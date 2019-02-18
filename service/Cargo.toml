@@ -1,0 +1,15 @@
+[package]
+name = "umaru-service"
+version = "0.1.0"
+authors = ["Cryptape Technologies <contact@cryptape.com>"]
+edition = "2018"
+license = "Apache-2.0"
+
+[lib]
+name = "umaru_service"
+
+[dependencies]
+umaru-proto = { path = "../proto" }
+failure = "0.1.3"
+futures = "0.1.25"
+bytes = "0.4.11"

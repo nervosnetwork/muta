@@ -1,0 +1,128 @@
+syntax = "proto3";
+
+// transaction - 232 + len(data) bytes
+message Transaction {
+    // bytes20(Address) - address deal with this tx
+    bytes to = 1;
+    // length <= 128
+    string nonce = 2;
+    uint64 quota = 3;
+    uint64 valid_until_block = 4;
+    bytes data = 5;
+    // bytes32(uint256)
+    bytes value = 6;
+    // bytes32(uint256)
+    bytes chain_id = 7;
+    uint32 version = 8;
+}
+
+enum Crypto {
+    SECP = 0;
+}
+
+// user use this structure
+message UnverifiedTransaction {
+    Transaction transaction = 1;
+    // sign hash of Transaction
+    bytes signature = 2;
+    Crypto crypto = 3;
+}
+
+// transaction in chain
+message SignedTransaction {
+    UnverifiedTransaction transaction_with_sig = 1;
+    // bytes32(H256) - UnverifiedTransaction hash
+    bytes utx_hash = 2;
+    // public key of signature
+    bytes public = 3;
+}
+
+// block
+enum ProofType {
+    Bft = 0;
+}
+
+message Proof {
+    // produced by Consensus
+    bytes votes = 1;
+    ProofType type = 2;
+}
+
+// 180 + len(proof)
+message BlockHeader {
+    // bytes32(H256) - hash of prev block header
+    bytes prevhash = 1;
+    // ms since 1970-1-1
+    uint64 timestamp = 2;
+    uint64 height = 3;
+    // bytes32(H256)
+    bytes transactions_root = 4;
+    // bytes32(H256)
+    bytes state_root = 5;
+    // bytes32(H256)
+    bytes receipts_root = 6;
+    uint64 quota_used = 7;
+    uint64 quota_limit = 8;
+    Proof proof = 9;
+    // bytes20 - address of proposer
+    bytes proposer = 10;
+}
+
+message BlockBody {
+    // bytes32(H256) - array of utx hash
+    repeated bytes utx_hashes = 1;
+}
+
+// proposal block same as Block
+message Block {
+    uint32 version = 1;
+    BlockHeader header = 2;
+    BlockBody body = 3;
+}
+
+// executor
+enum ReceiptError {
+    //ExecutionError
+    NotEnoughBaseQuota = 0;
+    BlockQuotaLimitReached = 1;
+    AccountQuotaLimitReached = 2;
+    InvalidTransactionNonce = 3;
+    NotEnoughCash = 4;
+    NoTransactionPermission = 5;
+    NoContractPermission = 6;
+    NoCallPermission = 7;
+    ExecutionInternal = 8;
+    TransactionMalformed = 9;
+    //EvmError
+    OutOfQuota = 10;
+    BadJumpDestination = 11;
+    BadInstruction = 12;
+    StackUnderflow = 13;
+    OutOfStack = 14;
+    Internal = 15;
+    MutableCallInStaticContext = 16;
+    OutOfBounds = 17;
+    Reverted = 18;
+}
+
+message LogEntry {
+    // bytes20(Address) - contract address deal with this tx
+    bytes address = 1;
+    // bytes32(H256)
+    repeated bytes topics = 2;
+    bytes data = 3;
+}
+
+message Receipt {
+    // bytes32(H256)
+    bytes state_root = 1;
+    // bytes32(U256) - quota used by this tx
+    bytes quota_used = 2;
+    // bytes256(2048bit)
+    bytes log_bloom = 3;
+    repeated LogEntry logs = 4;
+    ReceiptError error = 5;
+    uint64 account_nonce = 6;
+    // bytes32(H256)
+    bytes transaction_hash = 7;
+}

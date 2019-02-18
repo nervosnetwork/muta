@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package cita.common;
+
+message Result {
+  uint32 code = 1;
+  string msg = 2;
+}
+
+message Empty {
+}
+
+message NodeId {
+  string node_id = 1;
+}

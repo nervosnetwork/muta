@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+import "blockchain.proto";
+import "common.proto";
+
+package cita.chain;
+
+message AddBlockResp {
+  cita.common.Result result = 1;
+  uint64 height = 2;
+  bytes block_hash = 3;
+}
+
+message BlockHeight {
+  uint64 height = 1;
+}
+
+message TransactionHash {
+  bytes hash = 1;
+}
+
+message Data {
+  bytes data = 1;
+}
+
+message CallResp {
+  cita.common.Result result = 1;
+  bytes data = 2;
+}
+
+message SignedTransactionResp {
+  cita.common.Result result = 1;
+  SignedTransaction signed_tx = 2;
+}
+
+message BlockResp {
+  cita.common.Result result = 1;
+  Block block = 2;
+}
+
+message ReceiptResp {
+  cita.common.Result result = 1;
+  Receipt receipt = 2;
+}
+
+service ChainService {
+  rpc AddBlock(Block) returns (AddBlockResp);
+  rpc GetBlock(BlockHeight) returns (BlockResp);
+  rpc GetReceipt(TransactionHash) returns (ReceiptResp);
+  rpc GetTransaction(TransactionHash) returns (SignedTransactionResp);
+  rpc Call(Data) returns (CallResp);
+}

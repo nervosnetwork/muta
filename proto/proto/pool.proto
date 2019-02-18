@@ -1,0 +1,83 @@
+syntax = "proto3";
+
+import "blockchain.proto";
+import "common.proto";
+
+package cita.pool;
+
+enum UnverifiedTransactionResult {
+  OK = 0;
+  INVALID_NONCE = 1;
+  DUP = 2;
+  INVALID_UNTIL_BLOCK = 3;
+  BAD_SIG = 4;
+  NOT_READY = 5;
+  BUSY = 6;
+  BAD_CHAIN_ID = 7;
+  QUOTA_NOT_ENOUGH = 8;
+  FORBIDDEN = 9;
+  INVALID_VALUE = 10;
+  INVALID_VERSION = 11;
+  INVALID_TO = 12;
+}
+
+message UnverifiedTransactionHashes {
+  cita.common.NodeId node_id = 1;
+  repeated bytes hashes = 2;
+}
+
+message UnverifiedTransactionHashesResp {
+  cita.common.Result result = 1;
+  UnverifiedTransactionHashes utx_hashes = 2;
+}
+
+message UnverifiedTransactions {
+  cita.common.NodeId node_id = 1;
+  repeated UnverifiedTransaction transactions = 2;
+}
+
+message AccountQuotaLimit {
+  uint64 common_quota_limit = 1;
+  map<string, uint64> specific_quota_limit = 2;
+}
+
+message GlobalPoolConfig {
+  uint64 height = 1;
+  uint64 block_quota_limit = 3;
+  AccountQuotaLimit account_quota_limit = 4;
+  bool account_quota_checking = 5;
+  bytes emergency_admin = 6;
+  uint32 version = 7;
+}
+
+message UnverifiedProposalBlock {
+  UnverifiedTransactionHashes hashes = 1;
+  uint64 height = 2;
+}
+
+message UnverifiedSyncBlock {
+  UnverifiedTransactionHashes hashes = 1;
+  uint64 height = 2;
+}
+
+message ConfirmedBlock {
+  UnverifiedTransactionHashes hashes = 1;
+  uint64 height = 2;
+}
+
+service PoolService {
+  rpc AddUnverifiedTransaction(UnverifiedTransaction)
+      returns (cita.common.Result);
+  rpc AddBatchUnverifiedTransactions(UnverifiedTransactions)
+      returns (cita.common.Result);
+  rpc SyncUnverifiedTransactionHashes(UnverifiedTransactionHashes)
+      returns (cita.common.Result);
+  rpc PackUnverifiedTransactionHashes(GlobalPoolConfig)
+      returns (UnverifiedTransactionHashesResp);
+  rpc CheckUnverifiedProposalBlock(UnverifiedProposalBlock)
+      returns (cita.common.Result);
+  rpc CheckUnverifiedSyncBlock(UnverifiedSyncBlock)
+      returns (cita.common.Result);
+  rpc FlushConfirmedBlock(ConfirmedBlock)
+      returns (cita.common.Result);
+}

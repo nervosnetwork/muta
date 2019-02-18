@@ -1,0 +1,15 @@
+[workspace]
+members = ["umaru"
+, "service"
+, "grpc"
+, "examples/pool"
+, "examples/monolith-chain"
+, "proto"
+]
+
+default-members = ["umaru"
+, "service"
+, "examples/pool"
+, "examples/monolith-chain"
+, "proto"
+]

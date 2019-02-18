@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+import "blockchain.proto";
+import "common.proto";
+import "pool.proto";
+import "consensus.proto";
+import "sync.proto";
+
+package cita.net;
+
+service NetworkService {
+  // (to/from) Pool
+
+  rpc ForwardUnverifiedTransaction(UnverifiedTransaction)
+      returns (cita.common.Result);
+  rpc SendUnverifiedTransactionHashes(cita.pool.UnverifiedTransactionHashes)
+      returns (cita.common.Result);
+  rpc SendUnverifiedTransactions(cita.pool.UnverifiedTransactions)
+      returns (cita.common.Result);
+
+  // (from) Consensus
+
+  rpc BroadcastConsensusMessage(cita.consensus.Message)
+      returns (cita.common.Result);
+
+  // (to) Sync
+
+  rpc BroadcastNewStatus(cita.sync.Status)
+      returns (cita.common.Result);
+  rpc SendSyncRequest(cita.sync.SyncRequest)
+      returns (cita.common.Result);
+  rpc SendSyncResponse(cita.sync.SyncResp)
+      returns (cita.common.Result);
+}
