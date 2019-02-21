@@ -1,7 +1,7 @@
 use futures::future::Future;
 use std::default::Default;
 use std::{thread, time};
-use umaru::{client::rpc::Client, proto::blockchain, service::PoolService};
+use muta::{client::rpc::Client, proto::blockchain, service::PoolService};
 
 fn main() {
     let client = Client::new().unwrap();

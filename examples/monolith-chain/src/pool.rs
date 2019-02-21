@@ -1,6 +1,6 @@
 use futures::future;
-use umaru::prelude::*;
-use umaru::{
+use muta::prelude::*;
+use muta::{
     proto::{blockchain::*, common::*, pool::*},
     service::PoolService,
 };

@@ -1,6 +1,6 @@
 use futures::future::Future;
 use std::{thread, time};
-use umaru::{proto::blockchain, service::PoolService};
+use muta::{proto::blockchain, service::PoolService};
 
 mod pool;
 

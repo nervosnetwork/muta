@@ -17,7 +17,7 @@ macro_rules! rename_import {
             }
 
             import! {
-                pub use umaru_proto::"grpc_module"::{"service" as "renamed_service", "server" as "renamed_server", "client" as "renamed_client"};
+                pub use muta_proto::"grpc_module"::{"service" as "renamed_service", "server" as "renamed_server", "client" as "renamed_client"};
                 pub use crate::service::"service" as "renamed_server_service";
             }
         }
@@ -26,11 +26,11 @@ macro_rules! rename_import {
 }
 
 pub(crate) mod proto {
-    pub use umaru_proto::*;
+    pub use muta_proto::*;
 }
 
 pub(crate) mod service {
-    pub use umaru_service::*;
+    pub use muta_service::*;
 }
 
 // for example: PoolService as GrpcPoolService, PoolServiceServer as GrpcPoolServer

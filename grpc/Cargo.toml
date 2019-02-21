@@ -1,16 +1,16 @@
 [package]
-name = "umaru-grpc"
+name = "muta-grpc"
 version = "0.1.0"
 authors = ["Cryptape Technologies <contact@cryptape.com>"]
 edition = "2018"
 license = "Apache-2.0"
 
 [lib]
-name = "umaru_grpc"
+name = "muta_grpc"
 
 [dependencies]
-umaru-proto = { path = "../proto", features = ["with-grpc"] }
-umaru-service = { path = "../service" }
+muta-proto = { path = "../proto", features = ["with-grpc"] }
+muta-service = { path = "../service" }
 dotenv = "0.13.0"
 mashup = "0.1.9"
 failure = "0.1.3"

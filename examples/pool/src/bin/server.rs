@@ -4,8 +4,8 @@ use std::thread;
 use futures::future;
 use lazy_static::lazy_static;
 
-use umaru::prelude::*;
-use umaru::{
+use muta::prelude::*;
+use muta::{
     proto::{blockchain, common, pool::*},
     server::PoolServer,
     service::PoolService,

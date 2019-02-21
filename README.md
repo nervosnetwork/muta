@@ -1,6 +1,6 @@
-# umaru
+# muta
 
-"umaru" is just a project code name.
+"muta" is just a project code name.
 
 ## License
 
