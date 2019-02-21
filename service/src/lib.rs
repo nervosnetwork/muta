@@ -21,13 +21,13 @@ pub use self::response::FutResponse;
 
 pub(crate) mod proto {
     pub mod common {
-        pub use umaru_proto::blockchain::*;
-        pub use umaru_proto::common::*;
+        pub use muta_proto::blockchain::*;
+        pub use muta_proto::common::*;
     }
 
-    pub use umaru_proto::chain;
-    pub use umaru_proto::consensus;
-    pub use umaru_proto::executor;
-    pub use umaru_proto::pool;
-    pub use umaru_proto::sync;
+    pub use muta_proto::chain;
+    pub use muta_proto::consensus;
+    pub use muta_proto::executor;
+    pub use muta_proto::pool;
+    pub use muta_proto::sync;
 }

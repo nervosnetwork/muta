@@ -1,12 +1,12 @@
 [package]
-name = "umaru-proto"
+name = "muta-proto"
 version = "0.1.0"
 authors = ["Cryptape Technologies <contact@cryptape.com>"]
 edition = "2018"
 license = "Apache-2.0"
 
 [lib]
-name = "umaru_proto"
+name = "muta_proto"
 
 [dependencies]
 protobuf = "2.2.5"
