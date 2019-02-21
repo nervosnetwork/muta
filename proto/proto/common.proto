@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package cita.common;
+package common;
 
 message Result {
   uint32 code = 1;

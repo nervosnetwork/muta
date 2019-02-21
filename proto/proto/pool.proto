@@ -3,7 +3,7 @@ syntax = "proto3";
 import "blockchain.proto";
 import "common.proto";
 
-package cita.pool;
+package pool;
 
 enum UnverifiedTransactionResult {
   OK = 0;
@@ -22,18 +22,18 @@ enum UnverifiedTransactionResult {
 }
 
 message UnverifiedTransactionHashes {
-  cita.common.NodeId node_id = 1;
+  common.NodeId node_id = 1;
   repeated bytes hashes = 2;
 }
 
 message UnverifiedTransactionHashesResp {
-  cita.common.Result result = 1;
+  common.Result result = 1;
   UnverifiedTransactionHashes utx_hashes = 2;
 }
 
 message UnverifiedTransactions {
-  cita.common.NodeId node_id = 1;
-  repeated UnverifiedTransaction transactions = 2;
+  common.NodeId node_id = 1;
+  repeated blockchain.UnverifiedTransaction transactions = 2;
 }
 
 message AccountQuotaLimit {
@@ -66,18 +66,18 @@ message ConfirmedBlock {
 }
 
 service PoolService {
-  rpc AddUnverifiedTransaction(UnverifiedTransaction)
-      returns (cita.common.Result);
+  rpc AddUnverifiedTransaction(blockchain.UnverifiedTransaction)
+      returns (common.Result);
   rpc AddBatchUnverifiedTransactions(UnverifiedTransactions)
-      returns (cita.common.Result);
+      returns (common.Result);
   rpc SyncUnverifiedTransactionHashes(UnverifiedTransactionHashes)
-      returns (cita.common.Result);
+      returns (common.Result);
   rpc PackUnverifiedTransactionHashes(GlobalPoolConfig)
       returns (UnverifiedTransactionHashesResp);
   rpc CheckUnverifiedProposalBlock(UnverifiedProposalBlock)
-      returns (cita.common.Result);
+      returns (common.Result);
   rpc CheckUnverifiedSyncBlock(UnverifiedSyncBlock)
-      returns (cita.common.Result);
+      returns (common.Result);
   rpc FlushConfirmedBlock(ConfirmedBlock)
-      returns (cita.common.Result);
+      returns (common.Result);
 }

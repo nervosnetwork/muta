@@ -1,20 +1,16 @@
-pub mod blockchain;
-pub mod chain;
-pub mod common;
-pub mod consensus;
-pub mod executor;
-pub mod pool;
-pub mod sync;
+macro_rules! generate_module_for {
+    ([$( $name:ident, )+]) => {
+        $( generate_module_for!($name); )+
+    };
+    ([$( $name:ident ),+]) => {
+        $( generate_module_for!($name); )+
+    };
+    ($name:ident) => {
+        pub mod $name {
+            use prost_derive::*;
+            include!(concat!(env!("OUT_DIR"), "/", stringify!($name), ".rs"));
+        }
+    };
+}
 
-#[cfg(feature = "with-grpc")]
-pub mod chain_grpc;
-#[cfg(feature = "with-grpc")]
-pub mod consensus_grpc;
-#[cfg(feature = "with-grpc")]
-pub mod executor_grpc;
-#[cfg(feature = "with-grpc")]
-pub mod network_grpc;
-#[cfg(feature = "with-grpc")]
-pub mod pool_grpc;
-#[cfg(feature = "with-grpc")]
-pub mod sync_grpc;
+generate_module_for!([blockchain, chain, common, consensus, executor, pool, sync]);

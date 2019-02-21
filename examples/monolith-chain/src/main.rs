@@ -1,6 +1,5 @@
 use futures::future::Future;
 use muta::{proto::blockchain, service::PoolService};
-
 use std::{thread, time};
 
 mod pool;
@@ -22,7 +21,7 @@ fn main() {
         let resp = dummy_pool.add_unverified_transaction(Default::default(), utx);
         println!("{:?}", resp.wait());
 
-        count = count + 1;
+        count += 1;
 
         thread::sleep(sleep_time);
     }

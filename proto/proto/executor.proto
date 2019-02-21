@@ -3,14 +3,14 @@ syntax = "proto3";
 import "blockchain.proto";
 import "common.proto";
 
-package cita.executor;
+package executor;
 
 // The error code in result should be ReceiptError
 message ExecutionResp {
-  cita.common.Result result = 1;
-  Receipt receipt = 2;
+  common.Result result = 1;
+  blockchain.Receipt receipt = 2;
 }
 
 service ExecutorService {
-  rpc Apply(SignedTransaction) returns (ExecutionResp);
+  rpc Apply(blockchain.SignedTransaction) returns (ExecutionResp);
 }

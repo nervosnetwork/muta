@@ -3,37 +3,37 @@ syntax = "proto3";
 import "blockchain.proto";
 import "common.proto";
 
-package cita.sync;
+package sync;
 
 message Status {
-  cita.common.NodeId node_id = 1;
+  common.NodeId node_id = 1;
 
   uint64 height = 2;
   bytes block_hash = 3;
 }
 
 message SyncRequest {
-  cita.common.NodeId node_id = 1;
+  common.NodeId node_id = 1;
 
   uint64 start_height = 2;
   uint64 end_height = 3;
 }
 
 message SyncResp {
-  cita.common.Result result = 1;
-  cita.common.NodeId node_id = 2;
+  common.Result result = 1;
+  common.NodeId node_id = 2;
 
-  repeated Block blocks = 3;
+  repeated blockchain.Block blocks = 3;
 }
 
 message PeerCountResp {
-  cita.common.Result result = 1;
+  common.Result result = 1;
   uint64 peer_count = 2;
 }
 
 service SyncService {
-  rpc UpdateStatus(Status) returns (cita.common.Result);
+  rpc UpdateStatus(Status) returns (common.Result);
   rpc ProcSyncRequest(SyncRequest) returns (SyncResp);
-  rpc ProcSyncResponse(SyncResp) returns (cita.common.Result);
-  rpc GetPeerCount(cita.common.Empty) returns (PeerCountResp);
+  rpc ProcSyncResponse(SyncResp) returns (common.Result);
+  rpc GetPeerCount(common.Empty) returns (PeerCountResp);
 }
