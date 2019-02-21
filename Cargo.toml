@@ -1,15 +1,15 @@
 [workspace]
 members = ["muta"
 , "service"
-, "grpc"
-, "examples/pool"
+#, "grpc"
+#, "examples/pool"
 , "examples/monolith-chain"
 , "proto"
 ]
 
 default-members = ["muta"
 , "service"
-, "examples/pool"
+#, "examples/pool"
 , "examples/monolith-chain"
 , "proto"
 ]
