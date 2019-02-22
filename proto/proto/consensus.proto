@@ -3,7 +3,7 @@ syntax = "proto3";
 import "blockchain.proto";
 import "common.proto";
 
-package cita.consensus;
+package consensus;
 
 message RichStatus {
   bytes hash = 1;
@@ -14,12 +14,12 @@ message RichStatus {
 }
 
 message Message {
-  cita.common.NodeId node_id = 1;
+  common.NodeId node_id = 1;
   bytes data = 2;
 }
 
 service ConsensusService {
-  rpc VerifyProof(Proof) returns (cita.common.Result);
-  rpc ProcConsensusMessage(Message) returns (cita.common.Result);
-  rpc SetStatus(RichStatus) returns (cita.common.Result);
+  rpc VerifyProof(blockchain.Proof) returns (common.Result);
+  rpc ProcConsensusMessage(Message) returns (common.Result);
+  rpc SetStatus(RichStatus) returns (common.Result);
 }

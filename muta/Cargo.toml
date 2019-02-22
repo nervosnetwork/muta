@@ -11,7 +11,9 @@ name = "muta"
 [dependencies]
 muta-proto = { path = "../proto" }
 muta-service = { path = "../service" }
-muta-grpc = { path = "../grpc", optional = true }
+#muta-grpc = { path = "../grpc", optional = true }
 
 [features]
-with-grpc = ["muta-grpc"]
+default = []
+with-grpc = []
+#with-grpc = ["muta-grpc"]

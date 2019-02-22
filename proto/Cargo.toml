@@ -9,17 +9,9 @@ license = "Apache-2.0"
 name = "muta_proto"
 
 [dependencies]
-protobuf = "2.2.5"
-grpc = { version = "0.6.1", optional = true }
-tls-api = { version = "0.1.20", optional = true }
-futures = { version = "0.1.25", optional = true }
-futures-cpupool = { version = "0.1.8", optional = true }
+bytes = "0.4.11"
+prost = "0.4.0"
+prost-derive = "0.4.0"
 
 [build-dependencies]
-protoc-rust-grpc = { version = "0.6.1", optional = true }
-protobuf-codegen-pure = { version = "2.2.5", optional = true }
-
-[features]
-default = ["no-grpc"]
-no-grpc = ["protobuf-codegen-pure"]
-with-grpc = ["protoc-rust-grpc", "grpc", "tls-api", "futures", "futures-cpupool"]
+prost-build = "0.4.0"

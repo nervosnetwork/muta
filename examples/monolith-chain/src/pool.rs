@@ -18,8 +18,8 @@ impl PoolService for DummyPool {
     ) -> FutResponse<common::Result> {
         println!("new unverifiedtransaction: {:?}", utx);
 
-        let mut ret = common::Result::new();
-        ret.set_code((UnverifiedTransactionResult::OK) as u32);
+        let mut ret = common::Result::default();
+        ret.code = UnverifiedTransactionResult::Ok as u32;
 
         Box::new(future::ok(ret))
     }

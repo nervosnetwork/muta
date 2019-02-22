@@ -6,29 +6,29 @@ import "pool.proto";
 import "consensus.proto";
 import "sync.proto";
 
-package cita.net;
+package net;
 
 service NetworkService {
   // (to/from) Pool
 
-  rpc ForwardUnverifiedTransaction(UnverifiedTransaction)
-      returns (cita.common.Result);
-  rpc SendUnverifiedTransactionHashes(cita.pool.UnverifiedTransactionHashes)
-      returns (cita.common.Result);
-  rpc SendUnverifiedTransactions(cita.pool.UnverifiedTransactions)
-      returns (cita.common.Result);
+  rpc ForwardUnverifiedTransaction(blockchain.UnverifiedTransaction)
+      returns (common.Result);
+  rpc SendUnverifiedTransactionHashes(pool.UnverifiedTransactionHashes)
+      returns (common.Result);
+  rpc SendUnverifiedTransactions(pool.UnverifiedTransactions)
+      returns (common.Result);
 
   // (from) Consensus
 
-  rpc BroadcastConsensusMessage(cita.consensus.Message)
-      returns (cita.common.Result);
+  rpc BroadcastConsensusMessage(consensus.Message)
+      returns (common.Result);
 
   // (to) Sync
 
-  rpc BroadcastNewStatus(cita.sync.Status)
-      returns (cita.common.Result);
-  rpc SendSyncRequest(cita.sync.SyncRequest)
-      returns (cita.common.Result);
-  rpc SendSyncResponse(cita.sync.SyncResp)
-      returns (cita.common.Result);
+  rpc BroadcastNewStatus(sync.Status)
+      returns (common.Result);
+  rpc SendSyncRequest(sync.SyncRequest)
+      returns (common.Result);
+  rpc SendSyncResponse(sync.SyncResp)
+      returns (common.Result);
 }

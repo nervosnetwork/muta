@@ -1,5 +1,7 @@
 syntax = "proto3";
 
+package blockchain;
+
 // transaction - 232 + len(data) bytes
 message Transaction {
     // bytes20(Address) - address deal with this tx

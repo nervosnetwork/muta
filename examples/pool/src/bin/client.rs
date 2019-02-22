@@ -24,7 +24,7 @@ fn main() {
             .add_unverified_transaction(Default::default(), utx);
         println!("{:?}", resp.wait());
 
-        count = count + 1;
+        count += 1;
 
         thread::sleep(sleep_time);
     }
