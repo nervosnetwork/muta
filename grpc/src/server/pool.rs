@@ -4,7 +4,11 @@ use grpc::{RequestOptions, SingleResponse};
 
 use crate::{
     grpc::GrpcPoolService,
-    proto::{blockchain::UnverifiedTransaction, common::Result as SrvResult, pool::*},
+    proto::pool::{
+        ConfirmedBlock, GlobalPoolConfig, UnverifiedProposalBlock, UnverifiedSyncBlock,
+        UnverifiedTransactionHashes, UnverifiedTransactionHashesResp, UnverifiedTransactions,
+    },
+    proto::{blockchain::UnverifiedTransaction, common::Result as SrvResult},
     service::{Context, PoolService},
     ContextExchange, FutResponseExt,
 };

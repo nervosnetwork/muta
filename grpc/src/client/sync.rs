@@ -1,6 +1,7 @@
 use crate::{
     grpc::{GrpcSyncClient, GrpcSyncService},
-    proto::{common::Result as SrvResult, sync::*},
+    proto::common::Result as SrvResult,
+    proto::sync::{PeerCountResp, Status, SyncRequest, SyncResp},
     service::{Context, FutResponse, SyncService},
     ContextExchange, SingleResponseExt,
 };

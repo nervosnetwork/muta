@@ -24,22 +24,15 @@ pub mod service {
 
 #[cfg(feature = "with-grpc")]
 pub mod server {
-    pub use muta_grpc::server::*;
+    pub use muta_grpc::server;
 
-    pub use chain::ChainServer;
-    pub use consensus::ConsensusServer;
-    pub use executor::ExecutorServer;
-    pub use network::NetworkServer;
-    pub use pool::PoolServer;
-    pub use sync::SyncServer;
+    pub use server::chain::ChainServer;
+    pub use server::consensus::ConsensusServer;
+    pub use server::executor::ExecutorServer;
+    pub use server::network::NetworkServer;
+    pub use server::pool::PoolServer;
+    pub use server::sync::SyncServer;
 }
 
 #[cfg(feature = "with-grpc")]
-pub mod client {
-    pub use muta_grpc::client_container::*;
-}
-
-pub mod prelude {
-    pub use crate::service::Context;
-    pub use crate::service::FutResponse;
-}
+pub use muta_grpc::client_container as client;

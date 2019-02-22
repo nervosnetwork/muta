@@ -1,3 +1,5 @@
+pub(crate) use muta_proto as proto;
+
 pub mod chain;
 pub mod consensus;
 pub mod executor;
@@ -18,16 +20,3 @@ pub use self::sync::SyncService;
 
 pub use self::context::Context;
 pub use self::response::FutResponse;
-
-pub(crate) mod proto {
-    pub mod common {
-        pub use muta_proto::blockchain::*;
-        pub use muta_proto::common::*;
-    }
-
-    pub use muta_proto::chain;
-    pub use muta_proto::consensus;
-    pub use muta_proto::executor;
-    pub use muta_proto::pool;
-    pub use muta_proto::sync;
-}

@@ -1,5 +1,9 @@
 use crate::{
-    proto::{chain::*, common::Block},
+    proto::blockchain::Block,
+    proto::chain::{
+        AddBlockResp, BlockHeight, BlockResp, CallResp, Data, ReceiptResp, SignedTransactionResp,
+        TransactionHash,
+    },
     Context, FutResponse,
 };
 

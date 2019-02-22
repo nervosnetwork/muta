@@ -1,6 +1,10 @@
 use crate::{
     grpc::{GrpcChainClient, GrpcChainService},
-    proto::{blockchain::Block, chain::*},
+    proto::blockchain::Block,
+    proto::chain::{
+        AddBlockResp, BlockHeight, BlockResp, CallResp, Data, ReceiptResp, SignedTransactionResp,
+        TransactionHash,
+    },
     service::{ChainService, Context, FutResponse},
     ContextExchange, SingleResponseExt,
 };

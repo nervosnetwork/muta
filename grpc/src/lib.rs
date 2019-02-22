@@ -25,13 +25,8 @@ macro_rules! rename_import {
     )
 }
 
-pub(crate) mod proto {
-    pub use muta_proto::*;
-}
-
-pub(crate) mod service {
-    pub use muta_service::*;
-}
+pub(crate) use muta_proto as proto;
+pub(crate) use muta_service as service;
 
 // for example: PoolService as GrpcPoolService, PoolServiceServer as GrpcPoolServer
 pub(crate) mod grpc {

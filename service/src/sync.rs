@@ -1,5 +1,6 @@
 use crate::{
-    proto::{common::Result as SrvResult, sync::*},
+    proto::common::Result as SrvResult,
+    proto::sync::{PeerCountResp, Status, SyncRequest, SyncResp},
     Context, FutResponse,
 };
 

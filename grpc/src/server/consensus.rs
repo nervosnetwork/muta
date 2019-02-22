@@ -4,7 +4,11 @@ use grpc::{RequestOptions, SingleResponse};
 
 use crate::{
     grpc::GrpcConsensusService,
-    proto::{blockchain::Proof, common::Result as SrvResult, consensus::*},
+    proto::{
+        blockchain::Proof,
+        common::Result as SrvResult,
+        consensus::{Message, RichStatus},
+    },
     service::{ConsensusService, Context},
     ContextExchange, FutResponseExt,
 };

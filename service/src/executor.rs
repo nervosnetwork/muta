@@ -1,5 +1,5 @@
 use crate::{
-    proto::{common::SignedTransaction, executor::ExecutionResp},
+    proto::{blockchain::SignedTransaction, executor::ExecutionResp},
     Context, FutResponse,
 };
 

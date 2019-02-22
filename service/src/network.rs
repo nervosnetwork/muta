@@ -1,8 +1,5 @@
 use crate::{
-    proto::{
-        common::{Result as SrvResult, UnverifiedTransaction},
-        consensus, pool, sync,
-    },
+    proto::{blockchain, common::Result as SrvResult, consensus, pool, sync},
     Context, FutResponse,
 };
 
@@ -10,7 +7,7 @@ pub trait NetworkService {
     fn forward_unverified_transaction(
         &self,
         ctx: Context,
-        utx: UnverifiedTransaction,
+        utx: blockchain::UnverifiedTransaction,
     ) -> FutResponse<SrvResult>;
 
     fn send_unverified_transaction_hashes(

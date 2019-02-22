@@ -4,7 +4,11 @@ use grpc::{RequestOptions, SingleResponse};
 
 use crate::{
     grpc::GrpcChainService,
-    proto::{blockchain::Block, chain::*},
+    proto::blockchain::Block,
+    proto::chain::{
+        AddBlockResp, BlockHeight, BlockResp, CallResp, Data, ReceiptResp, SignedTransactionResp,
+        TransactionHash,
+    },
     service::{ChainService, Context},
     ContextExchange, FutResponseExt,
 };

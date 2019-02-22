@@ -4,11 +4,15 @@ use std::thread;
 use futures::future;
 use lazy_static::lazy_static;
 
-use muta::prelude::*;
+use muta::proto::pool::{
+    ConfirmedBlock, GlobalPoolConfig, UnverifiedProposalBlock, UnverifiedSyncBlock,
+    UnverifiedTransactionHashes, UnverifiedTransactionHashesResp, UnverifiedTransactionResult,
+    UnverifiedTransactions,
+};
 use muta::{
-    proto::{blockchain, common, pool::*},
+    proto::{blockchain, common},
     server::PoolServer,
-    service::PoolService,
+    service::{Context, FutResponse, PoolService},
 };
 
 lazy_static! {

@@ -1,7 +1,8 @@
 use crate::{
     proto::{
-        common::{Proof, Result as SrvResult},
-        consensus::*,
+        blockchain::Proof,
+        common::Result as SrvResult,
+        consensus::{Message, RichStatus},
     },
     Context, FutResponse,
 };

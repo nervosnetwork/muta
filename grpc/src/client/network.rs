@@ -1,8 +1,6 @@
 use crate::{
     grpc::{GrpcNetworkClient, GrpcNetworkService},
-    proto::{
-        blockchain::UnverifiedTransaction, common::Result as SrvResult, consensus, pool, sync,
-    },
+    proto::{blockchain, common::Result as SrvResult, consensus, pool, sync},
     service::{Context, FutResponse, NetworkService},
     ContextExchange, SingleResponseExt,
 };
@@ -17,7 +15,7 @@ impl NetworkService for NetworkClient {
     fn forward_unverified_transaction(
         &self,
         ctx: Context,
-        utx: UnverifiedTransaction,
+        utx: blockchain::UnverifiedTransaction,
     ) -> FutResponse<SrvResult> {
         self.client
             .forward_unverified_transaction(ctx.into_rpc_context(), utx)

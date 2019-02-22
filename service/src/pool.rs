@@ -1,7 +1,9 @@
 use crate::{
-    proto::{
-        common::{Result as SrvResult, UnverifiedTransaction},
-        pool::*,
+    proto::blockchain::UnverifiedTransaction,
+    proto::common::Result as SrvResult,
+    proto::pool::{
+        ConfirmedBlock, GlobalPoolConfig, UnverifiedProposalBlock, UnverifiedSyncBlock,
+        UnverifiedTransactionHashes, UnverifiedTransactionHashesResp, UnverifiedTransactions,
     },
     Context, FutResponse,
 };

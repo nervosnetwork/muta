@@ -1,9 +1,12 @@
 use futures::future;
-use muta::prelude::*;
-use muta::{
-    proto::{blockchain::*, common::*, pool::*},
-    service::PoolService,
+use muta::proto::blockchain::UnverifiedTransaction;
+use muta::proto::common;
+use muta::proto::pool::{
+    ConfirmedBlock, GlobalPoolConfig, UnverifiedProposalBlock, UnverifiedSyncBlock,
+    UnverifiedTransactionHashes, UnverifiedTransactionHashesResp, UnverifiedTransactionResult,
+    UnverifiedTransactions,
 };
+use muta::service::{Context, FutResponse, PoolService};
 
 pub struct DummyPool {}
 
@@ -12,10 +15,10 @@ impl PoolService for DummyPool {
         &self,
         _ctx: Context,
         utx: UnverifiedTransaction,
-    ) -> FutResponse<Result> {
+    ) -> FutResponse<common::Result> {
         println!("new unverifiedtransaction: {:?}", utx);
 
-        let mut ret = Result::new();
+        let mut ret = common::Result::new();
         ret.set_code((UnverifiedTransactionResult::OK) as u32);
 
         Box::new(future::ok(ret))
@@ -25,7 +28,7 @@ impl PoolService for DummyPool {
         &self,
         _ctx: Context,
         _unverified_transactions: UnverifiedTransactions,
-    ) -> FutResponse<Result> {
+    ) -> FutResponse<common::Result> {
         unimplemented!()
     }
 
@@ -33,7 +36,7 @@ impl PoolService for DummyPool {
         &self,
         _ctx: Context,
         _unverified_transaction_hashes: UnverifiedTransactionHashes,
-    ) -> FutResponse<Result> {
+    ) -> FutResponse<common::Result> {
         unimplemented!()
     }
 
@@ -49,7 +52,7 @@ impl PoolService for DummyPool {
         &self,
         _ctx: Context,
         _unverified_proposal_block: UnverifiedProposalBlock,
-    ) -> FutResponse<Result> {
+    ) -> FutResponse<common::Result> {
         unimplemented!()
     }
 
@@ -57,7 +60,7 @@ impl PoolService for DummyPool {
         &self,
         _ctx: Context,
         _unverified_sync_block: UnverifiedSyncBlock,
-    ) -> FutResponse<Result> {
+    ) -> FutResponse<common::Result> {
         unimplemented!()
     }
 
@@ -65,7 +68,7 @@ impl PoolService for DummyPool {
         &self,
         _ctx: Context,
         _confirmed_block: ConfirmedBlock,
-    ) -> FutResponse<Result> {
+    ) -> FutResponse<common::Result> {
         unimplemented!()
     }
 }
