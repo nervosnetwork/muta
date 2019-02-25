@@ -1,15 +1,26 @@
-[workspace]
-members = ["muta"
-, "service"
-#, "grpc"
-#, "examples/pool"
-, "examples/monolith-chain"
-, "proto"
-]
+[package]
+name = "muta"
+version = "0.1.0"
+authors = ["Cryptape Technologies <contact@cryptape.com>"]
+edition = "2018"
 
-default-members = ["muta"
-, "service"
-#, "examples/pool"
-, "examples/monolith-chain"
-, "proto"
+[dependencies]
+transaction-pool = { path = "components/transaction-pool" }
+database = { path = "components/database" }
+core-storage = { path = "core/storage" }
+
+[workspace]
+members = [
+  "core/types",
+  "core/runtime",
+  "core/consensus",
+  "core/storage",
+  "core/p2p",
+  "core/evm",
+
+  "components/transaction-pool",
+  "components/database",
+  "components/jsonrpc",
+  "components/network",
+  "components/executor",
 ]

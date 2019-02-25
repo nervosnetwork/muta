@@ -1,0 +1,13 @@
+[package]
+name = "core-runtime"
+version = "0.1.0"
+authors = ["Cryptape Technologies <contact@cryptape.com>"]
+edition = "2018"
+license = "Apache-2.0"
+
+[dependencies]
+core-types = { path = "../types" }
+
+failure = "0.1.3"
+futures = "0.1.17"
+bytes = "0.4.11"

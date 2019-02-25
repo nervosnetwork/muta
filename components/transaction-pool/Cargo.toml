@@ -1,0 +1,13 @@
+[package]
+name = "transaction-pool"
+version = "0.1.0"
+authors = ["Cryptape Technologies <contact@cryptape.com>"]
+edition = "2018"
+
+[dependencies]
+core-types = { path = "../../core/types" }
+core-runtime = { path = "../../core/runtime" }
+core-storage = { path = "../../core/storage" }
+
+failure = "0.1.3"
+futures = "0.1.17"
