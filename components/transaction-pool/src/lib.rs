@@ -8,6 +8,8 @@ use core_types::{Hash, SignedTransaction, UnverifiedTransaction};
 
 use crate::errors::TransactionPoolError;
 
+// TODO: remove this
+#[allow(dead_code)]
 pub struct TransactionPool<'db, DB, O, V>
 where
     DB: Database,
@@ -28,42 +30,42 @@ where
 {
     pub fn new(storage: Storage<'db, DB>, order: O, verifier: V) -> Self {
         TransactionPool {
-            storage: storage,
+            storage,
 
-            order: order,
-            verifier: verifier,
+            order,
+            verifier,
         }
     }
 
     pub fn add(
         &self,
-        ctx: &Context,
-        untx: &UnverifiedTransaction,
+        _ctx: &Context,
+        _untx: &UnverifiedTransaction,
     ) -> FutRuntimeResult<SignedTransaction, TransactionPoolError> {
         unimplemented!()
     }
 
     pub fn package(
         &mut self,
-        ctx: &Context,
-        count_limit: u64,
-        quota_limit: u64,
+        _ctx: &Context,
+        _count_limit: u64,
+        _quota_limit: u64,
     ) -> FutRuntimeResult<[SignedTransaction], TransactionPoolError> {
         unimplemented!()
     }
 
     pub fn clean(
         &mut self,
-        ctx: &Context,
-        hashes: &[&Hash],
+        _ctx: &Context,
+        _hashes: &[&Hash],
     ) -> FutRuntimeResult<(), TransactionPoolError> {
         unimplemented!()
     }
 
     pub fn check(
         &self,
-        ctx: &Context,
-        hashes: &[&Hash],
+        _ctx: &Context,
+        _hashes: &[&Hash],
     ) -> FutRuntimeResult<bool, TransactionPoolError> {
         unimplemented!()
     }

@@ -3,13 +3,17 @@ use core_types::{Block, Hash, Receipt, SignedTransaction};
 
 use crate::errors::StorageError;
 
-const PREFIX_LATEST_BLOCK: &'static [u8] = b"latest-block";
-const PREFIX_BLOCK_HEIGHT_BY_HASH: &'static [u8] = b"block-hash-";
-const PREFIX_BLOCK_HEIGHT: &'static [u8] = b"block-height-";
-
-const PREFIX_TRANSACTION: &'static [u8] = b"transaction-";
-
-const PREFIX_RECEIPT: &'static [u8] = b"receipt-";
+// TODO: remove these 'allow(dead_code)'
+#[allow(dead_code)]
+const PREFIX_LATEST_BLOCK: &[u8] = b"latest-block";
+#[allow(dead_code)]
+const PREFIX_BLOCK_HEIGHT_BY_HASH: &[u8] = b"block-hash-";
+#[allow(dead_code)]
+const PREFIX_BLOCK_HEIGHT: &[u8] = b"block-height-";
+#[allow(dead_code)]
+const PREFIX_TRANSACTION: &[u8] = b"transaction-";
+#[allow(dead_code)]
+const PREFIX_RECEIPT: &[u8] = b"receipt-";
 
 /// "storage" is responsible for the storage and retrieval of blockchain data.
 /// Block, transaction, and receipt can be obtained from here,
@@ -62,6 +66,8 @@ pub trait Storage: Send + Sync {
     fn insert_receipts(&self, receipts: &[&Receipt]) -> FutRuntimeResult<(), Self::Error>;
 }
 
+// TODO: remove this
+#[allow(dead_code)]
 pub struct BlockStorage<DB>
 where
     DB: Database,
@@ -74,7 +80,7 @@ where
     DB: Database,
 {
     pub fn new(db: DB) -> Self {
-        BlockStorage { db: db }
+        BlockStorage { db }
     }
 }
 
@@ -89,51 +95,51 @@ where
         unimplemented!()
     }
 
-    fn get_block_by_height(&self, height: u64) -> FutRuntimeResult<Option<Block>, Self::Error> {
+    fn get_block_by_height(&self, _height: u64) -> FutRuntimeResult<Option<Block>, Self::Error> {
         unimplemented!()
     }
 
-    fn get_block_by_hash(&self, hash: &Hash) -> FutRuntimeResult<Option<Block>, Self::Error> {
+    fn get_block_by_hash(&self, _hash: &Hash) -> FutRuntimeResult<Option<Block>, Self::Error> {
         unimplemented!()
     }
 
     fn get_transaction(
         &self,
-        hash: &Hash,
+        _hash: &Hash,
     ) -> FutRuntimeResult<Option<SignedTransaction>, Self::Error> {
         unimplemented!()
     }
 
     fn get_transactions(
         &self,
-        hashes: &[&Hash],
+        _hashes: &[&Hash],
     ) -> FutRuntimeResult<Vec<Option<SignedTransaction>>, Self::Error> {
         unimplemented!()
     }
 
-    fn get_receipt(&self, hash: &Hash) -> FutRuntimeResult<Option<Receipt>, Self::Error> {
+    fn get_receipt(&self, _hash: &Hash) -> FutRuntimeResult<Option<Receipt>, Self::Error> {
         unimplemented!()
     }
 
     fn get_receipts(
         &self,
-        hashes: &[&Hash],
+        _hashes: &[&Hash],
     ) -> FutRuntimeResult<Vec<Option<Receipt>>, Self::Error> {
         unimplemented!()
     }
 
-    fn insert_block(&self, block: &Block) -> FutRuntimeResult<(), Self::Error> {
+    fn insert_block(&self, _block: &Block) -> FutRuntimeResult<(), Self::Error> {
         unimplemented!()
     }
 
     fn insert_transactions(
         &self,
-        signed_txs: &[&SignedTransaction],
+        _signed_txs: &[&SignedTransaction],
     ) -> FutRuntimeResult<(), Self::Error> {
         unimplemented!()
     }
 
-    fn insert_receipts(&self, receipts: &[&Receipt]) -> FutRuntimeResult<(), Self::Error> {
+    fn insert_receipts(&self, _receipts: &[&Receipt]) -> FutRuntimeResult<(), Self::Error> {
         unimplemented!()
     }
 }
