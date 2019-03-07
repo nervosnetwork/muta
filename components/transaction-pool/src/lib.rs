@@ -3,32 +3,31 @@ pub mod order;
 pub mod verifier;
 
 use core_runtime::{Context, Database, FutRuntimeResult, Order, Verifier};
-use core_storage::storage::Storage;
 use core_types::{Hash, SignedTransaction, UnverifiedTransaction};
 
 use crate::errors::TransactionPoolError;
 
 // TODO: remove this
 #[allow(dead_code)]
-pub struct TransactionPool<'db, DB, O, V>
+pub struct TransactionPool<DB, O, V>
 where
     DB: Database,
     O: Order,
     V: Verifier,
 {
-    storage: Storage<'db, DB>,
+    storage: DB,
 
     order: O,
     verifier: V,
 }
 
-impl<'db, DB, O, V> TransactionPool<'db, DB, O, V>
+impl<DB, O, V> TransactionPool<DB, O, V>
 where
     DB: Database,
     O: Order,
     V: Verifier,
 {
-    pub fn new(storage: Storage<'db, DB>, order: O, verifier: V) -> Self {
+    pub fn new(storage: DB, order: O, verifier: V) -> Self {
         TransactionPool {
             storage,
 
