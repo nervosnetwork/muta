@@ -8,7 +8,7 @@ fn main() {
 
     let order = FIFO::new();
     let verifier = SECP256K1Verifier::new();
-    let tx_pool = TransactionPool::new(storage, order, verifier);
+    let _tx_pool = TransactionPool::new(storage, order, verifier);
 
     println!("hello world");
 }

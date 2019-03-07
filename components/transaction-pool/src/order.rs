@@ -9,6 +9,8 @@ use crate::errors::OrderError;
 #[derive(Debug)]
 pub struct FIFO {}
 
+// TODO: remove this
+#[allow(clippy::new_without_default)]
 impl FIFO {
     pub fn new() -> Self {
         FIFO {}
@@ -20,24 +22,24 @@ impl Order for FIFO {
 
     fn insert(
         &mut self,
-        ctx: &Context,
-        signed_tx: SignedTransaction,
+        _ctx: &Context,
+        _signed_tx: SignedTransaction,
     ) -> FutRuntimeResult<(), Self::Error> {
         unimplemented!()
     }
 
-    fn get_batch(&mut self, ctx: &Context, count: u64) -> FutRuntimeResult<&[Hash], Self::Error> {
+    fn get_batch(&mut self, _ctx: &Context, _count: u64) -> FutRuntimeResult<&[Hash], Self::Error> {
         unimplemented!()
     }
 
-    fn flush(&mut self, ctx: &Context, hashes: &[&Hash]) -> FutRuntimeResult<(), Self::Error> {
+    fn flush(&mut self, _ctx: &Context, _hashes: &[&Hash]) -> FutRuntimeResult<(), Self::Error> {
         unimplemented!()
     }
 
     fn get(
         &mut self,
-        ctx: &Context,
-        hash: &Hash,
+        _ctx: &Context,
+        _hash: &Hash,
     ) -> FutRuntimeResult<&[&SignedTransaction], Self::Error> {
         unimplemented!()
     }

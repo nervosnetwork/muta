@@ -6,6 +6,8 @@ use crate::errors::VerifierError;
 #[derive(Debug)]
 pub struct SECP256K1Verifier {}
 
+// TODO: remove this
+#[allow(clippy::new_without_default)]
 impl SECP256K1Verifier {
     pub fn new() -> Self {
         SECP256K1Verifier {}
@@ -17,8 +19,8 @@ impl Verifier for SECP256K1Verifier {
 
     fn unverified_transaction(
         &self,
-        ctx: &Context,
-        untx: UnverifiedTransaction,
+        _ctx: &Context,
+        _untx: UnverifiedTransaction,
     ) -> FutRuntimeResult<SignedTransaction, Self::Error> {
         unimplemented!()
     }
