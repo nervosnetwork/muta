@@ -1,7 +1,8 @@
-use std::convert::From;
+use std::convert::{AsRef, From};
 use std::fmt;
 
 use numext_fixed_hash::{H160, H256};
+use rlp::{Encodable, RlpStream};
 use sha3::{Digest, Sha3_256};
 
 const ADDRESS_LEN: usize = 20;
@@ -23,9 +24,31 @@ impl From<[u8; ADDRESS_LEN]> for Address {
     }
 }
 
+impl From<&[u8]> for Address {
+    fn from(data: &[u8]) -> Self {
+        let mut arr = [0u8; 20];
+        arr.copy_from_slice(&data[..]);
+        Address(H160::from(arr))
+    }
+}
+
+impl AsRef<[u8]> for Address {
+    fn as_ref(&self) -> &[u8] {
+        self.0.as_bytes()
+    }
+}
+
 impl fmt::Debug for Address {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", hex::encode(self.0.as_bytes()))
+    }
+}
+
+/// Structure encodable to RLP
+impl Encodable for Address {
+    /// Append a value to the stream
+    fn rlp_append(&self, s: &mut RlpStream) {
+        s.append(&self.0.as_bytes());
     }
 }
 
@@ -52,8 +75,22 @@ impl From<[u8; HASH_LEN]> for Hash {
     }
 }
 
+impl AsRef<[u8]> for Hash {
+    fn as_ref(&self) -> &[u8] {
+        self.0.as_bytes()
+    }
+}
+
 impl fmt::Debug for Hash {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", hex::encode(self.0.as_bytes()))
+    }
+}
+
+/// Structure encodable to RLP
+impl Encodable for Hash {
+    /// Append a value to the stream
+    fn rlp_append(&self, s: &mut RlpStream) {
+        s.append(&self.0.as_bytes());
     }
 }
