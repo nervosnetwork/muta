@@ -7,6 +7,10 @@ edition = "2018"
 [dependencies]
 core-types = { path = "../types" }
 core-runtime = { path = "../runtime" }
+core-serialization = { path = "../serialization" }
 
+bytes = "0.4.11"
 failure = "0.1.3"
 futures = "0.1.17"
+prost = "0.4.0"
+byteorder = "1.3.1"
