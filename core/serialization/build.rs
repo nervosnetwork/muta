@@ -1,5 +1,8 @@
 const INCLUDES: &'static [&'static str] = &["proto/"];
 const INPUTS: &'static [&'static str] = &[
+    "proto/block.proto",
+    "proto/transaction.proto",
+    "proto/receipt.proto",
     "proto/chain.proto",
     "proto/common.proto",
     "proto/consensus.proto",

@@ -13,4 +13,15 @@ macro_rules! generate_module_for {
     };
 }
 
-generate_module_for!([blockchain, chain, common, consensus, executor, pool, sync]);
+generate_module_for!([
+    block,
+    transaction,
+    receipt,
+    blockchain,
+    chain,
+    common,
+    consensus,
+    executor,
+    pool,
+    sync
+]);
