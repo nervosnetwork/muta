@@ -1,9 +1,7 @@
 use std::collections::HashMap;
 use std::sync::RwLock;
 
-use core_runtime::{Context, Database, FutRuntimeResult};
-
-use crate::errors::MemoryDBError;
+use core_runtime::{Database, DatabaseError, FutRuntimeResult};
 
 // TODO: remove this
 #[allow(dead_code)]
@@ -13,51 +11,38 @@ pub struct MemoryDB {
 }
 
 impl Database for MemoryDB {
-    type Error = MemoryDBError;
-
-    fn get(&self, _ctx: &Context, _key: &[u8]) -> FutRuntimeResult<Option<Vec<u8>>, Self::Error> {
+    fn get(&self, _key: &[u8]) -> FutRuntimeResult<Vec<u8>, DatabaseError> {
         unimplemented!()
     }
 
     fn get_batch(
         &self,
-        _ctx: &Context,
-        _keys: &[&[u8]],
-    ) -> FutRuntimeResult<Vec<Option<Vec<u8>>>, Self::Error> {
+        _keys: &[Vec<u8>],
+    ) -> FutRuntimeResult<Vec<Option<Vec<u8>>>, DatabaseError> {
         unimplemented!()
     }
 
-    fn insert(
-        &mut self,
-        _ctx: &Context,
-        _key: &[u8],
-        _value: &[u8],
-    ) -> FutRuntimeResult<(), Self::Error> {
+    fn insert(&mut self, _key: &[u8], _value: &[u8]) -> FutRuntimeResult<(), DatabaseError> {
         unimplemented!()
     }
 
     fn insert_batch(
         &mut self,
-        _ctx: &Context,
-        _keys: &[&[u8]],
-        _values: &[&[u8]],
-    ) -> FutRuntimeResult<(), Self::Error> {
+        _keys: &[Vec<u8>],
+        _values: &[Vec<u8>],
+    ) -> FutRuntimeResult<(), DatabaseError> {
         unimplemented!()
     }
 
-    fn contain(&self, _ctx: &Context, _key: &[u8]) -> FutRuntimeResult<bool, Self::Error> {
+    fn contain(&self, _key: &[u8]) -> FutRuntimeResult<bool, DatabaseError> {
         unimplemented!()
     }
 
-    fn remove(&mut self, _ctx: &Context, _key: &[u8]) -> FutRuntimeResult<(), Self::Error> {
+    fn remove(&mut self, _key: &[u8]) -> FutRuntimeResult<(), DatabaseError> {
         unimplemented!()
     }
 
-    fn remove_batch(
-        &mut self,
-        _ctx: &Context,
-        _keys: &[&[u8]],
-    ) -> FutRuntimeResult<(), Self::Error> {
+    fn remove_batch(&mut self, _keys: &[Vec<u8>]) -> FutRuntimeResult<(), DatabaseError> {
         unimplemented!()
     }
 }

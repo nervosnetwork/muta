@@ -1,33 +1,26 @@
-use crate::{Context, FutRuntimeResult};
+use crate::FutRuntimeResult;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DatabaseError {
+    NotFound,
+}
 
 pub trait Database: Send + Sync {
-    type Error;
+    fn get(&self, key: &[u8]) -> FutRuntimeResult<Vec<u8>, DatabaseError>;
 
-    fn get(&self, ctx: &Context, key: &[u8]) -> FutRuntimeResult<Option<Vec<u8>>, Self::Error>;
+    fn get_batch(&self, keys: &[Vec<u8>]) -> FutRuntimeResult<Vec<Option<Vec<u8>>>, DatabaseError>;
 
-    fn get_batch(
-        &self,
-        ctx: &Context,
-        keys: &[&[u8]],
-    ) -> FutRuntimeResult<Vec<Option<Vec<u8>>>, Self::Error>;
-
-    fn insert(
-        &mut self,
-        ctx: &Context,
-        key: &[u8],
-        value: &[u8],
-    ) -> FutRuntimeResult<(), Self::Error>;
+    fn insert(&mut self, key: &[u8], value: &[u8]) -> FutRuntimeResult<(), DatabaseError>;
 
     fn insert_batch(
         &mut self,
-        ctx: &Context,
-        keys: &[&[u8]],
-        values: &[&[u8]],
-    ) -> FutRuntimeResult<(), Self::Error>;
+        keys: &[Vec<u8>],
+        values: &[Vec<u8>],
+    ) -> FutRuntimeResult<(), DatabaseError>;
 
-    fn contain(&self, ctx: &Context, key: &[u8]) -> FutRuntimeResult<bool, Self::Error>;
+    fn contain(&self, key: &[u8]) -> FutRuntimeResult<bool, DatabaseError>;
 
-    fn remove(&mut self, ctx: &Context, key: &[u8]) -> FutRuntimeResult<(), Self::Error>;
+    fn remove(&mut self, key: &[u8]) -> FutRuntimeResult<(), DatabaseError>;
 
-    fn remove_batch(&mut self, ctx: &Context, keys: &[&[u8]]) -> FutRuntimeResult<(), Self::Error>;
+    fn remove_batch(&mut self, keys: &[Vec<u8>]) -> FutRuntimeResult<(), DatabaseError>;
 }
