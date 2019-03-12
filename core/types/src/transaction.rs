@@ -54,8 +54,13 @@ pub struct UnverifiedTransaction {
 
 impl From<PbUnverifiedTransaction> for UnverifiedTransaction {
     fn from(untx: PbUnverifiedTransaction) -> Self {
+        let tx = match untx.transaction {
+            Some(tx) => Transaction::from(tx),
+            None => Transaction::default(),
+        };
+
         UnverifiedTransaction {
-            transaction: Transaction::from(untx.transaction.unwrap()),
+            transaction: tx,
             signature: untx.signature,
         }
     }
@@ -79,8 +84,13 @@ pub struct SignedTransaction {
 
 impl From<PbSignedTransaction> for SignedTransaction {
     fn from(signed_tx: PbSignedTransaction) -> Self {
+        let untx = match signed_tx.untx {
+            Some(untx) => UnverifiedTransaction::from(untx),
+            None => UnverifiedTransaction::default(),
+        };
+
         SignedTransaction {
-            untx: UnverifiedTransaction::from(signed_tx.untx.unwrap()),
+            untx,
             hash: Hash::from_raw(&signed_tx.hash),
             sender: Address::from(signed_tx.sender.as_ref()),
         }

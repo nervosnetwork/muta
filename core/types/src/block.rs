@@ -96,8 +96,13 @@ impl Encodable for Block {
 
 impl From<PbBlock> for Block {
     fn from(block: PbBlock) -> Self {
+        let header = match block.header {
+            Some(header) => BlockHeader::from(header),
+            None => BlockHeader::default(),
+        };
+
         Block {
-            header: BlockHeader::from(block.header.unwrap()),
+            header,
             tx_hashes: block.tx_hashes.iter().map(|h| Hash::from_raw(h)).collect(),
         }
     }
