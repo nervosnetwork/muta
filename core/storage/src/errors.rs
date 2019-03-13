@@ -10,6 +10,7 @@ pub enum StorageError {
     Database(DatabaseError),
     Decode(DecodeError),
     Encode(EncodeError),
+    Internal,
 }
 
 impl Error for StorageError {
@@ -18,6 +19,7 @@ impl Error for StorageError {
             StorageError::Database(_) => "database error",
             StorageError::Decode(_) => "decode error",
             StorageError::Encode(_) => "encode error",
+            StorageError::Internal => "internal error",
         }
     }
 }
@@ -28,6 +30,7 @@ impl fmt::Display for StorageError {
             StorageError::Database(ref err) => format!("database error: {:?}", err),
             StorageError::Decode(ref err) => format!("decode error: {:?}", err),
             StorageError::Encode(ref err) => format!("encode error: {:?}", err),
+            StorageError::Internal => "internal error".to_string(),
         };
         write!(f, "{}", printable)
     }

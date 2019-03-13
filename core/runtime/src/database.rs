@@ -3,6 +3,7 @@ use crate::FutRuntimeResult;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DatabaseError {
     NotFound,
+    Internal,
 }
 
 pub trait Database: Send + Sync {

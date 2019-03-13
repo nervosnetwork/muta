@@ -1,6 +1,9 @@
+use std::sync::Arc;
+
 use byteorder::{ByteOrder, NativeEndian};
 use bytes::{BytesMut, IntoBuf};
-use futures::future::{err, ok, result, Future};
+use futures::future::{join_all, ok, result, Future, JoinAll};
+use futures_locks::RwLock;
 use prost::Message;
 
 use core_runtime::{Database, FutRuntimeResult};
@@ -68,73 +71,83 @@ pub struct BlockStorage<DB>
 where
     DB: Database,
 {
-    db: DB,
+    db: Arc<RwLock<DB>>,
 }
 
 impl<DB> BlockStorage<DB>
 where
     DB: Database,
 {
-    pub fn new(db: DB) -> Self {
+    pub fn new(db: Arc<RwLock<DB>>) -> Self {
         BlockStorage { db }
+    }
+
+    fn cloned(&self) -> Self {
+        BlockStorage {
+            db: self.db.clone(),
+        }
     }
 }
 
-impl<DB> Storage for BlockStorage<DB>
+impl<DB: 'static> Storage for BlockStorage<DB>
 where
     DB: Database,
 {
     fn get_latest_block(&self) -> FutRuntimeResult<Block, StorageError> {
-        let fut = self
+        let storage = self.cloned();
+
+        let fut = storage
             .db
-            .get(PREFIX_LATEST_BLOCK)
-            .from_err()
-            .and_then(|data| result(PbBlock::decode(data.into_buf()).map_err(StorageError::Decode)))
-            .from_err()
-            .and_then(|b| ok(Block::from(b)));
+            .read()
+            .map_err(|()| StorageError::Internal)
+            .and_then(|db| db.get(PREFIX_LATEST_BLOCK).map_err(StorageError::Database))
+            .and_then(AsyncCodec::decode::<PbBlock>)
+            .map(Block::from);
 
         Box::new(fut)
     }
 
     fn get_block_by_height(&self, height: u64) -> FutRuntimeResult<Block, StorageError> {
-        let fut = self
+        let storage = self.cloned();
+        let key = gen_key_with_u64(PREFIX_BLOCK_HEIGHT, height);
+
+        let fut = storage
             .db
-            .get(&gen_key_with_u64(PREFIX_BLOCK_HEIGHT, height))
-            .from_err()
-            .and_then(|data| result(PbBlock::decode(data.into_buf()).map_err(StorageError::Decode)))
-            .from_err()
-            .and_then(|b| ok(Block::from(b)));
+            .read()
+            .map_err(|()| StorageError::Internal)
+            .and_then(move |db| db.get(&key).map_err(StorageError::Database))
+            .and_then(AsyncCodec::decode::<PbBlock>)
+            .map(Block::from);
 
         Box::new(fut)
     }
 
     fn get_block_by_hash(&self, hash: &Hash) -> FutRuntimeResult<Block, StorageError> {
-        let result: Result<u64, StorageError> = self
-            .db
-            .get(&gen_key_with_slice(
-                PREFIX_BLOCK_HEIGHT_BY_HASH,
-                hash.as_ref(),
-            ))
-            .map_err(StorageError::Database)
-            .and_then(|height_slice| ok(transfrom_array_u8_to_u64(&height_slice)))
-            .wait();
+        let storage = self.cloned();
+        let key = gen_key_with_slice(PREFIX_BLOCK_HEIGHT_BY_HASH, hash.as_ref());
 
-        match result {
-            Ok(height) => self.get_block_by_height(height),
-            Err(e) => Box::new(err::<Block, StorageError>(e)),
-        }
+        let fut = storage
+            .db
+            .read()
+            .map_err(|()| StorageError::Internal)
+            .and_then(move |db| db.get(&key).map_err(StorageError::Database))
+            .map(|height_slice| transfrom_array_u8_to_u64(&height_slice))
+            .and_then(move |height| storage.cloned().get_block_by_height(height));
+
+        Box::new(fut)
     }
 
     fn get_transaction(&self, hash: &Hash) -> FutRuntimeResult<SignedTransaction, StorageError> {
-        let fut = self
+        let storage = self.cloned();
+        let key = gen_key_with_slice(PREFIX_TRANSACTION, hash.as_ref());
+
+        let fut = storage
             .db
-            .get(&gen_key_with_slice(PREFIX_TRANSACTION, hash.as_ref()))
-            .from_err()
-            .and_then(|data| {
-                result(PbSignedTransaction::decode(data.into_buf()).map_err(StorageError::Decode))
-            })
-            .from_err()
-            .and_then(|tx| ok(SignedTransaction::from(tx)));
+            .read()
+            .map_err(|()| StorageError::Internal)
+            .and_then(move |db| db.get(&key).map_err(StorageError::Database))
+            .and_then(AsyncCodec::decode::<PbSignedTransaction>)
+            .map(SignedTransaction::from);
 
         Box::new(fut)
     }
@@ -143,49 +156,52 @@ where
         &self,
         hashes: &[&Hash],
     ) -> FutRuntimeResult<Vec<Option<SignedTransaction>>, StorageError> {
+        let storage = self.cloned();
         let mut keys = vec![];
         for h in hashes {
             keys.push([PREFIX_TRANSACTION, h.as_ref()].concat());
         }
 
-        let fut = self
+        let fut = storage
             .db
-            .get_batch(&keys)
-            .from_err()
-            .and_then(|opt_txs_data| {
-                let results: Vec<Result<PbSignedTransaction, StorageError>> = opt_txs_data
-                    .iter()
-                    .filter_map(Option::as_ref)
-                    .map(|data| {
-                        PbSignedTransaction::decode(data.into_buf()).map_err(StorageError::Decode)
-                    })
-                    .collect();
-
-                ok(results
+            .read()
+            .map_err(|()| StorageError::Internal)
+            .and_then(move |db| db.get_batch(&keys).map_err(StorageError::Database))
+            .and_then(move |opt_txs_data| {
+                join_all(opt_txs_data.into_iter().map(|opt_data| {
+                    if let Some(data) = opt_data {
+                        Some(AsyncCodec::decode::<PbSignedTransaction>(data.to_vec()))
+                    } else {
+                        None
+                    }
+                }))
+            })
+            .map(|opt_txs| {
+                opt_txs
                     .into_iter()
-                    .map(|result| match result {
-                        Ok(tx) => Some(SignedTransaction::from(tx)),
-                        Err(e) => {
-                            // FIX: Replace log.
-                            println!("get_transactions error {:?}", e);
+                    .map(|opt_tx| {
+                        if let Some(tx) = opt_tx {
+                            Some(SignedTransaction::from(tx))
+                        } else {
                             None
                         }
                     })
-                    .collect())
+                    .collect()
             });
-
         Box::new(fut)
     }
 
     fn get_receipt(&self, hash: &Hash) -> FutRuntimeResult<Receipt, StorageError> {
-        let fut = self
+        let storage = self.cloned();
+        let key = gen_key_with_slice(PREFIX_RECEIPT, hash.as_ref());
+
+        let fut = storage
             .db
-            .get(&gen_key_with_slice(PREFIX_RECEIPT, hash.as_ref()))
-            .from_err()
-            .and_then(|data| {
-                result(PbReceipt::decode(data.into_buf())).map_err(StorageError::Decode)
-            })
-            .and_then(|r| ok(Receipt::from(r)));
+            .read()
+            .map_err(|()| StorageError::Internal)
+            .and_then(move |db| db.get(&key).map_err(StorageError::Database))
+            .and_then(AsyncCodec::decode::<PbReceipt>)
+            .map(Receipt::from);
 
         Box::new(fut)
     }
@@ -194,125 +210,121 @@ where
         &self,
         hashes: &[&Hash],
     ) -> FutRuntimeResult<Vec<Option<Receipt>>, StorageError> {
+        let storage = self.cloned();
         let mut keys = vec![];
         for h in hashes {
             keys.push([PREFIX_RECEIPT, h.as_ref()].concat());
         }
 
-        let fut = self
+        let fut = storage
             .db
-            .get_batch(&keys)
-            .from_err()
-            .and_then(|opt_txs_data| {
-                let results: Vec<Result<PbReceipt, StorageError>> = opt_txs_data
-                    .iter()
-                    .filter_map(Option::as_ref)
-                    .map(|data| PbReceipt::decode(data.into_buf()).map_err(StorageError::Decode))
-                    .collect();
-
-                ok(results
+            .read()
+            .map_err(|()| StorageError::Internal)
+            .and_then(move |db| db.get_batch(&keys).map_err(StorageError::Database))
+            .and_then(|opt_receipts_data| {
+                join_all(opt_receipts_data.into_iter().map(|opt_data| {
+                    if let Some(data) = opt_data {
+                        Some(AsyncCodec::decode::<PbReceipt>(data.to_vec()))
+                    } else {
+                        None
+                    }
+                }))
+            })
+            .map(|opt_txs| {
+                opt_txs
                     .into_iter()
-                    .map(|result| match result {
-                        Ok(r) => Some(Receipt::from(r)),
-                        Err(e) => {
-                            // FIX: Replace log.
-                            println!("get_receipts error {:?}", e);
+                    .map(|opt_tx| {
+                        if let Some(tx) = opt_tx {
+                            Some(Receipt::from(tx))
+                        } else {
                             None
                         }
                     })
-                    .collect())
+                    .collect()
             });
-
         Box::new(fut)
     }
 
     fn insert_block(&mut self, block: &Block) -> FutRuntimeResult<(), StorageError> {
+        let storage = self.cloned();
         let pb_block: PbBlock = block.clone().into();
-        let mut b = BytesMut::new();
+        let height_key = gen_key_with_u64(PREFIX_BLOCK_HEIGHT, block.header.height);
+        let hash_key = gen_key_with_slice(PREFIX_BLOCK_HEIGHT_BY_HASH, block.hash().as_ref());
 
-        // TODO: Can someone teach me how to reduce code nesting here?
-        match pb_block.encode(&mut b).map_err(StorageError::Encode) {
-            Err(e) => Box::new(err(e)),
-            Ok(()) => {
-                // First insert a block by height.
-                let key = &gen_key_with_u64(PREFIX_BLOCK_HEIGHT, block.header.height);
-                match self
-                    .db
-                    .insert(key, b.as_ref())
-                    .map_err(StorageError::Database)
-                    .wait()
-                {
-                    Err(e) => Box::new(err(e)),
-                    Ok(()) => {
-                        // Then insert a hash index.
-                        let key =
-                            &gen_key_with_slice(PREFIX_BLOCK_HEIGHT_BY_HASH, block.hash().as_ref());
-                        Box::new(
-                            self.db
-                                .insert(key, &transfrom_u64_to_array_u8(block.header.height))
-                                .map_err(StorageError::Database),
-                        )
-                    }
-                }
-            }
-        }
+        let fut = AsyncCodec::encode(pb_block)
+            .join3(
+                storage.db.write().map_err(|()| StorageError::Internal),
+                storage.db.write().map_err(|()| StorageError::Internal),
+            )
+            .map(move |(encoded_data, mut db1, mut db2)| {
+                [
+                    db1.insert(&height_key, &encoded_data),
+                    db2.insert(&hash_key, &encoded_data),
+                ]
+            })
+            .map(|_| ());
+
+        Box::new(fut)
     }
 
     fn insert_transactions(
         &mut self,
         signed_txs: &[SignedTransaction],
     ) -> FutRuntimeResult<(), StorageError> {
+        let storage = self.cloned();
         let mut keys = vec![];
         let mut values = vec![];
 
-        for signed_tx in signed_txs {
-            let pb_signed_tx: PbSignedTransaction = signed_tx.clone().into();
-            let mut b = BytesMut::new();
+        let fut_encoding: JoinAll<Vec<FutRuntimeResult<Vec<u8>, StorageError>>> = join_all(
+            signed_txs
+                .iter()
+                .map(|tx| {
+                    keys.push(gen_key_with_slice(PREFIX_TRANSACTION, tx.hash.as_ref()));
+                    AsyncCodec::encode::<PbSignedTransaction>(tx.clone().into())
+                })
+                .collect(),
+        );
 
-            match pb_signed_tx.encode(&mut b).map_err(StorageError::Encode) {
-                Err(e) => return Box::new(err(e)),
-                Ok(()) => {
-                    keys.push(gen_key_with_slice(
-                        PREFIX_TRANSACTION,
-                        signed_tx.hash.as_ref(),
-                    ));
-                    values.push(b.as_ref().to_vec());
-                }
-            }
-        }
+        let fut = fut_encoding
+            .join(storage.db.write().map_err(|()| StorageError::Internal))
+            .and_then(move |(txs_data, mut db)| {
+                txs_data.iter().for_each(|data| values.push(data.to_vec()));
+                db.insert_batch(&keys, &values)
+                    .map_err(StorageError::Database)
+            });
 
-        Box::new(
-            self.db
-                .insert_batch(&keys, &values)
-                .map_err(StorageError::Database),
-        )
+        Box::new(fut)
     }
 
     fn insert_receipts(&mut self, receipts: &[Receipt]) -> FutRuntimeResult<(), StorageError> {
+        let storage = self.cloned();
         let mut keys = vec![];
         let mut values = vec![];
 
-        for receipt in receipts {
-            let pb_receipt: PbReceipt = receipt.clone().into();
-            let mut b = BytesMut::new();
-
-            match pb_receipt.encode(&mut b).map_err(StorageError::Encode) {
-                Err(e) => return Box::new(err(e)),
-                Ok(()) => {
+        let fut_encoding: JoinAll<Vec<FutRuntimeResult<Vec<u8>, StorageError>>> = join_all(
+            receipts
+                .iter()
+                .map(|receipt| {
                     keys.push(gen_key_with_slice(
-                        PREFIX_RECEIPT,
-                        &receipt.transaction_hash.as_ref().to_vec(),
+                        PREFIX_TRANSACTION,
+                        receipt.transaction_hash.as_ref(),
                     ));
-                    values.push(b.as_ref().to_vec());
-                }
-            }
-        }
+                    AsyncCodec::encode::<PbReceipt>(receipt.clone().into())
+                })
+                .collect(),
+        );
 
-        Box::new(
-            self.db
-                .insert_batch(&keys, &values)
-                .map_err(StorageError::Database),
-        )
+        let fut = fut_encoding
+            .join(storage.db.write().map_err(|()| StorageError::Internal))
+            .and_then(move |(receipts_data, mut db)| {
+                receipts_data
+                    .iter()
+                    .for_each(|data| values.push(data.to_vec()));
+                db.insert_batch(&keys, &values)
+                    .map_err(StorageError::Database)
+            });
+
+        Box::new(fut)
     }
 }
 
@@ -332,4 +344,25 @@ fn transfrom_u64_to_array_u8(n: u64) -> Vec<u8> {
     let mut u64_slice = [];
     NativeEndian::write_u64(&mut u64_slice, n);
     u64_slice.to_vec()
+}
+
+#[derive(Default)]
+struct AsyncCodec;
+
+impl AsyncCodec {
+    pub fn decode<T: 'static + Message + Default>(
+        data: Vec<u8>,
+    ) -> FutRuntimeResult<T, StorageError> {
+        Box::new(result(
+            T::decode(data.into_buf()).map_err(StorageError::Decode),
+        ))
+    }
+
+    pub fn encode<T: Message>(msg: T) -> FutRuntimeResult<Vec<u8>, StorageError> {
+        let mut b = BytesMut::new();
+        let fut = result(msg.encode(&mut b).map_err(StorageError::Encode))
+            .from_err()
+            .and_then(move |_| ok(b.to_vec()));
+        Box::new(fut)
+    }
 }
