@@ -9,3 +9,4 @@ core-runtime = { path = "../../core/runtime" }
 
 failure = "0.1.3"
 futures = "0.1.17"
+futures-locks = "0.3"
