@@ -1,4 +1,4 @@
-use database::memory::MemoryDB;
+use components_database::memory::MemoryDB;
 use transaction_pool::{order::FIFO, verifier::SECP256K1Verifier, TransactionPool};
 
 fn main() {

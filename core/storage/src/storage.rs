@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use byteorder::{ByteOrder, NativeEndian};
 use bytes::{BytesMut, IntoBuf};
-use futures::future::{join_all, ok, result, Future, JoinAll};
+use futures::future::{join_all, result, Future};
 use futures_locks::RwLock;
 use prost::Message;
 
@@ -247,20 +247,25 @@ where
 
     fn insert_block(&mut self, block: &Block) -> FutRuntimeResult<(), StorageError> {
         let storage = self.cloned();
+
         let pb_block: PbBlock = block.clone().into();
+        let mut encoded_buf = BytesMut::with_capacity(pb_block.encoded_len());
+
+        let height = block.header.height;
         let height_key = gen_key_with_u64(PREFIX_BLOCK_HEIGHT, block.header.height);
         let hash_key = gen_key_with_slice(PREFIX_BLOCK_HEIGHT_BY_HASH, block.hash().as_ref());
 
-        let fut = AsyncCodec::encode(pb_block)
-            .join3(
-                storage.db.write().map_err(|()| StorageError::Internal),
-                storage.db.write().map_err(|()| StorageError::Internal),
-            )
-            .map(move |(encoded_data, mut db1, mut db2)| {
-                [
-                    db1.insert(&height_key, &encoded_data),
-                    db2.insert(&hash_key, &encoded_data),
-                ]
+        let fut = AsyncCodec::encode(pb_block, &mut encoded_buf)
+            .and_then(move |()| storage.db.write().map_err(|()| StorageError::Internal))
+            .and_then(move |mut db| {
+                join_all(vec![
+                    db.insert(&height_key, encoded_buf.as_ref())
+                        .map_err(StorageError::Database),
+                    db.insert(&hash_key, &transfrom_u64_to_array_u8(height))
+                        .map_err(StorageError::Database),
+                    db.insert(PREFIX_LATEST_BLOCK, encoded_buf.as_ref())
+                        .map_err(StorageError::Database),
+                ])
             })
             .map(|_| ());
 
@@ -273,23 +278,21 @@ where
     ) -> FutRuntimeResult<(), StorageError> {
         let storage = self.cloned();
         let mut keys = vec![];
-        let mut values = vec![];
 
-        let fut_encoding: JoinAll<Vec<FutRuntimeResult<Vec<u8>, StorageError>>> = join_all(
-            signed_txs
-                .iter()
-                .map(|tx| {
-                    keys.push(gen_key_with_slice(PREFIX_TRANSACTION, tx.hash.as_ref()));
-                    AsyncCodec::encode::<PbSignedTransaction>(tx.clone().into())
-                })
-                .collect(),
-        );
+        let mut peding_fut = vec![];
+        for tx in signed_txs {
+            let pb_tx: PbSignedTransaction = tx.clone().into();
+            let mut buf = BytesMut::with_capacity(pb_tx.encoded_len());
+            let fut = AsyncCodec::encode(pb_tx, &mut buf).map(move |_| buf.to_vec());
 
-        let fut = fut_encoding
+            keys.push(gen_key_with_slice(PREFIX_TRANSACTION, tx.hash.as_ref()));
+            peding_fut.push(fut);
+        }
+
+        let fut = join_all(peding_fut)
             .join(storage.db.write().map_err(|()| StorageError::Internal))
-            .and_then(move |(txs_data, mut db)| {
-                txs_data.iter().for_each(|data| values.push(data.to_vec()));
-                db.insert_batch(&keys, &values)
+            .and_then(move |(buf_list, mut db)| {
+                db.insert_batch(&keys, &buf_list)
                     .map_err(StorageError::Database)
             });
 
@@ -299,28 +302,24 @@ where
     fn insert_receipts(&mut self, receipts: &[Receipt]) -> FutRuntimeResult<(), StorageError> {
         let storage = self.cloned();
         let mut keys = vec![];
-        let mut values = vec![];
 
-        let fut_encoding: JoinAll<Vec<FutRuntimeResult<Vec<u8>, StorageError>>> = join_all(
-            receipts
-                .iter()
-                .map(|receipt| {
-                    keys.push(gen_key_with_slice(
-                        PREFIX_TRANSACTION,
-                        receipt.transaction_hash.as_ref(),
-                    ));
-                    AsyncCodec::encode::<PbReceipt>(receipt.clone().into())
-                })
-                .collect(),
-        );
+        let mut peding_fut = vec![];
+        for receipt in receipts {
+            let pb_receipt: PbReceipt = receipt.clone().into();
+            let mut buf = BytesMut::with_capacity(pb_receipt.encoded_len());
+            let fut = AsyncCodec::encode(pb_receipt, &mut buf).map(move |_| buf.to_vec());
 
-        let fut = fut_encoding
+            keys.push(gen_key_with_slice(
+                PREFIX_RECEIPT,
+                receipt.transaction_hash.as_ref(),
+            ));
+            peding_fut.push(fut);
+        }
+
+        let fut = join_all(peding_fut)
             .join(storage.db.write().map_err(|()| StorageError::Internal))
-            .and_then(move |(receipts_data, mut db)| {
-                receipts_data
-                    .iter()
-                    .for_each(|data| values.push(data.to_vec()));
-                db.insert_batch(&keys, &values)
+            .and_then(move |(buf_list, mut db)| {
+                db.insert_batch(&keys, &buf_list)
                     .map_err(StorageError::Database)
             });
 
@@ -341,7 +340,7 @@ fn transfrom_array_u8_to_u64(d: &[u8]) -> u64 {
 }
 
 fn transfrom_u64_to_array_u8(n: u64) -> Vec<u8> {
-    let mut u64_slice = [];
+    let mut u64_slice = [0u8; 8];
     NativeEndian::write_u64(&mut u64_slice, n);
     u64_slice.to_vec()
 }
@@ -358,11 +357,40 @@ impl AsyncCodec {
         ))
     }
 
-    pub fn encode<T: Message>(msg: T) -> FutRuntimeResult<Vec<u8>, StorageError> {
-        let mut b = BytesMut::new();
-        let fut = result(msg.encode(&mut b).map_err(StorageError::Encode))
-            .from_err()
-            .and_then(move |_| ok(b.to_vec()));
-        Box::new(fut)
+    pub fn encode<T: Message>(
+        msg: T,
+        mut buf: &mut BytesMut,
+    ) -> FutRuntimeResult<(), StorageError> {
+        Box::new(result(msg.encode(&mut buf).map_err(StorageError::Encode)))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use futures::future::Future;
+    use futures_locks::RwLock;
+
+    use super::{BlockStorage, Storage};
+
+    use components_database::memory::MemoryDB;
+    use core_types::{Block, Hash};
+
+    #[test]
+    fn test_get_latest_block_should_return_ok() {
+        let memdb = MemoryDB::new();
+        let mut storage = BlockStorage::new(Arc::new(RwLock::new(memdb)));
+        storage.insert_block(&mock_block()).wait().unwrap();
+        storage.get_latest_block().wait().unwrap();
+    }
+
+    fn mock_block() -> Block {
+        let mut b = Block::default();
+        b.header.prevhash = Hash::from_raw(b"test");
+        b.header.timestamp = 1234;
+        b.header.height = 1000;
+        b.tx_hashes = vec![Hash::from_raw(b"tx1"), Hash::from_raw(b"tx2")];
+        b
     }
 }
