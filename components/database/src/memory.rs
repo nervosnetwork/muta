@@ -17,6 +17,14 @@ impl MemoryDB {
     }
 }
 
+impl Default for MemoryDB {
+    fn default() -> Self {
+        MemoryDB {
+            storage: RwLock::new(HashMap::new()),
+        }
+    }
+}
+
 impl Database for MemoryDB {
     fn get(&self, key: &[u8]) -> FutRuntimeResult<Vec<u8>, DatabaseError> {
         let key = key.to_vec();
@@ -90,7 +98,6 @@ impl Database for MemoryDB {
 
                     storage.insert(key, value);
                 }
-                ()
             });
 
         Box::new(fut)
@@ -117,7 +124,6 @@ impl Database for MemoryDB {
             .map_err(|()| DatabaseError::Internal)
             .map(move |mut storage| {
                 storage.remove(&key);
-                ()
             });
 
         Box::new(fut)
@@ -134,7 +140,6 @@ impl Database for MemoryDB {
                 for key in keys {
                     storage.remove(&key);
                 }
-                ()
             });
 
         Box::new(fut)
