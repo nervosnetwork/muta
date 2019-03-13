@@ -8,6 +8,7 @@ edition = "2018"
 transaction-pool = { path = "components/transaction-pool" }
 database = { path = "components/database" }
 core-storage = { path = "core/storage" }
+core-p2p = { path = "core/p2p" }
 
 [workspace]
 members = [

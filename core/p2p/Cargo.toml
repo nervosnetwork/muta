@@ -1,7 +1,26 @@
 [package]
-name = "p2p"
+name = "core-p2p"
 version = "0.1.0"
 authors = ["Cryptape Technologies <contact@cryptape.com>"]
 edition = "2018"
 
 [dependencies]
+tentacle = { git = "http://github.com/nervosnetwork/p2p", rev = "78fbdaa" }
+env_logger = "0.6.1"
+log = "0.4.6"
+futures = "0.1.25"
+parking_lot = "0.7.1"
+bytes = "0.4.12"
+prost = { version = "0.5.0", optional = true }
+
+# Unfortunately, dev-dependencies cannot be optional.
+[dev-dependencies]
+prost-derive = { version = "0.5.0" }
+tokio = "0.1.16"
+
+[features]
+default = []
+prost-message = ["prost"]
+
+[[example]]
+name = "transmission"
