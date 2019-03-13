@@ -84,7 +84,7 @@ where
 
     fn cloned(&self) -> Self {
         BlockStorage {
-            db: self.db.clone(),
+            db: Arc::clone(&self.db),
         }
     }
 }
