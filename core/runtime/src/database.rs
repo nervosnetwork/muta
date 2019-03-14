@@ -7,7 +7,13 @@ pub enum DatabaseError {
     Internal,
 }
 
-pub trait Database: Send + Sync {
+pub trait DatabaseFactory: Send + Sync {
+    type Instance: DatabaseInstance;
+
+    fn crate_instance(&self) -> FutRuntimeResult<Self::Instance, DatabaseError>;
+}
+
+pub trait DatabaseInstance {
     fn get(&self, key: &[u8]) -> FutRuntimeResult<Vec<u8>, DatabaseError>;
 
     fn get_batch(&self, keys: &[Vec<u8>]) -> FutRuntimeResult<Vec<Option<Vec<u8>>>, DatabaseError>;

@@ -8,7 +8,7 @@ pub mod executor;
 pub mod pool;
 // pub mod sync;
 
-pub use database::{Database, DatabaseError};
+pub use database::{DatabaseFactory, DatabaseInstance, DatabaseError};
 pub use events::EventType;
 pub use pool::{Order, Verifier};
 

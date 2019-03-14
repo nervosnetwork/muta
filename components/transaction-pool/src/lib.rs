@@ -2,35 +2,29 @@ pub mod errors;
 pub mod order;
 pub mod verifier;
 
-use core_runtime::{Context, Database, FutRuntimeResult, Order, Verifier};
+use core_runtime::{Context, FutRuntimeResult, Order, Verifier};
 use core_types::{Hash, SignedTransaction, UnverifiedTransaction};
 
 use crate::errors::TransactionPoolError;
 
 // TODO: remove this
 #[allow(dead_code)]
-pub struct TransactionPool<DB, O, V>
+pub struct TransactionPool<O, V>
 where
-    DB: Database,
     O: Order,
     V: Verifier,
 {
-    storage: DB,
-
     order: O,
     verifier: V,
 }
 
-impl<DB, O, V> TransactionPool<DB, O, V>
+impl<O, V> TransactionPool<O, V>
 where
-    DB: Database,
     O: Order,
     V: Verifier,
 {
-    pub fn new(storage: DB, order: O, verifier: V) -> Self {
+    pub fn new(order: O, verifier: V) -> Self {
         TransactionPool {
-            storage,
-
             order,
             verifier,
         }

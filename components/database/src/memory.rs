@@ -1,31 +1,54 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use futures::future::{err, ok, Future};
 use futures_locks::RwLock;
 
-use core_runtime::{Database, DatabaseError, FutRuntimeResult};
+use core_runtime::{DatabaseError, DatabaseFactory, DatabaseInstance, FutRuntimeResult};
 
-pub struct MemoryDB {
-    storage: RwLock<HashMap<Vec<u8>, Vec<u8>>>,
+pub struct Factory {
+    storage: Arc<RwLock<HashMap<Vec<u8>, Vec<u8>>>>,
 }
 
-impl MemoryDB {
+impl Factory {
     pub fn new() -> Self {
-        MemoryDB {
-            storage: RwLock::new(HashMap::new()),
+        Factory {
+            storage: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 }
 
-impl Default for MemoryDB {
+impl Default for Factory {
     fn default() -> Self {
-        MemoryDB {
-            storage: RwLock::new(HashMap::new()),
+        Factory {
+            storage: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 }
 
-impl Database for MemoryDB {
+impl DatabaseFactory for Factory {
+    type Instance = Instance;
+
+    fn crate_instance(&self) -> FutRuntimeResult<Self::Instance, DatabaseError> {
+        Box::new(ok(Instance {
+            storage: Arc::clone(&self.storage),
+        }))
+    }
+}
+
+pub struct Instance {
+    storage: Arc<RwLock<HashMap<Vec<u8>, Vec<u8>>>>,
+}
+
+impl Default for Instance {
+    fn default() -> Self {
+        Instance {
+            storage: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+}
+
+impl DatabaseInstance for Instance {
     fn get(&self, key: &[u8]) -> FutRuntimeResult<Vec<u8>, DatabaseError> {
         let key = key.to_vec();
 
@@ -148,78 +171,84 @@ impl Database for MemoryDB {
 
 #[cfg(test)]
 mod tests {
-    use super::MemoryDB;
+    use super::Factory;
 
-    use core_runtime::{Database, DatabaseError};
+    use core_runtime::{DatabaseError, DatabaseFactory, DatabaseInstance};
     use futures::future::Future;
 
     #[test]
     fn test_get_should_return_ok() {
-        let mut memdb = MemoryDB::new();
-        check_not_found(memdb.get(b"test").wait());
-        memdb.insert(b"test", b"test").wait().unwrap();
-        let v = memdb.get(b"test").wait().unwrap();
+        let mut instance = Factory::new().crate_instance().wait().unwrap();
+
+        check_not_found(instance.get(b"test").wait());
+        instance.insert(b"test", b"test").wait().unwrap();
+        let v = instance.get(b"test").wait().unwrap();
         assert_eq!(v, b"test".to_vec())
     }
 
     #[test]
     fn test_insert_should_return_ok() {
-        let mut memdb = MemoryDB::new();
-        memdb.insert(b"test", b"test").wait().unwrap();
-        assert_eq!(b"test".to_vec(), memdb.get(b"test").wait().unwrap());
+        let mut instance = Factory::new().crate_instance().wait().unwrap();
+
+        instance.insert(b"test", b"test").wait().unwrap();
+        assert_eq!(b"test".to_vec(), instance.get(b"test").wait().unwrap());
     }
 
     #[test]
     fn test_insert_batch_should_return_ok() {
-        let mut memdb = MemoryDB::new();
-        memdb
+        let mut instance = Factory::new().crate_instance().wait().unwrap();
+
+        instance
             .insert_batch(
                 &[b"test1".to_vec(), b"test2".to_vec()],
                 &[b"test1".to_vec(), b"test2".to_vec()],
             )
             .wait()
             .unwrap();
-        assert_eq!(b"test1".to_vec(), memdb.get(b"test1").wait().unwrap());
-        assert_eq!(b"test2".to_vec(), memdb.get(b"test2").wait().unwrap());
+        assert_eq!(b"test1".to_vec(), instance.get(b"test1").wait().unwrap());
+        assert_eq!(b"test2".to_vec(), instance.get(b"test2").wait().unwrap());
     }
 
     #[test]
     fn test_contain_should_return_true() {
-        let mut memdb = MemoryDB::new();
-        memdb.insert(b"test", b"test").wait().unwrap();
-        assert_eq!(memdb.contain(b"test").wait().unwrap(), true)
+        let mut instance = Factory::new().crate_instance().wait().unwrap();
+
+        instance.insert(b"test", b"test").wait().unwrap();
+        assert_eq!(instance.contain(b"test").wait().unwrap(), true)
     }
 
     #[test]
     fn test_contain_should_return_false() {
-        let memdb = MemoryDB::new();
-        assert_eq!(memdb.contain(b"test").wait().unwrap(), false)
+        let instance = Factory::new().crate_instance().wait().unwrap();
+        assert_eq!(instance.contain(b"test").wait().unwrap(), false)
     }
 
     #[test]
     fn test_remove_should_return_ok() {
-        let mut memdb = MemoryDB::new();
-        memdb.insert(b"test", b"test").wait().unwrap();
-        memdb.remove(b"test").wait().unwrap();
-        check_not_found(memdb.get(b"test").wait());
+        let mut instance = Factory::new().crate_instance().wait().unwrap();
+
+        instance.insert(b"test", b"test").wait().unwrap();
+        instance.remove(b"test").wait().unwrap();
+        check_not_found(instance.get(b"test").wait());
     }
 
     #[test]
     fn test_remove_batch_should_return_ok() {
-        let mut memdb = MemoryDB::new();
-        memdb
+        let mut instance = Factory::new().crate_instance().wait().unwrap();
+
+        instance
             .insert_batch(
                 &[b"test1".to_vec(), b"test2".to_vec()],
                 &[b"test1".to_vec(), b"test2".to_vec()],
             )
             .wait()
             .unwrap();
-        memdb
+        instance
             .remove_batch(&[b"test1".to_vec(), b"test2".to_vec()])
             .wait()
             .unwrap();
-        check_not_found(memdb.get(b"test1").wait());
-        check_not_found(memdb.get(b"test2").wait());
+        check_not_found(instance.get(b"test1").wait());
+        check_not_found(instance.get(b"test2").wait());
     }
 
     fn check_not_found<T>(res: Result<T, DatabaseError>) {
