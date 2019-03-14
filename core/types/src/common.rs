@@ -59,8 +59,13 @@ pub struct Hash(H256);
 impl Hash {
     pub fn from_raw(raw: &[u8]) -> Self {
         let mut out = [0u8; HASH_LEN];
-        out.copy_from_slice(&Sha3_256::digest(raw));
-        Hash(H256::from(out))
+        if raw.len() == HASH_LEN {
+            out.copy_from_slice(raw);
+            Hash(H256::from(out))
+        } else {
+            out.copy_from_slice(&Sha3_256::digest(raw));
+            Hash(H256::from(out))
+        }
     }
 
     pub fn as_hex(&self) -> String {

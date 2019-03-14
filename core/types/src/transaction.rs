@@ -7,7 +7,7 @@ use core_serialization::transaction::{
 
 use crate::{Address, Hash};
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, PartialEq)]
 pub struct Transaction {
     pub to: Address,
     pub nonce: String,
@@ -46,7 +46,7 @@ impl Into<PbTransaction> for Transaction {
     }
 }
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, PartialEq)]
 pub struct UnverifiedTransaction {
     pub transaction: Transaction,
     pub signature: Vec<u8>,
@@ -75,7 +75,7 @@ impl Into<PbUnverifiedTransaction> for UnverifiedTransaction {
     }
 }
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, PartialEq)]
 pub struct SignedTransaction {
     pub untx: UnverifiedTransaction,
     pub hash: Hash,

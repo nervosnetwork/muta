@@ -394,7 +394,7 @@ mod tests {
     use super::{BlockStorage, Storage};
 
     use components_database::memory::Factory;
-    use core_types::{Block, Hash};
+    use core_types::{Block, Hash, Receipt, SignedTransaction, UnverifiedTransaction};
 
     #[test]
     fn test_get_latest_block_should_return_ok() {
@@ -416,6 +416,128 @@ mod tests {
         assert_eq!(block.header.height, 1000)
     }
 
+    #[test]
+    fn test_get_block_by_hash_should_return_ok() {
+        let factory = Factory::new();
+        let mut storage = BlockStorage::new(factory);
+
+        let b = mock_block(1000);
+        storage.insert_block(&b).wait().unwrap();
+
+        let b = storage.get_block_by_hash(&b.hash()).wait().unwrap();
+        assert_eq!(b.header.height, 1000)
+    }
+
+    #[test]
+    fn test_get_transaction_should_return_ok() {
+        let factory = Factory::new();
+        let mut storage = BlockStorage::new(factory);
+        let tx = mock_transaction(Hash::from_raw(b"test111"));
+
+        let hash = tx.hash.clone();
+        storage.insert_transactions(&[tx]).wait().unwrap();
+        let new_tx = storage.get_transaction(&hash).wait().unwrap();
+
+        assert_eq!(new_tx.hash, hash)
+    }
+
+    #[test]
+    fn test_get_transactions_should_return_ok() {
+        let factory = Factory::new();
+        let mut storage = BlockStorage::new(factory);
+        let tx1 = mock_transaction(Hash::from_raw(b"test111"));
+        let tx2 = mock_transaction(Hash::from_raw(b"test222"));
+
+        let tx_hash1 = tx1.hash.clone();
+        let tx_hash2 = tx2.hash.clone();
+        storage.insert_transactions(&[tx1, tx2]).wait().unwrap();
+        let transactions = storage
+            .get_transactions(&[&tx_hash1, &tx_hash2])
+            .wait()
+            .unwrap();
+        assert_eq!(transactions.len(), 2);
+
+        let hashes: Vec<Hash> = transactions
+            .into_iter()
+            .map(|opt_tx| opt_tx.unwrap().hash)
+            .collect();
+
+        assert_eq!(hashes.contains(&tx_hash1), true);
+        assert_eq!(hashes.contains(&tx_hash2), true);
+    }
+
+    #[test]
+    fn test_get_receipt_should_return_ok() {
+        let factory = Factory::new();
+        let mut storage = BlockStorage::new(factory);
+        let receipt = mock_receipt(Hash::from_raw(b"test111"));
+        let tx_hash = receipt.transaction_hash.clone();
+
+        storage.insert_receipts(&[receipt]).wait().unwrap();
+        let receipt = storage.get_receipt(&tx_hash).wait().unwrap();
+        assert_eq!(receipt.transaction_hash, tx_hash);
+    }
+
+    #[test]
+    fn test_get_receipts_should_return_ok() {
+        let factory = Factory::new();
+        let mut storage = BlockStorage::new(factory);
+        let receipt1 = mock_receipt(Hash::from_raw(b"test111"));
+        let receipt2 = mock_receipt(Hash::from_raw(b"test222"));
+
+        let tx_hash1 = receipt1.transaction_hash.clone();
+        let tx_hash2 = receipt2.transaction_hash.clone();
+        storage
+            .insert_receipts(&[receipt1, receipt2])
+            .wait()
+            .unwrap();
+        let transactions = storage
+            .get_receipts(&[&tx_hash1, &tx_hash2])
+            .wait()
+            .unwrap();
+        assert_eq!(transactions.len(), 2);
+
+        let hashes: Vec<Hash> = transactions
+            .into_iter()
+            .map(|opt_receipt| opt_receipt.unwrap().transaction_hash)
+            .collect();
+
+        assert_eq!(hashes.contains(&tx_hash1), true);
+        assert_eq!(hashes.contains(&tx_hash2), true);
+    }
+
+    #[test]
+    fn test_insert_block_should_return_ok() {
+        let factory = Factory::new();
+        let mut storage = BlockStorage::new(factory);
+
+        let block = mock_block(1000);
+        storage.insert_block(&block).wait().unwrap();
+        assert_eq!(
+            storage.get_latest_block().wait().unwrap().header.height,
+            block.header.height
+        );
+        assert_eq!(
+            storage
+                .get_block_by_height(block.header.height)
+                .wait()
+                .unwrap()
+                .header
+                .height,
+            block.header.height
+        );
+
+        assert_eq!(
+            storage
+                .get_block_by_hash(&block.hash())
+                .wait()
+                .unwrap()
+                .header
+                .height,
+            block.header.height
+        );
+    }
+
     fn mock_block(height: u64) -> Block {
         let mut b = Block::default();
         b.header.prevhash = Hash::from_raw(b"test");
@@ -423,5 +545,18 @@ mod tests {
         b.header.height = height;
         b.tx_hashes = vec![Hash::from_raw(b"tx1"), Hash::from_raw(b"tx2")];
         b
+    }
+
+    fn mock_transaction(tx_hash: Hash) -> SignedTransaction {
+        let mut signed_tx = SignedTransaction::default();
+        signed_tx.hash = tx_hash;
+        signed_tx.untx = UnverifiedTransaction::default();
+        signed_tx
+    }
+
+    fn mock_receipt(tx_hash: Hash) -> Receipt {
+        let mut receipt = Receipt::default();
+        receipt.transaction_hash = tx_hash;
+        receipt
     }
 }
