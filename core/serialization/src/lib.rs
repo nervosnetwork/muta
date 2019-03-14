@@ -7,7 +7,6 @@ macro_rules! generate_module_for {
     };
     ($name:ident) => {
         pub mod $name {
-            use prost_derive::*;
             include!(concat!(env!("OUT_DIR"), "/", stringify!($name), ".rs"));
         }
     };
