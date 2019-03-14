@@ -79,6 +79,7 @@ enum DoCast<TMessage: Debug> {
     Raw(RawCast),
 }
 
+/// Protocol for datagram transport
 pub struct TransmissionProtocol<TMessage, TPeerManager> {
     // Inner protocol id
     id: ProtocolId,
@@ -109,6 +110,7 @@ where
     TMessage: Codec + Send + Sync + 'static + Debug,
     TPeerManager: PeerManager + Send + Sync + Clone + 'static,
 {
+    /// Build a TransmissionProtocol instance
     pub fn build(
         id: ProtocolId,
         peer_mgr: TPeerManager,
@@ -258,7 +260,11 @@ where
         Box::new(deliver_task)
     }
 
-    pub fn do_init(&mut self, control: &mut ServiceContext) {
+    /// Init callback method for ServiceProtocol trait
+    ///
+    /// # Panics
+    ///
+    /// Panics if a protocol instance do init more than once
     pub(crate) fn do_init(&mut self, control: &mut ServiceContext) {
         info!("protocol [transmission{}]: do init", self.id);
 
