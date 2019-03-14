@@ -24,10 +24,7 @@ where
     V: Verifier,
 {
     pub fn new(order: O, verifier: V) -> Self {
-        TransactionPool {
-            order,
-            verifier,
-        }
+        TransactionPool { order, verifier }
     }
 
     pub fn add(
