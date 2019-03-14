@@ -1,8 +1,7 @@
 use bytes::Bytes;
 use futures::prelude::{Async, Future, Poll, Stream};
-use futures::stream;
 use futures::sync::mpsc::{channel, Receiver, Sender};
-use futures::task::{self as task, Task};
+use futures::{stream, task};
 use log::{debug, info, warn};
 use parking_lot::{Mutex, RwLock};
 use tentacle::context::{ServiceContext, SessionContext};
@@ -17,6 +16,12 @@ use std::fmt::Debug;
 use std::marker::Send;
 use std::sync::Arc;
 
+mod codec;
+pub(crate) mod task_handle;
+
+pub use codec::Codec;
+use task_handle::{TaskHandle, BROADCAST_TASK_ID, RECV_DATA_TASK_ID};
+
 /// Protocol name (handshake)
 pub const PROTOCOL_NAME: &str = "transmission";
 
@@ -26,20 +31,8 @@ pub const SUPPORT_VERSIONS: [&str; 1] = ["0.1"];
 /// Channel buffer size
 pub const CHANNEL_BUFFERS: usize = 8;
 
-const BROADCAST_TASK_ID: usize = 1;
-const RECV_DATA_TASK_ID: usize = 2;
-
 /// Low-level transport data type
 pub type RawMessage = Bytes;
-
-/// `Message` codec
-pub trait Codec: Sized {
-    /// Encode `Message` type to transport data type
-    fn encode(self) -> RawMessage;
-
-    /// Decode raw bytes to `Message` type
-    fn decode(raw: &[u8]) -> Result<Self, ()>;
-}
 
 /// The enum for session misbehavior
 pub enum Misbehavior {
@@ -84,50 +77,6 @@ type RawCast = (Option<Vec<SessionId>>, RawMessage);
 enum DoCast<TMessage: Debug> {
     Message(CastMessage<TMessage>),
     Raw(RawCast),
-}
-
-// Wrapper around cast and recv stream task
-pub(crate) struct TaskHandle {
-    inner: Arc<RwLock<(Option<Task>, Option<Task>)>>,
-}
-
-impl TaskHandle {
-    pub fn notify(&self, id: usize) {
-        let maybe_task = match id {
-            BROADCAST_TASK_ID => self.inner.read().0.clone(),
-            RECV_DATA_TASK_ID => self.inner.read().1.clone(),
-            _ => unreachable!(),
-        };
-
-        maybe_task.and_then(|task| {
-            task.notify();
-            Some(())
-        });
-    }
-
-    pub fn insert(&mut self, id: usize, task: Task) {
-        match id {
-            BROADCAST_TASK_ID => self.inner.write().0 = Some(task),
-            RECV_DATA_TASK_ID => self.inner.write().1 = Some(task),
-            _ => unreachable!(),
-        }
-    }
-}
-
-impl Default for TaskHandle {
-    fn default() -> Self {
-        TaskHandle {
-            inner: Arc::new(RwLock::new((None, None))),
-        }
-    }
-}
-
-impl Clone for TaskHandle {
-    fn clone(&self) -> Self {
-        TaskHandle {
-            inner: Arc::clone(&self.inner),
-        }
-    }
 }
 
 pub struct TransmissionProtocol<TMessage, TPeerManager> {
@@ -310,6 +259,7 @@ where
     }
 
     pub fn do_init(&mut self, control: &mut ServiceContext) {
+    pub(crate) fn do_init(&mut self, control: &mut ServiceContext) {
         info!("protocol [transmission{}]: do init", self.id);
 
         let proto_id = self.id;
@@ -351,7 +301,7 @@ where
             .expect("fail to register recv deliver task");
     }
 
-    pub fn do_recv(
+    pub(crate) fn do_recv(
         &mut self,
         _control: &mut ServiceContext,
         session: &SessionContext,
@@ -395,38 +345,5 @@ where
         data: RawMessage,
     ) {
         self.do_recv(control, session, data);
-    }
-}
-
-// Default implement for `RawMessage`
-#[cfg(not(feature = "prost-message"))]
-impl Codec for RawMessage {
-    fn encode(self) -> RawMessage {
-        self
-    }
-
-    fn decode(raw: &[u8]) -> Result<RawMessage, ()> {
-        Ok(Bytes::from(raw))
-    }
-}
-
-// Implement `prost` out-of-box support
-#[cfg(feature = "prost-message")]
-impl<TMessage: prost::Message + std::default::Default> Codec for TMessage {
-    fn encode(self) -> RawMessage {
-        let mut msg = vec![];
-
-        if let Err(err) = <TMessage as prost::Message>::encode(&self, &mut msg) {
-            // system should not provide non-encodeable message
-            // this means fatal error, but dont panic.
-            log::error!("protocol [transmission]: *! encode failure: {:?}", err);
-        }
-
-        Bytes::from(msg)
-    }
-
-    fn decode(raw: &[u8]) -> Result<TMessage, ()> {
-        <TMessage as prost::Message>::decode(raw.to_owned())
-            .map_err(|err| log::error!("protocol [transmission]: *! decode failure: {:?}", err))
     }
 }
