@@ -5,7 +5,7 @@ use futures::{stream, task};
 use log::{debug, info, warn};
 use parking_lot::RwLock;
 use tentacle::context::{ServiceContext, SessionContext};
-use tentacle::service::{ProtocolHandle, ProtocolMeta, ServiceControl};
+use tentacle::service::{ProtocolHandle, ProtocolMeta};
 use tentacle::{
     builder::MetaBuilder, multiaddr::Multiaddr, secio::PeerId, traits::ServiceProtocol, ProtocolId,
     SessionId,
@@ -171,7 +171,7 @@ where
     }
 
     /// Init callback method for ServiceProtocol trait
-    pub(crate) fn do_init(&mut self, mut control: ServiceControl) {
+    pub(crate) fn do_init(&mut self, serv_ctx: &mut ServiceContext) {
         info!("protocol [transmission{}]: do init", self.id);
 
         let recv_tx = self.recv_tx.clone();
@@ -179,9 +179,7 @@ where
         let task_handle = self.pending_task_handle.clone();
 
         let deliver_task = Self::recv_deliver_task(recv_tx, pending_recv_data, task_handle);
-        control
-            .future_task(deliver_task)
-            .expect("fail to register recv deliver task");
+        serv_ctx.future_task(deliver_task)
     }
 
     pub(crate) fn do_recv(&mut self, session: &SessionContext, data: RawMessage) {
@@ -230,7 +228,7 @@ where
     TPeerManager: PeerManager + Send + Sync + Clone + 'static,
 {
     fn init(&mut self, serv_ctx: &mut ServiceContext) {
-        self.do_init(serv_ctx.control().clone())
+        self.do_init(serv_ctx)
     }
 
     fn received(&mut self, _: &mut ServiceContext, session: &SessionContext, data: RawMessage) {
