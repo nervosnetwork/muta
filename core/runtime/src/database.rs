@@ -4,7 +4,7 @@ use crate::FutRuntimeResult;
 pub enum DatabaseError {
     NotFound,
     InvalidData,
-    Internal,
+    Internal(String),
 }
 
 pub trait DatabaseFactory: Send + Sync {

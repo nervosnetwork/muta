@@ -55,7 +55,7 @@ impl DatabaseInstance for Instance {
         let fut = self
             .storage
             .read()
-            .map_err(|()| DatabaseError::Internal)
+            .map_err(|()| DatabaseError::Internal("rwlock error".to_string()))
             .and_then(move |storage| match storage.get(&key) {
                 Some(v) => ok(v.to_vec()),
                 None => err(DatabaseError::NotFound),
@@ -70,7 +70,7 @@ impl DatabaseInstance for Instance {
         let fut = self
             .storage
             .read()
-            .map_err(|()| DatabaseError::Internal)
+            .map_err(|()| DatabaseError::Internal("rwlock error".to_string()))
             .map(move |storage| {
                 keys.into_iter()
                     .map(|key| storage.get(&key.to_vec()))
@@ -91,7 +91,7 @@ impl DatabaseInstance for Instance {
         let fut = self
             .storage
             .write()
-            .map_err(|()| DatabaseError::Internal)
+            .map_err(|()| DatabaseError::Internal("rwlock error".to_string()))
             .map(move |mut storage| storage.insert(key, value))
             .map(|_| ());
 
@@ -113,7 +113,7 @@ impl DatabaseInstance for Instance {
         let fut = self
             .storage
             .write()
-            .map_err(|()| DatabaseError::Internal)
+            .map_err(|()| DatabaseError::Internal("rwlock error".to_string()))
             .map(move |mut storage| {
                 for i in 0..keys.len() {
                     let key = keys[i].to_vec();
@@ -132,7 +132,7 @@ impl DatabaseInstance for Instance {
         let fut = self
             .storage
             .read()
-            .map_err(|()| DatabaseError::Internal)
+            .map_err(|()| DatabaseError::Internal("rwlock error".to_string()))
             .map(move |storage| storage.contains_key(&key));
 
         Box::new(fut)
@@ -144,7 +144,7 @@ impl DatabaseInstance for Instance {
         let fut = self
             .storage
             .write()
-            .map_err(|()| DatabaseError::Internal)
+            .map_err(|()| DatabaseError::Internal("rwlock error".to_string()))
             .map(move |mut storage| {
                 storage.remove(&key);
             });
@@ -158,7 +158,7 @@ impl DatabaseInstance for Instance {
         let fut = self
             .storage
             .write()
-            .map_err(|()| DatabaseError::Internal)
+            .map_err(|()| DatabaseError::Internal("rwlock error".to_string()))
             .map(move |mut storage| {
                 for key in keys {
                     storage.remove(&key);
