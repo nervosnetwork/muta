@@ -1,28 +1,26 @@
 use bytes::Bytes;
 use futures::prelude::{Async, Future, Poll, Stream};
 use futures::sync::mpsc::{channel, Receiver, SendError, Sender};
-use futures::{future, stream, task};
-use log::{debug, info, trace, warn};
+use futures::{stream, task};
+use log::{debug, info, warn};
 use parking_lot::RwLock;
 use tentacle::context::{ServiceContext, SessionContext};
-use tentacle::service::{ProtocolHandle, ProtocolMeta, ServiceControl, ServiceTask};
+use tentacle::service::{ProtocolHandle, ProtocolMeta, ServiceControl};
 use tentacle::{
-    builder::MetaBuilder, error::Error, multiaddr::Multiaddr, secio::PeerId,
-    traits::ServiceProtocol, ProtocolId, SessionId,
+    builder::MetaBuilder, multiaddr::Multiaddr, secio::PeerId, traits::ServiceProtocol, ProtocolId,
+    SessionId,
 };
-use tokio::timer::Delay;
 
 use std::collections::VecDeque;
 use std::fmt::Debug;
 use std::marker::Send;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
 
 mod codec;
 pub(crate) mod task_handle;
 
 pub use codec::Codec;
-use task_handle::{TaskHandle, BROADCAST_TASK_ID, RECV_DATA_TASK_ID};
+use task_handle::{TaskHandle, RECV_DATA_TASK_ID};
 
 /// Protocol name (handshake)
 pub const PROTOCOL_NAME: &str = "transmission";
@@ -32,9 +30,6 @@ pub const SUPPORT_VERSIONS: [&str; 1] = ["0.1"];
 
 /// Channel buffer size
 pub const CHANNEL_BUFFERS: usize = 8;
-
-/// Cast channel retry delay (seconds)
-pub const CHANNEL_CAST_RETRY_DELAY: u64 = 2;
 
 /// Low-level transport data type
 pub type RawMessage = Bytes;
@@ -74,16 +69,6 @@ pub enum CastMessage<TMessage> {
     All(TMessage),
 }
 
-// Data type for `pending_raw_casts`
-type RawCast = (Option<Vec<SessionId>>, RawMessage);
-
-// The enum wrapper for `CastMessage` and `RawCast`
-#[derive(Debug)]
-enum DoCast<TMessage: Debug> {
-    Message(CastMessage<TMessage>),
-    Raw(RawCast),
-}
-
 /// Protocol for datagram transport
 pub struct TransmissionProtocol<TMessage, TPeerManager> {
     // Inner protocol id
@@ -93,21 +78,16 @@ pub struct TransmissionProtocol<TMessage, TPeerManager> {
     recv_tx: Sender<TMessage>,
 
     // Receiver for message ready to broadcast to connected sessions
-    // note: Becasue we need to move it into another thread, must wrap
-    // it inside Arc<Mutex<_>>.
-    cast_rx: Option<Receiver<CastMessage<TMessage>>>,
+    cast_rx: Receiver<CastMessage<TMessage>>,
 
     // Peer manager for misbehave report
     peer_mgr: TPeerManager,
-
-    // Messages ready to send later
-    pending_raw_casts: Arc<RwLock<VecDeque<RawCast>>>,
 
     // Received data ready to send later
     pending_recv_data: Arc<RwLock<VecDeque<TMessage>>>,
 
     // Stream task handle to pending stream for later notify
-    pending_task_handles: TaskHandle,
+    pending_task_handle: TaskHandle,
 }
 
 impl<TMessage, TPeerManager> TransmissionProtocol<TMessage, TPeerManager>
@@ -139,11 +119,10 @@ where
                 peer_mgr: peer_mgr.clone(),
 
                 recv_tx: recv_tx.clone(),
-                cast_rx: Some(cast_rx),
+                cast_rx,
 
-                pending_raw_casts: Default::default(),
                 pending_recv_data: Default::default(),
-                pending_task_handles: Default::default(),
+                pending_task_handle: Default::default(),
             };
 
             ProtocolHandle::Callback(Box::new(proto))
@@ -157,79 +136,6 @@ where
             .build();
 
         (meta, cast_tx, recv_rx)
-    }
-
-    pub(crate) fn broadcast_task(
-        proto_id: ProtocolId,
-        cast_rx: Receiver<CastMessage<TMessage>>,
-        pending: Arc<RwLock<VecDeque<RawCast>>>,
-        task_handle: TaskHandle,
-        mut control: ServiceControl,
-    ) -> Box<dyn Future<Item = (), Error = ()> + Send + 'static> {
-        let pending_cloned = Arc::clone(&pending);
-        let mut task_handle_cloned = task_handle.clone();
-
-        // create stream from pending
-        let pending_stream = stream::poll_fn(move || -> Poll<Option<DoCast<TMessage>>, ()> {
-            // record task handle
-            task_handle_cloned.insert(BROADCAST_TASK_ID, task::current());
-
-            // do poll
-            Ok(pending_cloned
-                .write()
-                .pop_front()
-                .map_or(Async::NotReady, |raw| Async::Ready(Some(DoCast::Raw(raw)))))
-        });
-
-        let unpark_cast = |do_cast: DoCast<TMessage>| -> (Option<Vec<SessionId>>, RawMessage) {
-            match do_cast {
-                DoCast::Raw(raw_cast) => raw_cast,
-                DoCast::Message(cast) => {
-                    let (session_ids, msg) = match cast {
-                        CastMessage::Uni { session_id, msg } => (Some(vec![session_id]), msg),
-                        CastMessage::Multi { session_ids, msg } => (Some(session_ids), msg),
-                        CastMessage::All(msg) => (None, msg),
-                    };
-                    (session_ids, Codec::encode(msg))
-                }
-            }
-        };
-
-        let do_broadcast = move |do_cast: DoCast<TMessage>|
-              -> Box<Future<Item = (), Error = ()> + Send + 'static> {
-
-            let (session_ids, raw_msg) = unpark_cast(do_cast);
-
-            if let Err(err) = control.filter_broadcast(session_ids, proto_id, raw_msg.to_vec()) {
-                debug!("protocol [transmission]: fail to send message");
-                trace!("protocol [transmission]: *** broadcast error ***: {:?}", err);
-
-                // if full then move it to pending
-                let task_handle = task_handle.clone();
-                if let Error::TaskFull(ServiceTask::ProtocolMessage { session_ids, data, ..  }) = err {
-                    pending
-                        .write()
-                        .push_back((session_ids, RawMessage::from(data)));
-
-                    let fut = Delay::new(Instant::now() + Duration::from_secs(CHANNEL_CAST_RETRY_DELAY))
-                        .then(move |_| {
-                            task_handle.notify(BROADCAST_TASK_ID);
-                            Ok(())
-                        });
-
-                    return Box::new(fut);
-                }
-            }
-
-            Box::new(future::ok(()))
-        };
-
-        let fut_task = cast_rx
-            .map(DoCast::Message)
-            .select(pending_stream)
-            .for_each(do_broadcast);
-
-        Box::new(fut_task)
     }
 
     pub(crate) fn recv_deliver_task(
@@ -265,46 +171,14 @@ where
     }
 
     /// Init callback method for ServiceProtocol trait
-    ///
-    /// # Panics
-    ///
-    /// Panics if a protocol instance do init more than once
     pub(crate) fn do_init(&mut self, mut control: ServiceControl) {
         info!("protocol [transmission{}]: do init", self.id);
 
-        let proto_id = self.id;
         let recv_tx = self.recv_tx.clone();
-        let pending_raw_casts = Arc::clone(&self.pending_raw_casts);
         let pending_recv_data = Arc::clone(&self.pending_recv_data);
+        let task_handle = self.pending_task_handle.clone();
 
-        // Take out receiver for later broadcast task
-        let cast_rx = {
-            let cast_rx = self.cast_rx.take();
-
-            debug_assert!(
-                cast_rx.is_some(),
-                "protocol [transmission]: should init once",
-            );
-
-            cast_rx.unwrap()
-        };
-
-        let broadcast_task = Self::broadcast_task(
-            proto_id,
-            cast_rx,
-            pending_raw_casts,
-            self.pending_task_handles.clone(),
-            control.clone(),
-        );
-        let deliver_task = Self::recv_deliver_task(
-            recv_tx,
-            pending_recv_data,
-            self.pending_task_handles.clone(),
-        );
-
-        control
-            .future_task(broadcast_task)
-            .expect("fail to register broadcast task");
+        let deliver_task = Self::recv_deliver_task(recv_tx, pending_recv_data, task_handle);
         control
             .future_task(deliver_task)
             .expect("fail to register recv deliver task");
@@ -318,7 +192,7 @@ where
 
         if let Err(()) = <TMessage as Codec>::decode(&data).and_then(|data| {
             self.pending_recv_data.write().push_back(data);
-            self.pending_task_handles.notify(RECV_DATA_TASK_ID);
+            self.pending_task_handle.notify(RECV_DATA_TASK_ID);
 
             Ok(())
         }) {
@@ -329,6 +203,23 @@ where
                 session.address.clone(),
                 Misbehavior::InvalidMessage,
             );
+        }
+    }
+
+    pub(crate) fn do_cast(&mut self, serv_ctx: &mut ServiceContext) {
+        let unpark_cast =
+            |cast_msg: CastMessage<TMessage>| -> (Option<Vec<SessionId>>, RawMessage) {
+                let (session_ids, msg) = match cast_msg {
+                    CastMessage::Uni { session_id, msg } => (Some(vec![session_id]), msg),
+                    CastMessage::Multi { session_ids, msg } => (Some(session_ids), msg),
+                    CastMessage::All(msg) => (None, msg),
+                };
+                (session_ids, Codec::encode(msg))
+            };
+
+        if let Ok(Async::Ready(Some(cast))) = self.cast_rx.poll() {
+            let (session_ids, msg) = unpark_cast(cast);
+            serv_ctx.filter_broadcast(session_ids, self.id, msg.to_vec());
         }
     }
 }
@@ -343,6 +234,10 @@ where
     }
 
     fn received(&mut self, _: &mut ServiceContext, session: &SessionContext, data: RawMessage) {
-        self.do_recv(session, data);
+        self.do_recv(session, data)
+    }
+
+    fn poll(&mut self, serv_ctx: &mut ServiceContext) {
+        self.do_cast(serv_ctx)
     }
 }

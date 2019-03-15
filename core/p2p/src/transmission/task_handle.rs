@@ -5,21 +5,18 @@ use std::sync::Arc;
 
 pub type TaskId = usize;
 
-/// Broadcast task id
-pub const BROADCAST_TASK_ID: TaskId = 1;
 /// Recv data task id
-pub const RECV_DATA_TASK_ID: TaskId = 2;
+pub const RECV_DATA_TASK_ID: TaskId = 1;
 
 // Wrapper around cast and recv stream task
 pub(crate) struct TaskHandle {
-    inner: Arc<RwLock<(Option<Task>, Option<Task>)>>,
+    inner: Arc<RwLock<Option<Task>>>,
 }
 
 impl TaskHandle {
     pub fn notify(&self, id: TaskId) {
         let maybe_task = match id {
-            BROADCAST_TASK_ID => self.inner.read().0.clone(),
-            RECV_DATA_TASK_ID => self.inner.read().1.clone(),
+            RECV_DATA_TASK_ID => self.inner.read().clone(),
             _ => unreachable!(),
         };
 
@@ -31,8 +28,7 @@ impl TaskHandle {
 
     pub fn insert(&mut self, id: TaskId, task: Task) {
         match id {
-            BROADCAST_TASK_ID => self.inner.write().0 = Some(task),
-            RECV_DATA_TASK_ID => self.inner.write().1 = Some(task),
+            RECV_DATA_TASK_ID => *self.inner.write() = Some(task),
             _ => unreachable!(),
         }
     }
@@ -41,7 +37,7 @@ impl TaskHandle {
 impl Default for TaskHandle {
     fn default() -> Self {
         TaskHandle {
-            inner: Arc::new(RwLock::new((None, None))),
+            inner: Arc::new(RwLock::new(None)),
         }
     }
 }
