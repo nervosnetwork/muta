@@ -1,15 +1,13 @@
 use std::error::Error;
 use std::fmt;
 
-use prost::{DecodeError, EncodeError};
-
 use core_runtime::DatabaseError;
+use core_serialization::CodecError;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StorageError {
     Database(DatabaseError),
-    Decode(DecodeError),
-    Encode(EncodeError),
+    Codec(CodecError),
     Internal(String),
 }
 
@@ -17,8 +15,7 @@ impl Error for StorageError {
     fn description(&self) -> &str {
         match *self {
             StorageError::Database(_) => "database error",
-            StorageError::Decode(_) => "decode error",
-            StorageError::Encode(_) => "encode error",
+            StorageError::Codec(_) => "codec error",
             StorageError::Internal(_) => "internal error",
         }
     }
@@ -28,8 +25,7 @@ impl fmt::Display for StorageError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let printable = match *self {
             StorageError::Database(ref err) => format!("database error: {:?}", err),
-            StorageError::Decode(ref err) => format!("decode error: {:?}", err),
-            StorageError::Encode(ref err) => format!("encode error: {:?}", err),
+            StorageError::Codec(ref err) => format!("codec error: {:?}", err),
             StorageError::Internal(ref err) => format!("internal error: {:?}", err),
         };
         write!(f, "{}", printable)
@@ -42,15 +38,9 @@ impl From<DatabaseError> for StorageError {
     }
 }
 
-impl From<DecodeError> for StorageError {
-    fn from(err: DecodeError) -> Self {
-        StorageError::Decode(err)
-    }
-}
-
-impl From<EncodeError> for StorageError {
-    fn from(err: EncodeError) -> Self {
-        StorageError::Encode(err)
+impl From<CodecError> for StorageError {
+    fn from(err: CodecError) -> Self {
+        StorageError::Codec(err)
     }
 }
 
