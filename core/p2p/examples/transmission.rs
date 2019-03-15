@@ -100,27 +100,21 @@ struct DemoService {
 }
 
 impl ServiceHandle for DemoService {
-    fn handle_error(&mut self, _control: &mut ServiceContext, error: ServiceError) {
+    fn handle_error(&mut self, _: &mut ServiceContext, error: ServiceError) {
         error!("Demo service error: {:?}", error);
     }
 
-    fn handle_event(&mut self, control: &mut ServiceContext, event: ServiceEvent) {
+    fn handle_event(&mut self, _: &mut ServiceContext, event: ServiceEvent) {
         info!("Demo service event: {:?}", event);
 
         match event {
-            ServiceEvent::SessionOpen {
-                session_context: session,
-            } if session.remote_pubkey.is_none() => {
-                info!("Demo service: drop un-encypt session {}", session.id);
-                control.disconnect(session.id);
-            }
             ServiceEvent::SessionClose {
                 session_context: session,
             } => {
                 info!("Demo service: session {} disconnected", session.id);
             }
-            ServiceEvent::SessionOpen { .. } => {
-                // noop
+            _ => {
+                // no-op
             }
         }
     }
