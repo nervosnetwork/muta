@@ -3,7 +3,7 @@ use futures::prelude::{Async, Future, Poll, Stream};
 use futures::sync::mpsc::{channel, Receiver, SendError, Sender};
 use futures::{future, stream, task};
 use log::{debug, info, trace, warn};
-use parking_lot::{Mutex, RwLock};
+use parking_lot::RwLock;
 use tentacle::context::{ServiceContext, SessionContext};
 use tentacle::service::{ProtocolHandle, ProtocolMeta, ServiceControl, ServiceTask};
 use tentacle::{
@@ -95,7 +95,7 @@ pub struct TransmissionProtocol<TMessage, TPeerManager> {
     // Receiver for message ready to broadcast to connected sessions
     // note: Becasue we need to move it into another thread, must wrap
     // it inside Arc<Mutex<_>>.
-    cast_rx: Arc<Mutex<Option<Receiver<CastMessage<TMessage>>>>>,
+    cast_rx: Option<Receiver<CastMessage<TMessage>>>,
 
     // Peer manager for misbehave report
     peer_mgr: TPeerManager,
@@ -126,7 +126,6 @@ where
     ) {
         let (cast_tx, cast_rx) = channel(CHANNEL_BUFFERS);
         let (recv_tx, recv_rx) = channel::<TMessage>(CHANNEL_BUFFERS);
-        let cast_rx = Arc::new(Mutex::new(Some(cast_rx)));
 
         let support_versions = SUPPORT_VERSIONS
             .to_vec()
@@ -134,25 +133,27 @@ where
             .map(String::from)
             .collect();
 
-        let proto = move || -> TransmissionProtocol<TMessage, TPeerManager> {
-            TransmissionProtocol {
+        let proto_handle = move || -> ProtocolHandle<Box<dyn ServiceProtocol + Send + 'static>> {
+            let proto = TransmissionProtocol {
                 id,
                 peer_mgr: peer_mgr.clone(),
 
                 recv_tx: recv_tx.clone(),
-                cast_rx: Arc::clone(&cast_rx),
+                cast_rx: Some(cast_rx),
 
                 pending_raw_casts: Default::default(),
                 pending_recv_data: Default::default(),
                 pending_task_handles: Default::default(),
-            }
+            };
+
+            ProtocolHandle::Callback(Box::new(proto))
         };
 
         let meta = MetaBuilder::default()
             .id(id)
             .name(|id| format!("{}/{}", PROTOCOL_NAME, id))
             .support_versions(support_versions)
-            .service_handle(move |_meta| ProtocolHandle::Callback(Box::new(proto())))
+            .service_handle(proto_handle)
             .build();
 
         (meta, cast_tx, recv_rx)
@@ -278,7 +279,7 @@ where
 
         // Take out receiver for later broadcast task
         let cast_rx = {
-            let cast_rx = self.cast_rx.lock().take();
+            let cast_rx = self.cast_rx.take();
 
             debug_assert!(
                 cast_rx.is_some(),
