@@ -2,6 +2,7 @@ use core_p2p::transmission::{CastMessage, Misbehavior, PeerManager, Transmission
 
 use env_logger;
 use futures::future::Future;
+use futures::prelude::Async;
 use futures::stream::Stream;
 use log::{error, info};
 use parking_lot::RwLock;
@@ -130,14 +131,14 @@ fn create_peer(id: u64, msg: String) -> (Service<DemoService>, JoinHandle<()>, J
         addrs: Default::default(),
     };
 
-    let (demo_proto, mut tx, rx) = TransmissionProtocol::build(DEMO_PROTOCOL_ID, peer_mgr);
+    let (demo_proto, mut tx, mut rx) = TransmissionProtocol::build(DEMO_PROTOCOL_ID, peer_mgr);
 
     let key_pair = SecioKeyPair::secp256k1_generated();
     let pub_key = key_pair.to_public_key();
 
     // interval broadcast hello message to others
     let cast_handle = std::thread::spawn(move || {
-        let interval_task = Interval::new(Instant::now(), Duration::from_secs(5))
+        let interval_task = Interval::new(Instant::now(), Duration::from_secs(2))
             .for_each(move |_| {
                 let hello_msg = message::Hello {
                     id,
@@ -154,9 +155,17 @@ fn create_peer(id: u64, msg: String) -> (Service<DemoService>, JoinHandle<()>, J
 
     // handle hello message from others
     let recv_handle = std::thread::spawn(move || {
-        let recv_task = rx
-            .for_each(|msg| {
-                info!("Demo service: {:?}", msg);
+        let recv_task = Interval::new(Instant::now(), Duration::from_secs(5))
+            .for_each(move |_| {
+                match rx.poll() {
+                    Ok(Async::Ready(Some(msg))) => {
+                        info!("Demo service: {:?}", msg);
+                    }
+                    Err(err) => error!("Demo service: {:?}", err),
+                    _ => {
+                        // no-op
+                    }
+                }
                 Ok(())
             })
             .map_err(|err| error!("{:?}", err));

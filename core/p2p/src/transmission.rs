@@ -1,8 +1,8 @@
 use bytes::Bytes;
 use futures::prelude::{Async, Future, Poll, Stream};
-use futures::sync::mpsc::{channel, Receiver, Sender};
-use futures::{stream, task};
-use log::{debug, info, warn};
+use futures::sync::mpsc::{channel, Receiver, SendError, Sender};
+use futures::{future, stream, task};
+use log::{debug, info, trace, warn};
 use parking_lot::{Mutex, RwLock};
 use tentacle::context::{ServiceContext, SessionContext};
 use tentacle::service::{ProtocolHandle, ProtocolMeta, ServiceControl, ServiceTask};
@@ -10,11 +10,13 @@ use tentacle::{
     builder::MetaBuilder, error::Error, multiaddr::Multiaddr, secio::PeerId,
     traits::ServiceProtocol, ProtocolId, SessionId,
 };
+use tokio::timer::Delay;
 
 use std::collections::VecDeque;
 use std::fmt::Debug;
 use std::marker::Send;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 mod codec;
 pub(crate) mod task_handle;
@@ -30,6 +32,9 @@ pub const SUPPORT_VERSIONS: [&str; 1] = ["0.1"];
 
 /// Channel buffer size
 pub const CHANNEL_BUFFERS: usize = 8;
+
+/// Cast channel retry delay (seconds)
+pub const CHANNEL_CAST_RETRY_DELAY: u64 = 2;
 
 /// Low-level transport data type
 pub type RawMessage = Bytes;
@@ -158,10 +163,8 @@ where
         cast_rx: Receiver<CastMessage<TMessage>>,
         pending: Arc<RwLock<VecDeque<RawCast>>>,
         task_handle: TaskHandle,
-        control: &mut ServiceControl,
+        mut control: ServiceControl,
     ) -> Box<dyn Future<Item = (), Error = ()> + Send + 'static> {
-        let mut control = control.clone();
-
         let pending_cloned = Arc::clone(&pending);
         let mut task_handle_cloned = task_handle.clone();
 
@@ -191,38 +194,45 @@ where
             }
         };
 
-        let mut do_broadcast = move |session_ids: Option<Vec<SessionId>>, raw_msg: RawMessage| {
-            if let Err(err) = control.filter_broadcast(session_ids, proto_id, raw_msg.to_vec()) {
-                debug!("protocol [tranmission]: fail to send message");
+        let do_broadcast = move |do_cast: DoCast<TMessage>|
+              -> Box<Future<Item = (), Error = ()> + Send + 'static> {
 
-                // move it to pending
-                if let Error::TaskFull(ServiceTask::ProtocolMessage {
-                    session_ids, data, ..
-                }) = err
-                {
+            let (session_ids, raw_msg) = unpark_cast(do_cast);
+
+            if let Err(err) = control.filter_broadcast(session_ids, proto_id, raw_msg.to_vec()) {
+                debug!("protocol [transmission]: fail to send message");
+                trace!("protocol [transmission]: *** broadcast error ***: {:?}", err);
+
+                // if full then move it to pending
+                let task_handle = task_handle.clone();
+                if let Error::TaskFull(ServiceTask::ProtocolMessage { session_ids, data, ..  }) = err {
                     pending
                         .write()
                         .push_back((session_ids, RawMessage::from(data)));
 
-                    task_handle.notify(BROADCAST_TASK_ID);
+                    let fut = Delay::new(Instant::now() + Duration::from_secs(CHANNEL_CAST_RETRY_DELAY))
+                        .then(move |_| {
+                            task_handle.notify(BROADCAST_TASK_ID);
+                            Ok(())
+                        });
+
+                    return Box::new(fut);
                 }
             }
+
+            Box::new(future::ok(()))
         };
 
         let fut_task = cast_rx
             .map(DoCast::Message)
             .select(pending_stream)
-            .for_each(move |do_cast| {
-                let (session_ids, raw_msg) = unpark_cast(do_cast);
-                do_broadcast(session_ids, raw_msg);
-                Ok(()) // continue loop our task
-            });
+            .for_each(do_broadcast);
 
         Box::new(fut_task)
     }
 
     pub(crate) fn recv_deliver_task(
-        mut recv_tx: Sender<TMessage>,
+        recv_tx: Sender<TMessage>,
         pending: Arc<RwLock<VecDeque<TMessage>>>,
         task_handle: TaskHandle,
     ) -> Box<dyn Future<Item = (), Error = ()> + Send + 'static> {
@@ -230,29 +240,22 @@ where
         let mut task_handle_cloned = task_handle.clone();
 
         // create stream from pending
-        let pending_stream = stream::poll_fn(move || -> Poll<Option<TMessage>, ()> {
-            // record task handle
-            task_handle_cloned.insert(RECV_DATA_TASK_ID, task::current());
+        let pending_stream =
+            stream::poll_fn(move || -> Poll<Option<TMessage>, SendError<TMessage>> {
+                // record task handle
+                task_handle_cloned.insert(RECV_DATA_TASK_ID, task::current());
 
-            // do poll
-            Ok(pending_cloned
-                .write()
-                .pop_front()
-                .map_or(Async::NotReady, |msg| Async::Ready(Some(msg))))
-        });
+                // do poll
+                Ok(pending_cloned
+                    .write()
+                    .pop_front()
+                    .map_or(Async::NotReady, |msg| Async::Ready(Some(msg))))
+            });
 
-        let deliver_task = pending_stream.for_each(move |recv_msg| {
-            if let Err(err) = recv_tx.try_send(recv_msg) {
-                warn!(
-                    "protocol [transmission]: fail to deliver recv msg: [{}]",
-                    err
-                );
-
-                // unpark TrySendError to recover msg, push it back to pending
-                pending.write().push_front(err.into_inner());
-
-                // notify
-                task_handle.clone().notify(RECV_DATA_TASK_ID);
+        let deliver_task = pending_stream.forward(recv_tx).then(|finish| {
+            if let Err(err) = finish {
+                warn!("protocol [transmission]: deliver task error: [{:?}]", err);
+                Err(())?
             }
             Ok(())
         });
@@ -265,11 +268,10 @@ where
     /// # Panics
     ///
     /// Panics if a protocol instance do init more than once
-    pub(crate) fn do_init(&mut self, control: &mut ServiceContext) {
+    pub(crate) fn do_init(&mut self, mut control: ServiceControl) {
         info!("protocol [transmission{}]: do init", self.id);
 
         let proto_id = self.id;
-        let control = control.control();
         let recv_tx = self.recv_tx.clone();
         let pending_raw_casts = Arc::clone(&self.pending_raw_casts);
         let pending_recv_data = Arc::clone(&self.pending_recv_data);
@@ -291,7 +293,7 @@ where
             cast_rx,
             pending_raw_casts,
             self.pending_task_handles.clone(),
-            control,
+            control.clone(),
         );
         let deliver_task = Self::recv_deliver_task(
             recv_tx,
@@ -307,12 +309,7 @@ where
             .expect("fail to register recv deliver task");
     }
 
-    pub(crate) fn do_recv(
-        &mut self,
-        _control: &mut ServiceContext,
-        session: &SessionContext,
-        data: RawMessage,
-    ) {
+    pub(crate) fn do_recv(&mut self, session: &SessionContext, data: RawMessage) {
         debug!(
             "protocol [transmission]: message from session [{:?}]",
             (session.id, &session.address, &session.remote_pubkey)
@@ -340,16 +337,11 @@ where
     TMessage: Codec + Send + Sync + 'static + Debug,
     TPeerManager: PeerManager + Send + Sync + Clone + 'static,
 {
-    fn init(&mut self, control: &mut ServiceContext) {
-        self.do_init(control)
+    fn init(&mut self, serv_ctx: &mut ServiceContext) {
+        self.do_init(serv_ctx.control().clone())
     }
 
-    fn received(
-        &mut self,
-        control: &mut ServiceContext,
-        session: &SessionContext,
-        data: RawMessage,
-    ) {
-        self.do_recv(control, session, data);
+    fn received(&mut self, _: &mut ServiceContext, session: &SessionContext, data: RawMessage) {
+        self.do_recv(session, data);
     }
 }
