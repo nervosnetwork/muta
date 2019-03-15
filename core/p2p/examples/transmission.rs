@@ -107,15 +107,11 @@ impl ServiceHandle for DemoService {
     fn handle_event(&mut self, _: &mut ServiceContext, event: ServiceEvent) {
         info!("Demo service event: {:?}", event);
 
-        match event {
-            ServiceEvent::SessionClose {
-                session_context: session,
-            } => {
-                info!("Demo service: session {} disconnected", session.id);
-            }
-            _ => {
-                // no-op
-            }
+        if let ServiceEvent::SessionClose {
+            session_context: session,
+        } = event
+        {
+            info!("Demo service: session {} disconnected", session.id);
         }
     }
 }
