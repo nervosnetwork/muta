@@ -6,7 +6,7 @@ edition = "2018"
 
 [dependencies]
 transaction-pool = { path = "components/transaction-pool" }
-database = { path = "components/database" }
+components-database = { path = "components/database" }
 core-storage = { path = "core/storage" }
 
 [workspace]

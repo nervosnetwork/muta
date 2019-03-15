@@ -1,17 +1,14 @@
 [package]
-name = "muta-proto"
+name = "core-serialization"
 version = "0.1.0"
 authors = ["Cryptape Technologies <contact@cryptape.com>"]
 edition = "2018"
 license = "Apache-2.0"
 
-[lib]
-name = "muta_proto"
-
 [dependencies]
 bytes = "0.4.11"
-prost = "0.4.0"
-prost-derive = "0.4.0"
+prost = "0.5.0"
+prost-derive = "0.5.0"
 
 [build-dependencies]
-prost-build = "0.4.0"
+prost-build = "0.5.0"

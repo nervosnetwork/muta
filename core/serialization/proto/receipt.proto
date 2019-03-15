@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package receipt;
+
+message Receipt {
+    // bytes32(H256)
+    bytes state_root = 1;
+    // bytes32(U256) - quota used by this tx
+    uint64 quota_used = 2;
+    // bytes256(2048bit)
+    bytes log_bloom = 3;
+    repeated LogEntry logs = 4;
+    string error = 5;
+    uint64 account_nonce = 6;
+    // bytes32(H256)
+    bytes transaction_hash = 7;
+}
+
+message LogEntry {
+    // bytes20(Address) - contract address deal with this tx
+    bytes address = 1;
+    // bytes32(H256)
+    repeated bytes topics = 2;
+    bytes data = 3;
+}

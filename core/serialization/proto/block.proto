@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package block;
+
+// 180 + len(proof)
+message BlockHeader {
+    // bytes32(H256) - hash of prev block header
+    bytes prevhash = 1;
+    // ms since 1970-1-1
+    uint64 timestamp = 2;
+    uint64 height = 3;
+    // bytes32(H256)
+    bytes transactions_root = 4;
+    // bytes32(H256)
+    bytes state_root = 5;
+    // bytes32(H256)
+    bytes receipts_root = 6;
+    uint64 quota_used = 7;
+    uint64 quota_limit = 8;
+    repeated bytes votes = 9;
+    // bytes20 - address of proposer
+    bytes proposer = 10;
+}
+
+// proposal block same as Block
+message Block {
+    BlockHeader header = 1;
+    repeated bytes tx_hashes = 2;
+}
