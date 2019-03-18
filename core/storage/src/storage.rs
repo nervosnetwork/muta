@@ -1,12 +1,11 @@
 use byteorder::{ByteOrder, NativeEndian};
-use bytes::{BytesMut, IntoBuf};
-use futures::future::{join_all, result, Future};
-use prost::Message;
+use bytes::BytesMut;
+use futures::future::{join_all, Future};
 
 use core_runtime::{DatabaseFactory, DatabaseInstance, FutRuntimeResult};
 use core_serialization::{
     block::Block as PbBlock, receipt::Receipt as PbReceipt,
-    transaction::SignedTransaction as PbSignedTransaction,
+    transaction::SignedTransaction as PbSignedTransaction, AsyncCodec,
 };
 use core_types::{Block, Hash, Receipt, SignedTransaction};
 
@@ -94,7 +93,7 @@ where
                     .get(PREFIX_LATEST_BLOCK)
                     .map_err(StorageError::Database)
             })
-            .and_then(AsyncCodec::decode::<PbBlock>)
+            .and_then(|data| AsyncCodec::decode::<PbBlock>(data).map_err(StorageError::Codec))
             .map(Block::from);
 
         Box::new(fut)
@@ -108,7 +107,7 @@ where
             .crate_instance()
             .map_err(StorageError::Database)
             .and_then(move |db_instance| db_instance.get(&key).map_err(StorageError::Database))
-            .and_then(AsyncCodec::decode::<PbBlock>)
+            .and_then(|data| AsyncCodec::decode::<PbBlock>(data).map_err(StorageError::Codec))
             .map(Block::from);;
 
         Box::new(fut)
@@ -134,7 +133,7 @@ where
                     .get(&gen_key_with_u64(PREFIX_BLOCK_HEIGHT, height))
                     .map_err(StorageError::Database)
             })
-            .and_then(AsyncCodec::decode::<PbBlock>)
+            .and_then(|data| AsyncCodec::decode::<PbBlock>(data).map_err(StorageError::Codec))
             .map(Block::from);
 
         Box::new(fut)
@@ -148,7 +147,9 @@ where
             .crate_instance()
             .map_err(StorageError::Database)
             .and_then(move |db_instance| db_instance.get(&key).map_err(StorageError::Database))
-            .and_then(AsyncCodec::decode::<PbSignedTransaction>)
+            .and_then(|data| {
+                AsyncCodec::decode::<PbSignedTransaction>(data).map_err(StorageError::Codec)
+            })
             .map(SignedTransaction::from);
 
         Box::new(fut)
@@ -173,7 +174,10 @@ where
             .and_then(move |opt_txs_data| {
                 join_all(opt_txs_data.into_iter().map(|opt_data| {
                     if let Some(data) = opt_data {
-                        Some(AsyncCodec::decode::<PbSignedTransaction>(data.to_vec()))
+                        Some(
+                            AsyncCodec::decode::<PbSignedTransaction>(data.to_vec())
+                                .map_err(StorageError::Codec),
+                        )
                     } else {
                         None
                     }
@@ -203,7 +207,7 @@ where
             .crate_instance()
             .map_err(StorageError::Database)
             .and_then(move |db_instance| db_instance.get(&key).map_err(StorageError::Database))
-            .and_then(AsyncCodec::decode::<PbReceipt>)
+            .and_then(|data| AsyncCodec::decode::<PbReceipt>(data).map_err(StorageError::Codec))
             .map(Receipt::from);
 
         Box::new(fut)
@@ -228,7 +232,10 @@ where
             .and_then(|opt_receipts_data| {
                 join_all(opt_receipts_data.into_iter().map(|opt_data| {
                     if let Some(data) = opt_data {
-                        Some(AsyncCodec::decode::<PbReceipt>(data.to_vec()))
+                        Some(
+                            AsyncCodec::decode::<PbReceipt>(data.to_vec())
+                                .map_err(StorageError::Codec),
+                        )
                     } else {
                         None
                     }
@@ -256,13 +263,14 @@ where
             .map_err(StorageError::Database);
 
         let pb_block: PbBlock = block.clone().into();
-        let mut encoded_buf = BytesMut::with_capacity(pb_block.encoded_len());
+        let mut encoded_buf = BytesMut::with_capacity(AsyncCodec::encoded_len(&pb_block));
 
         let height = block.header.height;
         let height_key = gen_key_with_u64(PREFIX_BLOCK_HEIGHT, block.header.height);
         let hash_key = gen_key_with_slice(PREFIX_BLOCK_HEIGHT_BY_HASH, block.hash().as_ref());
 
-        let fut = AsyncCodec::encode(pb_block, &mut encoded_buf)
+        let fut = AsyncCodec::encode(&pb_block, &mut encoded_buf)
+            .map_err(StorageError::Codec)
             .and_then(|()| instance_fut)
             .and_then(move |mut db_instance| {
                 join_all(vec![
@@ -296,8 +304,11 @@ where
         let mut peding_fut = vec![];
         for tx in signed_txs {
             let pb_tx: PbSignedTransaction = tx.clone().into();
-            let mut buf = BytesMut::with_capacity(pb_tx.encoded_len());
-            let fut = AsyncCodec::encode(pb_tx, &mut buf).map(move |_| buf.to_vec());
+            let mut buf = BytesMut::with_capacity(AsyncCodec::encoded_len(&pb_tx));
+
+            let fut = AsyncCodec::encode(&pb_tx, &mut buf)
+                .map_err(StorageError::Codec)
+                .map(move |_| buf.to_vec());
 
             keys.push(gen_key_with_slice(PREFIX_TRANSACTION, tx.hash.as_ref()));
             peding_fut.push(fut);
@@ -326,8 +337,11 @@ where
         let mut peding_fut = vec![];
         for receipt in receipts {
             let pb_receipt: PbReceipt = receipt.clone().into();
-            let mut buf = BytesMut::with_capacity(pb_receipt.encoded_len());
-            let fut = AsyncCodec::encode(pb_receipt, &mut buf).map(move |_| buf.to_vec());
+            let mut buf = BytesMut::with_capacity(AsyncCodec::encoded_len(&pb_receipt));
+
+            let fut = AsyncCodec::encode(&pb_receipt, &mut buf)
+                .map_err(StorageError::Codec)
+                .map(move |_| buf.to_vec());
 
             keys.push(gen_key_with_slice(
                 PREFIX_RECEIPT,
@@ -365,26 +379,6 @@ fn transfrom_u64_to_array_u8(n: u64) -> Vec<u8> {
     let mut u64_slice = [0u8; 8];
     NativeEndian::write_u64(&mut u64_slice, n);
     u64_slice.to_vec()
-}
-
-#[derive(Default)]
-struct AsyncCodec;
-
-impl AsyncCodec {
-    pub fn decode<T: 'static + Message + Default>(
-        data: Vec<u8>,
-    ) -> FutRuntimeResult<T, StorageError> {
-        Box::new(result(
-            T::decode(data.into_buf()).map_err(StorageError::Decode),
-        ))
-    }
-
-    pub fn encode<T: Message>(
-        msg: T,
-        mut buf: &mut BytesMut,
-    ) -> FutRuntimeResult<(), StorageError> {
-        Box::new(result(msg.encode(&mut buf).map_err(StorageError::Encode)))
-    }
 }
 
 #[cfg(test)]
