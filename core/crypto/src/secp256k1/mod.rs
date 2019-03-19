@@ -13,10 +13,14 @@ pub struct Secp256k1;
 pub struct PrivateKey([u8; constants::SECRET_KEY_SIZE]);
 
 impl Transform for PrivateKey {
-    fn from_slice(data: &[u8]) -> Self {
+    fn from_bytes(data: &[u8]) -> Result<Self, CryptoError> {
+        if data.len() != constants::SECRET_KEY_SIZE {
+            return Err(CryptoError::PrivateKeyInvalid);
+        }
+
         let mut privkey = [0u8; constants::SECRET_KEY_SIZE];
         privkey[..].copy_from_slice(&data[..]);
-        PrivateKey(privkey)
+        Ok(PrivateKey(privkey))
     }
 
     fn as_bytes(&self) -> &[u8] {
@@ -27,10 +31,14 @@ impl Transform for PrivateKey {
 pub struct PublicKey([u8; constants::PUBLIC_KEY_SIZE]);
 
 impl Transform for PublicKey {
-    fn from_slice(data: &[u8]) -> Self {
+    fn from_bytes(data: &[u8]) -> Result<Self, CryptoError> {
+        if data.len() != constants::PUBLIC_KEY_SIZE {
+            return Err(CryptoError::PublicKeyInvalid);
+        }
+
         let mut pubkey = [0u8; constants::PUBLIC_KEY_SIZE];
         pubkey[..].copy_from_slice(&data[..]);
-        PublicKey(pubkey)
+        Ok(PublicKey(pubkey))
     }
 
     fn as_bytes(&self) -> &[u8] {
@@ -40,10 +48,14 @@ impl Transform for PublicKey {
 pub struct Signature([u8; constants::COMPACT_SIGNATURE_SIZE + 1]);
 
 impl Transform for Signature {
-    fn from_slice(data: &[u8]) -> Self {
+    fn from_bytes(data: &[u8]) -> Result<Self, CryptoError> {
+        if data.len() != constants::COMPACT_SIGNATURE_SIZE + 1 {
+            return Err(CryptoError::SignatureInvalid);
+        }
+
         let mut signatue = [0u8; constants::COMPACT_SIGNATURE_SIZE + 1];
         signatue[..].copy_from_slice(&data[..]);
-        Signature(signatue)
+        Ok(Signature(signatue))
     }
 
     fn as_bytes(&self) -> &[u8] {

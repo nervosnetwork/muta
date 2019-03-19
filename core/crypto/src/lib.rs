@@ -5,8 +5,8 @@ use std::fmt;
 use core_types::Hash;
 
 /// "Transform" ensures that the types associated with "Crypto" can be converted to bytes and converted from bytes.
-pub trait Transform {
-    fn from_slice(data: &[u8]) -> Self;
+pub trait Transform: Sized {
+    fn from_bytes(data: &[u8]) -> Result<Self, CryptoError>;
 
     fn as_bytes(&self) -> &[u8];
 }
@@ -32,6 +32,7 @@ pub trait Crypto {
 pub enum CryptoError {
     SignatureInvalid,
     PrivateKeyInvalid,
+    PublicKeyInvalid,
 }
 
 impl fmt::Display for CryptoError {
@@ -39,6 +40,7 @@ impl fmt::Display for CryptoError {
         let printable = match *self {
             CryptoError::SignatureInvalid => "signature invalid".to_string(),
             CryptoError::PrivateKeyInvalid => "private key invalid".to_string(),
+            CryptoError::PublicKeyInvalid => "public key invalid".to_string(),
         };
         write!(f, "{}", printable)
     }
