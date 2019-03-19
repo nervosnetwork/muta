@@ -4,16 +4,28 @@ use std::fmt;
 
 use core_types::Hash;
 
-pub struct Keypair {
-    pub private_key: Vec<u8>,
-    pub public_key: Vec<u8>,
+/// "Transform" ensures that the types associated with "Crypto" can be converted to bytes and converted from bytes.
+pub trait Transform {
+    fn from_slice(data: &[u8]) -> Self;
+
+    fn as_bytes(&self) -> &[u8];
 }
 
 pub trait Crypto {
-    fn recover_public_key(hash: &Hash, signature: &[u8]) -> Result<Vec<u8>, CryptoError>;
-    fn verify_with_signature(hash: &Hash, signature: &[u8]) -> Result<(), CryptoError>;
-    fn gen_keypair() -> Keypair;
-    fn sign(hash: &Hash, privkey: &[u8]) -> Result<Vec<u8>, CryptoError>;
+    type PrivateKey: Transform;
+    type PublicKey: Transform;
+    type Signature: Transform;
+
+    fn recover_public_key(
+        hash: &Hash,
+        signature: &Self::Signature,
+    ) -> Result<Self::PublicKey, CryptoError>;
+
+    fn verify_with_signature(hash: &Hash, signature: &Self::Signature) -> Result<(), CryptoError>;
+
+    fn gen_keypair() -> (Self::PrivateKey, Self::PublicKey);
+
+    fn sign(hash: &Hash, privkey: &Self::PrivateKey) -> Result<Self::Signature, CryptoError>;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

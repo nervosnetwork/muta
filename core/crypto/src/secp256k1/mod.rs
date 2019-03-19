@@ -1,45 +1,92 @@
 use secp256k1::{
     constants,
-    key::{PublicKey, SecretKey},
+    key::{PublicKey as RawPublicKey, SecretKey},
     rand, Message, RecoverableSignature, RecoveryId, Secp256k1 as RawSecp256k1,
 };
 
 use core_types::Hash;
 
-use crate::{Crypto, CryptoError, Keypair};
+use crate::{Crypto, CryptoError, Transform};
 
 pub struct Secp256k1;
 
-impl Crypto for Secp256k1 {
-    fn recover_public_key(hash: &Hash, signature: &[u8]) -> Result<Vec<u8>, CryptoError> {
-        let msg = Secp256k1::msg(hash)?;
-        let sig = Secp256k1::signature(signature)?;
-        let pubkey = Secp256k1::recover(&msg, &sig)?;
+pub struct PrivateKey([u8; constants::SECRET_KEY_SIZE]);
 
-        Ok(pubkey.serialize().to_vec())
+impl Transform for PrivateKey {
+    fn from_slice(data: &[u8]) -> Self {
+        let mut privkey = [0u8; constants::SECRET_KEY_SIZE];
+        privkey[..].copy_from_slice(&data[..]);
+        PrivateKey(privkey)
     }
 
-    fn verify_with_signature(hash: &Hash, signature: &[u8]) -> Result<(), CryptoError> {
+    fn as_bytes(&self) -> &[u8] {
+        self.0.as_ref()
+    }
+}
+
+pub struct PublicKey([u8; constants::PUBLIC_KEY_SIZE]);
+
+impl Transform for PublicKey {
+    fn from_slice(data: &[u8]) -> Self {
+        let mut pubkey = [0u8; constants::PUBLIC_KEY_SIZE];
+        pubkey[..].copy_from_slice(&data[..]);
+        PublicKey(pubkey)
+    }
+
+    fn as_bytes(&self) -> &[u8] {
+        self.0.as_ref()
+    }
+}
+pub struct Signature([u8; constants::COMPACT_SIGNATURE_SIZE + 1]);
+
+impl Transform for Signature {
+    fn from_slice(data: &[u8]) -> Self {
+        let mut signatue = [0u8; constants::COMPACT_SIGNATURE_SIZE + 1];
+        signatue[..].copy_from_slice(&data[..]);
+        Signature(signatue)
+    }
+
+    fn as_bytes(&self) -> &[u8] {
+        self.0.as_ref()
+    }
+}
+
+impl Crypto for Secp256k1 {
+    type PrivateKey = PrivateKey;
+    type PublicKey = PublicKey;
+    type Signature = Signature;
+
+    fn recover_public_key(
+        hash: &Hash,
+        signature: &Self::Signature,
+    ) -> Result<Self::PublicKey, CryptoError> {
         let msg = Secp256k1::msg(hash)?;
-        let sig = Secp256k1::signature(signature)?;
+        let sig = Secp256k1::signature(signature.as_bytes())?;
+        let pubkey = Secp256k1::recover(&msg, &sig)?;
+
+        Ok(PublicKey(pubkey.serialize()))
+    }
+
+    fn verify_with_signature(hash: &Hash, signature: &Self::Signature) -> Result<(), CryptoError> {
+        let msg = Secp256k1::msg(hash)?;
+        let sig = Secp256k1::signature(signature.as_bytes())?;
         let pubkey = Secp256k1::recover(&msg, &sig)?;
 
         Secp256k1::verify(&msg, &sig, &pubkey)?;
         Ok(())
     }
 
-    fn gen_keypair() -> Keypair {
-        let (privkey, pubkey) = RawSecp256k1::new().generate_keypair(&mut rand::thread_rng());
-
-        Keypair {
-            private_key: privkey[..].to_vec(),
-            public_key: pubkey.serialize().to_vec(),
-        }
+    fn gen_keypair() -> (Self::PrivateKey, Self::PublicKey) {
+        let (sk, pubkey) = RawSecp256k1::new().generate_keypair(&mut rand::thread_rng());
+        let mut privkey = [0u8; constants::SECRET_KEY_SIZE];
+        privkey[..].copy_from_slice(&sk[..]);
+        (PrivateKey(privkey), PublicKey(pubkey.serialize()))
     }
 
-    fn sign(hash: &Hash, privkey: &[u8]) -> Result<Vec<u8>, CryptoError> {
+    fn sign(hash: &Hash, privkey: &Self::PrivateKey) -> Result<Self::Signature, CryptoError> {
         let msg = Secp256k1::msg(hash)?;
-        let privkey = SecretKey::from_slice(privkey).map_err(|_| CryptoError::PrivateKeyInvalid)?;
+        let privkey = SecretKey::from_slice(privkey.as_bytes())
+            .map_err(|_| CryptoError::PrivateKeyInvalid)?;
 
         let secp = RawSecp256k1::new();
         let (rec_id, data) = secp.sign_recoverable(&msg, &privkey).serialize_compact();
@@ -47,7 +94,7 @@ impl Crypto for Secp256k1 {
         let mut signature = [0u8; constants::COMPACT_SIGNATURE_SIZE + 1];
         signature[0..64].copy_from_slice(&data[..]);
         signature[signature.len() - 1] = rec_id.to_i32() as u8;
-        Ok(signature.to_vec())
+        Ok(Signature(signature))
     }
 }
 
@@ -55,7 +102,7 @@ impl Secp256k1 {
     fn verify(
         msg: &Message,
         sig: &RecoverableSignature,
-        pubkey: &PublicKey,
+        pubkey: &RawPublicKey,
     ) -> Result<(), CryptoError> {
         let secp = RawSecp256k1::new();
         secp.verify(&msg, &sig.to_standard(), &pubkey)
@@ -63,7 +110,7 @@ impl Secp256k1 {
         Ok(())
     }
 
-    fn recover(msg: &Message, sig: &RecoverableSignature) -> Result<PublicKey, CryptoError> {
+    fn recover(msg: &Message, sig: &RecoverableSignature) -> Result<RawPublicKey, CryptoError> {
         let secp = RawSecp256k1::new();
         let pubkey = secp
             .recover(&msg, &sig)
@@ -95,23 +142,23 @@ impl Secp256k1 {
 mod tests {
     use super::Secp256k1;
 
-    use crate::Crypto;
+    use crate::{Crypto, Transform};
     use core_types::Hash;
 
     #[test]
     fn test_secp256k1_basic() {
-        let keypair = Secp256k1::gen_keypair();
+        let (privkey, pubkey) = Secp256k1::gen_keypair();
 
         let test_hash = Hash::from_raw(b"test");
 
         // test signature
-        let signature = Secp256k1::sign(&test_hash, &keypair.private_key).unwrap();
+        let signature = Secp256k1::sign(&test_hash, &privkey).unwrap();
 
         // test verify signature
         Secp256k1::verify_with_signature(&test_hash, &signature).unwrap();
 
         // test recover
-        let pubkey = Secp256k1::recover_public_key(&test_hash, &signature).unwrap();
-        assert_eq!(keypair.public_key, pubkey)
+        let pubkey2 = Secp256k1::recover_public_key(&test_hash, &signature).unwrap();
+        assert_eq!(pubkey.as_bytes(), pubkey2.as_bytes())
     }
 }
