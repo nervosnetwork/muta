@@ -5,16 +5,16 @@ use std::fmt;
 use core_types::Hash;
 
 /// "Transform" ensures that the types associated with "Crypto" can be converted to bytes and converted from bytes.
-pub trait Transform: Sized {
+pub trait CryptoTransform: Sized {
     fn from_bytes(data: &[u8]) -> Result<Self, CryptoError>;
 
     fn as_bytes(&self) -> &[u8];
 }
 
 pub trait Crypto {
-    type PrivateKey: Transform;
-    type PublicKey: Transform;
-    type Signature: Transform;
+    type PrivateKey: CryptoTransform;
+    type PublicKey: CryptoTransform;
+    type Signature: CryptoTransform;
 
     fn recover_public_key(
         hash: &Hash,

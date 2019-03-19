@@ -6,13 +6,13 @@ use secp256k1::{
 
 use core_types::Hash;
 
-use crate::{Crypto, CryptoError, Transform};
+use crate::{Crypto, CryptoError, CryptoTransform};
 
 pub struct Secp256k1;
 
 pub struct PrivateKey([u8; constants::SECRET_KEY_SIZE]);
 
-impl Transform for PrivateKey {
+impl CryptoTransform for PrivateKey {
     fn from_bytes(data: &[u8]) -> Result<Self, CryptoError> {
         if data.len() != constants::SECRET_KEY_SIZE {
             return Err(CryptoError::PrivateKeyInvalid);
@@ -30,7 +30,7 @@ impl Transform for PrivateKey {
 
 pub struct PublicKey([u8; constants::PUBLIC_KEY_SIZE]);
 
-impl Transform for PublicKey {
+impl CryptoTransform for PublicKey {
     fn from_bytes(data: &[u8]) -> Result<Self, CryptoError> {
         if data.len() != constants::PUBLIC_KEY_SIZE {
             return Err(CryptoError::PublicKeyInvalid);
@@ -47,7 +47,7 @@ impl Transform for PublicKey {
 }
 pub struct Signature([u8; constants::COMPACT_SIGNATURE_SIZE + 1]);
 
-impl Transform for Signature {
+impl CryptoTransform for Signature {
     fn from_bytes(data: &[u8]) -> Result<Self, CryptoError> {
         if data.len() != constants::COMPACT_SIGNATURE_SIZE + 1 {
             return Err(CryptoError::SignatureInvalid);
@@ -154,7 +154,7 @@ impl Secp256k1 {
 mod tests {
     use super::Secp256k1;
 
-    use crate::{Crypto, Transform};
+    use crate::{Crypto, CryptoTransform};
     use core_types::Hash;
 
     #[test]
