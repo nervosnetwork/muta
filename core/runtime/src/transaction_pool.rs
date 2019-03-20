@@ -14,7 +14,7 @@ pub trait TransactionPool {
     ) -> FutRuntimeResult<SignedTransaction, TransactionPoolError>;
 
     /// Filter a batch of valid transaction hashes from the transaction pool (and delete some expired transactions).
-    /// Returns "count" transactions if "quota_limit" does not exceed the upper limit,
+    /// Returns "count" the number of transactions if "quota_limit" does not exceed the upper limit,
     /// and returns all if the "count" number is not reached.
     /// Note: Transactions are still in the pool.
     fn package(
@@ -34,6 +34,12 @@ pub trait TransactionPool {
 
     /// Make sure that the transactions that specify the transactions hash are in the transaction pool.
     /// If there are transactions that do not exist, this function will request it from other nodes.
+
+    /// NOTE: If there are no transactions in the transaction pool of this node,
+    /// the function needs to obtain the missing transaction from the proposal node through P2P.
+    /// and P2P needs a "p2p_session_id" to find the corresponding node.
+    /// However, we don't want to pass "p2p_session_id" to this function.
+    /// In the next version we will use "context" to store "p2p_session_id".
     fn ensure(&mut self, tx_hashes: &[Hash]) -> FutRuntimeResult<bool, TransactionPoolError>;
 }
 

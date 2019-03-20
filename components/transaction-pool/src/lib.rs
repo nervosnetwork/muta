@@ -187,6 +187,8 @@ where
         Box::new(ok(signed_txs))
     }
 
+    /// TODO: Implement "ensure"
+    /// In the POC-1 phase, we only support single-node, so this function is not implemented.
     fn ensure(&mut self, _tx_hashes: &[Hash]) -> FutRuntimeResult<bool, TransactionPoolError> {
         unimplemented!();
     }
