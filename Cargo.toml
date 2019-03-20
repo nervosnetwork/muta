@@ -9,9 +9,13 @@ transaction-pool = { path = "components/transaction-pool" }
 components-database = { path = "components/database" }
 core-storage = { path = "core/storage" }
 core-p2p = { path = "core/p2p" }
+log = "0.4.0"
+logger = { path = "common/logger" }
 
 [workspace]
 members = [
+  "common/logger",
+
   "core/types",
   "core/runtime",
   "core/consensus",
