@@ -1,5 +1,7 @@
 use std::convert::{From, Into};
 
+use rlp::{Encodable, RlpStream};
+
 use core_serialization::transaction::{
     SignedTransaction as PbSignedTransaction, Transaction as PbTransaction,
     UnverifiedTransaction as PbUnverifiedTransaction,
@@ -16,6 +18,28 @@ pub struct Transaction {
     pub data: Vec<u8>,
     pub value: Vec<u8>,
     pub chain_id: Vec<u8>,
+}
+
+/// Structure encodable to RLP
+impl Encodable for Transaction {
+    /// Append a value to the stream
+    fn rlp_append(&self, s: &mut RlpStream) {
+        s.append(&self.to);
+        s.append(&self.nonce);
+        s.append(&self.quota);
+        s.append(&self.valid_until_block);
+        s.append(&self.data);
+        s.append(&self.value);
+        s.append(&self.chain_id);
+    }
+}
+
+impl Transaction {
+    /// Calculate the block hash. To maintain consistency we use RLP serialization.
+    pub fn hash(&self) -> Hash {
+        let rlp_data = rlp::encode(self);
+        Hash::from_raw(&rlp_data)
+    }
 }
 
 impl From<PbTransaction> for Transaction {
