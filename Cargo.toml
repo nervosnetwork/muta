@@ -23,6 +23,7 @@ members = [
   "core/p2p",
   "core/evm",
   "core/crypto",
+  "core/notify",
 
   "components/transaction-pool",
   "components/database",
