@@ -6,8 +6,14 @@ edition = "2018"
 
 [dependencies]
 core-types = { path = "../../core/types" }
+core-crypto = { path = "../../core/crypto" }
 core-runtime = { path = "../../core/runtime" }
 core-storage = { path = "../../core/storage" }
 
 failure = "0.1.3"
-futures = "0.1.17"
+futures = "0.1.25"
+futures-locks = "0.3"
+
+[dev-dependencies]
+components-database = { path = "../database" }
+hex = "0.3.2"

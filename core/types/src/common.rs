@@ -9,7 +9,7 @@ const ADDRESS_LEN: usize = 20;
 const HASH_LEN: usize = 32;
 
 /// Address represents the 20 byte address of an cita account.
-#[derive(Default, Clone, PartialEq)]
+#[derive(Default, Clone, PartialEq, Eq, Hash)]
 pub struct Address(H160);
 
 impl Address {
@@ -53,7 +53,7 @@ impl Encodable for Address {
 }
 
 /// Hash represents the 32 byte sha3-256 hash of arbitrary data.
-#[derive(Default, Clone, PartialEq)]
+#[derive(Default, Clone, PartialEq, Eq, Hash)]
 pub struct Hash(H256);
 
 impl Hash {

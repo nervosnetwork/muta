@@ -11,6 +11,18 @@ pub enum StorageError {
     Internal(String),
 }
 
+impl StorageError {
+    pub fn is_database_not_found(err: StorageError) -> bool {
+        match err {
+            StorageError::Database(err) => match err {
+                DatabaseError::NotFound => true,
+                _ => false,
+            },
+            _ => false,
+        }
+    }
+}
+
 impl Error for StorageError {
     fn description(&self) -> &str {
         match *self {
