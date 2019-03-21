@@ -1,4 +1,4 @@
-use log::*;
+use log::{debug, error, info, warn, trace};
 use logger::{init, Flag};
 
 #[test]
