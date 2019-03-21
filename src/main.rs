@@ -1,3 +1,8 @@
+use log::info;
+use logger;
+
 fn main() {
-    println!("hello world");
+    logger::init(logger::Flag::Main);
+
+    info!("hello world");
 }
