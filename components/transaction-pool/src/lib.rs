@@ -6,7 +6,7 @@ use futures_locks::RwLock;
 
 use core_crypto::{Crypto, CryptoTransform};
 use core_runtime::{FutRuntimeResult, TransactionPool, TransactionPoolError};
-use core_storage::storage::Storage;
+use core_storage::{errors::StorageError, storage::Storage};
 use core_types::{Address, Hash, SignedTransaction, Transaction, UnverifiedTransaction};
 
 pub struct HashTransactionPool<S> {
@@ -61,13 +61,23 @@ where
             Err(e) => return Box::new(err(TransactionPoolError::Crypto(e))),
         };
 
+        // 2. check if the transaction is in histories block.
+        match self.storage.get_transaction(&tx_hash).wait() {
+            Ok(_) => return Box::new(err(TransactionPoolError::Dup)),
+            Err(e) => {
+                if !StorageError::is_database_not_found(e.clone()) {
+                    return Box::new(err(TransactionPoolError::Internal(e.to_string())));
+                }
+            }
+        };
+
         let fut = self
             .storage
             .get_latest_block()
             .map_err(|e| TransactionPoolError::Internal(e.to_string()))
             .join(self.tx_cache.write().map_err(map_rwlock_err))
             .and_then(move |(block, mut tx_cache)| {
-                // 2. verify params
+                // 3. verify params
                 if let Err(e) = verify_transaction(
                     block.header.height,
                     &untx.transaction,
@@ -77,12 +87,12 @@ where
                     return err(e);
                 }
 
-                // 3. check size
+                // 4. check size
                 if tx_cache.len() >= pool_size {
                     return err(TransactionPoolError::ReachLimit);
                 }
 
-                // 4. check dup
+                // 5. check cache dup
                 if tx_cache.contains_key(&tx_hash) {
                     return err(TransactionPoolError::Dup);
                 }
@@ -94,10 +104,10 @@ where
                 };
 
                 let cloned_signed = signed_tx.clone();
-                // 5. insert to cache
+                // 6. insert to cache
                 tx_cache.insert(tx_hash.clone(), signed_tx);
                 ok(cloned_signed)
-                // TODO：6. broadcast the transaction, but event modules are not ready.
+                // TODO：7. broadcast the transaction, but event modules are not ready.
             });
 
         Box::new(fut)
@@ -233,7 +243,7 @@ mod tests {
     use core_crypto::{secp256k1::Secp256k1, Crypto, CryptoTransform};
     use core_runtime::{TransactionPool, TransactionPoolError};
     use core_storage::storage::{BlockStorage, Storage};
-    use core_types::{Address, Block, Transaction, UnverifiedTransaction};
+    use core_types::{Address, Block, Hash, SignedTransaction, Transaction, UnverifiedTransaction};
 
     #[test]
     fn test_insert_transaction() {
@@ -280,11 +290,40 @@ mod tests {
         let result = tx_pool.insert::<Secp256k1>(untx).wait();
         assert_eq!(result, Err(TransactionPoolError::QuotaNotEnough));
 
-        // test dup
+        // test cache dup
         let untx = mock_transaction(100, height + until_block_limit, "test_dup".to_owned());
         let untx2 = untx.clone();
         tx_pool.insert::<Secp256k1>(untx).wait().unwrap();
         let result = tx_pool.insert::<Secp256k1>(untx2).wait();
+        assert_eq!(result, Err(TransactionPoolError::Dup));
+    }
+
+    #[test]
+    fn test_histories_dup() {
+        let pool_size = 1000;
+        let until_block_limit = 100;
+        let quota_limit = 10000;
+        let height = 100;
+
+        let factory = Factory::new();
+        let mut storage = BlockStorage::new(factory);
+        let signed_tx = mock_signed_transaction(
+            100,
+            height + until_block_limit,
+            "test_histories_dup".to_owned(),
+        );
+        storage
+            .insert_transactions(&[signed_tx.clone()])
+            .wait()
+            .unwrap();
+        let mut block = Block::default();
+        block.header.height = height;
+        storage.insert_block(&block).wait().unwrap();
+
+        let mut tx_pool =
+            HashTransactionPool::new(storage, pool_size, until_block_limit, quota_limit);
+
+        let result = tx_pool.insert::<Secp256k1>(signed_tx.untx).wait();
         assert_eq!(result, Err(TransactionPoolError::Dup));
     }
 
@@ -404,6 +443,42 @@ mod tests {
         UnverifiedTransaction {
             transaction: tx,
             signature: signature.as_bytes().to_vec(),
+        }
+    }
+
+    fn mock_signed_transaction(
+        quota: u64,
+        valid_until_block: u64,
+        nonce: String,
+    ) -> SignedTransaction {
+        let (privkey, pubkey) = Secp256k1::gen_keypair();
+        let mut tx = Transaction::default();
+        tx.to = Address::from(
+            hex::decode("ffffffffffffffffffffffffffffffffffffffff")
+                .unwrap()
+                .as_ref(),
+        );
+        tx.nonce = nonce;
+        tx.quota = quota;
+        tx.valid_until_block = valid_until_block;
+        tx.data = vec![];
+        tx.value = vec![];
+        tx.chain_id = vec![];
+        let tx_hash = tx.hash();
+
+        let signature = Secp256k1::sign(&tx_hash, &privkey).unwrap();
+        let untx = UnverifiedTransaction {
+            transaction: tx,
+            signature: signature.as_bytes().to_vec(),
+        };
+
+        SignedTransaction {
+            untx: untx.clone(),
+            hash: untx.transaction.hash(),
+            sender: {
+                let hash = Hash::from_raw(&pubkey.as_bytes()[1..]);
+                Address::from(&hash.as_ref()[12..])
+            },
         }
     }
 }
