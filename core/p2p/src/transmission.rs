@@ -107,12 +107,6 @@ where
         let (cast_tx, cast_rx) = channel(CHANNEL_BUFFERS);
         let (recv_tx, recv_rx) = channel::<TMessage>(CHANNEL_BUFFERS);
 
-        let support_versions = SUPPORT_VERSIONS
-            .to_vec()
-            .into_iter()
-            .map(String::from)
-            .collect();
-
         let proto_handle = move || -> ProtocolHandle<Box<dyn ServiceProtocol + Send + 'static>> {
             let proto = TransmissionProtocol {
                 id,
@@ -130,8 +124,8 @@ where
 
         let meta = MetaBuilder::default()
             .id(id)
-            .name(|id| format!("{}/{}", PROTOCOL_NAME, id))
-            .support_versions(support_versions)
+            .name(name!(PROTOCOL_NAME))
+            .support_versions(support_versions!(SUPPORT_VERSIONS))
             .service_handle(proto_handle)
             .build();
 
