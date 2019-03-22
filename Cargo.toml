@@ -5,15 +5,23 @@ authors = ["Cryptape Technologies <contact@cryptape.com>"]
 edition = "2018"
 
 [dependencies]
+config = { path = "common/config" }
+logger = { path = "common/logger" }
+
 transaction-pool = { path = "components/transaction-pool" }
 components-database = { path = "components/database" }
+
 core-storage = { path = "core/storage" }
 core-p2p = { path = "core/p2p" }
+
+clap = "2.32"
 log = "0.4.0"
-logger = { path = "common/logger" }
+serde = "1.0"
+serde_derive = "1.0"
 
 [workspace]
 members = [
+  "common/config",
   "common/logger",
 
   "core/types",
