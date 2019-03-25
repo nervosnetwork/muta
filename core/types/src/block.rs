@@ -4,7 +4,7 @@ use rlp::{Encodable, RlpStream};
 
 use core_serialization::block::{Block as PbBlock, BlockHeader as PbBlockHeader};
 
-use crate::{Address, Hash};
+use crate::{Address, Bloom, Hash};
 
 #[derive(Default, Debug, Clone)]
 pub struct BlockHeader {
@@ -14,6 +14,7 @@ pub struct BlockHeader {
     pub transactions_root: Hash,
     pub state_root: Hash,
     pub receipts_root: Hash,
+    pub logs_bloom: Bloom,
     pub quota_used: u64,
     pub quota_limit: u64,
     pub votes: Vec<Hash>,
@@ -30,6 +31,7 @@ impl Encodable for BlockHeader {
         s.append(&self.transactions_root);
         s.append(&self.state_root);
         s.append(&self.receipts_root);
+        s.append(&self.logs_bloom.as_ref());
         s.append(&self.quota_used);
         s.append(&self.quota_limit);
         s.append_list(&self.votes);
@@ -46,6 +48,7 @@ impl From<PbBlockHeader> for BlockHeader {
             transactions_root: Hash::from_raw(&header.transactions_root),
             state_root: Hash::from_raw(&header.state_root),
             receipts_root: Hash::from_raw(&header.receipts_root),
+            logs_bloom: Bloom::from_slice(&header.logs_bloom),
             quota_used: header.quota_used,
             quota_limit: header.quota_limit,
             votes: header.votes.iter().map(|v| Hash::from_raw(v)).collect(),
@@ -63,6 +66,7 @@ impl Into<PbBlockHeader> for BlockHeader {
             transactions_root: self.transactions_root.as_ref().to_vec(),
             state_root: self.state_root.as_ref().to_vec(),
             receipts_root: self.receipts_root.as_ref().to_vec(),
+            logs_bloom: self.logs_bloom.as_bytes().to_vec(),
             quota_used: self.quota_used,
             quota_limit: self.quota_limit,
             votes: self.votes.iter().map(|v| v.as_ref().to_vec()).collect(),

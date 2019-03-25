@@ -1,18 +1,36 @@
 use std::convert::{From, Into};
 
+use rlp::{Encodable, RlpStream};
+
 use core_serialization::receipt::{LogEntry as PbLogEntry, Receipt as PbReceipt};
 
-use crate::{Address, Hash};
+use crate::{Address, Bloom, Hash};
 
 #[derive(Default, Debug, Clone)]
 pub struct Receipt {
     pub state_root: Hash,
     pub transaction_hash: Hash,
+    pub block_hash: Hash,
     pub quota_used: u64,
-    pub log_bloom: Vec<u8>,
+    pub log_bloom: Bloom,
     pub logs: Vec<LogEntry>,
     pub receipt_error: String,
-    pub account_nonce: u64,
+    pub contract_address: Option<Address>,
+}
+
+/// Structure encodable to RLP
+impl Encodable for Receipt {
+    /// Append a value to the stream
+    fn rlp_append(&self, s: &mut RlpStream) {
+        s.append(&self.state_root);
+        s.append(&self.transaction_hash);
+        s.append(&self.block_hash);
+        s.append(&self.quota_used);
+        s.append(&self.log_bloom.as_bytes());
+        s.append_list(&self.logs);
+        s.append(&self.receipt_error);
+        s.append(&self.contract_address);
+    }
 }
 
 impl From<PbReceipt> for Receipt {
@@ -20,15 +38,16 @@ impl From<PbReceipt> for Receipt {
         Receipt {
             state_root: Hash::from_raw(&receipt.state_root),
             transaction_hash: Hash::from_raw(&receipt.transaction_hash),
+            block_hash: Hash::from_raw(&receipt.block_hash),
             quota_used: receipt.quota_used,
-            log_bloom: receipt.log_bloom,
-            logs: receipt
-                .logs
-                .iter()
-                .map(|entry| LogEntry::from(entry.clone()))
-                .collect(),
+            log_bloom: Bloom::from_slice(&receipt.log_bloom),
+            logs: receipt.logs.into_iter().map(LogEntry::from).collect(),
             receipt_error: receipt.error,
-            account_nonce: receipt.account_nonce,
+            contract_address: if receipt.contract_address.is_empty() {
+                None
+            } else {
+                Some(Address::from(receipt.contract_address.as_ref()))
+            },
         }
     }
 }
@@ -38,11 +57,15 @@ impl Into<PbReceipt> for Receipt {
         PbReceipt {
             state_root: self.state_root.as_ref().to_vec(),
             transaction_hash: self.transaction_hash.as_ref().to_vec(),
+            block_hash: self.transaction_hash.as_ref().to_vec(),
             quota_used: self.quota_used,
-            log_bloom: self.log_bloom,
-            logs: self.logs.iter().map(|l| l.clone().into()).collect(),
+            log_bloom: self.log_bloom.as_bytes().to_vec(),
+            logs: self.logs.into_iter().map(Into::into).collect(),
             error: self.receipt_error,
-            account_nonce: self.account_nonce,
+            contract_address: match self.contract_address {
+                Some(v) => v.as_ref().to_vec(),
+                None => vec![],
+            },
         }
     }
 }
@@ -68,8 +91,22 @@ impl Into<PbLogEntry> for LogEntry {
     fn into(self) -> PbLogEntry {
         PbLogEntry {
             address: self.address.as_ref().to_vec(),
-            topics: self.topics.iter().map(|h| h.as_ref().to_vec()).collect(),
+            topics: self
+                .topics
+                .into_iter()
+                .map(|h| h.as_ref().to_vec())
+                .collect(),
             data: self.data,
         }
+    }
+}
+
+/// Structure encodable to RLP
+impl Encodable for LogEntry {
+    /// Append a value to the stream
+    fn rlp_append(&self, s: &mut RlpStream) {
+        s.append(&self.address);
+        s.append_list(&self.topics);
+        s.append(&self.data);
     }
 }

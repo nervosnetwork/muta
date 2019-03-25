@@ -1,20 +1,36 @@
 use std::convert::{AsRef, From};
 use std::fmt;
 
-use numext_fixed_hash::{H160, H256};
+use numext_fixed_hash::H160;
+use numext_fixed_uint::U256;
 use rlp::{Encodable, RlpStream};
 use sha3::{Digest, Sha3_256};
 
 const ADDRESS_LEN: usize = 20;
 const HASH_LEN: usize = 32;
 
+pub type Balance = U256;
+pub type H256 = numext_fixed_hash::H256;
+
 /// Address represents the 20 byte address of an cita account.
 #[derive(Default, Clone, PartialEq, Eq, Hash)]
 pub struct Address(H160);
 
 impl Address {
+    pub fn from_hash(h: &Hash) -> Self {
+        Address::from(&h.as_ref()[12..])
+    }
+
     pub fn as_hex(&self) -> String {
         hex::encode(self.0.as_bytes())
+    }
+
+    pub fn as_fixed_bytes(&self) -> &[u8; ADDRESS_LEN] {
+        self.0.as_fixed_bytes()
+    }
+
+    pub fn into_fixed_bytes(self) -> [u8; ADDRESS_LEN] {
+        self.0.into_fixed_bytes()
     }
 }
 
@@ -70,6 +86,14 @@ impl Hash {
 
     pub fn as_hex(&self) -> String {
         hex::encode(self.0.as_bytes())
+    }
+
+    pub fn as_fixed_bytes(&self) -> &[u8; HASH_LEN] {
+        self.0.as_fixed_bytes()
+    }
+
+    pub fn into_fixed_bytes(self) -> [u8; HASH_LEN] {
+        self.0.into_fixed_bytes()
     }
 }
 

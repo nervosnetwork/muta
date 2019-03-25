@@ -11,9 +11,10 @@ message Receipt {
     bytes log_bloom = 3;
     repeated LogEntry logs = 4;
     string error = 5;
-    uint64 account_nonce = 6;
     // bytes32(H256)
-    bytes transaction_hash = 7;
+    bytes transaction_hash = 6;
+    bytes contract_address = 7;
+    bytes block_hash = 8;
 }
 
 message LogEntry {

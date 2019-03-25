@@ -15,11 +15,12 @@ message BlockHeader {
     bytes state_root = 5;
     // bytes32(H256)
     bytes receipts_root = 6;
-    uint64 quota_used = 7;
-    uint64 quota_limit = 8;
-    repeated bytes votes = 9;
+    bytes logs_bloom = 7;
+    uint64 quota_used = 8;
+    uint64 quota_limit = 9;
+    repeated bytes votes = 10;
     // bytes20 - address of proposer
-    bytes proposer = 10;
+    bytes proposer = 11;
 }
 
 // proposal block same as Block

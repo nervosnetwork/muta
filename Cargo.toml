@@ -29,7 +29,6 @@ members = [
   "core/consensus",
   "core/storage",
   "core/p2p",
-  "core/evm",
   "core/crypto",
   "core/notify",
 
