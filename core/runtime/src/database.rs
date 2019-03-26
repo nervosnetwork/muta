@@ -23,7 +23,7 @@ pub enum DatabaseError {
 }
 
 pub trait DatabaseFactory: Send + Sync {
-    type Instance: DatabaseInstance;
+    type Instance: DatabaseInstance + Send;
 
     fn crate_instance(&self) -> FutRuntimeResult<Self::Instance, DatabaseError>;
 }

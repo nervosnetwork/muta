@@ -12,7 +12,7 @@ pub struct Receipt {
     pub transaction_hash: Hash,
     pub block_hash: Hash,
     pub quota_used: u64,
-    pub log_bloom: Bloom,
+    pub logs_bloom: Bloom,
     pub logs: Vec<LogEntry>,
     pub receipt_error: String,
     pub contract_address: Option<Address>,
@@ -26,7 +26,7 @@ impl Encodable for Receipt {
         s.append(&self.transaction_hash);
         s.append(&self.block_hash);
         s.append(&self.quota_used);
-        s.append(&self.log_bloom.as_bytes());
+        s.append(&self.logs_bloom.as_bytes());
         s.append_list(&self.logs);
         s.append(&self.receipt_error);
         s.append(&self.contract_address);
@@ -40,7 +40,7 @@ impl From<PbReceipt> for Receipt {
             transaction_hash: Hash::from_raw(&receipt.transaction_hash),
             block_hash: Hash::from_raw(&receipt.block_hash),
             quota_used: receipt.quota_used,
-            log_bloom: Bloom::from_slice(&receipt.log_bloom),
+            logs_bloom: Bloom::from_slice(&receipt.logs_bloom),
             logs: receipt.logs.into_iter().map(LogEntry::from).collect(),
             receipt_error: receipt.error,
             contract_address: if receipt.contract_address.is_empty() {
@@ -59,7 +59,7 @@ impl Into<PbReceipt> for Receipt {
             transaction_hash: self.transaction_hash.as_ref().to_vec(),
             block_hash: self.transaction_hash.as_ref().to_vec(),
             quota_used: self.quota_used,
-            log_bloom: self.log_bloom.as_bytes().to_vec(),
+            logs_bloom: self.logs_bloom.as_bytes().to_vec(),
             logs: self.logs.into_iter().map(Into::into).collect(),
             error: self.receipt_error,
             contract_address: match self.contract_address {

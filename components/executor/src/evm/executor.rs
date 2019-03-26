@@ -123,11 +123,11 @@ where
         for mut receipt in receipts.iter_mut() {
             receipt.state_root = root_hash.clone();
         }
-        let all_log_bloom = receipts_to_bloom(&receipts);
+        let all_logs_bloom = receipts_to_bloom(&receipts);
 
         Ok(ExecutionResult {
             state_root: root_hash,
-            all_logs_bloom: all_log_bloom,
+            all_logs_bloom,
             receipts,
         })
     }
@@ -329,7 +329,7 @@ fn build_receipt_with_ok(signed_tx: &SignedTransaction, result: InterpreterResul
         InterpreterResult::Normal(_data, quota_used, logs) => {
             receipt.quota_used = quota - quota_used;
             receipt.logs = transform_logs(logs);
-            receipt.log_bloom = logs_to_bloom(&receipt.logs);
+            receipt.logs_bloom = logs_to_bloom(&receipt.logs);
         }
         InterpreterResult::Revert(_data, quota_used) => {
             receipt.quota_used = quota - quota_used;
@@ -337,7 +337,7 @@ fn build_receipt_with_ok(signed_tx: &SignedTransaction, result: InterpreterResul
         InterpreterResult::Create(_data, quota_used, logs, contract_address) => {
             receipt.quota_used = quota - quota_used;
             receipt.logs = transform_logs(logs);
-            receipt.log_bloom = logs_to_bloom(&receipt.logs);
+            receipt.logs_bloom = logs_to_bloom(&receipt.logs);
 
             let address_slice: &[u8] = contract_address.as_ref();
             receipt.contract_address = Some(Address::from(address_slice));

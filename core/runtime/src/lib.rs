@@ -11,7 +11,7 @@ pub use database::{DataCategory, DatabaseError, DatabaseFactory, DatabaseInstanc
 pub use executor::{ExecutionResult, Executor, ExecutorError, ReadonlyResult};
 pub use transaction_pool::{TransactionPool, TransactionPoolError};
 
-pub type FutRuntimeResult<T, E> = Box<Future<Item = T, Error = E>>;
+pub type FutRuntimeResult<T, E> = Box<Future<Item = T, Error = E> + Send>;
 
 /// Blockchain Context. eg. block, system contract.
 // TODO: Add context information
