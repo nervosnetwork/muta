@@ -10,7 +10,7 @@ logger = { path = "common/logger" }
 
 transaction-pool = { path = "components/transaction-pool" }
 components-database = { path = "components/database" }
-
+cita-jsonrpc = { path = "components/cita-jsonrpc" }
 core-storage = { path = "core/storage" }
 core-p2p = { path = "core/p2p" }
 
@@ -34,7 +34,7 @@ members = [
 
   "components/transaction-pool",
   "components/database",
-  "components/jsonrpc",
+  "components/cita-jsonrpc",
   "components/network",
   "components/executor",
 ]

@@ -1,6 +1,7 @@
 use std::convert::{AsRef, From};
 use std::fmt;
 
+use crate::errors::CoreTypesError;
 use numext_fixed_hash::H160;
 use numext_fixed_uint::U256;
 use rlp::{Encodable, RlpStream};
@@ -23,6 +24,10 @@ impl Address {
 
     pub fn as_hex(&self) -> String {
         hex::encode(self.0.as_bytes())
+    }
+
+    pub fn from_hex(input: &str) -> Result<Self, CoreTypesError> {
+        Ok(Address(H160::from_hex_str(input)?))
     }
 
     pub fn as_fixed_bytes(&self) -> &[u8; ADDRESS_LEN] {
@@ -82,6 +87,10 @@ impl Hash {
             out.copy_from_slice(&Sha3_256::digest(raw));
             Hash(H256::from(out))
         }
+    }
+
+    pub fn from_hex(input: &str) -> Result<Self, CoreTypesError> {
+        Ok(Hash(H256::from_hex_str(input)?))
     }
 
     pub fn as_hex(&self) -> String {

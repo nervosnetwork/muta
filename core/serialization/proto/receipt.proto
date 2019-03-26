@@ -8,7 +8,7 @@ message Receipt {
     // bytes32(U256) - quota used by this tx
     uint64 quota_used = 2;
     // bytes256(2048bit)
-    bytes log_bloom = 3;
+    bytes logs_bloom = 3;
     repeated LogEntry logs = 4;
     string error = 5;
     // bytes32(H256)

@@ -15,6 +15,7 @@ message BlockHeader {
     bytes state_root = 5;
     // bytes32(H256)
     bytes receipts_root = 6;
+    // bytes256(2048bit)
     bytes logs_bloom = 7;
     uint64 quota_used = 8;
     uint64 quota_limit = 9;
