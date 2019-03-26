@@ -1,4 +1,6 @@
-use core_p2p::transmission::{CastMessage, Misbehavior, PeerManager, TransmissionProtocol};
+use core_p2p::transmission::{
+    CastMessage, Misbehavior, MisbehaviorResult, PeerManager, TransmissionProtocol,
+};
 
 use env_logger;
 use futures::future::Future;
@@ -78,11 +80,21 @@ struct DemoPeerManager {
 }
 
 impl PeerManager for DemoPeerManager {
-    fn misbehave(&mut self, _: Option<PeerId>, multiaddr: Multiaddr, _kind: Misbehavior) -> Score {
+    fn misbehave(
+        &mut self,
+        _: Option<PeerId>,
+        multiaddr: Multiaddr,
+        _kind: Misbehavior,
+    ) -> MisbehaviorResult {
         let mut addrs = self.addrs.write();
         let value = addrs.entry(multiaddr).or_insert(100);
         *value -= 20;
-        *value
+
+        if *value <= 0 {
+            MisbehaviorResult::Disconnect
+        } else {
+            MisbehaviorResult::Continue
+        }
     }
 }
 

@@ -3,7 +3,7 @@
 //! Implement core p2p functionality based on
 //! [tentacle](https://crates.io/crates/tentacle) crate.
 
-#![deny(missing_docs)]
+// #![deny(missing_docs)]
 
 #[macro_use]
 pub(crate) mod macros;
@@ -18,3 +18,6 @@ pub mod identify;
 pub mod ping;
 /// Datagram transport protocol
 pub mod transmission;
+
+/// Peer manager
+pub mod peer_manager;

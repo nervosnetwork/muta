@@ -40,10 +40,23 @@ pub enum Misbehavior {
     InvalidMessage,
 }
 
+/// The enum for session misbehavior result
+pub enum MisbehaviorResult {
+    /// Keep session connection
+    Continue,
+    /// Disconnect session
+    Disconnect,
+}
+
 /// Peer manager for transmission protocol
 pub trait PeerManager {
     /// Report misbehave to manager
-    fn misbehave(&mut self, peer_id: Option<PeerId>, addr: Multiaddr, kind: Misbehavior) -> i32;
+    fn misbehave(
+        &mut self,
+        peer_id: Option<PeerId>,
+        addr: Multiaddr,
+        kind: Misbehavior,
+    ) -> MisbehaviorResult;
 }
 
 /// The enum for sending message to different scoped session[s]
@@ -176,7 +189,12 @@ where
         serv_ctx.future_task(deliver_task)
     }
 
-    pub(crate) fn do_recv(&mut self, session: &SessionContext, data: RawMessage) {
+    pub(crate) fn do_recv(
+        &mut self,
+        serv_ctx: &mut ServiceContext,
+        session: &SessionContext,
+        data: RawMessage,
+    ) {
         debug!(
             "protocol [transmission]: message from session [{:?}]",
             (session.id, &session.address, &session.remote_pubkey)
@@ -188,13 +206,14 @@ where
 
             Ok(())
         }) {
-            let peer_id = session.remote_pubkey.as_ref().map(PeerId::from_public_key);
+            let peer_mgr = &mut self.peer_mgr;
+            let opt_peer_id = session.remote_pubkey.as_ref().map(PeerId::from_public_key);
+            let session_addr = session.address.clone();
 
-            self.peer_mgr.misbehave(
-                peer_id,
-                session.address.clone(),
-                Misbehavior::InvalidMessage,
-            );
+            match peer_mgr.misbehave(opt_peer_id, session_addr, Misbehavior::InvalidMessage) {
+                MisbehaviorResult::Disconnect => serv_ctx.disconnect(session.id),
+                MisbehaviorResult::Continue => (),
+            }
         }
     }
 
@@ -225,8 +244,13 @@ where
         self.do_init(serv_ctx)
     }
 
-    fn received(&mut self, _: &mut ServiceContext, session: &SessionContext, data: RawMessage) {
-        self.do_recv(session, data)
+    fn received(
+        &mut self,
+        serv_ctx: &mut ServiceContext,
+        session: &SessionContext,
+        data: RawMessage,
+    ) {
+        self.do_recv(serv_ctx, session, data)
     }
 
     fn poll(&mut self, serv_ctx: &mut ServiceContext) {
