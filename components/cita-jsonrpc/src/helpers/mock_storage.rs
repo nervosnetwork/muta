@@ -104,7 +104,7 @@ impl Storage for MockStorage {
             != self
                 .blocks
                 .last()
-                .map_or(Hash::from_raw(vec![].as_slice()), |block| block.hash())
+                .map_or(Hash::from_raw(vec![].as_slice()), Block::hash)
         {
             return Box::new(err(StorageError::Internal(
                 "prevhash doesn't match".to_string(),

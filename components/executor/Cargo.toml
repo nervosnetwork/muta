@@ -9,17 +9,14 @@ core-runtime = { path = "../../core/runtime" }
 core-storage = { path = "../../core/storage" }
 core-types = { path = "../../core/types" }
 
-logger = { path = "../../common/logger" }
-
-cita-vm = { git = "https://github.com/mohanson/cita-vm.git", branch = "executive-squashed" }
-
+cita-vm = { git = "https://github.com/mohanson/cita-vm.git", branch = "apirefine" }
 # cita-vm = { path = "../../../cita-vm" }
 
 log = "0.4.0"
 futures = "0.1.17"
 ethereum-types = "0.4"
 hex = "0.3.2"
-cita_trie = "0.2.0"
+cita_trie = "0.2.1"
 
 [dev-dependencies]
 core-crypto = { path = "../../core/crypto" }

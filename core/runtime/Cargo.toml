@@ -14,4 +14,4 @@ futures = "0.1.17"
 bytes = "0.4.11"
 
 # cita-vm = { path = "../../../cita-vm" }
-cita-vm = { git = "https://github.com/mohanson/cita-vm.git", branch = "executive-squashed" }
+cita-vm = { git = "https://github.com/mohanson/cita-vm.git", branch = "apirefine" }

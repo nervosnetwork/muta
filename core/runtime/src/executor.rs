@@ -19,11 +19,11 @@ pub struct ReadonlyResult {
 /// The “Executor” module determines which VM the transaction is processed by.
 /// We plan to support multiple VM such as EVM, WASM, etc..
 /// but their programming model must be account-based.
-pub trait Executor {
+pub trait Executor: Send + Sync {
     /// Execute the transactions and then return the receipts, this function will modify the "state of the world".
     fn exec(
-        &self,
-        header: &BlockHeader,
+        &mut self,
+        current_header: &BlockHeader,
         txs: &[SignedTransaction],
     ) -> Result<ExecutionResult, ExecutorError>;
 
@@ -51,6 +51,12 @@ pub trait Executor {
     fn get_storage_root(&self, state_root: &Hash, address: &Address)
         -> Result<Hash, ExecutorError>;
 
+    /// Query code of account.
+    fn get_code(
+        &self,
+        state_root: &Hash,
+        address: &Address,
+    ) -> Result<(Vec<u8>, Hash), ExecutorError>;
     // fn get_proof(&self, header: &BlockHeader, address: &Address, key: &Self::Key) -> Result<Self::Value, ExecutorError>;
 }
 

@@ -18,7 +18,7 @@ use core_types::{
 };
 
 pub struct EVMExecutor<DB> {
-    latest_state: Arc<RefCell<State<DB>>>,
+    latest_state_root: Hash,
     block_provider: Arc<Box<BlockDataProvider>>,
 
     db: DB,
@@ -67,7 +67,7 @@ where
         let root_hash = Hash::from_raw(state.root.as_ref());
 
         let evm_executor = EVMExecutor {
-            latest_state: Arc::new(RefCell::new(state)),
+            latest_state_root: root_hash.clone(),
             block_provider: Arc::new(block_provider),
 
             db,
@@ -81,11 +81,8 @@ where
         block_provider: Box<BlockDataProvider>,
         root: &Hash,
     ) -> Result<Self, ExecutorError> {
-        let root = H256(root.clone().into_fixed_bytes());
-        let state = State::from_existing(db.clone(), root)?;
-
         Ok(EVMExecutor {
-            latest_state: Arc::new(RefCell::new(state)),
+            latest_state_root: root.clone(),
             block_provider: Arc::new(block_provider),
 
             db,
@@ -97,20 +94,26 @@ impl<DB: 'static> Executor for EVMExecutor<DB>
 where
     DB: TrieDB,
 {
+    /// Execute the transactions and then return the receipts, this function will modify the "state of the world".
     fn exec(
-        &self,
-        header: &BlockHeader,
+        &mut self,
+        current_header: &BlockHeader,
         txs: &[SignedTransaction],
     ) -> Result<ExecutionResult, ExecutorError> {
-        let evm_context = build_evm_context(header);
-        let evm_config = build_evm_config(header);
+        let state_root = H256(self.latest_state_root.clone().into_fixed_bytes());
+        let state = Arc::new(RefCell::new(State::from_existing(
+            self.db.clone(),
+            state_root,
+        )?));
+        let evm_context = build_evm_context(current_header);
+        let evm_config = build_evm_config(current_header);
 
         let mut receipts: Vec<Receipt> = txs
             .iter()
             .map(|signed_tx| {
                 EVMExecutor::evm_exec(
                     Arc::clone(&self.block_provider),
-                    Arc::clone(&self.latest_state),
+                    Arc::clone(&state),
                     &evm_context,
                     &evm_config,
                     &signed_tx,
@@ -118,7 +121,9 @@ where
             })
             .collect();
 
-        let root_hash = Hash::from_raw(self.latest_state.borrow().root.as_ref());
+        state.borrow_mut().commit()?;
+        let root_hash = Hash::from_raw(state.borrow().root.as_ref());
+        self.latest_state_root = root_hash.clone();
 
         for mut receipt in receipts.iter_mut() {
             receipt.state_root = root_hash.clone();
@@ -132,6 +137,7 @@ where
         })
     }
 
+    /// Query historical height data or perform read-only functions.
     fn readonly(
         &self,
         header: &BlockHeader,
@@ -176,6 +182,7 @@ where
         }
     }
 
+    /// Query balance of account.
     fn get_balance(&self, state_root: &Hash, address: &Address) -> Result<Balance, ExecutorError> {
         let root = H256(state_root.clone().into_fixed_bytes());
         let mut state = State::from_existing(self.db.clone(), root)?;
@@ -184,6 +191,7 @@ where
         Ok(to_core_balance(&balance))
     }
 
+    /// Query value of account.
     fn get_value(
         &self,
         state_root: &Hash,
@@ -200,6 +208,7 @@ where
         Ok(CoreH256::from_slice(value.as_ref()).unwrap())
     }
 
+    /// Query storage root of account.
     fn get_storage_root(
         &self,
         state_root: &Hash,
@@ -215,6 +224,24 @@ where
             let storage_root = account.storage_root;
             Hash::from_raw(storage_root.to_vec().as_ref())
         })
+    }
+
+    /// Query code of account.
+    fn get_code(
+        &self,
+        state_root: &Hash,
+        address: &Address,
+    ) -> Result<(Vec<u8>, Hash), ExecutorError> {
+        let root = H256(state_root.clone().into_fixed_bytes());
+        let mut state = State::from_existing(self.db.clone(), root)?;
+
+        let address = &H160::from(address.clone().into_fixed_bytes());
+        let code = state.code(address)?;
+        if code.is_empty() {
+            return Err(ExecutorError::NotFound);
+        }
+        let code_hash = state.code_hash(address)?;
+        Ok((code, Hash::from_raw(code_hash.as_ref())))
     }
 }
 
@@ -490,7 +517,7 @@ mod tests {
             HashMap::default(),
         );
 
-        let (executor, state_root) = EVMExecutor::from_genesis(
+        let (mut executor, state_root) = EVMExecutor::from_genesis(
             &genesis,
             MemoryDB::new(),
             Box::new(BlockDataProviderMock::default()),
