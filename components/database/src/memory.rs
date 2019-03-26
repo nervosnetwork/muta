@@ -4,7 +4,9 @@ use std::sync::Arc;
 use futures::future::{err, ok, Future};
 use futures_locks::RwLock;
 
-use core_runtime::{DatabaseError, DatabaseFactory, DatabaseInstance, FutRuntimeResult};
+use core_runtime::{
+    DataCategory, DatabaseError, DatabaseFactory, DatabaseInstance, FutRuntimeResult,
+};
 
 pub struct Factory {
     storage: Arc<RwLock<HashMap<Vec<u8>, Vec<u8>>>>,
@@ -49,8 +51,8 @@ impl Default for Instance {
 }
 
 impl DatabaseInstance for Instance {
-    fn get(&self, key: &[u8]) -> FutRuntimeResult<Vec<u8>, DatabaseError> {
-        let key = key.to_vec();
+    fn get(&self, c: DataCategory, key: &[u8]) -> FutRuntimeResult<Vec<u8>, DatabaseError> {
+        let key = gen_key(&c, key);
 
         let fut = self
             .storage
@@ -64,8 +66,12 @@ impl DatabaseInstance for Instance {
         Box::new(fut)
     }
 
-    fn get_batch(&self, keys: &[Vec<u8>]) -> FutRuntimeResult<Vec<Option<Vec<u8>>>, DatabaseError> {
-        let keys = keys.to_vec();
+    fn get_batch(
+        &self,
+        c: DataCategory,
+        keys: &[Vec<u8>],
+    ) -> FutRuntimeResult<Vec<Option<Vec<u8>>>, DatabaseError> {
+        let keys = gen_keys(&c, keys);
 
         let fut = self
             .storage
@@ -84,8 +90,13 @@ impl DatabaseInstance for Instance {
         Box::new(fut)
     }
 
-    fn insert(&mut self, key: &[u8], value: &[u8]) -> FutRuntimeResult<(), DatabaseError> {
-        let key = key.to_vec();
+    fn insert(
+        &mut self,
+        c: DataCategory,
+        key: &[u8],
+        value: &[u8],
+    ) -> FutRuntimeResult<(), DatabaseError> {
+        let key = gen_key(&c, key);
         let value = value.to_vec();
 
         let fut = self
@@ -100,6 +111,7 @@ impl DatabaseInstance for Instance {
 
     fn insert_batch(
         &mut self,
+        c: DataCategory,
         keys: &[Vec<u8>],
         values: &[Vec<u8>],
     ) -> FutRuntimeResult<(), DatabaseError> {
@@ -107,7 +119,7 @@ impl DatabaseInstance for Instance {
             return Box::new(err(DatabaseError::InvalidData));
         }
 
-        let keys = keys.to_vec();
+        let keys = gen_keys(&c, keys);
         let values = values.to_vec();
 
         let fut = self
@@ -126,8 +138,8 @@ impl DatabaseInstance for Instance {
         Box::new(fut)
     }
 
-    fn contain(&self, key: &[u8]) -> FutRuntimeResult<bool, DatabaseError> {
-        let key = key.to_vec();
+    fn contains(&self, c: DataCategory, key: &[u8]) -> FutRuntimeResult<bool, DatabaseError> {
+        let key = gen_key(&c, key);
 
         let fut = self
             .storage
@@ -138,8 +150,8 @@ impl DatabaseInstance for Instance {
         Box::new(fut)
     }
 
-    fn remove(&mut self, key: &[u8]) -> FutRuntimeResult<(), DatabaseError> {
-        let key = key.to_vec();
+    fn remove(&mut self, c: DataCategory, key: &[u8]) -> FutRuntimeResult<(), DatabaseError> {
+        let key = gen_key(&c, key);
 
         let fut = self
             .storage
@@ -152,8 +164,12 @@ impl DatabaseInstance for Instance {
         Box::new(fut)
     }
 
-    fn remove_batch(&mut self, keys: &[Vec<u8>]) -> FutRuntimeResult<(), DatabaseError> {
-        let keys = keys.to_vec();
+    fn remove_batch(
+        &mut self,
+        c: DataCategory,
+        keys: &[Vec<u8>],
+    ) -> FutRuntimeResult<(), DatabaseError> {
+        let keys = gen_keys(&c, keys);
 
         let fut = self
             .storage
@@ -169,20 +185,37 @@ impl DatabaseInstance for Instance {
     }
 }
 
+fn gen_key(c: &DataCategory, key: &[u8]) -> Vec<u8> {
+    match c {
+        DataCategory::Block => [b"block-", key].concat(),
+        DataCategory::Transaction => [b"transaction-", key].concat(),
+        DataCategory::Receipt => [b"receipt-", key].concat(),
+        DataCategory::State => [b"state-", key].concat(),
+        DataCategory::TransactionPool => [b"transaction-pool-", key].concat(),
+    }
+}
+
+fn gen_keys(c: &DataCategory, keys: &[Vec<u8>]) -> Vec<Vec<u8>> {
+    keys.iter().map(|key| gen_key(c, key)).collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::Factory;
 
-    use core_runtime::{DatabaseError, DatabaseFactory, DatabaseInstance};
+    use core_runtime::{DataCategory, DatabaseError, DatabaseFactory, DatabaseInstance};
     use futures::future::Future;
 
     #[test]
     fn test_get_should_return_ok() {
         let mut instance = Factory::new().crate_instance().wait().unwrap();
 
-        check_not_found(instance.get(b"test").wait());
-        instance.insert(b"test", b"test").wait().unwrap();
-        let v = instance.get(b"test").wait().unwrap();
+        check_not_found(instance.get(DataCategory::Block, b"test").wait());
+        instance
+            .insert(DataCategory::Block, b"test", b"test")
+            .wait()
+            .unwrap();
+        let v = instance.get(DataCategory::Block, b"test").wait().unwrap();
         assert_eq!(v, b"test".to_vec())
     }
 
@@ -190,8 +223,14 @@ mod tests {
     fn test_insert_should_return_ok() {
         let mut instance = Factory::new().crate_instance().wait().unwrap();
 
-        instance.insert(b"test", b"test").wait().unwrap();
-        assert_eq!(b"test".to_vec(), instance.get(b"test").wait().unwrap());
+        instance
+            .insert(DataCategory::Block, b"test", b"test")
+            .wait()
+            .unwrap();
+        assert_eq!(
+            b"test".to_vec(),
+            instance.get(DataCategory::Block, b"test").wait().unwrap()
+        );
     }
 
     #[test]
@@ -200,36 +239,64 @@ mod tests {
 
         instance
             .insert_batch(
+                DataCategory::Block,
                 &[b"test1".to_vec(), b"test2".to_vec()],
                 &[b"test1".to_vec(), b"test2".to_vec()],
             )
             .wait()
             .unwrap();
-        assert_eq!(b"test1".to_vec(), instance.get(b"test1").wait().unwrap());
-        assert_eq!(b"test2".to_vec(), instance.get(b"test2").wait().unwrap());
+        assert_eq!(
+            b"test1".to_vec(),
+            instance.get(DataCategory::Block, b"test1").wait().unwrap()
+        );
+        assert_eq!(
+            b"test2".to_vec(),
+            instance.get(DataCategory::Block, b"test2").wait().unwrap()
+        );
     }
 
     #[test]
     fn test_contain_should_return_true() {
         let mut instance = Factory::new().crate_instance().wait().unwrap();
 
-        instance.insert(b"test", b"test").wait().unwrap();
-        assert_eq!(instance.contain(b"test").wait().unwrap(), true)
+        instance
+            .insert(DataCategory::Block, b"test", b"test")
+            .wait()
+            .unwrap();
+        assert_eq!(
+            instance
+                .contains(DataCategory::Block, b"test")
+                .wait()
+                .unwrap(),
+            true
+        )
     }
 
     #[test]
     fn test_contain_should_return_false() {
         let instance = Factory::new().crate_instance().wait().unwrap();
-        assert_eq!(instance.contain(b"test").wait().unwrap(), false)
+        assert_eq!(
+            instance
+                .contains(DataCategory::Block, b"test")
+                .wait()
+                .unwrap(),
+            false
+        )
     }
 
     #[test]
     fn test_remove_should_return_ok() {
         let mut instance = Factory::new().crate_instance().wait().unwrap();
 
-        instance.insert(b"test", b"test").wait().unwrap();
-        instance.remove(b"test").wait().unwrap();
-        check_not_found(instance.get(b"test").wait());
+        instance
+            .insert(DataCategory::Block, b"test", b"test")
+            .wait()
+            .unwrap();
+        instance
+            .remove(DataCategory::Block, b"test")
+            .wait()
+            .unwrap();
+        check_not_found(instance.get(DataCategory::Block, b"test").wait());
     }
 
     #[test]
@@ -238,17 +305,18 @@ mod tests {
 
         instance
             .insert_batch(
+                DataCategory::Block,
                 &[b"test1".to_vec(), b"test2".to_vec()],
                 &[b"test1".to_vec(), b"test2".to_vec()],
             )
             .wait()
             .unwrap();
         instance
-            .remove_batch(&[b"test1".to_vec(), b"test2".to_vec()])
+            .remove_batch(DataCategory::Block, &[b"test1".to_vec(), b"test2".to_vec()])
             .wait()
             .unwrap();
-        check_not_found(instance.get(b"test1").wait());
-        check_not_found(instance.get(b"test2").wait());
+        check_not_found(instance.get(DataCategory::Block, b"test1").wait());
+        check_not_found(instance.get(DataCategory::Block, b"test2").wait());
     }
 
     fn check_not_found<T>(res: Result<T, DatabaseError>) {

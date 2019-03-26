@@ -235,7 +235,7 @@ fn map_rwlock_err(_: ()) -> TransactionPoolError {
 
 #[cfg(test)]
 mod tests {
-    use super::HashTransactionPool;
+    use std::sync::Arc;
 
     use futures::future::Future;
 
@@ -245,6 +245,8 @@ mod tests {
     use core_storage::storage::{BlockStorage, Storage};
     use core_types::{Address, Block, Hash, SignedTransaction, Transaction, UnverifiedTransaction};
 
+    use super::HashTransactionPool;
+
     #[test]
     fn test_insert_transaction() {
         let pool_size = 1000;
@@ -252,7 +254,7 @@ mod tests {
         let quota_limit = 10000;
         let height = 100;
 
-        let factory = Factory::new();
+        let factory = Arc::new(Factory::new());
         let mut storage = BlockStorage::new(factory);
         let mut block = Block::default();
         block.header.height = height;
@@ -305,7 +307,7 @@ mod tests {
         let quota_limit = 10000;
         let height = 100;
 
-        let factory = Factory::new();
+        let factory = Arc::new(Factory::new());
         let mut storage = BlockStorage::new(factory);
         let signed_tx = mock_signed_transaction(
             100,
@@ -334,7 +336,7 @@ mod tests {
         let quota_limit = 10000;
         let height = 100;
 
-        let factory = Factory::new();
+        let factory = Arc::new(Factory::new());
         let mut storage = BlockStorage::new(factory);
         let mut block = Block::default();
         block.header.height = height;
@@ -360,7 +362,7 @@ mod tests {
         let quota_limit = 10000;
         let height = 100;
 
-        let factory = Factory::new();
+        let factory = Arc::new(Factory::new());
         let mut storage = BlockStorage::new(factory);
         let mut block = Block::default();
         block.header.height = height;
@@ -396,7 +398,7 @@ mod tests {
         let quota_limit = 800;
         let height = 100;
 
-        let factory = Factory::new();
+        let factory = Arc::new(Factory::new());
         let mut storage = BlockStorage::new(factory);
         let mut block = Block::default();
         block.header.height = height;
