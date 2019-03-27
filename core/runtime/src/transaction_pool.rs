@@ -1,3 +1,4 @@
+use std::error::Error;
 use std::fmt;
 
 use core_crypto::{Crypto, CryptoError};
@@ -53,6 +54,7 @@ pub enum TransactionPoolError {
     Internal(String),
 }
 
+impl Error for TransactionPoolError {}
 impl fmt::Display for TransactionPoolError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let printable = match *self {

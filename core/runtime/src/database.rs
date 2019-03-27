@@ -1,3 +1,6 @@
+use std::error::Error;
+use std::fmt;
+
 use crate::FutRuntimeResult;
 
 /// Specify the category of data stored, and users can store the data in a decentralized manner.
@@ -54,4 +57,16 @@ pub trait Database: Send + Sync {
         c: DataCategory,
         keys: &[Vec<u8>],
     ) -> FutRuntimeResult<(), DatabaseError>;
+}
+
+impl Error for DatabaseError {}
+impl fmt::Display for DatabaseError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let printable = match *self {
+            DatabaseError::NotFound => "not found".to_owned(),
+            DatabaseError::InvalidData => "invalid data".to_owned(),
+            DatabaseError::Internal(ref err) => format!("internal error: {:?}", err),
+        };
+        write!(f, "{}", printable)
+    }
 }

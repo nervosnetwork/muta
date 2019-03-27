@@ -1,5 +1,9 @@
 pub mod executor;
 
+pub use executor::EVMExecutor;
+
+use std::sync::Arc;
+
 use cita_vm::BlockDataProvider;
 use ethereum_types::{H256, U256};
 use futures::future::Future;
@@ -7,15 +11,15 @@ use futures::future::Future;
 use core_storage::storage::Storage;
 
 pub struct EVMBlockDataProvider<S> {
-    storage: S,
+    storage: Arc<S>,
 }
 
 impl<S> EVMBlockDataProvider<S>
 where
     S: Storage,
 {
-    pub fn new(s: S) -> Self {
-        EVMBlockDataProvider { storage: s }
+    pub fn new(storage: Arc<S>) -> Self {
+        EVMBlockDataProvider { storage }
     }
 }
 

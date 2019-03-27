@@ -1,3 +1,4 @@
+use std::error::Error;
 use std::fmt;
 
 use cita_vm::{state::Error as StateError, Error as VMError};
@@ -69,6 +70,7 @@ pub enum ExecutorError {
     Internal(String),
 }
 
+impl Error for ExecutorError {}
 impl fmt::Display for ExecutorError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let printable = match *self {
