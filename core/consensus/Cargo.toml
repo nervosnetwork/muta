@@ -17,3 +17,7 @@ futures-locks = "0.3.3"
 
 [dev-dependencies]
 tokio = "0.1.18"
+hex = "0.3.2"
+components-database = { path = "../../components/database" }
+components-transaction-pool = { path = "../../components/transaction-pool" }
+components-executor = { path = "../../components/executor" }
