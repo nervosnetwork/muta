@@ -16,12 +16,12 @@ pub trait Crypto {
     type PublicKey: CryptoTransform;
     type Signature: CryptoTransform;
 
-    fn recover_public_key(
+    fn get_public_key(privkey: &Self::PrivateKey) -> Result<Self::PublicKey, CryptoError>;
+
+    fn verify_with_signature(
         hash: &Hash,
         signature: &Self::Signature,
     ) -> Result<Self::PublicKey, CryptoError>;
-
-    fn verify_with_signature(hash: &Hash, signature: &Self::Signature) -> Result<(), CryptoError>;
 
     fn gen_keypair() -> (Self::PrivateKey, Self::PublicKey);
 

@@ -68,7 +68,15 @@ impl Crypto for Secp256k1 {
     type PublicKey = PublicKey;
     type Signature = Signature;
 
-    fn recover_public_key(
+    fn get_public_key(privkey: &Self::PrivateKey) -> Result<Self::PublicKey, CryptoError> {
+        let privkey = SecretKey::from_slice(privkey.as_bytes())
+            .map_err(|_| CryptoError::PrivateKeyInvalid)?;
+        let secp = RawSecp256k1::new();
+        let pubkey = RawPublicKey::from_secret_key(&secp, &privkey);
+        Ok(PublicKey(pubkey.serialize()))
+    }
+
+    fn verify_with_signature(
         hash: &Hash,
         signature: &Self::Signature,
     ) -> Result<Self::PublicKey, CryptoError> {
@@ -76,16 +84,8 @@ impl Crypto for Secp256k1 {
         let sig = Secp256k1::signature(signature.as_bytes())?;
         let pubkey = Secp256k1::recover(&msg, &sig)?;
 
-        Ok(PublicKey(pubkey.serialize()))
-    }
-
-    fn verify_with_signature(hash: &Hash, signature: &Self::Signature) -> Result<(), CryptoError> {
-        let msg = Secp256k1::msg(hash)?;
-        let sig = Secp256k1::signature(signature.as_bytes())?;
-        let pubkey = Secp256k1::recover(&msg, &sig)?;
-
         Secp256k1::verify(&msg, &sig, &pubkey)?;
-        Ok(())
+        Ok(PublicKey(pubkey.serialize()))
     }
 
     fn gen_keypair() -> (Self::PrivateKey, Self::PublicKey) {
@@ -167,10 +167,11 @@ mod tests {
         let signature = Secp256k1::sign(&test_hash, &privkey).unwrap();
 
         // test verify signature
-        Secp256k1::verify_with_signature(&test_hash, &signature).unwrap();
+        let pubkey2 = Secp256k1::verify_with_signature(&test_hash, &signature).unwrap();
+        assert_eq!(pubkey.as_bytes(), pubkey2.as_bytes());
 
         // test recover
-        let pubkey2 = Secp256k1::recover_public_key(&test_hash, &signature).unwrap();
-        assert_eq!(pubkey.as_bytes(), pubkey2.as_bytes())
+        let pubkey3 = Secp256k1::get_public_key(&privkey).unwrap();
+        assert_eq!(pubkey.as_bytes(), pubkey3.as_bytes());
     }
 }
