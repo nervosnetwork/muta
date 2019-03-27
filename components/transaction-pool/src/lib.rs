@@ -58,7 +58,7 @@ where
         };
 
         // 1. verify signature
-        let sender = match C::recover_public_key(&tx_hash, &signature) {
+        let sender = match C::verify_with_signature(&tx_hash, &signature) {
             Ok(pubkey) => {
                 let hash = Hash::from_raw(&pubkey.as_bytes()[1..]);
                 Address::from(&hash.as_ref()[12..])
