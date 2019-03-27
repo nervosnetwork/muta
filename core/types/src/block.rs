@@ -21,6 +21,14 @@ pub struct BlockHeader {
     pub proposer: Address,
 }
 
+impl BlockHeader {
+    /// Calculate the block header hash. To maintain consistency we use RLP serialization.
+    pub fn hash(&self) -> Hash {
+        let rlp_data = rlp::encode(self);
+        Hash::from_raw(&rlp_data)
+    }
+}
+
 /// Structure encodable to RLP
 impl Encodable for BlockHeader {
     /// Append a value to the stream

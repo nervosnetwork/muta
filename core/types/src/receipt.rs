@@ -18,6 +18,14 @@ pub struct Receipt {
     pub contract_address: Option<Address>,
 }
 
+impl Receipt {
+    /// Calculate the receipt hash. To maintain consistency we use RLP serialization.
+    pub fn hash(&self) -> Hash {
+        let rlp_data = rlp::encode(self);
+        Hash::from_raw(&rlp_data)
+    }
+}
+
 /// Structure encodable to RLP
 impl Encodable for Receipt {
     /// Append a value to the stream
