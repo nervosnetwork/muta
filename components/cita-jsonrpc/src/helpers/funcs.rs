@@ -152,7 +152,9 @@ where
                                                         .map(|t| t.as_ref().into())
                                                         .collect(),
                                                     data: Data::new(log_entry.data.clone()),
-                                                    block_hash: Some(block.hash().as_ref().into()),
+                                                    block_hash: Some(
+                                                        block.header.hash().as_ref().into(),
+                                                    ),
                                                     block_number: Some(block.header.height.into()),
                                                     transaction_hash: Some(tx_hash.as_ref().into()),
                                                     transaction_index: Some(

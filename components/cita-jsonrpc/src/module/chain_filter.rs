@@ -122,7 +122,9 @@ where
                                             error!("get_block_by_height err: {:?}", e);
                                             JsonrpcError::internal_error()
                                         })
-                                        .map(|block| Data32::new(block.hash().as_ref().into()))
+                                        .map(|block| {
+                                            Data32::new(block.header.hash().as_ref().into())
+                                        })
                                 }))
                                 .map(FilterChanges::Hashes);
                             *block_number = current_number;

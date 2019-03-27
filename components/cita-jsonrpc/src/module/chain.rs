@@ -140,7 +140,7 @@ where
 {
     let mut res_block = Block {
         version: 0,
-        hash: raw_block.hash().as_ref().into(),
+        hash: raw_block.header.hash().as_ref().into(),
         header: BlockHeader {
             timestamp: raw_block.header.timestamp,
             prev_hash: raw_block.header.prevhash.as_ref().into(),
