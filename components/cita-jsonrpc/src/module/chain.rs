@@ -1,10 +1,18 @@
-use crate::helpers::{get_height_by_block_number, get_logs, transform_data32_to_hash};
+use crate::helpers::{get_block_by_block_number, get_logs, transform_data32_to_hash};
 use crate::types::Filter;
-use core_runtime::DatabaseError;
+use core_crypto::secp256k1::Secp256k1;
+use core_runtime::{DatabaseError, Executor, TransactionPool};
+use core_serialization::{
+    transaction::UnverifiedTransaction as PbUnverifiedTransaction, AsyncCodec,
+};
 use core_storage::errors::StorageError;
 use core_storage::storage::Storage;
-use core_types::{Address, Block as RawBlock, Hash, Receipt as RawReceipt, SignedTransaction};
-use futures::future::{err, ok, Future};
+use core_types::{
+    Address, Balance, Block as RawBlock, Hash, Receipt as RawReceipt, SignedTransaction,
+    UnverifiedTransaction, H256,
+};
+use ethereum_types::H256 as EthH256;
+use futures::future::{err, ok, result, Future};
 use jsonrpc_core::{BoxFuture, Error as JsonrpcError};
 use jsonrpc_derive::rpc;
 use jsonrpc_types::rpctypes::{
@@ -21,7 +29,6 @@ pub trait Chain {
     #[rpc(name = "blockNumber")]
     fn block_number(&self) -> BoxFuture<Quantity>;
 
-    // not ready
     #[rpc(name = "sendRawTransaction")]
     fn send_raw_transaction(&self, signed_data: Data) -> BoxFuture<TxResponse>;
 
@@ -37,7 +44,6 @@ pub trait Chain {
     #[rpc(name = "getLogs")]
     fn get_logs(&self, filter: RpcFilter) -> BoxFuture<Vec<Log>>;
 
-    // not ready
     #[rpc(name = "call")]
     fn call(&self, call_request: CallRequest, block_number: BlockNumber) -> BoxFuture<Data32>;
 
@@ -48,7 +54,6 @@ pub trait Chain {
     fn get_transaction_count(&self, addr: Data20, block_number: BlockNumber)
         -> BoxFuture<Quantity>;
 
-    // not ready
     #[rpc(name = "getCode")]
     fn get_code(&self, addr: Data20, block_number: BlockNumber) -> BoxFuture<Data>;
 
@@ -56,7 +61,6 @@ pub trait Chain {
     #[rpc(name = "getAbi")]
     fn get_abi(&self, addr: Data20, block_number: BlockNumber) -> BoxFuture<Data>;
 
-    // not ready
     #[rpc(name = "getBalance")]
     fn get_balance(&self, addr: Data20, block_number: BlockNumber) -> BoxFuture<Quantity>;
 
@@ -70,6 +74,7 @@ pub trait Chain {
     #[rpc(name = "getBlockHeader")]
     fn get_block_header(&self, block_number: BlockNumber) -> BoxFuture<Data>;
 
+    // not ready
     #[rpc(name = "getStateProof")]
     fn get_state_proof(
         &self,
@@ -78,7 +83,6 @@ pub trait Chain {
         block_number: BlockNumber,
     ) -> BoxFuture<Data>;
 
-    // not ready
     #[rpc(name = "getStorageAt")]
     fn get_storage_at(
         &self,
@@ -88,23 +92,41 @@ pub trait Chain {
     ) -> BoxFuture<Data>;
 }
 
-pub struct ChainRpcImpl<S>
+pub struct ChainRpcImpl<S, E, T>
 where
     S: Storage,
+    E: Executor,
+    T: TransactionPool,
 {
     storage: Arc<S>,
+    executor: Arc<E>,
+    transaction_pool: Arc<T>,
 }
 
-impl<S> ChainRpcImpl<S>
+impl<S, E, T> ChainRpcImpl<S, E, T>
 where
     S: Storage + 'static,
+    E: Executor + 'static,
+    T: TransactionPool + 'static,
 {
-    pub fn new(storage: Arc<S>) -> Self {
-        ChainRpcImpl { storage }
+    pub fn new(storage: Arc<S>, executor: Arc<E>, transaction_pool: Arc<T>) -> Self {
+        Self {
+            storage,
+            executor,
+            transaction_pool,
+        }
     }
 
     pub fn get_storage_inst(&self) -> Arc<S> {
-        Arc::<S>::clone(&self.storage)
+        Arc::clone(&self.storage)
+    }
+
+    pub fn get_transaction_pool_inst(&self) -> Arc<T> {
+        Arc::clone(&self.transaction_pool)
+    }
+
+    pub fn get_executor_inst(&self) -> Arc<E> {
+        Arc::clone(&self.executor)
     }
 }
 
@@ -207,9 +229,11 @@ where
     Box::new(ok(receipt))
 }
 
-impl<S> Chain for ChainRpcImpl<S>
+impl<S, E, T> Chain for ChainRpcImpl<S, E, T>
 where
     S: Storage + 'static,
+    E: Executor + 'static,
+    T: TransactionPool + 'static,
 {
     fn block_number(&self) -> BoxFuture<Quantity> {
         let fut = self
@@ -224,8 +248,28 @@ where
         Box::new(fut)
     }
 
-    fn send_raw_transaction(&self, _signed_data: Data) -> BoxFuture<TxResponse> {
-        unimplemented!()
+    fn send_raw_transaction(&self, signed_data: Data) -> BoxFuture<TxResponse> {
+        let mut transaction_pool = self.get_transaction_pool_inst();
+        let fut = AsyncCodec::decode::<PbUnverifiedTransaction>(signed_data.into())
+            .map_err(|e| {
+                error!("decode transaction data err: {:?}", e);
+                JsonrpcError::internal_error()
+            })
+            .map(UnverifiedTransaction::from)
+            .and_then(move |untx| {
+                Arc::get_mut(&mut transaction_pool)
+                    .unwrap()
+                    .insert::<Secp256k1>(untx)
+                    .map_err(|e| {
+                        error!("insert transaction err: {:?}", e);
+                        JsonrpcError::internal_error()
+                    })
+                    .map(|tx| TxResponse {
+                        hash: tx.hash.into_fixed_bytes().into(),
+                        status: "OK".to_string(),
+                    })
+            });
+        Box::new(fut)
     }
 
     fn get_block_by_hash(&self, hash: Data32, include_tx: bool) -> BoxFuture<Option<Block>> {
@@ -293,8 +337,44 @@ where
         get_logs(self.get_storage_inst(), filter)
     }
 
-    fn call(&self, _call_request: CallRequest, _block_number: BlockNumber) -> BoxFuture<Data32> {
-        unimplemented!()
+    fn call(&self, call_request: CallRequest, block_number: BlockNumber) -> BoxFuture<Data32> {
+        let executor = self.get_executor_inst();
+        let storage = self.get_storage_inst();
+        let fut = get_block_by_block_number(storage, block_number.clone()).and_then(move |block| {
+            let res: BoxFuture<_> = match block {
+                None => Box::new(err(JsonrpcError::invalid_params_with_details(
+                    format!("{:?}", &block_number),
+                    "no block in the given BlockNumber",
+                ))),
+                Some(block) => Box::new(result(
+                    executor
+                        .readonly(
+                            &block.header,
+                            &Address::from(Into::<Vec<u8>>::into(call_request.to).as_slice()),
+                            &Address::from(
+                                call_request
+                                    .from
+                                    .map_or(vec![], |from| from.into())
+                                    .as_slice(),
+                            ),
+                            &call_request.data.map_or(vec![], |data| data.into()),
+                        )
+                        .map_err(|e| {
+                            error!("executor.readonly err: {:?}", e);
+                            JsonrpcError::internal_error()
+                        })
+                        .map(|result| {
+                            let vec_data = result.data.unwrap_or_else(|| vec![]);
+                            let mut array = [0u8; 32];
+                            array.copy_from_slice(&vec_data);
+                            let data: EthH256 = array.into();
+                            data.into()
+                        }),
+                )),
+            };
+            res
+        });
+        Box::new(fut)
     }
 
     fn get_transaction(&self, hash: Data32) -> BoxFuture<Option<RpcTransaction>> {
@@ -323,51 +403,35 @@ where
         block_number: BlockNumber,
     ) -> BoxFuture<Quantity> {
         let storage = self.get_storage_inst();
-
-        let fut = get_height_by_block_number(Arc::<S>::clone(&storage), block_number).and_then(
-            move |height| {
-                Arc::<S>::clone(&storage)
-                    .get_block_by_height(height)
-                    .then(move |x| {
-                        let res: BoxFuture<_> = match x {
-                            Ok(block) => {
-                                let addr = Address::from(Into::<Vec<u8>>::into(addr).as_slice());
-                                let hashes: Vec<&Hash> = block.tx_hashes.iter().collect();
-
-                                Box::new(
-                                    Arc::<S>::clone(&storage)
-                                        .get_transactions(&hashes)
-                                        .map_err(|e| {
-                                            error!("get_transactions err: {:?}", e);
-                                            JsonrpcError::internal_error()
+        let fut = get_block_by_block_number(Arc::<S>::clone(&storage), block_number).and_then(
+            move |block| {
+                let res: BoxFuture<_> = match block {
+                    Some(block) => {
+                        let addr = Address::from(Into::<Vec<u8>>::into(addr).as_slice());
+                        let hashes: Vec<&Hash> = block.tx_hashes.iter().collect();
+                        Box::new(
+                            Arc::<S>::clone(&storage)
+                                .get_transactions(&hashes)
+                                .map_err(|e| {
+                                    error!("get_transactions err: {:?}", e);
+                                    JsonrpcError::internal_error()
+                                })
+                                .and_then(move |transactions| {
+                                    let count = transactions
+                                        .into_iter()
+                                        .filter(|tx| {
+                                            tx.is_some() && tx.clone().unwrap().sender == addr
                                         })
-                                        .and_then(move |transactions| {
-                                            let count = transactions
-                                                .into_iter()
-                                                .filter(|tx| {
-                                                    tx.is_some()
-                                                        && tx.clone().unwrap().sender == addr
-                                                })
-                                                .count();
-                                            ok(Quantity::new(count.into()))
-                                        }),
-                                )
-                            }
-                            Err(e) => match e {
-                                StorageError::Database(DatabaseError::NotFound) => {
-                                    Box::new(ok(Quantity::new(0.into())))
-                                }
-                                _ => {
-                                    error!("get_transaction err: {:?}", e);
-                                    Box::new(err(JsonrpcError::internal_error()))
-                                }
-                            },
-                        };
-                        res
-                    })
+                                        .count();
+                                    ok(Quantity::new(count.into()))
+                                }),
+                        )
+                    }
+                    None => Box::new(ok(Quantity::new(0.into()))),
+                };
+                res
             },
         );
-
         Box::new(fut)
     }
 
@@ -379,8 +443,26 @@ where
         unimplemented!()
     }
 
-    fn get_balance(&self, _addr: Data20, _block_number: BlockNumber) -> BoxFuture<Quantity> {
-        unimplemented!()
+    fn get_balance(&self, addr: Data20, block_number: BlockNumber) -> BoxFuture<Quantity> {
+        let addr = Address::from(Into::<Vec<u8>>::into(addr).as_slice());
+        let storage = self.get_storage_inst();
+        let executor = Arc::<E>::clone(&self.executor);
+        let fut = get_block_by_block_number(storage, block_number).and_then(move |block| {
+            let res: BoxFuture<_> = match block {
+                Some(block) => Box::new(result(
+                    executor
+                        .get_balance(&block.header.state_root, &addr)
+                        .map_err(|e| {
+                            error!("get_balance err: {:?}", e);
+                            JsonrpcError::internal_error()
+                        })
+                        .map(transform_balance_to_quantity),
+                )),
+                None => Box::new(ok(Quantity::new(0.into()))),
+            };
+            res
+        });
+        Box::new(fut)
     }
 
     fn get_transaction_proof(&self, _hash: Data32) -> BoxFuture<Data> {
@@ -393,25 +475,10 @@ where
 
     fn get_block_header(&self, block_number: BlockNumber) -> BoxFuture<Data> {
         let storage = self.get_storage_inst();
-        let fut = get_height_by_block_number(Arc::<S>::clone(&storage), block_number).and_then(
-            move |height| {
-                storage.get_block_by_height(height).then(|x| {
-                    let res: BoxFuture<_> = match x {
-                        Ok(block) => Box::new(ok(Data::new(rlp::encode(&block.header)))),
-                        Err(e) => match e {
-                            StorageError::Database(DatabaseError::NotFound) => {
-                                Box::new(ok(Data::new(vec![])))
-                            }
-                            _ => {
-                                error!("get_block_by_height err: {:?}", e);
-                                Box::new(err(JsonrpcError::internal_error()))
-                            }
-                        },
-                    };
-                    res
-                })
-            },
-        );
+        let fut = get_block_by_block_number(storage, block_number).map(|block| match block {
+            Some(block) => Data::new(rlp::encode(&block.header)),
+            None => Data::new(vec![]),
+        });
         Box::new(fut)
     }
 
@@ -426,40 +493,75 @@ where
 
     fn get_storage_at(
         &self,
-        _addr: Data20,
-        _key: Data32,
-        _block_number: BlockNumber,
+        addr: Data20,
+        key: Data32,
+        block_number: BlockNumber,
     ) -> BoxFuture<Data> {
-        unimplemented!()
+        let addr = Address::from(Into::<Vec<u8>>::into(addr).as_slice());
+        let storage = self.get_storage_inst();
+        let executor = Arc::<E>::clone(&self.executor);
+        let fut = get_block_by_block_number(storage, block_number).and_then(move |block| {
+            let res: BoxFuture<_> = match block {
+                Some(block) => Box::new(result(
+                    executor
+                        .get_value(
+                            &block.header.state_root,
+                            &addr,
+                            &transform_data32_to_h256(key),
+                        )
+                        .map_err(|e| {
+                            error!("get_value err: {:?}", e);
+                            JsonrpcError::internal_error()
+                        })
+                        .map(|v| Data::new(v.to_vec())),
+                )),
+                None => Box::new(ok(Data::new([0; 32].to_vec()))),
+            };
+            res
+        });
+        Box::new(fut)
     }
+}
+
+fn transform_balance_to_quantity(balance: Balance) -> Quantity {
+    let mut arr = [0u8; 32];
+    balance.into_little_endian(&mut arr).unwrap();
+    arr.as_ref().into()
+}
+
+fn transform_data32_to_h256(data: Data32) -> H256 {
+    let v: Vec<u8> = data.into();
+    let mut array = [0; 32];
+    array.copy_from_slice(&v);
+    array.into()
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::helpers::mock_storage::MockStorage;
-    use jsonrpc_core::IoHandler;
-
-    fn get_io_handler() -> IoHandler {
-        let storage = Arc::new(MockStorage::new());
-        let mut io = IoHandler::new();
-        let chain_rpc_impl = ChainRpcImpl::new(Arc::<MockStorage>::clone(&storage));
-        io.extend_with(chain_rpc_impl.to_delegate());
-        io
-    }
-
-    #[test]
-    fn test_basic() {
-        let io = get_io_handler();
-        let req = r#"
-        {
-			"jsonrpc": "2.0",
-			"method": "blockNumber",
-			"params": [],
-			"id": 15
-		}
-        "#;
-        let res = io.handle_request_sync(&req).unwrap();
-        assert_eq!(r#"{"jsonrpc":"2.0","result":"0x0","id":15}"#, &res);
-    }
+    //        use super::*;
+    //        use crate::helpers::mock_storage::MockStorage;
+    //        use jsonrpc_core::IoHandler;
+    //
+    //        fn get_io_handler() -> IoHandler {
+    //            let storage = Arc::new(MockStorage::new());
+    //            let mut io = IoHandler::new();
+    //            let chain_rpc_impl = ChainRpcImpl::new(Arc::<MockStorage>::clone(&storage));
+    //            io.extend_with(chain_rpc_impl.to_delegate());
+    //            io
+    //        }
+    //
+    //        #[test]
+    //        fn test_basic() {
+    //            let io = get_io_handler();
+    //            let req = r#"
+    //            {
+    //    			"jsonrpc": "2.0",
+    //    			"method": "blockNumber",
+    //    			"params": [],
+    //    			"id": 15
+    //    		}
+    //            "#;
+    //            let res = io.handle_request_sync(&req).unwrap();
+    //            assert_eq!(r#"{"jsonrpc":"2.0","result":"0x0","id":15}"#, &res);
+    //        }
 }

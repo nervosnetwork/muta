@@ -14,7 +14,7 @@ num_cpus = "1.0"
 serde_derive = "1.0"
 serde = "1.0"
 serde_json = "1.0"
-ethereum-types = "0.4"
+ethereum-types = "0.3.2"
 numext-fixed-uint = "0.1.2"
 numext-fixed-hash = "0.1.2"
 futures = "0.1"
@@ -24,6 +24,8 @@ transient-hashmap = "0.4.1"
 parking_lot = "0.7.1"
 jsonrpc-types = { git = "https://github.com/cryptape/cita-common.git", rev = "68b31af3d73a042363da3da53639860f8fa6339a" }
 
+core-crypto = { path = "../../core/crypto" }
 core-runtime = { path = "../../core/runtime" }
 core-types = { path = "../../core/types" }
 core-storage = { path = "../../core/storage" }
+core-serialization = { path = "../../core/serialization" }

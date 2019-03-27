@@ -6,7 +6,7 @@ use core_types::{Hash, SignedTransaction, UnverifiedTransaction};
 use crate::FutRuntimeResult;
 
 /// ”TransactionPool“ contains all legitimate transactions sent from other nodes (P2P) or local (RPC).
-pub trait TransactionPool {
+pub trait TransactionPool: Sync + Send {
     /// Insert a transaction after verifying the signature and some parameters are correct.
     fn insert<C: Crypto>(
         &mut self,

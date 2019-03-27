@@ -1,6 +1,8 @@
 use crate::types::Filter;
+use core_runtime::DatabaseError;
+use core_storage::errors::StorageError;
 use core_storage::storage::Storage;
-use core_types::{BloomRef, Hash};
+use core_types::{Block, BloomRef, Hash};
 use futures::future::{err, join_all, ok, Future};
 use jsonrpc_core::{BoxFuture, Error as JsonrpcError};
 use jsonrpc_types::rpctypes::{BlockNumber, BlockTag, Data, Data32, Log, Quantity};
@@ -23,6 +25,35 @@ where
         })
         .and_then(|block| ok(Quantity::new(block.header.height.into())));
 
+    Box::new(fut)
+}
+
+pub fn get_block_by_block_number<S>(
+    storage: Arc<S>,
+    block_number: BlockNumber,
+) -> BoxFuture<Option<Block>>
+where
+    S: Storage + 'static,
+{
+    let fut = get_height_by_block_number(Arc::<S>::clone(&storage), block_number).and_then(
+        move |height| {
+            Arc::<S>::clone(&storage)
+                .get_block_by_height(height)
+                .then(move |x| {
+                    let res: BoxFuture<_> = match x {
+                        Ok(block) => Box::new(ok(Some(block))),
+                        Err(e) => match e {
+                            StorageError::Database(DatabaseError::NotFound) => Box::new(ok(None)),
+                            _ => {
+                                error!("get_block err: {:?}", e);
+                                Box::new(err(JsonrpcError::internal_error()))
+                            }
+                        },
+                    };
+                    res
+                })
+        },
+    );
     Box::new(fut)
 }
 
