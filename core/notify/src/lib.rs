@@ -21,13 +21,6 @@ type BlockRegisterRequest = Request<String, Receiver<Arc<Block>>>;
 type TransactionNotifyRequest = Request<Arc<SignedTransaction>, ()>;
 type BlockNotifyRequest = Request<Arc<Block>, ()>;
 
-enum NotifyRequest {
-    TRR(TransactionRegisterRequest),
-    BRR(BlockRegisterRequest),
-    TNR(TransactionNotifyRequest),
-    BNR(BlockNotifyRequest),
-}
-
 pub struct NotifyController {
     transaction_register: Sender<TransactionRegisterRequest>,
     block_register: Sender<BlockRegisterRequest>,
@@ -102,6 +95,13 @@ impl NotifyService {
     }
 
     fn serve(self) {
+        enum NotifyRequest {
+            TRR(TransactionRegisterRequest),
+            BRR(BlockRegisterRequest),
+            TNR(TransactionNotifyRequest),
+            BNR(BlockNotifyRequest),
+        }
+
         // Create subscriber: #{name => sender}
         let mut transaction_subscribers = HashMap::new();
         let mut block_subscribers = HashMap::new();
