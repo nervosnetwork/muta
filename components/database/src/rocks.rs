@@ -3,15 +3,13 @@ use std::sync::Arc;
 use futures::future::{err, ok, result, Future};
 use rocksdb::{ColumnFamily, Error as RocksError, Options, WriteBatch, DB};
 
-use core_runtime::{
-    DataCategory, DatabaseError, DatabaseFactory, DatabaseInstance, FutRuntimeResult,
-};
+use core_runtime::{DataCategory, Database, DatabaseError, FutRuntimeResult};
 
-pub struct Factory {
+pub struct RocksDB {
     db: Arc<DB>,
 }
 
-impl Factory {
+impl RocksDB {
     // TODO: Configure RocksDB options for each column.
     pub fn new(path: &str) -> Result<Self, DatabaseError> {
         let mut opts = Options::default();
@@ -28,7 +26,7 @@ impl Factory {
         let db = DB::open_cf(&opts, path, categories.iter())
             .map_err(|e| DatabaseError::Internal(e.to_string()))?;
 
-        Ok(Factory { db: Arc::new(db) })
+        Ok(RocksDB { db: Arc::new(db) })
     }
 
     #[cfg(test)]
@@ -45,23 +43,7 @@ impl Factory {
             self.db.drop_cf(c).unwrap();
         }
     }
-}
 
-impl DatabaseFactory for Factory {
-    type Instance = Instance;
-
-    fn crate_instance(&self) -> FutRuntimeResult<Self::Instance, DatabaseError> {
-        Box::new(ok(Instance {
-            db: Arc::clone(&self.db),
-        }))
-    }
-}
-
-pub struct Instance {
-    db: Arc<DB>,
-}
-
-impl Instance {
     fn get_column(&self, c: DataCategory) -> Result<ColumnFamily, DatabaseError> {
         self.db
             .cf_handle(map_data_category(c))
@@ -69,7 +51,7 @@ impl Instance {
     }
 }
 
-impl DatabaseInstance for Instance {
+impl Database for RocksDB {
     fn get(&self, c: DataCategory, key: &[u8]) -> FutRuntimeResult<Vec<u8>, DatabaseError> {
         let column = match self.get_column(c) {
             Ok(column) => column,
@@ -115,7 +97,7 @@ impl DatabaseInstance for Instance {
     }
 
     fn insert(
-        &mut self,
+        &self,
         c: DataCategory,
         key: &[u8],
         value: &[u8],
@@ -130,7 +112,7 @@ impl DatabaseInstance for Instance {
     }
 
     fn insert_batch(
-        &mut self,
+        &self,
         c: DataCategory,
         keys: &[Vec<u8>],
         values: &[Vec<u8>],
@@ -169,7 +151,7 @@ impl DatabaseInstance for Instance {
         Box::new(ok(v))
     }
 
-    fn remove(&mut self, c: DataCategory, key: &[u8]) -> FutRuntimeResult<(), DatabaseError> {
+    fn remove(&self, c: DataCategory, key: &[u8]) -> FutRuntimeResult<(), DatabaseError> {
         let column = match self.get_column(c) {
             Ok(column) => column,
             Err(e) => return Box::new(err(e)),
@@ -180,7 +162,7 @@ impl DatabaseInstance for Instance {
     }
 
     fn remove_batch(
-        &mut self,
+        &self,
         c: DataCategory,
         keys: &[Vec<u8>],
     ) -> FutRuntimeResult<(), DatabaseError> {
@@ -222,138 +204,115 @@ fn map_db_err(err: RocksError) -> DatabaseError {
 
 #[cfg(test)]
 mod tests {
-    use super::Factory;
+    use super::RocksDB;
 
-    use core_runtime::{DataCategory, DatabaseError, DatabaseFactory, DatabaseInstance};
+    use core_runtime::{DataCategory, Database, DatabaseError};
     use futures::future::Future;
 
     #[test]
     fn test_get_should_return_ok() {
-        let f = Factory::new("rocksdb/test_get_should_return_ok").unwrap();
-        let mut instance = f.crate_instance().wait().unwrap();
+        let db = RocksDB::new("rocksdb/test_get_should_return_ok").unwrap();
 
-        check_not_found(instance.get(DataCategory::Block, b"test").wait());
-        instance
-            .insert(DataCategory::Block, b"test", b"test")
+        check_not_found(db.get(DataCategory::Block, b"test").wait());
+        db.insert(DataCategory::Block, b"test", b"test")
             .wait()
             .unwrap();
-        let v = instance.get(DataCategory::Block, b"test").wait().unwrap();
+        let v = db.get(DataCategory::Block, b"test").wait().unwrap();
         assert_eq!(v, b"test".to_vec());
-        f.clean();
+        db.clean();
     }
 
     #[test]
     fn test_insert_should_return_ok() {
-        let f = Factory::new("rocksdb/test_insert_should_return_ok").unwrap();
-        let mut instance = f.crate_instance().wait().unwrap();
+        let db = RocksDB::new("rocksdb/test_insert_should_return_ok").unwrap();
 
-        instance
-            .insert(DataCategory::Block, b"test", b"test")
+        db.insert(DataCategory::Block, b"test", b"test")
             .wait()
             .unwrap();
         assert_eq!(
             b"test".to_vec(),
-            instance.get(DataCategory::Block, b"test").wait().unwrap()
+            db.get(DataCategory::Block, b"test").wait().unwrap()
         );
-        f.clean();
+        db.clean();
     }
 
     #[test]
     fn test_insert_batch_should_return_ok() {
-        let f = Factory::new("rocksdb/test_insert_batch_should_return_ok").unwrap();
-        let mut instance = f.crate_instance().wait().unwrap();
+        let db = RocksDB::new("rocksdb/test_insert_batch_should_return_ok").unwrap();
 
-        instance
-            .insert_batch(
-                DataCategory::Block,
-                &[b"test1".to_vec(), b"test2".to_vec()],
-                &[b"test1".to_vec(), b"test2".to_vec()],
-            )
-            .wait()
-            .unwrap();
+        db.insert_batch(
+            DataCategory::Block,
+            &[b"test1".to_vec(), b"test2".to_vec()],
+            &[b"test1".to_vec(), b"test2".to_vec()],
+        )
+        .wait()
+        .unwrap();
         assert_eq!(
             b"test1".to_vec(),
-            instance.get(DataCategory::Block, b"test1").wait().unwrap()
+            db.get(DataCategory::Block, b"test1").wait().unwrap()
         );
         assert_eq!(
             b"test2".to_vec(),
-            instance.get(DataCategory::Block, b"test2").wait().unwrap()
+            db.get(DataCategory::Block, b"test2").wait().unwrap()
         );
-        f.clean();
+        db.clean();
     }
 
     #[test]
     fn test_contain_should_return_true() {
-        let f = Factory::new("rocksdb/test_contain_should_return_true").unwrap();
-        let mut instance = f.crate_instance().wait().unwrap();
+        let db = RocksDB::new("rocksdb/test_contain_should_return_true").unwrap();
 
-        instance
-            .insert(DataCategory::Block, b"test", b"test")
+        db.insert(DataCategory::Block, b"test", b"test")
             .wait()
             .unwrap();
         assert_eq!(
-            instance
-                .contains(DataCategory::Block, b"test")
-                .wait()
-                .unwrap(),
+            db.contains(DataCategory::Block, b"test").wait().unwrap(),
             true
         );
 
-        f.clean()
+        db.clean()
     }
 
     #[test]
     fn test_contain_should_return_false() {
-        let f = Factory::new("rocksdb/test_contain_should_return_false").unwrap();
-        let instance = f.crate_instance().wait().unwrap();
+        let db = RocksDB::new("rocksdb/test_contain_should_return_false").unwrap();
 
         assert_eq!(
-            instance
-                .contains(DataCategory::Block, b"test")
-                .wait()
-                .unwrap(),
+            db.contains(DataCategory::Block, b"test").wait().unwrap(),
             false
         );
-        f.clean();
+        db.clean();
     }
 
     #[test]
     fn test_remove_should_return_ok() {
-        let f = Factory::new("rocksdb/test_remove_should_return_ok").unwrap();
-        let mut instance = f.crate_instance().wait().unwrap();
+        let db = RocksDB::new("rocksdb/test_remove_should_return_ok").unwrap();
 
-        instance
-            .insert(DataCategory::Block, b"test", b"test")
+        db.insert(DataCategory::Block, b"test", b"test")
             .wait()
             .unwrap();
-        instance
-            .remove(DataCategory::Block, b"test")
-            .wait()
-            .unwrap();
-        check_not_found(instance.get(DataCategory::Block, b"test").wait());
-        f.clean();
+        db.remove(DataCategory::Block, b"test").wait().unwrap();
+        check_not_found(db.get(DataCategory::Block, b"test").wait());
+        db.clean();
     }
 
     #[test]
     fn test_remove_batch_should_return_ok() {
-        let f = Factory::new("rocksdb/test_remove_batch_should_return_ok").unwrap();
-        let mut instance = f.crate_instance().wait().unwrap();
+        let db = RocksDB::new("rocksdb/test_remove_batch_should_return_ok").unwrap();
 
-        instance
-            .insert_batch(
-                DataCategory::Block,
-                &[b"test1".to_vec(), b"test2".to_vec()],
-                &[b"test1".to_vec(), b"test2".to_vec()],
-            )
+        db.insert_batch(
+            DataCategory::Block,
+            &[b"test1".to_vec(), b"test2".to_vec()],
+            &[b"test1".to_vec(), b"test2".to_vec()],
+        )
+        .wait()
+        .unwrap();
+        db.remove_batch(DataCategory::Block, &[b"test1".to_vec(), b"test2".to_vec()])
             .wait()
             .unwrap();
-        instance
-            .remove_batch(DataCategory::Block, &[b"test1".to_vec(), b"test2".to_vec()])
-            .wait()
-            .unwrap();
-        check_not_found(instance.get(DataCategory::Block, b"test1").wait());
-        check_not_found(instance.get(DataCategory::Block, b"test2").wait());
-        f.clean();
+        check_not_found(db.get(DataCategory::Block, b"test1").wait());
+        check_not_found(db.get(DataCategory::Block, b"test2").wait());
+        db.clean();
     }
 
     fn check_not_found<T>(res: Result<T, DatabaseError>) {

@@ -22,7 +22,8 @@ pub struct ReadonlyResult {
 pub trait Executor: Send + Sync {
     /// Execute the transactions and then return the receipts, this function will modify the "state of the world".
     fn exec(
-        &mut self,
+        &self,
+        latest_state_root: &Hash,
         current_header: &BlockHeader,
         txs: &[SignedTransaction],
     ) -> Result<ExecutionResult, ExecutorError>;

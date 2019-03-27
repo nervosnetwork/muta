@@ -351,13 +351,8 @@ where
                         .readonly(
                             &block.header,
                             &Address::from(Into::<Vec<u8>>::into(call_request.to).as_slice()),
-                            &Address::from(
-                                call_request
-                                    .from
-                                    .map_or(vec![], |from| from.into())
-                                    .as_slice(),
-                            ),
-                            &call_request.data.map_or(vec![], |data| data.into()),
+                            &Address::from(call_request.from.map_or(vec![], Into::into).as_slice()),
+                            &call_request.data.map_or(vec![], Into::into),
                         )
                         .map_err(|e| {
                             error!("executor.readonly err: {:?}", e);

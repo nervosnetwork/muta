@@ -4,7 +4,7 @@ use byteorder::{ByteOrder, NativeEndian};
 use bytes::BytesMut;
 use futures::future::{join_all, Future};
 
-use core_runtime::{DataCategory, DatabaseFactory, DatabaseInstance, FutRuntimeResult};
+use core_runtime::{DataCategory, Database, FutRuntimeResult};
 use core_serialization::{
     block::Block as PbBlock, receipt::Receipt as PbReceipt,
     transaction::SignedTransaction as PbSignedTransaction, AsyncCodec,
@@ -18,7 +18,7 @@ const LATEST_BLOCK: &[u8] = b"latest-block";
 /// "storage" is responsible for the storage and retrieval of blockchain data.
 /// Block, transaction, and receipt can be obtained from here,
 /// but data related to "world status" is not available.
-pub trait Storage: Send + Sync + Clone {
+pub trait Storage: Send + Sync {
     /// Get the latest block.
     fn get_latest_block(&self) -> FutRuntimeResult<Block, StorageError>;
 
@@ -49,48 +49,43 @@ pub trait Storage: Send + Sync + Clone {
     ) -> FutRuntimeResult<Vec<Option<Receipt>>, StorageError>;
 
     /// Insert a block.
-    fn insert_block(&mut self, block: &Block) -> FutRuntimeResult<(), StorageError>;
+    fn insert_block(&self, block: &Block) -> FutRuntimeResult<(), StorageError>;
 
     /// Insert a batch of transactions.
     fn insert_transactions(
-        &mut self,
+        &self,
         signed_txs: &[SignedTransaction],
     ) -> FutRuntimeResult<(), StorageError>;
 
     /// Insert a batch of receipts.
-    fn insert_receipts(&mut self, receipts: &[Receipt]) -> FutRuntimeResult<(), StorageError>;
+    fn insert_receipts(&self, receipts: &[Receipt]) -> FutRuntimeResult<(), StorageError>;
 }
 
-pub struct BlockStorage<F>
+pub struct BlockStorage<DB>
 where
-    F: DatabaseFactory,
+    DB: Database,
 {
-    factory: Arc<F>,
+    db: Arc<DB>,
 }
 
-impl<F> BlockStorage<F>
+impl<DB> BlockStorage<DB>
 where
-    F: DatabaseFactory,
+    DB: Database,
 {
-    pub fn new(factory: Arc<F>) -> Self {
-        BlockStorage { factory }
+    pub fn new(db: Arc<DB>) -> Self {
+        BlockStorage { db }
     }
 }
 
-impl<F: 'static> Storage for BlockStorage<F>
+impl<DB: 'static> Storage for BlockStorage<DB>
 where
-    F: DatabaseFactory,
+    DB: Database,
 {
     fn get_latest_block(&self) -> FutRuntimeResult<Block, StorageError> {
         let fut = self
-            .factory
-            .crate_instance()
+            .db
+            .get(DataCategory::Block, LATEST_BLOCK)
             .map_err(StorageError::Database)
-            .and_then(|db_instance| {
-                db_instance
-                    .get(DataCategory::Block, LATEST_BLOCK)
-                    .map_err(StorageError::Database)
-            })
             .and_then(|data| AsyncCodec::decode::<PbBlock>(data).map_err(StorageError::Codec))
             .map(Block::from);
 
@@ -101,14 +96,9 @@ where
         let key = transfrom_u64_to_array_u8(height);
 
         let fut = self
-            .factory
-            .crate_instance()
+            .db
+            .get(DataCategory::Block, &key)
             .map_err(StorageError::Database)
-            .and_then(move |db_instance| {
-                db_instance
-                    .get(DataCategory::Block, &key)
-                    .map_err(StorageError::Database)
-            })
             .and_then(|data| AsyncCodec::decode::<PbBlock>(data).map_err(StorageError::Codec))
             .map(Block::from);;
 
@@ -118,24 +108,14 @@ where
     fn get_block_by_hash(&self, hash: &Hash) -> FutRuntimeResult<Block, StorageError> {
         let key = hash.clone();
 
-        let instance_fut = self
-            .factory
-            .crate_instance()
-            .map_err(StorageError::Database);
+        let db = Arc::clone(&self.db);
 
         let fut = self
-            .factory
-            .crate_instance()
+            .db
+            .get(DataCategory::Block, key.as_ref())
             .map_err(StorageError::Database)
-            .and_then(move |db_instance| {
-                db_instance
-                    .get(DataCategory::Block, key.as_ref())
-                    .map_err(StorageError::Database)
-            })
-            .join(instance_fut)
-            .and_then(move |(height_slice, db_instance)| {
-                db_instance
-                    .get(DataCategory::Block, &height_slice)
+            .and_then(move |height_slice| {
+                db.get(DataCategory::Block, &height_slice)
                     .map_err(StorageError::Database)
             })
             .and_then(|data| AsyncCodec::decode::<PbBlock>(data).map_err(StorageError::Codec))
@@ -148,14 +128,9 @@ where
         let key = hash.clone();
 
         let fut = self
-            .factory
-            .crate_instance()
+            .db
+            .get(DataCategory::Transaction, key.as_ref())
             .map_err(StorageError::Database)
-            .and_then(move |db_instance| {
-                db_instance
-                    .get(DataCategory::Transaction, key.as_ref())
-                    .map_err(StorageError::Database)
-            })
             .and_then(|data| {
                 AsyncCodec::decode::<PbSignedTransaction>(data).map_err(StorageError::Codec)
             })
@@ -174,14 +149,9 @@ where
         }
 
         let fut = self
-            .factory
-            .crate_instance()
+            .db
+            .get_batch(DataCategory::Transaction, &keys)
             .map_err(StorageError::Database)
-            .and_then(move |db_instance| {
-                db_instance
-                    .get_batch(DataCategory::Transaction, &keys)
-                    .map_err(StorageError::Database)
-            })
             .and_then(move |opt_txs_data| {
                 join_all(opt_txs_data.into_iter().map(|opt_data| {
                     if let Some(data) = opt_data {
@@ -214,14 +184,9 @@ where
         let key = hash.clone();
 
         let fut = self
-            .factory
-            .crate_instance()
+            .db
+            .get(DataCategory::Receipt, key.as_ref())
             .map_err(StorageError::Database)
-            .and_then(move |db_instance| {
-                db_instance
-                    .get(DataCategory::Receipt, key.as_ref())
-                    .map_err(StorageError::Database)
-            })
             .and_then(|data| AsyncCodec::decode::<PbReceipt>(data).map_err(StorageError::Codec))
             .map(Receipt::from);
 
@@ -238,14 +203,9 @@ where
         }
 
         let fut = self
-            .factory
-            .crate_instance()
+            .db
+            .get_batch(DataCategory::Receipt, &keys)
             .map_err(StorageError::Database)
-            .and_then(move |db_instance| {
-                db_instance
-                    .get_batch(DataCategory::Receipt, &keys)
-                    .map_err(StorageError::Database)
-            })
             .and_then(|opt_receipts_data| {
                 join_all(opt_receipts_data.into_iter().map(|opt_data| {
                     if let Some(data) = opt_data {
@@ -273,11 +233,8 @@ where
         Box::new(fut)
     }
 
-    fn insert_block(&mut self, block: &Block) -> FutRuntimeResult<(), StorageError> {
-        let instance_fut = self
-            .factory
-            .crate_instance()
-            .map_err(StorageError::Database);
+    fn insert_block(&self, block: &Block) -> FutRuntimeResult<(), StorageError> {
+        let db = Arc::clone(&self.db);
 
         let pb_block: PbBlock = block.clone().into();
         let mut encoded_buf = BytesMut::with_capacity(AsyncCodec::encoded_len(&pb_block));
@@ -288,21 +245,17 @@ where
 
         let fut = AsyncCodec::encode(&pb_block, &mut encoded_buf)
             .map_err(StorageError::Codec)
-            .and_then(|()| instance_fut)
-            .and_then(move |mut db_instance| {
+            .and_then(move |()| {
                 join_all(vec![
-                    db_instance
-                        .insert(DataCategory::Block, &height_key, encoded_buf.as_ref())
+                    db.insert(DataCategory::Block, &height_key, encoded_buf.as_ref())
                         .map_err(StorageError::Database),
-                    db_instance
-                        .insert(
-                            DataCategory::Block,
-                            hash_key.as_ref(),
-                            &transfrom_u64_to_array_u8(height),
-                        )
-                        .map_err(StorageError::Database),
-                    db_instance
-                        .insert(DataCategory::Block, LATEST_BLOCK, encoded_buf.as_ref())
+                    db.insert(
+                        DataCategory::Block,
+                        hash_key.as_ref(),
+                        &transfrom_u64_to_array_u8(height),
+                    )
+                    .map_err(StorageError::Database),
+                    db.insert(DataCategory::Block, LATEST_BLOCK, encoded_buf.as_ref())
                         .map_err(StorageError::Database),
                 ])
             })
@@ -312,14 +265,10 @@ where
     }
 
     fn insert_transactions(
-        &mut self,
+        &self,
         signed_txs: &[SignedTransaction],
     ) -> FutRuntimeResult<(), StorageError> {
-        let instance_fut = self
-            .factory
-            .crate_instance()
-            .map_err(StorageError::Database);
-
+        let db = Arc::clone(&self.db);
         let mut keys = vec![];
 
         let mut peding_fut = vec![];
@@ -335,24 +284,16 @@ where
             peding_fut.push(fut);
         }
 
-        let fut =
-            join_all(peding_fut)
-                .join(instance_fut)
-                .and_then(move |(buf_list, mut db_instance)| {
-                    db_instance
-                        .insert_batch(DataCategory::Transaction, &keys, &buf_list)
-                        .map_err(StorageError::Database)
-                });
+        let fut = join_all(peding_fut).and_then(move |buf_list| {
+            db.insert_batch(DataCategory::Transaction, &keys, &buf_list)
+                .map_err(StorageError::Database)
+        });
 
         Box::new(fut)
     }
 
-    fn insert_receipts(&mut self, receipts: &[Receipt]) -> FutRuntimeResult<(), StorageError> {
-        let instance_fut = self
-            .factory
-            .crate_instance()
-            .map_err(StorageError::Database);
-
+    fn insert_receipts(&self, receipts: &[Receipt]) -> FutRuntimeResult<(), StorageError> {
+        let db = Arc::clone(&self.db);
         let mut keys = vec![];
 
         let mut peding_fut = vec![];
@@ -368,26 +309,22 @@ where
             peding_fut.push(fut);
         }
 
-        let fut =
-            join_all(peding_fut)
-                .join(instance_fut)
-                .and_then(move |(buf_list, mut db_instance)| {
-                    db_instance
-                        .insert_batch(DataCategory::Receipt, &keys, &buf_list)
-                        .map_err(StorageError::Database)
-                });
+        let fut = join_all(peding_fut).and_then(move |buf_list| {
+            db.insert_batch(DataCategory::Receipt, &keys, &buf_list)
+                .map_err(StorageError::Database)
+        });
 
         Box::new(fut)
     }
 }
 
-impl<F> Clone for BlockStorage<F>
+impl<DB> Clone for BlockStorage<DB>
 where
-    F: DatabaseFactory,
+    DB: Database,
 {
     fn clone(&self) -> Self {
         BlockStorage {
-            factory: Arc::clone(&self.factory),
+            db: Arc::clone(&self.db),
         }
     }
 }
@@ -406,13 +343,13 @@ mod tests {
 
     use super::{BlockStorage, Storage};
 
-    use components_database::memory::Factory;
+    use components_database::memory::MemoryDB;
     use core_types::{Block, Hash, Receipt, SignedTransaction, UnverifiedTransaction};
 
     #[test]
     fn test_get_latest_block_should_return_ok() {
-        let factory = Arc::new(Factory::new());
-        let mut storage = BlockStorage::new(factory);
+        let db = Arc::new(MemoryDB::new());
+        let storage = BlockStorage::new(db);
         storage.insert_block(&mock_block(1000)).wait().unwrap();
         let block = storage.get_latest_block().wait().unwrap();
 
@@ -421,8 +358,8 @@ mod tests {
 
     #[test]
     fn test_get_block_by_height_should_return_ok() {
-        let factory = Arc::new(Factory::new());
-        let mut storage = BlockStorage::new(factory);
+        let db = Arc::new(MemoryDB::new());
+        let storage = BlockStorage::new(db);
         storage.insert_block(&mock_block(1000)).wait().unwrap();
         let block = storage.get_block_by_height(1000).wait().unwrap();
 
@@ -431,8 +368,8 @@ mod tests {
 
     #[test]
     fn test_get_block_by_hash_should_return_ok() {
-        let factory = Arc::new(Factory::new());
-        let mut storage = BlockStorage::new(factory);
+        let db = Arc::new(MemoryDB::new());
+        let storage = BlockStorage::new(db);
 
         let b = mock_block(1000);
         storage.insert_block(&b).wait().unwrap();
@@ -443,8 +380,8 @@ mod tests {
 
     #[test]
     fn test_get_transaction_should_return_ok() {
-        let factory = Arc::new(Factory::new());
-        let mut storage = BlockStorage::new(factory);
+        let db = Arc::new(MemoryDB::new());
+        let storage = BlockStorage::new(db);
         let tx = mock_transaction(Hash::from_raw(b"test111"));
 
         let hash = tx.hash.clone();
@@ -456,8 +393,8 @@ mod tests {
 
     #[test]
     fn test_get_transactions_should_return_ok() {
-        let factory = Arc::new(Factory::new());
-        let mut storage = BlockStorage::new(factory);
+        let db = Arc::new(MemoryDB::new());
+        let storage = BlockStorage::new(db);
         let tx1 = mock_transaction(Hash::from_raw(b"test111"));
         let tx2 = mock_transaction(Hash::from_raw(b"test222"));
 
@@ -481,8 +418,8 @@ mod tests {
 
     #[test]
     fn test_get_receipt_should_return_ok() {
-        let factory = Arc::new(Factory::new());
-        let mut storage = BlockStorage::new(factory);
+        let db = Arc::new(MemoryDB::new());
+        let storage = BlockStorage::new(db);
         let receipt = mock_receipt(Hash::from_raw(b"test111"));
         let tx_hash = receipt.transaction_hash.clone();
 
@@ -493,8 +430,8 @@ mod tests {
 
     #[test]
     fn test_get_receipts_should_return_ok() {
-        let factory = Arc::new(Factory::new());
-        let mut storage = BlockStorage::new(factory);
+        let db = Arc::new(MemoryDB::new());
+        let storage = BlockStorage::new(db);
         let receipt1 = mock_receipt(Hash::from_raw(b"test111"));
         let receipt2 = mock_receipt(Hash::from_raw(b"test222"));
 
@@ -521,8 +458,8 @@ mod tests {
 
     #[test]
     fn test_insert_block_should_return_ok() {
-        let factory = Arc::new(Factory::new());
-        let mut storage = BlockStorage::new(factory);
+        let db = Arc::new(MemoryDB::new());
+        let storage = BlockStorage::new(db);
 
         let block = mock_block(1000);
         storage.insert_block(&block).wait().unwrap();

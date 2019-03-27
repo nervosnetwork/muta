@@ -15,14 +15,19 @@ pub struct HashTransactionPool<S> {
     quota_limit: u64,
 
     tx_cache: Arc<RwLock<HashMap<Hash, SignedTransaction>>>,
-    storage: S,
+    storage: Arc<S>,
 }
 
 impl<S> HashTransactionPool<S>
 where
     S: Storage,
 {
-    pub fn new(storage: S, pool_size: usize, until_block_limit: u64, quota_limit: u64) -> Self {
+    pub fn new(
+        storage: Arc<S>,
+        pool_size: usize,
+        until_block_limit: u64,
+        quota_limit: u64,
+    ) -> Self {
         HashTransactionPool {
             pool_size,
             until_block_limit,
@@ -39,7 +44,7 @@ where
     S: Storage,
 {
     fn insert<C: Crypto>(
-        &mut self,
+        &self,
         untx: UnverifiedTransaction,
     ) -> FutRuntimeResult<SignedTransaction, TransactionPoolError> {
         let tx_hash = untx.transaction.hash();
@@ -114,7 +119,7 @@ where
     }
 
     fn package(
-        &mut self,
+        &self,
         count: u64,
         quota_limit: u64,
     ) -> FutRuntimeResult<Vec<Hash>, TransactionPoolError> {
@@ -168,7 +173,7 @@ where
         Box::new(fut)
     }
 
-    fn flush(&mut self, tx_hashes: &[Hash]) -> FutRuntimeResult<(), TransactionPoolError> {
+    fn flush(&self, tx_hashes: &[Hash]) -> FutRuntimeResult<(), TransactionPoolError> {
         let mut tx_cache = match self.tx_cache.write().wait() {
             Ok(tx_cache) => tx_cache,
             Err(()) => return Box::new(err(map_rwlock_err(()))),
@@ -199,7 +204,7 @@ where
 
     /// TODO: Implement "ensure"
     /// In the POC-1 phase, we only support single-node, so this function is not implemented.
-    fn ensure(&mut self, _tx_hashes: &[Hash]) -> FutRuntimeResult<bool, TransactionPoolError> {
+    fn ensure(&self, _tx_hashes: &[Hash]) -> FutRuntimeResult<bool, TransactionPoolError> {
         unimplemented!();
     }
 }
@@ -239,7 +244,7 @@ mod tests {
 
     use futures::future::Future;
 
-    use components_database::memory::Factory;
+    use components_database::memory::MemoryDB;
     use core_crypto::{secp256k1::Secp256k1, Crypto, CryptoTransform};
     use core_runtime::{TransactionPool, TransactionPoolError};
     use core_storage::storage::{BlockStorage, Storage};
@@ -254,14 +259,13 @@ mod tests {
         let quota_limit = 10000;
         let height = 100;
 
-        let factory = Arc::new(Factory::new());
-        let mut storage = BlockStorage::new(factory);
+        let db = Arc::new(MemoryDB::new());
+        let storage = Arc::new(BlockStorage::new(db));
         let mut block = Block::default();
         block.header.height = height;
         storage.insert_block(&block).wait().unwrap();
 
-        let mut tx_pool =
-            HashTransactionPool::new(storage, pool_size, until_block_limit, quota_limit);
+        let tx_pool = HashTransactionPool::new(storage, pool_size, until_block_limit, quota_limit);
 
         // test normal
         let untx = mock_transaction(100, height + until_block_limit, "test_normal".to_owned());
@@ -307,8 +311,8 @@ mod tests {
         let quota_limit = 10000;
         let height = 100;
 
-        let factory = Arc::new(Factory::new());
-        let mut storage = BlockStorage::new(factory);
+        let db = Arc::new(MemoryDB::new());
+        let storage = Arc::new(BlockStorage::new(db));
         let signed_tx = mock_signed_transaction(
             100,
             height + until_block_limit,
@@ -322,8 +326,7 @@ mod tests {
         block.header.height = height;
         storage.insert_block(&block).wait().unwrap();
 
-        let mut tx_pool =
-            HashTransactionPool::new(storage, pool_size, until_block_limit, quota_limit);
+        let tx_pool = HashTransactionPool::new(storage, pool_size, until_block_limit, quota_limit);
 
         let result = tx_pool.insert::<Secp256k1>(signed_tx.untx).wait();
         assert_eq!(result, Err(TransactionPoolError::Dup));
@@ -336,14 +339,13 @@ mod tests {
         let quota_limit = 10000;
         let height = 100;
 
-        let factory = Arc::new(Factory::new());
-        let mut storage = BlockStorage::new(factory);
+        let db = Arc::new(MemoryDB::new());
+        let storage = Arc::new(BlockStorage::new(db));
         let mut block = Block::default();
         block.header.height = height;
         storage.insert_block(&block).wait().unwrap();
 
-        let mut tx_pool =
-            HashTransactionPool::new(storage, pool_size, until_block_limit, quota_limit);
+        let tx_pool = HashTransactionPool::new(storage, pool_size, until_block_limit, quota_limit);
 
         let untx = mock_transaction(100, height + until_block_limit, "test1".to_owned());
         let tx_hash = untx.transaction.hash();
@@ -362,14 +364,13 @@ mod tests {
         let quota_limit = 10000;
         let height = 100;
 
-        let factory = Arc::new(Factory::new());
-        let mut storage = BlockStorage::new(factory);
+        let db = Arc::new(MemoryDB::new());
+        let storage = Arc::new(BlockStorage::new(db));
         let mut block = Block::default();
         block.header.height = height;
         storage.insert_block(&block).wait().unwrap();
 
-        let mut tx_pool =
-            HashTransactionPool::new(storage, pool_size, until_block_limit, quota_limit);
+        let tx_pool = HashTransactionPool::new(storage, pool_size, until_block_limit, quota_limit);
 
         let mut tx_hashes = vec![];
         for i in 0..10 {
@@ -398,14 +399,13 @@ mod tests {
         let quota_limit = 800;
         let height = 100;
 
-        let factory = Arc::new(Factory::new());
-        let mut storage = BlockStorage::new(factory);
+        let db = Arc::new(MemoryDB::new());
+        let storage = Arc::new(BlockStorage::new(db));
         let mut block = Block::default();
         block.header.height = height;
         storage.insert_block(&block).wait().unwrap();
 
-        let mut tx_pool =
-            HashTransactionPool::new(storage, pool_size, until_block_limit, quota_limit);
+        let tx_pool = HashTransactionPool::new(storage, pool_size, until_block_limit, quota_limit);
 
         let mut tx_hashes = vec![];
         for i in 0..10 {

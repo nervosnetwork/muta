@@ -1,15 +1,18 @@
+use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
+
+use futures::future::{err, ok};
+
 use core_runtime::{DatabaseError, FutRuntimeResult};
 use core_storage::{errors::StorageError, storage::Storage};
 use core_types::{Block, BlockHeader, Bloom, Hash, Receipt, SignedTransaction};
-use futures::future::{err, ok};
-use std::collections::hash_map::HashMap;
 
 #[derive(Default, Debug, Clone)]
 pub struct MockStorage {
-    pub blocks: Vec<Block>,
-    pub hashes_height_map: HashMap<Hash, usize>,
-    pub transactions: HashMap<Hash, SignedTransaction>,
-    pub receipts: HashMap<Hash, Receipt>,
+    pub blocks: Arc<RwLock<Vec<Block>>>,
+    pub hashes_height_map: Arc<RwLock<HashMap<Hash, usize>>>,
+    pub transactions: Arc<RwLock<HashMap<Hash, SignedTransaction>>>,
+    pub receipts: Arc<RwLock<HashMap<Hash, Receipt>>>,
 }
 
 impl MockStorage {
@@ -32,41 +35,42 @@ impl MockStorage {
             tx_hashes: vec![],
         };
         Self {
-            blocks: vec![genesis],
-            hashes_height_map: HashMap::new(),
-            transactions: HashMap::new(),
-            receipts: HashMap::new(),
+            blocks: Arc::new(RwLock::new(vec![genesis])),
+            hashes_height_map: Arc::new(RwLock::new(HashMap::new())),
+            transactions: Arc::new(RwLock::new(HashMap::new())),
+            receipts: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 }
 
 impl Storage for MockStorage {
     fn get_latest_block(&self) -> FutRuntimeResult<Block, StorageError> {
-        if self.blocks.is_empty() {
+        if self.blocks.read().unwrap().is_empty() {
             Box::new(err(StorageError::Database(DatabaseError::NotFound)))
         } else {
-            Box::new(ok(self.blocks.last().cloned().unwrap()))
+            Box::new(ok(self.blocks.read().unwrap().last().cloned().unwrap()))
         }
     }
 
     fn get_block_by_height(&self, height: u64) -> FutRuntimeResult<Block, StorageError> {
-        if height < self.blocks.len() as u64 {
-            Box::new(ok(self.blocks[height as usize].clone()))
+        if height < self.blocks.read().unwrap().len() as u64 {
+            Box::new(ok(self.blocks.read().unwrap()[height as usize].clone()))
         } else {
             Box::new(err(StorageError::Database(DatabaseError::NotFound)))
         }
     }
 
     fn get_block_by_hash(&self, hash: &Hash) -> FutRuntimeResult<Block, StorageError> {
-        let height = self.hashes_height_map.get(hash);
+        let hashes_height_map = self.hashes_height_map.read().unwrap();
+        let height = hashes_height_map.get(hash);
         match height {
             None => Box::new(err(StorageError::Database(DatabaseError::NotFound))),
-            Some(height) => Box::new(ok(self.blocks[*height as usize].clone())),
+            Some(height) => Box::new(ok(self.blocks.read().unwrap()[*height as usize].clone())),
         }
     }
 
     fn get_transaction(&self, hash: &Hash) -> FutRuntimeResult<SignedTransaction, StorageError> {
-        match self.transactions.get(hash) {
+        match self.transactions.read().unwrap().get(hash) {
             None => Box::new(err(StorageError::Database(DatabaseError::NotFound))),
             Some(tx) => Box::new(ok(tx.clone())),
         }
@@ -78,12 +82,12 @@ impl Storage for MockStorage {
     ) -> FutRuntimeResult<Vec<Option<SignedTransaction>>, StorageError> {
         Box::new(ok(hashes
             .iter()
-            .map(|h| self.transactions.get(h).cloned())
+            .map(|h| self.transactions.read().unwrap().get(h).cloned())
             .collect::<Vec<_>>()))
     }
 
     fn get_receipt(&self, tx_hash: &Hash) -> FutRuntimeResult<Receipt, StorageError> {
-        match self.receipts.get(tx_hash) {
+        match self.receipts.read().unwrap().get(tx_hash) {
             None => Box::new(err(StorageError::Database(DatabaseError::NotFound))),
             Some(tx) => Box::new(ok(tx.clone())),
         }
@@ -95,14 +99,16 @@ impl Storage for MockStorage {
     ) -> FutRuntimeResult<Vec<Option<Receipt>>, StorageError> {
         Box::new(ok(tx_hashes
             .iter()
-            .map(|h| self.receipts.get(h).cloned())
+            .map(|h| self.receipts.read().unwrap().get(h).cloned())
             .collect::<Vec<_>>()))
     }
 
-    fn insert_block(&mut self, block: &Block) -> FutRuntimeResult<(), StorageError> {
+    fn insert_block(&self, block: &Block) -> FutRuntimeResult<(), StorageError> {
         if block.header.prevhash
             != self
                 .blocks
+                .read()
+                .unwrap()
                 .last()
                 .map_or(Hash::from_raw(vec![].as_slice()), Block::hash)
         {
@@ -113,7 +119,7 @@ impl Storage for MockStorage {
         if !block
             .tx_hashes
             .iter()
-            .all(|h| self.transactions.contains_key(h))
+            .all(|h| self.transactions.read().unwrap().contains_key(h))
         {
             return Box::new(err(StorageError::Internal(
                 "some transaction not exist".to_string(),
@@ -122,31 +128,38 @@ impl Storage for MockStorage {
         if !block
             .tx_hashes
             .iter()
-            .all(|h| self.receipts.contains_key(h))
+            .all(|h| self.receipts.read().unwrap().contains_key(h))
         {
             return Box::new(err(StorageError::Internal(
                 "some receipts not exist".to_string(),
             )));
         }
         self.hashes_height_map
-            .insert(block.hash(), self.blocks.len());
-        self.blocks.push(block.clone());
+            .write()
+            .unwrap()
+            .insert(block.hash(), self.blocks.read().unwrap().len());
+        self.blocks.write().unwrap().push(block.clone());
         Box::new(ok(()))
     }
 
     fn insert_transactions(
-        &mut self,
+        &self,
         signed_txs: &[SignedTransaction],
     ) -> FutRuntimeResult<(), StorageError> {
         for tx in signed_txs {
-            self.transactions.insert(tx.hash.clone(), tx.clone());
+            self.transactions
+                .write()
+                .unwrap()
+                .insert(tx.hash.clone(), tx.clone());
         }
         Box::new(ok(()))
     }
 
-    fn insert_receipts(&mut self, receipts: &[Receipt]) -> FutRuntimeResult<(), StorageError> {
+    fn insert_receipts(&self, receipts: &[Receipt]) -> FutRuntimeResult<(), StorageError> {
         for receipt in receipts {
             self.receipts
+                .write()
+                .unwrap()
                 .insert(receipt.transaction_hash.clone(), receipt.clone());
         }
         Box::new(ok(()))

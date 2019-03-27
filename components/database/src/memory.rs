@@ -4,53 +4,29 @@ use std::sync::Arc;
 use futures::future::{err, ok, Future};
 use futures_locks::RwLock;
 
-use core_runtime::{
-    DataCategory, DatabaseError, DatabaseFactory, DatabaseInstance, FutRuntimeResult,
-};
+use core_runtime::{DataCategory, Database, DatabaseError, FutRuntimeResult};
 
-pub struct Factory {
+pub struct MemoryDB {
     storage: Arc<RwLock<HashMap<Vec<u8>, Vec<u8>>>>,
 }
 
-impl Factory {
+impl MemoryDB {
     pub fn new() -> Self {
-        Factory {
+        MemoryDB {
             storage: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 }
 
-impl Default for Factory {
+impl Default for MemoryDB {
     fn default() -> Self {
-        Factory {
+        MemoryDB {
             storage: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 }
 
-impl DatabaseFactory for Factory {
-    type Instance = Instance;
-
-    fn crate_instance(&self) -> FutRuntimeResult<Self::Instance, DatabaseError> {
-        Box::new(ok(Instance {
-            storage: Arc::clone(&self.storage),
-        }))
-    }
-}
-
-pub struct Instance {
-    storage: Arc<RwLock<HashMap<Vec<u8>, Vec<u8>>>>,
-}
-
-impl Default for Instance {
-    fn default() -> Self {
-        Instance {
-            storage: Arc::new(RwLock::new(HashMap::new())),
-        }
-    }
-}
-
-impl DatabaseInstance for Instance {
+impl Database for MemoryDB {
     fn get(&self, c: DataCategory, key: &[u8]) -> FutRuntimeResult<Vec<u8>, DatabaseError> {
         let key = gen_key(&c, key);
 
@@ -91,7 +67,7 @@ impl DatabaseInstance for Instance {
     }
 
     fn insert(
-        &mut self,
+        &self,
         c: DataCategory,
         key: &[u8],
         value: &[u8],
@@ -110,7 +86,7 @@ impl DatabaseInstance for Instance {
     }
 
     fn insert_batch(
-        &mut self,
+        &self,
         c: DataCategory,
         keys: &[Vec<u8>],
         values: &[Vec<u8>],
@@ -150,7 +126,7 @@ impl DatabaseInstance for Instance {
         Box::new(fut)
     }
 
-    fn remove(&mut self, c: DataCategory, key: &[u8]) -> FutRuntimeResult<(), DatabaseError> {
+    fn remove(&self, c: DataCategory, key: &[u8]) -> FutRuntimeResult<(), DatabaseError> {
         let key = gen_key(&c, key);
 
         let fut = self
@@ -165,7 +141,7 @@ impl DatabaseInstance for Instance {
     }
 
     fn remove_batch(
-        &mut self,
+        &self,
         c: DataCategory,
         keys: &[Vec<u8>],
     ) -> FutRuntimeResult<(), DatabaseError> {
@@ -201,122 +177,106 @@ fn gen_keys(c: &DataCategory, keys: &[Vec<u8>]) -> Vec<Vec<u8>> {
 
 #[cfg(test)]
 mod tests {
-    use super::Factory;
+    use super::MemoryDB;
 
-    use core_runtime::{DataCategory, DatabaseError, DatabaseFactory, DatabaseInstance};
+    use core_runtime::{DataCategory, Database, DatabaseError};
     use futures::future::Future;
 
     #[test]
     fn test_get_should_return_ok() {
-        let mut instance = Factory::new().crate_instance().wait().unwrap();
+        let db = MemoryDB::new();
 
-        check_not_found(instance.get(DataCategory::Block, b"test").wait());
-        instance
-            .insert(DataCategory::Block, b"test", b"test")
+        check_not_found(db.get(DataCategory::Block, b"test").wait());
+        db.insert(DataCategory::Block, b"test", b"test")
             .wait()
             .unwrap();
-        let v = instance.get(DataCategory::Block, b"test").wait().unwrap();
+        let v = db.get(DataCategory::Block, b"test").wait().unwrap();
         assert_eq!(v, b"test".to_vec())
     }
 
     #[test]
     fn test_insert_should_return_ok() {
-        let mut instance = Factory::new().crate_instance().wait().unwrap();
+        let db = MemoryDB::new();
 
-        instance
-            .insert(DataCategory::Block, b"test", b"test")
+        db.insert(DataCategory::Block, b"test", b"test")
             .wait()
             .unwrap();
         assert_eq!(
             b"test".to_vec(),
-            instance.get(DataCategory::Block, b"test").wait().unwrap()
+            db.get(DataCategory::Block, b"test").wait().unwrap()
         );
     }
 
     #[test]
     fn test_insert_batch_should_return_ok() {
-        let mut instance = Factory::new().crate_instance().wait().unwrap();
+        let db = MemoryDB::new();
 
-        instance
-            .insert_batch(
-                DataCategory::Block,
-                &[b"test1".to_vec(), b"test2".to_vec()],
-                &[b"test1".to_vec(), b"test2".to_vec()],
-            )
-            .wait()
-            .unwrap();
+        db.insert_batch(
+            DataCategory::Block,
+            &[b"test1".to_vec(), b"test2".to_vec()],
+            &[b"test1".to_vec(), b"test2".to_vec()],
+        )
+        .wait()
+        .unwrap();
         assert_eq!(
             b"test1".to_vec(),
-            instance.get(DataCategory::Block, b"test1").wait().unwrap()
+            db.get(DataCategory::Block, b"test1").wait().unwrap()
         );
         assert_eq!(
             b"test2".to_vec(),
-            instance.get(DataCategory::Block, b"test2").wait().unwrap()
+            db.get(DataCategory::Block, b"test2").wait().unwrap()
         );
     }
 
     #[test]
     fn test_contain_should_return_true() {
-        let mut instance = Factory::new().crate_instance().wait().unwrap();
+        let db = MemoryDB::new();
 
-        instance
-            .insert(DataCategory::Block, b"test", b"test")
+        db.insert(DataCategory::Block, b"test", b"test")
             .wait()
             .unwrap();
         assert_eq!(
-            instance
-                .contains(DataCategory::Block, b"test")
-                .wait()
-                .unwrap(),
+            db.contains(DataCategory::Block, b"test").wait().unwrap(),
             true
         )
     }
 
     #[test]
     fn test_contain_should_return_false() {
-        let instance = Factory::new().crate_instance().wait().unwrap();
+        let db = MemoryDB::new();
         assert_eq!(
-            instance
-                .contains(DataCategory::Block, b"test")
-                .wait()
-                .unwrap(),
+            db.contains(DataCategory::Block, b"test").wait().unwrap(),
             false
         )
     }
 
     #[test]
     fn test_remove_should_return_ok() {
-        let mut instance = Factory::new().crate_instance().wait().unwrap();
+        let db = MemoryDB::new();
 
-        instance
-            .insert(DataCategory::Block, b"test", b"test")
+        db.insert(DataCategory::Block, b"test", b"test")
             .wait()
             .unwrap();
-        instance
-            .remove(DataCategory::Block, b"test")
-            .wait()
-            .unwrap();
-        check_not_found(instance.get(DataCategory::Block, b"test").wait());
+        db.remove(DataCategory::Block, b"test").wait().unwrap();
+        check_not_found(db.get(DataCategory::Block, b"test").wait());
     }
 
     #[test]
     fn test_remove_batch_should_return_ok() {
-        let mut instance = Factory::new().crate_instance().wait().unwrap();
+        let db = MemoryDB::new();
 
-        instance
-            .insert_batch(
-                DataCategory::Block,
-                &[b"test1".to_vec(), b"test2".to_vec()],
-                &[b"test1".to_vec(), b"test2".to_vec()],
-            )
+        db.insert_batch(
+            DataCategory::Block,
+            &[b"test1".to_vec(), b"test2".to_vec()],
+            &[b"test1".to_vec(), b"test2".to_vec()],
+        )
+        .wait()
+        .unwrap();
+        db.remove_batch(DataCategory::Block, &[b"test1".to_vec(), b"test2".to_vec()])
             .wait()
             .unwrap();
-        instance
-            .remove_batch(DataCategory::Block, &[b"test1".to_vec(), b"test2".to_vec()])
-            .wait()
-            .unwrap();
-        check_not_found(instance.get(DataCategory::Block, b"test1").wait());
-        check_not_found(instance.get(DataCategory::Block, b"test2").wait());
+        check_not_found(db.get(DataCategory::Block, b"test1").wait());
+        check_not_found(db.get(DataCategory::Block, b"test2").wait());
     }
 
     fn check_not_found<T>(res: Result<T, DatabaseError>) {

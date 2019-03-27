@@ -22,13 +22,7 @@ pub enum DatabaseError {
     Internal(String),
 }
 
-pub trait DatabaseFactory: Send + Sync {
-    type Instance: DatabaseInstance + Send;
-
-    fn crate_instance(&self) -> FutRuntimeResult<Self::Instance, DatabaseError>;
-}
-
-pub trait DatabaseInstance {
+pub trait Database: Send + Sync {
     fn get(&self, c: DataCategory, key: &[u8]) -> FutRuntimeResult<Vec<u8>, DatabaseError>;
 
     fn get_batch(
@@ -38,14 +32,14 @@ pub trait DatabaseInstance {
     ) -> FutRuntimeResult<Vec<Option<Vec<u8>>>, DatabaseError>;
 
     fn insert(
-        &mut self,
+        &self,
         c: DataCategory,
         key: &[u8],
         value: &[u8],
     ) -> FutRuntimeResult<(), DatabaseError>;
 
     fn insert_batch(
-        &mut self,
+        &self,
         c: DataCategory,
         keys: &[Vec<u8>],
         values: &[Vec<u8>],
@@ -53,10 +47,10 @@ pub trait DatabaseInstance {
 
     fn contains(&self, c: DataCategory, key: &[u8]) -> FutRuntimeResult<bool, DatabaseError>;
 
-    fn remove(&mut self, c: DataCategory, key: &[u8]) -> FutRuntimeResult<(), DatabaseError>;
+    fn remove(&self, c: DataCategory, key: &[u8]) -> FutRuntimeResult<(), DatabaseError>;
 
     fn remove_batch(
-        &mut self,
+        &self,
         c: DataCategory,
         keys: &[Vec<u8>],
     ) -> FutRuntimeResult<(), DatabaseError>;

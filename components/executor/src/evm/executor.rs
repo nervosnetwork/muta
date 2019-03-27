@@ -18,7 +18,6 @@ use core_types::{
 };
 
 pub struct EVMExecutor<DB> {
-    latest_state_root: Hash,
     block_provider: Arc<Box<BlockDataProvider>>,
 
     db: DB,
@@ -67,7 +66,6 @@ where
         let root_hash = Hash::from_raw(state.root.as_ref());
 
         let evm_executor = EVMExecutor {
-            latest_state_root: root_hash.clone(),
             block_provider: Arc::new(block_provider),
 
             db,
@@ -81,8 +79,10 @@ where
         block_provider: Box<BlockDataProvider>,
         root: &Hash,
     ) -> Result<Self, ExecutorError> {
+        let state_root = H256(root.clone().into_fixed_bytes());
+        // Check if state root exists
+        State::from_existing(db.clone(), state_root)?;
         Ok(EVMExecutor {
-            latest_state_root: root.clone(),
             block_provider: Arc::new(block_provider),
 
             db,
@@ -96,11 +96,13 @@ where
 {
     /// Execute the transactions and then return the receipts, this function will modify the "state of the world".
     fn exec(
-        &mut self,
+        &self,
+        latest_state_root: &Hash,
         current_header: &BlockHeader,
         txs: &[SignedTransaction],
     ) -> Result<ExecutionResult, ExecutorError> {
-        let state_root = H256(self.latest_state_root.clone().into_fixed_bytes());
+        let state_root = H256(latest_state_root.clone().into_fixed_bytes());
+
         let state = Arc::new(RefCell::new(State::from_existing(
             self.db.clone(),
             state_root,
@@ -123,7 +125,6 @@ where
 
         state.borrow_mut().commit()?;
         let root_hash = Hash::from_raw(state.borrow().root.as_ref());
-        self.latest_state_root = root_hash.clone();
 
         for mut receipt in receipts.iter_mut() {
             receipt.state_root = root_hash.clone();
@@ -517,7 +518,7 @@ mod tests {
             HashMap::default(),
         );
 
-        let (mut executor, state_root) = EVMExecutor::from_genesis(
+        let (executor, state_root) = EVMExecutor::from_genesis(
             &genesis,
             MemoryDB::new(),
             Box::new(BlockDataProviderMock::default()),
@@ -542,7 +543,7 @@ mod tests {
             },
         };
 
-        let exec_result = executor.exec(&header, &[signed_tx]).unwrap();
+        let exec_result = executor.exec(&state_root, &header, &[signed_tx]).unwrap();
         assert_ne!(exec_result.receipts[0].contract_address, None);
         assert_ne!(exec_result.state_root, state_root);
         assert_eq!(exec_result.receipts[0].logs.len(), 1);
