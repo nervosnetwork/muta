@@ -1,7 +1,11 @@
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
+pub mod errors;
+pub mod solo;
+
+pub use solo::Solo;
+
+pub enum ConsensusMode {
+    // Single node.
+    Solo,
+    // +2/3 byzantine consensus algorithm.
+    BFT,
 }

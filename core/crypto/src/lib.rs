@@ -12,9 +12,9 @@ pub trait CryptoTransform: Sized {
 }
 
 pub trait Crypto {
-    type PrivateKey: CryptoTransform;
-    type PublicKey: CryptoTransform;
-    type Signature: CryptoTransform;
+    type PrivateKey: CryptoTransform + Send;
+    type PublicKey: CryptoTransform + Send;
+    type Signature: CryptoTransform + Send;
 
     fn get_public_key(privkey: &Self::PrivateKey) -> Result<Self::PublicKey, CryptoError>;
 
