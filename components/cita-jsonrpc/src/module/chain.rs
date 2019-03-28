@@ -218,7 +218,7 @@ where
                 .position(|x| x == &tx_hash)
                 .unwrap()
                 .into();
-            tx.block_hash = b.hash().as_ref().into();
+            tx.block_hash = b.header.hash().as_ref().into();
             tx.block_number = b.header.height.into();
         };
         tx
@@ -283,7 +283,7 @@ where
                             address: log_entry.address.as_ref().into(),
                             topics: log_entry.topics.iter().map(|t| t.as_ref().into()).collect(),
                             data: Data::new(log_entry.data.clone()),
-                            block_hash: Some(block.hash().as_ref().into()),
+                            block_hash: Some(block.header.hash().as_ref().into()),
                             block_number: Some(block.header.height.into()),
                             transaction_hash: Some(raw_receipt.transaction_hash.as_ref().into()),
                             transaction_index: Some(tx_index.into()),
