@@ -1,12 +1,13 @@
-use crate::helpers::{get_block_by_block_number, get_logs, transform_data32_to_hash};
+use crate::helpers::{
+    get_block_by_block_number, get_block_by_tx_hash, get_logs, transform_data32_to_hash,
+};
 use crate::types::Filter;
 use core_crypto::secp256k1::Secp256k1;
 use core_runtime::{DatabaseError, Executor, TransactionPool};
 use core_serialization::{
     transaction::UnverifiedTransaction as PbUnverifiedTransaction, AsyncCodec,
 };
-use core_storage::errors::StorageError;
-use core_storage::storage::Storage;
+use core_storage::{errors::StorageError, storage::Storage};
 use core_types::{
     Address, Balance, Block as RawBlock, Hash, Receipt as RawReceipt, SignedTransaction,
     UnverifiedTransaction, H256,
@@ -193,40 +194,125 @@ where
     Box::new(fut)
 }
 
-fn get_jsonrpc_tx_from_raw_tx(raw_tx: &SignedTransaction) -> BoxFuture<RpcTransaction> {
-    let tx = RpcTransaction {
-        hash: raw_tx.hash.as_ref().into(),
-        content: raw_tx.untx.transaction.data.clone().into(),
-        from: raw_tx.sender.as_ref().into(),
-        // todo
-        block_number: 0.into(),
-        block_hash: 0.into(),
-        index: 0.into(),
-    };
-    Box::new(ok(tx))
+fn get_jsonrpc_tx_from_raw_tx<S>(
+    storage: Arc<S>,
+    raw_tx: SignedTransaction,
+) -> BoxFuture<RpcTransaction>
+where
+    S: Storage + 'static,
+{
+    let tx_hash = raw_tx.hash.clone();
+    let fut = get_block_by_tx_hash(storage, tx_hash.clone()).map(move |block| {
+        let mut tx = RpcTransaction {
+            hash: raw_tx.hash.as_ref().into(),
+            content: raw_tx.untx.transaction.data.clone().into(),
+            from: raw_tx.sender.as_ref().into(),
+            block_number: 0.into(),
+            block_hash: 0.into(),
+            index: 0.into(),
+        };
+        if let Some(b) = block {
+            tx.index = b
+                .tx_hashes
+                .iter()
+                .position(|x| x == &tx_hash)
+                .unwrap()
+                .into();
+            tx.block_hash = b.hash().as_ref().into();
+            tx.block_number = b.header.height.into();
+        };
+        tx
+    });
+
+    Box::new(fut)
 }
 
 fn get_jsonrpc_receipt_from_raw_receipt<S>(
-    _storage: Arc<S>,
-    raw_receipt: &RawReceipt,
+    storage: Arc<S>,
+    raw_receipt: RawReceipt,
 ) -> BoxFuture<Receipt>
 where
-    S: Storage,
+    S: Storage + 'static,
 {
-    let receipt = Receipt {
-        transaction_hash: Some(raw_receipt.transaction_hash.as_ref().into()),
-        transaction_index: None,         // todo
-        block_hash: None,                // todo
-        block_number: None,              // todo
-        cumulative_quota_used: 0.into(), // todo
-        quota_used: Some(raw_receipt.quota_used.into()),
-        contract_address: None, // todo
-        logs: vec![],           // todo
-        state_root: Some(raw_receipt.state_root.as_ref().into()),
-        logs_bloom: raw_receipt.logs_bloom.data().clone().into(),
-        error_message: Some(raw_receipt.receipt_error.clone()),
-    };
-    Box::new(ok(receipt))
+    let storage1 = Arc::clone(&storage);
+    let raw_receipt2 = raw_receipt.clone();
+    let fut = get_block_by_tx_hash(storage, raw_receipt.transaction_hash.clone())
+        .and_then(|block| match block {
+            None => {
+                error!("unexpected err, block is not found");
+                Err(JsonrpcError::internal_error())
+            }
+            Some(block) => Ok(block),
+        })
+        .and_then(move |block| {
+            storage1
+                .get_receipts(block.tx_hashes.iter().collect::<Vec<_>>().as_slice())
+                .map_err(|e| {
+                    error!("get_receipts err: {:?}", e);
+                    JsonrpcError::internal_error()
+                })
+                .and_then(move |receipts| {
+                    let mut logs_in_block_before_receipt = 0;
+                    let mut tx_index = 0;
+                    let tx_hash = raw_receipt2.transaction_hash.clone();
+                    for r in receipts {
+                        match r {
+                            None => {
+                                error!("unexpected err, some receipt is none");
+                                return err(JsonrpcError::internal_error());
+                            }
+                            Some(r) => {
+                                if r.transaction_hash == tx_hash {
+                                    return ok((block, logs_in_block_before_receipt, tx_index));
+                                } else {
+                                    logs_in_block_before_receipt += r.logs.len();
+                                    tx_index += 1;
+                                }
+                            }
+                        }
+                    }
+                    error!("unexpected err, tx not found in block");
+                    err(JsonrpcError::internal_error())
+                })
+                .and_then(move |(block, logs_in_block_before_receipt, tx_index)| {
+                    let logs = raw_receipt
+                        .logs
+                        .iter()
+                        .enumerate()
+                        .map(|(log_index, log_entry)| Log {
+                            address: log_entry.address.as_ref().into(),
+                            topics: log_entry.topics.iter().map(|t| t.as_ref().into()).collect(),
+                            data: Data::new(log_entry.data.clone()),
+                            block_hash: Some(block.hash().as_ref().into()),
+                            block_number: Some(block.header.height.into()),
+                            transaction_hash: Some(raw_receipt.transaction_hash.as_ref().into()),
+                            transaction_index: Some(tx_index.into()),
+                            log_index: Some(log_index.into()),
+                            transaction_log_index: Some(
+                                (log_index + logs_in_block_before_receipt).into(),
+                            ),
+                        })
+                        .collect();
+                    let receipt = Receipt {
+                        transaction_hash: Some(raw_receipt.transaction_hash.as_ref().into()),
+                        transaction_index: Some(tx_index.into()),
+                        block_hash: Some(raw_receipt.block_hash.as_ref().into()),
+                        block_number: Some(block.header.height.into()),
+                        cumulative_quota_used: 0.into(), // todo
+                        quota_used: Some(raw_receipt.quota_used.into()),
+                        contract_address: raw_receipt
+                            .contract_address
+                            .clone()
+                            .map(|addr| addr.as_ref().into()),
+                        logs,
+                        state_root: Some(raw_receipt.state_root.as_ref().into()),
+                        logs_bloom: raw_receipt.logs_bloom.data().clone().into(),
+                        error_message: Some(raw_receipt.receipt_error.clone()),
+                    };
+                    ok(receipt)
+                })
+        });
+    Box::new(fut)
 }
 
 impl<S, E, T> Chain for ChainRpcImpl<S, E, T>
@@ -249,7 +335,7 @@ where
     }
 
     fn send_raw_transaction(&self, signed_data: Data) -> BoxFuture<TxResponse> {
-        let mut transaction_pool = self.get_transaction_pool_inst();
+        let transaction_pool = self.get_transaction_pool_inst();
         let fut = AsyncCodec::decode::<PbUnverifiedTransaction>(signed_data.into())
             .map_err(|e| {
                 error!("decode transaction data err: {:?}", e);
@@ -257,8 +343,7 @@ where
             })
             .map(UnverifiedTransaction::from)
             .and_then(move |untx| {
-                Arc::get_mut(&mut transaction_pool)
-                    .unwrap()
+                transaction_pool
                     .insert::<Secp256k1>(untx)
                     .map_err(|e| {
                         error!("insert transaction err: {:?}", e);
@@ -327,7 +412,7 @@ where
                 error!("get_receipt err: {:?}", e);
                 JsonrpcError::internal_error()
             })
-            .and_then(|raw_receipt| get_jsonrpc_receipt_from_raw_receipt(storage, &raw_receipt));
+            .and_then(|raw_receipt| get_jsonrpc_receipt_from_raw_receipt(storage, raw_receipt));
 
         Box::new(fut)
     }
@@ -373,12 +458,13 @@ where
     }
 
     fn get_transaction(&self, hash: Data32) -> BoxFuture<Option<RpcTransaction>> {
+        let storage = self.get_storage_inst();
         let fut = self
             .storage
             .get_transaction(&transform_data32_to_hash(hash))
             .then(move |x| {
                 let res: BoxFuture<_> = match x {
-                    Ok(raw_tx) => Box::new(get_jsonrpc_tx_from_raw_tx(&raw_tx).map(Some)),
+                    Ok(raw_tx) => Box::new(get_jsonrpc_tx_from_raw_tx(storage, raw_tx).map(Some)),
                     Err(e) => match e {
                         StorageError::Database(DatabaseError::NotFound) => Box::new(ok(None)),
                         _ => {
@@ -430,8 +516,26 @@ where
         Box::new(fut)
     }
 
-    fn get_code(&self, _addr: Data20, _block_number: BlockNumber) -> BoxFuture<Data> {
-        unimplemented!()
+    fn get_code(&self, addr: Data20, block_number: BlockNumber) -> BoxFuture<Data> {
+        let addr = Address::from(Into::<Vec<u8>>::into(addr).as_slice());
+        let storage = self.get_storage_inst();
+        let executor = self.get_executor_inst();
+        let fut = get_block_by_block_number(storage, block_number).and_then(move |block| {
+            let res: BoxFuture<_> = match block {
+                Some(block) => Box::new(result(
+                    executor
+                        .get_code(&block.header.state_root, &addr)
+                        .map_err(|e| {
+                            error!("get_code err: {:?}", e);
+                            JsonrpcError::internal_error()
+                        })
+                        .map(|(code, _hash)| code.into()),
+                )),
+                None => Box::new(err(JsonrpcError::invalid_params("block not found"))),
+            };
+            res
+        });
+        Box::new(fut)
     }
 
     fn get_abi(&self, _addr: Data20, _block_number: BlockNumber) -> BoxFuture<Data> {
@@ -441,7 +545,7 @@ where
     fn get_balance(&self, addr: Data20, block_number: BlockNumber) -> BoxFuture<Quantity> {
         let addr = Address::from(Into::<Vec<u8>>::into(addr).as_slice());
         let storage = self.get_storage_inst();
-        let executor = Arc::<E>::clone(&self.executor);
+        let executor = self.get_executor_inst();
         let fut = get_block_by_block_number(storage, block_number).and_then(move |block| {
             let res: BoxFuture<_> = match block {
                 Some(block) => Box::new(result(
@@ -453,7 +557,7 @@ where
                         })
                         .map(transform_balance_to_quantity),
                 )),
-                None => Box::new(ok(Quantity::new(0.into()))),
+                None => Box::new(err(JsonrpcError::invalid_params("block not found"))),
             };
             res
         });

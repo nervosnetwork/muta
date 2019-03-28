@@ -13,6 +13,38 @@ pub fn transform_data32_to_hash(hash: Data32) -> Hash {
     Hash::from_raw(&Into::<Vec<u8>>::into(hash))
 }
 
+pub fn get_block_by_tx_hash<S>(storage: Arc<S>, tx_hash: Hash) -> BoxFuture<Option<Block>>
+where
+    S: Storage + 'static,
+{
+    let fut = storage
+        .get_latest_block()
+        .map_err(|e| {
+            error!("get_latest_block err: {:?}", e);
+            JsonrpcError::internal_error()
+        })
+        .and_then(move |block| {
+            if block.tx_hashes.contains(&tx_hash) {
+                return ok(Some(block));
+            }
+            for block_number in (0..block.header.height).rev() {
+                match storage.get_block_by_height(block_number as u64).wait() {
+                    Ok(b) => {
+                        if b.tx_hashes.contains(&tx_hash) {
+                            return ok(Some(b));
+                        }
+                    }
+                    Err(e) => {
+                        error!("unexpected get_block_by_height err: {:?}", e);
+                        return err(JsonrpcError::internal_error());
+                    }
+                }
+            }
+            ok(None)
+        });
+    Box::new(fut)
+}
+
 pub fn get_current_height<S>(storage: Arc<S>) -> BoxFuture<Quantity>
 where
     S: Storage,
@@ -168,6 +200,8 @@ where
                                             _transaction_log_index += 1;
                                             log_index += 1;
                                         }
+                                    } else {
+                                        log_index += &receipt.logs.len();
                                     }
                                 }
                             }

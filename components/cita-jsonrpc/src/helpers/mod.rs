@@ -5,6 +5,6 @@ pub mod mock_storage;
 
 pub use self::filter_manager::{FilterManager, FilterType};
 pub use self::funcs::{
-    get_block_by_block_number, get_current_height, get_height_by_block_number, get_logs,
-    transform_data32_to_hash,
+    get_block_by_block_number, get_block_by_tx_hash, get_current_height,
+    get_height_by_block_number, get_logs, transform_data32_to_hash,
 };
