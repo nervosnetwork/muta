@@ -176,7 +176,7 @@ where
                 block.header.receipts_root = receipts_root;
                 block.header.quota_used = quota_used;
 
-                ok(block.clone())
+                ok(block)
                     .join3(
                         storage.insert_transactions(&signed_txs),
                         storage.insert_receipts(&execution_result.receipts),
