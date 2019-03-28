@@ -10,6 +10,7 @@ use crate::{Crypto, CryptoError, CryptoTransform};
 
 pub struct Secp256k1;
 
+#[derive(Clone)]
 pub struct PrivateKey([u8; constants::SECRET_KEY_SIZE]);
 
 impl CryptoTransform for PrivateKey {
@@ -28,6 +29,7 @@ impl CryptoTransform for PrivateKey {
     }
 }
 
+#[derive(Clone)]
 pub struct PublicKey([u8; constants::PUBLIC_KEY_SIZE]);
 
 impl CryptoTransform for PublicKey {
@@ -45,6 +47,8 @@ impl CryptoTransform for PublicKey {
         self.0.as_ref()
     }
 }
+
+#[derive(Clone)]
 pub struct Signature([u8; constants::COMPACT_SIGNATURE_SIZE + 1]);
 
 impl CryptoTransform for Signature {

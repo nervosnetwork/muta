@@ -241,7 +241,7 @@ where
 
         let height = block.header.height;
         let height_key = transfrom_u64_to_array_u8(block.header.height);
-        let hash_key = block.hash();
+        let hash_key = block.header.hash();
 
         let fut = AsyncCodec::encode(&pb_block, &mut encoded_buf)
             .map_err(StorageError::Codec)
@@ -374,7 +374,7 @@ mod tests {
         let b = mock_block(1000);
         storage.insert_block(&b).wait().unwrap();
 
-        let b = storage.get_block_by_hash(&b.hash()).wait().unwrap();
+        let b = storage.get_block_by_hash(&b.header.hash()).wait().unwrap();
         assert_eq!(b.header.height, 1000)
     }
 
@@ -479,7 +479,7 @@ mod tests {
 
         assert_eq!(
             storage
-                .get_block_by_hash(&block.hash())
+                .get_block_by_hash(&block.header.hash())
                 .wait()
                 .unwrap()
                 .header

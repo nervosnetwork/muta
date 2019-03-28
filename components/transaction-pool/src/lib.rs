@@ -135,7 +135,7 @@ where
                 let mut valid_hashes = vec![];
                 let mut quota_count = 0;
 
-                for (tx_hash, signed_tx) in tx_cache.iter() {
+                for (tx_hash, signed_tx) in tx_cache.iter_mut() {
                     let valid_until_block = signed_tx.untx.transaction.valid_until_block;
                     let quota = signed_tx.untx.transaction.quota;
 
@@ -149,7 +149,7 @@ where
                         block.header.height,
                         until_block_limit,
                     ) {
-                        invalid_hashes.push(tx_hash);
+                        invalid_hashes.push(tx_hash.clone());
                         continue;
                     }
 
@@ -161,10 +161,8 @@ where
                     valid_hashes.push(tx_hash.clone());
                 }
 
-                if !valid_hashes.is_empty() {
-                    valid_hashes.iter().for_each(|hash| {
-                        tx_cache.remove(hash);
-                    });
+                for h in invalid_hashes {
+                    tx_cache.remove(&h);
                 }
 
                 ok(valid_hashes)

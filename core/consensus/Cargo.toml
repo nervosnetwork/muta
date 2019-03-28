@@ -1,7 +1,23 @@
 [package]
-name = "consensus"
+name = "core-consensus"
 version = "0.1.0"
 authors = ["Cryptape Technologies <contact@cryptape.com>"]
 edition = "2018"
 
 [dependencies]
+core-storage = { path = "../storage" }
+core-runtime = { path = "../runtime" }
+core-types = { path = "../types" }
+core-crypto = { path = "../crypto" }
+core-merkle = { path = "../merkle" }
+
+log = "0.4.0"
+futures = "0.1.17"
+futures-locks = "0.3.3"
+
+[dev-dependencies]
+tokio = "0.1.18"
+hex = "0.3.2"
+components-database = { path = "../../components/database" }
+components-transaction-pool = { path = "../../components/transaction-pool" }
+components-executor = { path = "../../components/executor" }

@@ -13,7 +13,9 @@ components-database = { path = "components/database" }
 components-cita-jsonrpc = { path = "components/cita-jsonrpc" }
 core-storage = { path = "core/storage" }
 core-p2p = { path = "core/p2p" }
+core-crypto = { path = "core/crypto" }
 
+tokio = "0.1.18"
 clap = "2.32"
 log = "0.4.0"
 serde = "1.0"
@@ -31,6 +33,7 @@ members = [
   "core/p2p",
   "core/crypto",
   "core/notify",
+  "core/merkle",
 
   "components/transaction-pool",
   "components/database",

@@ -110,7 +110,7 @@ impl Storage for MockStorage {
                 .read()
                 .unwrap()
                 .last()
-                .map_or(Hash::from_raw(vec![].as_slice()), Block::hash)
+                .map_or(Hash::from_raw(vec![].as_slice()), |b| b.header.hash())
         {
             return Box::new(err(StorageError::Internal(
                 "prevhash doesn't match".to_string(),
@@ -137,7 +137,7 @@ impl Storage for MockStorage {
         self.hashes_height_map
             .write()
             .unwrap()
-            .insert(block.hash(), self.blocks.read().unwrap().len());
+            .insert(block.header.hash(), self.blocks.read().unwrap().len());
         self.blocks.write().unwrap().push(block.clone());
         Box::new(ok(()))
     }
