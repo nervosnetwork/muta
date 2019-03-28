@@ -23,16 +23,7 @@ impl StorageError {
     }
 }
 
-impl Error for StorageError {
-    fn description(&self) -> &str {
-        match *self {
-            StorageError::Database(_) => "database error",
-            StorageError::Codec(_) => "codec error",
-            StorageError::Internal(_) => "internal error",
-        }
-    }
-}
-
+impl Error for StorageError {}
 impl fmt::Display for StorageError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let printable = match *self {

@@ -1,4 +1,5 @@
 use numext_fixed_hash::FixedHashError;
+use std::error;
 use std::fmt;
 
 #[derive(Debug)]
@@ -6,6 +7,7 @@ pub enum CoreTypesError {
     ParseHexError(FixedHashError),
 }
 
+impl error::Error for CoreTypesError {}
 impl fmt::Display for CoreTypesError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let printable = match *self {
