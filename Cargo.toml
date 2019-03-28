@@ -5,7 +5,7 @@ authors = ["Cryptape Technologies <contact@cryptape.com>"]
 edition = "2018"
 
 [dependencies]
-config = { path = "common/config" }
+config-parser = { path = "common/config-parser" }
 logger = { path = "common/logger" }
 
 components-transaction-pool = { path = "components/transaction-pool" }
@@ -23,7 +23,7 @@ serde_derive = "1.0"
 
 [workspace]
 members = [
-  "common/config",
+  "common/config-parser",
   "common/logger",
 
   "core/types",

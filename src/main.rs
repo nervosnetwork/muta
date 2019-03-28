@@ -17,7 +17,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .get_matches();
 
     let args_config = matches.value_of("config").unwrap_or("config.toml");
-    let cfg: Config = config::from(args_config)?;
+    let cfg: Config = config_parser::parse(args_config)?;
     info!("Config: {:?}", cfg);
     Ok(())
 }
