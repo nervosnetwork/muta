@@ -33,7 +33,7 @@ members = [
   "core/p2p",
   "core/crypto",
   "core/notify",
-  "core/merkel",
+  "core/merkle",
 
   "components/transaction-pool",
   "components/database",

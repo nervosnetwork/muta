@@ -6,7 +6,7 @@ use futures::future::{ok, Future};
 use futures_locks::RwLock;
 
 use core_crypto::{Crypto, CryptoTransform};
-use core_merkel::Merkel;
+use core_merkle::Merkle;
 use core_runtime::{Executor, TransactionPool};
 use core_storage::storage::Storage;
 use core_types::{Address, Block, BlockHeader, Hash};
@@ -131,7 +131,7 @@ where
         };
 
         if !tx_hashes.is_empty() {
-            let transactions_root = Merkel::hashes_root(&tx_hashes).unwrap();
+            let transactions_root = Merkle::hashes_root(&tx_hashes).unwrap();
             header.transactions_root = transactions_root;
         }
 
@@ -164,7 +164,7 @@ where
                         Ok(execution_result) => execution_result,
                         Err(e) => panic!("exec block: {:?}", e),
                     };
-                let receipts_root = Merkel::receipts_root(&execution_result.receipts)
+                let receipts_root = Merkle::receipts_root(&execution_result.receipts)
                     .expect("receipts hash cannot be empty");
                 let quota_used = execution_result
                     .receipts

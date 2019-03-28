@@ -9,7 +9,7 @@ core-storage = { path = "../storage" }
 core-runtime = { path = "../runtime" }
 core-types = { path = "../types" }
 core-crypto = { path = "../crypto" }
-core-merkel = { path = "../merkel" }
+core-merkle = { path = "../merkle" }
 
 log = "0.4.0"
 futures = "0.1.17"

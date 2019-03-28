@@ -1,10 +1,10 @@
-use static_merkel_tree::Tree;
+use static_merkle_tree::Tree;
 
 use core_types::{Hash, Receipt};
 
-pub struct Merkel;
+pub struct Merkle;
 
-impl Merkel {
+impl Merkle {
     pub fn receipts_root(receipts: &[Receipt]) -> Option<Hash> {
         let hahses: Vec<Hash> = receipts.iter().map(|receipt| receipt.hash()).collect();
         Self::hashes_root(&hahses)
