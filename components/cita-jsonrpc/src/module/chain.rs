@@ -12,7 +12,6 @@ use core_types::{
     Address, Balance, Block as RawBlock, Hash, Receipt as RawReceipt, SignedTransaction,
     UnverifiedTransaction, H256,
 };
-use ethereum_types::H256 as EthH256;
 use futures::future::{err, ok, result, Future};
 use jsonrpc_core::{BoxFuture, Error as JsonrpcError};
 use jsonrpc_derive::rpc;
@@ -46,7 +45,7 @@ pub trait Chain {
     fn get_logs(&self, filter: RpcFilter) -> BoxFuture<Vec<Log>>;
 
     #[rpc(name = "call")]
-    fn call(&self, call_request: CallRequest, block_number: BlockNumber) -> BoxFuture<Data32>;
+    fn call(&self, call_request: CallRequest, block_number: BlockNumber) -> BoxFuture<Data>;
 
     #[rpc(name = "getTransaction")]
     fn get_transaction(&self, hash: Data32) -> BoxFuture<Option<RpcTransaction>>;
@@ -422,7 +421,7 @@ where
         get_logs(self.get_storage_inst(), filter)
     }
 
-    fn call(&self, call_request: CallRequest, block_number: BlockNumber) -> BoxFuture<Data32> {
+    fn call(&self, call_request: CallRequest, block_number: BlockNumber) -> BoxFuture<Data> {
         let executor = self.get_executor_inst();
         let storage = self.get_storage_inst();
         let fut = get_block_by_block_number(storage, block_number.clone()).and_then(move |block| {
@@ -445,10 +444,7 @@ where
                         })
                         .map(|result| {
                             let vec_data = result.data.unwrap_or_else(|| vec![]);
-                            let mut array = [0u8; 32];
-                            array.copy_from_slice(&vec_data);
-                            let data: EthH256 = array.into();
-                            data.into()
+                            vec_data.into()
                         }),
                 )),
             };

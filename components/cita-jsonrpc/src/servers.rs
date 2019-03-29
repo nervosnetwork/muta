@@ -46,7 +46,7 @@ impl RpcServer {
             .max_request_body_size(config.max_request_body_size)
             .start_http(&config.listen_address.parse().unwrap())?;
 
-        println!("Now listening on {:?}", server.address());
+        log::info!("Jsonrpc service listening on {:?}", server.address());
         Ok(Self { server })
     }
 
