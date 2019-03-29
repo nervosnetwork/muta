@@ -2,6 +2,8 @@
 
 [![Build Status](https://travis-ci.com/cryptape/muta.svg?token=e7nTwk1GkUYrpv8hmrt9&branch=master)](https://travis-ci.com/cryptape/muta)
 
+[![CircleCI](https://circleci.com/gh/cryptape/muta/tree/master.svg?style=svg)](https://circleci.com/gh/cryptape/muta/tree/master)
+
 "muta" is just a project code name.
 
 ## License
