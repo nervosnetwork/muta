@@ -183,6 +183,7 @@ fn handle_init(cfg: &Config, genesis_path: impl AsRef<Path>) -> Result<(), Box<d
     block_header.prevhash = Hash::from_hex(&genesis.prevhash)?;
     block_header.timestamp = genesis.timestamp;
     block_header.state_root = state_root_hash;
+    block_header.quota_limit = cfg.quota_limit;
     let mut block = Block::default();
     block.header = block_header;
     block_db.insert_block(&block).wait()?;
