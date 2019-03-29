@@ -1,7 +1,23 @@
 [package]
-name = "network"
+name = "components-network"
 version = "0.1.0"
 authors = ["Cryptape Technologies <contact@cryptape.com>"]
 edition = "2018"
 
 [dependencies]
+core-p2p = { path = "../../core/p2p", features = ["prost-message"] }
+core-types = { path = "../../core/types" }
+
+config-parser = { path = "../../common/config-parser" }
+
+tentacle = "0.2.0-alpha.1"
+log = "0.4.6"
+futures = "0.1.25"
+prost = "0.5.0"
+bytes = "0.4.12"
+tokio = "0.1.18"
+serde_derive = "1.0.89"
+serde = "1.0.89"
+
+[dev-dependencies]
+env_logger = "0.6.1"

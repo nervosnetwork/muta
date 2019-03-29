@@ -400,6 +400,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "components-network"
+version = "0.1.0"
+dependencies = [
+ "bytes 0.4.12 (registry+https://github.com/rust-lang/crates.io-index)",
+ "config-parser 0.1.0",
+ "core-p2p 0.1.0",
+ "core-types 0.1.0",
+ "env_logger 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "futures 0.1.25 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "prost 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde 1.0.89 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_derive 1.0.89 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tentacle 0.2.0-alpha.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tokio 0.1.18 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "components-transaction-pool"
 version = "0.1.0"
 dependencies = [
@@ -1508,10 +1526,6 @@ dependencies = [
  "libc 0.2.51 (registry+https://github.com/rust-lang/crates.io-index)",
  "winapi 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
-
-[[package]]
-name = "network"
-version = "0.1.0"
 
 [[package]]
 name = "nibble_vec"

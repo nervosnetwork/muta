@@ -20,7 +20,7 @@ rand = "0.6.5"
 
 # Unfortunately, dev-dependencies cannot be optional.
 [dev-dependencies]
-prost-derive = { version = "0.5.0" }
+prost-derive = "0.5"
 tokio = "0.1.16"
 
 [features]

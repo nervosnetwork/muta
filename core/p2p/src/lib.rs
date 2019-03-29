@@ -21,3 +21,12 @@ pub mod transmission;
 
 /// Peer manager
 pub mod peer_manager;
+
+/// Re-export
+pub use connec::ConnecProtocol;
+pub use discovery::DiscoveryProtocol;
+pub use identify::IdentifyProtocol;
+pub use ping::PingProtocol;
+pub use transmission::TransmissionProtocol;
+
+pub use peer_manager::DefaultPeerManager;
