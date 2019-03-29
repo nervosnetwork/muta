@@ -14,9 +14,9 @@ core-merkle = { path = "../merkle" }
 log = "0.4.0"
 futures = "0.1.17"
 futures-locks = "0.3.3"
+tokio = "0.1.18"
 
 [dev-dependencies]
-tokio = "0.1.18"
 hex = "0.3.2"
 components-database = { path = "../../components/database" }
 components-transaction-pool = { path = "../../components/transaction-pool" }

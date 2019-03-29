@@ -1,9 +1,11 @@
+use std::error::Error;
 use std::marker::PhantomData;
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use futures::future::{ok, Future};
 use futures_locks::RwLock;
+use tokio::timer::Delay;
 
 use core_crypto::{Crypto, CryptoTransform};
 use core_merkle::Merkle;
@@ -40,7 +42,7 @@ where
     _phantom_data: PhantomData<C>,
 }
 
-impl<E: 'static, T, S: 'static, C> Solo<E, T, S, C>
+impl<E: 'static, T: 'static, S: 'static, C: 'static> Solo<E, T, S, C>
 where
     E: Executor,
     T: TransactionPool,
@@ -80,39 +82,50 @@ where
         })
     }
 
-    pub fn boom(&self) -> impl Future<Item = (), Error = ConsensusError> + '_ {
-        let quota_limit = { self.status.read().wait().unwrap().quota_limit };
+    pub fn boom(&self) -> Box<Future<Item = (), Error = ConsensusError> + Send> {
+        let status = { self.status.read().wait().unwrap().clone() };
 
-        self.tx_pool
+        let quota_limit = status.quota_limit;
+        let self_instant1 = self.clone();
+        let self_instant2 = self.clone();
+        let self_instant3 = self.clone();
+        let tx_pool = Arc::clone(&self.tx_pool);
+        let tx_pool2 = Arc::clone(&self.tx_pool);
+        let storage = Arc::clone(&self.storage);
+
+        let fut = tx_pool
             .package(self.transaction_size, quota_limit)
             .map_err(ConsensusError::TransactionPool)
             // Proposal block
-            .and_then(move |tx_hashes| ok(self.build_proposal_block(tx_hashes)))
+            .and_then(move |tx_hashes| ok(self_instant1.build_proposal_block(tx_hashes)))
             // Let's pretend that we have completed a proposal.
             .and_then(move |mut next_block| {
-                log::info!(target: "consensus", "next height = {} transaction len = {}", next_block.header.height, next_block.tx_hashes.len());
-                let status = self.status.read().wait().unwrap();
-
+                let status = status.clone();
+                log::info!(target: "consensus", "next height = {:?} transaction len = {:?}", next_block.header.height, next_block.tx_hashes.len());
                 if next_block.tx_hashes.is_empty() {
                     next_block.header.state_root = status.state_root.clone();
                     Box::new(ok(next_block))
                 } else {
-                    self.exec_block(status.clone(), next_block.clone())
+                    self_instant2.exec_block(status.clone(), next_block.clone())
                 }
             })
             .and_then(move |block| {
-                ok(block.header.clone()).join3(
-                    self.status.write().map_err(map_err_rwlock),
-                    self.storage.insert_block(&block).map_err(ConsensusError::Storage),
+                ok(block.header.clone()).join4(
+                    self_instant3.status.write().map_err(map_err_rwlock),
+                    storage.insert_block(&block).map_err(ConsensusError::Storage),
+                    tx_pool2.flush(&block.tx_hashes).map_err(ConsensusError::TransactionPool),
                 )
             })
-            .and_then(|(header, mut status, _)| {
+            .and_then(|(header, mut status, _, _)| {
+                log::info!("block committed, height = {:?} state root = {:?} quota used = {:?}", header.height, header.state_root, header.quota_used);
+
                 status.height = header.height;
                 status.quota_limit = header.quota_limit;
                 status.block_hash = header.hash();
                 status.state_root = header.state_root;
                 ok(())
-            })
+            });
+        Box::new(fut)
     }
 
     fn build_proposal_block(&self, tx_hashes: Vec<Hash>) -> Block {
@@ -142,7 +155,7 @@ where
         &self,
         status: Status,
         mut block: Block,
-    ) -> Box<Future<Item = Block, Error = ConsensusError>> {
+    ) -> Box<Future<Item = Block, Error = ConsensusError> + Send> {
         let storage = Arc::clone(&self.storage);
         let executor = Arc::clone(&self.executor);
 
@@ -189,8 +202,61 @@ where
     }
 }
 
+impl<E: 'static, T, S: 'static, C> Solo<E, T, S, C>
+where
+    E: Executor,
+    T: TransactionPool,
+    S: Storage,
+    C: Crypto,
+{
+    fn clone(&self) -> Self {
+        Solo {
+            executor: Arc::clone(&self.executor),
+            tx_pool: Arc::clone(&self.tx_pool),
+            storage: Arc::clone(&self.storage),
+
+            address: self.address.clone(),
+            transaction_size: self.transaction_size,
+            status: Arc::clone(&self.status),
+
+            _phantom_data: PhantomData::<C>,
+        }
+    }
+}
+
 fn map_err_rwlock(_: ()) -> ConsensusError {
     ConsensusError::Internal("rwlock error".to_owned())
+}
+
+fn map_err_print(e: Box<Error>) {
+    log::error!(target: "solo consensus", "{}", e);
+}
+
+pub fn solo_interval<
+    E: Executor + 'static,
+    T: TransactionPool + 'static,
+    S: Storage + 'static,
+    C: Crypto + 'static,
+>(
+    solo: Arc<Solo<E, T, S, C>>,
+    start_time: Instant,
+    interval: Duration,
+) {
+    let solo1 = Arc::clone(&solo);
+    let solo2 = Arc::clone(&solo);
+
+    let now = Instant::now();
+    let next = if now - start_time > interval {
+        now
+    } else {
+        now + (interval - (now - start_time))
+    };
+
+    let dealy = Delay::new(next)
+        .map_err(|e| ConsensusError::Internal(e.to_string()))
+        .and_then(move |_| solo1.boom())
+        .map(move |_| solo_interval(solo2, next, interval));
+    tokio::spawn(dealy.map_err(|e| map_err_print(Box::new(e))));
 }
 
 #[cfg(test)]

@@ -11,7 +11,7 @@ pub trait CryptoTransform: Sized {
     fn as_bytes(&self) -> &[u8];
 }
 
-pub trait Crypto {
+pub trait Crypto: Send + Sync {
     type PrivateKey: CryptoTransform + Clone + Send;
     type PublicKey: CryptoTransform + Clone + Send;
     type Signature: CryptoTransform + Clone + Send;

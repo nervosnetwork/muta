@@ -1,1 +1,15 @@
-data_path = "/tmp/muta"
+# crypto
+privkey = "028590ad352d54387a9c8a0ecf7e180e68c4840c72f958fc5917657f506caa80"
+
+# db config
+data_path = "./devtools/chain/rocksdb"
+
+# transaction pool
+pool_size = 100000
+until_block_limit = 100
+quota_limit = 9999999999
+
+# consensus
+consensus_mode = "solo"
+consensus_size = 30000
+consensus_interval = 3000
