@@ -129,7 +129,8 @@ fn start(cfg: &Config) {
     let consensus_solo = Arc::new(consensus_solo);
 
     // run json rpc
-    RpcServer::new(
+    // NOTE: Bind a variable to aviod "drop".
+    let _rpc_server = RpcServer::new(
         JSONRPCConfig::default(),
         Arc::clone(&storage),
         Arc::clone(&executor),
