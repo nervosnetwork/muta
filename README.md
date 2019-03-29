@@ -6,6 +6,12 @@
 
 "muta" is just a project code name.
 
+## Usage
+### dev
+```
+$ git clone https://github.com/cryptape/muta.git
+$ cargo run -- init
+```
 ## License
 
 This project is free and open source software distributed under the terms of both the [MIT License][lm] and the [Apache License 2.0][la].
