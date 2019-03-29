@@ -1,0 +1,151 @@
+alias:
+
+  - &restore-source-codes-cache
+    key: codes-{{ .Environment.CIRCLE_SHA1 }}
+
+  - &save-source-codes-cache
+    <<: *restore-source-codes-cache
+    paths: ~/muta
+
+  - &restore-dependencies-cache
+    key: deps-{{ checksum "Cargo.lock" }}
+
+  - &save-dependencies-cache
+    <<: *restore-dependencies-cache
+    paths:
+      - /opt/.cargo/git
+      - /opt/.cargo/registry
+
+  - &restore-clippy-cache
+    key: clippy-{{ .Environment.CIRCLE_BRANCH }}-{{ checksum "~/build-cache.key" }}
+    keys:
+      - clippy-{{ .Environment.CIRCLE_BRANCH }}-{{ checksum "~/build-cache.key" }}
+      - clippy-{{ .Environment.CIRCLE_BRANCH }}-
+      - clippy-
+      - build-
+
+  - &save-clippy-cache
+    <<: *restore-clippy-cache
+    paths: ~/muta/target
+
+  - &restore-security-audit-cache
+    key: audit-{{ checksum "/opt/.cargo/cargo-audit.version" }}
+
+  - &save-security-audit-cache
+    <<: *restore-security-audit-cache
+    paths:
+      - /opt/.cargo/bin/cargo-audit
+
+  - &before-restore-security-audit-cache
+    name: Before Restore Security Audit Cache
+    command: |
+        ver=$(cargo search cargo-audit | grep "^cargo-audit = " | awk '{ print $3 }' | tr -d '"')
+        date +"${ver}~%Y-%U" | tee /opt/.cargo/cargo-audit.version
+
+  - &restore-release-cache
+    key: release-{{ .Environment.CIRCLE_SHA1 }}
+
+  - &save-release-cache
+    <<: *restore-release-cache
+    paths: ~/muta/target/release-cache
+
+  - &before-save-release-cache
+    name: Before Save Release Cache
+    command: |
+        rm -rf target/release-cache
+        mv -vf target/install target/release-cache
+
+  - &after-restore-release-cache
+    name: After Restore Release Cache
+    command: |
+        rm -rf target/install
+        mv -vf target/release-cache target/install
+
+  - &restore-build-cache
+    key: build-{{ .Environment.CIRCLE_BRANCH }}-{{ checksum "~/build-cache.key" }}
+    keys:
+      - build-{{ .Environment.CIRCLE_BRANCH }}-{{ checksum "~/build-cache.key" }}
+      - build-{{ .Environment.CIRCLE_BRANCH }}-
+      - build-
+
+  - &save-build-cache
+    <<: *restore-build-cache
+    paths: ~/muta/target
+
+  - &before-restore-build-cache
+    name: Before Restore Build Cache
+    command: date +"%Y-%U" | tee ~/build-cache.key
+
+  - &before-save-build-cache
+    name: Before Save Build Cache
+    command: rm -rf target/install target/release-cache
+
+  - &restore-tarpaulin-cache
+    key: tarpaulin-{{ checksum "/opt/.cargo/cargo-tarpaulin.version" }}
+
+  - &save-tarpaulin-cache
+    <<: *restore-tarpaulin-cache
+    paths:
+    - /opt/.cargo/bin/cargo-tarpaulin
+
+  - &before-restore-tarpaulin-cache
+    name: Before Restore Tarpaulin Cache
+    command: |
+      ver=$(cargo search cargo-tarpaulin | grep "^cargo-tarpaulin = " | awk '{ print $3 }' | tr -d '"')
+      date +"${ver}~%Y-%U" | tee /opt/.cargo/cargo-tarpaulin.version
+
+  - &clean-build-cache-if-too-large
+    name: Clean Cache If Too Large
+    command: |
+        target_mb=$(du -sm ~/muta/target/ | awk '{ print $1 }')
+        if [ ${target_mb} -gt 2048 ]; then
+            echo "[Info ] The target has ${target_mb} MiBytes data, CLEAN them."
+            cargo clean
+        else
+            echo "[Info ] The target has ${target_mb} MiBytes data, SKIP them."
+        fi
+
+  - &job-default
+    docker:
+      - image: cita/cita-build:ubuntu-18.04-20190304
+    working_directory: ~/muta
+    resource_class: medium
+
+  - &job-build
+    <<: *job-default
+    steps:
+      - restore_cache: *restore-source-codes-cache
+      - restore_cache: *restore-dependencies-cache
+      - run: *before-restore-build-cache
+      - restore_cache: *restore-build-cache
+
+version: 2
+jobs:
+  "build-check":
+    <<: *job-build
+    environment:
+      FMT: true
+      CHECK: true
+      TEST: true
+    steps:
+      - run:
+        name: run check
+        command: devtools/ci/script.sh
+
+  "passed":
+    docker:
+      - image: alpine:latest
+    steps:
+      - run:
+          name: Passed
+          command: exit 0
+
+workflows:
+  version: 2
+  "build && check":
+    jobs:
+      - "build-check"
+
+      - "passed":
+          requires:
+            - "build-check"
