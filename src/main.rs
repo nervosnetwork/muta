@@ -27,6 +27,9 @@ struct Config {
     //crypto
     privkey: String,
 
+    // rpc_address
+    rpc_address: String,
+
     // db config
     data_path: PathBuf,
 
@@ -130,8 +133,10 @@ fn start(cfg: &Config) {
 
     // run json rpc
     // NOTE: Bind a variable to aviod "drop".
+    let mut rpc_config = JSONRPCConfig::default();
+    rpc_config.listen_address = cfg.rpc_address.clone();
     let _rpc_server = RpcServer::new(
-        JSONRPCConfig::default(),
+        rpc_config,
         Arc::clone(&storage),
         Arc::clone(&executor),
         Arc::clone(&tx_pool),
