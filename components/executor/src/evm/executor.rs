@@ -273,10 +273,7 @@ where
         };
         let evm_transaction = build_evm_transaction(&signed_tx, nonce);
 
-        let mut receipt = Receipt::default();
-        receipt.transaction_hash = signed_tx.hash.clone();
-
-        match cita_vm::exec(
+        let mut receipt = match cita_vm::exec(
             block_provider,
             state,
             evm_context.clone(),
@@ -289,7 +286,10 @@ where
                 receipt.quota_used = signed_tx.untx.transaction.quota;
                 receipt
             }
-        }
+        };
+
+        receipt.transaction_hash = signed_tx.hash.clone();
+        receipt
     }
 }
 
@@ -350,7 +350,6 @@ fn build_evm_transaction_of_readonly(to: &Address, from: &Address, data: &[u8]) 
 
 fn build_receipt_with_ok(signed_tx: &SignedTransaction, result: InterpreterResult) -> Receipt {
     let mut receipt = Receipt::default();
-    receipt.transaction_hash = signed_tx.hash.clone();
     let quota = signed_tx.untx.transaction.quota;
 
     match result {
