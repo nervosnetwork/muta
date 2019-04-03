@@ -1,6 +1,7 @@
-use numext_fixed_hash::FixedHashError;
 use std::error;
 use std::fmt;
+
+use numext_fixed_hash_core::FixedHashError;
 
 #[derive(Debug)]
 pub enum CoreTypesError {
