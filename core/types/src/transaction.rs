@@ -4,7 +4,7 @@ use rlp::{Encodable, RlpStream};
 
 use core_serialization::transaction::{
     SignedTransaction as PbSignedTransaction, Transaction as PbTransaction,
-    UnverifiedTransaction as PbUnverifiedTransaction,
+    TransactionPosition as PbTransactionPosition, UnverifiedTransaction as PbUnverifiedTransaction,
 };
 
 use crate::{Address, Hash};
@@ -127,6 +127,31 @@ impl Into<PbSignedTransaction> for SignedTransaction {
             untx: Some(self.untx.clone().into()),
             hash: self.hash.as_bytes().to_vec(),
             sender: self.sender.as_bytes().to_vec(),
+        }
+    }
+}
+
+#[derive(Default, Clone, Debug, PartialEq, Eq)]
+pub struct TransactionPosition {
+    pub block_hash: Hash,
+    pub position: u32,
+}
+
+impl From<PbTransactionPosition> for TransactionPosition {
+    fn from(transaction_position: PbTransactionPosition) -> Self {
+        TransactionPosition {
+            block_hash: Hash::from_bytes(&transaction_position.block_hash)
+                .expect("never returns an error"),
+            position: transaction_position.position,
+        }
+    }
+}
+
+impl Into<PbTransactionPosition> for TransactionPosition {
+    fn into(self) -> PbTransactionPosition {
+        PbTransactionPosition {
+            block_hash: self.block_hash.as_bytes().to_vec(),
+            position: self.position,
         }
     }
 }

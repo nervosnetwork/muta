@@ -16,6 +16,8 @@ pub enum DataCategory {
     State,
     // "SignedTransaction" in the transaction pool
     TransactionPool,
+    // Transaction position in block
+    TransactionPosition,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -168,6 +168,7 @@ fn gen_key(c: &DataCategory, key: &[u8]) -> Vec<u8> {
         DataCategory::Receipt => [b"receipt-", key].concat(),
         DataCategory::State => [b"state-", key].concat(),
         DataCategory::TransactionPool => [b"transaction-pool-", key].concat(),
+        DataCategory::TransactionPosition => [b"transaction-position-", key].concat(),
     }
 }
 

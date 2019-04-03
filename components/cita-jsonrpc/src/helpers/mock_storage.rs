@@ -5,7 +5,9 @@ use futures::future::{err, ok};
 
 use core_runtime::{DatabaseError, FutRuntimeResult};
 use core_storage::{errors::StorageError, storage::Storage};
-use core_types::{Address, Block, BlockHeader, Bloom, Hash, Receipt, SignedTransaction};
+use core_types::{
+    Address, Block, BlockHeader, Bloom, Hash, Receipt, SignedTransaction, TransactionPosition,
+};
 
 #[derive(Default, Debug, Clone)]
 pub struct MockStorage {
@@ -13,6 +15,7 @@ pub struct MockStorage {
     pub hashes_height_map: Arc<RwLock<HashMap<Hash, usize>>>,
     pub transactions: Arc<RwLock<HashMap<Hash, SignedTransaction>>>,
     pub receipts: Arc<RwLock<HashMap<Hash, Receipt>>>,
+    pub transaction_positions: Arc<RwLock<HashMap<Hash, TransactionPosition>>>,
 }
 
 impl MockStorage {
@@ -39,6 +42,7 @@ impl MockStorage {
             hashes_height_map: Arc::new(RwLock::new(HashMap::new())),
             transactions: Arc::new(RwLock::new(HashMap::new())),
             receipts: Arc::new(RwLock::new(HashMap::new())),
+            transaction_positions: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 }
@@ -103,6 +107,26 @@ impl Storage for MockStorage {
             .collect::<Vec<_>>()))
     }
 
+    fn get_transaction_position(
+        &self,
+        hash: &Hash,
+    ) -> FutRuntimeResult<TransactionPosition, StorageError> {
+        match self.transaction_positions.read().unwrap().get(hash) {
+            None => Box::new(err(StorageError::Database(DatabaseError::NotFound))),
+            Some(tx) => Box::new(ok(tx.clone())),
+        }
+    }
+
+    fn get_transaction_positions(
+        &self,
+        hashes: &[&Hash],
+    ) -> FutRuntimeResult<Vec<Option<TransactionPosition>>, StorageError> {
+        Box::new(ok(hashes
+            .iter()
+            .map(|h| self.transaction_positions.read().unwrap().get(h).cloned())
+            .collect::<Vec<_>>()))
+    }
+
     fn insert_block(&self, block: &Block) -> FutRuntimeResult<(), StorageError> {
         if block.header.prevhash
             != self
@@ -147,10 +171,24 @@ impl Storage for MockStorage {
         signed_txs: &[SignedTransaction],
     ) -> FutRuntimeResult<(), StorageError> {
         for tx in signed_txs {
+            let hash = tx.hash.clone();
             self.transactions
                 .write()
                 .unwrap()
-                .insert(tx.hash.clone(), tx.clone());
+                .insert(hash.clone(), tx.clone());
+        }
+        Box::new(ok(()))
+    }
+
+    fn insert_transaction_positions(
+        &self,
+        positions: &HashMap<Hash, TransactionPosition>,
+    ) -> FutRuntimeResult<(), StorageError> {
+        for (block_hash, position) in positions {
+            self.transaction_positions
+                .write()
+                .unwrap()
+                .insert(block_hash.clone(), position.clone());
         }
         Box::new(ok(()))
     }

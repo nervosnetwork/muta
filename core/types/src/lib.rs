@@ -12,4 +12,4 @@ pub use common::{Address, Balance, Hash, H256};
 pub use errors::TypesError;
 pub use genesis::{Genesis, StateAlloc};
 pub use receipt::{LogEntry, Receipt};
-pub use transaction::{SignedTransaction, Transaction, UnverifiedTransaction};
+pub use transaction::{SignedTransaction, Transaction, TransactionPosition, UnverifiedTransaction};

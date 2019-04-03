@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::error::Error;
 use std::marker::PhantomData;
 use std::sync::Arc;
@@ -11,7 +12,7 @@ use core_crypto::{Crypto, CryptoTransform};
 use core_merkle::Merkle;
 use core_runtime::{Executor, TransactionPool};
 use core_storage::storage::Storage;
-use core_types::{Address, Block, BlockHeader, Hash};
+use core_types::{Address, Block, BlockHeader, Hash, TransactionPosition};
 
 use crate::errors::ConsensusError;
 
@@ -189,14 +190,26 @@ where
                 block.header.receipts_root = receipts_root;
                 block.header.quota_used = quota_used;
 
+                let mut positions = HashMap::with_capacity(signed_txs.len());
+                let block_hash = block.header.hash();
+
+                for (position, tx) in signed_txs.iter().enumerate() {
+                    let tx_position = TransactionPosition {
+                        block_hash: block_hash.clone(),
+                        position: position as u32,
+                    };
+                    positions.insert(tx.hash.clone(), tx_position);
+                }
+
                 ok(block)
-                    .join3(
+                    .join4(
                         storage.insert_transactions(&signed_txs),
+                        storage.insert_transaction_positions(&positions),
                         storage.insert_receipts(&execution_result.receipts),
                     )
                     .map_err(ConsensusError::Storage)
             })
-            .and_then(|(block, _, _)| ok(block));
+            .and_then(|(block, _, _, _)| ok(block));
 
         Box::new(fut)
     }

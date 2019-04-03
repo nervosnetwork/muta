@@ -32,3 +32,10 @@ message SignedTransaction {
     // public key of signature
     bytes sender = 3;
 }
+
+message TransactionPosition {
+    // bytes32(H256) - Block hash
+    bytes block_hash = 1;
+    // transaction index in block
+    uint32 position = 2;
+}

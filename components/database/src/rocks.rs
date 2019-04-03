@@ -22,6 +22,7 @@ impl RocksDB {
             map_data_category(DataCategory::Receipt),
             map_data_category(DataCategory::State),
             map_data_category(DataCategory::TransactionPool),
+            map_data_category(DataCategory::TransactionPosition),
         ];
         let db = DB::open_cf(&opts, path, categories.iter())
             .map_err(|e| DatabaseError::Internal(e.to_string()))?;
@@ -37,6 +38,7 @@ impl RocksDB {
             map_data_category(DataCategory::Receipt),
             map_data_category(DataCategory::State),
             map_data_category(DataCategory::TransactionPool),
+            map_data_category(DataCategory::TransactionPosition),
         ];
 
         for c in categories.iter() {
@@ -187,6 +189,7 @@ const C_TRANSACTION: &str = "c2";
 const C_RECEIPT: &str = "c3";
 const C_STATE: &str = "c4";
 const C_TRANSACTION_POOL: &str = "c5";
+const C_TRANSACTION_POSITION: &str = "c6";
 
 fn map_data_category(category: DataCategory) -> &'static str {
     match category {
@@ -195,6 +198,7 @@ fn map_data_category(category: DataCategory) -> &'static str {
         DataCategory::Receipt => C_RECEIPT,
         DataCategory::State => C_STATE,
         DataCategory::TransactionPool => C_TRANSACTION_POOL,
+        DataCategory::TransactionPosition => C_TRANSACTION_POSITION,
     }
 }
 
