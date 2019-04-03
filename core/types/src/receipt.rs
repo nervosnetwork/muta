@@ -22,7 +22,7 @@ impl Receipt {
     /// Calculate the receipt hash. To maintain consistency we use RLP serialization.
     pub fn hash(&self) -> Hash {
         let rlp_data = rlp::encode(self);
-        Hash::from_raw(&rlp_data)
+        Hash::digest(&rlp_data)
     }
 }
 
@@ -44,9 +44,10 @@ impl Encodable for Receipt {
 impl From<PbReceipt> for Receipt {
     fn from(receipt: PbReceipt) -> Self {
         Receipt {
-            state_root: Hash::from_raw(&receipt.state_root),
-            transaction_hash: Hash::from_raw(&receipt.transaction_hash),
-            block_hash: Hash::from_raw(&receipt.block_hash),
+            state_root: Hash::from_bytes(&receipt.state_root).expect("never returns an error"),
+            transaction_hash: Hash::from_bytes(&receipt.transaction_hash)
+                .expect("never returns an error"),
+            block_hash: Hash::from_bytes(&receipt.block_hash).expect("never returns an error"),
             quota_used: receipt.quota_used,
             logs_bloom: Bloom::from_slice(&receipt.logs_bloom),
             logs: receipt.logs.into_iter().map(LogEntry::from).collect(),
@@ -54,7 +55,9 @@ impl From<PbReceipt> for Receipt {
             contract_address: if receipt.contract_address.is_empty() {
                 None
             } else {
-                Some(Address::from(receipt.contract_address.as_ref()))
+                Some(
+                    Address::from_bytes(&receipt.contract_address).expect("never returns an error"),
+                )
             },
         }
     }
@@ -63,15 +66,15 @@ impl From<PbReceipt> for Receipt {
 impl Into<PbReceipt> for Receipt {
     fn into(self) -> PbReceipt {
         PbReceipt {
-            state_root: self.state_root.as_ref().to_vec(),
-            transaction_hash: self.transaction_hash.as_ref().to_vec(),
-            block_hash: self.transaction_hash.as_ref().to_vec(),
+            state_root: self.state_root.as_bytes().to_vec(),
+            transaction_hash: self.transaction_hash.as_bytes().to_vec(),
+            block_hash: self.transaction_hash.as_bytes().to_vec(),
             quota_used: self.quota_used,
             logs_bloom: self.logs_bloom.as_bytes().to_vec(),
             logs: self.logs.into_iter().map(Into::into).collect(),
             error: self.receipt_error,
             contract_address: match self.contract_address {
-                Some(v) => v.as_ref().to_vec(),
+                Some(v) => v.as_bytes().to_vec(),
                 None => vec![],
             },
         }
@@ -88,8 +91,12 @@ pub struct LogEntry {
 impl From<PbLogEntry> for LogEntry {
     fn from(entry: PbLogEntry) -> Self {
         LogEntry {
-            address: Address::from(entry.address.as_ref()),
-            topics: entry.topics.iter().map(|t| Hash::from_raw(t)).collect(),
+            address: Address::from_bytes(&entry.address).expect("never returns an error"),
+            topics: entry
+                .topics
+                .iter()
+                .map(|t| Hash::from_bytes(t).expect("never returns an error"))
+                .collect(),
             data: entry.data,
         }
     }
@@ -98,11 +105,11 @@ impl From<PbLogEntry> for LogEntry {
 impl Into<PbLogEntry> for LogEntry {
     fn into(self) -> PbLogEntry {
         PbLogEntry {
-            address: self.address.as_ref().to_vec(),
+            address: self.address.as_bytes().to_vec(),
             topics: self
                 .topics
                 .into_iter()
-                .map(|h| h.as_ref().to_vec())
+                .map(|h| h.as_bytes().to_vec())
                 .collect(),
             data: self.data,
         }

@@ -1,7 +1,7 @@
-use std::convert::{AsRef, From};
+use std::convert::From;
 use std::fmt;
 
-use crate::errors::CoreTypesError;
+use crate::errors::TypesError;
 use numext_fixed_hash::H160;
 use numext_fixed_uint::U256;
 use rlp::{Encodable, RlpStream};
@@ -19,14 +19,33 @@ pub struct Address(H160);
 
 impl Address {
     pub fn from_hash(h: &Hash) -> Self {
-        Address::from(&h.as_ref()[12..])
+        let mut out = [0u8; 20];
+        out.copy_from_slice(&h.as_bytes()[12..]);
+        Address::from_fixed_bytes(out)
+    }
+
+    pub fn from_bytes(data: &[u8]) -> Result<Self, TypesError> {
+        if data.len() != ADDRESS_LEN {
+            return Err(TypesError::AddressLenInvalid);
+        }
+        let mut out = [0u8; 20];
+        out.copy_from_slice(&data[..]);
+        Ok(Address(H160::from(out)))
+    }
+
+    pub fn from_fixed_bytes(data: [u8; ADDRESS_LEN]) -> Self {
+        Address(H160::from(data))
+    }
+
+    pub fn as_bytes(&self) -> &[u8] {
+        self.0.as_bytes()
     }
 
     pub fn as_hex(&self) -> String {
         hex::encode(self.0.as_bytes())
     }
 
-    pub fn from_hex(input: &str) -> Result<Self, CoreTypesError> {
+    pub fn from_hex(input: &str) -> Result<Self, TypesError> {
         Ok(Address(H160::from_hex_str(input)?))
     }
 
@@ -36,26 +55,6 @@ impl Address {
 
     pub fn into_fixed_bytes(self) -> [u8; ADDRESS_LEN] {
         self.0.into_fixed_bytes()
-    }
-}
-
-impl From<[u8; ADDRESS_LEN]> for Address {
-    fn from(data: [u8; ADDRESS_LEN]) -> Self {
-        Address(H160::from(data))
-    }
-}
-
-impl From<&[u8]> for Address {
-    fn from(data: &[u8]) -> Self {
-        let mut arr = [0u8; 20];
-        arr.copy_from_slice(&data[..]);
-        Address(H160::from(arr))
-    }
-}
-
-impl AsRef<[u8]> for Address {
-    fn as_ref(&self) -> &[u8] {
-        self.0.as_bytes()
     }
 }
 
@@ -78,19 +77,34 @@ impl Encodable for Address {
 pub struct Hash(H256);
 
 impl Hash {
-    pub fn from_raw(raw: &[u8]) -> Self {
-        let mut out = [0u8; HASH_LEN];
-        if raw.len() == HASH_LEN {
-            out.copy_from_slice(raw);
-            Hash(H256::from(out))
-        } else {
-            out.copy_from_slice(&Sha3_256::digest(raw));
-            Hash(H256::from(out))
+    /// NOTE: The hash for bytes is not computed.
+    pub fn from_bytes(data: &[u8]) -> Result<Self, TypesError> {
+        if data.len() != HASH_LEN {
+            return Err(TypesError::HashLenInvalid);
         }
+
+        let mut out = [0u8; HASH_LEN];
+        out.copy_from_slice(data);
+        Ok(Hash(H256::from(out)))
     }
 
-    pub fn from_hex(input: &str) -> Result<Self, CoreTypesError> {
+    pub fn digest(raw: &[u8]) -> Self {
+        let mut out = [0u8; HASH_LEN];
+        out.copy_from_slice(&Sha3_256::digest(raw));
+        Hash(H256::from(out))
+    }
+
+    pub fn from_fixed_bytes(data: [u8; HASH_LEN]) -> Self {
+        let hash = H256::from(data);
+        Hash(hash)
+    }
+
+    pub fn from_hex(input: &str) -> Result<Self, TypesError> {
         Ok(Hash(H256::from_hex_str(input)?))
+    }
+
+    pub fn as_bytes(&self) -> &[u8] {
+        self.0.as_bytes()
     }
 
     pub fn as_hex(&self) -> String {
@@ -103,19 +117,6 @@ impl Hash {
 
     pub fn into_fixed_bytes(self) -> [u8; HASH_LEN] {
         self.0.into_fixed_bytes()
-    }
-}
-
-impl From<[u8; HASH_LEN]> for Hash {
-    fn from(data: [u8; HASH_LEN]) -> Self {
-        let hash = H256::from(data);
-        Hash(hash)
-    }
-}
-
-impl AsRef<[u8]> for Hash {
-    fn as_ref(&self) -> &[u8] {
-        self.0.as_bytes()
     }
 }
 

@@ -10,7 +10,7 @@ use log::error;
 use std::sync::Arc;
 
 pub fn transform_data32_to_hash(hash: Data32) -> Hash {
-    Hash::from_raw(&Into::<Vec<u8>>::into(hash))
+    Hash::from_bytes(&Into::<Vec<u8>>::into(hash)).expect("never returns an error")
 }
 
 pub fn get_block_by_tx_hash<S>(storage: Arc<S>, tx_hash: Hash) -> BoxFuture<Option<Block>>
@@ -177,18 +177,20 @@ where
                                             let mut _transaction_log_index = 0;
                                             if filter.matches(&log_entry) {
                                                 let log = Log {
-                                                    address: log_entry.address.as_ref().into(),
+                                                    address: log_entry.address.as_bytes().into(),
                                                     topics: log_entry
                                                         .topics
                                                         .iter()
-                                                        .map(|t| t.as_ref().into())
+                                                        .map(|t| t.as_bytes().into())
                                                         .collect(),
                                                     data: Data::new(log_entry.data.clone()),
                                                     block_hash: Some(
-                                                        block.header.hash().as_ref().into(),
+                                                        block.header.hash().as_bytes().into(),
                                                     ),
                                                     block_number: Some(block.header.height.into()),
-                                                    transaction_hash: Some(tx_hash.as_ref().into()),
+                                                    transaction_hash: Some(
+                                                        tx_hash.as_bytes().into(),
+                                                    ),
                                                     transaction_index: Some(
                                                         _transaction_index.into(),
                                                     ),

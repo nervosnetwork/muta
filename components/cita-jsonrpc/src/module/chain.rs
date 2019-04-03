@@ -140,23 +140,23 @@ where
 {
     let mut res_block = Block {
         version: 0,
-        hash: raw_block.header.hash().as_ref().into(),
+        hash: raw_block.header.hash().as_bytes().into(),
         header: BlockHeader {
             timestamp: raw_block.header.timestamp,
-            prev_hash: raw_block.header.prevhash.as_ref().into(),
+            prev_hash: raw_block.header.prevhash.as_bytes().into(),
             number: raw_block.header.height.into(),
-            state_root: raw_block.header.state_root.as_ref().into(),
-            transactions_root: raw_block.header.transactions_root.as_ref().into(),
-            receipts_root: raw_block.header.receipts_root.as_ref().into(),
+            state_root: raw_block.header.state_root.as_bytes().into(),
+            transactions_root: raw_block.header.transactions_root.as_bytes().into(),
+            receipts_root: raw_block.header.receipts_root.as_bytes().into(),
             quota_used: raw_block.header.quota_used.into(),
             proof: None,
-            proposer: raw_block.header.proposer.as_ref().into(),
+            proposer: raw_block.header.proposer.as_bytes().into(),
         },
         body: BlockBody {
             transactions: raw_block
                 .tx_hashes
                 .iter()
-                .map(|tx| BlockTransaction::Hash(tx.as_ref().into()))
+                .map(|tx| BlockTransaction::Hash(tx.as_bytes().into()))
                 .collect(),
         },
     };
@@ -178,9 +178,9 @@ where
                         return err(JsonrpcError::internal_error());
                     }
                     Some(tx) => txs.push(BlockTransaction::Full(FullTransaction {
-                        hash: tx.hash.as_ref().into(),
+                        hash: tx.hash.as_bytes().into(),
                         content: tx.untx.transaction.data.into(),
-                        from: tx.sender.as_ref().into(),
+                        from: tx.sender.as_bytes().into(),
                     })),
                 }
             }
@@ -203,9 +203,9 @@ where
     let tx_hash = raw_tx.hash.clone();
     let fut = get_block_by_tx_hash(storage, tx_hash.clone()).map(move |block| {
         let mut tx = RpcTransaction {
-            hash: raw_tx.hash.as_ref().into(),
+            hash: raw_tx.hash.as_bytes().into(),
             content: raw_tx.untx.transaction.data.clone().into(),
-            from: raw_tx.sender.as_ref().into(),
+            from: raw_tx.sender.as_bytes().into(),
             block_number: 0.into(),
             block_hash: 0.into(),
             index: 0.into(),
@@ -217,7 +217,7 @@ where
                 .position(|x| x == &tx_hash)
                 .unwrap()
                 .into();
-            tx.block_hash = b.header.hash().as_ref().into();
+            tx.block_hash = b.header.hash().as_bytes().into();
             tx.block_number = b.header.height.into();
         };
         tx
@@ -279,12 +279,16 @@ where
                         .iter()
                         .enumerate()
                         .map(|(log_index, log_entry)| Log {
-                            address: log_entry.address.as_ref().into(),
-                            topics: log_entry.topics.iter().map(|t| t.as_ref().into()).collect(),
+                            address: log_entry.address.as_bytes().into(),
+                            topics: log_entry
+                                .topics
+                                .iter()
+                                .map(|t| t.as_bytes().into())
+                                .collect(),
                             data: Data::new(log_entry.data.clone()),
-                            block_hash: Some(block.header.hash().as_ref().into()),
+                            block_hash: Some(block.header.hash().as_bytes().into()),
                             block_number: Some(block.header.height.into()),
-                            transaction_hash: Some(raw_receipt.transaction_hash.as_ref().into()),
+                            transaction_hash: Some(raw_receipt.transaction_hash.as_bytes().into()),
                             transaction_index: Some(tx_index.into()),
                             log_index: Some(log_index.into()),
                             transaction_log_index: Some(
@@ -293,18 +297,18 @@ where
                         })
                         .collect();
                     let receipt = Receipt {
-                        transaction_hash: Some(raw_receipt.transaction_hash.as_ref().into()),
+                        transaction_hash: Some(raw_receipt.transaction_hash.as_bytes().into()),
                         transaction_index: Some(tx_index.into()),
-                        block_hash: Some(raw_receipt.block_hash.as_ref().into()),
+                        block_hash: Some(raw_receipt.block_hash.as_bytes().into()),
                         block_number: Some(block.header.height.into()),
                         cumulative_quota_used: 0.into(), // todo
                         quota_used: Some(raw_receipt.quota_used.into()),
                         contract_address: raw_receipt
                             .contract_address
                             .clone()
-                            .map(|addr| addr.as_ref().into()),
+                            .map(|addr| addr.as_bytes().into()),
                         logs,
-                        state_root: Some(raw_receipt.state_root.as_ref().into()),
+                        state_root: Some(raw_receipt.state_root.as_bytes().into()),
                         logs_bloom: raw_receipt.logs_bloom.data().clone().into(),
                         error_message: Some(raw_receipt.receipt_error.clone()),
                     };
@@ -434,8 +438,12 @@ where
                     executor
                         .readonly(
                             &block.header,
-                            &Address::from(Into::<Vec<u8>>::into(call_request.to).as_slice()),
-                            &Address::from(call_request.from.map_or(vec![], Into::into).as_slice()),
+                            &Address::from_bytes(Into::<Vec<u8>>::into(call_request.to).as_slice())
+                                .expect("never returns an error"),
+                            &Address::from_bytes(
+                                call_request.from.map_or(vec![], Into::into).as_slice(),
+                            )
+                            .expect("never returns an error"),
                             &call_request.data.map_or(vec![], Into::into),
                         )
                         .map_err(|e| {
@@ -484,7 +492,8 @@ where
             move |block| {
                 let res: BoxFuture<_> = match block {
                     Some(block) => {
-                        let addr = Address::from(Into::<Vec<u8>>::into(addr).as_slice());
+                        let addr = Address::from_bytes(Into::<Vec<u8>>::into(addr).as_slice())
+                            .expect("never returns an error");
                         let hashes: Vec<&Hash> = block.tx_hashes.iter().collect();
                         Box::new(
                             Arc::<S>::clone(&storage)
@@ -513,7 +522,8 @@ where
     }
 
     fn get_code(&self, addr: Data20, block_number: BlockNumber) -> BoxFuture<Data> {
-        let addr = Address::from(Into::<Vec<u8>>::into(addr).as_slice());
+        let addr = Address::from_bytes(Into::<Vec<u8>>::into(addr).as_slice())
+            .expect("never returns an error");
         let storage = self.get_storage_inst();
         let executor = self.get_executor_inst();
         let fut = get_block_by_block_number(storage, block_number).and_then(move |block| {
@@ -539,7 +549,8 @@ where
     }
 
     fn get_balance(&self, addr: Data20, block_number: BlockNumber) -> BoxFuture<Quantity> {
-        let addr = Address::from(Into::<Vec<u8>>::into(addr).as_slice());
+        let addr = Address::from_bytes(Into::<Vec<u8>>::into(addr).as_slice())
+            .expect("never returns an error");
         let storage = self.get_storage_inst();
         let executor = self.get_executor_inst();
         let fut = get_block_by_block_number(storage, block_number).and_then(move |block| {
@@ -592,7 +603,8 @@ where
         key: Data32,
         block_number: BlockNumber,
     ) -> BoxFuture<Data> {
-        let addr = Address::from(Into::<Vec<u8>>::into(addr).as_slice());
+        let addr = Address::from_bytes(Into::<Vec<u8>>::into(addr).as_slice())
+            .expect("never returns an error");
         let storage = self.get_storage_inst();
         let executor = Arc::<E>::clone(&self.executor);
         let fut = get_block_by_block_number(storage, block_number).and_then(move |block| {

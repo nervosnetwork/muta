@@ -60,8 +60,8 @@ where
         // 1. verify signature
         let sender = match C::verify_with_signature(&tx_hash, &signature) {
             Ok(pubkey) => {
-                let hash = Hash::from_raw(&pubkey.as_bytes()[1..]);
-                Address::from(&hash.as_ref()[12..])
+                let hash = Hash::digest(&pubkey.as_bytes()[1..]);
+                Address::from_hash(&hash)
             }
             Err(e) => return Box::new(err(TransactionPoolError::Crypto(e))),
         };
@@ -426,11 +426,12 @@ mod tests {
     ) -> UnverifiedTransaction {
         let (privkey, _pubkey) = Secp256k1::gen_keypair();
         let mut tx = Transaction::default();
-        tx.to = Address::from(
+        tx.to = Address::from_bytes(
             hex::decode("ffffffffffffffffffffffffffffffffffffffff")
                 .unwrap()
                 .as_ref(),
-        );
+        )
+        .unwrap();
         tx.nonce = nonce;
         tx.quota = quota;
         tx.valid_until_block = valid_until_block;
@@ -453,11 +454,12 @@ mod tests {
     ) -> SignedTransaction {
         let (privkey, pubkey) = Secp256k1::gen_keypair();
         let mut tx = Transaction::default();
-        tx.to = Address::from(
+        tx.to = Address::from_bytes(
             hex::decode("ffffffffffffffffffffffffffffffffffffffff")
                 .unwrap()
                 .as_ref(),
-        );
+        )
+        .unwrap();
         tx.nonce = nonce;
         tx.quota = quota;
         tx.valid_until_block = valid_until_block;
@@ -476,8 +478,8 @@ mod tests {
             untx: untx.clone(),
             hash: untx.transaction.hash(),
             sender: {
-                let hash = Hash::from_raw(&pubkey.as_bytes()[1..]);
-                Address::from(&hash.as_ref()[12..])
+                let hash = Hash::digest(&pubkey.as_bytes()[1..]);
+                Address::from_hash(&hash)
             },
         }
     }

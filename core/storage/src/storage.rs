@@ -112,7 +112,7 @@ where
 
         let fut = self
             .db
-            .get(DataCategory::Block, key.as_ref())
+            .get(DataCategory::Block, key.as_bytes())
             .map_err(StorageError::Database)
             .and_then(move |height_slice| {
                 db.get(DataCategory::Block, &height_slice)
@@ -129,7 +129,7 @@ where
 
         let fut = self
             .db
-            .get(DataCategory::Transaction, key.as_ref())
+            .get(DataCategory::Transaction, key.as_bytes())
             .map_err(StorageError::Database)
             .and_then(|data| {
                 AsyncCodec::decode::<PbSignedTransaction>(data).map_err(StorageError::Codec)
@@ -145,7 +145,7 @@ where
     ) -> FutRuntimeResult<Vec<Option<SignedTransaction>>, StorageError> {
         let mut keys = vec![];
         for h in hashes {
-            keys.push(h.as_ref().to_vec());
+            keys.push(h.as_bytes().to_vec());
         }
 
         let fut = self
@@ -185,7 +185,7 @@ where
 
         let fut = self
             .db
-            .get(DataCategory::Receipt, key.as_ref())
+            .get(DataCategory::Receipt, key.as_bytes())
             .map_err(StorageError::Database)
             .and_then(|data| AsyncCodec::decode::<PbReceipt>(data).map_err(StorageError::Codec))
             .map(Receipt::from);
@@ -199,7 +199,7 @@ where
     ) -> FutRuntimeResult<Vec<Option<Receipt>>, StorageError> {
         let mut keys = vec![];
         for h in hashes {
-            keys.push(h.as_ref().to_vec());
+            keys.push(h.as_bytes().to_vec());
         }
 
         let fut = self
@@ -251,7 +251,7 @@ where
                         .map_err(StorageError::Database),
                     db.insert(
                         DataCategory::Block,
-                        hash_key.as_ref(),
+                        hash_key.as_bytes(),
                         &transfrom_u64_to_array_u8(height),
                     )
                     .map_err(StorageError::Database),
@@ -280,7 +280,7 @@ where
                 .map_err(StorageError::Codec)
                 .map(move |_| buf.to_vec());
 
-            keys.push(tx.hash.as_ref().to_vec());
+            keys.push(tx.hash.as_bytes().to_vec());
             peding_fut.push(fut);
         }
 
@@ -305,7 +305,7 @@ where
                 .map_err(StorageError::Codec)
                 .map(move |_| buf.to_vec());
 
-            keys.push(receipt.transaction_hash.as_ref().to_vec());
+            keys.push(receipt.transaction_hash.as_bytes().to_vec());
             peding_fut.push(fut);
         }
 
@@ -382,7 +382,7 @@ mod tests {
     fn test_get_transaction_should_return_ok() {
         let db = Arc::new(MemoryDB::new());
         let storage = BlockStorage::new(db);
-        let tx = mock_transaction(Hash::from_raw(b"test111"));
+        let tx = mock_transaction(Hash::digest(b"test111"));
 
         let hash = tx.hash.clone();
         storage.insert_transactions(&[tx]).wait().unwrap();
@@ -395,8 +395,8 @@ mod tests {
     fn test_get_transactions_should_return_ok() {
         let db = Arc::new(MemoryDB::new());
         let storage = BlockStorage::new(db);
-        let tx1 = mock_transaction(Hash::from_raw(b"test111"));
-        let tx2 = mock_transaction(Hash::from_raw(b"test222"));
+        let tx1 = mock_transaction(Hash::digest(b"test111"));
+        let tx2 = mock_transaction(Hash::digest(b"test222"));
 
         let tx_hash1 = tx1.hash.clone();
         let tx_hash2 = tx2.hash.clone();
@@ -420,7 +420,7 @@ mod tests {
     fn test_get_receipt_should_return_ok() {
         let db = Arc::new(MemoryDB::new());
         let storage = BlockStorage::new(db);
-        let receipt = mock_receipt(Hash::from_raw(b"test111"));
+        let receipt = mock_receipt(Hash::digest(b"test111"));
         let tx_hash = receipt.transaction_hash.clone();
 
         storage.insert_receipts(&[receipt]).wait().unwrap();
@@ -432,8 +432,8 @@ mod tests {
     fn test_get_receipts_should_return_ok() {
         let db = Arc::new(MemoryDB::new());
         let storage = BlockStorage::new(db);
-        let receipt1 = mock_receipt(Hash::from_raw(b"test111"));
-        let receipt2 = mock_receipt(Hash::from_raw(b"test222"));
+        let receipt1 = mock_receipt(Hash::digest(b"test111"));
+        let receipt2 = mock_receipt(Hash::digest(b"test222"));
 
         let tx_hash1 = receipt1.transaction_hash.clone();
         let tx_hash2 = receipt2.transaction_hash.clone();
@@ -490,10 +490,10 @@ mod tests {
 
     fn mock_block(height: u64) -> Block {
         let mut b = Block::default();
-        b.header.prevhash = Hash::from_raw(b"test");
+        b.header.prevhash = Hash::digest(b"test");
         b.header.timestamp = 1234;
         b.header.height = height;
-        b.tx_hashes = vec![Hash::from_raw(b"tx1"), Hash::from_raw(b"tx2")];
+        b.tx_hashes = vec![Hash::digest(b"tx1"), Hash::digest(b"tx2")];
         b
     }
 

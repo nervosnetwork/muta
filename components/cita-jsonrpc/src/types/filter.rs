@@ -15,7 +15,7 @@ impl Filter {
         let blooms = match self.address {
             Some(ref addresses) if !addresses.is_empty() => addresses
                 .iter()
-                .map(|ref address| Bloom::from(BloomInput::Raw(address.as_ref())))
+                .map(|ref address| Bloom::from(BloomInput::Raw(address.as_bytes())))
                 .collect(),
             _ => vec![Bloom::default()],
         };
@@ -29,7 +29,7 @@ impl Filter {
                         .iter()
                         .map(|topic| {
                             let mut b = bloom;
-                            b.accrue(BloomInput::Raw(topic.as_ref()));
+                            b.accrue(BloomInput::Raw(topic.as_bytes()));
                             b
                         })
                         .collect::<Vec<Bloom>>()
@@ -67,12 +67,16 @@ impl From<RpcFilter> for Filter {
             to_block: v.to_block,
             address: v.address.and_then(|address| match address {
                 VariadicValue::Null => None,
-                VariadicValue::Single(a) => {
-                    Some(vec![Address::from(Into::<Vec<u8>>::into(a).as_slice())])
-                }
+                VariadicValue::Single(a) => Some(vec![Address::from_bytes(
+                    Into::<Vec<u8>>::into(a).as_slice(),
+                )
+                .expect("never returns an error")]),
                 VariadicValue::Multiple(a) => Some(
                     a.into_iter()
-                        .map(|addr| Address::from(Into::<Vec<u8>>::into(addr).as_slice()))
+                        .map(|addr| {
+                            Address::from_bytes(Into::<Vec<u8>>::into(addr).as_slice())
+                                .expect("never returns an error")
+                        })
                         .collect(),
                 ),
             }),
@@ -86,11 +90,15 @@ impl From<RpcFilter> for Filter {
                             .map(|topic| match topic {
                                 VariadicValue::Null => None,
                                 VariadicValue::Single(a) => {
-                                    Some(vec![Hash::from_raw(&Into::<Vec<u8>>::into(a))])
+                                    Some(vec![Hash::from_bytes(&Into::<Vec<u8>>::into(a))
+                                        .expect("never returns an error")])
                                 }
                                 VariadicValue::Multiple(a) => Some(
                                     a.into_iter()
-                                        .map(|h| Hash::from_raw(&Into::<Vec<u8>>::into(h)))
+                                        .map(|h| {
+                                            Hash::from_bytes(&Into::<Vec<u8>>::into(h))
+                                                .expect("never returns an error")
+                                        })
                                         .collect(),
                                 ),
                             })

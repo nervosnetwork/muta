@@ -25,7 +25,7 @@ impl BlockHeader {
     /// Calculate the block header hash. To maintain consistency we use RLP serialization.
     pub fn hash(&self) -> Hash {
         let rlp_data = rlp::encode(self);
-        Hash::from_raw(&rlp_data)
+        Hash::digest(&rlp_data)
     }
 }
 
@@ -50,17 +50,22 @@ impl Encodable for BlockHeader {
 impl From<PbBlockHeader> for BlockHeader {
     fn from(header: PbBlockHeader) -> Self {
         BlockHeader {
-            prevhash: Hash::from_raw(&header.prevhash),
+            prevhash: Hash::from_bytes(&header.prevhash).expect("never returns an error"),
             timestamp: header.timestamp,
             height: header.height,
-            transactions_root: Hash::from_raw(&header.transactions_root),
-            state_root: Hash::from_raw(&header.state_root),
-            receipts_root: Hash::from_raw(&header.receipts_root),
+            transactions_root: Hash::from_bytes(&header.transactions_root)
+                .expect("never returns an error"),
+            state_root: Hash::from_bytes(&header.state_root).expect("never returns an error"),
+            receipts_root: Hash::from_bytes(&header.receipts_root).expect("never returns an error"),
             logs_bloom: Bloom::from_slice(&header.logs_bloom),
             quota_used: header.quota_used,
             quota_limit: header.quota_limit,
-            votes: header.votes.iter().map(|v| Hash::from_raw(v)).collect(),
-            proposer: Address::from(header.proposer.as_ref()),
+            votes: header
+                .votes
+                .iter()
+                .map(|v| Hash::from_bytes(v).expect("never returns an error"))
+                .collect(),
+            proposer: Address::from_bytes(&header.proposer).expect("never returns an error"),
         }
     }
 }
@@ -68,17 +73,17 @@ impl From<PbBlockHeader> for BlockHeader {
 impl Into<PbBlockHeader> for BlockHeader {
     fn into(self) -> PbBlockHeader {
         PbBlockHeader {
-            prevhash: self.prevhash.as_ref().to_vec(),
+            prevhash: self.prevhash.as_bytes().to_vec(),
             timestamp: self.timestamp,
             height: self.height,
-            transactions_root: self.transactions_root.as_ref().to_vec(),
-            state_root: self.state_root.as_ref().to_vec(),
-            receipts_root: self.receipts_root.as_ref().to_vec(),
+            transactions_root: self.transactions_root.as_bytes().to_vec(),
+            state_root: self.state_root.as_bytes().to_vec(),
+            receipts_root: self.receipts_root.as_bytes().to_vec(),
             logs_bloom: self.logs_bloom.as_bytes().to_vec(),
             quota_used: self.quota_used,
             quota_limit: self.quota_limit,
-            votes: self.votes.iter().map(|v| v.as_ref().to_vec()).collect(),
-            proposer: self.proposer.as_ref().to_vec(),
+            votes: self.votes.iter().map(|v| v.as_bytes().to_vec()).collect(),
+            proposer: self.proposer.as_bytes().to_vec(),
         }
     }
 }
@@ -98,7 +103,11 @@ impl From<PbBlock> for Block {
 
         Block {
             header,
-            tx_hashes: block.tx_hashes.iter().map(|h| Hash::from_raw(h)).collect(),
+            tx_hashes: block
+                .tx_hashes
+                .iter()
+                .map(|tx_hash| Hash::from_bytes(&tx_hash).expect("never returns an error"))
+                .collect(),
         }
     }
 }
@@ -107,7 +116,11 @@ impl Into<PbBlock> for Block {
     fn into(self) -> PbBlock {
         PbBlock {
             header: Some(self.header.into()),
-            tx_hashes: self.tx_hashes.iter().map(|h| h.as_ref().to_vec()).collect(),
+            tx_hashes: self
+                .tx_hashes
+                .iter()
+                .map(|h| h.as_bytes().to_vec())
+                .collect(),
         }
     }
 }

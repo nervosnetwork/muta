@@ -38,14 +38,14 @@ impl Transaction {
     /// Calculate the block hash. To maintain consistency we use RLP serialization.
     pub fn hash(&self) -> Hash {
         let rlp_data = rlp::encode(self);
-        Hash::from_raw(&rlp_data)
+        Hash::digest(&rlp_data)
     }
 }
 
 impl From<PbTransaction> for Transaction {
     fn from(tx: PbTransaction) -> Self {
         Transaction {
-            to: Address::from(tx.to.as_ref()),
+            to: Address::from_bytes(&tx.to).expect("never returns an error"),
             nonce: tx.nonce,
             quota: tx.quota,
             valid_until_block: tx.valid_until_block,
@@ -59,7 +59,7 @@ impl From<PbTransaction> for Transaction {
 impl Into<PbTransaction> for Transaction {
     fn into(self) -> PbTransaction {
         PbTransaction {
-            to: self.to.as_ref().to_vec(),
+            to: self.to.as_bytes().to_vec(),
             nonce: self.nonce,
             quota: self.quota,
             valid_until_block: self.valid_until_block,
@@ -115,8 +115,8 @@ impl From<PbSignedTransaction> for SignedTransaction {
 
         SignedTransaction {
             untx,
-            hash: Hash::from_raw(&signed_tx.hash),
-            sender: Address::from(signed_tx.sender.as_ref()),
+            hash: Hash::from_bytes(&signed_tx.hash).expect("never returns an error"),
+            sender: Address::from_bytes(&signed_tx.sender).expect("never returns an error"),
         }
     }
 }
@@ -125,8 +125,8 @@ impl Into<PbSignedTransaction> for SignedTransaction {
     fn into(self) -> PbSignedTransaction {
         PbSignedTransaction {
             untx: Some(self.untx.clone().into()),
-            hash: self.hash.as_ref().to_vec(),
-            sender: self.sender.as_ref().to_vec(),
+            hash: self.hash.as_bytes().to_vec(),
+            sender: self.sender.as_bytes().to_vec(),
         }
     }
 }

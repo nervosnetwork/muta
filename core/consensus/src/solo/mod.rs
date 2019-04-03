@@ -57,7 +57,7 @@ where
         transaction_size: u64,
     ) -> Result<Self, ConsensusError> {
         let pubkey = C::get_public_key(&privkey)?;
-        let pubkey_hash = Hash::from_raw(pubkey.as_bytes());
+        let pubkey_hash = Hash::digest(&pubkey.as_bytes()[1..]);
         let address = Address::from_hash(&pubkey_hash);
 
         let current_block = storage.get_latest_block().wait()?;
@@ -287,7 +287,7 @@ mod tests {
     #[test]
     fn test_boom() {
         let (privkey, pubkey) = Secp256k1::gen_keypair();
-        let pubkey_hash = Hash::from_raw(&pubkey.as_bytes()[1..]);
+        let pubkey_hash = Hash::digest(&pubkey.as_bytes()[1..]);
         let node_address = Address::from_hash(&pubkey_hash);
 
         let db = Arc::new(MemoryDB::new());
@@ -352,9 +352,9 @@ mod tests {
                 .duration_since(UNIX_EPOCH)
                 .unwrap()
                 .as_secs(),
-            prevhash: hex::encode(block.header.prevhash.clone()),
+            prevhash: hex::encode(block.header.prevhash.clone().as_bytes()),
             state_alloc: vec![StateAlloc {
-                address: hex::encode(address),
+                address: hex::encode(address.as_bytes()),
                 balance: hex::encode(b"fffffffffffffffff"),
                 ..Default::default()
             }],
@@ -369,11 +369,12 @@ mod tests {
         signer: &PrivateKey,
     ) -> UnverifiedTransaction {
         let mut tx = Transaction::default();
-        tx.to = Address::from(
+        tx.to = Address::from_bytes(
             hex::decode("ffffffffffffffffffffffffffffffffffffffff")
                 .unwrap()
                 .as_ref(),
-        );
+        )
+        .unwrap();
         tx.nonce = nonce;
         tx.quota = quota;
         tx.valid_until_block = valid_until_block;

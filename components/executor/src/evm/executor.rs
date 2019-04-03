@@ -63,7 +63,7 @@ where
 
         state.commit()?;
 
-        let root_hash = Hash::from_raw(state.root.as_ref());
+        let root_hash = Hash::from_bytes(state.root.as_ref())?;
 
         let evm_executor = EVMExecutor {
             block_provider: Arc::new(block_provider),
@@ -124,7 +124,7 @@ where
             .collect();
 
         state.borrow_mut().commit()?;
-        let root_hash = Hash::from_raw(state.borrow().root.as_ref());
+        let root_hash = Hash::from_bytes(state.borrow().root.as_ref())?;
 
         for mut receipt in receipts.iter_mut() {
             receipt.state_root = root_hash.clone();
@@ -221,10 +221,9 @@ where
         let address = &H160::from(address.clone().into_fixed_bytes());
         let account = state.get_state_object(&address)?;
 
-        account.ok_or(ExecutorError::NotFound).map(|account| {
-            let storage_root = account.storage_root;
-            Hash::from_raw(storage_root.to_vec().as_ref())
-        })
+        let account = account.ok_or(ExecutorError::NotFound)?;
+        let storage_root = account.storage_root;
+        Hash::from_bytes(storage_root.as_ref()).map_err(ExecutorError::Types)
     }
 
     /// Query code of account.
@@ -242,7 +241,8 @@ where
             return Err(ExecutorError::NotFound);
         }
         let code_hash = state.code_hash(address)?;
-        Ok((code, Hash::from_raw(code_hash.as_ref())))
+        let code_hash = Hash::from_bytes(code_hash.as_ref()).expect("never returns an error");
+        Ok((code, code_hash))
     }
 }
 
@@ -367,9 +367,10 @@ fn build_receipt_with_ok(signed_tx: &SignedTransaction, result: InterpreterResul
             receipt.logs_bloom = logs_to_bloom(&receipt.logs);
 
             let address_slice: &[u8] = contract_address.as_ref();
-            receipt.contract_address = Some(Address::from(address_slice));
+            receipt.contract_address =
+                Some(Address::from_bytes(address_slice).expect("never returns an error"));
         }
-    }
+    };
     receipt
 }
 
@@ -385,10 +386,10 @@ fn transform_logs(logs: Vec<EVMLog>) -> Vec<LogEntry> {
             let EVMLog(address, topics, data) = log;
 
             LogEntry {
-                address: Address::from(address.as_ref()),
+                address: Address::from_bytes(address.as_ref()).expect("never returns an error"),
                 topics: topics
                     .into_iter()
-                    .map(|topic| Hash::from_raw(topic.as_ref()))
+                    .map(|topic| Hash::from_bytes(topic.as_ref()).expect("never returns an error"))
                     .collect(),
                 data,
             }
@@ -417,7 +418,7 @@ fn logs_to_bloom(logs: &[LogEntry]) -> Bloom {
 }
 
 fn accrue_log(bloom: &mut Bloom, log: &LogEntry) {
-    let address_hash = Hash::from_raw(log.address.as_ref());
+    let address_hash = Hash::digest(log.address.as_bytes());
     let input = BloomInput::Hash(address_hash.as_fixed_bytes());
     bloom.accrue(input);
 
@@ -477,7 +478,7 @@ mod tests {
     #[test]
     fn test_evm_executor_basic() {
         let (_, pubkey) = Secp256k1::gen_keypair();
-        let pubkey_hash = Hash::from_raw(pubkey.as_bytes());
+        let pubkey_hash = Hash::digest(&pubkey.as_bytes()[1..]);
         let address = Address::from_hash(&pubkey_hash);
         let genesis = build_genesis(
             address.as_hex(),
@@ -508,7 +509,7 @@ mod tests {
     #[test]
     fn test_create_contract() {
         let (_, pubkey) = Secp256k1::gen_keypair();
-        let pubkey_hash = Hash::from_raw(pubkey.as_bytes());
+        let pubkey_hash = Hash::digest(&pubkey.as_bytes()[1..]);
         let address = Address::from_hash(&pubkey_hash);
         let genesis = build_genesis(
             address.as_hex(),
@@ -534,7 +535,7 @@ mod tests {
         tx.data = bin;
 
         let signed_tx = SignedTransaction {
-            hash: Hash::from_raw(b"test1"),
+            hash: Hash::digest(b"test1"),
             sender: address,
             untx: UnverifiedTransaction {
                 signature: vec![],

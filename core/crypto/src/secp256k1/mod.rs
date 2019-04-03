@@ -150,7 +150,7 @@ impl Secp256k1 {
     }
 
     fn msg(hash: &Hash) -> Result<Message, CryptoError> {
-        Ok(Message::from_slice(hash.as_ref()).map_err(|_| CryptoError::SignatureInvalid)?)
+        Ok(Message::from_slice(hash.as_bytes()).map_err(|_| CryptoError::SignatureInvalid)?)
     }
 }
 
@@ -165,7 +165,7 @@ mod tests {
     fn test_secp256k1_basic() {
         let (privkey, pubkey) = Secp256k1::gen_keypair();
 
-        let test_hash = Hash::from_raw(b"test");
+        let test_hash = Hash::digest(b"test");
 
         // test signature
         let signature = Secp256k1::sign(&test_hash, &privkey).unwrap();

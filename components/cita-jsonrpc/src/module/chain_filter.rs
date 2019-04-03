@@ -123,7 +123,7 @@ where
                                             JsonrpcError::internal_error()
                                         })
                                         .map(|block| {
-                                            Data32::new(block.header.hash().as_ref().into())
+                                            Data32::new(block.header.hash().as_bytes().into())
                                         })
                                 }))
                                 .map(FilterChanges::Hashes);

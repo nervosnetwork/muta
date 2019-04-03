@@ -17,8 +17,10 @@ impl Merkle {
 }
 
 fn merge(left: &Hash, right: &Hash) -> Hash {
-    let mut root = Vec::with_capacity(left.as_ref().len() + right.as_ref().len());
-    root.extend_from_slice(&left.as_ref());
-    root.extend_from_slice(&right.as_ref());
-    Hash::from_raw(&root)
+    let left = left.as_bytes();
+    let right = right.as_bytes();
+    let mut root = Vec::with_capacity(left.len() + right.len());
+    root.extend_from_slice(left);
+    root.extend_from_slice(right);
+    Hash::digest(&root)
 }

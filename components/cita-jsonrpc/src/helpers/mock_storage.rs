@@ -5,7 +5,7 @@ use futures::future::{err, ok};
 
 use core_runtime::{DatabaseError, FutRuntimeResult};
 use core_storage::{errors::StorageError, storage::Storage};
-use core_types::{Block, BlockHeader, Bloom, Hash, Receipt, SignedTransaction};
+use core_types::{Address, Block, BlockHeader, Bloom, Hash, Receipt, SignedTransaction};
 
 #[derive(Default, Debug, Clone)]
 pub struct MockStorage {
@@ -20,17 +20,17 @@ impl MockStorage {
     pub fn new() -> Self {
         let genesis = Block {
             header: BlockHeader {
-                prevhash: [0; 32].into(),
+                prevhash: Hash::from_fixed_bytes([0; 32]),
                 timestamp: 0,
                 height: 0,
-                transactions_root: [0; 32].into(),
-                state_root: [0; 32].into(),
-                receipts_root: [0; 32].into(),
+                transactions_root: Hash::from_fixed_bytes([0; 32]),
+                state_root: Hash::from_fixed_bytes([0; 32]),
+                receipts_root: Hash::from_fixed_bytes([0; 32]),
                 logs_bloom: Bloom::default(),
                 quota_used: 0,
                 quota_limit: 0,
                 votes: vec![],
-                proposer: [0; 20].into(),
+                proposer: Address::from_fixed_bytes([0; 20]),
             },
             tx_hashes: vec![],
         };
@@ -110,7 +110,7 @@ impl Storage for MockStorage {
                 .read()
                 .unwrap()
                 .last()
-                .map_or(Hash::from_raw(vec![].as_slice()), |b| b.header.hash())
+                .map_or(Hash::digest(b"test"), |b| b.header.hash())
         {
             return Box::new(err(StorageError::Internal(
                 "prevhash doesn't match".to_string(),
