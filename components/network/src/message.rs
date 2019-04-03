@@ -1,19 +1,8 @@
-use packed_message::Message;
+use core_types::block::Block;
+use core_types::transaction::SignedTransaction;
 
-use prost::Message as ProstMessage;
-
-pub mod packed_message {
-    use prost::Oneof;
-
-    #[derive(Clone, PartialEq, Oneof)]
-    pub enum Message {
-        #[prost(bytes, tag = "1")]
-        Consensus(Vec<u8>), // change Vec<u8> to SignedMessage from PR #74
-    }
-}
-
-#[derive(Clone, PartialEq, ProstMessage)]
-pub(crate) struct PackedMessage {
-    #[prost(oneof = "Message", tags = "1")]
-    pub message: Option<Message>,
+pub enum Message {
+    Consensus(Vec<u8>),
+    SignedTransaction(Box<SignedTransaction>),
+    Block(Box<Block>),
 }

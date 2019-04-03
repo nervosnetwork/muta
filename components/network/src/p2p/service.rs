@@ -1,5 +1,4 @@
-use crate::message::{packed_message::Message, PackedMessage};
-use crate::p2p::{Builder, Config, ServiceWorker, Task};
+use crate::p2p::{Builder, Config, Message, PackedMessage, ServiceWorker, Task};
 
 use core_p2p::{transmission::CastMessage, DefaultPeerManager};
 

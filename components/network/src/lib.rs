@@ -3,10 +3,10 @@ pub mod message;
 pub(crate) mod p2p;
 
 pub use config::Config;
-pub use message::packed_message::Message;
+pub use message::Message;
 pub use p2p::Broadcaster;
 
-use p2p::{Config as P2PConfig, Service as P2PService};
+use p2p::{Config as P2PConfig, Message as P2PMessage, Service as P2PService};
 
 use std::error::Error;
 
@@ -24,7 +24,7 @@ impl Network {
     }
 
     pub fn send(&mut self, msg: Message) {
-        self.p2p.send(msg)
+        self.p2p.send(P2PMessage::from(msg))
     }
 
     pub fn broadcaster(&self) -> Broadcaster {
