@@ -267,7 +267,7 @@ mod tests {
         let storage = Arc::new(BlockStorage::new(db));
         let mut block = Block::default();
         block.header.height = height;
-        storage.insert_block(&block).wait().unwrap();
+        storage.insert_block(block).wait().unwrap();
 
         let tx_pool =
             HashTransactionPool::new(storage, secp, pool_size, until_block_limit, quota_limit);
@@ -329,11 +329,11 @@ mod tests {
         block.header.height = height;
 
         storage
-            .insert_transactions(&[signed_tx.clone()])
+            .insert_transactions(vec![signed_tx.clone()])
             .wait()
             .unwrap();
 
-        storage.insert_block(&block).wait().unwrap();
+        storage.insert_block(block).wait().unwrap();
 
         let tx_pool =
             HashTransactionPool::new(storage, secp, pool_size, until_block_limit, quota_limit);
@@ -354,7 +354,7 @@ mod tests {
         let storage = Arc::new(BlockStorage::new(db));
         let mut block = Block::default();
         block.header.height = height;
-        storage.insert_block(&block).wait().unwrap();
+        storage.insert_block(block).wait().unwrap();
 
         let tx_pool =
             HashTransactionPool::new(storage, secp, pool_size, until_block_limit, quota_limit);
@@ -381,7 +381,7 @@ mod tests {
         let storage = Arc::new(BlockStorage::new(db));
         let mut block = Block::default();
         block.header.height = height;
-        storage.insert_block(&block).wait().unwrap();
+        storage.insert_block(block).wait().unwrap();
 
         let tx_pool =
             HashTransactionPool::new(storage, secp, pool_size, until_block_limit, quota_limit);
@@ -418,7 +418,7 @@ mod tests {
         let storage = Arc::new(BlockStorage::new(db));
         let mut block = Block::default();
         block.header.height = height;
-        storage.insert_block(&block).wait().unwrap();
+        storage.insert_block(block).wait().unwrap();
 
         let tx_pool =
             HashTransactionPool::new(storage, secp, pool_size, until_block_limit, quota_limit);

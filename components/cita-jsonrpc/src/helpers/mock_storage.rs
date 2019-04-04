@@ -127,7 +127,7 @@ impl Storage for MockStorage {
             .collect::<Vec<_>>()))
     }
 
-    fn insert_block(&self, block: &Block) -> FutRuntimeResult<(), StorageError> {
+    fn insert_block(&self, block: Block) -> FutRuntimeResult<(), StorageError> {
         if block.header.prevhash
             != self
                 .blocks
@@ -162,43 +162,40 @@ impl Storage for MockStorage {
             .write()
             .unwrap()
             .insert(block.header.hash(), self.blocks.read().unwrap().len());
-        self.blocks.write().unwrap().push(block.clone());
+        self.blocks.write().unwrap().push(block);
         Box::new(ok(()))
     }
 
     fn insert_transactions(
         &self,
-        signed_txs: &[SignedTransaction],
+        signed_txs: Vec<SignedTransaction>,
     ) -> FutRuntimeResult<(), StorageError> {
         for tx in signed_txs {
             let hash = tx.hash.clone();
-            self.transactions
-                .write()
-                .unwrap()
-                .insert(hash.clone(), tx.clone());
+            self.transactions.write().unwrap().insert(hash, tx);
         }
         Box::new(ok(()))
     }
 
     fn insert_transaction_positions(
         &self,
-        positions: &HashMap<Hash, TransactionPosition>,
+        positions: HashMap<Hash, TransactionPosition>,
     ) -> FutRuntimeResult<(), StorageError> {
         for (block_hash, position) in positions {
             self.transaction_positions
                 .write()
                 .unwrap()
-                .insert(block_hash.clone(), position.clone());
+                .insert(block_hash, position);
         }
         Box::new(ok(()))
     }
 
-    fn insert_receipts(&self, receipts: &[Receipt]) -> FutRuntimeResult<(), StorageError> {
+    fn insert_receipts(&self, receipts: Vec<Receipt>) -> FutRuntimeResult<(), StorageError> {
         for receipt in receipts {
             self.receipts
                 .write()
                 .unwrap()
-                .insert(receipt.transaction_hash.clone(), receipt.clone());
+                .insert(receipt.transaction_hash.clone(), receipt);
         }
         Box::new(ok(()))
     }
