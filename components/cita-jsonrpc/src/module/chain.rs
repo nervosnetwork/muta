@@ -2,7 +2,6 @@ use crate::helpers::{
     get_block_by_block_number, get_block_by_tx_hash, get_logs, transform_data32_to_hash,
 };
 use crate::types::Filter;
-use core_crypto::secp256k1::Secp256k1;
 use core_runtime::{DatabaseError, Executor, TransactionPool};
 use core_serialization::{
     transaction::UnverifiedTransaction as PbUnverifiedTransaction, AsyncCodec,
@@ -347,7 +346,7 @@ where
             .map(UnverifiedTransaction::from)
             .and_then(move |untx| {
                 transaction_pool
-                    .insert::<Secp256k1>(untx)
+                    .insert(untx)
                     .map_err(|e| {
                         error!("insert transaction err: {:?}", e);
                         JsonrpcError::internal_error()

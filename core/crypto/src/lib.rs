@@ -16,16 +16,18 @@ pub trait Crypto: Send + Sync {
     type PublicKey: CryptoTransform + Clone + Send;
     type Signature: CryptoTransform + Clone + Send;
 
-    fn get_public_key(privkey: &Self::PrivateKey) -> Result<Self::PublicKey, CryptoError>;
+    fn get_public_key(&self, privkey: &Self::PrivateKey) -> Result<Self::PublicKey, CryptoError>;
 
     fn verify_with_signature(
+        &self,
         hash: &Hash,
         signature: &Self::Signature,
     ) -> Result<Self::PublicKey, CryptoError>;
 
-    fn gen_keypair() -> (Self::PrivateKey, Self::PublicKey);
+    fn gen_keypair(&self) -> (Self::PrivateKey, Self::PublicKey);
 
-    fn sign(hash: &Hash, privkey: &Self::PrivateKey) -> Result<Self::Signature, CryptoError>;
+    fn sign(&self, hash: &Hash, privkey: &Self::PrivateKey)
+        -> Result<Self::Signature, CryptoError>;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

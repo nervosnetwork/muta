@@ -92,6 +92,9 @@ fn main() {
 }
 
 fn start(cfg: &Config) {
+    // new crypto
+    let secp = Arc::new(Secp256k1::new());
+
     // new db
     let block_db = Arc::new(RocksDB::new(cfg.data_path_for_block().to_str().unwrap()).unwrap());
     let state_db = Arc::new(RocksDB::new(cfg.data_path_for_state().to_str().unwrap()).unwrap());
@@ -114,6 +117,7 @@ fn start(cfg: &Config) {
     // new tx pool
     let tx_pool = Arc::new(HashTransactionPool::new(
         Arc::clone(&storage),
+        Arc::clone(&secp),
         cfg.pool_size as usize,
         cfg.until_block_limit,
         cfg.quota_limit,
@@ -125,6 +129,7 @@ fn start(cfg: &Config) {
         Arc::clone(&executor),
         Arc::clone(&tx_pool),
         Arc::clone(&storage),
+        Arc::clone(&secp),
         privkey,
         cfg.consensus_size,
     )

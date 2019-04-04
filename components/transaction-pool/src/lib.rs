@@ -9,21 +9,24 @@ use core_runtime::{FutRuntimeResult, TransactionPool, TransactionPoolError};
 use core_storage::{errors::StorageError, storage::Storage};
 use core_types::{Address, Hash, SignedTransaction, Transaction, UnverifiedTransaction};
 
-pub struct HashTransactionPool<S> {
+pub struct HashTransactionPool<S, C> {
     pool_size: usize,
     until_block_limit: u64,
     quota_limit: u64,
 
     tx_cache: Arc<RwLock<HashMap<Hash, SignedTransaction>>>,
     storage: Arc<S>,
+    crypto: Arc<C>,
 }
 
-impl<S> HashTransactionPool<S>
+impl<S, C> HashTransactionPool<S, C>
 where
     S: Storage,
+    C: Crypto,
 {
     pub fn new(
         storage: Arc<S>,
+        crypto: Arc<C>,
         pool_size: usize,
         until_block_limit: u64,
         quota_limit: u64,
@@ -35,15 +38,17 @@ where
 
             tx_cache: Arc::new(RwLock::new(HashMap::new())),
             storage,
+            crypto,
         }
     }
 }
 
-impl<S: 'static> TransactionPool for HashTransactionPool<S>
+impl<S: 'static, C> TransactionPool for HashTransactionPool<S, C>
 where
     S: Storage,
+    C: Crypto,
 {
-    fn insert<C: Crypto>(
+    fn insert(
         &self,
         untx: UnverifiedTransaction,
     ) -> FutRuntimeResult<SignedTransaction, TransactionPoolError> {
@@ -58,7 +63,7 @@ where
         };
 
         // 1. verify signature
-        let sender = match C::verify_with_signature(&tx_hash, &signature) {
+        let sender = match self.crypto.verify_with_signature(&tx_hash, &signature) {
             Ok(pubkey) => {
                 let hash = Hash::digest(&pubkey.as_bytes()[1..]);
                 Address::from_hash(&hash)
@@ -252,6 +257,7 @@ mod tests {
 
     #[test]
     fn test_insert_transaction() {
+        let secp = Arc::new(Secp256k1::new());
         let pool_size = 1000;
         let until_block_limit = 100;
         let quota_limit = 10000;
@@ -263,17 +269,18 @@ mod tests {
         block.header.height = height;
         storage.insert_block(&block).wait().unwrap();
 
-        let tx_pool = HashTransactionPool::new(storage, pool_size, until_block_limit, quota_limit);
+        let tx_pool =
+            HashTransactionPool::new(storage, secp, pool_size, until_block_limit, quota_limit);
 
         // test normal
         let untx = mock_transaction(100, height + until_block_limit, "test_normal".to_owned());
         let tx_hash = untx.transaction.hash();
-        let signed_tx = tx_pool.insert::<Secp256k1>(untx).wait().unwrap();
+        let signed_tx = tx_pool.insert(untx).wait().unwrap();
         assert_eq!(signed_tx.hash, tx_hash);
 
         // test lt valid_until_block
         let untx = mock_transaction(100, height, "test_lt_quota_limit".to_owned());
-        let result = tx_pool.insert::<Secp256k1>(untx).wait();
+        let result = tx_pool.insert(untx).wait();
         assert_eq!(result, Err(TransactionPoolError::InvalidUntilBlock));
 
         // test gt valid_until_block
@@ -282,7 +289,7 @@ mod tests {
             height + until_block_limit * 2,
             "test_gt_valid_until_block".to_owned(),
         );
-        let result = tx_pool.insert::<Secp256k1>(untx).wait();
+        let result = tx_pool.insert(untx).wait();
         assert_eq!(result, Err(TransactionPoolError::InvalidUntilBlock));
 
         // test gt quota limit
@@ -291,19 +298,20 @@ mod tests {
             height + until_block_limit,
             "test_gt_quota_limit".to_owned(),
         );
-        let result = tx_pool.insert::<Secp256k1>(untx).wait();
+        let result = tx_pool.insert(untx).wait();
         assert_eq!(result, Err(TransactionPoolError::QuotaNotEnough));
 
         // test cache dup
         let untx = mock_transaction(100, height + until_block_limit, "test_dup".to_owned());
         let untx2 = untx.clone();
-        tx_pool.insert::<Secp256k1>(untx).wait().unwrap();
-        let result = tx_pool.insert::<Secp256k1>(untx2).wait();
+        tx_pool.insert(untx).wait().unwrap();
+        let result = tx_pool.insert(untx2).wait();
         assert_eq!(result, Err(TransactionPoolError::Dup));
     }
 
     #[test]
     fn test_histories_dup() {
+        let secp = Arc::new(Secp256k1::new());
         let pool_size = 1000;
         let until_block_limit = 100;
         let quota_limit = 10000;
@@ -324,14 +332,16 @@ mod tests {
         block.header.height = height;
         storage.insert_block(&block).wait().unwrap();
 
-        let tx_pool = HashTransactionPool::new(storage, pool_size, until_block_limit, quota_limit);
+        let tx_pool =
+            HashTransactionPool::new(storage, secp, pool_size, until_block_limit, quota_limit);
 
-        let result = tx_pool.insert::<Secp256k1>(signed_tx.untx).wait();
+        let result = tx_pool.insert(signed_tx.untx).wait();
         assert_eq!(result, Err(TransactionPoolError::Dup));
     }
 
     #[test]
     fn test_pool_size() {
+        let secp = Arc::new(Secp256k1::new());
         let pool_size = 1;
         let until_block_limit = 100;
         let quota_limit = 10000;
@@ -343,20 +353,22 @@ mod tests {
         block.header.height = height;
         storage.insert_block(&block).wait().unwrap();
 
-        let tx_pool = HashTransactionPool::new(storage, pool_size, until_block_limit, quota_limit);
+        let tx_pool =
+            HashTransactionPool::new(storage, secp, pool_size, until_block_limit, quota_limit);
 
         let untx = mock_transaction(100, height + until_block_limit, "test1".to_owned());
         let tx_hash = untx.transaction.hash();
-        let signed_tx = tx_pool.insert::<Secp256k1>(untx).wait().unwrap();
+        let signed_tx = tx_pool.insert(untx).wait().unwrap();
         assert_eq!(signed_tx.hash, tx_hash);
 
         let untx = mock_transaction(100, height + until_block_limit, "test2".to_owned());
-        let result = tx_pool.insert::<Secp256k1>(untx).wait();
+        let result = tx_pool.insert(untx).wait();
         assert_eq!(result, Err(TransactionPoolError::ReachLimit));
     }
 
     #[test]
     fn test_package_transaction_count() {
+        let secp = Arc::new(Secp256k1::new());
         let pool_size = 100;
         let until_block_limit = 100;
         let quota_limit = 10000;
@@ -368,13 +380,14 @@ mod tests {
         block.header.height = height;
         storage.insert_block(&block).wait().unwrap();
 
-        let tx_pool = HashTransactionPool::new(storage, pool_size, until_block_limit, quota_limit);
+        let tx_pool =
+            HashTransactionPool::new(storage, secp, pool_size, until_block_limit, quota_limit);
 
         let mut tx_hashes = vec![];
         for i in 0..10 {
             let untx = mock_transaction(100, height + until_block_limit, format!("test{}", i));
             tx_hashes.push(untx.transaction.hash());
-            tx_pool.insert::<Secp256k1>(untx).wait().unwrap();
+            tx_pool.insert(untx).wait().unwrap();
         }
 
         let pachage_tx_hashes = tx_pool
@@ -392,6 +405,7 @@ mod tests {
 
     #[test]
     fn test_package_transaction_quota_limit() {
+        let secp = Arc::new(Secp256k1::new());
         let pool_size = 100;
         let until_block_limit = 100;
         let quota_limit = 800;
@@ -403,13 +417,14 @@ mod tests {
         block.header.height = height;
         storage.insert_block(&block).wait().unwrap();
 
-        let tx_pool = HashTransactionPool::new(storage, pool_size, until_block_limit, quota_limit);
+        let tx_pool =
+            HashTransactionPool::new(storage, secp, pool_size, until_block_limit, quota_limit);
 
         let mut tx_hashes = vec![];
         for i in 0..10 {
             let untx = mock_transaction(100, height + until_block_limit, format!("test{}", i));
             tx_hashes.push(untx.transaction.hash());
-            tx_pool.insert::<Secp256k1>(untx).wait().unwrap();
+            tx_pool.insert(untx).wait().unwrap();
         }
 
         let pachage_tx_hashes = tx_pool
@@ -424,7 +439,8 @@ mod tests {
         valid_until_block: u64,
         nonce: String,
     ) -> UnverifiedTransaction {
-        let (privkey, _pubkey) = Secp256k1::gen_keypair();
+        let secp = Secp256k1::new();
+        let (privkey, _pubkey) = secp.gen_keypair();
         let mut tx = Transaction::default();
         tx.to = Address::from_bytes(
             hex::decode("ffffffffffffffffffffffffffffffffffffffff")
@@ -440,7 +456,7 @@ mod tests {
         tx.chain_id = vec![];
         let tx_hash = tx.hash();
 
-        let signature = Secp256k1::sign(&tx_hash, &privkey).unwrap();
+        let signature = secp.sign(&tx_hash, &privkey).unwrap();
         UnverifiedTransaction {
             transaction: tx,
             signature: signature.as_bytes().to_vec(),
@@ -452,7 +468,8 @@ mod tests {
         valid_until_block: u64,
         nonce: String,
     ) -> SignedTransaction {
-        let (privkey, pubkey) = Secp256k1::gen_keypair();
+        let secp = Secp256k1::new();
+        let (privkey, pubkey) = secp.gen_keypair();
         let mut tx = Transaction::default();
         tx.to = Address::from_bytes(
             hex::decode("ffffffffffffffffffffffffffffffffffffffff")
@@ -468,7 +485,7 @@ mod tests {
         tx.chain_id = vec![];
         let tx_hash = tx.hash();
 
-        let signature = Secp256k1::sign(&tx_hash, &privkey).unwrap();
+        let signature = secp.sign(&tx_hash, &privkey).unwrap();
         let untx = UnverifiedTransaction {
             transaction: tx,
             signature: signature.as_bytes().to_vec(),

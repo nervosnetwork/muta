@@ -1,5 +1,4 @@
 use std::error::Error;
-use std::marker::PhantomData;
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -33,13 +32,12 @@ where
     executor: Arc<E>,
     tx_pool: Arc<T>,
     storage: Arc<S>,
+    crypto: Arc<C>,
 
     // privkey: C::PrivateKey,
     address: Address,
     transaction_size: u64,
     status: Arc<RwLock<Status>>,
-
-    _phantom_data: PhantomData<C>,
 }
 
 impl<E: 'static, T: 'static, S: 'static, C: 'static> Solo<E, T, S, C>
@@ -53,10 +51,11 @@ where
         executor: Arc<E>,
         tx_pool: Arc<T>,
         storage: Arc<S>,
+        crypto: Arc<C>,
         privkey: C::PrivateKey,
         transaction_size: u64,
     ) -> Result<Self, ConsensusError> {
-        let pubkey = C::get_public_key(&privkey)?;
+        let pubkey = crypto.get_public_key(&privkey)?;
         let pubkey_hash = Hash::digest(&pubkey.as_bytes()[1..]);
         let address = Address::from_hash(&pubkey_hash);
 
@@ -72,13 +71,12 @@ where
             executor,
             tx_pool,
             storage,
+            crypto,
 
             // privkey,
             address,
             transaction_size,
             status: Arc::new(RwLock::new(status)),
-
-            _phantom_data: PhantomData::<C>,
         })
     }
 
@@ -214,12 +212,11 @@ where
             executor: Arc::clone(&self.executor),
             tx_pool: Arc::clone(&self.tx_pool),
             storage: Arc::clone(&self.storage),
+            crypto: Arc::clone(&self.crypto),
 
             address: self.address.clone(),
             transaction_size: self.transaction_size,
             status: Arc::clone(&self.status),
-
-            _phantom_data: PhantomData::<C>,
         }
     }
 }
@@ -286,7 +283,8 @@ mod tests {
 
     #[test]
     fn test_boom() {
-        let (privkey, pubkey) = Secp256k1::gen_keypair();
+        let secp = Arc::new(Secp256k1::new());
+        let (privkey, pubkey) = secp.gen_keypair();
         let pubkey_hash = Hash::digest(&pubkey.as_bytes()[1..]);
         let node_address = Address::from_hash(&pubkey_hash);
 
@@ -294,6 +292,7 @@ mod tests {
         let storage = Arc::new(BlockStorage::new(Arc::clone(&db)));
         let tx_pool = Arc::new(HashTransactionPool::new(
             Arc::clone(&storage),
+            Arc::clone(&secp),
             100 * 100,
             100,
             1000 * 1024,
@@ -315,6 +314,7 @@ mod tests {
             Arc::clone(&executor),
             Arc::clone(&tx_pool),
             Arc::clone(&storage),
+            Arc::clone(&secp),
             privkey.clone(),
             100,
         )
@@ -329,7 +329,7 @@ mod tests {
                 format!("tx{}", i),
                 &privkey,
             );
-            tx_pool.insert::<Secp256k1>(tx).wait().unwrap();
+            tx_pool.insert(tx).wait().unwrap();
         }
 
         // exec block
@@ -368,6 +368,7 @@ mod tests {
         nonce: String,
         signer: &PrivateKey,
     ) -> UnverifiedTransaction {
+        let secp = Secp256k1::new();
         let mut tx = Transaction::default();
         tx.to = Address::from_bytes(
             hex::decode("ffffffffffffffffffffffffffffffffffffffff")
@@ -383,7 +384,7 @@ mod tests {
         tx.chain_id = vec![];
         let tx_hash = tx.hash();
 
-        let signature = Secp256k1::sign(&tx_hash, signer).unwrap();
+        let signature = secp.sign(&tx_hash, signer).unwrap();
         UnverifiedTransaction {
             transaction: tx,
             signature: signature.as_bytes().to_vec(),

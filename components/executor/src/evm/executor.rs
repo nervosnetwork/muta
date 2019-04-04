@@ -477,7 +477,8 @@ mod tests {
 
     #[test]
     fn test_evm_executor_basic() {
-        let (_, pubkey) = Secp256k1::gen_keypair();
+        let secp = Secp256k1::new();
+        let (_, pubkey) = secp.gen_keypair();
         let pubkey_hash = Hash::digest(&pubkey.as_bytes()[1..]);
         let address = Address::from_hash(&pubkey_hash);
         let genesis = build_genesis(
@@ -508,7 +509,8 @@ mod tests {
 
     #[test]
     fn test_create_contract() {
-        let (_, pubkey) = Secp256k1::gen_keypair();
+        let secp = Secp256k1::new();
+        let (_, pubkey) = secp.gen_keypair();
         let pubkey_hash = Hash::digest(&pubkey.as_bytes()[1..]);
         let address = Address::from_hash(&pubkey_hash);
         let genesis = build_genesis(

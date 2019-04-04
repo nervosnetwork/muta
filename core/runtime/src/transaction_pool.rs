@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::fmt;
 
-use core_crypto::{Crypto, CryptoError};
+use core_crypto::CryptoError;
 use core_types::{Hash, SignedTransaction, UnverifiedTransaction};
 
 use crate::FutRuntimeResult;
@@ -9,7 +9,7 @@ use crate::FutRuntimeResult;
 /// ”TransactionPool“ contains all legitimate transactions sent from other nodes (P2P) or local (RPC).
 pub trait TransactionPool: Sync + Send {
     /// Insert a transaction after verifying the signature and some parameters are correct.
-    fn insert<C: Crypto>(
+    fn insert(
         &self,
         untx: UnverifiedTransaction,
     ) -> FutRuntimeResult<SignedTransaction, TransactionPoolError>;
