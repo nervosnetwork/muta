@@ -324,12 +324,15 @@ mod tests {
             height + until_block_limit,
             "test_histories_dup".to_owned(),
         );
+
+        let mut block = Block::default();
+        block.header.height = height;
+
         storage
             .insert_transactions(&[signed_tx.clone()])
             .wait()
             .unwrap();
-        let mut block = Block::default();
-        block.header.height = height;
+
         storage.insert_block(&block).wait().unwrap();
 
         let tx_pool =

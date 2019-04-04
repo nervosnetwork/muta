@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use byteorder::{ByteOrder, NativeEndian};
@@ -7,9 +8,10 @@ use futures::future::{join_all, Future};
 use core_runtime::{DataCategory, Database, FutRuntimeResult};
 use core_serialization::{
     block::Block as PbBlock, receipt::Receipt as PbReceipt,
-    transaction::SignedTransaction as PbSignedTransaction, AsyncCodec,
+    transaction::SignedTransaction as PbSignedTransaction,
+    transaction::TransactionPosition as PbTransactionPosition, AsyncCodec,
 };
-use core_types::{Block, Hash, Receipt, SignedTransaction};
+use core_types::{Block, Hash, Receipt, SignedTransaction, TransactionPosition};
 
 use crate::errors::StorageError;
 
@@ -48,6 +50,18 @@ pub trait Storage: Send + Sync {
         tx_hashes: &[&Hash],
     ) -> FutRuntimeResult<Vec<Option<Receipt>>, StorageError>;
 
+    /// Get a transaction position by hash.
+    fn get_transaction_position(
+        &self,
+        hash: &Hash,
+    ) -> FutRuntimeResult<TransactionPosition, StorageError>;
+
+    /// Get a batch of transactions by hashes.
+    fn get_transaction_positions(
+        &self,
+        hashes: &[&Hash],
+    ) -> FutRuntimeResult<Vec<Option<TransactionPosition>>, StorageError>;
+
     /// Insert a block.
     fn insert_block(&self, block: &Block) -> FutRuntimeResult<(), StorageError>;
 
@@ -55,6 +69,12 @@ pub trait Storage: Send + Sync {
     fn insert_transactions(
         &self,
         signed_txs: &[SignedTransaction],
+    ) -> FutRuntimeResult<(), StorageError>;
+
+    /// Insert a batch of transaction positions.
+    fn insert_transaction_positions(
+        &self,
+        positions: &HashMap<Hash, TransactionPosition>,
     ) -> FutRuntimeResult<(), StorageError>;
 
     /// Insert a batch of receipts.
@@ -197,7 +217,7 @@ where
         &self,
         hashes: &[&Hash],
     ) -> FutRuntimeResult<Vec<Option<Receipt>>, StorageError> {
-        let mut keys = vec![];
+        let mut keys = Vec::with_capacity(hashes.len());
         for h in hashes {
             keys.push(h.as_bytes().to_vec());
         }
@@ -230,6 +250,65 @@ where
                     })
                     .collect()
             });
+        Box::new(fut)
+    }
+
+    fn get_transaction_position(
+        &self,
+        hash: &Hash,
+    ) -> FutRuntimeResult<TransactionPosition, StorageError> {
+        let key = hash.clone();
+
+        let fut = self
+            .db
+            .get(DataCategory::TransactionPosition, key.as_bytes())
+            .map_err(StorageError::Database)
+            .and_then(|data| {
+                AsyncCodec::decode::<PbTransactionPosition>(data).map_err(StorageError::Codec)
+            })
+            .map(TransactionPosition::from);
+
+        Box::new(fut)
+    }
+
+    fn get_transaction_positions(
+        &self,
+        hashes: &[&Hash],
+    ) -> FutRuntimeResult<Vec<Option<TransactionPosition>>, StorageError> {
+        let mut keys = vec![];
+        for h in hashes {
+            keys.push(h.as_bytes().to_vec());
+        }
+
+        let fut = self
+            .db
+            .get_batch(DataCategory::TransactionPosition, &keys)
+            .map_err(StorageError::Database)
+            .and_then(move |opt_txs_data| {
+                join_all(opt_txs_data.into_iter().map(|opt_data| {
+                    if let Some(data) = opt_data {
+                        Some(
+                            AsyncCodec::decode::<PbTransactionPosition>(data.to_vec())
+                                .map_err(StorageError::Codec),
+                        )
+                    } else {
+                        None
+                    }
+                }))
+            })
+            .map(|opt_txs| {
+                opt_txs
+                    .into_iter()
+                    .map(|opt_tx| {
+                        if let Some(tx) = opt_tx {
+                            Some(TransactionPosition::from(tx))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect()
+            });
+
         Box::new(fut)
     }
 
@@ -269,9 +348,9 @@ where
         signed_txs: &[SignedTransaction],
     ) -> FutRuntimeResult<(), StorageError> {
         let db = Arc::clone(&self.db);
-        let mut keys = vec![];
+        let mut keys = Vec::with_capacity(signed_txs.len());
 
-        let mut peding_fut = vec![];
+        let mut peding_fut = Vec::with_capacity(signed_txs.len());
         for tx in signed_txs {
             let pb_tx: PbSignedTransaction = tx.clone().into();
             let mut buf = BytesMut::with_capacity(AsyncCodec::encoded_len(&pb_tx));
@@ -292,11 +371,39 @@ where
         Box::new(fut)
     }
 
+    fn insert_transaction_positions(
+        &self,
+        positions: &HashMap<Hash, TransactionPosition>,
+    ) -> FutRuntimeResult<(), StorageError> {
+        let db = Arc::clone(&self.db);
+        let mut keys = Vec::with_capacity(positions.len());
+
+        let mut peding_fut = Vec::with_capacity(positions.len());
+        for (key, position) in positions.clone().into_iter() {
+            let pb_tx: PbTransactionPosition = position.into();
+            let mut buf = BytesMut::with_capacity(AsyncCodec::encoded_len(&pb_tx));
+
+            let fut = AsyncCodec::encode(&pb_tx, &mut buf)
+                .map_err(StorageError::Codec)
+                .map(move |_| buf.to_vec());
+
+            keys.push(key.as_bytes().to_vec());
+            peding_fut.push(fut);
+        }
+
+        let fut = join_all(peding_fut).and_then(move |buf_list| {
+            db.insert_batch(DataCategory::TransactionPosition, &keys, &buf_list)
+                .map_err(StorageError::Database)
+        });
+
+        Box::new(fut)
+    }
+
     fn insert_receipts(&self, receipts: &[Receipt]) -> FutRuntimeResult<(), StorageError> {
         let db = Arc::clone(&self.db);
-        let mut keys = vec![];
+        let mut keys = Vec::with_capacity(receipts.len());
 
-        let mut peding_fut = vec![];
+        let mut peding_fut = Vec::with_capacity(receipts.len());
         for receipt in receipts {
             let pb_receipt: PbReceipt = receipt.clone().into();
             let mut buf = BytesMut::with_capacity(AsyncCodec::encoded_len(&pb_receipt));
@@ -337,6 +444,7 @@ fn transfrom_u64_to_array_u8(n: u64) -> Vec<u8> {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
     use std::sync::Arc;
 
     use futures::future::Future;
@@ -344,7 +452,9 @@ mod tests {
     use super::{BlockStorage, Storage};
 
     use components_database::memory::MemoryDB;
-    use core_types::{Block, Hash, Receipt, SignedTransaction, UnverifiedTransaction};
+    use core_types::{
+        Block, Hash, Receipt, SignedTransaction, TransactionPosition, UnverifiedTransaction,
+    };
 
     #[test]
     fn test_get_latest_block_should_return_ok() {
@@ -412,8 +522,53 @@ mod tests {
             .map(|opt_tx| opt_tx.unwrap().hash)
             .collect();
 
-        assert_eq!(hashes.contains(&tx_hash1), true);
-        assert_eq!(hashes.contains(&tx_hash2), true);
+        assert!(hashes.contains(&tx_hash1));
+        assert!(hashes.contains(&tx_hash2));
+    }
+
+    #[test]
+    fn test_transaction_position_should_return_ok() {
+        let db = Arc::new(MemoryDB::new());
+        let storage = BlockStorage::new(db);
+        let tx_position = mock_transaction_position(Hash::default(), 0);
+
+        let hash = Hash::digest(b"test");
+        let mut positions = HashMap::new();
+        positions.insert(hash.clone(), tx_position.clone());
+        storage
+            .insert_transaction_positions(&positions)
+            .wait()
+            .unwrap();
+        let new_tx_position = storage.get_transaction_position(&hash).wait().unwrap();
+
+        assert_eq!(new_tx_position, tx_position)
+    }
+
+    #[test]
+    fn test_get_transaction_positions_should_return_ok() {
+        let db = Arc::new(MemoryDB::new());
+        let storage = BlockStorage::new(db);
+        let tx_position1 = mock_transaction_position(Hash::default(), 0);
+        let tx_position2 = mock_transaction_position(Hash::default(), 1);
+
+        let hash1 = Hash::digest(b"test");
+        let hash2 = Hash::digest(b"test2");
+
+        let mut positions = HashMap::new();
+        positions.insert(hash1.clone(), tx_position1.clone());
+        positions.insert(hash2.clone(), tx_position2.clone());
+        storage
+            .insert_transaction_positions(&positions)
+            .wait()
+            .unwrap();
+        let tx_positions = storage
+            .get_transaction_positions(&[&hash1, &hash2])
+            .wait()
+            .unwrap();
+        assert_eq!(tx_positions.len(), 2);
+
+        assert!(tx_positions.contains(&Some(tx_position1)));
+        assert!(tx_positions.contains(&Some(tx_position2)));
     }
 
     #[test]
@@ -452,8 +607,8 @@ mod tests {
             .map(|opt_receipt| opt_receipt.unwrap().transaction_hash)
             .collect();
 
-        assert_eq!(hashes.contains(&tx_hash1), true);
-        assert_eq!(hashes.contains(&tx_hash2), true);
+        assert!(hashes.contains(&tx_hash1));
+        assert!(hashes.contains(&tx_hash2));
     }
 
     #[test]
@@ -508,5 +663,12 @@ mod tests {
         let mut receipt = Receipt::default();
         receipt.transaction_hash = tx_hash;
         receipt
+    }
+
+    fn mock_transaction_position(block_hash: Hash, position: u32) -> TransactionPosition {
+        TransactionPosition {
+            block_hash,
+            position,
+        }
     }
 }
