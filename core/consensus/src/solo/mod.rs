@@ -320,7 +320,7 @@ mod tests {
 
         let genesis = build_genesis(&node_address, &block);
         let (executor, state_root) =
-            EVMExecutor::from_genesis(&genesis, trie_db, Box::new(block_provider)).unwrap();
+            EVMExecutor::from_genesis(&genesis, trie_db, Arc::new(block_provider)).unwrap();
         block.header.state_root = state_root.clone();
         let height = block.header.height;
         let transactions_root = block.header.transactions_root.clone();

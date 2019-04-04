@@ -18,7 +18,7 @@ use core_types::{
 };
 
 pub struct EVMExecutor<DB> {
-    block_provider: Arc<Box<BlockDataProvider>>,
+    block_provider: Arc<BlockDataProvider>,
 
     db: DB,
 }
@@ -30,7 +30,7 @@ where
     pub fn from_genesis(
         genesis: &Genesis,
         db: DB,
-        block_provider: Box<BlockDataProvider>,
+        block_provider: Arc<BlockDataProvider>,
     ) -> Result<(Self, Hash), ExecutorError> {
         let mut state = State::new(db.clone())?;
 
@@ -65,28 +65,20 @@ where
 
         let root_hash = Hash::from_bytes(state.root.as_ref())?;
 
-        let evm_executor = EVMExecutor {
-            block_provider: Arc::new(block_provider),
-
-            db,
-        };
+        let evm_executor = EVMExecutor { block_provider, db };
 
         Ok((evm_executor, root_hash))
     }
 
     pub fn from_existing(
         db: DB,
-        block_provider: Box<BlockDataProvider>,
+        block_provider: Arc<BlockDataProvider>,
         root: &Hash,
     ) -> Result<Self, ExecutorError> {
         let state_root = H256(root.clone().into_fixed_bytes());
         // Check if state root exists
         State::from_existing(db.clone(), state_root)?;
-        Ok(EVMExecutor {
-            block_provider: Arc::new(block_provider),
-
-            db,
-        })
+        Ok(EVMExecutor { block_provider, db })
     }
 }
 
@@ -251,7 +243,7 @@ where
     DB: TrieDB,
 {
     fn evm_exec(
-        block_provider: Arc<Box<BlockDataProvider>>,
+        block_provider: Arc<BlockDataProvider>,
         state: Arc<RefCell<State<DB>>>,
         evm_context: &EVMContext,
         evm_config: &EVMConfig,
@@ -441,6 +433,7 @@ fn map_from_str(err: String) -> ExecutorError {
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
+    use std::sync::Arc;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use cita_trie::db::MemoryDB;
@@ -490,8 +483,8 @@ mod tests {
 
         let (executor, state_root) = EVMExecutor::from_genesis(
             &genesis,
-            MemoryDB::new(),
-            Box::new(BlockDataProviderMock::default()),
+            MemoryDB::new(false),
+            Arc::new(BlockDataProviderMock::default()),
         )
         .unwrap();
 
@@ -522,8 +515,8 @@ mod tests {
 
         let (executor, state_root) = EVMExecutor::from_genesis(
             &genesis,
-            MemoryDB::new(),
-            Box::new(BlockDataProviderMock::default()),
+            MemoryDB::new(false),
+            Arc::new(BlockDataProviderMock::default()),
         )
         .unwrap();
 

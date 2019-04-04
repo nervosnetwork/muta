@@ -10,18 +10,18 @@ tentacle-discovery = "0.1.0"
 tentacle-identify = "0.1.0"
 tentacle-ping = "0.2.0"
 generic-channel = { version = "0.2.0", features = [ "futures" ] }
-env_logger = "0.6.1"
-log = "0.4.6"
-futures = "0.1.25"
-parking_lot = "0.7.1"
-bytes = "0.4.12"
-prost = { version = "0.5.0", optional = true }
-rand = "0.6.5"
+env_logger = "0.6"
+log = "0.4"
+futures = "0.1"
+parking_lot = "0.7"
+bytes = "0.4"
+prost = { version = "0.5", optional = true }
+rand = "0.6"
 
 # Unfortunately, dev-dependencies cannot be optional.
 [dev-dependencies]
 prost-derive = "0.5"
-tokio = "0.1.16"
+tokio = "0.1"
 
 [features]
 default = []

@@ -108,7 +108,7 @@ fn start(cfg: &Config) {
     let executor = Arc::new(
         EVMExecutor::from_existing(
             trie_db,
-            Box::new(EVMBlockDataProvider::new(Arc::clone(&storage))),
+            Arc::new(EVMBlockDataProvider::new(Arc::clone(&storage))),
             &block.header.state_root,
         )
         .unwrap(),
@@ -185,7 +185,7 @@ fn handle_init(cfg: &Config, genesis_path: impl AsRef<Path>) -> Result<(), Box<d
     let (_, state_root_hash) = EVMExecutor::from_genesis(
         &genesis,
         state_db,
-        Box::new(EVMBlockDataProvider::new(Arc::clone(&block_db))),
+        Arc::new(EVMBlockDataProvider::new(Arc::clone(&block_db))),
     )?;
     log::info!("State root hash: {:?}", state_root_hash);
 

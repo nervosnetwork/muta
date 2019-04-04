@@ -9,9 +9,7 @@ license = "Apache-2.0"
 core-types = { path = "../types" }
 core-crypto = { path = "../crypto" }
 
-failure = "0.1.3"
-futures = "0.1.17"
-bytes = "0.4.11"
-
-# cita-vm = { path = "../../../cita-vm" }
-cita-vm = { git = "https://github.com/mohanson/cita-vm.git", branch = "apirefine" }
+failure = "0.1"
+futures = "0.1"
+bytes = "0.4"
+cita-vm = "0.1"
