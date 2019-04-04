@@ -109,10 +109,11 @@ where
                 }
             })
             .and_then(move |block| {
+                let tx_hashes = block.tx_hashes.clone();
                 ok(block.header.clone()).join4(
                     self_instant3.status.write().map_err(map_err_rwlock),
-                    storage.insert_block(&block).map_err(ConsensusError::Storage),
-                    tx_pool2.flush(&block.tx_hashes).map_err(ConsensusError::TransactionPool),
+                    storage.insert_block(block).map_err(ConsensusError::Storage),
+                    tx_pool2.flush(&tx_hashes).map_err(ConsensusError::TransactionPool),
                 )
             })
             .and_then(|(header, mut status, _, _)| {
@@ -201,9 +202,9 @@ where
 
                 ok(block)
                     .join4(
-                        storage.insert_transactions(&signed_txs),
-                        storage.insert_transaction_positions(&positions),
-                        storage.insert_receipts(&execution_result.receipts),
+                        storage.insert_transactions(signed_txs),
+                        storage.insert_transaction_positions(positions),
+                        storage.insert_receipts(execution_result.receipts),
                     )
                     .map_err(ConsensusError::Storage)
             })
@@ -321,7 +322,11 @@ mod tests {
         let (executor, state_root) =
             EVMExecutor::from_genesis(&genesis, trie_db, Box::new(block_provider)).unwrap();
         block.header.state_root = state_root.clone();
-        storage.insert_block(&block).wait().unwrap();
+        let height = block.header.height;
+        let transactions_root = block.header.transactions_root.clone();
+        let receipts_root = block.header.receipts_root.clone();
+
+        storage.insert_block(block).wait().unwrap();
         let executor = Arc::new(executor);
         let solo: Solo<_, _, _, Secp256k1> = Solo::new(
             Arc::clone(&executor),
@@ -350,13 +355,10 @@ mod tests {
 
         let block2 = storage.get_latest_block().wait().unwrap();
         assert_eq!(block2.tx_hashes.len(), tx_count);
-        assert_eq!(block2.header.height, block.header.height + 1);
-        assert_ne!(block.header.state_root, block2.header.state_root);
-        assert_ne!(
-            block.header.transactions_root,
-            block2.header.transactions_root
-        );
-        assert_ne!(block.header.receipts_root, block2.header.receipts_root);
+        assert_eq!(block2.header.height, height + 1);
+        assert_ne!(state_root, block2.header.state_root);
+        assert_ne!(transactions_root, block2.header.transactions_root);
+        assert_ne!(receipts_root, block2.header.receipts_root);
     }
 
     fn build_genesis(address: &Address, block: &Block) -> Genesis {

@@ -63,22 +63,22 @@ pub trait Storage: Send + Sync {
     ) -> FutRuntimeResult<Vec<Option<TransactionPosition>>, StorageError>;
 
     /// Insert a block.
-    fn insert_block(&self, block: &Block) -> FutRuntimeResult<(), StorageError>;
+    fn insert_block(&self, block: Block) -> FutRuntimeResult<(), StorageError>;
 
     /// Insert a batch of transactions.
     fn insert_transactions(
         &self,
-        signed_txs: &[SignedTransaction],
+        signed_txs: Vec<SignedTransaction>,
     ) -> FutRuntimeResult<(), StorageError>;
 
     /// Insert a batch of transaction positions.
     fn insert_transaction_positions(
         &self,
-        positions: &HashMap<Hash, TransactionPosition>,
+        positions: HashMap<Hash, TransactionPosition>,
     ) -> FutRuntimeResult<(), StorageError>;
 
     /// Insert a batch of receipts.
-    fn insert_receipts(&self, receipts: &[Receipt]) -> FutRuntimeResult<(), StorageError>;
+    fn insert_receipts(&self, receipts: Vec<Receipt>) -> FutRuntimeResult<(), StorageError>;
 }
 
 pub struct BlockStorage<DB>
@@ -312,15 +312,15 @@ where
         Box::new(fut)
     }
 
-    fn insert_block(&self, block: &Block) -> FutRuntimeResult<(), StorageError> {
+    fn insert_block(&self, block: Block) -> FutRuntimeResult<(), StorageError> {
         let db = Arc::clone(&self.db);
-
-        let pb_block: PbBlock = block.clone().into();
-        let mut encoded_buf = BytesMut::with_capacity(AsyncCodec::encoded_len(&pb_block));
 
         let height = block.header.height;
         let height_key = transfrom_u64_to_array_u8(block.header.height);
         let hash_key = block.header.hash();
+
+        let pb_block: PbBlock = block.into();
+        let mut encoded_buf = BytesMut::with_capacity(AsyncCodec::encoded_len(&pb_block));
 
         let fut = AsyncCodec::encode(&pb_block, &mut encoded_buf)
             .map_err(StorageError::Codec)
@@ -345,21 +345,22 @@ where
 
     fn insert_transactions(
         &self,
-        signed_txs: &[SignedTransaction],
+        signed_txs: Vec<SignedTransaction>,
     ) -> FutRuntimeResult<(), StorageError> {
         let db = Arc::clone(&self.db);
         let mut keys = Vec::with_capacity(signed_txs.len());
 
         let mut peding_fut = Vec::with_capacity(signed_txs.len());
         for tx in signed_txs {
-            let pb_tx: PbSignedTransaction = tx.clone().into();
+            let hash = tx.hash.clone();
+            let pb_tx: PbSignedTransaction = tx.into();
             let mut buf = BytesMut::with_capacity(AsyncCodec::encoded_len(&pb_tx));
 
             let fut = AsyncCodec::encode(&pb_tx, &mut buf)
                 .map_err(StorageError::Codec)
                 .map(move |_| buf.to_vec());
 
-            keys.push(tx.hash.as_bytes().to_vec());
+            keys.push(hash.as_bytes().to_vec());
             peding_fut.push(fut);
         }
 
@@ -373,13 +374,13 @@ where
 
     fn insert_transaction_positions(
         &self,
-        positions: &HashMap<Hash, TransactionPosition>,
+        positions: HashMap<Hash, TransactionPosition>,
     ) -> FutRuntimeResult<(), StorageError> {
         let db = Arc::clone(&self.db);
         let mut keys = Vec::with_capacity(positions.len());
 
         let mut peding_fut = Vec::with_capacity(positions.len());
-        for (key, position) in positions.clone().into_iter() {
+        for (key, position) in positions.into_iter() {
             let pb_tx: PbTransactionPosition = position.into();
             let mut buf = BytesMut::with_capacity(AsyncCodec::encoded_len(&pb_tx));
 
@@ -399,20 +400,21 @@ where
         Box::new(fut)
     }
 
-    fn insert_receipts(&self, receipts: &[Receipt]) -> FutRuntimeResult<(), StorageError> {
+    fn insert_receipts(&self, receipts: Vec<Receipt>) -> FutRuntimeResult<(), StorageError> {
         let db = Arc::clone(&self.db);
         let mut keys = Vec::with_capacity(receipts.len());
 
         let mut peding_fut = Vec::with_capacity(receipts.len());
         for receipt in receipts {
-            let pb_receipt: PbReceipt = receipt.clone().into();
+            let hash = receipt.transaction_hash.clone();
+            let pb_receipt: PbReceipt = receipt.into();
             let mut buf = BytesMut::with_capacity(AsyncCodec::encoded_len(&pb_receipt));
 
             let fut = AsyncCodec::encode(&pb_receipt, &mut buf)
                 .map_err(StorageError::Codec)
                 .map(move |_| buf.to_vec());
 
-            keys.push(receipt.transaction_hash.as_bytes().to_vec());
+            keys.push(hash.as_bytes().to_vec());
             peding_fut.push(fut);
         }
 
@@ -460,7 +462,7 @@ mod tests {
     fn test_get_latest_block_should_return_ok() {
         let db = Arc::new(MemoryDB::new());
         let storage = BlockStorage::new(db);
-        storage.insert_block(&mock_block(1000)).wait().unwrap();
+        storage.insert_block(mock_block(1000)).wait().unwrap();
         let block = storage.get_latest_block().wait().unwrap();
 
         assert_eq!(block.header.height, 1000)
@@ -470,7 +472,7 @@ mod tests {
     fn test_get_block_by_height_should_return_ok() {
         let db = Arc::new(MemoryDB::new());
         let storage = BlockStorage::new(db);
-        storage.insert_block(&mock_block(1000)).wait().unwrap();
+        storage.insert_block(mock_block(1000)).wait().unwrap();
         let block = storage.get_block_by_height(1000).wait().unwrap();
 
         assert_eq!(block.header.height, 1000)
@@ -482,9 +484,10 @@ mod tests {
         let storage = BlockStorage::new(db);
 
         let b = mock_block(1000);
-        storage.insert_block(&b).wait().unwrap();
+        let hash = b.header.hash().clone();
+        storage.insert_block(b).wait().unwrap();
 
-        let b = storage.get_block_by_hash(&b.header.hash()).wait().unwrap();
+        let b = storage.get_block_by_hash(&hash).wait().unwrap();
         assert_eq!(b.header.height, 1000)
     }
 
@@ -495,7 +498,7 @@ mod tests {
         let tx = mock_transaction(Hash::digest(b"test111"));
 
         let hash = tx.hash.clone();
-        storage.insert_transactions(&[tx]).wait().unwrap();
+        storage.insert_transactions(vec![tx]).wait().unwrap();
         let new_tx = storage.get_transaction(&hash).wait().unwrap();
 
         assert_eq!(new_tx.hash, hash)
@@ -510,7 +513,7 @@ mod tests {
 
         let tx_hash1 = tx1.hash.clone();
         let tx_hash2 = tx2.hash.clone();
-        storage.insert_transactions(&[tx1, tx2]).wait().unwrap();
+        storage.insert_transactions(vec![tx1, tx2]).wait().unwrap();
         let transactions = storage
             .get_transactions(&[&tx_hash1, &tx_hash2])
             .wait()
@@ -536,7 +539,7 @@ mod tests {
         let mut positions = HashMap::new();
         positions.insert(hash.clone(), tx_position.clone());
         storage
-            .insert_transaction_positions(&positions)
+            .insert_transaction_positions(positions)
             .wait()
             .unwrap();
         let new_tx_position = storage.get_transaction_position(&hash).wait().unwrap();
@@ -558,7 +561,7 @@ mod tests {
         positions.insert(hash1.clone(), tx_position1.clone());
         positions.insert(hash2.clone(), tx_position2.clone());
         storage
-            .insert_transaction_positions(&positions)
+            .insert_transaction_positions(positions)
             .wait()
             .unwrap();
         let tx_positions = storage
@@ -578,7 +581,7 @@ mod tests {
         let receipt = mock_receipt(Hash::digest(b"test111"));
         let tx_hash = receipt.transaction_hash.clone();
 
-        storage.insert_receipts(&[receipt]).wait().unwrap();
+        storage.insert_receipts(vec![receipt]).wait().unwrap();
         let receipt = storage.get_receipt(&tx_hash).wait().unwrap();
         assert_eq!(receipt.transaction_hash, tx_hash);
     }
@@ -593,7 +596,7 @@ mod tests {
         let tx_hash1 = receipt1.transaction_hash.clone();
         let tx_hash2 = receipt2.transaction_hash.clone();
         storage
-            .insert_receipts(&[receipt1, receipt2])
+            .insert_receipts(vec![receipt1, receipt2])
             .wait()
             .unwrap();
         let transactions = storage
@@ -617,29 +620,31 @@ mod tests {
         let storage = BlockStorage::new(db);
 
         let block = mock_block(1000);
-        storage.insert_block(&block).wait().unwrap();
+        let height = block.header.height;
+        let hash = block.header.hash().clone();
+        storage.insert_block(block).wait().unwrap();
         assert_eq!(
             storage.get_latest_block().wait().unwrap().header.height,
-            block.header.height
+            height
         );
         assert_eq!(
             storage
-                .get_block_by_height(block.header.height)
+                .get_block_by_height(height)
                 .wait()
                 .unwrap()
                 .header
                 .height,
-            block.header.height
+            height
         );
 
         assert_eq!(
             storage
-                .get_block_by_hash(&block.header.hash())
+                .get_block_by_hash(&hash)
                 .wait()
                 .unwrap()
                 .header
                 .height,
-            block.header.height
+            height
         );
     }
 

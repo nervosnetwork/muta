@@ -196,7 +196,7 @@ fn handle_init(cfg: &Config, genesis_path: impl AsRef<Path>) -> Result<(), Box<d
     block_header.quota_limit = cfg.quota_limit;
     let mut block = Block::default();
     block.header = block_header;
-    block_db.insert_block(&block).wait()?;
+    block_db.insert_block(block).wait()?;
 
     Ok(())
 }
