@@ -1,8 +1,12 @@
+#![feature(async_await, await_macro, futures_api)]
+
 use std::collections::HashMap;
+use std::string::ToString;
 use std::sync::Arc;
 
 use futures::future::{err, ok, Future};
 use futures_locks::RwLock;
+use tokio_async_await::compat::{backward::Compat, forward::IntoAwaitable};
 
 use core_crypto::{Crypto, CryptoTransform};
 use core_runtime::{FutRuntimeResult, TransactionPool, TransactionPoolError};
@@ -43,7 +47,7 @@ where
     }
 }
 
-impl<S: 'static, C> TransactionPool for HashTransactionPool<S, C>
+impl<S: 'static, C: 'static> TransactionPool for HashTransactionPool<S, C>
 where
     S: Storage,
     C: Crypto,
@@ -52,75 +56,77 @@ where
         &self,
         untx: UnverifiedTransaction,
     ) -> FutRuntimeResult<SignedTransaction, TransactionPoolError> {
-        let tx_hash = untx.transaction.hash();
+        let storage = Arc::clone(&self.storage);
+        let crypto = Arc::clone(&self.crypto);
+        let tx_cache = Arc::clone(&self.tx_cache);
+
         let pool_size = self.pool_size;
         let until_block_limit = self.until_block_limit;
         let quota_limit = self.quota_limit;
 
-        let signature = match C::Signature::from_bytes(&untx.signature) {
-            Ok(signatue) => signatue,
-            Err(e) => return Box::new(err(TransactionPoolError::Crypto(e))),
-        };
+        let fut = async move {
+            let tx_hash = untx.transaction.hash();
 
-        // 1. verify signature
-        let sender = match self.crypto.verify_with_signature(&tx_hash, &signature) {
-            Ok(pubkey) => {
+            // 1. verify signature
+            let signature =
+                C::Signature::from_bytes(&untx.signature).map_err(TransactionPoolError::Crypto)?;
+
+            // recover sender
+            let pubkey = crypto
+                .verify_with_signature(&tx_hash, &signature)
+                .map_err(TransactionPoolError::Crypto)?;
+
+            let sender = {
                 let hash = Hash::digest(&pubkey.as_bytes()[1..]);
                 Address::from_hash(&hash)
-            }
-            Err(e) => return Box::new(err(TransactionPoolError::Crypto(e))),
-        };
+            };
 
-        // 2. check if the transaction is in histories block.
-        match self.storage.get_transaction(&tx_hash).wait() {
-            Ok(_) => return Box::new(err(TransactionPoolError::Dup)),
-            Err(e) => {
-                if !StorageError::is_database_not_found(e.clone()) {
-                    return Box::new(err(TransactionPoolError::Internal(e.to_string())));
+            // 2. check if the transaction is in histories block.
+            match await!(storage.get_transaction(&tx_hash).into_awaitable()) {
+                Ok(_) => Err(TransactionPoolError::Dup)?,
+                Err(e) => {
+                    if !StorageError::is_database_not_found(e.clone()) {
+                        Err(internal_error(e))?;
+                    }
                 }
             }
+
+            let mut tx_cache_w =
+                await!(tx_cache.write().into_awaitable()).map_err(map_rwlock_err)?;
+
+            // 3. verify params
+            let latest_block =
+                await!(storage.get_latest_block().into_awaitable()).map_err(internal_error)?;
+
+            verify_transaction(
+                latest_block.header.height,
+                &untx.transaction,
+                until_block_limit,
+                quota_limit,
+            )?;
+
+            // 4. check size
+            if tx_cache_w.len() >= pool_size {
+                Err(TransactionPoolError::ReachLimit)?
+            }
+
+            // 5. check cache dup
+            if tx_cache_w.contains_key(&tx_hash) {
+                Err(TransactionPoolError::Dup)?
+            }
+
+            // 6. do insert
+            let signed_tx = SignedTransaction {
+                untx,
+                sender,
+                hash: tx_hash.clone(),
+            };
+
+            tx_cache_w.insert(tx_hash, signed_tx.clone());
+            Ok(signed_tx)
         };
 
-        let fut = self
-            .storage
-            .get_latest_block()
-            .map_err(|e| TransactionPoolError::Internal(e.to_string()))
-            .join(self.tx_cache.write().map_err(map_rwlock_err))
-            .and_then(move |(block, mut tx_cache)| {
-                // 3. verify params
-                if let Err(e) = verify_transaction(
-                    block.header.height,
-                    &untx.transaction,
-                    until_block_limit,
-                    quota_limit,
-                ) {
-                    return err(e);
-                }
-
-                // 4. check size
-                if tx_cache.len() >= pool_size {
-                    return err(TransactionPoolError::ReachLimit);
-                }
-
-                // 5. check cache dup
-                if tx_cache.contains_key(&tx_hash) {
-                    return err(TransactionPoolError::Dup);
-                }
-
-                let signed_tx = SignedTransaction {
-                    untx,
-                    sender,
-                    hash: tx_hash.clone(),
-                };
-
-                let cloned_signed = signed_tx.clone();
-                // 6. insert to cache
-                tx_cache.insert(tx_hash.clone(), signed_tx);
-                ok(cloned_signed)
-                // TODO：7. broadcast the transaction, but event modules are not ready.
-            });
-
-        Box::new(fut)
+        Box::new(Compat::new(fut))
     }
 
     fn package(
@@ -128,52 +134,55 @@ where
         count: u64,
         quota_limit: u64,
     ) -> FutRuntimeResult<Vec<Hash>, TransactionPoolError> {
+        let storage = Arc::clone(&self.storage);
+        let tx_cache = Arc::clone(&self.tx_cache);
         let until_block_limit = self.until_block_limit;
 
-        let fut = self
-            .storage
-            .get_latest_block()
-            .map_err(|e| TransactionPoolError::Internal(e.to_string()))
-            .join(self.tx_cache.write().map_err(map_rwlock_err))
-            .and_then(move |(block, mut tx_cache)| {
-                let mut invalid_hashes = vec![];
-                let mut valid_hashes = vec![];
-                let mut quota_count = 0;
+        let fut = async move {
+            let latest_block =
+                await!(storage.get_latest_block().into_awaitable()).map_err(internal_error)?;
 
-                for (tx_hash, signed_tx) in tx_cache.iter_mut() {
-                    let valid_until_block = signed_tx.untx.transaction.valid_until_block;
-                    let quota = signed_tx.untx.transaction.quota;
+            let mut invalid_hashes = vec![];
+            let mut valid_hashes = vec![];
+            let mut quota_count: u64 = 0;
 
-                    if valid_hashes.len() >= count as usize {
-                        break;
-                    }
+            let mut tx_cache_w =
+                await!(tx_cache.write().into_awaitable()).map_err(map_rwlock_err)?;
 
-                    // The transaction has timed out？
-                    if !verify_until_block(
-                        valid_until_block,
-                        block.header.height,
-                        until_block_limit,
-                    ) {
-                        invalid_hashes.push(tx_hash.clone());
-                        continue;
-                    }
+            for (tx_hash, signed_tx) in tx_cache_w.iter_mut() {
+                let valid_until_block = signed_tx.untx.transaction.valid_until_block;
+                let quota = signed_tx.untx.transaction.quota;
 
-                    if quota_count + quota > quota_limit {
-                        break;
-                    }
-
-                    quota_count += quota;
-                    valid_hashes.push(tx_hash.clone());
+                if valid_hashes.len() >= count as usize {
+                    break;
                 }
 
-                for h in invalid_hashes {
-                    tx_cache.remove(&h);
+                // The transaction has timed out？
+                if !verify_until_block(
+                    valid_until_block,
+                    latest_block.header.height,
+                    until_block_limit,
+                ) {
+                    invalid_hashes.push(tx_hash.clone());
+                    continue;
                 }
 
-                ok(valid_hashes)
-            });
+                if quota_count + quota > quota_limit {
+                    break;
+                }
 
-        Box::new(fut)
+                quota_count += quota;
+                valid_hashes.push(tx_hash.clone());
+            }
+
+            for h in invalid_hashes {
+                tx_cache_w.remove(&h);
+            }
+
+            Ok(valid_hashes)
+        };
+
+        Box::new(Compat::new(fut))
     }
 
     fn flush(&self, tx_hashes: &[Hash]) -> FutRuntimeResult<(), TransactionPoolError> {
@@ -239,6 +248,10 @@ fn verify_until_block(valid_until_block: u64, current_height: u64, limit_until_b
 
 fn map_rwlock_err(_: ()) -> TransactionPoolError {
     TransactionPoolError::Internal("rwlock error".to_string())
+}
+
+fn internal_error(e: impl ToString) -> TransactionPoolError {
+    TransactionPoolError::Internal(e.to_string())
 }
 
 #[cfg(test)]

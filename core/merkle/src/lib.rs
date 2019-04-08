@@ -6,7 +6,7 @@ pub struct Merkle;
 
 impl Merkle {
     pub fn receipts_root(receipts: &[Receipt]) -> Option<Hash> {
-        let hahses: Vec<Hash> = receipts.iter().map(|receipt| receipt.hash()).collect();
+        let hahses: Vec<Hash> = receipts.iter().map(Receipt::hash).collect();
         Self::hashes_root(&hahses)
     }
 

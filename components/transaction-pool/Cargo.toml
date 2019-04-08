@@ -13,6 +13,7 @@ core-storage = { path = "../../core/storage" }
 failure = "0.1"
 futures = "0.1"
 futures-locks = "0.3"
+tokio-async-await = { version = "0.1", features = [ "async-await-preview" ] }
 
 [dev-dependencies]
 components-database = { path = "../database" }
