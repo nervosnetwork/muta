@@ -9,8 +9,7 @@ pub(crate) struct PackedMessage {
 }
 
 pub mod packed_message {
-    use core_serialization::block::Block;
-    use core_serialization::transaction::SignedTransaction;
+    use core_serialization::{Block, SignedTransaction};
 
     use prost::Oneof;
 

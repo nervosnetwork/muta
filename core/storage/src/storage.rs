@@ -7,9 +7,8 @@ use futures::future::{err, join_all, ok, Future};
 
 use core_runtime::{DataCategory, Database, DatabaseError};
 use core_serialization::{
-    block::Block as PbBlock, receipt::Receipt as PbReceipt,
-    transaction::SignedTransaction as PbSignedTransaction,
-    transaction::TransactionPosition as PbTransactionPosition, AsyncCodec,
+    AsyncCodec, Block as SerBlock, Receipt as SerReceipt,
+    SignedTransaction as SerSignedTransaction, TransactionPosition as SerTransactionPosition,
 };
 use core_types::{Block, Hash, Receipt, SignedTransaction, TransactionPosition};
 
@@ -93,7 +92,7 @@ where
         let decode = |d| -> Box<dyn Future<Item = _, Error = _> + Send> {
             match d {
                 Some(data) => {
-                    Box::new(AsyncCodec::decode::<PbBlock>(data).map_err(StorageError::Codec))
+                    Box::new(AsyncCodec::decode::<SerBlock>(data).map_err(StorageError::Codec))
                 }
                 None => Box::new(err(StorageError::Database(DatabaseError::NotFound))),
             }
@@ -104,7 +103,7 @@ where
             .get(DataCategory::Block, LATEST_BLOCK)
             .map_err(StorageError::Database)
             .and_then(decode)
-            .map(Block::from);
+            .map(SerBlock::into);
 
         Box::new(fut)
     }
@@ -117,9 +116,9 @@ where
             .get(DataCategory::Block, &key)
             .map_err(StorageError::Database)
             .and_then(|data| {
-                data.map(|v| AsyncCodec::decode::<PbBlock>(v).map_err(StorageError::Codec))
+                data.map(|v| AsyncCodec::decode::<SerBlock>(v).map_err(StorageError::Codec))
             })
-            .map(|b| b.map(Block::from));;
+            .map(|b| b.map(SerBlock::into));;
 
         Box::new(fut)
     }
@@ -146,9 +145,9 @@ where
             .map_err(StorageError::Database)
             .and_then(get_block)
             .and_then(|data| {
-                data.map(|value| AsyncCodec::decode::<PbBlock>(value).map_err(StorageError::Codec))
+                data.map(|value| AsyncCodec::decode::<SerBlock>(value).map_err(StorageError::Codec))
             })
-            .map(|b| b.map(Block::from));
+            .map(|b| b.map(SerBlock::into));
 
         Box::new(fut)
     }
@@ -162,10 +161,10 @@ where
             .map_err(StorageError::Database)
             .and_then(|data| {
                 data.map(|v| {
-                    AsyncCodec::decode::<PbSignedTransaction>(v).map_err(StorageError::Codec)
+                    AsyncCodec::decode::<SerSignedTransaction>(v).map_err(StorageError::Codec)
                 })
             })
-            .map(|b| b.map(SignedTransaction::from));
+            .map(|b| b.map(SerSignedTransaction::into));
 
         Box::new(fut)
     }
@@ -183,7 +182,7 @@ where
             .and_then(move |opt_txs_data| {
                 join_all(opt_txs_data.into_iter().map(|opt_data| {
                     opt_data.map(|v| {
-                        AsyncCodec::decode::<PbSignedTransaction>(v.to_vec())
+                        AsyncCodec::decode::<SerSignedTransaction>(v.to_vec())
                             .map_err(StorageError::Codec)
                     })
                 }))
@@ -193,7 +192,7 @@ where
                     .into_iter()
                     .map(|opt_tx| {
                         if let Some(tx) = opt_tx {
-                            Some(SignedTransaction::from(tx))
+                            Some(tx.into())
                         } else {
                             None
                         }
@@ -212,9 +211,9 @@ where
             .get(DataCategory::Receipt, key.as_bytes())
             .map_err(StorageError::Database)
             .and_then(|data| {
-                data.map(|v| AsyncCodec::decode::<PbReceipt>(v).map_err(StorageError::Codec))
+                data.map(|v| AsyncCodec::decode::<SerReceipt>(v).map_err(StorageError::Codec))
             })
-            .map(|b| b.map(Receipt::from));
+            .map(|b| b.map(SerReceipt::into));
 
         Box::new(fut)
     }
@@ -232,7 +231,7 @@ where
             .and_then(|opt_receipts_data| {
                 join_all(opt_receipts_data.into_iter().map(|opt_data| {
                     opt_data.map(|v| {
-                        AsyncCodec::decode::<PbReceipt>(v.to_vec()).map_err(StorageError::Codec)
+                        AsyncCodec::decode::<SerReceipt>(v.to_vec()).map_err(StorageError::Codec)
                     })
                 }))
             })
@@ -241,7 +240,7 @@ where
                     .into_iter()
                     .map(|opt_tx| {
                         if let Some(tx) = opt_tx {
-                            Some(Receipt::from(tx))
+                            Some(tx.into())
                         } else {
                             None
                         }
@@ -260,10 +259,10 @@ where
             .map_err(StorageError::Database)
             .and_then(|data| {
                 data.map(|v| {
-                    AsyncCodec::decode::<PbTransactionPosition>(v).map_err(StorageError::Codec)
+                    AsyncCodec::decode::<SerTransactionPosition>(v).map_err(StorageError::Codec)
                 })
             })
-            .map(|b| b.map(TransactionPosition::from));
+            .map(|b| b.map(SerTransactionPosition::into));
 
         Box::new(fut)
     }
@@ -286,7 +285,7 @@ where
                 join_all(opt_txs_data.into_iter().map(|opt_data| {
                     if let Some(data) = opt_data {
                         Some(
-                            AsyncCodec::decode::<PbTransactionPosition>(data.to_vec())
+                            AsyncCodec::decode::<SerTransactionPosition>(data.to_vec())
                                 .map_err(StorageError::Codec),
                         )
                     } else {
@@ -299,7 +298,7 @@ where
                     .into_iter()
                     .map(|opt_tx| {
                         if let Some(tx) = opt_tx {
-                            Some(TransactionPosition::from(tx))
+                            Some(tx.into())
                         } else {
                             None
                         }
@@ -317,7 +316,7 @@ where
         let height_key = transfrom_u64_to_array_u8(block.header.height);
         let hash_key = block.header.hash();
 
-        let pb_block: PbBlock = block.into();
+        let pb_block: SerBlock = block.into();
         let mut encoded_buf = BytesMut::with_capacity(AsyncCodec::encoded_len(&pb_block));
 
         let fut = AsyncCodec::encode(&pb_block, &mut encoded_buf)
@@ -348,7 +347,7 @@ where
         let mut peding_fut = Vec::with_capacity(signed_txs.len());
         for tx in signed_txs {
             let hash = tx.hash.clone();
-            let pb_tx: PbSignedTransaction = tx.into();
+            let pb_tx: SerSignedTransaction = tx.into();
             let mut buf = BytesMut::with_capacity(AsyncCodec::encoded_len(&pb_tx));
 
             let fut = AsyncCodec::encode(&pb_tx, &mut buf)
@@ -376,7 +375,7 @@ where
 
         let mut peding_fut = Vec::with_capacity(positions.len());
         for (key, position) in positions.into_iter() {
-            let pb_tx: PbTransactionPosition = position.into();
+            let pb_tx: SerTransactionPosition = position.into();
             let mut buf = BytesMut::with_capacity(AsyncCodec::encoded_len(&pb_tx));
 
             let fut = AsyncCodec::encode(&pb_tx, &mut buf)
@@ -402,7 +401,7 @@ where
         let mut peding_fut = Vec::with_capacity(receipts.len());
         for receipt in receipts {
             let hash = receipt.transaction_hash.clone();
-            let pb_receipt: PbReceipt = receipt.into();
+            let pb_receipt: SerReceipt = receipt.into();
             let mut buf = BytesMut::with_capacity(AsyncCodec::encoded_len(&pb_receipt));
 
             let fut = AsyncCodec::encode(&pb_receipt, &mut buf)

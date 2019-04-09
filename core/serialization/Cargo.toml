@@ -11,5 +11,7 @@ futures = "0.1"
 prost = "0.5"
 prost-derive = "0.5"
 
+core-types = { path = "../types" }
+
 [build-dependencies]
 prost-build = "0.5"

@@ -3,13 +3,10 @@ use crate::helpers::{
 };
 use crate::types::Filter;
 use core_runtime::{Executor, TransactionPool};
-use core_serialization::{
-    transaction::UnverifiedTransaction as PbUnverifiedTransaction, AsyncCodec,
-};
+use core_serialization::{AsyncCodec, UnverifiedTransaction as SerUnverifiedTransaction};
 use core_storage::storage::Storage;
 use core_types::{
-    Address, Balance, Block as RawBlock, Hash, Receipt as RawReceipt, SignedTransaction,
-    UnverifiedTransaction, H256,
+    Address, Balance, Block as RawBlock, Hash, Receipt as RawReceipt, SignedTransaction, H256,
 };
 use futures::future::{err, ok, result, Future};
 use jsonrpc_core::{BoxFuture, Error as JsonrpcError};
@@ -338,12 +335,12 @@ where
 
     fn send_raw_transaction(&self, signed_data: Data) -> BoxFuture<TxResponse> {
         let transaction_pool = self.get_transaction_pool_inst();
-        let fut = AsyncCodec::decode::<PbUnverifiedTransaction>(signed_data.into())
+        let fut = AsyncCodec::decode::<SerUnverifiedTransaction>(signed_data.into())
             .map_err(|e| {
                 error!("decode transaction data err: {:?}", e);
                 JsonrpcError::internal_error()
             })
-            .map(UnverifiedTransaction::from)
+            .map(SerUnverifiedTransaction::into)
             .and_then(move |untx| {
                 transaction_pool
                     .insert(untx)

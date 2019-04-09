@@ -1,11 +1,11 @@
-use std::convert::From;
 use std::fmt;
 
-use crate::errors::TypesError;
 use numext_fixed_hash::H160;
 use numext_fixed_uint::U256;
 use rlp::{Encodable, RlpStream};
 use sha3::{Digest, Sha3_256};
+
+use crate::errors::TypesError;
 
 const ADDRESS_LEN: usize = 20;
 const HASH_LEN: usize = 32;
