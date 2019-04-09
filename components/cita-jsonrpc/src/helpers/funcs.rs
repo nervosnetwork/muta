@@ -1,6 +1,4 @@
 use crate::types::Filter;
-use core_runtime::DatabaseError;
-use core_storage::errors::StorageError;
 use core_storage::storage::Storage;
 use core_types::{Block, BloomRef, Hash};
 use futures::future::{err, join_all, ok, Future};
@@ -29,11 +27,17 @@ where
             }
             for block_number in (0..block.header.height).rev() {
                 match storage.get_block_by_height(block_number as u64).wait() {
-                    Ok(b) => {
-                        if b.tx_hashes.contains(&tx_hash) {
-                            return ok(Some(b));
+                    Ok(b) => match b {
+                        Some(blk) => {
+                            if blk.tx_hashes.contains(&tx_hash) {
+                                return ok(Some(blk));
+                            }
                         }
-                    }
+                        None => {
+                            error!("get_block_by_height {:?} err: not found", block_number);
+                            return err(JsonrpcError::internal_error());
+                        }
+                    },
                     Err(e) => {
                         error!("unexpected get_block_by_height err: {:?}", e);
                         return err(JsonrpcError::internal_error());
@@ -73,14 +77,14 @@ where
                 .get_block_by_height(height)
                 .then(move |x| {
                     let res: BoxFuture<_> = match x {
-                        Ok(block) => Box::new(ok(Some(block))),
-                        Err(e) => match e {
-                            StorageError::Database(DatabaseError::NotFound) => Box::new(ok(None)),
-                            _ => {
-                                error!("get_block err: {:?}", e);
-                                Box::new(err(JsonrpcError::internal_error()))
-                            }
+                        Ok(block) => match block {
+                            Some(blk) => Box::new(ok(Some(blk))),
+                            None => Box::new(ok(None)),
                         },
+                        Err(e) => {
+                            error!("get_block err: {:?}", e);
+                            Box::new(err(JsonrpcError::internal_error()))
+                        }
                     };
                     res
                 })
@@ -134,11 +138,16 @@ where
         .and_then(move |blocks| {
             let filtered_blocks = blocks
                 .into_iter()
-                .filter(|block| {
-                    possible_blooms
-                        .iter()
-                        .any(|bloom| bloom.contains_bloom(BloomRef::from(&block.header.logs_bloom)))
+                .filter(|blk| {
+                    match blk {
+                        Some(block) => possible_blooms.iter().any(|bloom| {
+                            bloom.contains_bloom(BloomRef::from(&block.header.logs_bloom))
+                        }),
+                        // TODO: raise error?
+                        None => false,
+                    }
                 })
+                .map(std::option::Option::unwrap)
                 .collect::<Vec<_>>();
 
             let tx_hashes = filtered_blocks

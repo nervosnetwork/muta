@@ -4,7 +4,7 @@ use std::sync::Arc;
 use futures::future::{err, ok, Future};
 use futures_locks::RwLock;
 
-use core_runtime::{DataCategory, Database, DatabaseError, FutRuntimeResult};
+use core_runtime::{DBResult, DataCategory, Database, DatabaseError};
 
 pub struct MemoryDB {
     storage: Arc<RwLock<HashMap<Vec<u8>, Vec<u8>>>>,
@@ -27,26 +27,19 @@ impl Default for MemoryDB {
 }
 
 impl Database for MemoryDB {
-    fn get(&self, c: DataCategory, key: &[u8]) -> FutRuntimeResult<Vec<u8>, DatabaseError> {
+    fn get(&self, c: DataCategory, key: &[u8]) -> DBResult<Option<Vec<u8>>> {
         let key = gen_key(&c, key);
 
         let fut = self
             .storage
             .read()
             .map_err(|()| DatabaseError::Internal("rwlock error".to_string()))
-            .and_then(move |storage| match storage.get(&key) {
-                Some(v) => ok(v.to_vec()),
-                None => err(DatabaseError::NotFound),
-            });
+            .and_then(move |storage| ok(storage.get(&key).map(|v| v.to_vec())));
 
         Box::new(fut)
     }
 
-    fn get_batch(
-        &self,
-        c: DataCategory,
-        keys: &[Vec<u8>],
-    ) -> FutRuntimeResult<Vec<Option<Vec<u8>>>, DatabaseError> {
+    fn get_batch(&self, c: DataCategory, keys: &[Vec<u8>]) -> DBResult<Vec<Option<Vec<u8>>>> {
         let keys = gen_keys(&c, keys);
 
         let fut = self
@@ -55,23 +48,14 @@ impl Database for MemoryDB {
             .map_err(|()| DatabaseError::Internal("rwlock error".to_string()))
             .map(move |storage| {
                 keys.into_iter()
-                    .map(|key| storage.get(&key.to_vec()))
-                    .map(|v| match v {
-                        Some(v) => Some(v.to_vec()),
-                        None => None,
-                    })
+                    .map(|key| storage.get(&key.to_vec()).map(|v| v.to_vec()))
                     .collect()
             });
 
         Box::new(fut)
     }
 
-    fn insert(
-        &self,
-        c: DataCategory,
-        key: &[u8],
-        value: &[u8],
-    ) -> FutRuntimeResult<(), DatabaseError> {
+    fn insert(&self, c: DataCategory, key: &[u8], value: &[u8]) -> DBResult<()> {
         let key = gen_key(&c, key);
         let value = value.to_vec();
 
@@ -85,12 +69,7 @@ impl Database for MemoryDB {
         Box::new(fut)
     }
 
-    fn insert_batch(
-        &self,
-        c: DataCategory,
-        keys: &[Vec<u8>],
-        values: &[Vec<u8>],
-    ) -> FutRuntimeResult<(), DatabaseError> {
+    fn insert_batch(&self, c: DataCategory, keys: &[Vec<u8>], values: &[Vec<u8>]) -> DBResult<()> {
         if keys.len() != values.len() {
             return Box::new(err(DatabaseError::InvalidData));
         }
@@ -114,7 +93,7 @@ impl Database for MemoryDB {
         Box::new(fut)
     }
 
-    fn contains(&self, c: DataCategory, key: &[u8]) -> FutRuntimeResult<bool, DatabaseError> {
+    fn contains(&self, c: DataCategory, key: &[u8]) -> DBResult<bool> {
         let key = gen_key(&c, key);
 
         let fut = self
@@ -126,7 +105,7 @@ impl Database for MemoryDB {
         Box::new(fut)
     }
 
-    fn remove(&self, c: DataCategory, key: &[u8]) -> FutRuntimeResult<(), DatabaseError> {
+    fn remove(&self, c: DataCategory, key: &[u8]) -> DBResult<()> {
         let key = gen_key(&c, key);
 
         let fut = self
@@ -140,11 +119,7 @@ impl Database for MemoryDB {
         Box::new(fut)
     }
 
-    fn remove_batch(
-        &self,
-        c: DataCategory,
-        keys: &[Vec<u8>],
-    ) -> FutRuntimeResult<(), DatabaseError> {
+    fn remove_batch(&self, c: DataCategory, keys: &[Vec<u8>]) -> DBResult<()> {
         let keys = gen_keys(&c, keys);
 
         let fut = self
@@ -180,19 +155,19 @@ fn gen_keys(c: &DataCategory, keys: &[Vec<u8>]) -> Vec<Vec<u8>> {
 mod tests {
     use super::MemoryDB;
 
-    use core_runtime::{DataCategory, Database, DatabaseError};
+    use core_runtime::{DataCategory, Database};
     use futures::future::Future;
 
     #[test]
     fn test_get_should_return_ok() {
         let db = MemoryDB::new();
 
-        check_not_found(db.get(DataCategory::Block, b"test").wait());
+        assert_eq!(db.get(DataCategory::Block, b"test").wait(), Ok(None));
         db.insert(DataCategory::Block, b"test", b"test")
             .wait()
             .unwrap();
         let v = db.get(DataCategory::Block, b"test").wait().unwrap();
-        assert_eq!(v, b"test".to_vec())
+        assert_eq!(v, Some(b"test".to_vec()))
     }
 
     #[test]
@@ -203,7 +178,7 @@ mod tests {
             .wait()
             .unwrap();
         assert_eq!(
-            b"test".to_vec(),
+            Some(b"test".to_vec()),
             db.get(DataCategory::Block, b"test").wait().unwrap()
         );
     }
@@ -220,11 +195,11 @@ mod tests {
         .wait()
         .unwrap();
         assert_eq!(
-            b"test1".to_vec(),
+            Some(b"test1".to_vec()),
             db.get(DataCategory::Block, b"test1").wait().unwrap()
         );
         assert_eq!(
-            b"test2".to_vec(),
+            Some(b"test2".to_vec()),
             db.get(DataCategory::Block, b"test2").wait().unwrap()
         );
     }
@@ -259,7 +234,7 @@ mod tests {
             .wait()
             .unwrap();
         db.remove(DataCategory::Block, b"test").wait().unwrap();
-        check_not_found(db.get(DataCategory::Block, b"test").wait());
+        assert_eq!(db.get(DataCategory::Block, b"test").wait(), Ok(None));
     }
 
     #[test]
@@ -276,14 +251,7 @@ mod tests {
         db.remove_batch(DataCategory::Block, &[b"test1".to_vec(), b"test2".to_vec()])
             .wait()
             .unwrap();
-        check_not_found(db.get(DataCategory::Block, b"test1").wait());
-        check_not_found(db.get(DataCategory::Block, b"test2").wait());
-    }
-
-    fn check_not_found<T>(res: Result<T, DatabaseError>) {
-        match res {
-            Ok(_) => panic!("The result must be an error not found"),
-            Err(e) => assert_eq!(e, DatabaseError::NotFound),
-        }
+        assert_eq!(db.get(DataCategory::Block, b"test1").wait(), Ok(None));
+        assert_eq!(db.get(DataCategory::Block, b"test2").wait(), Ok(None));
     }
 }

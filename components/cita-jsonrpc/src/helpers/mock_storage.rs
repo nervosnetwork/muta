@@ -4,7 +4,10 @@ use std::sync::{Arc, RwLock};
 use futures::future::{err, ok};
 
 use core_runtime::{DatabaseError, FutRuntimeResult};
-use core_storage::{errors::StorageError, storage::Storage};
+use core_storage::{
+    errors::{StorageError, StorageResult},
+    storage::Storage,
+};
 use core_types::{
     Address, Block, BlockHeader, Bloom, Hash, Receipt, SignedTransaction, TransactionPosition,
 };
@@ -56,78 +59,80 @@ impl Storage for MockStorage {
         }
     }
 
-    fn get_block_by_height(&self, height: u64) -> FutRuntimeResult<Block, StorageError> {
-        if height < self.blocks.read().unwrap().len() as u64 {
-            Box::new(ok(self.blocks.read().unwrap()[height as usize].clone()))
-        } else {
-            Box::new(err(StorageError::Database(DatabaseError::NotFound)))
-        }
+    fn get_block_by_height(&self, height: u64) -> StorageResult<Option<Block>> {
+        Box::new(ok(self
+            .blocks
+            .read()
+            .unwrap()
+            .get(height as usize)
+            .cloned()))
     }
 
-    fn get_block_by_hash(&self, hash: &Hash) -> FutRuntimeResult<Block, StorageError> {
+    fn get_block_by_hash(&self, hash: &Hash) -> StorageResult<Option<Block>> {
         let hashes_height_map = self.hashes_height_map.read().unwrap();
         let height = hashes_height_map.get(hash);
+
         match height {
-            None => Box::new(err(StorageError::Database(DatabaseError::NotFound))),
-            Some(height) => Box::new(ok(self.blocks.read().unwrap()[*height as usize].clone())),
+            Some(h) => Box::new(ok(self.blocks.read().unwrap().get(*h as usize).cloned())),
+            None => Box::new(ok(None)),
         }
     }
 
-    fn get_transaction(&self, hash: &Hash) -> FutRuntimeResult<SignedTransaction, StorageError> {
-        match self.transactions.read().unwrap().get(hash) {
-            None => Box::new(err(StorageError::Database(DatabaseError::NotFound))),
-            Some(tx) => Box::new(ok(tx.clone())),
+    fn get_transaction(&self, hash: &Hash) -> StorageResult<Option<SignedTransaction>> {
+        let gurad = self.transactions.read().unwrap();
+        let tx = gurad.get(hash);
+
+        match tx {
+            Some(v) => Box::new(ok(Some(v.clone()))),
+            None => Box::new(ok(None)),
         }
     }
 
-    fn get_transactions(
-        &self,
-        hashes: &[&Hash],
-    ) -> FutRuntimeResult<Vec<Option<SignedTransaction>>, StorageError> {
+    fn get_transactions(&self, hashes: &[&Hash]) -> StorageResult<Vec<Option<SignedTransaction>>> {
         Box::new(ok(hashes
             .iter()
             .map(|h| self.transactions.read().unwrap().get(h).cloned())
             .collect::<Vec<_>>()))
     }
 
-    fn get_receipt(&self, tx_hash: &Hash) -> FutRuntimeResult<Receipt, StorageError> {
-        match self.receipts.read().unwrap().get(tx_hash) {
-            None => Box::new(err(StorageError::Database(DatabaseError::NotFound))),
-            Some(tx) => Box::new(ok(tx.clone())),
+    fn get_receipt(&self, tx_hash: &Hash) -> StorageResult<Option<Receipt>> {
+        let gurad = self.receipts.read().unwrap();
+        let receipt = gurad.get(tx_hash);
+
+        match receipt {
+            Some(v) => Box::new(ok(Some(v.clone()))),
+            None => Box::new(ok(None)),
         }
     }
 
-    fn get_receipts(
-        &self,
-        tx_hashes: &[&Hash],
-    ) -> FutRuntimeResult<Vec<Option<Receipt>>, StorageError> {
+    fn get_receipts(&self, tx_hashes: &[&Hash]) -> StorageResult<Vec<Option<Receipt>>> {
         Box::new(ok(tx_hashes
             .iter()
             .map(|h| self.receipts.read().unwrap().get(h).cloned())
             .collect::<Vec<_>>()))
     }
 
-    fn get_transaction_position(
-        &self,
-        hash: &Hash,
-    ) -> FutRuntimeResult<TransactionPosition, StorageError> {
-        match self.transaction_positions.read().unwrap().get(hash) {
-            None => Box::new(err(StorageError::Database(DatabaseError::NotFound))),
-            Some(tx) => Box::new(ok(tx.clone())),
+    fn get_transaction_position(&self, hash: &Hash) -> StorageResult<Option<TransactionPosition>> {
+        let gurad = self.transaction_positions.read().unwrap();
+        let position = gurad.get(hash);
+
+        match position {
+            Some(v) => Box::new(ok(Some(v.clone()))),
+            None => Box::new(ok(None)),
         }
     }
 
     fn get_transaction_positions(
         &self,
         hashes: &[&Hash],
-    ) -> FutRuntimeResult<Vec<Option<TransactionPosition>>, StorageError> {
+    ) -> StorageResult<Vec<Option<TransactionPosition>>> {
         Box::new(ok(hashes
             .iter()
             .map(|h| self.transaction_positions.read().unwrap().get(h).cloned())
             .collect::<Vec<_>>()))
     }
 
-    fn insert_block(&self, block: Block) -> FutRuntimeResult<(), StorageError> {
+    fn insert_block(&self, block: Block) -> StorageResult<()> {
         if block.header.prevhash
             != self
                 .blocks
@@ -166,10 +171,7 @@ impl Storage for MockStorage {
         Box::new(ok(()))
     }
 
-    fn insert_transactions(
-        &self,
-        signed_txs: Vec<SignedTransaction>,
-    ) -> FutRuntimeResult<(), StorageError> {
+    fn insert_transactions(&self, signed_txs: Vec<SignedTransaction>) -> StorageResult<()> {
         for tx in signed_txs {
             let hash = tx.hash.clone();
             self.transactions.write().unwrap().insert(hash, tx);
@@ -180,7 +182,7 @@ impl Storage for MockStorage {
     fn insert_transaction_positions(
         &self,
         positions: HashMap<Hash, TransactionPosition>,
-    ) -> FutRuntimeResult<(), StorageError> {
+    ) -> StorageResult<()> {
         for (block_hash, position) in positions {
             self.transaction_positions
                 .write()
@@ -190,7 +192,7 @@ impl Storage for MockStorage {
         Box::new(ok(()))
     }
 
-    fn insert_receipts(&self, receipts: Vec<Receipt>) -> FutRuntimeResult<(), StorageError> {
+    fn insert_receipts(&self, receipts: Vec<Receipt>) -> StorageResult<()> {
         for receipt in receipts {
             self.receipts
                 .write()

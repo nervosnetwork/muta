@@ -122,8 +122,15 @@ where
                                             error!("get_block_by_height err: {:?}", e);
                                             JsonrpcError::internal_error()
                                         })
-                                        .map(|block| {
-                                            Data32::new(block.header.hash().as_bytes().into())
+                                        .map(|blk| match blk {
+                                            Some(block) => {
+                                                Data32::new(block.header.hash().as_bytes().into())
+                                            }
+                                            None => {
+                                                error!("get_block_by_height err: Not found");
+                                                // TODO: please fix it!!!
+                                                Data32::default()
+                                            }
                                         })
                                 }))
                                 .map(FilterChanges::Hashes);

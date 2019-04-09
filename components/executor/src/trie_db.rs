@@ -29,16 +29,7 @@ where
     type Error = DatabaseError;
 
     fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Self::Error> {
-        match self.db.get(DataCategory::State, key).wait() {
-            Ok(v) => Ok(Some(v)),
-            Err(e) => {
-                if DatabaseError::NotFound == e {
-                    Ok(None)
-                } else {
-                    Err(e)
-                }
-            }
-        }
+        self.db.get(DataCategory::State, key).wait()
     }
 
     fn insert(&mut self, key: &[u8], value: &[u8]) -> Result<(), Self::Error> {

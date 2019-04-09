@@ -2,6 +2,7 @@ use std::error::Error;
 use std::fmt;
 
 use core_runtime::DatabaseError;
+use core_runtime::FutRuntimeResult;
 use core_serialization::CodecError;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -10,6 +11,8 @@ pub enum StorageError {
     Codec(CodecError),
     Internal(String),
 }
+
+pub type StorageResult<T> = FutRuntimeResult<T, StorageError>;
 
 impl StorageError {
     pub fn is_database_not_found(err: StorageError) -> bool {

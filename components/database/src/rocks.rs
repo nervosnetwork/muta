@@ -3,7 +3,7 @@ use std::sync::Arc;
 use futures::future::{err, ok, result, Future};
 use rocksdb::{ColumnFamily, Error as RocksError, Options, WriteBatch, DB};
 
-use core_runtime::{DataCategory, Database, DatabaseError, FutRuntimeResult};
+use core_runtime::{DBResult, DataCategory, Database, DatabaseError};
 
 pub struct RocksDB {
     db: Arc<DB>,
@@ -54,56 +54,43 @@ impl RocksDB {
 }
 
 impl Database for RocksDB {
-    fn get(&self, c: DataCategory, key: &[u8]) -> FutRuntimeResult<Vec<u8>, DatabaseError> {
+    fn get(&self, c: DataCategory, key: &[u8]) -> DBResult<Option<Vec<u8>>> {
+        // TODO: refactor
         let column = match self.get_column(c) {
             Ok(column) => column,
             Err(e) => return Box::new(err(e)),
         };
 
         let v = match self.db.get_cf(column, key) {
-            Ok(opt_v) => match opt_v {
-                Some(v) => v.to_vec(),
-                None => return Box::new(err(DatabaseError::NotFound)),
-            },
+            Ok(opt_v) => opt_v.map(|v| v.to_vec()),
             Err(e) => return Box::new(err(map_db_err(e))),
         };
 
-        Box::new(ok(v.to_vec()))
+        Box::new(ok(v.map(|v| v.to_vec())))
     }
 
-    fn get_batch(
-        &self,
-        c: DataCategory,
-        keys: &[Vec<u8>],
-    ) -> FutRuntimeResult<Vec<Option<Vec<u8>>>, DatabaseError> {
+    fn get_batch(&self, c: DataCategory, keys: &[Vec<u8>]) -> DBResult<Vec<Option<Vec<u8>>>> {
         let column = match self.get_column(c) {
             Ok(column) => column,
             Err(e) => return Box::new(err(e)),
         };
 
-        let values: Vec<Option<Vec<u8>>> = keys
-            .iter()
-            .map(|key| match self.db.get_cf(column, key) {
-                Ok(opt_v) => match opt_v {
-                    Some(v) => Some(v.to_vec()),
-                    None => None,
-                },
+        let mut values = Vec::with_capacity(keys.len());
+
+        for key in keys {
+            match self.db.get_cf(column, key) {
+                Ok(opt_v) => values.push(opt_v.map(|v| v.to_vec())),
                 Err(e) => {
                     log::error!(target: "database rocksdb", "{}", e);
-                    None
+                    return Box::new(err(map_db_err(e)));
                 }
-            })
-            .collect();
+            }
+        }
 
         Box::new(ok(values))
     }
 
-    fn insert(
-        &self,
-        c: DataCategory,
-        key: &[u8],
-        value: &[u8],
-    ) -> FutRuntimeResult<(), DatabaseError> {
+    fn insert(&self, c: DataCategory, key: &[u8], value: &[u8]) -> DBResult<()> {
         let column = match self.get_column(c) {
             Ok(column) => column,
             Err(e) => return Box::new(err(e)),
@@ -113,12 +100,7 @@ impl Database for RocksDB {
         Box::new(fut)
     }
 
-    fn insert_batch(
-        &self,
-        c: DataCategory,
-        keys: &[Vec<u8>],
-        values: &[Vec<u8>],
-    ) -> FutRuntimeResult<(), DatabaseError> {
+    fn insert_batch(&self, c: DataCategory, keys: &[Vec<u8>], values: &[Vec<u8>]) -> DBResult<()> {
         if keys.len() != values.len() {
             return Box::new(err(DatabaseError::InvalidData));
         }
@@ -139,7 +121,7 @@ impl Database for RocksDB {
         Box::new(fut)
     }
 
-    fn contains(&self, c: DataCategory, key: &[u8]) -> FutRuntimeResult<bool, DatabaseError> {
+    fn contains(&self, c: DataCategory, key: &[u8]) -> DBResult<bool> {
         let column = match self.get_column(c) {
             Ok(column) => column,
             Err(e) => return Box::new(err(e)),
@@ -153,7 +135,7 @@ impl Database for RocksDB {
         Box::new(ok(v))
     }
 
-    fn remove(&self, c: DataCategory, key: &[u8]) -> FutRuntimeResult<(), DatabaseError> {
+    fn remove(&self, c: DataCategory, key: &[u8]) -> DBResult<()> {
         let column = match self.get_column(c) {
             Ok(column) => column,
             Err(e) => return Box::new(err(e)),
@@ -163,11 +145,7 @@ impl Database for RocksDB {
         Box::new(fut)
     }
 
-    fn remove_batch(
-        &self,
-        c: DataCategory,
-        keys: &[Vec<u8>],
-    ) -> FutRuntimeResult<(), DatabaseError> {
+    fn remove_batch(&self, c: DataCategory, keys: &[Vec<u8>]) -> DBResult<()> {
         let column = match self.get_column(c) {
             Ok(column) => column,
             Err(e) => return Box::new(err(e)),
@@ -206,23 +184,24 @@ fn map_db_err(err: RocksError) -> DatabaseError {
     DatabaseError::Internal(err.to_string())
 }
 
+// TODO: merge rocksdb and memorydb test together.
 #[cfg(test)]
 mod tests {
     use super::RocksDB;
 
-    use core_runtime::{DataCategory, Database, DatabaseError};
+    use core_runtime::{DataCategory, Database};
     use futures::future::Future;
 
     #[test]
     fn test_get_should_return_ok() {
         let db = RocksDB::new("rocksdb/test_get_should_return_ok").unwrap();
 
-        check_not_found(db.get(DataCategory::Block, b"test").wait());
+        assert_eq!(db.get(DataCategory::Block, b"test").wait(), Ok(None));
         db.insert(DataCategory::Block, b"test", b"test")
             .wait()
             .unwrap();
         let v = db.get(DataCategory::Block, b"test").wait().unwrap();
-        assert_eq!(v, b"test".to_vec());
+        assert_eq!(v, Some(b"test".to_vec()));
         db.clean();
     }
 
@@ -234,7 +213,7 @@ mod tests {
             .wait()
             .unwrap();
         assert_eq!(
-            b"test".to_vec(),
+            Some(b"test".to_vec()),
             db.get(DataCategory::Block, b"test").wait().unwrap()
         );
         db.clean();
@@ -252,11 +231,11 @@ mod tests {
         .wait()
         .unwrap();
         assert_eq!(
-            b"test1".to_vec(),
+            Some(b"test1".to_vec()),
             db.get(DataCategory::Block, b"test1").wait().unwrap()
         );
         assert_eq!(
-            b"test2".to_vec(),
+            Some(b"test2".to_vec()),
             db.get(DataCategory::Block, b"test2").wait().unwrap()
         );
         db.clean();
@@ -296,7 +275,7 @@ mod tests {
             .wait()
             .unwrap();
         db.remove(DataCategory::Block, b"test").wait().unwrap();
-        check_not_found(db.get(DataCategory::Block, b"test").wait());
+        assert_eq!(db.get(DataCategory::Block, b"test").wait(), Ok(None));
         db.clean();
     }
 
@@ -314,15 +293,8 @@ mod tests {
         db.remove_batch(DataCategory::Block, &[b"test1".to_vec(), b"test2".to_vec()])
             .wait()
             .unwrap();
-        check_not_found(db.get(DataCategory::Block, b"test1").wait());
-        check_not_found(db.get(DataCategory::Block, b"test2").wait());
+        assert_eq!(db.get(DataCategory::Block, b"test1").wait(), Ok(None));
+        assert_eq!(db.get(DataCategory::Block, b"test2").wait(), Ok(None));
         db.clean();
-    }
-
-    fn check_not_found<T>(res: Result<T, DatabaseError>) {
-        match res {
-            Ok(_) => panic!("The result must be an error not found"),
-            Err(e) => assert_eq!(e, DatabaseError::NotFound),
-        }
     }
 }

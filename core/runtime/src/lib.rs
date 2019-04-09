@@ -7,7 +7,7 @@ pub mod executor;
 pub mod transaction_pool;
 // pub mod sync;
 
-pub use database::{DataCategory, Database, DatabaseError};
+pub use database::{DBResult, DataCategory, Database, DatabaseError};
 pub use executor::{ExecutionResult, Executor, ExecutorError, ReadonlyResult};
 pub use transaction_pool::{TransactionPool, TransactionPoolError};
 

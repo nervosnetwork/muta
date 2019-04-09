@@ -33,7 +33,8 @@ where
             .storage
             .get_block_by_height(height)
             .wait()
-            .expect("failed to get block");
+            .expect("failed to get block")
+            .expect("not found block");
 
         H256::from(block.header.prevhash.into_fixed_bytes())
     }

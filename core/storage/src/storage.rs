@@ -3,9 +3,9 @@ use std::sync::Arc;
 
 use byteorder::{ByteOrder, NativeEndian};
 use bytes::BytesMut;
-use futures::future::{join_all, Future};
+use futures::future::{err, join_all, ok, Future};
 
-use core_runtime::{DataCategory, Database, FutRuntimeResult};
+use core_runtime::{DataCategory, Database, DatabaseError};
 use core_serialization::{
     block::Block as PbBlock, receipt::Receipt as PbReceipt,
     transaction::SignedTransaction as PbSignedTransaction,
@@ -13,7 +13,7 @@ use core_serialization::{
 };
 use core_types::{Block, Hash, Receipt, SignedTransaction, TransactionPosition};
 
-use crate::errors::StorageError;
+use crate::errors::{StorageError, StorageResult};
 
 const LATEST_BLOCK: &[u8] = b"latest-block";
 
@@ -22,63 +22,51 @@ const LATEST_BLOCK: &[u8] = b"latest-block";
 /// but data related to "world status" is not available.
 pub trait Storage: Send + Sync {
     /// Get the latest block.
-    fn get_latest_block(&self) -> FutRuntimeResult<Block, StorageError>;
+    fn get_latest_block(&self) -> StorageResult<Block>;
 
     /// Get a block by height.
-    fn get_block_by_height(&self, height: u64) -> FutRuntimeResult<Block, StorageError>;
+    fn get_block_by_height(&self, height: u64) -> StorageResult<Option<Block>>;
 
     /// Get a block by hash.
     /// The hash is actually an index,
     /// and the corresponding height is obtained by hash and then querying the corresponding block.
-    fn get_block_by_hash(&self, hash: &Hash) -> FutRuntimeResult<Block, StorageError>;
+    fn get_block_by_hash(&self, hash: &Hash) -> StorageResult<Option<Block>>;
 
     /// Get a signed transaction by hash.
-    fn get_transaction(&self, hash: &Hash) -> FutRuntimeResult<SignedTransaction, StorageError>;
+    fn get_transaction(&self, hash: &Hash) -> StorageResult<Option<SignedTransaction>>;
 
     /// Get a batch of transactions by hashes.
-    fn get_transactions(
-        &self,
-        hashes: &[&Hash],
-    ) -> FutRuntimeResult<Vec<Option<SignedTransaction>>, StorageError>;
+    fn get_transactions(&self, hashes: &[&Hash]) -> StorageResult<Vec<Option<SignedTransaction>>>;
 
     /// Get a receipt by hash.
-    fn get_receipt(&self, tx_hash: &Hash) -> FutRuntimeResult<Receipt, StorageError>;
+    fn get_receipt(&self, tx_hash: &Hash) -> StorageResult<Option<Receipt>>;
 
     /// Get a batch of receipts by hashes
-    fn get_receipts(
-        &self,
-        tx_hashes: &[&Hash],
-    ) -> FutRuntimeResult<Vec<Option<Receipt>>, StorageError>;
+    fn get_receipts(&self, tx_hashes: &[&Hash]) -> StorageResult<Vec<Option<Receipt>>>;
 
     /// Get a transaction position by hash.
-    fn get_transaction_position(
-        &self,
-        hash: &Hash,
-    ) -> FutRuntimeResult<TransactionPosition, StorageError>;
+    fn get_transaction_position(&self, hash: &Hash) -> StorageResult<Option<TransactionPosition>>;
 
     /// Get a batch of transactions by hashes.
     fn get_transaction_positions(
         &self,
         hashes: &[&Hash],
-    ) -> FutRuntimeResult<Vec<Option<TransactionPosition>>, StorageError>;
+    ) -> StorageResult<Vec<Option<TransactionPosition>>>;
 
     /// Insert a block.
-    fn insert_block(&self, block: Block) -> FutRuntimeResult<(), StorageError>;
+    fn insert_block(&self, block: Block) -> StorageResult<()>;
 
     /// Insert a batch of transactions.
-    fn insert_transactions(
-        &self,
-        signed_txs: Vec<SignedTransaction>,
-    ) -> FutRuntimeResult<(), StorageError>;
+    fn insert_transactions(&self, signed_txs: Vec<SignedTransaction>) -> StorageResult<()>;
 
     /// Insert a batch of transaction positions.
     fn insert_transaction_positions(
         &self,
         positions: HashMap<Hash, TransactionPosition>,
-    ) -> FutRuntimeResult<(), StorageError>;
+    ) -> StorageResult<()>;
 
     /// Insert a batch of receipts.
-    fn insert_receipts(&self, receipts: Vec<Receipt>) -> FutRuntimeResult<(), StorageError>;
+    fn insert_receipts(&self, receipts: Vec<Receipt>) -> StorageResult<()>;
 }
 
 pub struct BlockStorage<DB>
@@ -101,50 +89,71 @@ impl<DB: 'static> Storage for BlockStorage<DB>
 where
     DB: Database,
 {
-    fn get_latest_block(&self) -> FutRuntimeResult<Block, StorageError> {
+    fn get_latest_block(&self) -> StorageResult<Block> {
+        let decode = |d| -> Box<dyn Future<Item = _, Error = _> + Send> {
+            match d {
+                Some(data) => {
+                    Box::new(AsyncCodec::decode::<PbBlock>(data).map_err(StorageError::Codec))
+                }
+                None => Box::new(err(StorageError::Database(DatabaseError::NotFound))),
+            }
+        };
+
         let fut = self
             .db
             .get(DataCategory::Block, LATEST_BLOCK)
             .map_err(StorageError::Database)
-            .and_then(|data| AsyncCodec::decode::<PbBlock>(data).map_err(StorageError::Codec))
+            .and_then(decode)
             .map(Block::from);
 
         Box::new(fut)
     }
 
-    fn get_block_by_height(&self, height: u64) -> FutRuntimeResult<Block, StorageError> {
+    fn get_block_by_height(&self, height: u64) -> StorageResult<Option<Block>> {
         let key = transfrom_u64_to_array_u8(height);
 
         let fut = self
             .db
             .get(DataCategory::Block, &key)
             .map_err(StorageError::Database)
-            .and_then(|data| AsyncCodec::decode::<PbBlock>(data).map_err(StorageError::Codec))
-            .map(Block::from);;
+            .and_then(|data| {
+                data.map(|v| AsyncCodec::decode::<PbBlock>(v).map_err(StorageError::Codec))
+            })
+            .map(|b| b.map(Block::from));;
 
         Box::new(fut)
     }
 
-    fn get_block_by_hash(&self, hash: &Hash) -> FutRuntimeResult<Block, StorageError> {
+    fn get_block_by_hash(&self, hash: &Hash) -> StorageResult<Option<Block>> {
         let key = hash.clone();
 
         let db = Arc::clone(&self.db);
+
+        let get_block =
+            move |height_slice: Option<Vec<u8>>| -> Box<dyn Future<Item = _, Error = _> + Send> {
+                match height_slice {
+                    Some(h) => Box::new(
+                        db.get(DataCategory::Block, &h)
+                            .map_err(StorageError::Database),
+                    ), // StorageResult<Option<Vec<u8>>>
+                    None => Box::new(ok(None)),
+                }
+            };
 
         let fut = self
             .db
             .get(DataCategory::Block, key.as_bytes())
             .map_err(StorageError::Database)
-            .and_then(move |height_slice| {
-                db.get(DataCategory::Block, &height_slice)
-                    .map_err(StorageError::Database)
+            .and_then(get_block)
+            .and_then(|data| {
+                data.map(|value| AsyncCodec::decode::<PbBlock>(value).map_err(StorageError::Codec))
             })
-            .and_then(|data| AsyncCodec::decode::<PbBlock>(data).map_err(StorageError::Codec))
-            .map(Block::from);
+            .map(|b| b.map(Block::from));
 
         Box::new(fut)
     }
 
-    fn get_transaction(&self, hash: &Hash) -> FutRuntimeResult<SignedTransaction, StorageError> {
+    fn get_transaction(&self, hash: &Hash) -> StorageResult<Option<SignedTransaction>> {
         let key = hash.clone();
 
         let fut = self
@@ -152,17 +161,16 @@ where
             .get(DataCategory::Transaction, key.as_bytes())
             .map_err(StorageError::Database)
             .and_then(|data| {
-                AsyncCodec::decode::<PbSignedTransaction>(data).map_err(StorageError::Codec)
+                data.map(|v| {
+                    AsyncCodec::decode::<PbSignedTransaction>(v).map_err(StorageError::Codec)
+                })
             })
-            .map(SignedTransaction::from);
+            .map(|b| b.map(SignedTransaction::from));
 
         Box::new(fut)
     }
 
-    fn get_transactions(
-        &self,
-        hashes: &[&Hash],
-    ) -> FutRuntimeResult<Vec<Option<SignedTransaction>>, StorageError> {
+    fn get_transactions(&self, hashes: &[&Hash]) -> StorageResult<Vec<Option<SignedTransaction>>> {
         let mut keys = vec![];
         for h in hashes {
             keys.push(h.as_bytes().to_vec());
@@ -174,14 +182,10 @@ where
             .map_err(StorageError::Database)
             .and_then(move |opt_txs_data| {
                 join_all(opt_txs_data.into_iter().map(|opt_data| {
-                    if let Some(data) = opt_data {
-                        Some(
-                            AsyncCodec::decode::<PbSignedTransaction>(data.to_vec())
-                                .map_err(StorageError::Codec),
-                        )
-                    } else {
-                        None
-                    }
+                    opt_data.map(|v| {
+                        AsyncCodec::decode::<PbSignedTransaction>(v.to_vec())
+                            .map_err(StorageError::Codec)
+                    })
                 }))
             })
             .map(|opt_txs| {
@@ -200,23 +204,22 @@ where
         Box::new(fut)
     }
 
-    fn get_receipt(&self, hash: &Hash) -> FutRuntimeResult<Receipt, StorageError> {
+    fn get_receipt(&self, hash: &Hash) -> StorageResult<Option<Receipt>> {
         let key = hash.clone();
 
         let fut = self
             .db
             .get(DataCategory::Receipt, key.as_bytes())
             .map_err(StorageError::Database)
-            .and_then(|data| AsyncCodec::decode::<PbReceipt>(data).map_err(StorageError::Codec))
-            .map(Receipt::from);
+            .and_then(|data| {
+                data.map(|v| AsyncCodec::decode::<PbReceipt>(v).map_err(StorageError::Codec))
+            })
+            .map(|b| b.map(Receipt::from));
 
         Box::new(fut)
     }
 
-    fn get_receipts(
-        &self,
-        hashes: &[&Hash],
-    ) -> FutRuntimeResult<Vec<Option<Receipt>>, StorageError> {
+    fn get_receipts(&self, hashes: &[&Hash]) -> StorageResult<Vec<Option<Receipt>>> {
         let mut keys = Vec::with_capacity(hashes.len());
         for h in hashes {
             keys.push(h.as_bytes().to_vec());
@@ -228,14 +231,9 @@ where
             .map_err(StorageError::Database)
             .and_then(|opt_receipts_data| {
                 join_all(opt_receipts_data.into_iter().map(|opt_data| {
-                    if let Some(data) = opt_data {
-                        Some(
-                            AsyncCodec::decode::<PbReceipt>(data.to_vec())
-                                .map_err(StorageError::Codec),
-                        )
-                    } else {
-                        None
-                    }
+                    opt_data.map(|v| {
+                        AsyncCodec::decode::<PbReceipt>(v.to_vec()).map_err(StorageError::Codec)
+                    })
                 }))
             })
             .map(|opt_txs| {
@@ -253,10 +251,7 @@ where
         Box::new(fut)
     }
 
-    fn get_transaction_position(
-        &self,
-        hash: &Hash,
-    ) -> FutRuntimeResult<TransactionPosition, StorageError> {
+    fn get_transaction_position(&self, hash: &Hash) -> StorageResult<Option<TransactionPosition>> {
         let key = hash.clone();
 
         let fut = self
@@ -264,17 +259,20 @@ where
             .get(DataCategory::TransactionPosition, key.as_bytes())
             .map_err(StorageError::Database)
             .and_then(|data| {
-                AsyncCodec::decode::<PbTransactionPosition>(data).map_err(StorageError::Codec)
+                data.map(|v| {
+                    AsyncCodec::decode::<PbTransactionPosition>(v).map_err(StorageError::Codec)
+                })
             })
-            .map(TransactionPosition::from);
+            .map(|b| b.map(TransactionPosition::from));
 
         Box::new(fut)
     }
 
+    // TODO: refactor
     fn get_transaction_positions(
         &self,
         hashes: &[&Hash],
-    ) -> FutRuntimeResult<Vec<Option<TransactionPosition>>, StorageError> {
+    ) -> StorageResult<Vec<Option<TransactionPosition>>> {
         let mut keys = vec![];
         for h in hashes {
             keys.push(h.as_bytes().to_vec());
@@ -312,7 +310,7 @@ where
         Box::new(fut)
     }
 
-    fn insert_block(&self, block: Block) -> FutRuntimeResult<(), StorageError> {
+    fn insert_block(&self, block: Block) -> StorageResult<()> {
         let db = Arc::clone(&self.db);
 
         let height = block.header.height;
@@ -343,10 +341,7 @@ where
         Box::new(fut)
     }
 
-    fn insert_transactions(
-        &self,
-        signed_txs: Vec<SignedTransaction>,
-    ) -> FutRuntimeResult<(), StorageError> {
+    fn insert_transactions(&self, signed_txs: Vec<SignedTransaction>) -> StorageResult<()> {
         let db = Arc::clone(&self.db);
         let mut keys = Vec::with_capacity(signed_txs.len());
 
@@ -375,7 +370,7 @@ where
     fn insert_transaction_positions(
         &self,
         positions: HashMap<Hash, TransactionPosition>,
-    ) -> FutRuntimeResult<(), StorageError> {
+    ) -> StorageResult<()> {
         let db = Arc::clone(&self.db);
         let mut keys = Vec::with_capacity(positions.len());
 
@@ -400,7 +395,7 @@ where
         Box::new(fut)
     }
 
-    fn insert_receipts(&self, receipts: Vec<Receipt>) -> FutRuntimeResult<(), StorageError> {
+    fn insert_receipts(&self, receipts: Vec<Receipt>) -> StorageResult<()> {
         let db = Arc::clone(&self.db);
         let mut keys = Vec::with_capacity(receipts.len());
 
@@ -475,7 +470,7 @@ mod tests {
         storage.insert_block(mock_block(1000)).wait().unwrap();
         let block = storage.get_block_by_height(1000).wait().unwrap();
 
-        assert_eq!(block.header.height, 1000)
+        assert_eq!(block.unwrap().header.height, 1000)
     }
 
     #[test]
@@ -488,7 +483,7 @@ mod tests {
         storage.insert_block(b).wait().unwrap();
 
         let b = storage.get_block_by_hash(&hash).wait().unwrap();
-        assert_eq!(b.header.height, 1000)
+        assert_eq!(b.unwrap().header.height, 1000)
     }
 
     #[test]
@@ -501,7 +496,7 @@ mod tests {
         storage.insert_transactions(vec![tx]).wait().unwrap();
         let new_tx = storage.get_transaction(&hash).wait().unwrap();
 
-        assert_eq!(new_tx.hash, hash)
+        assert_eq!(new_tx.unwrap().hash, hash)
     }
 
     #[test]
@@ -544,7 +539,7 @@ mod tests {
             .unwrap();
         let new_tx_position = storage.get_transaction_position(&hash).wait().unwrap();
 
-        assert_eq!(new_tx_position, tx_position)
+        assert_eq!(new_tx_position, Some(tx_position));
     }
 
     #[test]
@@ -583,7 +578,7 @@ mod tests {
 
         storage.insert_receipts(vec![receipt]).wait().unwrap();
         let receipt = storage.get_receipt(&tx_hash).wait().unwrap();
-        assert_eq!(receipt.transaction_hash, tx_hash);
+        assert_eq!(receipt.unwrap().transaction_hash, tx_hash);
     }
 
     #[test]
@@ -632,6 +627,7 @@ mod tests {
                 .get_block_by_height(height)
                 .wait()
                 .unwrap()
+                .unwrap()
                 .header
                 .height,
             height
@@ -641,6 +637,7 @@ mod tests {
             storage
                 .get_block_by_hash(&hash)
                 .wait()
+                .unwrap()
                 .unwrap()
                 .header
                 .height,

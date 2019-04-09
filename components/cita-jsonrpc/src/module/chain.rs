@@ -2,11 +2,11 @@ use crate::helpers::{
     get_block_by_block_number, get_block_by_tx_hash, get_logs, transform_data32_to_hash,
 };
 use crate::types::Filter;
-use core_runtime::{DatabaseError, Executor, TransactionPool};
+use core_runtime::{Executor, TransactionPool};
 use core_serialization::{
     transaction::UnverifiedTransaction as PbUnverifiedTransaction, AsyncCodec,
 };
-use core_storage::{errors::StorageError, storage::Storage};
+use core_storage::storage::Storage;
 use core_types::{
     Address, Balance, Block as RawBlock, Hash, Receipt as RawReceipt, SignedTransaction,
     UnverifiedTransaction, H256,
@@ -366,16 +366,17 @@ where
             .get_block_by_hash(&transform_data32_to_hash(hash))
             .then(move |x| {
                 let res: BoxFuture<_> = match x {
-                    Ok(raw_block) => Box::new(
-                        get_jsonrpc_block_from_raw_block(storage, &raw_block, include_tx).map(Some),
-                    ),
-                    Err(e) => match e {
-                        StorageError::Database(DatabaseError::NotFound) => Box::new(ok(None)),
-                        _ => {
-                            error!("get_block_by_hash err: {:?}", e);
-                            Box::new(err(JsonrpcError::internal_error()))
-                        }
+                    Ok(raw_block) => match raw_block {
+                        Some(rblock) => Box::new(
+                            get_jsonrpc_block_from_raw_block(storage, &rblock, include_tx)
+                                .map(Some),
+                        ),
+                        None => Box::new(ok(None)),
                     },
+                    Err(e) => {
+                        error!("get_block_by_hash err: {:?}", e);
+                        Box::new(err(JsonrpcError::internal_error()))
+                    }
                 };
                 res
             });
@@ -389,16 +390,17 @@ where
             .get_block_by_height(height.into())
             .then(move |x| {
                 let res: BoxFuture<_> = match x {
-                    Ok(raw_block) => Box::new(
-                        get_jsonrpc_block_from_raw_block(storage, &raw_block, include_tx).map(Some),
-                    ),
-                    Err(e) => match e {
-                        StorageError::Database(DatabaseError::NotFound) => Box::new(ok(None)),
-                        _ => {
-                            error!("get_block_by_height err: {:?}", e);
-                            Box::new(err(JsonrpcError::internal_error()))
-                        }
+                    Ok(raw_block) => match raw_block {
+                        Some(rblock) => Box::new(
+                            get_jsonrpc_block_from_raw_block(storage, &rblock, include_tx)
+                                .map(Some),
+                        ),
+                        None => Box::new(ok(None)),
                     },
+                    Err(e) => {
+                        error!("get_block_by_height err: {:?}", e);
+                        Box::new(err(JsonrpcError::internal_error()))
+                    }
                 };
                 res
             });
@@ -414,7 +416,13 @@ where
                 error!("get_receipt err: {:?}", e);
                 JsonrpcError::internal_error()
             })
-            .and_then(|raw_receipt| get_jsonrpc_receipt_from_raw_receipt(storage, raw_receipt));
+            .and_then(|raw_receipt| match raw_receipt {
+                Some(receipt) => get_jsonrpc_receipt_from_raw_receipt(storage, receipt),
+                None => {
+                    error!("get_receipt err: not found");
+                    Box::new(err(JsonrpcError::internal_error()))
+                }
+            });
 
         Box::new(fut)
     }
@@ -467,14 +475,16 @@ where
             .get_transaction(&transform_data32_to_hash(hash))
             .then(move |x| {
                 let res: BoxFuture<_> = match x {
-                    Ok(raw_tx) => Box::new(get_jsonrpc_tx_from_raw_tx(storage, raw_tx).map(Some)),
-                    Err(e) => match e {
-                        StorageError::Database(DatabaseError::NotFound) => Box::new(ok(None)),
-                        _ => {
-                            error!("get_transaction err: {:?}", e);
-                            Box::new(err(JsonrpcError::internal_error()))
+                    Ok(raw_transaction) => match raw_transaction {
+                        Some(raw_tx) => {
+                            Box::new(get_jsonrpc_tx_from_raw_tx(storage, raw_tx).map(Some))
                         }
+                        None => Box::new(ok(None)),
                     },
+                    Err(e) => {
+                        error!("get_transaction err: {:?}", e);
+                        Box::new(err(JsonrpcError::internal_error()))
+                    }
                 };
                 res
             });

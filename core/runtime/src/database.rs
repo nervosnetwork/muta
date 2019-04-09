@@ -27,38 +27,22 @@ pub enum DatabaseError {
     Internal(String),
 }
 
+pub type DBResult<T> = FutRuntimeResult<T, DatabaseError>;
+
 pub trait Database: Send + Sync {
-    fn get(&self, c: DataCategory, key: &[u8]) -> FutRuntimeResult<Vec<u8>, DatabaseError>;
+    fn get(&self, c: DataCategory, key: &[u8]) -> DBResult<Option<Vec<u8>>>;
 
-    fn get_batch(
-        &self,
-        c: DataCategory,
-        keys: &[Vec<u8>],
-    ) -> FutRuntimeResult<Vec<Option<Vec<u8>>>, DatabaseError>;
+    fn get_batch(&self, c: DataCategory, keys: &[Vec<u8>]) -> DBResult<Vec<Option<Vec<u8>>>>;
 
-    fn insert(
-        &self,
-        c: DataCategory,
-        key: &[u8],
-        value: &[u8],
-    ) -> FutRuntimeResult<(), DatabaseError>;
+    fn insert(&self, c: DataCategory, key: &[u8], value: &[u8]) -> DBResult<()>;
 
-    fn insert_batch(
-        &self,
-        c: DataCategory,
-        keys: &[Vec<u8>],
-        values: &[Vec<u8>],
-    ) -> FutRuntimeResult<(), DatabaseError>;
+    fn insert_batch(&self, c: DataCategory, keys: &[Vec<u8>], values: &[Vec<u8>]) -> DBResult<()>;
 
-    fn contains(&self, c: DataCategory, key: &[u8]) -> FutRuntimeResult<bool, DatabaseError>;
+    fn contains(&self, c: DataCategory, key: &[u8]) -> DBResult<bool>;
 
-    fn remove(&self, c: DataCategory, key: &[u8]) -> FutRuntimeResult<(), DatabaseError>;
+    fn remove(&self, c: DataCategory, key: &[u8]) -> DBResult<()>;
 
-    fn remove_batch(
-        &self,
-        c: DataCategory,
-        keys: &[Vec<u8>],
-    ) -> FutRuntimeResult<(), DatabaseError>;
+    fn remove_batch(&self, c: DataCategory, keys: &[Vec<u8>]) -> DBResult<()>;
 }
 
 impl Error for DatabaseError {}
