@@ -1,6 +1,6 @@
 use crate::types::Filter;
 use core_storage::storage::Storage;
-use core_types::{Block, BloomRef, Hash};
+use core_types::{Block, BloomRef, Hash, TransactionPosition};
 use futures::future::{err, join_all, ok, Future};
 use jsonrpc_core::{BoxFuture, Error as JsonrpcError};
 use jsonrpc_types::rpctypes::{BlockNumber, BlockTag, Data, Data32, Log, Quantity};
@@ -16,35 +16,22 @@ where
     S: Storage + 'static,
 {
     let fut = storage
-        .get_latest_block()
+        .get_transaction_position(&tx_hash)
         .map_err(|e| {
-            error!("get_latest_block err: {:?}", e);
+            error!("get_transaction_position err: {:?}", e);
             JsonrpcError::internal_error()
         })
-        .and_then(move |block| {
-            if block.tx_hashes.contains(&tx_hash) {
-                return ok(Some(block));
-            }
-            for block_number in (0..block.header.height).rev() {
-                match storage.get_block_by_height(block_number as u64).wait() {
-                    Ok(b) => match b {
-                        Some(blk) => {
-                            if blk.tx_hashes.contains(&tx_hash) {
-                                return ok(Some(blk));
-                            }
-                        }
-                        None => {
-                            error!("get_block_by_height {:?} err: not found", block_number);
-                            return err(JsonrpcError::internal_error());
-                        }
-                    },
+        .and_then(move |position| match position {
+            None => ok(None),
+            Some(TransactionPosition { block_hash, .. }) => {
+                match storage.get_block_by_hash(&block_hash).wait() {
+                    Ok(b) => ok(b),
                     Err(e) => {
                         error!("unexpected get_block_by_height err: {:?}", e);
-                        return err(JsonrpcError::internal_error());
+                        err(JsonrpcError::internal_error())
                     }
                 }
             }
-            ok(None)
         });
     Box::new(fut)
 }
