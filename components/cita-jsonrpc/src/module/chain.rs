@@ -1,14 +1,16 @@
-use crate::helpers::{
-    get_block_by_block_number, get_block_by_tx_hash, get_logs, transform_data32_to_hash,
-};
-use crate::types::Filter;
+use std::sync::Arc;
+
+use futures::future::{err, ok, result, Future};
+use log::error;
+use rlp;
+
+use core_merkle::{merge, Merkle};
 use core_runtime::{Executor, TransactionPool};
 use core_serialization::{AsyncCodec, UnverifiedTransaction as SerUnverifiedTransaction};
 use core_storage::storage::Storage;
 use core_types::{
     Address, Balance, Block as RawBlock, Hash, Receipt as RawReceipt, SignedTransaction, H256,
 };
-use futures::future::{err, ok, result, Future};
 use jsonrpc_core::{BoxFuture, Error as JsonrpcError};
 use jsonrpc_derive::rpc;
 use jsonrpc_types::rpctypes::{
@@ -16,9 +18,11 @@ use jsonrpc_types::rpctypes::{
     Data32, Filter as RpcFilter, FullTransaction, Log, MetaData, Quantity, Receipt, RpcTransaction,
     TxResponse,
 };
-use log::error;
-use rlp;
-use std::sync::Arc;
+
+use crate::helpers::{
+    get_block_by_block_number, get_block_by_tx_hash, get_logs, transform_data32_to_hash,
+};
+use crate::types::{Filter, ReceiptProof};
 
 #[rpc]
 pub trait Chain {
@@ -62,6 +66,9 @@ pub trait Chain {
 
     #[rpc(name = "getTransactionProof")]
     fn get_transaction_proof(&self, hash: Data32) -> BoxFuture<Data>;
+
+    #[rpc(name = "getReceiptProof")]
+    fn get_receipt_proof(&self, hash: Data32) -> BoxFuture<Option<Data>>;
 
     // not ready
     #[rpc(name = "getMetaData")]
@@ -197,7 +204,7 @@ where
     S: Storage + 'static,
 {
     let tx_hash = raw_tx.hash.clone();
-    let fut = get_block_by_tx_hash(storage, tx_hash.clone()).map(move |block| {
+    let fut = get_block_by_tx_hash(storage, &tx_hash).map(move |block| {
         let mut tx = RpcTransaction {
             hash: raw_tx.hash.as_bytes().into(),
             content: raw_tx.untx.transaction.data.clone().into(),
@@ -231,7 +238,7 @@ where
 {
     let storage1 = Arc::clone(&storage);
     let raw_receipt2 = raw_receipt.clone();
-    let fut = get_block_by_tx_hash(storage, raw_receipt.transaction_hash.clone())
+    let fut = get_block_by_tx_hash(storage, &raw_receipt.transaction_hash)
         .and_then(|block| match block {
             None => {
                 error!("unexpected err, block is not found");
@@ -579,6 +586,71 @@ where
 
     fn get_transaction_proof(&self, _hash: Data32) -> BoxFuture<Data> {
         unimplemented!()
+    }
+
+    fn get_receipt_proof(&self, hash: Data32) -> BoxFuture<Option<Data>> {
+        // get block body
+        let storage = self.get_storage_inst();
+        let storage2 = Arc::clone(&storage);
+        let hash = transform_data32_to_hash(hash);
+
+        let block_ret = get_block_by_tx_hash(storage, &hash).wait();
+        let mut block: RawBlock;
+        match block_ret {
+            Ok(blk) => match blk {
+                Some(value) => block = value,
+                None => return Box::new(ok(None)),
+            },
+            Err(e) => {
+                error!("get_block_by_tx_hash err: {:?}", e);
+                return Box::new(err(JsonrpcError::internal_error()));
+            }
+        };
+        let block_number = block.header.height;
+
+        // get all the receipts in block
+        let tx_hashes = block.tx_hashes;
+        let index = tx_hashes
+            .iter()
+            .position(|x| x == &hash)
+            .expect("tx should be in block");
+        let receipts_ret = storage2
+            .get_receipts(tx_hashes.iter().collect::<Vec<_>>().as_slice())
+            .wait();
+
+        let receipt_list;
+        match receipts_ret {
+            Ok(value) => receipt_list = value,
+            Err(e) => {
+                error!("get_receipts err: {:?}", e);
+                return Box::new(err(JsonrpcError::internal_error()));
+            }
+        };
+
+        let receipt: RawReceipt = receipt_list
+            .get(index)
+            .cloned()
+            .expect("should get receipt if index exist")
+            .unwrap();
+
+        // get merkle proof
+        let receipts: Vec<RawReceipt> = receipt_list
+            .into_iter()
+            .map(|r| r.expect("tx should have receipt"))
+            .collect();
+
+        let hahses: Vec<Hash> = receipts.iter().map(RawReceipt::hash).collect();
+        let tree = Merkle::from_hashes(hahses.clone(), merge);
+        let merkle_proof = tree
+            .get_proof_by_input_index(index)
+            .expect("should always return proof if index is correct");
+
+        let receipt_proof = ReceiptProof {
+            receipt,
+            merkle_proof,
+            block_number,
+        };
+        Box::new(ok(Some(Data::new(rlp::encode(&receipt_proof)))))
     }
 
     fn get_meta_data(&self, _block_number: BlockNumber) -> BoxFuture<MetaData> {

@@ -29,3 +29,4 @@ core-runtime = { path = "../../core/runtime" }
 core-types = { path = "../../core/types" }
 core-storage = { path = "../../core/storage" }
 core-serialization = { path = "../../core/serialization" }
+core-merkle = { path = "../../core/merkle" }
