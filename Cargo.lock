@@ -376,6 +376,7 @@ name = "components-cita-jsonrpc"
 version = "0.1.0"
 dependencies = [
  "core-crypto 0.1.0",
+ "core-merkle 0.1.0",
  "core-runtime 0.1.0",
  "core-serialization 0.1.0",
  "core-storage 0.1.0",
@@ -529,6 +530,7 @@ name = "core-merkle"
 version = "0.1.0"
 dependencies = [
  "core-types 0.1.0",
+ "rlp 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "static_merkle_tree 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 

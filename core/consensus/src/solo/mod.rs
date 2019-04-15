@@ -8,10 +8,10 @@ use futures_locks::RwLock;
 use tokio::timer::Delay;
 
 use core_crypto::{Crypto, CryptoTransform};
-use core_merkle::Merkle;
+use core_merkle::{merge, Merkle};
 use core_runtime::{Executor, TransactionPool};
 use core_storage::storage::Storage;
-use core_types::{Address, Block, BlockHeader, Hash, TransactionPosition};
+use core_types::{Address, Block, BlockHeader, Hash, Receipt, TransactionPosition};
 
 use crate::errors::ConsensusError;
 
@@ -144,8 +144,9 @@ where
         };
 
         if !tx_hashes.is_empty() {
-            let transactions_root = Merkle::hashes_root(&tx_hashes).unwrap();
-            header.transactions_root = transactions_root;
+            let tree = Merkle::from_hashes(tx_hashes.clone(), merge);
+            let transactions_root = tree.get_root_hash().expect("should generate merkle root");
+            header.transactions_root = transactions_root.clone();
         }
 
         Block { header, tx_hashes }
@@ -177,8 +178,13 @@ where
                         Ok(execution_result) => execution_result,
                         Err(e) => panic!("exec block: {:?}", e),
                     };
-                let receipts_root = Merkle::receipts_root(&execution_result.receipts)
-                    .expect("receipts hash cannot be empty");
+                let hahses: Vec<Hash> = execution_result
+                    .receipts
+                    .iter()
+                    .map(Receipt::hash)
+                    .collect();
+                let tree = Merkle::from_hashes(hahses.clone(), merge);
+                let receipts_root = tree.get_root_hash().expect("receipts hash cannot be empty");
                 let quota_used = execution_result
                     .receipts
                     .iter()
@@ -186,7 +192,7 @@ where
 
                 block.header.state_root = execution_result.state_root;
                 block.header.logs_bloom = execution_result.all_logs_bloom;
-                block.header.receipts_root = receipts_root;
+                block.header.receipts_root = receipts_root.clone();
                 block.header.quota_used = quota_used;
 
                 let mut positions = HashMap::with_capacity(signed_txs.len());

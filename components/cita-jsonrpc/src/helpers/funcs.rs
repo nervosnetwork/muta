@@ -11,7 +11,7 @@ pub fn transform_data32_to_hash(hash: Data32) -> Hash {
     Hash::from_bytes(&Into::<Vec<u8>>::into(hash)).expect("never returns an error")
 }
 
-pub fn get_block_by_tx_hash<S>(storage: Arc<S>, tx_hash: Hash) -> BoxFuture<Option<Block>>
+pub fn get_block_by_tx_hash<S>(storage: Arc<S>, tx_hash: &Hash) -> BoxFuture<Option<Block>>
 where
     S: Storage + 'static,
 {
