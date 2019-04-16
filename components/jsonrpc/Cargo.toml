@@ -1,0 +1,21 @@
+[package]
+name = "jsonrpc"
+version = "0.1.0"
+authors = ["Cryptape Technologies <contact@cryptape.com>"]
+edition = "2018"
+
+[dependencies]
+actix = "0.8.0-alpha.3"
+actix-web = "1.0.0-alpha.6"
+tokio-async-await = { version = "0.1", features = [ "async-await-preview" ] }
+old_futures = { package = "futures", version = "0.1" }
+futures-preview = { version = "0.3.0-alpha.13", features = ["compat"] }
+futures-util-preview = { version = "0.3.0-alpha.13" }
+futures-timer = "0.1"
+
+serde = "1.0"
+serde_derive = "1.0"
+serde_json = "1.0"
+env_logger = "0.6"
+json = "0.11"
+log = "0.4"

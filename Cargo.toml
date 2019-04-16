@@ -45,6 +45,7 @@ members = [
   "components/transaction-pool",
   "components/database",
   # "components/cita-jsonrpc",
+  "components/jsonrpc",
   "components/network",
   "components/executor",
 ]
