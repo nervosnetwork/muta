@@ -22,7 +22,7 @@ doc-deps:
 	cargo doc --all
 
 check:
-	cargo check ${VERBOSE} --all
+	${CARGO} check ${VERBOSE} --all
 
 build:
 	${CARGO} build ${VERBOSE} --release
