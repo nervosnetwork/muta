@@ -130,9 +130,9 @@ alias:
 
   - &job-default
     docker:
-      - image: cita/cita-build:ubuntu-18.04-20190304
+      - image: cita/cita-build:ubuntu-18.04-20190304-rocksdb
     working_directory: ~/muta
-    resource_class: large
+    resource_class: medium+
 
 version: 2
 jobs:
@@ -141,6 +141,7 @@ jobs:
     environment:
       FMT: true
       CHECK: true
+      USE_SYS_ROCKSDB: true
     steps:
       # checkout source code
       - restore_cache: *restore-source-codes-cache
@@ -173,6 +174,7 @@ jobs:
     <<: *job-default
     environment:
       TEST: true
+      USE_SYS_ROCKSDB: true
     steps:
       - restore_cache: *restore-source-codes-cache
       - restore_cache: *restore-dependencies-cache

@@ -1,7 +1,19 @@
 VERBOSE := $(if ${CI},--verbose,)
 
+ifneq ("$(wildcard /usr/lib/librocksdb.so)","")
+	SYS_LIB_DIR := /usr/lib
+else ifneq ("$(wildcard /usr/lib64/librocksdb.so)","")
+	SYS_LIB_DIR := /usr/lib64
+else
+	USE_SYS_ROCKSDB :=
+endif
+
+SYS_ROCKSDB := $(if ${USE_SYS_ROCKSDB},ROCKSDB_LIB_DIR=${SYS_LIB_DIR},)
+
+CARGO := env ${SYS_ROCKSDB} cargo
+
 test:
-	cargo test ${VERBOSE} --all -- --nocapture
+	${CARGO} test ${VERBOSE} --all -- --nocapture
 
 doc:
 	cargo doc --all --no-deps
@@ -13,19 +25,20 @@ check:
 	cargo check ${VERBOSE} --all
 
 build:
-	cargo build ${VERBOSE} --release
+	${CARGO} build ${VERBOSE} --release
 
 prod:
-	cargo build ${VERBOSE} --release
+	${CARGO} build ${VERBOSE} --release
 
 prod-test:
-	cargo test ${VERBOSE} --all -- --nocapture
+	${CARGO} test ${VERBOSE} --all -- --nocapture
 
 fmt:
 	cargo fmt ${VERBOSE} --all -- --check
 
 clippy:
-	cargo clippy ${VERBOSE} --all --all-targets --all-features -- -D warnings -D clippy::clone_on_ref_ptr -D clippy::enum_glob_use
+	${CARGO} clippy ${VERBOSE} --all --all-targets --all-features -- \
+		-D warnings -D clippy::clone_on_ref_ptr -D clippy::enum_glob_use
 
 
 ci: fmt clippy test
