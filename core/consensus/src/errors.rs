@@ -3,7 +3,7 @@ use std::fmt;
 
 use core_crypto::CryptoError;
 use core_runtime::{ExecutorError, TransactionPoolError};
-use core_storage::errors::StorageError;
+use core_storage::StorageError;
 
 #[derive(Debug)]
 pub enum ConsensusError {

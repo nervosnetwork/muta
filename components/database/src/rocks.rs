@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
-use futures::future::{err, ok, result, Future};
 use rocksdb::{ColumnFamily, Error as RocksError, Options, WriteBatch, DB};
+use tokio_async_await::compat::backward::Compat;
 
-use core_runtime::{DBResult, DataCategory, Database, DatabaseError};
+use core_runtime::{DataCategory, Database, DatabaseError, FutDBResult};
 
 pub struct RocksDB {
     db: Arc<DB>,
@@ -45,120 +45,115 @@ impl RocksDB {
             self.db.drop_cf(c).unwrap();
         }
     }
-
-    fn get_column(&self, c: DataCategory) -> Result<ColumnFamily, DatabaseError> {
-        self.db
-            .cf_handle(map_data_category(c))
-            .ok_or(DatabaseError::NotFound)
-    }
 }
 
 impl Database for RocksDB {
-    fn get(&self, c: DataCategory, key: &[u8]) -> DBResult<Option<Vec<u8>>> {
-        // TODO: refactor
-        let column = match self.get_column(c) {
-            Ok(column) => column,
-            Err(e) => return Box::new(err(e)),
-        };
+    fn get(&self, c: DataCategory, key: &[u8]) -> FutDBResult<Option<Vec<u8>>> {
+        let db = Arc::clone(&self.db);
+        let key = key.to_vec();
 
-        let v = match self.db.get_cf(column, key) {
-            Ok(opt_v) => opt_v.map(|v| v.to_vec()),
-            Err(e) => return Box::new(err(map_db_err(e))),
+        let fut = async move {
+            let column = get_column(&db, c)?;
+            let v = db.get_cf(column, &key).map_err(map_db_err)?;
+            Ok(v.map(|v| v.to_vec()))
         };
-
-        Box::new(ok(v.map(|v| v.to_vec())))
+        Box::new(Compat::new(fut))
     }
 
-    fn get_batch(&self, c: DataCategory, keys: &[Vec<u8>]) -> DBResult<Vec<Option<Vec<u8>>>> {
-        let column = match self.get_column(c) {
-            Ok(column) => column,
-            Err(e) => return Box::new(err(e)),
-        };
+    fn get_batch(&self, c: DataCategory, keys: &[Vec<u8>]) -> FutDBResult<Vec<Option<Vec<u8>>>> {
+        let db = Arc::clone(&self.db);
+        let keys = keys.to_vec();
 
-        let mut values = Vec::with_capacity(keys.len());
+        let fut = async move {
+            let column = get_column(&db, c)?;
+            let mut values = Vec::with_capacity(keys.len());
 
-        for key in keys {
-            match self.db.get_cf(column, key) {
-                Ok(opt_v) => values.push(opt_v.map(|v| v.to_vec())),
-                Err(e) => {
-                    log::error!(target: "database rocksdb", "{}", e);
-                    return Box::new(err(map_db_err(e)));
-                }
+            for key in keys {
+                let v = db.get_cf(column, key).map_err(map_db_err)?;
+                values.push(v.map(|v| v.to_vec()));
             }
-        }
-
-        Box::new(ok(values))
+            Ok(values)
+        };
+        Box::new(Compat::new(fut))
     }
 
-    fn insert(&self, c: DataCategory, key: &[u8], value: &[u8]) -> DBResult<()> {
-        let column = match self.get_column(c) {
-            Ok(column) => column,
-            Err(e) => return Box::new(err(e)),
-        };
+    fn insert(&self, c: DataCategory, key: Vec<u8>, value: Vec<u8>) -> FutDBResult<()> {
+        let db = Arc::clone(&self.db);
 
-        let fut = result(self.db.put_cf(column, key, value)).map_err(map_db_err);
-        Box::new(fut)
+        let fut = async move {
+            let column = get_column(&db, c)?;
+            db.put_cf(column, key, value).map_err(map_db_err)?;
+            Ok(())
+        };
+        Box::new(Compat::new(fut))
     }
 
-    fn insert_batch(&self, c: DataCategory, keys: &[Vec<u8>], values: &[Vec<u8>]) -> DBResult<()> {
-        if keys.len() != values.len() {
-            return Box::new(err(DatabaseError::InvalidData));
-        }
+    fn insert_batch(
+        &self,
+        c: DataCategory,
+        keys: Vec<Vec<u8>>,
+        values: Vec<Vec<u8>>,
+    ) -> FutDBResult<()> {
+        let db = Arc::clone(&self.db);
 
-        let column = match self.get_column(c) {
-            Ok(column) => column,
-            Err(e) => return Box::new(err(e)),
-        };
-
-        let mut batch = WriteBatch::default();
-        for i in 0..keys.len() {
-            if let Err(e) = batch.put_cf(column, &keys[i], &values[i]) {
-                return Box::new(err(map_db_err(e)));
+        let fut = async move {
+            if keys.len() != values.len() {
+                return Err(DatabaseError::InvalidData);
             }
-        }
 
-        let fut = result(self.db.write(batch)).map_err(map_db_err);
-        Box::new(fut)
-    }
+            let column = get_column(&db, c)?;
+            let mut batch = WriteBatch::default();
 
-    fn contains(&self, c: DataCategory, key: &[u8]) -> DBResult<bool> {
-        let column = match self.get_column(c) {
-            Ok(column) => column,
-            Err(e) => return Box::new(err(e)),
-        };
-
-        let v = match self.db.get_cf(column, key) {
-            Ok(opt_v) => opt_v.is_some(),
-            Err(e) => return Box::new(err(map_db_err(e))),
-        };
-
-        Box::new(ok(v))
-    }
-
-    fn remove(&self, c: DataCategory, key: &[u8]) -> DBResult<()> {
-        let column = match self.get_column(c) {
-            Ok(column) => column,
-            Err(e) => return Box::new(err(e)),
-        };
-
-        let fut = result(self.db.delete_cf(column, key)).map_err(map_db_err);
-        Box::new(fut)
-    }
-
-    fn remove_batch(&self, c: DataCategory, keys: &[Vec<u8>]) -> DBResult<()> {
-        let column = match self.get_column(c) {
-            Ok(column) => column,
-            Err(e) => return Box::new(err(e)),
-        };
-
-        let mut batch = WriteBatch::default();
-        for key in keys {
-            if let Err(e) = batch.delete_cf(column, &key) {
-                return Box::new(err(map_db_err(e)));
+            for i in 0..keys.len() {
+                batch
+                    .put_cf(column, &keys[i], &values[i])
+                    .map_err(map_db_err)?;
             }
-        }
-        let fut = result(self.db.write(batch)).map_err(map_db_err);
-        Box::new(fut)
+            db.write(batch).map_err(map_db_err)?;
+            Ok(())
+        };
+        Box::new(Compat::new(fut))
+    }
+
+    fn contains(&self, c: DataCategory, key: &[u8]) -> FutDBResult<bool> {
+        let db = Arc::clone(&self.db);
+        let key = key.to_vec();
+
+        let fut = async move {
+            let column = get_column(&db, c)?;
+            let v = db.get_cf(column, &key).map_err(map_db_err)?;
+            Ok(v.is_some())
+        };
+        Box::new(Compat::new(fut))
+    }
+
+    fn remove(&self, c: DataCategory, key: &[u8]) -> FutDBResult<()> {
+        let db = Arc::clone(&self.db);
+        let key = key.to_vec();
+
+        let fut = async move {
+            let column = get_column(&db, c)?;
+            db.delete_cf(column, key).map_err(map_db_err)?;
+            Ok(())
+        };
+        Box::new(Compat::new(fut))
+    }
+
+    fn remove_batch(&self, c: DataCategory, keys: &[Vec<u8>]) -> FutDBResult<()> {
+        let db = Arc::clone(&self.db);
+        let keys = keys.to_vec();
+
+        let fut = async move {
+            let column = get_column(&db, c)?;
+
+            let mut batch = WriteBatch::default();
+            for key in keys {
+                batch.delete_cf(column, key).map_err(map_db_err)?;
+            }
+            db.write(batch).map_err(map_db_err)?;
+            Ok(())
+        };
+        Box::new(Compat::new(fut))
     }
 }
 
@@ -184,20 +179,26 @@ fn map_db_err(err: RocksError) -> DatabaseError {
     DatabaseError::Internal(err.to_string())
 }
 
+fn get_column(db: &DB, c: DataCategory) -> Result<ColumnFamily, DatabaseError> {
+    db.cf_handle(map_data_category(c))
+        .ok_or(DatabaseError::NotFound)
+}
+
 // TODO: merge rocksdb and memorydb test together.
 #[cfg(test)]
 mod tests {
-    use super::RocksDB;
+    use futures::future::Future;
 
     use core_runtime::{DataCategory, Database};
-    use futures::future::Future;
+
+    use super::RocksDB;
 
     #[test]
     fn test_get_should_return_ok() {
         let db = RocksDB::new("rocksdb/test_get_should_return_ok").unwrap();
 
         assert_eq!(db.get(DataCategory::Block, b"test").wait(), Ok(None));
-        db.insert(DataCategory::Block, b"test", b"test")
+        db.insert(DataCategory::Block, b"test".to_vec(), b"test".to_vec())
             .wait()
             .unwrap();
         let v = db.get(DataCategory::Block, b"test").wait().unwrap();
@@ -209,7 +210,7 @@ mod tests {
     fn test_insert_should_return_ok() {
         let db = RocksDB::new("rocksdb/test_insert_should_return_ok").unwrap();
 
-        db.insert(DataCategory::Block, b"test", b"test")
+        db.insert(DataCategory::Block, b"test".to_vec(), b"test".to_vec())
             .wait()
             .unwrap();
         assert_eq!(
@@ -225,8 +226,8 @@ mod tests {
 
         db.insert_batch(
             DataCategory::Block,
-            &[b"test1".to_vec(), b"test2".to_vec()],
-            &[b"test1".to_vec(), b"test2".to_vec()],
+            vec![b"test1".to_vec(), b"test2".to_vec()],
+            vec![b"test1".to_vec(), b"test2".to_vec()],
         )
         .wait()
         .unwrap();
@@ -245,7 +246,7 @@ mod tests {
     fn test_contain_should_return_true() {
         let db = RocksDB::new("rocksdb/test_contain_should_return_true").unwrap();
 
-        db.insert(DataCategory::Block, b"test", b"test")
+        db.insert(DataCategory::Block, b"test".to_vec(), b"test".to_vec())
             .wait()
             .unwrap();
         assert_eq!(
@@ -271,7 +272,7 @@ mod tests {
     fn test_remove_should_return_ok() {
         let db = RocksDB::new("rocksdb/test_remove_should_return_ok").unwrap();
 
-        db.insert(DataCategory::Block, b"test", b"test")
+        db.insert(DataCategory::Block, b"test".to_vec(), b"test".to_vec())
             .wait()
             .unwrap();
         db.remove(DataCategory::Block, b"test").wait().unwrap();
@@ -285,8 +286,8 @@ mod tests {
 
         db.insert_batch(
             DataCategory::Block,
-            &[b"test1".to_vec(), b"test2".to_vec()],
-            &[b"test1".to_vec(), b"test2".to_vec()],
+            vec![b"test1".to_vec(), b"test2".to_vec()],
+            vec![b"test1".to_vec(), b"test2".to_vec()],
         )
         .wait()
         .unwrap();

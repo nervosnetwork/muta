@@ -33,7 +33,9 @@ where
     }
 
     fn insert(&mut self, key: &[u8], value: &[u8]) -> Result<(), Self::Error> {
-        self.db.insert(DataCategory::State, key, value).wait()
+        self.db
+            .insert(DataCategory::State, key.to_vec(), value.to_vec())
+            .wait()
     }
 
     fn contains(&self, key: &[u8]) -> Result<bool, Self::Error> {

@@ -5,8 +5,8 @@ use futures::future::{err, ok};
 
 use core_runtime::{DatabaseError, FutRuntimeResult};
 use core_storage::{
-    errors::{StorageError, StorageResult},
-    storage::Storage,
+    errors::StorageError,
+    storage::{Storage, StorageResult},
 };
 use core_types::{
     Address, Block, BlockHeader, Bloom, Hash, Receipt, SignedTransaction, TransactionPosition,

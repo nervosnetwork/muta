@@ -10,7 +10,7 @@ use tokio::timer::Delay;
 use core_crypto::{Crypto, CryptoTransform};
 use core_merkle::{merge, Merkle};
 use core_runtime::{Executor, TransactionPool};
-use core_storage::storage::Storage;
+use core_storage::Storage;
 use core_types::{Address, Block, BlockHeader, Hash, Receipt, TransactionPosition};
 
 use crate::errors::ConsensusError;
@@ -294,7 +294,7 @@ mod tests {
         Crypto, CryptoTransform,
     };
     use core_runtime::TransactionPool;
-    use core_storage::storage::{BlockStorage, Storage};
+    use core_storage::{BlockStorage, Storage};
     use core_types::{
         Address, Block, Genesis, Hash, StateAlloc, Transaction, UnverifiedTransaction,
     };

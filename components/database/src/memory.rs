@@ -1,10 +1,9 @@
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
-use futures::future::{err, ok, Future};
-use futures_locks::RwLock;
+use tokio_async_await::compat::backward::Compat;
 
-use core_runtime::{DBResult, DataCategory, Database, DatabaseError};
+use core_runtime::{DataCategory, Database, DatabaseError, FutDBResult};
 
 pub struct MemoryDB {
     storage: Arc<RwLock<HashMap<Vec<u8>, Vec<u8>>>>,
@@ -27,143 +26,150 @@ impl Default for MemoryDB {
 }
 
 impl Database for MemoryDB {
-    fn get(&self, c: DataCategory, key: &[u8]) -> DBResult<Option<Vec<u8>>> {
-        let key = gen_key(&c, key);
+    fn get(&self, c: DataCategory, key: &[u8]) -> FutDBResult<Option<Vec<u8>>> {
+        let storage = Arc::clone(&self.storage);
+        let key = gen_key(&c, key.to_vec());
 
-        let fut = self
-            .storage
-            .read()
-            .map_err(|()| DatabaseError::Internal("rwlock error".to_string()))
-            .and_then(move |storage| ok(storage.get(&key).map(|v| v.to_vec())));
-
-        Box::new(fut)
+        let fut = async move {
+            let storage = storage.read().map_err(|_| map_rwlock_err())?;
+            let v = storage.get(&key).map(|v| v.to_vec());
+            Ok(v)
+        };
+        Box::new(Compat::new(fut))
     }
 
-    fn get_batch(&self, c: DataCategory, keys: &[Vec<u8>]) -> DBResult<Vec<Option<Vec<u8>>>> {
-        let keys = gen_keys(&c, keys);
+    fn get_batch(&self, c: DataCategory, keys: &[Vec<u8>]) -> FutDBResult<Vec<Option<Vec<u8>>>> {
+        let storage = Arc::clone(&self.storage);
+        let keys = gen_keys(&c, keys.to_vec());
 
-        let fut = self
-            .storage
-            .read()
-            .map_err(|()| DatabaseError::Internal("rwlock error".to_string()))
-            .map(move |storage| {
-                keys.into_iter()
-                    .map(|key| storage.get(&key.to_vec()).map(|v| v.to_vec()))
-                    .collect()
-            });
+        let fut = async move {
+            let storage = storage.read().map_err(|_| map_rwlock_err())?;
+            let values = keys
+                .into_iter()
+                .map(|key| storage.get(&key.to_vec()).map(|v| v.to_vec()))
+                .collect();
 
-        Box::new(fut)
+            Ok(values)
+        };
+        Box::new(Compat::new(fut))
     }
 
-    fn insert(&self, c: DataCategory, key: &[u8], value: &[u8]) -> DBResult<()> {
+    fn insert(&self, c: DataCategory, key: Vec<u8>, value: Vec<u8>) -> FutDBResult<()> {
+        let storage = Arc::clone(&self.storage);
         let key = gen_key(&c, key);
         let value = value.to_vec();
 
-        let fut = self
-            .storage
-            .write()
-            .map_err(|()| DatabaseError::Internal("rwlock error".to_string()))
-            .map(move |mut storage| storage.insert(key, value))
-            .map(|_| ());
-
-        Box::new(fut)
+        let fut = async move {
+            let mut storage = storage.write().map_err(|_| map_rwlock_err())?;
+            storage.insert(key, value);
+            Ok(())
+        };
+        Box::new(Compat::new(fut))
     }
 
-    fn insert_batch(&self, c: DataCategory, keys: &[Vec<u8>], values: &[Vec<u8>]) -> DBResult<()> {
-        if keys.len() != values.len() {
-            return Box::new(err(DatabaseError::InvalidData));
-        }
-
+    fn insert_batch(
+        &self,
+        c: DataCategory,
+        keys: Vec<Vec<u8>>,
+        values: Vec<Vec<u8>>,
+    ) -> FutDBResult<()> {
+        let storage = Arc::clone(&self.storage);
         let keys = gen_keys(&c, keys);
         let values = values.to_vec();
 
-        let fut = self
-            .storage
-            .write()
-            .map_err(|()| DatabaseError::Internal("rwlock error".to_string()))
-            .map(move |mut storage| {
-                for i in 0..keys.len() {
-                    let key = keys[i].to_vec();
-                    let value = values[i].to_vec();
+        let fut = async move {
+            if keys.len() != values.len() {
+                return Err(DatabaseError::InvalidData);
+            }
 
-                    storage.insert(key, value);
-                }
-            });
+            let mut storage = storage.write().map_err(|_| map_rwlock_err())?;
+            for i in 0..keys.len() {
+                let key = keys[i].to_vec();
+                let value = values[i].to_vec();
 
-        Box::new(fut)
+                storage.insert(key, value);
+            }
+
+            Ok(())
+        };
+
+        Box::new(Compat::new(fut))
     }
 
-    fn contains(&self, c: DataCategory, key: &[u8]) -> DBResult<bool> {
-        let key = gen_key(&c, key);
+    fn contains(&self, c: DataCategory, key: &[u8]) -> FutDBResult<bool> {
+        let storage = Arc::clone(&self.storage);
+        let key = gen_key(&c, key.to_vec());
 
-        let fut = self
-            .storage
-            .read()
-            .map_err(|()| DatabaseError::Internal("rwlock error".to_string()))
-            .map(move |storage| storage.contains_key(&key));
+        let fut = async move {
+            let storage = storage.read().map_err(|_| map_rwlock_err())?;
+            Ok(storage.contains_key(&key))
+        };
 
-        Box::new(fut)
+        Box::new(Compat::new(fut))
     }
 
-    fn remove(&self, c: DataCategory, key: &[u8]) -> DBResult<()> {
-        let key = gen_key(&c, key);
+    fn remove(&self, c: DataCategory, key: &[u8]) -> FutDBResult<()> {
+        let storage = Arc::clone(&self.storage);
+        let key = gen_key(&c, key.to_vec());
 
-        let fut = self
-            .storage
-            .write()
-            .map_err(|()| DatabaseError::Internal("rwlock error".to_string()))
-            .map(move |mut storage| {
+        let fut = async move {
+            let mut storage = storage.write().map_err(|_| map_rwlock_err())?;
+            storage.remove(&key);
+            Ok(())
+        };
+
+        Box::new(Compat::new(fut))
+    }
+
+    fn remove_batch(&self, c: DataCategory, keys: &[Vec<u8>]) -> FutDBResult<()> {
+        let storage = Arc::clone(&self.storage);
+        let keys = gen_keys(&c, keys.to_vec());
+
+        let fut = async move {
+            let mut storage = storage.write().map_err(|_| map_rwlock_err())?;
+            for key in keys {
                 storage.remove(&key);
-            });
+            }
+            Ok(())
+        };
 
-        Box::new(fut)
-    }
-
-    fn remove_batch(&self, c: DataCategory, keys: &[Vec<u8>]) -> DBResult<()> {
-        let keys = gen_keys(&c, keys);
-
-        let fut = self
-            .storage
-            .write()
-            .map_err(|()| DatabaseError::Internal("rwlock error".to_string()))
-            .map(move |mut storage| {
-                for key in keys {
-                    storage.remove(&key);
-                }
-            });
-
-        Box::new(fut)
+        Box::new(Compat::new(fut))
     }
 }
 
-fn gen_key(c: &DataCategory, key: &[u8]) -> Vec<u8> {
+fn gen_key(c: &DataCategory, key: Vec<u8>) -> Vec<u8> {
     match c {
-        DataCategory::Block => [b"block-", key].concat(),
-        DataCategory::Transaction => [b"transaction-", key].concat(),
-        DataCategory::Receipt => [b"receipt-", key].concat(),
-        DataCategory::State => [b"state-", key].concat(),
-        DataCategory::TransactionPool => [b"transaction-pool-", key].concat(),
-        DataCategory::TransactionPosition => [b"transaction-position-", key].concat(),
+        DataCategory::Block => [b"block-".to_vec(), key].concat(),
+        DataCategory::Transaction => [b"transaction-".to_vec(), key].concat(),
+        DataCategory::Receipt => [b"receipt-".to_vec(), key].concat(),
+        DataCategory::State => [b"state-".to_vec(), key].concat(),
+        DataCategory::TransactionPool => [b"transaction-pool-".to_vec(), key].concat(),
+        DataCategory::TransactionPosition => [b"transaction-position-".to_vec(), key].concat(),
     }
 }
 
-fn gen_keys(c: &DataCategory, keys: &[Vec<u8>]) -> Vec<Vec<u8>> {
-    keys.iter().map(|key| gen_key(c, key)).collect()
+fn gen_keys(c: &DataCategory, keys: Vec<Vec<u8>>) -> Vec<Vec<u8>> {
+    keys.into_iter().map(|key| gen_key(c, key)).collect()
+}
+
+fn map_rwlock_err() -> DatabaseError {
+    DatabaseError::Internal("rwlock error".to_string())
 }
 
 #[cfg(test)]
 mod tests {
-    use super::MemoryDB;
+    use futures::future::Future;
 
     use core_runtime::{DataCategory, Database};
-    use futures::future::Future;
+
+    use super::MemoryDB;
 
     #[test]
     fn test_get_should_return_ok() {
         let db = MemoryDB::new();
 
         assert_eq!(db.get(DataCategory::Block, b"test").wait(), Ok(None));
-        db.insert(DataCategory::Block, b"test", b"test")
+        db.insert(DataCategory::Block, b"test".to_vec(), b"test".to_vec())
             .wait()
             .unwrap();
         let v = db.get(DataCategory::Block, b"test").wait().unwrap();
@@ -174,7 +180,7 @@ mod tests {
     fn test_insert_should_return_ok() {
         let db = MemoryDB::new();
 
-        db.insert(DataCategory::Block, b"test", b"test")
+        db.insert(DataCategory::Block, b"test".to_vec(), b"test".to_vec())
             .wait()
             .unwrap();
         assert_eq!(
@@ -189,8 +195,8 @@ mod tests {
 
         db.insert_batch(
             DataCategory::Block,
-            &[b"test1".to_vec(), b"test2".to_vec()],
-            &[b"test1".to_vec(), b"test2".to_vec()],
+            vec![b"test1".to_vec(), b"test2".to_vec()],
+            vec![b"test1".to_vec(), b"test2".to_vec()],
         )
         .wait()
         .unwrap();
@@ -208,7 +214,7 @@ mod tests {
     fn test_contain_should_return_true() {
         let db = MemoryDB::new();
 
-        db.insert(DataCategory::Block, b"test", b"test")
+        db.insert(DataCategory::Block, b"test".to_vec(), b"test".to_vec())
             .wait()
             .unwrap();
         assert_eq!(
@@ -230,7 +236,7 @@ mod tests {
     fn test_remove_should_return_ok() {
         let db = MemoryDB::new();
 
-        db.insert(DataCategory::Block, b"test", b"test")
+        db.insert(DataCategory::Block, b"test".to_vec(), b"test".to_vec())
             .wait()
             .unwrap();
         db.remove(DataCategory::Block, b"test").wait().unwrap();
@@ -243,8 +249,8 @@ mod tests {
 
         db.insert_batch(
             DataCategory::Block,
-            &[b"test1".to_vec(), b"test2".to_vec()],
-            &[b"test1".to_vec(), b"test2".to_vec()],
+            vec![b"test1".to_vec(), b"test2".to_vec()],
+            vec![b"test1".to_vec(), b"test2".to_vec()],
         )
         .wait()
         .unwrap();

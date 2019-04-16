@@ -2,55 +2,60 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use byteorder::{ByteOrder, NativeEndian};
-use bytes::BytesMut;
-use futures::future::{err, join_all, ok, Future};
+use futures::{
+    compat::Future01CompatExt,
+    stream::{self, TryStreamExt},
+};
+use old_futures::future::Future as OldFuture;
+use tokio_async_await::compat::backward::Compat;
 
-use core_runtime::{DataCategory, Database, DatabaseError};
+use core_runtime::{DataCategory, Database};
 use core_serialization::{
     AsyncCodec, Block as SerBlock, Receipt as SerReceipt,
     SignedTransaction as SerSignedTransaction, TransactionPosition as SerTransactionPosition,
 };
 use core_types::{Block, Hash, Receipt, SignedTransaction, TransactionPosition};
 
-use crate::errors::{StorageError, StorageResult};
+use crate::errors::StorageError;
 
 const LATEST_BLOCK: &[u8] = b"latest-block";
+
+pub type StorageResult<T> = Box<OldFuture<Item = T, Error = StorageError> + Send>;
 
 /// "storage" is responsible for the storage and retrieval of blockchain data.
 /// Block, transaction, and receipt can be obtained from here,
 /// but data related to "world status" is not available.
+/// NOTE: Anything that might return "std::option::None" will return "std::option:: NoneError".
 pub trait Storage: Send + Sync {
     /// Get the latest block.
     fn get_latest_block(&self) -> StorageResult<Block>;
 
     /// Get a block by height.
-    fn get_block_by_height(&self, height: u64) -> StorageResult<Option<Block>>;
+    fn get_block_by_height(&self, height: u64) -> StorageResult<Block>;
 
     /// Get a block by hash.
     /// The hash is actually an index,
     /// and the corresponding height is obtained by hash and then querying the corresponding block.
-    fn get_block_by_hash(&self, hash: &Hash) -> StorageResult<Option<Block>>;
+    fn get_block_by_hash(&self, hash: &Hash) -> StorageResult<Block>;
 
     /// Get a signed transaction by hash.
-    fn get_transaction(&self, hash: &Hash) -> StorageResult<Option<SignedTransaction>>;
+    fn get_transaction(&self, hash: &Hash) -> StorageResult<SignedTransaction>;
 
     /// Get a batch of transactions by hashes.
-    fn get_transactions(&self, hashes: &[&Hash]) -> StorageResult<Vec<Option<SignedTransaction>>>;
+    fn get_transactions(&self, hashes: &[Hash]) -> StorageResult<Vec<SignedTransaction>>;
 
     /// Get a receipt by hash.
-    fn get_receipt(&self, tx_hash: &Hash) -> StorageResult<Option<Receipt>>;
+    fn get_receipt(&self, tx_hash: &Hash) -> StorageResult<Receipt>;
 
     /// Get a batch of receipts by hashes
-    fn get_receipts(&self, tx_hashes: &[&Hash]) -> StorageResult<Vec<Option<Receipt>>>;
+    fn get_receipts(&self, tx_hashes: &[Hash]) -> StorageResult<Vec<Receipt>>;
 
     /// Get a transaction position by hash.
-    fn get_transaction_position(&self, hash: &Hash) -> StorageResult<Option<TransactionPosition>>;
+    fn get_transaction_position(&self, hash: &Hash) -> StorageResult<TransactionPosition>;
 
     /// Get a batch of transactions by hashes.
-    fn get_transaction_positions(
-        &self,
-        hashes: &[&Hash],
-    ) -> StorageResult<Vec<Option<TransactionPosition>>>;
+    fn get_transaction_positions(&self, hashes: &[Hash])
+        -> StorageResult<Vec<TransactionPosition>>;
 
     /// Insert a block.
     fn insert_block(&self, block: Block) -> StorageResult<()>;
@@ -89,224 +94,150 @@ where
     DB: Database,
 {
     fn get_latest_block(&self) -> StorageResult<Block> {
-        let decode = |d| -> Box<dyn Future<Item = _, Error = _> + Send> {
-            match d {
-                Some(data) => {
-                    Box::new(AsyncCodec::decode::<SerBlock>(data).map_err(StorageError::Codec))
-                }
-                None => Box::new(err(StorageError::Database(DatabaseError::NotFound))),
-            }
-        };
-
-        let fut = self
-            .db
-            .get(DataCategory::Block, LATEST_BLOCK)
-            .map_err(StorageError::Database)
-            .and_then(decode)
-            .map(SerBlock::into);
-
-        Box::new(fut)
-    }
-
-    fn get_block_by_height(&self, height: u64) -> StorageResult<Option<Block>> {
-        let key = transfrom_u64_to_array_u8(height);
-
-        let fut = self
-            .db
-            .get(DataCategory::Block, &key)
-            .map_err(StorageError::Database)
-            .and_then(|data| {
-                data.map(|v| AsyncCodec::decode::<SerBlock>(v).map_err(StorageError::Codec))
-            })
-            .map(|b| b.map(SerBlock::into));;
-
-        Box::new(fut)
-    }
-
-    fn get_block_by_hash(&self, hash: &Hash) -> StorageResult<Option<Block>> {
-        let key = hash.clone();
-
         let db = Arc::clone(&self.db);
 
-        let get_block =
-            move |height_slice: Option<Vec<u8>>| -> Box<dyn Future<Item = _, Error = _> + Send> {
-                match height_slice {
-                    Some(h) => Box::new(
-                        db.get(DataCategory::Block, &h)
-                            .map_err(StorageError::Database),
-                    ), // StorageResult<Option<Vec<u8>>>
-                    None => Box::new(ok(None)),
-                }
-            };
+        let fut = async move {
+            let value = await!(db.get(DataCategory::Block, LATEST_BLOCK).compat())?;
 
-        let fut = self
-            .db
-            .get(DataCategory::Block, key.as_bytes())
-            .map_err(StorageError::Database)
-            .and_then(get_block)
-            .and_then(|data| {
-                data.map(|value| AsyncCodec::decode::<SerBlock>(value).map_err(StorageError::Codec))
-            })
-            .map(|b| b.map(SerBlock::into));
+            let block = await!(AsyncCodec::decode::<SerBlock>(value?))?.into();
+            Ok(block)
+        };
 
-        Box::new(fut)
+        Box::new(Compat::new(fut))
     }
 
-    fn get_transaction(&self, hash: &Hash) -> StorageResult<Option<SignedTransaction>> {
+    fn get_block_by_height(&self, height: u64) -> StorageResult<Block> {
+        let db = Arc::clone(&self.db);
+        let key = transfrom_u64_to_array_u8(height);
+
+        let fut = async move {
+            let value = await!(db.get(DataCategory::Block, &key).compat())?;
+
+            let block = await!(AsyncCodec::decode::<SerBlock>(value?))?.into();
+            Ok(block)
+        };
+
+        Box::new(Compat::new(fut))
+    }
+
+    fn get_block_by_hash(&self, hash: &Hash) -> StorageResult<Block> {
+        let db = Arc::clone(&self.db);
         let key = hash.clone();
 
-        let fut = self
-            .db
-            .get(DataCategory::Transaction, key.as_bytes())
-            .map_err(StorageError::Database)
-            .and_then(|data| {
-                data.map(|v| {
-                    AsyncCodec::decode::<SerSignedTransaction>(v).map_err(StorageError::Codec)
-                })
-            })
-            .map(|b| b.map(SerSignedTransaction::into));
+        let fut = async move {
+            let height_slice = await!(db.get(DataCategory::Block, key.as_bytes()).compat())?;
+            let value = await!(db.get(DataCategory::Block, &height_slice?).compat())?;
 
-        Box::new(fut)
+            let block = await!(AsyncCodec::decode::<SerBlock>(value?))?.into();
+            Ok(block)
+        };
+
+        Box::new(Compat::new(fut))
     }
 
-    fn get_transactions(&self, hashes: &[&Hash]) -> StorageResult<Vec<Option<SignedTransaction>>> {
-        let mut keys = vec![];
-        for h in hashes {
-            keys.push(h.as_bytes().to_vec());
-        }
+    fn get_transaction(&self, hash: &Hash) -> StorageResult<SignedTransaction> {
+        let db = Arc::clone(&self.db);
+        let key = hash.clone();
 
-        let fut = self
-            .db
-            .get_batch(DataCategory::Transaction, &keys)
-            .map_err(StorageError::Database)
-            .and_then(move |opt_txs_data| {
-                join_all(opt_txs_data.into_iter().map(|opt_data| {
-                    opt_data.map(|v| {
-                        AsyncCodec::decode::<SerSignedTransaction>(v.to_vec())
-                            .map_err(StorageError::Codec)
-                    })
-                }))
-            })
-            .map(|opt_txs| {
-                opt_txs
+        let fut = async move {
+            let value = await!(db.get(DataCategory::Transaction, key.as_bytes()).compat())?;
+
+            let tx = await!(AsyncCodec::decode::<SerSignedTransaction>(value?))?.into();
+            Ok(tx)
+        };
+
+        Box::new(Compat::new(fut))
+    }
+
+    fn get_transactions(&self, hashes: &[Hash]) -> StorageResult<Vec<SignedTransaction>> {
+        let db = Arc::clone(&self.db);
+        let keys: Vec<Vec<u8>> = hashes.iter().map(|h| h.as_bytes().to_vec()).collect();
+
+        let fut = async move {
+            let values = await!(db.get_batch(DataCategory::Transaction, &keys).compat())?;
+            let values = opts_to_flat(values);
+
+            let txs: Vec<SignedTransaction> =
+                await!(AsyncCodec::decode_batch::<SerSignedTransaction>(values))?
                     .into_iter()
-                    .map(|opt_tx| {
-                        if let Some(tx) = opt_tx {
-                            Some(tx.into())
-                        } else {
-                            None
-                        }
-                    })
-                    .collect()
-            });
+                    .map(Into::into)
+                    .collect();
+            Ok(txs)
+        };
 
-        Box::new(fut)
+        Box::new(Compat::new(fut))
     }
 
-    fn get_receipt(&self, hash: &Hash) -> StorageResult<Option<Receipt>> {
+    fn get_receipt(&self, hash: &Hash) -> StorageResult<Receipt> {
+        let db = Arc::clone(&self.db);
         let key = hash.clone();
 
-        let fut = self
-            .db
-            .get(DataCategory::Receipt, key.as_bytes())
-            .map_err(StorageError::Database)
-            .and_then(|data| {
-                data.map(|v| AsyncCodec::decode::<SerReceipt>(v).map_err(StorageError::Codec))
-            })
-            .map(|b| b.map(SerReceipt::into));
+        let fut = async move {
+            let value = await!(db.get(DataCategory::Receipt, key.as_bytes()).compat())?;
 
-        Box::new(fut)
+            let receipt = await!(AsyncCodec::decode::<SerReceipt>(value?))?.into();
+            Ok(receipt)
+        };
+
+        Box::new(Compat::new(fut))
     }
 
-    fn get_receipts(&self, hashes: &[&Hash]) -> StorageResult<Vec<Option<Receipt>>> {
-        let mut keys = Vec::with_capacity(hashes.len());
-        for h in hashes {
-            keys.push(h.as_bytes().to_vec());
-        }
+    fn get_receipts(&self, hashes: &[Hash]) -> StorageResult<Vec<Receipt>> {
+        let db = Arc::clone(&self.db);
+        let keys: Vec<Vec<u8>> = hashes.iter().map(|h| h.as_bytes().to_vec()).collect();
 
-        let fut = self
-            .db
-            .get_batch(DataCategory::Receipt, &keys)
-            .map_err(StorageError::Database)
-            .and_then(|opt_receipts_data| {
-                join_all(opt_receipts_data.into_iter().map(|opt_data| {
-                    opt_data.map(|v| {
-                        AsyncCodec::decode::<SerReceipt>(v.to_vec()).map_err(StorageError::Codec)
-                    })
-                }))
-            })
-            .map(|opt_txs| {
-                opt_txs
-                    .into_iter()
-                    .map(|opt_tx| {
-                        if let Some(tx) = opt_tx {
-                            Some(tx.into())
-                        } else {
-                            None
-                        }
-                    })
-                    .collect()
-            });
-        Box::new(fut)
+        let fut = async move {
+            let values = await!(db.get_batch(DataCategory::Receipt, &keys).compat())?;
+            let values = opts_to_flat(values);
+
+            let receipts: Vec<Receipt> = await!(AsyncCodec::decode_batch::<SerReceipt>(values))?
+                .into_iter()
+                .map(Into::into)
+                .collect();
+            Ok(receipts)
+        };
+
+        Box::new(Compat::new(fut))
     }
 
-    fn get_transaction_position(&self, hash: &Hash) -> StorageResult<Option<TransactionPosition>> {
+    fn get_transaction_position(&self, hash: &Hash) -> StorageResult<TransactionPosition> {
+        let db = Arc::clone(&self.db);
         let key = hash.clone();
 
-        let fut = self
-            .db
-            .get(DataCategory::TransactionPosition, key.as_bytes())
-            .map_err(StorageError::Database)
-            .and_then(|data| {
-                data.map(|v| {
-                    AsyncCodec::decode::<SerTransactionPosition>(v).map_err(StorageError::Codec)
-                })
-            })
-            .map(|b| b.map(SerTransactionPosition::into));
+        let fut = async move {
+            let value = await!(db
+                .get(DataCategory::TransactionPosition, key.as_bytes())
+                .compat())?;
 
-        Box::new(fut)
+            let tx_position = await!(AsyncCodec::decode::<SerTransactionPosition>(value?))?.into();
+            Ok(tx_position)
+        };
+
+        Box::new(Compat::new(fut))
     }
 
-    // TODO: refactor
     fn get_transaction_positions(
         &self,
-        hashes: &[&Hash],
-    ) -> StorageResult<Vec<Option<TransactionPosition>>> {
-        let mut keys = vec![];
-        for h in hashes {
-            keys.push(h.as_bytes().to_vec());
-        }
+        hashes: &[Hash],
+    ) -> StorageResult<Vec<TransactionPosition>> {
+        let db = Arc::clone(&self.db);
+        let keys: Vec<Vec<u8>> = hashes.iter().map(|h| h.as_bytes().to_vec()).collect();
 
-        let fut = self
-            .db
-            .get_batch(DataCategory::TransactionPosition, &keys)
-            .map_err(StorageError::Database)
-            .and_then(move |opt_txs_data| {
-                join_all(opt_txs_data.into_iter().map(|opt_data| {
-                    if let Some(data) = opt_data {
-                        Some(
-                            AsyncCodec::decode::<SerTransactionPosition>(data.to_vec())
-                                .map_err(StorageError::Codec),
-                        )
-                    } else {
-                        None
-                    }
-                }))
-            })
-            .map(|opt_txs| {
-                opt_txs
+        let fut = async move {
+            let values = await!(db
+                .get_batch(DataCategory::TransactionPosition, &keys)
+                .compat())?;
+            let values = opts_to_flat(values);
+
+            let tx_positions: Vec<TransactionPosition> =
+                await!(AsyncCodec::decode_batch::<SerTransactionPosition>(values))?
                     .into_iter()
-                    .map(|opt_tx| {
-                        if let Some(tx) = opt_tx {
-                            Some(tx.into())
-                        } else {
-                            None
-                        }
-                    })
-                    .collect()
-            });
+                    .map(Into::into)
+                    .collect();
+            Ok(tx_positions)
+        };
 
-        Box::new(fut)
+        Box::new(Compat::new(fut))
     }
 
     fn insert_block(&self, block: Block) -> StorageResult<()> {
@@ -317,53 +248,53 @@ where
         let hash_key = block.header.hash();
 
         let pb_block: SerBlock = block.into();
-        let mut encoded_buf = BytesMut::with_capacity(AsyncCodec::encoded_len(&pb_block));
 
-        let fut = AsyncCodec::encode(&pb_block, &mut encoded_buf)
-            .map_err(StorageError::Codec)
-            .and_then(move |()| {
-                join_all(vec![
-                    db.insert(DataCategory::Block, &height_key, encoded_buf.as_ref())
-                        .map_err(StorageError::Database),
-                    db.insert(
-                        DataCategory::Block,
-                        hash_key.as_bytes(),
-                        &transfrom_u64_to_array_u8(height),
-                    )
-                    .map_err(StorageError::Database),
-                    db.insert(DataCategory::Block, LATEST_BLOCK, encoded_buf.as_ref())
-                        .map_err(StorageError::Database),
-                ])
-            })
-            .map(|_| ());
+        let fut = async move {
+            let encode_value = await!(AsyncCodec::encode(pb_block))?;
 
-        Box::new(fut)
+            let stream = stream::futures_unordered(vec![
+                db.insert(DataCategory::Block, height_key, encode_value.clone())
+                    .compat(),
+                db.insert(
+                    DataCategory::Block,
+                    hash_key.as_bytes().to_vec(),
+                    transfrom_u64_to_array_u8(height),
+                )
+                .compat(),
+                db.insert(
+                    DataCategory::Block,
+                    LATEST_BLOCK.to_vec(),
+                    encode_value.clone(),
+                )
+                .compat(),
+            ]);
+
+            await!(stream.try_collect())?;
+            Ok(())
+        };
+
+        Box::new(Compat::new(fut))
     }
 
     fn insert_transactions(&self, signed_txs: Vec<SignedTransaction>) -> StorageResult<()> {
         let db = Arc::clone(&self.db);
-        let mut keys = Vec::with_capacity(signed_txs.len());
+        let keys: Vec<Vec<u8>> = signed_txs
+            .iter()
+            .map(|tx| tx.hash.as_bytes().to_vec())
+            .collect();
 
-        let mut peding_fut = Vec::with_capacity(signed_txs.len());
-        for tx in signed_txs {
-            let hash = tx.hash.clone();
-            let pb_tx: SerSignedTransaction = tx.into();
-            let mut buf = BytesMut::with_capacity(AsyncCodec::encoded_len(&pb_tx));
+        let fut = async move {
+            let pb_txs: Vec<SerSignedTransaction> =
+                signed_txs.into_iter().map(Into::into).collect();
+            let values = await!(AsyncCodec::encode_batch(pb_txs))?;
 
-            let fut = AsyncCodec::encode(&pb_tx, &mut buf)
-                .map_err(StorageError::Codec)
-                .map(move |_| buf.to_vec());
+            await!(db
+                .insert_batch(DataCategory::Transaction, keys, values)
+                .compat())?;
+            Ok(())
+        };
 
-            keys.push(hash.as_bytes().to_vec());
-            peding_fut.push(fut);
-        }
-
-        let fut = join_all(peding_fut).and_then(move |buf_list| {
-            db.insert_batch(DataCategory::Transaction, &keys, &buf_list)
-                .map_err(StorageError::Database)
-        });
-
-        Box::new(fut)
+        Box::new(Compat::new(fut))
     }
 
     fn insert_transaction_positions(
@@ -371,64 +302,46 @@ where
         positions: HashMap<Hash, TransactionPosition>,
     ) -> StorageResult<()> {
         let db = Arc::clone(&self.db);
-        let mut keys = Vec::with_capacity(positions.len());
 
-        let mut peding_fut = Vec::with_capacity(positions.len());
-        for (key, position) in positions.into_iter() {
-            let pb_tx: SerTransactionPosition = position.into();
-            let mut buf = BytesMut::with_capacity(AsyncCodec::encoded_len(&pb_tx));
+        let fut = async move {
+            let mut keys: Vec<Vec<u8>> = Vec::with_capacity(positions.len());
+            let mut ser_positions: Vec<SerTransactionPosition> =
+                Vec::with_capacity(positions.len());
 
-            let fut = AsyncCodec::encode(&pb_tx, &mut buf)
-                .map_err(StorageError::Codec)
-                .map(move |_| buf.to_vec());
+            for (key, position) in positions.into_iter() {
+                keys.push(key.as_bytes().to_vec());
+                ser_positions.push(position.into());
+            }
 
-            keys.push(key.as_bytes().to_vec());
-            peding_fut.push(fut);
-        }
+            let values = await!(AsyncCodec::encode_batch(ser_positions))?;
 
-        let fut = join_all(peding_fut).and_then(move |buf_list| {
-            db.insert_batch(DataCategory::TransactionPosition, &keys, &buf_list)
-                .map_err(StorageError::Database)
-        });
+            await!(db
+                .insert_batch(DataCategory::TransactionPosition, keys, values)
+                .compat())?;
+            Ok(())
+        };
 
-        Box::new(fut)
+        Box::new(Compat::new(fut))
     }
 
     fn insert_receipts(&self, receipts: Vec<Receipt>) -> StorageResult<()> {
         let db = Arc::clone(&self.db);
-        let mut keys = Vec::with_capacity(receipts.len());
+        let keys: Vec<Vec<u8>> = receipts
+            .iter()
+            .map(|r| r.transaction_hash.as_bytes().to_vec())
+            .collect();
 
-        let mut peding_fut = Vec::with_capacity(receipts.len());
-        for receipt in receipts {
-            let hash = receipt.transaction_hash.clone();
-            let pb_receipt: SerReceipt = receipt.into();
-            let mut buf = BytesMut::with_capacity(AsyncCodec::encoded_len(&pb_receipt));
+        let fut = async move {
+            let pb_receipts: Vec<SerReceipt> = receipts.into_iter().map(Into::into).collect();
+            let values = await!(AsyncCodec::encode_batch(pb_receipts))?;
 
-            let fut = AsyncCodec::encode(&pb_receipt, &mut buf)
-                .map_err(StorageError::Codec)
-                .map(move |_| buf.to_vec());
+            await!(db
+                .insert_batch(DataCategory::Receipt, keys, values)
+                .compat())?;
+            Ok(())
+        };
 
-            keys.push(hash.as_bytes().to_vec());
-            peding_fut.push(fut);
-        }
-
-        let fut = join_all(peding_fut).and_then(move |buf_list| {
-            db.insert_batch(DataCategory::Receipt, &keys, &buf_list)
-                .map_err(StorageError::Database)
-        });
-
-        Box::new(fut)
-    }
-}
-
-impl<DB> Clone for BlockStorage<DB>
-where
-    DB: Database,
-{
-    fn clone(&self) -> Self {
-        BlockStorage {
-            db: Arc::clone(&self.db),
-        }
+        Box::new(Compat::new(fut))
     }
 }
 
@@ -438,12 +351,20 @@ fn transfrom_u64_to_array_u8(n: u64) -> Vec<u8> {
     u64_slice.to_vec()
 }
 
+fn opts_to_flat(values: Vec<Option<Vec<u8>>>) -> Vec<Vec<u8>> {
+    values
+        .into_iter()
+        .filter(Option::is_some)
+        .map(|v| v.expect("get value"))
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
     use std::sync::Arc;
 
-    use futures::future::Future;
+    use old_futures::future::Future;
 
     use super::{BlockStorage, Storage};
 
@@ -469,7 +390,7 @@ mod tests {
         storage.insert_block(mock_block(1000)).wait().unwrap();
         let block = storage.get_block_by_height(1000).wait().unwrap();
 
-        assert_eq!(block.unwrap().header.height, 1000)
+        assert_eq!(block.header.height, 1000)
     }
 
     #[test]
@@ -482,7 +403,7 @@ mod tests {
         storage.insert_block(b).wait().unwrap();
 
         let b = storage.get_block_by_hash(&hash).wait().unwrap();
-        assert_eq!(b.unwrap().header.height, 1000)
+        assert_eq!(b.header.height, 1000)
     }
 
     #[test]
@@ -495,7 +416,7 @@ mod tests {
         storage.insert_transactions(vec![tx]).wait().unwrap();
         let new_tx = storage.get_transaction(&hash).wait().unwrap();
 
-        assert_eq!(new_tx.unwrap().hash, hash)
+        assert_eq!(new_tx.hash, hash)
     }
 
     #[test]
@@ -509,15 +430,12 @@ mod tests {
         let tx_hash2 = tx2.hash.clone();
         storage.insert_transactions(vec![tx1, tx2]).wait().unwrap();
         let transactions = storage
-            .get_transactions(&[&tx_hash1, &tx_hash2])
+            .get_transactions(&[tx_hash1.clone(), tx_hash2.clone()])
             .wait()
             .unwrap();
         assert_eq!(transactions.len(), 2);
 
-        let hashes: Vec<Hash> = transactions
-            .into_iter()
-            .map(|opt_tx| opt_tx.unwrap().hash)
-            .collect();
+        let hashes: Vec<Hash> = transactions.into_iter().map(|tx| tx.hash).collect();
 
         assert!(hashes.contains(&tx_hash1));
         assert!(hashes.contains(&tx_hash2));
@@ -538,7 +456,7 @@ mod tests {
             .unwrap();
         let new_tx_position = storage.get_transaction_position(&hash).wait().unwrap();
 
-        assert_eq!(new_tx_position, Some(tx_position));
+        assert_eq!(new_tx_position, tx_position);
     }
 
     #[test]
@@ -559,13 +477,13 @@ mod tests {
             .wait()
             .unwrap();
         let tx_positions = storage
-            .get_transaction_positions(&[&hash1, &hash2])
+            .get_transaction_positions(&[hash1, hash2])
             .wait()
             .unwrap();
         assert_eq!(tx_positions.len(), 2);
 
-        assert!(tx_positions.contains(&Some(tx_position1)));
-        assert!(tx_positions.contains(&Some(tx_position2)));
+        assert!(tx_positions.contains(&tx_position1));
+        assert!(tx_positions.contains(&tx_position2));
     }
 
     #[test]
@@ -577,7 +495,7 @@ mod tests {
 
         storage.insert_receipts(vec![receipt]).wait().unwrap();
         let receipt = storage.get_receipt(&tx_hash).wait().unwrap();
-        assert_eq!(receipt.unwrap().transaction_hash, tx_hash);
+        assert_eq!(receipt.transaction_hash, tx_hash);
     }
 
     #[test]
@@ -594,14 +512,14 @@ mod tests {
             .wait()
             .unwrap();
         let transactions = storage
-            .get_receipts(&[&tx_hash1, &tx_hash2])
+            .get_receipts(&[tx_hash1.clone(), tx_hash2.clone()])
             .wait()
             .unwrap();
         assert_eq!(transactions.len(), 2);
 
         let hashes: Vec<Hash> = transactions
             .into_iter()
-            .map(|opt_receipt| opt_receipt.unwrap().transaction_hash)
+            .map(|receipt| receipt.transaction_hash)
             .collect();
 
         assert!(hashes.contains(&tx_hash1));
@@ -626,7 +544,6 @@ mod tests {
                 .get_block_by_height(height)
                 .wait()
                 .unwrap()
-                .unwrap()
                 .header
                 .height,
             height
@@ -636,7 +553,6 @@ mod tests {
             storage
                 .get_block_by_hash(&hash)
                 .wait()
-                .unwrap()
                 .unwrap()
                 .header
                 .height,

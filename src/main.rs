@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 use futures::future::{ok, Future};
 use serde_derive::Deserialize;
 
-use components_cita_jsonrpc::{Config as JSONRPCConfig, RpcServer};
+// use components_cita_jsonrpc::{Config as JSONRPCConfig, RpcServer};
 use components_database::rocks::RocksDB;
 use components_executor::evm::{EVMBlockDataProvider, EVMExecutor};
 use components_executor::TrieDB;
@@ -18,7 +18,7 @@ use core_crypto::{
     secp256k1::{PrivateKey, Secp256k1},
     CryptoTransform,
 };
-use core_storage::storage::{BlockStorage, Storage};
+use core_storage::{BlockStorage, Storage};
 use core_types::{Block, BlockHeader, Genesis, Hash};
 use logger;
 
@@ -138,15 +138,15 @@ fn start(cfg: &Config) {
 
     // run json rpc
     // NOTE: Bind a variable to aviod "drop".
-    let mut rpc_config = JSONRPCConfig::default();
-    rpc_config.listen_address = cfg.rpc_address.clone();
-    let _rpc_server = RpcServer::new(
-        rpc_config,
-        Arc::clone(&storage),
-        Arc::clone(&executor),
-        Arc::clone(&tx_pool),
-    )
-    .unwrap();
+    // let mut rpc_config = JSONRPCConfig::default();
+    // rpc_config.listen_address = cfg.rpc_address.clone();
+    // let _rpc_server = RpcServer::new(
+    //     rpc_config,
+    //     Arc::clone(&storage),
+    //     Arc::clone(&executor),
+    //     Arc::clone(&tx_pool),
+    // )
+    // .unwrap();
 
     let consensus_interval = Duration::from_millis(cfg.consensus_interval);
 

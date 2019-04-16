@@ -1,30 +1,54 @@
+#![feature(async_await, await_macro, futures_api)]
+
 use std::error;
 use std::fmt;
+use std::future::Future;
 
 use bytes::{BytesMut, IntoBuf};
-use core_types::{Address, Bloom, Hash};
-use futures::future::{result, Future};
+use futures::{
+    future,
+    stream::{self, TryStreamExt},
+};
 use prost::{DecodeError, EncodeError, Message};
+
+use core_types::{Address, Bloom, Hash};
 
 #[derive(Default)]
 pub struct AsyncCodec;
 
 impl AsyncCodec {
-    pub fn decode<T: 'static + Message + Default>(
+    pub fn decode<T: Message + Default>(
         data: Vec<u8>,
-    ) -> Box<Future<Item = T, Error = CodecError> + Send> {
-        Box::new(result(SyncCodec::decode(data)))
+    ) -> impl Future<Output = Result<T, CodecError>> + Send {
+        future::ready(SyncCodec::decode::<T>(data))
     }
 
-    pub fn encode<T: Message>(
-        msg: &T,
-        buf: &mut BytesMut,
-    ) -> Box<Future<Item = (), Error = CodecError> + Send> {
-        Box::new(result(SyncCodec::encode(msg, buf)))
+    pub fn decode_batch<T: Message + Default>(
+        values: Vec<Vec<u8>>,
+    ) -> impl Future<Output = Result<Vec<T>, CodecError>> + Send {
+        async move {
+            let iter = values.into_iter().map(AsyncCodec::decode::<T>);
+
+            let ser_values: Result<Vec<T>, CodecError> =
+                await!(stream::futures_ordered(iter).try_collect());
+            ser_values
+        }
     }
 
-    pub fn encoded_len<T: Message>(msg: &T) -> usize {
-        SyncCodec::encoded_len(msg)
+    pub fn encode<T: Message>(msg: T) -> impl Future<Output = Result<Vec<u8>, CodecError>> + Send {
+        future::ready(SyncCodec::encode::<T>(msg))
+    }
+
+    pub fn encode_batch<T: Message>(
+        msgs: Vec<T>,
+    ) -> impl Future<Output = Result<Vec<Vec<u8>>, CodecError>> + Send {
+        async move {
+            let iter = msgs.into_iter().map(AsyncCodec::encode::<T>);
+
+            let values: Result<Vec<Vec<u8>>, CodecError> =
+                await!(stream::futures_ordered(iter).try_collect());
+            values
+        }
     }
 }
 
@@ -32,17 +56,34 @@ impl AsyncCodec {
 pub struct SyncCodec;
 
 impl SyncCodec {
-    pub fn decode<T: 'static + Message + Default>(data: Vec<u8>) -> Result<T, CodecError> {
+    pub fn decode<T: Message + Default>(data: Vec<u8>) -> Result<T, CodecError> {
         T::decode(data.into_buf()).map_err(CodecError::Decode)
     }
 
-    pub fn encode<T: Message>(msg: &T, buf: &mut BytesMut) -> Result<(), CodecError> {
-        msg.encode(buf).map_err(CodecError::Encode)?;
-        Ok(())
+    pub fn decode_batch<T: Message + Default>(values: Vec<Vec<u8>>) -> Result<Vec<T>, CodecError> {
+        let mut ser_list = Vec::with_capacity(values.len());
+
+        for value in values.into_iter() {
+            let ser = SyncCodec::decode::<T>(value)?;
+            ser_list.push(ser);
+        }
+        Ok(ser_list)
     }
 
-    pub fn encoded_len<T: Message>(msg: &T) -> usize {
-        msg.encoded_len()
+    pub fn encode<T: Message>(msg: T) -> Result<Vec<u8>, CodecError> {
+        let mut buf = BytesMut::with_capacity(msg.encoded_len());
+        msg.encode(&mut buf).map_err(CodecError::Encode)?;
+        Ok(buf.to_vec())
+    }
+
+    pub fn encode_batch<T: Message>(msgs: Vec<T>) -> Result<Vec<Vec<u8>>, CodecError> {
+        let mut encoded_values = Vec::with_capacity(msgs.len());
+
+        for msg in msgs {
+            let encoded_value = SyncCodec::encode::<T>(msg)?;
+            encoded_values.push(encoded_value);
+        }
+        Ok(encoded_values)
     }
 }
 

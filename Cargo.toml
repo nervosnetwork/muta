@@ -8,7 +8,7 @@ edition = "2018"
 config-parser = { path = "common/config-parser" }
 logger = { path = "common/logger" }
 
-components-cita-jsonrpc = { path = "components/cita-jsonrpc" }
+# components-cita-jsonrpc = { path = "components/cita-jsonrpc" }
 components-database = { path = "components/database" }
 components-executor = { path = "components/executor" }
 components-transaction-pool = { path = "components/transaction-pool" }
@@ -44,7 +44,7 @@ members = [
 
   "components/transaction-pool",
   "components/database",
-  "components/cita-jsonrpc",
+  # "components/cita-jsonrpc",
   "components/network",
   "components/executor",
 ]

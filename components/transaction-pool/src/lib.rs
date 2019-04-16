@@ -10,7 +10,7 @@ use tokio_async_await::compat::{backward::Compat, forward::IntoAwaitable};
 
 use core_crypto::{Crypto, CryptoTransform};
 use core_runtime::{FutRuntimeResult, TransactionPool, TransactionPoolError};
-use core_storage::storage::Storage;
+use core_storage::{Storage, StorageError};
 use core_types::{Address, Hash, SignedTransaction, Transaction, UnverifiedTransaction};
 
 pub struct HashTransactionPool<S, C> {
@@ -83,8 +83,8 @@ where
 
             // 2. check if the transaction is in histories block.
             match await!(storage.get_transaction(&tx_hash).into_awaitable()) {
-                Ok(Some(_)) => Err(TransactionPoolError::Dup)?,
-                Ok(None) => {}
+                Ok(_) => Err(TransactionPoolError::Dup)?,
+                Err(StorageError::None(_)) => {}
                 Err(e) => Err(internal_error(e))?,
             }
 
@@ -260,7 +260,7 @@ mod tests {
     use components_database::memory::MemoryDB;
     use core_crypto::{secp256k1::Secp256k1, Crypto, CryptoTransform};
     use core_runtime::{TransactionPool, TransactionPoolError};
-    use core_storage::storage::{BlockStorage, Storage};
+    use core_storage::{BlockStorage, Storage};
     use core_types::{Address, Block, Hash, SignedTransaction, Transaction, UnverifiedTransaction};
 
     use super::HashTransactionPool;

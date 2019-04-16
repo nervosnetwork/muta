@@ -1,3 +1,5 @@
+#![feature(async_await, await_macro, futures_api)]
+
 use futures::future::Future;
 
 pub mod database;
@@ -7,7 +9,7 @@ pub mod executor;
 pub mod transaction_pool;
 // pub mod sync;
 
-pub use database::{DBResult, DataCategory, Database, DatabaseError};
+pub use database::{DataCategory, Database, DatabaseError, FutDBResult};
 pub use executor::{ExecutionResult, Executor, ExecutorError, ReadonlyResult};
 pub use transaction_pool::{TransactionPool, TransactionPoolError};
 

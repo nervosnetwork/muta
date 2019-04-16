@@ -8,7 +8,7 @@ use cita_vm::BlockDataProvider;
 use ethereum_types::{H256, U256};
 use futures::future::Future;
 
-use core_storage::storage::Storage;
+use core_storage::Storage;
 
 pub struct EVMBlockDataProvider<S> {
     storage: Arc<S>,
@@ -33,8 +33,7 @@ where
             .storage
             .get_block_by_height(height)
             .wait()
-            .expect("failed to get block")
-            .expect("not found block");
+            .expect("failed to get block");
 
         H256::from(block.header.prevhash.into_fixed_bytes())
     }

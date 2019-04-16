@@ -10,7 +10,9 @@ core-runtime = { path = "../../core/runtime" }
 logger = { path = "../../common/logger" }
 
 log = "0.4"
-failure = "0.1"
-futures = "0.1"
-futures-locks = "0.3"
 rocksdb = "0.12.0"
+
+tokio-async-await = { version = "0.1" }
+
+[dev-dependencies]
+futures = "0.1"
