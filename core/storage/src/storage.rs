@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::convert::TryInto;
 use std::sync::Arc;
 
 use byteorder::{ByteOrder, NativeEndian};
@@ -99,7 +100,7 @@ where
         let fut = async move {
             let value = await!(db.get(DataCategory::Block, LATEST_BLOCK).compat())?;
 
-            let block = await!(AsyncCodec::decode::<SerBlock>(value?))?.into();
+            let block = await!(AsyncCodec::decode::<SerBlock>(value?))?.try_into()?;
             Ok(block)
         };
 
@@ -113,7 +114,7 @@ where
         let fut = async move {
             let value = await!(db.get(DataCategory::Block, &key).compat())?;
 
-            let block = await!(AsyncCodec::decode::<SerBlock>(value?))?.into();
+            let block = await!(AsyncCodec::decode::<SerBlock>(value?))?.try_into()?;
             Ok(block)
         };
 
@@ -128,7 +129,7 @@ where
             let height_slice = await!(db.get(DataCategory::Block, key.as_bytes()).compat())?;
             let value = await!(db.get(DataCategory::Block, &height_slice?).compat())?;
 
-            let block = await!(AsyncCodec::decode::<SerBlock>(value?))?.into();
+            let block = await!(AsyncCodec::decode::<SerBlock>(value?))?.try_into()?;
             Ok(block)
         };
 
@@ -142,7 +143,7 @@ where
         let fut = async move {
             let value = await!(db.get(DataCategory::Transaction, key.as_bytes()).compat())?;
 
-            let tx = await!(AsyncCodec::decode::<SerSignedTransaction>(value?))?.into();
+            let tx = await!(AsyncCodec::decode::<SerSignedTransaction>(value?))?.try_into()?;
             Ok(tx)
         };
 
@@ -157,11 +158,10 @@ where
             let values = await!(db.get_batch(DataCategory::Transaction, &keys).compat())?;
             let values = opts_to_flat(values);
 
-            let txs: Vec<SignedTransaction> =
-                await!(AsyncCodec::decode_batch::<SerSignedTransaction>(values))?
-                    .into_iter()
-                    .map(Into::into)
-                    .collect();
+            let txs = await!(AsyncCodec::decode_batch::<SerSignedTransaction>(values))?
+                .into_iter()
+                .map(TryInto::try_into)
+                .collect::<Result<Vec<SignedTransaction>, _>>()?;
             Ok(txs)
         };
 
@@ -175,7 +175,7 @@ where
         let fut = async move {
             let value = await!(db.get(DataCategory::Receipt, key.as_bytes()).compat())?;
 
-            let receipt = await!(AsyncCodec::decode::<SerReceipt>(value?))?.into();
+            let receipt = await!(AsyncCodec::decode::<SerReceipt>(value?))?.try_into()?;
             Ok(receipt)
         };
 
@@ -190,10 +190,10 @@ where
             let values = await!(db.get_batch(DataCategory::Receipt, &keys).compat())?;
             let values = opts_to_flat(values);
 
-            let receipts: Vec<Receipt> = await!(AsyncCodec::decode_batch::<SerReceipt>(values))?
+            let receipts = await!(AsyncCodec::decode_batch::<SerReceipt>(values))?
                 .into_iter()
-                .map(Into::into)
-                .collect();
+                .map(TryInto::try_into)
+                .collect::<Result<Vec<Receipt>, _>>()?;
             Ok(receipts)
         };
 
@@ -209,7 +209,8 @@ where
                 .get(DataCategory::TransactionPosition, key.as_bytes())
                 .compat())?;
 
-            let tx_position = await!(AsyncCodec::decode::<SerTransactionPosition>(value?))?.into();
+            let tx_position =
+                await!(AsyncCodec::decode::<SerTransactionPosition>(value?))?.try_into()?;
             Ok(tx_position)
         };
 
@@ -229,12 +230,11 @@ where
                 .compat())?;
             let values = opts_to_flat(values);
 
-            let tx_positions: Vec<TransactionPosition> =
-                await!(AsyncCodec::decode_batch::<SerTransactionPosition>(values))?
-                    .into_iter()
-                    .map(Into::into)
-                    .collect();
-            Ok(tx_positions)
+            let positions = await!(AsyncCodec::decode_batch::<SerTransactionPosition>(values))?
+                .into_iter()
+                .map(TryInto::try_into)
+                .collect::<Result<Vec<TransactionPosition>, _>>()?;
+            Ok(positions)
         };
 
         Box::new(Compat::new(fut))

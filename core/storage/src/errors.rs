@@ -5,7 +5,7 @@ use std::option::NoneError;
 use core_runtime::DatabaseError;
 use core_serialization::CodecError;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug)]
 pub enum StorageError {
     Database(DatabaseError),
     Codec(CodecError),

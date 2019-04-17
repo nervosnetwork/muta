@@ -1,5 +1,6 @@
 #![feature(async_await, await_macro, futures_api)]
 
+use std::convert::TryInto;
 use std::error;
 use std::fmt;
 use std::future::Future;
@@ -11,7 +12,7 @@ use futures::{
 };
 use prost::{DecodeError, EncodeError, Message};
 
-use core_types::{Address, Bloom, Hash};
+use core_types::{Address, Bloom, Hash, TypesError};
 
 #[derive(Default)]
 pub struct AsyncCodec;
@@ -87,10 +88,11 @@ impl SyncCodec {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug)]
 pub enum CodecError {
     Decode(DecodeError),
     Encode(EncodeError),
+    Types(TypesError),
 }
 
 impl error::Error for CodecError {}
@@ -99,6 +101,7 @@ impl fmt::Display for CodecError {
         let printable = match *self {
             CodecError::Decode(ref err) => format!("serialization decode error: {:?}", err),
             CodecError::Encode(ref err) => format!("serialization encode error: {:?}", err),
+            CodecError::Types(ref err) => format!("serialization types error: {:?}", err),
         };
         write!(f, "{}", printable)
     }
@@ -113,6 +116,12 @@ impl From<DecodeError> for CodecError {
 impl From<EncodeError> for CodecError {
     fn from(err: EncodeError) -> Self {
         CodecError::Encode(err)
+    }
+}
+
+impl From<TypesError> for CodecError {
+    fn from(err: TypesError) -> Self {
+        CodecError::Types(err)
     }
 }
 
@@ -172,26 +181,29 @@ impl From<core_types::BlockHeader> for BlockHeader {
     }
 }
 
-impl Into<core_types::BlockHeader> for BlockHeader {
-    fn into(self) -> core_types::BlockHeader {
-        core_types::BlockHeader {
-            prevhash: Hash::from_bytes(&self.prevhash).expect("never returns an error"),
+impl TryInto<core_types::BlockHeader> for BlockHeader {
+    type Error = CodecError;
+
+    fn try_into(self) -> Result<core_types::BlockHeader, Self::Error> {
+        let votes: Result<Vec<core_types::Hash>, TypesError> = self
+            .votes
+            .into_iter()
+            .map(|v| Hash::from_bytes(&v))
+            .collect();
+
+        Ok(core_types::BlockHeader {
+            prevhash: Hash::from_bytes(&self.prevhash)?,
             timestamp: self.timestamp,
             height: self.height,
-            transactions_root: Hash::from_bytes(&self.transactions_root)
-                .expect("never returns an error"),
-            state_root: Hash::from_bytes(&self.state_root).expect("never returns an error"),
-            receipts_root: Hash::from_bytes(&self.receipts_root).expect("never returns an error"),
+            transactions_root: Hash::from_bytes(&self.transactions_root)?,
+            state_root: Hash::from_bytes(&self.state_root)?,
+            receipts_root: Hash::from_bytes(&self.receipts_root)?,
             logs_bloom: Bloom::from_slice(&self.logs_bloom),
             quota_used: self.quota_used,
             quota_limit: self.quota_limit,
-            votes: self
-                .votes
-                .into_iter()
-                .map(|v| Hash::from_bytes(&v).expect("never returns an error"))
-                .collect(),
-            proposer: Address::from_bytes(&self.proposer).expect("never returns an error"),
-        }
+            votes: votes?,
+            proposer: Address::from_bytes(&self.proposer)?,
+        })
     }
 }
 
@@ -208,20 +220,23 @@ impl From<core_types::Block> for Block {
     }
 }
 
-impl Into<core_types::Block> for Block {
-    fn into(self) -> core_types::Block {
+impl TryInto<core_types::Block> for Block {
+    type Error = CodecError;
+
+    fn try_into(self) -> Result<core_types::Block, Self::Error> {
         let header = match self.header {
-            Some(header) => header.into(),
+            Some(header) => header.try_into()?,
             None => core_types::BlockHeader::default(),
         };
-        core_types::Block {
+        let tx_hashes: Result<Vec<Hash>, TypesError> = self
+            .tx_hashes
+            .into_iter()
+            .map(|tx_hash| Hash::from_bytes(&tx_hash))
+            .collect();
+        Ok(core_types::Block {
             header,
-            tx_hashes: self
-                .tx_hashes
-                .into_iter()
-                .map(|tx_hash| Hash::from_bytes(&tx_hash).expect("never returns an error"))
-                .collect(),
-        }
+            tx_hashes: tx_hashes?,
+        })
     }
 }
 
@@ -239,17 +254,21 @@ impl From<core_types::LogEntry> for LogEntry {
     }
 }
 
-impl Into<core_types::LogEntry> for LogEntry {
-    fn into(self) -> core_types::LogEntry {
-        core_types::LogEntry {
-            address: Address::from_bytes(&self.address).expect("never returns an error"),
-            topics: self
-                .topics
-                .into_iter()
-                .map(|t| Hash::from_bytes(&t).expect("never returns an error"))
-                .collect(),
+impl TryInto<core_types::LogEntry> for LogEntry {
+    type Error = CodecError;
+
+    fn try_into(self) -> Result<core_types::LogEntry, Self::Error> {
+        let topics: Result<Vec<Hash>, TypesError> = self
+            .topics
+            .into_iter()
+            .map(|t| Hash::from_bytes(&t))
+            .collect();
+
+        Ok(core_types::LogEntry {
+            address: Address::from_bytes(&self.address)?,
+            topics: topics?,
             data: self.data,
-        }
+        })
     }
 }
 
@@ -271,23 +290,27 @@ impl From<core_types::Receipt> for Receipt {
     }
 }
 
-impl Into<core_types::Receipt> for Receipt {
-    fn into(self) -> core_types::Receipt {
-        core_types::Receipt {
-            state_root: Hash::from_bytes(&self.state_root).expect("never returns an error"),
-            transaction_hash: Hash::from_bytes(&self.transaction_hash)
-                .expect("never returns an error"),
-            block_hash: Hash::from_bytes(&self.block_hash).expect("never returns an error"),
+impl TryInto<core_types::Receipt> for Receipt {
+    type Error = CodecError;
+
+    fn try_into(self) -> Result<core_types::Receipt, Self::Error> {
+        let logs: Result<Vec<core_types::LogEntry>, _> =
+            self.logs.into_iter().map(TryInto::try_into).collect();
+
+        Ok(core_types::Receipt {
+            state_root: Hash::from_bytes(&self.state_root)?,
+            transaction_hash: Hash::from_bytes(&self.transaction_hash)?,
+            block_hash: Hash::from_bytes(&self.block_hash)?,
             quota_used: self.quota_used,
             logs_bloom: Bloom::from_slice(&self.logs_bloom),
-            logs: self.logs.into_iter().map(LogEntry::into).collect(),
+            logs: logs?,
             receipt_error: self.error,
             contract_address: if self.contract_address.is_empty() {
                 None
             } else {
-                Some(Address::from_bytes(&self.contract_address).expect("never returns an error"))
+                Some(Address::from_bytes(&self.contract_address)?)
             },
-        }
+        })
     }
 }
 
@@ -305,17 +328,19 @@ impl From<core_types::Transaction> for Transaction {
     }
 }
 
-impl Into<core_types::Transaction> for Transaction {
-    fn into(self) -> core_types::Transaction {
-        core_types::Transaction {
-            to: Address::from_bytes(&self.to).expect("never returns an error"),
+impl TryInto<core_types::Transaction> for Transaction {
+    type Error = CodecError;
+
+    fn try_into(self) -> Result<core_types::Transaction, Self::Error> {
+        Ok(core_types::Transaction {
+            to: Address::from_bytes(&self.to)?,
             nonce: self.nonce,
             quota: self.quota,
             valid_until_block: self.valid_until_block,
             data: self.data,
             value: self.value,
             chain_id: self.chain_id,
-        }
+        })
     }
 }
 
@@ -328,16 +353,18 @@ impl From<core_types::UnverifiedTransaction> for UnverifiedTransaction {
     }
 }
 
-impl Into<core_types::UnverifiedTransaction> for UnverifiedTransaction {
-    fn into(self) -> core_types::UnverifiedTransaction {
+impl TryInto<core_types::UnverifiedTransaction> for UnverifiedTransaction {
+    type Error = CodecError;
+
+    fn try_into(self) -> Result<core_types::UnverifiedTransaction, Self::Error> {
         let tx = match self.transaction {
-            Some(tx) => tx.into(),
+            Some(tx) => tx.try_into()?,
             None => core_types::Transaction::default(),
         };
-        core_types::UnverifiedTransaction {
+        Ok(core_types::UnverifiedTransaction {
             transaction: tx,
             signature: self.signature,
-        }
+        })
     }
 }
 
@@ -351,17 +378,19 @@ impl From<core_types::SignedTransaction> for SignedTransaction {
     }
 }
 
-impl Into<core_types::SignedTransaction> for SignedTransaction {
-    fn into(self) -> core_types::SignedTransaction {
+impl TryInto<core_types::SignedTransaction> for SignedTransaction {
+    type Error = CodecError;
+
+    fn try_into(self) -> Result<core_types::SignedTransaction, Self::Error> {
         let untx = match self.untx {
-            Some(untx) => untx.into(),
+            Some(untx) => untx.try_into()?,
             None => core_types::UnverifiedTransaction::default(),
         };
-        core_types::SignedTransaction {
+        Ok(core_types::SignedTransaction {
             untx,
-            hash: Hash::from_bytes(&self.hash).expect("never returns an error"),
-            sender: Address::from_bytes(&self.sender).expect("never returns an error"),
-        }
+            hash: Hash::from_bytes(&self.hash)?,
+            sender: Address::from_bytes(&self.sender)?,
+        })
     }
 }
 
@@ -374,11 +403,13 @@ impl From<core_types::TransactionPosition> for TransactionPosition {
     }
 }
 
-impl Into<core_types::TransactionPosition> for TransactionPosition {
-    fn into(self) -> core_types::TransactionPosition {
-        core_types::TransactionPosition {
-            block_hash: Hash::from_bytes(&self.block_hash).expect("never returns an error"),
+impl TryInto<core_types::TransactionPosition> for TransactionPosition {
+    type Error = CodecError;
+
+    fn try_into(self) -> Result<core_types::TransactionPosition, Self::Error> {
+        Ok(core_types::TransactionPosition {
+            block_hash: Hash::from_bytes(&self.block_hash)?,
             position: self.position,
-        }
+        })
     }
 }
