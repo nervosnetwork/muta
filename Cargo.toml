@@ -41,6 +41,7 @@ members = [
   "core/crypto",
   "core/notify",
   "core/merkle",
+  "core/pubsub",
 
   "components/transaction-pool",
   "components/database",
