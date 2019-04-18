@@ -42,11 +42,11 @@ members = [
   "core/notify",
   "core/merkle",
   "core/pubsub",
+  "core/network",
 
   "components/transaction-pool",
   "components/database",
   # "components/cita-jsonrpc",
   "components/jsonrpc",
-  "components/network",
   "components/executor",
 ]

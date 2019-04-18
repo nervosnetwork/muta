@@ -1,13 +1,13 @@
 [package]
-name = "components-network"
+name = "core-network"
 version = "0.1.0"
 authors = ["Cryptape Technologies <contact@cryptape.com>"]
 edition = "2018"
 
 [dependencies]
-core-p2p = { path = "../../core/p2p", features = ["prost-message"] }
-core-types = { path = "../../core/types" }
-core-serialization = { path = "../../core/serialization" }
+core-p2p = { path = "../p2p", features = ["prost-message"] }
+core-types = { path = "../types" }
+core-serialization = { path = "../serialization" }
 
 config-parser = { path = "../../common/config-parser" }
 

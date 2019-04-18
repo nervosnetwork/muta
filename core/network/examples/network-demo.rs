@@ -1,4 +1,4 @@
-use components_network::{Config, Message, Network};
+use core_network::{Config, Message, Network};
 
 use env_logger;
 use log::info;
