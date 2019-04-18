@@ -1985,15 +1985,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "notify"
-version = "0.1.0"
-dependencies = [
- "core-types 0.1.0",
- "futures 0.1.26 (registry+https://github.com/rust-lang/crates.io-index)",
- "tokio 0.1.18 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
 name = "num-integer"
 version = "0.1.39"
 source = "registry+https://github.com/rust-lang/crates.io-index"
