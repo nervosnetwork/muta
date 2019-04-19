@@ -10,6 +10,7 @@ core-runtime = { path = "../runtime" }
 core-types = { path = "../types" }
 core-crypto = { path = "../crypto" }
 core-merkle = { path = "../merkle" }
+core-context = { path = "../context" }
 
 log = "0.4"
 futures = "0.1"

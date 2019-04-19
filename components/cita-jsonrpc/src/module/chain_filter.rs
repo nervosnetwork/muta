@@ -117,7 +117,7 @@ where
                             let hashes_fut =
                                 join_all(((*block_number + 1)..current_number).map(move |h| {
                                     Arc::<S>::clone(&storage)
-                                        .get_block_by_height(h)
+                                        .get_block_by_height(ctx, h)
                                         .map_err(|e| {
                                             error!("get_block_by_height err: {:?}", e);
                                             JsonrpcError::internal_error()

@@ -8,6 +8,7 @@ edition = "2018"
 core-types = { path = "../types" }
 core-runtime = { path = "../runtime" }
 core-serialization = { path = "../serialization" }
+core-context = { path = "../context" }
 
 bytes = "0.4"
 old_futures = { package = "futures", version = "0.1" }

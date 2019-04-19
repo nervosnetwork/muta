@@ -16,7 +16,7 @@ where
     S: Storage + 'static,
 {
     let fut = storage
-        .get_transaction_position(&tx_hash)
+        .get_transaction_position(ctx, &tx_hash)
         .map_err(|e| {
             error!("get_transaction_position err: {:?}", e);
             JsonrpcError::internal_error()
@@ -24,7 +24,7 @@ where
         .and_then(move |position| match position {
             None => ok(None),
             Some(TransactionPosition { block_hash, .. }) => {
-                match storage.get_block_by_hash(&block_hash).wait() {
+                match storage.get_block_by_hash(ctx, &block_hash).wait() {
                     Ok(b) => ok(b),
                     Err(e) => {
                         error!("unexpected get_block_by_height err: {:?}", e);
@@ -41,7 +41,7 @@ where
     S: Storage,
 {
     let fut = storage
-        .get_latest_block()
+        .get_latest_block(ctx)
         .map_err(|e| {
             error!("get_latest_block err: {:?}", e);
             JsonrpcError::internal_error()
@@ -61,7 +61,7 @@ where
     let fut = get_height_by_block_number(Arc::<S>::clone(&storage), block_number).and_then(
         move |height| {
             Arc::<S>::clone(&storage)
-                .get_block_by_height(height)
+                .get_block_by_height(ctx, height)
                 .then(move |x| {
                     let res: BoxFuture<_> = match x {
                         Ok(block) => match block {
@@ -91,7 +91,7 @@ where
             // TODO: make the concept of latest and pending clear
             BlockTag::Latest | BlockTag::Pending => Box::new(
                 storage
-                    .get_latest_block()
+                    .get_latest_block(ctx)
                     .map_err(|e| {
                         error!("get_latest_block err: {:?}", e);
                         JsonrpcError::internal_error()
@@ -116,7 +116,7 @@ where
     let fut = join_all(vec![from_block_fut, to_block_fut])
         .and_then(move |from_to| {
             join_all((from_to[0]..=from_to[1]).map(move |height| {
-                storage1.get_block_by_height(height).map_err(|e| {
+                storage1.get_block_by_height(ctx, height).map_err(|e| {
                     error!("get_block_by_height err: {:?}", e);
                     JsonrpcError::internal_error()
                 })
@@ -144,7 +144,7 @@ where
             if tx_hashes.is_empty() {
                 return ok(vec![]);
             }
-            let receipts_res = storage2.get_receipts(tx_hashes.as_slice()).wait();
+            let receipts_res = storage2.get_receipts(ctx, tx_hashes.as_slice()).wait();
             match receipts_res {
                 Err(e) => {
                     error!("get_receipts err: {:?}", e);

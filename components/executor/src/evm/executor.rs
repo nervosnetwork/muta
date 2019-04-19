@@ -11,6 +11,7 @@ use cita_vm::{
 };
 use ethereum_types::{H160, H256, U256};
 
+use core_context::Context;
 use core_runtime::{ExecutionResult, Executor, ExecutorError, ReadonlyResult};
 use core_types::{
     Address, Balance, BlockHeader, Bloom, BloomInput, Genesis, Hash, LogEntry, Receipt,
@@ -89,6 +90,7 @@ where
     /// Execute the transactions and then return the receipts, this function will modify the "state of the world".
     fn exec(
         &self,
+        _: Context,
         latest_state_root: &Hash,
         current_header: &BlockHeader,
         txs: &[SignedTransaction],
@@ -133,6 +135,7 @@ where
     /// Query historical height data or perform read-only functions.
     fn readonly(
         &self,
+        _: Context,
         header: &BlockHeader,
         to: &Address,
         from: &Address,
@@ -176,7 +179,12 @@ where
     }
 
     /// Query balance of account.
-    fn get_balance(&self, state_root: &Hash, address: &Address) -> Result<Balance, ExecutorError> {
+    fn get_balance(
+        &self,
+        _: Context,
+        state_root: &Hash,
+        address: &Address,
+    ) -> Result<Balance, ExecutorError> {
         let root = H256(state_root.clone().into_fixed_bytes());
         let mut state = State::from_existing(self.db.clone(), root)?;
 
@@ -187,6 +195,7 @@ where
     /// Query value of account.
     fn get_value(
         &self,
+        _: Context,
         state_root: &Hash,
         address: &Address,
         key: &CoreH256,
@@ -204,6 +213,7 @@ where
     /// Query storage root of account.
     fn get_storage_root(
         &self,
+        _: Context,
         state_root: &Hash,
         address: &Address,
     ) -> Result<Hash, ExecutorError> {
@@ -221,6 +231,7 @@ where
     /// Query code of account.
     fn get_code(
         &self,
+        _: Context,
         state_root: &Hash,
         address: &Address,
     ) -> Result<(Vec<u8>, Hash), ExecutorError> {
@@ -439,6 +450,7 @@ mod tests {
     use cita_trie::db::MemoryDB;
     use cita_vm::BlockDataProviderMock;
 
+    use core_context::Context;
     use core_crypto::{secp256k1::Secp256k1, Crypto, CryptoTransform};
     use core_runtime::Executor;
     use core_types::{
@@ -470,6 +482,7 @@ mod tests {
 
     #[test]
     fn test_evm_executor_basic() {
+        let ctx = Context::new();
         let secp = Secp256k1::new();
         let (_, pubkey) = secp.gen_keypair();
         let pubkey_hash = Hash::digest(&pubkey.as_bytes()[1..]);
@@ -489,11 +502,15 @@ mod tests {
         .unwrap();
 
         // test storage root
-        let root = executor.get_storage_root(&state_root, &address).unwrap();
+        let root = executor
+            .get_storage_root(ctx.clone(), &state_root, &address)
+            .unwrap();
         assert_eq!(root.as_hex(), EMPTY_STATE);
 
         // test balance
-        let balance = executor.get_balance(&state_root, &address).unwrap();
+        let balance = executor
+            .get_balance(ctx.clone(), &state_root, &address)
+            .unwrap();
         assert_eq!(
             balance,
             Balance::from_hex_str("ffffffffffffffffff").unwrap()
@@ -502,6 +519,7 @@ mod tests {
 
     #[test]
     fn test_create_contract() {
+        let ctx = Context::new();
         let secp = Secp256k1::new();
         let (_, pubkey) = secp.gen_keypair();
         let pubkey_hash = Hash::digest(&pubkey.as_bytes()[1..]);
@@ -538,7 +556,9 @@ mod tests {
             },
         };
 
-        let exec_result = executor.exec(&state_root, &header, &[signed_tx]).unwrap();
+        let exec_result = executor
+            .exec(ctx, &state_root, &header, &[signed_tx])
+            .unwrap();
         assert_ne!(exec_result.receipts[0].contract_address, None);
         assert_ne!(exec_result.state_root, state_root);
         assert_eq!(exec_result.receipts[0].logs.len(), 1);

@@ -8,6 +8,7 @@ use cita_vm::BlockDataProvider;
 use ethereum_types::{H256, U256};
 use futures::future::Future;
 
+use core_context::Context;
 use core_storage::Storage;
 
 pub struct EVMBlockDataProvider<S> {
@@ -28,10 +29,11 @@ where
     S: Storage,
 {
     fn get_block_hash(&self, number: &U256) -> H256 {
+        let ctx = Context::new();
         let height = number.as_u64();
         let block = self
             .storage
-            .get_block_by_height(height)
+            .get_block_by_height(ctx, height)
             .wait()
             .expect("failed to get block");
 

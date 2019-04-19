@@ -2,6 +2,7 @@ use std::error::Error;
 use std::fmt;
 
 use cita_vm::{state::Error as StateError, Error as VMError};
+use core_context::Context;
 use core_types::{
     Address, Balance, BlockHeader, Bloom, Hash, Receipt, SignedTransaction, TypesError, H256,
 };
@@ -26,6 +27,7 @@ pub trait Executor: Send + Sync {
     /// Execute the transactions and then return the receipts, this function will modify the "state of the world".
     fn exec(
         &self,
+        ctx: Context,
         latest_state_root: &Hash,
         current_header: &BlockHeader,
         txs: &[SignedTransaction],
@@ -34,6 +36,7 @@ pub trait Executor: Send + Sync {
     /// Query historical height data or perform read-only functions.
     fn readonly(
         &self,
+        ctx: Context,
         header: &BlockHeader,
         to: &Address,
         from: &Address,
@@ -41,27 +44,38 @@ pub trait Executor: Send + Sync {
     ) -> Result<ReadonlyResult, ExecutorError>;
 
     /// Query balance of account.
-    fn get_balance(&self, state_root: &Hash, address: &Address) -> Result<Balance, ExecutorError>;
+    fn get_balance(
+        &self,
+        ctx: Context,
+        state_root: &Hash,
+        address: &Address,
+    ) -> Result<Balance, ExecutorError>;
 
     /// Query value of account.
     fn get_value(
         &self,
+        ctx: Context,
         state_root: &Hash,
         address: &Address,
         key: &H256,
     ) -> Result<H256, ExecutorError>;
 
     /// Query storage root of account.
-    fn get_storage_root(&self, state_root: &Hash, address: &Address)
-        -> Result<Hash, ExecutorError>;
+    fn get_storage_root(
+        &self,
+        ctx: Context,
+        state_root: &Hash,
+        address: &Address,
+    ) -> Result<Hash, ExecutorError>;
 
     /// Query code of account.
     fn get_code(
         &self,
+        ctx: Context,
         state_root: &Hash,
         address: &Address,
     ) -> Result<(Vec<u8>, Hash), ExecutorError>;
-    // fn get_proof(&self, header: &BlockHeader, address: &Address, key: &Self::Key) -> Result<Self::Value, ExecutorError>;
+    // fn get_proof(&self, ctx: Context, header: &BlockHeader, address: &Address, key: &Self::Key) -> Result<Self::Value, ExecutorError>;
 }
 
 #[derive(Debug)]

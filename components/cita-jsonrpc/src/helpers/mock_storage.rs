@@ -211,7 +211,7 @@ mod tests {
     #[test]
     fn test_mock_storage() {
         let ms = MockStorage::new();
-        assert_eq!(ms.get_latest_block().wait().unwrap().header.height, 0);
+        assert_eq!(ms.get_latest_block(ctx).wait().unwrap().header.height, 0);
     }
 
 }

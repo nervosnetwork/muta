@@ -6,6 +6,7 @@ edition = "2018"
 
 [dependencies]
 core-runtime = { path = "../../core/runtime" }
+core-context = { path = "../../core/context" }
 
 logger = { path = "../../common/logger" }
 

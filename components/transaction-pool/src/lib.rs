@@ -8,6 +8,7 @@ use futures::future::{err, ok, Future};
 use futures_locks::RwLock;
 use tokio_async_await::compat::{backward::Compat, forward::IntoAwaitable};
 
+use core_context::Context;
 use core_crypto::{Crypto, CryptoTransform};
 use core_runtime::{FutRuntimeResult, TransactionPool, TransactionPoolError};
 use core_storage::{Storage, StorageError};
@@ -54,6 +55,7 @@ where
 {
     fn insert(
         &self,
+        ctx: Context,
         untx: UnverifiedTransaction,
     ) -> FutRuntimeResult<SignedTransaction, TransactionPoolError> {
         let storage = Arc::clone(&self.storage);
@@ -82,7 +84,10 @@ where
             };
 
             // 2. check if the transaction is in histories block.
-            match await!(storage.get_transaction(&tx_hash).into_awaitable()) {
+            match await!(storage
+                .get_transaction(ctx.clone(), &tx_hash)
+                .into_awaitable())
+            {
                 Ok(_) => Err(TransactionPoolError::Dup)?,
                 Err(StorageError::None(_)) => {}
                 Err(e) => Err(internal_error(e))?,
@@ -93,7 +98,7 @@ where
 
             // 3. verify params
             let latest_block =
-                await!(storage.get_latest_block().into_awaitable()).map_err(internal_error)?;
+                await!(storage.get_latest_block(ctx).into_awaitable()).map_err(internal_error)?;
 
             verify_transaction(
                 latest_block.header.height,
@@ -128,6 +133,7 @@ where
 
     fn package(
         &self,
+        ctx: Context,
         count: u64,
         quota_limit: u64,
     ) -> FutRuntimeResult<Vec<Hash>, TransactionPoolError> {
@@ -137,7 +143,7 @@ where
 
         let fut = async move {
             let latest_block =
-                await!(storage.get_latest_block().into_awaitable()).map_err(internal_error)?;
+                await!(storage.get_latest_block(ctx).into_awaitable()).map_err(internal_error)?;
 
             let mut invalid_hashes = vec![];
             let mut valid_hashes = vec![];
@@ -182,7 +188,7 @@ where
         Box::new(Compat::new(fut))
     }
 
-    fn flush(&self, tx_hashes: &[Hash]) -> FutRuntimeResult<(), TransactionPoolError> {
+    fn flush(&self, _: Context, tx_hashes: &[Hash]) -> FutRuntimeResult<(), TransactionPoolError> {
         let mut tx_cache = match self.tx_cache.write().wait() {
             Ok(tx_cache) => tx_cache,
             Err(()) => return Box::new(err(map_rwlock_err(()))),
@@ -197,6 +203,7 @@ where
 
     fn get_batch(
         &self,
+        _: Context,
         tx_hashes: &[Hash],
     ) -> FutRuntimeResult<Vec<Option<SignedTransaction>>, TransactionPoolError> {
         let tx_cache = match self.tx_cache.read().wait() {
@@ -213,7 +220,11 @@ where
 
     /// TODO: Implement "ensure"
     /// In the POC-1 phase, we only support single-node, so this function is not implemented.
-    fn ensure(&self, _tx_hashes: &[Hash]) -> FutRuntimeResult<bool, TransactionPoolError> {
+    fn ensure(
+        &self,
+        _: Context,
+        _tx_hashes: &[Hash],
+    ) -> FutRuntimeResult<bool, TransactionPoolError> {
         unimplemented!();
     }
 }
@@ -258,6 +269,7 @@ mod tests {
     use futures::future::Future;
 
     use components_database::memory::MemoryDB;
+    use core_context::Context;
     use core_crypto::{secp256k1::Secp256k1, Crypto, CryptoTransform};
     use core_runtime::{TransactionPool, TransactionPoolError};
     use core_storage::{BlockStorage, Storage};
@@ -267,6 +279,7 @@ mod tests {
 
     #[test]
     fn test_insert_transaction() {
+        let ctx = Context::new();
         let secp = Arc::new(Secp256k1::new());
         let pool_size = 1000;
         let until_block_limit = 100;
@@ -277,7 +290,7 @@ mod tests {
         let storage = Arc::new(BlockStorage::new(db));
         let mut block = Block::default();
         block.header.height = height;
-        storage.insert_block(block).wait().unwrap();
+        storage.insert_block(ctx.clone(), block).wait().unwrap();
 
         let tx_pool =
             HashTransactionPool::new(storage, secp, pool_size, until_block_limit, quota_limit);
@@ -285,12 +298,12 @@ mod tests {
         // test normal
         let untx = mock_transaction(100, height + until_block_limit, "test_normal".to_owned());
         let tx_hash = untx.transaction.hash();
-        let signed_tx = tx_pool.insert(untx).wait().unwrap();
+        let signed_tx = tx_pool.insert(ctx.clone(), untx).wait().unwrap();
         assert_eq!(signed_tx.hash, tx_hash);
 
         // test lt valid_until_block
         let untx = mock_transaction(100, height, "test_lt_quota_limit".to_owned());
-        let result = tx_pool.insert(untx).wait();
+        let result = tx_pool.insert(ctx.clone(), untx).wait();
         assert_eq!(result, Err(TransactionPoolError::InvalidUntilBlock));
 
         // test gt valid_until_block
@@ -299,7 +312,7 @@ mod tests {
             height + until_block_limit * 2,
             "test_gt_valid_until_block".to_owned(),
         );
-        let result = tx_pool.insert(untx).wait();
+        let result = tx_pool.insert(ctx.clone(), untx).wait();
         assert_eq!(result, Err(TransactionPoolError::InvalidUntilBlock));
 
         // test gt quota limit
@@ -308,19 +321,20 @@ mod tests {
             height + until_block_limit,
             "test_gt_quota_limit".to_owned(),
         );
-        let result = tx_pool.insert(untx).wait();
+        let result = tx_pool.insert(ctx.clone(), untx).wait();
         assert_eq!(result, Err(TransactionPoolError::QuotaNotEnough));
 
         // test cache dup
         let untx = mock_transaction(100, height + until_block_limit, "test_dup".to_owned());
         let untx2 = untx.clone();
-        tx_pool.insert(untx).wait().unwrap();
-        let result = tx_pool.insert(untx2).wait();
+        tx_pool.insert(ctx.clone(), untx).wait().unwrap();
+        let result = tx_pool.insert(ctx, untx2).wait();
         assert_eq!(result, Err(TransactionPoolError::Dup));
     }
 
     #[test]
     fn test_histories_dup() {
+        let ctx = Context::new();
         let secp = Arc::new(Secp256k1::new());
         let pool_size = 1000;
         let until_block_limit = 100;
@@ -339,21 +353,22 @@ mod tests {
         block.header.height = height;
 
         storage
-            .insert_transactions(vec![signed_tx.clone()])
+            .insert_transactions(ctx.clone(), vec![signed_tx.clone()])
             .wait()
             .unwrap();
 
-        storage.insert_block(block).wait().unwrap();
+        storage.insert_block(ctx.clone(), block).wait().unwrap();
 
         let tx_pool =
             HashTransactionPool::new(storage, secp, pool_size, until_block_limit, quota_limit);
 
-        let result = tx_pool.insert(signed_tx.untx).wait();
+        let result = tx_pool.insert(ctx, signed_tx.untx).wait();
         assert_eq!(result, Err(TransactionPoolError::Dup));
     }
 
     #[test]
     fn test_pool_size() {
+        let ctx = Context::new();
         let secp = Arc::new(Secp256k1::new());
         let pool_size = 1;
         let until_block_limit = 100;
@@ -364,23 +379,24 @@ mod tests {
         let storage = Arc::new(BlockStorage::new(db));
         let mut block = Block::default();
         block.header.height = height;
-        storage.insert_block(block).wait().unwrap();
+        storage.insert_block(ctx.clone(), block).wait().unwrap();
 
         let tx_pool =
             HashTransactionPool::new(storage, secp, pool_size, until_block_limit, quota_limit);
 
         let untx = mock_transaction(100, height + until_block_limit, "test1".to_owned());
         let tx_hash = untx.transaction.hash();
-        let signed_tx = tx_pool.insert(untx).wait().unwrap();
+        let signed_tx = tx_pool.insert(ctx.clone(), untx).wait().unwrap();
         assert_eq!(signed_tx.hash, tx_hash);
 
         let untx = mock_transaction(100, height + until_block_limit, "test2".to_owned());
-        let result = tx_pool.insert(untx).wait();
+        let result = tx_pool.insert(ctx, untx).wait();
         assert_eq!(result, Err(TransactionPoolError::ReachLimit));
     }
 
     #[test]
     fn test_package_transaction_count() {
+        let ctx = Context::new();
         let secp = Arc::new(Secp256k1::new());
         let pool_size = 100;
         let until_block_limit = 100;
@@ -391,7 +407,7 @@ mod tests {
         let storage = Arc::new(BlockStorage::new(db));
         let mut block = Block::default();
         block.header.height = height;
-        storage.insert_block(block).wait().unwrap();
+        storage.insert_block(ctx.clone(), block).wait().unwrap();
 
         let tx_pool =
             HashTransactionPool::new(storage, secp, pool_size, until_block_limit, quota_limit);
@@ -400,11 +416,11 @@ mod tests {
         for i in 0..10 {
             let untx = mock_transaction(100, height + until_block_limit, format!("test{}", i));
             tx_hashes.push(untx.transaction.hash());
-            tx_pool.insert(untx).wait().unwrap();
+            tx_pool.insert(ctx.clone(), untx).wait().unwrap();
         }
 
         let pachage_tx_hashes = tx_pool
-            .package(tx_hashes.len() as u64, quota_limit)
+            .package(ctx, tx_hashes.len() as u64, quota_limit)
             .wait()
             .unwrap();
         assert_eq!(tx_hashes.len(), pachage_tx_hashes.len());
@@ -418,6 +434,7 @@ mod tests {
 
     #[test]
     fn test_package_transaction_quota_limit() {
+        let ctx = Context::new();
         let secp = Arc::new(Secp256k1::new());
         let pool_size = 100;
         let until_block_limit = 100;
@@ -428,7 +445,7 @@ mod tests {
         let storage = Arc::new(BlockStorage::new(db));
         let mut block = Block::default();
         block.header.height = height;
-        storage.insert_block(block).wait().unwrap();
+        storage.insert_block(ctx.clone(), block).wait().unwrap();
 
         let tx_pool =
             HashTransactionPool::new(storage, secp, pool_size, until_block_limit, quota_limit);
@@ -437,11 +454,11 @@ mod tests {
         for i in 0..10 {
             let untx = mock_transaction(100, height + until_block_limit, format!("test{}", i));
             tx_hashes.push(untx.transaction.hash());
-            tx_pool.insert(untx).wait().unwrap();
+            tx_pool.insert(ctx.clone(), untx).wait().unwrap();
         }
 
         let pachage_tx_hashes = tx_pool
-            .package(tx_hashes.len() as u64, quota_limit)
+            .package(ctx, tx_hashes.len() as u64, quota_limit)
             .wait()
             .unwrap();
         assert_eq!(8, pachage_tx_hashes.len());

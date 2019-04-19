@@ -167,7 +167,7 @@ where
         return Box::new(ok(res_block));
     }
     let fut = storage
-        .get_transactions(&raw_block.tx_hashes.iter().collect::<Vec<_>>())
+        .get_transactions(ctx, &raw_block.tx_hashes.iter().collect::<Vec<_>>())
         .map_err(|e| {
             error!("get_transactions err: {:?}", e);
             JsonrpcError::internal_error()
@@ -248,7 +248,7 @@ where
         })
         .and_then(move |block| {
             storage1
-                .get_receipts(block.tx_hashes.iter().collect::<Vec<_>>().as_slice())
+                .get_receipts(ctx, block.tx_hashes.iter().collect::<Vec<_>>().as_slice())
                 .map_err(|e| {
                     error!("get_receipts err: {:?}", e);
                     JsonrpcError::internal_error()
@@ -330,7 +330,7 @@ where
     fn block_number(&self) -> BoxFuture<Quantity> {
         let fut = self
             .storage
-            .get_latest_block()
+            .get_latest_block(ctx)
             .map_err(|e| {
                 error!("get_latest_block err: {:?}", e);
                 JsonrpcError::internal_error()
@@ -367,7 +367,7 @@ where
         let storage = self.get_storage_inst();
         let fut = self
             .storage
-            .get_block_by_hash(&transform_data32_to_hash(hash))
+            .get_block_by_hash(ctx, &transform_data32_to_hash(hash))
             .then(move |x| {
                 let res: BoxFuture<_> = match x {
                     Ok(raw_block) => match raw_block {
@@ -391,7 +391,7 @@ where
         let storage = self.get_storage_inst();
         let fut = self
             .storage
-            .get_block_by_height(height.into())
+            .get_block_by_height(ctx, height.into())
             .then(move |x| {
                 let res: BoxFuture<_> = match x {
                     Ok(raw_block) => match raw_block {
@@ -415,7 +415,7 @@ where
         let storage = self.get_storage_inst();
         let fut = self
             .storage
-            .get_receipt(&transform_data32_to_hash(hash))
+            .get_receipt(ctx, &transform_data32_to_hash(hash))
             .map_err(|e| {
                 error!("get_receipt err: {:?}", e);
                 JsonrpcError::internal_error()
@@ -510,7 +510,7 @@ where
                         let hashes: Vec<&Hash> = block.tx_hashes.iter().collect();
                         Box::new(
                             Arc::<S>::clone(&storage)
-                                .get_transactions(&hashes)
+                                .get_transactions(ctx, &hashes)
                                 .map_err(|e| {
                                     error!("get_transactions err: {:?}", e);
                                     JsonrpcError::internal_error()
@@ -615,7 +615,7 @@ where
             .position(|x| x == &hash)
             .expect("tx should be in block");
         let receipts_ret = storage2
-            .get_receipts(tx_hashes.iter().collect::<Vec<_>>().as_slice())
+            .get_receipts(ctx, tx_hashes.iter().collect::<Vec<_>>().as_slice())
             .wait();
 
         let receipt_list;

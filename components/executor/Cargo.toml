@@ -8,6 +8,7 @@ edition = "2018"
 core-runtime = { path = "../../core/runtime" }
 core-storage = { path = "../../core/storage" }
 core-types = { path = "../../core/types" }
+core-context = { path = "../../core/context" }
 
 cita-vm = "0.1"
 log = "0.4"

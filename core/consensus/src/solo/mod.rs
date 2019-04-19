@@ -7,6 +7,7 @@ use futures::future::{ok, Future};
 use futures_locks::RwLock;
 use tokio::timer::Delay;
 
+use core_context::Context;
 use core_crypto::{Crypto, CryptoTransform};
 use core_merkle::{merge, Merkle};
 use core_runtime::{Executor, TransactionPool};
@@ -56,11 +57,12 @@ where
         privkey: C::PrivateKey,
         transaction_size: u64,
     ) -> Result<Self, ConsensusError> {
+        let ctx = Context::new();
         let pubkey = crypto.get_public_key(&privkey)?;
         let pubkey_hash = Hash::digest(&pubkey.as_bytes()[1..]);
         let address = Address::from_hash(&pubkey_hash);
 
-        let current_block = storage.get_latest_block().wait()?;
+        let current_block = storage.get_latest_block(ctx).wait()?;
         let status = Status {
             height: current_block.header.height,
             quota_limit: current_block.header.quota_limit,
@@ -91,9 +93,10 @@ where
         let tx_pool = Arc::clone(&self.tx_pool);
         let tx_pool2 = Arc::clone(&self.tx_pool);
         let storage = Arc::clone(&self.storage);
+        let ctx = Context::new();
 
         let fut = tx_pool
-            .package(self.transaction_size, quota_limit)
+            .package(ctx.clone(), self.transaction_size, quota_limit)
             .map_err(ConsensusError::TransactionPool)
             // Proposal block
             .and_then(move |tx_hashes| ok(self_instant1.build_proposal_block(tx_hashes)))
@@ -112,8 +115,8 @@ where
                 let tx_hashes = block.tx_hashes.clone();
                 ok(block.header.clone()).join4(
                     self_instant3.status.write().map_err(map_err_rwlock),
-                    storage.insert_block(block).map_err(ConsensusError::Storage),
-                    tx_pool2.flush(&tx_hashes).map_err(ConsensusError::TransactionPool),
+                    storage.insert_block(ctx.clone(), block).map_err(ConsensusError::Storage),
+                    tx_pool2.flush(ctx, &tx_hashes).map_err(ConsensusError::TransactionPool),
                 )
             })
             .and_then(|(header, mut status, _, _)| {
@@ -157,12 +160,13 @@ where
         status: Status,
         mut block: Block,
     ) -> Box<Future<Item = Block, Error = ConsensusError> + Send> {
+        let ctx = Context::new();
         let storage = Arc::clone(&self.storage);
         let executor = Arc::clone(&self.executor);
 
         let fut = self
             .tx_pool
-            .get_batch(&block.tx_hashes)
+            .get_batch(ctx.clone(), &block.tx_hashes)
             .map_err(ConsensusError::TransactionPool)
             .and_then(move |opt_signed_txs| {
                 let mut signed_txs = Vec::with_capacity(opt_signed_txs.len());
@@ -173,11 +177,15 @@ where
                     }
                 }
 
-                let execution_result =
-                    match executor.exec(&status.state_root, &block.header, &signed_txs) {
-                        Ok(execution_result) => execution_result,
-                        Err(e) => panic!("exec block: {:?}", e),
-                    };
+                let execution_result = match executor.exec(
+                    ctx.clone(),
+                    &status.state_root,
+                    &block.header,
+                    &signed_txs,
+                ) {
+                    Ok(execution_result) => execution_result,
+                    Err(e) => panic!("exec block: {:?}", e),
+                };
                 let hahses: Vec<Hash> = execution_result
                     .receipts
                     .iter()
@@ -208,9 +216,9 @@ where
 
                 ok(block)
                     .join4(
-                        storage.insert_transactions(signed_txs),
-                        storage.insert_transaction_positions(positions),
-                        storage.insert_receipts(execution_result.receipts),
+                        storage.insert_transactions(ctx.clone(), signed_txs),
+                        storage.insert_transaction_positions(ctx.clone(), positions),
+                        storage.insert_receipts(ctx, execution_result.receipts),
                     )
                     .map_err(ConsensusError::Storage)
             })
@@ -289,6 +297,7 @@ mod tests {
         TrieDB,
     };
     use components_transaction_pool::HashTransactionPool;
+    use core_context::Context;
     use core_crypto::{
         secp256k1::{PrivateKey, Secp256k1},
         Crypto, CryptoTransform,
@@ -303,6 +312,7 @@ mod tests {
 
     #[test]
     fn test_boom() {
+        let ctx = Context::new();
         let secp = Arc::new(Secp256k1::new());
         let (privkey, pubkey) = secp.gen_keypair();
         let pubkey_hash = Hash::digest(&pubkey.as_bytes()[1..]);
@@ -332,7 +342,7 @@ mod tests {
         let transactions_root = block.header.transactions_root.clone();
         let receipts_root = block.header.receipts_root.clone();
 
-        storage.insert_block(block).wait().unwrap();
+        storage.insert_block(ctx.clone(), block).wait().unwrap();
         let executor = Arc::new(executor);
         let solo: Solo<_, _, _, Secp256k1> = Solo::new(
             Arc::clone(&executor),
@@ -353,13 +363,13 @@ mod tests {
                 format!("tx{}", i),
                 &privkey,
             );
-            tx_pool.insert(tx).wait().unwrap();
+            tx_pool.insert(ctx.clone(), tx).wait().unwrap();
         }
 
         // exec block
         solo.boom().wait().unwrap();
 
-        let block2 = storage.get_latest_block().wait().unwrap();
+        let block2 = storage.get_latest_block(ctx).wait().unwrap();
         assert_eq!(block2.tx_hashes.len(), tx_count);
         assert_eq!(block2.header.height, height + 1);
         assert_ne!(state_root, block2.header.state_root);

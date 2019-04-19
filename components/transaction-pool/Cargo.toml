@@ -9,6 +9,7 @@ core-types = { path = "../../core/types" }
 core-crypto = { path = "../../core/crypto" }
 core-runtime = { path = "../../core/runtime" }
 core-storage = { path = "../../core/storage" }
+core-context = { path = "../../core/context" }
 
 failure = "0.1"
 futures = "0.1"

@@ -14,8 +14,3 @@ pub use executor::{ExecutionResult, Executor, ExecutorError, ReadonlyResult};
 pub use transaction_pool::{TransactionPool, TransactionPoolError};
 
 pub type FutRuntimeResult<T, E> = Box<Future<Item = T, Error = E> + Send>;
-
-/// Blockchain Context. eg. block, system contract.
-// TODO: Add context information
-#[derive(Default)]
-pub struct Context {}

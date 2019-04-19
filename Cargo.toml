@@ -18,6 +18,7 @@ core-runtime = { path = "core/runtime" }
 core-storage = { path = "core/storage" }
 core-types = { path = "core/types" }
 core-consensus = { path = "core/consensus" }
+core-context = { path = "core/context" }
 
 hex = "0.3"
 futures = "0.1"
@@ -42,6 +43,7 @@ members = [
   "core/merkle",
   "core/pubsub",
   "core/network",
+  "core/context",
 
   "components/transaction-pool",
   "components/database",

@@ -1,6 +1,7 @@
 use std::error::Error;
 use std::fmt;
 
+use core_context::Context;
 use core_crypto::CryptoError;
 use core_types::{Hash, SignedTransaction, UnverifiedTransaction};
 
@@ -11,6 +12,7 @@ pub trait TransactionPool: Sync + Send {
     /// Insert a transaction after verifying the signature and some parameters are correct.
     fn insert(
         &self,
+        ctx: Context,
         untx: UnverifiedTransaction,
     ) -> FutRuntimeResult<SignedTransaction, TransactionPoolError>;
 
@@ -20,16 +22,19 @@ pub trait TransactionPool: Sync + Send {
     /// Note: Transactions are still in the pool.
     fn package(
         &self,
+        ctx: Context,
         count: u64,
         quota_limit: u64,
     ) -> FutRuntimeResult<Vec<Hash>, TransactionPoolError>;
 
     /// Delete the specified transactions.
-    fn flush(&self, tx_hashes: &[Hash]) -> FutRuntimeResult<(), TransactionPoolError>;
+    fn flush(&self, ctx: Context, tx_hashes: &[Hash])
+        -> FutRuntimeResult<(), TransactionPoolError>;
 
     /// Get a batch of transactions.
     fn get_batch(
         &self,
+        ctx: Context,
         tx_hashes: &[Hash],
     ) -> FutRuntimeResult<Vec<Option<SignedTransaction>>, TransactionPoolError>;
 
@@ -41,7 +46,11 @@ pub trait TransactionPool: Sync + Send {
     /// and P2P needs a "p2p_session_id" to find the corresponding node.
     /// However, we don't want to pass "p2p_session_id" to this function.
     /// In the next version we will use "context" to store "p2p_session_id".
-    fn ensure(&self, tx_hashes: &[Hash]) -> FutRuntimeResult<bool, TransactionPoolError>;
+    fn ensure(
+        &self,
+        ctx: Context,
+        tx_hashes: &[Hash],
+    ) -> FutRuntimeResult<bool, TransactionPoolError>;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

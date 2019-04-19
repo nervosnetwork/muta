@@ -1,6 +1,8 @@
 use std::error::Error;
 use std::fmt;
 
+use core_context::Context;
+
 use crate::FutRuntimeResult;
 
 /// Specify the category of data stored, and users can store the data in a decentralized manner.
@@ -30,24 +32,36 @@ pub enum DatabaseError {
 pub type FutDBResult<T> = FutRuntimeResult<T, DatabaseError>;
 
 pub trait Database: Send + Sync {
-    fn get(&self, c: DataCategory, key: &[u8]) -> FutDBResult<Option<Vec<u8>>>;
+    fn get(&self, ctx: Context, c: DataCategory, key: &[u8]) -> FutDBResult<Option<Vec<u8>>>;
 
-    fn get_batch(&self, c: DataCategory, keys: &[Vec<u8>]) -> FutDBResult<Vec<Option<Vec<u8>>>>;
+    fn get_batch(
+        &self,
+        ctx: Context,
+        c: DataCategory,
+        keys: &[Vec<u8>],
+    ) -> FutDBResult<Vec<Option<Vec<u8>>>>;
 
-    fn insert(&self, c: DataCategory, key: Vec<u8>, value: Vec<u8>) -> FutDBResult<()>;
+    fn insert(
+        &self,
+        ctx: Context,
+        c: DataCategory,
+        key: Vec<u8>,
+        value: Vec<u8>,
+    ) -> FutDBResult<()>;
 
     fn insert_batch(
         &self,
+        ctx: Context,
         c: DataCategory,
         keys: Vec<Vec<u8>>,
         values: Vec<Vec<u8>>,
     ) -> FutDBResult<()>;
 
-    fn contains(&self, c: DataCategory, key: &[u8]) -> FutDBResult<bool>;
+    fn contains(&self, ctx: Context, c: DataCategory, key: &[u8]) -> FutDBResult<bool>;
 
-    fn remove(&self, c: DataCategory, key: &[u8]) -> FutDBResult<()>;
+    fn remove(&self, ctx: Context, c: DataCategory, key: &[u8]) -> FutDBResult<()>;
 
-    fn remove_batch(&self, c: DataCategory, keys: &[Vec<u8>]) -> FutDBResult<()>;
+    fn remove_batch(&self, ctx: Context, c: DataCategory, keys: &[Vec<u8>]) -> FutDBResult<()>;
 }
 
 impl Error for DatabaseError {}

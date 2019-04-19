@@ -10,6 +10,7 @@ use futures::{
 use old_futures::future::Future as OldFuture;
 use tokio_async_await::compat::backward::Compat;
 
+use core_context::Context;
 use core_runtime::{DataCategory, Database};
 use core_serialization::{
     AsyncCodec, Block as SerBlock, Receipt as SerReceipt,
@@ -29,49 +30,65 @@ pub type StorageResult<T> = Box<OldFuture<Item = T, Error = StorageError> + Send
 /// NOTE: Anything that might return "std::option::None" will return "std::option:: NoneError".
 pub trait Storage: Send + Sync {
     /// Get the latest block.
-    fn get_latest_block(&self) -> StorageResult<Block>;
+    fn get_latest_block(&self, ctx: Context) -> StorageResult<Block>;
 
     /// Get a block by height.
-    fn get_block_by_height(&self, height: u64) -> StorageResult<Block>;
+    fn get_block_by_height(&self, ctx: Context, height: u64) -> StorageResult<Block>;
 
     /// Get a block by hash.
     /// The hash is actually an index,
     /// and the corresponding height is obtained by hash and then querying the corresponding block.
-    fn get_block_by_hash(&self, hash: &Hash) -> StorageResult<Block>;
+    fn get_block_by_hash(&self, ctx: Context, hash: &Hash) -> StorageResult<Block>;
 
     /// Get a signed transaction by hash.
-    fn get_transaction(&self, hash: &Hash) -> StorageResult<SignedTransaction>;
+    fn get_transaction(&self, ctx: Context, hash: &Hash) -> StorageResult<SignedTransaction>;
 
     /// Get a batch of transactions by hashes.
-    fn get_transactions(&self, hashes: &[Hash]) -> StorageResult<Vec<SignedTransaction>>;
+    fn get_transactions(
+        &self,
+        ctx: Context,
+        hashes: &[Hash],
+    ) -> StorageResult<Vec<SignedTransaction>>;
 
     /// Get a receipt by hash.
-    fn get_receipt(&self, tx_hash: &Hash) -> StorageResult<Receipt>;
+    fn get_receipt(&self, ctx: Context, tx_hash: &Hash) -> StorageResult<Receipt>;
 
     /// Get a batch of receipts by hashes
-    fn get_receipts(&self, tx_hashes: &[Hash]) -> StorageResult<Vec<Receipt>>;
+    fn get_receipts(&self, ctx: Context, tx_hashes: &[Hash]) -> StorageResult<Vec<Receipt>>;
 
     /// Get a transaction position by hash.
-    fn get_transaction_position(&self, hash: &Hash) -> StorageResult<TransactionPosition>;
+    fn get_transaction_position(
+        &self,
+        ctx: Context,
+        hash: &Hash,
+    ) -> StorageResult<TransactionPosition>;
 
     /// Get a batch of transactions by hashes.
-    fn get_transaction_positions(&self, hashes: &[Hash])
-        -> StorageResult<Vec<TransactionPosition>>;
+    fn get_transaction_positions(
+        &self,
+        ctx: Context,
+        hashes: &[Hash],
+    ) -> StorageResult<Vec<TransactionPosition>>;
 
     /// Insert a block.
-    fn insert_block(&self, block: Block) -> StorageResult<()>;
+    fn insert_block(&self, ctx: Context, block: Block) -> StorageResult<()>;
 
     /// Insert a batch of transactions.
-    fn insert_transactions(&self, signed_txs: Vec<SignedTransaction>) -> StorageResult<()>;
+    fn insert_transactions(
+        &self,
+        ctx: Context,
+        signed_txs: Vec<SignedTransaction>,
+    ) -> StorageResult<()>;
 
     /// Insert a batch of transaction positions.
     fn insert_transaction_positions(
         &self,
+        ctx: Context,
         positions: HashMap<Hash, TransactionPosition>,
     ) -> StorageResult<()>;
 
     /// Insert a batch of receipts.
-    fn insert_receipts(&self, receipts: Vec<Receipt>) -> StorageResult<()>;
+    fn insert_receipts(&self, ctx: Context, receipts: Vec<Receipt>) -> StorageResult<()>;
 }
 
 pub struct BlockStorage<DB>
@@ -94,11 +111,11 @@ impl<DB: 'static> Storage for BlockStorage<DB>
 where
     DB: Database,
 {
-    fn get_latest_block(&self) -> StorageResult<Block> {
+    fn get_latest_block(&self, ctx: Context) -> StorageResult<Block> {
         let db = Arc::clone(&self.db);
 
         let fut = async move {
-            let value = await!(db.get(DataCategory::Block, LATEST_BLOCK).compat())?;
+            let value = await!(db.get(ctx, DataCategory::Block, LATEST_BLOCK).compat())?;
 
             let block = await!(AsyncCodec::decode::<SerBlock>(value?))?.try_into()?;
             Ok(block)
@@ -107,12 +124,12 @@ where
         Box::new(Compat::new(fut))
     }
 
-    fn get_block_by_height(&self, height: u64) -> StorageResult<Block> {
+    fn get_block_by_height(&self, ctx: Context, height: u64) -> StorageResult<Block> {
         let db = Arc::clone(&self.db);
         let key = transfrom_u64_to_array_u8(height);
 
         let fut = async move {
-            let value = await!(db.get(DataCategory::Block, &key).compat())?;
+            let value = await!(db.get(ctx, DataCategory::Block, &key).compat())?;
 
             let block = await!(AsyncCodec::decode::<SerBlock>(value?))?.try_into()?;
             Ok(block)
@@ -121,13 +138,15 @@ where
         Box::new(Compat::new(fut))
     }
 
-    fn get_block_by_hash(&self, hash: &Hash) -> StorageResult<Block> {
+    fn get_block_by_hash(&self, ctx: Context, hash: &Hash) -> StorageResult<Block> {
         let db = Arc::clone(&self.db);
         let key = hash.clone();
 
         let fut = async move {
-            let height_slice = await!(db.get(DataCategory::Block, key.as_bytes()).compat())?;
-            let value = await!(db.get(DataCategory::Block, &height_slice?).compat())?;
+            let height_slice = await!(db
+                .get(ctx.clone(), DataCategory::Block, key.as_bytes())
+                .compat())?;
+            let value = await!(db.get(ctx, DataCategory::Block, &height_slice?).compat())?;
 
             let block = await!(AsyncCodec::decode::<SerBlock>(value?))?.try_into()?;
             Ok(block)
@@ -136,12 +155,14 @@ where
         Box::new(Compat::new(fut))
     }
 
-    fn get_transaction(&self, hash: &Hash) -> StorageResult<SignedTransaction> {
+    fn get_transaction(&self, ctx: Context, hash: &Hash) -> StorageResult<SignedTransaction> {
         let db = Arc::clone(&self.db);
         let key = hash.clone();
 
         let fut = async move {
-            let value = await!(db.get(DataCategory::Transaction, key.as_bytes()).compat())?;
+            let value = await!(db
+                .get(ctx, DataCategory::Transaction, key.as_bytes())
+                .compat())?;
 
             let tx = await!(AsyncCodec::decode::<SerSignedTransaction>(value?))?.try_into()?;
             Ok(tx)
@@ -150,12 +171,16 @@ where
         Box::new(Compat::new(fut))
     }
 
-    fn get_transactions(&self, hashes: &[Hash]) -> StorageResult<Vec<SignedTransaction>> {
+    fn get_transactions(
+        &self,
+        ctx: Context,
+        hashes: &[Hash],
+    ) -> StorageResult<Vec<SignedTransaction>> {
         let db = Arc::clone(&self.db);
         let keys: Vec<Vec<u8>> = hashes.iter().map(|h| h.as_bytes().to_vec()).collect();
 
         let fut = async move {
-            let values = await!(db.get_batch(DataCategory::Transaction, &keys).compat())?;
+            let values = await!(db.get_batch(ctx, DataCategory::Transaction, &keys).compat())?;
             let values = opts_to_flat(values);
 
             let txs = await!(AsyncCodec::decode_batch::<SerSignedTransaction>(values))?
@@ -168,12 +193,12 @@ where
         Box::new(Compat::new(fut))
     }
 
-    fn get_receipt(&self, hash: &Hash) -> StorageResult<Receipt> {
+    fn get_receipt(&self, ctx: Context, hash: &Hash) -> StorageResult<Receipt> {
         let db = Arc::clone(&self.db);
         let key = hash.clone();
 
         let fut = async move {
-            let value = await!(db.get(DataCategory::Receipt, key.as_bytes()).compat())?;
+            let value = await!(db.get(ctx, DataCategory::Receipt, key.as_bytes()).compat())?;
 
             let receipt = await!(AsyncCodec::decode::<SerReceipt>(value?))?.try_into()?;
             Ok(receipt)
@@ -182,12 +207,12 @@ where
         Box::new(Compat::new(fut))
     }
 
-    fn get_receipts(&self, hashes: &[Hash]) -> StorageResult<Vec<Receipt>> {
+    fn get_receipts(&self, ctx: Context, hashes: &[Hash]) -> StorageResult<Vec<Receipt>> {
         let db = Arc::clone(&self.db);
         let keys: Vec<Vec<u8>> = hashes.iter().map(|h| h.as_bytes().to_vec()).collect();
 
         let fut = async move {
-            let values = await!(db.get_batch(DataCategory::Receipt, &keys).compat())?;
+            let values = await!(db.get_batch(ctx, DataCategory::Receipt, &keys).compat())?;
             let values = opts_to_flat(values);
 
             let receipts = await!(AsyncCodec::decode_batch::<SerReceipt>(values))?
@@ -200,13 +225,17 @@ where
         Box::new(Compat::new(fut))
     }
 
-    fn get_transaction_position(&self, hash: &Hash) -> StorageResult<TransactionPosition> {
+    fn get_transaction_position(
+        &self,
+        ctx: Context,
+        hash: &Hash,
+    ) -> StorageResult<TransactionPosition> {
         let db = Arc::clone(&self.db);
         let key = hash.clone();
 
         let fut = async move {
             let value = await!(db
-                .get(DataCategory::TransactionPosition, key.as_bytes())
+                .get(ctx, DataCategory::TransactionPosition, key.as_bytes())
                 .compat())?;
 
             let tx_position =
@@ -219,6 +248,7 @@ where
 
     fn get_transaction_positions(
         &self,
+        ctx: Context,
         hashes: &[Hash],
     ) -> StorageResult<Vec<TransactionPosition>> {
         let db = Arc::clone(&self.db);
@@ -226,7 +256,7 @@ where
 
         let fut = async move {
             let values = await!(db
-                .get_batch(DataCategory::TransactionPosition, &keys)
+                .get_batch(ctx, DataCategory::TransactionPosition, &keys)
                 .compat())?;
             let values = opts_to_flat(values);
 
@@ -240,7 +270,7 @@ where
         Box::new(Compat::new(fut))
     }
 
-    fn insert_block(&self, block: Block) -> StorageResult<()> {
+    fn insert_block(&self, ctx: Context, block: Block) -> StorageResult<()> {
         let db = Arc::clone(&self.db);
 
         let height = block.header.height;
@@ -253,15 +283,22 @@ where
             let encode_value = await!(AsyncCodec::encode(pb_block))?;
 
             let stream = stream::futures_unordered(vec![
-                db.insert(DataCategory::Block, height_key, encode_value.clone())
-                    .compat(),
                 db.insert(
+                    ctx.clone(),
+                    DataCategory::Block,
+                    height_key,
+                    encode_value.clone(),
+                )
+                .compat(),
+                db.insert(
+                    ctx.clone(),
                     DataCategory::Block,
                     hash_key.as_bytes().to_vec(),
                     transfrom_u64_to_array_u8(height),
                 )
                 .compat(),
                 db.insert(
+                    ctx,
                     DataCategory::Block,
                     LATEST_BLOCK.to_vec(),
                     encode_value.clone(),
@@ -276,7 +313,11 @@ where
         Box::new(Compat::new(fut))
     }
 
-    fn insert_transactions(&self, signed_txs: Vec<SignedTransaction>) -> StorageResult<()> {
+    fn insert_transactions(
+        &self,
+        ctx: Context,
+        signed_txs: Vec<SignedTransaction>,
+    ) -> StorageResult<()> {
         let db = Arc::clone(&self.db);
         let keys: Vec<Vec<u8>> = signed_txs
             .iter()
@@ -289,7 +330,7 @@ where
             let values = await!(AsyncCodec::encode_batch(pb_txs))?;
 
             await!(db
-                .insert_batch(DataCategory::Transaction, keys, values)
+                .insert_batch(ctx, DataCategory::Transaction, keys, values)
                 .compat())?;
             Ok(())
         };
@@ -299,6 +340,7 @@ where
 
     fn insert_transaction_positions(
         &self,
+        ctx: Context,
         positions: HashMap<Hash, TransactionPosition>,
     ) -> StorageResult<()> {
         let db = Arc::clone(&self.db);
@@ -316,7 +358,7 @@ where
             let values = await!(AsyncCodec::encode_batch(ser_positions))?;
 
             await!(db
-                .insert_batch(DataCategory::TransactionPosition, keys, values)
+                .insert_batch(ctx, DataCategory::TransactionPosition, keys, values)
                 .compat())?;
             Ok(())
         };
@@ -324,7 +366,7 @@ where
         Box::new(Compat::new(fut))
     }
 
-    fn insert_receipts(&self, receipts: Vec<Receipt>) -> StorageResult<()> {
+    fn insert_receipts(&self, ctx: Context, receipts: Vec<Receipt>) -> StorageResult<()> {
         let db = Arc::clone(&self.db);
         let keys: Vec<Vec<u8>> = receipts
             .iter()
@@ -336,7 +378,7 @@ where
             let values = await!(AsyncCodec::encode_batch(pb_receipts))?;
 
             await!(db
-                .insert_batch(DataCategory::Receipt, keys, values)
+                .insert_batch(ctx, DataCategory::Receipt, keys, values)
                 .compat())?;
             Ok(())
         };
@@ -369,58 +411,73 @@ mod tests {
     use super::{BlockStorage, Storage};
 
     use components_database::memory::MemoryDB;
+    use core_context::Context;
     use core_types::{
         Block, Hash, Receipt, SignedTransaction, TransactionPosition, UnverifiedTransaction,
     };
 
     #[test]
     fn test_get_latest_block_should_return_ok() {
+        let ctx = Context::new();
         let db = Arc::new(MemoryDB::new());
         let storage = BlockStorage::new(db);
-        storage.insert_block(mock_block(1000)).wait().unwrap();
-        let block = storage.get_latest_block().wait().unwrap();
+        storage
+            .insert_block(ctx.clone(), mock_block(1000))
+            .wait()
+            .unwrap();
+        let block = storage.get_latest_block(ctx).wait().unwrap();
 
         assert_eq!(block.header.height, 1000)
     }
 
     #[test]
     fn test_get_block_by_height_should_return_ok() {
+        let ctx = Context::new();
         let db = Arc::new(MemoryDB::new());
         let storage = BlockStorage::new(db);
-        storage.insert_block(mock_block(1000)).wait().unwrap();
-        let block = storage.get_block_by_height(1000).wait().unwrap();
+        storage
+            .insert_block(ctx.clone(), mock_block(1000))
+            .wait()
+            .unwrap();
+        let block = storage.get_block_by_height(ctx, 1000).wait().unwrap();
 
         assert_eq!(block.header.height, 1000)
     }
 
     #[test]
     fn test_get_block_by_hash_should_return_ok() {
+        let ctx = Context::new();
         let db = Arc::new(MemoryDB::new());
         let storage = BlockStorage::new(db);
 
         let b = mock_block(1000);
         let hash = b.header.hash().clone();
-        storage.insert_block(b).wait().unwrap();
+        storage.insert_block(ctx.clone(), b).wait().unwrap();
 
-        let b = storage.get_block_by_hash(&hash).wait().unwrap();
+        let b = storage.get_block_by_hash(ctx, &hash).wait().unwrap();
         assert_eq!(b.header.height, 1000)
     }
 
     #[test]
     fn test_get_transaction_should_return_ok() {
+        let ctx = Context::new();
         let db = Arc::new(MemoryDB::new());
         let storage = BlockStorage::new(db);
         let tx = mock_transaction(Hash::digest(b"test111"));
 
         let hash = tx.hash.clone();
-        storage.insert_transactions(vec![tx]).wait().unwrap();
-        let new_tx = storage.get_transaction(&hash).wait().unwrap();
+        storage
+            .insert_transactions(ctx.clone(), vec![tx])
+            .wait()
+            .unwrap();
+        let new_tx = storage.get_transaction(ctx, &hash).wait().unwrap();
 
         assert_eq!(new_tx.hash, hash)
     }
 
     #[test]
     fn test_get_transactions_should_return_ok() {
+        let ctx = Context::new();
         let db = Arc::new(MemoryDB::new());
         let storage = BlockStorage::new(db);
         let tx1 = mock_transaction(Hash::digest(b"test111"));
@@ -428,9 +485,12 @@ mod tests {
 
         let tx_hash1 = tx1.hash.clone();
         let tx_hash2 = tx2.hash.clone();
-        storage.insert_transactions(vec![tx1, tx2]).wait().unwrap();
+        storage
+            .insert_transactions(ctx.clone(), vec![tx1, tx2])
+            .wait()
+            .unwrap();
         let transactions = storage
-            .get_transactions(&[tx_hash1.clone(), tx_hash2.clone()])
+            .get_transactions(ctx, &[tx_hash1.clone(), tx_hash2.clone()])
             .wait()
             .unwrap();
         assert_eq!(transactions.len(), 2);
@@ -443,6 +503,7 @@ mod tests {
 
     #[test]
     fn test_transaction_position_should_return_ok() {
+        let ctx = Context::new();
         let db = Arc::new(MemoryDB::new());
         let storage = BlockStorage::new(db);
         let tx_position = mock_transaction_position(Hash::default(), 0);
@@ -451,16 +512,17 @@ mod tests {
         let mut positions = HashMap::new();
         positions.insert(hash.clone(), tx_position.clone());
         storage
-            .insert_transaction_positions(positions)
+            .insert_transaction_positions(ctx.clone(), positions)
             .wait()
             .unwrap();
-        let new_tx_position = storage.get_transaction_position(&hash).wait().unwrap();
+        let new_tx_position = storage.get_transaction_position(ctx, &hash).wait().unwrap();
 
         assert_eq!(new_tx_position, tx_position);
     }
 
     #[test]
     fn test_get_transaction_positions_should_return_ok() {
+        let ctx = Context::new();
         let db = Arc::new(MemoryDB::new());
         let storage = BlockStorage::new(db);
         let tx_position1 = mock_transaction_position(Hash::default(), 0);
@@ -473,11 +535,11 @@ mod tests {
         positions.insert(hash1.clone(), tx_position1.clone());
         positions.insert(hash2.clone(), tx_position2.clone());
         storage
-            .insert_transaction_positions(positions)
+            .insert_transaction_positions(ctx.clone(), positions)
             .wait()
             .unwrap();
         let tx_positions = storage
-            .get_transaction_positions(&[hash1, hash2])
+            .get_transaction_positions(ctx, &[hash1, hash2])
             .wait()
             .unwrap();
         assert_eq!(tx_positions.len(), 2);
@@ -488,18 +550,23 @@ mod tests {
 
     #[test]
     fn test_get_receipt_should_return_ok() {
+        let ctx = Context::new();
         let db = Arc::new(MemoryDB::new());
         let storage = BlockStorage::new(db);
         let receipt = mock_receipt(Hash::digest(b"test111"));
         let tx_hash = receipt.transaction_hash.clone();
 
-        storage.insert_receipts(vec![receipt]).wait().unwrap();
-        let receipt = storage.get_receipt(&tx_hash).wait().unwrap();
+        storage
+            .insert_receipts(ctx.clone(), vec![receipt])
+            .wait()
+            .unwrap();
+        let receipt = storage.get_receipt(ctx, &tx_hash).wait().unwrap();
         assert_eq!(receipt.transaction_hash, tx_hash);
     }
 
     #[test]
     fn test_get_receipts_should_return_ok() {
+        let ctx = Context::new();
         let db = Arc::new(MemoryDB::new());
         let storage = BlockStorage::new(db);
         let receipt1 = mock_receipt(Hash::digest(b"test111"));
@@ -508,11 +575,11 @@ mod tests {
         let tx_hash1 = receipt1.transaction_hash.clone();
         let tx_hash2 = receipt2.transaction_hash.clone();
         storage
-            .insert_receipts(vec![receipt1, receipt2])
+            .insert_receipts(ctx.clone(), vec![receipt1, receipt2])
             .wait()
             .unwrap();
         let transactions = storage
-            .get_receipts(&[tx_hash1.clone(), tx_hash2.clone()])
+            .get_receipts(ctx, &[tx_hash1.clone(), tx_hash2.clone()])
             .wait()
             .unwrap();
         assert_eq!(transactions.len(), 2);
@@ -528,20 +595,26 @@ mod tests {
 
     #[test]
     fn test_insert_block_should_return_ok() {
+        let ctx = Context::new();
         let db = Arc::new(MemoryDB::new());
         let storage = BlockStorage::new(db);
 
         let block = mock_block(1000);
         let height = block.header.height;
         let hash = block.header.hash().clone();
-        storage.insert_block(block).wait().unwrap();
+        storage.insert_block(ctx.clone(), block).wait().unwrap();
         assert_eq!(
-            storage.get_latest_block().wait().unwrap().header.height,
+            storage
+                .get_latest_block(ctx.clone())
+                .wait()
+                .unwrap()
+                .header
+                .height,
             height
         );
         assert_eq!(
             storage
-                .get_block_by_height(height)
+                .get_block_by_height(ctx.clone(), height)
                 .wait()
                 .unwrap()
                 .header
@@ -551,7 +624,7 @@ mod tests {
 
         assert_eq!(
             storage
-                .get_block_by_hash(&hash)
+                .get_block_by_hash(ctx, &hash)
                 .wait()
                 .unwrap()
                 .header

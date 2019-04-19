@@ -3,6 +3,7 @@ use std::sync::Arc;
 use rocksdb::{ColumnFamily, Error as RocksError, Options, WriteBatch, DB};
 use tokio_async_await::compat::backward::Compat;
 
+use core_context::Context;
 use core_runtime::{DataCategory, Database, DatabaseError, FutDBResult};
 
 pub struct RocksDB {
@@ -48,7 +49,7 @@ impl RocksDB {
 }
 
 impl Database for RocksDB {
-    fn get(&self, c: DataCategory, key: &[u8]) -> FutDBResult<Option<Vec<u8>>> {
+    fn get(&self, _: Context, c: DataCategory, key: &[u8]) -> FutDBResult<Option<Vec<u8>>> {
         let db = Arc::clone(&self.db);
         let key = key.to_vec();
 
@@ -60,7 +61,12 @@ impl Database for RocksDB {
         Box::new(Compat::new(fut))
     }
 
-    fn get_batch(&self, c: DataCategory, keys: &[Vec<u8>]) -> FutDBResult<Vec<Option<Vec<u8>>>> {
+    fn get_batch(
+        &self,
+        _: Context,
+        c: DataCategory,
+        keys: &[Vec<u8>],
+    ) -> FutDBResult<Vec<Option<Vec<u8>>>> {
         let db = Arc::clone(&self.db);
         let keys = keys.to_vec();
 
@@ -77,7 +83,7 @@ impl Database for RocksDB {
         Box::new(Compat::new(fut))
     }
 
-    fn insert(&self, c: DataCategory, key: Vec<u8>, value: Vec<u8>) -> FutDBResult<()> {
+    fn insert(&self, _: Context, c: DataCategory, key: Vec<u8>, value: Vec<u8>) -> FutDBResult<()> {
         let db = Arc::clone(&self.db);
 
         let fut = async move {
@@ -90,6 +96,7 @@ impl Database for RocksDB {
 
     fn insert_batch(
         &self,
+        _: Context,
         c: DataCategory,
         keys: Vec<Vec<u8>>,
         values: Vec<Vec<u8>>,
@@ -115,7 +122,7 @@ impl Database for RocksDB {
         Box::new(Compat::new(fut))
     }
 
-    fn contains(&self, c: DataCategory, key: &[u8]) -> FutDBResult<bool> {
+    fn contains(&self, _: Context, c: DataCategory, key: &[u8]) -> FutDBResult<bool> {
         let db = Arc::clone(&self.db);
         let key = key.to_vec();
 
@@ -127,7 +134,7 @@ impl Database for RocksDB {
         Box::new(Compat::new(fut))
     }
 
-    fn remove(&self, c: DataCategory, key: &[u8]) -> FutDBResult<()> {
+    fn remove(&self, _: Context, c: DataCategory, key: &[u8]) -> FutDBResult<()> {
         let db = Arc::clone(&self.db);
         let key = key.to_vec();
 
@@ -139,7 +146,7 @@ impl Database for RocksDB {
         Box::new(Compat::new(fut))
     }
 
-    fn remove_batch(&self, c: DataCategory, keys: &[Vec<u8>]) -> FutDBResult<()> {
+    fn remove_batch(&self, _: Context, c: DataCategory, keys: &[Vec<u8>]) -> FutDBResult<()> {
         let db = Arc::clone(&self.db);
         let keys = keys.to_vec();
 
@@ -189,42 +196,62 @@ fn get_column(db: &DB, c: DataCategory) -> Result<ColumnFamily, DatabaseError> {
 mod tests {
     use futures::future::Future;
 
+    use core_context::Context;
     use core_runtime::{DataCategory, Database};
 
     use super::RocksDB;
 
     #[test]
     fn test_get_should_return_ok() {
+        let ctx = Context::new();
         let db = RocksDB::new("rocksdb/test_get_should_return_ok").unwrap();
 
-        assert_eq!(db.get(DataCategory::Block, b"test").wait(), Ok(None));
-        db.insert(DataCategory::Block, b"test".to_vec(), b"test".to_vec())
-            .wait()
-            .unwrap();
-        let v = db.get(DataCategory::Block, b"test").wait().unwrap();
+        assert_eq!(
+            db.get(ctx.clone(), DataCategory::Block, b"test").wait(),
+            Ok(None)
+        );
+        db.insert(
+            ctx.clone(),
+            DataCategory::Block,
+            b"test".to_vec(),
+            b"test".to_vec(),
+        )
+        .wait()
+        .unwrap();
+        let v = db.get(ctx, DataCategory::Block, b"test").wait().unwrap();
         assert_eq!(v, Some(b"test".to_vec()));
         db.clean();
     }
 
     #[test]
     fn test_insert_should_return_ok() {
+        let ctx = Context::new();
         let db = RocksDB::new("rocksdb/test_insert_should_return_ok").unwrap();
 
-        db.insert(DataCategory::Block, b"test".to_vec(), b"test".to_vec())
-            .wait()
-            .unwrap();
+        db.insert(
+            ctx.clone(),
+            DataCategory::Block,
+            b"test".to_vec(),
+            b"test".to_vec(),
+        )
+        .wait()
+        .unwrap();
         assert_eq!(
             Some(b"test".to_vec()),
-            db.get(DataCategory::Block, b"test").wait().unwrap()
+            db.get(ctx.clone(), DataCategory::Block, b"test")
+                .wait()
+                .unwrap()
         );
         db.clean();
     }
 
     #[test]
     fn test_insert_batch_should_return_ok() {
+        let ctx = Context::new();
         let db = RocksDB::new("rocksdb/test_insert_batch_should_return_ok").unwrap();
 
         db.insert_batch(
+            ctx.clone(),
             DataCategory::Block,
             vec![b"test1".to_vec(), b"test2".to_vec()],
             vec![b"test1".to_vec(), b"test2".to_vec()],
@@ -233,24 +260,34 @@ mod tests {
         .unwrap();
         assert_eq!(
             Some(b"test1".to_vec()),
-            db.get(DataCategory::Block, b"test1").wait().unwrap()
+            db.get(ctx.clone(), DataCategory::Block, b"test1")
+                .wait()
+                .unwrap()
         );
         assert_eq!(
             Some(b"test2".to_vec()),
-            db.get(DataCategory::Block, b"test2").wait().unwrap()
+            db.get(ctx, DataCategory::Block, b"test2").wait().unwrap()
         );
         db.clean();
     }
 
     #[test]
     fn test_contain_should_return_true() {
+        let ctx = Context::new();
         let db = RocksDB::new("rocksdb/test_contain_should_return_true").unwrap();
 
-        db.insert(DataCategory::Block, b"test".to_vec(), b"test".to_vec())
-            .wait()
-            .unwrap();
+        db.insert(
+            ctx.clone(),
+            DataCategory::Block,
+            b"test".to_vec(),
+            b"test".to_vec(),
+        )
+        .wait()
+        .unwrap();
         assert_eq!(
-            db.contains(DataCategory::Block, b"test").wait().unwrap(),
+            db.contains(ctx.clone(), DataCategory::Block, b"test")
+                .wait()
+                .unwrap(),
             true
         );
 
@@ -259,10 +296,13 @@ mod tests {
 
     #[test]
     fn test_contain_should_return_false() {
+        let ctx = Context::new();
         let db = RocksDB::new("rocksdb/test_contain_should_return_false").unwrap();
 
         assert_eq!(
-            db.contains(DataCategory::Block, b"test").wait().unwrap(),
+            db.contains(ctx.clone(), DataCategory::Block, b"test")
+                .wait()
+                .unwrap(),
             false
         );
         db.clean();
@@ -270,32 +310,49 @@ mod tests {
 
     #[test]
     fn test_remove_should_return_ok() {
+        let ctx = Context::new();
         let db = RocksDB::new("rocksdb/test_remove_should_return_ok").unwrap();
 
-        db.insert(DataCategory::Block, b"test".to_vec(), b"test".to_vec())
+        db.insert(
+            ctx.clone(),
+            DataCategory::Block,
+            b"test".to_vec(),
+            b"test".to_vec(),
+        )
+        .wait()
+        .unwrap();
+        db.remove(ctx.clone(), DataCategory::Block, b"test")
             .wait()
             .unwrap();
-        db.remove(DataCategory::Block, b"test").wait().unwrap();
-        assert_eq!(db.get(DataCategory::Block, b"test").wait(), Ok(None));
+        assert_eq!(db.get(ctx, DataCategory::Block, b"test").wait(), Ok(None));
         db.clean();
     }
 
     #[test]
     fn test_remove_batch_should_return_ok() {
+        let ctx = Context::new();
         let db = RocksDB::new("rocksdb/test_remove_batch_should_return_ok").unwrap();
 
         db.insert_batch(
+            ctx.clone(),
             DataCategory::Block,
             vec![b"test1".to_vec(), b"test2".to_vec()],
             vec![b"test1".to_vec(), b"test2".to_vec()],
         )
         .wait()
         .unwrap();
-        db.remove_batch(DataCategory::Block, &[b"test1".to_vec(), b"test2".to_vec()])
-            .wait()
-            .unwrap();
-        assert_eq!(db.get(DataCategory::Block, b"test1").wait(), Ok(None));
-        assert_eq!(db.get(DataCategory::Block, b"test2").wait(), Ok(None));
+        db.remove_batch(
+            ctx.clone(),
+            DataCategory::Block,
+            &[b"test1".to_vec(), b"test2".to_vec()],
+        )
+        .wait()
+        .unwrap();
+        assert_eq!(
+            db.get(ctx.clone(), DataCategory::Block, b"test1").wait(),
+            Ok(None)
+        );
+        assert_eq!(db.get(ctx, DataCategory::Block, b"test2").wait(), Ok(None));
         db.clean();
     }
 }

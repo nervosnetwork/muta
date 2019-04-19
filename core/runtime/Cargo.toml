@@ -8,6 +8,7 @@ license = "Apache-2.0"
 [dependencies]
 core-types = { path = "../types" }
 core-crypto = { path = "../crypto" }
+core-context = { path = "../context" }
 
 failure = "0.1"
 futures = "0.1"

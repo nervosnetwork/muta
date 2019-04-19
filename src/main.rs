@@ -14,6 +14,7 @@ use components_executor::evm::{EVMBlockDataProvider, EVMExecutor};
 use components_executor::TrieDB;
 use components_transaction_pool::HashTransactionPool;
 use core_consensus::{solo_interval, Solo};
+use core_context::Context;
 use core_crypto::{
     secp256k1::{PrivateKey, Secp256k1},
     CryptoTransform,
@@ -92,6 +93,9 @@ fn main() {
 }
 
 fn start(cfg: &Config) {
+    // new context
+    let ctx = Context::new();
+
     // new crypto
     let secp = Arc::new(Secp256k1::new());
 
@@ -104,7 +108,7 @@ fn start(cfg: &Config) {
     let trie_db = TrieDB::new(Arc::clone(&state_db));
 
     // new executor
-    let block = storage.get_latest_block().wait().unwrap();
+    let block = storage.get_latest_block(ctx).wait().unwrap();
     let executor = Arc::new(
         EVMExecutor::from_existing(
             trie_db,
@@ -165,13 +169,15 @@ fn handle_init(cfg: &Config, genesis_path: impl AsRef<Path>) -> Result<(), Box<d
     let genesis: Genesis = serde_json::from_reader(&mut r)?;
     log::info!("Genesis data: {:?}", genesis);
 
+    let ctx = Context::new();
+
     // Init Block db
     let path_block = cfg.data_path_for_block();
     log::info!("Data path for block: {:?}", path_block);
     let block_disk_db = Arc::new(RocksDB::new(path_block.to_str().unwrap())?);
     let block_db = Arc::new(BlockStorage::new(block_disk_db));
 
-    if block_db.get_latest_block().wait().is_ok() {
+    if block_db.get_latest_block(ctx.clone()).wait().is_ok() {
         log::error!("There is already a chain, you should specify a new path");
         return Ok(());
     }
@@ -196,7 +202,7 @@ fn handle_init(cfg: &Config, genesis_path: impl AsRef<Path>) -> Result<(), Box<d
     block_header.quota_limit = cfg.quota_limit;
     let mut block = Block::default();
     block.header = block_header;
-    block_db.insert_block(block).wait()?;
+    block_db.insert_block(ctx, block).wait()?;
 
     Ok(())
 }
