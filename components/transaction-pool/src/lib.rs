@@ -5,8 +5,11 @@ use std::string::ToString;
 use std::sync::Arc;
 
 use futures::future::{err, ok, Future};
+use futures03::{
+    compat::Future01CompatExt,
+    prelude::{FutureExt, TryFutureExt},
+};
 use futures_locks::RwLock;
-use tokio_async_await::compat::{backward::Compat, forward::IntoAwaitable};
 
 use core_context::Context;
 use core_crypto::{Crypto, CryptoTransform};
@@ -84,21 +87,17 @@ where
             };
 
             // 2. check if the transaction is in histories block.
-            match await!(storage
-                .get_transaction(ctx.clone(), &tx_hash)
-                .into_awaitable())
-            {
+            match await!(storage.get_transaction(ctx.clone(), &tx_hash).compat()) {
                 Ok(_) => Err(TransactionPoolError::Dup)?,
                 Err(StorageError::None(_)) => {}
                 Err(e) => Err(internal_error(e))?,
             }
 
-            let mut tx_cache_w =
-                await!(tx_cache.write().into_awaitable()).map_err(map_rwlock_err)?;
+            let mut tx_cache_w = await!(tx_cache.write().compat()).map_err(map_rwlock_err)?;
 
             // 3. verify params
             let latest_block =
-                await!(storage.get_latest_block(ctx).into_awaitable()).map_err(internal_error)?;
+                await!(storage.get_latest_block(ctx).compat()).map_err(internal_error)?;
 
             verify_transaction(
                 latest_block.header.height,
@@ -128,7 +127,7 @@ where
             Ok(signed_tx)
         };
 
-        Box::new(Compat::new(fut))
+        Box::new(fut.boxed().compat())
     }
 
     fn package(
@@ -143,14 +142,13 @@ where
 
         let fut = async move {
             let latest_block =
-                await!(storage.get_latest_block(ctx).into_awaitable()).map_err(internal_error)?;
+                await!(storage.get_latest_block(ctx).compat()).map_err(internal_error)?;
 
             let mut invalid_hashes = vec![];
             let mut valid_hashes = vec![];
             let mut quota_count: u64 = 0;
 
-            let mut tx_cache_w =
-                await!(tx_cache.write().into_awaitable()).map_err(map_rwlock_err)?;
+            let mut tx_cache_w = await!(tx_cache.write().compat()).map_err(map_rwlock_err)?;
 
             for (tx_hash, signed_tx) in tx_cache_w.iter_mut() {
                 let valid_until_block = signed_tx.untx.transaction.valid_until_block;
@@ -185,7 +183,7 @@ where
             Ok(valid_hashes)
         };
 
-        Box::new(Compat::new(fut))
+        Box::new(fut.boxed().compat())
     }
 
     fn flush(&self, _: Context, tx_hashes: &[Hash]) -> FutRuntimeResult<(), TransactionPoolError> {

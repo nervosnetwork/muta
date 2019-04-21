@@ -7,10 +7,9 @@ edition = "2018"
 [dependencies]
 actix = "0.8.0-alpha.3"
 actix-web = "1.0.0-alpha.6"
-tokio-async-await = { version = "0.1", features = [ "async-await-preview" ] }
 old_futures = { package = "futures", version = "0.1" }
-futures-preview = { version = "0.3.0-alpha.13", features = ["compat"] }
-futures-util-preview = { version = "0.3.0-alpha.13" }
+futures-preview = { version = "0.3.0-alpha.14", features = ["compat"] }
+futures-util-preview = { version = "0.3.0-alpha.14" }
 futures-timer = "0.1"
 
 serde = "1.0"

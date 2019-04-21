@@ -42,10 +42,10 @@ impl Service {
         Builder::default()
     }
 
-    pub fn shutdown(self) {
+    pub async fn shutdown(self) {
         let error = |_| error!("Network: worker shutdown failure");
-        let _ = self.transmit_worker.shutdown().map_err(error);
-        let _ = self.service_worker.shutdown().map_err(error);
+        let _ = await!(self.transmit_worker.shutdown()).map_err(error);
+        let _ = await!(self.service_worker.shutdown()).map_err(error);
     }
 
     pub fn send(&mut self, msg: Message) {

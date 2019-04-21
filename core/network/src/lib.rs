@@ -1,3 +1,5 @@
+#![feature(async_await, await_macro, futures_api)]
+
 pub mod config;
 pub mod message;
 pub(crate) mod p2p;
@@ -31,7 +33,7 @@ impl Network {
         self.p2p.broadcaster()
     }
 
-    pub fn shutdown(self) {
-        self.p2p.shutdown()
+    pub async fn shutdown(self) {
+        await!(self.p2p.shutdown())
     }
 }

@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use futures::channel::mpsc;
 use futures::prelude::Stream;
-use futures::task::{Poll, Waker};
+use futures::task::{Context, Poll};
 use uuid::Uuid;
 
 use crate::channel::broadcast::{BroadcastEvent, Event, Message};
@@ -197,8 +197,8 @@ where
     type Item = Option<TMessage>;
 
     #[inline]
-    fn poll_next(mut self: Pin<&mut Self>, waker: &Waker) -> Poll<Option<Self::Item>> {
-        match Stream::poll_next(Pin::new(&mut self.rx), waker) {
+    fn poll_next(mut self: Pin<&mut Self>, ctx: &mut Context) -> Poll<Option<Self::Item>> {
+        match Stream::poll_next(Pin::new(&mut self.rx), ctx) {
             Poll::Pending => Poll::Pending,
             Poll::Ready(None) => Poll::Ready(None), // close the stream
             Poll::Ready(Some(any_box)) => {

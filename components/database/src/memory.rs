@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
-use tokio_async_await::compat::backward::Compat;
+use futures::prelude::{FutureExt, TryFutureExt};
 
 use core_context::Context;
 use core_runtime::{DataCategory, Database, DatabaseError, FutDBResult};
@@ -36,7 +36,7 @@ impl Database for MemoryDB {
             let v = storage.get(&key).map(|v| v.to_vec());
             Ok(v)
         };
-        Box::new(Compat::new(fut))
+        Box::new(fut.boxed().compat())
     }
 
     fn get_batch(
@@ -57,7 +57,7 @@ impl Database for MemoryDB {
 
             Ok(values)
         };
-        Box::new(Compat::new(fut))
+        Box::new(fut.boxed().compat())
     }
 
     fn insert(&self, _: Context, c: DataCategory, key: Vec<u8>, value: Vec<u8>) -> FutDBResult<()> {
@@ -70,7 +70,7 @@ impl Database for MemoryDB {
             storage.insert(key, value);
             Ok(())
         };
-        Box::new(Compat::new(fut))
+        Box::new(fut.boxed().compat())
     }
 
     fn insert_batch(
@@ -100,7 +100,7 @@ impl Database for MemoryDB {
             Ok(())
         };
 
-        Box::new(Compat::new(fut))
+        Box::new(fut.boxed().compat())
     }
 
     fn contains(&self, _: Context, c: DataCategory, key: &[u8]) -> FutDBResult<bool> {
@@ -112,7 +112,7 @@ impl Database for MemoryDB {
             Ok(storage.contains_key(&key))
         };
 
-        Box::new(Compat::new(fut))
+        Box::new(fut.boxed().compat())
     }
 
     fn remove(&self, _: Context, c: DataCategory, key: &[u8]) -> FutDBResult<()> {
@@ -125,7 +125,7 @@ impl Database for MemoryDB {
             Ok(())
         };
 
-        Box::new(Compat::new(fut))
+        Box::new(fut.boxed().compat())
     }
 
     fn remove_batch(&self, _: Context, c: DataCategory, keys: &[Vec<u8>]) -> FutDBResult<()> {
@@ -140,7 +140,7 @@ impl Database for MemoryDB {
             Ok(())
         };
 
-        Box::new(Compat::new(fut))
+        Box::new(fut.boxed().compat())
     }
 }
 
@@ -165,7 +165,7 @@ fn map_rwlock_err() -> DatabaseError {
 
 #[cfg(test)]
 mod tests {
-    use futures::future::Future;
+    use futures01::future::Future;
 
     use core_context::Context;
     use core_runtime::{DataCategory, Database};

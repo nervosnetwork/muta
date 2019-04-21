@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use futures::channel::mpsc::{self as mpsc, TrySendError};
 use futures::stream::{Fuse, Stream, StreamExt};
-use futures::task::{Poll, Waker};
+use futures::task::{Context, Poll};
 use uuid::Uuid;
 
 pub type Message = Arc<Box<dyn Any + Send + Sync>>;
@@ -62,7 +62,7 @@ impl Stream for Receiver {
     type Item = Event;
 
     #[inline]
-    fn poll_next(mut self: Pin<&mut Self>, waker: &Waker) -> Poll<Option<Self::Item>> {
-        Stream::poll_next(Pin::new(&mut self.rx), waker)
+    fn poll_next(mut self: Pin<&mut Self>, ctx: &mut Context) -> Poll<Option<Self::Item>> {
+        Stream::poll_next(Pin::new(&mut self.rx), ctx)
     }
 }

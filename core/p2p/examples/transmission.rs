@@ -1,13 +1,17 @@
+#![feature(async_await, await_macro, futures_api)]
+
 use core_p2p::transmission::{
     CastMessage, Misbehavior, MisbehaviorResult, PeerManager, TransmissionProtocol,
 };
 
 use env_logger;
-use futures::future::Future;
-use futures::prelude::Async;
-use futures::stream::Stream;
+use futures::prelude::{Async, Stream};
+use futures03::compat::Stream01CompatExt;
+use futures03::future::ready;
+use futures03::prelude::StreamExt;
 use log::{error, info};
 use parking_lot::RwLock;
+use runtime::task::{spawn, JoinHandle};
 use tentacle::{
     builder::ServiceBuilder,
     context::ServiceContext,
@@ -17,13 +21,11 @@ use tentacle::{
     traits::ServiceHandle,
     ProtocolId,
 };
-use tokio;
 use tokio::timer::Interval;
 
 use std::clone::Clone;
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
 const DEMO_PROTOCOL_ID: ProtocolId = 2077;
@@ -139,8 +141,9 @@ fn create_peer(id: u64, msg: String) -> (Service<DemoService>, JoinHandle<()>, J
     let pub_key = key_pair.to_public_key();
 
     // interval broadcast hello message to others
-    let cast_handle = std::thread::spawn(move || {
+    let cast_handle = spawn(async move {
         let interval_task = Interval::new(Instant::now(), Duration::from_secs(2))
+            .compat()
             .for_each(move |_| {
                 let hello_msg = message::Hello {
                     id,
@@ -148,16 +151,16 @@ fn create_peer(id: u64, msg: String) -> (Service<DemoService>, JoinHandle<()>, J
                 };
                 let _ = tx.try_send(CastMessage::All(hello_msg));
 
-                Ok(())
-            })
-            .map_err(|err| error!("{}", err));
+                ready(())
+            });
 
-        tokio::run(interval_task);
+        await!(interval_task);
     });
 
     // handle hello message from others
-    let recv_handle = std::thread::spawn(move || {
+    let recv_handle = spawn(async move {
         let recv_task = Interval::new(Instant::now(), Duration::from_secs(5))
+            .compat()
             .for_each(move |_| {
                 match rx.poll() {
                     Ok(Async::Ready(Some(msg))) => {
@@ -168,11 +171,11 @@ fn create_peer(id: u64, msg: String) -> (Service<DemoService>, JoinHandle<()>, J
                         // no-op
                     }
                 }
-                Ok(())
-            })
-            .map_err(|err| error!("{:?}", err));
 
-        tokio::run(recv_task);
+                ready(())
+            });
+
+        await!(recv_task);
     });
 
     let service = ServiceBuilder::default()
@@ -186,14 +189,14 @@ fn create_peer(id: u64, msg: String) -> (Service<DemoService>, JoinHandle<()>, J
     (service, cast_handle, recv_handle)
 }
 
-fn bootstrap_peer() {
+async fn bootstrap_peer() {
     let (mut service, ..) = create_peer(1337, String::from("hello visitors"));
     let _ = service.listen("/ip4/127.0.0.1/tcp/1337".parse().unwrap());
 
-    tokio::run(service.for_each(|_| Ok(())));
+    await!(service.compat().for_each(|_| ready(())));
 }
 
-fn normal_peer(port: u64, hello_msg: String) {
+async fn normal_peer(port: u64, hello_msg: String) {
     let (mut service, ..) = create_peer(port, hello_msg);
     service
         .dial(
@@ -205,19 +208,20 @@ fn normal_peer(port: u64, hello_msg: String) {
         .listen(format!("/ip4/127.0.0.1/tcp/{}", port).parse().unwrap())
         .unwrap();
 
-    tokio::run(service.for_each(|_| Ok(())));
+    await!(service.compat().for_each(|_| ready(())));
 }
 
-fn main() {
+#[runtime::main(runtime_tokio::Tokio)]
+async fn main() {
     env_logger::init();
 
     let arg = std::env::args().nth(1);
     if arg == Some("bootstrap".to_string()) {
         info!("Starting bootstrap peer ......");
-        bootstrap_peer();
+        await!(bootstrap_peer());
     } else {
         let port = arg.unwrap().parse::<u64>().unwrap();
         info!("Starting demo peer ......");
-        normal_peer(port, format!("hello from {}", port));
+        await!(normal_peer(port, format!("hello from {}", port)));
     }
 }

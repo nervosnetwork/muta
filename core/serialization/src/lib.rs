@@ -4,11 +4,12 @@ use std::convert::TryInto;
 use std::error;
 use std::fmt;
 use std::future::Future;
+use std::iter::FromIterator;
 
 use bytes::{BytesMut, IntoBuf};
 use futures::{
     future,
-    stream::{self, TryStreamExt},
+    stream::{FuturesOrdered, TryStreamExt},
 };
 use prost::{DecodeError, EncodeError, Message};
 
@@ -31,7 +32,7 @@ impl AsyncCodec {
             let iter = values.into_iter().map(AsyncCodec::decode::<T>);
 
             let ser_values: Result<Vec<T>, CodecError> =
-                await!(stream::futures_ordered(iter).try_collect());
+                await!(FuturesOrdered::from_iter(iter).try_collect());
             ser_values
         }
     }
@@ -47,7 +48,7 @@ impl AsyncCodec {
             let iter = msgs.into_iter().map(AsyncCodec::encode::<T>);
 
             let values: Result<Vec<Vec<u8>>, CodecError> =
-                await!(stream::futures_ordered(iter).try_collect());
+                await!(FuturesOrdered::from_iter(iter).try_collect());
             values
         }
     }

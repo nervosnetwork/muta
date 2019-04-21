@@ -14,7 +14,8 @@ core-context = { path = "../../core/context" }
 failure = "0.1"
 futures = "0.1"
 futures-locks = "0.3"
-tokio-async-await = { version = "0.1", features = [ "async-await-preview" ] }
+# TODO: rename futures01 instead
+futures03 = { package = "futures-preview", version = "0.3.0-alpha.14", features = [ "compat" ] }
 
 [dev-dependencies]
 components-database = { path = "../database" }

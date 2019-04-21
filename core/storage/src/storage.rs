@@ -1,14 +1,15 @@
 use std::collections::HashMap;
 use std::convert::TryInto;
+use std::iter::FromIterator;
 use std::sync::Arc;
 
 use byteorder::{ByteOrder, NativeEndian};
 use futures::{
     compat::Future01CompatExt,
-    stream::{self, TryStreamExt},
+    prelude::{FutureExt, TryFutureExt, TryStreamExt},
+    stream::FuturesOrdered,
 };
 use old_futures::future::Future as OldFuture;
-use tokio_async_await::compat::backward::Compat;
 
 use core_context::Context;
 use core_runtime::{DataCategory, Database};
@@ -121,7 +122,7 @@ where
             Ok(block)
         };
 
-        Box::new(Compat::new(fut))
+        Box::new(fut.boxed().compat())
     }
 
     fn get_block_by_height(&self, ctx: Context, height: u64) -> StorageResult<Block> {
@@ -135,7 +136,7 @@ where
             Ok(block)
         };
 
-        Box::new(Compat::new(fut))
+        Box::new(fut.boxed().compat())
     }
 
     fn get_block_by_hash(&self, ctx: Context, hash: &Hash) -> StorageResult<Block> {
@@ -152,7 +153,7 @@ where
             Ok(block)
         };
 
-        Box::new(Compat::new(fut))
+        Box::new(fut.boxed().compat())
     }
 
     fn get_transaction(&self, ctx: Context, hash: &Hash) -> StorageResult<SignedTransaction> {
@@ -168,7 +169,7 @@ where
             Ok(tx)
         };
 
-        Box::new(Compat::new(fut))
+        Box::new(fut.boxed().compat())
     }
 
     fn get_transactions(
@@ -190,7 +191,7 @@ where
             Ok(txs)
         };
 
-        Box::new(Compat::new(fut))
+        Box::new(fut.boxed().compat())
     }
 
     fn get_receipt(&self, ctx: Context, hash: &Hash) -> StorageResult<Receipt> {
@@ -204,7 +205,7 @@ where
             Ok(receipt)
         };
 
-        Box::new(Compat::new(fut))
+        Box::new(fut.boxed().compat())
     }
 
     fn get_receipts(&self, ctx: Context, hashes: &[Hash]) -> StorageResult<Vec<Receipt>> {
@@ -222,7 +223,7 @@ where
             Ok(receipts)
         };
 
-        Box::new(Compat::new(fut))
+        Box::new(fut.boxed().compat())
     }
 
     fn get_transaction_position(
@@ -243,7 +244,7 @@ where
             Ok(tx_position)
         };
 
-        Box::new(Compat::new(fut))
+        Box::new(fut.boxed().compat())
     }
 
     fn get_transaction_positions(
@@ -267,7 +268,7 @@ where
             Ok(positions)
         };
 
-        Box::new(Compat::new(fut))
+        Box::new(fut.boxed().compat())
     }
 
     fn insert_block(&self, ctx: Context, block: Block) -> StorageResult<()> {
@@ -282,7 +283,7 @@ where
         let fut = async move {
             let encode_value = await!(AsyncCodec::encode(pb_block))?;
 
-            let stream = stream::futures_unordered(vec![
+            let stream = FuturesOrdered::from_iter(vec![
                 db.insert(
                     ctx.clone(),
                     DataCategory::Block,
@@ -310,7 +311,7 @@ where
             Ok(())
         };
 
-        Box::new(Compat::new(fut))
+        Box::new(fut.boxed().compat())
     }
 
     fn insert_transactions(
@@ -335,7 +336,7 @@ where
             Ok(())
         };
 
-        Box::new(Compat::new(fut))
+        Box::new(fut.boxed().compat())
     }
 
     fn insert_transaction_positions(
@@ -363,7 +364,7 @@ where
             Ok(())
         };
 
-        Box::new(Compat::new(fut))
+        Box::new(fut.boxed().compat())
     }
 
     fn insert_receipts(&self, ctx: Context, receipts: Vec<Receipt>) -> StorageResult<()> {
@@ -383,7 +384,7 @@ where
             Ok(())
         };
 
-        Box::new(Compat::new(fut))
+        Box::new(fut.boxed().compat())
     }
 }
 

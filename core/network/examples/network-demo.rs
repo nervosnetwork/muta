@@ -1,13 +1,15 @@
+#![feature(async_await, await_macro, futures_api)]
+
 use core_network::{Config, Message, Network};
 
 use env_logger;
 use log::info;
 
-use std::error::Error;
 use std::thread;
 use std::time::Duration;
 
-fn main() -> Result<(), Box<dyn Error>> {
+#[runtime::main(runtime_tokio::Tokio)]
+async fn main() {
     env_logger::init();
 
     let mut config = Config::default();
@@ -22,13 +24,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         config.p2p.listening_address = Some(format!("/ip4/127.0.0.1/tcp/{}", port));
     }
 
-    let mut network = Network::new(config)?;
+    let mut network = Network::new(config).unwrap();
 
     for _ in 1..10 {
         network.send(Message::Consensus(b"hello world".to_vec()));
     }
     thread::sleep(Duration::from_secs(10));
-    network.shutdown();
-
-    Ok(())
+    await!(network.shutdown());
 }

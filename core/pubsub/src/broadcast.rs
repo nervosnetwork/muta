@@ -1,3 +1,6 @@
+// FIXME: strange clippy bug, it report on line: 189
+#![allow(clippy::needless_lifetimes)]
+
 #[cfg(test)]
 mod mock_hash_map;
 

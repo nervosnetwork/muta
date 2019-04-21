@@ -1,3 +1,5 @@
+#![feature(async_await, await_macro, futures_api)]
+
 use core_p2p::connec::ConnecProtocol;
 use core_p2p::discovery::DiscoveryProtocol;
 use core_p2p::identify::IdentifyProtocol;
@@ -5,14 +7,17 @@ use core_p2p::peer_manager::DefaultPeerManager;
 use core_p2p::ping::PingProtocol;
 
 use env_logger;
-use futures::prelude::Stream;
+use futures03::compat::Stream01CompatExt;
+use futures03::future::ready;
+use futures03::prelude::StreamExt;
 use log::{error, info};
 use tentacle::secio::{PeerId, SecioKeyPair};
 use tentacle::service::{DialProtocol, ProtocolMeta, ServiceError, ServiceEvent};
 use tentacle::{builder::ServiceBuilder, context::ServiceContext};
 use tentacle::{multiaddr::Multiaddr, traits::ServiceHandle, ProtocolId};
 
-fn main() {
+#[runtime::main(runtime_tokio::Tokio)]
+async fn main() {
     env_logger::init();
 
     let (opt_server, listen_addr): (Option<Multiaddr>, Multiaddr) = {
@@ -46,7 +51,8 @@ fn main() {
         Some(())
     });
     let _ = service.listen(listen_addr);
-    tokio::run(service.for_each(|_| Ok(())))
+
+    await!(service.compat().for_each(|_| ready(())))
 }
 
 fn build_protocols(

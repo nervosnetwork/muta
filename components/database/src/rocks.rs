@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
+use futures::prelude::{FutureExt, TryFutureExt};
 use rocksdb::{ColumnFamily, Error as RocksError, Options, WriteBatch, DB};
-use tokio_async_await::compat::backward::Compat;
 
 use core_context::Context;
 use core_runtime::{DataCategory, Database, DatabaseError, FutDBResult};
@@ -58,7 +58,7 @@ impl Database for RocksDB {
             let v = db.get_cf(column, &key).map_err(map_db_err)?;
             Ok(v.map(|v| v.to_vec()))
         };
-        Box::new(Compat::new(fut))
+        Box::new(fut.boxed().compat())
     }
 
     fn get_batch(
@@ -80,7 +80,7 @@ impl Database for RocksDB {
             }
             Ok(values)
         };
-        Box::new(Compat::new(fut))
+        Box::new(fut.boxed().compat())
     }
 
     fn insert(&self, _: Context, c: DataCategory, key: Vec<u8>, value: Vec<u8>) -> FutDBResult<()> {
@@ -91,7 +91,7 @@ impl Database for RocksDB {
             db.put_cf(column, key, value).map_err(map_db_err)?;
             Ok(())
         };
-        Box::new(Compat::new(fut))
+        Box::new(fut.boxed().compat())
     }
 
     fn insert_batch(
@@ -119,7 +119,7 @@ impl Database for RocksDB {
             db.write(batch).map_err(map_db_err)?;
             Ok(())
         };
-        Box::new(Compat::new(fut))
+        Box::new(fut.boxed().compat())
     }
 
     fn contains(&self, _: Context, c: DataCategory, key: &[u8]) -> FutDBResult<bool> {
@@ -131,7 +131,7 @@ impl Database for RocksDB {
             let v = db.get_cf(column, &key).map_err(map_db_err)?;
             Ok(v.is_some())
         };
-        Box::new(Compat::new(fut))
+        Box::new(fut.boxed().compat())
     }
 
     fn remove(&self, _: Context, c: DataCategory, key: &[u8]) -> FutDBResult<()> {
@@ -143,7 +143,7 @@ impl Database for RocksDB {
             db.delete_cf(column, key).map_err(map_db_err)?;
             Ok(())
         };
-        Box::new(Compat::new(fut))
+        Box::new(fut.boxed().compat())
     }
 
     fn remove_batch(&self, _: Context, c: DataCategory, keys: &[Vec<u8>]) -> FutDBResult<()> {
@@ -160,7 +160,7 @@ impl Database for RocksDB {
             db.write(batch).map_err(map_db_err)?;
             Ok(())
         };
-        Box::new(Compat::new(fut))
+        Box::new(fut.boxed().compat())
     }
 }
 
@@ -194,7 +194,7 @@ fn get_column(db: &DB, c: DataCategory) -> Result<ColumnFamily, DatabaseError> {
 // TODO: merge rocksdb and memorydb test together.
 #[cfg(test)]
 mod tests {
-    use futures::future::Future;
+    use futures01::future::Future;
 
     use core_context::Context;
     use core_runtime::{DataCategory, Database};

@@ -1,14 +1,17 @@
+// FIXME: strange clippy bug, it report on line: 189
+#![allow(clippy::needless_lifetimes)]
+
 use std::sync::Arc;
 use std::sync::RwLock;
 use std::time::Duration;
 
 use actix_web::{self, middleware, web, App, HttpRequest, HttpResponse, HttpServer};
-use futures::compat;
+use futures::compat::Future01CompatExt;
+use futures::prelude::{FutureExt, TryFutureExt};
 use futures_timer::Delay;
 use old_futures::{self, Future as OldFuture};
 use serde_json;
 use serde_json::Value;
-use tokio_async_await::compat::{backward::Compat, forward::IntoAwaitable};
 
 use crate::convention;
 use crate::error::RpcError;
@@ -27,7 +30,7 @@ fn rpc_handle(
             reqjson.method.clone(),
             reqjson.params.clone()
         )
-        .into_awaitable())
+        .compat())
         {
             Ok(ok) => result.result = ok,
             Err(e) => result.error = Some(e),
@@ -35,7 +38,7 @@ fn rpc_handle(
         Ok(HttpResponse::Ok().json(result))
     };
 
-    Box::new(Compat::new(fut))
+    Box::new(fut.boxed().compat())
 }
 
 fn rpc_select(
@@ -71,7 +74,7 @@ fn rpc_select(
             _ => Err(convention::ErrorData::std(-32601)),
         }
     };
-    Box::new(Compat::new(fut))
+    Box::new(fut.boxed().compat())
 }
 
 pub struct ObjNetwork {
@@ -90,9 +93,7 @@ impl ObjNetwork {
     }
 
     async fn wait(&self, d: u64) -> Result<String, RpcError> {
-        if let Err(e) = await!(compat::Compat01As03::new(Delay::new(Duration::from_secs(
-            d
-        )))) {
+        if let Err(e) = await!(Delay::new(Duration::from_secs(d)).compat()) {
             return Err(e.into());
         }
         Ok(String::from("pong"))

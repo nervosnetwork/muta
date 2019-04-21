@@ -12,8 +12,7 @@ logger = { path = "../../common/logger" }
 
 log = "0.4"
 rocksdb = "0.12.0"
-
-tokio-async-await = { version = "0.1" }
+futures-preview = { version = "0.3.0-alpha.14", features = [ "compat" ] }
 
 [dev-dependencies]
-futures = "0.1"
+futures01 = { package = "futures", version = "0.1" }
