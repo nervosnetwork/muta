@@ -3,6 +3,8 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::marker::Send;
 
+pub const P2P_SESSION_ID: &str = "p2p_session_id";
+
 pub trait Cloneable: CloneableImpl + Debug + Send {}
 
 pub trait CloneableImpl {
@@ -31,6 +33,16 @@ impl Clone for Box<Cloneable> {
 
 impl Cloneable for String {}
 impl Cloneable for usize {}
+
+pub trait CommonValue {
+    fn p2p_session_id(&self) -> Option<usize>;
+}
+
+impl CommonValue for Context {
+    fn p2p_session_id(&self) -> Option<usize> {
+        self.get::<usize>(P2P_SESSION_ID).map(Clone::clone)
+    }
+}
 
 /// Blockchain Context. eg. block, system contract.
 #[derive(Clone, Debug, Default)]
@@ -61,7 +73,7 @@ impl Context {
 
 #[cfg(test)]
 mod tests {
-    use super::Context;
+    use super::{CommonValue, Context, P2P_SESSION_ID};
 
     #[test]
     fn test_context() {
@@ -82,5 +94,14 @@ mod tests {
         let micky_guess = kingdom.get::<u64>("knights");
 
         assert_eq!(micky_guess, None);
+    }
+
+    #[test]
+    fn test_context_common_value() {
+        let ctx = Context::new();
+        assert_eq!(ctx.p2p_session_id(), None);
+
+        let ctx = ctx.with_value::<usize>(P2P_SESSION_ID, 1);
+        assert_eq!(ctx.p2p_session_id(), Some(1));
     }
 }
