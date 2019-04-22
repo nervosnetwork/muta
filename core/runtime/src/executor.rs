@@ -3,9 +3,16 @@ use std::fmt;
 
 use cita_vm::{state::Error as StateError, Error as VMError};
 use core_context::Context;
-use core_types::{
-    Address, Balance, BlockHeader, Bloom, Hash, Receipt, SignedTransaction, TypesError, H256,
-};
+use core_types::{Address, Balance, Bloom, Hash, Receipt, SignedTransaction, TypesError, H256};
+
+#[derive(Default, Debug, Clone)]
+pub struct ExecutionContext {
+    pub state_root: Hash,
+    pub proposer: Address,
+    pub height: u64,
+    pub quota_limit: u64,
+    pub timestamp: u64,
+}
 
 #[derive(Default, Debug, Clone)]
 pub struct ExecutionResult {
@@ -28,8 +35,7 @@ pub trait Executor: Send + Sync {
     fn exec(
         &self,
         ctx: Context,
-        latest_state_root: &Hash,
-        current_header: &BlockHeader,
+        execution_ctx: &ExecutionContext,
         txs: &[SignedTransaction],
     ) -> Result<ExecutionResult, ExecutorError>;
 
@@ -37,7 +43,7 @@ pub trait Executor: Send + Sync {
     fn readonly(
         &self,
         ctx: Context,
-        header: &BlockHeader,
+        execution_ctx: &ExecutionContext,
         to: &Address,
         from: &Address,
         data: &[u8],

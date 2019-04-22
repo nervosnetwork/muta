@@ -37,7 +37,7 @@ pub trait TransactionPool: Sync + Send {
         &self,
         ctx: Context,
         tx_hashes: &[Hash],
-    ) -> FutRuntimeResult<Vec<Option<SignedTransaction>>, TransactionPoolError>;
+    ) -> FutRuntimeResult<Vec<SignedTransaction>, TransactionPoolError>;
 
     /// Make sure that the transactions that specify the transactions hash are in the transaction pool.
     /// If there are transactions that do not exist, this function will request it from other nodes.
@@ -51,7 +51,7 @@ pub trait TransactionPool: Sync + Send {
         &self,
         ctx: Context,
         tx_hashes: &[Hash],
-    ) -> FutRuntimeResult<bool, TransactionPoolError>;
+    ) -> FutRuntimeResult<(), TransactionPoolError>;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

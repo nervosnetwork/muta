@@ -2,7 +2,7 @@ pub mod secp256k1;
 
 use std::fmt;
 
-use core_types::Hash;
+use core_types::{Address, Hash};
 
 /// "Transform" ensures that the types associated with "Crypto" can be converted to bytes and converted from bytes.
 pub trait CryptoTransform: Sized {
@@ -11,23 +11,29 @@ pub trait CryptoTransform: Sized {
     fn as_bytes(&self) -> &[u8];
 }
 
+pub type CryptoResult<T> = Result<T, CryptoError>;
+
 pub trait Crypto: Send + Sync {
     type PrivateKey: CryptoTransform + Clone + Send;
     type PublicKey: CryptoTransform + Clone + Send;
     type Signature: CryptoTransform + Clone + Send;
 
-    fn get_public_key(&self, privkey: &Self::PrivateKey) -> Result<Self::PublicKey, CryptoError>;
+    fn get_public_key(&self, privkey: &Self::PrivateKey) -> CryptoResult<Self::PublicKey>;
 
     fn verify_with_signature(
         &self,
         hash: &Hash,
         signature: &Self::Signature,
-    ) -> Result<Self::PublicKey, CryptoError>;
+    ) -> CryptoResult<Self::PublicKey>;
 
     fn gen_keypair(&self) -> (Self::PrivateKey, Self::PublicKey);
 
-    fn sign(&self, hash: &Hash, privkey: &Self::PrivateKey)
-        -> Result<Self::Signature, CryptoError>;
+    fn sign(&self, hash: &Hash, privkey: &Self::PrivateKey) -> CryptoResult<Self::Signature>;
+
+    fn pubkey_to_address(&self, pubkey: &Self::PublicKey) -> Address {
+        let pubkey_hash = Hash::digest(&pubkey.as_bytes()[1..]);
+        Address::from_hash(&pubkey_hash)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

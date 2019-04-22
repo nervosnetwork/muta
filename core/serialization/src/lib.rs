@@ -1,10 +1,11 @@
-#![feature(async_await, await_macro, futures_api)]
+#![feature(async_await, await_macro, futures_api, try_trait)]
 
 use std::convert::TryInto;
 use std::error;
 use std::fmt;
 use std::future::Future;
 use std::iter::FromIterator;
+use std::option::NoneError;
 
 use bytes::{BytesMut, IntoBuf};
 use futures::{
@@ -94,6 +95,7 @@ pub enum CodecError {
     Decode(DecodeError),
     Encode(EncodeError),
     Types(TypesError),
+    None(NoneError),
 }
 
 impl error::Error for CodecError {}
@@ -103,6 +105,7 @@ impl fmt::Display for CodecError {
             CodecError::Decode(ref err) => format!("serialization decode error: {:?}", err),
             CodecError::Encode(ref err) => format!("serialization encode error: {:?}", err),
             CodecError::Types(ref err) => format!("serialization types error: {:?}", err),
+            CodecError::None(ref err) => format!("serialization none error: {:?}", err),
         };
         write!(f, "{}", printable)
     }
@@ -126,6 +129,12 @@ impl From<TypesError> for CodecError {
     }
 }
 
+impl From<NoneError> for CodecError {
+    fn from(err: NoneError) -> Self {
+        CodecError::None(err)
+    }
+}
+
 // ----------------------------------------------------------------------------
 // To generate .rs files, prost-build used from build.rs.
 //
@@ -137,6 +146,7 @@ impl From<TypesError> for CodecError {
 // Structs:
 //  - [block.rs] BlockHeader
 //  - [block.rs] Block
+//  - [block.rs] Proposal
 //  - [receipt.rs] LogEntry
 //  - [receipt.rs] Receipt
 //  - [transaction.rs] Transaction
@@ -187,11 +197,11 @@ impl TryInto<core_types::BlockHeader> for BlockHeader {
     type Error = CodecError;
 
     fn try_into(self) -> Result<core_types::BlockHeader, Self::Error> {
-        let votes: Result<Vec<core_types::Hash>, TypesError> = self
+        let votes = self
             .votes
             .into_iter()
             .map(|v| Hash::from_bytes(&v))
-            .collect();
+            .collect::<Result<Vec<core_types::Hash>, TypesError>>()?;
 
         Ok(core_types::BlockHeader {
             prevhash: Hash::from_bytes(&self.prevhash)?,
@@ -203,8 +213,8 @@ impl TryInto<core_types::BlockHeader> for BlockHeader {
             logs_bloom: Bloom::from_slice(&self.logs_bloom),
             quota_used: self.quota_used,
             quota_limit: self.quota_limit,
-            votes: votes?,
             proposer: Address::from_bytes(&self.proposer)?,
+            votes,
         })
     }
 }
@@ -218,6 +228,7 @@ impl From<core_types::Block> for Block {
                 .into_iter()
                 .map(|h| h.as_bytes().to_vec())
                 .collect(),
+            hash: block.hash.as_bytes().to_vec(),
         }
     }
 }
@@ -226,18 +237,56 @@ impl TryInto<core_types::Block> for Block {
     type Error = CodecError;
 
     fn try_into(self) -> Result<core_types::Block, Self::Error> {
-        let header = match self.header {
-            Some(header) => header.try_into()?,
-            None => core_types::BlockHeader::default(),
-        };
-        let tx_hashes: Result<Vec<Hash>, TypesError> = self
+        let header = self.header.ok_or(NoneError)?.try_into()?;
+
+        let tx_hashes = self
             .tx_hashes
             .into_iter()
             .map(|tx_hash| Hash::from_bytes(&tx_hash))
-            .collect();
+            .collect::<Result<Vec<Hash>, TypesError>>()?;
+        let hash = Hash::from_bytes(&self.hash)?;
         Ok(core_types::Block {
             header,
-            tx_hashes: tx_hashes?,
+            tx_hashes,
+            hash,
+        })
+    }
+}
+
+impl From<core_types::Proposal> for Proposal {
+    fn from(proposal: core_types::Proposal) -> Self {
+        Self {
+            prevhash: proposal.prevhash.as_bytes().to_vec(),
+            timestamp: proposal.timestamp,
+            height: proposal.height,
+            quota_limit: proposal.quota_limit,
+            proposer: proposal.proposer.as_bytes().to_vec(),
+            tx_hashes: proposal
+                .tx_hashes
+                .into_iter()
+                .map(|h| h.as_bytes().to_vec())
+                .collect(),
+        }
+    }
+}
+
+impl TryInto<core_types::Proposal> for Proposal {
+    type Error = CodecError;
+
+    fn try_into(self) -> Result<core_types::Proposal, Self::Error> {
+        let tx_hashes = self
+            .tx_hashes
+            .into_iter()
+            .map(|h| Hash::from_bytes(&h))
+            .collect::<Result<Vec<Hash>, TypesError>>()?;
+
+        Ok(core_types::Proposal {
+            prevhash: Hash::from_bytes(&self.prevhash)?,
+            timestamp: self.timestamp,
+            height: self.height,
+            quota_limit: self.quota_limit,
+            proposer: Address::from_bytes(&self.proposer)?,
+            tx_hashes,
         })
     }
 }
@@ -260,16 +309,16 @@ impl TryInto<core_types::LogEntry> for LogEntry {
     type Error = CodecError;
 
     fn try_into(self) -> Result<core_types::LogEntry, Self::Error> {
-        let topics: Result<Vec<Hash>, TypesError> = self
+        let topics = self
             .topics
             .into_iter()
             .map(|t| Hash::from_bytes(&t))
-            .collect();
+            .collect::<Result<Vec<Hash>, TypesError>>()?;
 
         Ok(core_types::LogEntry {
             address: Address::from_bytes(&self.address)?,
-            topics: topics?,
             data: self.data,
+            topics,
         })
     }
 }
@@ -296,8 +345,11 @@ impl TryInto<core_types::Receipt> for Receipt {
     type Error = CodecError;
 
     fn try_into(self) -> Result<core_types::Receipt, Self::Error> {
-        let logs: Result<Vec<core_types::LogEntry>, _> =
-            self.logs.into_iter().map(TryInto::try_into).collect();
+        let logs = self
+            .logs
+            .into_iter()
+            .map(TryInto::try_into)
+            .collect::<Result<Vec<core_types::LogEntry>, CodecError>>()?;
 
         Ok(core_types::Receipt {
             state_root: Hash::from_bytes(&self.state_root)?,
@@ -305,13 +357,13 @@ impl TryInto<core_types::Receipt> for Receipt {
             block_hash: Hash::from_bytes(&self.block_hash)?,
             quota_used: self.quota_used,
             logs_bloom: Bloom::from_slice(&self.logs_bloom),
-            logs: logs?,
             receipt_error: self.error,
             contract_address: if self.contract_address.is_empty() {
                 None
             } else {
                 Some(Address::from_bytes(&self.contract_address)?)
             },
+            logs,
         })
     }
 }
@@ -368,10 +420,8 @@ impl TryInto<core_types::UnverifiedTransaction> for UnverifiedTransaction {
     type Error = CodecError;
 
     fn try_into(self) -> Result<core_types::UnverifiedTransaction, Self::Error> {
-        let tx = match self.transaction {
-            Some(tx) => tx.try_into()?,
-            None => core_types::Transaction::default(),
-        };
+        let tx = self.transaction.ok_or(NoneError)?.try_into()?;
+
         Ok(core_types::UnverifiedTransaction {
             transaction: tx,
             signature: self.signature,
@@ -393,10 +443,8 @@ impl TryInto<core_types::SignedTransaction> for SignedTransaction {
     type Error = CodecError;
 
     fn try_into(self) -> Result<core_types::SignedTransaction, Self::Error> {
-        let untx = match self.untx {
-            Some(untx) => untx.try_into()?,
-            None => core_types::UnverifiedTransaction::default(),
-        };
+        let untx = self.untx.ok_or(NoneError)?.try_into()?;
+
         Ok(core_types::SignedTransaction {
             untx,
             hash: Hash::from_bytes(&self.hash)?,

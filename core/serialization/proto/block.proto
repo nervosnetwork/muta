@@ -24,8 +24,17 @@ message BlockHeader {
     bytes proposer = 11;
 }
 
-// proposal block same as Block
 message Block {
     BlockHeader header = 1;
     repeated bytes tx_hashes = 2;
+    bytes hash = 3;
+}
+
+message Proposal {
+  bytes prevhash = 1;
+  uint64 timestamp = 2;
+  uint64 height = 3;
+  uint64 quota_limit = 4;
+  bytes proposer = 5;
+  repeated bytes tx_hashes = 6;
 }

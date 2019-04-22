@@ -22,7 +22,6 @@ core-consensus = { path = "core/consensus" }
 core-context = { path = "core/context" }
 
 hex = "0.3"
-futures = "0.1"
 tokio = "0.1"
 clap = "2.32"
 log = "0.4"
@@ -30,6 +29,8 @@ num_cpus = "1.0"
 serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"
+futures01 = { package = "futures", version = "0.1" }
+futures-preview = { version = "0.3.0-alpha.14", features = [ "compat" ] }
 
 [workspace]
 members = [

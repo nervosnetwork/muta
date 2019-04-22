@@ -202,7 +202,7 @@ where
         &self,
         _: Context,
         tx_hashes: &[Hash],
-    ) -> FutRuntimeResult<Vec<Option<SignedTransaction>>, TransactionPoolError> {
+    ) -> FutRuntimeResult<Vec<SignedTransaction>, TransactionPoolError> {
         let tx_cache = match self.tx_cache.read().wait() {
             Ok(tx_cache) => tx_cache,
             Err(()) => return Box::new(err(map_rwlock_err(()))),
@@ -211,6 +211,7 @@ where
         let signed_txs = tx_hashes
             .iter()
             .map(|hash| tx_cache.get(hash).cloned())
+            .filter_map(|tx| tx)
             .collect();
         Box::new(ok(signed_txs))
     }
@@ -221,7 +222,7 @@ where
         &self,
         _: Context,
         _tx_hashes: &[Hash],
-    ) -> FutRuntimeResult<bool, TransactionPoolError> {
+    ) -> FutRuntimeResult<(), TransactionPoolError> {
         unimplemented!();
     }
 }

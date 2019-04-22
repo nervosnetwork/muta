@@ -10,7 +10,7 @@ pub mod transaction_pool;
 // pub mod sync;
 
 pub use database::{DataCategory, Database, DatabaseError, FutDBResult};
-pub use executor::{ExecutionResult, Executor, ExecutorError, ReadonlyResult};
+pub use executor::{ExecutionContext, ExecutionResult, Executor, ExecutorError, ReadonlyResult};
 pub use transaction_pool::{TransactionPool, TransactionPoolError};
 
 pub type FutRuntimeResult<T, E> = Box<Future<Item = T, Error = E> + Send>;

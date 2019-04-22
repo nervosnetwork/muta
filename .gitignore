@@ -15,3 +15,5 @@ __pycache__/
 *.egg-info/
 
 rocksdb*
+# bft
+file_wal

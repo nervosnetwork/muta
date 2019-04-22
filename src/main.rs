@@ -1,3 +1,5 @@
+#![feature(async_await, await_macro, futures_api)]
+
 use std::cmp;
 use std::error::Error;
 use std::fs::File;
@@ -5,9 +7,9 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::thread;
-use std::time::{Duration, Instant};
 
-use futures::future::{ok, Future};
+use futures::prelude::{FutureExt, TryFutureExt};
+use futures01::future::{ok, Future as Future01};
 use serde_derive::Deserialize;
 
 use components_database::rocks::RocksDB;
@@ -15,7 +17,7 @@ use components_executor::evm::{EVMBlockDataProvider, EVMExecutor};
 use components_executor::TrieDB;
 use components_jsonrpc;
 use components_transaction_pool::HashTransactionPool;
-use core_consensus::{solo_interval, Solo};
+use core_consensus::{ConsensusStatus, Engine, Solo};
 use core_context::Context;
 use core_crypto::{
     secp256k1::{PrivateKey, Secp256k1},
@@ -44,7 +46,7 @@ struct Config {
 
     // consensus
     consensus_mode: String,
-    consensus_size: u64,
+    consensus_tx_limit: u64,
     consensus_interval: u64,
 }
 
@@ -130,19 +132,6 @@ fn start(cfg: &Config) {
         cfg.quota_limit,
     ));
 
-    let privkey = PrivateKey::from_bytes(&hex::decode(cfg.privkey.clone()).unwrap()).unwrap();
-    // new solo
-    let consensus_solo: Solo<_, _, _, Secp256k1> = Solo::new(
-        Arc::clone(&executor),
-        Arc::clone(&tx_pool),
-        Arc::clone(&storage),
-        Arc::clone(&secp),
-        privkey,
-        cfg.consensus_size,
-    )
-    .unwrap();
-    let consensus_solo = Arc::new(consensus_solo);
-
     // run json rpc
     let mut jrpc_config = components_jsonrpc::Config::default();
     jrpc_config.listen = cfg.rpc_address.clone();
@@ -162,15 +151,39 @@ fn start(cfg: &Config) {
         };
     });
 
-    let consensus_interval = Duration::from_millis(cfg.consensus_interval);
+    // new consensus
+    let privkey = PrivateKey::from_bytes(&hex::decode(cfg.privkey.clone()).unwrap()).unwrap();
+
+    let status = ConsensusStatus {
+        height: block.header.height,
+        timestamp: block.header.timestamp,
+        block_hash: block.hash.clone(),
+        state_root: block.header.state_root.clone(),
+        tx_limit: cfg.consensus_tx_limit,
+        quota_limit: cfg.quota_limit,
+        verifier_list: vec![],
+    };
+
+    let engine = Engine::new(
+        Arc::clone(&executor),
+        Arc::clone(&tx_pool),
+        Arc::clone(&storage),
+        Arc::clone(&secp),
+        privkey.clone(),
+        status,
+    )
+    .unwrap();
+    let consensus_solo = Arc::new(Solo::new(engine, cfg.consensus_interval).unwrap());
 
     // start consensus
-    tokio::run(ok(()).map(move |_| {
-        solo_interval(
-            Arc::clone(&consensus_solo),
-            Instant::now(),
-            consensus_interval,
-        )
+    tokio::run(ok(()).and_then(move |_| {
+        let fut = async move {
+            await!(consensus_solo.start().map_err(|e| {
+                log::error!("{:?}", e);
+            }))?;
+            Ok(())
+        };
+        Box::new(fut.boxed().compat())
     }));
 }
 

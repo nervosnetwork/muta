@@ -276,7 +276,7 @@ where
 
         let height = block.header.height;
         let height_key = transfrom_u64_to_array_u8(block.header.height);
-        let hash_key = block.header.hash();
+        let hash_key = block.hash.clone();
 
         let pb_block: SerBlock = block.into();
 
@@ -640,6 +640,7 @@ mod tests {
         b.header.timestamp = 1234;
         b.header.height = height;
         b.tx_hashes = vec![Hash::digest(b"tx1"), Hash::digest(b"tx2")];
+        b.hash = b.header.hash();
         b
     }
 

@@ -13,9 +13,9 @@ core-merkle = { path = "../merkle" }
 core-context = { path = "../context" }
 
 log = "0.4"
-futures = "0.1"
-futures-locks = "0.3"
 tokio = "0.1"
+old_futures = { package = "futures", version = "0.1" }
+futures-preview = { version = "0.3.0-alpha.14", features = [ "compat" ] }
 
 [dev-dependencies]
 hex = "0.3"

@@ -13,7 +13,6 @@ pool_size = 100000
 until_block_limit = 100
 quota_limit = 9999999999
 
-# consensus
 consensus_mode = "solo"
-consensus_size = 30000
+consensus_tx_limit = 30000
 consensus_interval = 3000

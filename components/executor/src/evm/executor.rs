@@ -12,10 +12,10 @@ use cita_vm::{
 use ethereum_types::{H160, H256, U256};
 
 use core_context::Context;
-use core_runtime::{ExecutionResult, Executor, ExecutorError, ReadonlyResult};
+use core_runtime::{ExecutionContext, ExecutionResult, Executor, ExecutorError, ReadonlyResult};
 use core_types::{
-    Address, Balance, BlockHeader, Bloom, BloomInput, Genesis, Hash, LogEntry, Receipt,
-    SignedTransaction, StateAlloc, H256 as CoreH256,
+    Address, Balance, Bloom, BloomInput, Genesis, Hash, LogEntry, Receipt, SignedTransaction,
+    StateAlloc, H256 as CoreH256,
 };
 
 pub struct EVMExecutor<DB> {
@@ -91,18 +91,17 @@ where
     fn exec(
         &self,
         _: Context,
-        latest_state_root: &Hash,
-        current_header: &BlockHeader,
+        execution_ctx: &ExecutionContext,
         txs: &[SignedTransaction],
     ) -> Result<ExecutionResult, ExecutorError> {
-        let state_root = H256(latest_state_root.clone().into_fixed_bytes());
+        let state_root = H256(execution_ctx.state_root.clone().into_fixed_bytes());
 
         let state = Arc::new(RefCell::new(State::from_existing(
             self.db.clone(),
             state_root,
         )?));
-        let evm_context = build_evm_context(current_header);
-        let evm_config = build_evm_config(current_header);
+        let evm_context = build_evm_context(execution_ctx);
+        let evm_config = build_evm_config(execution_ctx);
 
         let mut receipts: Vec<Receipt> = txs
             .iter()
@@ -136,16 +135,16 @@ where
     fn readonly(
         &self,
         _: Context,
-        header: &BlockHeader,
+        execution_ctx: &ExecutionContext,
         to: &Address,
         from: &Address,
         data: &[u8],
     ) -> Result<ReadonlyResult, ExecutorError> {
-        let evm_context = build_evm_context(header);
-        let evm_config = build_evm_config(header);
+        let evm_context = build_evm_context(execution_ctx);
+        let evm_config = build_evm_config(execution_ctx);
         let evm_transaction = build_evm_transaction_of_readonly(to, from, data);
 
-        let root = H256(header.state_root.clone().into_fixed_bytes());
+        let root = H256(execution_ctx.state_root.clone().into_fixed_bytes());
         let state = State::from_existing(self.db.clone(), root)?;
 
         let result = cita_vm::exec_static(
@@ -296,21 +295,21 @@ where
     }
 }
 
-fn build_evm_context(header: &BlockHeader) -> EVMContext {
+fn build_evm_context(ctx: &ExecutionContext) -> EVMContext {
     EVMContext {
-        gas_limit: header.quota_limit,
-        coinbase: H160::from(header.proposer.clone().into_fixed_bytes()),
-        number: U256::from(header.height),
-        timestamp: header.timestamp,
+        gas_limit: ctx.quota_limit,
+        coinbase: H160::from(ctx.proposer.clone().into_fixed_bytes()),
+        number: U256::from(ctx.height),
+        timestamp: ctx.timestamp,
 
         // The cita-bft consensus does not have difficulty ​​like POW, so set 0
         difficulty: U256::from(0),
     }
 }
 
-fn build_evm_config(header: &BlockHeader) -> EVMConfig {
+fn build_evm_config(ctx: &ExecutionContext) -> EVMConfig {
     EVMConfig {
-        block_gas_limit: header.quota_limit,
+        block_gas_limit: ctx.quota_limit,
         ..Default::default()
     }
 }
@@ -448,7 +447,7 @@ mod tests {
 
     use core_context::Context;
     use core_crypto::{secp256k1::Secp256k1, Crypto, CryptoTransform};
-    use core_runtime::Executor;
+    use core_runtime::{ExecutionContext, Executor};
     use core_types::{
         Address, Balance, BlockHeader, Genesis, Hash, SignedTransaction, StateAlloc, Transaction,
         UnverifiedTransaction,
@@ -552,9 +551,14 @@ mod tests {
             },
         };
 
-        let exec_result = executor
-            .exec(ctx, &state_root, &header, &[signed_tx])
-            .unwrap();
+        let execution_ctx = ExecutionContext {
+            state_root: state_root.clone(),
+            proposer: header.proposer.clone(),
+            height: header.height,
+            quota_limit: header.quota_limit,
+            timestamp: header.timestamp,
+        };
+        let exec_result = executor.exec(ctx, &execution_ctx, &[signed_tx]).unwrap();
         assert_ne!(exec_result.receipts[0].contract_address, None);
         assert_ne!(exec_result.state_root, state_root);
         assert_eq!(exec_result.receipts[0].logs.len(), 1);

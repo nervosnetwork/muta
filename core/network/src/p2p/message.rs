@@ -22,7 +22,7 @@ pub mod packed_message {
         SignedTransaction(SignedTransaction),
 
         #[prost(message, tag = "3")]
-        Block(Block),
+        Block(Box<Block>),
     }
 }
 
@@ -34,7 +34,7 @@ impl From<crate::Message> for Message {
         match msg {
             CTMessage::Consensus(v) => Message::Consensus(v),
             CTMessage::SignedTransaction(stx) => Message::SignedTransaction((*stx).into()),
-            CTMessage::Block(block) => Message::Block((*block).into()),
+            CTMessage::Block(block) => Message::Block(Box::new((*block).into())),
         }
     }
 }
