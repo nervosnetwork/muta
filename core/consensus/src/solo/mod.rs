@@ -363,7 +363,8 @@ mod tests {
                 format!("tx{}", i),
                 &privkey,
             );
-            tx_pool.insert(ctx.clone(), tx).wait().unwrap();
+            let tx_hash = tx.transaction.hash();
+            tx_pool.insert(ctx.clone(), tx_hash, tx).wait().unwrap();
         }
 
         // exec block
@@ -401,12 +402,14 @@ mod tests {
     ) -> UnverifiedTransaction {
         let secp = Secp256k1::new();
         let mut tx = Transaction::default();
-        tx.to = Address::from_bytes(
-            hex::decode("ffffffffffffffffffffffffffffffffffffffff")
-                .unwrap()
-                .as_ref(),
-        )
-        .unwrap();
+        tx.to = Some(
+            Address::from_bytes(
+                hex::decode("ffffffffffffffffffffffffffffffffffffffff")
+                    .unwrap()
+                    .as_ref(),
+            )
+            .unwrap(),
+        );
         tx.nonce = nonce;
         tx.quota = quota;
         tx.valid_until_block = valid_until_block;

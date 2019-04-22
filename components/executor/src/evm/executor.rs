@@ -319,13 +319,9 @@ fn build_evm_transaction(signed_tx: &SignedTransaction, nonce: U256) -> EVMTrans
     let tx = &signed_tx.untx.transaction;
     let from = &signed_tx.sender.clone();
     let value_slice: &[u8] = tx.value.as_ref();
-    let to = {
-        let address = H160(tx.to.clone().into_fixed_bytes());
-        if address == H160::zero() {
-            None
-        } else {
-            Some(address)
-        }
+    let to = match &tx.to {
+        Some(data) => Some(H160(data.clone().into_fixed_bytes())),
+        None => None,
     };
 
     EVMTransaction {

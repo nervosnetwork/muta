@@ -59,6 +59,7 @@ where
     fn insert(
         &self,
         ctx: Context,
+        tx_hash: Hash,
         untx: UnverifiedTransaction,
     ) -> FutRuntimeResult<SignedTransaction, TransactionPoolError> {
         let storage = Arc::clone(&self.storage);
@@ -70,8 +71,6 @@ where
         let quota_limit = self.quota_limit;
 
         let fut = async move {
-            let tx_hash = untx.transaction.hash();
-
             // 1. verify signature
             let signature =
                 C::Signature::from_bytes(&untx.signature).map_err(TransactionPoolError::Crypto)?;
@@ -296,12 +295,16 @@ mod tests {
         // test normal
         let untx = mock_transaction(100, height + until_block_limit, "test_normal".to_owned());
         let tx_hash = untx.transaction.hash();
-        let signed_tx = tx_pool.insert(ctx.clone(), untx).wait().unwrap();
+        let signed_tx = tx_pool
+            .insert(ctx.clone(), tx_hash.clone(), untx)
+            .wait()
+            .unwrap();
         assert_eq!(signed_tx.hash, tx_hash);
 
         // test lt valid_until_block
         let untx = mock_transaction(100, height, "test_lt_quota_limit".to_owned());
-        let result = tx_pool.insert(ctx.clone(), untx).wait();
+        let tx_hash = untx.transaction.hash();
+        let result = tx_pool.insert(ctx.clone(), tx_hash, untx).wait();
         assert_eq!(result, Err(TransactionPoolError::InvalidUntilBlock));
 
         // test gt valid_until_block
@@ -310,7 +313,8 @@ mod tests {
             height + until_block_limit * 2,
             "test_gt_valid_until_block".to_owned(),
         );
-        let result = tx_pool.insert(ctx.clone(), untx).wait();
+        let tx_hash = untx.transaction.hash();
+        let result = tx_pool.insert(ctx.clone(), tx_hash, untx).wait();
         assert_eq!(result, Err(TransactionPoolError::InvalidUntilBlock));
 
         // test gt quota limit
@@ -319,14 +323,17 @@ mod tests {
             height + until_block_limit,
             "test_gt_quota_limit".to_owned(),
         );
-        let result = tx_pool.insert(ctx.clone(), untx).wait();
+        let tx_hash = untx.transaction.hash();
+        let result = tx_pool.insert(ctx.clone(), tx_hash, untx).wait();
         assert_eq!(result, Err(TransactionPoolError::QuotaNotEnough));
 
         // test cache dup
         let untx = mock_transaction(100, height + until_block_limit, "test_dup".to_owned());
         let untx2 = untx.clone();
-        tx_pool.insert(ctx.clone(), untx).wait().unwrap();
-        let result = tx_pool.insert(ctx, untx2).wait();
+        let tx_hash = untx.transaction.hash();
+        let tx_hash2 = untx2.transaction.hash();
+        tx_pool.insert(ctx.clone(), tx_hash, untx).wait().unwrap();
+        let result = tx_pool.insert(ctx.clone(), tx_hash2, untx2).wait();
         assert_eq!(result, Err(TransactionPoolError::Dup));
     }
 
@@ -360,7 +367,8 @@ mod tests {
         let tx_pool =
             HashTransactionPool::new(storage, secp, pool_size, until_block_limit, quota_limit);
 
-        let result = tx_pool.insert(ctx, signed_tx.untx).wait();
+        let tx_hash = signed_tx.untx.transaction.hash();
+        let result = tx_pool.insert(ctx.clone(), tx_hash, signed_tx.untx).wait();
         assert_eq!(result, Err(TransactionPoolError::Dup));
     }
 
@@ -384,11 +392,15 @@ mod tests {
 
         let untx = mock_transaction(100, height + until_block_limit, "test1".to_owned());
         let tx_hash = untx.transaction.hash();
-        let signed_tx = tx_pool.insert(ctx.clone(), untx).wait().unwrap();
+        let signed_tx = tx_pool
+            .insert(ctx.clone(), tx_hash.clone(), untx)
+            .wait()
+            .unwrap();
         assert_eq!(signed_tx.hash, tx_hash);
 
         let untx = mock_transaction(100, height + until_block_limit, "test2".to_owned());
-        let result = tx_pool.insert(ctx, untx).wait();
+        let tx_hash = untx.transaction.hash();
+        let result = tx_pool.insert(ctx.clone(), tx_hash, untx).wait();
         assert_eq!(result, Err(TransactionPoolError::ReachLimit));
     }
 
@@ -413,8 +425,9 @@ mod tests {
         let mut tx_hashes = vec![];
         for i in 0..10 {
             let untx = mock_transaction(100, height + until_block_limit, format!("test{}", i));
-            tx_hashes.push(untx.transaction.hash());
-            tx_pool.insert(ctx.clone(), untx).wait().unwrap();
+            let tx_hash = untx.transaction.hash();
+            tx_hashes.push(tx_hash.clone());
+            tx_pool.insert(ctx.clone(), tx_hash, untx).wait().unwrap();
         }
 
         let pachage_tx_hashes = tx_pool
@@ -451,8 +464,9 @@ mod tests {
         let mut tx_hashes = vec![];
         for i in 0..10 {
             let untx = mock_transaction(100, height + until_block_limit, format!("test{}", i));
-            tx_hashes.push(untx.transaction.hash());
-            tx_pool.insert(ctx.clone(), untx).wait().unwrap();
+            let tx_hash = untx.transaction.hash();
+            tx_hashes.push(tx_hash.clone());
+            tx_pool.insert(ctx.clone(), tx_hash, untx).wait().unwrap();
         }
 
         let pachage_tx_hashes = tx_pool
@@ -470,12 +484,14 @@ mod tests {
         let secp = Secp256k1::new();
         let (privkey, _pubkey) = secp.gen_keypair();
         let mut tx = Transaction::default();
-        tx.to = Address::from_bytes(
-            hex::decode("ffffffffffffffffffffffffffffffffffffffff")
-                .unwrap()
-                .as_ref(),
-        )
-        .unwrap();
+        tx.to = Some(
+            Address::from_bytes(
+                hex::decode("ffffffffffffffffffffffffffffffffffffffff")
+                    .unwrap()
+                    .as_ref(),
+            )
+            .unwrap(),
+        );
         tx.nonce = nonce;
         tx.quota = quota;
         tx.valid_until_block = valid_until_block;
@@ -499,12 +515,14 @@ mod tests {
         let secp = Secp256k1::new();
         let (privkey, pubkey) = secp.gen_keypair();
         let mut tx = Transaction::default();
-        tx.to = Address::from_bytes(
-            hex::decode("ffffffffffffffffffffffffffffffffffffffff")
-                .unwrap()
-                .as_ref(),
-        )
-        .unwrap();
+        tx.to = Some(
+            Address::from_bytes(
+                hex::decode("ffffffffffffffffffffffffffffffffffffffff")
+                    .unwrap()
+                    .as_ref(),
+            )
+            .unwrap(),
+        );
         tx.nonce = nonce;
         tx.quota = quota;
         tx.valid_until_block = valid_until_block;

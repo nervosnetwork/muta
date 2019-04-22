@@ -13,6 +13,7 @@ pub trait TransactionPool: Sync + Send {
     fn insert(
         &self,
         ctx: Context,
+        hash: Hash,
         untx: UnverifiedTransaction,
     ) -> FutRuntimeResult<SignedTransaction, TransactionPoolError>;
 

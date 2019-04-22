@@ -1,17 +1,19 @@
+use std::cmp;
 use std::error::Error;
 use std::fs::File;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::thread;
 use std::time::{Duration, Instant};
 
 use futures::future::{ok, Future};
 use serde_derive::Deserialize;
 
-// use components_cita_jsonrpc::{Config as JSONRPCConfig, RpcServer};
 use components_database::rocks::RocksDB;
 use components_executor::evm::{EVMBlockDataProvider, EVMExecutor};
 use components_executor::TrieDB;
+use components_jsonrpc;
 use components_transaction_pool::HashTransactionPool;
 use core_consensus::{solo_interval, Solo};
 use core_context::Context;
@@ -30,6 +32,7 @@ struct Config {
 
     // rpc_address
     rpc_address: String,
+    rpc_workers: u64,
 
     // db config
     data_path: PathBuf,
@@ -141,16 +144,23 @@ fn start(cfg: &Config) {
     let consensus_solo = Arc::new(consensus_solo);
 
     // run json rpc
-    // NOTE: Bind a variable to aviod "drop".
-    // let mut rpc_config = JSONRPCConfig::default();
-    // rpc_config.listen_address = cfg.rpc_address.clone();
-    // let _rpc_server = RpcServer::new(
-    //     rpc_config,
-    //     Arc::clone(&storage),
-    //     Arc::clone(&executor),
-    //     Arc::clone(&tx_pool),
-    // )
-    // .unwrap();
+    let mut jrpc_config = components_jsonrpc::Config::default();
+    jrpc_config.listen = cfg.rpc_address.clone();
+    jrpc_config.workers = if cfg.rpc_workers != 0 {
+        cfg.rpc_workers as usize
+    } else {
+        cmp::min(2, num_cpus::get())
+    };
+    let jrpc_state = components_jsonrpc::AppState::new(
+        Arc::clone(&executor),
+        Arc::clone(&tx_pool),
+        Arc::clone(&storage),
+    );
+    thread::spawn(move || {
+        if let Err(e) = components_jsonrpc::listen(jrpc_config, jrpc_state) {
+            log::error!("Failed to start jrpc server: {}", e);
+        };
+    });
 
     let consensus_interval = Duration::from_millis(cfg.consensus_interval);
 

@@ -146,6 +146,7 @@ impl From<TypesError> for CodecError {
 //  - ...
 // ----------------------------------------------------------------------------
 
+#[macro_export]
 macro_rules! generate_module_for {
     ([$( $name:ident, )+]) => {
         $( generate_module_for!($name); )+
@@ -317,8 +318,12 @@ impl TryInto<core_types::Receipt> for Receipt {
 
 impl From<core_types::Transaction> for Transaction {
     fn from(tx: core_types::Transaction) -> Self {
+        let to = match tx.to {
+            Some(data) => data.as_bytes().to_vec(),
+            None => vec![],
+        };
         Self {
-            to: tx.to.as_bytes().to_vec(),
+            to,
             nonce: tx.nonce,
             quota: tx.quota,
             valid_until_block: tx.valid_until_block,
@@ -333,8 +338,13 @@ impl TryInto<core_types::Transaction> for Transaction {
     type Error = CodecError;
 
     fn try_into(self) -> Result<core_types::Transaction, Self::Error> {
+        let to = if self.to.is_empty() {
+            None
+        } else {
+            Some(Address::from_bytes(&self.to)?)
+        };
         Ok(core_types::Transaction {
-            to: Address::from_bytes(&self.to)?,
+            to,
             nonce: self.nonce,
             quota: self.quota,
             valid_until_block: self.valid_until_block,

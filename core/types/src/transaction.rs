@@ -4,7 +4,7 @@ use crate::{Address, Hash};
 
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct Transaction {
-    pub to: Address,
+    pub to: Option<Address>,
     pub nonce: String,
     pub quota: u64,
     pub valid_until_block: u64,
@@ -17,7 +17,10 @@ pub struct Transaction {
 impl Encodable for Transaction {
     /// Append a value to the stream
     fn rlp_append(&self, s: &mut RlpStream) {
-        s.append(&self.to);
+        match &self.to {
+            Some(ref data) => s.append(data),
+            None => s.append(&""),
+        };
         s.append(&self.nonce);
         s.append(&self.quota);
         s.append(&self.valid_until_block);

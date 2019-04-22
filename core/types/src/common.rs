@@ -3,6 +3,7 @@ use std::fmt;
 use numext_fixed_hash::H160;
 use numext_fixed_uint::U256;
 use rlp::{Encodable, RlpStream};
+use serde::{Serialize, Serializer};
 use sha3::{Digest, Sha3_256};
 
 use crate::errors::TypesError;
@@ -131,5 +132,14 @@ impl Encodable for Hash {
     /// Append a value to the stream
     fn rlp_append(&self, s: &mut RlpStream) {
         s.append(&self.0.as_bytes());
+    }
+}
+
+impl Serialize for Hash {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&self.as_hex())
     }
 }

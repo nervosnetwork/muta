@@ -3,8 +3,13 @@
 use std::error;
 use std::fmt;
 
+use hex;
 use serde_derive::{Deserialize, Serialize};
 use serde_json::Value;
+
+use core_types::errors::TypesError;
+
+use crate::error::RpcError;
 
 pub static JSONRPC_VERSION: &str = "2.0";
 
@@ -52,11 +57,6 @@ impl ErrorData {
             _ => panic!("Undefined pre-defined error codes"),
         }
     }
-
-    /// Prints out the value as JSON string.
-    pub fn dump(&self) -> String {
-        serde_json::to_string(self).expect("Should never failed")
-    }
 }
 
 impl error::Error for ErrorData {}
@@ -79,19 +79,12 @@ pub struct Request {
 
     /// A Structured value that holds the parameter values to be used during the invocation of the method. This member
     /// MAY be omitted.
-    pub params: Vec<Value>,
+    pub params: Option<Vec<Value>>,
 
     /// An identifier established by the Client that MUST contain a String, Number, or NULL value if included. If it is
     /// not included it is assumed to be a notification. The value SHOULD normally not be Null [1] and Numbers SHOULD
     /// NOT contain fractional parts.
     pub id: Value,
-}
-
-impl Request {
-    /// Prints out the value as JSON string.
-    pub fn dump(&self) -> String {
-        serde_json::to_string(self).expect("Should never failed")
-    }
 }
 
 /// When a rpc call is made, the Server MUST reply with a Response, except for in the case of Notifications. The
@@ -118,13 +111,6 @@ pub struct Response {
     pub id: Value,
 }
 
-impl Response {
-    /// Prints out the value as JSON string.
-    pub fn dump(&self) -> String {
-        serde_json::to_string(self).expect("Should never failed")
-    }
-}
-
 impl Default for Response {
     fn default() -> Self {
         Self {
@@ -133,5 +119,36 @@ impl Default for Response {
             error: None,
             id: Value::Null,
         }
+    }
+}
+
+impl From<RpcError> for ErrorData {
+    fn from(err: RpcError) -> Self {
+        ErrorData::new(500, &format!("{:?}", err))
+    }
+}
+
+impl From<hex::FromHexError> for ErrorData {
+    fn from(err: hex::FromHexError) -> Self {
+        ErrorData::new(500, &format!("{:?}", err))
+    }
+}
+
+impl From<TypesError> for ErrorData {
+    fn from(err: TypesError) -> Self {
+        ErrorData::new(500, &format!("{:?}", err))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json;
+
+    #[test]
+    fn test_parse() {
+        let data = r#"{"id":1,"jsonrpc":"2.0","method":"blockNumber"}"#;
+        let v: Request = serde_json::from_str(data).unwrap();
+        assert_eq!(v.method.as_str(), "blockNumber");
     }
 }
