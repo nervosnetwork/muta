@@ -11,11 +11,14 @@ core-types = { path = "../types" }
 core-crypto = { path = "../crypto" }
 core-merkle = { path = "../merkle" }
 core-context = { path = "../context" }
+core-serialization = { path = "../serialization" }
+core-pubsub = { path = "../pubsub" }
 
 log = "0.4"
 tokio = "0.1"
 old_futures = { package = "futures", version = "0.1" }
 futures-preview = { version = "0.3.0-alpha.14", features = [ "compat" ] }
+bft-rs = { git = "https://github.com/cryptape/bft-rs.git", features = [ "verify_req" ], branch = "v0.3" }
 
 [dev-dependencies]
 hex = "0.3"

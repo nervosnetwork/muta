@@ -147,6 +147,8 @@ impl From<NoneError> for CodecError {
 //  - [block.rs] BlockHeader
 //  - [block.rs] Block
 //  - [block.rs] Proposal
+//  - [block.rs] Proof
+//  - [block.rs] Vote
 //  - [receipt.rs] LogEntry
 //  - [receipt.rs] Receipt
 //  - [transaction.rs] Transaction
@@ -183,11 +185,7 @@ impl From<core_types::BlockHeader> for BlockHeader {
             logs_bloom: header.logs_bloom.as_bytes().to_vec(),
             quota_used: header.quota_used,
             quota_limit: header.quota_limit,
-            votes: header
-                .votes
-                .into_iter()
-                .map(|v| v.as_bytes().to_vec())
-                .collect(),
+            proof: Some(header.proof.into()),
             proposer: header.proposer.as_bytes().to_vec(),
         }
     }
@@ -197,12 +195,6 @@ impl TryInto<core_types::BlockHeader> for BlockHeader {
     type Error = CodecError;
 
     fn try_into(self) -> Result<core_types::BlockHeader, Self::Error> {
-        let votes = self
-            .votes
-            .into_iter()
-            .map(|v| Hash::from_bytes(&v))
-            .collect::<Result<Vec<core_types::Hash>, TypesError>>()?;
-
         Ok(core_types::BlockHeader {
             prevhash: Hash::from_bytes(&self.prevhash)?,
             timestamp: self.timestamp,
@@ -213,8 +205,8 @@ impl TryInto<core_types::BlockHeader> for BlockHeader {
             logs_bloom: Bloom::from_slice(&self.logs_bloom),
             quota_used: self.quota_used,
             quota_limit: self.quota_limit,
+            proof: self.proof?.try_into()?,
             proposer: Address::from_bytes(&self.proposer)?,
-            votes,
         })
     }
 }
@@ -266,6 +258,7 @@ impl From<core_types::Proposal> for Proposal {
                 .into_iter()
                 .map(|h| h.as_bytes().to_vec())
                 .collect(),
+            proof: Some(proposal.proof.into()),
         }
     }
 }
@@ -279,6 +272,7 @@ impl TryInto<core_types::Proposal> for Proposal {
             .into_iter()
             .map(|h| Hash::from_bytes(&h))
             .collect::<Result<Vec<Hash>, TypesError>>()?;
+        let proof = self.proof.ok_or(NoneError)?.try_into()?;
 
         Ok(core_types::Proposal {
             prevhash: Hash::from_bytes(&self.prevhash)?,
@@ -287,6 +281,59 @@ impl TryInto<core_types::Proposal> for Proposal {
             quota_limit: self.quota_limit,
             proposer: Address::from_bytes(&self.proposer)?,
             tx_hashes,
+            proof,
+        })
+    }
+}
+
+impl From<core_types::Proof> for Proof {
+    fn from(proof: core_types::Proof) -> Self {
+        let commits: Vec<Vote> = proof.commits.into_iter().map(Into::into).collect();
+
+        Self {
+            height: proof.height,
+            round: proof.round,
+            proposal_hash: proof.proposal_hash.as_bytes().to_vec(),
+            commits,
+        }
+    }
+}
+
+impl TryInto<core_types::Proof> for Proof {
+    type Error = CodecError;
+
+    fn try_into(self) -> Result<core_types::Proof, Self::Error> {
+        let commits = self
+            .commits
+            .into_iter()
+            .map(TryInto::try_into)
+            .collect::<Result<Vec<core_types::Vote>, CodecError>>()?;
+
+        Ok(core_types::Proof {
+            height: self.height,
+            round: self.round,
+            proposal_hash: Hash::from_bytes(&self.proposal_hash)?,
+            commits,
+        })
+    }
+}
+
+impl From<core_types::Vote> for Vote {
+    fn from(vote: core_types::Vote) -> Self {
+        Self {
+            address: vote.address.as_bytes().to_vec(),
+            signature: vote.signature,
+        }
+    }
+}
+
+impl TryInto<core_types::Vote> for Vote {
+    type Error = CodecError;
+
+    fn try_into(self) -> Result<core_types::Vote, Self::Error> {
+        Ok(core_types::Vote {
+            address: Address::from_bytes(&self.address)?,
+            signature: self.signature,
         })
     }
 }

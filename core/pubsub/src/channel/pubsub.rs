@@ -42,7 +42,7 @@ impl BroadcastEvent for PubEvent {
 }
 
 /// PubSub channel Sender
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Sender<TMessage>
 where
     TMessage: Any + Send,

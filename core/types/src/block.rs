@@ -13,7 +13,7 @@ pub struct BlockHeader {
     pub logs_bloom: Bloom,
     pub quota_used: u64,
     pub quota_limit: u64,
-    pub votes: Vec<Hash>,
+    pub proof: Proof,
     pub proposer: Address,
 }
 
@@ -38,7 +38,7 @@ impl Encodable for BlockHeader {
         s.append(&self.logs_bloom.as_ref());
         s.append(&self.quota_used);
         s.append(&self.quota_limit);
-        s.append_list(&self.votes);
+        s.append(&self.proof);
         s.append(&self.proposer);
     }
 }
@@ -59,4 +59,39 @@ pub struct Proposal {
     pub quota_limit: u64,
     pub proposer: Address,
     pub tx_hashes: Vec<Hash>,
+    pub proof: Proof,
+}
+
+#[derive(Default, Debug, Clone)]
+pub struct Proof {
+    pub height: u64,
+    pub round: u64,
+    pub proposal_hash: Hash,
+    pub commits: Vec<Vote>,
+}
+
+/// Structure encodable to RLP
+impl Encodable for Proof {
+    /// Append a value to the stream
+    fn rlp_append(&self, s: &mut RlpStream) {
+        s.append(&self.height);
+        s.append(&self.round);
+        s.append(&self.proposal_hash);
+        s.append_list(&self.commits);
+    }
+}
+
+#[derive(Default, Debug, Clone)]
+pub struct Vote {
+    pub address: Address,
+    pub signature: Vec<u8>,
+}
+
+/// Structure encodable to RLP
+impl Encodable for Vote {
+    /// Append a value to the stream
+    fn rlp_append(&self, s: &mut RlpStream) {
+        s.append(&self.address);
+        s.append(&self.signature);
+    }
 }

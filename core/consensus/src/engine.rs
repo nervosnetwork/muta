@@ -1,7 +1,6 @@
 use std::collections::HashMap;
-use std::ops::Add;
 use std::sync::{Arc, RwLock};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use futures::{
     compat::Future01CompatExt,
@@ -14,13 +13,10 @@ use core_merkle::Merkle;
 use core_runtime::{ExecutionContext, ExecutionResult, Executor, TransactionPool};
 use core_storage::Storage;
 use core_types::{
-    Address, Block, BlockHeader, Hash, Proposal, SignedTransaction, TransactionPosition,
+    Address, Block, BlockHeader, Hash, Proof, Proposal, SignedTransaction, TransactionPosition,
 };
 
 use crate::{ConsensusError, ConsensusResult, ConsensusStatus};
-
-// TODO: This time should be equal to the consensus interval.
-const ALLOWED_BLOCK_TIME: Duration = Duration::from_millis(3000);
 
 /// The "Engine" contains the logic required for all consensus except voting.
 ///
@@ -32,9 +28,9 @@ const ALLOWED_BLOCK_TIME: Duration = Duration::from_millis(3000);
 /// If this node is not a "proposer".
 /// step:
 /// 1. Verify proposal from other nodes, call "verify_proposal".
-/// 2. Verify that the transactions in the proposal has a transaction pool for that node.
+/// 2. Verify that the transactions in the proposal has a transaction pool for that node, call "verify_transactions".
 /// If it does not exist, the transaction pool will actively pull the transactions from the proposed node.
-/// If the pull fails, the verification will fail, call "verify_transactions".
+/// If the pull fails, the verification will fail.
 /// 3. If the consensus condition is met, execute and submit the "Proposal", call "commit_block".
 #[derive(Debug)]
 pub struct Engine<E, T, S, C>
@@ -49,7 +45,7 @@ where
     storage: Arc<S>,
     crypto: Arc<C>,
 
-    address: Address,
+    privkey: C::PrivateKey,
     status: RwLock<ConsensusStatus>,
 }
 
@@ -68,19 +64,16 @@ where
 
         privkey: C::PrivateKey,
         status: ConsensusStatus,
-    ) -> ConsensusResult<Self> {
-        let pubkey = crypto.get_public_key(&privkey)?;
-        let address = crypto.pubkey_to_address(&pubkey);
-
-        Ok(Self {
+    ) -> Self {
+        Self {
             executor,
             tx_pool,
             storage,
             crypto,
 
-            address,
+            privkey,
             status: RwLock::new(status),
-        })
+        }
     }
 
     /// Package a new block.
@@ -91,38 +84,67 @@ where
             .package(ctx.clone(), status.tx_limit, status.quota_limit)
             .compat())?;
 
-        Ok(Proposal {
+        let proposal = Proposal {
             timestamp: time_now(),
             prevhash: status.block_hash.clone(),
             height: status.height + 1,
             quota_limit: status.quota_limit,
-            proposer: self.address.clone(),
+            proposer: status.node_address.clone(),
+            proof: status.proof,
             tx_hashes,
-        })
+        };
+        log::info!(target: "engine", "build proposal {:?}", proposal);
+        Ok(proposal)
+    }
+
+    // Verify signature of proposal.
+    pub(crate) fn verify_signature(
+        &self,
+        hash: &Hash,
+        signature: &C::Signature,
+    ) -> ConsensusResult<Address> {
+        let pubkey = self.crypto.verify_with_signature(&hash, &signature)?;
+        Ok(self.crypto.pubkey_to_address(&pubkey))
+    }
+
+    // Sign the proposal hash.
+    pub(crate) fn sign_with_hash(&self, hash: &Hash) -> ConsensusResult<C::Signature> {
+        let signature = self.crypto.sign(&hash, &self.privkey)?;
+        Ok(signature)
     }
 
     /// Verify proposal block
     pub(crate) fn verify_proposal(&self, _: Context, proposal: &Proposal) -> ConsensusResult<()> {
+        log::debug!("verify proposal {:?}", proposal);
+
         let status = self.get_status()?;
 
         // check height
         if proposal.height != status.height + 1 {
-            return Err(ConsensusError::InvalidHeight);
+            return Err(ConsensusError::InvalidProposal("invalid height".to_owned()));
         }
         // check timestamp
-        if !check_timestamp(proposal.timestamp, status.timestamp) {
-            return Err(ConsensusError::InvalidBlockTime);
+        if !check_timestamp(proposal.timestamp, status.timestamp, status.interval) {
+            // Ignore the first block after the genesis block.
+            if proposal.height != 1 {
+                return Err(ConsensusError::InvalidProposal(
+                    "invalid timestamp".to_owned(),
+                ));
+            }
         }
         // check quota limit
         if proposal.quota_limit != status.quota_limit {
-            return Err(ConsensusError::InvalidQuotaLimit);
+            return Err(ConsensusError::InvalidProposal(
+                "invalid quota limit".to_owned(),
+            ));
         }
         // check prevhash
         if proposal.prevhash != status.block_hash {
-            return Err(ConsensusError::InvalidPrevhash);
+            return Err(ConsensusError::InvalidProposal(
+                "invalid prevhash".to_owned(),
+            ));
         }
         Ok(())
-        // TODO: check proof
     }
 
     /// Verify proposal transactions
@@ -131,6 +153,7 @@ where
         ctx: Context,
         proposal: Proposal,
     ) -> ConsensusResult<()> {
+        log::debug!("verify transactions {:?}", proposal);
         await!(self
             .tx_pool
             .ensure(ctx.clone(), &proposal.tx_hashes)
@@ -143,12 +166,14 @@ where
     /// 1. Get the transactions contained in the block from the transaction pool.
     /// 2. Execute all transactions with "executor".
     /// 3. build block
-    /// 4. save
-    /// 5. update status
+    /// 4. save block
+    /// 5. flush transaction pool
+    /// 6. update status
     pub(crate) async fn commit_block(
         &self,
         ctx: Context,
         proposal: Proposal,
+        latest_proof: Proof,
     ) -> ConsensusResult<ConsensusStatus> {
         let status = self.get_status()?;
 
@@ -179,6 +204,11 @@ where
 
         let mut stream = FuturesUnordered::new();
         stream.push(self.storage.insert_block(ctx.clone(), block).compat());
+        stream.push(
+            self.storage
+                .update_latest_proof(ctx.clone(), latest_proof.clone())
+                .compat(),
+        );
         if !signed_txs.is_empty() {
             let tx_positions = build_tx_potsitions(&block_hash, &signed_txs);
 
@@ -201,8 +231,14 @@ where
 
         await!(stream.try_collect())?;
 
+        // flush transaction pool
+        await!(self
+            .tx_pool
+            .flush(ctx.clone(), &proposal.tx_hashes)
+            .compat())?;
+
         // update status
-        let updated_status = self.update_status(&cloned_header, &block_hash)?;
+        let updated_status = self.update_status(&cloned_header, &block_hash, &latest_proof)?;
         log::info!("block committed, status = {:?}", updated_status);
 
         Ok(updated_status)
@@ -222,6 +258,7 @@ where
         &self,
         header: &BlockHeader,
         block_hash: &Hash,
+        latest_proof: &Proof,
     ) -> ConsensusResult<ConsensusStatus> {
         let mut status = self
             .status
@@ -232,6 +269,7 @@ where
         status.timestamp = header.timestamp;
         status.block_hash = block_hash.clone();
         status.state_root = header.state_root.clone();
+        status.proof = latest_proof.clone();
         Ok(status.clone())
     }
 }
@@ -268,7 +306,7 @@ fn build_block(proposal: &Proposal, execution_result: &ExecutionResult) -> Block
             .iter()
             .fold(0, |acc, r| acc + r.quota_used),
         proposer: proposal.proposer.clone(),
-        votes: vec![],
+        proof: proposal.proof.clone(),
     };
     let hash = header.hash();
     Block {
@@ -278,11 +316,11 @@ fn build_block(proposal: &Proposal, execution_result: &ExecutionResult) -> Block
     }
 }
 
-fn check_timestamp(current_timestamp: u64, parent_timestamp: u64) -> bool {
-    if current_timestamp <= parent_timestamp {
+fn check_timestamp(current_timestamp: u64, parent_timestamp: u64, interval: u64) -> bool {
+    if current_timestamp < parent_timestamp {
         return false;
     }
-    Duration::from_secs(current_timestamp) > Duration::from_secs(time_now()).add(ALLOWED_BLOCK_TIME)
+    current_timestamp < (time_now() + interval)
 }
 
 fn time_now() -> u64 {

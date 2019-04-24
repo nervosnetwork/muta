@@ -4,9 +4,11 @@ use futures::{compat::Future01CompatExt, future::TryFutureExt};
 use tokio::timer::Delay;
 
 use core_context::Context;
-use core_crypto::Crypto;
+use core_crypto::{Crypto, CryptoTransform};
 use core_runtime::{Executor, TransactionPool};
+use core_serialization::{AsyncCodec, Proposal as SerProposal};
 use core_storage::Storage;
+use core_types::{Hash, Proof, Vote};
 
 use crate::engine::Engine;
 use crate::{
@@ -37,12 +39,27 @@ where
 
     async fn boom(&self) -> ConsensusResult<()> {
         let ctx = Context::new();
-        let proposal_block = await!(self.engine.build_proposal(ctx.clone()))?;
-        self.engine.verify_proposal(ctx.clone(), &proposal_block)?;
+        let proposal = await!(self.engine.build_proposal(ctx.clone()))?;
+        let ser_proposal: SerProposal = proposal.clone().into();
+
+        let encoded = await!(AsyncCodec::encode(ser_proposal))?;
+        let proposal_hash = Hash::digest(&encoded);
+        let signature = self.engine.sign_with_hash(&proposal_hash)?;
+        let status = self.engine.get_status()?;
+
+        let latest_proof = Proof {
+            height: proposal.height,
+            round: 0,
+            proposal_hash: proposal_hash.clone(),
+            commits: vec![Vote {
+                address: status.node_address,
+                signature: signature.as_bytes().to_vec(),
+            }],
+        };
+
         await!(self
             .engine
-            .verify_transactions(ctx.clone(), proposal_block.clone()))?;
-        await!(self.engine.commit_block(ctx.clone(), proposal_block))?;
+            .commit_block(ctx.clone(), proposal, latest_proof))?;
         Ok(())
     }
 

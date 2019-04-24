@@ -14,14 +14,15 @@ use old_futures::future::Future as OldFuture;
 use core_context::Context;
 use core_runtime::{DataCategory, Database};
 use core_serialization::{
-    AsyncCodec, Block as SerBlock, Receipt as SerReceipt,
+    AsyncCodec, Block as SerBlock, Proof as SerProof, Receipt as SerReceipt,
     SignedTransaction as SerSignedTransaction, TransactionPosition as SerTransactionPosition,
 };
-use core_types::{Block, Hash, Receipt, SignedTransaction, TransactionPosition};
+use core_types::{Block, Hash, Proof, Receipt, SignedTransaction, TransactionPosition};
 
 use crate::errors::StorageError;
 
 const LATEST_BLOCK: &[u8] = b"latest-block";
+const LATEST_PROOF: &[u8] = b"latest-proof";
 
 pub type StorageResult<T> = Box<OldFuture<Item = T, Error = StorageError> + Send>;
 
@@ -71,6 +72,9 @@ pub trait Storage: Send + Sync {
         hashes: &[Hash],
     ) -> StorageResult<Vec<TransactionPosition>>;
 
+    // Get the latest proof.
+    fn get_latest_proof(&self, ctx: Context) -> StorageResult<Proof>;
+
     /// Insert a block.
     fn insert_block(&self, ctx: Context, block: Block) -> StorageResult<()>;
 
@@ -90,6 +94,9 @@ pub trait Storage: Send + Sync {
 
     /// Insert a batch of receipts.
     fn insert_receipts(&self, ctx: Context, receipts: Vec<Receipt>) -> StorageResult<()>;
+
+    // Update the latest proof.
+    fn update_latest_proof(&self, ctx: Context, proof: Proof) -> StorageResult<()>;
 }
 
 pub struct BlockStorage<DB>
@@ -271,6 +278,20 @@ where
         Box::new(fut.boxed().compat())
     }
 
+    fn get_latest_proof(&self, ctx: Context) -> StorageResult<Proof> {
+        let db = Arc::clone(&self.db);
+
+        let fut = async move {
+            let value = await!(db
+                .get(ctx, DataCategory::Block, &LATEST_PROOF.to_vec())
+                .compat())?;
+            let proof: Proof = await!(AsyncCodec::decode::<SerProof>(value?))?.try_into()?;
+            Ok(proof)
+        };
+
+        Box::new(fut.boxed().compat())
+    }
+
     fn insert_block(&self, ctx: Context, block: Block) -> StorageResult<()> {
         let db = Arc::clone(&self.db);
 
@@ -386,6 +407,20 @@ where
 
         Box::new(fut.boxed().compat())
     }
+
+    fn update_latest_proof(&self, ctx: Context, proof: Proof) -> StorageResult<()> {
+        let db = Arc::clone(&self.db);
+
+        let fut = async move {
+            let value = await!(AsyncCodec::encode::<SerProof>(proof.into()))?;
+            await!(db
+                .insert(ctx, DataCategory::Block, LATEST_PROOF.to_vec(), value)
+                .compat())?;
+            Ok(())
+        };
+
+        Box::new(fut.boxed().compat())
+    }
 }
 
 fn transfrom_u64_to_array_u8(n: u64) -> Vec<u8> {
@@ -414,7 +449,7 @@ mod tests {
     use components_database::memory::MemoryDB;
     use core_context::Context;
     use core_types::{
-        Block, Hash, Receipt, SignedTransaction, TransactionPosition, UnverifiedTransaction,
+        Block, Hash, Proof, Receipt, SignedTransaction, TransactionPosition, UnverifiedTransaction,
     };
 
     #[test]
@@ -632,6 +667,29 @@ mod tests {
                 .height,
             height
         );
+    }
+
+    #[test]
+    fn test_insert_proof() {
+        let ctx = Context::new();
+        let db = Arc::new(MemoryDB::new());
+        let storage = BlockStorage::new(db);
+
+        storage
+            .update_latest_proof(
+                ctx.clone(),
+                Proof {
+                    height: 10,
+                    round: 10,
+                    ..Default::default()
+                },
+            )
+            .wait()
+            .unwrap();
+
+        let proof = storage.get_latest_proof(ctx.clone()).wait().unwrap();
+        assert_eq!(proof.height, 10);
+        assert_eq!(proof.round, 10);
     }
 
     fn mock_block(height: u64) -> Block {

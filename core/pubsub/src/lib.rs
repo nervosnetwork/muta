@@ -95,6 +95,11 @@
 #![feature(async_await, await_macro, futures_api)]
 #![deny(missing_docs, missing_debug_implementations)]
 
+/// broadcast proposal
+pub const PUBSUB_BROADCAST_PROPOSAL: &str = "broadcast_proposal";
+/// broadcast vote
+pub const PUBSUB_BROADCAST_VOTE: &str = "broadcast_vote";
+
 /// PubSub builder
 pub mod builder;
 /// Message channel

@@ -3,27 +3,30 @@
 #![allow(clippy::needless_lifetimes)]
 #![feature(async_await, await_macro, futures_api, try_trait)]
 
+mod bft;
 mod engine;
 mod errors;
-mod solo;
+// mod solo;
 
+pub use bft::Bft;
 pub use engine::Engine;
 pub use errors::ConsensusError;
-pub use solo::Solo;
+// pub use solo::Solo;
 
 use old_futures::future::Future as OldFuture;
 
 use core_context::Context;
-use core_types::{Address, Hash};
+use core_types::{Address, Hash, Proof};
 
-#[derive(Debug)]
-pub enum ConsensusMode {
-    // Single node.
-    Solo,
-    // +2/3 byzantine consensus algorithm.
-    BFT,
-}
+// #[derive(Debug, Deserialize)]
+// pub enum ConsensusMode {
+//     // Single node.
+//     Solo,
+//     // +2/3 byzantine consensus algorithm.
+//     BFT,
+// }
 
+/// The necessary state to complete the consensus will be updated with each block.
 #[derive(Clone, Debug)]
 pub struct ConsensusStatus {
     pub height: u64,
@@ -32,14 +35,19 @@ pub struct ConsensusStatus {
     pub tx_limit: u64,
     pub block_hash: Hash,
     pub state_root: Hash,
+    pub node_address: Address,
     pub verifier_list: Vec<Address>,
+    pub proof: Proof,
+    pub interval: u64,
 }
 
 pub type ConsensusResult<T> = Result<T, ConsensusError>;
 
 pub type FutConsensusResult<T> = Box<OldFuture<Item = T, Error = ConsensusError> + Send>;
 
+/// The proposal from p2p, serialization and deserialization are all handled in bft-rs.
 pub type PorposalMessage = Vec<u8>;
+// The vote from p2p, serialization and deserialization are all handled in bft-rs.
 pub type VoteMessage = Vec<u8>;
 
 pub trait Consensus: Send + Sync {

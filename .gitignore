@@ -17,3 +17,4 @@ __pycache__/
 rocksdb*
 # bft
 file_wal
+bft_wal

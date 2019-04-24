@@ -47,6 +47,7 @@ impl Address {
     }
 
     pub fn from_hex(input: &str) -> Result<Self, TypesError> {
+        let input = clean_0x(input);
         Ok(Address(H160::from_hex_str(input)?))
     }
 
@@ -101,6 +102,7 @@ impl Hash {
     }
 
     pub fn from_hex(input: &str) -> Result<Self, TypesError> {
+        let input = clean_0x(input);
         Ok(Hash(H256::from_hex_str(input)?))
     }
 
@@ -141,5 +143,13 @@ impl Serialize for Hash {
         S: Serializer,
     {
         serializer.serialize_str(&self.as_hex())
+    }
+}
+
+pub fn clean_0x(s: &str) -> &str {
+    if s.starts_with("0x") {
+        &s[2..]
+    } else {
+        s
     }
 }

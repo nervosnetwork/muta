@@ -14,9 +14,9 @@ pub trait CryptoTransform: Sized {
 pub type CryptoResult<T> = Result<T, CryptoError>;
 
 pub trait Crypto: Send + Sync {
-    type PrivateKey: CryptoTransform + Clone + Send;
-    type PublicKey: CryptoTransform + Clone + Send;
-    type Signature: CryptoTransform + Clone + Send;
+    type PrivateKey: CryptoTransform + Clone + Send + Sync;
+    type PublicKey: CryptoTransform + Clone + Send + Sync;
+    type Signature: CryptoTransform + Clone + Send + Sync;
 
     fn get_public_key(&self, privkey: &Self::PrivateKey) -> CryptoResult<Self::PublicKey>;
 

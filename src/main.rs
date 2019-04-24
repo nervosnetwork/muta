@@ -6,10 +6,8 @@ use std::fs::File;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::thread;
 
-use futures::prelude::{FutureExt, TryFutureExt};
-use futures01::future::{ok, Future as Future01};
+use futures01::future::Future as Future01;
 use serde_derive::Deserialize;
 
 use components_database::rocks::RocksDB;
@@ -17,14 +15,15 @@ use components_executor::evm::{EVMBlockDataProvider, EVMExecutor};
 use components_executor::TrieDB;
 use components_jsonrpc;
 use components_transaction_pool::HashTransactionPool;
-use core_consensus::{ConsensusStatus, Engine, Solo};
+use core_consensus::{Bft, ConsensusStatus, Engine};
 use core_context::Context;
 use core_crypto::{
     secp256k1::{PrivateKey, Secp256k1},
-    CryptoTransform,
+    Crypto, CryptoTransform,
 };
+use core_pubsub::PubSub;
 use core_storage::{BlockStorage, Storage};
-use core_types::{Block, BlockHeader, Genesis, Hash};
+use core_types::{Address, Block, BlockHeader, Genesis, Hash, Proof};
 use logger;
 
 #[derive(Debug, Deserialize)]
@@ -45,9 +44,10 @@ struct Config {
     quota_limit: u64,
 
     // consensus
-    consensus_mode: String,
     consensus_tx_limit: u64,
     consensus_interval: u64,
+    consensus_verifier_list: Vec<String>,
+    consensus_wal_path: String,
 }
 
 impl Config {
@@ -113,7 +113,7 @@ fn start(cfg: &Config) {
     let trie_db = TrieDB::new(Arc::clone(&state_db));
 
     // new executor
-    let block = storage.get_latest_block(ctx).wait().unwrap();
+    let block = storage.get_latest_block(ctx.clone()).wait().unwrap();
     let executor = Arc::new(
         EVMExecutor::from_existing(
             trie_db,
@@ -145,15 +145,19 @@ fn start(cfg: &Config) {
         Arc::clone(&tx_pool),
         Arc::clone(&storage),
     );
-    thread::spawn(move || {
-        if let Err(e) = components_jsonrpc::listen(jrpc_config, jrpc_state) {
-            log::error!("Failed to start jrpc server: {}", e);
-        };
-    });
 
     // new consensus
     let privkey = PrivateKey::from_bytes(&hex::decode(cfg.privkey.clone()).unwrap()).unwrap();
 
+    let pubkey = secp.get_public_key(&privkey).unwrap();
+    let node_address = secp.pubkey_to_address(&pubkey);
+
+    let mut verifier_list = Vec::with_capacity(cfg.consensus_verifier_list.len());
+    for address in cfg.consensus_verifier_list.iter() {
+        verifier_list.push(Address::from_hex(address).unwrap());
+    }
+
+    let proof = storage.get_latest_proof(ctx.clone()).wait().unwrap();
     let status = ConsensusStatus {
         height: block.header.height,
         timestamp: block.header.timestamp,
@@ -161,7 +165,10 @@ fn start(cfg: &Config) {
         state_root: block.header.state_root.clone(),
         tx_limit: cfg.consensus_tx_limit,
         quota_limit: cfg.quota_limit,
-        verifier_list: vec![],
+        interval: cfg.consensus_interval,
+        proof,
+        node_address,
+        verifier_list,
     };
 
     let engine = Engine::new(
@@ -171,20 +178,15 @@ fn start(cfg: &Config) {
         Arc::clone(&secp),
         privkey.clone(),
         status,
-    )
-    .unwrap();
-    let consensus_solo = Arc::new(Solo::new(engine, cfg.consensus_interval).unwrap());
+    );
 
-    // start consensus
-    tokio::run(ok(()).and_then(move |_| {
-        let fut = async move {
-            await!(consensus_solo.start().map_err(|e| {
-                log::error!("{:?}", e);
-            }))?;
-            Ok(())
-        };
-        Box::new(fut.boxed().compat())
-    }));
+    // start consensus.
+    let pubsub = PubSub::builder().build().start();
+    let _bft = Bft::new(engine, pubsub.register(), &cfg.consensus_wal_path).unwrap();
+
+    if let Err(e) = components_jsonrpc::listen(jrpc_config, jrpc_state) {
+        log::error!("Failed to start jrpc server: {}", e);
+    };
 }
 
 fn handle_init(cfg: &Config, genesis_path: impl AsRef<Path>) -> Result<(), Box<dyn Error>> {
@@ -224,8 +226,22 @@ fn handle_init(cfg: &Config, genesis_path: impl AsRef<Path>) -> Result<(), Box<d
     block_header.state_root = state_root_hash;
     block_header.quota_limit = cfg.quota_limit;
     let mut block = Block::default();
+    block.hash = block_header.hash();
     block.header = block_header;
-    block_db.insert_block(ctx, block).wait()?;
+    log::info!("init state {:?}", block);
+    block_db.insert_block(ctx.clone(), block).wait()?;
+
+    // init proof
+    block_db
+        .update_latest_proof(
+            ctx.clone(),
+            Proof {
+                height: 0,
+                round: 0,
+                ..Default::default()
+            },
+        )
+        .wait()?;
 
     Ok(())
 }

@@ -20,6 +20,7 @@ core-storage = { path = "core/storage" }
 core-types = { path = "core/types" }
 core-consensus = { path = "core/consensus" }
 core-context = { path = "core/context" }
+core-pubsub = { path = "core/pubsub" }
 
 hex = "0.3"
 tokio = "0.1"

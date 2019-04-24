@@ -7,7 +7,7 @@ pub mod transaction;
 
 pub use ethbloom::{Bloom, BloomRef, Input as BloomInput};
 
-pub use block::{Block, BlockHeader, Proposal};
+pub use block::{Block, BlockHeader, Proof, Proposal, Vote};
 pub use common::{Address, Balance, Hash, H256};
 pub use errors::TypesError;
 pub use genesis::{Genesis, StateAlloc};
