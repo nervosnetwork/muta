@@ -24,7 +24,7 @@ use crate::channel::broadcast::{self as broadcast, Event, Message};
 pub enum Action {
     NewPub {
         topic: String,
-        rx: mpsc::Receiver<Event>,
+        rx:    mpsc::Receiver<Event>,
     },
 
     RemovePub {
@@ -33,13 +33,13 @@ pub enum Action {
 
     NewSub {
         topic: String,
-        uuid: Uuid,
-        tx: mpsc::Sender<Message>,
+        uuid:  Uuid,
+        tx:    mpsc::Sender<Message>,
     },
 
     RemoveSub {
         topic: String,
-        uuid: Uuid,
+        uuid:  Uuid,
     },
 }
 
@@ -150,7 +150,7 @@ mod tests {
     #[derive(Debug)]
     struct TestEvent {
         topic: String,
-        msg: Message,
+        msg:   Message,
     }
 
     impl TestEvent {
@@ -176,9 +176,9 @@ mod tests {
     }
 
     struct Control {
-        act_tx: mpsc::Sender<Action>,
+        act_tx:      mpsc::Sender<Action>,
         shutdown_tx: oneshot::Sender<()>,
-        state_rx: StateRx,
+        state_rx:    StateRx,
 
         handle: JoinHandle<()>,
     }
@@ -203,7 +203,7 @@ mod tests {
 
             let new_pub = Action::NewPub {
                 topic: topic.clone(),
-                rx: pub_rx,
+                rx:    pub_rx,
             };
             let new_sub = Action::NewSub {
                 topic: topic.clone(),
@@ -322,7 +322,7 @@ mod tests {
 
         let rm_sub = Action::RemoveSub {
             topic: topic.to_owned(),
-            uuid: sub_uuid,
+            uuid:  sub_uuid,
         };
 
         ctrl.act_tx.try_send(rm_sub).unwrap();

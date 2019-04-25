@@ -31,7 +31,7 @@ impl Default for Config {
                 private_key: None,
 
                 bootstrap_addresses: vec![],
-                listening_address: None,
+                listening_address:   None,
             },
         }
     }

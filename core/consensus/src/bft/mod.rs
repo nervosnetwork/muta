@@ -26,7 +26,7 @@ where
     C: Crypto + 'static,
 {
     bft_actuator: Arc<BftActuator>,
-    support: Arc<Support<E, T, S, C>>,
+    support:      Arc<Support<E, T, S, C>>,
 }
 
 impl<E, T, S, C> Bft<E, T, S, C>
@@ -52,8 +52,8 @@ where
         );
 
         bft_actuator.send(BftMsg::Status(BftStatus {
-            height: status.height,
-            interval: Some(status.interval),
+            height:         status.height,
+            interval:       Some(status.interval),
             authority_list: status
                 .verifier_list
                 .iter()
@@ -114,7 +114,7 @@ where
     fn clone(&self) -> Self {
         Self {
             bft_actuator: Arc::clone(&self.bft_actuator),
-            support: Arc::clone(&self.support),
+            support:      Arc::clone(&self.support),
         }
     }
 }

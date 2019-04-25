@@ -7,7 +7,7 @@ use runtime::task::{spawn, JoinHandle};
 pub type Task = Box<dyn Future<Item = (), Error = ()> + Send + 'static>;
 
 pub struct ServiceWorker {
-    shutdown_tx: Sender<()>,
+    shutdown_tx:   Sender<()>,
     thread_handle: JoinHandle<Result<(), ()>>,
 }
 

@@ -87,7 +87,8 @@ impl<DB: 'static> Executor for EVMExecutor<DB>
 where
     DB: TrieDB,
 {
-    /// Execute the transactions and then return the receipts, this function will modify the "state of the world".
+    /// Execute the transactions and then return the receipts, this function
+    /// will modify the "state of the world".
     fn exec(
         &self,
         _: Context,
@@ -163,14 +164,14 @@ where
                     InterpreterResult::Create(data, _, _, _) => data,
                 };
                 Ok(ReadonlyResult {
-                    data: Some(data),
+                    data:  Some(data),
                     error: None,
                 })
             }
             Err(e) => {
                 log::error!(target: "evm readonly", "{}", e);
                 Ok(ReadonlyResult {
-                    data: None,
+                    data:  None,
                     error: Some(e.to_string()),
                 })
             }
@@ -312,8 +313,8 @@ where
 fn build_evm_context(ctx: &ExecutionContext) -> EVMContext {
     EVMContext {
         gas_limit: ctx.quota_limit,
-        coinbase: H160::from(ctx.proposer.clone().into_fixed_bytes()),
-        number: U256::from(ctx.height),
+        coinbase:  H160::from(ctx.proposer.clone().into_fixed_bytes()),
+        number:    U256::from(ctx.height),
         timestamp: ctx.timestamp,
 
         // The cita-bft consensus does not have difficulty ​​like POW, so set 0
@@ -350,13 +351,13 @@ fn build_evm_transaction(signed_tx: &SignedTransaction, nonce: U256) -> EVMTrans
 
 fn build_evm_transaction_of_readonly(to: &Address, from: &Address, data: &[u8]) -> EVMTransaction {
     EVMTransaction {
-        to: Some(H160::from(to.clone().into_fixed_bytes())),
-        from: H160::from(from.clone().into_fixed_bytes()),
-        value: U256::zero(),
+        to:        Some(H160::from(to.clone().into_fixed_bytes())),
+        from:      H160::from(from.clone().into_fixed_bytes()),
+        value:     U256::zero(),
         gas_limit: std::u64::MAX,
         gas_price: U256::from(1),
-        input: data.to_vec(),
-        nonce: U256::zero(),
+        input:     data.to_vec(),
+        nonce:     U256::zero(),
     }
 }
 
@@ -561,20 +562,20 @@ mod tests {
         tx.data = bin;
 
         let signed_tx = SignedTransaction {
-            hash: Hash::digest(b"test1"),
+            hash:   Hash::digest(b"test1"),
             sender: address,
-            untx: UnverifiedTransaction {
-                signature: vec![],
+            untx:   UnverifiedTransaction {
+                signature:   vec![],
                 transaction: tx,
             },
         };
 
         let execution_ctx = ExecutionContext {
-            state_root: state_root.clone(),
-            proposer: header.proposer.clone(),
-            height: header.height,
+            state_root:  state_root.clone(),
+            proposer:    header.proposer.clone(),
+            height:      header.height,
             quota_limit: header.quota_limit,
-            timestamp: header.timestamp,
+            timestamp:   header.timestamp,
         };
         let exec_result = executor.exec(ctx, &execution_ctx, &[signed_tx]).unwrap();
         assert_ne!(exec_result.receipts[0].contract_address, None);
@@ -589,11 +590,11 @@ mod tests {
         storage: HashMap<String, String>,
     ) -> Genesis {
         Genesis {
-            timestamp: SystemTime::now()
+            timestamp:   SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .unwrap()
                 .as_secs(),
-            prevhash: "0000000000000000000000000000".to_owned(),
+            prevhash:    "0000000000000000000000000000".to_owned(),
             state_alloc: vec![StateAlloc {
                 code,
                 address,

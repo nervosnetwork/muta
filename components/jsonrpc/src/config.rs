@@ -14,9 +14,9 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            listen: String::from("127.0.0.1:8080"),
+            listen:       String::from("127.0.0.1:8080"),
             payload_size: 65536,
-            workers: 4,
+            workers:      4,
         }
     }
 }

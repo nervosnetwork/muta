@@ -5,7 +5,7 @@ use stringreader::StringReader;
 #[derive(Debug, Deserialize)]
 struct Config {
     global_string: Option<String>,
-    global_int: Option<u64>,
+    global_int:    Option<u64>,
 }
 
 #[test]

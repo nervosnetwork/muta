@@ -4,13 +4,13 @@ use crate::{Address, Hash};
 
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct Transaction {
-    pub to: Option<Address>,
-    pub nonce: String,
-    pub quota: u64,
+    pub to:                Option<Address>,
+    pub nonce:             String,
+    pub quota:             u64,
     pub valid_until_block: u64,
-    pub data: Vec<u8>,
-    pub value: Vec<u8>,
-    pub chain_id: Vec<u8>,
+    pub data:              Vec<u8>,
+    pub value:             Vec<u8>,
+    pub chain_id:          Vec<u8>,
 }
 
 /// Structure encodable to RLP
@@ -31,7 +31,8 @@ impl Encodable for Transaction {
 }
 
 impl Transaction {
-    /// Calculate the block hash. To maintain consistency we use RLP serialization.
+    /// Calculate the block hash. To maintain consistency we use RLP
+    /// serialization.
     pub fn hash(&self) -> Hash {
         let rlp_data = rlp::encode(self);
         Hash::digest(&rlp_data)
@@ -41,18 +42,18 @@ impl Transaction {
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct UnverifiedTransaction {
     pub transaction: Transaction,
-    pub signature: Vec<u8>,
+    pub signature:   Vec<u8>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct SignedTransaction {
-    pub untx: UnverifiedTransaction,
-    pub hash: Hash,
+    pub untx:   UnverifiedTransaction,
+    pub hash:   Hash,
     pub sender: Address,
 }
 
 #[derive(Default, Clone, Debug, PartialEq, Eq)]
 pub struct TransactionPosition {
     pub block_hash: Hash,
-    pub position: u32,
+    pub position:   u32,
 }

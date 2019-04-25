@@ -26,28 +26,31 @@ use core_types::{Address, Hash, Proof};
 //     BFT,
 // }
 
-/// The necessary state to complete the consensus will be updated with each block.
+/// The necessary state to complete the consensus will be updated with each
+/// block.
 #[derive(Clone, Debug)]
 pub struct ConsensusStatus {
-    pub height: u64,
-    pub timestamp: u64,
-    pub quota_limit: u64,
-    pub tx_limit: u64,
-    pub block_hash: Hash,
-    pub state_root: Hash,
-    pub node_address: Address,
+    pub height:        u64,
+    pub timestamp:     u64,
+    pub quota_limit:   u64,
+    pub tx_limit:      u64,
+    pub block_hash:    Hash,
+    pub state_root:    Hash,
+    pub node_address:  Address,
     pub verifier_list: Vec<Address>,
-    pub proof: Proof,
-    pub interval: u64,
+    pub proof:         Proof,
+    pub interval:      u64,
 }
 
 pub type ConsensusResult<T> = Result<T, ConsensusError>;
 
 pub type FutConsensusResult<T> = Box<OldFuture<Item = T, Error = ConsensusError> + Send>;
 
-/// The proposal from p2p, serialization and deserialization are all handled in bft-rs.
+/// The proposal from p2p, serialization and deserialization are all handled in
+/// bft-rs.
 pub type PorposalMessage = Vec<u8>;
-// The vote from p2p, serialization and deserialization are all handled in bft-rs.
+// The vote from p2p, serialization and deserialization are all handled in
+// bft-rs.
 pub type VoteMessage = Vec<u8>;
 
 pub trait Consensus: Send + Sync {

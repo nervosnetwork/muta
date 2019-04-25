@@ -39,7 +39,7 @@ impl PeerConnec {
 impl Default for PeerConnec {
     fn default() -> Self {
         PeerConnec {
-            addrs: Default::default(),
+            addrs:  Default::default(),
             status: ConnecStatus::Disconnect,
         }
     }
@@ -70,7 +70,7 @@ impl PeerInfo {
 }
 
 pub struct DefaultPeerManagerImpl {
-    peers: Arc<RwLock<HashMap<PeerId, PeerInfo>>>,
+    peers:   Arc<RwLock<HashMap<PeerId, PeerInfo>>>,
     connecs: Arc<RwLock<HashMap<PeerId, PeerConnec>>>,
 
     addr_peers: Arc<RwLock<HashMap<Multiaddr, PeerId>>>,
@@ -81,9 +81,9 @@ pub struct DefaultPeerManagerImpl {
 impl DefaultPeerManagerImpl {
     pub fn new() -> Self {
         DefaultPeerManagerImpl {
-            peers: Default::default(),
-            connecs: Default::default(),
-            addr_peers: Default::default(),
+            peers:         Default::default(),
+            connecs:       Default::default(),
+            addr_peers:    Default::default(),
             masquer_addrs: Default::default(),
         }
     }
@@ -98,9 +98,9 @@ impl Default for DefaultPeerManagerImpl {
 impl Clone for DefaultPeerManagerImpl {
     fn clone(&self) -> Self {
         DefaultPeerManagerImpl {
-            peers: Arc::clone(&self.peers),
-            connecs: Arc::clone(&self.connecs),
-            addr_peers: Arc::clone(&self.addr_peers),
+            peers:         Arc::clone(&self.peers),
+            connecs:       Arc::clone(&self.connecs),
+            addr_peers:    Arc::clone(&self.addr_peers),
             masquer_addrs: Arc::clone(&self.masquer_addrs),
         }
     }

@@ -16,7 +16,7 @@ use core_types::{Address, Hash};
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct TxResponse {
-    pub hash: Hash,
+    pub hash:   Hash,
     pub status: String,
 }
 
@@ -66,7 +66,7 @@ impl Into<core_types::UnverifiedTransaction> for UnverifiedTransaction {
     fn into(self) -> core_types::UnverifiedTransaction {
         core_types::UnverifiedTransaction {
             transaction: self.transaction.unwrap_or_default().into(),
-            signature: self.signature,
+            signature:   self.signature,
         }
     }
 }
@@ -80,16 +80,16 @@ pub enum Proof {
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct BftProof {
     pub proposal: Hash,
-    pub height: usize,
-    pub round: usize,
-    pub commits: HashMap<Address, String>,
+    pub height:   usize,
+    pub round:    usize,
+    pub commits:  HashMap<Address, String>,
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct FullTransaction {
-    pub hash: Hash,
+    pub hash:    Hash,
     pub content: Vec<u8>,
-    pub from: Address,
+    pub from:    Address,
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
@@ -137,9 +137,9 @@ pub struct BlockHeader {
 #[derive(Debug, Clone, Serialize)]
 pub struct Block {
     pub version: u32,
-    pub hash: Hash,
-    pub header: BlockHeader,
-    pub body: BlockBody,
+    pub hash:    Hash,
+    pub header:  BlockHeader,
+    pub body:    BlockBody,
 }
 
 #[derive(Debug, Serialize, Hash, Clone)]
@@ -492,9 +492,11 @@ where
     pub fn null() -> Self {
         VariadicValue::Null
     }
+
     pub fn single(data: T) -> Self {
         VariadicValue::Single(data)
     }
+
     pub fn multiple(data: Vec<T>) -> Self {
         VariadicValue::Multiple(data)
     }
@@ -590,7 +592,7 @@ pub struct MetaData {
 #[derive(Debug, Clone)]
 pub struct ProofNode<T> {
     pub is_right: bool,
-    pub hash: T,
+    pub hash:     T,
 }
 
 /// Structure encodable to RLP

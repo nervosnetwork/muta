@@ -29,7 +29,7 @@ pub enum Task {
 }
 
 pub struct Worker {
-    task: Task,
+    task:        Task,
     shutdown_tx: Sender<()>,
 }
 

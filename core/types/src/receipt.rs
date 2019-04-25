@@ -4,18 +4,19 @@ use crate::{Address, Bloom, Hash};
 
 #[derive(Default, Debug, Clone)]
 pub struct Receipt {
-    pub state_root: Hash,
+    pub state_root:       Hash,
     pub transaction_hash: Hash,
-    pub block_hash: Hash,
-    pub quota_used: u64,
-    pub logs_bloom: Bloom,
-    pub logs: Vec<LogEntry>,
-    pub receipt_error: String,
+    pub block_hash:       Hash,
+    pub quota_used:       u64,
+    pub logs_bloom:       Bloom,
+    pub logs:             Vec<LogEntry>,
+    pub receipt_error:    String,
     pub contract_address: Option<Address>,
 }
 
 impl Receipt {
-    /// Calculate the receipt hash. To maintain consistency we use RLP serialization.
+    /// Calculate the receipt hash. To maintain consistency we use RLP
+    /// serialization.
     pub fn hash(&self) -> Hash {
         let rlp_data = rlp::encode(self);
         Hash::digest(&rlp_data)
@@ -40,8 +41,8 @@ impl Encodable for Receipt {
 #[derive(Default, Debug, Clone)]
 pub struct LogEntry {
     pub address: Address,
-    pub topics: Vec<Hash>,
-    pub data: Vec<u8>,
+    pub topics:  Vec<Hash>,
+    pub data:    Vec<u8>,
 }
 
 /// Structure encodable to RLP

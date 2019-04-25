@@ -5,7 +5,7 @@ use core_types::{Hash, Receipt};
 #[derive(Debug, Clone)]
 pub struct ProofNode {
     pub is_right: bool,
-    pub hash: Hash,
+    pub hash:     Hash,
 }
 
 pub struct Merkle {
@@ -39,7 +39,7 @@ impl Merkle {
                     .into_iter()
                     .map(|node| ProofNode {
                         is_right: node.is_right,
-                        hash: node.hash.clone(),
+                        hash:     node.hash.clone(),
                     })
                     .collect()
             })

@@ -5,7 +5,8 @@ use core_context::Context;
 
 use crate::FutRuntimeResult;
 
-/// Specify the category of data stored, and users can store the data in a decentralized manner.
+/// Specify the category of data stored, and users can store the data in a
+/// decentralized manner.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DataCategory {
     // Block

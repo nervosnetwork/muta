@@ -17,9 +17,9 @@ pub type StateRx = mpsc::Receiver<State>;
 pub type State = (String, usize);
 
 pub struct HashMap<K, V> {
-    inner: StdHashMap<K, V>,
+    inner:        StdHashMap<K, V>,
     latest_entry: Option<K>,
-    state_tx: Option<StateTx>,
+    state_tx:     Option<StateTx>,
 }
 
 impl<K, V> HashMap<K, V>
@@ -29,17 +29,17 @@ where
 {
     pub fn new() -> Self {
         HashMap {
-            inner: Default::default(),
+            inner:        Default::default(),
             latest_entry: None,
-            state_tx: None,
+            state_tx:     None,
         }
     }
 
     pub fn with_state_tx(state_tx: StateTx) -> Self {
         HashMap {
-            inner: Default::default(),
+            inner:        Default::default(),
             latest_entry: None,
-            state_tx: Some(state_tx),
+            state_tx:     Some(state_tx),
         }
     }
 

@@ -18,13 +18,13 @@ use core_storage::{Storage, StorageError};
 use core_types::{Address, Hash, SignedTransaction, Transaction, UnverifiedTransaction};
 
 pub struct HashTransactionPool<S, C> {
-    pool_size: usize,
+    pool_size:         usize,
     until_block_limit: u64,
-    quota_limit: u64,
+    quota_limit:       u64,
 
     tx_cache: Arc<RwLock<HashMap<Hash, SignedTransaction>>>,
-    storage: Arc<S>,
-    crypto: Arc<C>,
+    storage:  Arc<S>,
+    crypto:   Arc<C>,
 }
 
 impl<S, C> HashTransactionPool<S, C>
@@ -217,7 +217,8 @@ where
     }
 
     /// TODO: Implement "ensure"
-    /// In the POC-1 phase, we only support single-node, so this function is not implemented.
+    /// In the POC-1 phase, we only support single-node, so this function is not
+    /// implemented.
     fn ensure(
         &self,
         _: Context,
@@ -504,7 +505,7 @@ mod tests {
         let signature = secp.sign(&tx_hash, &privkey).unwrap();
         UnverifiedTransaction {
             transaction: tx,
-            signature: signature.as_bytes().to_vec(),
+            signature:   signature.as_bytes().to_vec(),
         }
     }
 
@@ -535,12 +536,12 @@ mod tests {
         let signature = secp.sign(&tx_hash, &privkey).unwrap();
         let untx = UnverifiedTransaction {
             transaction: tx,
-            signature: signature.as_bytes().to_vec(),
+            signature:   signature.as_bytes().to_vec(),
         };
 
         SignedTransaction {
-            untx: untx.clone(),
-            hash: untx.transaction.hash(),
+            untx:   untx.clone(),
+            hash:   untx.transaction.hash(),
             sender: {
                 let hash = Hash::digest(&pubkey.as_bytes()[1..]);
                 Address::from_hash(&hash)

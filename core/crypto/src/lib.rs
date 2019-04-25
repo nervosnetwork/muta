@@ -4,7 +4,8 @@ use std::fmt;
 
 use core_types::{Address, Hash};
 
-/// "Transform" ensures that the types associated with "Crypto" can be converted to bytes and converted from bytes.
+/// "Transform" ensures that the types associated with "Crypto" can be converted
+/// to bytes and converted from bytes.
 pub trait CryptoTransform: Sized {
     fn from_bytes(data: &[u8]) -> Result<Self, CryptoError>;
 

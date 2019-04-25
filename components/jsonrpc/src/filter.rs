@@ -5,10 +5,10 @@ use crate::cita::{Filter as RpcFilter, VariadicValue};
 #[derive(Debug, Clone)]
 pub struct Filter {
     pub from_block: String,
-    pub to_block: String,
-    pub address: Option<Vec<Address>>,
-    pub topics: Vec<Option<Vec<Hash>>>,
-    pub limit: Option<usize>,
+    pub to_block:   String,
+    pub address:    Option<Vec<Address>>,
+    pub topics:     Vec<Option<Vec<Hash>>>,
+    pub limit:      Option<usize>,
 }
 
 impl Filter {
@@ -65,8 +65,8 @@ impl From<RpcFilter> for Filter {
     fn from(v: RpcFilter) -> Filter {
         Filter {
             from_block: v.from_block,
-            to_block: v.to_block,
-            address: v.address.and_then(|address| match address {
+            to_block:   v.to_block,
+            address:    v.address.and_then(|address| match address {
                 VariadicValue::Null => None,
                 VariadicValue::Single(a) => Some(vec![Address::from_bytes(
                     Into::<Vec<u8>>::into(a).as_slice(),
@@ -81,7 +81,7 @@ impl From<RpcFilter> for Filter {
                         .collect(),
                 ),
             }),
-            topics: {
+            topics:     {
                 let mut iter = v
                     .topics
                     .map_or_else(Vec::new, |topics| {
@@ -114,7 +114,7 @@ impl From<RpcFilter> for Filter {
                     iter.next().unwrap_or(None),
                 ]
             },
-            limit: v.limit,
+            limit:      v.limit,
         }
     }
 }
@@ -129,10 +129,10 @@ mod tests {
     fn test_bloom_possibilities_none() {
         let none_filter = Filter {
             from_block: String::from("latest"),
-            to_block: String::from("latest"),
-            address: None,
-            topics: vec![None, None, None, None],
-            limit: None,
+            to_block:   String::from("latest"),
+            address:    None,
+            topics:     vec![None, None, None, None],
+            limit:      None,
         };
 
         let possibilities = none_filter.bloom_possibilities();
@@ -145,12 +145,12 @@ mod tests {
     fn test_bloom_possibilities_single_address_and_topic() {
         let filter = Filter {
             from_block: String::from("latest"),
-            to_block: String::from("latest"),
-            address: Some(vec![Address::from_hex(
+            to_block:   String::from("latest"),
+            address:    Some(vec![Address::from_hex(
                 "b372018f3be9e171df0581136b59d2faf73a7d5d",
             )
             .unwrap()]),
-            topics: vec![
+            topics:     vec![
                 Some(vec![Hash::from_hex(
                     "ff74e91598aed6ae5d2fdcf8b24cd2c7be49a0808112a305069355b7160f23f9",
                 )
@@ -159,7 +159,7 @@ mod tests {
                 None,
                 None,
             ],
-            limit: None,
+            limit:      None,
         };
         let possibilities = filter.bloom_possibilities();
         let blooms: Vec<Bloom> = vec![Bloom::from_str(
@@ -180,12 +180,12 @@ mod tests {
     fn test_bloom_possibilities_single_address_and_many_topics() {
         let filter = Filter {
             from_block: String::from("latest"),
-            to_block: String::from("latest"),
-            address: Some(vec![Address::from_hex(
+            to_block:   String::from("latest"),
+            address:    Some(vec![Address::from_hex(
                 "b372018f3be9e171df0581136b59d2faf73a7d5d",
             )
             .unwrap()]),
-            topics: vec![
+            topics:     vec![
                 Some(vec![Hash::from_hex(
                     "ff74e91598aed6ae5d2fdcf8b24cd2c7be49a0808112a305069355b7160f23f9",
                 )
@@ -197,7 +197,7 @@ mod tests {
                 None,
                 None,
             ],
-            limit: None,
+            limit:      None,
         };
         let possibilities = filter.bloom_possibilities();
         let blooms: Vec<Bloom> = vec![Bloom::from_str(
@@ -218,12 +218,12 @@ mod tests {
     fn test_bloom_possibilites_multiple_addresses_and_topics() {
         let filter = Filter {
             from_block: String::from("latest"),
-            to_block: String::from("latest"),
-            address: Some(vec![
+            to_block:   String::from("latest"),
+            address:    Some(vec![
                 Address::from_hex("b372018f3be9e171df0581136b59d2faf73a7d5d").unwrap(),
                 Address::from_hex("b372018f3be9e171df0581136b59d2faf73a7d5d").unwrap(),
             ]),
-            topics: vec![
+            topics:     vec![
                 Some(vec![
                     Hash::from_hex(
                         "ff74e91598aed6ae5d2fdcf8b24cd2c7be49a0808112a305069355b7160f23f9",
@@ -250,7 +250,7 @@ mod tests {
                 .unwrap()]),
                 None,
             ],
-            limit: None,
+            limit:      None,
         };
 
         // number of possibilites should be equal 2 * 2 * 2 * 1 = 8
@@ -352,12 +352,12 @@ mod tests {
     fn test_filter_matches() {
         let filter = Filter {
             from_block: String::from("latest"),
-            to_block: String::from("latest"),
-            address: Some(vec![Address::from_hex(
+            to_block:   String::from("latest"),
+            address:    Some(vec![Address::from_hex(
                 "b372018f3be9e171df0581136b59d2faf73a7d5d",
             )
             .unwrap()]),
-            topics: vec![
+            topics:     vec![
                 Some(vec![Hash::from_hex(
                     "ff74e91598aed6ae5d2fdcf8b24cd2c7be49a0808112a305069355b7160f23f9",
                 )
@@ -369,12 +369,12 @@ mod tests {
                 None,
                 None,
             ],
-            limit: None,
+            limit:      None,
         };
 
         let entry0 = LogEntry {
             address: Address::from_hex("b372018f3be9e171df0581136b59d2faf73a7d5d").unwrap(),
-            topics: vec![
+            topics:  vec![
                 Hash::from_hex("ff74e91598aed6ae5d2fdcf8b24cd2c7be49a0808112a305069355b7160f23f9")
                     .unwrap(),
                 Hash::from_hex("ff74e91598aed6ae5d2fdcf8b24cd2c7be49a0808112a305069355b7160f23fa")
@@ -382,12 +382,12 @@ mod tests {
                 Hash::from_hex("ff74e91598aed6ae5d2fdcf8b24cd2c7be49a0808112a305069355b7160f23f9")
                     .unwrap(),
             ],
-            data: vec![],
+            data:    vec![],
         };
 
         let entry1 = LogEntry {
             address: Address::from_hex("b372018f3be9e171df0581136b59d2faf73a7d5e").unwrap(),
-            topics: vec![
+            topics:  vec![
                 Hash::from_hex("ff74e91598aed6ae5d2fdcf8b24cd2c7be49a0808112a305069355b7160f23f9")
                     .unwrap(),
                 Hash::from_hex("ff74e91598aed6ae5d2fdcf8b24cd2c7be49a0808112a305069355b7160f23fa")
@@ -395,16 +395,16 @@ mod tests {
                 Hash::from_hex("ff74e91598aed6ae5d2fdcf8b24cd2c7be49a0808112a305069355b7160f23f9")
                     .unwrap(),
             ],
-            data: vec![],
+            data:    vec![],
         };
 
         let entry2 = LogEntry {
             address: Address::from_hex("b372018f3be9e171df0581136b59d2faf73a7d5d").unwrap(),
-            topics: vec![Hash::from_hex(
+            topics:  vec![Hash::from_hex(
                 "ff74e91598aed6ae5d2fdcf8b24cd2c7be49a0808112a305069355b7160f23f9",
             )
             .unwrap()],
-            data: vec![],
+            data:    vec![],
         };
 
         assert_eq!(filter.matches(&entry0), true);

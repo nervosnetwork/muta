@@ -24,7 +24,7 @@ pub trait BroadcastEvent: Debug {
 #[derive(Clone)]
 pub struct Sender {
     uuid: Uuid,
-    tx: mpsc::Sender<Message>,
+    tx:   mpsc::Sender<Message>,
 }
 
 impl Sender {

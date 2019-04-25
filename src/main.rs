@@ -28,7 +28,7 @@ use logger;
 
 #[derive(Debug, Deserialize)]
 struct Config {
-    //crypto
+    // crypto
     privkey: String,
 
     // rpc_address
@@ -39,15 +39,15 @@ struct Config {
     data_path: PathBuf,
 
     // transaction pool
-    pool_size: u64,
+    pool_size:         u64,
     until_block_limit: u64,
-    quota_limit: u64,
+    quota_limit:       u64,
 
     // consensus
-    consensus_tx_limit: u64,
-    consensus_interval: u64,
+    consensus_tx_limit:      u64,
+    consensus_interval:      u64,
     consensus_verifier_list: Vec<String>,
-    consensus_wal_path: String,
+    consensus_wal_path:      String,
 }
 
 impl Config {
@@ -233,14 +233,11 @@ fn handle_init(cfg: &Config, genesis_path: impl AsRef<Path>) -> Result<(), Box<d
 
     // init proof
     block_db
-        .update_latest_proof(
-            ctx.clone(),
-            Proof {
-                height: 0,
-                round: 0,
-                ..Default::default()
-            },
-        )
+        .update_latest_proof(ctx.clone(), Proof {
+            height: 0,
+            round: 0,
+            ..Default::default()
+        })
         .wait()?;
 
     Ok(())

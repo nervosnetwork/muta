@@ -4,21 +4,22 @@ use crate::{Address, Bloom, Hash};
 
 #[derive(Default, Debug, Clone)]
 pub struct BlockHeader {
-    pub prevhash: Hash,
-    pub timestamp: u64,
-    pub height: u64,
+    pub prevhash:          Hash,
+    pub timestamp:         u64,
+    pub height:            u64,
     pub transactions_root: Hash,
-    pub state_root: Hash,
-    pub receipts_root: Hash,
-    pub logs_bloom: Bloom,
-    pub quota_used: u64,
-    pub quota_limit: u64,
-    pub proof: Proof,
-    pub proposer: Address,
+    pub state_root:        Hash,
+    pub receipts_root:     Hash,
+    pub logs_bloom:        Bloom,
+    pub quota_used:        u64,
+    pub quota_limit:       u64,
+    pub proof:             Proof,
+    pub proposer:          Address,
 }
 
 impl BlockHeader {
-    /// Calculate the block header hash. To maintain consistency we use RLP serialization.
+    /// Calculate the block header hash. To maintain consistency we use RLP
+    /// serialization.
     pub fn hash(&self) -> Hash {
         let rlp_data = rlp::encode(self);
         Hash::digest(&rlp_data)
@@ -45,29 +46,28 @@ impl Encodable for BlockHeader {
 
 #[derive(Default, Debug, Clone)]
 pub struct Block {
-    pub header: BlockHeader,
+    pub header:    BlockHeader,
     pub tx_hashes: Vec<Hash>,
-    pub hash: Hash,
+    pub hash:      Hash,
 }
 
-// TODO: proof
 #[derive(Default, Debug, Clone)]
 pub struct Proposal {
-    pub prevhash: Hash,
-    pub timestamp: u64,
-    pub height: u64,
+    pub prevhash:    Hash,
+    pub timestamp:   u64,
+    pub height:      u64,
     pub quota_limit: u64,
-    pub proposer: Address,
-    pub tx_hashes: Vec<Hash>,
-    pub proof: Proof,
+    pub proposer:    Address,
+    pub tx_hashes:   Vec<Hash>,
+    pub proof:       Proof,
 }
 
 #[derive(Default, Debug, Clone)]
 pub struct Proof {
-    pub height: u64,
-    pub round: u64,
+    pub height:        u64,
+    pub round:         u64,
     pub proposal_hash: Hash,
-    pub commits: Vec<Vote>,
+    pub commits:       Vec<Vote>,
 }
 
 /// Structure encodable to RLP
@@ -83,7 +83,7 @@ impl Encodable for Proof {
 
 #[derive(Default, Debug, Clone)]
 pub struct Vote {
-    pub address: Address,
+    pub address:   Address,
     pub signature: Vec<u8>,
 }
 

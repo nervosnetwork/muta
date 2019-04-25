@@ -32,8 +32,8 @@ where
     // to ensure performance use a separate thread pool to run the futures in "support".
     thread_pool: ThreadPool,
 
-    pub_proposal: Sender<Vec<u8>>,
-    pub_vote: Sender<Vec<u8>>,
+    pub_proposal:    Sender<Vec<u8>>,
+    pub_vote:        Sender<Vec<u8>>,
     proposal_origin: RwLock<HashMap<Hash, usize>>,
 }
 
@@ -99,8 +99,8 @@ where
     type Error = ConsensusError;
 
     /// A user-defined function for block validation.
-    /// Every block bft received will call this function, even if the feed block.
-    /// Users should validate block format, block headers here.
+    /// Every block bft received will call this function, even if the feed
+    /// block. Users should validate block format, block headers here.
     fn check_block(&self, proposal: &[u8], _height: u64) -> Result<(), Self::Error> {
         let fut = async move {
             let proposal: Proposal =
@@ -116,9 +116,10 @@ where
     }
 
     /// A user-defined function for transactions validation.
-    /// Every block bft received will call this function, even if the feed block.
-    /// Users should validate transactions here.
-    /// The [`proposal_hash`] is corresponding to the proposal of the [`proposal_hash`].
+    /// Every block bft received will call this function, even if the feed
+    /// block. Users should validate transactions here.
+    /// The [`proposal_hash`] is corresponding to the proposal of the
+    /// [`proposal_hash`].
     fn check_txs(
         &self,
         proposal: &[u8],
@@ -159,9 +160,10 @@ where
         pool.run(fut)
     }
 
-    /// A user-defined function for transmitting signed_proposals and signed_votes.
-    /// The signed_proposals and signed_votes have been serialized,
-    /// users do not have to care about the structure of Proposal and Vote.
+    /// A user-defined function for transmitting signed_proposals and
+    /// signed_votes. The signed_proposals and signed_votes have been
+    /// serialized, users do not have to care about the structure of
+    /// Proposal and Vote.
     fn transmit(&self, msg: BftMsg) {
         let mut pub_proposal = self.pub_proposal.clone();
         let mut pub_vote = self.pub_vote.clone();
@@ -205,8 +207,8 @@ where
                 .commit_block(ctx.clone(), proposal, latest_proof))?;
 
             Ok(BftStatus {
-                height: status.height,
-                interval: Some(status.interval),
+                height:         status.height,
+                interval:       Some(status.interval),
                 authority_list: status
                     .verifier_list
                     .iter()

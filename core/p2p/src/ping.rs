@@ -44,7 +44,7 @@ pub trait PeerManager: Clone + Send {
 
 /// Protocol for ping
 pub struct PingProtocol<TPeerManager> {
-    ping_rx: Receiver<Event>,
+    ping_rx:  Receiver<Event>,
     peer_mgr: TPeerManager,
 
     inner: PingHandler<Sender<Event>>,

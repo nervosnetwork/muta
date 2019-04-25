@@ -7,9 +7,11 @@ use core_types::{Hash, SignedTransaction, UnverifiedTransaction};
 
 use crate::FutRuntimeResult;
 
-/// ”TransactionPool“ contains all legitimate transactions sent from other nodes (P2P) or local (RPC).
+/// ”TransactionPool“ contains all legitimate transactions sent from other nodes
+/// (P2P) or local (RPC).
 pub trait TransactionPool: Sync + Send {
-    /// Insert a transaction after verifying the signature and some parameters are correct.
+    /// Insert a transaction after verifying the signature and some parameters
+    /// are correct.
     fn insert(
         &self,
         ctx: Context,
@@ -17,8 +19,9 @@ pub trait TransactionPool: Sync + Send {
         untx: UnverifiedTransaction,
     ) -> FutRuntimeResult<SignedTransaction, TransactionPoolError>;
 
-    /// Filter a batch of valid transaction hashes from the transaction pool (and delete some expired transactions).
-    /// Returns "count" the number of transactions if "quota_limit" does not exceed the upper limit,
+    /// Filter a batch of valid transaction hashes from the transaction pool
+    /// (and delete some expired transactions). Returns "count" the number
+    /// of transactions if "quota_limit" does not exceed the upper limit,
     /// and returns all if the "count" number is not reached.
     /// Note: Transactions are still in the pool.
     fn package(
@@ -39,14 +42,16 @@ pub trait TransactionPool: Sync + Send {
         tx_hashes: &[Hash],
     ) -> FutRuntimeResult<Vec<SignedTransaction>, TransactionPoolError>;
 
-    /// Make sure that the transactions that specify the transactions hash are in the transaction pool.
-    /// If there are transactions that do not exist, this function will request it from other nodes.
+    /// Make sure that the transactions that specify the transactions hash are
+    /// in the transaction pool. If there are transactions that do not
+    /// exist, this function will request it from other nodes.
 
     /// NOTE: If there are no transactions in the transaction pool of this node,
-    /// the function needs to obtain the missing transaction from the proposal node through P2P.
-    /// and P2P needs a "p2p_session_id" to find the corresponding node.
-    /// However, we don't want to pass "p2p_session_id" to this function.
-    /// In the next version we will use "context" to store "p2p_session_id".
+    /// the function needs to obtain the missing transaction from the proposal
+    /// node through P2P. and P2P needs a "p2p_session_id" to find the
+    /// corresponding node. However, we don't want to pass "p2p_session_id"
+    /// to this function. In the next version we will use "context" to store
+    /// "p2p_session_id".
     fn ensure(
         &self,
         ctx: Context,

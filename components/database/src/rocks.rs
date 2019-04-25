@@ -341,11 +341,10 @@ mod tests {
         )
         .wait()
         .unwrap();
-        db.remove_batch(
-            ctx.clone(),
-            DataCategory::Block,
-            &[b"test1".to_vec(), b"test2".to_vec()],
-        )
+        db.remove_batch(ctx.clone(), DataCategory::Block, &[
+            b"test1".to_vec(),
+            b"test2".to_vec(),
+        ])
         .wait()
         .unwrap();
         assert_eq!(

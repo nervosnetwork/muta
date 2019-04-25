@@ -12,7 +12,7 @@ use crate::worker::{Control, Worker};
 /// PubSub
 #[allow(missing_debug_implementations)]
 pub struct PubSub {
-    pub(crate) register: Register,
+    pub(crate) register:         Register,
     pub(crate) broadcast_worker: Worker,
 }
 
@@ -64,7 +64,7 @@ impl PubSub {
     /// Run pubsub in single thread
     pub fn start(self) -> Self {
         PubSub {
-            register: self.register,
+            register:         self.register,
             broadcast_worker: self.broadcast_worker.start_loop(),
         }
     }

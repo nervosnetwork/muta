@@ -10,8 +10,8 @@ use serde_derive::Deserialize;
 // }
 #[derive(Default, Clone, Debug, Deserialize)]
 pub struct Genesis {
-    pub timestamp: u64,
-    pub prevhash: String,
+    pub timestamp:   u64,
+    pub prevhash:    String,
     pub state_alloc: Vec<StateAlloc>,
 }
 
@@ -25,7 +25,7 @@ pub struct Genesis {
 #[derive(Default, Clone, Debug, Deserialize)]
 pub struct StateAlloc {
     pub address: String,
-    pub code: String,
+    pub code:    String,
     pub storage: HashMap<String, String>,
     pub balance: String,
 }

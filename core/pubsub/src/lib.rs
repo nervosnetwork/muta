@@ -20,7 +20,8 @@
 //!
 //! ### Usage
 //!
-//! To use this crate, you need to start with a Rust 2018 edition crate, with rustc 1.33.0-nightly or later.
+//! To use this crate, you need to start with a Rust 2018 edition crate, with
+//! rustc 1.33.0-nightly or later.
 //!
 //! Add this to your `Cargo.toml`:
 //!
@@ -49,7 +50,7 @@
 //! #[derive(Clone, Debug)]
 //! struct Message {
 //!     header: String,
-//!     body: String,
+//!     body:   String,
 //! }
 //!
 //! pub fn main() -> Result<(), ()> {
@@ -67,7 +68,7 @@
 //!         let mut count = 1;
 //!         let msg = Message {
 //!             header: "dummy".to_owned(),
-//!             body: "hello world".to_owned(),
+//!             body:   "hello world".to_owned(),
 //!         };
 //!
 //!         for _ in 0..15 {

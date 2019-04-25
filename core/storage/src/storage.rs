@@ -29,7 +29,8 @@ pub type StorageResult<T> = Box<OldFuture<Item = T, Error = StorageError> + Send
 /// "storage" is responsible for the storage and retrieval of blockchain data.
 /// Block, transaction, and receipt can be obtained from here,
 /// but data related to "world status" is not available.
-/// NOTE: Anything that might return "std::option::None" will return "std::option:: NoneError".
+/// NOTE: Anything that might return "std::option::None" will return
+/// "std::option:: NoneError".
 pub trait Storage: Send + Sync {
     /// Get the latest block.
     fn get_latest_block(&self, ctx: Context) -> StorageResult<Block>;
@@ -39,7 +40,8 @@ pub trait Storage: Send + Sync {
 
     /// Get a block by hash.
     /// The hash is actually an index,
-    /// and the corresponding height is obtained by hash and then querying the corresponding block.
+    /// and the corresponding height is obtained by hash and then querying the
+    /// corresponding block.
     fn get_block_by_hash(&self, ctx: Context, hash: &Hash) -> StorageResult<Block>;
 
     /// Get a signed transaction by hash.
@@ -676,14 +678,11 @@ mod tests {
         let storage = BlockStorage::new(db);
 
         storage
-            .update_latest_proof(
-                ctx.clone(),
-                Proof {
-                    height: 10,
-                    round: 10,
-                    ..Default::default()
-                },
-            )
+            .update_latest_proof(ctx.clone(), Proof {
+                height: 10,
+                round: 10,
+                ..Default::default()
+            })
             .wait()
             .unwrap();
 

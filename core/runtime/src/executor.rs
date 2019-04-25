@@ -9,23 +9,23 @@ use core_types::{
 
 #[derive(Default, Debug, Clone)]
 pub struct ExecutionContext {
-    pub state_root: Hash,
-    pub proposer: Address,
-    pub height: u64,
+    pub state_root:  Hash,
+    pub proposer:    Address,
+    pub height:      u64,
     pub quota_limit: u64,
-    pub timestamp: u64,
+    pub timestamp:   u64,
 }
 
 #[derive(Default, Debug, Clone)]
 pub struct ExecutionResult {
-    pub state_root: Hash,
+    pub state_root:     Hash,
     pub all_logs_bloom: Bloom,
-    pub receipts: Vec<Receipt>,
+    pub receipts:       Vec<Receipt>,
 }
 
 #[derive(Default, Debug, Clone)]
 pub struct ReadonlyResult {
-    pub data: Option<Vec<u8>>,
+    pub data:  Option<Vec<u8>>,
     pub error: Option<String>,
 }
 
@@ -33,7 +33,8 @@ pub struct ReadonlyResult {
 /// We plan to support multiple VM such as EVM, WASM, etc..
 /// but their programming model must be account-based.
 pub trait Executor: Send + Sync {
-    /// Execute the transactions and then return the receipts, this function will modify the "state of the world".
+    /// Execute the transactions and then return the receipts, this function
+    /// will modify the "state of the world".
     fn exec(
         &self,
         ctx: Context,
@@ -91,7 +92,8 @@ pub trait Executor: Send + Sync {
         state_root: &Hash,
         address: &Address,
     ) -> Result<(Vec<u8>, Hash), ExecutorError>;
-    // fn get_proof(&self, ctx: Context, header: &BlockHeader, address: &Address, key: &Self::Key) -> Result<Self::Value, ExecutorError>;
+    // fn get_proof(&self, ctx: Context, header: &BlockHeader, address: &Address,
+    // key: &Self::Key) -> Result<Self::Value, ExecutorError>;
 }
 
 #[derive(Debug)]

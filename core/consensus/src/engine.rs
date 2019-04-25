@@ -22,16 +22,18 @@ use crate::{ConsensusError, ConsensusResult, ConsensusStatus};
 ///
 /// If this node is a proposer.
 /// step:
-/// 1. Get a batch of transactions from the transaction pool and package them into "proposal", call "build_proposal".
-/// 2. If the consensus condition is met, execute and submit the "Proposal", call "commit_block".
+/// 1. Get a batch of transactions from the transaction pool and package them
+/// into "proposal", call "build_proposal". 2. If the consensus condition is
+/// met, execute and submit the "Proposal", call "commit_block".
 ///
 /// If this node is not a "proposer".
 /// step:
 /// 1. Verify proposal from other nodes, call "verify_proposal".
-/// 2. Verify that the transactions in the proposal has a transaction pool for that node, call "verify_transactions".
-/// If it does not exist, the transaction pool will actively pull the transactions from the proposed node.
-/// If the pull fails, the verification will fail.
-/// 3. If the consensus condition is met, execute and submit the "Proposal", call "commit_block".
+/// 2. Verify that the transactions in the proposal has a transaction pool for
+/// that node, call "verify_transactions". If it does not exist, the transaction
+/// pool will actively pull the transactions from the proposed node. If the pull
+/// fails, the verification will fail. 3. If the consensus condition is met,
+/// execute and submit the "Proposal", call "commit_block".
 #[derive(Debug)]
 pub struct Engine<E, T, S, C>
 where
@@ -41,12 +43,12 @@ where
     C: Crypto,
 {
     executor: Arc<E>,
-    tx_pool: Arc<T>,
-    storage: Arc<S>,
-    crypto: Arc<C>,
+    tx_pool:  Arc<T>,
+    storage:  Arc<S>,
+    crypto:   Arc<C>,
 
     privkey: C::PrivateKey,
-    status: RwLock<ConsensusStatus>,
+    status:  RwLock<ConsensusStatus>,
 }
 
 impl<E, T, S, C> Engine<E, T, S, C>
@@ -163,8 +165,8 @@ where
 
     /// Commit a block of consensus completion.
     /// step:
-    /// 1. Get the transactions contained in the block from the transaction pool.
-    /// 2. Execute all transactions with "executor".
+    /// 1. Get the transactions contained in the block from the transaction
+    /// pool. 2. Execute all transactions with "executor".
     /// 3. build block
     /// 4. save block
     /// 5. flush transaction pool
@@ -185,11 +187,11 @@ where
 
         // exec transactions
         let execution_context = ExecutionContext {
-            state_root: status.state_root.clone(),
-            proposer: proposal.proposer.clone(),
-            height: proposal.height,
+            state_root:  status.state_root.clone(),
+            proposer:    proposal.proposer.clone(),
+            height:      proposal.height,
             quota_limit: proposal.quota_limit,
-            timestamp: proposal.timestamp,
+            timestamp:   proposal.timestamp,
         };
         let execution_result = self
             .executor
@@ -283,7 +285,7 @@ fn build_tx_potsitions(
     for (position, tx) in signed_txs.iter().enumerate() {
         let tx_position = TransactionPosition {
             block_hash: block_hash.clone(),
-            position: position as u32,
+            position:   position as u32,
         };
         positions.insert(tx.hash.clone(), tx_position);
     }
@@ -293,20 +295,20 @@ fn build_tx_potsitions(
 
 fn build_block(proposal: &Proposal, execution_result: &ExecutionResult) -> Block {
     let header = BlockHeader {
-        prevhash: proposal.prevhash.clone(),
-        timestamp: proposal.timestamp,
-        height: proposal.height,
-        state_root: execution_result.state_root.clone(),
+        prevhash:          proposal.prevhash.clone(),
+        timestamp:         proposal.timestamp,
+        height:            proposal.height,
+        state_root:        execution_result.state_root.clone(),
         transactions_root: Merkle::from_hashes(proposal.tx_hashes.clone()).get_root_hash(),
-        receipts_root: Merkle::from_receipts(&execution_result.receipts).get_root_hash(),
-        logs_bloom: execution_result.all_logs_bloom,
-        quota_limit: proposal.quota_limit,
-        quota_used: execution_result
+        receipts_root:     Merkle::from_receipts(&execution_result.receipts).get_root_hash(),
+        logs_bloom:        execution_result.all_logs_bloom,
+        quota_limit:       proposal.quota_limit,
+        quota_used:        execution_result
             .receipts
             .iter()
             .fold(0, |acc, r| acc + r.quota_used),
-        proposer: proposal.proposer.clone(),
-        proof: proposal.proof.clone(),
+        proposer:          proposal.proposer.clone(),
+        proof:             proposal.proof.clone(),
     };
     let hash = header.hash();
     Block {

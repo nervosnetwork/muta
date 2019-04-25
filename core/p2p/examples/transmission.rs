@@ -50,7 +50,7 @@ mod message {
 
     #[derive(Debug)]
     pub struct Hello {
-        pub id: u64,
+        pub id:  u64,
         pub msg: String,
     }
 

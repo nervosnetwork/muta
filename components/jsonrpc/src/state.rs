@@ -21,17 +21,17 @@ use numext_fixed_hash::H256;
 use numext_fixed_uint::U256;
 
 pub struct AppState<E, T, S> {
-    executor: Arc<E>,
+    executor:         Arc<E>,
     transaction_pool: Arc<T>,
-    storage: Arc<S>,
+    storage:          Arc<S>,
 }
 
 impl<E, T, S> Clone for AppState<E, T, S> {
     fn clone(&self) -> Self {
         Self {
-            executor: Arc::<E>::clone(&self.executor),
+            executor:         Arc::<E>::clone(&self.executor),
             transaction_pool: Arc::<T>::clone(&self.transaction_pool),
-            storage: Arc::<S>::clone(&self.storage),
+            storage:          Arc::<S>::clone(&self.storage),
         }
     }
 }
@@ -98,19 +98,19 @@ where
     ) -> RpcResult<cita::Block> {
         let mut res_block = cita::Block {
             version: 0,
-            hash: raw_block.header.hash(),
-            header: cita::BlockHeader {
-                timestamp: raw_block.header.timestamp,
-                prev_hash: raw_block.header.prevhash,
-                number: Uint::from(raw_block.header.height),
-                state_root: raw_block.header.state_root,
+            hash:    raw_block.header.hash(),
+            header:  cita::BlockHeader {
+                timestamp:         raw_block.header.timestamp,
+                prev_hash:         raw_block.header.prevhash,
+                number:            Uint::from(raw_block.header.height),
+                state_root:        raw_block.header.state_root,
                 transactions_root: raw_block.header.transactions_root,
-                receipts_root: raw_block.header.receipts_root,
-                quota_used: Uint::from(raw_block.header.quota_used),
-                proof: None,
-                proposer: raw_block.header.proposer,
+                receipts_root:     raw_block.header.receipts_root,
+                quota_used:        Uint::from(raw_block.header.quota_used),
+                proof:             None,
+                proposer:          raw_block.header.proposer,
             },
-            body: cita::BlockBody {
+            body:    cita::BlockBody {
                 transactions: raw_block
                     .tx_hashes
                     .iter()
@@ -129,9 +129,9 @@ where
         let mut txs = vec![];
         for tx in raw_txs {
             txs.push(cita::BlockTransaction::Full(cita::FullTransaction {
-                hash: tx.hash,
+                hash:    tx.hash,
                 content: tx.untx.transaction.data,
-                from: tx.sender,
+                from:    tx.sender,
             }));
         }
         res_block.body.transactions = txs;
@@ -160,14 +160,14 @@ where
             .iter()
             .enumerate()
             .map(|(log_index, log_entry)| cita::Log {
-                address: log_entry.address.clone(),
-                topics: log_entry.topics.clone(),
-                data: cita::Data::from(log_entry.data.clone()),
-                block_hash: Some(b.header.hash()),
-                block_number: Some(b.header.height.into()),
-                transaction_hash: Some(raw_receipt.transaction_hash.clone()),
-                transaction_index: Some(tx_index.into()),
-                log_index: Some(Uint::from(log_index as u64)),
+                address:               log_entry.address.clone(),
+                topics:                log_entry.topics.clone(),
+                data:                  cita::Data::from(log_entry.data.clone()),
+                block_hash:            Some(b.header.hash()),
+                block_number:          Some(b.header.height.into()),
+                transaction_hash:      Some(raw_receipt.transaction_hash.clone()),
+                transaction_index:     Some(tx_index.into()),
+                log_index:             Some(Uint::from(log_index as u64)),
                 transaction_log_index: Some(Uint::from(
                     (log_index + logs_in_block_before_receipt) as u64,
                 )),
@@ -195,12 +195,12 @@ where
         raw_tx: SignedTransaction,
     ) -> RpcResult<cita::RpcTransaction> {
         let mut tx = cita::RpcTransaction {
-            hash: raw_tx.hash.clone(),
-            content: raw_tx.untx.transaction.data.clone(),
-            from: raw_tx.sender.clone(),
+            hash:         raw_tx.hash.clone(),
+            content:      raw_tx.untx.transaction.data.clone(),
+            from:         raw_tx.sender.clone(),
             block_number: Uint::from(0),
-            block_hash: Hash::from_bytes(&[0x00u8; 32]).unwrap(),
-            index: Uint::from(0),
+            block_hash:   Hash::from_bytes(&[0x00u8; 32]).unwrap(),
+            index:        Uint::from(0),
         };
         let receipt = await!(self
             .storage
@@ -243,11 +243,11 @@ where
         let rd_result = self.executor.readonly(
             Context::new(),
             &ExecutionContext {
-                state_root: b.header.state_root,
-                proposer: b.header.proposer,
-                height: b.header.height,
+                state_root:  b.header.state_root,
+                proposer:    b.header.proposer,
+                height:      b.header.height,
                 quota_limit: b.header.quota_limit,
-                timestamp: b.header.timestamp,
+                timestamp:   b.header.timestamp,
             },
             &Address::from_bytes(Into::<Vec<u8>>::into(call_request.to).as_slice())
                 .expect("never returns an error"),
@@ -358,14 +358,14 @@ where
                         let mut _transaction_log_index = 0;
                         if filter.matches(&log_entry) {
                             let log = cita::Log {
-                                address: log_entry.address.clone(),
-                                topics: log_entry.topics.clone(),
-                                data: cita::Data::from(log_entry.data.clone()),
-                                block_hash: Some(block.header.hash()),
-                                block_number: Some(block.header.height.into()),
-                                transaction_hash: Some(tx_hash.clone()),
-                                transaction_index: Some(_transaction_index.into()),
-                                log_index: Some(Uint::from(log_index as u64)),
+                                address:               log_entry.address.clone(),
+                                topics:                log_entry.topics.clone(),
+                                data:                  cita::Data::from(log_entry.data.clone()),
+                                block_hash:            Some(block.header.hash()),
+                                block_number:          Some(block.header.height.into()),
+                                transaction_hash:      Some(tx_hash.clone()),
+                                transaction_index:     Some(_transaction_index.into()),
+                                log_index:             Some(Uint::from(log_index as u64)),
                                 transaction_log_index: Some(_transaction_log_index.into()),
                             };
                             logs.push(log);

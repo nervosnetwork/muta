@@ -29,12 +29,12 @@ impl Broadcaster {
 
 pub struct Service {
     pub peer_manager: DefaultPeerManager,
-    pub config: Config,
+    pub config:       Config,
 
     pub(crate) msg_tx: Sender<TransmitMessage>,
 
     pub(crate) transmit_worker: ServiceWorker,
-    pub(crate) service_worker: ServiceWorker,
+    pub(crate) service_worker:  ServiceWorker,
 }
 
 impl Service {

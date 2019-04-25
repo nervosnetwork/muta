@@ -21,7 +21,7 @@ pub(crate) const CONNEC_PEER_TOKEN: u64 = 77;
 /// Remote multiaddr to connect
 #[derive(Debug)]
 pub struct RemoteAddr {
-    addr: Multiaddr,
+    addr:  Multiaddr,
     proto: DialProtocol,
 }
 
@@ -45,7 +45,7 @@ pub trait PeerManager: Clone + Send {
 
 /// Pure stateless interval multiaddr connection protocol
 pub struct ConnecProtocol<TPeerManager> {
-    id: ProtocolId,
+    id:       ProtocolId,
     peer_mgr: TPeerManager,
 }
 

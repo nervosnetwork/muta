@@ -13,7 +13,7 @@ const INIT_PROTOCOL_ID: ProtocolId = 1;
 
 pub struct Builder {
     service_builder: ServiceBuilder,
-    peer_manager: DefaultPeerManager, // FIXME: make `PeerManager` trait object
+    peer_manager:    DefaultPeerManager, // FIXME: make `PeerManager` trait object
 
     msg_tx: Sender<CastMessage<PackedMessage>>,
     msg_rx: Receiver<PackedMessage>,

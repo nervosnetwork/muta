@@ -16,7 +16,7 @@ use crate::channel::broadcast::{BroadcastEvent, Event, Message};
 #[derive(Debug)]
 struct PubEvent {
     pub topic: String,
-    pub msg: Message,
+    pub msg:   Message,
 }
 
 impl PubEvent {
@@ -48,7 +48,7 @@ where
     TMessage: Any + Send,
 {
     topic: String,
-    tx: mpsc::Sender<Event>,
+    tx:    mpsc::Sender<Event>,
 
     pin_msg_type: PhantomData<TMessage>,
 }
@@ -164,7 +164,7 @@ where
     TMessage: Any + Send,
 {
     uuid: Uuid,
-    rx: mpsc::Receiver<Message>,
+    rx:   mpsc::Receiver<Message>,
 
     pin_msg_type: PhantomData<TMessage>,
 }

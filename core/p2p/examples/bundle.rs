@@ -134,7 +134,7 @@ mod peer_manager {
     impl Default for PeerConnec {
         fn default() -> Self {
             PeerConnec {
-                addrs: Default::default(),
+                addrs:  Default::default(),
                 status: ConnecStatus::Disconnect,
             }
         }
@@ -165,7 +165,7 @@ mod peer_manager {
     }
 
     pub struct DemoPeerManager {
-        peers: Arc<RwLock<HashMap<PeerId, PeerInfo>>>,
+        peers:   Arc<RwLock<HashMap<PeerId, PeerInfo>>>,
         connecs: Arc<RwLock<HashMap<PeerId, PeerConnec>>>,
 
         addr_peers: Arc<RwLock<HashMap<Multiaddr, PeerId>>>,
@@ -176,9 +176,9 @@ mod peer_manager {
     impl Clone for DemoPeerManager {
         fn clone(&self) -> Self {
             DemoPeerManager {
-                peers: Arc::clone(&self.peers),
-                connecs: Arc::clone(&self.connecs),
-                addr_peers: Arc::clone(&self.addr_peers),
+                peers:         Arc::clone(&self.peers),
+                connecs:       Arc::clone(&self.connecs),
+                addr_peers:    Arc::clone(&self.addr_peers),
                 masquer_addrs: Arc::clone(&self.masquer_addrs),
             }
         }
@@ -187,9 +187,9 @@ mod peer_manager {
     impl DemoPeerManager {
         pub fn new() -> Self {
             DemoPeerManager {
-                peers: Default::default(),
-                connecs: Default::default(),
-                addr_peers: Default::default(),
+                peers:         Default::default(),
+                connecs:       Default::default(),
+                addr_peers:    Default::default(),
                 masquer_addrs: Default::default(),
             }
         }
@@ -245,6 +245,7 @@ mod peer_manager {
                     .insert(addr.clone(), peer_id.clone());
             }
         }
+
         pub fn add_masquer_addr(&mut self, addr: Multiaddr) {
             self.masquer_addrs.write().insert(addr);
         }

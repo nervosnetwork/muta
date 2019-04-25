@@ -176,17 +176,17 @@ generate_module_for!([block, transaction, receipt,]);
 impl From<core_types::BlockHeader> for BlockHeader {
     fn from(header: core_types::BlockHeader) -> Self {
         Self {
-            prevhash: header.prevhash.as_bytes().to_vec(),
-            timestamp: header.timestamp,
-            height: header.height,
+            prevhash:          header.prevhash.as_bytes().to_vec(),
+            timestamp:         header.timestamp,
+            height:            header.height,
             transactions_root: header.transactions_root.as_bytes().to_vec(),
-            state_root: header.state_root.as_bytes().to_vec(),
-            receipts_root: header.receipts_root.as_bytes().to_vec(),
-            logs_bloom: header.logs_bloom.as_bytes().to_vec(),
-            quota_used: header.quota_used,
-            quota_limit: header.quota_limit,
-            proof: Some(header.proof.into()),
-            proposer: header.proposer.as_bytes().to_vec(),
+            state_root:        header.state_root.as_bytes().to_vec(),
+            receipts_root:     header.receipts_root.as_bytes().to_vec(),
+            logs_bloom:        header.logs_bloom.as_bytes().to_vec(),
+            quota_used:        header.quota_used,
+            quota_limit:       header.quota_limit,
+            proof:             Some(header.proof.into()),
+            proposer:          header.proposer.as_bytes().to_vec(),
         }
     }
 }
@@ -196,17 +196,17 @@ impl TryInto<core_types::BlockHeader> for BlockHeader {
 
     fn try_into(self) -> Result<core_types::BlockHeader, Self::Error> {
         Ok(core_types::BlockHeader {
-            prevhash: Hash::from_bytes(&self.prevhash)?,
-            timestamp: self.timestamp,
-            height: self.height,
+            prevhash:          Hash::from_bytes(&self.prevhash)?,
+            timestamp:         self.timestamp,
+            height:            self.height,
             transactions_root: Hash::from_bytes(&self.transactions_root)?,
-            state_root: Hash::from_bytes(&self.state_root)?,
-            receipts_root: Hash::from_bytes(&self.receipts_root)?,
-            logs_bloom: Bloom::from_slice(&self.logs_bloom),
-            quota_used: self.quota_used,
-            quota_limit: self.quota_limit,
-            proof: self.proof?.try_into()?,
-            proposer: Address::from_bytes(&self.proposer)?,
+            state_root:        Hash::from_bytes(&self.state_root)?,
+            receipts_root:     Hash::from_bytes(&self.receipts_root)?,
+            logs_bloom:        Bloom::from_slice(&self.logs_bloom),
+            quota_used:        self.quota_used,
+            quota_limit:       self.quota_limit,
+            proof:             self.proof?.try_into()?,
+            proposer:          Address::from_bytes(&self.proposer)?,
         })
     }
 }
@@ -214,13 +214,13 @@ impl TryInto<core_types::BlockHeader> for BlockHeader {
 impl From<core_types::Block> for Block {
     fn from(block: core_types::Block) -> Self {
         Self {
-            header: Some(block.header.into()),
+            header:    Some(block.header.into()),
             tx_hashes: block
                 .tx_hashes
                 .into_iter()
                 .map(|h| h.as_bytes().to_vec())
                 .collect(),
-            hash: block.hash.as_bytes().to_vec(),
+            hash:      block.hash.as_bytes().to_vec(),
         }
     }
 }
@@ -248,17 +248,17 @@ impl TryInto<core_types::Block> for Block {
 impl From<core_types::Proposal> for Proposal {
     fn from(proposal: core_types::Proposal) -> Self {
         Self {
-            prevhash: proposal.prevhash.as_bytes().to_vec(),
-            timestamp: proposal.timestamp,
-            height: proposal.height,
+            prevhash:    proposal.prevhash.as_bytes().to_vec(),
+            timestamp:   proposal.timestamp,
+            height:      proposal.height,
             quota_limit: proposal.quota_limit,
-            proposer: proposal.proposer.as_bytes().to_vec(),
-            tx_hashes: proposal
+            proposer:    proposal.proposer.as_bytes().to_vec(),
+            tx_hashes:   proposal
                 .tx_hashes
                 .into_iter()
                 .map(|h| h.as_bytes().to_vec())
                 .collect(),
-            proof: Some(proposal.proof.into()),
+            proof:       Some(proposal.proof.into()),
         }
     }
 }
@@ -321,7 +321,7 @@ impl TryInto<core_types::Proof> for Proof {
 impl From<core_types::Vote> for Vote {
     fn from(vote: core_types::Vote) -> Self {
         Self {
-            address: vote.address.as_bytes().to_vec(),
+            address:   vote.address.as_bytes().to_vec(),
             signature: vote.signature,
         }
     }
@@ -332,7 +332,7 @@ impl TryInto<core_types::Vote> for Vote {
 
     fn try_into(self) -> Result<core_types::Vote, Self::Error> {
         Ok(core_types::Vote {
-            address: Address::from_bytes(&self.address)?,
+            address:   Address::from_bytes(&self.address)?,
             signature: self.signature,
         })
     }
@@ -342,12 +342,12 @@ impl From<core_types::LogEntry> for LogEntry {
     fn from(entry: core_types::LogEntry) -> Self {
         Self {
             address: entry.address.as_bytes().to_vec(),
-            topics: entry
+            topics:  entry
                 .topics
                 .into_iter()
                 .map(|h| h.as_bytes().to_vec())
                 .collect(),
-            data: entry.data,
+            data:    entry.data,
         }
     }
 }
@@ -373,13 +373,13 @@ impl TryInto<core_types::LogEntry> for LogEntry {
 impl From<core_types::Receipt> for Receipt {
     fn from(receipt: core_types::Receipt) -> Receipt {
         Self {
-            state_root: receipt.state_root.as_bytes().to_vec(),
+            state_root:       receipt.state_root.as_bytes().to_vec(),
             transaction_hash: receipt.transaction_hash.as_bytes().to_vec(),
-            block_hash: receipt.block_hash.as_bytes().to_vec(),
-            quota_used: receipt.quota_used,
-            logs_bloom: receipt.logs_bloom.as_bytes().to_vec(),
-            logs: receipt.logs.into_iter().map(Into::into).collect(),
-            error: receipt.receipt_error,
+            block_hash:       receipt.block_hash.as_bytes().to_vec(),
+            quota_used:       receipt.quota_used,
+            logs_bloom:       receipt.logs_bloom.as_bytes().to_vec(),
+            logs:             receipt.logs.into_iter().map(Into::into).collect(),
+            error:            receipt.receipt_error,
             contract_address: match receipt.contract_address {
                 Some(v) => v.as_bytes().to_vec(),
                 None => vec![],
@@ -458,7 +458,7 @@ impl From<core_types::UnverifiedTransaction> for UnverifiedTransaction {
     fn from(untx: core_types::UnverifiedTransaction) -> Self {
         Self {
             transaction: Some(Transaction::from(untx.transaction)),
-            signature: untx.signature,
+            signature:   untx.signature,
         }
     }
 }
@@ -471,7 +471,7 @@ impl TryInto<core_types::UnverifiedTransaction> for UnverifiedTransaction {
 
         Ok(core_types::UnverifiedTransaction {
             transaction: tx,
-            signature: self.signature,
+            signature:   self.signature,
         })
     }
 }
@@ -479,8 +479,8 @@ impl TryInto<core_types::UnverifiedTransaction> for UnverifiedTransaction {
 impl From<core_types::SignedTransaction> for SignedTransaction {
     fn from(signed_tx: core_types::SignedTransaction) -> Self {
         Self {
-            untx: Some(UnverifiedTransaction::from(signed_tx.untx)),
-            hash: signed_tx.hash.as_bytes().to_vec(),
+            untx:   Some(UnverifiedTransaction::from(signed_tx.untx)),
+            hash:   signed_tx.hash.as_bytes().to_vec(),
             sender: signed_tx.sender.as_bytes().to_vec(),
         }
     }
@@ -504,7 +504,7 @@ impl From<core_types::TransactionPosition> for TransactionPosition {
     fn from(tp: core_types::TransactionPosition) -> Self {
         Self {
             block_hash: tp.block_hash.as_bytes().to_vec(),
-            position: tp.position,
+            position:   tp.position,
         }
     }
 }
@@ -515,7 +515,7 @@ impl TryInto<core_types::TransactionPosition> for TransactionPosition {
     fn try_into(self) -> Result<core_types::TransactionPosition, Self::Error> {
         Ok(core_types::TransactionPosition {
             block_hash: Hash::from_bytes(&self.block_hash)?,
-            position: self.position,
+            position:   self.position,
         })
     }
 }

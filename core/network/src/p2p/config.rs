@@ -13,7 +13,7 @@ pub struct Config {
     key_pair: SecioKeyPair,
 
     bootstrap_addresses: Vec<Multiaddr>,
-    listening_address: Multiaddr,
+    listening_address:   Multiaddr,
 }
 
 impl Config {
