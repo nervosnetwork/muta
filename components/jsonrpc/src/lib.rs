@@ -1,11 +1,13 @@
 #![feature(async_await, await_macro, futures_api)]
 
+#[allow(clippy::all)] // cita.rs copies from cita-common, just omit all checks
+mod cita;
 mod config;
 mod convention;
 mod error;
+mod filter;
 mod server;
 mod state;
-mod types;
 mod util;
 
 pub use config::Config;

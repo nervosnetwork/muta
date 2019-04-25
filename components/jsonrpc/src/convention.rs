@@ -5,7 +5,7 @@ use std::fmt;
 
 use hex;
 use serde_derive::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{self, Value};
 
 use core_types::errors::TypesError;
 
@@ -136,6 +136,12 @@ impl From<hex::FromHexError> for ErrorData {
 
 impl From<TypesError> for ErrorData {
     fn from(err: TypesError) -> Self {
+        ErrorData::new(500, &format!("{:?}", err))
+    }
+}
+
+impl From<serde_json::error::Error> for ErrorData {
+    fn from(err: serde_json::error::Error) -> Self {
         ErrorData::new(500, &format!("{:?}", err))
     }
 }

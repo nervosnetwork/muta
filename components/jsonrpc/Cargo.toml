@@ -12,19 +12,24 @@ futures-preview = { version = "0.3.0-alpha.14", features = ["compat"] }
 futures-util-preview = { version = "0.3.0-alpha.14" }
 
 bytes = "0.4"
+ethbloom = "0.6"
 hex = "0.3"
+rlp = "0.3"
 serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"
 env_logger = "0.6"
+ethereum-types-serialize = "0.2"
 json = "0.11"
 log = "0.4"
 prost = "0.5"
 prost-derive = "0.5"
 numext-fixed-uint = "0.1"
+numext-fixed-hash = "0.1"
 tiny-keccak = "1.4"
 
 core-context = { path = "../../core/context" }
+core-merkle = { path = "../../core/merkle" }
 core-runtime = { path = "../../core/runtime" }
 core-types = { path = "../../core/types" }
 core-storage = { path = "../../core/storage" }

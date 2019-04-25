@@ -74,6 +74,15 @@ impl Encodable for Address {
     }
 }
 
+impl Serialize for Address {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&format!("0x{}", self.as_hex()))
+    }
+}
+
 /// Hash represents the 32 byte sha3-256 hash of arbitrary data.
 #[derive(Default, Clone, PartialEq, Eq, Hash)]
 pub struct Hash(H256);
