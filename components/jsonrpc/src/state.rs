@@ -19,6 +19,7 @@ use crate::util;
 use crate::RpcResult;
 use numext_fixed_hash::H256;
 use numext_fixed_uint::U256;
+
 pub struct AppState<E, T, S> {
     executor: Arc<E>,
     transaction_pool: Arc<T>,
@@ -422,13 +423,12 @@ where
         Ok(tx_cita)
     }
 
-    pub async fn get_transaction_count(
-        &self,
-        _address: Address,
-        _number: String,
-    ) -> RpcResult<u64> {
-        // TODO. Can't implement at now
-        unimplemented!()
+    pub async fn get_transaction_count(&self, addr: Address, number: String) -> RpcResult<U256> {
+        let b = await!(self.get_block(number))?;
+        let r = self
+            .executor
+            .get_nonce(Context::new(), &b.header.state_root, &addr)?;
+        Ok(r)
     }
 
     pub async fn get_transaction_proof(&self, _hash: Hash) -> RpcResult<Vec<u8>> {

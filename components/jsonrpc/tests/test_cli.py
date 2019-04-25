@@ -142,6 +142,14 @@ def test_get_storage_at():
     assert v[-1] == 42
 
 
+def test_get_transaction_count():
+    pre = call(f'{prefix} getTransactionCount --address {user1.address}')
+    tx = client.sign_tx(user1.private_key, user2.address, "", 10, 100000)
+    client.sync_raw_transaction(tx)
+    new = call(f'{prefix} getTransactionCount --address {user1.address}')
+    assert int(new, 16) == int(pre, 16) + 1
+
+
 if __name__ == '__main__':
     test_peer_count()
     test_block_number()
@@ -156,3 +164,4 @@ if __name__ == '__main__':
     test_get_abi()
     test_get_block_header()
     test_get_storage_at()
+    test_get_transaction_count()

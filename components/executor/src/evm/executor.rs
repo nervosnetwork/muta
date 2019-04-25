@@ -15,7 +15,7 @@ use core_context::Context;
 use core_runtime::{ExecutionContext, ExecutionResult, Executor, ExecutorError, ReadonlyResult};
 use core_types::{
     Address, Balance, Bloom, BloomInput, Genesis, Hash, LogEntry, Receipt, SignedTransaction,
-    StateAlloc, H256 as CoreH256,
+    StateAlloc, H256 as CoreH256, U256 as CoreU256,
 };
 
 pub struct EVMExecutor<DB> {
@@ -189,6 +189,20 @@ where
 
         let balance = state.balance(&H160::from(address.clone().into_fixed_bytes()))?;
         Ok(to_core_balance(&balance))
+    }
+
+    /// Query nonce of account.
+    fn get_nonce(
+        &self,
+        _: Context,
+        state_root: &Hash,
+        address: &Address,
+    ) -> Result<CoreU256, ExecutorError> {
+        let root = H256(state_root.clone().into_fixed_bytes());
+        let mut state = State::from_existing(self.db.clone(), root)?;
+
+        let nonce = state.nonce(&H160::from(address.clone().into_fixed_bytes()))?;
+        Ok(to_core_u256(&nonce))
     }
 
     /// Query value of account.
@@ -427,9 +441,13 @@ fn accrue_log(bloom: &mut Bloom, log: &LogEntry) {
 }
 
 fn to_core_balance(balance: &U256) -> Balance {
+    to_core_u256(balance) as Balance
+}
+
+fn to_core_u256(u: &U256) -> CoreU256 {
     let mut arr = [0u8; 32];
-    balance.to_little_endian(&mut arr);
-    Balance::from_little_endian(&arr).unwrap()
+    u.to_little_endian(&mut arr);
+    CoreU256::from_little_endian(&arr).unwrap()
 }
 
 fn map_from_str(err: String) -> ExecutorError {

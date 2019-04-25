@@ -1,7 +1,7 @@
 use std::fmt;
 
 use numext_fixed_hash::H160;
-use numext_fixed_uint::U256;
+pub use numext_fixed_uint::U256;
 use rlp::{Encodable, RlpStream};
 use serde::{Serialize, Serializer};
 use sha3::{Digest, Sha3_256};

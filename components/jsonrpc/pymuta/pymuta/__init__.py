@@ -126,7 +126,7 @@ class Client:
         return self.send('getTransaction', params=[h])
 
     def get_transaction_count(self, addr: str, block_number: str = 'latest') -> int:
-        return self.send('getTransactionCount', params=[addr, block_number])
+        return int(self.send('getTransactionCount', params=[addr, block_number]), 16)
 
     def get_transaction_receipt(self, h: str):
         return self.send('getTransactionReceipt', params=[h])

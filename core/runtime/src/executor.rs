@@ -3,7 +3,9 @@ use std::fmt;
 
 use cita_vm::{state::Error as StateError, Error as VMError};
 use core_context::Context;
-use core_types::{Address, Balance, Bloom, Hash, Receipt, SignedTransaction, TypesError, H256};
+use core_types::{
+    Address, Balance, Bloom, Hash, Receipt, SignedTransaction, TypesError, H256, U256,
+};
 
 #[derive(Default, Debug, Clone)]
 pub struct ExecutionContext {
@@ -56,6 +58,14 @@ pub trait Executor: Send + Sync {
         state_root: &Hash,
         address: &Address,
     ) -> Result<Balance, ExecutorError>;
+
+    /// Query nonce of account.
+    fn get_nonce(
+        &self,
+        ctx: Context,
+        state_root: &Hash,
+        address: &Address,
+    ) -> Result<U256, ExecutorError>;
 
     /// Query value of account.
     fn get_value(
