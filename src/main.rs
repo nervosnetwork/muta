@@ -23,7 +23,7 @@ use core_crypto::{
     Crypto, CryptoTransform,
 };
 use core_network::reactor::{outbound, CallbackMap, ChainReactor, InboundReactor, OutboundReactor};
-use core_network::Network;
+use core_network::{Config as NetworkConfig, Network};
 use core_pubsub::PubSub;
 use core_storage::{BlockStorage, Storage};
 use core_types::{Address, Block, BlockHeader, Genesis, Hash, Proof};
@@ -40,6 +40,11 @@ struct Config {
 
     // db config
     data_path: PathBuf,
+
+    // network
+    private_key:         Option<String>,
+    bootstrap_addresses: Vec<String>,
+    listening_address:   String,
 
     // transaction pool
     pool_size:         u64,
@@ -151,7 +156,11 @@ fn start(cfg: &Config) {
     // or peer that only handle outbound message
     // let network_reactor = outbound_reactor;
 
-    let _network = Network::new(Default::default(), outbound_rx, network_reactor).unwrap();
+    let mut net_config = NetworkConfig::default();
+    net_config.p2p.private_key = cfg.private_key.clone();
+    net_config.p2p.listening_address = Some(cfg.listening_address.to_owned());
+    net_config.p2p.bootstrap_addresses = cfg.bootstrap_addresses.to_owned();
+    let _network = Network::new(net_config, outbound_rx, network_reactor).unwrap();
 
     // run json rpc
     let mut jrpc_config = components_jsonrpc::Config::default();

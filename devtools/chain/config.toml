@@ -9,8 +9,9 @@ rpc_workers = 0
 data_path = "./devtools/chain/rocksdb"
 
 # network
-bootstrap_addresses: []
-listening_address: "/ip4/127.0.0.1/tcp/1337"
+# private_key = "bcfa6d5fffa63edf3bd17b17422e416f9374d981322c4ccccf38de215e659b02"
+bootstrap_addresses = []
+listening_address = "/ip4/127.0.0.1/tcp/1337"
 
 # transaction pool
 pool_size = 100000
