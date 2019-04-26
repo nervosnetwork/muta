@@ -10,10 +10,12 @@ core-crypto = { path = "../../core/crypto" }
 core-runtime = { path = "../../core/runtime" }
 core-storage = { path = "../../core/storage" }
 core-context = { path = "../../core/context" }
+core-pubsub = { path = "../../core/pubsub" }
 
 failure = "0.1"
 futures = "0.1"
 futures-locks = "0.3"
+log = "0.4"
 # TODO: rename futures01 instead
 futures03 = { package = "futures-preview", version = "0.3.0-alpha.14", features = [ "compat" ] }
 

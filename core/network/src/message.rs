@@ -1,8 +1,8 @@
-use core_types::block::Block;
-use core_types::transaction::SignedTransaction;
+use uuid::Uuid;
+
+use core_types::{Hash, SignedTransaction};
 
 pub enum Message {
-    Consensus(Vec<u8>),
-    SignedTransaction(Box<SignedTransaction>),
-    Block(Box<Block>),
+    BroadcastTxs { txs: Vec<SignedTransaction> },
+    PullTxs { uuid: Uuid, hashes: Vec<Hash> },
 }

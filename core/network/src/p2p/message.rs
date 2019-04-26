@@ -1,40 +1,44 @@
-pub use packed_message::Message;
+pub mod tx_pool;
 
 use prost::Message as ProstMessage;
 
+use crate::Message as NetworkMessage;
+
+// use sub-mod message types
+use packed_message::Message as P2PMessage;
+use tx_pool::TxPoolMessage;
+
+// re-export
+pub use packed_message::Message;
+
 #[derive(Clone, PartialEq, ProstMessage)]
-pub(crate) struct PackedMessage {
-    #[prost(oneof = "Message", tags = "1, 2, 3")]
+pub struct PackedMessage {
+    #[prost(oneof = "Message", tags = "1")]
     pub message: Option<Message>,
 }
 
 pub mod packed_message {
-    use core_serialization::{Block, SignedTransaction};
+    use super::TxPoolMessage;
 
     use prost::Oneof;
 
     #[derive(Clone, PartialEq, Oneof)]
     pub enum Message {
-        #[prost(bytes, tag = "1")]
-        Consensus(Vec<u8>), // change Vec<u8> to SignedMessage from PR #74
-
-        #[prost(message, tag = "2")]
-        SignedTransaction(SignedTransaction),
-
-        #[prost(message, tag = "3")]
-        Block(Box<Block>),
+        #[prost(message, tag = "1")]
+        TxPoolMessage(TxPoolMessage),
     }
 }
 
 // Conversion from core-types to core-serialization
-impl From<crate::Message> for Message {
-    fn from(msg: crate::Message) -> Message {
-        use crate::Message as CTMessage;
-
+impl From<NetworkMessage> for P2PMessage {
+    fn from(msg: NetworkMessage) -> P2PMessage {
         match msg {
-            CTMessage::Consensus(v) => Message::Consensus(v),
-            CTMessage::SignedTransaction(stx) => Message::SignedTransaction((*stx).into()),
-            CTMessage::Block(block) => Message::Block(Box::new((*block).into())),
+            NetworkMessage::BroadcastTxs { txs } => {
+                P2PMessage::TxPoolMessage(TxPoolMessage::broadcast_txs(txs))
+            }
+            NetworkMessage::PullTxs { uuid, hashes } => {
+                P2PMessage::TxPoolMessage(TxPoolMessage::pull_txs(uuid, hashes))
+            }
         }
     }
 }

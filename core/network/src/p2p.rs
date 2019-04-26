@@ -1,13 +1,17 @@
 pub mod builder;
 pub mod service;
 
-pub(crate) mod config;
-pub(crate) mod message;
-pub(crate) mod worker;
+pub mod broadcaster;
+pub mod config;
+pub mod message;
+pub mod worker;
 
+pub use service::Service;
+
+pub use broadcaster::Broadcaster;
 pub use builder::Builder;
-pub use service::{Broadcaster, Service};
+pub use config::Config;
+pub use message::{Message, PackedMessage};
+pub use worker::{ServiceWorker, Task};
 
-pub(crate) use config::Config;
-pub(crate) use message::{Message, PackedMessage};
-pub(crate) use worker::{ServiceWorker, Task};
+pub use core_p2p::transmission::RecvMessage;

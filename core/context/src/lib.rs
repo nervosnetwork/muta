@@ -1,11 +1,11 @@
 use std::any::Any;
 use std::collections::HashMap;
 use std::fmt::Debug;
-use std::marker::Send;
+use std::marker::{Send, Sync};
 
 pub const P2P_SESSION_ID: &str = "p2p_session_id";
 
-pub trait Cloneable: CloneableImpl + Debug + Send {}
+pub trait Cloneable: CloneableImpl + Debug + Send + Sync {}
 
 pub trait CloneableImpl {
     fn box_clone(&self) -> Box<Cloneable>;

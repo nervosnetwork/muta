@@ -17,24 +17,40 @@ use core_runtime::{FutRuntimeResult, TransactionPool, TransactionPoolError};
 use core_storage::{Storage, StorageError};
 use core_types::{Address, Hash, SignedTransaction, Transaction, UnverifiedTransaction};
 
-pub struct HashTransactionPool<S, C> {
+pub trait Broadcaster: Send + Sync + Clone {
+    fn broadcast_batch(&mut self, txs: Vec<SignedTransaction>);
+
+    fn pull_txs(
+        &mut self,
+        ctx: Context,
+        hashes: Vec<Hash>,
+    ) -> FutRuntimeResult<Vec<SignedTransaction>, TransactionPoolError>;
+}
+
+type CallbackCache = Arc<RwLock<HashMap<Hash, SignedTransaction>>>;
+
+pub struct HashTransactionPool<S, C, B> {
     pool_size:         usize,
     until_block_limit: u64,
     quota_limit:       u64,
 
-    tx_cache: Arc<RwLock<HashMap<Hash, SignedTransaction>>>,
-    storage:  Arc<S>,
-    crypto:   Arc<C>,
+    tx_cache:       Arc<RwLock<HashMap<Hash, SignedTransaction>>>,
+    callback_cache: CallbackCache,
+    storage:        Arc<S>,
+    crypto:         Arc<C>,
+    broadcaster:    B,
 }
 
-impl<S, C> HashTransactionPool<S, C>
+impl<S, C, B> HashTransactionPool<S, C, B>
 where
     S: Storage,
     C: Crypto,
+    B: Broadcaster,
 {
     pub fn new(
         storage: Arc<S>,
         crypto: Arc<C>,
+        broadcaster: B,
         pool_size: usize,
         until_block_limit: u64,
         quota_limit: u64,
@@ -45,16 +61,19 @@ where
             quota_limit,
 
             tx_cache: Arc::new(RwLock::new(HashMap::new())),
+            callback_cache: Arc::new(RwLock::new(HashMap::new())),
             storage,
             crypto,
+            broadcaster,
         }
     }
 }
 
-impl<S: 'static, C: 'static> TransactionPool for HashTransactionPool<S, C>
+impl<S, C, B> TransactionPool for HashTransactionPool<S, C, B>
 where
-    S: Storage,
-    C: Crypto,
+    S: Storage + 'static,
+    C: Crypto + 'static,
+    B: Broadcaster + 'static,
 {
     fn insert(
         &self,
@@ -65,6 +84,7 @@ where
         let storage = Arc::clone(&self.storage);
         let crypto = Arc::clone(&self.crypto);
         let tx_cache = Arc::clone(&self.tx_cache);
+        let mut broadcaster = self.broadcaster.clone();
 
         let pool_size = self.pool_size;
         let until_block_limit = self.until_block_limit;
@@ -123,6 +143,10 @@ where
             };
 
             tx_cache_w.insert(tx_hash, signed_tx.clone());
+
+            // 7. broadcast tx
+            broadcaster.broadcast_batch(vec![signed_tx.clone()]);
+
             Ok(signed_tx)
         };
 
@@ -203,6 +227,25 @@ where
         _: Context,
         tx_hashes: &[Hash],
     ) -> FutRuntimeResult<Vec<SignedTransaction>, TransactionPoolError> {
+        // check callback first
+        let mut callback_cache = match self.callback_cache.write().wait() {
+            Ok(callback_cache) => callback_cache,
+            Err(()) => return Box::new(err(map_rwlock_err(()))),
+        };
+
+        let signed_txs = tx_hashes
+            .iter()
+            .map(|hash| callback_cache.get(hash).cloned())
+            .filter_map(|tx| tx)
+            .collect::<Vec<SignedTransaction>>();
+        if !signed_txs.is_empty() {
+            for hash in tx_hashes.iter() {
+                callback_cache.remove(hash);
+            }
+
+            return Box::new(ok(signed_txs));
+        }
+
         let tx_cache = match self.tx_cache.read().wait() {
             Ok(tx_cache) => tx_cache,
             Err(()) => return Box::new(err(map_rwlock_err(()))),
@@ -216,15 +259,36 @@ where
         Box::new(ok(signed_txs))
     }
 
-    /// TODO: Implement "ensure"
-    /// In the POC-1 phase, we only support single-node, so this function is not
-    /// implemented.
     fn ensure(
         &self,
-        _: Context,
-        _tx_hashes: &[Hash],
+        ctx: Context,
+        tx_hashes: &[Hash],
     ) -> FutRuntimeResult<(), TransactionPoolError> {
-        unimplemented!();
+        // FIXME: only pull txs we dont have
+        let mut broadcaster = self.broadcaster.clone();
+        let hashes = tx_hashes.to_vec();
+
+        let mut callback_cache = match self.callback_cache.write().wait() {
+            Ok(callback_cache) => callback_cache,
+            Err(()) => return Box::new(err(map_rwlock_err(()))),
+        };
+
+        // TODO: pass network error
+        let fut = async move {
+            let sig_txs = match await!(broadcaster.pull_txs(ctx, hashes).compat()) {
+                Ok(sig_txs) => sig_txs,
+                Err(e) => return Err(e),
+            };
+
+            for stx in sig_txs.into_iter() {
+                let hash = stx.hash.clone();
+                callback_cache.insert(hash, stx);
+            }
+
+            Ok(())
+        };
+
+        Box::new(fut.boxed().compat())
     }
 }
 
@@ -265,16 +329,31 @@ fn internal_error(e: impl ToString) -> TransactionPoolError {
 mod tests {
     use std::sync::Arc;
 
-    use futures::future::Future;
+    use futures::future::{ok, Future};
 
     use components_database::memory::MemoryDB;
     use core_context::Context;
     use core_crypto::{secp256k1::Secp256k1, Crypto, CryptoTransform};
-    use core_runtime::{TransactionPool, TransactionPoolError};
+    use core_runtime::{FutRuntimeResult, TransactionPool, TransactionPoolError};
     use core_storage::{BlockStorage, Storage};
     use core_types::{Address, Block, Hash, SignedTransaction, Transaction, UnverifiedTransaction};
 
-    use super::HashTransactionPool;
+    use super::{Broadcaster, HashTransactionPool};
+
+    #[derive(Clone)]
+    struct MockBroadcast;
+
+    impl Broadcaster for MockBroadcast {
+        fn broadcast_batch(&mut self, _: Vec<SignedTransaction>) {}
+
+        fn pull_txs(
+            &mut self,
+            _: Context,
+            _: Vec<Hash>,
+        ) -> FutRuntimeResult<Vec<SignedTransaction>, TransactionPoolError> {
+            Box::new(ok(vec![SignedTransaction::default()]))
+        }
+    }
 
     #[test]
     fn test_insert_transaction() {
@@ -291,8 +370,15 @@ mod tests {
         block.header.height = height;
         storage.insert_block(ctx.clone(), block).wait().unwrap();
 
-        let tx_pool =
-            HashTransactionPool::new(storage, secp, pool_size, until_block_limit, quota_limit);
+        let broadcast = MockBroadcast;
+        let tx_pool = HashTransactionPool::new(
+            storage,
+            secp,
+            broadcast,
+            pool_size,
+            until_block_limit,
+            quota_limit,
+        );
 
         // test normal
         let untx = mock_transaction(100, height + until_block_limit, "test_normal".to_owned());
@@ -366,8 +452,15 @@ mod tests {
 
         storage.insert_block(ctx.clone(), block).wait().unwrap();
 
-        let tx_pool =
-            HashTransactionPool::new(storage, secp, pool_size, until_block_limit, quota_limit);
+        let broadcast = MockBroadcast;
+        let tx_pool = HashTransactionPool::new(
+            storage,
+            secp,
+            broadcast,
+            pool_size,
+            until_block_limit,
+            quota_limit,
+        );
 
         let tx_hash = signed_tx.untx.transaction.hash();
         let result = tx_pool.insert(ctx.clone(), tx_hash, signed_tx.untx).wait();
@@ -389,8 +482,15 @@ mod tests {
         block.header.height = height;
         storage.insert_block(ctx.clone(), block).wait().unwrap();
 
-        let tx_pool =
-            HashTransactionPool::new(storage, secp, pool_size, until_block_limit, quota_limit);
+        let broadcast = MockBroadcast;
+        let tx_pool = HashTransactionPool::new(
+            storage,
+            secp,
+            broadcast,
+            pool_size,
+            until_block_limit,
+            quota_limit,
+        );
 
         let untx = mock_transaction(100, height + until_block_limit, "test1".to_owned());
         let tx_hash = untx.transaction.hash();
@@ -421,8 +521,15 @@ mod tests {
         block.header.height = height;
         storage.insert_block(ctx.clone(), block).wait().unwrap();
 
-        let tx_pool =
-            HashTransactionPool::new(storage, secp, pool_size, until_block_limit, quota_limit);
+        let broadcast = MockBroadcast;
+        let tx_pool = HashTransactionPool::new(
+            storage,
+            secp,
+            broadcast,
+            pool_size,
+            until_block_limit,
+            quota_limit,
+        );
 
         let mut tx_hashes = vec![];
         for i in 0..10 {
@@ -460,8 +567,15 @@ mod tests {
         block.header.height = height;
         storage.insert_block(ctx.clone(), block).wait().unwrap();
 
-        let tx_pool =
-            HashTransactionPool::new(storage, secp, pool_size, until_block_limit, quota_limit);
+        let broadcast = MockBroadcast;
+        let tx_pool = HashTransactionPool::new(
+            storage,
+            secp,
+            broadcast,
+            pool_size,
+            until_block_limit,
+            quota_limit,
+        );
 
         let mut tx_hashes = vec![];
         for i in 0..10 {

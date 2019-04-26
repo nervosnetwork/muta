@@ -1,7 +1,4 @@
-use crate::p2p::{Builder, Config, Message, PackedMessage, ServiceWorker, Task};
-
-use core_p2p::{transmission::CastMessage, DefaultPeerManager};
-
+use futures::future::ok;
 use futures::prelude::Stream;
 use futures::sync::mpsc::{Receiver, Sender};
 use log::{debug, error};
@@ -10,22 +7,16 @@ use tentacle::context::ServiceContext;
 use tentacle::service::{DialProtocol, ServiceError, ServiceEvent};
 use tentacle::traits::ServiceHandle;
 
+use core_context::Context;
+use core_p2p::{
+    transmission::{CastMessage, RecvMessage},
+    DefaultPeerManager,
+};
+
+use crate::p2p::{Broadcaster, Builder, Config, Message, PackedMessage, ServiceWorker, Task};
+use crate::reactor::{OutboundMessage, Reaction, Reactor, ReactorMessage};
+
 type TransmitMessage = CastMessage<PackedMessage>;
-
-#[derive(Clone)]
-pub struct Broadcaster {
-    msg_tx: Sender<TransmitMessage>,
-}
-
-impl Broadcaster {
-    pub fn send(&mut self, msg: Message) {
-        let packed_msg = PackedMessage { message: Some(msg) };
-
-        // TODO: add a buffer to handle failure
-        // or increase buffer in TransmissionProtocol ?
-        let _ = self.msg_tx.try_send(CastMessage::All(packed_msg));
-    }
-}
 
 pub struct Service {
     pub peer_manager: DefaultPeerManager,
@@ -38,24 +29,25 @@ pub struct Service {
 }
 
 impl Service {
-    pub fn build() -> Builder {
-        Builder::default()
+    pub(crate) fn build<R>(reactor: R, outbound_rx: Receiver<OutboundMessage>) -> Builder<R>
+    where
+        R: Reactor<Input = ReactorMessage, Output = Reaction<ReactorMessage>> + Send + 'static,
+    {
+        Builder::new(reactor, outbound_rx)
     }
 
     pub async fn shutdown(self) {
         let error = |_| error!("Network: worker shutdown failure");
-        let _ = await!(self.transmit_worker.shutdown()).map_err(error);
-        let _ = await!(self.service_worker.shutdown()).map_err(error);
+        let _ = self.transmit_worker.shutdown().map_err(error);
+        let _ = self.service_worker.shutdown().map_err(error);
     }
 
-    pub fn send(&mut self, msg: Message) {
-        self.broadcaster().send(msg);
+    pub fn send(&mut self, ctx: Context, msg: Message) {
+        self.broadcaster().send(ctx, msg);
     }
 
     pub fn broadcaster(&self) -> Broadcaster {
-        Broadcaster {
-            msg_tx: self.msg_tx.clone(),
-        }
+        Broadcaster::new(self.msg_tx.clone())
     }
 }
 
@@ -78,12 +70,25 @@ impl Service {
         Box::new(service.for_each(|_| Ok(())))
     }
 
-    pub(crate) fn transmit_worker(msg_rx: Receiver<PackedMessage>) -> Task {
-        let worker = msg_rx.for_each(|msg| {
-            // TODO: handling msg
-            println!("{:?}", msg);
-            Ok(())
-        });
+    pub(crate) fn transmit_worker<R>(
+        inbound_rx: Receiver<RecvMessage<PackedMessage>>,
+        outbound_rx: Receiver<OutboundMessage>,
+        broadcaster: Broadcaster,
+        mut reactor: R,
+    ) -> Task
+    where
+        R: Reactor<Input = ReactorMessage, Output = Reaction<ReactorMessage>> + Send + 'static,
+    {
+        let worker = outbound_rx
+            .map(ReactorMessage::Outbound)
+            .select(inbound_rx.map(ReactorMessage::Inbound))
+            .for_each(move |msg| match reactor.react(broadcaster.clone(), msg) {
+                Reaction::Message(msg) => {
+                    error!("network: drop unhandle msg: {:?}", msg);
+                    Box::new(ok(())) // match `Done`
+                }
+                Reaction::Done(ret) => ret,
+            });
 
         Box::new(worker)
     }

@@ -8,6 +8,10 @@ rpc_workers = 0
 # db config
 data_path = "./devtools/chain/rocksdb"
 
+# network
+bootstrap_addresses: []
+listening_address: "/ip4/127.0.0.1/tcp/1337"
+
 # transaction pool
 pool_size = 100000
 until_block_limit = 100

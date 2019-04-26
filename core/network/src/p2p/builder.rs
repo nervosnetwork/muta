@@ -1,59 +1,31 @@
-use crate::p2p::{Config, PackedMessage, Service, ServiceWorker};
-
-use core_p2p::{transmission::CastMessage, DefaultPeerManager, TransmissionProtocol};
-use core_p2p::{ConnecProtocol, DiscoveryProtocol, IdentifyProtocol, PingProtocol};
+use std::default::Default;
 
 use futures::sync::mpsc::{Receiver, Sender};
 use tentacle::builder::ServiceBuilder;
 use tentacle::ProtocolId;
 
-use std::default::Default;
+use core_p2p::{
+    transmission::{CastMessage, RecvMessage},
+    DefaultPeerManager, TransmissionProtocol,
+};
+use core_p2p::{ConnecProtocol, DiscoveryProtocol, IdentifyProtocol, PingProtocol};
+
+use crate::p2p::{Broadcaster, Config, PackedMessage, Service, ServiceWorker};
+use crate::reactor::{OutboundMessage, Reaction, Reactor, ReactorMessage};
 
 const INIT_PROTOCOL_ID: ProtocolId = 1;
 
-pub struct Builder {
+struct PartialBuilder {
     service_builder: ServiceBuilder,
     peer_manager:    DefaultPeerManager, // FIXME: make `PeerManager` trait object
 
     msg_tx: Sender<CastMessage<PackedMessage>>,
-    msg_rx: Receiver<PackedMessage>,
+    msg_rx: Receiver<RecvMessage<PackedMessage>>,
 
     config: Config,
 }
 
-impl Builder {
-    pub fn launch(self) -> Service {
-        let config = self.config;
-
-        let mut peer_manager = self.peer_manager;
-        peer_manager.register_self(config.peer_id(), vec![config.listening_address()]);
-
-        // kick start p2p service
-        let builder = self.service_builder;
-        let service_worker = ServiceWorker::kick_start(Service::service_worker(builder, &config));
-
-        // kick start transmission msg rx handling
-        let msg_rx = self.msg_rx;
-        let transmit_worker = ServiceWorker::kick_start(Service::transmit_worker(msg_rx));
-
-        Service {
-            peer_manager,
-            config,
-
-            msg_tx: self.msg_tx,
-
-            transmit_worker,
-            service_worker,
-        }
-    }
-
-    pub fn config(mut self, config: Config) -> Self {
-        self.config = config;
-        self
-    }
-}
-
-impl Default for Builder {
+impl Default for PartialBuilder {
     fn default() -> Self {
         let peer_manager = DefaultPeerManager::new();
         let config = Config::default();
@@ -73,7 +45,7 @@ impl Default for Builder {
             .insert_protocol(transmit)
             .forever(true);
 
-        Builder {
+        PartialBuilder {
             service_builder,
             peer_manager,
 
@@ -81,6 +53,85 @@ impl Default for Builder {
             msg_rx,
 
             config,
+        }
+    }
+}
+
+pub struct Builder<R> {
+    service_builder: ServiceBuilder,
+    peer_manager:    DefaultPeerManager,
+
+    msg_tx: Sender<CastMessage<PackedMessage>>,
+    msg_rx: Receiver<RecvMessage<PackedMessage>>,
+
+    reactor:     R,
+    outbound_rx: Receiver<OutboundMessage>,
+
+    config: Config,
+}
+
+impl<R> Builder<R>
+where
+    R: Reactor<Input = ReactorMessage, Output = Reaction<ReactorMessage>> + Send + 'static,
+{
+    pub fn new(reactor: R, outbound_rx: Receiver<OutboundMessage>) -> Self {
+        let PartialBuilder {
+            service_builder,
+            peer_manager,
+            msg_tx,
+            msg_rx,
+            config,
+        } = PartialBuilder::default();
+
+        Builder {
+            service_builder,
+            peer_manager,
+
+            msg_tx,
+            msg_rx,
+
+            reactor,
+            outbound_rx,
+
+            config,
+        }
+    }
+
+    pub fn config(mut self, config: Config) -> Self {
+        self.config = config;
+        self
+    }
+
+    pub fn launch(self) -> Service {
+        let config = self.config;
+
+        let mut peer_manager = self.peer_manager;
+        peer_manager.register_self(config.peer_id(), vec![config.listening_address()]);
+
+        // kick start p2p service
+        let builder = self.service_builder;
+        let service_worker = ServiceWorker::kick_start(Service::service_worker(builder, &config));
+
+        // kick start transmission msg rx handling
+        let msg_rx = self.msg_rx;
+        let reactor = self.reactor;
+        let outbound_rx = self.outbound_rx;
+        let broadcaster = Broadcaster::new(self.msg_tx.clone());
+        let transmit_worker = ServiceWorker::kick_start(Service::transmit_worker(
+            msg_rx,
+            outbound_rx,
+            broadcaster,
+            reactor,
+        ));
+
+        Service {
+            peer_manager,
+            config,
+
+            msg_tx: self.msg_tx,
+
+            transmit_worker,
+            service_worker,
         }
     }
 }

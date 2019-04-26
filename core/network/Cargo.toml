@@ -8,6 +8,11 @@ edition = "2018"
 core-p2p = { path = "../p2p", features = ["prost-message"] }
 core-types = { path = "../types" }
 core-serialization = { path = "../serialization" }
+core-context = { path = "../context" }
+core-runtime = { path = "../runtime" }
+core-pubsub = { path = "../pubsub" }
+
+components-transaction-pool = { path = "../../components/transaction-pool" }
 
 config-parser = { path = "../../common/config-parser" }
 
@@ -18,11 +23,14 @@ prost = "0.5"
 bytes = "0.4"
 serde_derive = "1.0"
 serde = "1.0"
-runtime = "0.3.0-alpha.1"
-runtime-raw = "0.3.0-alpha.1"
-runtime-tokio = "0.3.0-alpha.2"
 # TODO: rename futures01 instead
 futures03 = { package = "futures-preview", version = "0.3.0-alpha.14", features = [ "compat" ] }
+uuid = "0.7"
+parking_lot = "0.7"
+tokio = "0.1"
 
 [dev-dependencies]
 env_logger = "0.6"
+runtime = "0.3.0-alpha.1"
+runtime-raw = "0.3.0-alpha.1"
+runtime-tokio = "0.3.0-alpha.2"

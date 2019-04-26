@@ -82,13 +82,33 @@ pub enum CastMessage<TMessage> {
     All(TMessage),
 }
 
+#[derive(Debug)]
+pub struct RecvMessage<TMessage> {
+    session_id: SessionId,
+    msg:        TMessage,
+}
+
+impl<TMessage> RecvMessage<TMessage> {
+    pub fn new(session_id: SessionId, msg: TMessage) -> Self {
+        RecvMessage { session_id, msg }
+    }
+
+    pub fn session_id(&self) -> SessionId {
+        self.session_id
+    }
+
+    pub fn take_msg(self) -> TMessage {
+        self.msg
+    }
+}
+
 /// Protocol for datagram transport
 pub struct TransmissionProtocol<TMessage, TPeerManager> {
     // Inner protocol id
     id: ProtocolId,
 
     // Sender for received message from connected sessions
-    recv_tx: Sender<TMessage>,
+    recv_tx: Sender<RecvMessage<TMessage>>,
 
     // Receiver for message ready to broadcast to connected sessions
     cast_rx: Receiver<CastMessage<TMessage>>,
@@ -97,7 +117,7 @@ pub struct TransmissionProtocol<TMessage, TPeerManager> {
     peer_mgr: TPeerManager,
 
     // Received data ready to send later
-    pending_recv_data: Arc<RwLock<VecDeque<TMessage>>>,
+    pending_recv_data: Arc<RwLock<VecDeque<RecvMessage<TMessage>>>>,
 
     // Stream task handle to pending stream for later notify
     pending_task_handle: TaskHandle,
@@ -115,10 +135,10 @@ where
     ) -> (
         ProtocolMeta,
         Sender<CastMessage<TMessage>>,
-        Receiver<TMessage>,
+        Receiver<RecvMessage<TMessage>>,
     ) {
         let (cast_tx, cast_rx) = channel(CHANNEL_BUFFERS);
-        let (recv_tx, recv_rx) = channel::<TMessage>(CHANNEL_BUFFERS);
+        let (recv_tx, recv_rx) = channel(CHANNEL_BUFFERS);
 
         let proto_handle = move || -> ProtocolHandle<Box<dyn ServiceProtocol + Send + 'static>> {
             let proto = TransmissionProtocol {
@@ -146,16 +166,16 @@ where
     }
 
     pub(crate) fn recv_deliver_task(
-        recv_tx: Sender<TMessage>,
-        pending: Arc<RwLock<VecDeque<TMessage>>>,
+        recv_tx: Sender<RecvMessage<TMessage>>,
+        pending: Arc<RwLock<VecDeque<RecvMessage<TMessage>>>>,
         task_handle: TaskHandle,
     ) -> Box<dyn Future<Item = (), Error = ()> + Send + 'static> {
         let pending_cloned = Arc::clone(&pending);
         let mut task_handle_cloned = task_handle.clone();
 
         // create stream from pending
-        let pending_stream =
-            stream::poll_fn(move || -> Poll<Option<TMessage>, SendError<TMessage>> {
+        let pending_stream = stream::poll_fn(
+            move || -> Poll<Option<RecvMessage<TMessage>>, SendError<RecvMessage<TMessage>>> {
                 // record task handle
                 task_handle_cloned.insert(RECV_DATA_TASK_ID, task::current());
 
@@ -164,7 +184,8 @@ where
                     .write()
                     .pop_front()
                     .map_or(Async::NotReady, |msg| Async::Ready(Some(msg))))
-            });
+            },
+        );
 
         let deliver_task = pending_stream.forward(recv_tx).then(|finish| {
             if let Err(err) = finish {
@@ -201,7 +222,9 @@ where
         );
 
         if let Err(()) = <TMessage as Codec>::decode(&data).and_then(|data| {
-            self.pending_recv_data.write().push_back(data);
+            self.pending_recv_data
+                .write()
+                .push_back(RecvMessage::new(session.id, data));
             self.pending_task_handle.notify(RECV_DATA_TASK_ID);
 
             Ok(())

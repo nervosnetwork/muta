@@ -1,14 +1,16 @@
 use futures::future::{err, ok, Either};
 use futures::prelude::Future;
 use futures::sync::oneshot::{channel, Sender};
-use futures03::compat::Future01CompatExt;
-use runtime::task::{spawn, JoinHandle};
+use log::error;
+use tokio;
+
+use std::thread::{self as thread, JoinHandle};
 
 pub type Task = Box<dyn Future<Item = (), Error = ()> + Send + 'static>;
 
 pub struct ServiceWorker {
     shutdown_tx:   Sender<()>,
-    thread_handle: JoinHandle<Result<(), ()>>,
+    thread_handle: JoinHandle<()>,
 }
 
 impl ServiceWorker {
@@ -21,7 +23,7 @@ impl ServiceWorker {
                 _ => Box::new(err(())),
             }
         });
-        let thread_handle = spawn(async move { await!(worker.compat()) });
+        let thread_handle = thread::spawn(move || tokio::run(worker));
 
         ServiceWorker {
             shutdown_tx,
@@ -29,9 +31,11 @@ impl ServiceWorker {
         }
     }
 
-    pub async fn shutdown(self) -> Result<(), ()> {
+    pub fn shutdown(self) -> Result<(), ()> {
         self.shutdown_tx.send(())?;
-        await!(self.thread_handle)?;
+        self.thread_handle.join().map_err(|err| {
+            error!("Network: worker thread join error: {:?}", err);
+        })?;
 
         Ok(())
     }

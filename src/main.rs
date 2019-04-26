@@ -8,6 +8,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use futures01::future::Future as Future01;
+use futures01::sync::mpsc::channel;
 use serde_derive::Deserialize;
 
 use components_database::rocks::RocksDB;
@@ -21,6 +22,8 @@ use core_crypto::{
     secp256k1::{PrivateKey, Secp256k1},
     Crypto, CryptoTransform,
 };
+use core_network::reactor::{outbound, CallbackMap, ChainReactor, InboundReactor, OutboundReactor};
+use core_network::Network;
 use core_pubsub::PubSub;
 use core_storage::{BlockStorage, Storage};
 use core_types::{Address, Block, BlockHeader, Genesis, Hash, Proof};
@@ -123,14 +126,32 @@ fn start(cfg: &Config) {
         .unwrap(),
     );
 
+    let (outbound_tx, outbound_rx) = channel(255);
+    let outbound_tx = outbound::Sender::new(outbound_tx);
+
     // new tx pool
     let tx_pool = Arc::new(HashTransactionPool::new(
         Arc::clone(&storage),
         Arc::clone(&secp),
+        outbound_tx,
         cfg.pool_size as usize,
         cfg.until_block_limit,
         cfg.quota_limit,
     ));
+
+    // net network
+    let callback_map = CallbackMap::default();
+    let inbound_reactor = InboundReactor::new(Arc::clone(&tx_pool), Arc::clone(&callback_map));
+    let outbound_reactor = OutboundReactor::new(callback_map);
+    let network_reactor = inbound_reactor.chain(outbound_reactor);
+    // or
+    // let network_reactor = outbound_reactor.chain(inbound_reactor);
+    // or peer that only handle inbound message
+    // let network_reactor = inbound_reactor;
+    // or peer that only handle outbound message
+    // let network_reactor = outbound_reactor;
+
+    let _network = Network::new(Default::default(), outbound_rx, network_reactor).unwrap();
 
     // run json rpc
     let mut jrpc_config = components_jsonrpc::Config::default();

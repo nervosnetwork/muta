@@ -21,6 +21,7 @@ core-types = { path = "core/types" }
 core-consensus = { path = "core/consensus" }
 core-context = { path = "core/context" }
 core-pubsub = { path = "core/pubsub" }
+core-network = { path = "core/network" }
 
 hex = "0.3"
 tokio = "0.1"
