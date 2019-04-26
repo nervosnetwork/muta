@@ -202,20 +202,9 @@ where
             block_hash:   Hash::from_bytes(&[0x00u8; 32]).unwrap(),
             index:        Uint::from(0),
         };
-        let receipt = await!(self
-            .storage
-            .get_receipt(Context::new(), &raw_tx.hash)
-            .compat());
-        let receipt = match receipt {
-            Ok(ok) => ok,
-            Err(_) => return Ok(tx),
-        };
-        let b = await!(self
-            .storage
-            .get_block_by_hash(Context::new(), &receipt.block_hash)
-            .compat())?;
+        let b = await!(self.get_block_by_tx_hash(raw_tx.hash.clone()))?;
         tx.block_number = Uint::from(b.header.height);
-        tx.block_hash = receipt.block_hash;
+        tx.block_hash = b.hash;
         tx.index = Uint::from(b.tx_hashes.iter().position(|x| x == &raw_tx.hash).unwrap() as u64);
         Ok(tx)
     }

@@ -6,7 +6,6 @@ use crate::{Address, Bloom, Hash};
 pub struct Receipt {
     pub state_root:       Hash,
     pub transaction_hash: Hash,
-    pub block_hash:       Hash,
     pub quota_used:       u64,
     pub logs_bloom:       Bloom,
     pub logs:             Vec<LogEntry>,
@@ -29,7 +28,6 @@ impl Encodable for Receipt {
     fn rlp_append(&self, s: &mut RlpStream) {
         s.append(&self.state_root);
         s.append(&self.transaction_hash);
-        s.append(&self.block_hash);
         s.append(&self.quota_used);
         s.append(&self.logs_bloom.as_bytes());
         s.append_list(&self.logs);

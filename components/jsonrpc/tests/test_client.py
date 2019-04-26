@@ -127,7 +127,12 @@ def test_call():
 
 
 def test_get_transaction():
-    pass
+    tx = client.sign_tx(user1.private_key, user2.address, "", 10, 100000)
+    receipt = client.sync_raw_transaction(tx)
+    h = receipt['transactionHash']
+    tx = client.get_transaction(h)
+    assert tx['hash'] == h
+    assert tx['from'] == user1.address.lower()
 
 
 def test_get_code():

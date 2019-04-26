@@ -375,7 +375,6 @@ impl From<core_types::Receipt> for Receipt {
         Self {
             state_root:       receipt.state_root.as_bytes().to_vec(),
             transaction_hash: receipt.transaction_hash.as_bytes().to_vec(),
-            block_hash:       receipt.block_hash.as_bytes().to_vec(),
             quota_used:       receipt.quota_used,
             logs_bloom:       receipt.logs_bloom.as_bytes().to_vec(),
             logs:             receipt.logs.into_iter().map(Into::into).collect(),
@@ -401,7 +400,6 @@ impl TryInto<core_types::Receipt> for Receipt {
         Ok(core_types::Receipt {
             state_root: Hash::from_bytes(&self.state_root)?,
             transaction_hash: Hash::from_bytes(&self.transaction_hash)?,
-            block_hash: Hash::from_bytes(&self.block_hash)?,
             quota_used: self.quota_used,
             logs_bloom: Bloom::from_slice(&self.logs_bloom),
             receipt_error: self.error,

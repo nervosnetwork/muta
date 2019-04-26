@@ -14,7 +14,6 @@ message Receipt {
     // bytes32(H256)
     bytes transaction_hash = 6;
     bytes contract_address = 7;
-    bytes block_hash = 8;
 }
 
 message LogEntry {
