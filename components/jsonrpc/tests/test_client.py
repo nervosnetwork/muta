@@ -62,7 +62,7 @@ def test_get_block_by_number():
 
     b = client.get_block_by_number(block_number, True)
     assert len(b['body']['transactions']) == 1
-    assert b['body']['transactions'][0]['from'] == user1.address
+    assert b['body']['transactions'][0]['from'] == user1.address.lower()
     assert b['body']['transactions'][0]['hash'] == tx_hash
 
 
@@ -165,11 +165,11 @@ if __name__ == '__main__':
     test_block_number()
     test_transfer_balance()
     test_get_block_by_hash()
-    # test_get_block_by_number()
+    test_get_block_by_number()
     test_get_block_include_tx_with_data()
     test_get_logs()
     test_call()
-    # test_get_transaction()
+    test_get_transaction()
     test_get_code()
     test_get_abi()
     test_get_block_header()

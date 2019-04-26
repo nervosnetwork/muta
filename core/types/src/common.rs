@@ -151,7 +151,7 @@ impl Serialize for Hash {
     where
         S: Serializer,
     {
-        serializer.serialize_str(&self.as_hex())
+        serializer.serialize_str(&format!("0x{}", self.as_hex()))
     }
 }
 

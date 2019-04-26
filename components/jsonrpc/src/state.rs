@@ -114,7 +114,7 @@ where
                 transactions: raw_block
                     .tx_hashes
                     .iter()
-                    .map(|tx| cita::BlockTransaction::Hash(Hash::digest(tx.as_bytes())))
+                    .map(|hash| cita::BlockTransaction::Hash(hash.clone()))
                     .collect(),
             },
         };
