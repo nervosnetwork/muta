@@ -17,7 +17,7 @@ futures = "0.1"
 futures-locks = "0.3"
 log = "0.4"
 # TODO: rename futures01 instead
-futures03 = { package = "futures-preview", version = "0.3.0-alpha.14", features = [ "compat" ] }
+futures03 = { package = "futures-preview", version = "=0.3.0-alpha.14", features = [ "compat" ] }
 
 [dev-dependencies]
 components-database = { path = "../database" }

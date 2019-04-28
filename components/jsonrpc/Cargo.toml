@@ -8,8 +8,8 @@ edition = "2018"
 actix = "0.8.0-alpha.3"
 actix-web = "1.0.0-alpha.6"
 old_futures = { package = "futures", version = "0.1" }
-futures-preview = { version = "0.3.0-alpha.14", features = ["compat"] }
-futures-util-preview = { version = "0.3.0-alpha.14" }
+futures-preview = { version = "=0.3.0-alpha.14", features = ["compat"] }
+futures-util-preview = { version = "=0.3.0-alpha.14" }
 
 bytes = "0.4"
 ethbloom = "0.6"

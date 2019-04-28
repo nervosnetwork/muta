@@ -24,7 +24,7 @@ bytes = "0.4"
 serde_derive = "1.0"
 serde = "1.0"
 # TODO: rename futures01 instead
-futures03 = { package = "futures-preview", version = "0.3.0-alpha.14", features = [ "compat" ] }
+futures03 = { package = "futures-preview", version = "=0.3.0-alpha.14", features = [ "compat" ] }
 uuid = "0.7"
 parking_lot = "0.7"
 tokio = "0.1"

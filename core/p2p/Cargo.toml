@@ -18,7 +18,7 @@ bytes = "0.4"
 prost = { version = "0.5", optional = true }
 rand = "0.6"
 # TODO: rename futures01 instead
-futures03 = { package = "futures-preview", version = "0.3.0-alpha.14", features = [ "compat" ] }
+futures03 = { package = "futures-preview", version = "=0.3.0-alpha.14", features = [ "compat" ] }
 
 
 # Unfortunately, dev-dependencies cannot be optional.
