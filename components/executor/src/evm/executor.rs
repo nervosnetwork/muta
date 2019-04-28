@@ -431,9 +431,7 @@ fn logs_to_bloom(logs: &[LogEntry]) -> Bloom {
 }
 
 fn accrue_log(bloom: &mut Bloom, log: &LogEntry) {
-    let address_hash = Hash::digest(log.address.as_bytes());
-    let input = BloomInput::Hash(address_hash.as_fixed_bytes());
-    bloom.accrue(input);
+    bloom.accrue(BloomInput::Raw(log.address.as_bytes()));
 
     for topic in &log.topics {
         let input = BloomInput::Hash(topic.as_fixed_bytes());

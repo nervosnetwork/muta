@@ -81,40 +81,40 @@ def test_get_block_include_tx_with_data():
 
 def test_get_logs():
     bnb = pymuta.Bnb(client, user0)
-    # bnb.deploy()
-    bnb.address = '0xf7591a8bd1c67b8159ea165ad00d9057d8aff121'
-    # assert bnb.owner() == '0x00000000000000000000000019e49d3efd4e81dc82943ad9791c1916e2229138'
-    # assert bnb.balance_of(user0.address) == 400000000
-    # assert bnb.total_supply() == 400000000
-    # assert bnb.symbol() == b'DOUZ'
+    bnb.deploy()
+    assert bnb.owner() == '0x00000000000000000000000019e49d3efd4e81dc82943ad9791c1916e2229138'
+    assert bnb.balance_of(user0.address) == 400000000
+    assert bnb.total_supply() == 400000000
+    assert bnb.symbol() == b'DOUZ'
 
-    # bnb.transfer(user1.address, 10)
-    # assert bnb.balance_of(user0.address) == 400000000 - 10
-    # assert bnb.balance_of(user1.address) == 10
+    r = bnb.transfer(user1.address, 10)
+    assert bnb.balance_of(user0.address) == 400000000 - 10
+    assert bnb.balance_of(user1.address) == 10
 
-    # 'logs': [
-    #     {'address': '0xf7591a8bd1c67b8159ea165ad00d9057d8aff121',
-    #     'blockHash': '0xe7040aa7319abf49cf0d20674b38a0605c5fa30e4e8808d71c06b69c2aee81ae',
-    #     'blockNumber': '0x80b',
-    #     'data': '0x000000000000000000000000000000000000000000000000000000000000000a',
-    #     'logIndex': '0x0',
-    #     'topics': [
-    #         '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef',
-    #         '0x00000000000000000000000019e49d3efd4e81dc82943ad9791c1916e2229138',
-    #         '0x0000000000000000000000002ae83ce578e4bb7968104b5d7c034af36a771a35'],
+    block_number = r['blockNumber']
+    logs = r['logs']  # address, blockHash, blockNumber, data, logIndex, topics
 
-    #         'transactionHash': '0x4dad5a889eeeedf60bd415b223ee319dd1e1b99f9f601b13f507f4db2ffd0b0e',
-    #         'transactionIndex': '0x0', 'transactionLogIndex': '0x0'}],
-    #         'logsBloom': '0x0000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000
-    #         000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000000000
-    #         000000000000000000000000000000000000000000000000000000000000000040000000000000000000000800000000000000000000
-    #         000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000000000000000
-    #         0000000008000000000000000000000000000000000000000000000000000000000000000000000000000000000000001'
+    r = client.get_logs({"fromBlock": block_number, "toBlock": block_number, "address": bnb.address})
+    assert len(r) == 1
+    assert r[0]['address'] == bnb.address.lower()
+    assert r[0]['topics'][0] == logs[0]['topics'][0]
+    assert r[0]['topics'][1] == logs[0]['topics'][1]
+    assert r[0]['topics'][2] == logs[0]['topics'][2]
 
-    # self.client.get_logs
-    # {"topics":["0x8fb1356be6b2a4e49ee94447eb9dcb8783f51c41dcddfe7919f945017d163bf3"],"fromBlock": "0x0"}
+    r = client.get_logs({"fromBlock": block_number, "toBlock": block_number, "topics": [logs[0]['topics'][0]]})
+    assert len(r) == 1
+    assert r[0]['address'] == bnb.address.lower()
+    assert r[0]['topics'][0] == logs[0]['topics'][0]
+    assert r[0]['topics'][1] == logs[0]['topics'][1]
+    assert r[0]['topics'][2] == logs[0]['topics'][2]
 
-    client.get_logs({"topics": [], "fromBlock": "0x0", "toBlock": "latest"})
+    r = client.get_logs({"fromBlock": block_number, "toBlock": block_number,
+                         "topics": [logs[0]['topics'][0], None, logs[0]['topics'][2]]})
+    assert len(r) == 1
+    assert r[0]['address'] == bnb.address.lower()
+    assert r[0]['topics'][0] == logs[0]['topics'][0]
+    assert r[0]['topics'][1] == logs[0]['topics'][1]
+    assert r[0]['topics'][2] == logs[0]['topics'][2]
 
 
 def test_call():

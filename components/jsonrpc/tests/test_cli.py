@@ -101,7 +101,33 @@ def test_get_block_include_tx_with_data():
 
 
 def test_get_logs():
-    pass
+    bnb = pymuta.Bnb(client, user0)
+    bnb.deploy()
+    assert bnb.owner() == '0x00000000000000000000000019e49d3efd4e81dc82943ad9791c1916e2229138'
+    assert bnb.balance_of(user0.address) == 400000000
+    assert bnb.total_supply() == 400000000
+    assert bnb.symbol() == b'DOUZ'
+
+    r = bnb.transfer(user1.address, 10)
+    assert bnb.balance_of(user0.address) == 400000000 - 10
+    assert bnb.balance_of(user1.address) == 10
+
+    block_number = r['blockNumber']
+    logs = r['logs']  # address, blockHash, blockNumber, data, logIndex, topics
+
+    r = call(f'{prefix} getLogs --from {block_number} --to {block_number} --address {bnb.address}')
+    assert len(r) == 1
+    assert r[0]['address'] == bnb.address.lower()
+    assert r[0]['topics'][0] == logs[0]['topics'][0]
+    assert r[0]['topics'][1] == logs[0]['topics'][1]
+    assert r[0]['topics'][2] == logs[0]['topics'][2]
+
+    r = call(f'{prefix} getLogs --from {block_number} --to {block_number} --topic {logs[0]["topics"][0]}')
+    assert len(r) == 1
+    assert r[0]['address'] == bnb.address.lower()
+    assert r[0]['topics'][0] == logs[0]['topics'][0]
+    assert r[0]['topics'][1] == logs[0]['topics'][1]
+    assert r[0]['topics'][2] == logs[0]['topics'][2]
 
 
 def test_call():

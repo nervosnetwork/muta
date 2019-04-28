@@ -146,10 +146,10 @@ class Client:
         r = self.send_raw_transaction(data)
         h = r['hash']
         for _ in range(64):
+            time.sleep(3)
             r = self.send('getTransactionReceipt', params=[h])
             if r:
                 return r
-            time.sleep(1)
         return None
 
     def sign_tx(self, pk: eth_keys.keys.PrivateKey, to: str, data: str, value: int, quota: int):

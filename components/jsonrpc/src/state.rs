@@ -303,78 +303,64 @@ where
         let from_block = await!(self.get_height(filter.from_block.clone()))?;
         let to_block = await!(self.get_height(filter.to_block.clone()))?;
 
-        let mut blocks: Vec<Block> = Vec::new();
+        let mut logs = vec![];
+        let mut log_index = 0;
         for block_height in from_block..=to_block {
             let block = await!(self
                 .storage
                 .get_block_by_height(Context::new(), block_height)
                 .compat())?;
-            blocks.push(block)
-        }
-        let filtered_blocks = blocks
-            .into_iter()
-            .filter(|block| {
-                possible_blooms
-                    .iter()
-                    .any(|bloom| bloom.contains_bloom(BloomRef::from(&block.header.logs_bloom)))
-            })
-            .collect::<Vec<_>>();
 
-        let mut tx_hashes: Vec<Hash> = vec![];
-        for block in &filtered_blocks[..] {
-            tx_hashes.extend(block.tx_hashes.clone());
-        }
-        if tx_hashes.is_empty() {
-            return Ok(vec![]);
-        }
-        let receipts_res = await!(self
-            .storage
-            .get_receipts(Context::new(), tx_hashes.as_slice())
-            .compat())?;
-
-        let mut logs = vec![];
-        let mut tx_idx = 0;
-        for block in &filtered_blocks[..] {
-            let mut log_index: usize = 0;
-            for tx_hash in &block.tx_hashes {
-                let mut _transaction_index = 0;
-                let receipt = &receipts_res[tx_idx];
-                let receipt_contains_bloom = possible_blooms
-                    .iter()
-                    .any(|bloom| bloom.contains_bloom(BloomRef::from(&receipt.logs_bloom)));
-                if receipt_contains_bloom {
-                    for log_entry in &receipt.logs {
-                        let mut _transaction_log_index = 0;
-                        if filter.matches(&log_entry) {
-                            let log = cita::Log {
-                                address:               log_entry.address.clone(),
-                                topics:                log_entry.topics.clone(),
-                                data:                  cita::Data::from(log_entry.data.clone()),
-                                block_hash:            Some(block.header.hash()),
-                                block_number:          Some(block.header.height.into()),
-                                transaction_hash:      Some(tx_hash.clone()),
-                                transaction_index:     Some(_transaction_index.into()),
-                                log_index:             Some(Uint::from(log_index as u64)),
-                                transaction_log_index: Some(_transaction_log_index.into()),
-                            };
-                            logs.push(log);
-                        }
-                        _transaction_log_index += 1;
-                        log_index += 1;
-                    }
-                } else {
-                    log_index += &receipt.logs.len();
+            let mut fit = false;
+            for bloom in &possible_blooms {
+                if block
+                    .header
+                    .logs_bloom
+                    .contains_bloom(BloomRef::from(bloom))
+                {
+                    fit = true;
+                    break;
                 }
-                _transaction_index += 1;
-                tx_idx += 1;
+            }
+
+            if !fit {
+                log_index += block.tx_hashes.len();
+                continue;
+            }
+            let receipts_res = await!(self
+                .storage
+                .get_receipts(Context::new(), block.tx_hashes.as_slice())
+                .compat())?;
+
+            for (tx_idx, tx_hash) in block.tx_hashes.iter().enumerate() {
+                let receipt = &receipts_res[tx_idx];
+                for (log_entry_index, log_entry) in receipt.logs.iter().enumerate() {
+                    if filter.matches(&log_entry) {
+                        let log = cita::Log {
+                            address:               log_entry.address.clone(),
+                            topics:                log_entry.topics.clone(),
+                            data:                  cita::Data::from(log_entry.data.clone()),
+                            block_hash:            Some(block.header.hash()),
+                            block_number:          Some(block.header.height.into()),
+                            transaction_hash:      Some(tx_hash.clone()),
+                            transaction_index:     Some((tx_idx as u64).into()),
+                            log_index:             Some(Uint::from(log_index as u64)),
+                            transaction_log_index: Some((log_entry_index as u64).into()),
+                        };
+                        logs.push(log);
+                    }
+
+                    // Early return
+                    if let Some(limit) = filter.limit {
+                        if logs.len() >= limit {
+                            return Ok(logs);
+                        }
+                    }
+
+                    log_index += 1;
+                }
             }
         }
-
-        let len = logs.len();
-        let logs = match filter.limit {
-            Some(limit) if len >= limit => logs.split_off(len - limit),
-            _ => logs,
-        };
         Ok(logs)
     }
 
