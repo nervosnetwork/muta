@@ -420,9 +420,64 @@ where
         Ok(r)
     }
 
-    pub async fn get_transaction_proof(&self, _hash: Hash) -> RpcResult<Vec<u8>> {
-        // TODO. Can't implement at now
-        unimplemented!()
+    pub async fn get_transaction_proof(&self, hash: Hash) -> RpcResult<Vec<u8>> {
+        let block = await!(self.get_block_by_tx_hash(hash.clone()))?;
+        let block_receipts = await!(self
+            .storage
+            .get_receipts(Context::new(), block.tx_hashes.as_slice())
+            .compat())?;
+        let tx_index = block
+            .tx_hashes
+            .iter()
+            .position(|x| x == &hash)
+            .expect("block should always contains the transaction");
+        let tx_receipt = &block_receipts[tx_index];
+        assert_eq!(tx_receipt.transaction_hash, hash); // Must fit
+
+        // Build the receipts merkle tree for block
+        let tree = Merkle::from_hashes(
+            block_receipts
+                .iter()
+                .map(|r| Hash::digest(rlp::encode(r).as_slice()))
+                .collect(),
+        );
+        // Get proof
+        let proof = tree
+            .get_proof_by_input_index(tx_index)
+            .expect("should always exists");
+
+        // Done! Now we build the TxProof struct for CITA RPC response.
+        // Get raw transaction
+        let resp_tx = await!(self.storage.get_transaction(Context::new(), &hash).compat())?;
+        let resp_block_header = block.header;
+        let resp_next_proposal_block = await!(self
+            .storage
+            .get_block_by_height(Context::new(), resp_block_header.height + 1)
+            .compat())?;
+        let resp_next_proposal_header = resp_next_proposal_block.header;
+
+        let resp_third_block = await!(self
+            .storage
+            .get_block_by_height(Context::new(), resp_block_header.height + 1)
+            .compat())?;
+        let resp_third_proposal_proof = resp_third_block.header.proof.clone();
+
+        let resp_proof: Vec<cita::ProofNode<Hash>> = proof
+            .iter()
+            .map(|x| cita::ProofNode {
+                is_right: x.is_right,
+                hash:     x.hash.clone(),
+            })
+            .collect();
+
+        Ok(rlp::encode(&cita::TxProof {
+            tx:                   resp_tx,
+            receipt:              tx_receipt.clone(),
+            receipt_proof:        resp_proof,
+            block_header:         resp_block_header,
+            next_proposal_header: resp_next_proposal_header,
+            proposal_proof:       resp_third_proposal_proof,
+        }))
     }
 
     pub async fn get_receipt_proof(&self, tx_hash: Hash) -> RpcResult<Vec<ProofNode>> {

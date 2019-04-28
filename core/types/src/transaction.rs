@@ -45,11 +45,26 @@ pub struct UnverifiedTransaction {
     pub signature:   Vec<u8>,
 }
 
+impl Encodable for UnverifiedTransaction {
+    fn rlp_append(&self, s: &mut RlpStream) {
+        s.append(&self.transaction);
+        s.append(&self.signature);
+    }
+}
+
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct SignedTransaction {
     pub untx:   UnverifiedTransaction,
     pub hash:   Hash,
     pub sender: Address,
+}
+
+impl Encodable for SignedTransaction {
+    fn rlp_append(&self, s: &mut RlpStream) {
+        s.append(&self.untx);
+        s.append(&self.hash);
+        s.append(&self.sender);
+    }
 }
 
 #[derive(Default, Clone, Debug, PartialEq, Eq)]
