@@ -5,10 +5,10 @@ authors = ["Cryptape Technologies <contact@cryptape.com>"]
 edition = "2018"
 
 [dependencies]
-tentacle = "0.2.0-alpha.1"
-tentacle-discovery = "0.1.0"
-tentacle-identify = "0.1.0"
-tentacle-ping = "0.2.0"
+tentacle = "0.2.0-alpha.5"
+tentacle-discovery = "0.2.0"
+tentacle-identify = "0.2.0"
+tentacle-ping = "0.3.0"
 generic-channel = { version = "0.2.0", features = [ "futures" ] }
 env_logger = "0.6"
 log = "0.4"
@@ -33,5 +33,5 @@ runtime-tokio = "0.3.0-alpha.2"
 default = []
 prost-message = ["prost"]
 
-[[example]]
-name = "transmission"
+# [[example]]
+# name = "transmission"

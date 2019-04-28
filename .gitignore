@@ -18,3 +18,5 @@ rocksdb*
 # bft
 file_wal
 bft_wal
+# macos
+.DS_Store

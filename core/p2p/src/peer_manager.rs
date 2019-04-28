@@ -25,7 +25,7 @@ pub enum ConnecStatus {
     Banned,
 }
 
-pub trait PeerManager: Send + Clone {
+pub trait PeerManager: Send + Sync + Clone {
     fn max_peer_conns() -> usize {
         MAX_PEER_CONNECTIONS
     }

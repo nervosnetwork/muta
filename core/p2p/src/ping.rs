@@ -1,7 +1,7 @@
 use bytes::Bytes;
 use futures::prelude::{Async, Stream};
 use futures::sync::mpsc::{channel, Receiver, Sender};
-use tentacle::context::{ServiceContext, SessionContext};
+use tentacle::context::{ProtocolContext, ProtocolContextMutRef};
 use tentacle::service::{ProtocolHandle, ProtocolMeta};
 use tentacle::{builder::MetaBuilder, secio::PeerId, traits::ServiceProtocol, ProtocolId};
 use tentacle_ping::{Event, PingHandler};
@@ -52,62 +52,54 @@ pub struct PingProtocol<TPeerManager> {
 
 impl<TPeerManager> PingProtocol<TPeerManager>
 where
-    TPeerManager: PeerManager + 'static,
+    TPeerManager: PeerManager + Clone + 'static,
 {
     /// Build a PingProtocol instance
     pub fn build(id: ProtocolId, peer_mgr: TPeerManager) -> ProtocolMeta {
-        let (ping_tx, ping_rx) = channel(PING_EVENT_CHANNEL_BUFFER);
-
-        let interval = Duration::from_secs(PING_INTERVAL);
-        let timeout = Duration::from_secs(PING_TIMEOUT);
-        let inner = PingHandler::new(id, interval, timeout, ping_tx);
-
-        let boxed_proto = Box::new(PingProtocol {
-            ping_rx,
-            peer_mgr,
-
-            inner,
-        });
-
         MetaBuilder::default()
             .id(id)
             .name(name!(PROTOCOL_NAME))
             .support_versions(support_versions!(SUPPORT_VERSIONS))
-            .service_handle(|| ProtocolHandle::Callback(boxed_proto))
+            .service_handle(move || {
+                let (ping_tx, ping_rx) = channel(PING_EVENT_CHANNEL_BUFFER);
+
+                let interval = Duration::from_secs(PING_INTERVAL);
+                let timeout = Duration::from_secs(PING_TIMEOUT);
+                let inner = PingHandler::new(interval, timeout, ping_tx);
+
+                let boxed_proto = Box::new(PingProtocol {
+                    ping_rx,
+                    peer_mgr: peer_mgr.clone(),
+
+                    inner,
+                });
+
+                ProtocolHandle::Callback(boxed_proto)
+            })
             .build()
     }
 
-    pub(crate) fn do_init(&mut self, serv_ctx: &mut ServiceContext) {
-        self.inner.init(serv_ctx)
+    pub(crate) fn do_init(&mut self, proto_ctx: &mut ProtocolContext) {
+        self.inner.init(proto_ctx)
     }
 
-    pub(crate) fn do_connec(
-        &mut self,
-        serv_ctx: &mut ServiceContext,
-        session: &SessionContext,
-        version: &str,
-    ) {
-        self.inner.connected(serv_ctx, session, version)
+    pub(crate) fn do_connec(&mut self, proto_ctx: ProtocolContextMutRef, version: &str) {
+        self.inner.connected(proto_ctx, version)
     }
 
-    pub(crate) fn do_disc(&mut self, serv_ctx: &mut ServiceContext, session: &SessionContext) {
-        self.inner.disconnected(serv_ctx, session)
+    pub(crate) fn do_disc(&mut self, proto_ctx: ProtocolContextMutRef) {
+        self.inner.disconnected(proto_ctx)
     }
 
-    pub(crate) fn do_recv(
-        &mut self,
-        serv_ctx: &mut ServiceContext,
-        session: &SessionContext,
-        data: Bytes,
-    ) {
-        self.inner.received(serv_ctx, session, data)
+    pub(crate) fn do_recv(&mut self, proto_ctx: ProtocolContextMutRef, data: Bytes) {
+        self.inner.received(proto_ctx, data)
     }
 
-    pub(crate) fn do_notify(&mut self, serv_ctx: &mut ServiceContext, token: u64) {
-        self.inner.notify(serv_ctx, token)
+    pub(crate) fn do_notify(&mut self, proto_ctx: &mut ProtocolContext, token: u64) {
+        self.inner.notify(proto_ctx, token)
     }
 
-    pub(crate) fn do_peer_update(&mut self, serv_ctx: &mut ServiceContext) {
+    pub(crate) fn do_peer_update(&mut self, proto_ctx: &mut ProtocolContext) {
         if let Ok(Async::Ready(Some(event))) = self.ping_rx.poll() {
             let (peer_id, behavior) = match event {
                 Event::Ping(peer_id) => (peer_id, Behavior::Ping),
@@ -119,7 +111,7 @@ where
             self.peer_mgr.update_peer_status(&peer_id, behavior);
         }
 
-        self.inner.poll(serv_ctx)
+        self.inner.poll(proto_ctx)
     }
 }
 
@@ -127,32 +119,27 @@ impl<TPeerManager> ServiceProtocol for PingProtocol<TPeerManager>
 where
     TPeerManager: PeerManager + 'static,
 {
-    fn init(&mut self, serv_ctx: &mut ServiceContext) {
-        self.do_init(serv_ctx)
+    fn init(&mut self, proto_ctx: &mut ProtocolContext) {
+        self.do_init(proto_ctx)
     }
 
-    fn connected(
-        &mut self,
-        serv_ctx: &mut ServiceContext,
-        session: &SessionContext,
-        version: &str,
-    ) {
-        self.do_connec(serv_ctx, session, version)
+    fn connected(&mut self, proto_ctx: ProtocolContextMutRef, version: &str) {
+        self.do_connec(proto_ctx, version)
     }
 
-    fn disconnected(&mut self, serv_ctx: &mut ServiceContext, session: &SessionContext) {
-        self.do_disc(serv_ctx, session)
+    fn disconnected(&mut self, proto_ctx: ProtocolContextMutRef) {
+        self.do_disc(proto_ctx)
     }
 
-    fn received(&mut self, serv_ctx: &mut ServiceContext, session: &SessionContext, data: Bytes) {
-        self.do_recv(serv_ctx, session, data)
+    fn received(&mut self, proto_ctx: ProtocolContextMutRef, data: Bytes) {
+        self.do_recv(proto_ctx, data)
     }
 
-    fn notify(&mut self, serv_ctx: &mut ServiceContext, token: u64) {
-        self.do_notify(serv_ctx, token)
+    fn notify(&mut self, proto_ctx: &mut ProtocolContext, token: u64) {
+        self.do_notify(proto_ctx, token)
     }
 
-    fn poll(&mut self, serv_ctx: &mut ServiceContext) {
-        self.do_peer_update(serv_ctx)
+    fn poll(&mut self, proto_ctx: &mut ProtocolContext) {
+        self.do_peer_update(proto_ctx)
     }
 }

@@ -1,3 +1,5 @@
+use std::clone::Clone;
+
 use tentacle::service::{ProtocolHandle, ProtocolMeta};
 use tentacle::{builder::MetaBuilder, ProtocolId};
 use tentacle_discovery::{Discovery, DiscoveryProtocol as InnerDiscoveryProtocol};
@@ -18,16 +20,17 @@ impl DiscoveryProtocol {
     /// Build a `DiscoveryProtocol` instance
     pub fn build<TPeerManager>(id: ProtocolId, peer_mgr: TPeerManager) -> ProtocolMeta
     where
-        TPeerManager: PeerManager + 'static + Send,
+        TPeerManager: PeerManager + 'static + Send + Clone,
     {
-        let discovery = Discovery::new(peer_mgr);
-        let boxed_disc = Box::new(InnerDiscoveryProtocol::new(id, discovery));
-
         MetaBuilder::default()
             .id(id)
             .name(name!(PROTOCOL_NAME))
             .support_versions(support_versions!(SUPPORT_VERSIONS))
-            .service_handle(|| ProtocolHandle::Callback(boxed_disc))
+            .service_handle(move || {
+                let discovery = Discovery::new(peer_mgr.clone(), None);
+                let boxed_disc = Box::new(InnerDiscoveryProtocol::new(discovery));
+                ProtocolHandle::Callback(boxed_disc)
+            })
             .build()
     }
 }

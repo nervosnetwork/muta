@@ -1,6 +1,6 @@
 use crate::peer_manager::{DefaultPeerManagerImpl, PeerManager};
 
-use tentacle::{multiaddr::Multiaddr, secio::PeerId};
+use tentacle::multiaddr::Multiaddr;
 
 use std::borrow::{Borrow, BorrowMut};
 use std::default::Default;
@@ -22,7 +22,8 @@ pub type DefaultPeerManager = PeerManagerHandle<DefaultPeerManagerImpl>;
 impl DefaultPeerManager {
     pub fn new() -> Self {
         PeerManagerHandle {
-            inner: DefaultPeerManagerImpl::new(),
+            inner:              DefaultPeerManagerImpl::new(),
+            local_listen_addrs: vec![],
         }
     }
 }
@@ -34,21 +35,21 @@ impl Default for DefaultPeerManager {
 }
 
 pub struct PeerManagerHandle<I> {
-    pub(crate) inner: I,
+    pub(crate) inner:              I,
+    pub(crate) local_listen_addrs: Vec<Multiaddr>,
 }
 
 impl<M: PeerManager> PeerManagerHandle<M> {
-    pub fn register_self(&mut self, peer_id: PeerId, addrs: Vec<Multiaddr>) {
-        let peer_mgr = <Self as BorrowMutExt>::borrow_mut::<M>(self);
-
-        peer_mgr.new_peer(peer_id, addrs);
+    pub fn register_self(&mut self, addrs: Vec<Multiaddr>) {
+        self.local_listen_addrs = addrs;
     }
 }
 
 impl<M: Clone> Clone for PeerManagerHandle<M> {
     fn clone(&self) -> Self {
         PeerManagerHandle {
-            inner: self.inner.clone(),
+            inner:              self.inner.clone(),
+            local_listen_addrs: self.local_listen_addrs.clone(),
         }
     }
 }

@@ -41,8 +41,8 @@ where
     fn react(&mut self, broadcaster: Broadcaster, input: Self::Input) -> Self::Output {
         match input {
             ReactorMessage::Inbound(recv_msg) => {
-                let session_ctx =
-                    Context::new().with_value::<usize>(P2P_SESSION_ID, recv_msg.session_id());
+                let session_ctx = Context::new()
+                    .with_value::<usize>(P2P_SESSION_ID, recv_msg.session_id().value());
                 let tx_pool = Arc::clone(&self.tx_pool);
                 let callback = Arc::clone(&self.callback_map);
 

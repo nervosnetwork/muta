@@ -1,5 +1,6 @@
 use futures::sync::mpsc::Sender;
 use log::{debug, error};
+use tentacle::SessionId;
 
 use core_context::{CommonValue, Context};
 use core_p2p::transmission::CastMessage;
@@ -30,8 +31,8 @@ impl Broadcaster {
                 debug!("network: broadcaster uni message: {:?}", packed_msg);
 
                 CastMessage::Uni {
-                    session_id,
-                    msg: packed_msg,
+                    session_id: SessionId::new(session_id),
+                    msg:        packed_msg,
                 }
             } else {
                 CastMessage::All(packed_msg)

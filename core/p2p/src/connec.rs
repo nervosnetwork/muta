@@ -1,9 +1,10 @@
 use tentacle::service::{DialProtocol, ProtocolHandle, ProtocolMeta};
 use tentacle::{builder::MetaBuilder, multiaddr::Multiaddr, traits::ServiceProtocol};
-use tentacle::{context::ServiceContext, ProtocolId};
+use tentacle::{
+    context::{ProtocolContext, ServiceContext},
+    ProtocolId,
+};
 
-use std::clone::Clone;
-use std::marker::Send;
 use std::time::Duration;
 
 /// Protocol name (handshake)
@@ -38,7 +39,7 @@ impl RemoteAddr {
 }
 
 /// Peer manager for `connec` protocol
-pub trait PeerManager: Clone + Send {
+pub trait PeerManager: Clone + Send + Sync {
     /// Get unconnected multiaddrs to connect
     fn unconnected_multiaddrs(&mut self) -> Vec<RemoteAddr>;
 }
@@ -55,13 +56,17 @@ where
 {
     /// build a `ConnecProtocol` instance
     pub fn build(id: ProtocolId, peer_mgr: TPeerManager) -> ProtocolMeta {
-        let boxed_proto = Box::new(ConnecProtocol { id, peer_mgr });
-
         MetaBuilder::default()
             .id(id)
             .name(name!(PROTOCOL_NAME))
             .support_versions(support_versions!(SUPPORT_VERSIONS))
-            .service_handle(|| ProtocolHandle::Callback(boxed_proto))
+            .service_handle(move || {
+                let boxed_proto = Box::new(ConnecProtocol {
+                    id,
+                    peer_mgr: peer_mgr.clone(),
+                });
+                ProtocolHandle::Callback(boxed_proto)
+            })
             .build()
     }
 
@@ -80,15 +85,15 @@ impl<TPeerManager> ServiceProtocol for ConnecProtocol<TPeerManager>
 where
     TPeerManager: PeerManager + 'static,
 {
-    fn init(&mut self, serv_ctx: &mut ServiceContext) {
-        serv_ctx.set_service_notify(
+    fn init(&mut self, proto_ctx: &mut ProtocolContext) {
+        proto_ctx.set_service_notify(
             self.id,
             Duration::from_secs(CONNEC_DIAL_INTERVAL),
             CONNEC_PEER_TOKEN,
         )
     }
 
-    fn notify(&mut self, serv_ctx: &mut ServiceContext, token: u64) {
-        self.do_connec(serv_ctx, token);
+    fn notify(&mut self, proto_ctx: &mut ProtocolContext, token: u64) {
+        self.do_connec(proto_ctx, token);
     }
 }

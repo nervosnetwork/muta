@@ -2,16 +2,29 @@ use crate::identify::{MisbehaveResult, Misbehavior, PeerManager as IdentifyPeerM
 use crate::peer_manager::default_manager::{BorrowMutExt, PeerManagerHandle};
 use crate::peer_manager::{ConnecStatus, PeerManager};
 
+use tentacle::service::SessionType;
 use tentacle::{multiaddr::Multiaddr, secio::PeerId};
 
 impl<M: PeerManager> IdentifyPeerManager for PeerManagerHandle<M> {
-    fn add_listen_addrs(&mut self, peer_id: &PeerId, addrs: Vec<Multiaddr>) {
+    /// Get local listen addresses
+    fn local_listen_addrs(&mut self) -> Vec<Multiaddr> {
+        self.local_listen_addrs.clone()
+    }
+
+    /// Add remote peer's listen addresses
+    fn add_remote_listen_addrs(&mut self, peer_id: &PeerId, addrs: Vec<Multiaddr>) {
         let peer_mgr = self.borrow_mut::<M>();
 
         peer_mgr.new_peer(peer_id.clone(), addrs);
     }
 
-    fn add_observed_addr(&mut self, peer_id: &PeerId, addr: Multiaddr) -> MisbehaveResult {
+    /// Add our address observed by remote peer
+    fn add_observed_addr(
+        &mut self,
+        peer_id: &PeerId,
+        addr: Multiaddr,
+        _ty: SessionType,
+    ) -> MisbehaveResult {
         let peer_mgr = self.borrow_mut::<M>();
 
         peer_mgr.new_peer(peer_id.clone(), vec![addr]);

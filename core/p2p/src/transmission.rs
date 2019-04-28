@@ -4,7 +4,8 @@ use futures::sync::mpsc::{channel, Receiver, SendError, Sender};
 use futures::{stream, task};
 use log::{debug, info, warn};
 use parking_lot::RwLock;
-use tentacle::context::{ServiceContext, SessionContext};
+use tentacle::context::{ProtocolContext, ProtocolContextMutRef, ServiceContext};
+use tentacle::service::TargetSession;
 use tentacle::service::{ProtocolHandle, ProtocolMeta};
 use tentacle::{
     builder::MetaBuilder, multiaddr::Multiaddr, secio::PeerId, traits::ServiceProtocol, ProtocolId,
@@ -111,7 +112,7 @@ pub struct TransmissionProtocol<TMessage, TPeerManager> {
     recv_tx: Sender<RecvMessage<TMessage>>,
 
     // Receiver for message ready to broadcast to connected sessions
-    cast_rx: Receiver<CastMessage<TMessage>>,
+    cast_rx: Arc<RwLock<Receiver<CastMessage<TMessage>>>>,
 
     // Peer manager for misbehave report
     peer_mgr: TPeerManager,
@@ -140,26 +141,26 @@ where
         let (cast_tx, cast_rx) = channel(CHANNEL_BUFFERS);
         let (recv_tx, recv_rx) = channel(CHANNEL_BUFFERS);
 
-        let proto_handle = move || -> ProtocolHandle<Box<dyn ServiceProtocol + Send + 'static>> {
-            let proto = TransmissionProtocol {
-                id,
-                peer_mgr: peer_mgr.clone(),
-
-                recv_tx: recv_tx.clone(),
-                cast_rx,
-
-                pending_recv_data: Default::default(),
-                pending_task_handle: Default::default(),
-            };
-
-            ProtocolHandle::Callback(Box::new(proto))
-        };
-
+        //
+        let cast_rx = Arc::new(RwLock::new(cast_rx));
         let meta = MetaBuilder::default()
             .id(id)
             .name(name!(PROTOCOL_NAME))
             .support_versions(support_versions!(SUPPORT_VERSIONS))
-            .service_handle(proto_handle)
+            .service_handle(move || {
+                let proto = TransmissionProtocol {
+                    id,
+                    peer_mgr: peer_mgr.clone(),
+
+                    recv_tx: recv_tx.clone(),
+                    cast_rx: Arc::clone(&cast_rx),
+
+                    pending_recv_data: Default::default(),
+                    pending_task_handle: Default::default(),
+                };
+
+                ProtocolHandle::Callback(Box::new(proto))
+            })
             .build();
 
         (meta, cast_tx, recv_rx)
@@ -210,12 +211,8 @@ where
         serv_ctx.future_task(deliver_task)
     }
 
-    pub(crate) fn do_recv(
-        &mut self,
-        serv_ctx: &mut ServiceContext,
-        session: &SessionContext,
-        data: RawMessage,
-    ) {
+    pub(crate) fn do_recv(&mut self, proto_ctx: ProtocolContextMutRef, data: RawMessage) {
+        let session = proto_ctx.session;
         debug!(
             "protocol [transmission]: message from session [{:?}]",
             (session.id, &session.address, &session.remote_pubkey)
@@ -234,26 +231,25 @@ where
             let session_addr = session.address.clone();
 
             match peer_mgr.misbehave(opt_peer_id, session_addr, Misbehavior::InvalidMessage) {
-                MisbehaviorResult::Disconnect => serv_ctx.disconnect(session.id),
+                MisbehaviorResult::Disconnect => proto_ctx.disconnect(session.id),
                 MisbehaviorResult::Continue => (),
             }
         }
     }
 
-    pub(crate) fn do_cast(&mut self, serv_ctx: &mut ServiceContext) {
-        let unpark_cast =
-            |cast_msg: CastMessage<TMessage>| -> (Option<Vec<SessionId>>, RawMessage) {
-                let (session_ids, msg) = match cast_msg {
-                    CastMessage::Uni { session_id, msg } => (Some(vec![session_id]), msg),
-                    CastMessage::Multi { session_ids, msg } => (Some(session_ids), msg),
-                    CastMessage::All(msg) => (None, msg),
-                };
-                (session_ids, Codec::encode(msg))
+    pub(crate) fn do_cast(&mut self, proto_ctx: &mut ProtocolContext) {
+        let unpark_cast = |cast_msg: CastMessage<TMessage>| -> (TargetSession, RawMessage) {
+            let (target_session, msg) = match cast_msg {
+                CastMessage::Uni { session_id, msg } => (TargetSession::Single(session_id), msg),
+                CastMessage::Multi { session_ids, msg } => (TargetSession::Multi(session_ids), msg),
+                CastMessage::All(msg) => (TargetSession::All, msg),
             };
+            (target_session, Codec::encode(msg))
+        };
 
-        if let Ok(Async::Ready(Some(cast))) = self.cast_rx.poll() {
-            let (session_ids, msg) = unpark_cast(cast);
-            serv_ctx.filter_broadcast(session_ids, self.id, msg.to_vec());
+        if let Ok(Async::Ready(Some(cast))) = self.cast_rx.write().poll() {
+            let (target_session, msg) = unpark_cast(cast);
+            proto_ctx.filter_broadcast(target_session, self.id, msg.to_vec());
         }
     }
 }
@@ -263,20 +259,15 @@ where
     TMessage: Codec + Send + Sync + 'static + Debug,
     TPeerManager: PeerManager + Send + Sync + Clone + 'static,
 {
-    fn init(&mut self, serv_ctx: &mut ServiceContext) {
-        self.do_init(serv_ctx)
+    fn init(&mut self, proto_ctx: &mut ProtocolContext) {
+        self.do_init(proto_ctx)
     }
 
-    fn received(
-        &mut self,
-        serv_ctx: &mut ServiceContext,
-        session: &SessionContext,
-        data: RawMessage,
-    ) {
-        self.do_recv(serv_ctx, session, data)
+    fn received(&mut self, proto_ctx: ProtocolContextMutRef, data: RawMessage) {
+        self.do_recv(proto_ctx, data)
     }
 
-    fn poll(&mut self, serv_ctx: &mut ServiceContext) {
-        self.do_cast(serv_ctx)
+    fn poll(&mut self, proto_ctx: &mut ProtocolContext) {
+        self.do_cast(proto_ctx)
     }
 }

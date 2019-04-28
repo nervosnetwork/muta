@@ -13,7 +13,7 @@ use core_p2p::{ConnecProtocol, DiscoveryProtocol, IdentifyProtocol, PingProtocol
 use crate::p2p::{Broadcaster, Config, PackedMessage, Service, ServiceWorker};
 use crate::reactor::{OutboundMessage, Reaction, Reactor, ReactorMessage};
 
-const INIT_PROTOCOL_ID: ProtocolId = 1;
+const INIT_PROTOCOL_ID: usize = 1;
 
 struct PartialBuilder {
     service_builder: ServiceBuilder,
@@ -30,12 +30,17 @@ impl Default for PartialBuilder {
         let peer_manager = DefaultPeerManager::new();
         let config = Config::default();
 
-        let ident = IdentifyProtocol::build(INIT_PROTOCOL_ID, peer_manager.clone());
-        let disc = DiscoveryProtocol::build(INIT_PROTOCOL_ID + 1, peer_manager.clone());
-        let connec = ConnecProtocol::build(INIT_PROTOCOL_ID + 2, peer_manager.clone());
-        let ping = PingProtocol::build(INIT_PROTOCOL_ID + 3, peer_manager.clone());
-        let (transmit, msg_tx, msg_rx) =
-            TransmissionProtocol::build(INIT_PROTOCOL_ID + 4, peer_manager.clone());
+        let ident =
+            IdentifyProtocol::build(ProtocolId::new(INIT_PROTOCOL_ID), peer_manager.clone());
+        let disc =
+            DiscoveryProtocol::build(ProtocolId::new(INIT_PROTOCOL_ID + 1), peer_manager.clone());
+        let connec =
+            ConnecProtocol::build(ProtocolId::new(INIT_PROTOCOL_ID + 2), peer_manager.clone());
+        let ping = PingProtocol::build(ProtocolId::new(INIT_PROTOCOL_ID + 3), peer_manager.clone());
+        let (transmit, msg_tx, msg_rx) = TransmissionProtocol::build(
+            ProtocolId::new(INIT_PROTOCOL_ID + 4),
+            peer_manager.clone(),
+        );
 
         let service_builder = ServiceBuilder::default()
             .insert_protocol(ident)
@@ -106,7 +111,7 @@ where
         let config = self.config;
 
         let mut peer_manager = self.peer_manager;
-        peer_manager.register_self(config.peer_id(), vec![config.listening_address()]);
+        peer_manager.register_self(vec![config.listening_address()]);
 
         // kick start p2p service
         let builder = self.service_builder;

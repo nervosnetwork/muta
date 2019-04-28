@@ -863,7 +863,7 @@ dependencies = [
  "runtime-tokio 0.3.0-alpha.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.89 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.89 (registry+https://github.com/rust-lang/crates.io-index)",
- "tentacle 0.2.0-alpha.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tentacle 0.2.0-alpha.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio 0.1.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "uuid 0.7.4 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -885,10 +885,10 @@ dependencies = [
  "runtime 0.3.0-alpha.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "runtime-raw 0.3.0-alpha.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "runtime-tokio 0.3.0-alpha.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "tentacle 0.2.0-alpha.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "tentacle-discovery 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "tentacle-identify 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "tentacle-ping 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tentacle 0.2.0-alpha.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tentacle-discovery 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tentacle-identify 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tentacle-ping 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio 0.1.18 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -1393,6 +1393,14 @@ version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "smallvec 0.6.9 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "flatbuffers-verifier"
+version = "0.1.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "flatbuffers 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -2247,7 +2255,7 @@ dependencies = [
 
 [[package]]
 name = "parity-multiaddr"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "arrayref 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -3116,67 +3124,71 @@ dependencies = [
 
 [[package]]
 name = "tentacle"
-version = "0.2.0-alpha.1"
+version = "0.2.0-alpha.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "bytes 0.4.12 (registry+https://github.com/rust-lang/crates.io-index)",
  "flatbuffers 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "flatbuffers-verifier 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "parity-multiaddr 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "tentacle-secio 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "parity-multiaddr 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tentacle-secio 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio 0.1.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-threadpool 0.1.13 (registry+https://github.com/rust-lang/crates.io-index)",
- "tokio-yamux 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tokio-yamux 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "tentacle-discovery"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "byteorder 1.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "bytes 0.4.12 (registry+https://github.com/rust-lang/crates.io-index)",
  "flatbuffers 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "flatbuffers-verifier 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "fnv 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.6.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.89 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.89 (registry+https://github.com/rust-lang/crates.io-index)",
- "tentacle 0.2.0-alpha.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tentacle 0.2.0-alpha.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio 0.1.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "trust-dns 0.15.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "tentacle-identify"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "bytes 0.4.12 (registry+https://github.com/rust-lang/crates.io-index)",
- "flatbuffers 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "tentacle 0.2.0-alpha.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "tokio 0.1.18 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "tentacle-ping"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "bytes 0.4.12 (registry+https://github.com/rust-lang/crates.io-index)",
  "flatbuffers 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "flatbuffers-verifier 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tentacle 0.2.0-alpha.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tokio 0.1.18 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "tentacle-ping"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "bytes 0.4.12 (registry+https://github.com/rust-lang/crates.io-index)",
+ "flatbuffers 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "flatbuffers-verifier 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "fnv 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "generic-channel 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "tentacle 0.2.0-alpha.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tentacle 0.2.0-alpha.5 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "tentacle-secio"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "aes-ctr 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -3184,6 +3196,7 @@ dependencies = [
  "bytes 0.4.12 (registry+https://github.com/rust-lang/crates.io-index)",
  "ctr 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "flatbuffers 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "flatbuffers-verifier 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "hmac 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -3453,7 +3466,7 @@ dependencies = [
 
 [[package]]
 name = "tokio-yamux"
-version = "0.1.4"
+version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "byteorder 1.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -3907,6 +3920,7 @@ dependencies = [
 "checksum fixed-hash 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "a557e80084b05c32b455963ff565a9de6f2866da023d6671705c6aff6f65e01c"
 "checksum fixedbitset 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)" = "86d4de0081402f5e88cdac65c8dcdcc73118c1a7a465e2a05f0da05843a8ea33"
 "checksum flatbuffers 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ea0c34f669be9911826facafe996adfda978aeee67285a13556869e2d8b8331f"
+"checksum flatbuffers-verifier 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)" = "228f0226833a59e66d5ba28d15fca4efce5d598314d56179b22b3d89fbb6bf10"
 "checksum flate2 1.0.7 (registry+https://github.com/rust-lang/crates.io-index)" = "f87e68aa82b2de08a6e037f1385455759df6e445a8df5e005b4297191dbf18aa"
 "checksum fnv 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)" = "2fad85553e09a6f881f739c29f0b00b0f01357c743266d478b68951ce23285f3"
 "checksum foreign-types 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)" = "f6f339eb8adc052cd2ca78910fda869aefa38d22d5cb648e6485e4d3fc06f3b1"
@@ -3999,7 +4013,7 @@ dependencies = [
 "checksum openssl-probe 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "77af24da69f9d9341038eba93a073b1fdaaa1b788221b00a69bce9e762cb32de"
 "checksum openssl-sys 0.9.43 (registry+https://github.com/rust-lang/crates.io-index)" = "33c86834957dd5b915623e94f2f4ab2c70dd8f6b70679824155d5ae21dbd495d"
 "checksum owning_ref 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "49a4b8ea2179e6a2e27411d3bca09ca6dd630821cf6894c6c7c8467a8ee7ef13"
-"checksum parity-multiaddr 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "61ae6944d4435d41f4d0f12108c5cbb9207cbb14bc8f2b4984c6e930dc9c8e41"
+"checksum parity-multiaddr 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "143cb29a33d708ccc4b00686c93acee8c76d8e188b0156a5214fcec63b59a6fc"
 "checksum parity-multihash 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "3e8eab0287ccde7821e337a124dc5a4f1d6e4c25d10cc91e3f9361615dd95076"
 "checksum parking_lot 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)" = "ab41b4aed082705d1056416ae4468b6ea99d52599ecf3169b00088d43113e337"
 "checksum parking_lot_core 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "94c8c7923936b28d546dfd14d4472eaf34c99b14e1c973a32b3e6d4eb04298c9"
@@ -4096,11 +4110,11 @@ dependencies = [
 "checksum synom 0.11.3 (registry+https://github.com/rust-lang/crates.io-index)" = "a393066ed9010ebaed60b9eafa373d4b1baac186dd7e008555b0f702b51945b6"
 "checksum synstructure 0.10.1 (registry+https://github.com/rust-lang/crates.io-index)" = "73687139bf99285483c96ac0add482c3776528beac1d97d444f6e91f203a2015"
 "checksum tempfile 3.0.7 (registry+https://github.com/rust-lang/crates.io-index)" = "b86c784c88d98c801132806dadd3819ed29d8600836c4088e855cdf3e178ed8a"
-"checksum tentacle 0.2.0-alpha.1 (registry+https://github.com/rust-lang/crates.io-index)" = "6ca96f03210576ee49f63cca4683b5c3001d0482c6b8c00d6792553f7d9beec5"
-"checksum tentacle-discovery 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "d458765c30402c4265902cf95ff56a85c11306efd0d2d27776e3e200e310e39c"
-"checksum tentacle-identify 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "da7475de71972640e134aa154696bf80e140e337764eaa21f1a9db476596f932"
-"checksum tentacle-ping 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "9da20c040b0cf48d93c0c91cbd4c3c2fb77e0e39cbc99f9ee474af15a4a20050"
-"checksum tentacle-secio 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "9562b522b885f057e39aac9feb9048e64d4b9cc7f5c0be5933ae6606eb56ad40"
+"checksum tentacle 0.2.0-alpha.5 (registry+https://github.com/rust-lang/crates.io-index)" = "4dae87203f8a19fcdbc5cabf08fa9c1a337ff015a14221919754c5191a3773e1"
+"checksum tentacle-discovery 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "39a377a602798077a0b1414490fea3df8239625782d9b8bffcaeb94ca2b0d59e"
+"checksum tentacle-identify 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "232645ea902f99ca0314c8a95ec779a11a65d3458fea3b2d52975f5b388fc9c1"
+"checksum tentacle-ping 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "788731325d7179435a8c9711619b1eee8ad2cbd716d29584cffdb2040799796f"
+"checksum tentacle-secio 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "5f13591b37fad9bfdc167a646eb7cdd97faac3d606bac3be04107d9f2a816fcc"
 "checksum termcolor 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)" = "4096add70612622289f2fdcdbd5086dc81c1e2675e6ae58d6c4f62a16c6d7f2f"
 "checksum termion 1.5.1 (registry+https://github.com/rust-lang/crates.io-index)" = "689a3bdfaab439fd92bc87df5c4c78417d3cbe537487274e9b0b2dce76e92096"
 "checksum textwrap 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)" = "307686869c93e71f94da64286f9a9524c0f308a9e1c87a583de8e9c9039ad3f6"
@@ -4123,7 +4137,7 @@ dependencies = [
 "checksum tokio-trace-core 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "350c9edade9830dc185ae48ba45667a445ab59f6167ef6d0254ec9d2430d9dd3"
 "checksum tokio-udp 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)" = "66268575b80f4a4a710ef83d087fdfeeabdce9b74c797535fbac18a2cb906e92"
 "checksum tokio-uds 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)" = "037ffc3ba0e12a0ab4aca92e5234e0dedeb48fddf6ccd260f1f150a36a9f2445"
-"checksum tokio-yamux 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)" = "1815b4502bb86c8ffaae8521ecc26e148edb4fcc2ed24c1feba0807a492b4946"
+"checksum tokio-yamux 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "50e8f25455f7b9e9202b5cf713170bd94e01886d44905dce2db8060e738c44e1"
 "checksum toml 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)" = "758664fc71a3a69038656bee8b6be6477d2a6c315a6b81f7081f591bffa4111f"
 "checksum trust-dns 0.15.1 (registry+https://github.com/rust-lang/crates.io-index)" = "65096825b064877da37eeeb9a83390bd23433eabfc503a6476dc5b1949034aa7"
 "checksum trust-dns-proto 0.6.3 (registry+https://github.com/rust-lang/crates.io-index)" = "09144f0992b0870fa8d2972cc069cbf1e3c0fda64d1f3d45c4d68d0e0b52ad4e"
