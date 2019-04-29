@@ -181,6 +181,11 @@ def test_get_transaction_count():
     assert int(new, 16) == int(pre, 16) + 1
 
 
+def test_get_state_proof():
+    r = call(f'{prefix} getStateProof --address {user0.address} --key 0x0000000000000000000000000000000000000000000000000000000000000000')
+    assert r
+
+
 if __name__ == '__main__':
     test_peer_count()
     test_block_number()
@@ -196,3 +201,4 @@ if __name__ == '__main__':
     test_get_block_header()
     test_get_storage_at()
     test_get_transaction_count()
+    test_get_state_proof()

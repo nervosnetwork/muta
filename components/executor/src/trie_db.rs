@@ -33,7 +33,7 @@ where
         self.db.get(Context::new(), DataCategory::State, key).wait()
     }
 
-    fn insert(&mut self, key: &[u8], value: &[u8]) -> Result<(), Self::Error> {
+    fn insert(&self, key: &[u8], value: &[u8]) -> Result<(), Self::Error> {
         self.db
             .insert(
                 Context::new(),
@@ -50,7 +50,7 @@ where
             .wait()
     }
 
-    fn remove(&mut self, key: &[u8]) -> Result<(), Self::Error> {
+    fn remove(&self, key: &[u8]) -> Result<(), Self::Error> {
         self.db
             .remove(Context::new(), DataCategory::State, key)
             .wait()

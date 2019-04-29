@@ -92,8 +92,23 @@ pub trait Executor: Send + Sync {
         state_root: &Hash,
         address: &Address,
     ) -> Result<(Vec<u8>, Hash), ExecutorError>;
-    // fn get_proof(&self, ctx: Context, header: &BlockHeader, address: &Address,
-    // key: &Self::Key) -> Result<Self::Value, ExecutorError>;
+
+    /// Get the merkle proof for a given account.
+    fn get_account_proof(
+        &self,
+        ctx: Context,
+        state_root: &Hash,
+        address: &Address,
+    ) -> Result<Vec<Vec<u8>>, ExecutorError>;
+
+    /// Get the storage proof for given account and key.
+    fn get_storage_proof(
+        &self,
+        ctx: Context,
+        state_root: &Hash,
+        address: &Address,
+        key: &Hash,
+    ) -> Result<Vec<Vec<u8>>, ExecutorError>;
 }
 
 #[derive(Debug)]

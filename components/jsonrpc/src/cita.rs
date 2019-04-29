@@ -206,6 +206,12 @@ impl Data {
     }
 }
 
+impl Encodable for Data {
+    fn rlp_append(&self, s: &mut RlpStream) {
+        s.append(&self.0);
+    }
+}
+
 impl Serialize for Data {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -641,6 +647,24 @@ impl<'de> Deserialize<'de> for Uint {
             deserializer,
             ethereum_types_serialize::ExpectedLen::Between(0, &mut bytes),
         )?;
+
         Ok(U256::from_big_endian(&bytes[0..wrote]).map(Uint).unwrap())
+    }
+}
+
+#[derive(Default, Debug, Clone)]
+pub struct StateProof {
+    pub address:       Address,
+    pub account_proof: Vec<Data>,
+    pub key:           Hash,
+    pub value_proof:   Vec<Data>,
+}
+
+impl Encodable for StateProof {
+    fn rlp_append(&self, s: &mut RlpStream) {
+        s.append(&self.address);
+        s.append_list(&self.account_proof);
+        s.append(&self.key);
+        s.append_list(&self.value_proof);
     }
 }

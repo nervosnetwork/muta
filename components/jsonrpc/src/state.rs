@@ -371,12 +371,26 @@ where
 
     pub async fn get_state_proof(
         &self,
-        _addr: Address,
-        _key: Hash,
-        _block_number: String,
+        addr: Address,
+        key: Hash,
+        number: String,
     ) -> RpcResult<Vec<u8>> {
-        // TODO. Can't implement at now
-        unimplemented!()
+        let b = await!(self.get_block(number))?;
+        let state_root = &b.header.state_root;
+        let account_proof = self
+            .executor
+            .get_account_proof(Context::new(), state_root, &addr)?;
+        let storage_proof =
+            self.executor
+                .get_storage_proof(Context::new(), state_root, &addr, &key)?;
+        let state_proof = cita::StateProof {
+            address:       addr,
+            account_proof: account_proof.into_iter().map(cita::Data::from).collect(),
+            key:           key.clone(),
+            value_proof:   storage_proof.into_iter().map(cita::Data::from).collect(),
+        };
+
+        Ok(rlp::encode(&state_proof))
     }
 
     pub async fn get_storage_at(

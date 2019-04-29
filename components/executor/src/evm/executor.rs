@@ -21,7 +21,7 @@ use core_types::{
 pub struct EVMExecutor<DB> {
     block_provider: Arc<BlockDataProvider>,
 
-    db: DB,
+    db: Arc<DB>,
 }
 
 impl<DB> EVMExecutor<DB>
@@ -30,10 +30,10 @@ where
 {
     pub fn from_genesis(
         genesis: &Genesis,
-        db: DB,
+        db: Arc<DB>,
         block_provider: Arc<BlockDataProvider>,
     ) -> Result<(Self, Hash), ExecutorError> {
-        let mut state = State::new(db.clone())?;
+        let mut state = State::new(Arc::<DB>::clone(&db))?;
 
         for alloc in genesis.state_alloc.iter() {
             let StateAlloc {
@@ -72,13 +72,13 @@ where
     }
 
     pub fn from_existing(
-        db: DB,
+        db: Arc<DB>,
         block_provider: Arc<BlockDataProvider>,
         root: &Hash,
     ) -> Result<Self, ExecutorError> {
         let state_root = H256(root.clone().into_fixed_bytes());
         // Check if state root exists
-        State::from_existing(db.clone(), state_root)?;
+        State::from_existing(Arc::<DB>::clone(&db), state_root)?;
         Ok(EVMExecutor { block_provider, db })
     }
 }
@@ -98,7 +98,7 @@ where
         let state_root = H256(execution_ctx.state_root.clone().into_fixed_bytes());
 
         let state = Arc::new(RefCell::new(State::from_existing(
-            self.db.clone(),
+            Arc::<DB>::clone(&self.db),
             state_root,
         )?));
         let evm_context = build_evm_context(execution_ctx);
@@ -146,7 +146,7 @@ where
         let evm_transaction = build_evm_transaction_of_readonly(to, from, data);
 
         let root = H256(execution_ctx.state_root.clone().into_fixed_bytes());
-        let state = State::from_existing(self.db.clone(), root)?;
+        let state = State::from_existing(Arc::<DB>::clone(&self.db), root)?;
 
         let result = cita_vm::exec_static(
             Arc::clone(&self.block_provider),
@@ -186,7 +186,7 @@ where
         address: &Address,
     ) -> Result<Balance, ExecutorError> {
         let root = H256(state_root.clone().into_fixed_bytes());
-        let mut state = State::from_existing(self.db.clone(), root)?;
+        let mut state = State::from_existing(Arc::<DB>::clone(&self.db), root)?;
 
         let balance = state.balance(&H160::from(address.clone().into_fixed_bytes()))?;
         Ok(to_core_balance(&balance))
@@ -200,7 +200,7 @@ where
         address: &Address,
     ) -> Result<CoreU256, ExecutorError> {
         let root = H256(state_root.clone().into_fixed_bytes());
-        let mut state = State::from_existing(self.db.clone(), root)?;
+        let mut state = State::from_existing(Arc::<DB>::clone(&self.db), root)?;
 
         let nonce = state.nonce(&H160::from(address.clone().into_fixed_bytes()))?;
         Ok(to_core_u256(&nonce))
@@ -215,7 +215,7 @@ where
         key: &CoreH256,
     ) -> Result<CoreH256, ExecutorError> {
         let root = H256(state_root.clone().into_fixed_bytes());
-        let mut state = State::from_existing(self.db.clone(), root)?;
+        let mut state = State::from_existing(Arc::<DB>::clone(&self.db), root)?;
 
         let address = &H160::from(address.clone().into_fixed_bytes());
         let key = H256::from(key.clone().into_fixed_bytes());
@@ -232,7 +232,7 @@ where
         address: &Address,
     ) -> Result<Hash, ExecutorError> {
         let root = H256(state_root.clone().into_fixed_bytes());
-        let mut state = State::from_existing(self.db.clone(), root)?;
+        let state = State::from_existing(Arc::<DB>::clone(&self.db), root)?;
 
         let address = &H160::from(address.clone().into_fixed_bytes());
         let account = state.get_state_object(&address)?;
@@ -250,7 +250,7 @@ where
         address: &Address,
     ) -> Result<(Vec<u8>, Hash), ExecutorError> {
         let root = H256(state_root.clone().into_fixed_bytes());
-        let mut state = State::from_existing(self.db.clone(), root)?;
+        let mut state = State::from_existing(Arc::<DB>::clone(&self.db), root)?;
 
         let address = &H160::from(address.clone().into_fixed_bytes());
         let code = state.code(address)?;
@@ -260,6 +260,36 @@ where
         let code_hash = state.code_hash(address)?;
         let code_hash = Hash::from_bytes(code_hash.as_ref()).expect("never returns an error");
         Ok((code, code_hash))
+    }
+
+    /// Get the merkle proof for a given account.
+    fn get_account_proof(
+        &self,
+        _: Context,
+        state_root: &Hash,
+        address: &Address,
+    ) -> Result<Vec<Vec<u8>>, ExecutorError> {
+        let root = H256(state_root.clone().into_fixed_bytes());
+        let state = State::from_existing(Arc::<DB>::clone(&self.db), root)?;
+        let address = &H160::from(address.clone().into_fixed_bytes());
+        let proof = state.get_account_proof(address)?;
+        Ok(proof)
+    }
+
+    /// Get the storage proof for given account and key.
+    fn get_storage_proof(
+        &self,
+        _: Context,
+        state_root: &Hash,
+        address: &Address,
+        key: &Hash,
+    ) -> Result<Vec<Vec<u8>>, ExecutorError> {
+        let root = H256(state_root.clone().into_fixed_bytes());
+        let state = State::from_existing(Arc::<DB>::clone(&self.db), root)?;
+        let key = H256(key.clone().into_fixed_bytes());
+        let address = &H160::from(address.clone().into_fixed_bytes());
+        let proof = state.get_storage_proof(address, &key)?;
+        Ok(proof)
     }
 }
 
@@ -508,7 +538,7 @@ mod tests {
 
         let (executor, state_root) = EVMExecutor::from_genesis(
             &genesis,
-            MemoryDB::new(false),
+            Arc::new(MemoryDB::new(false)),
             Arc::new(BlockDataProviderMock::default()),
         )
         .unwrap();
@@ -545,7 +575,7 @@ mod tests {
 
         let (executor, state_root) = EVMExecutor::from_genesis(
             &genesis,
-            MemoryDB::new(false),
+            Arc::new(MemoryDB::new(false)),
             Arc::new(BlockDataProviderMock::default()),
         )
         .unwrap();

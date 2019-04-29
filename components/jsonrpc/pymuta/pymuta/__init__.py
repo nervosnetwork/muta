@@ -119,6 +119,9 @@ class Client:
         # {"topics":["0x8fb1356be6b2a4e49ee94447eb9dcb8783f51c41dcddfe7919f945017d163bf3"],"fromBlock": "0x0"}
         return self.send('getLogs', params=[filter_obj])
 
+    def get_state_proof(self, addr: str, key: str, block_number: str = 'latest'):
+        return self.send('getStateProof', params=[addr, key, block_number])
+
     def get_storage_at(self, addr: str, key: str, block_number: str = 'latest'):
         return self.send('getStorageAt', params=[addr, key, block_number])
 

@@ -15,7 +15,7 @@ log = "0.4"
 futures = "0.1"
 ethereum-types = "0.4"
 hex = "0.3"
-cita_trie = "0.2"
+cita_trie = "0.3"
 
 [dev-dependencies]
 core-crypto = { path = "../../core/crypto" }

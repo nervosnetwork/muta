@@ -118,7 +118,7 @@ fn start(cfg: &Config) {
 
     // new storage and trie db
     let storage = Arc::new(BlockStorage::new(Arc::clone(&block_db)));
-    let trie_db = TrieDB::new(Arc::clone(&state_db));
+    let trie_db = Arc::new(TrieDB::new(Arc::clone(&state_db)));
 
     // new executor
     let block = storage.get_latest_block(ctx.clone()).wait().unwrap();
@@ -241,7 +241,7 @@ fn handle_init(cfg: &Config, genesis_path: impl AsRef<Path>) -> Result<(), Box<d
     let path_state = cfg.data_path_for_state();
     log::info!("Data path for state: {:?}", path_state);
     let state_disk_db = Arc::new(RocksDB::new(path_state.to_str().unwrap())?);
-    let state_db = TrieDB::new(state_disk_db);
+    let state_db = Arc::new(TrieDB::new(state_disk_db));
 
     let (_, state_root_hash) = EVMExecutor::from_genesis(
         &genesis,
