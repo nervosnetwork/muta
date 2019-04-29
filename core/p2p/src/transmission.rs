@@ -247,9 +247,18 @@ where
             (target_session, Codec::encode(msg))
         };
 
-        if let Ok(Async::Ready(Some(cast))) = self.cast_rx.write().poll() {
-            let (target_session, msg) = unpark_cast(cast);
-            proto_ctx.filter_broadcast(target_session, self.id, msg.to_vec());
+        loop {
+            match self.cast_rx.write().poll() {
+                Ok(Async::Ready(Some(cast))) => {
+                    let (target_session, msg) = unpark_cast(cast);
+                    proto_ctx.filter_broadcast(target_session, self.id, msg.to_vec());
+                }
+                Ok(Async::NotReady) | Ok(Async::Ready(None)) => break,
+                Err(e) => {
+                    log::error!("do cast {:?}", e);
+                    break;
+                }
+            }
         }
     }
 }
