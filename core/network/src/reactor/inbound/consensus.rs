@@ -46,7 +46,7 @@ where
         if let (ctx, ConsensusMessage { message: Some(msg) }) = input {
             match msg {
                 packed_message::Message::ConsensusProposal(Proposal { msg }) => {
-                    let fut = self.consensus.set_vote(ctx.clone(), msg).map_err(|e| {
+                    let fut = self.consensus.set_proposal(ctx.clone(), msg).map_err(|e| {
                         log::error!("set proposal {:?}", e);
                     });
                     Reaction::Done(Box::new(fut))

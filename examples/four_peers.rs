@@ -9,7 +9,7 @@ use logger;
 use components_database::memory::MemoryDB;
 use components_transaction_pool::HashTransactionPool;
 
-use core_consensus::{Consensus, FutConsensusResult, PorposalMessage, VoteMessage};
+use core_consensus::{Consensus, FutConsensusResult, ProposalMessage, VoteMessage};
 use core_context::{Context, P2P_SESSION_ID};
 use core_crypto::{secp256k1::Secp256k1, Crypto, CryptoTransform};
 use core_network::reactor::{outbound, CallbackMap, ChainReactor, InboundReactor, OutboundReactor};
@@ -209,7 +209,7 @@ fn mock_transaction(quota: u64, valid_until_block: u64, nonce: String) -> Unveri
 pub struct MockConsensus {}
 
 impl Consensus for MockConsensus {
-    fn set_proposal(&self, _ctx: Context, _msg: PorposalMessage) -> FutConsensusResult<()> {
+    fn set_proposal(&self, _ctx: Context, _msg: ProposalMessage) -> FutConsensusResult<()> {
         Box::new(ok(()))
     }
 
