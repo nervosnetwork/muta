@@ -1,4 +1,7 @@
+mod consensus;
 mod tx_pool;
+
+use consensus::{ConsensusMessage, ConsensusReactor};
 use tx_pool::{TransactionPoolMessage, TransactionPoolReactor};
 
 use std::sync::Arc;
@@ -12,6 +15,7 @@ use crate::reactor::{CallbackMap, Reaction, Reactor, ReactorMessage};
 pub enum OutboundMessage {
     Echo(String),
     TransactionPool(TransactionPoolMessage),
+    Consensus(ConsensusMessage),
 }
 
 #[derive(Clone)]
@@ -52,6 +56,10 @@ impl Reactor for OutboundReactor {
             ReactorMessage::Outbound(OutboundMessage::TransactionPool(tx_msg)) => {
                 let mut tx_react = TransactionPoolReactor::new(Arc::clone(&self.callback_map));
                 Reaction::Done(tx_react.react(broadcaster, tx_msg))
+            }
+            ReactorMessage::Outbound(OutboundMessage::Consensus(consensus_msg)) => {
+                let mut consensus_react = ConsensusReactor::new();
+                Reaction::Done(consensus_react.react(broadcaster, consensus_msg))
             }
             msg => Reaction::Message(msg),
         }

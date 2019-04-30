@@ -2,13 +2,14 @@
 
 use std::sync::Arc;
 
-use futures01::future::Future as Future01;
+use futures01::future::{ok, Future as Future01};
 use futures01::sync::mpsc::channel;
 use logger;
 
 use components_database::memory::MemoryDB;
 use components_transaction_pool::HashTransactionPool;
 
+use core_consensus::{Consensus, FutConsensusResult, PorposalMessage, VoteMessage};
 use core_context::{Context, P2P_SESSION_ID};
 use core_crypto::{secp256k1::Secp256k1, Crypto, CryptoTransform};
 use core_network::reactor::{outbound, CallbackMap, ChainReactor, InboundReactor, OutboundReactor};
@@ -154,7 +155,11 @@ fn start_peer(
 
     // net network
     let callback_map = CallbackMap::default();
-    let inbound_reactor = InboundReactor::new(Arc::clone(&tx_pool), Arc::clone(&callback_map));
+    let inbound_reactor = InboundReactor::new(
+        Arc::clone(&tx_pool),
+        Arc::new(MockConsensus::default()),
+        Arc::clone(&callback_map),
+    );
     let outbound_reactor = OutboundReactor::new(callback_map);
 
     let mut network_config = NetworkConfig::default();
@@ -197,5 +202,18 @@ fn mock_transaction(quota: u64, valid_until_block: u64, nonce: String) -> Unveri
     UnverifiedTransaction {
         transaction: tx,
         signature:   signature.as_bytes().to_vec(),
+    }
+}
+
+#[derive(Default)]
+pub struct MockConsensus {}
+
+impl Consensus for MockConsensus {
+    fn set_proposal(&self, _ctx: Context, _msg: PorposalMessage) -> FutConsensusResult<()> {
+        Box::new(ok(()))
+    }
+
+    fn set_vote(&self, _ctx: Context, _msg: VoteMessage) -> FutConsensusResult<()> {
+        Box::new(ok(()))
     }
 }

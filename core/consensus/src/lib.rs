@@ -58,3 +58,9 @@ pub trait Consensus: Send + Sync {
 
     fn set_vote(&self, ctx: Context, msg: VoteMessage) -> FutConsensusResult<()>;
 }
+
+pub trait Broadcaster: Send + Sync + Clone {
+    fn proposal(&mut self, proposal: PorposalMessage);
+
+    fn vote(&mut self, vote: VoteMessage);
+}

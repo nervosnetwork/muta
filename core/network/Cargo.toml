@@ -11,6 +11,7 @@ core-serialization = { path = "../serialization" }
 core-context = { path = "../context" }
 core-runtime = { path = "../runtime" }
 core-pubsub = { path = "../pubsub" }
+core-consensus = { path = "../consensus" }
 
 components-transaction-pool = { path = "../../components/transaction-pool" }
 

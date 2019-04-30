@@ -138,29 +138,11 @@ fn start(cfg: &Config) {
     let tx_pool = Arc::new(HashTransactionPool::new(
         Arc::clone(&storage),
         Arc::clone(&secp),
-        outbound_tx,
+        outbound_tx.clone(),
         cfg.pool_size as usize,
         cfg.until_block_limit,
         cfg.quota_limit,
     ));
-
-    // net network
-    let callback_map = CallbackMap::default();
-    let inbound_reactor = InboundReactor::new(Arc::clone(&tx_pool), Arc::clone(&callback_map));
-    let outbound_reactor = OutboundReactor::new(callback_map);
-    let network_reactor = inbound_reactor.chain(outbound_reactor);
-    // or
-    // let network_reactor = outbound_reactor.chain(inbound_reactor);
-    // or peer that only handle inbound message
-    // let network_reactor = inbound_reactor;
-    // or peer that only handle outbound message
-    // let network_reactor = outbound_reactor;
-
-    let mut net_config = NetworkConfig::default();
-    net_config.p2p.private_key = cfg.private_key.clone();
-    net_config.p2p.listening_address = Some(cfg.listening_address.to_owned());
-    net_config.p2p.bootstrap_addresses = cfg.bootstrap_addresses.to_owned();
-    let _network = Network::new(net_config, outbound_rx, network_reactor).unwrap();
 
     // run json rpc
     let mut jrpc_config = components_jsonrpc::Config::default();
@@ -215,7 +197,30 @@ fn start(cfg: &Config) {
     .unwrap();
 
     // start consensus.
-    let _bft = Bft::new(engine, pubsub.register(), &cfg.consensus_wal_path).unwrap();
+    let consensus = Bft::new(engine, outbound_tx.clone(), &cfg.consensus_wal_path).unwrap();
+    let consensus = Arc::new(consensus);
+
+    // net network
+    let callback_map = CallbackMap::default();
+    let inbound_reactor = InboundReactor::new(
+        Arc::clone(&tx_pool),
+        Arc::clone(&consensus),
+        Arc::clone(&callback_map),
+    );
+    let outbound_reactor = OutboundReactor::new(callback_map);
+    let network_reactor = inbound_reactor.chain(outbound_reactor);
+    // or
+    // let network_reactor = outbound_reactor.chain(inbound_reactor);
+    // or peer that only handle inbound message
+    // let network_reactor = inbound_reactor;
+    // or peer that only handle outbound message
+    // let network_reactor = outbound_reactor;
+
+    let mut net_config = NetworkConfig::default();
+    net_config.p2p.private_key = cfg.private_key.clone();
+    net_config.p2p.listening_address = Some(cfg.listening_address.to_owned());
+    net_config.p2p.bootstrap_addresses = cfg.bootstrap_addresses.to_owned();
+    let _network = Network::new(net_config, outbound_rx, network_reactor).unwrap();
 
     let sub_block = pubsub
         .subscribe::<Block>(PUBSUB_BROADCAST_BLOCK.to_owned())

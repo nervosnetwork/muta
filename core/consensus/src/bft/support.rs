@@ -10,47 +10,39 @@ use futures::executor::{ThreadPool, ThreadPoolBuilder};
 
 use core_context::{Context, P2P_SESSION_ID};
 use core_crypto::{Crypto, CryptoTransform};
-use core_pubsub::{
-    channel::pubsub::Sender, register::Register, PUBSUB_BROADCAST_PROPOSAL, PUBSUB_BROADCAST_VOTE,
-};
 use core_runtime::{Executor, TransactionPool};
 use core_serialization::{AsyncCodec, Proposal as SerProposal};
 use core_storage::Storage;
 use core_types::{Address, Hash, Proof, Proposal, Vote};
 
-use crate::{ConsensusError, ConsensusResult, Engine};
+use crate::{Broadcaster, ConsensusError, ConsensusResult, Engine};
 
-pub(crate) struct Support<E, T, S, C>
+pub(crate) struct Support<E, T, S, C, B>
 where
     E: Executor + 'static,
     T: TransactionPool + 'static,
     S: Storage + 'static,
     C: Crypto + 'static,
+    B: Broadcaster + 'static,
 {
     engine: Engine<E, T, S, C>,
     // Because "bft-rs" is not in the futures runtime,
     // to ensure performance use a separate thread pool to run the futures in "support".
     thread_pool: ThreadPool,
 
-    pub_proposal:    Sender<Vec<u8>>,
-    pub_vote:        Sender<Vec<u8>>,
+    broadcaster:     B,
     proposal_origin: RwLock<HashMap<Hash, usize>>,
 }
 
-impl<E, T, S, C> Support<E, T, S, C>
+impl<E, T, S, C, B> Support<E, T, S, C, B>
 where
     E: Executor + 'static,
     T: TransactionPool + 'static,
     S: Storage + 'static,
     C: Crypto + 'static,
+    B: Broadcaster + 'static,
 {
-    pub(crate) fn new(engine: Engine<E, T, S, C>, mut register: Register) -> ConsensusResult<Self> {
-        let pub_proposal = register
-            .publish(PUBSUB_BROADCAST_PROPOSAL.to_owned())
-            .map_err(|_| ConsensusError::Internal("publish failure".to_owned()))?;
-        let pub_vote = register
-            .publish(PUBSUB_BROADCAST_VOTE.to_owned())
-            .map_err(|_| ConsensusError::Internal("publish failure".to_owned()))?;
+    pub(crate) fn new(engine: Engine<E, T, S, C>, broadcaster: B) -> ConsensusResult<Self> {
         let thread_pool = ThreadPoolBuilder::new()
             .pool_size(10)
             .create()
@@ -59,9 +51,8 @@ where
         Ok(Self {
             engine,
             thread_pool,
+            broadcaster,
 
-            pub_proposal,
-            pub_vote,
             proposal_origin: RwLock::new(HashMap::new()),
         })
     }
@@ -89,12 +80,13 @@ where
     }
 }
 
-impl<E, T, S, C> BftSupport for Support<E, T, S, C>
+impl<E, T, S, C, B> BftSupport for Support<E, T, S, C, B>
 where
     E: Executor + 'static,
     T: TransactionPool + 'static,
     S: Storage + 'static,
     C: Crypto + 'static,
+    B: Broadcaster + 'static,
 {
     type Error = ConsensusError;
 
@@ -165,17 +157,12 @@ where
     /// serialized, users do not have to care about the structure of
     /// Proposal and Vote.
     fn transmit(&self, msg: BftMsg) {
-        let mut pub_proposal = self.pub_proposal.clone();
-        let mut pub_vote = self.pub_vote.clone();
+        let mut broadcaster = self.broadcaster.clone();
 
-        let result = match msg {
-            BftMsg::Proposal(proposal) => pub_proposal.try_send(proposal),
-            BftMsg::Vote(vote) => pub_vote.try_send(vote),
-            _ => Ok(()),
-        };
-
-        if let Err(e) = result {
-            log::error!(target: "bft", "transmit {:?}", e)
+        match msg {
+            BftMsg::Proposal(proposal) => broadcaster.proposal(proposal),
+            BftMsg::Vote(vote) => broadcaster.vote(vote),
+            _ => {}
         }
     }
 

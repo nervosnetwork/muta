@@ -7,42 +7,43 @@ use futures::prelude::{FutureExt, TryFutureExt};
 
 use core_context::{CommonValue, Context};
 use core_crypto::Crypto;
-use core_pubsub::register::Register;
 use core_runtime::{Executor, TransactionPool};
 use core_storage::Storage;
 use core_types::Hash;
 
 use crate::bft::support::Support;
 use crate::{
-    Consensus, ConsensusError, ConsensusResult, Engine, FutConsensusResult, PorposalMessage,
-    VoteMessage,
+    Broadcaster, Consensus, ConsensusError, ConsensusResult, Engine, FutConsensusResult,
+    PorposalMessage, VoteMessage,
 };
 
-pub struct Bft<E, T, S, C>
+pub struct Bft<E, T, S, C, B>
 where
     E: Executor + 'static,
     T: TransactionPool + 'static,
     S: Storage + 'static,
     C: Crypto + 'static,
+    B: Broadcaster + 'static,
 {
     bft_actuator: Arc<BftActuator>,
-    support:      Arc<Support<E, T, S, C>>,
+    support:      Arc<Support<E, T, S, C, B>>,
 }
 
-impl<E, T, S, C> Bft<E, T, S, C>
+impl<E, T, S, C, B> Bft<E, T, S, C, B>
 where
     E: Executor + 'static,
     T: TransactionPool + 'static,
     S: Storage + 'static,
     C: Crypto + 'static,
+    B: Broadcaster + 'static,
 {
     pub fn new(
         engine: Engine<E, T, S, C>,
-        register: Register,
+        broadcaster: B,
         wal_path: &str,
     ) -> ConsensusResult<Self> {
         let status = engine.get_status()?;
-        let support = Support::new(engine, register)?;
+        let support = Support::new(engine, broadcaster)?;
         let support = Arc::new(support);
 
         let bft_actuator = BftActuator::new(
@@ -68,12 +69,13 @@ where
     }
 }
 
-impl<E, T, S, C> Consensus for Bft<E, T, S, C>
+impl<E, T, S, C, B> Consensus for Bft<E, T, S, C, B>
 where
     E: Executor + 'static,
     T: TransactionPool + 'static,
     S: Storage + 'static,
     C: Crypto + 'static,
+    B: Broadcaster + 'static,
 {
     fn set_proposal(&self, ctx: Context, msg: PorposalMessage) -> FutConsensusResult<()> {
         let bft = self.clone();
@@ -104,12 +106,13 @@ where
     }
 }
 
-impl<E, T, S, C> Clone for Bft<E, T, S, C>
+impl<E, T, S, C, B> Clone for Bft<E, T, S, C, B>
 where
     E: Executor + 'static,
     T: TransactionPool + 'static,
     S: Storage + 'static,
     C: Crypto + 'static,
+    B: Broadcaster + 'static,
 {
     fn clone(&self) -> Self {
         Self {
