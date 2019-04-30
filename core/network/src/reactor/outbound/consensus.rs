@@ -45,14 +45,14 @@ impl Reactor for ConsensusReactor {
 }
 
 pub mod impl_comp {
-    use core_consensus::{Broadcaster, PorposalMessage, VoteMessage};
+    use core_consensus::{Broadcaster, ProposalMessage, VoteMessage};
 
     use crate::reactor::outbound::{OutboundMessage, Sender};
 
     use super::ConsensusMessage;
 
     impl Broadcaster for Sender {
-        fn proposal(&mut self, proposal: PorposalMessage) {
+        fn proposal(&mut self, proposal: ProposalMessage) {
             let msg = OutboundMessage::Consensus(ConsensusMessage::Proposal { msg: proposal });
             if let Err(err) = self.try_send(msg) {
                 log::error!("consensus: broadcast proposal failure {}", err);

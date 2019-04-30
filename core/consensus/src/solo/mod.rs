@@ -12,7 +12,7 @@ use core_types::{Hash, Proof, Vote};
 
 use crate::engine::Engine;
 use crate::{
-    Consensus, ConsensusError, ConsensusResult, FutConsensusResult, PorposalMessage, VoteMessage,
+    Consensus, ConsensusError, ConsensusResult, FutConsensusResult, ProposalMessage, VoteMessage,
 };
 
 pub struct Solo<E, T, S, C>
@@ -89,7 +89,7 @@ where
     S: Storage,
     C: Crypto,
 {
-    fn set_proposal(&self, _: Context, _: PorposalMessage) -> FutConsensusResult<()> {
+    fn set_proposal(&self, _: Context, _: ProposalMessage) -> FutConsensusResult<()> {
         unreachable!()
     }
 

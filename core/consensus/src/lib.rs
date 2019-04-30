@@ -48,19 +48,19 @@ pub type FutConsensusResult<T> = Box<OldFuture<Item = T, Error = ConsensusError>
 
 /// The proposal from p2p, serialization and deserialization are all handled in
 /// bft-rs.
-pub type PorposalMessage = Vec<u8>;
+pub type ProposalMessage = Vec<u8>;
 // The vote from p2p, serialization and deserialization are all handled in
 // bft-rs.
 pub type VoteMessage = Vec<u8>;
 
 pub trait Consensus: Send + Sync {
-    fn set_proposal(&self, ctx: Context, msg: PorposalMessage) -> FutConsensusResult<()>;
+    fn set_proposal(&self, ctx: Context, msg: ProposalMessage) -> FutConsensusResult<()>;
 
     fn set_vote(&self, ctx: Context, msg: VoteMessage) -> FutConsensusResult<()>;
 }
 
 pub trait Broadcaster: Send + Sync + Clone {
-    fn proposal(&mut self, proposal: PorposalMessage);
+    fn proposal(&mut self, proposal: ProposalMessage);
 
     fn vote(&mut self, vote: VoteMessage);
 }

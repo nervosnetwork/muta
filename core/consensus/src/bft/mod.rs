@@ -14,7 +14,7 @@ use core_types::Hash;
 use crate::bft::support::Support;
 use crate::{
     Broadcaster, Consensus, ConsensusError, ConsensusResult, Engine, FutConsensusResult,
-    PorposalMessage, VoteMessage,
+    ProposalMessage, VoteMessage,
 };
 
 pub struct Bft<E, T, S, C, B>
@@ -77,7 +77,7 @@ where
     C: Crypto + 'static,
     B: Broadcaster + 'static,
 {
-    fn set_proposal(&self, ctx: Context, msg: PorposalMessage) -> FutConsensusResult<()> {
+    fn set_proposal(&self, ctx: Context, msg: ProposalMessage) -> FutConsensusResult<()> {
         let bft = self.clone();
 
         let fut = async move {
