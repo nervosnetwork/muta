@@ -1,13 +1,14 @@
 use actix_web::{self, middleware, web, App, HttpRequest, HttpResponse, HttpServer};
 use futures::compat::Future01CompatExt;
-use futures::prelude::{FutureExt, TryFutureExt};
+use futures::prelude::{FutureExt, StreamExt, TryFutureExt};
 use old_futures::{self, Future as OldFuture};
 use serde_json;
 use serde_json::Value;
 
+use core_pubsub::channel::pubsub::Receiver;
 use core_runtime::{Executor, TransactionPool};
 use core_storage::{Storage, StorageError};
-use core_types::{Address, Hash};
+use core_types::{Address, Block, Hash};
 
 use crate::cita;
 use crate::config::Config;
@@ -254,12 +255,20 @@ where
 pub fn listen<E: 'static, T: 'static, S: 'static>(
     config: Config,
     app_state: AppState<E, T, S>,
+    mut sub_block: Receiver<Block>,
 ) -> std::io::Result<()>
 where
     E: Executor,
     T: TransactionPool,
     S: Storage,
 {
+    std::thread::spawn(move || {
+        futures::executor::block_on(sub_block.for_each(|_| {
+            // println!("---------- {:?}", e);
+            futures::future::ready(())
+        }));
+    });
+
     let c_payload_size = config.payload_size;
     HttpServer::new(move || {
         App::new()

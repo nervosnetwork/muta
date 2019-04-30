@@ -24,7 +24,7 @@ use core_crypto::{
 };
 use core_network::reactor::{outbound, CallbackMap, ChainReactor, InboundReactor, OutboundReactor};
 use core_network::{Config as NetworkConfig, Network};
-use core_pubsub::PubSub;
+use core_pubsub::{PubSub, PUBSUB_BROADCAST_BLOCK};
 use core_storage::{BlockStorage, Storage};
 use core_types::{Address, Block, BlockHeader, Genesis, Hash, Proof};
 use logger;
@@ -201,6 +201,8 @@ fn start(cfg: &Config) {
         verifier_list,
     };
 
+    let mut pubsub = PubSub::builder().build().start();
+
     let engine = Engine::new(
         Arc::clone(&executor),
         Arc::clone(&tx_pool),
@@ -208,13 +210,18 @@ fn start(cfg: &Config) {
         Arc::clone(&secp),
         privkey.clone(),
         status,
-    );
+        pubsub.register(),
+    )
+    .unwrap();
 
     // start consensus.
-    let pubsub = PubSub::builder().build().start();
     let _bft = Bft::new(engine, pubsub.register(), &cfg.consensus_wal_path).unwrap();
 
-    if let Err(e) = components_jsonrpc::listen(jrpc_config, jrpc_state) {
+    let sub_block = pubsub
+        .subscribe::<Block>(PUBSUB_BROADCAST_BLOCK.to_owned())
+        .unwrap();
+
+    if let Err(e) = components_jsonrpc::listen(jrpc_config, jrpc_state, sub_block) {
         log::error!("Failed to start jrpc server: {}", e);
     };
 }

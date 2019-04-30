@@ -32,6 +32,7 @@ core-context = { path = "../../core/context" }
 core-merkle = { path = "../../core/merkle" }
 core-runtime = { path = "../../core/runtime" }
 core-types = { path = "../../core/types" }
+core-pubsub = { path = "../../core/pubsub" }
 core-storage = { path = "../../core/storage" }
 core-serialization = { path = "../../core/serialization" }
 core-crypto = { path = "../../core/crypto" }

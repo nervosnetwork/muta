@@ -100,6 +100,8 @@
 pub const PUBSUB_BROADCAST_PROPOSAL: &str = "broadcast_proposal";
 /// broadcast vote
 pub const PUBSUB_BROADCAST_VOTE: &str = "broadcast_vote";
+/// broadcase block
+pub const PUBSUB_BROADCAST_BLOCK: &str = "broadcase_block";
 
 /// PubSub builder
 pub mod builder;

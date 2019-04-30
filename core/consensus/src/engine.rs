@@ -10,6 +10,7 @@ use futures::{
 use core_context::Context;
 use core_crypto::Crypto;
 use core_merkle::Merkle;
+use core_pubsub::{channel::pubsub::Sender, register::Register, PUBSUB_BROADCAST_BLOCK};
 use core_runtime::{ExecutionContext, ExecutionResult, Executor, TransactionPool};
 use core_storage::Storage;
 use core_types::{
@@ -47,8 +48,9 @@ where
     storage:  Arc<S>,
     crypto:   Arc<C>,
 
-    privkey: C::PrivateKey,
-    status:  RwLock<ConsensusStatus>,
+    privkey:   C::PrivateKey,
+    status:    RwLock<ConsensusStatus>,
+    pub_block: Sender<Block>,
 }
 
 impl<E, T, S, C> Engine<E, T, S, C>
@@ -66,8 +68,13 @@ where
 
         privkey: C::PrivateKey,
         status: ConsensusStatus,
-    ) -> Self {
-        Self {
+        mut register: Register,
+    ) -> ConsensusResult<Self> {
+        let pub_block = register
+            .publish(PUBSUB_BROADCAST_BLOCK.to_owned())
+            .map_err(|_| ConsensusError::Internal("publish failure".to_owned()))?;
+
+        Ok(Self {
             executor,
             tx_pool,
             storage,
@@ -75,7 +82,8 @@ where
 
             privkey,
             status: RwLock::new(status),
-        }
+            pub_block,
+        })
     }
 
     /// Package a new block.
@@ -205,7 +213,11 @@ where
         let cloned_header = block.header.clone();
 
         let mut stream = FuturesUnordered::new();
-        stream.push(self.storage.insert_block(ctx.clone(), block).compat());
+        stream.push(
+            self.storage
+                .insert_block(ctx.clone(), block.clone())
+                .compat(),
+        );
         stream.push(
             self.storage
                 .update_latest_proof(ctx.clone(), latest_proof.clone())
@@ -242,6 +254,12 @@ where
         // update status
         let updated_status = self.update_status(&cloned_header, &block_hash, &latest_proof)?;
         log::info!("block committed, status = {:?}", updated_status);
+
+        // broadcast the block
+        let mut pub_block = self.pub_block.clone();
+        if let Err(e) = pub_block.try_send(block) {
+            log::error!("broadcast block failed, error: {:?}", e);
+        }
 
         Ok(updated_status)
     }
