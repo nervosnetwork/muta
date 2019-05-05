@@ -26,6 +26,7 @@ impl Receipt {
 impl Encodable for Receipt {
     /// Append a value to the stream
     fn rlp_append(&self, s: &mut RlpStream) {
+        s.begin_list(7);
         s.append(&self.state_root);
         s.append(&self.transaction_hash);
         s.append(&self.quota_used);
@@ -47,6 +48,7 @@ pub struct LogEntry {
 impl Encodable for LogEntry {
     /// Append a value to the stream
     fn rlp_append(&self, s: &mut RlpStream) {
+        s.begin_list(3);
         s.append(&self.address);
         s.append_list(&self.topics);
         s.append(&self.data);

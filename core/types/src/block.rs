@@ -30,6 +30,7 @@ impl BlockHeader {
 impl Encodable for BlockHeader {
     /// Append a value to the stream
     fn rlp_append(&self, s: &mut RlpStream) {
+        s.begin_list(11);
         s.append(&self.prevhash);
         s.append(&self.timestamp);
         s.append(&self.height);
@@ -74,6 +75,7 @@ pub struct Proof {
 impl Encodable for Proof {
     /// Append a value to the stream
     fn rlp_append(&self, s: &mut RlpStream) {
+        s.begin_list(4);
         s.append(&self.height);
         s.append(&self.round);
         s.append(&self.proposal_hash);
@@ -91,6 +93,7 @@ pub struct Vote {
 impl Encodable for Vote {
     /// Append a value to the stream
     fn rlp_append(&self, s: &mut RlpStream) {
+        s.begin_list(2);
         s.append(&self.address);
         s.append(&self.signature);
     }
