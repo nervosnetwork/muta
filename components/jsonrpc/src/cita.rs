@@ -12,7 +12,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::{self, Value};
 
 use core_serialization::generate_module_for;
-use core_types::{Address, Hash};
+use core_types::{self, Address, Hash};
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct TxResponse {
@@ -666,5 +666,28 @@ impl Encodable for StateProof {
         s.append_list(&self.account_proof);
         s.append(&self.key);
         s.append_list(&self.value_proof);
+    }
+}
+
+// TxProof is not fully same as cita. muta's core types used to fill the struct,
+// not cita.
+#[derive(Debug, Clone)]
+pub struct TxProof {
+    pub tx:                   core_types::SignedTransaction,
+    pub receipt:              core_types::Receipt,
+    pub receipt_proof:        Vec<ProofNode<Hash>>,
+    pub block_header:         core_types::BlockHeader,
+    pub next_proposal_header: core_types::BlockHeader,
+    pub proposal_proof:       core_types::Proof,
+}
+
+impl Encodable for TxProof {
+    fn rlp_append(&self, s: &mut RlpStream) {
+        s.append(&self.tx);
+        s.append(&self.receipt);
+        s.append_list(&self.receipt_proof);
+        s.append(&self.block_header);
+        s.append(&self.next_proposal_header);
+        s.append(&self.proposal_proof);
     }
 }

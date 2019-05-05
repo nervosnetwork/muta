@@ -134,6 +134,9 @@ class Client:
     def get_transaction_receipt(self, h: str):
         return self.send('getTransactionReceipt', params=[h])
 
+    def get_transaction_proof(self, h: str):
+        return self.send('getTransactionProof', params=[h])
+
     def ping(self):
         return self.send('ping')
 

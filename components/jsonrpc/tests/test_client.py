@@ -170,6 +170,14 @@ def test_get_state_proof():
     assert r
 
 
+def test_get_transaction_proof():
+    tx = client.sign_tx(user1.private_key, user2.address, "", 10, 100000)
+    r = client.sync_raw_transaction(tx)
+    h = r['transactionHash']
+    time.sleep(6)
+    assert client.get_transaction_proof(h)
+
+
 if __name__ == '__main__':
     test_peer_count()
     test_block_number()
@@ -186,3 +194,4 @@ if __name__ == '__main__':
     test_get_storage_at()
     test_get_transaction_count()
     test_get_state_proof()
+    test_get_transaction_proof()
