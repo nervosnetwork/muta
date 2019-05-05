@@ -14,6 +14,7 @@ pub struct ReceiptProof {
 impl Encodable for ReceiptProof {
     /// Append a value to the stream
     fn rlp_append(&self, s: &mut RlpStream) {
+        s.begin_list(3);
         s.append(&self.receipt);
         s.append(&self.merkle_proof);
         s.append(&self.block_number);

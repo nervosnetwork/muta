@@ -608,6 +608,7 @@ where
 {
     /// Append a value to the stream
     fn rlp_append(&self, s: &mut RlpStream) {
+        s.begin_list(2);
         s.append(&self.is_right);
         s.append(&self.hash);
     }
@@ -662,6 +663,7 @@ pub struct StateProof {
 
 impl Encodable for StateProof {
     fn rlp_append(&self, s: &mut RlpStream) {
+        s.begin_list(4);
         s.append(&self.address);
         s.append_list(&self.account_proof);
         s.append(&self.key);
@@ -683,6 +685,7 @@ pub struct TxProof {
 
 impl Encodable for TxProof {
     fn rlp_append(&self, s: &mut RlpStream) {
+        s.begin_list(6);
         s.append(&self.tx);
         s.append(&self.receipt);
         s.append_list(&self.receipt_proof);

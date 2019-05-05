@@ -17,10 +17,8 @@ pub struct Transaction {
 impl Encodable for Transaction {
     /// Append a value to the stream
     fn rlp_append(&self, s: &mut RlpStream) {
-        match &self.to {
-            Some(ref data) => s.append(data),
-            None => s.append(&""),
-        };
+        s.begin_list(7);
+        s.append(&self.to);
         s.append(&self.nonce);
         s.append(&self.quota);
         s.append(&self.valid_until_block);
@@ -47,6 +45,7 @@ pub struct UnverifiedTransaction {
 
 impl Encodable for UnverifiedTransaction {
     fn rlp_append(&self, s: &mut RlpStream) {
+        s.begin_list(2);
         s.append(&self.transaction);
         s.append(&self.signature);
     }
@@ -61,6 +60,7 @@ pub struct SignedTransaction {
 
 impl Encodable for SignedTransaction {
     fn rlp_append(&self, s: &mut RlpStream) {
+        s.begin_list(3);
         s.append(&self.untx);
         s.append(&self.hash);
         s.append(&self.sender);
