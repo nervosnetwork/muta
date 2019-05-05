@@ -70,7 +70,7 @@ impl fmt::Debug for Address {
 impl Encodable for Address {
     /// Append a value to the stream
     fn rlp_append(&self, s: &mut RlpStream) {
-        s.append(&self.0.as_bytes());
+        s.encoder().encode_value(self.as_bytes());
     }
 }
 
@@ -142,7 +142,7 @@ impl fmt::Debug for Hash {
 impl Encodable for Hash {
     /// Append a value to the stream
     fn rlp_append(&self, s: &mut RlpStream) {
-        s.append(&self.0.as_bytes());
+        s.encoder().encode_value(self.as_bytes());
     }
 }
 
