@@ -11,9 +11,8 @@ use futures::sync::mpsc;
 use crate::p2p::Broadcaster;
 use crate::reactor::{CallbackMap, Reaction, Reactor, ReactorMessage};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum OutboundMessage {
-    Echo(String),
     TransactionPool(TransactionPoolMessage),
     Consensus(ConsensusMessage),
 }

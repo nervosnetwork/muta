@@ -83,7 +83,7 @@ pub enum CastMessage<TMessage> {
     All(TMessage),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RecvMessage<TMessage> {
     session_id: SessionId,
     msg:        TMessage,

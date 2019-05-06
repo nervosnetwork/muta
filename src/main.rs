@@ -22,7 +22,7 @@ use core_crypto::{
     secp256k1::{PrivateKey, Secp256k1},
     Crypto, CryptoTransform,
 };
-use core_network::reactor::{outbound, CallbackMap, ChainReactor, InboundReactor, OutboundReactor};
+use core_network::reactor::{outbound, CallbackMap, InboundReactor, JoinReactor, OutboundReactor};
 use core_network::{Config as NetworkConfig, Network};
 use core_pubsub::{PubSub, PUBSUB_BROADCAST_BLOCK};
 use core_storage::{BlockStorage, Storage};
@@ -208,9 +208,9 @@ fn start(cfg: &Config) {
         Arc::clone(&callback_map),
     );
     let outbound_reactor = OutboundReactor::new(callback_map);
-    let network_reactor = inbound_reactor.chain(outbound_reactor);
+    let network_reactor = inbound_reactor.join(outbound_reactor);
     // or
-    // let network_reactor = outbound_reactor.chain(inbound_reactor);
+    // let network_reactor = outbound_reactor.join(inbound_reactor);
     // or peer that only handle inbound message
     // let network_reactor = inbound_reactor;
     // or peer that only handle outbound message

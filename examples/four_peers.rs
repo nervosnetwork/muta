@@ -12,7 +12,7 @@ use components_transaction_pool::HashTransactionPool;
 use core_consensus::{Consensus, FutConsensusResult, ProposalMessage, VoteMessage};
 use core_context::{Context, P2P_SESSION_ID};
 use core_crypto::{secp256k1::Secp256k1, Crypto, CryptoTransform};
-use core_network::reactor::{outbound, CallbackMap, ChainReactor, InboundReactor, OutboundReactor};
+use core_network::reactor::{outbound, CallbackMap, InboundReactor, JoinReactor, OutboundReactor};
 use core_network::Config as NetworkConfig;
 use core_network::Network;
 use core_runtime::TransactionPool;
@@ -170,7 +170,7 @@ fn start_peer(
             let network_reactor = inbound_reactor;
             Network::new(network_config, outbound_rx, network_reactor).unwrap()
         } else {
-            let network_reactor = inbound_reactor.chain(outbound_reactor);
+            let network_reactor = inbound_reactor.join(outbound_reactor);
             Network::new(network_config, outbound_rx, network_reactor).unwrap()
         }
     };
