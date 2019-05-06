@@ -4,7 +4,6 @@ use std::collections::HashMap;
 use std::string::ToString;
 use std::sync::Arc;
 
-use futures::future::{err, ok, Future};
 use futures03::{
     compat::Future01CompatExt,
     prelude::{FutureExt, TryFutureExt},
@@ -15,7 +14,7 @@ use core_context::{Context, ORIGIN};
 use core_crypto::{Crypto, CryptoTransform};
 use core_runtime::{FutRuntimeResult, TransactionOrigin, TransactionPool, TransactionPoolError};
 use core_storage::{Storage, StorageError};
-use core_types::{Address, Hash, SignedTransaction, Transaction, UnverifiedTransaction};
+use core_types::{Hash, SignedTransaction, Transaction, UnverifiedTransaction};
 
 pub trait Broadcaster: Send + Sync + Clone {
     fn broadcast_batch(&mut self, txs: Vec<SignedTransaction>);
@@ -27,15 +26,15 @@ pub trait Broadcaster: Send + Sync + Clone {
     ) -> FutRuntimeResult<Vec<SignedTransaction>, TransactionPoolError>;
 }
 
-type CallbackCache = Arc<RwLock<HashMap<Hash, SignedTransaction>>>;
+type TxCache = Arc<RwLock<HashMap<Hash, SignedTransaction>>>;
 
 pub struct HashTransactionPool<S, C, B> {
     pool_size:         usize,
     until_block_limit: u64,
     quota_limit:       u64,
 
-    tx_cache:       Arc<RwLock<HashMap<Hash, SignedTransaction>>>,
-    callback_cache: CallbackCache,
+    tx_cache:       TxCache,
+    callback_cache: TxCache,
     storage:        Arc<S>,
     crypto:         Arc<C>,
     broadcaster:    B,
@@ -100,10 +99,7 @@ where
                 .verify_with_signature(&tx_hash, &signature)
                 .map_err(TransactionPoolError::Crypto)?;
 
-            let sender = {
-                let hash = Hash::digest(&pubkey.as_bytes()[1..]);
-                Address::from_hash(&hash)
-            };
+            let sender = crypto.pubkey_to_address(&pubkey);
 
             // 2. check if the transaction is in histories block.
             match await!(storage.get_transaction(ctx.clone(), &tx_hash).compat()) {
@@ -212,16 +208,24 @@ where
     }
 
     fn flush(&self, _: Context, tx_hashes: &[Hash]) -> FutRuntimeResult<(), TransactionPoolError> {
-        let mut tx_cache = match self.tx_cache.write().wait() {
-            Ok(tx_cache) => tx_cache,
-            Err(()) => return Box::new(err(map_rwlock_err(()))),
+        let tx_cache = Arc::clone(&self.tx_cache);
+        let callback_cache = Arc::clone(&self.callback_cache);
+        let tx_hashes = tx_hashes.to_owned();
+
+        let fut = async move {
+            let mut callback_cache_w =
+                await!(callback_cache.write().compat()).map_err(map_rwlock_err)?;
+            let mut tx_cache_w = await!(tx_cache.write().compat()).map_err(map_rwlock_err)?;
+
+            callback_cache_w.clear();
+            for hash in tx_hashes.iter() {
+                tx_cache_w.remove(hash);
+            }
+
+            Ok(())
         };
 
-        tx_hashes.iter().for_each(|hash| {
-            tx_cache.remove(hash);
-        });
-
-        Box::new(ok(()))
+        Box::new(fut.boxed().compat())
     }
 
     fn get_batch(
@@ -229,36 +233,39 @@ where
         _: Context,
         tx_hashes: &[Hash],
     ) -> FutRuntimeResult<Vec<SignedTransaction>, TransactionPoolError> {
-        // check callback first
-        let mut callback_cache = match self.callback_cache.write().wait() {
-            Ok(callback_cache) => callback_cache,
-            Err(()) => return Box::new(err(map_rwlock_err(()))),
-        };
+        let tx_cache = Arc::clone(&self.tx_cache);
+        let callback_cache = Arc::clone(&self.callback_cache);
+        let tx_hashes = tx_hashes.to_owned();
 
-        let signed_txs = tx_hashes
-            .iter()
-            .map(|hash| callback_cache.get(hash).cloned())
-            .filter_map(|tx| tx)
-            .collect::<Vec<SignedTransaction>>();
-        if !signed_txs.is_empty() {
+        let fut = async move {
+            let callback_cache = await!(callback_cache.read().compat()).map_err(map_rwlock_err)?;
+            let mut sig_txs = Vec::with_capacity(tx_hashes.len());
+            let mut leftover = vec![];
+
             for hash in tx_hashes.iter() {
-                callback_cache.remove(hash);
+                if let Some(stx) = callback_cache.get(hash) {
+                    sig_txs.push(stx.clone());
+                } else {
+                    leftover.push(hash.clone())
+                }
             }
 
-            return Box::new(ok(signed_txs));
-        }
+            if leftover.is_empty() {
+                return Ok(sig_txs);
+            }
 
-        let tx_cache = match self.tx_cache.read().wait() {
-            Ok(tx_cache) => tx_cache,
-            Err(()) => return Box::new(err(map_rwlock_err(()))),
+            let tx_cache = await!(tx_cache.read().compat()).map_err(map_rwlock_err)?;
+
+            for hash in leftover.iter() {
+                if let Some(stx) = tx_cache.get(hash) {
+                    sig_txs.push(stx.clone());
+                }
+            }
+
+            Ok(sig_txs)
         };
 
-        let signed_txs = tx_hashes
-            .iter()
-            .map(|hash| tx_cache.get(hash).cloned())
-            .filter_map(|tx| tx)
-            .collect();
-        Box::new(ok(signed_txs))
+        Box::new(fut.boxed().compat())
     }
 
     fn ensure(
@@ -266,25 +273,29 @@ where
         ctx: Context,
         tx_hashes: &[Hash],
     ) -> FutRuntimeResult<(), TransactionPoolError> {
-        // FIXME: only pull txs we dont have
+        let tx_cache = Arc::clone(&self.tx_cache);
+        let callback_cache = Arc::clone(&self.callback_cache);
         let mut broadcaster = self.broadcaster.clone();
-        let hashes = tx_hashes.to_vec();
+        let tx_hashes = tx_hashes.to_owned();
 
-        let mut callback_cache = match self.callback_cache.write().wait() {
-            Ok(callback_cache) => callback_cache,
-            Err(()) => return Box::new(err(map_rwlock_err(()))),
-        };
-
-        // TODO: pass network error
         let fut = async move {
-            let sig_txs = match await!(broadcaster.pull_txs(ctx, hashes).compat()) {
-                Ok(sig_txs) => sig_txs,
-                Err(e) => return Err(e),
-            };
+            let tx_cache = await!(tx_cache.read().compat()).map_err(map_rwlock_err)?;
+            let mut unknown = vec![];
 
-            for stx in sig_txs.into_iter() {
-                let hash = stx.hash.clone();
-                callback_cache.insert(hash, stx);
+            for hash in tx_hashes.iter() {
+                if !tx_cache.contains_key(hash) {
+                    unknown.push(hash.to_owned());
+                }
+            }
+
+            if !unknown.is_empty() {
+                let mut callback_cache_w =
+                    await!(callback_cache.write().compat()).map_err(map_rwlock_err)?;
+                let sig_txs = await!(broadcaster.pull_txs(ctx, unknown).compat())?;
+
+                for stx in sig_txs.into_iter() {
+                    callback_cache_w.insert(stx.hash.clone(), stx);
+                }
             }
 
             Ok(())
@@ -355,35 +366,35 @@ mod tests {
         fn pull_txs(
             &mut self,
             _: Context,
-            _: Vec<Hash>,
+            unknown_hashes: Vec<Hash>,
         ) -> FutRuntimeResult<Vec<SignedTransaction>, TransactionPoolError> {
-            Box::new(ok(vec![SignedTransaction::default()]))
+            let mut mock_stxs = Vec::with_capacity(unknown_hashes.len());
+
+            for hash in unknown_hashes.into_iter() {
+                let mut stx = SignedTransaction::default();
+                stx.hash = hash;
+                mock_stxs.push(stx);
+            }
+
+            Box::new(ok(mock_stxs))
         }
     }
 
     #[test]
     fn test_insert_transaction() {
         let ctx = Context::new();
-        let secp = Arc::new(Secp256k1::new());
         let pool_size = 1000;
         let until_block_limit = 100;
         let quota_limit = 10000;
         let height = 100;
 
-        let db = Arc::new(MemoryDB::new());
-        let storage = Arc::new(BlockStorage::new(db));
-        let mut block = Block::default();
-        block.header.height = height;
-        storage.insert_block(ctx.clone(), block).wait().unwrap();
-
-        let broadcast = BroadcastMock;
-        let tx_pool = HashTransactionPool::new(
-            storage,
-            secp,
-            broadcast,
+        let tx_pool = new_test_pool(
+            ctx.clone(),
+            None,
             pool_size,
             until_block_limit,
             quota_limit,
+            height,
         );
 
         // test normal
@@ -436,26 +447,18 @@ mod tests {
     #[should_panic(expected = "should not broadcast inserted txs")]
     fn test_insert_transaction_from_jsonrpc() {
         let ctx = Context::new();
-        let secp = Arc::new(Secp256k1::new());
         let pool_size = 1000;
         let until_block_limit = 100;
         let quota_limit = 10000;
         let height = 100;
 
-        let db = Arc::new(MemoryDB::new());
-        let storage = Arc::new(BlockStorage::new(db));
-        let mut block = Block::default();
-        block.header.height = height;
-        storage.insert_block(ctx.clone(), block).wait().unwrap();
-
-        let broadcast = BroadcastMock;
-        let tx_pool = HashTransactionPool::new(
-            storage,
-            secp,
-            broadcast,
+        let tx_pool = new_test_pool(
+            ctx.clone(),
+            None,
             pool_size,
             until_block_limit,
             quota_limit,
+            height,
         );
 
         // test normal
@@ -471,7 +474,6 @@ mod tests {
     #[test]
     fn test_histories_dup() {
         let ctx = Context::new();
-        let secp = Arc::new(Secp256k1::new());
         let pool_size = 1000;
         let until_block_limit = 100;
         let quota_limit = 10000;
@@ -495,14 +497,13 @@ mod tests {
 
         storage.insert_block(ctx.clone(), block).wait().unwrap();
 
-        let broadcast = BroadcastMock;
-        let tx_pool = HashTransactionPool::new(
-            storage,
-            secp,
-            broadcast,
+        let tx_pool = new_test_pool(
+            ctx.clone(),
+            Some(storage),
             pool_size,
             until_block_limit,
             quota_limit,
+            height,
         );
 
         let tx_hash = signed_tx.untx.transaction.hash();
@@ -513,26 +514,18 @@ mod tests {
     #[test]
     fn test_pool_size() {
         let ctx = Context::new();
-        let secp = Arc::new(Secp256k1::new());
         let pool_size = 1;
         let until_block_limit = 100;
         let quota_limit = 10000;
         let height = 100;
 
-        let db = Arc::new(MemoryDB::new());
-        let storage = Arc::new(BlockStorage::new(db));
-        let mut block = Block::default();
-        block.header.height = height;
-        storage.insert_block(ctx.clone(), block).wait().unwrap();
-
-        let broadcast = BroadcastMock;
-        let tx_pool = HashTransactionPool::new(
-            storage,
-            secp,
-            broadcast,
+        let tx_pool = new_test_pool(
+            ctx.clone(),
+            None,
             pool_size,
             until_block_limit,
             quota_limit,
+            height,
         );
 
         let untx = mock_transaction(100, height + until_block_limit, "test1".to_owned());
@@ -552,26 +545,18 @@ mod tests {
     #[test]
     fn test_package_transaction_count() {
         let ctx = Context::new();
-        let secp = Arc::new(Secp256k1::new());
         let pool_size = 100;
         let until_block_limit = 100;
         let quota_limit = 10000;
         let height = 100;
 
-        let db = Arc::new(MemoryDB::new());
-        let storage = Arc::new(BlockStorage::new(db));
-        let mut block = Block::default();
-        block.header.height = height;
-        storage.insert_block(ctx.clone(), block).wait().unwrap();
-
-        let broadcast = BroadcastMock;
-        let tx_pool = HashTransactionPool::new(
-            storage,
-            secp,
-            broadcast,
+        let tx_pool = new_test_pool(
+            ctx.clone(),
+            None,
             pool_size,
             until_block_limit,
             quota_limit,
+            height,
         );
 
         let mut tx_hashes = vec![];
@@ -596,28 +581,85 @@ mod tests {
     }
 
     #[test]
+    fn test_flush() {
+        let ctx = Context::new();
+        let pool_size = 1000;
+        let until_block_limit = 100;
+        let quota_limit = 10000;
+        let height = 100;
+
+        let tx_pool = new_test_pool(
+            ctx.clone(),
+            None,
+            pool_size,
+            until_block_limit,
+            quota_limit,
+            height,
+        );
+
+        let mut sig_txs = Vec::with_capacity(10);
+        for i in 1..=10 {
+            let stx =
+                mock_signed_transaction(100, height + until_block_limit, format!("test stx {}", i));
+
+            sig_txs.push(stx);
+        }
+
+        let (callback_stxs, pool_stxs) = sig_txs.split_at(5);
+        {
+            // insert test signed transactions
+            let mut callback_cache = tx_pool.callback_cache.write().wait().unwrap();
+            let mut pool_cache = tx_pool.tx_cache.write().wait().unwrap();
+
+            for stx in callback_stxs.iter() {
+                callback_cache.insert(stx.hash.clone(), stx.clone());
+            }
+            for stx in pool_stxs.iter() {
+                pool_cache.insert(stx.hash.clone(), stx.clone());
+            }
+        }
+
+        let test_hashes = callback_stxs
+            .iter()
+            .map(|stx| stx.hash.clone())
+            .collect::<Vec<Hash>>();
+        let stxs = tx_pool
+            .get_batch(ctx.clone(), test_hashes.as_slice())
+            .wait()
+            .unwrap();
+        assert_eq!(stxs.len(), test_hashes.len());
+        assert_eq!(
+            tx_pool.callback_cache.read().wait().unwrap().len(),
+            test_hashes.len()
+        );
+
+        let test_hashes = pool_stxs
+            .iter()
+            .map(|stx| stx.hash.clone())
+            .collect::<Vec<Hash>>();
+        tx_pool
+            .flush(ctx.clone(), test_hashes.as_slice())
+            .wait()
+            .unwrap();
+        assert_eq!(tx_pool.callback_cache.read().wait().unwrap().len(), 0);
+        assert_eq!(tx_pool.tx_cache.read().wait().unwrap().len(), 0);
+    }
+
+    #[test]
     fn test_package_transaction_quota_limit() {
         let ctx = Context::new();
-        let secp = Arc::new(Secp256k1::new());
         let pool_size = 100;
         let until_block_limit = 100;
         let quota_limit = 800;
         let height = 100;
 
-        let db = Arc::new(MemoryDB::new());
-        let storage = Arc::new(BlockStorage::new(db));
-        let mut block = Block::default();
-        block.header.height = height;
-        storage.insert_block(ctx.clone(), block).wait().unwrap();
-
-        let broadcast = BroadcastMock;
-        let tx_pool = HashTransactionPool::new(
-            storage,
-            secp,
-            broadcast,
+        let tx_pool = new_test_pool(
+            ctx.clone(),
+            None,
             pool_size,
             until_block_limit,
             quota_limit,
+            height,
         );
 
         let mut tx_hashes = vec![];
@@ -633,6 +675,119 @@ mod tests {
             .wait()
             .unwrap();
         assert_eq!(8, pachage_tx_hashes.len());
+    }
+
+    #[test]
+    fn test_ensure_partial_unknown_hashes() {
+        let ctx = Context::new();
+        let pool_size = 1000;
+        let until_block_limit = 100;
+        let quota_limit = 10000;
+        let height = 100;
+
+        let tx_pool = new_test_pool(
+            ctx.clone(),
+            None,
+            pool_size,
+            until_block_limit,
+            quota_limit,
+            height,
+        );
+
+        let mut untxs = vec![];
+        let mut tx_hashes = vec![];
+        for i in 1..=5 {
+            let untx = mock_transaction(100, height + until_block_limit, format!("test{}", i));
+            let hash = untx.transaction.hash();
+
+            untxs.push(untx);
+            tx_hashes.push(hash);
+        }
+
+        tx_pool
+            .insert(ctx.clone(), tx_hashes[0].clone(), untxs[0].clone())
+            .wait()
+            .unwrap();
+        assert_eq!(tx_pool.tx_cache.read().wait().unwrap().len(), 1);
+
+        tx_pool
+            .ensure(ctx.clone(), tx_hashes.as_slice())
+            .wait()
+            .unwrap();
+        let callback_cache = tx_pool.callback_cache.read().wait().unwrap();
+
+        assert_eq!(callback_cache.len(), 4);
+        assert!(!callback_cache.contains_key(&tx_hashes[0]));
+        for hash in tx_hashes.iter().take(5).skip(1) {
+            assert!(callback_cache.contains_key(hash));
+        }
+    }
+
+    #[test]
+    fn test_ensure_full_known_hashes() {
+        let ctx = Context::new();
+        let pool_size = 1000;
+        let until_block_limit = 100;
+        let quota_limit = 10000;
+        let height = 100;
+
+        let tx_pool = new_test_pool(
+            ctx.clone(),
+            None,
+            pool_size,
+            until_block_limit,
+            quota_limit,
+            height,
+        );
+
+        let mut tx_hashes = vec![];
+        for i in 1..=5 {
+            let untx = mock_transaction(100, height + until_block_limit, format!("test{}", i));
+            let hash = untx.transaction.hash();
+
+            tx_hashes.push(hash.clone());
+            tx_pool.insert(ctx.clone(), hash, untx).wait().unwrap();
+        }
+        assert_eq!(tx_pool.tx_cache.read().wait().unwrap().len(), 5);
+
+        tx_pool
+            .ensure(ctx.clone(), tx_hashes.as_slice())
+            .wait()
+            .unwrap();
+        assert_eq!(tx_pool.callback_cache.read().wait().unwrap().len(), 0);
+    }
+
+    fn new_test_pool(
+        ctx: Context,
+        storage: Option<Arc<BlockStorage<MemoryDB>>>,
+        size: usize,
+        until_block_limit: u64,
+        quota_limit: u64,
+        height: u64,
+    ) -> HashTransactionPool<BlockStorage<MemoryDB>, Secp256k1, BroadcastMock> {
+        let secp = Arc::new(Secp256k1::new());
+
+        let storage = storage.unwrap_or_else(|| {
+            let db = Arc::new(MemoryDB::new());
+            let storage = Arc::new(BlockStorage::new(db));
+
+            let mut block = Block::default();
+            block.header.height = height;
+
+            storage.insert_block(ctx.clone(), block).wait().unwrap();
+            storage
+        });
+
+        let broadcast = BroadcastMock;
+
+        HashTransactionPool::new(
+            storage,
+            secp,
+            broadcast,
+            size,
+            until_block_limit,
+            quota_limit,
+        )
     }
 
     fn mock_transaction(
@@ -699,10 +854,7 @@ mod tests {
         SignedTransaction {
             untx:   untx.clone(),
             hash:   untx.transaction.hash(),
-            sender: {
-                let hash = Hash::digest(&pubkey.as_bytes()[1..]);
-                Address::from_hash(&hash)
-            },
+            sender: secp.pubkey_to_address(&pubkey),
         }
     }
 }
