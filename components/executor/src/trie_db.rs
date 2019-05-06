@@ -50,10 +50,11 @@ where
             .wait()
     }
 
-    fn remove(&self, key: &[u8]) -> Result<(), Self::Error> {
-        self.db
-            .remove(Context::new(), DataCategory::State, key)
-            .wait()
+    fn remove(&self, _key: &[u8]) -> Result<(), Self::Error> {
+        Ok(())
+        // self.db
+        //     .remove(Context::new(), DataCategory::State, key)
+        //     .wait()
     }
 }
 
