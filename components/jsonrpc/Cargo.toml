@@ -10,6 +10,7 @@ actix-web = "1.0.0-alpha.6"
 old_futures = { package = "futures", version = "0.1" }
 futures-preview = { version = "=0.3.0-alpha.14", features = ["compat"] }
 futures-util-preview = { version = "=0.3.0-alpha.14" }
+futures-locks = "0.3"
 
 bytes = "0.4"
 ethbloom = "0.6"
@@ -36,6 +37,7 @@ core-pubsub = { path = "../../core/pubsub" }
 core-storage = { path = "../../core/storage" }
 core-serialization = { path = "../../core/serialization" }
 core-crypto = { path = "../../core/crypto" }
+logger = { path = "../../common/logger" }
 
 [build-dependencies]
 prost-build = "0.5"

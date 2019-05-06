@@ -14,6 +14,7 @@ use crate::cita;
 use crate::config::Config;
 use crate::convention;
 use crate::error::RpcError;
+use crate::filter::Filter;
 use crate::state::AppState;
 use crate::util::clean_0x;
 
@@ -67,6 +68,7 @@ fn get_string(
     Ok(String::from(r))
 }
 
+#[allow(clippy::cognitive_complexity)]
 fn rpc_select<E: 'static, T: 'static, S: 'static>(
     app_state: AppState<E, T, S>,
     method: String,
@@ -150,6 +152,15 @@ where
                 let r = await!(app_state.get_code(addr, number))?;
                 Ok(Value::from(r))
             }
+            // Get Filter logs by filter id
+            "getFilterChanges" => {
+                let id = get_string(params, 0, true)?;
+                let id_u64 = u64::from_str_radix(clean_0x(&id[..]), 16)?;
+                let r = await!(app_state.filterdb.write().compat())
+                    .unwrap()
+                    .filter_changes(id_u64 as u32);
+                Ok(serde_json::to_value(r).unwrap())
+            }
             // Get logs by filter
             "getLogs" => {
                 let filter: cita::Filter = serde_json::from_value(
@@ -231,6 +242,27 @@ where
                     Err(e) => Err(convention::ErrorData::from(e)),
                 }
             }
+            // Register a new block filter
+            "newBlockFilter" => {
+                let r = await!(app_state.filterdb.write().compat())
+                    .unwrap()
+                    .new_block_filter(0);
+                Ok(Value::from(format!("{:#x}", r)))
+            }
+            // Register a new filter
+            "newFilter" => {
+                let filter: cita::Filter = serde_json::from_value(
+                    params
+                        .get(0)
+                        .ok_or_else(|| convention::ErrorData::std(-32602))?
+                        .clone(),
+                )?;
+                let filter: Filter = filter.into();
+                let r = await!(app_state.filterdb.write().compat())
+                    .unwrap()
+                    .new_filter(filter);
+                Ok(Value::from(format!("{:#x}", r)))
+            }
             // Get the count of peers
             "peerCount" => {
                 let r = await!(app_state.peer_count())?;
@@ -239,10 +271,18 @@ where
             // Test whether the server is still aliving. It's not in CITA spec.
             "ping" => Ok(Value::from("pong")),
             // Send a raw transaction to chain. Yes, indeed.
-            "sendRawTransaction" => {
+            "sendTransaction" | "sendRawTransaction" => {
                 let data_str = get_string(params, 0, true)?;
                 let data = hex::decode(clean_0x(&data_str[..]))?;
                 let r = await!(app_state.send_raw_transaction(data))?;
+                Ok(serde_json::to_value(r).unwrap())
+            }
+            "uninstallFilter" => {
+                let id = get_string(params, 0, true)?;
+                let id_u64 = u64::from_str_radix(clean_0x(&id[..]), 16)?;
+                let r = await!(app_state.filterdb.write().compat())
+                    .unwrap()
+                    .uninstall(id_u64 as u32);
                 Ok(serde_json::to_value(r).unwrap())
             }
             _ => Err(convention::ErrorData::std(-32601)),
@@ -262,11 +302,19 @@ where
     T: TransactionPool,
     S: Storage,
 {
+    let mut app_state_clone = app_state.clone();
+    let fut = async move {
+        let mut s: &mut Receiver<Block> = &mut sub_block;
+        while let Some(e) = await!(s.next()) {
+            if let Some(b) = e {
+                if let Err(e) = await!(app_state_clone.recv_block(b)) {
+                    println!("{:?}", e);
+                };
+            }
+        }
+    };
     std::thread::spawn(move || {
-        futures::executor::block_on(sub_block.for_each(|_| {
-            // println!("---------- {:?}", e);
-            futures::future::ready(())
-        }));
+        futures::executor::block_on(fut);
     });
 
     let c_payload_size = config.payload_size;

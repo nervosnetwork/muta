@@ -1,6 +1,7 @@
 /// Struct used and only used for CITA jsonrpc.
 /// Note: Most of these codes copies from "https://github.com/cryptape/cita-common"
 use std::collections::HashMap;
+use std::convert::TryInto;
 
 use ethbloom::Bloom;
 use hex;
@@ -28,21 +29,23 @@ impl TxResponse {
 
 generate_module_for!([blockchain]);
 
-impl Into<core_types::Transaction> for Transaction {
-    fn into(self) -> core_types::Transaction {
+impl TryInto<core_types::Transaction> for Transaction {
+    type Error = core_types::TypesError;
+
+    fn try_into(self) -> Result<core_types::Transaction, Self::Error> {
         let to = match self.version {
             1 => {
                 if self.to_v1.is_empty() {
                     None
                 } else {
-                    Some(Address::from_bytes(&self.to_v1).unwrap())
+                    Some(Address::from_bytes(&self.to_v1)?)
                 }
             }
             _ => {
                 if self.to.is_empty() {
                     None
                 } else {
-                    Some(Address::from_hex(&self.to).unwrap())
+                    Some(Address::from_hex(&self.to)?)
                 }
             }
         };
@@ -50,7 +53,7 @@ impl Into<core_types::Transaction> for Transaction {
             1 => self.chain_id_v1,
             _ => self.chain_id.to_be_bytes().to_vec(),
         };
-        core_types::Transaction {
+        Ok(core_types::Transaction {
             to,
             nonce: self.nonce,
             quota: self.quota,
@@ -58,16 +61,18 @@ impl Into<core_types::Transaction> for Transaction {
             data: self.data,
             value: self.value,
             chain_id,
-        }
+        })
     }
 }
 
-impl Into<core_types::UnverifiedTransaction> for UnverifiedTransaction {
-    fn into(self) -> core_types::UnverifiedTransaction {
-        core_types::UnverifiedTransaction {
-            transaction: self.transaction.unwrap_or_default().into(),
+impl TryInto<core_types::UnverifiedTransaction> for UnverifiedTransaction {
+    type Error = core_types::TypesError;
+
+    fn try_into(self) -> Result<core_types::UnverifiedTransaction, Self::Error> {
+        Ok(core_types::UnverifiedTransaction {
+            transaction: self.transaction.unwrap_or_default().try_into()?,
             signature:   self.signature,
-        }
+        })
     }
 }
 
@@ -543,6 +548,27 @@ pub struct Filter {
     pub topics: Option<Vec<Topic>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub limit: Option<usize>,
+}
+
+// Results of the filter_changes RPC.
+#[derive(Debug, Clone)]
+pub enum FilterChanges {
+    /// New logs.
+    Logs(Vec<Log>),
+    /// New hashes (block or transactions)
+    Hashes(Vec<Hash>),
+}
+
+impl Serialize for FilterChanges {
+    fn serialize<S>(&self, s: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match *self {
+            FilterChanges::Logs(ref logs) => logs.serialize(s),
+            FilterChanges::Hashes(ref hashes) => hashes.serialize(s),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Hash, PartialEq, Eq)]

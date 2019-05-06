@@ -178,6 +178,36 @@ def test_get_transaction_proof():
     assert client.get_transaction_proof(h)
 
 
+def test_get_filter_block():
+    filter_id = client.new_block_filter()
+    time.sleep(6)
+    r0 = client.get_filter_changes(filter_id)
+    assert r0
+    time.sleep(6)
+    r1 = client.get_filter_changes(filter_id)
+    assert r1
+    assert r0 != r1
+
+
+def test_get_filter():
+    bnb = pymuta.Bnb(client, user0)
+    bnb.deploy()
+
+    filter_id = client.new_filter({"fromBlock": "0x00", "toBlock": "latest", "address": bnb.address})
+
+    r = bnb.transfer(user1.address, 10)
+    assert bnb.balance_of(user0.address) == 400000000 - 10
+    assert bnb.balance_of(user1.address) == 10
+
+    block_number = r['blockNumber']
+    logs = r['logs']  # address, blockHash, blockNumber, data, logIndex, topics
+
+    r = client.get_filter_changes(filter_id)
+    assert r[0]['address'] == bnb.address.lower()
+    assert r[0]['blockHash'] == logs[0]['blockHash']
+    assert r[0]['blockNumber'] == logs[0]['blockNumber']
+
+
 if __name__ == '__main__':
     test_peer_count()
     test_block_number()
@@ -195,3 +225,5 @@ if __name__ == '__main__':
     test_get_transaction_count()
     test_get_state_proof()
     test_get_transaction_proof()
+    test_get_filter_block()
+    test_get_filter()

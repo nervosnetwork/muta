@@ -7,6 +7,7 @@ use core_runtime::executor::ExecutorError;
 use core_runtime::TransactionPoolError;
 use core_serialization::CodecError;
 use core_storage::StorageError;
+use core_types::TypesError;
 
 #[derive(Debug)]
 pub enum RpcError {
@@ -16,6 +17,7 @@ pub enum RpcError {
     ExecutorError(ExecutorError),
     StorageError(StorageError),
     TransactionPoolError(TransactionPoolError),
+    TypesError(TypesError),
     IO(io::Error),
 }
 
@@ -29,6 +31,7 @@ impl fmt::Display for RpcError {
             RpcError::ExecutorError(e) => return write!(f, "{}", e),
             RpcError::StorageError(e) => return write!(f, "{}", e),
             RpcError::TransactionPoolError(e) => return write!(f, "{}", e),
+            RpcError::TypesError(e) => return write!(f, "{}", e),
             RpcError::IO(e) => return write!(f, "{}", e),
         };
     }
@@ -67,5 +70,11 @@ impl From<CryptoError> for RpcError {
 impl From<ExecutorError> for RpcError {
     fn from(error: ExecutorError) -> Self {
         RpcError::ExecutorError(error)
+    }
+}
+
+impl From<TypesError> for RpcError {
+    fn from(err: TypesError) -> Self {
+        RpcError::TypesError(err)
     }
 }

@@ -114,6 +114,9 @@ class Client:
     def get_block_by_number(self, block_number: str = 'latest', include_tx: bool = False):
         return self.send('getBlockByNumber', params=[block_number, include_tx])
 
+    def get_filter_changes(self, filter_id: int):
+        return self.send('getFilterChanges', params=[hex(filter_id)])
+
     def get_logs(self, filter_obj):
         # Params filter_obj Example
         # {"topics":["0x8fb1356be6b2a4e49ee94447eb9dcb8783f51c41dcddfe7919f945017d163bf3"],"fromBlock": "0x0"}
@@ -136,6 +139,14 @@ class Client:
 
     def get_transaction_proof(self, h: str):
         return self.send('getTransactionProof', params=[h])
+
+    def new_block_filter(self):
+        a = self.send('newBlockFilter')
+        return int(a, 16)
+
+    def new_filter(self, filter_obj):
+        a = self.send('newFilter', params=[filter_obj])
+        return int(a, 16)
 
     def ping(self):
         return self.send('ping')
@@ -185,6 +196,9 @@ class Client:
         r = unverify_tx.SerializeToString().hex()
 
         return eth_utils.add_0x_prefix(r)
+
+    def uninstall_filter(self, filter_id):
+        return self.send('uninstallFilter', params=[filter_id])
 
 
 class SimpleStorage:

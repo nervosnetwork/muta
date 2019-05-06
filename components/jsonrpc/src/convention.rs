@@ -2,6 +2,7 @@
 //! See: https://www.jsonrpc.org/specification
 use std::error;
 use std::fmt;
+use std::num::ParseIntError;
 
 use hex;
 use serde_derive::{Deserialize, Serialize};
@@ -151,6 +152,12 @@ impl From<TypesError> for ErrorData {
 
 impl From<serde_json::error::Error> for ErrorData {
     fn from(err: serde_json::error::Error) -> Self {
+        ErrorData::new(500, &format!("{:?}", err))
+    }
+}
+
+impl From<ParseIntError> for ErrorData {
+    fn from(err: ParseIntError) -> Self {
         ErrorData::new(500, &format!("{:?}", err))
     }
 }

@@ -1,8 +1,16 @@
 //! A middleware for JSONRPC and Muta blockchain.
 #![allow(clippy::needless_lifetimes)]
 
-use futures::compat::Future01CompatExt;
+use std::collections::HashMap;
+use std::convert::TryInto;
 use std::sync::Arc;
+use std::time::SystemTime;
+
+use futures::compat::Future01CompatExt;
+use futures_locks::RwLock;
+use log;
+use numext_fixed_hash::H256;
+use numext_fixed_uint::U256;
 
 use core_context::{Context, ORIGIN};
 use core_merkle::{self, Merkle, ProofNode};
@@ -10,17 +18,138 @@ use core_runtime::{ExecutionContext, Executor, TransactionOrigin, TransactionPoo
 use core_serialization::AsyncCodec;
 use core_storage::Storage;
 use core_types::{Address, Block, BloomRef, Hash, Receipt, SignedTransaction};
-use log;
 
 use crate::cita::{self, Uint};
 use crate::error::RpcError;
 use crate::filter::Filter;
 use crate::util;
 use crate::RpcResult;
-use numext_fixed_hash::H256;
-use numext_fixed_uint::U256;
+
+#[derive(Default)]
+pub struct FilterDatabase {
+    /// Self-increase ID.
+    /// Note: Should use function `gen_id()` istead of touch it directly.
+    next_available_id: u32,
+
+    /// To save the filter for filter_logs
+    regs: HashMap<u32, Filter>,
+    /// To save the result for filter_logs
+    data: HashMap<u32, Vec<cita::Log>>,
+    /// To save the last update timestamp for filter_logs
+    lastupdate: HashMap<u32, u64>,
+
+    /// To save the filter for filter_blocks
+    block_regs: HashMap<u32, u64>,
+    /// To save the result for filter_blocks
+    block_data: HashMap<u32, Vec<Hash>>,
+    /// To save the last update timestamp for filter_blocks
+    block_lastupdate: HashMap<u32, u64>,
+}
+
+impl FilterDatabase {
+    /// Generate a new fresh id
+    fn gen_id(&mut self) -> u32 {
+        let id = self.next_available_id;
+        self.next_available_id = self.next_available_id.wrapping_add(1);
+        id
+    }
+
+    fn is_filter(&self, id: u32) -> bool {
+        self.regs.contains_key(&id)
+    }
+
+    fn is_block_filter(&self, id: u32) -> bool {
+        self.block_regs.contains_key(&id)
+    }
+
+    pub fn new_filter(&mut self, filter: Filter) -> u32 {
+        let id = self.gen_id();
+        let now = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        self.regs.insert(id, filter);
+        self.lastupdate.insert(id, now);
+        id
+    }
+
+    pub fn new_block_filter(&mut self, start: u64) -> u32 {
+        let id = self.gen_id();
+        let now = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        self.block_regs.insert(id, start);
+        self.block_lastupdate.insert(id, now);
+        id
+    }
+
+    // If there are any block filter, insert the block hash into
+    // dataset.
+    // recv_block in FilterDataBase is state independent.
+    fn recv_block(&mut self, block: Block) {
+        let now = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        let mut uninstall_id = vec![];
+        for (id, start_block_number) in self.block_regs.clone() {
+            // Check if we should uninstall the filter
+            let lastupdate = self.block_lastupdate.get(&id).expect("must exist");
+            if now - lastupdate > 60 {
+                uninstall_id.push(id);
+                continue;
+            }
+
+            if block.header.height > start_block_number {
+                let hashes = self.block_data.entry(id).or_insert_with(|| vec![]);
+                hashes.push(block.hash.clone());
+                continue;
+            }
+        }
+        for id in uninstall_id {
+            self.uninstall(id);
+        }
+    }
+
+    pub fn uninstall(&mut self, id: u32) -> bool {
+        if self.is_block_filter(id) {
+            self.block_regs.remove(&id);
+            self.block_data.remove(&id);
+            self.block_lastupdate.remove(&id);
+            true
+        } else if self.is_filter(id) {
+            self.regs.remove(&id);
+            self.data.remove(&id);
+            self.lastupdate.remove(&id);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn filter_changes(&mut self, id: u32) -> Option<cita::FilterChanges> {
+        let now = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        if self.is_block_filter(id) {
+            self.block_lastupdate.insert(id, now);
+            let hashes = self.block_data.insert(id, vec![]).expect("must exist");
+            Some(cita::FilterChanges::Hashes(hashes.clone()))
+        } else if self.is_filter(id) {
+            self.lastupdate.insert(id, now);
+            let logs = self.data.insert(id, vec![]).expect("must exist");
+            Some(cita::FilterChanges::Logs(logs))
+        } else {
+            None
+        }
+    }
+}
 
 pub struct AppState<E, T, S> {
+    pub filterdb: Arc<RwLock<FilterDatabase>>,
+
     executor:         Arc<E>,
     transaction_pool: Arc<T>,
     storage:          Arc<S>,
@@ -32,6 +161,7 @@ impl<E, T, S> Clone for AppState<E, T, S> {
             executor:         Arc::<E>::clone(&self.executor),
             transaction_pool: Arc::<T>::clone(&self.transaction_pool),
             storage:          Arc::<S>::clone(&self.storage),
+            filterdb:         Arc::<RwLock<FilterDatabase>>::clone(&self.filterdb),
         }
     }
 }
@@ -47,6 +177,7 @@ where
             executor,
             transaction_pool,
             storage,
+            filterdb: Arc::new(RwLock::new(FilterDatabase::default())),
         }
     }
 }
@@ -519,7 +650,7 @@ where
         };
         let ser_raw_tx = await!(AsyncCodec::encode(ser_untx.clone().transaction.unwrap()))?;
         let message = Hash::from_fixed_bytes(tiny_keccak::keccak256(&ser_raw_tx));
-        let untx: core_types::transaction::UnverifiedTransaction = ser_untx.into();
+        let untx: core_types::transaction::UnverifiedTransaction = ser_untx.try_into()?;
         let origin_ctx =
             Context::new().with_value::<TransactionOrigin>(ORIGIN, TransactionOrigin::Jsonrpc);
         log::debug!("Accept {:?}", untx);
@@ -535,5 +666,180 @@ where
             }
         };
         Ok(cita::TxResponse::new(r.hash, String::from("OK")))
+    }
+}
+
+/// A set of functions for FilterDataBase.
+impl<E, T, S> AppState<E, T, S>
+where
+    E: Executor,
+    T: TransactionPool,
+    S: Storage,
+{
+    /// Pass a block into FilterDatabase.
+    pub async fn recv_block(&mut self, block: Block) -> RpcResult<()> {
+        let mut ftdb = await!(self.filterdb.write().compat()).unwrap();
+        ftdb.recv_block(block.clone());
+
+        let now = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+
+        let mut uninstall_id = vec![];
+        // If there are any log filter matchs the logs in block, insert the
+        // logs into their dataset.panic!
+        for (id, filter) in &ftdb.regs.clone() {
+            // It's similar with RPC API `getLogs`, but has something different.
+
+            // Check if we should uninstall the filter
+            let lastupdate = ftdb.lastupdate.get(id).expect("must exist");
+            if now - lastupdate > 60 {
+                uninstall_id.push(*id);
+                continue;
+            }
+
+            // Maybe we can save the result instead of the filter,
+            // but at now, I want make it simply.
+            let possible_blooms = filter.bloom_possibilities();
+            let from_block = await!(self.get_height(filter.from_block.clone()))?;
+            let to_block = await!(self.get_height(filter.to_block.clone()))?;
+
+            if block.header.height < from_block || block.header.height > to_block {
+                continue;
+            }
+
+            let mut logs: Vec<cita::Log> = vec![];
+            let mut log_index = 0;
+
+            let mut fit = false;
+            for bloom in &possible_blooms {
+                if block
+                    .header
+                    .logs_bloom
+                    .contains_bloom(BloomRef::from(bloom))
+                {
+                    fit = true;
+                    break;
+                }
+            }
+
+            if !fit {
+                continue;
+            }
+
+            let receipts_res = await!(self
+                .storage
+                .get_receipts(Context::new(), block.tx_hashes.as_slice())
+                .compat())?;
+
+            for (tx_idx, tx_hash) in block.tx_hashes.iter().enumerate() {
+                let receipt = &receipts_res[tx_idx];
+                for (log_entry_index, log_entry) in receipt.logs.iter().enumerate() {
+                    if filter.matches(&log_entry) {
+                        let log = cita::Log {
+                            address:               log_entry.address.clone(),
+                            topics:                log_entry.topics.clone(),
+                            data:                  cita::Data::from(log_entry.data.clone()),
+                            block_hash:            Some(block.header.hash()),
+                            block_number:          Some(block.header.height.into()),
+                            transaction_hash:      Some(tx_hash.clone()),
+                            transaction_index:     Some((tx_idx as u64).into()),
+                            log_index:             Some(Uint::from(log_index as u64)),
+                            transaction_log_index: Some((log_entry_index as u64).into()),
+                        };
+                        logs.push(log);
+                    }
+                    log_index += 1;
+                }
+            }
+
+            let filter_logs = ftdb.data.entry(*id).or_insert_with(|| vec![]);
+            filter_logs.extend(logs);
+        }
+
+        for id in uninstall_id {
+            ftdb.uninstall(id);
+        }
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_filter_block_single() {
+        logger::init(logger::Flag::Test);
+        let mut fd = FilterDatabase::default();
+        let id = fd.new_block_filter(100);
+
+        let mut block = Block::default();
+        block.header.height = 101;
+        fd.recv_block(block);
+        assert_eq!(fd.block_data.get(&id).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn test_filter_block_multiple() {
+        logger::init(logger::Flag::Test);
+        let mut fd = FilterDatabase::default();
+        let id = fd.new_block_filter(100);
+
+        let mut block = Block::default();
+
+        block.header.height = 101;
+        fd.recv_block(block.clone());
+        block.header.height = 102;
+        fd.recv_block(block.clone());
+        block.header.height = 103;
+        fd.recv_block(block.clone());
+
+        assert_eq!(fd.block_data.get(&id).unwrap().len(), 3);
+    }
+
+    #[test]
+    fn test_filter_block_and_then_fetch() {
+        logger::init(logger::Flag::Test);
+        let mut fd = FilterDatabase::default();
+        let id = fd.new_block_filter(100);
+
+        let mut block = Block::default();
+
+        block.header.height = 101;
+        fd.recv_block(block.clone());
+        block.header.height = 102;
+        fd.recv_block(block.clone());
+        block.header.height = 103;
+        fd.recv_block(block.clone());
+
+        assert_eq!(fd.block_data.get(&id).unwrap().len(), 3);
+
+        let changes = fd.filter_changes(id).unwrap();
+
+        if let cita::FilterChanges::Hashes(hashed) = changes {
+            assert_eq!(hashed.len(), 3);
+        } else {
+            panic!("The type of changes must be FilterChanges::Hashes")
+        }
+
+        let changes = fd.filter_changes(id).unwrap();
+        if let cita::FilterChanges::Hashes(hashed) = changes {
+            assert_eq!(hashed.len(), 0);
+        } else {
+            panic!("The type of changes must be FilterChanges::Hashes")
+        }
+
+        block.header.height = 104;
+        fd.recv_block(block.clone());
+
+        let changes = fd.filter_changes(id).unwrap();
+        if let cita::FilterChanges::Hashes(hashed) = changes {
+            assert_eq!(hashed.len(), 1);
+        } else {
+            panic!("The type of changes must be FilterChanges::Hashes")
+        }
     }
 }
