@@ -60,13 +60,15 @@ impl Service {
         let key_pair = config.key_pair();
         let mut service = service_builder.key_pair(key_pair).build(Service::handle());
 
+        let listening_address = service.listen(listening_address).unwrap();
+        log::info!("p2p listening {:?}", listening_address);
+
         for addr in bootstrap_addresses {
             if let Err(err) = service.dial(addr.clone(), DialProtocol::All) {
                 debug!("Network: dail {} failure: {}", addr, err);
             }
         }
 
-        let _ = service.listen(listening_address);
         Box::new(service.for_each(|_| Ok(())))
     }
 

@@ -251,7 +251,7 @@ where
             match self.cast_rx.write().poll() {
                 Ok(Async::Ready(Some(cast))) => {
                     let (target_session, msg) = unpark_cast(cast);
-                    proto_ctx.filter_broadcast(target_session, self.id, msg.to_vec());
+                    proto_ctx.filter_broadcast(target_session, self.id, msg);
                 }
                 Ok(Async::NotReady) | Ok(Async::Ready(None)) => break,
                 Err(e) => {
