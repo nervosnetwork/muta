@@ -1,11 +1,19 @@
 use std::error::Error;
 use std::fmt;
 
-use core_context::Context;
+use core_context::{Cloneable, Context};
 use core_crypto::CryptoError;
 use core_types::{Hash, SignedTransaction, UnverifiedTransaction};
 
 use crate::FutRuntimeResult;
+
+#[derive(Clone, Debug)]
+pub enum TransactionOrigin {
+    Jsonrpc,
+    Other,
+}
+
+impl Cloneable for TransactionOrigin {}
 
 /// ”TransactionPool“ contains all legitimate transactions sent from other nodes
 /// (P2P) or local (RPC).

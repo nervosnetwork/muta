@@ -4,9 +4,9 @@
 use futures::compat::Future01CompatExt;
 use std::sync::Arc;
 
-use core_context::Context;
+use core_context::{Context, ORIGIN};
 use core_merkle::{self, Merkle, ProofNode};
-use core_runtime::{ExecutionContext, Executor, TransactionPool};
+use core_runtime::{ExecutionContext, Executor, TransactionOrigin, TransactionPool};
 use core_serialization::AsyncCodec;
 use core_storage::Storage;
 use core_types::{Address, Block, BloomRef, Hash, Receipt, SignedTransaction};
@@ -520,10 +520,12 @@ where
         let ser_raw_tx = await!(AsyncCodec::encode(ser_untx.clone().transaction.unwrap()))?;
         let message = Hash::from_fixed_bytes(tiny_keccak::keccak256(&ser_raw_tx));
         let untx: core_types::transaction::UnverifiedTransaction = ser_untx.into();
+        let origin_ctx =
+            Context::new().with_value::<TransactionOrigin>(ORIGIN, TransactionOrigin::Jsonrpc);
         log::debug!("Accept {:?}", untx);
         let r = await!(self
             .transaction_pool
-            .insert(Context::new(), message, untx)
+            .insert(origin_ctx, message, untx)
             .compat());
         let r = match r {
             Ok(ok) => ok,

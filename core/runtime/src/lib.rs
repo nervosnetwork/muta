@@ -11,6 +11,6 @@ pub mod transaction_pool;
 
 pub use database::{DataCategory, Database, DatabaseError, FutDBResult};
 pub use executor::{ExecutionContext, ExecutionResult, Executor, ExecutorError, ReadonlyResult};
-pub use transaction_pool::{TransactionPool, TransactionPoolError};
+pub use transaction_pool::{TransactionOrigin, TransactionPool, TransactionPoolError};
 
 pub type FutRuntimeResult<T, E> = Box<Future<Item = T, Error = E> + Send>;

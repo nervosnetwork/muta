@@ -4,6 +4,7 @@ use std::fmt::Debug;
 use std::marker::{Send, Sync};
 
 pub const P2P_SESSION_ID: &str = "p2p_session_id";
+pub const ORIGIN: &str = "origin";
 
 pub trait Cloneable: CloneableImpl + Debug + Send + Sync {}
 
@@ -103,5 +104,20 @@ mod tests {
 
         let ctx = ctx.with_value::<usize>(P2P_SESSION_ID, 1);
         assert_eq!(ctx.p2p_session_id(), Some(1));
+    }
+
+    #[test]
+    fn test_context_enum_value() {
+        #[derive(Debug, Clone, PartialEq)]
+        enum Count {
+            One,
+        }
+
+        impl super::Cloneable for Count {}
+
+        let ctx = Context::new();
+        let count = ctx.with_value::<Count>("count", Count::One);
+
+        assert_eq!(count.get::<Count>("count"), Some(&Count::One));
     }
 }

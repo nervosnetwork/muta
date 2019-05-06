@@ -11,9 +11,9 @@ use futures03::{
 };
 use futures_locks::RwLock;
 
-use core_context::Context;
+use core_context::{Context, ORIGIN};
 use core_crypto::{Crypto, CryptoTransform};
-use core_runtime::{FutRuntimeResult, TransactionPool, TransactionPoolError};
+use core_runtime::{FutRuntimeResult, TransactionOrigin, TransactionPool, TransactionPoolError};
 use core_storage::{Storage, StorageError};
 use core_types::{Address, Hash, SignedTransaction, Transaction, UnverifiedTransaction};
 
@@ -116,7 +116,7 @@ where
 
             // 3. verify params
             let latest_block =
-                await!(storage.get_latest_block(ctx).compat()).map_err(internal_error)?;
+                await!(storage.get_latest_block(ctx.clone()).compat()).map_err(internal_error)?;
 
             verify_transaction(
                 latest_block.header.height,
@@ -145,7 +145,9 @@ where
             tx_cache_w.insert(tx_hash, signed_tx.clone());
 
             // 7. broadcast tx
-            broadcaster.broadcast_batch(vec![signed_tx.clone()]);
+            if let Some(TransactionOrigin::Jsonrpc) = ctx.get::<TransactionOrigin>(ORIGIN) {
+                broadcaster.broadcast_batch(vec![signed_tx.clone()]);
+            }
 
             Ok(signed_tx)
         };
@@ -332,19 +334,23 @@ mod tests {
     use futures::future::{ok, Future};
 
     use components_database::memory::MemoryDB;
-    use core_context::Context;
+    use core_context::{Context, ORIGIN};
     use core_crypto::{secp256k1::Secp256k1, Crypto, CryptoTransform};
-    use core_runtime::{FutRuntimeResult, TransactionPool, TransactionPoolError};
+    use core_runtime::{
+        FutRuntimeResult, TransactionOrigin, TransactionPool, TransactionPoolError,
+    };
     use core_storage::{BlockStorage, Storage};
     use core_types::{Address, Block, Hash, SignedTransaction, Transaction, UnverifiedTransaction};
 
     use super::{Broadcaster, HashTransactionPool};
 
     #[derive(Clone)]
-    struct MockBroadcast;
+    struct BroadcastMock;
 
-    impl Broadcaster for MockBroadcast {
-        fn broadcast_batch(&mut self, _: Vec<SignedTransaction>) {}
+    impl Broadcaster for BroadcastMock {
+        fn broadcast_batch(&mut self, _: Vec<SignedTransaction>) {
+            panic!("should not broadcast inserted txs");
+        }
 
         fn pull_txs(
             &mut self,
@@ -370,7 +376,7 @@ mod tests {
         block.header.height = height;
         storage.insert_block(ctx.clone(), block).wait().unwrap();
 
-        let broadcast = MockBroadcast;
+        let broadcast = BroadcastMock;
         let tx_pool = HashTransactionPool::new(
             storage,
             secp,
@@ -425,6 +431,43 @@ mod tests {
         assert_eq!(result, Err(TransactionPoolError::Dup));
     }
 
+    // only transactions from jsonrpc will trigger broadcasting
+    #[test]
+    #[should_panic(expected = "should not broadcast inserted txs")]
+    fn test_insert_transaction_from_jsonrpc() {
+        let ctx = Context::new();
+        let secp = Arc::new(Secp256k1::new());
+        let pool_size = 1000;
+        let until_block_limit = 100;
+        let quota_limit = 10000;
+        let height = 100;
+
+        let db = Arc::new(MemoryDB::new());
+        let storage = Arc::new(BlockStorage::new(db));
+        let mut block = Block::default();
+        block.header.height = height;
+        storage.insert_block(ctx.clone(), block).wait().unwrap();
+
+        let broadcast = BroadcastMock;
+        let tx_pool = HashTransactionPool::new(
+            storage,
+            secp,
+            broadcast,
+            pool_size,
+            until_block_limit,
+            quota_limit,
+        );
+
+        // test normal
+        let untx = mock_transaction(100, height + until_block_limit, "test_normal".to_owned());
+        let tx_hash = untx.transaction.hash();
+        let origin_ctx = ctx.with_value::<TransactionOrigin>(ORIGIN, TransactionOrigin::Jsonrpc);
+        tx_pool
+            .insert(origin_ctx, tx_hash.clone(), untx)
+            .wait()
+            .unwrap();
+    }
+
     #[test]
     fn test_histories_dup() {
         let ctx = Context::new();
@@ -452,7 +495,7 @@ mod tests {
 
         storage.insert_block(ctx.clone(), block).wait().unwrap();
 
-        let broadcast = MockBroadcast;
+        let broadcast = BroadcastMock;
         let tx_pool = HashTransactionPool::new(
             storage,
             secp,
@@ -482,7 +525,7 @@ mod tests {
         block.header.height = height;
         storage.insert_block(ctx.clone(), block).wait().unwrap();
 
-        let broadcast = MockBroadcast;
+        let broadcast = BroadcastMock;
         let tx_pool = HashTransactionPool::new(
             storage,
             secp,
@@ -521,7 +564,7 @@ mod tests {
         block.header.height = height;
         storage.insert_block(ctx.clone(), block).wait().unwrap();
 
-        let broadcast = MockBroadcast;
+        let broadcast = BroadcastMock;
         let tx_pool = HashTransactionPool::new(
             storage,
             secp,
@@ -567,7 +610,7 @@ mod tests {
         block.header.height = height;
         storage.insert_block(ctx.clone(), block).wait().unwrap();
 
-        let broadcast = MockBroadcast;
+        let broadcast = BroadcastMock;
         let tx_pool = HashTransactionPool::new(
             storage,
             secp,
