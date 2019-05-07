@@ -8,10 +8,12 @@ edition = "2018"
 core-p2p = { path = "../p2p", features = ["prost-message"] }
 core-types = { path = "../types" }
 core-serialization = { path = "../serialization" }
+core-consensus = { path = "../consensus" }
+core-crypto = { path = "../crypto" }
 core-context = { path = "../context" }
 core-runtime = { path = "../runtime" }
 core-pubsub = { path = "../pubsub" }
-core-consensus = { path = "../consensus" }
+core-storage = { path = "../storage" }
 
 components-transaction-pool = { path = "../../components/transaction-pool" }
 
@@ -25,7 +27,8 @@ bytes = "0.4"
 serde_derive = "1.0"
 serde = "1.0"
 # TODO: rename futures01 instead
-futures03 = { package = "futures-preview", version = "=0.3.0-alpha.14", features = [ "compat" ] }
+futures03 = { package = "futures-preview", version = "0.3.0-alpha.14", features = [ "compat" ] }
+futures-locks = "0.3"
 uuid = "0.7"
 parking_lot = "0.7"
 tokio = "0.1"

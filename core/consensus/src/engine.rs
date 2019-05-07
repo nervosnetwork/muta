@@ -2,16 +2,19 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use bft_rs::{check_proof, Node as BftNode, Proof as BftProof};
 use futures::{
     compat::Future01CompatExt,
     stream::{FuturesUnordered, TryStreamExt},
 };
+use futures_locks::Mutex;
 
 use core_context::Context;
-use core_crypto::Crypto;
+use core_crypto::{Crypto, CryptoTransform};
 use core_merkle::Merkle;
 use core_pubsub::{channel::pubsub::Sender, register::Register, PUBSUB_BROADCAST_BLOCK};
 use core_runtime::{ExecutionContext, ExecutionResult, Executor, TransactionPool};
+use core_serialization::{AsyncCodec, Proposal as SerProposal};
 use core_storage::Storage;
 use core_types::{
     Address, Block, BlockHeader, Hash, Proof, Proposal, SignedTransaction, TransactionPosition,
@@ -48,9 +51,12 @@ where
     storage:  Arc<S>,
     crypto:   Arc<C>,
 
-    privkey:   C::PrivateKey,
-    status:    RwLock<ConsensusStatus>,
+    privkey: C::PrivateKey,
+    status: RwLock<ConsensusStatus>,
     pub_block: Sender<Block>,
+    /// mutex lock to ensure only one of insert_sync_block and commit_block is
+    /// processing
+    lock: Mutex<()>,
 }
 
 impl<E, T, S, C> Engine<E, T, S, C>
@@ -83,6 +89,7 @@ where
             privkey,
             status: RwLock::new(status),
             pub_block,
+            lock: Mutex::new(()),
         })
     }
 
@@ -185,7 +192,14 @@ where
         proposal: Proposal,
         latest_proof: Proof,
     ) -> ConsensusResult<ConsensusStatus> {
+        let _lock = await!(self.lock.lock().compat());
+
         let status = self.get_status()?;
+        if status.height + 1 != proposal.height {
+            return Err(ConsensusError::Internal(
+                "proposal to commit not match current height".to_owned(),
+            ));
+        }
 
         // Get transactions from the transaction pool
         let signed_txs = await!(self
@@ -208,6 +222,41 @@ where
         // build block
         let block = build_block(&proposal, &execution_result);
 
+        await!(self.insert_block(
+            ctx.clone(),
+            signed_txs,
+            block,
+            latest_proof,
+            Some(execution_result)
+        ))
+    }
+
+    async fn insert_block(
+        &self,
+        ctx: Context,
+        signed_txs: Vec<SignedTransaction>,
+        block: Block,
+        proof: Proof,
+        execution_result: Option<ExecutionResult>,
+    ) -> ConsensusResult<ConsensusStatus> {
+        let status = self.get_status()?;
+
+        let execution_result = match execution_result {
+            Some(exe_res) => exe_res,
+            None => {
+                // exec transactions
+                let execution_context = ExecutionContext {
+                    state_root:  status.state_root.clone(),
+                    proposer:    block.header.proposer.clone(),
+                    height:      block.header.height,
+                    quota_limit: block.header.quota_limit,
+                    timestamp:   block.header.timestamp,
+                };
+                self.executor
+                    .exec(ctx.clone(), &execution_context, &signed_txs)?
+            }
+        };
+
         // save
         let block_hash = block.hash.clone();
         let cloned_header = block.header.clone();
@@ -220,7 +269,7 @@ where
         );
         stream.push(
             self.storage
-                .update_latest_proof(ctx.clone(), latest_proof.clone())
+                .update_latest_proof(ctx.clone(), proof.clone())
                 .compat(),
         );
         if !signed_txs.is_empty() {
@@ -246,13 +295,10 @@ where
         await!(stream.try_collect())?;
 
         // flush transaction pool
-        await!(self
-            .tx_pool
-            .flush(ctx.clone(), &proposal.tx_hashes)
-            .compat())?;
+        await!(self.tx_pool.flush(ctx.clone(), &block.tx_hashes).compat())?;
 
         // update status
-        let updated_status = self.update_status(&cloned_header, &block_hash, &latest_proof)?;
+        let updated_status = self.update_status(&cloned_header, &block_hash, &proof)?;
         log::info!("block committed, status = {:?}", updated_status);
 
         // broadcast the block
@@ -262,6 +308,100 @@ where
         }
 
         Ok(updated_status)
+    }
+
+    /// insert block syncing from other nodes
+    pub async fn insert_sync_block(
+        &self,
+        ctx: Context,
+        block: Block,
+        proof: Proof,
+    ) -> ConsensusResult<ConsensusStatus> {
+        let _lock = await!(self.lock.lock().compat());
+
+        let status = self.get_status()?;
+        if status.height + 1 != block.header.height {
+            return Err(ConsensusError::Internal(
+                "block to insert not match current height".to_owned(),
+            ));
+        }
+
+        if proof.height != status.height + 1 {
+            return Err(ConsensusError::Internal(
+                "insert block is not the next of current".to_owned(),
+            ));
+        }
+
+        let proposal: SerProposal = Proposal {
+            prevhash:    block.header.prevhash.clone(),
+            timestamp:   block.header.timestamp,
+            height:      block.header.height,
+            quota_limit: block.header.quota_limit,
+            proposer:    block.header.proposer.clone(),
+            tx_hashes:   block.tx_hashes.clone(),
+            proof:       block.header.proof.clone(),
+        }
+        .into();
+        let proposal_bytes = await!(AsyncCodec::encode(proposal))?;
+        let proposal_hash = Hash::digest(&proposal_bytes);
+        if proof.proposal_hash != proposal_hash {
+            return Err(ConsensusError::Internal(
+                "proof and proposal_hash hash not match".to_owned(),
+            ));
+        }
+
+        if !self.verify_proof(&proof) {
+            return Err(ConsensusError::Internal("invalid proof".to_owned()));
+        }
+
+        // Get transactions from the transaction pool
+        await!(self.tx_pool.ensure(ctx.clone(), &block.tx_hashes).compat())?;
+        let signed_txs = await!(self
+            .tx_pool
+            .get_batch(ctx.clone(), &block.tx_hashes)
+            .compat())?;
+
+        await!(self.insert_block(ctx.clone(), signed_txs, block, proof, None))
+    }
+
+    fn verify_proof(&self, proof: &Proof) -> bool {
+        let bft_proof = BftProof {
+            height:          proof.height,
+            round:           proof.round,
+            block_hash:      proof.proposal_hash.as_bytes().to_vec(),
+            precommit_votes: proof.commits.clone().into_iter().fold(
+                HashMap::new(),
+                |mut h, vote| {
+                    h.insert(vote.address.as_bytes().to_vec(), vote.signature);
+                    h
+                },
+            ),
+        };
+        let crypt_hash = |msg: &[u8]| Hash::digest(msg).as_bytes().to_vec();
+        let check_sig_result =
+            move |signature: &[u8], hash: &[u8]| -> Result<Vec<u8>, Box<std::error::Error>> {
+                let signature = C::Signature::from_bytes(signature)?;
+                let hash = Hash::from_bytes(hash)?;
+                let pubkey = self.crypto.verify_with_signature(&hash, &signature)?;
+                Ok(self.crypto.pubkey_to_address(&pubkey).as_bytes().to_vec())
+            };
+        let check_sig_option = move |signature: &[u8], hash: &[u8]| -> Option<Vec<u8>> {
+            check_sig_result(signature, hash).ok()
+        };
+        let authorities = &self
+            .get_status()
+            .unwrap_or_default()
+            .verifier_list
+            .iter()
+            .map(|a| BftNode::set_address(a.as_bytes().to_vec()))
+            .collect::<Vec<_>>();
+        check_proof(
+            &bft_proof,
+            proof.height + 1,
+            authorities,
+            crypt_hash,
+            check_sig_option,
+        )
     }
 
     pub(crate) fn get_status(&self) -> ConsensusResult<ConsensusStatus> {

@@ -1,7 +1,9 @@
 mod consensus;
+mod synchronizer;
 mod tx_pool;
 
 use consensus::{ConsensusMessage, ConsensusReactor};
+use synchronizer::{SynchronizerMessage, SynchronizerReactor};
 use tx_pool::{TransactionPoolMessage, TransactionPoolReactor};
 
 use std::sync::Arc;
@@ -14,6 +16,7 @@ use crate::reactor::{CallbackMap, Reaction, Reactor, ReactorMessage};
 #[derive(Debug, Clone)]
 pub enum OutboundMessage {
     TransactionPool(TransactionPoolMessage),
+    Synchronizer(SynchronizerMessage),
     Consensus(ConsensusMessage),
 }
 
@@ -28,10 +31,11 @@ impl Sender {
     }
 
     pub fn try_send(
-        &mut self,
+        &self,
         msg: OutboundMessage,
     ) -> Result<(), mpsc::TrySendError<OutboundMessage>> {
-        self.inner.try_send(msg)
+        let mut inner = self.inner.clone();
+        inner.try_send(msg)
     }
 }
 
@@ -54,6 +58,10 @@ impl Reactor for OutboundReactor {
         match input {
             ReactorMessage::Outbound(OutboundMessage::TransactionPool(tx_msg)) => {
                 let mut tx_react = TransactionPoolReactor::new(Arc::clone(&self.callback_map));
+                Reaction::Done(tx_react.react(broadcaster, tx_msg))
+            }
+            ReactorMessage::Outbound(OutboundMessage::Synchronizer(tx_msg)) => {
+                let mut tx_react = SynchronizerReactor::new(Arc::clone(&self.callback_map));
                 Reaction::Done(tx_react.react(broadcaster, tx_msg))
             }
             ReactorMessage::Outbound(OutboundMessage::Consensus(consensus_msg)) => {

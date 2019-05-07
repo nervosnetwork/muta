@@ -1,45 +1,75 @@
 pub mod consensus;
 pub mod tx_pool;
+use tx_pool::TransactionPoolReactor;
+pub mod synchronizer;
+use synchronizer::SynchronizerReactor;
 
 use std::sync::Arc;
 
 use log::debug;
 
 use consensus::ConsensusReactor;
-use core_consensus::Consensus;
+use core_consensus::{Consensus, Engine, Synchronizer};
 use core_context::{Context, P2P_SESSION_ID};
-use core_runtime::TransactionPool;
-use tx_pool::TransactionPoolReactor;
+use core_crypto::Crypto;
+use core_runtime::{Executor, TransactionPool};
+use core_storage::Storage;
 
 use crate::p2p::{Broadcaster, Message, PackedMessage};
 use crate::reactor::{CallbackMap, Reaction, Reactor, ReactorMessage};
 
 // TODO: allow plugable chained reactors from components
-pub struct InboundReactor<T, Con> {
-    tx_pool:   Arc<T>,
-    consensus: Arc<Con>,
-
+pub struct InboundReactor<E, T, S, C, Y, Con>
+where
+    E: Executor + 'static,
+    T: TransactionPool + 'static,
+    S: Storage + 'static,
+    C: Crypto + 'static,
+    Y: Synchronizer + 'static,
+{
+    tx_pool:      Arc<T>,
+    storage:      Arc<S>,
+    engine:       Arc<Engine<E, T, S, C>>,
+    synchronizer: Arc<Y>,
+    consensus:    Arc<Con>,
     callback_map: CallbackMap,
 }
 
-impl<T, Con> InboundReactor<T, Con>
+impl<E, T, S, C, Y, Con> InboundReactor<E, T, S, C, Y, Con>
 where
+    E: Executor + 'static,
     T: TransactionPool + 'static,
+    S: Storage + 'static,
+    C: Crypto + 'static,
+    Y: Synchronizer + 'static,
     Con: Consensus + 'static,
 {
-    pub fn new(tx_pool: Arc<T>, consensus: Arc<Con>, callback_map: CallbackMap) -> Self {
+    pub fn new(
+        tx_pool: Arc<T>,
+        storage: Arc<S>,
+        engine: Arc<Engine<E, T, S, C>>,
+        synchronizer: Arc<Y>,
+        consensus: Arc<Con>,
+        callback_map: CallbackMap,
+    ) -> Self {
         InboundReactor {
             tx_pool,
+            engine,
+            storage,
+            synchronizer,
             consensus,
-
             callback_map,
         }
     }
 }
 
-impl<T, Con> Reactor for InboundReactor<T, Con>
+impl<E, T, S, C, Y, Con> Reactor for InboundReactor<E, T, S, C, Y, Con>
 where
+    E: Executor + 'static,
     T: TransactionPool + 'static,
+    S: Storage + 'static,
+    C: Crypto + 'static,
+    Y: Synchronizer + 'static,
     Con: Consensus + 'static,
 {
     type Input = ReactorMessage;
@@ -60,6 +90,16 @@ where
                             let mut tx_pool_reactor =
                                 TransactionPoolReactor::new(tx_pool, callback);
                             tx_pool_reactor.react(broadcaster, (session_ctx.clone(), msg))
+                        }
+                        Message::SynchronizerMessage(msg) => {
+                            let mut synchronizer_reactor = SynchronizerReactor::new(
+                                Arc::clone(&self.storage),
+                                Arc::clone(&self.engine),
+                                Arc::clone(&self.synchronizer),
+                                Arc::clone(&self.consensus),
+                                callback,
+                            );
+                            synchronizer_reactor.react(broadcaster, (session_ctx.clone(), msg))
                         }
                         Message::ConsensusMessage(msg) => {
                             let mut consensus_reactor = ConsensusReactor::new(consensus);

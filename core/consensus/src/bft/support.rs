@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::convert::TryInto;
+use std::sync::Arc;
 use std::sync::RwLock;
 
 use bft_rs::{
@@ -25,7 +26,7 @@ where
     C: Crypto + 'static,
     B: Broadcaster + 'static,
 {
-    engine: Engine<E, T, S, C>,
+    engine: Arc<Engine<E, T, S, C>>,
     // Because "bft-rs" is not in the futures runtime,
     // to ensure performance use a separate thread pool to run the futures in "support".
     thread_pool: ThreadPool,
@@ -42,9 +43,9 @@ where
     C: Crypto + 'static,
     B: Broadcaster + 'static,
 {
-    pub(crate) fn new(engine: Engine<E, T, S, C>, broadcaster: B) -> ConsensusResult<Self> {
+    pub(crate) fn new(engine: Arc<Engine<E, T, S, C>>, broadcaster: B) -> ConsensusResult<Self> {
         let thread_pool = ThreadPoolBuilder::new()
-            .pool_size(10)
+            .pool_size(num_cpus::get())
             .create()
             .map_err(|e| ConsensusError::Internal(e.to_string()))?;
 

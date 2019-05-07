@@ -788,9 +788,12 @@ dependencies = [
  "core-storage 0.1.0",
  "core-types 0.1.0",
  "futures 0.1.26 (registry+https://github.com/rust-lang/crates.io-index)",
+ "futures-locks 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures-preview 0.3.0-alpha.14 (registry+https://github.com/rust-lang/crates.io-index)",
+ "futures-timer 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "hex 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "num_cpus 1.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio 0.1.18 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -841,13 +844,16 @@ dependencies = [
  "config-parser 0.1.0",
  "core-consensus 0.1.0",
  "core-context 0.1.0",
+ "core-crypto 0.1.0",
  "core-p2p 0.1.0",
  "core-pubsub 0.1.0",
  "core-runtime 0.1.0",
  "core-serialization 0.1.0",
+ "core-storage 0.1.0",
  "core-types 0.1.0",
  "env_logger 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.26 (registry+https://github.com/rust-lang/crates.io-index)",
+ "futures-locks 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures-preview 0.3.0-alpha.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "parking_lot 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1513,6 +1519,14 @@ dependencies = [
  "either 1.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures-channel-preview 0.3.0-alpha.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures-core-preview 0.3.0-alpha.14 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "futures-timer"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "futures 0.1.26 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -3790,6 +3804,7 @@ dependencies = [
 "checksum futures-preview 0.3.0-alpha.14 (registry+https://github.com/rust-lang/crates.io-index)" = "bb4443b7b07cb01f3e9ad819456b0a9f3625b5dd885e8f8da6141c6b929fc07d"
 "checksum futures-select-macro-preview 0.3.0-alpha.14 (registry+https://github.com/rust-lang/crates.io-index)" = "c9c0d15b57c3e4fa7074a03e05ae9a17a3b790d0b308d9939cf26418805f6785"
 "checksum futures-sink-preview 0.3.0-alpha.14 (registry+https://github.com/rust-lang/crates.io-index)" = "dbbc2bc8aff721d0e5b745a3f8e904e799a5c83372a15779239980c89e2d6cb4"
+"checksum futures-timer 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "a5cedfe9b6dc756220782cc1ba5bcb1fa091cdcba155e40d3556159c3db58043"
 "checksum futures-util-preview 0.3.0-alpha.14 (registry+https://github.com/rust-lang/crates.io-index)" = "71908da95cfa7454d0e4466865251d5218aa2233217d0f8382d3a58e9bc7d9ac"
 "checksum generic-array 0.12.0 (registry+https://github.com/rust-lang/crates.io-index)" = "3c0f28c2f5bfb5960175af447a2da7c18900693738343dc896ffbcabd9839592"
 "checksum generic-array 0.8.3 (registry+https://github.com/rust-lang/crates.io-index)" = "fceb69994e330afed50c93524be68c42fa898c2d9fd4ee8da03bd7363acd26f2"

@@ -7,10 +7,12 @@ mod bft;
 mod engine;
 mod errors;
 // mod solo;
+mod synchronizer;
 
 pub use bft::Bft;
 pub use engine::Engine;
-pub use errors::ConsensusError;
+pub use errors::{ConsensusError, SynchronizerError};
+pub use synchronizer::{Status, Synchronizer, SynchronizerManager};
 // pub use solo::Solo;
 
 use old_futures::future::Future as OldFuture;
@@ -28,7 +30,7 @@ use core_types::{Address, Hash, Proof};
 
 /// The necessary state to complete the consensus will be updated with each
 /// block.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct ConsensusStatus {
     pub height:        u64,
     pub timestamp:     u64,
@@ -57,6 +59,9 @@ pub trait Consensus: Send + Sync {
     fn set_proposal(&self, ctx: Context, msg: ProposalMessage) -> FutConsensusResult<()>;
 
     fn set_vote(&self, ctx: Context, msg: VoteMessage) -> FutConsensusResult<()>;
+
+    // Send status to peers after synchronizing blocks to trigger bft
+    fn send_status(&self) -> FutConsensusResult<()>;
 }
 
 pub trait Broadcaster: Send + Sync + Clone {

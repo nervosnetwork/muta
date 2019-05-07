@@ -25,6 +25,7 @@ where
     C: Crypto + 'static,
     B: Broadcaster + 'static,
 {
+    engine:       Arc<Engine<E, T, S, C>>,
     bft_actuator: Arc<BftActuator>,
     support:      Arc<Support<E, T, S, C, B>>,
 }
@@ -38,12 +39,12 @@ where
     B: Broadcaster + 'static,
 {
     pub fn new(
-        engine: Engine<E, T, S, C>,
+        engine: Arc<Engine<E, T, S, C>>,
         broadcaster: B,
         wal_path: &str,
     ) -> ConsensusResult<Self> {
         let status = engine.get_status()?;
-        let support = Support::new(engine, broadcaster)?;
+        let support = Support::new(Arc::clone(&engine), broadcaster)?;
         let support = Arc::new(support);
 
         let bft_actuator = BftActuator::new(
@@ -63,6 +64,7 @@ where
         }))?;
 
         Ok(Self {
+            engine,
             bft_actuator: Arc::new(bft_actuator),
             support,
         })
@@ -77,6 +79,24 @@ where
     C: Crypto + 'static,
     B: Broadcaster + 'static,
 {
+    fn send_status(&self) -> FutConsensusResult<()> {
+        let bft = self.clone();
+        let fut = async move {
+            let status = bft.engine.get_status()?;
+            bft.bft_actuator.send(BftMsg::Status(BftStatus {
+                height:         status.height,
+                interval:       Some(status.interval),
+                authority_list: status
+                    .verifier_list
+                    .iter()
+                    .map(|a| Node::set_address(a.as_bytes().to_vec()))
+                    .collect(),
+            }))?;
+            Ok(())
+        };
+        Box::new(fut.boxed().compat())
+    }
+
     fn set_proposal(&self, ctx: Context, msg: ProposalMessage) -> FutConsensusResult<()> {
         let bft = self.clone();
 
@@ -116,6 +136,7 @@ where
 {
     fn clone(&self) -> Self {
         Self {
+            engine:       Arc::clone(&self.engine),
             bft_actuator: Arc::clone(&self.bft_actuator),
             support:      Arc::clone(&self.support),
         }

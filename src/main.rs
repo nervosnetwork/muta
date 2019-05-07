@@ -16,7 +16,7 @@ use components_executor::evm::{EVMBlockDataProvider, EVMExecutor};
 use components_executor::TrieDB;
 use components_jsonrpc;
 use components_transaction_pool::HashTransactionPool;
-use core_consensus::{Bft, ConsensusStatus, Engine};
+use core_consensus::{Bft, ConsensusStatus, Engine, SynchronizerManager};
 use core_context::Context;
 use core_crypto::{
     secp256k1::{PrivateKey, Secp256k1},
@@ -56,6 +56,9 @@ struct Config {
     consensus_interval:      u64,
     consensus_verifier_list: Vec<String>,
     consensus_wal_path:      String,
+
+    // synchronizer
+    synchronzer_broadcast_status_interval: u64,
 }
 
 impl Config {
@@ -185,25 +188,35 @@ fn start(cfg: &Config) {
 
     let mut pubsub = PubSub::builder().build().start();
 
-    let engine = Engine::new(
-        Arc::clone(&executor),
-        Arc::clone(&tx_pool),
-        Arc::clone(&storage),
-        Arc::clone(&secp),
-        privkey.clone(),
-        status,
-        pubsub.register(),
-    )
-    .unwrap();
+    let engine = Arc::new(
+        Engine::new(
+            Arc::clone(&executor),
+            Arc::clone(&tx_pool),
+            Arc::clone(&storage),
+            Arc::clone(&secp),
+            privkey.clone(),
+            status,
+            pubsub.register(),
+        )
+        .unwrap(),
+    );
 
     // start consensus.
-    let consensus = Bft::new(engine, outbound_tx.clone(), &cfg.consensus_wal_path).unwrap();
+    let consensus = Bft::new(
+        Arc::clone(&engine),
+        outbound_tx.clone(),
+        &cfg.consensus_wal_path,
+    )
+    .unwrap();
     let consensus = Arc::new(consensus);
 
     // net network
     let callback_map = CallbackMap::default();
     let inbound_reactor = InboundReactor::new(
         Arc::clone(&tx_pool),
+        Arc::clone(&storage),
+        Arc::clone(&engine),
+        Arc::new(outbound_tx.clone()),
         Arc::clone(&consensus),
         Arc::clone(&callback_map),
     );
@@ -222,6 +235,18 @@ fn start(cfg: &Config) {
     net_config.p2p.bootstrap_addresses = cfg.bootstrap_addresses.to_owned();
     let _network = Network::new(net_config, outbound_rx, network_reactor).unwrap();
 
+    // start synchronizer
+    let sub_block2 = pubsub
+        .subscribe::<Block>(PUBSUB_BROADCAST_BLOCK.to_owned())
+        .unwrap();
+    let synchronizer_manager = SynchronizerManager::new(
+        Arc::new(outbound_tx.clone()),
+        Arc::clone(&storage),
+        cfg.synchronzer_broadcast_status_interval,
+    );
+    synchronizer_manager.start(sub_block2);
+
+    // start jsonrpc
     let sub_block = pubsub
         .subscribe::<Block>(PUBSUB_BROADCAST_BLOCK.to_owned())
         .unwrap();

@@ -23,3 +23,6 @@ consensus_tx_limit = 30000
 consensus_interval = 3000
 consensus_verifier_list = [ "19e49d3efd4e81dc82943ad9791c1916e2229138" ]
 consensus_wal_path = "./devtools/chain/bft_wal"
+
+# synchronzer
+synchronzer_broadcast_status_interval = 180000

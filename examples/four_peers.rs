@@ -7,15 +7,24 @@ use futures01::sync::mpsc::channel;
 use logger;
 
 use components_database::memory::MemoryDB;
+use components_executor::evm::{EVMBlockDataProvider, EVMExecutor};
+use components_executor::TrieDB;
 use components_transaction_pool::HashTransactionPool;
 
-use core_consensus::{Consensus, FutConsensusResult, ProposalMessage, VoteMessage};
+use core_consensus::{
+    Consensus, ConsensusStatus, Engine, FutConsensusResult, ProposalMessage, Status, Synchronizer,
+    SynchronizerError, VoteMessage,
+};
 use core_context::{Context, P2P_SESSION_ID};
-use core_crypto::{secp256k1::Secp256k1, Crypto, CryptoTransform};
+use core_crypto::{
+    secp256k1::{PrivateKey, Secp256k1},
+    Crypto, CryptoTransform,
+};
 use core_network::reactor::{outbound, CallbackMap, InboundReactor, JoinReactor, OutboundReactor};
 use core_network::Config as NetworkConfig;
 use core_network::Network;
-use core_runtime::TransactionPool;
+use core_pubsub::PubSub;
+use core_runtime::{FutRuntimeResult, TransactionPool};
 use core_storage::{BlockStorage, Storage};
 use core_types::{Address, Block, Transaction, UnverifiedTransaction};
 
@@ -155,8 +164,37 @@ fn start_peer(
 
     // net network
     let callback_map = CallbackMap::default();
+    let pubsub = PubSub::builder().build().start();
+    let privkey = PrivateKey::from_bytes([0u8; 32].as_ref()).unwrap();
+    let status = ConsensusStatus::default();
+    let state_db = Arc::new(MemoryDB::new());
+    let trie_db = Arc::new(TrieDB::new(Arc::clone(&state_db)));
+    let block = Block::default();
+    let executor = Arc::new(
+        EVMExecutor::from_existing(
+            trie_db,
+            Arc::new(EVMBlockDataProvider::new(Arc::clone(&storage))),
+            &block.header.state_root,
+        )
+        .unwrap(),
+    );
+    let engine = Arc::new(
+        Engine::new(
+            Arc::clone(&executor),
+            Arc::clone(&tx_pool),
+            Arc::clone(&storage),
+            Arc::clone(&secp),
+            privkey.clone(),
+            status,
+            pubsub.register(),
+        )
+        .unwrap(),
+    );
     let inbound_reactor = InboundReactor::new(
         Arc::clone(&tx_pool),
+        Arc::clone(&storage),
+        engine,
+        Arc::new(MockSynchronizer::default()),
         Arc::new(MockConsensus::default()),
         Arc::clone(&callback_map),
     );
@@ -209,11 +247,30 @@ fn mock_transaction(quota: u64, valid_until_block: u64, nonce: String) -> Unveri
 pub struct MockConsensus {}
 
 impl Consensus for MockConsensus {
+    fn send_status(&self) -> FutConsensusResult<()> {
+        Box::new(ok(()))
+    }
+
     fn set_proposal(&self, _ctx: Context, _msg: ProposalMessage) -> FutConsensusResult<()> {
         Box::new(ok(()))
     }
 
     fn set_vote(&self, _ctx: Context, _msg: VoteMessage) -> FutConsensusResult<()> {
         Box::new(ok(()))
+    }
+}
+
+#[derive(Default, Clone)]
+pub struct MockSynchronizer {}
+
+impl Synchronizer for MockSynchronizer {
+    fn broadcast_status(&self, _status: Status) {}
+
+    fn pull_blocks(
+        &self,
+        _ctx: Context,
+        _heights: Vec<u64>,
+    ) -> FutRuntimeResult<Vec<Block>, SynchronizerError> {
+        unimplemented!()
     }
 }

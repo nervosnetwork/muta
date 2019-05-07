@@ -84,12 +84,17 @@ impl Service {
         let worker = outbound_rx
             .map(ReactorMessage::Outbound)
             .select(inbound_rx.map(ReactorMessage::Inbound))
-            .for_each(move |msg| match reactor.react(broadcaster.clone(), msg) {
-                Reaction::Message(msg) => {
-                    error!("network: drop unhandle msg: {:?}", msg);
-                    Box::new(ok(())) // match `Done`
-                }
-                Reaction::Done(ret) => ret,
+            .for_each(move |msg| {
+                tokio::spawn({
+                    match reactor.react(broadcaster.clone(), msg) {
+                        Reaction::Message(msg) => {
+                            error!("network: drop unhandle msg: {:?}", msg);
+                            Box::new(ok(())) // match `Done`
+                        }
+                        Reaction::Done(ret) => ret,
+                    }
+                });
+                Ok(())
             });
 
         Box::new(worker)

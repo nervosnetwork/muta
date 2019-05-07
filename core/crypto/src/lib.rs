@@ -1,5 +1,6 @@
 pub mod secp256k1;
 
+use std::error::Error;
 use std::fmt;
 
 use core_types::{Address, Hash};
@@ -44,6 +45,7 @@ pub enum CryptoError {
     PublicKeyInvalid,
 }
 
+impl Error for CryptoError {}
 impl fmt::Display for CryptoError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let printable = match *self {
