@@ -22,9 +22,15 @@ pub type DefaultPeerManager = PeerManagerHandle<DefaultPeerManagerImpl>;
 impl DefaultPeerManager {
     pub fn new() -> Self {
         PeerManagerHandle {
-            inner:              DefaultPeerManagerImpl::new(),
-            local_listen_addrs: vec![],
+            inner: DefaultPeerManagerImpl::new(),
         }
+    }
+
+    pub fn register_self(&mut self, addrs: Vec<Multiaddr>) {
+        self.inner
+            .local_listen_addrs
+            .write()
+            .extend(addrs.into_iter());
     }
 }
 
@@ -35,21 +41,13 @@ impl Default for DefaultPeerManager {
 }
 
 pub struct PeerManagerHandle<I> {
-    pub(crate) inner:              I,
-    pub(crate) local_listen_addrs: Vec<Multiaddr>,
-}
-
-impl<M: PeerManager> PeerManagerHandle<M> {
-    pub fn register_self(&mut self, addrs: Vec<Multiaddr>) {
-        self.local_listen_addrs = addrs;
-    }
+    pub(crate) inner: I,
 }
 
 impl<M: Clone> Clone for PeerManagerHandle<M> {
     fn clone(&self) -> Self {
         PeerManagerHandle {
-            inner:              self.inner.clone(),
-            local_listen_addrs: self.local_listen_addrs.clone(),
+            inner: self.inner.clone(),
         }
     }
 }

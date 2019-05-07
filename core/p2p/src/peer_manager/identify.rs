@@ -8,7 +8,9 @@ use tentacle::{multiaddr::Multiaddr, secio::PeerId};
 impl<M: PeerManager> IdentifyPeerManager for PeerManagerHandle<M> {
     /// Get local listen addresses
     fn local_listen_addrs(&mut self) -> Vec<Multiaddr> {
-        self.local_listen_addrs.clone()
+        let peer_mgr = self.borrow_mut::<M>();
+
+        peer_mgr.local_listen_addrs().clone()
     }
 
     /// Add remote peer's listen addresses

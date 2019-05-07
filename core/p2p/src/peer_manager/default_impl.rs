@@ -76,15 +76,19 @@ pub struct DefaultPeerManagerImpl {
     addr_peers: Arc<RwLock<HashMap<Multiaddr, PeerId>>>,
     // Multiaddrs from discovery
     masquer_addrs: Arc<RwLock<HashSet<Multiaddr>>>,
+
+    // Ourselves
+    pub(crate) local_listen_addrs: Arc<RwLock<HashSet<Multiaddr>>>,
 }
 
 impl DefaultPeerManagerImpl {
     pub fn new() -> Self {
         DefaultPeerManagerImpl {
-            peers:         Default::default(),
-            connecs:       Default::default(),
-            addr_peers:    Default::default(),
-            masquer_addrs: Default::default(),
+            peers:              Default::default(),
+            connecs:            Default::default(),
+            addr_peers:         Default::default(),
+            masquer_addrs:      Default::default(),
+            local_listen_addrs: Default::default(),
         }
     }
 }
@@ -98,15 +102,24 @@ impl Default for DefaultPeerManagerImpl {
 impl Clone for DefaultPeerManagerImpl {
     fn clone(&self) -> Self {
         DefaultPeerManagerImpl {
-            peers:         Arc::clone(&self.peers),
-            connecs:       Arc::clone(&self.connecs),
-            addr_peers:    Arc::clone(&self.addr_peers),
-            masquer_addrs: Arc::clone(&self.masquer_addrs),
+            peers:              Arc::clone(&self.peers),
+            connecs:            Arc::clone(&self.connecs),
+            addr_peers:         Arc::clone(&self.addr_peers),
+            masquer_addrs:      Arc::clone(&self.masquer_addrs),
+            local_listen_addrs: Arc::clone(&self.local_listen_addrs),
         }
     }
 }
 
 impl PeerManager for DefaultPeerManagerImpl {
+    fn local_listen_addrs(&mut self) -> Vec<Multiaddr> {
+        self.local_listen_addrs
+            .read()
+            .iter()
+            .map(Clone::clone)
+            .collect::<Vec<Multiaddr>>()
+    }
+
     fn peer_id(&self, addr: &Multiaddr) -> Option<PeerId> {
         self.addr_peers.read().get(addr).map(Clone::clone)
     }

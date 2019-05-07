@@ -26,6 +26,8 @@ pub enum ConnecStatus {
 }
 
 pub trait PeerManager: Send + Sync + Clone {
+    fn local_listen_addrs(&mut self) -> Vec<Multiaddr>;
+
     fn max_peer_conns() -> usize {
         MAX_PEER_CONNECTIONS
     }
