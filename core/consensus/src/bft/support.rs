@@ -194,6 +194,13 @@ where
                 .engine
                 .commit_block(ctx.clone(), proposal, latest_proof))?;
 
+            // clear cache of last proposal.
+            let mut proposal_origin = self
+                .proposal_origin
+                .write()
+                .map_err(|_| ConsensusError::Internal("rwlock error".to_owned()))?;
+            proposal_origin.clear();
+
             Ok(BftStatus {
                 height:         status.height,
                 interval:       Some(status.interval),
