@@ -176,6 +176,10 @@ impl PeerManager for DefaultPeerManagerImpl {
         self.masquer_addrs.write().insert(addr);
     }
 
+    fn remove_masquer_addr(&mut self, addr: &Multiaddr) {
+        self.masquer_addrs.write().remove(addr);
+    }
+
     fn update_peer_score(&mut self, peer_id: &PeerId, score: Score) -> Score {
         let mut peer_info = self.peers.write();
 

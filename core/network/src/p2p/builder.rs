@@ -115,7 +115,11 @@ where
 
         // kick start p2p service
         let builder = self.service_builder;
-        let service_worker = ServiceWorker::kick_start(Service::service_worker(builder, &config));
+        let service_worker = ServiceWorker::kick_start(Service::service_worker(
+            builder,
+            &config,
+            peer_manager.clone(),
+        ));
 
         // kick start transmission msg rx handling
         let msg_rx = self.msg_rx;

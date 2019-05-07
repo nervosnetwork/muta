@@ -4,11 +4,14 @@ use futures::sync::mpsc::{Receiver, Sender};
 use log::{debug, error};
 use tentacle::builder::ServiceBuilder;
 use tentacle::context::ServiceContext;
+use tentacle::error::Error;
 use tentacle::service::{DialProtocol, ServiceError, ServiceEvent};
 use tentacle::traits::ServiceHandle;
 
 use core_context::Context;
 use core_p2p::{
+    peer_manager::default_manager::{BorrowExt, PeerManagerHandle},
+    peer_manager::PeerManager,
     transmission::{CastMessage, RecvMessage},
     DefaultPeerManager,
 };
@@ -54,11 +57,18 @@ impl Service {
 impl Service {
     // FIXME: cannot cleanly shutdown yet, wait for tentacle to implement
     // shutdown feature?
-    pub(crate) fn service_worker(service_builder: ServiceBuilder, config: &Config) -> Task {
+    pub(crate) fn service_worker<M: PeerManager + 'static>(
+        service_builder: ServiceBuilder,
+        config: &Config,
+        peer_manager: PeerManagerHandle<M>,
+    ) -> Task {
         let listening_address = config.listening_address();
         let bootstrap_addresses = config.bootstrap_addresses();
         let key_pair = config.key_pair();
-        let mut service = service_builder.key_pair(key_pair).build(Service::handle());
+        let peer_mgr = peer_manager.borrow::<M>().clone();
+        let mut service = service_builder
+            .key_pair(key_pair)
+            .build(Service::handle(peer_mgr));
 
         let listening_address = service.listen(listening_address).unwrap();
         log::info!("p2p listening {:?}", listening_address);
@@ -100,16 +110,26 @@ impl Service {
         Box::new(worker)
     }
 
-    pub(crate) fn handle() -> Handle {
-        Handle {}
+    pub(crate) fn handle<M: PeerManager>(peer_manager: M) -> Handle<M> {
+        Handle { peer_manager }
     }
 }
 
-pub(crate) struct Handle {}
+pub(crate) struct Handle<M> {
+    peer_manager: M,
+}
 
-impl ServiceHandle for Handle {
+impl<M: PeerManager> ServiceHandle for Handle<M> {
     fn handle_error(&mut self, _: &mut ServiceContext, err: ServiceError) {
-        error!("Network service error: {:?}", err)
+        error!("Network service error: {:?}", err);
+
+        if let ServiceError::DialerError { address, error }
+        | ServiceError::ListenError { address, error } = err
+        {
+            if let Error::RepeatedConnection(_) | Error::ConnectSelf = error {
+                self.peer_manager.remove_masquer_addr(&address);
+            }
+        }
     }
 
     fn handle_event(&mut self, _: &mut ServiceContext, _: ServiceEvent) {

@@ -48,6 +48,8 @@ pub trait PeerManager: Send + Sync + Clone {
 
     fn new_masquer_addr(&mut self, addr: Multiaddr);
 
+    fn remove_masquer_addr(&mut self, addr: &Multiaddr);
+
     fn update_peer_score(&mut self, peer_id: &PeerId, score: Score) -> Score;
 
     fn set_peer_status(&mut self, peer_id: &PeerId, status: ConnecStatus);
