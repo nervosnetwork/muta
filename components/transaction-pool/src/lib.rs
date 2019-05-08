@@ -1,14 +1,13 @@
 #![feature(async_await, await_macro, futures_api)]
 
-use std::collections::HashMap;
 use std::string::ToString;
 use std::sync::Arc;
 
+use chashmap::CHashMap;
 use futures03::{
     compat::Future01CompatExt,
     prelude::{FutureExt, TryFutureExt},
 };
-use futures_locks::RwLock;
 
 use core_context::{Context, ORIGIN};
 use core_crypto::{Crypto, CryptoTransform};
@@ -26,7 +25,7 @@ pub trait Broadcaster: Send + Sync + Clone {
     ) -> FutRuntimeResult<Vec<SignedTransaction>, TransactionPoolError>;
 }
 
-type TxCache = Arc<RwLock<HashMap<Hash, SignedTransaction>>>;
+type TxCache = Arc<CHashMap<Hash, SignedTransaction>>;
 
 pub struct HashTransactionPool<S, C, B> {
     pool_size:         usize,
@@ -59,8 +58,8 @@ where
             until_block_limit,
             quota_limit,
 
-            tx_cache: Arc::new(RwLock::new(HashMap::new())),
-            callback_cache: Arc::new(RwLock::new(HashMap::new())),
+            tx_cache: Arc::new(CHashMap::new()),
+            callback_cache: Arc::new(CHashMap::new()),
             storage,
             crypto,
             broadcaster,
@@ -108,8 +107,6 @@ where
                 Err(e) => Err(internal_error(e))?,
             }
 
-            let mut tx_cache_w = await!(tx_cache.write().compat()).map_err(map_rwlock_err)?;
-
             // 3. verify params
             let latest_block =
                 await!(storage.get_latest_block(ctx.clone()).compat()).map_err(internal_error)?;
@@ -122,12 +119,12 @@ where
             )?;
 
             // 4. check size
-            if tx_cache_w.len() >= pool_size {
+            if tx_cache.len() >= pool_size {
                 Err(TransactionPoolError::ReachLimit)?
             }
 
             // 5. check cache dup
-            if tx_cache_w.contains_key(&tx_hash) {
+            if tx_cache.contains_key(&tx_hash) {
                 Err(TransactionPoolError::Dup)?
             }
 
@@ -138,7 +135,7 @@ where
                 hash: tx_hash.clone(),
             };
 
-            tx_cache_w.insert(tx_hash, signed_tx.clone());
+            tx_cache.insert(tx_hash, signed_tx.clone());
 
             // 7. broadcast tx
             if let Some(TransactionOrigin::Jsonrpc) = ctx.get::<TransactionOrigin>(ORIGIN) {
@@ -169,9 +166,7 @@ where
             let mut valid_hashes = vec![];
             let mut quota_count: u64 = 0;
 
-            let mut tx_cache_w = await!(tx_cache.write().compat()).map_err(map_rwlock_err)?;
-
-            for (tx_hash, signed_tx) in tx_cache_w.iter_mut() {
+            for (tx_hash, signed_tx) in tx_cache.as_ref().clone() {
                 let valid_until_block = signed_tx.untx.transaction.valid_until_block;
                 let quota = signed_tx.untx.transaction.quota;
 
@@ -198,7 +193,7 @@ where
             }
 
             for h in invalid_hashes {
-                tx_cache_w.remove(&h);
+                tx_cache.remove(&h);
             }
 
             Ok(valid_hashes)
@@ -213,13 +208,9 @@ where
         let tx_hashes = tx_hashes.to_owned();
 
         let fut = async move {
-            let mut callback_cache_w =
-                await!(callback_cache.write().compat()).map_err(map_rwlock_err)?;
-            let mut tx_cache_w = await!(tx_cache.write().compat()).map_err(map_rwlock_err)?;
-
-            callback_cache_w.clear();
+            callback_cache.clear();
             for hash in tx_hashes.iter() {
-                tx_cache_w.remove(hash);
+                tx_cache.remove(hash);
             }
 
             Ok(())
@@ -238,7 +229,6 @@ where
         let tx_hashes = tx_hashes.to_owned();
 
         let fut = async move {
-            let callback_cache = await!(callback_cache.read().compat()).map_err(map_rwlock_err)?;
             let mut sig_txs = Vec::with_capacity(tx_hashes.len());
             let mut leftover = vec![];
 
@@ -253,8 +243,6 @@ where
             if leftover.is_empty() {
                 return Ok(sig_txs);
             }
-
-            let tx_cache = await!(tx_cache.read().compat()).map_err(map_rwlock_err)?;
 
             for hash in leftover.iter() {
                 if let Some(stx) = tx_cache.get(hash) {
@@ -279,7 +267,6 @@ where
         let tx_hashes = tx_hashes.to_owned();
 
         let fut = async move {
-            let tx_cache = await!(tx_cache.read().compat()).map_err(map_rwlock_err)?;
             let mut unknown = vec![];
 
             for hash in tx_hashes.iter() {
@@ -289,12 +276,10 @@ where
             }
 
             if !unknown.is_empty() {
-                let mut callback_cache_w =
-                    await!(callback_cache.write().compat()).map_err(map_rwlock_err)?;
                 let sig_txs = await!(broadcaster.pull_txs(ctx, unknown).compat())?;
 
                 for stx in sig_txs.into_iter() {
-                    callback_cache_w.insert(stx.hash.clone(), stx);
+                    callback_cache.insert(stx.hash.clone(), stx);
                 }
             }
 
@@ -328,10 +313,6 @@ fn verify_transaction(
 
 fn verify_until_block(valid_until_block: u64, current_height: u64, limit_until_block: u64) -> bool {
     !(valid_until_block <= current_height || valid_until_block > current_height + limit_until_block)
-}
-
-fn map_rwlock_err(_: ()) -> TransactionPoolError {
-    TransactionPoolError::Internal("rwlock error".to_string())
 }
 
 fn internal_error(e: impl ToString) -> TransactionPoolError {
@@ -608,8 +589,8 @@ mod tests {
         let (callback_stxs, pool_stxs) = sig_txs.split_at(5);
         {
             // insert test signed transactions
-            let mut callback_cache = tx_pool.callback_cache.write().wait().unwrap();
-            let mut pool_cache = tx_pool.tx_cache.write().wait().unwrap();
+            let callback_cache = Arc::clone(&tx_pool.callback_cache);
+            let pool_cache = Arc::clone(&tx_pool.tx_cache);
 
             for stx in callback_stxs.iter() {
                 callback_cache.insert(stx.hash.clone(), stx.clone());
@@ -628,10 +609,7 @@ mod tests {
             .wait()
             .unwrap();
         assert_eq!(stxs.len(), test_hashes.len());
-        assert_eq!(
-            tx_pool.callback_cache.read().wait().unwrap().len(),
-            test_hashes.len()
-        );
+        assert_eq!(tx_pool.callback_cache.len(), test_hashes.len());
 
         let test_hashes = pool_stxs
             .iter()
@@ -641,8 +619,8 @@ mod tests {
             .flush(ctx.clone(), test_hashes.as_slice())
             .wait()
             .unwrap();
-        assert_eq!(tx_pool.callback_cache.read().wait().unwrap().len(), 0);
-        assert_eq!(tx_pool.tx_cache.read().wait().unwrap().len(), 0);
+        assert_eq!(tx_pool.callback_cache.len(), 0);
+        assert_eq!(tx_pool.tx_cache.len(), 0);
     }
 
     #[test]
@@ -708,14 +686,15 @@ mod tests {
             .insert(ctx.clone(), tx_hashes[0].clone(), untxs[0].clone())
             .wait()
             .unwrap();
-        assert_eq!(tx_pool.tx_cache.read().wait().unwrap().len(), 1);
+        assert_eq!(tx_pool.tx_cache.len(), 1);
 
         tx_pool
             .ensure(ctx.clone(), tx_hashes.as_slice())
             .wait()
             .unwrap();
-        let callback_cache = tx_pool.callback_cache.read().wait().unwrap();
+        let callback_cache = tx_pool.callback_cache;
 
+        dbg!(callback_cache.len());
         assert_eq!(callback_cache.len(), 4);
         assert!(!callback_cache.contains_key(&tx_hashes[0]));
         for hash in tx_hashes.iter().take(5).skip(1) {
@@ -748,13 +727,13 @@ mod tests {
             tx_hashes.push(hash.clone());
             tx_pool.insert(ctx.clone(), hash, untx).wait().unwrap();
         }
-        assert_eq!(tx_pool.tx_cache.read().wait().unwrap().len(), 5);
+        assert_eq!(tx_pool.tx_cache.len(), 5);
 
         tx_pool
             .ensure(ctx.clone(), tx_hashes.as_slice())
             .wait()
             .unwrap();
-        assert_eq!(tx_pool.callback_cache.read().wait().unwrap().len(), 0);
+        assert_eq!(tx_pool.callback_cache.len(), 0);
     }
 
     fn new_test_pool(
