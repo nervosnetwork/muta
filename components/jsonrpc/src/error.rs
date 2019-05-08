@@ -3,6 +3,7 @@ use std::fmt;
 use std::io;
 
 use core_crypto::CryptoError;
+use core_runtime::database::DatabaseError;
 use core_runtime::executor::ExecutorError;
 use core_runtime::TransactionPoolError;
 use core_serialization::CodecError;
@@ -19,6 +20,7 @@ pub enum RpcError {
     TransactionPoolError(TransactionPoolError),
     TypesError(TypesError),
     IO(io::Error),
+    DatabaseError(DatabaseError),
 }
 
 impl error::Error for RpcError {}
@@ -33,6 +35,7 @@ impl fmt::Display for RpcError {
             RpcError::TransactionPoolError(e) => return write!(f, "{}", e),
             RpcError::TypesError(e) => return write!(f, "{}", e),
             RpcError::IO(e) => return write!(f, "{}", e),
+            RpcError::DatabaseError(e) => return write!(f, "{}", e),
         };
     }
 }
@@ -76,5 +79,11 @@ impl From<ExecutorError> for RpcError {
 impl From<TypesError> for RpcError {
     fn from(err: TypesError) -> Self {
         RpcError::TypesError(err)
+    }
+}
+
+impl From<DatabaseError> for RpcError {
+    fn from(err: DatabaseError) -> Self {
+        RpcError::DatabaseError(err)
     }
 }

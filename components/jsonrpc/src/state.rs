@@ -9,12 +9,14 @@ use std::time::SystemTime;
 use futures::compat::Future01CompatExt;
 use futures_locks::RwLock;
 use log;
-use numext_fixed_hash::H256;
+use numext_fixed_hash::{H160, H256};
 use numext_fixed_uint::U256;
 
 use core_context::{Context, ORIGIN};
 use core_merkle::{self, Merkle, ProofNode};
-use core_runtime::{ExecutionContext, Executor, TransactionOrigin, TransactionPool};
+use core_runtime::{
+    DataCategory, Database, ExecutionContext, Executor, TransactionOrigin, TransactionPool,
+};
 use core_serialization::AsyncCodec;
 use core_storage::Storage;
 use core_types::{Address, Block, BloomRef, Hash, Receipt, SignedTransaction};
@@ -147,47 +149,54 @@ impl FilterDatabase {
     }
 }
 
-pub struct AppState<E, T, S> {
+pub struct AppState<E, T, S, D> {
     pub filterdb: Arc<RwLock<FilterDatabase>>,
 
     executor:         Arc<E>,
     transaction_pool: Arc<T>,
     storage:          Arc<S>,
+    db:               Arc<D>,
 }
 
-impl<E, T, S> Clone for AppState<E, T, S> {
+impl<E, T, S, D> Clone for AppState<E, T, S, D> {
     fn clone(&self) -> Self {
         Self {
+            filterdb: Arc::<RwLock<FilterDatabase>>::clone(&self.filterdb),
+
             executor:         Arc::<E>::clone(&self.executor),
             transaction_pool: Arc::<T>::clone(&self.transaction_pool),
             storage:          Arc::<S>::clone(&self.storage),
-            filterdb:         Arc::<RwLock<FilterDatabase>>::clone(&self.filterdb),
+            db:               Arc::<D>::clone(&self.db),
         }
     }
 }
 
-impl<E, T, S> AppState<E, T, S>
+impl<E, T, S, D> AppState<E, T, S, D>
 where
     E: Executor,
     T: TransactionPool,
     S: Storage,
+    D: Database,
 {
-    pub fn new(executor: Arc<E>, transaction_pool: Arc<T>, storage: Arc<S>) -> Self {
+    pub fn new(executor: Arc<E>, transaction_pool: Arc<T>, storage: Arc<S>, db: Arc<D>) -> Self {
         Self {
+            filterdb: Arc::new(RwLock::new(FilterDatabase::default())),
+
             executor,
             transaction_pool,
             storage,
-            filterdb: Arc::new(RwLock::new(FilterDatabase::default())),
+            db,
         }
     }
 }
 
 /// Help functions for rpc APIs.
-impl<E, T, S> AppState<E, T, S>
+impl<E, T, S, D> AppState<E, T, S, D>
 where
     E: Executor,
     T: TransactionPool,
     S: Storage,
+    D: Database,
 {
     pub async fn get_block(&self, number: String) -> RpcResult<Block> {
         let h = await!(self.get_height(number))?;
@@ -231,7 +240,7 @@ where
             version: 0,
             hash:    raw_block.header.hash(),
             header:  cita::BlockHeader {
-                timestamp:         raw_block.header.timestamp,
+                timestamp:         raw_block.header.timestamp * 1000, // ms
                 prev_hash:         raw_block.header.prevhash,
                 number:            Uint::from(raw_block.header.height),
                 state_root:        raw_block.header.state_root,
@@ -260,8 +269,8 @@ where
         let mut txs = vec![];
         for tx in raw_txs {
             txs.push(cita::BlockTransaction::Full(cita::FullTransaction {
-                hash:    tx.hash,
-                content: tx.untx.transaction.data,
+                hash:    tx.hash.clone(),
+                content: cita::Data::new(await!(self.get_rawtx(tx.hash))?),
                 from:    tx.sender,
             }));
         }
@@ -327,7 +336,7 @@ where
     ) -> RpcResult<cita::RpcTransaction> {
         let mut tx = cita::RpcTransaction {
             hash:         raw_tx.hash.clone(),
-            content:      raw_tx.untx.transaction.data.clone(),
+            content:      cita::Data::new(await!(self.get_rawtx(raw_tx.hash.clone()))?),
             from:         raw_tx.sender.clone(),
             block_number: Uint::from(0),
             block_hash:   Hash::from_bytes(&[0x00u8; 32]).unwrap(),
@@ -343,11 +352,12 @@ where
 
 /// Async rpc APIs.
 /// See ./server.rs::rpc_select to learn about meanings of these APIs.
-impl<E, T, S> AppState<E, T, S>
+impl<E, T, S, D> AppState<E, T, S, D>
 where
     E: Executor,
     T: TransactionPool,
     S: Storage,
+    D: Database,
 {
     pub async fn block_number(&self) -> RpcResult<u64> {
         let b = await!(self.storage.get_latest_block(Context::new()).compat())?;
@@ -383,9 +393,9 @@ where
         Ok(cita::Data::from(rd_result.data.unwrap_or_default()))
     }
 
-    pub async fn get_abi(&self, _addr: Address, _block_number: String) -> RpcResult<Vec<u8>> {
+    pub async fn get_abi(&self, _addr: Address, _block_number: String) -> RpcResult<cita::Data> {
         // TODO. Can't implement at now
-        unimplemented!()
+        Ok(cita::Data::new(vec![]))
     }
 
     pub async fn get_balance(&self, number: String, addr: Address) -> RpcResult<U256> {
@@ -420,12 +430,13 @@ where
         Ok(rlp::encode(&b.header))
     }
 
-    pub async fn get_code(&self, address: Address, number: String) -> RpcResult<Vec<u8>> {
+    pub async fn get_code(&self, address: Address, number: String) -> RpcResult<cita::Data> {
         let b = await!(self.get_block(number))?;
-        let (code, _code_hash) =
-            self.executor
-                .get_code(Context::new(), &b.header.state_root, &address)?;
-        Ok(code)
+        let (code, _code_hash) = self
+            .executor
+            .get_code(Context::new(), &b.header.state_root, &address)
+            .unwrap_or_default();
+        Ok(cita::Data::new(code))
     }
 
     pub async fn get_logs(&self, filter: cita::Filter) -> RpcResult<Vec<cita::Log>> {
@@ -497,7 +508,35 @@ where
 
     pub async fn get_metadata(&self, _number: String) -> RpcResult<cita::MetaData> {
         // TODO. Can't implement at now
-        Ok(cita::MetaData::default())
+        Ok(cita::MetaData {
+            chain_id: 42,
+            chain_id_v1: Uint::from(42),
+            chain_name: String::from("Muta TestNet"),
+            operator: String::from("Muta team"),
+            website: String::from("https://github.com/cryptape"),
+            genesis_timestamp: 0,
+            validators: vec![
+                cita::Data20::new(
+                    H160::from_hex_str("19e49d3efd4e81dc82943ad9791c1916e2229138").unwrap(),
+                ),
+                cita::Data20::new(
+                    H160::from_hex_str("2ae83ce578e4bb7968104b5d7c034af36a771a35").unwrap(),
+                ),
+                cita::Data20::new(
+                    H160::from_hex_str("529dd2ef2dd117072b7e606b6a8ae111628f9108").unwrap(),
+                ),
+                cita::Data20::new(
+                    H160::from_hex_str("7d14100eba2db1858e77a62d3d592b332a37a7a7").unwrap(),
+                ),
+            ],
+            block_interval: 3000, // ms
+            token_name: String::from("Mutcoin"),
+            token_symbol: String::from("MUT"),
+            token_avatar: String::from(
+                "http://miamioh.edu/_files/images/ucm/resources/logo/print-M_186K.jpg",
+            ),
+            ..cita::MetaData::default()
+        })
     }
 
     pub async fn get_state_proof(
@@ -643,13 +682,20 @@ where
 
     pub async fn send_raw_transaction(&self, signed_data: Vec<u8>) -> RpcResult<cita::TxResponse> {
         let ser_untx = await!(AsyncCodec::decode::<cita::UnverifiedTransaction>(
-            signed_data
+            signed_data.clone()
         ))?;
         if ser_untx.transaction.is_none() {
             return Err(RpcError::Str("Transaction not found!".into()));
         };
         let ser_raw_tx = await!(AsyncCodec::encode(ser_untx.clone().transaction.unwrap()))?;
         let message = Hash::from_fixed_bytes(tiny_keccak::keccak256(&ser_raw_tx));
+
+        // Store the raw content because it's required in RPC API
+        //   - getBlockByNumber
+        //   - getBlockByHeight
+        //   - getTransaction
+        await!(self.insert_rawtx(message.clone(), signed_data))?;
+
         let untx: core_types::transaction::UnverifiedTransaction = ser_untx.try_into()?;
         let origin_ctx =
             Context::new().with_value::<TransactionOrigin>(ORIGIN, TransactionOrigin::Jsonrpc);
@@ -670,11 +716,12 @@ where
 }
 
 /// A set of functions for FilterDataBase.
-impl<E, T, S> AppState<E, T, S>
+impl<E, T, S, D> AppState<E, T, S, D>
 where
     E: Executor,
     T: TransactionPool,
     S: Storage,
+    D: Database,
 {
     /// Pass a block into FilterDatabase.
     pub async fn recv_block(&mut self, block: Block) -> RpcResult<()> {
@@ -763,6 +810,37 @@ where
         }
 
         Ok(())
+    }
+}
+
+/// Database functions
+impl<E, T, S, D> AppState<E, T, S, D>
+where
+    E: Executor,
+    T: TransactionPool,
+    S: Storage,
+    D: Database,
+{
+    async fn insert_rawtx(&self, hash: Hash, data: Vec<u8>) -> RpcResult<()> {
+        await!(self
+            .db
+            .insert(
+                Context::new(),
+                DataCategory::Transaction,
+                hash.as_bytes().to_vec(),
+                data
+            )
+            .compat())?;
+        Ok(())
+    }
+
+    async fn get_rawtx(&self, hash: Hash) -> RpcResult<Vec<u8>> {
+        let fut = self
+            .db
+            .get(Context::new(), DataCategory::Transaction, hash.as_bytes())
+            .compat();
+        let r = await!(fut)?.unwrap_or_default();
+        Ok(r)
     }
 }
 

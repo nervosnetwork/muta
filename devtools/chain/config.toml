@@ -4,6 +4,7 @@ privkey = "028590ad352d54387a9c8a0ecf7e180e68c4840c72f958fc5917657f506caa80"
 # json rpc
 rpc_address = "127.0.0.1:3030"
 rpc_workers = 0
+rpc_cross_domain_allowd_origin = "http://microscope.citahub.com"
 
 # db config
 data_path = "./devtools/chain/rocksdb"

@@ -1,3 +1,4 @@
+use actix_web::middleware::cors::Cors;
 use actix_web::{self, middleware, web, App, HttpRequest, HttpResponse, HttpServer};
 use futures::compat::Future01CompatExt;
 use futures::prelude::{FutureExt, StreamExt, TryFutureExt};
@@ -6,7 +7,7 @@ use serde_json;
 use serde_json::Value;
 
 use core_pubsub::channel::pubsub::Receiver;
-use core_runtime::{Executor, TransactionPool};
+use core_runtime::{Database, Executor, TransactionPool};
 use core_storage::{Storage, StorageError};
 use core_types::{Address, Block, Hash};
 
@@ -18,15 +19,16 @@ use crate::filter::Filter;
 use crate::state::AppState;
 use crate::util::clean_0x;
 
-fn rpc_handle<E: 'static, T: 'static, S: 'static>(
+fn rpc_handle<E: 'static, T: 'static, S: 'static, D: 'static>(
     reqjson: web::Json<convention::Request>,
-    app_state: web::Data<AppState<E, T, S>>,
+    app_state: web::Data<AppState<E, T, S, D>>,
     _req: HttpRequest,
 ) -> Box<OldFuture<Item = HttpResponse, Error = actix_web::Error>>
 where
     E: Executor,
     T: TransactionPool,
     S: Storage,
+    D: Database,
 {
     let mut result = convention::Response::default();
     result.id = reqjson.id.clone();
@@ -69,8 +71,8 @@ fn get_string(
 }
 
 #[allow(clippy::cognitive_complexity)]
-fn rpc_select<E: 'static, T: 'static, S: 'static>(
-    app_state: AppState<E, T, S>,
+fn rpc_select<E: 'static, T: 'static, S: 'static, D: 'static>(
+    app_state: AppState<E, T, S, D>,
     method: String,
     params: Option<Vec<Value>>,
 ) -> Box<OldFuture<Item = Value, Error = convention::ErrorData>>
@@ -78,6 +80,7 @@ where
     E: Executor,
     T: TransactionPool,
     S: Storage,
+    D: Database,
 {
     let fut = async move {
         let params = params.unwrap_or_default();
@@ -105,7 +108,7 @@ where
                 let addr = Address::from_hex(clean_0x(&addr_str[..]))?;
                 let number = get_string(params, 1, false)?;
                 let r = await!(app_state.get_abi(addr, number))?;
-                Ok(Value::from(r))
+                Ok(serde_json::to_value(r).unwrap())
             }
             // Get balance by [address, block number].
             "getBalance" => {
@@ -149,8 +152,10 @@ where
                 let addr_str = get_string(params.clone(), 0, true)?;
                 let addr = Address::from_hex(clean_0x(&addr_str[..]))?;
                 let number = get_string(params, 1, false)?;
-                let r = await!(app_state.get_code(addr, number))?;
-                Ok(Value::from(r))
+                match await!(app_state.get_code(addr, number)) {
+                    Ok(ok) => Ok(serde_json::to_value(ok).unwrap()),
+                    Err(e) => Err(convention::ErrorData::from(e)),
+                }
             }
             // Get Filter logs by filter id
             "getFilterChanges" => {
@@ -292,15 +297,16 @@ where
 }
 
 /// Listen and server on address:port which definds on config
-pub fn listen<E: 'static, T: 'static, S: 'static>(
+pub fn listen<E: 'static, T: 'static, S: 'static, D: 'static>(
     config: Config,
-    app_state: AppState<E, T, S>,
+    app_state: AppState<E, T, S, D>,
     mut sub_block: Receiver<Block>,
 ) -> std::io::Result<()>
 where
     E: Executor,
     T: TransactionPool,
     S: Storage,
+    D: Database,
 {
     let mut app_state_clone = app_state.clone();
     let fut = async move {
@@ -321,12 +327,13 @@ where
     HttpServer::new(move || {
         App::new()
             .wrap(middleware::Logger::default())
+            .wrap(Cors::default())
             .data(app_state.clone())
             .service(
                 web::resource("/").route(
                     web::post()
                         .data(web::JsonConfig::default().limit(c_payload_size)) // <- limit size of the payload
-                        .to_async(rpc_handle::<E, T, S>),
+                        .to_async(rpc_handle::<E, T, S, D>),
                 ),
             )
     })

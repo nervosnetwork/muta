@@ -93,14 +93,14 @@ pub struct BftProof {
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct FullTransaction {
     pub hash:    Hash,
-    pub content: Vec<u8>,
+    pub content: Data,
     pub from:    Address,
 }
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct RpcTransaction {
     pub hash: Hash,
-    pub content: Vec<u8>,
+    pub content: Data,
     pub from: Address,
     #[serde(rename = "blockNumber")]
     pub block_number: Uint,

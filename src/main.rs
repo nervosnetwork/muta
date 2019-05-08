@@ -73,6 +73,12 @@ impl Config {
         path_state.push("block_data");
         path_state
     }
+
+    pub fn data_path_for_rawtx(&self) -> PathBuf {
+        let mut path_state = self.data_path.clone();
+        path_state.push("rawtx_data");
+        path_state
+    }
 }
 
 fn main() {
@@ -118,6 +124,7 @@ fn start(cfg: &Config) {
     // new db
     let block_db = Arc::new(RocksDB::new(cfg.data_path_for_block().to_str().unwrap()).unwrap());
     let state_db = Arc::new(RocksDB::new(cfg.data_path_for_state().to_str().unwrap()).unwrap());
+    let rawtx_db = Arc::new(RocksDB::new(cfg.data_path_for_rawtx().to_str().unwrap()).unwrap());
 
     // new storage and trie db
     let storage = Arc::new(BlockStorage::new(Arc::clone(&block_db)));
@@ -159,6 +166,7 @@ fn start(cfg: &Config) {
         Arc::clone(&executor),
         Arc::clone(&tx_pool),
         Arc::clone(&storage),
+        rawtx_db,
     );
 
     // new consensus
