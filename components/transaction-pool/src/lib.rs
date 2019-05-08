@@ -123,21 +123,18 @@ where
                 Err(TransactionPoolError::ReachLimit)?
             }
 
-            // 5. check cache dup
-            if tx_cache.contains_key(&tx_hash) {
-                Err(TransactionPoolError::Dup)?
-            }
-
-            // 6. do insert
+            // 5. do insert
             let signed_tx = SignedTransaction {
                 untx,
                 sender,
                 hash: tx_hash.clone(),
             };
 
-            tx_cache.insert(tx_hash, signed_tx.clone());
+            if tx_cache.insert(tx_hash, signed_tx.clone()).is_some() {
+                return Err(TransactionPoolError::Dup);
+            }
 
-            // 7. broadcast tx
+            // 6. broadcast tx
             if let Some(TransactionOrigin::Jsonrpc) = ctx.get::<TransactionOrigin>(ORIGIN) {
                 broadcaster.broadcast_batch(vec![signed_tx.clone()]);
             }
@@ -276,7 +273,16 @@ where
             }
 
             if !unknown.is_empty() {
-                let sig_txs = await!(broadcaster.pull_txs(ctx, unknown).compat())?;
+                let sig_txs = await!(broadcaster.pull_txs(ctx, unknown.clone()).compat())?;
+                if sig_txs.len() != unknown.len() {
+                    return Err(TransactionPoolError::NotExpected);
+                }
+
+                for unknown_hash in unknown {
+                    if !sig_txs.iter().any(|tx| tx.hash == unknown_hash) {
+                        return Err(TransactionPoolError::NotExpected);
+                    }
+                }
 
                 for stx in sig_txs.into_iter() {
                     callback_cache.insert(stx.hash.clone(), stx);

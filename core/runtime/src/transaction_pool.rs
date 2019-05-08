@@ -74,6 +74,7 @@ pub enum TransactionPoolError {
     Crypto(CryptoError),
     InvalidUntilBlock,
     QuotaNotEnough,
+    NotExpected,
     Internal(String),
 }
 
@@ -86,6 +87,7 @@ impl fmt::Display for TransactionPoolError {
             TransactionPoolError::Crypto(ref err) => format!("signature invalid {:?}", err),
             TransactionPoolError::InvalidUntilBlock => "invalid until block".to_owned(),
             TransactionPoolError::QuotaNotEnough => "quota not enouth".to_owned(),
+            TransactionPoolError::NotExpected => "not the expected transaction".to_owned(),
             TransactionPoolError::Internal(ref err) => format!("internel error {:?}", err),
         };
         write!(f, "{}", printable)
