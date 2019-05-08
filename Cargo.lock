@@ -405,7 +405,7 @@ dependencies = [
 [[package]]
 name = "bft-rs"
 version = "0.2.0-alpha"
-source = "git+https://github.com/cryptape/bft-rs.git?branch=v0.3#3dfb6d37e7efa7c647deb42f9dd029b7fd0db86f"
+source = "git+https://github.com/cryptape/bft-rs.git?branch=v0.3#815f067397b60bbcb33228bac6c618acd78d0f90"
 dependencies = [
  "crossbeam 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "crossbeam-utils 0.6.5 (registry+https://github.com/rust-lang/crates.io-index)",
