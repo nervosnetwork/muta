@@ -21,6 +21,7 @@ setuptools.setup(
         'eth-keys==0.2.1',
         'eth-typing==2.1.0',
         'eth-utils==1.4.1',
+        'protobuf==3.7.1',
     ],
     packages=['pymuta'],
 )
