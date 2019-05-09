@@ -35,8 +35,9 @@ struct Config {
     privkey: String,
 
     // rpc_address
-    rpc_address: String,
-    rpc_workers: u64,
+    rpc_address:      String,
+    rpc_workers:      u64,
+    rpc_payload_size: usize,
 
     // db config
     data_path: PathBuf,
@@ -162,6 +163,7 @@ fn start(cfg: &Config) {
     } else {
         cmp::min(2, num_cpus::get())
     };
+    jrpc_config.payload_size = cfg.rpc_payload_size;
     let jrpc_state = components_jsonrpc::AppState::new(
         Arc::clone(&executor),
         Arc::clone(&tx_pool),
