@@ -71,7 +71,7 @@ impl fmt::Display for ErrorData {
 }
 
 /// A rpc call is represented by sending a Request object to a Server.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Request {
     /// A String specifying the version of the JSON-RPC protocol. MUST be
     /// exactly "2.0".
@@ -94,6 +94,16 @@ pub struct Request {
     pub id: Value,
 }
 
+/// Represents jsonrpc request.
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum Call {
+    /// Single request
+    Single(Request),
+    /// Batch of requests
+    Batch(Vec<Request>),
+}
+
 /// When a rpc call is made, the Server MUST reply with a Response, except for
 /// in the case of Notifications. The Response is expressed as a single JSON
 /// Object, with the following members:
@@ -107,11 +117,13 @@ pub struct Response {
     /// This member MUST NOT exist if there was an error invoking the method.
     /// The value of this member is determined by the method invoked on the
     /// Server.
-    pub result: Value,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub result: Option<Value>,
 
     // This member is REQUIRED on error.
     // This member MUST NOT exist if there was no error triggered during invocation.
     // The value for this member MUST be an Object as defined in section 5.1.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<ErrorData>,
 
     /// This member is REQUIRED.
@@ -125,7 +137,7 @@ impl Default for Response {
     fn default() -> Self {
         Self {
             jsonrpc: JSONRPC_VERSION.into(),
-            result:  Value::Null,
+            result:  None,
             error:   None,
             id:      Value::Null,
         }
