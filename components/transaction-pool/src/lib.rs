@@ -1,9 +1,10 @@
 #![feature(async_await, await_macro, futures_api)]
 
+mod cache;
+
 use std::string::ToString;
 use std::sync::Arc;
 
-use chashmap::CHashMap;
 use futures03::{
     compat::Future01CompatExt,
     prelude::{FutureExt, TryFutureExt},
@@ -15,6 +16,8 @@ use core_runtime::{FutRuntimeResult, TransactionOrigin, TransactionPool, Transac
 use core_storage::{Storage, StorageError};
 use core_types::{Hash, SignedTransaction, Transaction, UnverifiedTransaction};
 
+use crate::cache::Cache;
+
 pub trait Broadcaster: Send + Sync + Clone {
     fn broadcast_batch(&mut self, txs: Vec<SignedTransaction>);
 
@@ -25,7 +28,7 @@ pub trait Broadcaster: Send + Sync + Clone {
     ) -> FutRuntimeResult<Vec<SignedTransaction>, TransactionPoolError>;
 }
 
-type TxCache = Arc<CHashMap<Hash, SignedTransaction>>;
+type TxCache = Cache;
 
 pub struct HashTransactionPool<S, C, B> {
     pool_size:         usize,
@@ -58,8 +61,8 @@ where
             until_block_limit,
             quota_limit,
 
-            tx_cache: Arc::new(CHashMap::new()),
-            callback_cache: Arc::new(CHashMap::new()),
+            tx_cache: Cache::new(),
+            callback_cache: Cache::new(),
             storage,
             crypto,
             broadcaster,
@@ -81,7 +84,7 @@ where
     ) -> FutRuntimeResult<SignedTransaction, TransactionPoolError> {
         let storage = Arc::clone(&self.storage);
         let crypto = Arc::clone(&self.crypto);
-        let tx_cache = Arc::clone(&self.tx_cache);
+        let tx_cache = self.tx_cache.clone();
         let mut broadcaster = self.broadcaster.clone();
 
         let pool_size = self.pool_size;
@@ -89,7 +92,17 @@ where
         let quota_limit = self.quota_limit;
 
         let fut = async move {
-            // 1. verify signature
+            // 1. check size
+            if tx_cache.len() >= pool_size {
+                Err(TransactionPoolError::ReachLimit)?
+            }
+
+            // 2. check dup
+            if tx_cache.contains_key(&tx_hash) {
+                Err(TransactionPoolError::Dup)?
+            }
+
+            // 3. verify signature
             let signature =
                 C::Signature::from_bytes(&untx.signature).map_err(TransactionPoolError::Crypto)?;
 
@@ -100,14 +113,14 @@ where
 
             let sender = crypto.pubkey_to_address(&pubkey);
 
-            // 2. check if the transaction is in histories block.
+            // 4. check if the transaction is in histories block.
             match await!(storage.get_transaction(ctx.clone(), &tx_hash).compat()) {
                 Ok(_) => Err(TransactionPoolError::Dup)?,
                 Err(StorageError::None(_)) => {}
                 Err(e) => Err(internal_error(e))?,
             }
 
-            // 3. verify params
+            // 5. verify params
             let latest_block =
                 await!(storage.get_latest_block(ctx.clone()).compat()).map_err(internal_error)?;
 
@@ -118,21 +131,14 @@ where
                 quota_limit,
             )?;
 
-            // 4. check size
-            if tx_cache.len() >= pool_size {
-                Err(TransactionPoolError::ReachLimit)?
-            }
-
-            // 5. do insert
+            // 6. do insert
             let signed_tx = SignedTransaction {
                 untx,
                 sender,
                 hash: tx_hash.clone(),
             };
 
-            if tx_cache.insert(tx_hash, signed_tx.clone()).is_some() {
-                return Err(TransactionPoolError::Dup);
-            }
+            tx_cache.insert(signed_tx.clone());
 
             // 6. broadcast tx
             if let Some(TransactionOrigin::Jsonrpc) = ctx.get::<TransactionOrigin>(ORIGIN) {
@@ -152,7 +158,7 @@ where
         quota_limit: u64,
     ) -> FutRuntimeResult<Vec<Hash>, TransactionPoolError> {
         let storage = Arc::clone(&self.storage);
-        let tx_cache = Arc::clone(&self.tx_cache);
+        let tx_cache = self.tx_cache.clone();
         let until_block_limit = self.until_block_limit;
 
         let fut = async move {
@@ -163,13 +169,12 @@ where
             let mut valid_hashes = vec![];
             let mut quota_count: u64 = 0;
 
-            for (tx_hash, signed_tx) in tx_cache.as_ref().clone() {
+            let txs = tx_cache.get_count(count as usize);
+
+            for signed_tx in txs {
+                let tx_hash = signed_tx.hash.clone();
                 let valid_until_block = signed_tx.untx.transaction.valid_until_block;
                 let quota = signed_tx.untx.transaction.quota;
-
-                if valid_hashes.len() >= count as usize {
-                    break;
-                }
 
                 // The transaction has timed out？
                 if !verify_until_block(
@@ -189,9 +194,7 @@ where
                 valid_hashes.push(tx_hash.clone());
             }
 
-            for h in invalid_hashes {
-                tx_cache.remove(&h);
-            }
+            tx_cache.deletes(&invalid_hashes);
 
             Ok(valid_hashes)
         };
@@ -200,15 +203,13 @@ where
     }
 
     fn flush(&self, _: Context, tx_hashes: &[Hash]) -> FutRuntimeResult<(), TransactionPoolError> {
-        let tx_cache = Arc::clone(&self.tx_cache);
-        let callback_cache = Arc::clone(&self.callback_cache);
+        let tx_cache = self.tx_cache.clone();
+        let callback_cache = self.callback_cache.clone();
         let tx_hashes = tx_hashes.to_owned();
 
         let fut = async move {
             callback_cache.clear();
-            for hash in tx_hashes.iter() {
-                tx_cache.remove(hash);
-            }
+            tx_cache.deletes(&tx_hashes);
 
             Ok(())
         };
@@ -221,8 +222,8 @@ where
         _: Context,
         tx_hashes: &[Hash],
     ) -> FutRuntimeResult<Vec<SignedTransaction>, TransactionPoolError> {
-        let tx_cache = Arc::clone(&self.tx_cache);
-        let callback_cache = Arc::clone(&self.callback_cache);
+        let tx_cache = self.tx_cache.clone();
+        let callback_cache = self.callback_cache.clone();
         let tx_hashes = tx_hashes.to_owned();
 
         let fut = async move {
@@ -258,19 +259,13 @@ where
         ctx: Context,
         tx_hashes: &[Hash],
     ) -> FutRuntimeResult<(), TransactionPoolError> {
-        let tx_cache = Arc::clone(&self.tx_cache);
-        let callback_cache = Arc::clone(&self.callback_cache);
+        let tx_cache = self.tx_cache.clone();
+        let callback_cache = self.callback_cache.clone();
         let mut broadcaster = self.broadcaster.clone();
         let tx_hashes = tx_hashes.to_owned();
 
         let fut = async move {
-            let mut unknown = vec![];
-
-            for hash in tx_hashes.iter() {
-                if !tx_cache.contains_key(hash) {
-                    unknown.push(hash.to_owned());
-                }
-            }
+            let unknown = tx_cache.contains_keys(&tx_hashes);
 
             if !unknown.is_empty() {
                 let sig_txs = await!(broadcaster.pull_txs(ctx, unknown.clone()).compat())?;
@@ -283,10 +278,7 @@ where
                         return Err(TransactionPoolError::NotExpected);
                     }
                 }
-
-                for stx in sig_txs.into_iter() {
-                    callback_cache.insert(stx.hash.clone(), stx);
-                }
+                callback_cache.insert_batch(sig_txs);
             }
 
             Ok(())
@@ -595,14 +587,14 @@ mod tests {
         let (callback_stxs, pool_stxs) = sig_txs.split_at(5);
         {
             // insert test signed transactions
-            let callback_cache = Arc::clone(&tx_pool.callback_cache);
-            let pool_cache = Arc::clone(&tx_pool.tx_cache);
+            let callback_cache = tx_pool.callback_cache.clone();
+            let pool_cache = tx_pool.tx_cache.clone();
 
             for stx in callback_stxs.iter() {
-                callback_cache.insert(stx.hash.clone(), stx.clone());
+                callback_cache.insert(stx.clone());
             }
             for stx in pool_stxs.iter() {
-                pool_cache.insert(stx.hash.clone(), stx.clone());
+                pool_cache.insert(stx.clone());
             }
         }
 

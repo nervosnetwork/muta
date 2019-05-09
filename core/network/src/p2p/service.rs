@@ -4,7 +4,6 @@ use futures::sync::mpsc::{Receiver, Sender};
 use log::{debug, error};
 use tentacle::builder::ServiceBuilder;
 use tentacle::context::ServiceContext;
-use tentacle::error::Error;
 use tentacle::service::{DialProtocol, ServiceError, ServiceEvent};
 use tentacle::traits::ServiceHandle;
 
@@ -111,25 +110,27 @@ impl Service {
     }
 
     pub(crate) fn handle<M: PeerManager>(peer_manager: M) -> Handle<M> {
-        Handle { peer_manager }
+        Handle {
+            _peer_manager: peer_manager,
+        }
     }
 }
 
 pub(crate) struct Handle<M> {
-    peer_manager: M,
+    _peer_manager: M,
 }
 
 impl<M: PeerManager> ServiceHandle for Handle<M> {
     fn handle_error(&mut self, _: &mut ServiceContext, err: ServiceError) {
         error!("Network service error: {:?}", err);
 
-        if let ServiceError::DialerError { address, error }
-        | ServiceError::ListenError { address, error } = err
-        {
-            if let Error::RepeatedConnection(_) | Error::ConnectSelf = error {
-                self.peer_manager.remove_masquer_addr(&address);
-            }
-        }
+        // if let ServiceError::DialerError { address, error }
+        // | ServiceError::ListenError { address, error } = err
+        // {
+        //     if let Error::RepeatedConnection(_) | Error::ConnectSelf = error {
+        //         self.peer_manager.remove_masquer_addr(&address);
+        //     }
+        // }
     }
 
     fn handle_event(&mut self, _: &mut ServiceContext, _: ServiceEvent) {

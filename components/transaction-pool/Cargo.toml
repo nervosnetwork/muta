@@ -12,7 +12,7 @@ core-storage = { path = "../../core/storage" }
 core-context = { path = "../../core/context" }
 core-pubsub = { path = "../../core/pubsub" }
 
-chashmap = "2.2.2"
+parking_lot = "0.7"
 futures = "0.1"
 log = "0.4"
 # TODO: rename futures01 instead
