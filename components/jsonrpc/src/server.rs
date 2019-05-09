@@ -41,7 +41,7 @@ where
         )
         .compat())
         {
-            Ok(ok) => result.result = ok,
+            Ok(ok) => result.result = Some(ok),
             Err(e) => result.error = Some(e),
         }
         Ok(HttpResponse::Ok().json(result))
