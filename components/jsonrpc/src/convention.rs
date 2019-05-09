@@ -146,31 +146,31 @@ impl Default for Response {
 
 impl From<RpcError> for ErrorData {
     fn from(err: RpcError) -> Self {
-        ErrorData::new(500, &format!("{:?}", err))
+        ErrorData::new(-32000, &format!("{:?}", err))
     }
 }
 
 impl From<hex::FromHexError> for ErrorData {
     fn from(err: hex::FromHexError) -> Self {
-        ErrorData::new(500, &format!("{:?}", err))
+        ErrorData::new(-32700, &format!("{:?}", err))
     }
 }
 
 impl From<TypesError> for ErrorData {
     fn from(err: TypesError) -> Self {
-        ErrorData::new(500, &format!("{:?}", err))
+        ErrorData::new(-32700, &format!("{:?}", err))
     }
 }
 
 impl From<serde_json::error::Error> for ErrorData {
     fn from(err: serde_json::error::Error) -> Self {
-        ErrorData::new(500, &format!("{:?}", err))
+        ErrorData::new(-32700, &format!("{:?}", err))
     }
 }
 
 impl From<ParseIntError> for ErrorData {
     fn from(err: ParseIntError) -> Self {
-        ErrorData::new(500, &format!("{:?}", err))
+        ErrorData::new(-32700, &format!("{:?}", err))
     }
 }
 
