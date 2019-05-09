@@ -9,6 +9,7 @@ pub enum Message {
 
     BroadcastStatus { status: Status },
     PullBlocks { uuid: Uuid, heights: Vec<u64> },
+    PullTxsSync { uuid: Uuid, hashes: Vec<Hash> },
 
     BroadcastPrposal { msg: Vec<u8> },
     BroadcastVote { msg: Vec<u8> },

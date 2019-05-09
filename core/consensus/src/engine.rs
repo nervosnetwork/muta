@@ -315,6 +315,7 @@ where
         &self,
         ctx: Context,
         block: Block,
+        signed_txs: Vec<SignedTransaction>,
         proof: Proof,
     ) -> ConsensusResult<ConsensusStatus> {
         let _lock = await!(self.lock.lock().compat());
@@ -354,14 +355,26 @@ where
             return Err(ConsensusError::Internal("invalid proof".to_owned()));
         }
 
-        // Get transactions from the transaction pool
-        await!(self.tx_pool.ensure(ctx.clone(), &block.tx_hashes).compat())?;
-        let signed_txs = await!(self
-            .tx_pool
-            .get_batch(ctx.clone(), &block.tx_hashes)
-            .compat())?;
+        // verify transaction
+        let valid = Self::verify_sync_transactions(&block, &signed_txs).unwrap_or(false);
+        if !valid {
+            return Err(ConsensusError::Internal("invalid transactions".to_owned()));
+        }
 
         await!(self.insert_block(ctx.clone(), signed_txs, block, proof, None))
+    }
+
+    // todo: verify transaction hash and signature
+    fn verify_sync_transactions(
+        block: &Block,
+        signed_tx: &[SignedTransaction],
+    ) -> ConsensusResult<bool> {
+        let tx_hashes_match = block.tx_hashes
+            == signed_tx
+                .iter()
+                .map(|tx| tx.hash.clone())
+                .collect::<Vec<_>>();
+        Ok(tx_hashes_match)
     }
 
     fn verify_proof(&self, proof: &Proof) -> bool {

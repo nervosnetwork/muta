@@ -2,7 +2,8 @@ use prost::Message as ProstMessage;
 use uuid::Uuid;
 
 use core_consensus::Status;
-use core_serialization::Block as SerBlock;
+use core_serialization::{Block as SerBlock, SignedTransaction as SerSignedTransaction};
+use core_types::Hash;
 
 #[derive(Clone, PartialEq, ProstMessage)]
 pub struct BroadcastStatus {
@@ -28,10 +29,26 @@ pub struct PushBlocks {
     pub blocks: Vec<SerBlock>,
 }
 
+#[derive(Clone, PartialEq, ProstMessage)]
+pub struct PullTxsSync {
+    #[prost(string, tag = "1")]
+    pub uuid: String,
+    #[prost(bytes, repeated, tag = "2")]
+    pub hashes: Vec<Vec<u8>>,
+}
+
+#[derive(Clone, PartialEq, ProstMessage)]
+pub struct PushTxsSync {
+    #[prost(string, tag = "1")]
+    pub uuid: String,
+    #[prost(message, repeated, tag = "2")]
+    pub sig_txs: Vec<SerSignedTransaction>,
+}
+
 pub mod packed_message {
     use prost::Oneof;
 
-    use super::{BroadcastStatus, PullBlocks, PushBlocks};
+    use super::{BroadcastStatus, PullBlocks, PullTxsSync, PushBlocks, PushTxsSync};
 
     #[derive(Clone, PartialEq, Oneof)]
     pub enum Message {
@@ -43,12 +60,18 @@ pub mod packed_message {
 
         #[prost(message, tag = "3")]
         PullBlocks(PullBlocks),
+
+        #[prost(message, tag = "4")]
+        PullTxsSync(PullTxsSync),
+
+        #[prost(message, tag = "5")]
+        PushTxsSync(PushTxsSync),
     }
 }
 
 #[derive(Clone, PartialEq, ProstMessage)]
 pub struct SynchronizerMessage {
-    #[prost(oneof = "packed_message::Message", tags = "1, 2, 3")]
+    #[prost(oneof = "packed_message::Message", tags = "1, 2, 3, 4, 5")]
     pub message: Option<packed_message::Message>,
 }
 
@@ -76,6 +99,28 @@ impl SynchronizerMessage {
             message: Some(packed_message::Message::PushBlocks(PushBlocks {
                 uuid,
                 blocks,
+            })),
+        }
+    }
+
+    pub fn pull_txs_sync(uuid: Uuid, hashes: Vec<Hash>) -> Self {
+        let hashes = hashes
+            .into_iter()
+            .map(|h| h.as_bytes().to_vec())
+            .collect::<_>();
+        SynchronizerMessage {
+            message: Some(packed_message::Message::PullTxsSync(PullTxsSync {
+                uuid: uuid.to_string(),
+                hashes,
+            })),
+        }
+    }
+
+    pub fn push_txs_sync(uuid: String, sig_txs: Vec<SerSignedTransaction>) -> Self {
+        SynchronizerMessage {
+            message: Some(packed_message::Message::PushTxsSync(PushTxsSync {
+                uuid,
+                sig_txs,
             })),
         }
     }

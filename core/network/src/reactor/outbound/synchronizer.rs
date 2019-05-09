@@ -14,7 +14,7 @@ use uuid::Uuid;
 use core_consensus::{Status, Synchronizer, SynchronizerError};
 use core_context::Context;
 use core_runtime::FutRuntimeResult;
-use core_types::Block;
+use core_types::{Block, Hash, SignedTransaction};
 
 use crate::p2p::{Broadcaster, Message as P2PMessage};
 use crate::reactor::outbound::{OutboundMessage, Sender as OutboundSender};
@@ -30,6 +30,11 @@ pub enum SynchronizerMessage {
         ctx:     Context,
         done:    Sender<Box<dyn Any + Send + 'static>>,
         heights: Vec<u64>,
+    },
+    PullTxsSync {
+        ctx:    Context,
+        done:   Sender<Box<dyn Any + Send + 'static>>,
+        hashes: Vec<Hash>,
     },
 }
 
@@ -57,6 +62,11 @@ impl Reactor for SynchronizerReactor {
                 let uuid = Uuid::new_v4();
                 self.callback_map.write().insert(uuid, done);
                 broadcaster.send(ctx, P2PMessage::from(Message::PullBlocks { uuid, heights }));
+            }
+            SynchronizerMessage::PullTxsSync { ctx, done, hashes } => {
+                let uuid = Uuid::new_v4();
+                self.callback_map.write().insert(uuid, done);
+                broadcaster.send(ctx, P2PMessage::from(Message::PullTxsSync { uuid, hashes }));
             }
         }
 
@@ -93,6 +103,42 @@ impl Synchronizer for OutboundSender {
 
                     if let Some(Ok(box_any)) = await!(done_rx.next()) {
                         if let Ok(box_stxs) = box_any.downcast::<Vec<Block>>() {
+                            return Ok(*box_stxs);
+                        }
+                    }
+
+                    Err(SynchronizerError::Internal("network failure".to_owned()))
+                };
+
+                Box::new(fut.boxed().compat())
+            }
+            Err(e) => Box::new(err(SynchronizerError::Internal(format!(
+                "network failure: {:?}",
+                e
+            )))),
+        }
+    }
+
+    fn pull_txs_sync(
+        &self,
+        ctx: Context,
+        tx_hashes: &[Hash],
+    ) -> FutRuntimeResult<Vec<SignedTransaction>, SynchronizerError> {
+        let (done_tx, done_rx) = channel(1);
+
+        let msg = OutboundMessage::Synchronizer(SynchronizerMessage::PullTxsSync {
+            ctx,
+            done: done_tx,
+            hashes: tx_hashes.to_vec(),
+        });
+
+        match self.try_send(msg) {
+            Ok(_) => {
+                let fut = async move {
+                    let mut done_rx = done_rx.compat();
+
+                    if let Some(Ok(box_any)) = await!(done_rx.next()) {
+                        if let Ok(box_stxs) = box_any.downcast::<Vec<SignedTransaction>>() {
                             return Ok(*box_stxs);
                         }
                     }

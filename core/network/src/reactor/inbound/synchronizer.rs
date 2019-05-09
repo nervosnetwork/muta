@@ -14,10 +14,11 @@ use core_crypto::Crypto;
 use core_runtime::{Executor, TransactionPool};
 use core_serialization as ser;
 use core_storage::Storage;
-use core_types::Block;
+use core_types::{Block, Hash, SignedTransaction};
 
 use crate::p2p::message::synchronizer::{
-    packed_message, BroadcastStatus, PullBlocks, PushBlocks, SynchronizerMessage,
+    packed_message, BroadcastStatus, PullBlocks, PullTxsSync, PushBlocks, PushTxsSync,
+    SynchronizerMessage,
 };
 use crate::p2p::{self as p2p, Broadcaster};
 use crate::reactor::{CallbackMap, Reaction, Reactor, ReactorMessage};
@@ -82,6 +83,20 @@ where
                         Self::push_blocks(ctx.clone(), Arc::clone(&self.callback_map), push_msg);
                     Reaction::Done(Box::new(fut.unit_error().boxed().compat()))
                 }
+                packed_message::Message::PullTxsSync(pull_msg) => {
+                    let fut = Self::pull_txs_sync(
+                        ctx.clone(),
+                        Arc::clone(&self.storage),
+                        broadcaster.clone(),
+                        pull_msg,
+                    );
+                    Reaction::Done(Box::new(fut.unit_error().boxed().compat()))
+                }
+                packed_message::Message::PushTxsSync(push_msg) => {
+                    let fut =
+                        Self::push_txs_sync(ctx.clone(), Arc::clone(&self.callback_map), push_msg);
+                    Reaction::Done(Box::new(fut.unit_error().boxed().compat()))
+                }
             }
         } else {
             unreachable!()
@@ -112,6 +127,84 @@ where
             consensus,
             callback_map,
             current_height: Mutex::new(0),
+        }
+    }
+
+    async fn pull_txs_sync(
+        ctx: Context,
+        storage: Arc<S>,
+        broadcaster: Broadcaster,
+        pull_msg: PullTxsSync,
+    ) {
+        let res = await!(Self::pull_txs_sync_with_err(
+            ctx,
+            storage,
+            broadcaster,
+            pull_msg,
+        ));
+        if let Err(e) = res {
+            error!("pull_txs_sync err: {:?}", e);
+        }
+    }
+
+    async fn pull_txs_sync_with_err(
+        ctx: Context,
+        storage: Arc<S>,
+        mut broadcaster: Broadcaster,
+        pull_msg: PullTxsSync,
+    ) -> Result<(), Box<dyn Error>> {
+        let PullTxsSync {
+            uuid,
+            hashes: hashes_bytes,
+        } = pull_msg;
+        let hashes = hashes_bytes
+            .into_iter()
+            .map(|h| Hash::from_bytes(h.as_slice()))
+            .collect::<Result<Vec<Hash>, _>>()?;
+        let sig_txs = await!(storage
+            .get_transactions(ctx.clone(), hashes.as_slice())
+            .compat())?;
+        let ser_sig_txs = sig_txs
+            .into_iter()
+            .map(From::from)
+            .collect::<Vec<ser::SignedTransaction>>();
+        broadcaster.send(
+            ctx,
+            p2p::Message::SynchronizerMessage(SynchronizerMessage::push_txs_sync(
+                uuid,
+                ser_sig_txs,
+            )),
+        );
+        Ok(())
+    }
+
+    async fn push_txs_sync_with_err(
+        _ctx: Context,
+        callback_map: CallbackMap,
+        push_msg: PushTxsSync,
+    ) -> Result<(), Box<dyn Error>> {
+        let PushTxsSync {
+            uuid,
+            sig_txs: ser_sig_txs,
+        } = push_msg;
+
+        if let Ok(uuid) = Uuid::parse_str(uuid.as_str()) {
+            if let Some(mut done_tx) = callback_map.write().remove(&uuid) {
+                let mut sig_txs = vec![];
+                for ser_sig_tx in ser_sig_txs {
+                    let sig_tx = TryInto::<SignedTransaction>::try_into(ser_sig_tx)?;
+                    sig_txs.push(sig_tx);
+                }
+                done_tx.try_send(Box::new(sig_txs))?;
+            }
+        }
+        Ok(())
+    }
+
+    async fn push_txs_sync(ctx: Context, callback_map: CallbackMap, push_msg: PushTxsSync) {
+        let res = await!(Self::push_txs_sync_with_err(ctx, callback_map, push_msg));
+        if let Err(e) = res {
+            error!("push_txs_sync err: {:?}", e);
         }
     }
 
@@ -257,7 +350,15 @@ where
             for i in 0..last_index {
                 let block = all_blocks[i].clone();
                 let proof = all_blocks[i + 1].header.proof.clone();
-                await!(engine.insert_sync_block(ctx.clone(), block, proof))?;
+                let signed_txs = if block.tx_hashes.is_empty() {
+                    vec![]
+                } else {
+                    // todo: if there are too many txes, split it into small request
+                    await!(synchronizer
+                        .pull_txs_sync(ctx.clone(), &block.tx_hashes)
+                        .compat())?
+                };
+                await!(engine.insert_sync_block(ctx.clone(), block, signed_txs, proof))?;
             }
             all_blocks = all_blocks.split_off(last_index);
         }

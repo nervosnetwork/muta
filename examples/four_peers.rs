@@ -26,7 +26,7 @@ use core_network::Network;
 use core_pubsub::PubSub;
 use core_runtime::{FutRuntimeResult, TransactionPool};
 use core_storage::{BlockStorage, Storage};
-use core_types::{Address, Block, Transaction, UnverifiedTransaction};
+use core_types::{Address, Block, Hash, SignedTransaction, Transaction, UnverifiedTransaction};
 
 #[derive(Debug, Clone)]
 struct Config {
@@ -271,6 +271,14 @@ impl Synchronizer for MockSynchronizer {
         _ctx: Context,
         _heights: Vec<u64>,
     ) -> FutRuntimeResult<Vec<Block>, SynchronizerError> {
+        unimplemented!()
+    }
+
+    fn pull_txs_sync(
+        &self,
+        _ctx: Context,
+        _tx_hashes: &[Hash],
+    ) -> FutRuntimeResult<Vec<SignedTransaction>, SynchronizerError> {
         unimplemented!()
     }
 }

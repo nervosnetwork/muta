@@ -12,7 +12,7 @@ use core_context::Context;
 use core_pubsub::channel::pubsub::Receiver;
 use core_runtime::FutRuntimeResult;
 use core_storage::Storage;
-use core_types::{Block, Hash};
+use core_types::{Block, Hash, SignedTransaction};
 
 use crate::SynchronizerError;
 
@@ -30,6 +30,12 @@ pub trait Synchronizer: Send + Sync + Clone {
         ctx: Context,
         heights: Vec<u64>,
     ) -> FutRuntimeResult<Vec<Block>, SynchronizerError>;
+
+    fn pull_txs_sync(
+        &self,
+        ctx: Context,
+        tx_hashes: &[Hash],
+    ) -> FutRuntimeResult<Vec<SignedTransaction>, SynchronizerError>;
 }
 
 pub struct SynchronizerManager<S, Sy> {

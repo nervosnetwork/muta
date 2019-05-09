@@ -53,6 +53,9 @@ impl From<NetworkMessage> for P2PMessage {
             NetworkMessage::PullBlocks { uuid, heights } => {
                 P2PMessage::SynchronizerMessage(SynchronizerMessage::pull_blocks(uuid, heights))
             }
+            NetworkMessage::PullTxsSync { uuid, hashes } => {
+                P2PMessage::SynchronizerMessage(SynchronizerMessage::pull_txs_sync(uuid, hashes))
+            }
             NetworkMessage::BroadcastPrposal { msg } => {
                 P2PMessage::ConsensusMessage(ConsensusMessage::proposal(msg))
             }
