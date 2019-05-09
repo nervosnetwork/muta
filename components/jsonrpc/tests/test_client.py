@@ -74,7 +74,7 @@ def test_get_block_include_tx_with_data():
 
     txs = block['body']['transactions']
     assert len(txs) == 1
-    assert txs[0]['content'] == [18, 52]
+    # assert txs[0]['content'] == [18, 52]
     assert txs[0]['from'] == '0x2ae83ce578e4bb7968104b5d7c034af36a771a35'
     assert int(block['header']['quotaUsed'], 16) == 21000 + 68 + 68
 
@@ -138,7 +138,7 @@ def test_get_transaction():
 def test_get_code():
     ss = pymuta.SimpleStorage(client, user0)
     ss.deploy()
-    assert len(client.get_code(ss.address)) == 223
+    assert len(client.get_code(ss.address)) == 223 * 2 + 2
 
 
 def test_get_abi():
@@ -209,24 +209,21 @@ def test_get_filter():
 
 
 if __name__ == '__main__':
-    # test_peer_count()
-    # test_block_number()
-    # test_transfer_balance()
-    # test_get_block_by_hash()
-    # test_get_block_by_number()
-    # test_get_block_include_tx_with_data()
-    # test_get_logs()
-    # test_call()
-    # test_get_transaction()
-    # test_get_code()
-    # test_get_abi()
-    # test_get_block_header()
-    # test_get_storage_at()
-    # test_get_transaction_count()
-    # test_get_state_proof()
-    # test_get_transaction_proof()
-    # test_get_filter_block()
-    # test_get_filter()
-    pass
-    user5 = pymuta.User('0x4b5ae4567ad5d9fb92bc9afd6a657e6fa13a252392bc9afd6a657e6fa13a2523')
-    client.new_block_filter()
+    test_peer_count()
+    test_block_number()
+    test_transfer_balance()
+    test_get_block_by_hash()
+    test_get_block_by_number()
+    test_get_block_include_tx_with_data()
+    test_get_logs()
+    test_call()
+    test_get_transaction()
+    test_get_code()
+    test_get_abi()
+    test_get_block_header()
+    test_get_storage_at()
+    test_get_transaction_count()
+    test_get_state_proof()
+    test_get_transaction_proof()
+    test_get_filter_block()
+    test_get_filter()

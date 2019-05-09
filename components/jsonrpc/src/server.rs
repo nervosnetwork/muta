@@ -300,7 +300,7 @@ where
             // Get the count of peers
             "peerCount" => {
                 let r = await!(app_state.peer_count())?;
-                Ok(Value::from(r))
+                Ok(Value::from(format!("{:#x}", r)))
             }
             // Test whether the server is still aliving. It's not in CITA spec.
             "ping" => Ok(Value::from("pong")),
