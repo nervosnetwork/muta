@@ -20,7 +20,7 @@ use crate::state::AppState;
 use crate::util::clean_0x;
 
 fn rpc_handle<E: 'static, T: 'static, S: 'static, D: 'static>(
-    reqjson: web::Json<convention::Request>,
+    reqjson: web::Json<convention::Call>,
     app_state: web::Data<AppState<E, T, S, D>>,
     _req: HttpRequest,
 ) -> Box<OldFuture<Item = HttpResponse, Error = actix_web::Error>>
@@ -30,24 +30,53 @@ where
     S: Storage,
     D: Database,
 {
-    let mut result = convention::Response::default();
-    result.id = reqjson.id.clone();
-
-    let fut = async move {
-        match await!(rpc_select(
-            app_state.get_ref().clone(),
-            reqjson.method.clone(),
-            reqjson.params.clone()
-        )
-        .compat())
-        {
-            Ok(ok) => result.result = Some(ok),
-            Err(e) => result.error = Some(e),
+    match reqjson.into_inner() {
+        convention::Call::Single(req) => {
+            let fut = async move {
+                let result = await!(handle_one_request(req, app_state));
+                Ok(HttpResponse::Ok().json(result))
+            };
+            Box::new(fut.boxed().compat())
         }
-        Ok(HttpResponse::Ok().json(result))
-    };
+        convention::Call::Batch(reqs) => {
+            let mut results = vec![];
+            let fut = async move {
+                for req in reqs {
+                    let result = await!(handle_one_request(req, app_state.clone()));
+                    results.push(result);
+                }
+                Ok(HttpResponse::Ok().json(results))
+            };
 
-    Box::new(fut.boxed().compat())
+            Box::new(fut.boxed().compat())
+        }
+    }
+}
+
+async fn handle_one_request<E: 'static, T: 'static, S: 'static, D: 'static>(
+    req: convention::Request,
+    app_state: web::Data<AppState<E, T, S, D>>,
+) -> convention::Response
+where
+    E: Executor,
+    T: TransactionPool,
+    S: Storage,
+    D: Database,
+{
+    let mut result = convention::Response::default();
+    result.id = req.id.clone();
+
+    match await!(rpc_select(
+        app_state.get_ref().clone(),
+        req.method.clone(),
+        req.params.clone()
+    )
+    .compat())
+    {
+        Ok(ok) => result.result = Some(ok),
+        Err(e) => result.error = Some(e),
+    }
+    result
 }
 
 fn get_string(

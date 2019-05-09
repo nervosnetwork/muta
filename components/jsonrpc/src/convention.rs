@@ -71,7 +71,7 @@ impl fmt::Display for ErrorData {
 }
 
 /// A rpc call is represented by sending a Request object to a Server.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Request {
     /// A String specifying the version of the JSON-RPC protocol. MUST be
     /// exactly "2.0".
@@ -92,6 +92,16 @@ pub struct Request {
     /// assumed to be a notification. The value SHOULD normally not be Null [1]
     /// and Numbers SHOULD NOT contain fractional parts.
     pub id: Value,
+}
+
+/// Represents jsonrpc request.
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum Call {
+    /// Single request
+    Single(Request),
+    /// Batch of requests
+    Batch(Vec<Request>),
 }
 
 /// When a rpc call is made, the Server MUST reply with a Response, except for
