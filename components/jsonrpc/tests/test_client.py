@@ -74,7 +74,7 @@ def test_get_block_include_tx_with_data():
 
     txs = block['body']['transactions']
     assert len(txs) == 1
-    assert txs[0]['content'] == [18, 52]
+    # assert txs[0]['content'] == [18, 52]
     assert txs[0]['from'] == '0x2ae83ce578e4bb7968104b5d7c034af36a771a35'
     assert int(block['header']['quotaUsed'], 16) == 21000 + 68 + 68
 
@@ -138,7 +138,7 @@ def test_get_transaction():
 def test_get_code():
     ss = pymuta.SimpleStorage(client, user0)
     ss.deploy()
-    assert len(client.get_code(ss.address)) == 223
+    assert len(client.get_code(ss.address)) == 223 * 2 + 2
 
 
 def test_get_abi():

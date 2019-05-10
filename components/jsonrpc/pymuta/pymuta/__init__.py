@@ -22,6 +22,7 @@ c_private_key_3 = '0x028590ad352d54387a9c8a0ecf7e180e68c4840c72f958fc5917657f506
 c_root = pathlib.Path(__file__).parent
 c_tx_version = 0
 c_muta = 1
+c_logs = 1
 
 
 class User:
@@ -80,10 +81,12 @@ class Client:
 
     def send(self, method: str, params: typing.List = None):
         send_data = {'jsonrpc': '2.0', 'method': method, 'params': params, 'id': 1}
-        print("<-", send_data)
+        if c_logs:
+            print("<-", send_data)
         resp = requests.post(self.server, json=send_data)
         recv_data = resp.json()
-        print("->", recv_data)
+        if c_logs:
+            print("->", recv_data)
         return recv_data['result']
 
     def block_number(self) -> int:
@@ -152,7 +155,7 @@ class Client:
         return self.send('ping')
 
     def peer_count(self) -> int:
-        return self.send('peerCount')
+        return int(self.send('peerCount'), 16)
 
     def send_raw_transaction(self, data: str):
         # Send a transaction with hex data
@@ -212,7 +215,7 @@ class SimpleStorage:
 
     def deploy(self):
         with c_root.joinpath('SimpleStorage.bin').open('r') as f:
-            code = f.read()
+            code = f.read().rstrip()
             code = eth_utils.add_0x_prefix(code)
         code = self.client.sign_tx(self.user.private_key, None, code, 0, 1000000)
         r = self.client.sync_raw_transaction(code)
@@ -240,13 +243,13 @@ class Bnb:
 
     def deploy(self):
         # Params of [400000000, "DOUZ", 6, "DOUZ"]
-        data = """0000000000000000000000000000000000000000000000000000000017d7840000000000000000000000000000000000000000
-000000000000000000000000800000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000
-00000000000000000000000000000000c00000000000000000000000000000000000000000000000000000000000000004444f555a00000000000000
-0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004444f555a000000
-00000000000000000000000000000000000000000000000000"""
+        data = """0000000000000000000000000000000000000000000000000000000017d784000000000000000000000000000000000000000\
+00000000000000000000000008000000000000000000000000000000000000000000000000000000000000000060000000000000000000000000000\
+0000000000000000000000000000000000c00000000000000000000000000000000000000000000000000000000000000004444f555a00000000000\
+0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000004444f555a00\
+000000000000000000000000000000000000000000000000000000"""
         with c_root.joinpath('bnb.bin').open('r') as f:
-            code = f.read()
+            code = f.read().rstrip()
             code = eth_utils.add_0x_prefix(code)
         code = self.client.sign_tx(self.user.private_key, None, code + data, 0, 5000000)
         r = self.client.sync_raw_transaction(code)
