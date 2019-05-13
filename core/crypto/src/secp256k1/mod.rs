@@ -4,7 +4,7 @@ use secp256k1::{
     rand, All, Message, RecoverableSignature, RecoveryId, Secp256k1 as RawSecp256k1,
 };
 
-use core_types::Hash;
+use core_types::{Address, Hash};
 
 use crate::{Crypto, CryptoError, CryptoTransform};
 
@@ -119,6 +119,12 @@ impl Crypto for Secp256k1 {
         signature[0..64].copy_from_slice(&data[..]);
         signature[signature.len() - 1] = rec_id.to_i32() as u8;
         Ok(Signature(signature))
+    }
+
+    fn pubkey_to_address(&self, pubkey: &Self::PublicKey) -> Address {
+        let pubkey = RawPublicKey::from_slice(&pubkey.0).expect("should never failed");
+        let pubkey_hash = Hash::digest(&pubkey.serialize_uncompressed()[1..]);
+        Address::from_hash(&pubkey_hash)
     }
 }
 

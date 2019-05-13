@@ -22,7 +22,7 @@ quota_limit = 9999999999
 # consensus
 consensus_tx_limit = 30000
 consensus_interval = 3000
-consensus_verifier_list = [ "19e49d3efd4e81dc82943ad9791c1916e2229138" ]
+consensus_verifier_list = [ "7899EE7319601cbC2684709e0eC3A4807bb0Fd74" ]
 consensus_wal_path = "./devtools/chain/bft_wal"
 
 # synchronzer

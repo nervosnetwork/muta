@@ -220,7 +220,7 @@ where
                 let hash = Hash::from_hex(clean_0x(&hash_str[..]))?;
                 let number = get_string(params, 2, false)?;
                 match await!(app_state.get_state_proof(addr, hash, number)) {
-                    Ok(ok) => Ok(serde_json::to_value(ok).unwrap()),
+                    Ok(ok) => Ok(Value::from(hex::encode(ok))),
                     Err(RpcError::StorageError(StorageError::None(_))) => Ok(Value::Null),
                     Err(e) => Err(convention::ErrorData::from(e)),
                 }
@@ -261,7 +261,7 @@ where
                 let hash_str = get_string(params, 0, true)?;
                 let hash = Hash::from_hex(clean_0x(&hash_str[..]))?;
                 match await!(app_state.get_transaction_proof(hash)) {
-                    Ok(ok) => Ok(serde_json::to_value(ok).unwrap()),
+                    Ok(ok) => Ok(Value::from(hex::encode(ok))),
                     Err(RpcError::StorageError(StorageError::None(_))) => Ok(Value::Null),
                     Err(e) => Err(convention::ErrorData::from(e)),
                 }

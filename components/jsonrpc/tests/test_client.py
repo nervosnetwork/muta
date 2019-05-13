@@ -75,14 +75,14 @@ def test_get_block_include_tx_with_data():
     txs = block['body']['transactions']
     assert len(txs) == 1
     # assert txs[0]['content'] == [18, 52]
-    assert txs[0]['from'] == '0x2ae83ce578e4bb7968104b5d7c034af36a771a35'
+    assert txs[0]['from'] == user1.address.lower()
     assert int(block['header']['quotaUsed'], 16) == 21000 + 68 + 68
 
 
 def test_get_logs():
     bnb = pymuta.Bnb(client, user0)
     bnb.deploy()
-    assert bnb.owner() == '0x00000000000000000000000019e49d3efd4e81dc82943ad9791c1916e2229138'
+    assert bnb.owner().lower() == '0x000000000000000000000000' + user0.address[2:].lower()
     assert bnb.balance_of(user0.address) == 400000000
     assert bnb.total_supply() == 400000000
     assert bnb.symbol() == b'DOUZ'
