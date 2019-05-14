@@ -359,9 +359,10 @@ where
             .wrap(Cors::default())
             .data(app_state.clone())
             .service(
-                web::resource("/").route(
+                web::resource("/")
+                .data(web::JsonConfig::default().limit(c_payload_size)) // <- limit size of the payload
+                .route(
                     web::post()
-                        .data(web::JsonConfig::default().limit(c_payload_size)) // <- limit size of the payload
                         .to_async(rpc_handle::<E, T, S, D>),
                 ),
             )
