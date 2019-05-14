@@ -1,4 +1,4 @@
-#![feature(async_await, await_macro, futures_api)]
+#![feature(async_await, await_macro, futures_api, test)]
 
 mod cache;
 
@@ -16,7 +16,7 @@ use core_runtime::{FutRuntimeResult, TransactionOrigin, TransactionPool, Transac
 use core_storage::{Storage, StorageError};
 use core_types::{Hash, SignedTransaction, Transaction, UnverifiedTransaction};
 
-use crate::cache::Cache;
+use crate::cache::TxCache;
 
 pub trait Broadcaster: Send + Sync + Clone {
     fn broadcast_batch(&mut self, txs: Vec<SignedTransaction>);
@@ -28,15 +28,13 @@ pub trait Broadcaster: Send + Sync + Clone {
     ) -> FutRuntimeResult<Vec<SignedTransaction>, TransactionPoolError>;
 }
 
-type TxCache = Cache;
-
 pub struct HashTransactionPool<S, C, B> {
     pool_size:         usize,
     until_block_limit: u64,
     quota_limit:       u64,
 
-    tx_cache:       TxCache,
-    callback_cache: TxCache,
+    tx_cache:       Arc<TxCache>,
+    callback_cache: Arc<TxCache>,
     storage:        Arc<S>,
     crypto:         Arc<C>,
     broadcaster:    B,
@@ -61,8 +59,8 @@ where
             until_block_limit,
             quota_limit,
 
-            tx_cache: Cache::new(),
-            callback_cache: Cache::new(),
+            tx_cache: Arc::new(TxCache::new()),
+            callback_cache: Arc::new(TxCache::new()),
             storage,
             crypto,
             broadcaster,
@@ -84,7 +82,7 @@ where
     ) -> FutRuntimeResult<SignedTransaction, TransactionPoolError> {
         let storage = Arc::clone(&self.storage);
         let crypto = Arc::clone(&self.crypto);
-        let tx_cache = self.tx_cache.clone();
+        let tx_cache = Arc::clone(&self.tx_cache);
         let mut broadcaster = self.broadcaster.clone();
 
         let pool_size = self.pool_size;
@@ -158,7 +156,7 @@ where
         quota_limit: u64,
     ) -> FutRuntimeResult<Vec<Hash>, TransactionPoolError> {
         let storage = Arc::clone(&self.storage);
-        let tx_cache = self.tx_cache.clone();
+        let tx_cache = Arc::clone(&self.tx_cache);
         let until_block_limit = self.until_block_limit;
 
         let fut = async move {
@@ -203,8 +201,8 @@ where
     }
 
     fn flush(&self, _: Context, tx_hashes: &[Hash]) -> FutRuntimeResult<(), TransactionPoolError> {
-        let tx_cache = self.tx_cache.clone();
-        let callback_cache = self.callback_cache.clone();
+        let tx_cache = Arc::clone(&self.tx_cache);
+        let callback_cache = Arc::clone(&self.callback_cache);
         let tx_hashes = tx_hashes.to_owned();
 
         let fut = async move {
@@ -222,8 +220,8 @@ where
         _: Context,
         tx_hashes: &[Hash],
     ) -> FutRuntimeResult<Vec<SignedTransaction>, TransactionPoolError> {
-        let tx_cache = self.tx_cache.clone();
-        let callback_cache = self.callback_cache.clone();
+        let tx_cache = Arc::clone(&self.tx_cache);
+        let callback_cache = Arc::clone(&self.callback_cache);
         let tx_hashes = tx_hashes.to_owned();
 
         let fut = async move {
@@ -259,8 +257,8 @@ where
         ctx: Context,
         tx_hashes: &[Hash],
     ) -> FutRuntimeResult<(), TransactionPoolError> {
-        let tx_cache = self.tx_cache.clone();
-        let callback_cache = self.callback_cache.clone();
+        let tx_cache = Arc::clone(&self.tx_cache);
+        let callback_cache = Arc::clone(&self.callback_cache);
         let mut broadcaster = self.broadcaster.clone();
         let tx_hashes = tx_hashes.to_owned();
 
@@ -587,8 +585,8 @@ mod tests {
         let (callback_stxs, pool_stxs) = sig_txs.split_at(5);
         {
             // insert test signed transactions
-            let callback_cache = tx_pool.callback_cache.clone();
-            let pool_cache = tx_pool.tx_cache.clone();
+            let callback_cache = Arc::clone(&tx_pool.callback_cache);
+            let pool_cache = Arc::clone(&tx_pool.tx_cache);
 
             for stx in callback_stxs.iter() {
                 callback_cache.insert(stx.clone());
