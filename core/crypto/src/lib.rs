@@ -56,3 +56,25 @@ impl fmt::Display for CryptoError {
         write!(f, "{}", printable)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_secp256k1_pubkey_to_address() {
+        let secp = secp256k1::Secp256k1::new();
+        let priv_key = secp256k1::PrivateKey::from_bytes(
+            &hex::decode("37e59320911cdeacd4a39b6dbca45a37dc7c96ec88687cb5242cd51f48504880")
+                .unwrap()[..],
+        )
+        .unwrap();
+        let pub_key = secp.get_public_key(&priv_key).unwrap();
+
+        let address = secp.pubkey_to_address(&pub_key);
+        assert_eq!(
+            hex::encode(address.as_bytes()),
+            String::from("bCc4BB994cB0975cdd20C99584318374B3D1522B").to_lowercase()
+        );
+    }
+}

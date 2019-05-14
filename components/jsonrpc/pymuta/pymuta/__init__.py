@@ -21,7 +21,7 @@ c_private_key_2 = '0x028590ad352d54387a9c8a0ecf7e180e68c4840c72f958fc5917657f506
 c_private_key_3 = '0x028590ad352d54387a9c8a0ecf7e180e68c4840c72f958fc5917657f506caa83'
 c_root = pathlib.Path(__file__).parent
 c_tx_version = 0
-c_muta = 1
+c_muta = 0
 c_logs = 1
 
 
