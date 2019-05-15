@@ -55,14 +55,19 @@ impl TxCache {
     pub fn get_count(&self, count: usize) -> Vec<SignedTransaction> {
         // TODO: https://github.com/cryptape/muta/pull/217/files/697ca72df9192937abf1fb2c253d06ca213d85a4#r283665498
         let avg_len = count / self.buckets.len();
+        let avg_len = if avg_len == 0 { 1 } else { avg_len };
         let mut all_txs = vec![];
 
         // get the same length of transactions from each bucket.
         for bucket in self.buckets.iter() {
             let txs = bucket.get_count(avg_len);
             all_txs.extend(txs);
+
+            if all_txs.len() == count {
+                break;
+            }
         }
-        if all_txs.len() == count {
+        if all_txs.len() == count || self.len() <= count {
             return all_txs;
         }
 
@@ -219,6 +224,24 @@ mod tests {
     use core_types::{Hash, SignedTransaction};
 
     const GEN_TX_SIZE: usize = 100_000;
+
+    #[test]
+    fn test_get_count() {
+        let txs = gen_txs(10);
+        let cache = TxCache::new();
+        cache.insert_batch(txs.clone());
+        assert_eq!(cache.len(), 10);
+
+        let get_txs = cache.get_count(10000);
+        assert_eq!(get_txs.len(), 10);
+
+        let get_txs = cache.get_count(5);
+        assert_eq!(get_txs.len(), 5);
+
+        cache.clear();
+        let get_txs = cache.get_count(1000);
+        assert_eq!(get_txs.len(), 0);
+    }
 
     #[bench]
     fn bench_insert_sharding(b: &mut Bencher) {
