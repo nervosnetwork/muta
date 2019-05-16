@@ -160,6 +160,7 @@ fn start_peer(
         cfg.pool_size as usize,
         cfg.until_block_limit,
         cfg.quota_limit,
+        cfg.height,
     ));
 
     // net network

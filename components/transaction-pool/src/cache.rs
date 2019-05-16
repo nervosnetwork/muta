@@ -12,11 +12,12 @@ pub struct TxCache {
 }
 
 impl TxCache {
-    pub fn new() -> Self {
+    pub fn new(cache_size: usize) -> Self {
         let mut buckets = Vec::with_capacity(16);
         for _ in 0..16 {
             buckets.push(Bucket {
-                store: RwLock::new(HashMap::new()),
+                // Allocate enough space to avoid triggering resize.
+                store: RwLock::new(HashMap::with_capacity(cache_size)),
             });
         }
         Self { buckets }
@@ -228,7 +229,7 @@ mod tests {
     #[test]
     fn test_get_count() {
         let txs = gen_txs(10);
-        let cache = TxCache::new();
+        let cache = TxCache::new(100);
         cache.insert_batch(txs.clone());
         assert_eq!(cache.len(), 10);
 
@@ -248,7 +249,7 @@ mod tests {
         let txs = gen_txs(GEN_TX_SIZE);
 
         b.iter(move || {
-            let cache = TxCache::new();
+            let cache = TxCache::new(GEN_TX_SIZE);
             txs.par_iter().for_each(|tx| cache.insert(tx.clone()));
         });
     }
