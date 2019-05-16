@@ -153,6 +153,7 @@ fn start(cfg: &Config) {
         cfg.pool_size as usize,
         cfg.until_block_limit,
         cfg.quota_limit,
+        block.header.height,
     ));
 
     // run json rpc

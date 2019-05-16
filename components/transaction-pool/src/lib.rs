@@ -1,8 +1,9 @@
-#![feature(async_await, await_macro, futures_api, test)]
+#![feature(async_await, await_macro, integer_atomics, futures_api, test)]
 
 mod cache;
 
 use std::string::ToString;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
 use futures03::{
@@ -38,6 +39,8 @@ pub struct HashTransactionPool<S, C, B> {
     storage:        Arc<S>,
     crypto:         Arc<C>,
     broadcaster:    B,
+
+    latest_height: Arc<AtomicU64>,
 }
 
 impl<S, C, B> HashTransactionPool<S, C, B>
@@ -53,17 +56,20 @@ where
         pool_size: usize,
         until_block_limit: u64,
         quota_limit: u64,
+        latest_height: u64,
     ) -> Self {
         HashTransactionPool {
             pool_size,
             until_block_limit,
             quota_limit,
 
-            tx_cache: Arc::new(TxCache::new()),
-            callback_cache: Arc::new(TxCache::new()),
+            tx_cache: Arc::new(TxCache::new(pool_size)),
+            callback_cache: Arc::new(TxCache::new(pool_size)),
             storage,
             crypto,
             broadcaster,
+
+            latest_height: Arc::new(AtomicU64::new(latest_height)),
         }
     }
 }
@@ -88,6 +94,7 @@ where
         let pool_size = self.pool_size;
         let until_block_limit = self.until_block_limit;
         let quota_limit = self.quota_limit;
+        let latest_height = self.latest_height.load(Ordering::Acquire);
 
         let fut = async move {
             // 1. check size
@@ -119,11 +126,8 @@ where
             }
 
             // 5. verify params
-            let latest_block =
-                await!(storage.get_latest_block(ctx.clone()).compat()).map_err(internal_error)?;
-
             verify_transaction(
-                latest_block.header.height,
+                latest_height,
                 &untx.transaction,
                 until_block_limit,
                 quota_limit,
@@ -203,12 +207,14 @@ where
     fn flush(&self, _: Context, tx_hashes: &[Hash]) -> FutRuntimeResult<(), TransactionPoolError> {
         let tx_cache = Arc::clone(&self.tx_cache);
         let callback_cache = Arc::clone(&self.callback_cache);
+        let latest_height = Arc::clone(&self.latest_height);
         let tx_hashes = tx_hashes.to_owned();
 
         let fut = async move {
             callback_cache.clear();
             tx_cache.deletes(&tx_hashes);
 
+            latest_height.fetch_add(1, Ordering::Acquire);
             Ok(())
         };
 
@@ -762,6 +768,7 @@ mod tests {
             size,
             until_block_limit,
             quota_limit,
+            height,
         )
     }
 
