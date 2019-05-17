@@ -1,5 +1,8 @@
 use hashbrown::HashMap;
 use parking_lot::RwLock;
+use rayon::prelude::{
+    IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelIterator,
+};
 
 use core_types::{Hash, SignedTransaction};
 
@@ -54,34 +57,19 @@ impl TxCache {
 
     // TODO: concurrently get
     pub fn get_count(&self, count: usize) -> Vec<SignedTransaction> {
-        // TODO: https://github.com/cryptape/muta/pull/217/files/697ca72df9192937abf1fb2c253d06ca213d85a4#r283665498
-        let avg_len = count / self.buckets.len();
-        let avg_len = if avg_len == 0 { 1 } else { avg_len };
         let mut all_txs = vec![];
+        let mut leaf_count = count;
 
-        // get the same length of transactions from each bucket.
+        // TODO: Make sure each bucket is average.
         for bucket in self.buckets.iter() {
-            let txs = bucket.get_count(avg_len);
-            all_txs.extend(txs);
-
-            if all_txs.len() == count {
-                break;
-            }
-        }
-        if all_txs.len() == count || self.len() <= count {
-            return all_txs;
-        }
-
-        // If we don't get enough transactions, start the loop from the first bukcet
-        // until the conditions are met.
-        let mut left_len = count - all_txs.len();
-        for bucket in self.buckets.iter() {
-            let txs = bucket.get_count(left_len);
+            let txs = bucket.get_count(leaf_count);
             let txs_len = txs.len();
             all_txs.extend(txs);
 
-            left_len -= txs_len;
-            if left_len == 0 {
+            // Avoid overflow
+            if leaf_count > txs_len {
+                leaf_count -= txs_len
+            } else {
                 break;
             }
         }
@@ -97,9 +85,9 @@ impl TxCache {
             h.entry(index).or_insert_with(|| vec![]).push(hash.clone());
         }
 
-        for (index, hashes) in h.into_iter() {
+        h.into_par_iter().for_each(|(index, hashes)| {
             self.buckets[index].deletes(&hashes);
-        }
+        });
     }
 
     // TODO: concurrently contains
@@ -174,11 +162,14 @@ impl Bucket {
         let len = store.len();
         let count = if len < count { len } else { count };
 
-        let mut txs = Vec::with_capacity(count);
-        for (_, tx) in store.iter() {
-            txs.push(tx.clone());
-        }
-        txs
+        store
+            .par_iter()
+            .map(|(_, tx)| tx)
+            .collect::<Vec<&SignedTransaction>>()
+            .into_par_iter()
+            .take(count)
+            .map(Clone::clone)
+            .collect::<Vec<SignedTransaction>>()
     }
 
     fn deletes(&self, tx_hashes: &[Hash]) {

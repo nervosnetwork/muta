@@ -10,3 +10,4 @@ core-types = { path = "../types" }
 # static_merkle_tree = "1.0.0"
 static_merkle_tree = { git = "https://github.com/yejiayu/static-merkle-tree.git", branch = "trait_scope" }
 rlp = "0.3"
+rayon = "1.0"

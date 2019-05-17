@@ -1,3 +1,4 @@
+use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 use static_merkle_tree::Tree;
 
 use core_types::{Hash, Receipt};
@@ -19,7 +20,7 @@ impl Merkle {
     }
 
     pub fn from_receipts(receipts: &[Receipt]) -> Self {
-        let hashes = receipts.iter().map(Receipt::hash).collect();
+        let hashes = receipts.par_iter().map(Receipt::hash).collect();
         Merkle::from_hashes(hashes)
     }
 

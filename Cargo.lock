@@ -858,6 +858,7 @@ name = "core-merkle"
 version = "0.1.0"
 dependencies = [
  "core-types 0.1.0",
+ "rayon 1.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "rlp 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "static_merkle_tree 1.0.0 (git+https://github.com/yejiayu/static-merkle-tree.git?branch=trait_scope)",
 ]
@@ -1643,6 +1644,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "hashbrown"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "rayon 1.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
+]
 
 [[package]]
 name = "heapsize"
