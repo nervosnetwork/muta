@@ -94,7 +94,7 @@ where
     /// A user-defined function for block validation.
     /// Every block bft received will call this function, even if the feed
     /// block. Users should validate block format, block headers here.
-    fn check_block(&self, proposal: &[u8], _height: u64) -> Result<(), Self::Error> {
+    fn check_block(&self, proposal: &[u8], _: &[u8], _height: u64) -> Result<(), Self::Error> {
         let fut = async move {
             let proposal: Proposal =
                 await!(AsyncCodec::decode::<SerProposal>(proposal.to_vec()))?.try_into()?;
@@ -116,6 +116,7 @@ where
     fn check_txs(
         &self,
         proposal: &[u8],
+        _: &[u8],
         signed_proposal_hash: &[u8],
         _height: u64,
         _round: u64,
