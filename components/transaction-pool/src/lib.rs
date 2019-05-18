@@ -154,18 +154,15 @@ where
 
     fn package(
         &self,
-        ctx: Context,
+        _: Context,
         count: u64,
         quota_limit: u64,
     ) -> FutRuntimeResult<Vec<Hash>, TransactionPoolError> {
-        let storage = Arc::clone(&self.storage);
         let tx_cache = Arc::clone(&self.tx_cache);
         let until_block_limit = self.until_block_limit;
+        let latest_height = self.latest_height.load(Ordering::Acquire);
 
         let fut = async move {
-            let latest_block =
-                await!(storage.get_latest_block(ctx).compat()).map_err(internal_error)?;
-
             let mut invalid_hashes = vec![];
             let mut valid_hashes = vec![];
             let mut quota_count: u64 = 0;
@@ -178,11 +175,7 @@ where
                 let quota = signed_tx.untx.transaction.quota;
 
                 // The transaction has timed out？
-                if !verify_until_block(
-                    valid_until_block,
-                    latest_block.header.height,
-                    until_block_limit,
-                ) {
+                if !verify_until_block(valid_until_block, latest_height, until_block_limit) {
                     invalid_hashes.push(tx_hash.clone());
                     continue;
                 }
@@ -231,23 +224,12 @@ where
 
         let fut = async move {
             let mut sig_txs = Vec::with_capacity(tx_hashes.len());
-            let mut leftover = vec![];
 
             for hash in tx_hashes.iter() {
-                if let Some(stx) = callback_cache.get(hash) {
-                    sig_txs.push(stx.clone());
-                } else {
-                    leftover.push(hash.clone())
-                }
-            }
-
-            if leftover.is_empty() {
-                return Ok(sig_txs);
-            }
-
-            for hash in leftover.iter() {
-                if let Some(stx) = tx_cache.get(hash) {
-                    sig_txs.push(stx.clone());
+                if let Some(tx) = tx_cache.get(hash) {
+                    sig_txs.push(tx);
+                } else if let Some(tx) = callback_cache.get(hash) {
+                    sig_txs.push(tx);
                 }
             }
 

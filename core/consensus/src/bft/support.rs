@@ -99,6 +99,12 @@ where
             let proposal: Proposal =
                 await!(AsyncCodec::decode::<SerProposal>(proposal.to_vec()))?.try_into()?;
 
+            // Ignore the self proposal
+            let status = self.engine.get_status()?;
+            if proposal.proposer == status.node_address {
+                return Ok(());
+            }
+
             let ctx = Context::new();
             self.engine.verify_proposal(ctx.clone(), &proposal)?;
             Ok(())
