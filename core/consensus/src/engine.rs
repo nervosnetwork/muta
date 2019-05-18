@@ -3,11 +3,10 @@ use std::sync::{Arc, RwLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use bft_rs::{check_proof, Node as BftNode, Proof as BftProof};
-use futures::{
-    compat::Future01CompatExt,
-    stream::{FuturesUnordered, TryStreamExt},
-};
+use futures::compat::Future01CompatExt;
+use futures::executor::block_on;
 use futures_locks::Mutex;
+use rayon::prelude::{IntoParallelIterator, ParallelIterator};
 
 use core_context::Context;
 use core_crypto::{Crypto, CryptoTransform};
@@ -15,7 +14,7 @@ use core_merkle::Merkle;
 use core_pubsub::{channel::pubsub::Sender, register::Register, PUBSUB_BROADCAST_BLOCK};
 use core_runtime::{ExecutionContext, ExecutionResult, Executor, TransactionPool};
 use core_serialization::{AsyncCodec, Proposal as SerProposal};
-use core_storage::Storage;
+use core_storage::{Storage, StorageError};
 use core_types::{
     Address, Block, BlockHeader, Hash, Proof, Proposal, SignedTransaction, TransactionPosition,
 };
@@ -215,87 +214,104 @@ where
             quota_limit: proposal.quota_limit,
             timestamp:   proposal.timestamp,
         };
-        let execution_result = self
-            .executor
-            .exec(ctx.clone(), &execution_context, &signed_txs)?;
 
+        let execution_result = self.exec_block(ctx.clone(), signed_txs, execution_context)?;
         // build block
         let block = build_block(&proposal, &execution_result);
 
-        await!(self.insert_block(
-            ctx.clone(),
-            signed_txs,
-            block,
-            latest_proof,
-            Some(execution_result)
-        ))
+        await!(self.insert_block(ctx.clone(), block, latest_proof, execution_result))
+    }
+
+    fn exec_block(
+        &self,
+        ctx: Context,
+        signaed_txs: Vec<SignedTransaction>,
+        execution_context: ExecutionContext,
+    ) -> ConsensusResult<ExecutionResult> {
+        let ctx1 = ctx.clone();
+        let ctx2 = ctx.clone();
+        let signaed_txs2 = signaed_txs.clone();
+
+        let mut result_with_executor = None;
+        let mut result_with_insert_transaction = None;
+        let mut result_with_flush_transaction = None;
+
+        rayon::scope(|s| {
+            s.spawn(|_| {
+                result_with_executor =
+                    Some(self.executor.exec(ctx1, &execution_context, &signaed_txs2));
+            });
+            s.spawn(|_| {
+                let tx_hashes = signaed_txs
+                    .iter()
+                    .map(|tx| tx.hash.clone())
+                    .collect::<Vec<Hash>>();
+
+                result_with_insert_transaction = Some(block_on(
+                    self.storage.insert_transactions(ctx2, signaed_txs).compat(),
+                ));
+                // flush transaction pool
+                result_with_flush_transaction = Some(block_on(
+                    self.tx_pool.flush(ctx.clone(), &tx_hashes).compat(),
+                ));
+            });
+        });
+
+        result_with_insert_transaction.unwrap()?;
+        result_with_flush_transaction.unwrap()?;
+        let exec_result = result_with_executor.unwrap()?;
+        Ok(exec_result)
     }
 
     async fn insert_block(
         &self,
         ctx: Context,
-        signed_txs: Vec<SignedTransaction>,
         block: Block,
         proof: Proof,
-        execution_result: Option<ExecutionResult>,
+        execution_result: ExecutionResult,
     ) -> ConsensusResult<ConsensusStatus> {
-        let status = self.get_status()?;
-
-        let execution_result = match execution_result {
-            Some(exe_res) => exe_res,
-            None => {
-                // exec transactions
-                let execution_context = ExecutionContext {
-                    state_root:  status.state_root.clone(),
-                    proposer:    block.header.proposer.clone(),
-                    height:      block.header.height,
-                    quota_limit: block.header.quota_limit,
-                    timestamp:   block.header.timestamp,
-                };
-                self.executor
-                    .exec(ctx.clone(), &execution_context, &signed_txs)?
-            }
-        };
-
         // save
         let block_hash = block.hash.clone();
         let cloned_header = block.header.clone();
 
-        let mut stream = FuturesUnordered::new();
-        stream.push(
+        let mut futs = vec![];
+        futs.push(
             self.storage
                 .insert_block(ctx.clone(), block.clone())
                 .compat(),
         );
-        stream.push(
+        futs.push(
             self.storage
                 .update_latest_proof(ctx.clone(), proof.clone())
                 .compat(),
         );
-        if !signed_txs.is_empty() {
-            let tx_positions = build_tx_potsitions(&block_hash, &signed_txs);
+        if !execution_result.receipts.is_empty() {
+            // Execution in the background, if an error occurs we can recover the data by
+            // re-executing transactions.
+            let storage = Arc::clone(&self.storage);
+            let ctx1 = ctx.clone();
+            let receipts = execution_result.receipts.clone();
+            let tx_hashes = block.tx_hashes.clone();
+            let block_hash = block_hash.clone();
 
-            stream.push(
-                self.storage
-                    .insert_transactions(ctx.clone(), signed_txs)
-                    .compat(),
-            );
-            stream.push(
-                self.storage
-                    .insert_receipts(ctx.clone(), execution_result.receipts)
-                    .compat(),
-            );
-            stream.push(
-                self.storage
-                    .insert_transaction_positions(ctx.clone(), tx_positions)
-                    .compat(),
-            );
+            rayon::spawn(move || {
+                let tx_positions = build_tx_potsitions(&block_hash, &tx_hashes);
+                if let Err(e) = block_on(storage.insert_receipts(ctx1.clone(), receipts).compat()) {
+                    log::error!("insert_receipts {:?}", e)
+                };
+                if let Err(e) = block_on(
+                    storage
+                        .insert_transaction_positions(ctx1.clone(), tx_positions)
+                        .compat(),
+                ) {
+                    log::error!("insert_transaction_positions {:?}", e)
+                };
+            });
         }
 
-        await!(stream.try_collect())?;
-
-        // flush transaction pool
-        await!(self.tx_pool.flush(ctx.clone(), &block.tx_hashes).compat())?;
+        futs.into_par_iter()
+            .map(block_on)
+            .collect::<Result<Vec<_>, StorageError>>()?;
 
         // update status
         let updated_status = self.update_status(&cloned_header, &block_hash, &proof)?;
@@ -363,7 +379,16 @@ where
             return Err(ConsensusError::Internal("invalid transactions".to_owned()));
         }
 
-        await!(self.insert_block(ctx.clone(), signed_txs, block, proof, None))
+        let execution_context = ExecutionContext {
+            state_root:  status.state_root.clone(),
+            proposer:    block.header.proposer.clone(),
+            height:      block.header.height,
+            quota_limit: block.header.quota_limit,
+            timestamp:   block.header.timestamp,
+        };
+
+        let exec_result = self.exec_block(ctx.clone(), signed_txs, execution_context)?;
+        await!(self.insert_block(ctx.clone(), block, proof, exec_result))
     }
 
     // todo: verify transaction hash and signature
@@ -466,16 +491,16 @@ where
 
 fn build_tx_potsitions(
     block_hash: &Hash,
-    signed_txs: &[SignedTransaction],
+    tx_hashes: &[Hash],
 ) -> HashMap<Hash, TransactionPosition> {
-    let mut positions = HashMap::with_capacity(signed_txs.len());
+    let mut positions = HashMap::with_capacity(tx_hashes.len());
 
-    for (position, tx) in signed_txs.iter().enumerate() {
+    for (position, hash) in tx_hashes.iter().enumerate() {
         let tx_position = TransactionPosition {
             block_hash: block_hash.clone(),
             position:   position as u32,
         };
-        positions.insert(tx.hash.clone(), tx_position);
+        positions.insert(hash.clone(), tx_position);
     }
 
     positions

@@ -23,6 +23,7 @@ futures-preview = { version = "0.3.0-alpha.14", features = [ "compat" ] }
 futures-locks = "0.3"
 futures-timer = "0.1"
 bft-rs = { git = "https://github.com/cryptape/bft-rs.git", features = [ "verify_req" ], branch = "v0.3" }
+rayon = "1.0"
 
 [dev-dependencies]
 hex = "0.3"
