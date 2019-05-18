@@ -52,9 +52,21 @@ where
 
     fn remove(&self, _key: &[u8]) -> Result<(), Self::Error> {
         Ok(())
-        // self.db
-        //     .remove(Context::new(), DataCategory::State, key)
-        //     .wait()
+    }
+
+    fn insert_batch(&self, keys: &[Vec<u8>], values: &[Vec<u8>]) -> Result<(), Self::Error> {
+        self.db
+            .insert_batch(
+                Context::new(),
+                DataCategory::State,
+                keys.to_vec(),
+                values.to_vec(),
+            )
+            .wait()
+    }
+
+    fn remove_batch(&self, _keys: &[Vec<u8>]) -> Result<(), Self::Error> {
+        Ok(())
     }
 }
 
