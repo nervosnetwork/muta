@@ -219,13 +219,14 @@ where
 
     /// A user-defined function for feeding the bft consensus.
     /// The new block provided will feed for bft consensus of giving [`height`]
-    fn get_block(&self, _height: u64) -> Result<Vec<u8>, Self::Error> {
+    fn get_block(&self, _height: u64) -> Result<(Vec<u8>, Vec<u8>), Self::Error> {
         let fut = async move {
-            let ctx = Context::new();
-            let ser_proposal: SerProposal = await!(self.engine.build_proposal(ctx))?.into();
+            let proposal = await!(self.engine.build_proposal(Context::new()))?;
+            let proposal_hash = proposal.hash();
+            let ser_proposal: SerProposal = proposal.into();
 
             let encoded = await!(AsyncCodec::encode(ser_proposal))?;
-            Ok(encoded)
+            Ok((encoded, proposal_hash.as_bytes().to_vec()))
         };
         let mut pool = self.thread_pool.clone();
         pool.run(fut)

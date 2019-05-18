@@ -248,17 +248,18 @@ impl TryInto<core_types::Block> for Block {
 impl From<core_types::Proposal> for Proposal {
     fn from(proposal: core_types::Proposal) -> Self {
         Self {
-            prevhash:    proposal.prevhash.as_bytes().to_vec(),
-            timestamp:   proposal.timestamp,
-            height:      proposal.height,
-            quota_limit: proposal.quota_limit,
-            proposer:    proposal.proposer.as_bytes().to_vec(),
-            tx_hashes:   proposal
+            prevhash:         proposal.prevhash.as_bytes().to_vec(),
+            timestamp:        proposal.timestamp,
+            height:           proposal.height,
+            quota_limit:      proposal.quota_limit,
+            proposer:         proposal.proposer.as_bytes().to_vec(),
+            transaction_root: proposal.transaction_root.as_bytes().to_vec(),
+            tx_hashes:        proposal
                 .tx_hashes
                 .into_iter()
                 .map(|h| h.as_bytes().to_vec())
                 .collect(),
-            proof:       Some(proposal.proof.into()),
+            proof:            Some(proposal.proof.into()),
         }
     }
 }
@@ -280,6 +281,7 @@ impl TryInto<core_types::Proposal> for Proposal {
             height: self.height,
             quota_limit: self.quota_limit,
             proposer: Address::from_bytes(&self.proposer)?,
+            transaction_root: Hash::from_bytes(&self.transaction_root)?,
             tx_hashes,
             proof,
         })

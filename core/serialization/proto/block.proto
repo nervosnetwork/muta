@@ -36,8 +36,9 @@ message Proposal {
   uint64 height = 3;
   uint64 quota_limit = 4;
   bytes proposer = 5;
-  repeated bytes tx_hashes = 6;
-  Proof proof = 7;
+  bytes transaction_root = 6;
+  repeated bytes tx_hashes = 7;
+  Proof proof = 8;
 }
 
 message Proof {

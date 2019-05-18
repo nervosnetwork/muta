@@ -107,6 +107,7 @@ where
             quota_limit: status.quota_limit,
             proposer: status.node_address.clone(),
             proof: status.proof,
+            transaction_root: Merkle::from_hashes(tx_hashes.clone()).get_root_hash(),
             tx_hashes,
         };
         log::info!(target: "engine", "build proposal {:?}", proposal);
@@ -158,6 +159,14 @@ where
         if proposal.prevhash != status.block_hash {
             return Err(ConsensusError::InvalidProposal(
                 "invalid prevhash".to_owned(),
+            ));
+        }
+        // check transaction root
+        if proposal.transaction_root
+            != Merkle::from_hashes(proposal.tx_hashes.clone()).get_root_hash()
+        {
+            return Err(ConsensusError::InvalidProposal(
+                "invalid transaction root".to_owned(),
             ));
         }
         Ok(())
@@ -350,13 +359,14 @@ where
         }
 
         let proposal: SerProposal = Proposal {
-            prevhash:    block.header.prevhash.clone(),
-            timestamp:   block.header.timestamp,
-            height:      block.header.height,
-            quota_limit: block.header.quota_limit,
-            proposer:    block.header.proposer.clone(),
-            tx_hashes:   block.tx_hashes.clone(),
-            proof:       block.header.proof.clone(),
+            prevhash:         block.header.prevhash.clone(),
+            timestamp:        block.header.timestamp,
+            height:           block.header.height,
+            quota_limit:      block.header.quota_limit,
+            proposer:         block.header.proposer.clone(),
+            transaction_root: Merkle::from_hashes(block.tx_hashes.clone()).get_root_hash(),
+            tx_hashes:        block.tx_hashes.clone(),
+            proof:            block.header.proof.clone(),
         }
         .into();
         let proposal_bytes = await!(AsyncCodec::encode(proposal))?;
@@ -512,7 +522,7 @@ fn build_block(proposal: &Proposal, execution_result: &ExecutionResult) -> Block
         timestamp:         proposal.timestamp,
         height:            proposal.height,
         state_root:        execution_result.state_root.clone(),
-        transactions_root: Merkle::from_hashes(proposal.tx_hashes.clone()).get_root_hash(),
+        transactions_root: proposal.transaction_root.clone(),
         receipts_root:     Merkle::from_receipts(&execution_result.receipts).get_root_hash(),
         logs_bloom:        execution_result.all_logs_bloom,
         quota_limit:       proposal.quota_limit,
