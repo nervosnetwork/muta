@@ -687,6 +687,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "common-cita"
+version = "0.1.0"
+dependencies = [
+ "bytes 0.4.12 (registry+https://github.com/rust-lang/crates.io-index)",
+ "core-crypto 0.1.0",
+ "core-serialization 0.1.0",
+ "core-types 0.1.0",
+ "prost 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "prost-build 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "prost-derive 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tiny-keccak 1.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "components-database"
 version = "0.1.0"
 dependencies = [
@@ -723,6 +737,7 @@ dependencies = [
  "actix 0.8.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "actix-web 1.0.0-beta.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "bytes 0.4.12 (registry+https://github.com/rust-lang/crates.io-index)",
+ "common-cita 0.1.0",
  "core-context 0.1.0",
  "core-crypto 0.1.0",
  "core-merkle 0.1.0",
@@ -744,14 +759,10 @@ dependencies = [
  "logger 0.1.0",
  "numext-fixed-hash 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "numext-fixed-uint 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "prost 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "prost-build 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "prost-derive 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rlp 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.89 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.89 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 1.0.39 (registry+https://github.com/rust-lang/crates.io-index)",
- "tiny-keccak 1.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -759,6 +770,7 @@ name = "components-transaction-pool"
 version = "0.1.0"
 dependencies = [
  "chashmap 2.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "common-cita 0.1.0",
  "components-database 0.1.0",
  "core-context 0.1.0",
  "core-crypto 0.1.0",
@@ -802,6 +814,7 @@ name = "core-consensus"
 version = "0.1.0"
 dependencies = [
  "bft-rs 0.2.0-alpha (git+https://github.com/cryptape/bft-rs.git?branch=v0.3)",
+ "common-cita 0.1.0",
  "components-database 0.1.0",
  "components-executor 0.1.0",
  "components-transaction-pool 0.1.0",
@@ -2072,6 +2085,7 @@ name = "muta"
 version = "0.1.0"
 dependencies = [
  "clap 2.32.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "common-cita 0.1.0",
  "components-database 0.1.0",
  "components-executor 0.1.0",
  "components-jsonrpc 0.1.0",

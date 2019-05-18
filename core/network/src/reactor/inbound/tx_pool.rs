@@ -80,10 +80,8 @@ where
         ser_stx: ser::SignedTransaction,
     ) -> Result<(), Error> {
         let stx = TryInto::<SignedTransaction>::try_into(ser_stx).map_err(Error::Serialization)?;
-        let hash = stx.hash;
-        let untx = stx.untx;
 
-        await!(tx_pool.insert(ctx, hash, untx).compat())
+        await!(tx_pool.insert(ctx, stx.untx).compat())
             .map_err(Error::TransactionPool)
             .map(|_| ())
     }

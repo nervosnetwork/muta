@@ -1,7 +1,6 @@
 /// Struct used and only used for CITA jsonrpc.
 /// Note: Most of these codes copies from "https://github.com/cryptape/cita-common"
 use std::collections::HashMap;
-use std::convert::TryInto;
 
 use ethbloom::Bloom;
 use hex;
@@ -12,7 +11,7 @@ use serde::de::{self, DeserializeOwned, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::{self, Value};
 
-use core_serialization::generate_module_for;
+pub use common_cita::{Transaction, UnverifiedTransaction};
 use core_types::{self, Address, Hash};
 
 #[derive(Debug, PartialEq, Clone, Serialize)]
@@ -24,55 +23,6 @@ pub struct TxResponse {
 impl TxResponse {
     pub fn new(hash: Hash, status: String) -> Self {
         TxResponse { hash, status }
-    }
-}
-
-generate_module_for!([blockchain]);
-
-impl TryInto<core_types::Transaction> for Transaction {
-    type Error = core_types::TypesError;
-
-    fn try_into(self) -> Result<core_types::Transaction, Self::Error> {
-        let to = match self.version {
-            1 => {
-                if self.to_v1.is_empty() {
-                    None
-                } else {
-                    Some(Address::from_bytes(&self.to_v1)?)
-                }
-            }
-            _ => {
-                if self.to.is_empty() {
-                    None
-                } else {
-                    Some(Address::from_hex(&self.to)?)
-                }
-            }
-        };
-        let chain_id = match self.version {
-            1 => self.chain_id_v1,
-            _ => self.chain_id.to_be_bytes().to_vec(),
-        };
-        Ok(core_types::Transaction {
-            to,
-            nonce: self.nonce,
-            quota: self.quota,
-            valid_until_block: self.valid_until_block,
-            data: self.data,
-            value: self.value,
-            chain_id,
-        })
-    }
-}
-
-impl TryInto<core_types::UnverifiedTransaction> for UnverifiedTransaction {
-    type Error = core_types::TypesError;
-
-    fn try_into(self) -> Result<core_types::UnverifiedTransaction, Self::Error> {
-        Ok(core_types::UnverifiedTransaction {
-            transaction: self.transaction.unwrap_or_default().try_into()?,
-            signature:   self.signature,
-        })
     }
 }
 

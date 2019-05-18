@@ -14,9 +14,7 @@ use numext_fixed_uint::U256;
 
 use core_context::{Context, ORIGIN};
 use core_merkle::{self, Merkle, ProofNode};
-use core_runtime::{
-    DataCategory, Database, ExecutionContext, Executor, TransactionOrigin, TransactionPool,
-};
+use core_runtime::{ExecutionContext, Executor, TransactionOrigin, TransactionPool};
 use core_serialization::AsyncCodec;
 use core_storage::Storage;
 use core_types::{Address, Block, BloomRef, Hash, Receipt, SignedTransaction};
@@ -149,16 +147,15 @@ impl FilterDatabase {
     }
 }
 
-pub struct AppState<E, T, S, D> {
+pub struct AppState<E, T, S> {
     pub filterdb: Arc<RwLock<FilterDatabase>>,
 
     executor:         Arc<E>,
     transaction_pool: Arc<T>,
     storage:          Arc<S>,
-    db:               Arc<D>,
 }
 
-impl<E, T, S, D> Clone for AppState<E, T, S, D> {
+impl<E, T, S> Clone for AppState<E, T, S> {
     fn clone(&self) -> Self {
         Self {
             filterdb: Arc::<RwLock<FilterDatabase>>::clone(&self.filterdb),
@@ -166,37 +163,33 @@ impl<E, T, S, D> Clone for AppState<E, T, S, D> {
             executor:         Arc::<E>::clone(&self.executor),
             transaction_pool: Arc::<T>::clone(&self.transaction_pool),
             storage:          Arc::<S>::clone(&self.storage),
-            db:               Arc::<D>::clone(&self.db),
         }
     }
 }
 
-impl<E, T, S, D> AppState<E, T, S, D>
+impl<E, T, S> AppState<E, T, S>
 where
     E: Executor,
     T: TransactionPool,
     S: Storage,
-    D: Database,
 {
-    pub fn new(executor: Arc<E>, transaction_pool: Arc<T>, storage: Arc<S>, db: Arc<D>) -> Self {
+    pub fn new(executor: Arc<E>, transaction_pool: Arc<T>, storage: Arc<S>) -> Self {
         Self {
             filterdb: Arc::new(RwLock::new(FilterDatabase::default())),
 
             executor,
             transaction_pool,
             storage,
-            db,
         }
     }
 }
 
 /// Help functions for rpc APIs.
-impl<E, T, S, D> AppState<E, T, S, D>
+impl<E, T, S> AppState<E, T, S>
 where
     E: Executor,
     T: TransactionPool,
     S: Storage,
-    D: Database,
 {
     pub async fn get_block(&self, number: String) -> RpcResult<Block> {
         let h = await!(self.get_height(number))?;
@@ -268,9 +261,11 @@ where
             .compat())?;
         let mut txs = vec![];
         for tx in raw_txs {
+            let cita_untx: cita::UnverifiedTransaction = From::from(tx.untx.clone());
+            let content = await!(AsyncCodec::encode(cita_untx))?;
             txs.push(cita::BlockTransaction::Full(cita::FullTransaction {
                 hash:    tx.hash.clone(),
-                content: cita::Data::new(await!(self.get_rawtx(tx.hash))?),
+                content: cita::Data::new(content),
                 from:    tx.sender,
             }));
         }
@@ -334,9 +329,11 @@ where
         &self,
         raw_tx: SignedTransaction,
     ) -> RpcResult<cita::RpcTransaction> {
+        let cita_untx: cita::UnverifiedTransaction = From::from(raw_tx.untx.clone());
+        let content = await!(AsyncCodec::encode(cita_untx))?;
         let mut tx = cita::RpcTransaction {
             hash:         raw_tx.hash.clone(),
-            content:      cita::Data::new(await!(self.get_rawtx(raw_tx.hash.clone()))?),
+            content:      cita::Data::new(content),
             from:         raw_tx.sender.clone(),
             block_number: Uint::from(0),
             block_hash:   Hash::from_bytes(&[0x00u8; 32]).unwrap(),
@@ -352,12 +349,11 @@ where
 
 /// Async rpc APIs.
 /// See ./server.rs::rpc_select to learn about meanings of these APIs.
-impl<E, T, S, D> AppState<E, T, S, D>
+impl<E, T, S> AppState<E, T, S>
 where
     E: Executor,
     T: TransactionPool,
     S: Storage,
-    D: Database,
 {
     pub async fn block_number(&self) -> RpcResult<u64> {
         let b = await!(self.storage.get_latest_block(Context::new()).compat())?;
@@ -425,9 +421,9 @@ where
         Ok(r)
     }
 
-    pub async fn get_block_header(&self, number: String) -> RpcResult<Vec<u8>> {
+    pub async fn get_block_header(&self, number: String) -> RpcResult<cita::Data> {
         let b = await!(self.get_block(number))?;
-        Ok(rlp::encode(&b.header))
+        Ok(cita::Data::new(rlp::encode(&b.header)))
     }
 
     pub async fn get_code(&self, address: Address, number: String) -> RpcResult<cita::Data> {
@@ -568,12 +564,12 @@ where
         addr: Address,
         key: H256,
         number: String,
-    ) -> RpcResult<Vec<u8>> {
+    ) -> RpcResult<cita::Data> {
         let b = await!(self.get_block(number))?;
         let r = self
             .executor
             .get_value(Context::new(), &b.header.state_root, &addr, &key)?;
-        Ok(r.as_bytes().to_vec())
+        Ok(cita::Data::new(r.as_bytes().to_vec()))
     }
 
     pub async fn get_transaction(&self, hash: Hash) -> RpcResult<cita::RpcTransaction> {
@@ -687,23 +683,11 @@ where
         if ser_untx.transaction.is_none() {
             return Err(RpcError::Str("Transaction not found!".into()));
         };
-        let ser_raw_tx = await!(AsyncCodec::encode(ser_untx.clone().transaction.unwrap()))?;
-        let message = Hash::from_fixed_bytes(tiny_keccak::keccak256(&ser_raw_tx));
-
-        // Store the raw content because it's required in RPC API
-        //   - getBlockByNumber
-        //   - getBlockByHeight
-        //   - getTransaction
-        await!(self.insert_rawtx(message.clone(), signed_data))?;
-
         let untx: core_types::transaction::UnverifiedTransaction = ser_untx.try_into()?;
         let origin_ctx =
             Context::new().with_value::<TransactionOrigin>(ORIGIN, TransactionOrigin::Jsonrpc);
         log::debug!("Accept {:?}", untx);
-        let r = await!(self
-            .transaction_pool
-            .insert(origin_ctx, message, untx)
-            .compat());
+        let r = await!(self.transaction_pool.insert(origin_ctx, untx).compat());
         let r = match r {
             Ok(ok) => ok,
             Err(e) => {
@@ -716,12 +700,11 @@ where
 }
 
 /// A set of functions for FilterDataBase.
-impl<E, T, S, D> AppState<E, T, S, D>
+impl<E, T, S> AppState<E, T, S>
 where
     E: Executor,
     T: TransactionPool,
     S: Storage,
-    D: Database,
 {
     /// Pass a block into FilterDatabase.
     pub async fn recv_block(&mut self, block: Block) -> RpcResult<()> {
@@ -810,37 +793,6 @@ where
         }
 
         Ok(())
-    }
-}
-
-/// Database functions
-impl<E, T, S, D> AppState<E, T, S, D>
-where
-    E: Executor,
-    T: TransactionPool,
-    S: Storage,
-    D: Database,
-{
-    async fn insert_rawtx(&self, hash: Hash, data: Vec<u8>) -> RpcResult<()> {
-        await!(self
-            .db
-            .insert(
-                Context::new(),
-                DataCategory::Transaction,
-                hash.as_bytes().to_vec(),
-                data
-            )
-            .compat())?;
-        Ok(())
-    }
-
-    async fn get_rawtx(&self, hash: Hash) -> RpcResult<Vec<u8>> {
-        let fut = self
-            .db
-            .get(Context::new(), DataCategory::Transaction, hash.as_bytes())
-            .compat();
-        let r = await!(fut)?.unwrap_or_default();
-        Ok(r)
     }
 }
 

@@ -47,14 +47,14 @@ impl Address {
         hex::encode(self.0.as_bytes())
     }
 
-    /// Mixed-case checksum address encoding.
+    /// Mixed-case checksum address encoding. Note: without 0x prefix!
     /// See: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-55.md
     pub fn as_checksum_hex(&self) -> String {
         let address = self.as_hex();
         let address_char_vec: Vec<char> = address.chars().collect();
         let hash = Hash::digest(address.as_bytes()).as_hex();
         let hash_char_vec: Vec<char> = hash.chars().collect();
-        let mut ret = String::from("0x");
+        let mut ret = String::new();
 
         for i in 0..40 {
             let c = hash_char_vec[i];
@@ -199,42 +199,42 @@ mod tests {
     fn test_checksum_encoding() {
         // From: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-55.md#implementation
         let raw = Address::from_hex("0xfb6916095ca1df60bb79ce92ce3ea74c37c5d359").unwrap();
-        let ret = "0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359";
+        let ret = "fB6916095ca1df60bB79Ce92cE3Ea74c37c5d359";
         assert_eq!(raw.as_checksum_hex(), ret);
 
         // From: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-55.md#test-cases
         for (raw, ret) in &[
             (
                 "0x52908400098527886E0F7030069857D2E4169EE7",
-                "0x52908400098527886E0F7030069857D2E4169EE7",
+                "52908400098527886E0F7030069857D2E4169EE7",
             ),
             (
                 "0x8617E340B3D01FA5F11F306F4090FD50E238070D",
-                "0x8617E340B3D01FA5F11F306F4090FD50E238070D",
+                "8617E340B3D01FA5F11F306F4090FD50E238070D",
             ),
             (
                 "0xde709f2102306220921060314715629080e2fb77",
-                "0xde709f2102306220921060314715629080e2fb77",
+                "de709f2102306220921060314715629080e2fb77",
             ),
             (
                 "0x27b1fdb04752bbc536007a920d24acb045561c26",
-                "0x27b1fdb04752bbc536007a920d24acb045561c26",
+                "27b1fdb04752bbc536007a920d24acb045561c26",
             ),
             (
                 "0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed",
-                "0x5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed",
+                "5aAeb6053F3E94C9b9A09f33669435E7Ef1BeAed",
             ),
             (
                 "0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359",
-                "0xfB6916095ca1df60bB79Ce92cE3Ea74c37c5d359",
+                "fB6916095ca1df60bB79Ce92cE3Ea74c37c5d359",
             ),
             (
                 "0xdbF03B407c01E7cD3CBea99509d93f8DDDC8C6FB",
-                "0xdbF03B407c01E7cD3CBea99509d93f8DDDC8C6FB",
+                "dbF03B407c01E7cD3CBea99509d93f8DDDC8C6FB",
             ),
             (
                 "0xD1220A0cf47c7B9Be7A2E6BA89F429762e7b9aDb",
-                "0xD1220A0cf47c7B9Be7A2E6BA89F429762e7b9aDb",
+                "D1220A0cf47c7B9Be7A2E6BA89F429762e7b9aDb",
             ),
         ] {
             let raw = Address::from_hex(raw).unwrap();

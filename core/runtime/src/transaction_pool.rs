@@ -23,7 +23,6 @@ pub trait TransactionPool: Sync + Send {
     fn insert(
         &self,
         ctx: Context,
-        hash: Hash,
         untx: UnverifiedTransaction,
     ) -> FutRuntimeResult<SignedTransaction, TransactionPoolError>;
 
@@ -75,6 +74,7 @@ pub enum TransactionPoolError {
     InvalidUntilBlock,
     QuotaNotEnough,
     NotExpected,
+    TransactionNotFound,
     Internal(String),
 }
 
@@ -88,6 +88,7 @@ impl fmt::Display for TransactionPoolError {
             TransactionPoolError::InvalidUntilBlock => "invalid until block".to_owned(),
             TransactionPoolError::QuotaNotEnough => "quota not enouth".to_owned(),
             TransactionPoolError::NotExpected => "not the expected transaction".to_owned(),
+            TransactionPoolError::TransactionNotFound => "transaction filed is empty".to_owned(),
             TransactionPoolError::Internal(ref err) => format!("internel error {:?}", err),
         };
         write!(f, "{}", printable)

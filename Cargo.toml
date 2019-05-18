@@ -7,6 +7,7 @@ edition = "2018"
 [dependencies]
 config-parser = { path = "common/config-parser" }
 logger = { path = "common/logger" }
+common-cita = { path = "common/cita" }
 
 # components-cita-jsonrpc = { path = "components/cita-jsonrpc" }
 components-jsonrpc = { path = "components/jsonrpc" }
@@ -36,6 +37,7 @@ futures-preview = { version = "=0.3.0-alpha.14", features = [ "compat" ] }
 
 [workspace]
 members = [
+  "common/cita",
   "common/config-parser",
   "common/logger",
 

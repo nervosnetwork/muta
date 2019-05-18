@@ -1,0 +1,18 @@
+[package]
+name = "common-cita"
+version = "0.1.0"
+authors = ["Cryptape Technologies <contact@cryptape.com>"]
+edition = "2018"
+
+[dependencies]
+bytes = "0.4"
+prost = "0.5"
+prost-derive = "0.5"
+tiny-keccak = "1.4"
+
+core-crypto = { path = "../../core/crypto" }
+core-types = { path = "../../core/types" }
+core-serialization = { path = "../../core/serialization" }
+
+[build-dependencies]
+prost-build = "0.5"

@@ -7,7 +7,7 @@ use serde_json;
 use serde_json::Value;
 
 use core_pubsub::channel::pubsub::Receiver;
-use core_runtime::{Database, Executor, TransactionPool};
+use core_runtime::{Executor, TransactionPool};
 use core_storage::{Storage, StorageError};
 use core_types::{Address, Block, Hash};
 
@@ -19,16 +19,15 @@ use crate::filter::Filter;
 use crate::state::AppState;
 use crate::util::clean_0x;
 
-fn rpc_handle<E: 'static, T: 'static, S: 'static, D: 'static>(
+fn rpc_handle<E: 'static, T: 'static, S: 'static>(
     reqjson: web::Json<convention::Call>,
-    app_state: web::Data<AppState<E, T, S, D>>,
+    app_state: web::Data<AppState<E, T, S>>,
     _req: HttpRequest,
 ) -> Box<OldFuture<Item = HttpResponse, Error = actix_web::Error>>
 where
     E: Executor,
     T: TransactionPool,
     S: Storage,
-    D: Database,
 {
     match reqjson.into_inner() {
         convention::Call::Single(req) => {
@@ -53,15 +52,14 @@ where
     }
 }
 
-async fn handle_one_request<E: 'static, T: 'static, S: 'static, D: 'static>(
+async fn handle_one_request<E: 'static, T: 'static, S: 'static>(
     req: convention::Request,
-    app_state: web::Data<AppState<E, T, S, D>>,
+    app_state: web::Data<AppState<E, T, S>>,
 ) -> convention::Response
 where
     E: Executor,
     T: TransactionPool,
     S: Storage,
-    D: Database,
 {
     let mut result = convention::Response::default();
     result.id = req.id.clone();
@@ -100,8 +98,8 @@ fn get_string(
 }
 
 #[allow(clippy::cognitive_complexity)]
-fn rpc_select<E: 'static, T: 'static, S: 'static, D: 'static>(
-    app_state: AppState<E, T, S, D>,
+fn rpc_select<E: 'static, T: 'static, S: 'static>(
+    app_state: AppState<E, T, S>,
     method: String,
     params: Option<Vec<Value>>,
 ) -> Box<OldFuture<Item = Value, Error = convention::ErrorData>>
@@ -109,7 +107,6 @@ where
     E: Executor,
     T: TransactionPool,
     S: Storage,
-    D: Database,
 {
     let fut = async move {
         let params = params.unwrap_or_default();
@@ -326,16 +323,15 @@ where
 }
 
 /// Listen and server on address:port which definds on config
-pub fn listen<E: 'static, T: 'static, S: 'static, D: 'static>(
+pub fn listen<E: 'static, T: 'static, S: 'static>(
     config: Config,
-    app_state: AppState<E, T, S, D>,
+    app_state: AppState<E, T, S>,
     mut sub_block: Receiver<Block>,
 ) -> std::io::Result<()>
 where
     E: Executor,
     T: TransactionPool,
     S: Storage,
-    D: Database,
 {
     let mut app_state_clone = app_state.clone();
     let fut = async move {
@@ -363,7 +359,7 @@ where
                 .data(web::JsonConfig::default().limit(c_payload_size)) // <- limit size of the payload
                 .route(
                     web::post()
-                        .to_async(rpc_handle::<E, T, S, D>),
+                        .to_async(rpc_handle::<E, T, S>),
                 ),
             )
     })

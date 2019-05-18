@@ -356,7 +356,9 @@ where
         }
 
         // verify transaction
-        let valid = Self::verify_sync_transactions(&block, &signed_txs).unwrap_or(false);
+        let valid = self
+            .verify_sync_transactions(&block, &signed_txs)
+            .unwrap_or(false);
         if !valid {
             return Err(ConsensusError::Internal("invalid transactions".to_owned()));
         }
@@ -366,6 +368,7 @@ where
 
     // todo: verify transaction hash and signature
     fn verify_sync_transactions(
+        &self,
         block: &Block,
         signed_tx: &[SignedTransaction],
     ) -> ConsensusResult<bool> {
@@ -374,7 +377,21 @@ where
                 .iter()
                 .map(|tx| tx.hash.clone())
                 .collect::<Vec<_>>();
-        Ok(tx_hashes_match)
+        if !tx_hashes_match {
+            return Ok(false);
+        }
+        for signed_tx_entry in signed_tx {
+            let cita_untx: common_cita::UnverifiedTransaction = signed_tx_entry.clone().untx.into();
+            if let Some(data) = cita_untx.clone().transaction {
+                if data.hash() != signed_tx_entry.hash {
+                    return Ok(false);
+                }
+            }
+            if cita_untx.verify(Arc::<C>::clone(&self.crypto)).is_err() {
+                return Ok(false);
+            }
+        }
+        Ok(true)
     }
 
     fn verify_proof(&self, proof: &Proof) -> bool {

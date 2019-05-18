@@ -12,7 +12,7 @@ use futures03::{
 };
 
 use core_context::{Context, ORIGIN};
-use core_crypto::{Crypto, CryptoTransform};
+use core_crypto::Crypto;
 use core_runtime::{FutRuntimeResult, TransactionOrigin, TransactionPool, TransactionPoolError};
 use core_storage::{Storage, StorageError};
 use core_types::{Hash, SignedTransaction, Transaction, UnverifiedTransaction};
@@ -83,7 +83,6 @@ where
     fn insert(
         &self,
         ctx: Context,
-        tx_hash: Hash,
         untx: UnverifiedTransaction,
     ) -> FutRuntimeResult<SignedTransaction, TransactionPoolError> {
         let storage = Arc::clone(&self.storage);
@@ -102,20 +101,20 @@ where
                 Err(TransactionPoolError::ReachLimit)?
             }
 
+            let cita_untx: common_cita::UnverifiedTransaction = untx.clone().into();
+            let tx_hash = cita_untx
+                .clone()
+                .transaction
+                .ok_or_else(|| TransactionPoolError::TransactionNotFound)?
+                .hash();
+
             // 2. check dup
             if tx_cache.contains_key(&tx_hash) {
                 Err(TransactionPoolError::Dup)?
             }
 
-            // 3. verify signature
-            let signature =
-                C::Signature::from_bytes(&untx.signature).map_err(TransactionPoolError::Crypto)?;
-
             // recover sender
-            let pubkey = crypto
-                .verify_with_signature(&tx_hash, &signature)
-                .map_err(TransactionPoolError::Crypto)?;
-
+            let pubkey = cita_untx.verify(Arc::<C>::clone(&crypto))?;
             let sender = crypto.pubkey_to_address(&pubkey);
 
             // 4. check if the transaction is in histories block.
@@ -327,6 +326,9 @@ mod tests {
 
     use futures::future::{ok, Future};
 
+    use common_cita::{
+        Transaction as CitaTransaction, UnverifiedTransaction as CitaUnverifiedTransaction,
+    };
     use components_database::memory::MemoryDB;
     use core_context::{Context, ORIGIN};
     use core_crypto::{secp256k1::Secp256k1, Crypto, CryptoTransform};
@@ -382,17 +384,18 @@ mod tests {
 
         // test normal
         let untx = mock_transaction(100, height + until_block_limit, "test_normal".to_owned());
-        let tx_hash = untx.transaction.hash();
-        let signed_tx = tx_pool
-            .insert(ctx.clone(), tx_hash.clone(), untx)
-            .wait()
-            .unwrap();
-        assert_eq!(signed_tx.hash, tx_hash);
+        let signed_tx = tx_pool.insert(ctx.clone(), untx.clone()).wait().unwrap();
+        assert_eq!(
+            signed_tx.hash,
+            Into::<CitaUnverifiedTransaction>::into(untx)
+                .transaction
+                .unwrap()
+                .hash()
+        );
 
         // test lt valid_until_block
         let untx = mock_transaction(100, height, "test_lt_quota_limit".to_owned());
-        let tx_hash = untx.transaction.hash();
-        let result = tx_pool.insert(ctx.clone(), tx_hash, untx).wait();
+        let result = tx_pool.insert(ctx.clone(), untx).wait();
         assert_eq!(result, Err(TransactionPoolError::InvalidUntilBlock));
 
         // test gt valid_until_block
@@ -401,8 +404,7 @@ mod tests {
             height + until_block_limit * 2,
             "test_gt_valid_until_block".to_owned(),
         );
-        let tx_hash = untx.transaction.hash();
-        let result = tx_pool.insert(ctx.clone(), tx_hash, untx).wait();
+        let result = tx_pool.insert(ctx.clone(), untx).wait();
         assert_eq!(result, Err(TransactionPoolError::InvalidUntilBlock));
 
         // test gt quota limit
@@ -411,17 +413,14 @@ mod tests {
             height + until_block_limit,
             "test_gt_quota_limit".to_owned(),
         );
-        let tx_hash = untx.transaction.hash();
-        let result = tx_pool.insert(ctx.clone(), tx_hash, untx).wait();
+        let result = tx_pool.insert(ctx.clone(), untx).wait();
         assert_eq!(result, Err(TransactionPoolError::QuotaNotEnough));
 
         // test cache dup
         let untx = mock_transaction(100, height + until_block_limit, "test_dup".to_owned());
         let untx2 = untx.clone();
-        let tx_hash = untx.transaction.hash();
-        let tx_hash2 = untx2.transaction.hash();
-        tx_pool.insert(ctx.clone(), tx_hash, untx).wait().unwrap();
-        let result = tx_pool.insert(ctx.clone(), tx_hash2, untx2).wait();
+        tx_pool.insert(ctx.clone(), untx).wait().unwrap();
+        let result = tx_pool.insert(ctx.clone(), untx2).wait();
         assert_eq!(result, Err(TransactionPoolError::Dup));
     }
 
@@ -446,12 +445,8 @@ mod tests {
 
         // test normal
         let untx = mock_transaction(100, height + until_block_limit, "test_normal".to_owned());
-        let tx_hash = untx.transaction.hash();
         let origin_ctx = ctx.with_value::<TransactionOrigin>(ORIGIN, TransactionOrigin::Jsonrpc);
-        tx_pool
-            .insert(origin_ctx, tx_hash.clone(), untx)
-            .wait()
-            .unwrap();
+        tx_pool.insert(origin_ctx, untx).wait().unwrap();
     }
 
     #[test]
@@ -489,8 +484,7 @@ mod tests {
             height,
         );
 
-        let tx_hash = signed_tx.untx.transaction.hash();
-        let result = tx_pool.insert(ctx.clone(), tx_hash, signed_tx.untx).wait();
+        let result = tx_pool.insert(ctx.clone(), signed_tx.untx).wait();
         assert_eq!(result, Err(TransactionPoolError::Dup));
     }
 
@@ -512,16 +506,17 @@ mod tests {
         );
 
         let untx = mock_transaction(100, height + until_block_limit, "test1".to_owned());
-        let tx_hash = untx.transaction.hash();
-        let signed_tx = tx_pool
-            .insert(ctx.clone(), tx_hash.clone(), untx)
-            .wait()
-            .unwrap();
-        assert_eq!(signed_tx.hash, tx_hash);
+        let signed_tx = tx_pool.insert(ctx.clone(), untx.clone()).wait().unwrap();
+        assert_eq!(
+            signed_tx.hash,
+            Into::<CitaUnverifiedTransaction>::into(untx)
+                .transaction
+                .unwrap()
+                .hash()
+        );
 
         let untx = mock_transaction(100, height + until_block_limit, "test2".to_owned());
-        let tx_hash = untx.transaction.hash();
-        let result = tx_pool.insert(ctx.clone(), tx_hash, untx).wait();
+        let result = tx_pool.insert(ctx.clone(), untx).wait();
         assert_eq!(result, Err(TransactionPoolError::ReachLimit));
     }
 
@@ -545,9 +540,12 @@ mod tests {
         let mut tx_hashes = vec![];
         for i in 0..10 {
             let untx = mock_transaction(100, height + until_block_limit, format!("test{}", i));
-            let tx_hash = untx.transaction.hash();
+            let tx_hash = Into::<CitaUnverifiedTransaction>::into(untx.clone())
+                .transaction
+                .unwrap()
+                .hash();
             tx_hashes.push(tx_hash.clone());
-            tx_pool.insert(ctx.clone(), tx_hash, untx).wait().unwrap();
+            tx_pool.insert(ctx.clone(), untx.clone()).wait().unwrap();
         }
 
         let pachage_tx_hashes = tx_pool
@@ -645,9 +643,12 @@ mod tests {
         let mut tx_hashes = vec![];
         for i in 0..10 {
             let untx = mock_transaction(100, height + until_block_limit, format!("test{}", i));
-            let tx_hash = untx.transaction.hash();
+            let tx_hash = Into::<CitaUnverifiedTransaction>::into(untx.clone())
+                .transaction
+                .unwrap()
+                .hash();
             tx_hashes.push(tx_hash.clone());
-            tx_pool.insert(ctx.clone(), tx_hash, untx).wait().unwrap();
+            tx_pool.insert(ctx.clone(), untx).wait().unwrap();
         }
 
         let pachage_tx_hashes = tx_pool
@@ -678,14 +679,16 @@ mod tests {
         let mut tx_hashes = vec![];
         for i in 1..=5 {
             let untx = mock_transaction(100, height + until_block_limit, format!("test{}", i));
-            let hash = untx.transaction.hash();
-
+            let tx_hash = Into::<CitaUnverifiedTransaction>::into(untx.clone())
+                .transaction
+                .unwrap()
+                .hash();
+            tx_hashes.push(tx_hash.clone());
             untxs.push(untx);
-            tx_hashes.push(hash);
         }
 
         tx_pool
-            .insert(ctx.clone(), tx_hashes[0].clone(), untxs[0].clone())
+            .insert(ctx.clone(), untxs[0].clone())
             .wait()
             .unwrap();
         assert_eq!(tx_pool.tx_cache.len(), 1);
@@ -724,10 +727,14 @@ mod tests {
         let mut tx_hashes = vec![];
         for i in 1..=5 {
             let untx = mock_transaction(100, height + until_block_limit, format!("test{}", i));
-            let hash = untx.transaction.hash();
 
-            tx_hashes.push(hash.clone());
-            tx_pool.insert(ctx.clone(), hash, untx).wait().unwrap();
+            tx_hashes.push(
+                Into::<CitaUnverifiedTransaction>::into(untx.clone())
+                    .transaction
+                    .unwrap()
+                    .hash(),
+            );
+            tx_pool.insert(ctx.clone(), untx).wait().unwrap();
         }
         assert_eq!(tx_pool.tx_cache.len(), 5);
 
@@ -793,9 +800,8 @@ mod tests {
         tx.valid_until_block = valid_until_block;
         tx.data = vec![];
         tx.value = vec![];
-        tx.chain_id = vec![];
-        let tx_hash = tx.hash();
-
+        tx.chain_id = vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
+        let tx_hash = Into::<CitaTransaction>::into(tx.clone()).hash();
         let signature = secp.sign(&tx_hash, &privkey).unwrap();
         UnverifiedTransaction {
             transaction: tx,
@@ -824,8 +830,8 @@ mod tests {
         tx.valid_until_block = valid_until_block;
         tx.data = vec![];
         tx.value = vec![];
-        tx.chain_id = vec![];
-        let tx_hash = tx.hash();
+        tx.chain_id = vec![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
+        let tx_hash = Into::<CitaTransaction>::into(tx.clone()).hash();
 
         let signature = secp.sign(&tx_hash, &privkey).unwrap();
         let untx = UnverifiedTransaction {
@@ -835,7 +841,7 @@ mod tests {
 
         SignedTransaction {
             untx:   untx.clone(),
-            hash:   untx.transaction.hash(),
+            hash:   tx_hash,
             sender: secp.pubkey_to_address(&pubkey),
         }
     }

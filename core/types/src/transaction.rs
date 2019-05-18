@@ -28,15 +28,6 @@ impl Encodable for Transaction {
     }
 }
 
-impl Transaction {
-    /// Calculate the block hash. To maintain consistency we use RLP
-    /// serialization.
-    pub fn hash(&self) -> Hash {
-        let rlp_data = rlp::encode(self);
-        Hash::digest(&rlp_data)
-    }
-}
-
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct UnverifiedTransaction {
     pub transaction: Transaction,

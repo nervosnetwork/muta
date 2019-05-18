@@ -154,7 +154,7 @@ def test_get_storage_at():
     ss.deploy()
     ss.set(42)
     v = client.get_storage_at(ss.address, '0x0000000000000000000000000000000000000000000000000000000000000000')
-    assert v[-1] == 42
+    assert v == '0x000000000000000000000000000000000000000000000000000000000000002a'
 
 
 def test_get_transaction_count():

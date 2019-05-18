@@ -5,6 +5,7 @@ authors = ["Cryptape Technologies <contact@cryptape.com>"]
 edition = "2018"
 
 [dependencies]
+common-cita = { path = "../../common/cita" }
 core-types = { path = "../../core/types" }
 core-crypto = { path = "../../core/crypto" }
 core-runtime = { path = "../../core/runtime" }

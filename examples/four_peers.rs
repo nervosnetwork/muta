@@ -28,6 +28,10 @@ use core_runtime::{FutRuntimeResult, TransactionPool};
 use core_storage::{BlockStorage, Storage};
 use core_types::{Address, Block, Hash, SignedTransaction, Transaction, UnverifiedTransaction};
 
+use common_cita::{
+    Transaction as CitaTransaction, UnverifiedTransaction as CitaUnverifiedTransaction,
+};
+
 #[derive(Debug, Clone)]
 struct Config {
     // network
@@ -66,7 +70,10 @@ fn main() {
         config.height + config.until_block_limit,
         "test_test".to_owned(),
     );
-    let tx_hash = untx.transaction.hash();
+    let tx_hash = Into::<CitaUnverifiedTransaction>::into(untx.clone())
+        .transaction
+        .unwrap()
+        .hash();
 
     // peer1
     let (peer1_tx_pool, _peer1_network) = start_peer(&config, false);
@@ -80,10 +87,7 @@ fn main() {
     let (peer2_tx_pool, _peer2_network) = start_peer(&peer2_config, false);
 
     // test broadcast txs from peer1 to peer2
-    peer1_tx_pool
-        .insert(ctx.clone(), tx_hash.clone(), untx)
-        .wait()
-        .unwrap();
+    peer1_tx_pool.insert(ctx.clone(), untx).wait().unwrap();
 
     std::thread::sleep(std::time::Duration::from_secs(3));
 
@@ -103,12 +107,12 @@ fn main() {
         config.height + config.until_block_limit,
         "test_ensure".to_owned(),
     );
-    let tx_hash = untx.transaction.hash();
+    let tx_hash = Into::<CitaUnverifiedTransaction>::into(untx.clone())
+        .transaction
+        .unwrap()
+        .hash();
 
-    peer2_tx_pool
-        .insert(ctx.clone(), tx_hash.clone(), untx)
-        .wait()
-        .unwrap();
+    peer2_tx_pool.insert(ctx.clone(), untx).wait().unwrap();
 
     // here we assume both peers' session id is 1, since we only have 2 peers
     let peer1_ctx = ctx.with_value::<usize>(P2P_SESSION_ID, 1);
@@ -235,7 +239,7 @@ fn mock_transaction(quota: u64, valid_until_block: u64, nonce: String) -> Unveri
     tx.data = vec![];
     tx.value = vec![];
     tx.chain_id = vec![];
-    let tx_hash = tx.hash();
+    let tx_hash = Into::<CitaTransaction>::into(tx.clone()).hash();
 
     let signature = secp.sign(&tx_hash, &privkey).unwrap();
     UnverifiedTransaction {
