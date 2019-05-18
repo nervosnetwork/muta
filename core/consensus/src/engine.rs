@@ -299,12 +299,13 @@ where
             // re-executing transactions.
             let storage = Arc::clone(&self.storage);
             let ctx1 = ctx.clone();
-            let receipts = execution_result.receipts.clone();
+            let receipts = execution_result.receipts;
             let tx_hashes = block.tx_hashes.clone();
             let block_hash = block_hash.clone();
 
             rayon::spawn(move || {
                 let tx_positions = build_tx_potsitions(&block_hash, &tx_hashes);
+
                 if let Err(e) = block_on(storage.insert_receipts(ctx1.clone(), receipts).compat()) {
                     log::error!("insert_receipts {:?}", e)
                 };
