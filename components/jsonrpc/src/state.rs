@@ -13,6 +13,7 @@ use numext_fixed_hash::{H160, H256};
 use numext_fixed_uint::U256;
 
 use core_context::{Context, ORIGIN};
+use core_crypto::{Crypto, CryptoTransform};
 use core_merkle::{self, Merkle, ProofNode};
 use core_runtime::{ExecutionContext, Executor, TransactionOrigin, TransactionPool};
 use core_serialization::AsyncCodec;
@@ -147,15 +148,16 @@ impl FilterDatabase {
     }
 }
 
-pub struct AppState<E, T, S> {
+pub struct AppState<E, T, S, C> {
     pub filterdb: Arc<RwLock<FilterDatabase>>,
 
     executor:         Arc<E>,
     transaction_pool: Arc<T>,
     storage:          Arc<S>,
+    crypto:           Arc<C>,
 }
 
-impl<E, T, S> Clone for AppState<E, T, S> {
+impl<E, T, S, C> Clone for AppState<E, T, S, C> {
     fn clone(&self) -> Self {
         Self {
             filterdb: Arc::<RwLock<FilterDatabase>>::clone(&self.filterdb),
@@ -163,33 +165,41 @@ impl<E, T, S> Clone for AppState<E, T, S> {
             executor:         Arc::<E>::clone(&self.executor),
             transaction_pool: Arc::<T>::clone(&self.transaction_pool),
             storage:          Arc::<S>::clone(&self.storage),
+            crypto:           Arc::<C>::clone(&self.crypto),
         }
     }
 }
 
-impl<E, T, S> AppState<E, T, S>
+impl<E, T, S, C> AppState<E, T, S, C>
 where
     E: Executor,
     T: TransactionPool,
     S: Storage,
 {
-    pub fn new(executor: Arc<E>, transaction_pool: Arc<T>, storage: Arc<S>) -> Self {
+    pub fn new(
+        executor: Arc<E>,
+        transaction_pool: Arc<T>,
+        storage: Arc<S>,
+        crypto: Arc<C>,
+    ) -> Self {
         Self {
             filterdb: Arc::new(RwLock::new(FilterDatabase::default())),
 
             executor,
             transaction_pool,
             storage,
+            crypto,
         }
     }
 }
 
 /// Help functions for rpc APIs.
-impl<E, T, S> AppState<E, T, S>
+impl<E, T, S, C> AppState<E, T, S, C>
 where
     E: Executor,
     T: TransactionPool,
     S: Storage,
+    C: Crypto,
 {
     pub async fn get_block(&self, number: String) -> RpcResult<Block> {
         let h = await!(self.get_height(number))?;
@@ -349,11 +359,12 @@ where
 
 /// Async rpc APIs.
 /// See ./server.rs::rpc_select to learn about meanings of these APIs.
-impl<E, T, S> AppState<E, T, S>
+impl<E, T, S, C> AppState<E, T, S, C>
 where
     E: Executor,
     T: TransactionPool,
     S: Storage,
+    C: Crypto,
 {
     pub async fn block_number(&self) -> RpcResult<u64> {
         let b = await!(self.storage.get_latest_block(Context::new()).compat())?;
@@ -697,14 +708,36 @@ where
         };
         Ok(cita::TxResponse::new(r.hash, String::from("OK")))
     }
+
+    pub async fn send_unsafe_transaction(
+        &self,
+        tx_data: Vec<u8>,
+        privkey: Vec<u8>,
+    ) -> RpcResult<cita::TxResponse> {
+        let ser_tx = await!(AsyncCodec::decode::<cita::Transaction>(tx_data,))?;
+        let message = ser_tx.hash();
+
+        let private_key = C::PrivateKey::from_bytes(&privkey).unwrap();
+        let signature = self.crypto.sign(&message, &private_key).unwrap();
+        let untx = cita::UnverifiedTransaction {
+            transaction: Some(ser_tx),
+            signature:   signature.as_bytes().to_vec(),
+            crypto:      0,
+        };
+
+        let ser_raw_tx = await!(AsyncCodec::encode(untx))?;
+        let r = await!(self.send_raw_transaction(ser_raw_tx))?;
+        Ok(r)
+    }
 }
 
 /// A set of functions for FilterDataBase.
-impl<E, T, S> AppState<E, T, S>
+impl<E, T, S, C> AppState<E, T, S, C>
 where
     E: Executor,
     T: TransactionPool,
     S: Storage,
+    C: Crypto,
 {
     /// Pass a block into FilterDatabase.
     pub async fn recv_block(&mut self, block: Block) -> RpcResult<()> {

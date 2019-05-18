@@ -162,6 +162,7 @@ fn start(cfg: &Config) {
         Arc::clone(&executor),
         Arc::clone(&tx_pool),
         Arc::clone(&storage),
+        Arc::clone(&secp),
     );
 
     // new consensus
