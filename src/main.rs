@@ -4,12 +4,10 @@ use std::cmp;
 use std::error::Error;
 use std::fs::File;
 use std::path::Path;
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use futures01::future::Future as Future01;
 use futures01::sync::mpsc::channel;
-use serde_derive::Deserialize;
 
 use components_database::rocks::RocksDB;
 use components_executor::evm::{EVMBlockDataProvider, EVMExecutor};
@@ -29,52 +27,8 @@ use core_storage::{BlockStorage, Storage};
 use core_types::{Address, Block, BlockHeader, Genesis, Hash, Proof};
 use logger;
 
-#[derive(Debug, Deserialize)]
-struct Config {
-    // crypto
-    privkey: String,
-
-    // rpc_address
-    rpc_address:      String,
-    rpc_workers:      u64,
-    rpc_payload_size: usize,
-
-    // db config
-    data_path: PathBuf,
-
-    // network
-    private_key:         Option<String>,
-    bootstrap_addresses: Vec<String>,
-    listening_address:   String,
-
-    // transaction pool
-    pool_size:         u64,
-    until_block_limit: u64,
-    quota_limit:       u64,
-
-    // consensus
-    consensus_tx_limit:      u64,
-    consensus_interval:      u64,
-    consensus_verifier_list: Vec<String>,
-    consensus_wal_path:      String,
-
-    // synchronizer
-    synchronzer_broadcast_status_interval: u64,
-}
-
-impl Config {
-    pub fn data_path_for_state(&self) -> PathBuf {
-        let mut path_state = self.data_path.clone();
-        path_state.push("state_data");
-        path_state
-    }
-
-    pub fn data_path_for_block(&self) -> PathBuf {
-        let mut path_state = self.data_path.clone();
-        path_state.push("block_data");
-        path_state
-    }
-}
+mod config;
+use config::Config;
 
 fn main() {
     logger::init(logger::Flag::Main);
@@ -143,21 +97,21 @@ fn start(cfg: &Config) {
         Arc::clone(&storage),
         Arc::clone(&secp),
         outbound_tx.clone(),
-        cfg.pool_size as usize,
-        cfg.until_block_limit,
-        cfg.quota_limit,
+        cfg.txpool.pool_size as usize,
+        cfg.txpool.until_block_limit,
+        cfg.txpool.quota_limit,
         block.header.height,
     ));
 
     // run json rpc
     let mut jrpc_config = components_jsonrpc::Config::default();
-    jrpc_config.listen = cfg.rpc_address.clone();
-    jrpc_config.workers = if cfg.rpc_workers != 0 {
-        cfg.rpc_workers as usize
+    jrpc_config.listen = cfg.rpc.address.clone();
+    jrpc_config.workers = if cfg.rpc.workers != 0 {
+        cfg.rpc.workers as usize
     } else {
         cmp::min(2, num_cpus::get())
     };
-    jrpc_config.payload_size = cfg.rpc_payload_size;
+    jrpc_config.payload_size = cfg.rpc.payload_size;
     let jrpc_state = components_jsonrpc::AppState::new(
         Arc::clone(&executor),
         Arc::clone(&tx_pool),
@@ -171,8 +125,8 @@ fn start(cfg: &Config) {
     let pubkey = secp.get_public_key(&privkey).unwrap();
     let node_address = secp.pubkey_to_address(&pubkey);
 
-    let mut verifier_list = Vec::with_capacity(cfg.consensus_verifier_list.len());
-    for address in cfg.consensus_verifier_list.iter() {
+    let mut verifier_list = Vec::with_capacity(cfg.consensus.verifier_list.len());
+    for address in cfg.consensus.verifier_list.iter() {
         verifier_list.push(Address::from_hex(address).unwrap());
     }
 
@@ -182,9 +136,9 @@ fn start(cfg: &Config) {
         timestamp: block.header.timestamp,
         block_hash: block.hash.clone(),
         state_root: block.header.state_root.clone(),
-        tx_limit: cfg.consensus_tx_limit,
-        quota_limit: cfg.quota_limit,
-        interval: cfg.consensus_interval,
+        tx_limit: cfg.consensus.tx_limit,
+        quota_limit: cfg.txpool.quota_limit,
+        interval: cfg.consensus.interval,
         proof,
         node_address,
         verifier_list,
@@ -209,7 +163,7 @@ fn start(cfg: &Config) {
     let consensus = Bft::new(
         Arc::clone(&engine),
         outbound_tx.clone(),
-        &cfg.consensus_wal_path,
+        &cfg.data_path_for_bft_wal().to_str().unwrap(),
     )
     .unwrap();
     let consensus = Arc::new(consensus);
@@ -234,9 +188,9 @@ fn start(cfg: &Config) {
     // let network_reactor = outbound_reactor;
 
     let mut net_config = NetworkConfig::default();
-    net_config.p2p.private_key = cfg.private_key.clone();
-    net_config.p2p.listening_address = Some(cfg.listening_address.to_owned());
-    net_config.p2p.bootstrap_addresses = cfg.bootstrap_addresses.to_owned();
+    net_config.p2p.private_key = cfg.network.private_key.clone();
+    net_config.p2p.listening_address = Some(cfg.network.listening_address.to_owned());
+    net_config.p2p.bootstrap_addresses = cfg.network.bootstrap_addresses.to_owned();
     let _network = Network::new(net_config, outbound_rx, network_reactor).unwrap();
 
     // start synchronizer
@@ -246,7 +200,7 @@ fn start(cfg: &Config) {
     let synchronizer_manager = SynchronizerManager::new(
         Arc::new(outbound_tx.clone()),
         Arc::clone(&storage),
-        cfg.synchronzer_broadcast_status_interval,
+        cfg.synchronzer.broadcast_status_interval,
     );
     synchronizer_manager.start(sub_block2);
 
@@ -295,7 +249,7 @@ fn handle_init(cfg: &Config, genesis_path: impl AsRef<Path>) -> Result<(), Box<d
     block_header.prevhash = Hash::from_hex(&genesis.prevhash)?;
     block_header.timestamp = genesis.timestamp;
     block_header.state_root = state_root_hash;
-    block_header.quota_limit = cfg.quota_limit;
+    block_header.quota_limit = cfg.txpool.quota_limit;
     let mut block = Block::default();
     block.hash = block_header.hash();
     block.header = block_header;

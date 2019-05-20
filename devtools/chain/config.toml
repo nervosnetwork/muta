@@ -1,29 +1,28 @@
 # crypto
 privkey = "028590ad352d54387a9c8a0ecf7e180e68c4840c72f958fc5917657f506caa80"
 
-# json rpc
-rpc_address = "127.0.0.1:3030"
-rpc_workers = 0
-rpc_payload_size = 8388608
-
 # db config
-data_path = "./devtools/chain/data/rocksdb"
+data_path = "./devtools/chain/data"
 
-# network
+[rpc]
+address = "127.0.0.1:3030"
+workers = 0
+payload_size = 8388608
+
+[network]
 # private_key = "bcfa6d5fffa63edf3bd17b17422e416f9374d981322c4ccccf38de215e659b02"
 bootstrap_addresses = []
 listening_address = "/ip4/127.0.0.1/tcp/1337"
 
-# transaction pool
+[txpool]
 pool_size = 100000
 until_block_limit = 100
 quota_limit = 9999999999
 
-# consensus
-consensus_tx_limit = 30000
-consensus_interval = 3000
-consensus_verifier_list = [ "7899EE7319601cbC2684709e0eC3A4807bb0Fd74" ]
-consensus_wal_path = "./devtools/chain/data/bft_wal"
+[consensus]
+tx_limit = 30000
+interval = 3000
+verifier_list = [ "7899EE7319601cbC2684709e0eC3A4807bb0Fd74" ]
 
-# synchronzer
-synchronzer_broadcast_status_interval = 180000
+[synchronzer]
+broadcast_status_interval = 180000
