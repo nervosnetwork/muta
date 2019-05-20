@@ -1,4 +1,4 @@
-use config_parser::{parse, parse_file, parse_http, parse_reader};
+use common_config_parser::{parse, parse_file, parse_http, parse_reader};
 use serde_derive::Deserialize;
 use stringreader::StringReader;
 

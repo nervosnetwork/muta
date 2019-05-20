@@ -7,9 +7,9 @@ use log::error;
 
 use common_channel::Sender;
 use core_context::Context;
-use core_networkv2_message::common::{PullTxs, PushTxs};
-use core_networkv2_message::sync::{BroadcastStatus, PullBlocks, PushBlocks};
-use core_networkv2_message::{Codec, Method};
+use core_network_message::common::{PullTxs, PushTxs};
+use core_network_message::sync::{BroadcastStatus, PullBlocks, PushBlocks};
+use core_network_message::{Codec, Method};
 use core_runtime::{network::Synchronizer, Consensus, Storage};
 use core_types::{Block, SignedTransaction};
 

@@ -1,5 +1,5 @@
-use core_networkv2_message::consensus::{Proposal, Vote};
-use core_networkv2_message::Method;
+use core_network_message::consensus::{Proposal, Vote};
+use core_network_message::Method;
 use core_runtime::network::Consensus;
 
 use crate::outbound::Mode;

@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use log::error;
 
-use core_networkv2_message::{Codec, Message, Method};
+use core_network_message::{Codec, Message, Method};
 
 use crate::p2p::{Bytes, Outbound, Scope};
 use crate::{CallbackMap, Error};

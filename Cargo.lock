@@ -701,6 +701,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "common-config-parser"
+version = "0.1.0"
+dependencies = [
+ "reqwest 0.9.12 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde 1.0.91 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_derive 1.0.91 (registry+https://github.com/rust-lang/crates.io-index)",
+ "stringreader 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "toml 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "common-logger"
+version = "0.1.0"
+dependencies = [
+ "env_logger 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "components-database"
 version = "0.1.0"
 dependencies = [
@@ -709,7 +728,6 @@ dependencies = [
  "futures 0.1.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures-preview 0.3.0-alpha.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "logger 0.1.0",
  "rocksdb 0.12.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -738,6 +756,7 @@ dependencies = [
  "actix-web 1.0.0-beta.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "bytes 0.4.12 (registry+https://github.com/rust-lang/crates.io-index)",
  "common-cita 0.1.0",
+ "common-logger 0.1.0",
  "core-context 0.1.0",
  "core-crypto 0.1.0",
  "core-merkle 0.1.0",
@@ -756,7 +775,6 @@ dependencies = [
  "hex 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "json 0.11.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "logger 0.1.0",
  "numext-fixed-hash 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "numext-fixed-uint 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "rlp 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -786,17 +804,6 @@ dependencies = [
  "parking_lot 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rayon 1.0.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "uuid 0.7.4 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "config-parser"
-version = "0.1.0"
-dependencies = [
- "reqwest 0.9.12 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde 1.0.91 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde_derive 1.0.91 (registry+https://github.com/rust-lang/crates.io-index)",
- "stringreader 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "toml 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -879,12 +886,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "core-networkv2"
+name = "core-network"
 version = "0.2.0"
 dependencies = [
  "common-channel 0.1.0",
  "core-context 0.1.0",
- "core-networkv2-message 0.1.0",
+ "core-network-message 0.1.0",
  "core-runtime 0.1.0",
  "core-serialization 0.1.0",
  "core-types 0.1.0",
@@ -901,7 +908,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "core-networkv2-message"
+name = "core-network-message"
 version = "0.1.0"
 dependencies = [
  "bytes 0.4.12 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1889,14 +1896,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "logger"
-version = "0.1.0"
-dependencies = [
- "env_logger 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
 name = "lru-cache"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2021,15 +2020,16 @@ version = "0.1.0"
 dependencies = [
  "clap 2.32.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "common-cita 0.1.0",
+ "common-config-parser 0.1.0",
+ "common-logger 0.1.0",
  "components-database 0.1.0",
  "components-executor 0.1.0",
  "components-jsonrpc 0.1.0",
  "components-transaction-pool 0.1.0",
- "config-parser 0.1.0",
  "core-consensus 0.1.0",
  "core-context 0.1.0",
  "core-crypto 0.1.0",
- "core-networkv2 0.2.0",
+ "core-network 0.2.0",
  "core-pubsub 0.1.0",
  "core-runtime 0.1.0",
  "core-storage 0.1.0",
@@ -2038,7 +2038,6 @@ dependencies = [
  "futures-preview 0.3.0-alpha.14 (registry+https://github.com/rust-lang/crates.io-index)",
  "hex 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "logger 0.1.0",
  "num_cpus 1.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.91 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.91 (registry+https://github.com/rust-lang/crates.io-index)",

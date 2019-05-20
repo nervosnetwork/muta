@@ -1,5 +1,5 @@
+use common_logger::{init, Flag};
 use log::{debug, error, info, trace, warn};
-use logger::{init, Flag};
 
 #[test]
 fn test_debug() {

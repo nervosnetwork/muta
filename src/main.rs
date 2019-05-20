@@ -16,24 +16,24 @@ use components_executor::TrieDB;
 use components_jsonrpc;
 use components_transaction_pool::HashTransactionPool;
 
+use common_logger;
 use core_consensus::{Bft, ConsensusStatus, Engine, SynchronizerManager};
 use core_context::Context;
 use core_crypto::{
     secp256k1::{PrivateKey, Secp256k1},
     Crypto, CryptoTransform,
 };
-use core_networkv2::{Config as NetConfig, PartialService};
+use core_network::{Config as NetConfig, PartialService};
 use core_pubsub::{PubSub, PUBSUB_BROADCAST_BLOCK};
 use core_runtime::Storage;
 use core_storage::BlockStorage;
 use core_types::{Address, Block, BlockHeader, Genesis, Hash, Proof};
-use logger;
 
 mod config;
 use config::Config;
 
 fn main() {
-    logger::init(logger::Flag::Main);
+    common_logger::init(common_logger::Flag::Main);
     let matches = clap::App::new("Muta")
         .version("0.1")
         .author("Cryptape Technologies <contact@cryptape.com>")
@@ -52,7 +52,7 @@ fn main() {
         .get_matches();
 
     let args_config = matches.value_of("config").unwrap();
-    let cfg: Config = config_parser::parse(args_config).unwrap();
+    let cfg: Config = common_config_parser::parse(args_config).unwrap();
     log::info!("Go with config: {:?}", cfg);
 
     // init genesis

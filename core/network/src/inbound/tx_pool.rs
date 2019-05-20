@@ -8,11 +8,11 @@ use futures::stream;
 use log::error;
 
 use core_context::Context;
-use core_networkv2_message::{
+use core_network_message::{
     common::{PullTxs, PushTxs},
     tx_pool::BroadcastTxs,
 };
-use core_networkv2_message::{Codec, Method};
+use core_network_message::{Codec, Method};
 use core_runtime::TransactionPool;
 use core_types::SignedTransaction;
 

@@ -16,7 +16,7 @@ use log::{error, info};
 
 use common_channel::Receiver;
 use core_context::P2P_SESSION_ID;
-use core_networkv2_message::{Codec, Message, Method};
+use core_network_message::{Codec, Message, Method};
 use core_runtime::{Consensus, Storage, TransactionPool};
 
 use crate::p2p::SessionMessage;

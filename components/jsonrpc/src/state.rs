@@ -834,7 +834,7 @@ mod tests {
 
     #[test]
     fn test_filter_block_single() {
-        logger::init(logger::Flag::Test);
+        common_logger::init(common_logger::Flag::Test);
         let mut fd = FilterDatabase::default();
         let id = fd.new_block_filter(100);
 
@@ -846,7 +846,7 @@ mod tests {
 
     #[test]
     fn test_filter_block_multiple() {
-        logger::init(logger::Flag::Test);
+        common_logger::init(common_logger::Flag::Test);
         let mut fd = FilterDatabase::default();
         let id = fd.new_block_filter(100);
 
@@ -864,7 +864,7 @@ mod tests {
 
     #[test]
     fn test_filter_block_and_then_fetch() {
-        logger::init(logger::Flag::Test);
+        common_logger::init(common_logger::Flag::Test);
         let mut fd = FilterDatabase::default();
         let id = fd.new_block_filter(100);
 

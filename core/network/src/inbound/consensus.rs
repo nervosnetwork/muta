@@ -4,8 +4,8 @@ use std::sync::Arc;
 use futures::compat::Future01CompatExt;
 
 use core_context::Context;
-use core_networkv2_message::consensus::{Proposal, Vote};
-use core_networkv2_message::{Codec, Method};
+use core_network_message::consensus::{Proposal, Vote};
+use core_network_message::{Codec, Method};
 use core_runtime::Consensus;
 
 use crate::Error;

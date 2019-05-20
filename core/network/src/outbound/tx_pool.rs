@@ -3,8 +3,8 @@ use futures::prelude::TryFutureExt;
 use core_runtime::{network::TransactionPool, FutRuntimeResult, TransactionPoolError};
 
 use core_context::Context;
-use core_networkv2_message::Method;
-use core_networkv2_message::{common::PullTxs, tx_pool::BroadcastTxs};
+use core_network_message::Method;
+use core_network_message::{common::PullTxs, tx_pool::BroadcastTxs};
 use core_types::{Hash, SignedTransaction};
 
 use crate::outbound::Mode;

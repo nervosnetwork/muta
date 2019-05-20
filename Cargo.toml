@@ -5,15 +5,15 @@ authors = ["Cryptape Technologies <contact@cryptape.com>"]
 edition = "2018"
 
 [dependencies]
-config-parser = { path = "common/config-parser" }
-logger = { path = "common/logger" }
+common-config-parser = { path = "common/config-parser" }
+common-logger = { path = "common/logger" }
 common-cita = { path = "common/cita" }
 
-# components-cita-jsonrpc = { path = "components/cita-jsonrpc" }
 components-jsonrpc = { path = "components/jsonrpc" }
 components-database = { path = "components/database" }
 components-executor = { path = "components/executor" }
 components-transaction-pool = { path = "components/transaction-pool" }
+
 core-crypto = { path = "core/crypto" }
 core-runtime = { path = "core/runtime" }
 core-storage = { path = "core/storage" }
@@ -21,7 +21,7 @@ core-types = { path = "core/types" }
 core-consensus = { path = "core/consensus" }
 core-context = { path = "core/context" }
 core-pubsub = { path = "core/pubsub" }
-core-networkv2 = { path = "core/networkv2" }
+core-network = { path = "core/network" }
 
 hex = "0.3"
 tokio = "0.1"
@@ -49,13 +49,11 @@ members = [
   "core/merkle",
   "core/pubsub",
   "core/context",
-
-  "core/networkv2",
-  "core/networkv2/message",
+  "core/network",
+  "core/network/message",
 
   "components/transaction-pool",
   "components/database",
-  # "components/cita-jsonrpc",
   "components/jsonrpc",
   "components/executor",
 ]

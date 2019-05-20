@@ -3,7 +3,7 @@ use std::io;
 use tentacle::error::Error as TentacleError;
 use tentacle::service::ServiceError as TentacleServiceError;
 
-use core_networkv2_message::Error as NetMessageError;
+use core_network_message::Error as NetMessageError;
 use core_runtime::{ConsensusError, StorageError, SynchronizerError, TransactionPoolError};
 use core_serialization::CodecError as SerCodecError;
 
