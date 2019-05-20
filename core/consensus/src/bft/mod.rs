@@ -43,7 +43,7 @@ where
         broadcaster: B,
         wal_path: &str,
     ) -> ConsensusResult<Self> {
-        let status = engine.get_status()?;
+        let status = engine.get_status();
         let support = Support::new(Arc::clone(&engine), broadcaster)?;
         let support = Arc::new(support);
 
@@ -82,7 +82,7 @@ where
     fn send_status(&self) -> FutConsensusResult<()> {
         let bft = self.clone();
         let fut = async move {
-            let status = bft.engine.get_status()?;
+            let status = bft.engine.get_status();
             bft.bft_actuator.send(BftMsg::Status(BftStatus {
                 height:         status.height,
                 interval:       Some(status.interval),

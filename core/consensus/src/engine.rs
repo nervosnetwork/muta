@@ -1,12 +1,13 @@
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use bft_rs::{check_proof, Node as BftNode, Proof as BftProof};
 use futures::compat::Future01CompatExt;
 use futures::executor::block_on;
 use futures_locks::Mutex;
-use rayon::prelude::{IntoParallelIterator, ParallelIterator};
+use parking_lot::RwLock;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 use core_context::Context;
 use core_crypto::{Crypto, CryptoTransform};
@@ -94,7 +95,7 @@ where
 
     /// Package a new block.
     pub(crate) async fn build_proposal(&self, ctx: Context) -> ConsensusResult<Proposal> {
-        let status = self.get_status()?;
+        let status = self.get_status();
         let tx_hashes = await!(self
             .tx_pool
             .package(ctx.clone(), status.tx_limit, status.quota_limit)
@@ -134,7 +135,7 @@ where
     pub(crate) fn verify_proposal(&self, _: Context, proposal: &Proposal) -> ConsensusResult<()> {
         log::debug!("verify proposal {:?}", proposal);
 
-        let status = self.get_status()?;
+        let status = self.get_status();
 
         // check height
         if proposal.height != status.height + 1 {
@@ -202,7 +203,7 @@ where
     ) -> ConsensusResult<ConsensusStatus> {
         let _lock = await!(self.lock.lock().compat());
 
-        let status = self.get_status()?;
+        let status = self.get_status();
         if status.height + 1 != proposal.height {
             return Err(ConsensusError::Internal(
                 "proposal to commit not match current height".to_owned(),
@@ -324,7 +325,7 @@ where
             .collect::<Result<Vec<_>, StorageError>>()?;
 
         // update status
-        let updated_status = self.update_status(&cloned_header, &block_hash, &proof)?;
+        let updated_status = self.update_status(&cloned_header, &block_hash, &proof);
         log::info!("block committed, status = {:?}", updated_status);
 
         // broadcast the block
@@ -346,7 +347,7 @@ where
     ) -> ConsensusResult<ConsensusStatus> {
         let _lock = await!(self.lock.lock().compat());
 
-        let status = self.get_status()?;
+        let status = self.get_status();
         if status.height + 1 != block.header.height {
             return Err(ConsensusError::Internal(
                 "block to insert not match current height".to_owned(),
@@ -456,7 +457,6 @@ where
         };
         let authorities = &self
             .get_status()
-            .unwrap_or_default()
             .verifier_list
             .iter()
             .map(|a| BftNode::set_address(a.as_bytes().to_vec()))
@@ -470,14 +470,8 @@ where
         )
     }
 
-    pub(crate) fn get_status(&self) -> ConsensusResult<ConsensusStatus> {
-        let status = self
-            .status
-            .read()
-            .map_err(|_| ConsensusError::Internal("rwlock error".to_owned()))?
-            .clone();
-
-        Ok(status)
+    pub(crate) fn get_status(&self) -> ConsensusStatus {
+        self.status.read().clone()
     }
 
     pub(crate) fn update_status(
@@ -485,18 +479,15 @@ where
         header: &BlockHeader,
         block_hash: &Hash,
         latest_proof: &Proof,
-    ) -> ConsensusResult<ConsensusStatus> {
-        let mut status = self
-            .status
-            .write()
-            .map_err(|_| ConsensusError::Internal("rwlock error".to_owned()))?;
+    ) -> ConsensusStatus {
+        let mut status = self.status.write();
 
         status.height = header.height;
         status.timestamp = header.timestamp;
         status.block_hash = block_hash.clone();
         status.state_root = header.state_root.clone();
         status.proof = latest_proof.clone();
-        Ok(status.clone())
+        status.clone()
     }
 }
 

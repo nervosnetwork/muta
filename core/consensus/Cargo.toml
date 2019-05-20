@@ -15,6 +15,7 @@ core-context = { path = "../context" }
 core-serialization = { path = "../serialization" }
 core-pubsub = { path = "../pubsub" }
 
+parking_lot = "0.8"
 num_cpus = "1.0"
 log = "0.4"
 tokio = "0.1"

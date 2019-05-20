@@ -1,13 +1,14 @@
+use std::cmp;
 use std::collections::HashMap;
 use std::convert::TryInto;
 use std::sync::Arc;
-use std::sync::RwLock;
 
 use bft_rs::{
     Address as BFTAddress, BftMsg, BftSupport, Commit, Node as BftNode, Signature,
     Status as BftStatus,
 };
 use futures::executor::{ThreadPool, ThreadPoolBuilder};
+use parking_lot::RwLock;
 
 use core_context::{Context, P2P_SESSION_ID};
 use core_crypto::{Crypto, CryptoTransform};
@@ -45,7 +46,7 @@ where
 {
     pub(crate) fn new(engine: Arc<Engine<E, T, S, C>>, broadcaster: B) -> ConsensusResult<Self> {
         let thread_pool = ThreadPoolBuilder::new()
-            .pool_size(num_cpus::get())
+            .pool_size(cmp::max(4, num_cpus::get() / 4))
             .create()
             .map_err(|e| ConsensusError::Internal(e.to_string()))?;
 
@@ -63,20 +64,14 @@ where
         hash: Hash,
         session_id: usize,
     ) -> ConsensusResult<()> {
-        let mut proposal_origin = self
-            .proposal_origin
-            .write()
-            .map_err(|_| ConsensusError::Internal("rwlock error".to_owned()))?;
+        let mut proposal_origin = self.proposal_origin.write();
 
         proposal_origin.insert(hash, session_id);
         Ok(())
     }
 
     pub(crate) fn get_proposal_origin(&self, hash: &Hash) -> ConsensusResult<Option<usize>> {
-        let proposal_origin = self
-            .proposal_origin
-            .read()
-            .map_err(|_| ConsensusError::Internal("rwlock error".to_owned()))?;
+        let proposal_origin = self.proposal_origin.read();
         Ok(proposal_origin.get(hash).map(Clone::clone))
     }
 }
@@ -100,7 +95,7 @@ where
                 await!(AsyncCodec::decode::<SerProposal>(proposal.to_vec()))?.try_into()?;
 
             // Ignore the self proposal
-            let status = self.engine.get_status()?;
+            let status = self.engine.get_status();
             if proposal.proposer == status.node_address {
                 return Ok(());
             }
@@ -136,7 +131,7 @@ where
             }
 
             // Ignore the self proposal
-            let status = self.engine.get_status()?;
+            let status = self.engine.get_status();
             if proposal.proposer == status.node_address {
                 return Ok(());
             }
@@ -202,10 +197,7 @@ where
                 .commit_block(ctx.clone(), proposal, latest_proof))?;
 
             // clear cache of last proposal.
-            let mut proposal_origin = self
-                .proposal_origin
-                .write()
-                .map_err(|_| ConsensusError::Internal("rwlock error".to_owned()))?;
+            let mut proposal_origin = self.proposal_origin.write();
             proposal_origin.clear();
 
             Ok(BftStatus {
