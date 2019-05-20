@@ -12,39 +12,39 @@ use parking_lot::RwLock;
 
 use core_context::{Context, P2P_SESSION_ID};
 use core_crypto::{Crypto, CryptoTransform};
-use core_runtime::{Executor, TransactionPool};
+use core_runtime::network::Consensus as Network;
+use core_runtime::{ConsensusError, Executor, Storage, TransactionPool};
 use core_serialization::{AsyncCodec, Proposal as SerProposal};
-use core_storage::Storage;
 use core_types::{Address, Hash, Proof, Proposal, Vote};
 
-use crate::{Broadcaster, ConsensusError, ConsensusResult, Engine};
+use crate::{ConsensusResult, Engine};
 
-pub(crate) struct Support<E, T, S, C, B>
+pub(crate) struct Support<E, T, S, C, N>
 where
     E: Executor + 'static,
     T: TransactionPool + 'static,
     S: Storage + 'static,
     C: Crypto + 'static,
-    B: Broadcaster + 'static,
+    N: Network + 'static,
 {
     engine: Arc<Engine<E, T, S, C>>,
     // Because "bft-rs" is not in the futures runtime,
     // to ensure performance use a separate thread pool to run the futures in "support".
     thread_pool: ThreadPool,
 
-    broadcaster:     B,
+    network:         N,
     proposal_origin: RwLock<HashMap<Hash, usize>>,
 }
 
-impl<E, T, S, C, B> Support<E, T, S, C, B>
+impl<E, T, S, C, N> Support<E, T, S, C, N>
 where
     E: Executor + 'static,
     T: TransactionPool + 'static,
     S: Storage + 'static,
     C: Crypto + 'static,
-    B: Broadcaster + 'static,
+    N: Network + 'static,
 {
-    pub(crate) fn new(engine: Arc<Engine<E, T, S, C>>, broadcaster: B) -> ConsensusResult<Self> {
+    pub(crate) fn new(engine: Arc<Engine<E, T, S, C>>, network: N) -> ConsensusResult<Self> {
         let thread_pool = ThreadPoolBuilder::new()
             .pool_size(cmp::max(4, num_cpus::get() / 4))
             .create()
@@ -53,7 +53,7 @@ where
         Ok(Self {
             engine,
             thread_pool,
-            broadcaster,
+            network,
 
             proposal_origin: RwLock::new(HashMap::new()),
         })
@@ -76,13 +76,13 @@ where
     }
 }
 
-impl<E, T, S, C, B> BftSupport for Support<E, T, S, C, B>
+impl<E, T, S, C, N> BftSupport for Support<E, T, S, C, N>
 where
     E: Executor + 'static,
     T: TransactionPool + 'static,
     S: Storage + 'static,
     C: Crypto + 'static,
-    B: Broadcaster + 'static,
+    N: Network + 'static,
 {
     type Error = ConsensusError;
 
@@ -160,11 +160,11 @@ where
     /// serialized, users do not have to care about the structure of
     /// Proposal and Vote.
     fn transmit(&self, msg: BftMsg) {
-        let mut broadcaster = self.broadcaster.clone();
+        let network = self.network.clone();
 
         match msg {
-            BftMsg::Proposal(proposal) => broadcaster.proposal(proposal),
-            BftMsg::Vote(vote) => broadcaster.vote(vote),
+            BftMsg::Proposal(proposal) => network.proposal(proposal),
+            BftMsg::Vote(vote) => network.vote(vote),
             _ => {}
         }
     }

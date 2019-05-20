@@ -1,3 +1,4 @@
+use std::net::SocketAddr;
 use std::path::PathBuf;
 
 use serde_derive::Deserialize;
@@ -12,8 +13,9 @@ pub struct ConfigRPC {
 #[derive(Debug, Deserialize)]
 pub struct ConfigNetwork {
     pub private_key:         Option<String>,
-    pub bootstrap_addresses: Vec<String>,
-    pub listening_address:   String,
+    pub bootstrap_addresses: Vec<SocketAddr>,
+    pub listening_address:   SocketAddr,
+    pub max_connections:     usize,
 }
 
 #[derive(Debug, Deserialize)]

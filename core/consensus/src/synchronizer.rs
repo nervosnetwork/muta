@@ -10,33 +10,8 @@ use old_futures::{self, stream::Stream, Future as OldFuture};
 
 use core_context::Context;
 use core_pubsub::channel::pubsub::Receiver;
-use core_runtime::FutRuntimeResult;
-use core_storage::Storage;
-use core_types::{Block, Hash, SignedTransaction};
-
-use crate::SynchronizerError;
-
-#[derive(Debug, Clone)]
-pub struct Status {
-    pub hash:   Hash,
-    pub height: u64,
-}
-
-pub trait Synchronizer: Send + Sync + Clone {
-    fn broadcast_status(&self, status: Status);
-
-    fn pull_blocks(
-        &self,
-        ctx: Context,
-        heights: Vec<u64>,
-    ) -> FutRuntimeResult<Vec<Block>, SynchronizerError>;
-
-    fn pull_txs_sync(
-        &self,
-        ctx: Context,
-        tx_hashes: &[Hash],
-    ) -> FutRuntimeResult<Vec<SignedTransaction>, SynchronizerError>;
-}
+use core_runtime::{network::Synchronizer as Network, Storage, SyncStatus};
+use core_types::Block;
 
 pub struct SynchronizerManager<S, Sy> {
     broadcast_status_interval: u64,
@@ -47,7 +22,7 @@ pub struct SynchronizerManager<S, Sy> {
 impl<S, Sy> SynchronizerManager<S, Sy>
 where
     S: Storage + 'static,
-    Sy: Synchronizer + 'static,
+    Sy: Network + 'static,
 {
     pub fn new(synchronizer: Arc<Sy>, storage: Arc<S>, broadcast_status_interval: u64) -> Self {
         Self {
@@ -78,7 +53,7 @@ where
                     .select(interval_broadcaster)
                     .filter_map(future::ready)
                     .for_each(move |block| {
-                        let status = Status {
+                        let status = SyncStatus {
                             hash:   block.hash,
                             height: block.header.height,
                         };

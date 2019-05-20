@@ -1,0 +1,25 @@
+[package]
+name = "core-networkv2"
+version = "0.2.0"
+authors = ["Cryptape Technologies <contact@cryptape.com>"]
+edition = "2018"
+
+[dependencies]
+common-channel = { path = "../../common/channel" }
+
+core-networkv2-message = { path = "./message" }
+core-context = { path = "../context" }
+core-serialization = { path = "../serialization" }
+core-runtime = { path = "../runtime" }
+core-types = { path = "../types" }
+
+tentacle = "0.2.0-alpha.13"
+tentacle-discovery = "0.2"
+log = "0.4"
+futures-preview = { version = "0.3.0-alpha.14", features = [ "compat" ] }
+serde_derive = "1.0"
+serde = "1.0"
+hashbrown = "0.3"
+rand = "0.6"
+parking_lot = "0.8"
+tokio = "0.1"

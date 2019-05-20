@@ -1,7 +1,5 @@
-#![feature(async_await, await_macro, futures_api, try_trait)]
+#![feature(async_await, await_macro, futures_api)]
 
-mod errors;
 mod storage;
 
-pub use errors::StorageError;
-pub use storage::{BlockStorage, Storage, StorageResult};
+pub use storage::BlockStorage;

@@ -13,9 +13,10 @@ use core_context::Context;
 use core_crypto::{Crypto, CryptoTransform};
 use core_merkle::Merkle;
 use core_pubsub::{channel::pubsub::Sender, register::Register, PUBSUB_BROADCAST_BLOCK};
-use core_runtime::{ExecutionContext, ExecutionResult, Executor, TransactionPool};
+use core_runtime::{
+    ExecutionContext, ExecutionResult, Executor, Storage, StorageError, TransactionPool,
+};
 use core_serialization::{AsyncCodec, Proposal as SerProposal};
-use core_storage::{Storage, StorageError};
 use core_types::{
     Address, Block, BlockHeader, Hash, Proof, Proposal, SignedTransaction, TransactionPosition,
 };

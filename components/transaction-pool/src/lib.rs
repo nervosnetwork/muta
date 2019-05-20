@@ -13,23 +13,14 @@ use futures03::{
 
 use core_context::{Context, ORIGIN};
 use core_crypto::Crypto;
+use core_runtime::network::TransactionPool as Network;
 use core_runtime::{FutRuntimeResult, TransactionOrigin, TransactionPool, TransactionPoolError};
-use core_storage::{Storage, StorageError};
+use core_runtime::{Storage, StorageError};
 use core_types::{Hash, SignedTransaction, Transaction, UnverifiedTransaction};
 
 use crate::cache::TxCache;
 
-pub trait Broadcaster: Send + Sync + Clone {
-    fn broadcast_batch(&mut self, txs: Vec<SignedTransaction>);
-
-    fn pull_txs(
-        &mut self,
-        ctx: Context,
-        hashes: Vec<Hash>,
-    ) -> FutRuntimeResult<Vec<SignedTransaction>, TransactionPoolError>;
-}
-
-pub struct HashTransactionPool<S, C, B> {
+pub struct HashTransactionPool<S, C, N> {
     pool_size:         usize,
     until_block_limit: u64,
     quota_limit:       u64,
@@ -38,21 +29,21 @@ pub struct HashTransactionPool<S, C, B> {
     callback_cache: Arc<TxCache>,
     storage:        Arc<S>,
     crypto:         Arc<C>,
-    broadcaster:    B,
+    network:        N,
 
     latest_height: Arc<AtomicU64>,
 }
 
-impl<S, C, B> HashTransactionPool<S, C, B>
+impl<S, C, N> HashTransactionPool<S, C, N>
 where
     S: Storage,
     C: Crypto,
-    B: Broadcaster,
+    N: Network,
 {
     pub fn new(
         storage: Arc<S>,
         crypto: Arc<C>,
-        broadcaster: B,
+        network: N,
         pool_size: usize,
         until_block_limit: u64,
         quota_limit: u64,
@@ -67,18 +58,18 @@ where
             callback_cache: Arc::new(TxCache::new(pool_size)),
             storage,
             crypto,
-            broadcaster,
+            network,
 
             latest_height: Arc::new(AtomicU64::new(latest_height)),
         }
     }
 }
 
-impl<S, C, B> TransactionPool for HashTransactionPool<S, C, B>
+impl<S, C, N> TransactionPool for HashTransactionPool<S, C, N>
 where
     S: Storage + 'static,
     C: Crypto + 'static,
-    B: Broadcaster + 'static,
+    N: Network + 'static,
 {
     fn insert(
         &self,
@@ -88,7 +79,7 @@ where
         let storage = Arc::clone(&self.storage);
         let crypto = Arc::clone(&self.crypto);
         let tx_cache = Arc::clone(&self.tx_cache);
-        let mut broadcaster = self.broadcaster.clone();
+        let network = self.network.clone();
 
         let pool_size = self.pool_size;
         let until_block_limit = self.until_block_limit;
@@ -141,9 +132,9 @@ where
 
             tx_cache.insert(signed_tx.clone());
 
-            // 6. broadcast tx
+            // 6. network tx
             if let Some(TransactionOrigin::Jsonrpc) = ctx.get::<TransactionOrigin>(ORIGIN) {
-                broadcaster.broadcast_batch(vec![signed_tx.clone()]);
+                network.broadcast_batch(vec![signed_tx.clone()]);
             }
 
             Ok(signed_tx)
@@ -246,14 +237,14 @@ where
     ) -> FutRuntimeResult<(), TransactionPoolError> {
         let tx_cache = Arc::clone(&self.tx_cache);
         let callback_cache = Arc::clone(&self.callback_cache);
-        let mut broadcaster = self.broadcaster.clone();
+        let network = self.network.clone();
         let tx_hashes = tx_hashes.to_owned();
 
         let fut = async move {
             let unknown = tx_cache.contains_keys(&tx_hashes);
 
             if !unknown.is_empty() {
-                let sig_txs = await!(broadcaster.pull_txs(ctx, unknown.clone()).compat())?;
+                let sig_txs = await!(network.pull_txs(ctx, unknown.clone()).compat())?;
                 if sig_txs.len() != unknown.len() {
                     return Err(TransactionPoolError::NotExpected);
                 }
@@ -315,23 +306,23 @@ mod tests {
     use core_context::{Context, ORIGIN};
     use core_crypto::{secp256k1::Secp256k1, Crypto, CryptoTransform};
     use core_runtime::{
-        FutRuntimeResult, TransactionOrigin, TransactionPool, TransactionPoolError,
+        FutRuntimeResult, Storage, TransactionOrigin, TransactionPool, TransactionPoolError,
     };
-    use core_storage::{BlockStorage, Storage};
+    use core_storage::BlockStorage;
     use core_types::{Address, Block, Hash, SignedTransaction, Transaction, UnverifiedTransaction};
 
-    use super::{Broadcaster, HashTransactionPool};
+    use super::{HashTransactionPool, Network};
 
     #[derive(Clone)]
-    struct BroadcastMock;
+    struct NetworkMock;
 
-    impl Broadcaster for BroadcastMock {
-        fn broadcast_batch(&mut self, _: Vec<SignedTransaction>) {
+    impl Network for NetworkMock {
+        fn broadcast_batch(&self, _: Vec<SignedTransaction>) {
             panic!("should not broadcast inserted txs");
         }
 
         fn pull_txs(
-            &mut self,
+            &self,
             _: Context,
             unknown_hashes: Vec<Hash>,
         ) -> FutRuntimeResult<Vec<SignedTransaction>, TransactionPoolError> {
@@ -734,7 +725,7 @@ mod tests {
         until_block_limit: u64,
         quota_limit: u64,
         height: u64,
-    ) -> HashTransactionPool<BlockStorage<MemoryDB>, Secp256k1, BroadcastMock> {
+    ) -> HashTransactionPool<BlockStorage<MemoryDB>, Secp256k1, NetworkMock> {
         let secp = Arc::new(Secp256k1::new());
 
         let storage = storage.unwrap_or_else(|| {
@@ -748,12 +739,12 @@ mod tests {
             storage
         });
 
-        let broadcast = BroadcastMock;
+        let network = NetworkMock;
 
         HashTransactionPool::new(
             storage,
             secp,
-            broadcast,
+            network,
             size,
             until_block_limit,
             quota_limit,

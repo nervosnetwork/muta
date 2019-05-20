@@ -2,12 +2,34 @@ use std::error::Error;
 use std::fmt;
 
 use bft_rs::error::BftError;
+use futures::prelude::Future;
 
+use core_context::Context;
 use core_crypto::CryptoError;
-use core_runtime::{ExecutorError, TransactionPoolError};
 use core_serialization::CodecError;
-use core_storage::StorageError;
-use core_types::TypesError;
+use core_types::{Block, Proof, SignedTransaction, TypesError};
+
+use crate::{ExecutorError, StorageError, TransactionPoolError};
+
+pub type FutConsensusResult<T> = Box<dyn Future<Item = T, Error = ConsensusError> + Send>;
+
+pub trait Consensus: Send + Sync {
+    fn set_proposal(&self, ctx: Context, msg: Vec<u8>) -> FutConsensusResult<()>;
+
+    fn set_vote(&self, ctx: Context, msg: Vec<u8>) -> FutConsensusResult<()>;
+
+    // Send status to peers after synchronizing blocks to trigger bft
+    fn send_status(&self) -> FutConsensusResult<()>;
+
+    /// insert block syncing from other nodes
+    fn insert_sync_block(
+        &self,
+        ctx: Context,
+        block: Block,
+        stxs: Vec<SignedTransaction>,
+        proof: Proof,
+    ) -> FutConsensusResult<()>;
+}
 
 #[derive(Debug)]
 pub enum ConsensusError {
@@ -81,36 +103,5 @@ impl From<TypesError> for ConsensusError {
 impl From<BftError> for ConsensusError {
     fn from(err: BftError) -> Self {
         ConsensusError::Bft(err)
-    }
-}
-
-#[derive(Debug)]
-pub enum SynchronizerError {
-    Internal(String),
-    Storage(StorageError),
-    Consensus(ConsensusError),
-}
-
-impl Error for SynchronizerError {}
-impl fmt::Display for SynchronizerError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let printable = match *self {
-            SynchronizerError::Internal(ref err) => format!("internal error {:?}", err),
-            SynchronizerError::Storage(ref err) => format!("storage error {:?}", err),
-            SynchronizerError::Consensus(ref err) => format!("consensus error {:?}", err),
-        };
-        write!(f, "{}", printable)
-    }
-}
-
-impl From<StorageError> for SynchronizerError {
-    fn from(err: StorageError) -> Self {
-        SynchronizerError::Storage(err)
-    }
-}
-
-impl From<ConsensusError> for SynchronizerError {
-    fn from(err: ConsensusError) -> Self {
-        SynchronizerError::Consensus(err)
     }
 }

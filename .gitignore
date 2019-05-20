@@ -20,3 +20,4 @@ rocksdb*
 
 # macos
 .DS_Store
+devtools/chain/data

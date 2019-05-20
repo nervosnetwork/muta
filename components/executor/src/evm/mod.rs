@@ -9,7 +9,7 @@ use ethereum_types::{H256, U256};
 use futures::future::Future;
 
 use core_context::Context;
-use core_storage::Storage;
+use core_runtime::Storage;
 
 pub struct EVMBlockDataProvider<S> {
     storage: Arc<S>,

@@ -15,14 +15,13 @@ components-database = { path = "components/database" }
 components-executor = { path = "components/executor" }
 components-transaction-pool = { path = "components/transaction-pool" }
 core-crypto = { path = "core/crypto" }
-core-p2p = { path = "core/p2p" }
 core-runtime = { path = "core/runtime" }
 core-storage = { path = "core/storage" }
 core-types = { path = "core/types" }
 core-consensus = { path = "core/consensus" }
 core-context = { path = "core/context" }
 core-pubsub = { path = "core/pubsub" }
-core-network = { path = "core/network" }
+core-networkv2 = { path = "core/networkv2" }
 
 hex = "0.3"
 tokio = "0.1"
@@ -40,17 +39,19 @@ members = [
   "common/cita",
   "common/config-parser",
   "common/logger",
+  "common/channel",
 
   "core/types",
   "core/runtime",
   "core/consensus",
   "core/storage",
-  "core/p2p",
   "core/crypto",
   "core/merkle",
   "core/pubsub",
-  "core/network",
   "core/context",
+
+  "core/networkv2",
+  "core/networkv2/message",
 
   "components/transaction-pool",
   "components/database",

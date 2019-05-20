@@ -15,9 +15,8 @@ use numext_fixed_uint::U256;
 use core_context::{Context, ORIGIN};
 use core_crypto::{Crypto, CryptoTransform};
 use core_merkle::{self, Merkle, ProofNode};
-use core_runtime::{ExecutionContext, Executor, TransactionOrigin, TransactionPool};
+use core_runtime::{ExecutionContext, Executor, Storage, TransactionOrigin, TransactionPool};
 use core_serialization::AsyncCodec;
-use core_storage::Storage;
 use core_types::{Address, Block, BloomRef, Hash, Receipt, SignedTransaction};
 
 use crate::cita::{self, Uint};

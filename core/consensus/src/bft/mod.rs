@@ -7,44 +7,43 @@ use futures::prelude::{FutureExt, TryFutureExt};
 
 use core_context::{CommonValue, Context};
 use core_crypto::Crypto;
-use core_runtime::{Executor, TransactionPool};
-use core_storage::Storage;
-use core_types::Hash;
+use core_runtime::network::Consensus as Network;
+use core_runtime::{
+    Consensus, ConsensusError, Executor, FutConsensusResult, Storage, TransactionPool,
+};
+use core_types::{Block, Hash, Proof, SignedTransaction};
 
 use crate::bft::support::Support;
-use crate::{
-    Broadcaster, Consensus, ConsensusError, ConsensusResult, Engine, FutConsensusResult,
-    ProposalMessage, VoteMessage,
-};
+use crate::{ConsensusResult, Engine, ProposalMessage, VoteMessage};
 
-pub struct Bft<E, T, S, C, B>
+pub struct Bft<E, T, S, C, N>
 where
     E: Executor + 'static,
     T: TransactionPool + 'static,
     S: Storage + 'static,
     C: Crypto + 'static,
-    B: Broadcaster + 'static,
+    N: Network + 'static,
 {
     engine:       Arc<Engine<E, T, S, C>>,
     bft_actuator: Arc<BftActuator>,
-    support:      Arc<Support<E, T, S, C, B>>,
+    support:      Arc<Support<E, T, S, C, N>>,
 }
 
-impl<E, T, S, C, B> Bft<E, T, S, C, B>
+impl<E, T, S, C, N> Bft<E, T, S, C, N>
 where
     E: Executor + 'static,
     T: TransactionPool + 'static,
     S: Storage + 'static,
     C: Crypto + 'static,
-    B: Broadcaster + 'static,
+    N: Network + 'static,
 {
     pub fn new(
         engine: Arc<Engine<E, T, S, C>>,
-        broadcaster: B,
+        network: N,
         wal_path: &str,
     ) -> ConsensusResult<Self> {
         let status = engine.get_status();
-        let support = Support::new(Arc::clone(&engine), broadcaster)?;
+        let support = Support::new(Arc::clone(&engine), network)?;
         let support = Arc::new(support);
 
         let bft_actuator = BftActuator::new(
@@ -71,13 +70,13 @@ where
     }
 }
 
-impl<E, T, S, C, B> Consensus for Bft<E, T, S, C, B>
+impl<E, T, S, C, N> Consensus for Bft<E, T, S, C, N>
 where
     E: Executor + 'static,
     T: TransactionPool + 'static,
     S: Storage + 'static,
     C: Crypto + 'static,
-    B: Broadcaster + 'static,
+    N: Network + 'static,
 {
     fn send_status(&self) -> FutConsensusResult<()> {
         let bft = self.clone();
@@ -124,15 +123,32 @@ where
 
         Box::new(fut.boxed().compat())
     }
+
+    fn insert_sync_block(
+        &self,
+        ctx: Context,
+        block: Block,
+        stxs: Vec<SignedTransaction>,
+        proof: Proof,
+    ) -> FutConsensusResult<()> {
+        let bft = self.clone();
+
+        let fut = async move {
+            await!(bft.engine.insert_sync_block(ctx, block, stxs, proof))?;
+            Ok(())
+        };
+
+        Box::new(fut.boxed().compat())
+    }
 }
 
-impl<E, T, S, C, B> Clone for Bft<E, T, S, C, B>
+impl<E, T, S, C, N> Clone for Bft<E, T, S, C, N>
 where
     E: Executor + 'static,
     T: TransactionPool + 'static,
     S: Storage + 'static,
     C: Crypto + 'static,
-    B: Broadcaster + 'static,
+    N: Network + 'static,
 {
     fn clone(&self) -> Self {
         Self {

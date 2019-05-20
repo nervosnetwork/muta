@@ -5,25 +5,27 @@ use std::error::Error;
 use std::fs::File;
 use std::path::Path;
 use std::sync::Arc;
+use std::thread::spawn;
 
+use futures::prelude::{FutureExt, TryFutureExt};
 use futures01::future::Future as Future01;
-use futures01::sync::mpsc::channel;
 
 use components_database::rocks::RocksDB;
 use components_executor::evm::{EVMBlockDataProvider, EVMExecutor};
 use components_executor::TrieDB;
 use components_jsonrpc;
 use components_transaction_pool::HashTransactionPool;
+
 use core_consensus::{Bft, ConsensusStatus, Engine, SynchronizerManager};
 use core_context::Context;
 use core_crypto::{
     secp256k1::{PrivateKey, Secp256k1},
     Crypto, CryptoTransform,
 };
-use core_network::reactor::{outbound, CallbackMap, InboundReactor, JoinReactor, OutboundReactor};
-use core_network::{Config as NetworkConfig, Network};
+use core_networkv2::{Config as NetConfig, PartialService};
 use core_pubsub::{PubSub, PUBSUB_BROADCAST_BLOCK};
-use core_storage::{BlockStorage, Storage};
+use core_runtime::Storage;
+use core_storage::BlockStorage;
 use core_types::{Address, Block, BlockHeader, Genesis, Hash, Proof};
 use logger;
 
@@ -89,14 +91,22 @@ fn start(cfg: &Config) {
         .unwrap(),
     );
 
-    let (outbound_tx, outbound_rx) = channel(255);
-    let outbound_tx = outbound::Sender::new(outbound_tx);
+    // net network
+    let network_config = NetConfig {
+        private_key:         cfg.network.private_key.to_owned(),
+        bootstrap_addresses: cfg.network.bootstrap_addresses.to_owned(),
+        listening_address:   cfg.network.listening_address.to_owned(),
+        max_connections:     cfg.network.max_connections.to_owned(),
+    };
+
+    let partial_network = PartialService::new(network_config).unwrap();
+    let outbound = partial_network.outbound();
 
     // new tx pool
     let tx_pool = Arc::new(HashTransactionPool::new(
         Arc::clone(&storage),
         Arc::clone(&secp),
-        outbound_tx.clone(),
+        outbound.clone(),
         cfg.txpool.pool_size as usize,
         cfg.txpool.until_block_limit,
         cfg.txpool.quota_limit,
@@ -162,43 +172,26 @@ fn start(cfg: &Config) {
     // start consensus.
     let consensus = Bft::new(
         Arc::clone(&engine),
-        outbound_tx.clone(),
+        outbound.clone(),
         &cfg.data_path_for_bft_wal().to_str().unwrap(),
     )
     .unwrap();
     let consensus = Arc::new(consensus);
 
-    // net network
-    let callback_map = CallbackMap::default();
-    let inbound_reactor = InboundReactor::new(
+    // remain network procedures
+    let network = partial_network.build(
         Arc::clone(&tx_pool),
-        Arc::clone(&storage),
-        Arc::clone(&engine),
-        Arc::new(outbound_tx.clone()),
         Arc::clone(&consensus),
-        Arc::clone(&callback_map),
+        Arc::clone(&storage),
     );
-    let outbound_reactor = OutboundReactor::new(callback_map);
-    let network_reactor = inbound_reactor.join(outbound_reactor);
-    // or
-    // let network_reactor = outbound_reactor.join(inbound_reactor);
-    // or peer that only handle inbound message
-    // let network_reactor = inbound_reactor;
-    // or peer that only handle outbound message
-    // let network_reactor = outbound_reactor;
-
-    let mut net_config = NetworkConfig::default();
-    net_config.p2p.private_key = cfg.network.private_key.clone();
-    net_config.p2p.listening_address = Some(cfg.network.listening_address.to_owned());
-    net_config.p2p.bootstrap_addresses = cfg.network.bootstrap_addresses.to_owned();
-    let _network = Network::new(net_config, outbound_rx, network_reactor).unwrap();
+    spawn(move || tokio::run(network.run().unit_error().boxed().compat()));
 
     // start synchronizer
     let sub_block2 = pubsub
         .subscribe::<Block>(PUBSUB_BROADCAST_BLOCK.to_owned())
         .unwrap();
     let synchronizer_manager = SynchronizerManager::new(
-        Arc::new(outbound_tx.clone()),
+        Arc::new(outbound.clone()),
         Arc::clone(&storage),
         cfg.synchronzer.broadcast_status_interval,
     );

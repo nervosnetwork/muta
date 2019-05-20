@@ -5,9 +5,9 @@ use std::io;
 use core_crypto::CryptoError;
 use core_runtime::database::DatabaseError;
 use core_runtime::executor::ExecutorError;
+use core_runtime::StorageError;
 use core_runtime::TransactionPoolError;
 use core_serialization::CodecError;
-use core_storage::StorageError;
 use core_types::TypesError;
 
 #[derive(Debug)]
