@@ -1,4 +1,4 @@
-use futures::prelude::TryFutureExt;
+use futures::prelude::{FutureExt, TryFutureExt};
 
 use core_runtime::{network::TransactionPool, FutRuntimeResult, TransactionPoolError};
 
@@ -12,10 +12,16 @@ use crate::{BytesBroadcaster, OutboundHandle};
 
 impl TransactionPool for OutboundHandle {
     fn broadcast_batch(&self, txs: Vec<SignedTransaction>) {
-        let data = BroadcastTxs::from(txs);
+        let outbound = self.clone();
 
-        // TODO: retry ?
-        self.silent_broadcast(Method::BroadcastTxs, data, Mode::Normal);
+        let job = async move {
+            let data = BroadcastTxs::from(txs);
+
+            // TODO: retry ?
+            outbound.silent_broadcast(Method::BroadcastTxs, data, Mode::Normal);
+        };
+
+        tokio::run(job.unit_error().boxed().compat());
     }
 
     fn pull_txs(

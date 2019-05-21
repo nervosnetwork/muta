@@ -1,8 +1,9 @@
 #[macro_export]
 macro_rules! callback_broadcast {
     ($outbound:expr, $ctx:expr, $arg:expr, $data_ty:ty, $method:expr, $err_ty:expr) => {{
-        use futures::channel::mpsc::channel;
         use futures::prelude::{FutureExt, StreamExt};
+
+        use common_channel::bounded;
 
         use crate::common::scope_from_context;
 
@@ -24,7 +25,7 @@ macro_rules! callback_broadcast {
                     $err_ty(format!("net [outbound]: {}, [err: {:?}]", s_method, err))
                 })?;
 
-            let (done_tx, mut done_rx) = channel(1);
+            let (done_tx, mut done_rx) = bounded(1);
             $outbound.callback.insert(uid, done_tx);
 
             // TODO: Timeout

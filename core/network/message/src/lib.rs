@@ -1,7 +1,7 @@
 use std::default::Default;
 use std::fmt::Debug;
 
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
 
 pub mod common;
 pub mod consensus;
@@ -44,7 +44,7 @@ where
     type Error = Error;
 
     fn encode(&self) -> Result<Bytes, Self::Error> {
-        let mut bytes = vec![];
+        let mut bytes = BytesMut::with_capacity(self.encoded_len());
 
         <T as prost::Message>::encode(self, &mut bytes).map_err(Error::EncodeError)?;
 
