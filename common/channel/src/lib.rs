@@ -7,7 +7,7 @@ use std::{marker::Unpin, pin::Pin};
 use futures::prelude::{Sink, Stream};
 use futures::task::{AtomicWaker, Context, Poll};
 
-pub use crossbeam_channel::{TryRecvError, TrySendError};
+pub use crossbeam_channel::{RecvError, TryRecvError, TrySendError};
 
 pub struct Sender<T> {
     inner: crossbeam_channel::Sender<T>,
@@ -102,6 +102,10 @@ impl<T> Stream for Receiver<T> {
 impl<T> Receiver<T> {
     pub fn try_recv(&self) -> Result<T, TryRecvError> {
         self.inner.try_recv()
+    }
+
+    pub fn recv(&self) -> Result<T, RecvError> {
+        self.inner.recv()
     }
 }
 

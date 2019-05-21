@@ -1,4 +1,4 @@
-use futures::prelude::{FutureExt, TryFutureExt};
+use futures::prelude::TryFutureExt;
 
 use core_context::Context;
 use core_network_message::common::PullTxs;
@@ -13,15 +13,9 @@ use crate::{BytesBroadcaster, OutboundHandle};
 
 impl Synchronizer for OutboundHandle {
     fn broadcast_status(&self, status: SyncStatus) {
-        let outbound = self.clone();
+        let data = BroadcastStatus::from(status.hash, status.height);
 
-        let job = async move {
-            let data = BroadcastStatus::from(status.hash, status.height);
-
-            outbound.silent_broadcast(Method::SyncBroadcastStatus, data, Mode::Normal);
-        };
-
-        tokio::spawn(job.unit_error().boxed().compat());
+        self.silent_broadcast(Method::SyncBroadcastStatus, data, Mode::Normal);
     }
 
     fn pull_blocks(&self, ctx: Context, heights: Vec<u64>) -> FutSyncResult<Vec<Block>> {

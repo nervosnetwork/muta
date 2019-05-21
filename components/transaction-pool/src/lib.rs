@@ -319,7 +319,7 @@ fn cache_broadcast_txs<N: Network>(network: N, receiver: Receiver<SignedTransact
             network.broadcast_batch(temp);
         }
 
-        match receiver.try_recv() {
+        match receiver.recv() {
             Ok(tx) => {
                 buffer_txs.push(tx);
             }
