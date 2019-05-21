@@ -21,7 +21,7 @@ impl TransactionPool for OutboundHandle {
             outbound.silent_broadcast(Method::BroadcastTxs, data, Mode::Normal);
         };
 
-        tokio::run(job.unit_error().boxed().compat());
+        tokio::spawn(job.unit_error().boxed().compat());
     }
 
     fn pull_txs(
