@@ -10,7 +10,7 @@ use std::thread::spawn;
 use futures::prelude::{FutureExt, TryFutureExt};
 use futures01::future::Future as Future01;
 
-use components_database::rocks::RocksDB;
+use components_database::rocks::{Config as RocksDBConfig, RocksDB};
 use components_executor::evm::{EVMBlockDataProvider, EVMExecutor};
 use components_executor::TrieDB;
 use components_jsonrpc;
@@ -73,8 +73,11 @@ fn start(cfg: &Config) {
     let secp = Arc::new(Secp256k1::new());
 
     // new db
-    let block_db = Arc::new(RocksDB::new(cfg.data_path_for_block().to_str().unwrap()).unwrap());
-    let state_db = Arc::new(RocksDB::new(cfg.data_path_for_state().to_str().unwrap()).unwrap());
+    let db_cfg = rocksdb_cfg_from(cfg);
+    let block_path = cfg.data_path_for_block();
+    let state_path = cfg.data_path_for_state();
+    let block_db = Arc::new(RocksDB::new(block_path, &db_cfg).unwrap());
+    let state_db = Arc::new(RocksDB::new(state_path, &db_cfg).unwrap());
 
     // new storage and trie db
     let storage = Arc::new(BlockStorage::new(Arc::clone(&block_db)));
@@ -213,11 +216,12 @@ fn handle_init(cfg: &Config, genesis_path: impl AsRef<Path>) -> Result<(), Box<d
     log::info!("Genesis data: {:?}", genesis);
 
     let ctx = Context::new();
+    let db_cfg = rocksdb_cfg_from(cfg);
 
     // Init Block db
     let path_block = cfg.data_path_for_block();
     log::info!("Data path for block: {:?}", path_block);
-    let block_disk_db = Arc::new(RocksDB::new(path_block.to_str().unwrap())?);
+    let block_disk_db = Arc::new(RocksDB::new(path_block, &db_cfg)?);
     let block_db = Arc::new(BlockStorage::new(block_disk_db));
 
     if block_db.get_latest_block(ctx.clone()).wait().is_ok() {
@@ -228,7 +232,7 @@ fn handle_init(cfg: &Config, genesis_path: impl AsRef<Path>) -> Result<(), Box<d
     // Init State db
     let path_state = cfg.data_path_for_state();
     log::info!("Data path for state: {:?}", path_state);
-    let state_disk_db = Arc::new(RocksDB::new(path_state.to_str().unwrap())?);
+    let state_disk_db = Arc::new(RocksDB::new(path_state, &db_cfg)?);
     let state_db = Arc::new(TrieDB::new(state_disk_db));
 
     let (_, state_root_hash) = EVMExecutor::from_genesis(
@@ -259,4 +263,19 @@ fn handle_init(cfg: &Config, genesis_path: impl AsRef<Path>) -> Result<(), Box<d
         .wait()?;
 
     Ok(())
+}
+
+fn rocksdb_cfg_from(cfg: &Config) -> RocksDBConfig {
+    RocksDBConfig {
+        block_size:                     cfg.rocksdb.block_size,
+        block_cache_size:               cfg.rocksdb.block_cache_size,
+        max_bytes_for_level_base:       cfg.rocksdb.max_bytes_for_level_base,
+        max_bytes_for_level_multiplier: cfg.rocksdb.max_bytes_for_level_multiplier,
+        write_buffer_size:              cfg.rocksdb.write_buffer_size,
+        target_file_size_base:          cfg.rocksdb.target_file_size_base,
+        max_write_buffer_number:        cfg.rocksdb.max_write_buffer_number,
+        max_background_compactions:     cfg.rocksdb.max_background_compactions,
+        max_background_flushes:         cfg.rocksdb.max_background_flushes,
+        increase_parallelism:           cfg.rocksdb.increase_parallelism,
+    }
 }

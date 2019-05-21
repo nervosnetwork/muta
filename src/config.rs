@@ -38,6 +38,20 @@ pub struct ConfigSynchronzer {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct ConfigRocksdb {
+    pub block_size:                     usize,
+    pub block_cache_size:               u64,
+    pub max_bytes_for_level_base:       u64,
+    pub max_bytes_for_level_multiplier: f64,
+    pub write_buffer_size:              usize,
+    pub target_file_size_base:          u64,
+    pub max_write_buffer_number:        i32,
+    pub max_background_compactions:     i32,
+    pub max_background_flushes:         i32,
+    pub increase_parallelism:           i32,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct Config {
     // crypto
     pub privkey: String,
@@ -49,6 +63,7 @@ pub struct Config {
     pub txpool:      ConfigTxPool,
     pub consensus:   ConfigConsensus,
     pub synchronzer: ConfigSynchronzer,
+    pub rocksdb:     ConfigRocksdb,
 }
 
 impl Config {
