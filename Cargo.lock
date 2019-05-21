@@ -582,7 +582,7 @@ dependencies = [
 
 [[package]]
 name = "cita-evm"
-version = "0.1.2"
+version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "env_logger 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -594,10 +594,10 @@ dependencies = [
 
 [[package]]
 name = "cita-state"
-version = "0.1.2"
+version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "cita_trie 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "cita_trie 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "ethereum-types 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "hashbrown 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -611,13 +611,13 @@ dependencies = [
 
 [[package]]
 name = "cita-vm"
-version = "0.1.2"
+version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "byteorder 1.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "cita-evm 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "cita-state 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "cita_trie 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "cita-evm 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "cita-state 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "cita_trie 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "ethereum-types 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "hashbrown 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -636,11 +636,12 @@ dependencies = [
 
 [[package]]
 name = "cita_trie"
-version = "0.3.1"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "bytes 0.4.12 (registry+https://github.com/rust-lang/crates.io-index)",
  "failure 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "parking_lot 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rlp 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "sha3 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "tiny-keccak 1.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -735,8 +736,8 @@ dependencies = [
 name = "components-executor"
 version = "0.1.0"
 dependencies = [
- "cita-vm 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "cita_trie 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "cita-vm 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "cita_trie 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "core-context 0.1.0",
  "core-crypto 0.1.0",
  "core-runtime 0.1.0",
@@ -744,8 +745,10 @@ dependencies = [
  "core-types 0.1.0",
  "ethereum-types 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.26 (registry+https://github.com/rust-lang/crates.io-index)",
+ "hashbrown 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "hex 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "parking_lot 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -934,7 +937,7 @@ version = "0.1.0"
 dependencies = [
  "bft-rs 0.2.0-alpha (git+https://github.com/cryptape/bft-rs.git?branch=v0.3)",
  "bytes 0.4.12 (registry+https://github.com/rust-lang/crates.io-index)",
- "cita-vm 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "cita-vm 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "core-context 0.1.0",
  "core-crypto 0.1.0",
  "core-serialization 0.1.0",
@@ -3687,10 +3690,10 @@ dependencies = [
 "checksum cfg-if 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)" = "11d43355396e872eefb45ce6342e4374ed7bc2b3a502d1b28e36d6e23c05d1f4"
 "checksum chashmap 2.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "ff41a3c2c1e39921b9003de14bf0439c7b63a9039637c291e1a64925d8ddfa45"
 "checksum chrono 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)" = "45912881121cb26fad7c38c17ba7daa18764771836b34fab7d3fbd93ed633878"
-"checksum cita-evm 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "2024252968d1c78bae61bb7d8e7b5f6f912a7c70972aff8b0897f0477669dd39"
-"checksum cita-state 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "011cc9479df6100aceb0226045a0fe5407aca1c081e822208fa085097d6d6337"
-"checksum cita-vm 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "d5ce52f9fe6510d7046c1b2392f7561feaf30a56122df22011bc6d9670bb42e9"
-"checksum cita_trie 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)" = "75b2bd3231f22b07623b73b95417beec7567fa6450ad687b398a042be70b13b2"
+"checksum cita-evm 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)" = "df501f365901a00be30a3e7808c34bccef86543194135b8a07c378d6263d9efb"
+"checksum cita-state 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)" = "df3abf1daedbd4586548f64671006754cc8fa931ac7865abcb4f4ce99e6e9169"
+"checksum cita-vm 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)" = "733d17fd1e10d8789c0112bec21a081a7e9b5c25ca0f99a79c301aec9b5224b5"
+"checksum cita_trie 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)" = "40ec971e37efbd958ddc3500de0364a7b136843743cced5d7c7810b36bf7b936"
 "checksum clang-sys 0.26.4 (registry+https://github.com/rust-lang/crates.io-index)" = "6ef0c1bcf2e99c649104bd7a7012d8f8802684400e03db0ec0af48583c6fa0e4"
 "checksum clap 2.32.0 (registry+https://github.com/rust-lang/crates.io-index)" = "b957d88f4b6a63b9d70d5f454ac8011819c6efa7727858f458ab71c756ce2d3e"
 "checksum cloudabi 0.0.3 (registry+https://github.com/rust-lang/crates.io-index)" = "ddfc5b9aa5d4507acaf872de71051dfd0e309860e88966e1051e462a077aac4f"
