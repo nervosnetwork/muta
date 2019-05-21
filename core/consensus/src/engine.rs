@@ -16,7 +16,6 @@ use core_pubsub::{channel::pubsub::Sender, register::Register, PUBSUB_BROADCAST_
 use core_runtime::{
     ExecutionContext, ExecutionResult, Executor, Storage, StorageError, TransactionPool,
 };
-use core_serialization::{AsyncCodec, Proposal as SerProposal};
 use core_types::{
     Address, Block, BlockHeader, Hash, Proof, Proposal, SignedTransaction, TransactionPosition,
 };
@@ -361,7 +360,7 @@ where
             ));
         }
 
-        let proposal: SerProposal = Proposal {
+        let proposal = Proposal {
             prevhash:         block.header.prevhash.clone(),
             timestamp:        block.header.timestamp,
             height:           block.header.height,
@@ -370,11 +369,8 @@ where
             transaction_root: Merkle::from_hashes(block.tx_hashes.clone()).get_root_hash(),
             tx_hashes:        block.tx_hashes.clone(),
             proof:            block.header.proof.clone(),
-        }
-        .into();
-        let proposal_bytes = await!(AsyncCodec::encode(proposal))?;
-        let proposal_hash = Hash::digest(&proposal_bytes);
-        if proof.proposal_hash != proposal_hash {
+        };
+        if proof.proposal_hash != proposal.hash() {
             return Err(ConsensusError::Internal(
                 "proof and proposal_hash hash not match".to_owned(),
             ));
