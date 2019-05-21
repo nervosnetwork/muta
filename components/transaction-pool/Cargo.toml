@@ -6,6 +6,8 @@ edition = "2018"
 
 [dependencies]
 common-cita = { path = "../../common/cita" }
+common-channel = { path = "../../common/channel" }
+
 core-types = { path = "../../core/types" }
 core-crypto = { path = "../../core/crypto" }
 core-runtime = { path = "../../core/runtime" }

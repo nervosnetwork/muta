@@ -2,6 +2,7 @@
 
 mod cache;
 
+use std::mem;
 use std::string::ToString;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -11,6 +12,7 @@ use futures03::{
     prelude::{FutureExt, TryFutureExt},
 };
 
+use common_channel::{unbounded, Receiver, Sender};
 use core_context::{Context, ORIGIN};
 use core_crypto::Crypto;
 use core_runtime::network::TransactionPool as Network;
@@ -20,16 +22,19 @@ use core_types::{Hash, SignedTransaction, Transaction, UnverifiedTransaction};
 
 use crate::cache::TxCache;
 
+const CACHE_BROOADCAST_LEN: usize = 100;
+
 pub struct HashTransactionPool<S, C, N> {
     pool_size:         usize,
     until_block_limit: u64,
     quota_limit:       u64,
 
-    tx_cache:       Arc<TxCache>,
-    callback_cache: Arc<TxCache>,
-    storage:        Arc<S>,
-    crypto:         Arc<C>,
-    network:        N,
+    tx_cache:               Arc<TxCache>,
+    callback_cache:         Arc<TxCache>,
+    storage:                Arc<S>,
+    crypto:                 Arc<C>,
+    network:                N,
+    cache_broadcast_sender: Sender<SignedTransaction>,
 
     latest_height: Arc<AtomicU64>,
 }
@@ -38,7 +43,7 @@ impl<S, C, N> HashTransactionPool<S, C, N>
 where
     S: Storage,
     C: Crypto,
-    N: Network,
+    N: Network + 'static,
 {
     pub fn new(
         storage: Arc<S>,
@@ -49,6 +54,11 @@ where
         quota_limit: u64,
         latest_height: u64,
     ) -> Self {
+        let (cache_broadcast_sender, cache_broadcast_receiver) = unbounded();
+        let network2 = network.clone();
+
+        rayon::spawn(move || cache_broadcast_txs(network2, cache_broadcast_receiver));
+
         HashTransactionPool {
             pool_size,
             until_block_limit,
@@ -59,6 +69,7 @@ where
             storage,
             crypto,
             network,
+            cache_broadcast_sender,
 
             latest_height: Arc::new(AtomicU64::new(latest_height)),
         }
@@ -79,7 +90,7 @@ where
         let storage = Arc::clone(&self.storage);
         let crypto = Arc::clone(&self.crypto);
         let tx_cache = Arc::clone(&self.tx_cache);
-        let network = self.network.clone();
+        let cache_broadcast_sender = self.cache_broadcast_sender.clone();
 
         let pool_size = self.pool_size;
         let until_block_limit = self.until_block_limit;
@@ -134,7 +145,9 @@ where
 
             // 6. network tx
             if let Some(TransactionOrigin::Jsonrpc) = ctx.get::<TransactionOrigin>(ORIGIN) {
-                network.broadcast_batch(vec![signed_tx.clone()]);
+                if let Err(e) = cache_broadcast_sender.try_send(signed_tx.clone()) {
+                    log::error!("cache broadcast sender {:?}", e)
+                };
             }
 
             Ok(signed_tx)
@@ -293,9 +306,31 @@ fn internal_error(e: impl ToString) -> TransactionPoolError {
     TransactionPoolError::Internal(e.to_string())
 }
 
+// TODO: If the number of transactions does not satisfy "CACHE_BROOADCAST_LEN",
+// does it need to set up a timed broadcast?
+fn cache_broadcast_txs<N: Network>(network: N, receiver: Receiver<SignedTransaction>) {
+    let mut buffer_txs: Vec<SignedTransaction> = Vec::with_capacity(CACHE_BROOADCAST_LEN);
+
+    loop {
+        if buffer_txs.len() >= CACHE_BROOADCAST_LEN {
+            let mut temp = Vec::with_capacity(CACHE_BROOADCAST_LEN);
+            mem::swap(&mut buffer_txs, &mut temp);
+
+            network.broadcast_batch(temp);
+        }
+
+        match receiver.try_recv() {
+            Ok(tx) => {
+                buffer_txs.push(tx);
+            }
+            Err(e) => log::error!("cache broadcast receiver {:?}", e),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
+    use std::sync::{Arc, RwLock};
 
     use futures::future::{ok, Future};
 
@@ -311,14 +346,16 @@ mod tests {
     use core_storage::BlockStorage;
     use core_types::{Address, Block, Hash, SignedTransaction, Transaction, UnverifiedTransaction};
 
-    use super::{HashTransactionPool, Network};
+    use super::{HashTransactionPool, Network, CACHE_BROOADCAST_LEN};
 
     #[derive(Clone)]
-    struct NetworkMock;
+    struct NetworkMock {
+        pub txs: Arc<RwLock<Vec<SignedTransaction>>>,
+    }
 
     impl Network for NetworkMock {
-        fn broadcast_batch(&self, _: Vec<SignedTransaction>) {
-            panic!("should not broadcast inserted txs");
+        fn broadcast_batch(&self, txs: Vec<SignedTransaction>) {
+            self.txs.write().unwrap().extend(txs);
         }
 
         fn pull_txs(
@@ -395,31 +432,6 @@ mod tests {
         tx_pool.insert(ctx.clone(), untx).wait().unwrap();
         let result = tx_pool.insert(ctx.clone(), untx2).wait();
         assert_eq!(result, Err(TransactionPoolError::Dup));
-    }
-
-    // only transactions from jsonrpc will trigger broadcasting
-    #[test]
-    #[should_panic(expected = "should not broadcast inserted txs")]
-    fn test_insert_transaction_from_jsonrpc() {
-        let ctx = Context::new();
-        let pool_size = 1000;
-        let until_block_limit = 100;
-        let quota_limit = 10000;
-        let height = 100;
-
-        let tx_pool = new_test_pool(
-            ctx.clone(),
-            None,
-            pool_size,
-            until_block_limit,
-            quota_limit,
-            height,
-        );
-
-        // test normal
-        let untx = mock_transaction(100, height + until_block_limit, "test_normal".to_owned());
-        let origin_ctx = ctx.with_value::<TransactionOrigin>(ORIGIN, TransactionOrigin::Jsonrpc);
-        tx_pool.insert(origin_ctx, untx).wait().unwrap();
     }
 
     #[test]
@@ -718,6 +730,42 @@ mod tests {
         assert_eq!(tx_pool.callback_cache.len(), 0);
     }
 
+    #[test]
+    fn test_broadcast_txs() {
+        let ctx = Context::new().with_value(ORIGIN, TransactionOrigin::Jsonrpc);
+        let pool_size = 1000;
+        let until_block_limit = 100;
+        let quota_limit = 10000;
+        let height = 100;
+
+        let network = NetworkMock {
+            txs: Arc::new(RwLock::new(vec![])),
+        };
+        let network1 = network.clone();
+
+        let tx_pool = new_test_pool_with_network(
+            ctx.clone(),
+            None,
+            pool_size,
+            until_block_limit,
+            quota_limit,
+            height,
+            network,
+        );
+
+        for i in 0..=CACHE_BROOADCAST_LEN + 10 {
+            let untx = mock_transaction(100, height + until_block_limit, format!("test{}", i));
+
+            if i == CACHE_BROOADCAST_LEN {
+                tx_pool.insert(Context::new(), untx).wait().unwrap();
+            } else {
+                tx_pool.insert(ctx.clone(), untx).wait().unwrap();
+            }
+        }
+
+        assert_eq!(network1.txs.read().unwrap().len(), CACHE_BROOADCAST_LEN);
+    }
+
     fn new_test_pool(
         ctx: Context,
         storage: Option<Arc<BlockStorage<MemoryDB>>>,
@@ -739,7 +787,42 @@ mod tests {
             storage
         });
 
-        let network = NetworkMock;
+        let network = NetworkMock {
+            txs: Arc::new(RwLock::new(vec![])),
+        };
+
+        HashTransactionPool::new(
+            storage,
+            secp,
+            network,
+            size,
+            until_block_limit,
+            quota_limit,
+            height,
+        )
+    }
+
+    fn new_test_pool_with_network(
+        ctx: Context,
+        storage: Option<Arc<BlockStorage<MemoryDB>>>,
+        size: usize,
+        until_block_limit: u64,
+        quota_limit: u64,
+        height: u64,
+        network: NetworkMock,
+    ) -> HashTransactionPool<BlockStorage<MemoryDB>, Secp256k1, NetworkMock> {
+        let secp = Arc::new(Secp256k1::new());
+
+        let storage = storage.unwrap_or_else(|| {
+            let db = Arc::new(MemoryDB::new());
+            let storage = Arc::new(BlockStorage::new(db));
+
+            let mut block = Block::default();
+            block.header.height = height;
+
+            storage.insert_block(ctx.clone(), block).wait().unwrap();
+            storage
+        });
 
         HashTransactionPool::new(
             storage,

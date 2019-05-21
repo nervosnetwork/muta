@@ -788,6 +788,7 @@ name = "components-transaction-pool"
 version = "0.1.0"
 dependencies = [
  "chashmap 2.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "common-channel 0.1.0",
  "common-cita 0.1.0",
  "components-database 0.1.0",
  "core-context 0.1.0",
