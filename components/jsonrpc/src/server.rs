@@ -371,7 +371,7 @@ where
             }
         }
     };
-    rayon::spawn(move || {
+    std::thread::spawn(move || {
         futures::executor::block_on(fut);
     });
 
