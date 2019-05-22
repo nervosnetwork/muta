@@ -186,7 +186,7 @@ fn start(cfg: &Config) {
         Arc::clone(&consensus),
         Arc::clone(&storage),
     );
-    rayon::spawn(move || tokio::run(network.run().unit_error().boxed().compat()));
+    std::thread::spawn(move || tokio::run(network.run().unit_error().boxed().compat()));
 
     // start synchronizer
     let sub_block2 = pubsub

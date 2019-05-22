@@ -57,7 +57,7 @@ where
         let (cache_broadcast_sender, cache_broadcast_receiver) = unbounded();
         let network2 = network.clone();
 
-        rayon::spawn(move || cache_broadcast_txs(network2, cache_broadcast_receiver));
+        std::thread::spawn(move || cache_broadcast_txs(network2, cache_broadcast_receiver));
 
         HashTransactionPool {
             pool_size,

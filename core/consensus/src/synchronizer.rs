@@ -47,7 +47,7 @@ where
                 .compat()
                 .map(std::result::Result::ok);
 
-        rayon::spawn(move || {
+        std::thread::spawn(move || {
             futures::executor::block_on(
                 futures::stream::select(sub_block.boxed(), interval_broadcaster.boxed())
                     .filter_map(future::ready)
