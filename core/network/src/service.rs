@@ -169,7 +169,7 @@ where
                 .compat(),
         );
 
-        await!(self.for_each(async move |_| ()))
+        self.for_each(async move |_| ()).await
     }
 
     pub fn outbound(&self) -> OutboundHandle {

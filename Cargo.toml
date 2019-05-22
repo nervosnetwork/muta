@@ -23,6 +23,7 @@ core-context = { path = "core/context" }
 core-pubsub = { path = "core/pubsub" }
 core-network = { path = "core/network" }
 
+rayon = "1.0"
 hex = "0.3"
 tokio = "0.1"
 clap = "2.32"
@@ -32,7 +33,7 @@ serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"
 futures01 = { package = "futures", version = "0.1" }
-futures-preview = { version = "=0.3.0-alpha.14", features = [ "compat" ] }
+futures-preview = { version = "0.3.0-alpha.16", features = [ "async-await", "nightly", "compat" ] }
 
 [workspace]
 members = [

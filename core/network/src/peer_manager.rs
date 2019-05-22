@@ -7,10 +7,10 @@ use futures::compat::Stream01CompatExt;
 use futures::future::{ready, FutureObj};
 use futures::prelude::{FutureExt, Stream, StreamExt, TryFutureExt};
 use futures::task::{AtomicWaker, Context, Poll};
-use hashbrown::HashSet;
 use log::{debug, error};
 use parking_lot::RwLock;
 use rand::seq::SliceRandom;
+use std::collections::HashSet;
 use tentacle::{multiaddr::Multiaddr, service::DialProtocol};
 use tokio::timer::Interval;
 
@@ -88,7 +88,7 @@ impl DefaultPeerManager {
                 });
 
             tokio::spawn(routine_job.unit_error().boxed().compat());
-            await!(self.for_each(async move |_| ()));
+            self.for_each(async move |_| ()).await;
         };
 
         FutureObj::new(Box::new(job))

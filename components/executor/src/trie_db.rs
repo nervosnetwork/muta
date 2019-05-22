@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use futures::future::Future;
-use hashbrown::HashMap;
 use parking_lot::RwLock;
+use std::collections::HashMap;
 
 use core_context::Context;
 use core_runtime::{DataCategory, Database, DatabaseError};

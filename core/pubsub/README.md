@@ -36,7 +36,7 @@ Then, get started. In your application, add:
 
 ```rust
 // The nightly features that are commonly needed with async/await
-#![feature(await_macro, async_await, futures_api)]
+#![feature(async_await)]
 
 use std::thread::spawn;
 

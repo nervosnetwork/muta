@@ -7,4 +7,4 @@ description = "crossbeam-channel wrapper with async/await support"
 
 [dependencies]
 crossbeam-channel = "0.3"
-futures-preview = "0.3.0-alpha.14"
+futures-preview = "0.3.0-alpha.16"

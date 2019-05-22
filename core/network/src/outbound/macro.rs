@@ -29,7 +29,7 @@ macro_rules! callback_broadcast {
             $outbound.callback.insert(uid, done_tx);
 
             // TODO: Timeout
-            await!(done_rx.next()).ok_or($err_ty(format!(
+            done_rx.next().await.ok_or($err_ty(format!(
                 "net [outbound]: {}: done_rx return None",
                 s_method
             )))

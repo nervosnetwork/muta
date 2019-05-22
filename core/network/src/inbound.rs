@@ -98,18 +98,18 @@ where
             let method = Method::from_u32(method)?;
             match method {
                 Method::PullTxs | Method::PushTxs | Method::BroadcastTxs => {
-                    await!(tx_pool.react(ctx, method, data.to_vec()))?
+                    tx_pool.react(ctx, method, data.to_vec()).await?
                 }
 
                 Method::Proposal | Method::Vote => {
-                    await!(consensus.react(ctx, method, data.to_vec()))?
+                    consensus.react(ctx, method, data.to_vec()).await?
                 }
 
                 Method::SyncBroadcastStatus
                 | Method::SyncPullBlocks
                 | Method::SyncPushBlocks
                 | Method::SyncPullTxs
-                | Method::SyncPushTxs => await!(sync.react(ctx, method, data.to_vec()))?,
+                | Method::SyncPushTxs => sync.react(ctx, method, data.to_vec()).await?,
             }
 
             Ok(())

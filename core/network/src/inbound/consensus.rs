@@ -32,8 +32,8 @@ where
 
     pub async fn react(&self, ctx: Context, method: Method, data: Vec<u8>) -> Result<(), Error> {
         match method {
-            Method::Proposal => await!(self.handle_proposal(ctx, data))?,
-            Method::Vote => await!(self.handle_vote(ctx, data))?,
+            Method::Proposal => self.handle_proposal(ctx, data).await?,
+            Method::Vote => self.handle_vote(ctx, data).await?,
             _ => Err(Error::UnknownMethod(method.to_u32()))?,
         };
 
@@ -43,7 +43,10 @@ where
     pub async fn handle_proposal(&self, ctx: Context, msg: Vec<u8>) -> Result<(), Error> {
         let proposal = <Proposal as Codec>::decode(msg.as_slice())?;
 
-        await!(self.consensus.set_proposal(ctx, proposal.des()).compat())?;
+        self.consensus
+            .set_proposal(ctx, proposal.des())
+            .compat()
+            .await?;
 
         Ok(())
     }
@@ -51,7 +54,7 @@ where
     pub async fn handle_vote(&self, ctx: Context, msg: Vec<u8>) -> Result<(), Error> {
         let vote = <Vote as Codec>::decode(msg.as_slice())?;
 
-        await!(self.consensus.set_vote(ctx, vote.des()).compat())?;
+        self.consensus.set_vote(ctx, vote.des()).compat().await?;
 
         Ok(())
     }

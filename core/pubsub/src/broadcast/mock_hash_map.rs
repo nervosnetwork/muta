@@ -60,7 +60,9 @@ where
         self
     }
 
-    pub fn or_insert(&mut self, mut val: V) -> &mut V {
+    pub fn or_insert_with<F: FnOnce() -> V>(&mut self, default: F) -> &mut V {
+        let mut val = default();
+
         assert!(
             self.latest_entry.is_some(),
             "call or_insert() before entry()"

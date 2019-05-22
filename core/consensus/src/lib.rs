@@ -1,7 +1,7 @@
 // Remove this clippy bug with async await is resolved.
 // ISSUE: https://github.com/rust-lang/rust-clippy/issues/3988
 #![allow(clippy::needless_lifetimes)]
-#![feature(async_await, await_macro, futures_api, try_trait)]
+#![feature(async_await, try_trait)]
 
 mod bft;
 mod engine;

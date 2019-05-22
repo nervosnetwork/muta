@@ -4,8 +4,8 @@ use std::marker::{Send, Sync};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
-use hashbrown::HashMap;
 use parking_lot::RwLock;
+use std::collections::HashMap;
 
 type CallMap = HashMap<u64, Arc<Box<dyn Any + 'static>>>;
 

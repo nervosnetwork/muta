@@ -134,7 +134,9 @@ where
         let bft = self.clone();
 
         let fut = async move {
-            await!(bft.engine.insert_sync_block(ctx, block, stxs, proof))?;
+            bft.engine
+                .insert_sync_block(ctx, block, stxs, proof)
+                .await?;
             Ok(())
         };
 

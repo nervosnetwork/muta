@@ -47,10 +47,9 @@ where
                 .compat()
                 .map(std::result::Result::ok);
 
-        std::thread::spawn(move || {
+        rayon::spawn(move || {
             futures::executor::block_on(
-                sub_block
-                    .select(interval_broadcaster)
+                futures::stream::select(sub_block.boxed(), interval_broadcaster.boxed())
                     .filter_map(future::ready)
                     .for_each(move |block| {
                         let status = SyncStatus {

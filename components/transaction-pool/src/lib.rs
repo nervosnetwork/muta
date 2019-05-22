@@ -1,4 +1,4 @@
-#![feature(async_await, await_macro, integer_atomics, futures_api, test)]
+#![feature(async_await, integer_atomics, test)]
 
 mod cache;
 
@@ -120,7 +120,11 @@ where
             let sender = crypto.pubkey_to_address(&pubkey);
 
             // 4. check if the transaction is in histories block.
-            match await!(storage.get_transaction(ctx.clone(), &tx_hash).compat()) {
+            match storage
+                .get_transaction(ctx.clone(), &tx_hash)
+                .compat()
+                .await
+            {
                 Ok(_) => Err(TransactionPoolError::Dup)?,
                 Err(StorageError::None(_)) => {}
                 Err(e) => Err(internal_error(e))?,
@@ -257,7 +261,7 @@ where
             let unknown = tx_cache.contains_keys(&tx_hashes);
 
             if !unknown.is_empty() {
-                let sig_txs = await!(network.pull_txs(ctx, unknown.clone()).compat())?;
+                let sig_txs = network.pull_txs(ctx, unknown.clone()).compat().await?;
                 if sig_txs.len() != unknown.len() {
                     return Err(TransactionPoolError::NotExpected);
                 }

@@ -63,11 +63,11 @@ where
 
     pub async fn react(&self, ctx: Context, method: Method, data: Vec<u8>) -> Result<(), Error> {
         match method {
-            Method::SyncBroadcastStatus => await!(self.handle_broadcast_status(ctx, data))?,
-            Method::SyncPullBlocks => await!(self.handle_pull_blocks(ctx, data))?,
-            Method::SyncPushBlocks => await!(self.handle_push_blocks(ctx, data))?,
-            Method::SyncPullTxs => await!(self.handle_pull_txs(ctx, data))?,
-            Method::SyncPushTxs => await!(self.handle_push_txs(ctx, data))?,
+            Method::SyncBroadcastStatus => self.handle_broadcast_status(ctx, data).await?,
+            Method::SyncPullBlocks => self.handle_pull_blocks(ctx, data).await?,
+            Method::SyncPushBlocks => self.handle_push_blocks(ctx, data).await?,
+            Method::SyncPullTxs => self.handle_pull_txs(ctx, data).await?,
+            Method::SyncPushTxs => self.handle_push_txs(ctx, data).await?,
             _ => Err(Error::UnknownMethod(method.to_u32()))?,
         };
 
@@ -76,14 +76,14 @@ where
 
     pub async fn handle_broadcast_status(&self, ctx: Context, data: Vec<u8>) -> Result<(), Error> {
         let status = <BroadcastStatus as Codec>::decode(data.as_slice())?;
-        let mut current_height = await!(self.current_height.lock());
+        let mut current_height = self.current_height.lock().await;
 
         let global_height = status.height;
         if global_height <= *current_height {
             return Ok(());
         }
 
-        let latest_block: Block = await!(self.storage.get_latest_block(ctx.clone()).compat())?;
+        let latest_block: Block = self.storage.get_latest_block(ctx.clone()).compat().await?;
         *current_height = latest_block.header.height;
         // ignore update process if height difference is less than or equal to 1,
         // wait for consensus to catch up
@@ -97,7 +97,11 @@ where
         let mut all_blocks = vec![];
         for height in ((*current_height + 1)..=global_height).step_by(SYNC_STEP as usize) {
             let heights = (height..(height + SYNC_STEP)).collect::<Vec<_>>();
-            let mut blocks = await!(self.outbound.pull_blocks(ctx.clone(), heights).compat())?;
+            let mut blocks = self
+                .outbound
+                .pull_blocks(ctx.clone(), heights)
+                .compat()
+                .await?;
             all_blocks.append(&mut blocks);
             let last_index = all_blocks.len() - 1;
             for i in 0..last_index {
@@ -107,21 +111,21 @@ where
                     vec![]
                 } else {
                     // todo: if there are too many txes, split it into small request
-                    await!(self
-                        .outbound
+                    self.outbound
                         .pull_txs_sync(ctx.clone(), &block.tx_hashes)
-                        .compat())?
+                        .compat()
+                        .await?
                 };
-                await!(self
-                    .consensus
+                self.consensus
                     .insert_sync_block(ctx.clone(), block, signed_txs, proof)
-                    .compat())?;
+                    .compat()
+                    .await?;
             }
             all_blocks = all_blocks.split_off(last_index);
         }
 
         // send status after synchronizing blocks, trigger bft
-        await!(self.consensus.send_status().compat())?;
+        self.consensus.send_status().compat().await?;
 
         Ok(())
     }
@@ -130,16 +134,17 @@ where
         let PullBlocks { uid, heights } = <PullBlocks as Codec>::decode(data.as_slice())?;
 
         let mut blocks = vec![];
-        let latest_proof = await!(self.storage.get_latest_proof(ctx.clone()).compat())?;
+        let latest_proof = self.storage.get_latest_proof(ctx.clone()).compat().await?;
         let current_height = latest_proof.height;
         for height in heights
             .into_iter()
             .filter(|height| *height <= current_height)
         {
-            let block = await!(self
+            let block = self
                 .storage
                 .get_block_by_height(ctx.clone(), height)
-                .compat())?;
+                .compat()
+                .await?;
 
             blocks.push(block);
             if height == current_height {
@@ -184,10 +189,11 @@ where
         let uid = pull_txs.uid;
         let hashes = pull_txs.des()?;
 
-        let stxs = await!(self
+        let stxs = self
             .storage
             .get_transactions(ctx.clone(), hashes.as_slice())
-            .compat())?;
+            .compat()
+            .await?;
 
         let push_txs = PushTxs::from(uid, stxs);
         let scope = scope_from_context(ctx).ok_or(Error::SessionIdNotFound)?;

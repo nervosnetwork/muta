@@ -1,8 +1,8 @@
 use std::iter::FromIterator;
 
-use hashbrown::HashSet;
 use log::warn;
 use rand::seq::SliceRandom;
+use std::collections::HashSet;
 use tentacle::{multiaddr::Multiaddr, SessionId};
 
 use crate::p2p::protocol::discovery::{AddressManager, MisbehaveResult, Misbehavior};

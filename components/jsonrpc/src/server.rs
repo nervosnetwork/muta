@@ -23,34 +23,30 @@ fn rpc_handle<E: 'static, T: 'static, S: 'static, C: 'static>(
     reqjson: web::Json<convention::Call>,
     app_state: web::Data<AppState<E, T, S, C>>,
     _req: HttpRequest,
-) -> Box<OldFuture<Item = HttpResponse, Error = actix_web::Error>>
+) -> impl OldFuture<Item = HttpResponse, Error = actix_web::Error>
 where
     E: Executor,
     T: TransactionPool,
     S: Storage,
     C: Crypto,
 {
-    match reqjson.into_inner() {
-        convention::Call::Single(req) => {
-            let fut = async move {
-                let result = await!(handle_one_request(req, app_state));
+    let fut = async move {
+        match reqjson.into_inner() {
+            convention::Call::Single(req) => {
+                let result = handle_one_request(req, app_state).await;
                 Ok(HttpResponse::Ok().json(result))
-            };
-            Box::new(fut.boxed().compat())
-        }
-        convention::Call::Batch(reqs) => {
-            let mut results = vec![];
-            let fut = async move {
+            }
+            convention::Call::Batch(reqs) => {
+                let mut results = vec![];
                 for req in reqs {
-                    let result = await!(handle_one_request(req, app_state.clone()));
+                    let result = handle_one_request(req, app_state.clone()).await;
                     results.push(result);
                 }
                 Ok(HttpResponse::Ok().json(results))
-            };
-
-            Box::new(fut.boxed().compat())
+            }
         }
-    }
+    };
+    fut.boxed().compat()
 }
 
 async fn handle_one_request<E: 'static, T: 'static, S: 'static, C: 'static>(
@@ -66,12 +62,12 @@ where
     let mut result = convention::Response::default();
     result.id = req.id.clone();
 
-    match await!(rpc_select(
+    match rpc_select(
         app_state.get_ref().clone(),
         req.method.clone(),
-        req.params.clone()
+        req.params.clone(),
     )
-    .compat())
+    .await
     {
         Ok(ok) => result.result = Some(ok),
         Err(e) => result.error = Some(e),
@@ -100,240 +96,256 @@ fn get_string(
 }
 
 #[allow(clippy::cognitive_complexity)]
-fn rpc_select<E: 'static, T: 'static, S: 'static, C: 'static>(
+async fn rpc_select<E: 'static, T: 'static, S: 'static, C: 'static>(
     app_state: AppState<E, T, S, C>,
     method: String,
     params: Option<Vec<Value>>,
-) -> Box<OldFuture<Item = Value, Error = convention::ErrorData>>
+) -> Result<Value, convention::ErrorData>
 where
     E: Executor,
     T: TransactionPool,
     S: Storage,
     C: Crypto,
 {
-    let fut = async move {
-        let params = params.unwrap_or_default();
-        match method.as_str() {
-            // Get block number. CITA api needs hex string with 0x prefix.
-            "blockNumber" => {
-                let r = await!(app_state.block_number())?;
-                Ok(Value::from(format!("{:#x}", r)))
-            }
-            // Call contract in readonly mode.
-            "call" => {
-                let req: cita::CallRequest = serde_json::from_value(
-                    params
-                        .get(0)
-                        .ok_or_else(|| convention::ErrorData::std(-32602))?
-                        .clone(),
-                )?;
-                let number = get_string(params, 1, false)?;
-                let r = await!(app_state.call(number, req))?;
-                Ok(serde_json::to_value(r).unwrap())
-            }
-            // Get Abi
-            "getAbi" => {
-                let addr_str = get_string(params.clone(), 0, true)?;
-                let addr = Address::from_hex(clean_0x(&addr_str[..]))?;
-                let number = get_string(params, 1, false)?;
-                let r = await!(app_state.get_abi(addr, number))?;
-                Ok(serde_json::to_value(r).unwrap())
-            }
-            // Get balance by [address, block number].
-            "getBalance" => {
-                let addr_str = get_string(params.clone(), 0, true)?;
-                let addr = Address::from_hex(clean_0x(&addr_str[..]))?;
-                let number = get_string(params, 1, false)?;
-                let r = await!(app_state.get_balance(number, addr))?;
-                Ok(Value::from(format!("{:#x}", r)))
-            }
-            // Get Block by [hash, include_tx]
-            "getBlockByHash" => {
-                let hash_str = get_string(params.clone(), 0, true)?;
-                let hash = Hash::from_hex(clean_0x(&hash_str[..]))?;
-                let include_tx = params
-                    .get(1)
-                    .ok_or_else(|| convention::ErrorData::std(-32602))?
-                    .as_bool()
-                    .unwrap_or_default();
-                let r = await!(app_state.get_block_by_hash(hash, include_tx))?;
-                Ok(serde_json::to_value(r).unwrap())
-            }
-            // Get Block by [number, include_tx]
-            "getBlockByNumber" => {
-                let number = get_string(params.clone(), 0, false)?;
-                let include_tx = params
-                    .get(1)
-                    .ok_or_else(|| convention::ErrorData::std(-32602))?
-                    .as_bool()
-                    .unwrap_or_default();
-                let r = await!(app_state.get_block_by_number(number, include_tx))?;
-                Ok(serde_json::to_value(r).unwrap())
-            }
-            // Get BlockHeader by [number]
-            "getBlockHeader" => {
-                let number = get_string(params, 0, false)?;
-                let r = await!(app_state.get_block_header(number))?;
-                Ok(serde_json::to_value(r).unwrap())
-            }
-            // Get Code
-            "getCode" => {
-                let addr_str = get_string(params.clone(), 0, true)?;
-                let addr = Address::from_hex(clean_0x(&addr_str[..]))?;
-                let number = get_string(params, 1, false)?;
-                match await!(app_state.get_code(addr, number)) {
-                    Ok(ok) => Ok(serde_json::to_value(ok).unwrap()),
-                    Err(e) => Err(convention::ErrorData::from(e)),
-                }
-            }
-            // Get Filter logs by filter id
-            "getFilterChanges" => {
-                let id = get_string(params, 0, true)?;
-                let id_u64 = u64::from_str_radix(clean_0x(&id[..]), 16)?;
-                let r = await!(app_state.filterdb.write().compat())
-                    .unwrap()
-                    .filter_changes(id_u64 as u32);
-                Ok(serde_json::to_value(r).unwrap())
-            }
-            // Get logs by filter
-            "getLogs" => {
-                let filter: cita::Filter = serde_json::from_value(
-                    params
-                        .get(0)
-                        .ok_or_else(|| convention::ErrorData::std(-32602))?
-                        .clone(),
-                )?;
-                let r = await!(app_state.get_logs(filter))?;
-                Ok(serde_json::to_value(r).unwrap())
-            }
-            // Get Metadata of this chain
-            "getMetaData" => {
-                let number = get_string(params, 0, false)?;
-                let r = await!(app_state.get_metadata(number))?;
-                Ok(serde_json::to_value(r).unwrap())
-            }
-            // Get proof of state by [address, key_hash, block_number]
-            "getStateProof" => {
-                let addr_str = get_string(params.clone(), 0, true)?;
-                let addr = Address::from_hex(clean_0x(&addr_str[..]))?;
-                let hash_str = get_string(params.clone(), 1, true)?;
-                let hash = Hash::from_hex(clean_0x(&hash_str[..]))?;
-                let number = get_string(params, 2, false)?;
-                match await!(app_state.get_state_proof(addr, hash, number)) {
-                    Ok(ok) => Ok(Value::from(hex::encode(ok))),
-                    Err(RpcError::StorageError(StorageError::None(_))) => Ok(Value::Null),
-                    Err(e) => Err(convention::ErrorData::from(e)),
-                }
-            }
-            // Get value of key in storage by [address, key_hash, block_number]
-            "getStorageAt" => {
-                let addr_str = get_string(params.clone(), 0, true)?;
-                let addr = Address::from_hex(clean_0x(&addr_str[..]))?;
-                let hash_str = get_string(params.clone(), 1, true)?;
-                let hash = Hash::from_hex(clean_0x(&hash_str[..]))?;
-                let number = get_string(params, 2, false)?;
-                match await!(app_state.get_storage_at(addr, hash.as_fixed_bytes().into(), number)) {
-                    Ok(ok) => Ok(serde_json::to_value(ok).unwrap()),
-                    Err(RpcError::StorageError(StorageError::None(_))) => Ok(Value::Null),
-                    Err(e) => Err(convention::ErrorData::from(e)),
-                }
-            }
-            // Get transaction by hash
-            "getTransaction" => {
-                let hash_str = get_string(params, 0, true)?;
-                let hash = Hash::from_hex(clean_0x(&hash_str[..]))?;
-                match await!(app_state.get_transaction(hash)) {
-                    Ok(ok) => Ok(serde_json::to_value(ok).unwrap()),
-                    Err(RpcError::StorageError(StorageError::None(_))) => Ok(Value::Null),
-                    Err(e) => Err(convention::ErrorData::from(e)),
-                }
-            }
-            // Get the nonce of address
-            "getTransactionCount" => {
-                let addr_str = get_string(params.clone(), 0, true)?;
-                let addr = Address::from_hex(clean_0x(&addr_str[..]))?;
-                let number = get_string(params, 1, false)?;
-                let r = await!(app_state.get_transaction_count(addr, number))?;
-                Ok(Value::from(format!("{:#x}", r)))
-            }
-            // Get the proof of transaction by [tx_hash]
-            "getTransactionProof" => {
-                let hash_str = get_string(params, 0, true)?;
-                let hash = Hash::from_hex(clean_0x(&hash_str[..]))?;
-                match await!(app_state.get_transaction_proof(hash)) {
-                    Ok(ok) => Ok(Value::from(hex::encode(ok))),
-                    Err(RpcError::StorageError(StorageError::None(_))) => Ok(Value::Null),
-                    Err(e) => Err(convention::ErrorData::from(e)),
-                }
-            }
-            // Get receipt by transaction's hash
-            "getTransactionReceipt" => {
-                let hash_str = get_string(params, 0, true)?;
-                let hash = Hash::from_hex(clean_0x(&hash_str[..]))?;
-                match await!(app_state.get_transaction_receipt(hash)) {
-                    Ok(ok) => Ok(serde_json::to_value(ok).unwrap()),
-                    Err(RpcError::StorageError(StorageError::None(_))) => Ok(Value::Null),
-                    Err(e) => Err(convention::ErrorData::from(e)),
-                }
-            }
-            // Register a new block filter
-            "newBlockFilter" => {
-                let r = await!(app_state.filterdb.write().compat())
-                    .unwrap()
-                    .new_block_filter(0);
-                Ok(Value::from(format!("{:#x}", r)))
-            }
-            // Register a new filter
-            "newFilter" => {
-                let filter: cita::Filter = serde_json::from_value(
-                    params
-                        .get(0)
-                        .ok_or_else(|| convention::ErrorData::std(-32602))?
-                        .clone(),
-                )?;
-                let filter: Filter = filter.into();
-                let r = await!(app_state.filterdb.write().compat())
-                    .unwrap()
-                    .new_filter(filter);
-                Ok(Value::from(format!("{:#x}", r)))
-            }
-            // Get the count of peers
-            "peerCount" => {
-                let r = await!(app_state.peer_count())?;
-                Ok(Value::from(format!("{:#x}", r)))
-            }
-            // Test whether the server is still aliving. It's not in CITA spec.
-            "ping" => Ok(Value::from("pong")),
-            // Send a raw transaction to chain. Yes, indeed.
-            "sendTransaction" | "sendRawTransaction" => {
-                let data_str = get_string(params, 0, true)?;
-                let data = hex::decode(clean_0x(&data_str[..]))?;
-                let r = await!(app_state.send_raw_transaction(data))?;
-                Ok(serde_json::to_value(r).unwrap())
-            }
-            "uninstallFilter" => {
-                let id = get_string(params, 0, true)?;
-                let id_u64 = u64::from_str_radix(clean_0x(&id[..]), 16)?;
-                let r = await!(app_state.filterdb.write().compat())
-                    .unwrap()
-                    .uninstall(id_u64 as u32);
-                Ok(serde_json::to_value(r).unwrap())
-            }
-            // TODO: We used "wrk" and "lua script" for performance testing, but the binary and rust
-            // versions generated by "lua-protobuf" were inconsistent, so we provided an
-            // "sendUnsafeTransaction" interface for performance testing.
-            "sendUnsafeTransaction" => {
-                let data_str = get_string(params.clone(), 0, true)?;
-                let privkey_str = get_string(params.clone(), 1, true)?;
-                let data = hex::decode(clean_0x(&data_str[..]))?;
-                let privkey = hex::decode(clean_0x(&privkey_str[..]))?;
-                let r = await!(app_state.send_unsafe_transaction(data, privkey))?;
-                Ok(serde_json::to_value(r).unwrap())
-            }
-            _ => Err(convention::ErrorData::std(-32601)),
+    let params = params.unwrap_or_default();
+    match method.as_str() {
+        // Get block number. CITA api needs hex string with 0x prefix.
+        "blockNumber" => {
+            let r = app_state.block_number().await?;
+            Ok(Value::from(format!("{:#x}", r)))
         }
-    };
-    Box::new(fut.boxed().compat())
+        // Call contract in readonly mode.
+        "call" => {
+            let req: cita::CallRequest = serde_json::from_value(
+                params
+                    .get(0)
+                    .ok_or_else(|| convention::ErrorData::std(-32602))?
+                    .clone(),
+            )?;
+            let number = get_string(params, 1, false)?;
+            let r = app_state.call(number, req).await?;
+            Ok(serde_json::to_value(r).unwrap())
+        }
+        // Get Abi
+        "getAbi" => {
+            let addr_str = get_string(params.clone(), 0, true)?;
+            let addr = Address::from_hex(clean_0x(&addr_str[..]))?;
+            let number = get_string(params, 1, false)?;
+            let r = app_state.get_abi(addr, number).await?;
+            Ok(serde_json::to_value(r).unwrap())
+        }
+        // Get balance by [address, block number].
+        "getBalance" => {
+            let addr_str = get_string(params.clone(), 0, true)?;
+            let addr = Address::from_hex(clean_0x(&addr_str[..]))?;
+            let number = get_string(params, 1, false)?;
+            let r = app_state.get_balance(number, addr).await?;
+            Ok(Value::from(format!("{:#x}", r)))
+        }
+        // Get Block by [hash, include_tx]
+        "getBlockByHash" => {
+            let hash_str = get_string(params.clone(), 0, true)?;
+            let hash = Hash::from_hex(clean_0x(&hash_str[..]))?;
+            let include_tx = params
+                .get(1)
+                .ok_or_else(|| convention::ErrorData::std(-32602))?
+                .as_bool()
+                .unwrap_or_default();
+            let r = app_state.get_block_by_hash(hash, include_tx).await?;
+            Ok(serde_json::to_value(r).unwrap())
+        }
+        // Get Block by [number, include_tx]
+        "getBlockByNumber" => {
+            let number = get_string(params.clone(), 0, false)?;
+            let include_tx = params
+                .get(1)
+                .ok_or_else(|| convention::ErrorData::std(-32602))?
+                .as_bool()
+                .unwrap_or_default();
+            let r = app_state.get_block_by_number(number, include_tx).await?;
+            Ok(serde_json::to_value(r).unwrap())
+        }
+        // Get BlockHeader by [number]
+        "getBlockHeader" => {
+            let number = get_string(params, 0, false)?;
+            let r = app_state.get_block_header(number).await?;
+            Ok(serde_json::to_value(r).unwrap())
+        }
+        // Get Code
+        "getCode" => {
+            let addr_str = get_string(params.clone(), 0, true)?;
+            let addr = Address::from_hex(clean_0x(&addr_str[..]))?;
+            let number = get_string(params, 1, false)?;
+            match app_state.get_code(addr, number).await {
+                Ok(ok) => Ok(serde_json::to_value(ok).unwrap()),
+                Err(e) => Err(convention::ErrorData::from(e)),
+            }
+        }
+        // Get Filter logs by filter id
+        "getFilterChanges" => {
+            let id = get_string(params, 0, true)?;
+            let id_u64 = u64::from_str_radix(clean_0x(&id[..]), 16)?;
+            let r = app_state
+                .filterdb
+                .write()
+                .compat()
+                .await
+                .unwrap()
+                .filter_changes(id_u64 as u32);
+            Ok(serde_json::to_value(r).unwrap())
+        }
+        // Get logs by filter
+        "getLogs" => {
+            let filter: cita::Filter = serde_json::from_value(
+                params
+                    .get(0)
+                    .ok_or_else(|| convention::ErrorData::std(-32602))?
+                    .clone(),
+            )?;
+            let r = app_state.get_logs(filter).await?;
+            Ok(serde_json::to_value(r).unwrap())
+        }
+        // Get Metadata of this chain
+        "getMetaData" => {
+            let number = get_string(params, 0, false)?;
+            let r = app_state.get_metadata(number).await?;
+            Ok(serde_json::to_value(r).unwrap())
+        }
+        // Get proof of state by [address, key_hash, block_number]
+        "getStateProof" => {
+            let addr_str = get_string(params.clone(), 0, true)?;
+            let addr = Address::from_hex(clean_0x(&addr_str[..]))?;
+            let hash_str = get_string(params.clone(), 1, true)?;
+            let hash = Hash::from_hex(clean_0x(&hash_str[..]))?;
+            let number = get_string(params, 2, false)?;
+            match app_state.get_state_proof(addr, hash, number).await {
+                Ok(ok) => Ok(Value::from(hex::encode(ok))),
+                Err(RpcError::StorageError(StorageError::None(_))) => Ok(Value::Null),
+                Err(e) => Err(convention::ErrorData::from(e)),
+            }
+        }
+        // Get value of key in storage by [address, key_hash, block_number]
+        "getStorageAt" => {
+            let addr_str = get_string(params.clone(), 0, true)?;
+            let addr = Address::from_hex(clean_0x(&addr_str[..]))?;
+            let hash_str = get_string(params.clone(), 1, true)?;
+            let hash = Hash::from_hex(clean_0x(&hash_str[..]))?;
+            let number = get_string(params, 2, false)?;
+            match app_state
+                .get_storage_at(addr, hash.as_fixed_bytes().into(), number)
+                .await
+            {
+                Ok(ok) => Ok(serde_json::to_value(ok).unwrap()),
+                Err(RpcError::StorageError(StorageError::None(_))) => Ok(Value::Null),
+                Err(e) => Err(convention::ErrorData::from(e)),
+            }
+        }
+        // Get transaction by hash
+        "getTransaction" => {
+            let hash_str = get_string(params, 0, true)?;
+            let hash = Hash::from_hex(clean_0x(&hash_str[..]))?;
+            match app_state.get_transaction(hash).await {
+                Ok(ok) => Ok(serde_json::to_value(ok).unwrap()),
+                Err(RpcError::StorageError(StorageError::None(_))) => Ok(Value::Null),
+                Err(e) => Err(convention::ErrorData::from(e)),
+            }
+        }
+        // Get the nonce of address
+        "getTransactionCount" => {
+            let addr_str = get_string(params.clone(), 0, true)?;
+            let addr = Address::from_hex(clean_0x(&addr_str[..]))?;
+            let number = get_string(params, 1, false)?;
+            let r = app_state.get_transaction_count(addr, number).await?;
+            Ok(Value::from(format!("{:#x}", r)))
+        }
+        // Get the proof of transaction by [tx_hash]
+        "getTransactionProof" => {
+            let hash_str = get_string(params, 0, true)?;
+            let hash = Hash::from_hex(clean_0x(&hash_str[..]))?;
+            match app_state.get_transaction_proof(hash).await {
+                Ok(ok) => Ok(Value::from(hex::encode(ok))),
+                Err(RpcError::StorageError(StorageError::None(_))) => Ok(Value::Null),
+                Err(e) => Err(convention::ErrorData::from(e)),
+            }
+        }
+        // Get receipt by transaction's hash
+        "getTransactionReceipt" => {
+            let hash_str = get_string(params, 0, true)?;
+            let hash = Hash::from_hex(clean_0x(&hash_str[..]))?;
+            match app_state.get_transaction_receipt(hash).await {
+                Ok(ok) => Ok(serde_json::to_value(ok).unwrap()),
+                Err(RpcError::StorageError(StorageError::None(_))) => Ok(Value::Null),
+                Err(e) => Err(convention::ErrorData::from(e)),
+            }
+        }
+        // Register a new block filter
+        "newBlockFilter" => {
+            let r = app_state
+                .filterdb
+                .write()
+                .compat()
+                .await
+                .unwrap()
+                .new_block_filter(0);
+            Ok(Value::from(format!("{:#x}", r)))
+        }
+        // Register a new filter
+        "newFilter" => {
+            let filter: cita::Filter = serde_json::from_value(
+                params
+                    .get(0)
+                    .ok_or_else(|| convention::ErrorData::std(-32602))?
+                    .clone(),
+            )?;
+            let filter: Filter = filter.into();
+            let r = app_state
+                .filterdb
+                .write()
+                .compat()
+                .await
+                .unwrap()
+                .new_filter(filter);
+            Ok(Value::from(format!("{:#x}", r)))
+        }
+        // Get the count of peers
+        "peerCount" => {
+            let r = app_state.peer_count().await?;
+            Ok(Value::from(format!("{:#x}", r)))
+        }
+        // Test whether the server is still aliving. It's not in CITA spec.
+        "ping" => Ok(Value::from("pong")),
+        // Send a raw transaction to chain. Yes, indeed.
+        "sendTransaction" | "sendRawTransaction" => {
+            let data_str = get_string(params, 0, true)?;
+            let data = hex::decode(clean_0x(&data_str[..]))?;
+            let r = app_state.send_raw_transaction(data).await?;
+            Ok(serde_json::to_value(r).unwrap())
+        }
+        "uninstallFilter" => {
+            let id = get_string(params, 0, true)?;
+            let id_u64 = u64::from_str_radix(clean_0x(&id[..]), 16)?;
+            let r = app_state
+                .filterdb
+                .write()
+                .compat()
+                .await
+                .unwrap()
+                .uninstall(id_u64 as u32);
+            Ok(serde_json::to_value(r).unwrap())
+        }
+        // TODO: We used "wrk" and "lua script" for performance testing, but the binary and rust
+        // versions generated by "lua-protobuf" were inconsistent, so we provided an
+        // "sendUnsafeTransaction" interface for performance testing.
+        "sendUnsafeTransaction" => {
+            let data_str = get_string(params.clone(), 0, true)?;
+            let privkey_str = get_string(params.clone(), 1, true)?;
+            let data = hex::decode(clean_0x(&data_str[..]))?;
+            let privkey = hex::decode(clean_0x(&privkey_str[..]))?;
+            let r = app_state.send_unsafe_transaction(data, privkey).await?;
+            Ok(serde_json::to_value(r).unwrap())
+        }
+        _ => Err(convention::ErrorData::std(-32601)),
+    }
 }
 
 /// Listen and server on address:port which definds on config
@@ -351,15 +363,15 @@ where
     let mut app_state_clone = app_state.clone();
     let fut = async move {
         let mut s: &mut Receiver<Block> = &mut sub_block;
-        while let Some(e) = await!(s.next()) {
+        while let Some(e) = s.next().await {
             if let Some(b) = e {
-                if let Err(e) = await!(app_state_clone.recv_block(b)) {
+                if let Err(e) = app_state_clone.recv_block(b).await {
                     println!("{:?}", e);
                 };
             }
         }
     };
-    std::thread::spawn(move || {
+    rayon::spawn(move || {
         futures::executor::block_on(fut);
     });
 

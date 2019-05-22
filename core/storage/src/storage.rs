@@ -45,9 +45,12 @@ where
         let db = Arc::clone(&self.db);
 
         let fut = async move {
-            let value = await!(db.get(ctx, DataCategory::Block, LATEST_BLOCK).compat())?;
+            let value = db
+                .get(ctx, DataCategory::Block, LATEST_BLOCK)
+                .compat()
+                .await?;
 
-            let block = await!(AsyncCodec::decode::<SerBlock>(value?))?.try_into()?;
+            let block = AsyncCodec::decode::<SerBlock>(value?).await?.try_into()?;
             Ok(block)
         };
 
@@ -59,9 +62,9 @@ where
         let key = transfrom_u64_to_array_u8(height);
 
         let fut = async move {
-            let value = await!(db.get(ctx, DataCategory::Block, &key).compat())?;
+            let value = db.get(ctx, DataCategory::Block, &key).compat().await?;
 
-            let block = await!(AsyncCodec::decode::<SerBlock>(value?))?.try_into()?;
+            let block = AsyncCodec::decode::<SerBlock>(value?).await?.try_into()?;
             Ok(block)
         };
 
@@ -73,12 +76,16 @@ where
         let key = hash.clone();
 
         let fut = async move {
-            let height_slice = await!(db
+            let height_slice = db
                 .get(ctx.clone(), DataCategory::Block, key.as_bytes())
-                .compat())?;
-            let value = await!(db.get(ctx, DataCategory::Block, &height_slice?).compat())?;
+                .compat()
+                .await?;
+            let value = db
+                .get(ctx, DataCategory::Block, &height_slice?)
+                .compat()
+                .await?;
 
-            let block = await!(AsyncCodec::decode::<SerBlock>(value?))?.try_into()?;
+            let block = AsyncCodec::decode::<SerBlock>(value?).await?.try_into()?;
             Ok(block)
         };
 
@@ -90,11 +97,14 @@ where
         let key = hash.clone();
 
         let fut = async move {
-            let value = await!(db
+            let value = db
                 .get(ctx, DataCategory::Transaction, key.as_bytes())
-                .compat())?;
+                .compat()
+                .await?;
 
-            let tx = await!(AsyncCodec::decode::<SerSignedTransaction>(value?))?.try_into()?;
+            let tx = AsyncCodec::decode::<SerSignedTransaction>(value?)
+                .await?
+                .try_into()?;
             Ok(tx)
         };
 
@@ -110,10 +120,14 @@ where
         let keys: Vec<Vec<u8>> = hashes.iter().map(|h| h.as_bytes().to_vec()).collect();
 
         let fut = async move {
-            let values = await!(db.get_batch(ctx, DataCategory::Transaction, &keys).compat())?;
+            let values = db
+                .get_batch(ctx, DataCategory::Transaction, &keys)
+                .compat()
+                .await?;
             let values = opts_to_flat(values);
 
-            let txs = await!(AsyncCodec::decode_batch::<SerSignedTransaction>(values))?
+            let txs = AsyncCodec::decode_batch::<SerSignedTransaction>(values)
+                .await?
                 .into_iter()
                 .map(TryInto::try_into)
                 .collect::<Result<Vec<SignedTransaction>, _>>()?;
@@ -128,9 +142,12 @@ where
         let key = hash.clone();
 
         let fut = async move {
-            let value = await!(db.get(ctx, DataCategory::Receipt, key.as_bytes()).compat())?;
+            let value = db
+                .get(ctx, DataCategory::Receipt, key.as_bytes())
+                .compat()
+                .await?;
 
-            let receipt = await!(AsyncCodec::decode::<SerReceipt>(value?))?.try_into()?;
+            let receipt = AsyncCodec::decode::<SerReceipt>(value?).await?.try_into()?;
             Ok(receipt)
         };
 
@@ -142,10 +159,14 @@ where
         let keys: Vec<Vec<u8>> = hashes.iter().map(|h| h.as_bytes().to_vec()).collect();
 
         let fut = async move {
-            let values = await!(db.get_batch(ctx, DataCategory::Receipt, &keys).compat())?;
+            let values = db
+                .get_batch(ctx, DataCategory::Receipt, &keys)
+                .compat()
+                .await?;
             let values = opts_to_flat(values);
 
-            let receipts = await!(AsyncCodec::decode_batch::<SerReceipt>(values))?
+            let receipts = AsyncCodec::decode_batch::<SerReceipt>(values)
+                .await?
                 .into_iter()
                 .map(TryInto::try_into)
                 .collect::<Result<Vec<Receipt>, _>>()?;
@@ -164,12 +185,14 @@ where
         let key = hash.clone();
 
         let fut = async move {
-            let value = await!(db
+            let value = db
                 .get(ctx, DataCategory::TransactionPosition, key.as_bytes())
-                .compat())?;
+                .compat()
+                .await?;
 
-            let tx_position =
-                await!(AsyncCodec::decode::<SerTransactionPosition>(value?))?.try_into()?;
+            let tx_position = AsyncCodec::decode::<SerTransactionPosition>(value?)
+                .await?
+                .try_into()?;
             Ok(tx_position)
         };
 
@@ -185,12 +208,14 @@ where
         let keys: Vec<Vec<u8>> = hashes.iter().map(|h| h.as_bytes().to_vec()).collect();
 
         let fut = async move {
-            let values = await!(db
+            let values = db
                 .get_batch(ctx, DataCategory::TransactionPosition, &keys)
-                .compat())?;
+                .compat()
+                .await?;
             let values = opts_to_flat(values);
 
-            let positions = await!(AsyncCodec::decode_batch::<SerTransactionPosition>(values))?
+            let positions = AsyncCodec::decode_batch::<SerTransactionPosition>(values)
+                .await?
                 .into_iter()
                 .map(TryInto::try_into)
                 .collect::<Result<Vec<TransactionPosition>, _>>()?;
@@ -204,10 +229,11 @@ where
         let db = Arc::clone(&self.db);
 
         let fut = async move {
-            let value = await!(db
+            let value = db
                 .get(ctx, DataCategory::Block, &LATEST_PROOF.to_vec())
-                .compat())?;
-            let proof: Proof = await!(AsyncCodec::decode::<SerProof>(value?))?.try_into()?;
+                .compat()
+                .await?;
+            let proof: Proof = AsyncCodec::decode::<SerProof>(value?).await?.try_into()?;
             Ok(proof)
         };
 
@@ -224,7 +250,7 @@ where
         let pb_block: SerBlock = block.into();
 
         let fut = async move {
-            let encode_value = await!(AsyncCodec::encode(pb_block))?;
+            let encode_value = AsyncCodec::encode(pb_block).await?;
 
             let stream = FuturesOrdered::from_iter(vec![
                 db.insert(
@@ -250,7 +276,7 @@ where
                 .compat(),
             ]);
 
-            await!(stream.try_collect())?;
+            stream.try_collect().await?;
             Ok(())
         };
 
@@ -271,11 +297,11 @@ where
         let fut = async move {
             let pb_txs: Vec<SerSignedTransaction> =
                 signed_txs.into_iter().map(Into::into).collect();
-            let values = await!(AsyncCodec::encode_batch(pb_txs))?;
+            let values = AsyncCodec::encode_batch(pb_txs).await?;
 
-            await!(db
-                .insert_batch(ctx, DataCategory::Transaction, keys, values)
-                .compat())?;
+            db.insert_batch(ctx, DataCategory::Transaction, keys, values)
+                .compat()
+                .await?;
             Ok(())
         };
 
@@ -299,11 +325,11 @@ where
                 ser_positions.push(position.into());
             }
 
-            let values = await!(AsyncCodec::encode_batch(ser_positions))?;
+            let values = AsyncCodec::encode_batch(ser_positions).await?;
 
-            await!(db
-                .insert_batch(ctx, DataCategory::TransactionPosition, keys, values)
-                .compat())?;
+            db.insert_batch(ctx, DataCategory::TransactionPosition, keys, values)
+                .compat()
+                .await?;
             Ok(())
         };
 
@@ -319,11 +345,11 @@ where
 
         let fut = async move {
             let pb_receipts: Vec<SerReceipt> = receipts.into_iter().map(Into::into).collect();
-            let values = await!(AsyncCodec::encode_batch(pb_receipts))?;
+            let values = AsyncCodec::encode_batch(pb_receipts).await?;
 
-            await!(db
-                .insert_batch(ctx, DataCategory::Receipt, keys, values)
-                .compat())?;
+            db.insert_batch(ctx, DataCategory::Receipt, keys, values)
+                .compat()
+                .await?;
             Ok(())
         };
 
@@ -334,10 +360,10 @@ where
         let db = Arc::clone(&self.db);
 
         let fut = async move {
-            let value = await!(AsyncCodec::encode::<SerProof>(proof.into()))?;
-            await!(db
-                .insert(ctx, DataCategory::Block, LATEST_PROOF.to_vec(), value)
-                .compat())?;
+            let value = AsyncCodec::encode::<SerProof>(proof.into()).await?;
+            db.insert(ctx, DataCategory::Block, LATEST_PROOF.to_vec(), value)
+                .compat()
+                .await?;
             Ok(())
         };
 

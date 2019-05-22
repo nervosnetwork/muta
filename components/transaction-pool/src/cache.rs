@@ -1,8 +1,8 @@
-use hashbrown::HashMap;
 use parking_lot::RwLock;
 use rayon::prelude::{
     IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelIterator,
 };
+use std::collections::HashMap;
 
 use core_types::{Hash, SignedTransaction};
 
@@ -208,8 +208,8 @@ mod tests {
     use test::Bencher;
 
     use chashmap::CHashMap;
-    use hashbrown::HashMap;
     use rayon::prelude::*;
+    use std::collections::HashMap;
     use uuid::Uuid;
 
     use super::*;

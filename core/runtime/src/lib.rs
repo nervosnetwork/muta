@@ -1,4 +1,4 @@
-#![feature(async_await, await_macro, futures_api, try_trait)]
+#![feature(async_await, try_trait)]
 
 use futures::future::Future;
 

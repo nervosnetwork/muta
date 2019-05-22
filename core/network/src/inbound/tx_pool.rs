@@ -52,9 +52,9 @@ where
 
     pub async fn react(&self, ctx: Context, method: Method, data: Vec<u8>) -> Result<(), Error> {
         match method {
-            Method::BroadcastTxs => await!(self.handle_broadcast_txs(ctx, data))?,
-            Method::PullTxs => await!(self.handle_pull_txs(ctx, data))?,
-            Method::PushTxs => await!(self.handle_push_txs(ctx, data))?,
+            Method::BroadcastTxs => self.handle_broadcast_txs(ctx, data).await?,
+            Method::PullTxs => self.handle_pull_txs(ctx, data).await?,
+            Method::PushTxs => self.handle_push_txs(ctx, data).await?,
             _ => Err(Error::UnknownMethod(method.to_u32()))?,
         };
 
@@ -65,12 +65,12 @@ where
         let broadcast_txs = <BroadcastTxs as Codec>::decode(data.as_slice())?;
         let mut sig_txs = stream::iter(broadcast_txs.des()?);
 
-        while let Some(stx) = await!(sig_txs.next()) {
+        while let Some(stx) = sig_txs.next().await {
             let ctx = ctx.clone();
             let tx_pool = Arc::clone(&self.tx_pool);
 
             let insert = async move {
-                if let Err(err) = await!(tx_pool.insert(ctx, stx.untx).compat()) {
+                if let Err(err) = tx_pool.insert(ctx, stx.untx).compat().await {
                     error!(
                         "net [inbound]: tx_pool: [hash: {:?}, err: {:?}]",
                         stx.hash, err
@@ -89,10 +89,11 @@ where
         let uid = pull_txs.uid;
         let hashes = pull_txs.des()?;
 
-        let txs = await!(self
+        let txs = self
             .tx_pool
             .get_batch(ctx.clone(), hashes.as_slice())
-            .compat())?;
+            .compat()
+            .await?;
         let push_txs = PushTxs::from(uid, txs);
 
         let scope = scope_from_context(ctx).ok_or(Error::SessionIdNotFound)?;

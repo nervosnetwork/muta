@@ -1,11 +1,10 @@
-#![feature(async_await, await_macro, futures_api)]
+#![feature(async_await)]
 
 use std::cmp;
 use std::error::Error;
 use std::fs::File;
 use std::path::Path;
 use std::sync::Arc;
-use std::thread::spawn;
 
 use futures::prelude::{FutureExt, TryFutureExt};
 use futures01::future::Future as Future01;
@@ -187,7 +186,7 @@ fn start(cfg: &Config) {
         Arc::clone(&consensus),
         Arc::clone(&storage),
     );
-    spawn(move || tokio::run(network.run().unit_error().boxed().compat()));
+    rayon::spawn(move || tokio::run(network.run().unit_error().boxed().compat()));
 
     // start synchronizer
     let sub_block2 = pubsub

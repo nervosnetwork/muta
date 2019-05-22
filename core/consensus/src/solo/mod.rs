@@ -39,10 +39,10 @@ where
 
     async fn boom(&self) -> ConsensusResult<()> {
         let ctx = Context::new();
-        let proposal = await!(self.engine.build_proposal(ctx.clone()))?;
+        let proposal = self.engine.build_proposal(ctx.clone()).await?;
         let ser_proposal: SerProposal = proposal.clone().into();
 
-        let encoded = await!(AsyncCodec::encode(ser_proposal))?;
+        let encoded = AsyncCodec::encode(ser_proposal).await?;
         let proposal_hash = Hash::digest(&encoded);
         let signature = self.engine.sign_with_hash(&proposal_hash)?;
         let status = self.engine.get_status()?;
@@ -57,9 +57,9 @@ where
             }],
         };
 
-        await!(self
+        self
             .engine
-            .commit_block(ctx.clone(), proposal, latest_proof))?;
+            .commit_block(ctx.clone(), proposal, latest_proof).await?;
         Ok(())
     }
 
@@ -68,16 +68,16 @@ where
 
         loop {
             let start_time = Instant::now();
-            await!(self.boom())?;
+            self.boom().await?;
             let now = Instant::now();
             let next = if now - start_time > interval {
                 now
             } else {
                 now + (interval - (now - start_time))
             };
-            await!(Delay::new(next)
+            Delay::new(next)
                 .compat()
-                .map_err(|_| ConsensusError::Internal("internal".to_owned())))?;
+                .map_err(|_| ConsensusError::Internal("internal".to_owned())).await?;
         }
     }
 }

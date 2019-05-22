@@ -37,7 +37,7 @@
 //!
 //! ```rust
 //! // The nightly features that are commonly needed with async/await
-//! #![feature(await_macro, async_await, futures_api)]
+//! #![feature(async_await)]
 //!
 //! use std::thread::spawn;
 //!
@@ -93,7 +93,7 @@
 //! }
 //! ```
 
-#![feature(async_await, await_macro, futures_api)]
+#![feature(async_await)]
 #![deny(missing_docs, missing_debug_implementations)]
 
 /// broadcast proposal

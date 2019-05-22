@@ -10,7 +10,6 @@ core-storage = { path = "../../core/storage" }
 core-types = { path = "../../core/types" }
 core-context = { path = "../../core/context" }
 
-hashbrown = "0.3"
 parking_lot = "0.8"
 cita-vm = "0.1"
 log = "0.4"

@@ -96,10 +96,11 @@ where
     /// Package a new block.
     pub(crate) async fn build_proposal(&self, ctx: Context) -> ConsensusResult<Proposal> {
         let status = self.get_status();
-        let tx_hashes = await!(self
+        let tx_hashes = self
             .tx_pool
             .package(ctx.clone(), status.tx_limit, status.quota_limit)
-            .compat())?;
+            .compat()
+            .await?;
 
         let proposal = Proposal {
             timestamp: time_now(),
@@ -180,10 +181,10 @@ where
         proposal: Proposal,
     ) -> ConsensusResult<()> {
         log::debug!("verify transactions {:?}", proposal);
-        await!(self
-            .tx_pool
+        self.tx_pool
             .ensure(ctx.clone(), &proposal.tx_hashes)
-            .compat())?;
+            .compat()
+            .await?;
         Ok(())
     }
 
@@ -201,7 +202,7 @@ where
         proposal: Proposal,
         latest_proof: Proof,
     ) -> ConsensusResult<ConsensusStatus> {
-        let _lock = await!(self.lock.lock().compat());
+        let _lock = self.lock.lock().compat().await;
 
         let status = self.get_status();
         if status.height + 1 != proposal.height {
@@ -211,10 +212,11 @@ where
         }
 
         // Get transactions from the transaction pool
-        let signed_txs = await!(self
+        let signed_txs = self
             .tx_pool
             .get_batch(ctx.clone(), &proposal.tx_hashes)
-            .compat())?;
+            .compat()
+            .await?;
 
         // exec transactions
         let execution_context = ExecutionContext {
@@ -229,7 +231,8 @@ where
         // build block
         let block = build_block(&proposal, &execution_result);
 
-        await!(self.insert_block(ctx.clone(), block, latest_proof, execution_result))
+        self.insert_block(ctx.clone(), block, latest_proof, execution_result)
+            .await
     }
 
     fn exec_block(
@@ -345,7 +348,7 @@ where
         signed_txs: Vec<SignedTransaction>,
         proof: Proof,
     ) -> ConsensusResult<ConsensusStatus> {
-        let _lock = await!(self.lock.lock().compat());
+        let _lock = self.lock.lock().compat().await;
 
         let status = self.get_status();
         if status.height + 1 != block.header.height {
@@ -397,7 +400,8 @@ where
         };
 
         let exec_result = self.exec_block(ctx.clone(), signed_txs, execution_context)?;
-        await!(self.insert_block(ctx.clone(), block, proof, exec_result))
+        self.insert_block(ctx.clone(), block, proof, exec_result)
+            .await
     }
 
     // todo: verify transaction hash and signature

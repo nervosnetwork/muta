@@ -91,8 +91,9 @@ where
     /// block. Users should validate block format, block headers here.
     fn check_block(&self, proposal: &[u8], _: &[u8], _height: u64) -> Result<(), Self::Error> {
         let fut = async move {
-            let proposal: Proposal =
-                await!(AsyncCodec::decode::<SerProposal>(proposal.to_vec()))?.try_into()?;
+            let proposal: Proposal = AsyncCodec::decode::<SerProposal>(proposal.to_vec())
+                .await?
+                .try_into()?;
 
             // Ignore the self proposal
             let status = self.engine.get_status();
@@ -123,8 +124,9 @@ where
         _round: u64,
     ) -> Result<(), Self::Error> {
         let fut = async move {
-            let proposal: Proposal =
-                await!(AsyncCodec::decode::<SerProposal>(proposal.to_vec()))?.try_into()?;
+            let proposal: Proposal = AsyncCodec::decode::<SerProposal>(proposal.to_vec())
+                .await?
+                .try_into()?;
 
             if proposal.tx_hashes.is_empty() {
                 return Ok(());
@@ -145,9 +147,9 @@ where
 
             let ctx = Context::new().with_value(P2P_SESSION_ID, session_id);
 
-            await!(self
-                .engine
-                .verify_transactions(ctx.clone(), proposal.clone()))?;
+            self.engine
+                .verify_transactions(ctx.clone(), proposal.clone())
+                .await?;
             Ok(())
         };
 
@@ -174,8 +176,9 @@ where
     /// The height of proof inside the commit equals to block height.
     fn commit(&self, commit: Commit) -> Result<BftStatus, Self::Error> {
         let fut = async move {
-            let proposal: Proposal =
-                await!(AsyncCodec::decode::<SerProposal>(commit.block.to_vec()))?.try_into()?;
+            let proposal: Proposal = AsyncCodec::decode::<SerProposal>(commit.block.to_vec())
+                .await?
+                .try_into()?;
 
             let mut commits: Vec<Vote> = Vec::with_capacity(commit.proof.precommit_votes.len());
             for (address, signature) in commit.proof.precommit_votes.into_iter() {
@@ -192,9 +195,10 @@ where
             };
 
             let ctx = Context::new();
-            let status = await!(self
+            let status = self
                 .engine
-                .commit_block(ctx.clone(), proposal, latest_proof))?;
+                .commit_block(ctx.clone(), proposal, latest_proof)
+                .await?;
 
             // clear cache of last proposal.
             let mut proposal_origin = self.proposal_origin.write();
@@ -219,11 +223,11 @@ where
     /// The new block provided will feed for bft consensus of giving [`height`]
     fn get_block(&self, _height: u64) -> Result<(Vec<u8>, Vec<u8>), Self::Error> {
         let fut = async move {
-            let proposal = await!(self.engine.build_proposal(Context::new()))?;
+            let proposal = self.engine.build_proposal(Context::new()).await?;
             let proposal_hash = proposal.hash();
             let ser_proposal: SerProposal = proposal.into();
 
-            let encoded = await!(AsyncCodec::encode(ser_proposal))?;
+            let encoded = AsyncCodec::encode(ser_proposal).await?;
             Ok((encoded, proposal_hash.as_bytes().to_vec()))
         };
         let mut pool = self.thread_pool.clone();

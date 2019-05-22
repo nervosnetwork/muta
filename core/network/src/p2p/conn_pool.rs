@@ -266,6 +266,9 @@ where
                     error!("net [p2p]: fail to report error to network: {}", err);
                 }
             }
+            ServiceError::SessionBlocked { session_context } => {
+                warn!("net [p2p]: session blocked: {:?}", session_context);
+            }
         }
     }
 

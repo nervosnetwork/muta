@@ -6,10 +6,10 @@ edition = "2018"
 
 [dependencies]
 actix = "0.8"
-actix-web = "1.0.0-beta.5"
+actix-web = "1.0.0-rc"
 old_futures = { package = "futures", version = "0.1" }
-futures-preview = { version = "=0.3.0-alpha.14", features = ["compat"] }
-futures-util-preview = { version = "=0.3.0-alpha.14" }
+futures-preview = { version = "0.3.0-alpha.16", features = [ "async-await", "nightly", "compat" ] }
+# futures-util-preview = { version = "0.3.0-alpha.16" }
 futures-locks = "0.3"
 
 bytes = "0.4"
@@ -25,6 +25,7 @@ json = "0.11"
 log = "0.4"
 numext-fixed-uint = "0.1"
 numext-fixed-hash = "0.1"
+rayon = "1.0"
 
 common-cita = { path = "../../common/cita" }
 

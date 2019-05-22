@@ -11,9 +11,9 @@ use futures::channel::{mpsc, oneshot};
 use futures::prelude::{FutureExt, StreamExt};
 use futures::select;
 use futures::stream::select_all;
-#[cfg(not(test))]
-use hashbrown::HashMap;
 use log::warn;
+#[cfg(not(test))]
+use std::collections::HashMap;
 use uuid::Uuid;
 
 #[cfg(test)]
@@ -103,13 +103,12 @@ impl Broadcast {
                 }
                 Action::NewSub { topic, uuid, tx } => {
                     let tx = broadcast::Sender::new(uuid, tx);
-                    let subs = subs.entry(topic).or_insert(HashMap::new());
-
-                    subs.insert(uuid, tx);
+                    subs.entry(topic)
+                        .or_insert_with(HashMap::new)
+                        .insert(uuid, tx);
                 }
                 Action::RemoveSub { topic, uuid } => {
-                    let subs = subs.entry(topic).or_insert(HashMap::new());
-                    subs.remove(&uuid);
+                    subs.entry(topic).or_insert_with(HashMap::new).remove(&uuid);
                 }
             }
         }
@@ -190,7 +189,7 @@ mod tests {
         }
 
         pub async fn get_next_state(&mut self) -> State {
-            await!(self.state_rx.next()).unwrap()
+            self.state_rx.next().await.unwrap()
         }
 
         pub fn new_pub_sub(

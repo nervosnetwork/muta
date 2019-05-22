@@ -201,20 +201,26 @@ where
     C: Crypto,
 {
     pub async fn get_block(&self, number: String) -> RpcResult<Block> {
-        let h = await!(self.get_height(number))?;
-        let b = await!(self.storage.get_block_by_height(Context::new(), h).compat())?;
+        let h = self.get_height(number).await?;
+        let b = self
+            .storage
+            .get_block_by_height(Context::new(), h)
+            .compat()
+            .await?;
         Ok(b)
     }
 
     pub async fn get_block_by_tx_hash(&self, tx_hash: Hash) -> RpcResult<Block> {
-        let p = await!(self
+        let p = self
             .storage
             .get_transaction_position(Context::new(), &tx_hash)
-            .compat())?;
-        let b = await!(self
+            .compat()
+            .await?;
+        let b = self
             .storage
             .get_block_by_hash(Context::new(), &p.block_hash)
-            .compat())?;
+            .compat()
+            .await?;
         Ok(b)
     }
 
@@ -222,7 +228,11 @@ where
         match &number.to_ascii_lowercase()[..] {
             "earliest" => Ok(0),
             "latest" | "pending" | "" => {
-                let b = await!(self.storage.get_latest_block(Context::new()).compat())?;
+                let b = self
+                    .storage
+                    .get_latest_block(Context::new())
+                    .compat()
+                    .await?;
                 Ok(b.header.height)
             }
             x => {
@@ -264,14 +274,15 @@ where
             return Ok(res_block);
         }
 
-        let raw_txs = await!(self
+        let raw_txs = self
             .storage
             .get_transactions(Context::new(), &raw_block.tx_hashes)
-            .compat())?;
+            .compat()
+            .await?;
         let mut txs = vec![];
         for tx in raw_txs {
             let cita_untx: cita::UnverifiedTransaction = From::from(tx.untx.clone());
-            let content = await!(AsyncCodec::encode(cita_untx))?;
+            let content = AsyncCodec::encode(cita_untx).await?;
             txs.push(cita::BlockTransaction::Full(cita::FullTransaction {
                 hash:    tx.hash.clone(),
                 content: cita::Data::new(content),
@@ -284,11 +295,14 @@ where
 
     /// Convert muta::Receipt => cita::Receipt
     pub async fn ret_cita_receipt(&self, raw_receipt: Receipt) -> RpcResult<cita::Receipt> {
-        let b = await!(self.get_block_by_tx_hash(raw_receipt.transaction_hash.clone()))?;
-        let receipts = await!(self
+        let b = self
+            .get_block_by_tx_hash(raw_receipt.transaction_hash.clone())
+            .await?;
+        let receipts = self
             .storage
             .get_receipts(Context::new(), &b.tx_hashes[..])
-            .compat())?;
+            .compat()
+            .await?;
         let mut logs_in_block_before_receipt = 0;
         let mut tx_index = 0;
         let tx_hash = raw_receipt.transaction_hash.clone();
@@ -339,7 +353,7 @@ where
         raw_tx: SignedTransaction,
     ) -> RpcResult<cita::RpcTransaction> {
         let cita_untx: cita::UnverifiedTransaction = From::from(raw_tx.untx.clone());
-        let content = await!(AsyncCodec::encode(cita_untx))?;
+        let content = AsyncCodec::encode(cita_untx).await?;
         let mut tx = cita::RpcTransaction {
             hash:         raw_tx.hash.clone(),
             content:      cita::Data::new(content),
@@ -348,7 +362,7 @@ where
             block_hash:   Hash::from_bytes(&[0x00u8; 32]).unwrap(),
             index:        Uint::from(0),
         };
-        let b = await!(self.get_block_by_tx_hash(raw_tx.hash.clone()))?;
+        let b = self.get_block_by_tx_hash(raw_tx.hash.clone()).await?;
         tx.block_number = Uint::from(b.header.height);
         tx.block_hash = b.hash;
         tx.index = Uint::from(b.tx_hashes.iter().position(|x| x == &raw_tx.hash).unwrap() as u64);
@@ -366,7 +380,11 @@ where
     C: Crypto,
 {
     pub async fn block_number(&self) -> RpcResult<u64> {
-        let b = await!(self.storage.get_latest_block(Context::new()).compat())?;
+        let b = self
+            .storage
+            .get_latest_block(Context::new())
+            .compat()
+            .await?;
         Ok(b.header.height)
     }
 
@@ -375,7 +393,7 @@ where
         number: String,
         call_request: cita::CallRequest,
     ) -> RpcResult<cita::Data> {
-        let b = await!(self.get_block(number))?;
+        let b = self.get_block(number).await?;
         let rd_result = self.executor.readonly(
             Context::new(),
             &ExecutionContext {
@@ -405,7 +423,7 @@ where
     }
 
     pub async fn get_balance(&self, number: String, addr: Address) -> RpcResult<U256> {
-        let b = await!(self.get_block(number))?;
+        let b = self.get_block(number).await?;
         let balance = self
             .executor
             .get_balance(Context::new(), &b.header.state_root, &addr)?;
@@ -413,11 +431,12 @@ where
     }
 
     pub async fn get_block_by_hash(&self, hash: Hash, include_tx: bool) -> RpcResult<cita::Block> {
-        let b = await!(self
+        let b = self
             .storage
             .get_block_by_hash(Context::new(), &hash)
-            .compat())?;
-        let r = await!(self.ret_cita_block(b, include_tx))?;
+            .compat()
+            .await?;
+        let r = self.ret_cita_block(b, include_tx).await?;
         Ok(r)
     }
 
@@ -426,18 +445,18 @@ where
         number: String,
         include_tx: bool,
     ) -> RpcResult<cita::Block> {
-        let b = await!(self.get_block(number))?;
-        let r = await!(self.ret_cita_block(b, include_tx))?;
+        let b = self.get_block(number).await?;
+        let r = self.ret_cita_block(b, include_tx).await?;
         Ok(r)
     }
 
     pub async fn get_block_header(&self, number: String) -> RpcResult<cita::Data> {
-        let b = await!(self.get_block(number))?;
+        let b = self.get_block(number).await?;
         Ok(cita::Data::new(rlp::encode(&b.header)))
     }
 
     pub async fn get_code(&self, address: Address, number: String) -> RpcResult<cita::Data> {
-        let b = await!(self.get_block(number))?;
+        let b = self.get_block(number).await?;
         let (code, _code_hash) = self
             .executor
             .get_code(Context::new(), &b.header.state_root, &address)
@@ -448,16 +467,17 @@ where
     pub async fn get_logs(&self, filter: cita::Filter) -> RpcResult<Vec<cita::Log>> {
         let filter: Filter = filter.into();
         let possible_blooms = filter.bloom_possibilities();
-        let from_block = await!(self.get_height(filter.from_block.clone()))?;
-        let to_block = await!(self.get_height(filter.to_block.clone()))?;
+        let from_block = self.get_height(filter.from_block.clone()).await?;
+        let to_block = self.get_height(filter.to_block.clone()).await?;
 
         let mut logs = vec![];
         let mut log_index = 0;
         for block_height in from_block..=to_block {
-            let block = await!(self
+            let block = self
                 .storage
                 .get_block_by_height(Context::new(), block_height)
-                .compat())?;
+                .compat()
+                .await?;
 
             let mut fit = false;
             for bloom in &possible_blooms {
@@ -475,10 +495,11 @@ where
                 log_index += block.tx_hashes.len();
                 continue;
             }
-            let receipts_res = await!(self
+            let receipts_res = self
                 .storage
                 .get_receipts(Context::new(), block.tx_hashes.as_slice())
-                .compat())?;
+                .compat()
+                .await?;
 
             for (tx_idx, tx_hash) in block.tx_hashes.iter().enumerate() {
                 let receipt = &receipts_res[tx_idx];
@@ -551,7 +572,7 @@ where
         key: Hash,
         number: String,
     ) -> RpcResult<Vec<u8>> {
-        let b = await!(self.get_block(number))?;
+        let b = self.get_block(number).await?;
         let state_root = &b.header.state_root;
         let account_proof = self
             .executor
@@ -575,7 +596,7 @@ where
         key: H256,
         number: String,
     ) -> RpcResult<cita::Data> {
-        let b = await!(self.get_block(number))?;
+        let b = self.get_block(number).await?;
         let r = self
             .executor
             .get_value(Context::new(), &b.header.state_root, &addr, &key)?;
@@ -583,13 +604,17 @@ where
     }
 
     pub async fn get_transaction(&self, hash: Hash) -> RpcResult<cita::RpcTransaction> {
-        let tx = await!(self.storage.get_transaction(Context::new(), &hash).compat())?;
-        let tx_cita = await!(self.ret_cita_transaction(tx))?;
+        let tx = self
+            .storage
+            .get_transaction(Context::new(), &hash)
+            .compat()
+            .await?;
+        let tx_cita = self.ret_cita_transaction(tx).await?;
         Ok(tx_cita)
     }
 
     pub async fn get_transaction_count(&self, addr: Address, number: String) -> RpcResult<U256> {
-        let b = await!(self.get_block(number))?;
+        let b = self.get_block(number).await?;
         let r = self
             .executor
             .get_nonce(Context::new(), &b.header.state_root, &addr)?;
@@ -597,11 +622,12 @@ where
     }
 
     pub async fn get_transaction_proof(&self, hash: Hash) -> RpcResult<Vec<u8>> {
-        let block = await!(self.get_block_by_tx_hash(hash.clone()))?;
-        let block_receipts = await!(self
+        let block = self.get_block_by_tx_hash(hash.clone()).await?;
+        let block_receipts = self
             .storage
             .get_receipts(Context::new(), block.tx_hashes.as_slice())
-            .compat())?;
+            .compat()
+            .await?;
         let tx_index = block
             .tx_hashes
             .iter()
@@ -624,18 +650,24 @@ where
 
         // Done! Now we build the TxProof struct for CITA RPC response.
         // Get raw transaction
-        let resp_tx = await!(self.storage.get_transaction(Context::new(), &hash).compat())?;
+        let resp_tx = self
+            .storage
+            .get_transaction(Context::new(), &hash)
+            .compat()
+            .await?;
         let resp_block_header = block.header;
-        let resp_next_proposal_block = await!(self
+        let resp_next_proposal_block = self
             .storage
             .get_block_by_height(Context::new(), resp_block_header.height + 1)
-            .compat())?;
+            .compat()
+            .await?;
         let resp_next_proposal_header = resp_next_proposal_block.header;
 
-        let resp_third_block = await!(self
+        let resp_third_block = self
             .storage
             .get_block_by_height(Context::new(), resp_block_header.height + 1)
-            .compat())?;
+            .compat()
+            .await?;
         let resp_third_proposal_proof = resp_third_block.header.proof.clone();
 
         let resp_proof: Vec<cita::ProofNode<Hash>> = proof
@@ -657,16 +689,17 @@ where
     }
 
     pub async fn get_receipt_proof(&self, tx_hash: Hash) -> RpcResult<Vec<ProofNode>> {
-        let block = await!(self.get_block_by_tx_hash(tx_hash.clone()))?;
+        let block = self.get_block_by_tx_hash(tx_hash.clone()).await?;
         let tx_hashes = block.tx_hashes;
         let index = tx_hashes
             .iter()
             .position(|x| x == &tx_hash)
             .expect("tx should be in block");
-        let receipt_list = await!(self
+        let receipt_list = self
             .storage
             .get_receipts(Context::new(), &tx_hashes[..])
-            .compat())?;
+            .compat()
+            .await?;
         // get merkle proof
         let hahses: Vec<Hash> = receipt_list.iter().map(Receipt::hash).collect();
         let tree = Merkle::from_hashes(hahses.clone());
@@ -676,8 +709,12 @@ where
     }
 
     pub async fn get_transaction_receipt(&self, hash: Hash) -> RpcResult<cita::Receipt> {
-        let r = await!(self.storage.get_receipt(Context::new(), &hash).compat())?;
-        let cita_r = await!(self.ret_cita_receipt(r))?;
+        let r = self
+            .storage
+            .get_receipt(Context::new(), &hash)
+            .compat()
+            .await?;
+        let cita_r = self.ret_cita_receipt(r).await?;
         Ok(cita_r)
     }
 
@@ -687,9 +724,8 @@ where
     }
 
     pub async fn send_raw_transaction(&self, signed_data: Vec<u8>) -> RpcResult<cita::TxResponse> {
-        let ser_untx = await!(AsyncCodec::decode::<cita::UnverifiedTransaction>(
-            signed_data.clone()
-        ))?;
+        let ser_untx =
+            AsyncCodec::decode::<cita::UnverifiedTransaction>(signed_data.clone()).await?;
         if ser_untx.transaction.is_none() {
             return Err(RpcError::Str("Transaction not found!".into()));
         };
@@ -697,7 +733,11 @@ where
         let origin_ctx =
             Context::new().with_value::<TransactionOrigin>(ORIGIN, TransactionOrigin::Jsonrpc);
         log::debug!("Accept {:?}", untx);
-        let r = await!(self.transaction_pool.insert(origin_ctx, untx).compat());
+        let r = self
+            .transaction_pool
+            .insert(origin_ctx, untx)
+            .compat()
+            .await;
         let r = match r {
             Ok(ok) => ok,
             Err(e) => {
@@ -713,7 +753,7 @@ where
         tx_data: Vec<u8>,
         privkey: Vec<u8>,
     ) -> RpcResult<cita::TxResponse> {
-        let ser_tx = await!(AsyncCodec::decode::<cita::Transaction>(tx_data,))?;
+        let ser_tx = AsyncCodec::decode::<cita::Transaction>(tx_data).await?;
         let message = ser_tx.hash();
 
         let private_key = C::PrivateKey::from_bytes(&privkey).unwrap();
@@ -724,8 +764,8 @@ where
             crypto:      0,
         };
 
-        let ser_raw_tx = await!(AsyncCodec::encode(untx))?;
-        let r = await!(self.send_raw_transaction(ser_raw_tx))?;
+        let ser_raw_tx = AsyncCodec::encode(untx).await?;
+        let r = self.send_raw_transaction(ser_raw_tx).await?;
         Ok(r)
     }
 }
@@ -740,7 +780,7 @@ where
 {
     /// Pass a block into FilterDatabase.
     pub async fn recv_block(&mut self, block: Block) -> RpcResult<()> {
-        let mut ftdb = await!(self.filterdb.write().compat()).unwrap();
+        let mut ftdb = self.filterdb.write().compat().await.unwrap();
         ftdb.recv_block(block.clone());
 
         let now = SystemTime::now()
@@ -764,8 +804,8 @@ where
             // Maybe we can save the result instead of the filter,
             // but at now, I want make it simply.
             let possible_blooms = filter.bloom_possibilities();
-            let from_block = await!(self.get_height(filter.from_block.clone()))?;
-            let to_block = await!(self.get_height(filter.to_block.clone()))?;
+            let from_block = self.get_height(filter.from_block.clone()).await?;
+            let to_block = self.get_height(filter.to_block.clone()).await?;
 
             if block.header.height < from_block || block.header.height > to_block {
                 continue;
@@ -790,10 +830,11 @@ where
                 continue;
             }
 
-            let receipts_res = await!(self
+            let receipts_res = self
                 .storage
                 .get_receipts(Context::new(), block.tx_hashes.as_slice())
-                .compat())?;
+                .compat()
+                .await?;
 
             for (tx_idx, tx_hash) in block.tx_hashes.iter().enumerate() {
                 let receipt = &receipts_res[tx_idx];
