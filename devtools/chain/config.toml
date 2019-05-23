@@ -13,6 +13,9 @@ payload_size = 8388608
 # private_key = "bcfa6d5fffa63edf3bd17b17422e416f9374d981322c4ccccf38de215e659b02"
 bootstrap_addresses = []
 listening_address = "127.0.0.1:1337"
+# 1024 * 1024 * 10 (10 MiB)
+send_buffer_size = 10485760
+recv_buffer_size = 10485760
 max_connections = 40
 
 [txpool]

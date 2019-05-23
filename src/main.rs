@@ -98,7 +98,9 @@ fn start(cfg: &Config) {
         private_key:         cfg.network.private_key.to_owned(),
         bootstrap_addresses: cfg.network.bootstrap_addresses.to_owned(),
         listening_address:   cfg.network.listening_address.to_owned(),
-        max_connections:     cfg.network.max_connections.to_owned(),
+        send_buffer_size:    cfg.network.send_buffer_size,
+        recv_buffer_size:    cfg.network.recv_buffer_size,
+        max_connections:     cfg.network.max_connections,
     };
 
     let partial_network = PartialService::new(network_config).unwrap();

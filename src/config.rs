@@ -15,6 +15,8 @@ pub struct ConfigNetwork {
     pub private_key:         Option<String>,
     pub bootstrap_addresses: Vec<SocketAddr>,
     pub listening_address:   SocketAddr,
+    pub send_buffer_size:    usize,
+    pub recv_buffer_size:    usize,
     pub max_connections:     usize,
 }
 

@@ -86,6 +86,9 @@ where
             .insert_protocol(trans)
             .insert_protocol(disc)
             .key_pair(config.key_pair.clone())
+            .set_send_buffer_size(config.send_buffer_size)
+            .set_recv_buffer_size(config.recv_buffer_size)
+            .forever(true)
             .build(handle);
         let control = inner.control().clone();
 
