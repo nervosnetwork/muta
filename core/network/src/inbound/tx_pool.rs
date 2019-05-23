@@ -1,12 +1,12 @@
 use std::clone::Clone;
 use std::sync::Arc;
 
-use futures::channel::mpsc::Sender;
 use futures::compat::Future01CompatExt;
 use futures::prelude::{FutureExt, StreamExt, TryFutureExt};
 use futures::stream;
 use log::error;
 
+use common_channel::Sender;
 use core_context::Context;
 use core_network_message::{
     common::{PullTxs, PushTxs},
@@ -111,7 +111,7 @@ where
         let push_txs = <PushTxs as Codec>::decode(data.as_slice())?;
         let uid = push_txs.uid;
 
-        let mut done_tx = self
+        let done_tx = self
             .callback
             .take::<Sender<Vec<SignedTransaction>>>(uid)
             .ok_or_else(|| Error::CallbackItemNotFound(uid))?;
