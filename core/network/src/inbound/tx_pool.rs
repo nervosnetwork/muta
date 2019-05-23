@@ -101,7 +101,7 @@ where
             .outbound
             .quick_filter_broadcast(Method::PushTxs, push_txs, scope)
         {
-            error!("net [inbound]: pull_txs: [err: {:?}]", err);
+            log::warn!("net [inbound]: pull_txs: [err: {:?}]", err);
         }
 
         Ok(())
