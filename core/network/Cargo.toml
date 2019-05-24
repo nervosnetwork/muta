@@ -13,7 +13,7 @@ core-serialization = { path = "../serialization" }
 core-runtime = { path = "../runtime" }
 core-types = { path = "../types" }
 
-tentacle = "0.2.0-alpha.13"
+tentacle = "0.2"
 tentacle-discovery = "0.2"
 log = "0.4"
 futures-preview = { version = "0.3.0-alpha.16", features = [ "compat" ] }
