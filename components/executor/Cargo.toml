@@ -19,4 +19,5 @@ hex = "0.3"
 cita_trie = "0.4"
 
 [dev-dependencies]
+common-logger = { path = "../../common/logger" }
 core-crypto = { path = "../../core/crypto" }

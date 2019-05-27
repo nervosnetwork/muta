@@ -730,6 +730,7 @@ version = "0.1.0"
 dependencies = [
  "cita-vm 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "cita_trie 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "common-logger 0.1.0",
  "core-context 0.1.0",
  "core-crypto 0.1.0",
  "core-runtime 0.1.0",
