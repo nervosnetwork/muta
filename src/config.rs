@@ -15,8 +15,8 @@ pub struct ConfigNetwork {
     pub private_key:         Option<String>,
     pub bootstrap_addresses: Vec<SocketAddr>,
     pub listening_address:   SocketAddr,
-    pub send_buffer_size:    usize,
-    pub recv_buffer_size:    usize,
+    pub send_buffer_size:    Option<usize>,
+    pub recv_buffer_size:    Option<usize>,
     pub max_connections:     usize,
 }
 
@@ -41,16 +41,16 @@ pub struct ConfigSynchronzer {
 
 #[derive(Debug, Deserialize)]
 pub struct ConfigRocksdb {
-    pub block_size:                     usize,
-    pub block_cache_size:               u64,
-    pub max_bytes_for_level_base:       u64,
-    pub max_bytes_for_level_multiplier: f64,
-    pub write_buffer_size:              usize,
-    pub target_file_size_base:          u64,
-    pub max_write_buffer_number:        i32,
-    pub max_background_compactions:     i32,
-    pub max_background_flushes:         i32,
-    pub increase_parallelism:           i32,
+    pub block_size:                     Option<usize>,
+    pub block_cache_size:               Option<u64>,
+    pub max_bytes_for_level_base:       Option<u64>,
+    pub max_bytes_for_level_multiplier: Option<f64>,
+    pub write_buffer_size:              Option<usize>,
+    pub target_file_size_base:          Option<u64>,
+    pub max_write_buffer_number:        Option<i32>,
+    pub max_background_compactions:     Option<i32>,
+    pub max_background_flushes:         Option<i32>,
+    pub increase_parallelism:           Option<i32>,
 }
 
 #[derive(Debug, Deserialize)]

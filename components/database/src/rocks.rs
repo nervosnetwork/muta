@@ -14,31 +14,31 @@ pub struct RocksDB {
 
 #[derive(Debug)]
 pub struct Config {
-    pub block_size:                     usize,
-    pub block_cache_size:               u64,
-    pub max_bytes_for_level_base:       u64,
-    pub max_bytes_for_level_multiplier: f64,
-    pub write_buffer_size:              usize,
-    pub target_file_size_base:          u64,
-    pub max_write_buffer_number:        i32,
-    pub max_background_compactions:     i32,
-    pub max_background_flushes:         i32,
-    pub increase_parallelism:           i32,
+    pub block_size:                     Option<usize>,
+    pub block_cache_size:               Option<u64>,
+    pub max_bytes_for_level_base:       Option<u64>,
+    pub max_bytes_for_level_multiplier: Option<f64>,
+    pub write_buffer_size:              Option<usize>,
+    pub target_file_size_base:          Option<u64>,
+    pub max_write_buffer_number:        Option<i32>,
+    pub max_background_compactions:     Option<i32>,
+    pub max_background_flushes:         Option<i32>,
+    pub increase_parallelism:           Option<i32>,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Config {
-            block_size:                     8192,              // 8KB
-            block_cache_size:               1024 * 1024 * 8,   // 8 MiB
-            max_bytes_for_level_base:       1024 * 1024 * 256, // 256 MiB
-            max_bytes_for_level_multiplier: 10.0,
-            write_buffer_size:              1024 * 1024 * 64, // 64 MiB
-            target_file_size_base:          1024 * 1024 * 64, // 64 MiB
-            max_write_buffer_number:        4,
-            max_background_compactions:     2,
-            max_background_flushes:         2,
-            increase_parallelism:           3,
+            block_size:                     None,
+            block_cache_size:               None,
+            max_bytes_for_level_base:       None,
+            max_bytes_for_level_multiplier: None,
+            write_buffer_size:              None,
+            target_file_size_base:          None,
+            max_write_buffer_number:        None,
+            max_background_compactions:     None,
+            max_background_flushes:         None,
+            increase_parallelism:           None,
         }
     }
 }
@@ -50,19 +50,47 @@ impl RocksDB {
         opts.create_if_missing(true);
         opts.create_missing_column_families(true);
 
-        opts.optimize_for_point_lookup(conf.block_cache_size);
-        opts.set_max_bytes_for_level_base(conf.max_bytes_for_level_base);
-        opts.set_max_bytes_for_level_multiplier(conf.max_bytes_for_level_multiplier);
-        opts.set_write_buffer_size(conf.write_buffer_size);
-        opts.set_target_file_size_base(conf.target_file_size_base);
-        opts.set_max_write_buffer_number(conf.max_write_buffer_number);
-        opts.set_max_background_compactions(conf.max_background_compactions);
-        opts.set_max_background_flushes(conf.max_background_flushes);
-        opts.increase_parallelism(conf.increase_parallelism);
+        if let Some(size) = conf.block_cache_size {
+            opts.optimize_for_point_lookup(size);
+        }
+
+        if let Some(level_base) = conf.max_bytes_for_level_base {
+            opts.set_max_bytes_for_level_base(level_base);
+        }
+
+        if let Some(level_multiplier) = conf.max_bytes_for_level_multiplier {
+            opts.set_max_bytes_for_level_multiplier(level_multiplier);
+        }
+
+        if let Some(size) = conf.write_buffer_size {
+            opts.set_write_buffer_size(size);
+        }
+
+        if let Some(size_base) = conf.target_file_size_base {
+            opts.set_target_file_size_base(size_base);
+        }
+
+        if let Some(number) = conf.max_write_buffer_number {
+            opts.set_max_write_buffer_number(number);
+        }
+
+        if let Some(compactions) = conf.max_background_compactions {
+            opts.set_max_background_compactions(compactions);
+        }
+
+        if let Some(flushes) = conf.max_background_flushes {
+            opts.set_max_background_flushes(flushes);
+        }
+
+        if let Some(parallelism) = conf.increase_parallelism {
+            opts.increase_parallelism(parallelism);
+        }
 
         let mut block_opts = BlockBasedOptions::default();
-        block_opts.set_block_size(conf.block_size);
 
+        if let Some(block_size) = conf.block_size {
+            block_opts.set_block_size(block_size);
+        }
         opts.set_block_based_table_factory(&block_opts);
 
         let categories = [

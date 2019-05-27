@@ -25,11 +25,11 @@ pub struct Config {
     /// Listening address
     pub listening_address: SocketAddr,
 
-    /// Send buffer size
-    pub send_buffer_size: usize,
+    /// Send buffer size, default: 1 MiB
+    pub send_buffer_size: Option<usize>,
 
-    /// Recv buffer sizse
-    pub recv_buffer_size: usize,
+    /// Recv buffer sizse, default: 1 MiB
+    pub recv_buffer_size: Option<usize>,
 
     /// Maximum connected addresses
     pub max_connections: usize,
@@ -44,8 +44,8 @@ impl Default for Config {
             private_key: None,
             bootstrap_addresses: vec![],
             listening_address,
-            send_buffer_size: 1024 * 1024, // 1 MiB
-            recv_buffer_size: 1024 * 1024, // 1 MiB
+            send_buffer_size: None,
+            recv_buffer_size: None,
             max_connections: DEFAULT_MAXIMUM_CONNECTIONS,
         }
     }
@@ -55,8 +55,8 @@ pub struct ConnectionPoolConfig {
     pub key_pair:            SecioKeyPair,
     pub bootstrap_addresses: Vec<Multiaddr>,
     pub listening_address:   Multiaddr,
-    pub send_buffer_size:    usize,
-    pub recv_buffer_size:    usize,
+    pub send_buffer_size:    Option<usize>,
+    pub recv_buffer_size:    Option<usize>,
 }
 
 impl ConnectionPoolConfig {
