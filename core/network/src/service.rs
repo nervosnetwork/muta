@@ -9,7 +9,7 @@ use common_channel::{bounded, Receiver};
 use core_runtime::{Consensus, Storage, TransactionPool};
 
 use crate::p2p::{conn_pool::ConnectionPoolService, Dialer, SessionMessage};
-use crate::peer_manager::DefaultPeerManager;
+use crate::peer_manager::{DefaultPeerManager, PeerCount};
 use crate::{
     CallbackMap, Config, ConnectionPoolConfig, Context, Error, InboundHandle, OutboundHandle,
 };
@@ -67,6 +67,10 @@ impl PartialService {
 
     pub fn outbound(&self) -> OutboundHandle {
         self.outbound.clone()
+    }
+
+    pub fn peer_count(&self) -> PeerCount<DefaultPeerManager> {
+        PeerCount::new(self.peer_mgr.clone())
     }
 
     pub fn build<T, C, S>(

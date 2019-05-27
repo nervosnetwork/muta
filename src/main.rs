@@ -105,6 +105,7 @@ fn start(cfg: &Config) {
 
     let partial_network = PartialService::new(network_config).unwrap();
     let outbound = partial_network.outbound();
+    let _peer_count = partial_network.peer_count();
 
     // new tx pool
     let tx_pool = Arc::new(HashTransactionPool::new(

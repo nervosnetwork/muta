@@ -17,6 +17,8 @@ use tokio::timer::Interval;
 use crate::p2p::Dialer;
 
 pub mod discovery;
+pub mod peer_count;
+pub use peer_count::PeerCount;
 
 pub enum Source {
     BootStrap,
@@ -197,6 +199,7 @@ impl PeerManager for DefaultPeerManager {
         self.connected.write().insert(addr.clone());
     }
 
+    // TODO: Count peer id instead of addresses
     fn connected_count(&self) -> usize {
         self.connected.read().len()
     }

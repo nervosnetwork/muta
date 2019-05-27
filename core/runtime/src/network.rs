@@ -29,3 +29,7 @@ pub trait Synchronizer: Send + Sync {
         tx_hashes: &[Hash],
     ) -> FutSyncResult<Vec<SignedTransaction>>;
 }
+
+pub trait PeerCount: Send + Sync {
+    fn peer_count(&self) -> usize;
+}
