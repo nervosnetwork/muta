@@ -15,6 +15,7 @@ use numext_fixed_uint::U256;
 use core_context::{Context, ORIGIN};
 use core_crypto::{Crypto, CryptoTransform};
 use core_merkle::{self, Merkle, ProofNode};
+use core_runtime::network::PeerCount;
 use core_runtime::{ExecutionContext, Executor, Storage, TransactionOrigin, TransactionPool};
 use core_serialization::AsyncCodec;
 use core_types::{Address, Block, BloomRef, Hash, Receipt, SignedTransaction};
@@ -147,16 +148,17 @@ impl FilterDatabase {
     }
 }
 
-pub struct AppState<E, T, S, C> {
+pub struct AppState<E, T, S, C, P> {
     pub filterdb: Arc<RwLock<FilterDatabase>>,
 
     executor:         Arc<E>,
     transaction_pool: Arc<T>,
     storage:          Arc<S>,
     crypto:           Arc<C>,
+    peer_count:       Arc<P>,
 }
 
-impl<E, T, S, C> Clone for AppState<E, T, S, C> {
+impl<E, T, S, C, P> Clone for AppState<E, T, S, C, P> {
     fn clone(&self) -> Self {
         Self {
             filterdb: Arc::<RwLock<FilterDatabase>>::clone(&self.filterdb),
@@ -165,21 +167,25 @@ impl<E, T, S, C> Clone for AppState<E, T, S, C> {
             transaction_pool: Arc::<T>::clone(&self.transaction_pool),
             storage:          Arc::<S>::clone(&self.storage),
             crypto:           Arc::<C>::clone(&self.crypto),
+            peer_count:       Arc::<P>::clone(&self.peer_count),
         }
     }
 }
 
-impl<E, T, S, C> AppState<E, T, S, C>
+impl<E, T, S, C, P> AppState<E, T, S, C, P>
 where
     E: Executor,
     T: TransactionPool,
     S: Storage,
+    C: Crypto,
+    P: PeerCount,
 {
     pub fn new(
         executor: Arc<E>,
         transaction_pool: Arc<T>,
         storage: Arc<S>,
         crypto: Arc<C>,
+        peer_count: Arc<P>,
     ) -> Self {
         Self {
             filterdb: Arc::new(RwLock::new(FilterDatabase::default())),
@@ -188,17 +194,19 @@ where
             transaction_pool,
             storage,
             crypto,
+            peer_count,
         }
     }
 }
 
 /// Help functions for rpc APIs.
-impl<E, T, S, C> AppState<E, T, S, C>
+impl<E, T, S, C, P> AppState<E, T, S, C, P>
 where
     E: Executor,
     T: TransactionPool,
     S: Storage,
     C: Crypto,
+    P: PeerCount,
 {
     pub async fn get_block(&self, number: String) -> RpcResult<Block> {
         let h = self.get_height(number).await?;
@@ -372,12 +380,13 @@ where
 
 /// Async rpc APIs.
 /// See ./server.rs::rpc_select to learn about meanings of these APIs.
-impl<E, T, S, C> AppState<E, T, S, C>
+impl<E, T, S, C, P> AppState<E, T, S, C, P>
 where
     E: Executor,
     T: TransactionPool,
     S: Storage,
     C: Crypto,
+    P: PeerCount,
 {
     pub async fn block_number(&self) -> RpcResult<u64> {
         let b = self
@@ -719,8 +728,7 @@ where
     }
 
     pub async fn peer_count(&self) -> RpcResult<u32> {
-        // TODO. Can't implement at now
-        Ok(42)
+        Ok(self.peer_count.peer_count() as u32)
     }
 
     pub async fn send_raw_transaction(&self, signed_data: Vec<u8>) -> RpcResult<cita::TxResponse> {
@@ -771,12 +779,13 @@ where
 }
 
 /// A set of functions for FilterDataBase.
-impl<E, T, S, C> AppState<E, T, S, C>
+impl<E, T, S, C, P> AppState<E, T, S, C, P>
 where
     E: Executor,
     T: TransactionPool,
     S: Storage,
     C: Crypto,
+    P: PeerCount,
 {
     /// Pass a block into FilterDatabase.
     pub async fn recv_block(&mut self, block: Block) -> RpcResult<()> {

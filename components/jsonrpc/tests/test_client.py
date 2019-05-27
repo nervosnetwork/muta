@@ -16,7 +16,7 @@ if ensure_blank_chain and client.get_balance(user1, '0x00') != 0x400000000000000
 
 def test_peer_count():
     r = client.peer_count()
-    assert r == 42
+    assert r == 1
 
 
 def test_block_number():

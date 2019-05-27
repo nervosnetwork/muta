@@ -754,6 +754,7 @@ dependencies = [
  "core-context 0.1.0",
  "core-crypto 0.1.0",
  "core-merkle 0.1.0",
+ "core-network 0.2.0",
  "core-pubsub 0.1.0",
  "core-runtime 0.1.0",
  "core-serialization 0.1.0",

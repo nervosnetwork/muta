@@ -8,6 +8,7 @@ use serde_json::Value;
 
 use core_crypto::Crypto;
 use core_pubsub::channel::pubsub::Receiver;
+use core_runtime::network::PeerCount;
 use core_runtime::{Executor, Storage, StorageError, TransactionPool};
 use core_types::{Address, Block, Hash};
 
@@ -19,9 +20,9 @@ use crate::filter::Filter;
 use crate::state::AppState;
 use crate::util::clean_0x;
 
-fn rpc_handle<E: 'static, T: 'static, S: 'static, C: 'static>(
+fn rpc_handle<E: 'static, T: 'static, S: 'static, C: 'static, P: 'static>(
     reqjson: web::Json<convention::Call>,
-    app_state: web::Data<AppState<E, T, S, C>>,
+    app_state: web::Data<AppState<E, T, S, C, P>>,
     _req: HttpRequest,
 ) -> impl OldFuture<Item = HttpResponse, Error = actix_web::Error>
 where
@@ -29,6 +30,7 @@ where
     T: TransactionPool,
     S: Storage,
     C: Crypto,
+    P: PeerCount,
 {
     let fut = async move {
         match reqjson.into_inner() {
@@ -49,15 +51,16 @@ where
     fut.boxed().compat()
 }
 
-async fn handle_one_request<E: 'static, T: 'static, S: 'static, C: 'static>(
+async fn handle_one_request<E: 'static, T: 'static, S: 'static, C: 'static, P: 'static>(
     req: convention::Request,
-    app_state: web::Data<AppState<E, T, S, C>>,
+    app_state: web::Data<AppState<E, T, S, C, P>>,
 ) -> convention::Response
 where
     E: Executor,
     T: TransactionPool,
     S: Storage,
     C: Crypto,
+    P: PeerCount,
 {
     let mut result = convention::Response::default();
     result.id = req.id.clone();
@@ -96,8 +99,8 @@ fn get_string(
 }
 
 #[allow(clippy::cognitive_complexity)]
-async fn rpc_select<E: 'static, T: 'static, S: 'static, C: 'static>(
-    app_state: AppState<E, T, S, C>,
+async fn rpc_select<E: 'static, T: 'static, S: 'static, C: 'static, P: 'static>(
+    app_state: AppState<E, T, S, C, P>,
     method: String,
     params: Option<Vec<Value>>,
 ) -> Result<Value, convention::ErrorData>
@@ -106,6 +109,7 @@ where
     T: TransactionPool,
     S: Storage,
     C: Crypto,
+    P: PeerCount,
 {
     let params = params.unwrap_or_default();
     match method.as_str() {
@@ -349,9 +353,9 @@ where
 }
 
 /// Listen and server on address:port which definds on config
-pub fn listen<E: 'static, T: 'static, S: 'static, C: 'static>(
+pub fn listen<E: 'static, T: 'static, S: 'static, C: 'static, P: 'static>(
     config: Config,
-    app_state: AppState<E, T, S, C>,
+    app_state: AppState<E, T, S, C, P>,
     mut sub_block: Receiver<Block>,
 ) -> std::io::Result<()>
 where
@@ -359,6 +363,7 @@ where
     T: TransactionPool,
     S: Storage,
     C: Crypto,
+    P: PeerCount,
 {
     let mut app_state_clone = app_state.clone();
     let fut = async move {
@@ -386,7 +391,7 @@ where
                 .data(web::JsonConfig::default().limit(c_payload_size)) // <- limit size of the payload
                 .route(
                     web::post()
-                        .to_async(rpc_handle::<E, T, S, C>),
+                        .to_async(rpc_handle::<E, T, S, C, P>),
                 ),
             )
     })

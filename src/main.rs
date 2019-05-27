@@ -105,7 +105,7 @@ fn start(cfg: &Config) {
 
     let partial_network = PartialService::new(network_config).unwrap();
     let outbound = partial_network.outbound();
-    let _peer_count = partial_network.peer_count();
+    let peer_count = Arc::new(partial_network.peer_count());
 
     // new tx pool
     let tx_pool = Arc::new(HashTransactionPool::new(
@@ -117,22 +117,6 @@ fn start(cfg: &Config) {
         cfg.txpool.quota_limit,
         block.header.height,
     ));
-
-    // run json rpc
-    let mut jrpc_config = components_jsonrpc::Config::default();
-    jrpc_config.listen = cfg.rpc.address.clone();
-    jrpc_config.workers = if cfg.rpc.workers != 0 {
-        cfg.rpc.workers as usize
-    } else {
-        cmp::min(2, num_cpus::get())
-    };
-    jrpc_config.payload_size = cfg.rpc.payload_size;
-    let jrpc_state = components_jsonrpc::AppState::new(
-        Arc::clone(&executor),
-        Arc::clone(&tx_pool),
-        Arc::clone(&storage),
-        Arc::clone(&secp),
-    );
 
     // new consensus
     let privkey = PrivateKey::from_bytes(&hex::decode(cfg.privkey.clone()).unwrap()).unwrap();
@@ -207,6 +191,22 @@ fn start(cfg: &Config) {
         .subscribe::<Block>(PUBSUB_BROADCAST_BLOCK.to_owned())
         .unwrap();
 
+    // run json rpc
+    let mut jrpc_config = components_jsonrpc::Config::default();
+    jrpc_config.listen = cfg.rpc.address.clone();
+    jrpc_config.workers = if cfg.rpc.workers != 0 {
+        cfg.rpc.workers as usize
+    } else {
+        cmp::min(2, num_cpus::get())
+    };
+    jrpc_config.payload_size = cfg.rpc.payload_size;
+    let jrpc_state = components_jsonrpc::AppState::new(
+        Arc::clone(&executor),
+        Arc::clone(&tx_pool),
+        Arc::clone(&storage),
+        Arc::clone(&secp),
+        Arc::clone(&peer_count),
+    );
     if let Err(e) = components_jsonrpc::listen(jrpc_config, jrpc_state, sub_block) {
         log::error!("Failed to start jrpc server: {}", e);
     };
