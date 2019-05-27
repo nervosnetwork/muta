@@ -1,0 +1,30 @@
+{
+  "timestamp": 0,
+  "prevhash": "44915be5b6c20b0678cf05fcddbbaa832e25d7e6ac538784cd5c24de00d47472",
+  "state_alloc": [
+    {
+      "address": "7899EE7319601cbC2684709e0eC3A4807bb0Fd74",
+      "code": "",
+      "storage": {},
+      "balance": "400000000000000000"
+    },
+    {
+      "address": "C5b874618a1E81C68bEb30A7A219Fee3f9839a01",
+      "code": "",
+      "storage": {},
+      "balance": "400000000000000000"
+    },
+    {
+      "address": "9Ad301Eb2A4938070ccda5e4b298C4f867812d6e",
+      "code": "",
+      "storage": {},
+      "balance": "400000000000000000"
+    },
+    {
+      "address": "64EC8878182F52af52611dDc575E267ABd012560",
+      "code": "",
+      "storage": {},
+      "balance": "400000000000000000"
+    }
+  ]
+}
