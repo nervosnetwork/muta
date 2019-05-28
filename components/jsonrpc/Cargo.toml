@@ -8,8 +8,7 @@ edition = "2018"
 actix = "0.8"
 actix-web = "1.0.0-rc"
 old_futures = { package = "futures", version = "0.1" }
-futures-preview = { version = "0.3.0-alpha.16", features = [ "async-await", "nightly", "compat" ] }
-# futures-util-preview = { version = "0.3.0-alpha.16" }
+futures-preview = { version = "0.3.0-alpha.16", features = [ "compat" ] }
 futures-locks = "0.3"
 
 bytes = "0.4"

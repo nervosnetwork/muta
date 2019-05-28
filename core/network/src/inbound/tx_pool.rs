@@ -1,7 +1,6 @@
 use std::clone::Clone;
 use std::sync::Arc;
 
-use futures::compat::Future01CompatExt;
 use futures::prelude::{FutureExt, StreamExt, TryFutureExt};
 use futures::stream;
 use log::error;
@@ -70,7 +69,7 @@ where
             let tx_pool = Arc::clone(&self.tx_pool);
 
             let insert = async move {
-                if let Err(err) = tx_pool.insert(ctx, stx.untx).compat().await {
+                if let Err(err) = tx_pool.insert(ctx, stx.untx).await {
                     error!(
                         "net [inbound]: tx_pool: [hash: {:?}, err: {:?}]",
                         stx.hash, err
@@ -92,7 +91,6 @@ where
         let txs = self
             .tx_pool
             .get_batch(ctx.clone(), hashes.as_slice())
-            .compat()
             .await?;
         let push_txs = PushTxs::from(uid, txs);
 

@@ -210,11 +210,7 @@ where
 {
     pub async fn get_block(&self, number: String) -> RpcResult<Block> {
         let h = self.get_height(number).await?;
-        let b = self
-            .storage
-            .get_block_by_height(Context::new(), h)
-            .compat()
-            .await?;
+        let b = self.storage.get_block_by_height(Context::new(), h).await?;
         Ok(b)
     }
 
@@ -222,12 +218,10 @@ where
         let p = self
             .storage
             .get_transaction_position(Context::new(), &tx_hash)
-            .compat()
             .await?;
         let b = self
             .storage
             .get_block_by_hash(Context::new(), &p.block_hash)
-            .compat()
             .await?;
         Ok(b)
     }
@@ -236,11 +230,7 @@ where
         match &number.to_ascii_lowercase()[..] {
             "earliest" => Ok(0),
             "latest" | "pending" | "" => {
-                let b = self
-                    .storage
-                    .get_latest_block(Context::new())
-                    .compat()
-                    .await?;
+                let b = self.storage.get_latest_block(Context::new()).await?;
                 Ok(b.header.height)
             }
             x => {
@@ -285,7 +275,6 @@ where
         let raw_txs = self
             .storage
             .get_transactions(Context::new(), &raw_block.tx_hashes)
-            .compat()
             .await?;
         let mut txs = vec![];
         for tx in raw_txs {
@@ -309,7 +298,6 @@ where
         let receipts = self
             .storage
             .get_receipts(Context::new(), &b.tx_hashes[..])
-            .compat()
             .await?;
         let mut logs_in_block_before_receipt = 0;
         let mut tx_index = 0;
@@ -389,11 +377,7 @@ where
     P: PeerCount,
 {
     pub async fn block_number(&self) -> RpcResult<u64> {
-        let b = self
-            .storage
-            .get_latest_block(Context::new())
-            .compat()
-            .await?;
+        let b = self.storage.get_latest_block(Context::new()).await?;
         Ok(b.header.height)
     }
 
@@ -443,7 +427,6 @@ where
         let b = self
             .storage
             .get_block_by_hash(Context::new(), &hash)
-            .compat()
             .await?;
         let r = self.ret_cita_block(b, include_tx).await?;
         Ok(r)
@@ -485,7 +468,6 @@ where
             let block = self
                 .storage
                 .get_block_by_height(Context::new(), block_height)
-                .compat()
                 .await?;
 
             let mut fit = false;
@@ -507,7 +489,6 @@ where
             let receipts_res = self
                 .storage
                 .get_receipts(Context::new(), block.tx_hashes.as_slice())
-                .compat()
                 .await?;
 
             for (tx_idx, tx_hash) in block.tx_hashes.iter().enumerate() {
@@ -613,11 +594,7 @@ where
     }
 
     pub async fn get_transaction(&self, hash: Hash) -> RpcResult<cita::RpcTransaction> {
-        let tx = self
-            .storage
-            .get_transaction(Context::new(), &hash)
-            .compat()
-            .await?;
+        let tx = self.storage.get_transaction(Context::new(), &hash).await?;
         let tx_cita = self.ret_cita_transaction(tx).await?;
         Ok(tx_cita)
     }
@@ -635,7 +612,6 @@ where
         let block_receipts = self
             .storage
             .get_receipts(Context::new(), block.tx_hashes.as_slice())
-            .compat()
             .await?;
         let tx_index = block
             .tx_hashes
@@ -659,23 +635,17 @@ where
 
         // Done! Now we build the TxProof struct for CITA RPC response.
         // Get raw transaction
-        let resp_tx = self
-            .storage
-            .get_transaction(Context::new(), &hash)
-            .compat()
-            .await?;
+        let resp_tx = self.storage.get_transaction(Context::new(), &hash).await?;
         let resp_block_header = block.header;
         let resp_next_proposal_block = self
             .storage
             .get_block_by_height(Context::new(), resp_block_header.height + 1)
-            .compat()
             .await?;
         let resp_next_proposal_header = resp_next_proposal_block.header;
 
         let resp_third_block = self
             .storage
             .get_block_by_height(Context::new(), resp_block_header.height + 1)
-            .compat()
             .await?;
         let resp_third_proposal_proof = resp_third_block.header.proof.clone();
 
@@ -707,7 +677,6 @@ where
         let receipt_list = self
             .storage
             .get_receipts(Context::new(), &tx_hashes[..])
-            .compat()
             .await?;
         // get merkle proof
         let hahses: Vec<Hash> = receipt_list.iter().map(Receipt::hash).collect();
@@ -718,11 +687,7 @@ where
     }
 
     pub async fn get_transaction_receipt(&self, hash: Hash) -> RpcResult<cita::Receipt> {
-        let r = self
-            .storage
-            .get_receipt(Context::new(), &hash)
-            .compat()
-            .await?;
+        let r = self.storage.get_receipt(Context::new(), &hash).await?;
         let cita_r = self.ret_cita_receipt(r).await?;
         Ok(cita_r)
     }
@@ -741,11 +706,7 @@ where
         let origin_ctx =
             Context::new().with_value::<TransactionOrigin>(ORIGIN, TransactionOrigin::Jsonrpc);
         log::debug!("Accept {:?}", untx);
-        let r = self
-            .transaction_pool
-            .insert(origin_ctx, untx)
-            .compat()
-            .await;
+        let r = self.transaction_pool.insert(origin_ctx, untx).await;
         let r = match r {
             Ok(ok) => ok,
             Err(e) => {
@@ -842,7 +803,6 @@ where
             let receipts_res = self
                 .storage
                 .get_receipts(Context::new(), block.tx_hashes.as_slice())
-                .compat()
                 .await?;
 
             for (tx_idx, tx_hash) in block.tx_hashes.iter().enumerate() {

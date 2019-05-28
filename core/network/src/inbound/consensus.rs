@@ -1,8 +1,6 @@
 use std::clone::Clone;
 use std::sync::Arc;
 
-use futures::compat::Future01CompatExt;
-
 use core_context::Context;
 use core_network_message::consensus::{Proposal, Vote};
 use core_network_message::{Codec, Method};
@@ -43,10 +41,7 @@ where
     pub async fn handle_proposal(&self, ctx: Context, msg: Vec<u8>) -> Result<(), Error> {
         let proposal = <Proposal as Codec>::decode(msg.as_slice())?;
 
-        self.consensus
-            .set_proposal(ctx, proposal.des())
-            .compat()
-            .await?;
+        self.consensus.set_proposal(ctx, proposal.des()).await?;
 
         Ok(())
     }
@@ -54,7 +49,7 @@ where
     pub async fn handle_vote(&self, ctx: Context, msg: Vec<u8>) -> Result<(), Error> {
         let vote = <Vote as Codec>::decode(msg.as_slice())?;
 
-        self.consensus.set_vote(ctx, vote.des()).compat().await?;
+        self.consensus.set_vote(ctx, vote.des()).await?;
 
         Ok(())
     }

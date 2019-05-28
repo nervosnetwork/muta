@@ -10,8 +10,8 @@ mod synchronizer;
 
 pub use bft::Bft;
 pub use engine::Engine;
-pub use synchronizer::SynchronizerManager;
 // pub use solo::Solo;
+pub use synchronizer::SynchronizerManager;
 
 use core_runtime::ConsensusError;
 use core_types::{Address, Hash, Proof};

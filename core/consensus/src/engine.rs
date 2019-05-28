@@ -3,9 +3,7 @@ use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use bft_rs::{check_proof, Node as BftNode, Proof as BftProof};
-use futures::compat::Future01CompatExt;
-use futures::executor::block_on;
-use futures_locks::Mutex;
+use futures::{executor::block_on, lock::Mutex};
 use parking_lot::RwLock;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
@@ -99,7 +97,6 @@ where
         let tx_hashes = self
             .tx_pool
             .package(ctx.clone(), status.tx_limit, status.quota_limit)
-            .compat()
             .await?;
 
         let proposal = Proposal {
@@ -183,7 +180,6 @@ where
         log::debug!("verify transactions {:?}", proposal);
         self.tx_pool
             .ensure(ctx.clone(), &proposal.tx_hashes)
-            .compat()
             .await?;
         Ok(())
     }
@@ -202,7 +198,7 @@ where
         proposal: Proposal,
         latest_proof: Proof,
     ) -> ConsensusResult<ConsensusStatus> {
-        let _lock = self.lock.lock().compat().await;
+        let _lock = self.lock.lock().await;
 
         let status = self.get_status();
         if status.height + 1 != proposal.height {
@@ -215,7 +211,6 @@ where
         let signed_txs = self
             .tx_pool
             .get_batch(ctx.clone(), &proposal.tx_hashes)
-            .compat()
             .await?;
 
         // exec transactions
@@ -261,12 +256,11 @@ where
                     .collect::<Vec<Hash>>();
 
                 result_with_insert_transaction = Some(block_on(
-                    self.storage.insert_transactions(ctx2, signaed_txs).compat(),
+                    self.storage.insert_transactions(ctx2, signaed_txs),
                 ));
                 // flush transaction pool
-                result_with_flush_transaction = Some(block_on(
-                    self.tx_pool.flush(ctx.clone(), &tx_hashes).compat(),
-                ));
+                result_with_flush_transaction =
+                    Some(block_on(self.tx_pool.flush(ctx.clone(), &tx_hashes)));
             });
         });
 
@@ -288,16 +282,8 @@ where
         let cloned_header = block.header.clone();
 
         let mut futs = vec![];
-        futs.push(
-            self.storage
-                .insert_block(ctx.clone(), block.clone())
-                .compat(),
-        );
-        futs.push(
-            self.storage
-                .update_latest_proof(ctx.clone(), proof.clone())
-                .compat(),
-        );
+        futs.push(self.storage.insert_block(ctx.clone(), block.clone()));
+        futs.push(self.storage.update_latest_proof(ctx.clone(), proof.clone()));
         if !execution_result.receipts.is_empty() {
             // Execution in the background, if an error occurs we can recover the data by
             // re-executing transactions.
@@ -310,14 +296,12 @@ where
             rayon::spawn(move || {
                 let tx_positions = build_tx_potsitions(&block_hash, &tx_hashes);
 
-                if let Err(e) = block_on(storage.insert_receipts(ctx1.clone(), receipts).compat()) {
+                if let Err(e) = block_on(storage.insert_receipts(ctx1.clone(), receipts)) {
                     log::error!("insert_receipts {:?}", e)
                 };
-                if let Err(e) = block_on(
-                    storage
-                        .insert_transaction_positions(ctx1.clone(), tx_positions)
-                        .compat(),
-                ) {
+                if let Err(e) =
+                    block_on(storage.insert_transaction_positions(ctx1.clone(), tx_positions))
+                {
                     log::error!("insert_transaction_positions {:?}", e)
                 };
             });
@@ -348,7 +332,7 @@ where
         signed_txs: Vec<SignedTransaction>,
         proof: Proof,
     ) -> ConsensusResult<ConsensusStatus> {
-        let _lock = self.lock.lock().compat().await;
+        let _lock = self.lock.lock().await;
 
         let status = self.get_status();
         if status.height + 1 != block.header.height {

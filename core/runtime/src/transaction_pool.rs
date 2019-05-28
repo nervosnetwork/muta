@@ -5,7 +5,9 @@ use core_context::{Cloneable, Context};
 use core_crypto::CryptoError;
 use core_types::{Hash, SignedTransaction, UnverifiedTransaction};
 
-use crate::FutRuntimeResult;
+use crate::BoxFuture;
+
+pub type FutTxPoolResult<T> = BoxFuture<'static, Result<T, TransactionPoolError>>;
 
 #[derive(Clone, Debug)]
 pub enum TransactionOrigin {
@@ -24,30 +26,24 @@ pub trait TransactionPool: Sync + Send {
         &self,
         ctx: Context,
         untx: UnverifiedTransaction,
-    ) -> FutRuntimeResult<SignedTransaction, TransactionPoolError>;
+    ) -> FutTxPoolResult<SignedTransaction>;
 
     /// Filter a batch of valid transaction hashes from the transaction pool
     /// (and delete some expired transactions). Returns "count" the number
     /// of transactions if "quota_limit" does not exceed the upper limit,
     /// and returns all if the "count" number is not reached.
     /// Note: Transactions are still in the pool.
-    fn package(
-        &self,
-        ctx: Context,
-        count: u64,
-        quota_limit: u64,
-    ) -> FutRuntimeResult<Vec<Hash>, TransactionPoolError>;
+    fn package(&self, ctx: Context, count: u64, quota_limit: u64) -> FutTxPoolResult<Vec<Hash>>;
 
     /// Delete the specified transactions.
-    fn flush(&self, ctx: Context, tx_hashes: &[Hash])
-        -> FutRuntimeResult<(), TransactionPoolError>;
+    fn flush(&self, ctx: Context, tx_hashes: &[Hash]) -> FutTxPoolResult<()>;
 
     /// Get a batch of transactions.
     fn get_batch(
         &self,
         ctx: Context,
         tx_hashes: &[Hash],
-    ) -> FutRuntimeResult<Vec<SignedTransaction>, TransactionPoolError>;
+    ) -> FutTxPoolResult<Vec<SignedTransaction>>;
 
     /// Make sure that the transactions that specify the transactions hash are
     /// in the transaction pool. If there are transactions that do not
@@ -59,11 +55,7 @@ pub trait TransactionPool: Sync + Send {
     /// corresponding node. However, we don't want to pass "p2p_session_id"
     /// to this function. In the next version we will use "context" to store
     /// "p2p_session_id".
-    fn ensure(
-        &self,
-        ctx: Context,
-        tx_hashes: &[Hash],
-    ) -> FutRuntimeResult<(), TransactionPoolError>;
+    fn ensure(&self, ctx: Context, tx_hashes: &[Hash]) -> FutTxPoolResult<()>;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -1,6 +1,5 @@
 use std::any::Any;
 
-use futures::compat::Compat;
 use futures::future::FutureObj;
 use uuid::Uuid;
 
@@ -71,9 +70,8 @@ impl PubSub {
 
     /// Return inner pubsub future task, it's control and `Register`. Use this
     /// method if you want to spawn pubsub future yourself.
-    pub fn fut_task(self) -> (Compat<FutureObj<'static, ()>>, Control, Register) {
+    pub fn fut_task(self) -> (FutureObj<'static, ()>, Control, Register) {
         let (futobj, ctrl) = self.broadcast_worker.task();
-        let futobj = Compat::new(futobj);
 
         (futobj, ctrl, self.register)
     }

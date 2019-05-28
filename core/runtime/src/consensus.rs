@@ -2,24 +2,23 @@ use std::error::Error;
 use std::fmt;
 
 use bft_rs::error::BftError;
-use futures::prelude::Future;
 
 use core_context::Context;
 use core_crypto::CryptoError;
 use core_serialization::CodecError;
 use core_types::{Block, Proof, SignedTransaction, TypesError};
 
-use crate::{ExecutorError, StorageError, TransactionPoolError};
+use crate::{BoxFuture, ExecutorError, StorageError, TransactionPoolError};
 
-pub type FutConsensusResult<T> = Box<dyn Future<Item = T, Error = ConsensusError> + Send>;
+pub type FutConsensusResult = BoxFuture<'static, Result<(), ConsensusError>>;
 
 pub trait Consensus: Send + Sync {
-    fn set_proposal(&self, ctx: Context, msg: Vec<u8>) -> FutConsensusResult<()>;
+    fn set_proposal(&self, ctx: Context, msg: Vec<u8>) -> FutConsensusResult;
 
-    fn set_vote(&self, ctx: Context, msg: Vec<u8>) -> FutConsensusResult<()>;
+    fn set_vote(&self, ctx: Context, msg: Vec<u8>) -> FutConsensusResult;
 
     // Send status to peers after synchronizing blocks to trigger bft
-    fn send_status(&self) -> FutConsensusResult<()>;
+    fn send_status(&self) -> FutConsensusResult;
 
     /// insert block syncing from other nodes
     fn insert_sync_block(
@@ -28,7 +27,7 @@ pub trait Consensus: Send + Sync {
         block: Block,
         stxs: Vec<SignedTransaction>,
         proof: Proof,
-    ) -> FutConsensusResult<()>;
+    ) -> FutConsensusResult;
 }
 
 #[derive(Debug)]

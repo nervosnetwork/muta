@@ -16,10 +16,8 @@ core-context = { path = "../../core/context" }
 core-pubsub = { path = "../../core/pubsub" }
 
 parking_lot = "0.8"
-futures = "0.1"
 log = "0.4"
-# TODO: rename futures01 instead
-futures03 = { package = "futures-preview", version = "0.3.0-alpha.16",features = [ "async-await", "nightly", "compat" ] }
+futures-preview = "0.3.0-alpha.16"
 rayon = "1.0"
 
 [dev-dependencies]

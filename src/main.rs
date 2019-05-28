@@ -6,8 +6,8 @@ use std::fs::File;
 use std::path::Path;
 use std::sync::Arc;
 
+use futures::executor::block_on;
 use futures::prelude::{FutureExt, TryFutureExt};
-use futures01::future::Future as Future01;
 
 use components_database::rocks::{Config as RocksDBConfig, RocksDB};
 use components_executor::evm::{EVMBlockDataProvider, EVMExecutor};
@@ -83,7 +83,7 @@ fn start(cfg: &Config) {
     let trie_db = Arc::new(TrieDB::new(Arc::clone(&state_db)));
 
     // new executor
-    let block = storage.get_latest_block(ctx.clone()).wait().unwrap();
+    let block = block_on(storage.get_latest_block(ctx.clone())).unwrap();
     let executor = Arc::new(
         EVMExecutor::from_existing(
             trie_db,
@@ -129,7 +129,7 @@ fn start(cfg: &Config) {
         verifier_list.push(Address::from_hex(address).unwrap());
     }
 
-    let proof = storage.get_latest_proof(ctx.clone()).wait().unwrap();
+    let proof = block_on(storage.get_latest_proof(ctx.clone())).unwrap();
     let status = ConsensusStatus {
         height: block.header.height,
         timestamp: block.header.timestamp,
@@ -226,7 +226,7 @@ fn handle_init(cfg: &Config, genesis_path: impl AsRef<Path>) -> Result<(), Box<d
     let block_disk_db = Arc::new(RocksDB::new(path_block, &db_cfg)?);
     let block_db = Arc::new(BlockStorage::new(block_disk_db));
 
-    if block_db.get_latest_block(ctx.clone()).wait().is_ok() {
+    if block_on(block_db.get_latest_block(ctx.clone())).is_ok() {
         log::error!("There is already a chain, you should specify a new path");
         return Ok(());
     }
@@ -253,16 +253,14 @@ fn handle_init(cfg: &Config, genesis_path: impl AsRef<Path>) -> Result<(), Box<d
     block.hash = block_header.hash();
     block.header = block_header;
     log::info!("init state {:?}", block);
-    block_db.insert_block(ctx.clone(), block).wait()?;
+    block_on(block_db.insert_block(ctx.clone(), block))?;
 
     // init proof
-    block_db
-        .update_latest_proof(ctx.clone(), Proof {
-            height: 0,
-            round: 0,
-            ..Default::default()
-        })
-        .wait()?;
+    block_on(block_db.update_latest_proof(ctx.clone(), Proof {
+        height: 0,
+        round: 0,
+        ..Default::default()
+    }))?;
 
     Ok(())
 }

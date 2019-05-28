@@ -3,15 +3,13 @@ use std::error::Error;
 use std::fmt;
 use std::option::NoneError;
 
-use futures::prelude::Future;
-
 use core_context::Context;
 use core_serialization::CodecError;
 use core_types::{Block, Hash, Proof, Receipt, SignedTransaction, TransactionPosition};
 
-use crate::DatabaseError;
+use crate::{BoxFuture, DatabaseError};
 
-pub type StorageResult<T> = Box<Future<Item = T, Error = StorageError> + Send>;
+pub type StorageResult<T> = BoxFuture<'static, Result<T, StorageError>>;
 
 /// "storage" is responsible for the storage and retrieval of blockchain data.
 /// Block, transaction, and receipt can be obtained from here,

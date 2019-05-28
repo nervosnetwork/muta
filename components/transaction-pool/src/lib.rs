@@ -7,16 +7,11 @@ use std::string::ToString;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
-use futures03::{
-    compat::Future01CompatExt,
-    prelude::{FutureExt, TryFutureExt},
-};
-
 use common_channel::{unbounded, Receiver, Sender};
 use core_context::{Context, ORIGIN};
 use core_crypto::Crypto;
 use core_runtime::network::TransactionPool as Network;
-use core_runtime::{FutRuntimeResult, TransactionOrigin, TransactionPool, TransactionPoolError};
+use core_runtime::{FutTxPoolResult, TransactionOrigin, TransactionPool, TransactionPoolError};
 use core_runtime::{Storage, StorageError};
 use core_types::{Hash, SignedTransaction, Transaction, UnverifiedTransaction};
 
@@ -86,7 +81,7 @@ where
         &self,
         ctx: Context,
         untx: UnverifiedTransaction,
-    ) -> FutRuntimeResult<SignedTransaction, TransactionPoolError> {
+    ) -> FutTxPoolResult<SignedTransaction> {
         let storage = Arc::clone(&self.storage);
         let crypto = Arc::clone(&self.crypto);
         let tx_cache = Arc::clone(&self.tx_cache);
@@ -120,11 +115,7 @@ where
             let sender = crypto.pubkey_to_address(&pubkey);
 
             // 4. check if the transaction is in histories block.
-            match storage
-                .get_transaction(ctx.clone(), &tx_hash)
-                .compat()
-                .await
-            {
+            match storage.get_transaction(ctx.clone(), &tx_hash).await {
                 Ok(_) => Err(TransactionPoolError::Dup)?,
                 Err(StorageError::None(_)) => {}
                 Err(e) => Err(internal_error(e))?,
@@ -157,15 +148,10 @@ where
             Ok(signed_tx)
         };
 
-        Box::new(fut.boxed().compat())
+        Box::pin(fut)
     }
 
-    fn package(
-        &self,
-        _: Context,
-        count: u64,
-        quota_limit: u64,
-    ) -> FutRuntimeResult<Vec<Hash>, TransactionPoolError> {
+    fn package(&self, _: Context, count: u64, quota_limit: u64) -> FutTxPoolResult<Vec<Hash>> {
         let tx_cache = Arc::clone(&self.tx_cache);
         let until_block_limit = self.until_block_limit;
         let latest_height = self.latest_height.load(Ordering::Acquire);
@@ -201,10 +187,10 @@ where
             Ok(valid_hashes)
         };
 
-        Box::new(fut.boxed().compat())
+        Box::pin(fut)
     }
 
-    fn flush(&self, _: Context, tx_hashes: &[Hash]) -> FutRuntimeResult<(), TransactionPoolError> {
+    fn flush(&self, _: Context, tx_hashes: &[Hash]) -> FutTxPoolResult<()> {
         let tx_cache = Arc::clone(&self.tx_cache);
         let callback_cache = Arc::clone(&self.callback_cache);
         let latest_height = Arc::clone(&self.latest_height);
@@ -218,14 +204,10 @@ where
             Ok(())
         };
 
-        Box::new(fut.boxed().compat())
+        Box::pin(fut)
     }
 
-    fn get_batch(
-        &self,
-        _: Context,
-        tx_hashes: &[Hash],
-    ) -> FutRuntimeResult<Vec<SignedTransaction>, TransactionPoolError> {
+    fn get_batch(&self, _: Context, tx_hashes: &[Hash]) -> FutTxPoolResult<Vec<SignedTransaction>> {
         let tx_cache = Arc::clone(&self.tx_cache);
         let callback_cache = Arc::clone(&self.callback_cache);
         let tx_hashes = tx_hashes.to_owned();
@@ -244,14 +226,10 @@ where
             Ok(sig_txs)
         };
 
-        Box::new(fut.boxed().compat())
+        Box::pin(fut)
     }
 
-    fn ensure(
-        &self,
-        ctx: Context,
-        tx_hashes: &[Hash],
-    ) -> FutRuntimeResult<(), TransactionPoolError> {
+    fn ensure(&self, ctx: Context, tx_hashes: &[Hash]) -> FutTxPoolResult<()> {
         let tx_cache = Arc::clone(&self.tx_cache);
         let callback_cache = Arc::clone(&self.callback_cache);
         let network = self.network.clone();
@@ -261,7 +239,7 @@ where
             let unknown = tx_cache.contains_keys(&tx_hashes);
 
             if !unknown.is_empty() {
-                let sig_txs = network.pull_txs(ctx, unknown.clone()).compat().await?;
+                let sig_txs = network.pull_txs(ctx, unknown.clone()).await?;
                 if sig_txs.len() != unknown.len() {
                     return Err(TransactionPoolError::NotExpected);
                 }
@@ -277,7 +255,7 @@ where
             Ok(())
         };
 
-        Box::new(fut.boxed().compat())
+        Box::pin(fut)
     }
 }
 
@@ -336,7 +314,8 @@ fn cache_broadcast_txs<N: Network>(network: N, receiver: Receiver<SignedTransact
 mod tests {
     use std::sync::{Arc, RwLock};
 
-    use futures::future::{ok, Future};
+    use futures::executor::block_on;
+    use futures::future::ok;
 
     use common_cita::{
         Transaction as CitaTransaction, UnverifiedTransaction as CitaUnverifiedTransaction,
@@ -345,7 +324,7 @@ mod tests {
     use core_context::{Context, ORIGIN};
     use core_crypto::{secp256k1::Secp256k1, Crypto, CryptoTransform};
     use core_runtime::{
-        FutRuntimeResult, Storage, TransactionOrigin, TransactionPool, TransactionPoolError,
+        FutTxPoolResult, Storage, TransactionOrigin, TransactionPool, TransactionPoolError,
     };
     use core_storage::BlockStorage;
     use core_types::{Address, Block, Hash, SignedTransaction, Transaction, UnverifiedTransaction};
@@ -366,7 +345,7 @@ mod tests {
             &self,
             _: Context,
             unknown_hashes: Vec<Hash>,
-        ) -> FutRuntimeResult<Vec<SignedTransaction>, TransactionPoolError> {
+        ) -> FutTxPoolResult<Vec<SignedTransaction>> {
             let mut mock_stxs = Vec::with_capacity(unknown_hashes.len());
 
             for hash in unknown_hashes.into_iter() {
@@ -375,7 +354,7 @@ mod tests {
                 mock_stxs.push(stx);
             }
 
-            Box::new(ok(mock_stxs))
+            Box::pin(ok(mock_stxs))
         }
     }
 
@@ -398,7 +377,7 @@ mod tests {
 
         // test normal
         let untx = mock_transaction(100, height + until_block_limit, "test_normal".to_owned());
-        let signed_tx = tx_pool.insert(ctx.clone(), untx.clone()).wait().unwrap();
+        let signed_tx = block_on(tx_pool.insert(ctx.clone(), untx.clone())).unwrap();
         assert_eq!(
             signed_tx.hash,
             Into::<CitaUnverifiedTransaction>::into(untx)
@@ -409,7 +388,7 @@ mod tests {
 
         // test lt valid_until_block
         let untx = mock_transaction(100, height, "test_lt_quota_limit".to_owned());
-        let result = tx_pool.insert(ctx.clone(), untx).wait();
+        let result = block_on(tx_pool.insert(ctx.clone(), untx));
         assert_eq!(result, Err(TransactionPoolError::InvalidUntilBlock));
 
         // test gt valid_until_block
@@ -418,7 +397,7 @@ mod tests {
             height + until_block_limit * 2,
             "test_gt_valid_until_block".to_owned(),
         );
-        let result = tx_pool.insert(ctx.clone(), untx).wait();
+        let result = block_on(tx_pool.insert(ctx.clone(), untx));
         assert_eq!(result, Err(TransactionPoolError::InvalidUntilBlock));
 
         // test gt quota limit
@@ -427,14 +406,14 @@ mod tests {
             height + until_block_limit,
             "test_gt_quota_limit".to_owned(),
         );
-        let result = tx_pool.insert(ctx.clone(), untx).wait();
+        let result = block_on(tx_pool.insert(ctx.clone(), untx));
         assert_eq!(result, Err(TransactionPoolError::QuotaNotEnough));
 
         // test cache dup
         let untx = mock_transaction(100, height + until_block_limit, "test_dup".to_owned());
         let untx2 = untx.clone();
-        tx_pool.insert(ctx.clone(), untx).wait().unwrap();
-        let result = tx_pool.insert(ctx.clone(), untx2).wait();
+        block_on(tx_pool.insert(ctx.clone(), untx)).unwrap();
+        let result = block_on(tx_pool.insert(ctx.clone(), untx2));
         assert_eq!(result, Err(TransactionPoolError::Dup));
     }
 
@@ -457,12 +436,9 @@ mod tests {
         let mut block = Block::default();
         block.header.height = height;
 
-        storage
-            .insert_transactions(ctx.clone(), vec![signed_tx.clone()])
-            .wait()
-            .unwrap();
+        block_on(storage.insert_transactions(ctx.clone(), vec![signed_tx.clone()])).unwrap();
 
-        storage.insert_block(ctx.clone(), block).wait().unwrap();
+        block_on(storage.insert_block(ctx.clone(), block)).unwrap();
 
         let tx_pool = new_test_pool(
             ctx.clone(),
@@ -473,7 +449,7 @@ mod tests {
             height,
         );
 
-        let result = tx_pool.insert(ctx.clone(), signed_tx.untx).wait();
+        let result = block_on(tx_pool.insert(ctx.clone(), signed_tx.untx));
         assert_eq!(result, Err(TransactionPoolError::Dup));
     }
 
@@ -495,7 +471,7 @@ mod tests {
         );
 
         let untx = mock_transaction(100, height + until_block_limit, "test1".to_owned());
-        let signed_tx = tx_pool.insert(ctx.clone(), untx.clone()).wait().unwrap();
+        let signed_tx = block_on(tx_pool.insert(ctx.clone(), untx.clone())).unwrap();
         assert_eq!(
             signed_tx.hash,
             Into::<CitaUnverifiedTransaction>::into(untx)
@@ -505,7 +481,7 @@ mod tests {
         );
 
         let untx = mock_transaction(100, height + until_block_limit, "test2".to_owned());
-        let result = tx_pool.insert(ctx.clone(), untx).wait();
+        let result = block_on(tx_pool.insert(ctx.clone(), untx));
         assert_eq!(result, Err(TransactionPoolError::ReachLimit));
     }
 
@@ -534,13 +510,11 @@ mod tests {
                 .unwrap()
                 .hash();
             tx_hashes.push(tx_hash.clone());
-            tx_pool.insert(ctx.clone(), untx.clone()).wait().unwrap();
+            block_on(tx_pool.insert(ctx.clone(), untx.clone())).unwrap();
         }
 
-        let pachage_tx_hashes = tx_pool
-            .package(ctx, tx_hashes.len() as u64, quota_limit)
-            .wait()
-            .unwrap();
+        let pachage_tx_hashes =
+            block_on(tx_pool.package(ctx, tx_hashes.len() as u64, quota_limit)).unwrap();
         assert_eq!(tx_hashes.len(), pachage_tx_hashes.len());
         assert_eq!(
             tx_hashes
@@ -593,10 +567,7 @@ mod tests {
             .iter()
             .map(|stx| stx.hash.clone())
             .collect::<Vec<Hash>>();
-        let stxs = tx_pool
-            .get_batch(ctx.clone(), test_hashes.as_slice())
-            .wait()
-            .unwrap();
+        let stxs = block_on(tx_pool.get_batch(ctx.clone(), test_hashes.as_slice())).unwrap();
         assert_eq!(stxs.len(), test_hashes.len());
         assert_eq!(tx_pool.callback_cache.len(), test_hashes.len());
 
@@ -604,10 +575,7 @@ mod tests {
             .iter()
             .map(|stx| stx.hash.clone())
             .collect::<Vec<Hash>>();
-        tx_pool
-            .flush(ctx.clone(), test_hashes.as_slice())
-            .wait()
-            .unwrap();
+        block_on(tx_pool.flush(ctx.clone(), test_hashes.as_slice())).unwrap();
         assert_eq!(tx_pool.callback_cache.len(), 0);
         assert_eq!(tx_pool.tx_cache.len(), 0);
     }
@@ -637,13 +605,11 @@ mod tests {
                 .unwrap()
                 .hash();
             tx_hashes.push(tx_hash.clone());
-            tx_pool.insert(ctx.clone(), untx).wait().unwrap();
+            block_on(tx_pool.insert(ctx.clone(), untx)).unwrap();
         }
 
-        let pachage_tx_hashes = tx_pool
-            .package(ctx, tx_hashes.len() as u64, quota_limit)
-            .wait()
-            .unwrap();
+        let pachage_tx_hashes =
+            block_on(tx_pool.package(ctx, tx_hashes.len() as u64, quota_limit)).unwrap();
         assert_eq!(8, pachage_tx_hashes.len());
     }
 
@@ -676,16 +642,10 @@ mod tests {
             untxs.push(untx);
         }
 
-        tx_pool
-            .insert(ctx.clone(), untxs[0].clone())
-            .wait()
-            .unwrap();
+        block_on(tx_pool.insert(ctx.clone(), untxs[0].clone())).unwrap();
         assert_eq!(tx_pool.tx_cache.len(), 1);
 
-        tx_pool
-            .ensure(ctx.clone(), tx_hashes.as_slice())
-            .wait()
-            .unwrap();
+        block_on(tx_pool.ensure(ctx.clone(), tx_hashes.as_slice())).unwrap();
         let callback_cache = tx_pool.callback_cache;
 
         dbg!(callback_cache.len());
@@ -723,14 +683,11 @@ mod tests {
                     .unwrap()
                     .hash(),
             );
-            tx_pool.insert(ctx.clone(), untx).wait().unwrap();
+            block_on(tx_pool.insert(ctx.clone(), untx)).unwrap();
         }
         assert_eq!(tx_pool.tx_cache.len(), 5);
 
-        tx_pool
-            .ensure(ctx.clone(), tx_hashes.as_slice())
-            .wait()
-            .unwrap();
+        block_on(tx_pool.ensure(ctx.clone(), tx_hashes.as_slice())).unwrap();
         assert_eq!(tx_pool.callback_cache.len(), 0);
     }
 
@@ -761,9 +718,9 @@ mod tests {
             let untx = mock_transaction(100, height + until_block_limit, format!("test{}", i));
 
             if i == CACHE_BROOADCAST_LEN {
-                tx_pool.insert(Context::new(), untx).wait().unwrap();
+                block_on(tx_pool.insert(Context::new(), untx)).unwrap();
             } else {
-                tx_pool.insert(ctx.clone(), untx).wait().unwrap();
+                block_on(tx_pool.insert(ctx.clone(), untx)).unwrap();
             }
         }
 
@@ -787,7 +744,7 @@ mod tests {
             let mut block = Block::default();
             block.header.height = height;
 
-            storage.insert_block(ctx.clone(), block).wait().unwrap();
+            block_on(storage.insert_block(ctx.clone(), block)).unwrap();
             storage
         });
 
@@ -824,7 +781,7 @@ mod tests {
             let mut block = Block::default();
             block.header.height = height;
 
-            storage.insert_block(ctx.clone(), block).wait().unwrap();
+            block_on(storage.insert_block(ctx.clone(), block)).unwrap();
             storage
         });
 

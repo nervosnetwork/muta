@@ -10,7 +10,6 @@ core-context = { path = "../../core/context" }
 
 log = "0.4"
 rocksdb = "0.12.0"
-futures-preview = { version = "0.3.0-alpha.16", features = [ "async-await", "nightly", "compat" ] }
 
 [dev-dependencies]
-futures01 = { package = "futures", version = "0.1" }
+futures-preview = "0.3.0-alpha.16"

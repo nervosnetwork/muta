@@ -1,7 +1,7 @@
 #[macro_export]
 macro_rules! callback_broadcast {
     ($outbound:expr, $ctx:expr, $arg:expr, $data_ty:ty, $method:expr, $err_ty:expr) => {{
-        use futures::prelude::{FutureExt, StreamExt};
+        use futures::prelude::StreamExt;
 
         use common_channel::bounded;
 
@@ -35,6 +35,6 @@ macro_rules! callback_broadcast {
             )))
         };
 
-        Box::new(fut.boxed().compat())
+        Box::pin(fut)
     }};
 }

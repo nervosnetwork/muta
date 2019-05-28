@@ -1,10 +1,9 @@
 use core_context::Context;
 use core_types::{Block, Hash, SignedTransaction};
 
-use crate::{FutRuntimeResult, SyncStatus, SynchronizerError, TransactionPoolError};
+use crate::{BoxFuture, FutTxPoolResult, SyncStatus, SynchronizerError};
 
-pub type FutTxPoolResult<T> = FutRuntimeResult<T, TransactionPoolError>;
-pub type FutSyncResult<T> = FutRuntimeResult<T, SynchronizerError>;
+pub type FutSyncResult<T> = BoxFuture<'static, Result<T, SynchronizerError>>;
 
 pub trait TransactionPool: Clone + Send + Sync {
     fn broadcast_batch(&self, txs: Vec<SignedTransaction>);

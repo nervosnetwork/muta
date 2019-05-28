@@ -1,5 +1,3 @@
-use futures::prelude::TryFutureExt;
-
 use core_context::Context;
 use core_network_message::common::PullTxs;
 use core_network_message::sync::{BroadcastStatus, PullBlocks};

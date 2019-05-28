@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use futures::future::Future;
+use futures::executor::block_on;
 use parking_lot::RwLock;
 use std::collections::HashMap;
 
@@ -38,7 +38,7 @@ where
     fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Self::Error> {
         match self.cache.read().get(key) {
             Some(v) => Ok(Some(v.to_vec())),
-            None => self.db.get(Context::new(), DataCategory::State, key).wait(),
+            None => block_on(self.db.get(Context::new(), DataCategory::State, key)),
         }
     }
 
@@ -51,9 +51,7 @@ where
         if self.cache.read().contains_key(key) {
             Ok(true)
         } else {
-            self.db
-                .contains(Context::new(), DataCategory::State, key)
-                .wait()
+            block_on(self.db.contains(Context::new(), DataCategory::State, key))
         }
     }
 
@@ -85,14 +83,12 @@ where
             values.push(value);
         }
 
-        self.db
-            .insert_batch(
-                Context::new(),
-                DataCategory::State,
-                keys.to_vec(),
-                values.to_vec(),
-            )
-            .wait()
+        block_on(self.db.insert_batch(
+            Context::new(),
+            DataCategory::State,
+            keys.to_vec(),
+            values.to_vec(),
+        ))
     }
 }
 

@@ -1,7 +1,6 @@
 use std::clone::Clone;
 use std::sync::Arc;
 
-use futures::compat::Future01CompatExt;
 use futures::lock::Mutex;
 use log::error;
 
@@ -83,7 +82,7 @@ where
             return Ok(());
         }
 
-        let latest_block: Block = self.storage.get_latest_block(ctx.clone()).compat().await?;
+        let latest_block: Block = self.storage.get_latest_block(ctx.clone()).await?;
         *current_height = latest_block.header.height;
         // ignore update process if height difference is less than or equal to 1,
         // wait for consensus to catch up
@@ -97,11 +96,7 @@ where
         let mut all_blocks = vec![];
         for height in ((*current_height + 1)..=global_height).step_by(SYNC_STEP as usize) {
             let heights = (height..(height + SYNC_STEP)).collect::<Vec<_>>();
-            let mut blocks = self
-                .outbound
-                .pull_blocks(ctx.clone(), heights)
-                .compat()
-                .await?;
+            let mut blocks = self.outbound.pull_blocks(ctx.clone(), heights).await?;
             all_blocks.append(&mut blocks);
             let last_index = all_blocks.len() - 1;
             for i in 0..last_index {
@@ -113,19 +108,17 @@ where
                     // todo: if there are too many txes, split it into small request
                     self.outbound
                         .pull_txs_sync(ctx.clone(), &block.tx_hashes)
-                        .compat()
                         .await?
                 };
                 self.consensus
                     .insert_sync_block(ctx.clone(), block, signed_txs, proof)
-                    .compat()
                     .await?;
             }
             all_blocks = all_blocks.split_off(last_index);
         }
 
         // send status after synchronizing blocks, trigger bft
-        self.consensus.send_status().compat().await?;
+        self.consensus.send_status().await?;
 
         Ok(())
     }
@@ -134,7 +127,7 @@ where
         let PullBlocks { uid, heights } = <PullBlocks as Codec>::decode(data.as_slice())?;
 
         let mut blocks = vec![];
-        let latest_proof = self.storage.get_latest_proof(ctx.clone()).compat().await?;
+        let latest_proof = self.storage.get_latest_proof(ctx.clone()).await?;
         let current_height = latest_proof.height;
         for height in heights
             .into_iter()
@@ -143,7 +136,6 @@ where
             let block = self
                 .storage
                 .get_block_by_height(ctx.clone(), height)
-                .compat()
                 .await?;
 
             blocks.push(block);
@@ -192,7 +184,6 @@ where
         let stxs = self
             .storage
             .get_transactions(ctx.clone(), hashes.as_slice())
-            .compat()
             .await?;
 
         let push_txs = PushTxs::from(uid, stxs);

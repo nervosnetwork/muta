@@ -2,11 +2,11 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use futures::compat::Stream01CompatExt;
-use futures::future;
-use futures::prelude::StreamExt;
+use futures::prelude::{StreamExt, TryFutureExt, TryStreamExt};
+use futures::{executor::block_on, future::ready, stream::select};
+// TODO: tokio timer doens't work on block_on
 use futures_timer::Interval;
 use log;
-use old_futures::{self, stream::Stream, Future as OldFuture};
 
 use core_context::Context;
 use core_pubsub::channel::pubsub::Receiver;
@@ -38,19 +38,19 @@ where
 
         let interval_broadcaster =
             Interval::new(Duration::from_millis(self.broadcast_status_interval))
+                .compat()
                 .map_err(|e| log::error!("interval err: {:?}", e))
                 .and_then(move |_| {
                     storage
                         .get_latest_block(Context::new())
                         .map_err(|e| log::error!("get_latest_block err: {:?}", e))
                 })
-                .compat()
                 .map(std::result::Result::ok);
 
         std::thread::spawn(move || {
-            futures::executor::block_on(
-                futures::stream::select(sub_block.boxed(), interval_broadcaster.boxed())
-                    .filter_map(future::ready)
+            block_on(
+                select(sub_block.boxed(), interval_broadcaster.boxed())
+                    .filter_map(ready)
                     .for_each(move |block| {
                         let status = SyncStatus {
                             hash:   block.hash,
@@ -58,7 +58,7 @@ where
                         };
                         log::debug!("broadcast status: {:?}", &status);
                         synchronizer.broadcast_status(status);
-                        future::ready(())
+                        ready(())
                     }),
             );
         });

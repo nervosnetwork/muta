@@ -1,6 +1,4 @@
-use futures::prelude::TryFutureExt;
-
-use core_runtime::{network::TransactionPool, FutRuntimeResult, TransactionPoolError};
+use core_runtime::{network::TransactionPool, FutTxPoolResult, TransactionPoolError};
 
 use core_context::Context;
 use core_network_message::Method;
@@ -18,11 +16,7 @@ impl TransactionPool for OutboundHandle {
         self.silent_broadcast(Method::BroadcastTxs, data, Mode::Normal);
     }
 
-    fn pull_txs(
-        &self,
-        ctx: Context,
-        hashes: Vec<Hash>,
-    ) -> FutRuntimeResult<Vec<SignedTransaction>, TransactionPoolError> {
+    fn pull_txs(&self, ctx: Context, hashes: Vec<Hash>) -> FutTxPoolResult<Vec<SignedTransaction>> {
         let outbound = self.clone();
 
         callback_broadcast!(

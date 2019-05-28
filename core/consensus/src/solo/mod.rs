@@ -5,15 +5,12 @@ use tokio::timer::Delay;
 
 use core_context::Context;
 use core_crypto::{Crypto, CryptoTransform};
-use core_runtime::{Executor, TransactionPool};
+use core_runtime::{Consensus, Executor, FutConsensusResult, Storage, TransactionPool};
 use core_serialization::{AsyncCodec, Proposal as SerProposal};
-use core_storage::Storage;
-use core_types::{Hash, Proof, Vote};
+use core_types::{Block, Hash, Proof, SignedTransaction, Vote};
 
 use crate::engine::Engine;
-use crate::{
-    Consensus, ConsensusError, ConsensusResult, FutConsensusResult, ProposalMessage, VoteMessage,
-};
+use crate::{ConsensusError, ConsensusResult, ProposalMessage, VoteMessage};
 
 pub struct Solo<E, T, S, C>
 where
@@ -22,7 +19,7 @@ where
     S: Storage,
     C: Crypto,
 {
-    engine: Engine<E, T, S, C>,
+    engine:   Engine<E, T, S, C>,
     interval: u64,
 }
 
@@ -45,21 +42,22 @@ where
         let encoded = AsyncCodec::encode(ser_proposal).await?;
         let proposal_hash = Hash::digest(&encoded);
         let signature = self.engine.sign_with_hash(&proposal_hash)?;
-        let status = self.engine.get_status()?;
+        let status = self.engine.get_status();
 
         let latest_proof = Proof {
-            height: proposal.height,
-            round: 0,
+            height:        proposal.height,
+            round:         0,
             proposal_hash: proposal_hash.clone(),
-            commits: vec![Vote {
-                address: status.node_address,
+            commits:       vec![Vote {
+                address:   status.node_address,
                 signature: signature.as_bytes().to_vec(),
             }],
         };
 
-        self
-            .engine
-            .commit_block(ctx.clone(), proposal, latest_proof).await?;
+        self.engine
+            .commit_block(ctx.clone(), proposal, latest_proof)
+            .await?;
+
         Ok(())
     }
 
@@ -75,9 +73,11 @@ where
             } else {
                 now + (interval - (now - start_time))
             };
+
             Delay::new(next)
                 .compat()
-                .map_err(|_| ConsensusError::Internal("internal".to_owned())).await?;
+                .map_err(|_| ConsensusError::Internal("internal".to_owned()))
+                .await?;
         }
     }
 }
@@ -89,11 +89,25 @@ where
     S: Storage,
     C: Crypto,
 {
-    fn set_proposal(&self, _: Context, _: ProposalMessage) -> FutConsensusResult<()> {
+    fn set_proposal(&self, _: Context, _: ProposalMessage) -> FutConsensusResult {
         unreachable!()
     }
 
-    fn set_vote(&self, _: Context, _: VoteMessage) -> FutConsensusResult<()> {
+    fn set_vote(&self, _: Context, _: VoteMessage) -> FutConsensusResult {
+        unreachable!()
+    }
+
+    fn send_status(&self) -> FutConsensusResult {
+        unreachable!()
+    }
+
+    fn insert_sync_block(
+        &self,
+        _: Context,
+        _: Block,
+        _: Vec<SignedTransaction>,
+        _: Proof,
+    ) -> FutConsensusResult {
         unreachable!()
     }
 }

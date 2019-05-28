@@ -3,7 +3,6 @@ mod support;
 use std::sync::Arc;
 
 use bft_rs::{BftActuator, BftMsg, Node, Status as BftStatus};
-use futures::prelude::{FutureExt, TryFutureExt};
 
 use core_context::{CommonValue, Context};
 use core_crypto::Crypto;
@@ -78,7 +77,7 @@ where
     C: Crypto + 'static,
     N: Network + 'static,
 {
-    fn send_status(&self) -> FutConsensusResult<()> {
+    fn send_status(&self) -> FutConsensusResult {
         let bft = self.clone();
         let fut = async move {
             let status = bft.engine.get_status();
@@ -93,10 +92,11 @@ where
             }))?;
             Ok(())
         };
-        Box::new(fut.boxed().compat())
+
+        Box::pin(fut)
     }
 
-    fn set_proposal(&self, ctx: Context, msg: ProposalMessage) -> FutConsensusResult<()> {
+    fn set_proposal(&self, ctx: Context, msg: ProposalMessage) -> FutConsensusResult {
         let bft = self.clone();
 
         let fut = async move {
@@ -110,10 +110,10 @@ where
             Ok(())
         };
 
-        Box::new(fut.boxed().compat())
+        Box::pin(fut)
     }
 
-    fn set_vote(&self, _: Context, msg: VoteMessage) -> FutConsensusResult<()> {
+    fn set_vote(&self, _: Context, msg: VoteMessage) -> FutConsensusResult {
         let bft = self.clone();
 
         let fut = async move {
@@ -121,7 +121,7 @@ where
             Ok(())
         };
 
-        Box::new(fut.boxed().compat())
+        Box::pin(fut)
     }
 
     fn insert_sync_block(
@@ -130,7 +130,7 @@ where
         block: Block,
         stxs: Vec<SignedTransaction>,
         proof: Proof,
-    ) -> FutConsensusResult<()> {
+    ) -> FutConsensusResult {
         let bft = self.clone();
 
         let fut = async move {
@@ -140,7 +140,7 @@ where
             Ok(())
         };
 
-        Box::new(fut.boxed().compat())
+        Box::pin(fut)
     }
 }
 

@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use cita_vm::BlockDataProvider;
 use ethereum_types::{H256, U256};
-use futures::future::Future;
+use futures::executor::block_on;
 
 use core_context::Context;
 use core_runtime::Storage;
@@ -31,11 +31,8 @@ where
     fn get_block_hash(&self, number: &U256) -> H256 {
         let ctx = Context::new();
         let height = number.as_u64();
-        let block = self
-            .storage
-            .get_block_by_height(ctx, height)
-            .wait()
-            .expect("failed to get block");
+        let block =
+            block_on(self.storage.get_block_by_height(ctx, height)).expect("failed to get block");
 
         H256::from(block.header.prevhash.into_fixed_bytes())
     }

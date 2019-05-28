@@ -3,7 +3,7 @@ use std::fmt;
 
 use core_context::Context;
 
-use crate::FutRuntimeResult;
+use crate::BoxFuture;
 
 /// Specify the category of data stored, and users can store the data in a
 /// decentralized manner.
@@ -30,7 +30,19 @@ pub enum DatabaseError {
     Internal(String),
 }
 
-pub type FutDBResult<T> = FutRuntimeResult<T, DatabaseError>;
+impl Error for DatabaseError {}
+impl fmt::Display for DatabaseError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let printable = match *self {
+            DatabaseError::NotFound => "not found".to_owned(),
+            DatabaseError::InvalidData => "invalid data".to_owned(),
+            DatabaseError::Internal(ref err) => format!("internal error: {:?}", err),
+        };
+        write!(f, "{}", printable)
+    }
+}
+
+pub type FutDBResult<T> = BoxFuture<'static, Result<T, DatabaseError>>;
 
 pub trait Database: Send + Sync {
     fn get(&self, ctx: Context, c: DataCategory, key: &[u8]) -> FutDBResult<Option<Vec<u8>>>;
@@ -63,16 +75,4 @@ pub trait Database: Send + Sync {
     fn remove(&self, ctx: Context, c: DataCategory, key: &[u8]) -> FutDBResult<()>;
 
     fn remove_batch(&self, ctx: Context, c: DataCategory, keys: &[Vec<u8>]) -> FutDBResult<()>;
-}
-
-impl Error for DatabaseError {}
-impl fmt::Display for DatabaseError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let printable = match *self {
-            DatabaseError::NotFound => "not found".to_owned(),
-            DatabaseError::InvalidData => "invalid data".to_owned(),
-            DatabaseError::Internal(ref err) => format!("internal error: {:?}", err),
-        };
-        write!(f, "{}", printable)
-    }
 }

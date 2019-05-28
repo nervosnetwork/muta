@@ -1,8 +1,6 @@
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
-use futures::prelude::{FutureExt, TryFutureExt};
-
 use core_context::Context;
 use core_runtime::{DataCategory, Database, DatabaseError, FutDBResult};
 
@@ -36,7 +34,8 @@ impl Database for MemoryDB {
             let v = storage.get(&key).map(|v| v.to_vec());
             Ok(v)
         };
-        Box::new(fut.boxed().compat())
+
+        Box::pin(fut)
     }
 
     fn get_batch(
@@ -57,7 +56,8 @@ impl Database for MemoryDB {
 
             Ok(values)
         };
-        Box::new(fut.boxed().compat())
+
+        Box::pin(fut)
     }
 
     fn insert(&self, _: Context, c: DataCategory, key: Vec<u8>, value: Vec<u8>) -> FutDBResult<()> {
@@ -70,7 +70,8 @@ impl Database for MemoryDB {
             storage.insert(key, value);
             Ok(())
         };
-        Box::new(fut.boxed().compat())
+
+        Box::pin(fut)
     }
 
     fn insert_batch(
@@ -100,7 +101,7 @@ impl Database for MemoryDB {
             Ok(())
         };
 
-        Box::new(fut.boxed().compat())
+        Box::pin(fut)
     }
 
     fn contains(&self, _: Context, c: DataCategory, key: &[u8]) -> FutDBResult<bool> {
@@ -112,7 +113,7 @@ impl Database for MemoryDB {
             Ok(storage.contains_key(&key))
         };
 
-        Box::new(fut.boxed().compat())
+        Box::pin(fut)
     }
 
     fn remove(&self, _: Context, c: DataCategory, key: &[u8]) -> FutDBResult<()> {
@@ -125,7 +126,7 @@ impl Database for MemoryDB {
             Ok(())
         };
 
-        Box::new(fut.boxed().compat())
+        Box::pin(fut)
     }
 
     fn remove_batch(&self, _: Context, c: DataCategory, keys: &[Vec<u8>]) -> FutDBResult<()> {
@@ -140,7 +141,7 @@ impl Database for MemoryDB {
             Ok(())
         };
 
-        Box::new(fut.boxed().compat())
+        Box::pin(fut)
     }
 }
 
@@ -165,157 +166,51 @@ fn map_rwlock_err() -> DatabaseError {
 
 #[cfg(test)]
 mod tests {
-    use futures01::future::Future;
-
-    use core_context::Context;
-    use core_runtime::{DataCategory, Database};
+    use crate::test::{
+        test_contains, test_get, test_insert, test_insert_batch, test_remove, test_remove_batch,
+    };
 
     use super::MemoryDB;
 
     #[test]
-    fn test_get_should_return_ok() {
-        let ctx = Context::new();
+    fn test_get_should_pass() {
         let db = MemoryDB::new();
 
-        assert_eq!(
-            db.get(ctx.clone(), DataCategory::Block, b"test").wait(),
-            Ok(None)
-        );
-        db.insert(
-            ctx.clone(),
-            DataCategory::Block,
-            b"test".to_vec(),
-            b"test".to_vec(),
-        )
-        .wait()
-        .unwrap();
-        let v = db
-            .get(ctx.clone(), DataCategory::Block, b"test")
-            .wait()
-            .unwrap();
-        assert_eq!(v, Some(b"test".to_vec()))
+        test_get(&db);
     }
 
     #[test]
-    fn test_insert_should_return_ok() {
-        let ctx = Context::new();
+    fn test_insert_should_pass() {
         let db = MemoryDB::new();
 
-        db.insert(
-            ctx.clone(),
-            DataCategory::Block,
-            b"test".to_vec(),
-            b"test".to_vec(),
-        )
-        .wait()
-        .unwrap();
-        assert_eq!(
-            Some(b"test".to_vec()),
-            db.get(ctx, DataCategory::Block, b"test").wait().unwrap()
-        );
+        test_insert(&db);
     }
 
     #[test]
-    fn test_insert_batch_should_return_ok() {
-        let ctx = Context::new();
+    fn test_insert_batch_should_pass() {
         let db = MemoryDB::new();
 
-        db.insert_batch(
-            ctx.clone(),
-            DataCategory::Block,
-            vec![b"test1".to_vec(), b"test2".to_vec()],
-            vec![b"test1".to_vec(), b"test2".to_vec()],
-        )
-        .wait()
-        .unwrap();
-        assert_eq!(
-            Some(b"test1".to_vec()),
-            db.get(ctx.clone(), DataCategory::Block, b"test1")
-                .wait()
-                .unwrap()
-        );
-        assert_eq!(
-            Some(b"test2".to_vec()),
-            db.get(ctx, DataCategory::Block, b"test2").wait().unwrap()
-        );
+        test_insert_batch(&db);
     }
 
     #[test]
-    fn test_contain_should_return_true() {
-        let ctx = Context::new();
+    fn test_contains_should_pass() {
         let db = MemoryDB::new();
 
-        db.insert(
-            ctx.clone(),
-            DataCategory::Block,
-            b"test".to_vec(),
-            b"test".to_vec(),
-        )
-        .wait()
-        .unwrap();
-        assert_eq!(
-            db.contains(ctx, DataCategory::Block, b"test")
-                .wait()
-                .unwrap(),
-            true
-        )
+        test_contains(&db);
     }
 
     #[test]
-    fn test_contain_should_return_false() {
-        let ctx = Context::new();
+    fn test_remove_should_pass() {
         let db = MemoryDB::new();
 
-        assert_eq!(
-            db.contains(ctx, DataCategory::Block, b"test")
-                .wait()
-                .unwrap(),
-            false
-        )
+        test_remove(&db);
     }
 
     #[test]
-    fn test_remove_should_return_ok() {
-        let ctx = Context::new();
+    fn test_remove_batch_should_pass() {
         let db = MemoryDB::new();
 
-        db.insert(
-            ctx.clone(),
-            DataCategory::Block,
-            b"test".to_vec(),
-            b"test".to_vec(),
-        )
-        .wait()
-        .unwrap();
-        db.remove(ctx.clone(), DataCategory::Block, b"test")
-            .wait()
-            .unwrap();
-        assert_eq!(db.get(ctx, DataCategory::Block, b"test").wait(), Ok(None));
-    }
-
-    #[test]
-    fn test_remove_batch_should_return_ok() {
-        let ctx = Context::new();
-        let db = MemoryDB::new();
-
-        db.insert_batch(
-            ctx.clone(),
-            DataCategory::Block,
-            vec![b"test1".to_vec(), b"test2".to_vec()],
-            vec![b"test1".to_vec(), b"test2".to_vec()],
-        )
-        .wait()
-        .unwrap();
-        db.remove_batch(ctx.clone(), DataCategory::Block, &[
-            b"test1".to_vec(),
-            b"test2".to_vec(),
-        ])
-        .wait()
-        .unwrap();
-        assert_eq!(
-            db.get(ctx.clone(), DataCategory::Block, b"test1").wait(),
-            Ok(None)
-        );
-        assert_eq!(db.get(ctx, DataCategory::Block, b"test2").wait(), Ok(None));
+        test_remove_batch(&db);
     }
 }

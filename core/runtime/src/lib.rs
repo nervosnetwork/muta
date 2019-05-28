@@ -1,6 +1,6 @@
 #![feature(async_await, try_trait)]
 
-use futures::future::Future;
+use std::{future::Future, marker::Send, pin::Pin};
 
 pub mod consensus;
 pub mod database;
@@ -15,6 +15,9 @@ pub use database::{DataCategory, Database, DatabaseError, FutDBResult};
 pub use executor::{ExecutionContext, ExecutionResult, Executor, ExecutorError, ReadonlyResult};
 pub use storage::{Storage, StorageError, StorageResult};
 pub use sync::{SyncStatus, SynchronizerError};
-pub use transaction_pool::{TransactionOrigin, TransactionPool, TransactionPoolError};
+pub use transaction_pool::{
+    FutTxPoolResult, TransactionOrigin, TransactionPool, TransactionPoolError,
+};
 
-pub type FutRuntimeResult<T, E> = Box<Future<Item = T, Error = E> + Send>;
+// Same as futures::future::BoxFuture
+pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + 'a + Send>>;

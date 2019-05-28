@@ -11,8 +11,7 @@ core-crypto = { path = "../crypto" }
 core-context = { path = "../context" }
 core-serialization = { path = "../serialization" }
 
-failure = "0.1"
-futures = "0.1"
 bytes = "0.4"
 cita-vm = "0.1"
-bft-rs = { git = "https://github.com/cryptape/bft-rs.git", features = [ "verify_req" ], branch = "v0.3" }
+# TODO: upgrade bft-rs
+bft-rs = { git = "https://github.com/cryptape/bft-rs.git", features = [ "verify_req" ], rev = "861aa4f" }
