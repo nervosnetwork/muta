@@ -3,7 +3,7 @@ use std::fmt;
 use numext_fixed_hash::H160;
 pub use numext_fixed_uint::U256;
 use rlp::{Encodable, RlpStream};
-use serde::{Serialize, Serializer};
+use serde::{de::Visitor, Deserialize, Deserializer, Serialize, Serializer};
 #[cfg(feature = "hashlib-sha3")]
 use sha3::{Digest, Sha3_256};
 
@@ -104,6 +104,32 @@ impl Serialize for Address {
     }
 }
 
+struct AddressVisitor;
+
+impl<'de> Visitor<'de> for AddressVisitor {
+    type Value = Address;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("an ASCII hex string whose length is 40, with or without prefix '0x'")
+    }
+
+    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+    where
+        E: ::serde::de::Error,
+    {
+        Address::from_hex(v).map_err(E::custom)
+    }
+}
+
+impl<'de> Deserialize<'de> for Address {
+    fn deserialize<D>(deserializer: D) -> Result<Address, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_str(AddressVisitor)
+    }
+}
+
 /// Hash represents the 32 byte sha3-256 hash of arbitrary data.
 #[derive(Default, Clone, PartialEq, Eq, Hash)]
 pub struct Hash(H256);
@@ -182,6 +208,32 @@ impl Serialize for Hash {
     }
 }
 
+struct HashVisitor;
+
+impl<'de> Visitor<'de> for HashVisitor {
+    type Value = Hash;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("an ASCII hex string whose length is 64, with or without prefix '0x'")
+    }
+
+    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+    where
+        E: ::serde::de::Error,
+    {
+        Hash::from_hex(v).map_err(E::custom)
+    }
+}
+
+impl<'de> Deserialize<'de> for Hash {
+    fn deserialize<D>(deserializer: D) -> Result<Hash, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_str(HashVisitor)
+    }
+}
+
 pub fn clean_0x(s: &str) -> &str {
     if s.starts_with("0x") {
         &s[2..]
@@ -193,6 +245,47 @@ pub fn clean_0x(s: &str) -> &str {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_derive::{Deserialize, Serialize};
+
+    #[test]
+    fn test_hash_addr_serde() {
+        #[derive(Debug, Deserialize, Serialize, PartialEq)]
+        struct Config {
+            timestamp: u64,
+            hash:      Hash,
+            address:   Address,
+        }
+
+        let config = Config {
+            timestamp: 1,
+            hash:      Hash::from_fixed_bytes([1u8; 32]),
+            address:   Address::from_fixed_bytes([2u8; 20]),
+        };
+        let config_str = serde_json::to_string(&config).unwrap();
+        assert_eq!(config_str, r#"{"timestamp":1,"hash":"0x0101010101010101010101010101010101010101010101010101010101010101","address":"0x0202020202020202020202020202020202020202"}"#);
+        let config2: Config = serde_json::from_str(&config_str).unwrap();
+        assert_eq!(config, config2);
+
+        // serde from string directly
+        let config_str = r#"{"timestamp":1,"hash":"0x0101010101010101010101010101010101010101010101010101010101010102","address":"0x0202020202020202020202020202020202020201"}"#;
+        let config: Result<Config, _> = serde_json::from_str(&config_str);
+        assert!(config.is_ok());
+
+        // without 0x prefix is fine
+        let config_str = r#"{"timestamp":1,"hash":"0101010101010101010101010101010101010101010101010101010101010102","address":"0202020202020202020202020202020202020201"}"#;
+        let config: Result<Config, _> = serde_json::from_str(&config_str);
+        assert!(config.is_ok());
+
+        // wrong serde
+        let wrong_config_str =
+            r#"{"timestamp":1,"hash":1,"address":"0x0202020202020202020202020202020202020201"}"#;
+        let wrong_config: Result<Config, _> = serde_json::from_str(&wrong_config_str);
+        assert!(wrong_config.is_err());
+
+        let wrong_config_str = r#"{"timestamp":1,"hash":"0x01","address":"0x0202020202020202020202020202020202020201"}"#;
+        let wrong_config: Result<Config, _> = serde_json::from_str(&wrong_config_str);
+        assert!(wrong_config.is_err());
+    }
 
     #[cfg(feature = "hashlib-keccak")]
     #[test]
