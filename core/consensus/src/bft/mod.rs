@@ -96,17 +96,22 @@ where
         Box::pin(fut)
     }
 
-    fn set_proposal(&self, ctx: Context, msg: ProposalMessage) -> FutConsensusResult {
+    fn set_proposal(&self, ctx: Context, msg_with_height: ProposalMessage) -> FutConsensusResult {
         let bft = self.clone();
 
         let fut = async move {
+            let (msg, height_be_bytes_slice) = msg_with_height.split_at(msg_with_height.len() - 8);
+            let mut height_be_bytes = [0u8; 8];
+            height_be_bytes.copy_from_slice(&height_be_bytes_slice);
+            let height = u64::from_be_bytes(height_be_bytes);
             let hash = Hash::digest(&msg);
             let session_id = ctx.p2p_session_id().ok_or_else(|| {
                 ConsensusError::InvalidProposal("session id cannot be empty".to_owned())
             })?;
 
-            bft.support.insert_proposal_origin(hash, session_id)?;
-            bft.bft_actuator.send(BftMsg::Proposal(msg))?;
+            bft.support
+                .insert_proposal_origin(hash, session_id, height)?;
+            bft.bft_actuator.send(BftMsg::Proposal(msg.to_vec()))?;
             Ok(())
         };
 

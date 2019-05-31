@@ -19,6 +19,12 @@ use core_types::{Address, Hash, Proof, Proposal, Vote};
 
 use crate::{ConsensusResult, Engine};
 
+#[derive(Clone)]
+pub(crate) struct ProposalOriginValue {
+    height:     u64,
+    session_id: usize,
+}
+
 pub(crate) struct Support<E, T, S, C, N>
 where
     E: Executor + 'static,
@@ -33,7 +39,7 @@ where
     thread_pool: ThreadPool,
 
     network:         N,
-    proposal_origin: RwLock<HashMap<Hash, usize>>,
+    proposal_origin: RwLock<HashMap<Hash, ProposalOriginValue>>,
 }
 
 impl<E, T, S, C, N> Support<E, T, S, C, N>
@@ -63,14 +69,18 @@ where
         &self,
         hash: Hash,
         session_id: usize,
+        height: u64,
     ) -> ConsensusResult<()> {
         let mut proposal_origin = self.proposal_origin.write();
 
-        proposal_origin.insert(hash, session_id);
+        proposal_origin.insert(hash, ProposalOriginValue { height, session_id });
         Ok(())
     }
 
-    pub(crate) fn get_proposal_origin(&self, hash: &Hash) -> ConsensusResult<Option<usize>> {
+    pub(crate) fn get_proposal_origin(
+        &self,
+        hash: &Hash,
+    ) -> ConsensusResult<Option<ProposalOriginValue>> {
         let proposal_origin = self.proposal_origin.read();
         Ok(proposal_origin.get(hash).map(Clone::clone))
     }
@@ -139,13 +149,13 @@ where
             }
 
             let hash = Hash::from_bytes(signed_proposal_hash)?;
-            let session_id = self.get_proposal_origin(&hash)?.ok_or_else(|| {
+            let value = self.get_proposal_origin(&hash)?.ok_or_else(|| {
                 ConsensusError::InvalidProposal(
                     "the origin of the proposal could not be found".to_owned(),
                 )
             })?;
 
-            let ctx = Context::new().with_value(P2P_SESSION_ID, session_id);
+            let ctx = Context::new().with_value(P2P_SESSION_ID, value.session_id);
 
             self.engine
                 .verify_transactions(ctx.clone(), proposal.clone())
@@ -165,7 +175,12 @@ where
         let network = self.network.clone();
 
         match msg {
-            BftMsg::Proposal(proposal) => network.proposal(proposal),
+            BftMsg::Proposal(proposal) => {
+                let height = self.engine.get_status().height;
+                let mut proposal_with_height = proposal.clone();
+                proposal_with_height.extend(height.to_be_bytes().iter().cloned());
+                network.proposal(proposal_with_height);
+            }
             BftMsg::Vote(vote) => network.vote(vote),
             _ => {}
         }
@@ -187,6 +202,7 @@ where
                     signature,
                 })
             }
+            let height = commit.proof.height;
             let latest_proof = Proof {
                 height: commit.proof.height,
                 round: commit.proof.round,
@@ -202,7 +218,7 @@ where
 
             // clear cache of last proposal.
             let mut proposal_origin = self.proposal_origin.write();
-            proposal_origin.clear();
+            proposal_origin.retain(|_, v| v.height > height);
 
             Ok(BftStatus {
                 height:         status.height,
