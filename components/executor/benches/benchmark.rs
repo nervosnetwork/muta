@@ -176,7 +176,7 @@ fn bench_new_contract(bench: &mut Bencher) {
     };
     let (evm_executor, root_hash) = components_executor::evm::EVMExecutor::from_genesis(
         &genesis,
-        Arc::<cita_trie::db::MemoryDB>::clone(&db),
+        Arc::<cita_trie::MemoryDB>::clone(&db),
         Arc::<(dyn cita_vm::BlockDataProvider + 'static)>::clone(&block_data_provider),
     )
     .unwrap();
@@ -251,7 +251,7 @@ fn bench_erc20(bench: &mut Bencher) {
     };
     let (evm_executor, root_hash) = components_executor::evm::EVMExecutor::from_genesis(
         &genesis,
-        Arc::<cita_trie::db::MemoryDB>::clone(&db),
+        Arc::<cita_trie::MemoryDB>::clone(&db),
         Arc::<(dyn cita_vm::BlockDataProvider + 'static)>::clone(&block_data_provider),
     )
     .unwrap();

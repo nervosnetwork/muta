@@ -3,7 +3,7 @@ use std::convert::From;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use cita_trie::db::DB as TrieDB;
+use cita_trie::DB as TrieDB;
 use cita_vm::{
     evm::{Context as EVMContext, InterpreterResult, Log as EVMLog},
     state::{State, StateObjectInfo},
@@ -489,7 +489,7 @@ mod tests {
     use std::sync::Arc;
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    use cita_trie::db::MemoryDB;
+    use cita_trie::MemoryDB;
     use cita_vm::BlockDataProviderMock;
 
     use core_context::Context;

@@ -29,7 +29,7 @@ where
 }
 
 /// "TrieDB" provides state read/write capabilities for executor.
-impl<DB> cita_trie::db::DB for TrieDB<DB>
+impl<DB> cita_trie::DB for TrieDB<DB>
 where
     DB: Database,
 {
