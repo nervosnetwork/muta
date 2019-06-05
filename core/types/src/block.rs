@@ -1,4 +1,5 @@
 use rlp::{Encodable, RlpStream};
+use serde::{Deserialize, Serialize};
 
 use crate::{Address, Bloom, Hash};
 
@@ -52,7 +53,7 @@ pub struct Block {
     pub hash:      Hash,
 }
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct Proposal {
     pub prevhash:         Hash,
     pub timestamp:        u64,
@@ -86,7 +87,7 @@ impl Encodable for Proposal {
     }
 }
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct Proof {
     pub height:        u64,
     pub round:         u64,
@@ -106,7 +107,7 @@ impl Encodable for Proof {
     }
 }
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct Vote {
     pub address:   Address,
     pub signature: Vec<u8>,
