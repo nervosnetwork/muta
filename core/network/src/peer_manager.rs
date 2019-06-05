@@ -11,10 +11,9 @@ use log::{debug, error};
 use parking_lot::RwLock;
 use rand::seq::SliceRandom;
 use std::collections::HashSet;
-use tentacle::{multiaddr::Multiaddr, service::DialProtocol};
 use tokio::timer::Interval;
 
-use crate::p2p::Dialer;
+use crate::p2p::{multiaddr::Multiaddr, DialProtocol, Dialer};
 
 pub mod discovery;
 pub mod peer_count;

@@ -1,9 +1,20 @@
 use std::error::Error;
 use std::fmt;
 
-use core_types::Hash;
+use core_context::Context;
+use core_types::{Block, Hash, SignedTransaction};
 
-use crate::{ConsensusError, StorageError};
+use crate::{BoxFuture, ConsensusError, StorageError};
+
+pub type FutSyncResult<T> = BoxFuture<'static, Result<T, SynchronizerError>>;
+
+pub trait Synchronization: Send + Sync {
+    fn sync_blocks(&self, ctx: Context, global_height: u64) -> FutSyncResult<()>;
+
+    fn get_blocks(&self, ctx: Context, heights: Vec<u64>) -> FutSyncResult<Vec<Block>>;
+
+    fn get_stxs(&self, ctx: Context, hashes: Vec<Hash>) -> FutSyncResult<Vec<SignedTransaction>>;
+}
 
 #[derive(Debug, Clone)]
 pub struct SyncStatus {

@@ -1,26 +1,27 @@
 use std::io;
 
-use tentacle::error::Error as TentacleError;
-use tentacle::service::ServiceError as TentacleServiceError;
-
+use common_channel::TrySendError;
 use core_network_message::Error as NetMessageError;
 use core_runtime::{ConsensusError, StorageError, SynchronizerError, TransactionPoolError};
 use core_serialization::CodecError as SerCodecError;
+
+use crate::p2p::{ConnPoolError, ConnectionError};
 
 #[derive(Debug)]
 pub enum Error {
     InboundDisconnected,
     InvalidPrivateKey,
     IoError(io::Error),
-    ConnectionError(TentacleError),
-    ConnPollError(TentacleServiceError),
+    ConnectionError(ConnectionError),
+    ConnPoolError(ConnPoolError),
     MsgCodecError(NetMessageError),
     UnknownMethod(u32),
     TransactionPoolError(TransactionPoolError),
     SerCodecError(SerCodecError),
     SessionIdNotFound,
     CallbackItemNotFound(u64),
-    CallbackTrySendError,
+    CallbackItemWrongType(u64),
+    ChannelTrySendError(String),
     ConsensusError(ConsensusError),
     StorageError(StorageError),
     SynchronizerError(SynchronizerError),
@@ -32,15 +33,15 @@ impl From<io::Error> for Error {
     }
 }
 
-impl From<TentacleError> for Error {
-    fn from(err: TentacleError) -> Self {
+impl From<ConnectionError> for Error {
+    fn from(err: ConnectionError) -> Self {
         Error::ConnectionError(err)
     }
 }
 
-impl From<TentacleServiceError> for Error {
-    fn from(err: TentacleServiceError) -> Self {
-        Error::ConnPollError(err)
+impl From<ConnPoolError> for Error {
+    fn from(err: ConnPoolError) -> Self {
+        Error::ConnPoolError(err)
     }
 }
 
@@ -82,5 +83,11 @@ impl From<StorageError> for Error {
 impl From<SynchronizerError> for Error {
     fn from(err: SynchronizerError) -> Self {
         Error::SynchronizerError(err)
+    }
+}
+
+impl<T> From<TrySendError<T>> for Error {
+    fn from(err: TrySendError<T>) -> Self {
+        Error::ChannelTrySendError(format!("cause: {:?}", err))
     }
 }

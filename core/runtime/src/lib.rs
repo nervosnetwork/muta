@@ -14,7 +14,7 @@ pub use consensus::{Consensus, ConsensusError, FutConsensusResult};
 pub use database::{DataCategory, Database, DatabaseError, FutDBResult};
 pub use executor::{ExecutionContext, ExecutionResult, Executor, ExecutorError, ReadonlyResult};
 pub use storage::{Storage, StorageError, StorageResult};
-pub use sync::{SyncStatus, SynchronizerError};
+pub use sync::{FutSyncResult, SyncStatus, Synchronization, SynchronizerError};
 pub use transaction_pool::{
     FutTxPoolResult, TransactionOrigin, TransactionPool, TransactionPoolError,
 };

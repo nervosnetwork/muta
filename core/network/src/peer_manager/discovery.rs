@@ -3,9 +3,9 @@ use std::iter::FromIterator;
 use log::warn;
 use rand::seq::SliceRandom;
 use std::collections::HashSet;
-use tentacle::{multiaddr::Multiaddr, SessionId};
 
 use crate::p2p::protocol::discovery::{AddressManager, MisbehaveResult, Misbehavior};
+use crate::p2p::{multiaddr::Multiaddr, SessionId};
 use crate::peer_manager::{DefaultPeerManager, PeerManager, Source};
 
 impl AddressManager for DefaultPeerManager {

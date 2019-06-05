@@ -2,6 +2,13 @@ use prost::Enumeration;
 
 use crate::Error;
 
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub enum Component {
+    TxPool = 0,
+    Consensus = 1,
+    Synch = 2,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Enumeration)]
 pub enum Method {
     BroadcastTxs = 0,
@@ -14,6 +21,19 @@ pub enum Method {
     SyncPushBlocks = 7,
     SyncPullTxs = 8,
     SyncPushTxs = 9,
+}
+
+impl Method {
+    pub fn component(self) -> Component {
+        match self {
+            Method::BroadcastTxs => Component::TxPool,
+            Method::PullTxs | Method::PushTxs => Component::TxPool,
+            Method::Proposal | Method::Vote => Component::Consensus,
+            Method::SyncBroadcastStatus => Component::Synch,
+            Method::SyncPullBlocks | Method::SyncPushBlocks => Component::Synch,
+            Method::SyncPullTxs | Method::SyncPushTxs => Component::Synch,
+        }
+    }
 }
 
 macro_rules! impl_from_to {

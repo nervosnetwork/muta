@@ -19,14 +19,13 @@ use common_channel::Sender;
 use crate::p2p::protocol::discovery::AddressManager;
 use crate::p2p::protocol::{DiscoveryProtocol, TransmissionProtocol};
 use crate::p2p::SessionMessage;
-use crate::peer_manager::PeerManager;
-use crate::{ConnectionPoolConfig, Context, Error};
+use crate::{config::ConnectionPoolConfig, context::Context, peer_manager::PeerManager, Error};
 
 const INIT_PROTO_ID: usize = 1;
 
-pub use tentacle::bytes::Bytes;
 pub use tentacle::service::{DialProtocol, TargetSession as Scope};
-pub use tentacle::SessionId;
+pub use tentacle::{bytes::Bytes, multiaddr, secio, SessionId};
+pub use tentacle::{error::Error as ConnectionError, service::ServiceError as ConnPoolError};
 
 #[derive(Clone)]
 pub struct Dialer {
@@ -91,11 +90,12 @@ where
         if let Some(size) = config.send_buffer_size {
             inner = inner.set_send_buffer_size(size);
         }
+
         if let Some(size) = config.recv_buffer_size {
             inner = inner.set_recv_buffer_size(size);
         }
-        let mut inner = inner.build(handle);
 
+        let mut inner = inner.build(handle);
         let control = inner.control().clone();
 
         for addr in config.bootstrap_addresses.iter() {

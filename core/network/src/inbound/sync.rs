@@ -1,62 +1,69 @@
 use std::clone::Clone;
 use std::sync::Arc;
 
-use futures::lock::Mutex;
+use futures::future::{BoxFuture, TryFutureExt};
 use log::error;
 
-use common_channel::Sender;
 use core_context::Context;
 use core_network_message::common::{PullTxs, PushTxs};
 use core_network_message::sync::{BroadcastStatus, PullBlocks, PushBlocks};
 use core_network_message::{Codec, Method};
-use core_runtime::{network::Synchronizer, Consensus, Storage};
-use core_types::{Block, SignedTransaction};
+use core_runtime::Synchronization;
+use core_types::{Block, Hash, SignedTransaction};
 
-use crate::common::scope_from_context;
-use crate::{BytesBroadcaster, CallbackMap, Error, OutboundHandle};
+use crate::callback_map::Callback;
+use crate::common::{scope_from_context, session_id_from_context};
+use crate::inbound::{FutReactResult, Reactor};
+use crate::outbound::DataEncoder;
+use crate::p2p::Scope;
+use crate::{DefaultOutboundHandle, Error};
 
-const SYNC_STEP: u64 = 20;
+pub type FutResult<T> = BoxFuture<'static, Result<T, Error>>;
 
-pub struct SyncReactor<C, S> {
-    consensus: Arc<C>,
-    storage:   Arc<S>,
+pub trait InboundSynchronization: Send + Sync {
+    fn sync_blocks(&self, ctx: Context, global_height: u64) -> FutResult<()>;
 
-    callback:       Arc<CallbackMap>,
-    outbound:       OutboundHandle,
-    current_height: Arc<Mutex<u64>>,
+    fn get_blocks(&self, ctx: Context, heights: Vec<u64>) -> FutResult<Vec<Block>>;
+
+    fn get_stxs(&self, ctx: Context, hashes: Vec<Hash>) -> FutResult<Vec<SignedTransaction>>;
 }
 
-impl<C, S> Clone for SyncReactor<C, S> {
+pub trait SessionOutbound: Send + Sync + Clone {
+    fn session_broadcast<D: DataEncoder>(&self, m: Method, d: D, s: Scope) -> Result<(), Error>;
+}
+
+pub struct SyncReactor<S, O> {
+    sync: Arc<S>,
+
+    outbound: O,
+    callback: Arc<Callback>,
+}
+
+impl<S, O> Clone for SyncReactor<S, O>
+where
+    O: Clone,
+{
     fn clone(&self) -> Self {
         SyncReactor {
-            consensus: Arc::clone(&self.consensus),
-            storage:   Arc::clone(&self.storage),
+            sync: Arc::clone(&self.sync),
 
-            callback:       Arc::clone(&self.callback),
-            outbound:       self.outbound.clone(),
-            current_height: Arc::clone(&self.current_height),
+            outbound: self.outbound.clone(),
+            callback: Arc::clone(&self.callback),
         }
     }
 }
 
-impl<C, S> SyncReactor<C, S>
+impl<S, O> SyncReactor<S, O>
 where
-    C: Consensus + 'static,
-    S: Storage + 'static,
+    S: InboundSynchronization + 'static,
+    O: SessionOutbound + 'static,
 {
-    pub fn new(
-        consensus: Arc<C>,
-        storage: Arc<S>,
-        callback: Arc<CallbackMap>,
-        outbound: OutboundHandle,
-    ) -> Self {
+    pub fn new(sync: Arc<S>, callback: Arc<Callback>, outbound: O) -> Self {
         SyncReactor {
-            consensus,
-            storage,
+            sync,
 
-            callback,
             outbound,
-            current_height: Arc::new(Mutex::new(0)),
+            callback,
         }
     }
 
@@ -75,143 +82,680 @@ where
 
     pub async fn handle_broadcast_status(&self, ctx: Context, data: Vec<u8>) -> Result<(), Error> {
         let status = <BroadcastStatus as Codec>::decode(data.as_slice())?;
-        let mut current_height = self.current_height.lock().await;
 
-        let global_height = status.height;
-        if global_height <= *current_height {
-            return Ok(());
-        }
-
-        let latest_block: Block = self.storage.get_latest_block(ctx.clone()).await?;
-        *current_height = latest_block.header.height;
-        // ignore update process if height difference is less than or equal to 1,
-        // wait for consensus to catch up
-        if global_height <= *current_height + 1 {
-            return Ok(());
-        }
-
-        // Every block's proof is in the block of next height, for the lastest block,
-        // the proof will be put in a virtual block whose height is ::std::u64::MAX.
-        // Use SYNC_STEP to avoid geting a bulk of blocks from peers at one time.
-        let mut all_blocks = vec![];
-        for height in ((*current_height + 1)..=global_height).step_by(SYNC_STEP as usize) {
-            let heights = (height..(height + SYNC_STEP)).collect::<Vec<_>>();
-            let mut blocks = self.outbound.pull_blocks(ctx.clone(), heights).await?;
-            all_blocks.append(&mut blocks);
-            let last_index = all_blocks.len() - 1;
-            for i in 0..last_index {
-                let block = all_blocks[i].clone();
-                let proof = all_blocks[i + 1].header.proof.clone();
-                let signed_txs = if block.tx_hashes.is_empty() {
-                    vec![]
-                } else {
-                    // todo: if there are too many txes, split it into small request
-                    self.outbound
-                        .pull_txs_sync(ctx.clone(), &block.tx_hashes)
-                        .await?
-                };
-                self.consensus
-                    .insert_sync_block(ctx.clone(), block, signed_txs, proof)
-                    .await?;
-            }
-            all_blocks = all_blocks.split_off(last_index);
-        }
-
-        // send status after synchronizing blocks, trigger bft
-        self.consensus.send_status().await?;
+        self.sync.sync_blocks(ctx, status.height).await?;
 
         Ok(())
     }
 
     pub async fn handle_pull_blocks(&self, ctx: Context, data: Vec<u8>) -> Result<(), Error> {
+        let scope = scope_from_context(&ctx)?;
+        let outbound = self.outbound.clone();
+
         let PullBlocks { uid, heights } = <PullBlocks as Codec>::decode(data.as_slice())?;
 
-        let mut blocks = vec![];
-        let latest_proof = self.storage.get_latest_proof(ctx.clone()).await?;
-        let current_height = latest_proof.height;
-        for height in heights
-            .into_iter()
-            .filter(|height| *height <= current_height)
-        {
-            let block = self
-                .storage
-                .get_block_by_height(ctx.clone(), height)
-                .await?;
-
-            blocks.push(block);
-            if height == current_height {
-                let mut proof_block = Block::default();
-                proof_block.header.height = ::std::u64::MAX;
-                proof_block.header.proof = latest_proof.clone();
-                blocks.push(proof_block);
-            }
-        }
-
+        let blocks = self.sync.get_blocks(ctx.clone(), heights).await?;
         let push_blocks = PushBlocks::from(uid, blocks);
-        let scope = scope_from_context(ctx).ok_or(Error::SessionIdNotFound)?;
-        if let Err(err) =
-            self.outbound
-                .quick_filter_broadcast(Method::SyncPushBlocks, push_blocks, scope)
-        {
+
+        if let Err(err) = outbound.session_broadcast(Method::SyncPushBlocks, push_blocks, scope) {
             error!("net [inbound]: push_blocks: [err: {:?}]", err);
         }
 
         Ok(())
     }
 
-    pub async fn handle_push_blocks(&self, _: Context, data: Vec<u8>) -> Result<(), Error> {
+    pub async fn handle_push_blocks(&self, ctx: Context, data: Vec<u8>) -> Result<(), Error> {
+        let callback = Arc::clone(&self.callback);
+
+        let session_id = session_id_from_context(&ctx)?.value();
         let push_blocks = <PushBlocks as Codec>::decode(data.as_slice())?;
         let uid = push_blocks.uid;
 
-        let done_tx = self
-            .callback
-            .take::<Sender<Vec<Block>>>(uid)
-            .ok_or_else(|| Error::CallbackItemNotFound(uid))?;
+        let done_tx = callback.take::<Vec<Block>>(uid, session_id)?;
         let blocks = push_blocks.des()?;
 
-        done_tx
-            .try_send(blocks)
-            .map_err(|_| Error::CallbackTrySendError)?;
+        done_tx.try_send(blocks)?;
 
         Ok(())
     }
 
     pub async fn handle_pull_txs(&self, ctx: Context, data: Vec<u8>) -> Result<(), Error> {
+        let scope = scope_from_context(&ctx)?;
+        let outbound = self.outbound.clone();
+
         let pull_txs = <PullTxs as Codec>::decode(data.as_slice())?;
         let uid = pull_txs.uid;
         let hashes = pull_txs.des()?;
 
-        let stxs = self
-            .storage
-            .get_transactions(ctx.clone(), hashes.as_slice())
-            .await?;
-
+        let stxs = self.sync.get_stxs(ctx.clone(), hashes).await?;
         let push_txs = PushTxs::from(uid, stxs);
-        let scope = scope_from_context(ctx).ok_or(Error::SessionIdNotFound)?;
-        if let Err(err) = self
-            .outbound
-            .quick_filter_broadcast(Method::SyncPushTxs, push_txs, scope)
-        {
+
+        if let Err(err) = outbound.session_broadcast(Method::SyncPushTxs, push_txs, scope) {
             error!("net [inbound]: push_txs: [err: {:?}]", err);
         }
 
         Ok(())
     }
 
-    pub async fn handle_push_txs(&self, _: Context, data: Vec<u8>) -> Result<(), Error> {
+    pub async fn handle_push_txs(&self, ctx: Context, data: Vec<u8>) -> Result<(), Error> {
+        let callback = Arc::clone(&self.callback);
+
+        let session_id = session_id_from_context(&ctx)?.value();
         let push_txs = <PushTxs as Codec>::decode(data.as_slice())?;
         let uid = push_txs.uid;
 
-        let done_tx = self
-            .callback
-            .take::<Sender<Vec<SignedTransaction>>>(uid)
-            .ok_or_else(|| Error::CallbackItemNotFound(uid))?;
+        let done_tx = callback.take::<Vec<SignedTransaction>>(uid, session_id)?;
         let stxs = push_txs.des()?;
 
-        done_tx
-            .try_send(stxs)
-            .map_err(|_| Error::CallbackTrySendError)?;
+        done_tx.try_send(stxs)?;
 
         Ok(())
+    }
+}
+
+impl<S> InboundSynchronization for S
+where
+    S: Synchronization + 'static,
+{
+    fn sync_blocks(&self, ctx: Context, global_height: u64) -> FutResult<()> {
+        Box::pin(self.sync_blocks(ctx, global_height).err_into())
+    }
+
+    fn get_blocks(&self, ctx: Context, heights: Vec<u64>) -> FutResult<Vec<Block>> {
+        Box::pin(self.get_blocks(ctx, heights).err_into())
+    }
+
+    fn get_stxs(&self, ctx: Context, hashes: Vec<Hash>) -> FutResult<Vec<SignedTransaction>> {
+        Box::pin(self.get_stxs(ctx, hashes).err_into())
+    }
+}
+
+impl SessionOutbound for DefaultOutboundHandle {
+    fn session_broadcast<D>(&self, method: Method, data: D, scope: Scope) -> Result<(), Error>
+    where
+        D: DataEncoder,
+    {
+        self.quick_broadcast(method, data, scope)
+    }
+}
+
+impl<S, O> Reactor for SyncReactor<S, O>
+where
+    S: InboundSynchronization + 'static,
+    O: SessionOutbound + 'static,
+{
+    fn react(&self, ctx: Context, method: Method, data: Vec<u8>) -> FutReactResult {
+        let reactor = self.clone();
+
+        Box::pin(async move { reactor.react(ctx, method, data).await })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::{self as io, ErrorKind};
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::{Arc, Mutex};
+
+    use futures::executor::block_on;
+
+    use core_context::{Context, P2P_SESSION_ID};
+    use core_network_message::common::{PullTxs, PushTxs};
+    use core_network_message::sync::{BroadcastStatus, PullBlocks, PushBlocks};
+    use core_network_message::{Codec, Method};
+    use core_runtime::SynchronizerError;
+    use core_serialization::{Block as SerBlock, SignedTransaction as SerSignedTransaction};
+    use core_types::{Block, Hash, SignedTransaction};
+
+    use crate::callback_map::Callback;
+    use crate::outbound::DataEncoder;
+    use crate::p2p::{Bytes, Scope, SessionId};
+    use crate::Error;
+
+    use super::{FutResult, SyncReactor};
+    use super::{InboundSynchronization, SessionOutbound};
+
+    struct MockSynchronizer {
+        reply_err: AtomicBool,
+    }
+
+    impl MockSynchronizer {
+        pub fn new() -> Self {
+            MockSynchronizer {
+                reply_err: AtomicBool::new(false),
+            }
+        }
+
+        pub fn reply_err(&self, switch: bool) {
+            self.reply_err.store(switch, Ordering::Relaxed);
+        }
+
+        pub fn error() -> Error {
+            Error::SynchronizerError(SynchronizerError::Internal("mock error".to_owned()))
+        }
+    }
+
+    impl InboundSynchronization for MockSynchronizer {
+        fn sync_blocks(&self, _: Context, _: u64) -> FutResult<()> {
+            if self.reply_err.load(Ordering::Relaxed) {
+                Box::pin(async move { Err(MockSynchronizer::error()) })
+            } else {
+                Box::pin(async move { Ok(()) })
+            }
+        }
+
+        fn get_blocks(&self, _: Context, _: Vec<u64>) -> FutResult<Vec<Block>> {
+            if self.reply_err.load(Ordering::Relaxed) {
+                Box::pin(async move { Err(MockSynchronizer::error()) })
+            } else {
+                Box::pin(async move { Ok(vec![Block::default(), Block::default()]) })
+            }
+        }
+
+        fn get_stxs(&self, _: Context, _: Vec<Hash>) -> FutResult<Vec<SignedTransaction>> {
+            if self.reply_err.load(Ordering::Relaxed) {
+                Box::pin(async move { Err(MockSynchronizer::error()) })
+            } else {
+                Box::pin(async move { Ok(vec![SignedTransaction::default()]) })
+            }
+        }
+    }
+
+    #[derive(Clone)]
+    struct MockOutbound {
+        reply_err:        Arc<AtomicBool>,
+        broadcasted_data: Arc<Mutex<Option<(Bytes, Scope)>>>,
+    }
+
+    impl MockOutbound {
+        pub fn new() -> Self {
+            MockOutbound {
+                reply_err:        Arc::new(AtomicBool::new(false)),
+                broadcasted_data: Arc::new(Mutex::new(None)),
+            }
+        }
+
+        pub fn reply_err(&self, switch: bool) {
+            self.reply_err.store(switch, Ordering::Relaxed);
+        }
+
+        pub fn broadcasted_data(&self) -> Option<(Bytes, Scope)> {
+            self.broadcasted_data.lock().unwrap().take()
+        }
+    }
+
+    impl SessionOutbound for MockOutbound {
+        fn session_broadcast<D>(&self, m: Method, d: D, s: Scope) -> Result<(), Error>
+        where
+            D: DataEncoder,
+        {
+            if !self.reply_err.load(Ordering::Relaxed) {
+                let bytes = d.encode(m)?;
+                *self.broadcasted_data.lock().unwrap() = Some((bytes, s));
+
+                Ok(())
+            } else {
+                let io_err = io::Error::new(ErrorKind::NotConnected, "broken");
+                Err(Error::IoError(io_err))
+            }
+        }
+    }
+
+    fn new_sync_reactor() -> SyncReactor<MockSynchronizer, MockOutbound> {
+        let synchronizer = Arc::new(MockSynchronizer::new());
+        let outbound = MockOutbound::new();
+        let callback = Arc::new(Callback::new());
+
+        SyncReactor::new(synchronizer, callback, outbound)
+    }
+
+    #[test]
+    fn test_react_with_unknown_method() {
+        let reactor = new_sync_reactor();
+        let ctx = Context::new();
+        let method = Method::Vote;
+
+        match block_on(reactor.react(ctx, method, vec![1, 2, 3])) {
+            Err(Error::UnknownMethod(m)) => assert_eq!(m, method.to_u32()),
+            _ => panic!("should return Error::UnknownMethod"),
+        }
+    }
+
+    #[test]
+    fn test_react_broadcast_status() {
+        let reactor = new_sync_reactor();
+        let status = BroadcastStatus::from(Hash::default(), 20);
+        let data = <BroadcastStatus as Codec>::encode(&status).unwrap();
+
+        let ctx = Context::new();
+        let method = Method::SyncBroadcastStatus;
+        let maybe_ok = block_on(reactor.react(ctx, method, data.to_vec()));
+
+        assert_eq!(maybe_ok.unwrap(), ())
+    }
+
+    #[test]
+    fn test_react_broadcast_status_with_bad_data() {
+        let reactor = new_sync_reactor();
+        let ctx = Context::new();
+        let method = Method::SyncBroadcastStatus;
+
+        match block_on(reactor.react(ctx, method, vec![1, 2, 3])) {
+            Err(Error::MsgCodecError(_)) => (),
+            _ => panic!("should return Error::MsgCodecError"),
+        }
+    }
+
+    #[test]
+    fn test_react_broadcast_status_with_sync_failure() {
+        let reactor = new_sync_reactor();
+        let status = BroadcastStatus::from(Hash::default(), 20);
+        let data = <BroadcastStatus as Codec>::encode(&status).unwrap();
+
+        let ctx = Context::new();
+        let method = Method::SyncBroadcastStatus;
+
+        reactor.sync.reply_err(true);
+        match block_on(reactor.react(ctx, method, data.to_vec())) {
+            Err(Error::SynchronizerError(SynchronizerError::Internal(str))) => {
+                assert!(str.contains("mock error"))
+            }
+            _ => panic!("should return Error::SynchronizerError"),
+        }
+    }
+
+    #[test]
+    fn test_react_pull_blocks() {
+        let reactor = new_sync_reactor();
+        let pull_blocks = PullBlocks::from(1, vec![1, 2]);
+        let data = <PullBlocks as Codec>::encode(&pull_blocks).unwrap();
+
+        let ctx = Context::new().with_value(P2P_SESSION_ID, 1);
+        let method = Method::SyncPullBlocks;
+
+        let push_blocks = PushBlocks::from(1, vec![Block::default(), Block::default()]);
+        let bytes =
+            <PushBlocks as DataEncoder>::encode(&push_blocks, Method::SyncPushBlocks).unwrap();
+        let scope = Scope::Single(SessionId::new(1));
+
+        let maybe_ok = block_on(reactor.react(ctx, method, data.to_vec()));
+
+        assert_eq!(maybe_ok.unwrap(), ());
+        assert_eq!(reactor.outbound.broadcasted_data(), Some((bytes, scope)));
+    }
+
+    #[test]
+    fn test_react_pull_blocks_without_session_id() {
+        let reactor = new_sync_reactor();
+        let pull_blocks = PullBlocks::from(1, vec![1, 2]);
+        let data = <PullBlocks as Codec>::encode(&pull_blocks).unwrap();
+
+        let ctx = Context::new();
+        let method = Method::SyncPullBlocks;
+
+        match block_on(reactor.react(ctx, method, data.to_vec())) {
+            Err(Error::SessionIdNotFound) => (),
+            _ => panic!("should return Error::SessionIdNotFound"),
+        }
+    }
+
+    #[test]
+    fn test_react_pull_blocks_with_bad_data() {
+        let reactor = new_sync_reactor();
+        let ctx = Context::new().with_value(P2P_SESSION_ID, 1);
+        let method = Method::SyncPullBlocks;
+
+        match block_on(reactor.react(ctx, method, vec![1, 2, 3])) {
+            Err(Error::MsgCodecError(_)) => (),
+            _ => panic!("should return Error::MsgCodecError"),
+        }
+    }
+
+    #[test]
+    fn test_react_pull_blocks_with_sync_failure() {
+        let reactor = new_sync_reactor();
+        let pull_blocks = PullBlocks::from(1, vec![1, 2]);
+        let data = <PullBlocks as Codec>::encode(&pull_blocks).unwrap();
+
+        let ctx = Context::new().with_value(P2P_SESSION_ID, 1);
+        let method = Method::SyncPullBlocks;
+        reactor.sync.reply_err(true);
+
+        match block_on(reactor.react(ctx, method, data.to_vec())) {
+            Err(Error::SynchronizerError(SynchronizerError::Internal(str))) => {
+                assert!(str.contains("mock error"))
+            }
+            _ => panic!("should return Error::SynchronizerError"),
+        }
+    }
+
+    #[test]
+    fn test_react_pull_blocks_with_broadcast_failure() {
+        let reactor = new_sync_reactor();
+        let pull_blocks = PullBlocks::from(1, vec![1, 2]);
+        let data = <PullBlocks as Codec>::encode(&pull_blocks).unwrap();
+
+        let ctx = Context::new().with_value(P2P_SESSION_ID, 1);
+        let method = Method::SyncPullBlocks;
+        reactor.outbound.reply_err(true);
+
+        let maybe_ok = block_on(reactor.react(ctx, method, data.to_vec()));
+        assert_eq!(maybe_ok.unwrap(), ());
+        assert_eq!(reactor.outbound.broadcasted_data(), None);
+    }
+
+    #[test]
+    fn test_react_push_blocks() {
+        let reactor = new_sync_reactor();
+        let push_blocks = PushBlocks::from(1, vec![Block::default()]);
+        let data = <PushBlocks as Codec>::encode(&push_blocks).unwrap();
+
+        let ctx = Context::new().with_value(P2P_SESSION_ID, 1);
+        let method = Method::SyncPushBlocks;
+        let rx = reactor.callback.insert::<Vec<Block>>(1, 1);
+
+        let maybe_ok = block_on(reactor.react(ctx, method, data.to_vec()));
+        assert_eq!(maybe_ok.unwrap(), ());
+
+        let blocks = rx.try_recv().unwrap();
+        assert_eq!(blocks.len(), 1);
+    }
+
+    #[test]
+    fn test_react_push_blocks_without_session_id() {
+        let reactor = new_sync_reactor();
+        let push_blocks = PushBlocks::from(1, vec![Block::default()]);
+        let data = <PushBlocks as Codec>::encode(&push_blocks).unwrap();
+
+        let ctx = Context::new();
+        let method = Method::SyncPushBlocks;
+
+        match block_on(reactor.react(ctx, method, data.to_vec())) {
+            Err(Error::SessionIdNotFound) => (),
+            _ => panic!("should return Error::SessionIdNotFound"),
+        }
+    }
+
+    #[test]
+    fn test_react_push_blocks_with_bad_data() {
+        let reactor = new_sync_reactor();
+        let ctx = Context::new().with_value(P2P_SESSION_ID, 1);
+        let method = Method::SyncPushBlocks;
+
+        match block_on(reactor.react(ctx, method, vec![1, 2, 3])) {
+            Err(Error::MsgCodecError(_)) => (),
+            _ => panic!("should return Error::MsgCodecError"),
+        }
+    }
+
+    #[test]
+    fn test_react_push_blocks_without_cb_tx() {
+        let reactor = new_sync_reactor();
+        let push_blocks = PushBlocks::from(1, vec![Block::default()]);
+        let data = <PushBlocks as Codec>::encode(&push_blocks).unwrap();
+
+        let ctx = Context::new().with_value(P2P_SESSION_ID, 1);
+        let method = Method::SyncPushBlocks;
+
+        match block_on(reactor.react(ctx, method, data.to_vec())) {
+            Err(Error::CallbackItemNotFound(id)) => assert_eq!(id, 1),
+            _ => panic!("should return Error::CallbackItemNotFound"),
+        }
+    }
+
+    #[test]
+    fn test_react_push_blocks_with_wrong_cb_tx() {
+        let reactor = new_sync_reactor();
+        let push_blocks = PushBlocks::from(1, vec![Block::default()]);
+        let data = <PushBlocks as Codec>::encode(&push_blocks).unwrap();
+
+        let ctx = Context::new().with_value(P2P_SESSION_ID, 1);
+        let method = Method::SyncPushBlocks;
+        let _rx = reactor.callback.insert::<Vec<String>>(1, 1);
+
+        match block_on(reactor.react(ctx, method, data.to_vec())) {
+            Err(Error::CallbackItemWrongType(id)) => assert_eq!(id, 1),
+            _ => panic!("should return Error::CallbackItemWrongType"),
+        }
+    }
+
+    #[test]
+    fn test_react_push_blocks_with_bad_ser_block() {
+        let reactor = new_sync_reactor();
+        let mut ser_block = SerBlock::default();
+        ser_block.header = None;
+
+        let push_blocks = PushBlocks {
+            uid:    1,
+            blocks: vec![ser_block],
+        };
+        let data = <PushBlocks as Codec>::encode(&push_blocks).unwrap();
+
+        let ctx = Context::new().with_value(P2P_SESSION_ID, 1);
+        let method = Method::SyncPushBlocks;
+        let _rx = reactor.callback.insert::<Vec<Block>>(1, 1);
+
+        match block_on(reactor.react(ctx, method, data.to_vec())) {
+            Err(Error::SerCodecError(_)) => (),
+            _ => panic!("should return Error::SerCodecError"),
+        }
+    }
+
+    #[test]
+    fn test_react_push_blocks_with_tx_failure() {
+        let reactor = new_sync_reactor();
+        let push_blocks = PushBlocks::from(1, vec![Block::default()]);
+        let data = <PushBlocks as Codec>::encode(&push_blocks).unwrap();
+
+        let ctx = Context::new().with_value(P2P_SESSION_ID, 1);
+        let method = Method::SyncPushBlocks;
+        let rx = reactor.callback.insert::<Vec<Block>>(1, 1);
+        drop(rx);
+
+        match block_on(reactor.react(ctx, method, data.to_vec())) {
+            Err(Error::ChannelTrySendError(_)) => (),
+            _ => panic!("should return Error::ChannelTrySendError"),
+        }
+    }
+
+    #[test]
+    fn test_react_pull_txs() {
+        let reactor = new_sync_reactor();
+        let pull_txs = PullTxs::from(1, vec![Hash::default()]);
+        let data = <PullTxs as Codec>::encode(&pull_txs).unwrap();
+
+        let push_txs = PushTxs::from(1, vec![SignedTransaction::default()]);
+        let bytes = <PushTxs as DataEncoder>::encode(&push_txs, Method::SyncPushTxs).unwrap();
+        let scope = Scope::Single(SessionId::new(1));
+
+        let ctx = Context::new().with_value(P2P_SESSION_ID, 1);
+        let method = Method::SyncPullTxs;
+
+        let maybe_ok = block_on(reactor.react(ctx, method, data.to_vec()));
+
+        assert_eq!(maybe_ok.unwrap(), ());
+        assert_eq!(reactor.outbound.broadcasted_data(), Some((bytes, scope)));
+    }
+
+    #[test]
+    fn test_pull_txs_without_session_id() {
+        let reactor = new_sync_reactor();
+        let ctx = Context::new();
+
+        match block_on(reactor.react(ctx, Method::SyncPullTxs, vec![1, 2, 3])) {
+            Err(Error::SessionIdNotFound) => (),
+            _ => panic!("should return Error::SessionIdNotFound"),
+        }
+    }
+
+    #[test]
+    fn test_pull_txs_with_bad_data() {
+        let reactor = new_sync_reactor();
+
+        let ctx = Context::new().with_value(P2P_SESSION_ID, 1);
+
+        match block_on(reactor.react(ctx, Method::SyncPullTxs, vec![1, 2, 3])) {
+            Err(Error::MsgCodecError(_)) => (),
+            _ => panic!("should return Error::MsgCodecError"),
+        }
+    }
+
+    #[test]
+    fn test_pull_txs_with_bad_ser_hash() {
+        let reactor = new_sync_reactor();
+        let pull_txs = PullTxs {
+            uid:    1,
+            hashes: vec![vec![1, 2, 3]],
+        };
+        let data = <PullTxs as Codec>::encode(&pull_txs).unwrap();
+
+        let ctx = Context::new().with_value(P2P_SESSION_ID, 1);
+        let method = Method::SyncPullTxs;
+
+        match block_on(reactor.react(ctx, method, data.to_vec())) {
+            Err(Error::SerCodecError(_)) => (),
+            _ => panic!("should return Error::SerCodecError"),
+        }
+    }
+
+    #[test]
+    fn test_pull_txs_with_sync_get_txs_failure() {
+        let reactor = new_sync_reactor();
+        let pull_txs = PullTxs::from(1, vec![Hash::default()]);
+        let data = <PullTxs as Codec>::encode(&pull_txs).unwrap();
+
+        let ctx = Context::new().with_value(P2P_SESSION_ID, 1);
+        let method = Method::SyncPullTxs;
+
+        reactor.sync.reply_err(true);
+        match block_on(reactor.react(ctx, method, data.to_vec())) {
+            Err(Error::SynchronizerError(SynchronizerError::Internal(str))) => {
+                assert!(str.contains("mock error"))
+            }
+            _ => panic!("should return Error::SynchronizerError"),
+        }
+    }
+
+    #[test]
+    fn test_pull_txs_with_outbound_failure() {
+        let reactor = new_sync_reactor();
+        let pull_txs = PullTxs::from(1, vec![Hash::default()]);
+        let data = <PullTxs as Codec>::encode(&pull_txs).unwrap();
+
+        let ctx = Context::new().with_value(P2P_SESSION_ID, 1);
+        let method = Method::SyncPullTxs;
+
+        reactor.outbound.reply_err(true);
+        let maybe_ok = block_on(reactor.react(ctx, method, data.to_vec()));
+
+        assert_eq!(maybe_ok.unwrap(), ());
+        assert_eq!(reactor.outbound.broadcasted_data(), None);
+    }
+
+    #[test]
+    fn test_react_push_txs() {
+        let reactor = new_sync_reactor();
+        let push_txs = PushTxs::from(1, vec![SignedTransaction::default()]);
+        let data = <PushTxs as Codec>::encode(&push_txs).unwrap();
+
+        let ctx = Context::new().with_value(P2P_SESSION_ID, 2);
+        let method = Method::SyncPushTxs;
+        let rx = reactor.callback.insert::<Vec<SignedTransaction>>(1, 2);
+
+        let maybe_ok = block_on(reactor.react(ctx, method, data.to_vec()));
+        assert_eq!(maybe_ok.unwrap(), ());
+        assert_eq!(rx.try_recv().unwrap(), vec![SignedTransaction::default()]);
+    }
+
+    #[test]
+    fn test_react_push_txs_without_session_id() {
+        let reactor = new_sync_reactor();
+        let ctx = Context::new();
+
+        match block_on(reactor.react(ctx, Method::SyncPushTxs, vec![1, 2])) {
+            Err(Error::SessionIdNotFound) => (),
+            _ => panic!("should return Error::SessionIdNotFound"),
+        }
+    }
+
+    #[test]
+    fn test_react_push_txs_with_bad_data() {
+        let reactor = new_sync_reactor();
+        let ctx = Context::new().with_value(P2P_SESSION_ID, 1);
+
+        match block_on(reactor.react(ctx, Method::SyncPushTxs, vec![1, 2])) {
+            Err(Error::MsgCodecError(_)) => (),
+            _ => panic!("should return Error::MsgCodecError"),
+        }
+    }
+
+    #[test]
+    fn test_react_push_txs_without_cb_tx() {
+        let reactor = new_sync_reactor();
+        let push_txs = PushTxs::from(1, vec![SignedTransaction::default()]);
+        let data = <PushTxs as Codec>::encode(&push_txs).unwrap();
+
+        let ctx = Context::new().with_value(P2P_SESSION_ID, 1);
+        let method = Method::SyncPushTxs;
+
+        match block_on(reactor.react(ctx, method, data.to_vec())) {
+            Err(Error::CallbackItemNotFound(id)) => assert_eq!(id, 1),
+            _ => panic!("should return Error::CallbackItemNotFound"),
+        }
+    }
+
+    #[test]
+    fn test_react_push_txs_with_wrong_cb_type() {
+        let reactor = new_sync_reactor();
+        let push_txs = PushTxs::from(1, vec![SignedTransaction::default()]);
+        let data = <PushTxs as Codec>::encode(&push_txs).unwrap();
+
+        let ctx = Context::new().with_value(P2P_SESSION_ID, 1);
+        let method = Method::SyncPushTxs;
+        let _rx = reactor.callback.insert::<Vec<String>>(1, 1);
+
+        match block_on(reactor.react(ctx, method, data.to_vec())) {
+            Err(Error::CallbackItemWrongType(id)) => assert_eq!(id, 1),
+            _ => panic!("should return Error::CallbackItemWrongType"),
+        }
+    }
+
+    #[test]
+    fn test_react_push_txs_with_bad_ser_stxs() {
+        let reactor = new_sync_reactor();
+        let mut ser_stx = SerSignedTransaction::default();
+        ser_stx.untx = None;
+
+        let push_txs = PushTxs {
+            uid:     1,
+            sig_txs: vec![ser_stx],
+        };
+        let data = <PushTxs as Codec>::encode(&push_txs).unwrap();
+
+        let ctx = Context::new().with_value(P2P_SESSION_ID, 1);
+        let method = Method::SyncPushTxs;
+        let _rx = reactor.callback.insert::<Vec<SignedTransaction>>(1, 1);
+
+        match block_on(reactor.react(ctx, method, data.to_vec())) {
+            Err(Error::SerCodecError(_)) => (),
+            _ => panic!("should return Error::SerCodecError"),
+        }
+    }
+
+    #[test]
+    fn test_react_push_txs_with_cb_tx_failure() {
+        let reactor = new_sync_reactor();
+        let push_txs = PushTxs::from(1, vec![SignedTransaction::default()]);
+        let data = <PushTxs as Codec>::encode(&push_txs).unwrap();
+
+        let ctx = Context::new().with_value(P2P_SESSION_ID, 1);
+        let method = Method::SyncPushTxs;
+        let rx = reactor.callback.insert::<Vec<SignedTransaction>>(1, 1);
+        drop(rx);
+
+        match block_on(reactor.react(ctx, method, data.to_vec())) {
+            Err(Error::ChannelTrySendError(_)) => (),
+            _ => panic!("should return Error::ChannelTrySendError"),
+        }
     }
 }

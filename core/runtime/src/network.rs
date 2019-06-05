@@ -17,16 +17,12 @@ pub trait Consensus: Clone + Send + Sync {
     fn vote(&self, vote: Vec<u8>);
 }
 
-pub trait Synchronizer: Send + Sync {
+pub trait Synchronizer: Clone + Send + Sync {
     fn broadcast_status(&self, status: SyncStatus);
 
     fn pull_blocks(&self, ctx: Context, heights: Vec<u64>) -> FutSyncResult<Vec<Block>>;
 
-    fn pull_txs_sync(
-        &self,
-        ctx: Context,
-        tx_hashes: &[Hash],
-    ) -> FutSyncResult<Vec<SignedTransaction>>;
+    fn pull_txs(&self, ctx: Context, hashes: &[Hash]) -> FutSyncResult<Vec<SignedTransaction>>;
 }
 
 pub trait PeerCount: Send + Sync {

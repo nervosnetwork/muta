@@ -1,118 +1,163 @@
 use std::any::Any;
-use std::clone::Clone;
 use std::collections::HashMap;
 use std::marker::{Send, Sync};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
-use log::debug;
 use parking_lot::RwLock;
 
-type AnyBox = Box<dyn Any + 'static>;
-type CallMap = HashMap<u64, Arc<AnyBox>>;
+use common_channel::{bounded, Receiver, Sender};
+use core_context::Cloneable;
+
+use crate::Error;
+
+pub type SessionId = u64;
+
+#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
+pub struct CallId(u64);
+
+impl CallId {
+    pub fn new(v: u64) -> Self {
+        CallId(v)
+    }
+
+    pub fn value(self) -> u64 {
+        self.0
+    }
+}
+
+impl Cloneable for CallId {}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+struct ChanId {
+    call_id: CallId,
+    sess_id: SessionId,
+}
+
+struct BackChannel(Box<dyn Any + 'static>); // Sender wrapped in boxed Any
 
 // TODO: implement cleanup
 #[derive(Default)]
-pub struct CallbackMap {
-    latest_uid: AtomicU64,
-    call_map:   Arc<RwLock<CallMap>>,
+pub struct Callback {
+    latest_call_id: AtomicU64,
+    cb_chans:       Arc<RwLock<HashMap<ChanId, BackChannel>>>,
 }
 
-impl CallbackMap {
+impl Callback {
     pub fn new() -> Self {
-        CallbackMap {
-            latest_uid: AtomicU64::new(0),
-            call_map:   Default::default(),
+        Callback {
+            latest_call_id: AtomicU64::new(0),
+            cb_chans:       Default::default(),
         }
     }
 
-    pub fn new_uid(&self) -> u64 {
-        self.latest_uid.fetch_add(1, Ordering::SeqCst)
+    pub fn new_call_id(&self) -> CallId {
+        CallId::new(self.latest_call_id.fetch_add(1, Ordering::SeqCst))
     }
 
-    pub fn insert<T: Clone + 'static>(&self, uid: u64, value: T) {
-        let boxed_any = Arc::new(Box::new(value) as AnyBox);
+    pub fn insert<T: 'static>(&self, call_id: u64, sess_id: usize) -> Receiver<T> {
+        let sess_id = sess_id as u64;
+        let call_id = CallId::new(call_id);
+        let chan_id = ChanId { call_id, sess_id };
 
-        debug!(
-            "net [callback]: insert [uid: {}, type_id: {:?}]",
-            uid,
-            boxed_any.type_id()
-        );
+        let (done_tx, done_rx) = bounded(1);
+        let bchan = BackChannel(Box::new(done_tx));
 
-        self.call_map.write().insert(uid, boxed_any);
+        self.cb_chans.write().insert(chan_id, bchan);
+        done_rx
     }
 
-    pub fn take<T: Clone + 'static>(&self, uid: u64) -> Option<T> {
-        if let Some(boxed_any) = self.call_map.write().remove(&uid) {
-            debug!(
-                "net [callback]: take [uid: {}, type_id: {:?}]",
-                uid,
-                boxed_any.type_id()
-            );
+    pub fn take<T: 'static>(&self, call_id: u64, sess_id: usize) -> Result<Sender<T>, Error> {
+        let sess_id = sess_id as u64;
+        let call_id = CallId::new(call_id);
+        let chan_id = ChanId { call_id, sess_id };
 
-            boxed_any.downcast_ref::<T>().map(ToOwned::to_owned)
-        } else {
-            None
-        }
+        let BackChannel(boxed_any) = {
+            let opt_bchan = self.cb_chans.write().remove(&chan_id);
+            opt_bchan.ok_or_else(|| Error::CallbackItemNotFound(call_id.value()))?
+        };
+
+        let boxed_chan = boxed_any
+            .downcast::<Sender<T>>()
+            .map_err(|_| Error::CallbackItemWrongType(call_id.value()))?;
+
+        Ok(*boxed_chan)
     }
 }
 
-unsafe impl Send for CallbackMap {}
-unsafe impl Sync for CallbackMap {}
+unsafe impl Send for Callback {}
+unsafe impl Sync for Callback {}
 
 #[cfg(test)]
 mod tests {
     use std::sync::atomic::Ordering;
 
-    use common_channel::{bounded, Sender};
+    use crate::Error;
 
-    use super::CallbackMap;
+    use super::Callback;
 
     #[test]
-    fn test_new_uid() {
-        let callback = CallbackMap::new();
+    fn test_new_call_id() {
+        let callback = Callback::new();
+        assert_eq!(callback.latest_call_id.load(Ordering::SeqCst), 0);
 
-        let uid = callback.new_uid();
-        let new_uid = callback.new_uid();
-        assert_eq!(uid + 1, new_uid);
+        let call_id = callback.new_call_id();
+        assert_eq!(call_id.value(), 0);
+        assert_eq!(callback.latest_call_id.load(Ordering::SeqCst), 1);
     }
 
     #[test]
-    fn test_reach_max_uid() {
-        let callback = CallbackMap::new();
+    fn test_reach_max_call_id() {
+        let callback = Callback::new();
+        let max_u64 = u64::max_value();
 
-        callback
-            .latest_uid
-            .store(u64::max_value(), Ordering::SeqCst);
-
-        assert_eq!(callback.new_uid(), u64::max_value());
-        assert_eq!(callback.new_uid(), 0);
+        callback.latest_call_id.store(max_u64, Ordering::SeqCst);
+        assert_eq!(callback.new_call_id().value(), max_u64);
+        assert_eq!(callback.new_call_id().value(), 0);
     }
 
     #[test]
     fn test_insert_then_take() {
-        let callback = CallbackMap::new();
+        let callback = Callback::new();
+        let call_id = callback.new_call_id().value();
+        let session_id = 1usize;
 
-        let uid = callback.new_uid();
-        let (done_tx, done_rx) = bounded::<usize>(1);
+        let done_rx = callback.insert::<usize>(call_id, session_id);
+        let done_tx = callback.take::<usize>(call_id, session_id).unwrap();
 
-        callback.insert(uid, done_tx);
-        let done_tx = callback.take::<Sender<usize>>(uid);
-        assert!(done_tx.is_some());
+        done_tx.try_send(2077).unwrap();
+        assert_eq!(done_rx.try_recv(), Ok(2077));
+    }
 
-        assert!(done_tx.unwrap().try_send(1).is_ok());
-        assert_eq!(done_rx.try_recv(), Ok(1));
+    #[test]
+    fn test_take_wrong_id() {
+        let callback = Callback::new();
+        let call_id = callback.new_call_id().value();
+        let session_id = 1usize;
+
+        callback.insert::<usize>(call_id, session_id);
+
+        match callback.take::<usize>(call_id + 1, session_id) {
+            Err(Error::CallbackItemNotFound(id)) => assert_eq!(id, call_id + 1),
+            _ => panic!("should return Error::CallbackItemNotFound"),
+        }
+
+        match callback.take::<usize>(call_id, session_id + 1) {
+            Err(Error::CallbackItemNotFound(id)) => assert_eq!(id, call_id),
+            _ => panic!("should return Error::CallbackItemNotFound"),
+        }
     }
 
     #[test]
     fn test_take_wrong_type() {
-        let callback = CallbackMap::new();
+        let callback = Callback::new();
+        let call_id = callback.new_call_id().value();
+        let sess_id = 1usize;
 
-        let uid = callback.new_uid();
-        let (done_tx, _) = bounded::<usize>(1);
-
-        callback.insert(uid, done_tx);
-        let done_tx = callback.take::<Sender<u64>>(uid);
-        assert!(done_tx.is_none());
+        callback.insert::<usize>(call_id, sess_id);
+        match callback.take::<u64>(call_id, sess_id) {
+            Err(Error::CallbackItemWrongType(id)) => assert_eq!(id, call_id),
+            _ => panic!("should return Error::CallbackItemWrongType"),
+        }
     }
 }

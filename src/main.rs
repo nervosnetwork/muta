@@ -101,6 +101,7 @@ fn start(cfg: &Config) {
         send_buffer_size:    cfg.network.send_buffer_size,
         recv_buffer_size:    cfg.network.recv_buffer_size,
         max_connections:     cfg.network.max_connections,
+        rpc_timeout:         cfg.network.rpc_timeout,
     };
 
     let partial_network = PartialService::new(network_config).unwrap();

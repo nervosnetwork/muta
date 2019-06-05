@@ -2,12 +2,13 @@ use std::default::Default;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 use serde_derive::Deserialize;
-use tentacle::{multiaddr::Multiaddr, secio::SecioKeyPair};
 
+use crate::p2p::{multiaddr::Multiaddr, secio::SecioKeyPair};
 use crate::{common::socket_to_multiaddr, Error};
 
 pub const DEFAULT_LISTENING_ADDRESS: &str = "127.0.0.1:1337";
 pub const DEFAULT_MAXIMUM_CONNECTIONS: usize = 100;
+pub const DEFAULT_RPC_TIMEOUT: u64 = 30;
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
@@ -33,6 +34,9 @@ pub struct Config {
 
     /// Maximum connected addresses
     pub max_connections: usize,
+
+    /// Rpc call timeout, default: 30 seconds
+    pub rpc_timeout: Option<u64>,
 }
 
 impl Default for Config {
@@ -47,6 +51,7 @@ impl Default for Config {
             send_buffer_size: None,
             recv_buffer_size: None,
             max_connections: DEFAULT_MAXIMUM_CONNECTIONS,
+            rpc_timeout: None,
         }
     }
 }

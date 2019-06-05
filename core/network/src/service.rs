@@ -10,9 +10,8 @@ use core_runtime::{Consensus, Storage, TransactionPool};
 
 use crate::p2p::{conn_pool::ConnectionPoolService, Dialer, SessionMessage};
 use crate::peer_manager::{DefaultPeerManager, PeerCount};
-use crate::{
-    CallbackMap, Config, ConnectionPoolConfig, Context, Error, InboundHandle, OutboundHandle,
-};
+use crate::{callback_map::Callback, config::ConnectionPoolConfig, context::Context};
+use crate::{Config, DefaultOutboundHandle, Error, InboundHandle, Reactors};
 
 pub const PEER_MANAGER_ROUTINE_INTERVAL: u64 = 5;
 
@@ -22,14 +21,14 @@ pub struct PartialService {
     config: Config,
 
     peer_mgr: DefaultPeerManager,
-    outbound: OutboundHandle,
+    outbound: DefaultOutboundHandle,
     dialer:   Dialer,
 
     pool_config: ConnectionPoolConfig,
     conn_pool:   ConnectionPoolService<DefaultPeerManager>,
     msg_rx:      Receiver<SessionMessage>,
 
-    callback: Arc<CallbackMap>,
+    callback: Arc<Callback>,
 }
 
 impl PartialService {
@@ -44,8 +43,10 @@ impl PartialService {
         let conn_pool =
             ConnectionPoolService::init(ctx.clone(), &pool_config, msg_tx, peer_mgr.clone())?;
 
-        let callback = Arc::new(CallbackMap::new());
-        let outbound = OutboundHandle::new(Arc::clone(&callback), conn_pool.outbound());
+        let callback = Arc::new(Callback::new());
+        let rpc_timeout = config.rpc_timeout;
+        let outbound =
+            DefaultOutboundHandle::new(conn_pool.outbound(), Arc::clone(&callback), rpc_timeout);
         let dialer = conn_pool.dialer();
 
         Ok(PartialService {
@@ -65,7 +66,7 @@ impl PartialService {
         })
     }
 
-    pub fn outbound(&self) -> OutboundHandle {
+    pub fn outbound(&self) -> DefaultOutboundHandle {
         self.outbound.clone()
     }
 
@@ -84,14 +85,19 @@ impl PartialService {
         C: Consensus + 'static,
         S: Storage + 'static,
     {
-        let inbound = InboundHandle::new(
-            Arc::clone(&self.callback),
-            self.msg_rx,
-            self.outbound.clone(),
-            Arc::clone(&tx_pool),
-            Arc::clone(&consensus),
-            Arc::clone(&storage),
-        );
+        let out = self.outbound.clone();
+        let callback = Arc::clone(&self.callback);
+
+        let synchronizer =
+            Reactors::synchronizer(Arc::clone(&consensus), Arc::clone(&storage), out.clone());
+
+        let reactors = Reactors::builder(3)
+            .consensus_reactor(Arc::clone(&consensus))
+            .pool_reactor(Arc::clone(&tx_pool), out.clone(), Arc::clone(&callback))
+            .sync_reactor(Arc::new(synchronizer), out.clone(), Arc::clone(&callback))
+            .build();
+
+        let inbound = InboundHandle::new(self.msg_rx, reactors);
 
         Service {
             ctx: self.ctx,
@@ -126,8 +132,8 @@ where
     config: Config,
 
     peer_mgr: DefaultPeerManager,
-    inbound:  Option<InboundHandle<T, C, S>>,
-    outbound: OutboundHandle,
+    inbound:  Option<InboundHandle>,
+    outbound: DefaultOutboundHandle,
     dialer:   Dialer,
 
     conn_pool:   Option<ConnectionPoolService<DefaultPeerManager>>,
@@ -176,7 +182,7 @@ where
         self.for_each(async move |_| ()).await
     }
 
-    pub fn outbound(&self) -> OutboundHandle {
+    pub fn outbound(&self) -> DefaultOutboundHandle {
         self.outbound.clone()
     }
 }

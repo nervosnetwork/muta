@@ -18,6 +18,7 @@ pub struct ConfigNetwork {
     pub send_buffer_size:    Option<usize>,
     pub recv_buffer_size:    Option<usize>,
     pub max_connections:     usize,
+    pub rpc_timeout:         Option<u64>,
 }
 
 #[derive(Debug, Deserialize)]

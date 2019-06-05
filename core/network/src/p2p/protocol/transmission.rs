@@ -6,7 +6,8 @@ use tentacle::{multiaddr::Multiaddr, ProtocolId, SessionId};
 
 use common_channel::Sender;
 
-use crate::{Context, Error};
+use crate::context::Context;
+use crate::Error;
 
 macro_rules! log_format {
     () => {

@@ -4,12 +4,12 @@ use std::fmt::Debug;
 use bytes::{Bytes, BytesMut};
 
 pub mod common;
+pub mod comp_method;
 pub mod consensus;
-pub mod method;
 pub mod sync;
 pub mod tx_pool;
 
-pub use method::Method;
+pub use comp_method::{Component, Method};
 
 // TODO: try flatbuffer or cap'n proto, or maybe serde to binary
 // TODO: change method to u8 but protobuf doesn't support it

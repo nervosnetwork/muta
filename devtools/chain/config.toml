@@ -17,6 +17,8 @@ listening_address = "127.0.0.1:1337"
 # send_buffer_size = 10485760
 # recv_buffer_size = 10485760
 max_connections = 40
+# 30 seconds
+# rpc_timeout = 30
 
 [txpool]
 pool_size = 100000
