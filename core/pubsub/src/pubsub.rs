@@ -77,7 +77,7 @@ impl PubSub {
     }
 
     /// Shutdown this pubsub instance
-    pub fn shutdown(self) -> Result<(), ()> {
-        self.broadcast_worker.shutdown()
+    pub async fn shutdown(self) -> Result<(), ()> {
+        self.broadcast_worker.shutdown().await
     }
 }

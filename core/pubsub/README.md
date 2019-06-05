@@ -20,7 +20,7 @@ broadcast::Receiver => broadcast::Sender => pubsub::Receiver => Generic Message 
 
 ### Usage
 
-To use this crate, you need to start with a Rust 2018 edition crate, with rustc 1.33.0-nightly or later.
+To use this crate, you need to start with a Rust 2018 edition crate, with rustc 1.35.0-nightly or later.
 
 Add this to your `Cargo.toml`:
 
@@ -38,9 +38,6 @@ Then, get started. In your application, add:
 // The nightly features that are commonly needed with async/await
 #![feature(async_await)]
 
-use std::thread::spawn;
-
-use futures::executor::block_on;
 use futures::future::ready;
 use futures::prelude::StreamExt;
 
@@ -49,10 +46,11 @@ use core_pubsub::PubSub;
 #[derive(Clone, Debug)]
 struct Message {
     header: String,
-    body: String,
+    body:   String,
 }
 
-pub fn main() -> Result<(), ()> {
+#[runtime::main]
+pub async fn main() -> Result<(), ()> {
     let mut pubsub = PubSub::builder().build().start();
 
     let mut sub = pubsub.subscribe::<Message>("test".to_owned())?;
@@ -63,11 +61,11 @@ pub fn main() -> Result<(), ()> {
     let mut register = pubsub.register();
 
     let mut pubb = register.publish::<Message>("test".to_owned())?;
-    let _test_pubb = spawn(move || {
+    let _test_pubb = runtime::spawn(async move {
         let mut count = 1;
         let msg = Message {
             header: "dummy".to_owned(),
-            body: "hello world".to_owned(),
+            body:   "hello world".to_owned(),
         };
 
         for _ in 0..15 {
@@ -79,15 +77,16 @@ pub fn main() -> Result<(), ()> {
         }
     });
 
-    block_on(sub.take(5).for_each(|e| {
-        println!("{:?}", e);
-        ready(())
-    }));
+    sub.take(5)
+        .for_each(|e| {
+            println!("{:?}", e);
+            ready(())
+        })
+        .await;
 
-    if let Err(err) = pubsub.shutdown() {
+    if let Err(err) = pubsub.shutdown().await {
         eprintln!("shutdown failure: {:?}", err);
     }
 
     Ok(())
-}
 ```

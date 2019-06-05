@@ -3,8 +3,7 @@ use std::time::Duration;
 
 use futures::compat::Stream01CompatExt;
 use futures::prelude::{StreamExt, TryFutureExt, TryStreamExt};
-use futures::{executor::block_on, future::ready, stream::select};
-// TODO: tokio timer doens't work on block_on
+use futures::{future::ready, stream::select};
 use futures_timer::Interval;
 use log;
 
@@ -32,7 +31,7 @@ where
         }
     }
 
-    pub fn start(&self, mut sub_block: Receiver<Block>) {
+    pub async fn start(self, mut sub_block: Receiver<Block>) {
         let synchronizer = Arc::clone(&self.synchronizer);
         let storage = Arc::clone(&self.storage);
 
@@ -47,20 +46,17 @@ where
                 })
                 .map(std::result::Result::ok);
 
-        std::thread::spawn(move || {
-            block_on(
-                select(sub_block.boxed(), interval_broadcaster.boxed())
-                    .filter_map(ready)
-                    .for_each(move |block| {
-                        let status = SyncStatus {
-                            hash:   block.hash,
-                            height: block.header.height,
-                        };
-                        log::debug!("broadcast status: {:?}", &status);
-                        synchronizer.broadcast_status(status);
-                        ready(())
-                    }),
-            );
-        });
+        select(sub_block.boxed(), interval_broadcaster.boxed())
+            .filter_map(ready)
+            .for_each(move |block| {
+                let status = SyncStatus {
+                    hash:   block.hash,
+                    height: block.header.height,
+                };
+                log::debug!("broadcast status: {:?}", &status);
+                synchronizer.broadcast_status(status);
+                ready(())
+            })
+            .await;
     }
 }

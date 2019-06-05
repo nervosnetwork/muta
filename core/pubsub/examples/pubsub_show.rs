@@ -1,6 +1,5 @@
-use std::thread::spawn;
+#![feature(async_await)]
 
-use futures::executor::block_on;
 use futures::future::ready;
 use futures::prelude::StreamExt;
 
@@ -12,7 +11,8 @@ struct Message {
     body:   String,
 }
 
-pub fn main() -> Result<(), ()> {
+#[runtime::main]
+pub async fn main() -> Result<(), ()> {
     let mut pubsub = PubSub::builder().build().start();
 
     let mut sub = pubsub.subscribe::<Message>("test".to_owned())?;
@@ -23,7 +23,7 @@ pub fn main() -> Result<(), ()> {
     let mut register = pubsub.register();
 
     let mut pubb = register.publish::<Message>("test".to_owned())?;
-    let _test_pubb = spawn(move || {
+    let _test_pubb = runtime::spawn(async move {
         let mut count = 1;
         let msg = Message {
             header: "dummy".to_owned(),
@@ -39,12 +39,14 @@ pub fn main() -> Result<(), ()> {
         }
     });
 
-    block_on(sub.take(5).for_each(|e| {
-        println!("{:?}", e);
-        ready(())
-    }));
+    sub.take(5)
+        .for_each(|e| {
+            println!("{:?}", e);
+            ready(())
+        })
+        .await;
 
-    if let Err(err) = pubsub.shutdown() {
+    if let Err(err) = pubsub.shutdown().await {
         eprintln!("shutdown failure: {:?}", err);
     }
 

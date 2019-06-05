@@ -19,9 +19,11 @@ parking_lot = "0.8"
 log = "0.4"
 futures-preview = "0.3.0-alpha.16"
 rayon = "1.0"
+runtime = "0.3.0-alpha.4"
 
 [dev-dependencies]
 components-database = { path = "../database" }
 hex = "0.3"
 uuid = { version = "0.7", features = ["serde", "v4"] }
 chashmap = "2.2"
+runtime-tokio = "0.3.0-alpha.4"

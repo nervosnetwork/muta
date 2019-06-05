@@ -48,8 +48,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use futures::executor::block_on;
-
     use core_context::{Context, P2P_SESSION_ID};
     use core_network_message::sync::{BroadcastStatus, PullBlocks};
     use core_network_message::{common::PullTxs, Method};
@@ -60,8 +58,8 @@ mod tests {
     use crate::outbound::Mode;
     use crate::p2p::{Scope, SessionId};
 
-    #[test]
-    fn test_broadcast_status() {
+    #[runtime::test]
+    async fn test_broadcast_status() {
         let status = SyncStatus {
             hash:   Hash::default(),
             height: 2020,
@@ -80,8 +78,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_broadcast_status_but_fail() {
+    #[runtime::test]
+    async fn test_broadcast_status_but_fail() {
         let status = SyncStatus {
             hash:   Hash::default(),
             height: 2020,
@@ -94,8 +92,8 @@ mod tests {
         assert_eq!(outbound.broadcaster.broadcasted_bytes(), None);
     }
 
-    #[test]
-    fn test_pull_blocks() {
+    #[runtime::test]
+    async fn test_pull_blocks() {
         let heights = vec![2020, 2021];
         let ctx = Context::new().with_value(P2P_SESSION_ID, 1usize);
         let bytes = encode_bytes(
@@ -112,7 +110,7 @@ mod tests {
         let (outbound, done_tx) = new_outbound::<Vec<Block>>();
         done_tx.try_send(expect_resp.clone()).unwrap();
 
-        let resp = block_on(outbound.pull_blocks(ctx, heights)).unwrap();
+        let resp = outbound.pull_blocks(ctx, heights).await.unwrap();
         assert_eq!(resp.first().unwrap().header.height, 2020);
         assert_eq!(
             outbound.broadcaster.broadcasted_bytes(),
@@ -120,48 +118,48 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_pull_blocks_without_session_id() {
+    #[runtime::test]
+    async fn test_pull_blocks_without_session_id() {
         let heights = vec![2099];
         let ctx = Context::new();
 
         let (outbound, _) = new_outbound::<()>();
-        match block_on(outbound.pull_blocks(ctx, heights)) {
+        match outbound.pull_blocks(ctx, heights).await {
             Err(SynchronizerError::Internal(str)) => assert!(str.contains("session id not found")),
             _ => panic!("should return SynchronizerError::Internal"),
         }
     }
 
-    #[test]
-    fn test_pull_blocks_but_broadcast_fail() {
+    #[runtime::test]
+    async fn test_pull_blocks_but_broadcast_fail() {
         let heights = vec![2099];
         let ctx = Context::new().with_value(P2P_SESSION_ID, 1usize);
 
         let (outbound, _) = new_outbound::<()>();
         outbound.broadcaster.reply_err(true);
 
-        match block_on(outbound.pull_blocks(ctx, heights)) {
+        match outbound.pull_blocks(ctx, heights).await {
             Err(SynchronizerError::Internal(_)) => (),
             _ => panic!("should return SynchronizerError::Internal"),
         }
     }
 
-    #[test]
-    fn test_pull_blocks_with_disconnected_done_tx() {
+    #[runtime::test]
+    async fn test_pull_blocks_with_disconnected_done_tx() {
         let heights = vec![2099];
         let ctx = Context::new().with_value(P2P_SESSION_ID, 1usize);
 
         let (outbound, done_tx) = new_outbound::<Vec<Block>>();
         drop(done_tx);
 
-        match block_on(outbound.pull_blocks(ctx, heights)) {
+        match outbound.pull_blocks(ctx, heights).await {
             Err(SynchronizerError::Internal(str)) => assert!(str.contains("done_rx return None")),
             _ => panic!("should return SynchronizerError::Internal"),
         }
     }
 
-    #[test]
-    fn test_pull_blocks_timeout() {
+    #[runtime::test]
+    async fn test_pull_blocks_timeout() {
         let heights = vec![2077];
         let ctx = Context::new().with_value(P2P_SESSION_ID, 1usize);
         let bytes = encode_bytes(
@@ -172,7 +170,7 @@ mod tests {
 
         let (outbound, _done_tx) = new_outbound::<Vec<Block>>();
 
-        match block_on(outbound.pull_blocks(ctx, heights)) {
+        match outbound.pull_blocks(ctx, heights).await {
             Err(SynchronizerError::Internal(str)) => assert!(str.contains("timeout")),
             _ => panic!("should return SynchronizerError::Internal indicates timeout"),
         }
@@ -182,8 +180,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_pull_txs() {
+    #[runtime::test]
+    async fn test_pull_txs() {
         let hashes = vec![Hash::default(), Hash::default()];
         let ctx = Context::new().with_value(P2P_SESSION_ID, 1usize);
         let bytes = encode_bytes(&PullTxs::from(1, hashes.clone()), Method::SyncPullTxs);
@@ -193,7 +191,7 @@ mod tests {
         let (outbound, done_tx) = new_outbound::<Vec<SignedTransaction>>();
         done_tx.try_send(expect_resp.clone()).unwrap();
 
-        let resp = block_on(outbound.pull_txs(ctx, hashes.as_slice())).unwrap();
+        let resp = outbound.pull_txs(ctx, hashes.as_slice()).await.unwrap();
         assert_eq!(resp, expect_resp);
         assert_eq!(
             outbound.broadcaster.broadcasted_bytes(),
@@ -201,48 +199,48 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_pull_txs_without_session_id() {
+    #[runtime::test]
+    async fn test_pull_txs_without_session_id() {
         let hashes = vec![Hash::default()];
         let ctx = Context::new();
 
         let (outbound, _) = new_outbound::<()>();
-        match block_on(outbound.pull_txs(ctx, hashes.as_slice())) {
+        match outbound.pull_txs(ctx, hashes.as_slice()).await {
             Err(SynchronizerError::Internal(str)) => assert!(str.contains("session id not found")),
             _ => panic!("should return SynchronizerError::Internal"),
         }
     }
 
-    #[test]
-    fn test_pull_txs_but_broadcast_fail() {
+    #[runtime::test]
+    async fn test_pull_txs_but_broadcast_fail() {
         let hashes = vec![Hash::default()];
         let ctx = Context::new().with_value(P2P_SESSION_ID, 1usize);
 
         let (outbound, _) = new_outbound::<()>();
         outbound.broadcaster.reply_err(true);
 
-        match block_on(outbound.pull_txs(ctx, hashes.as_slice())) {
+        match outbound.pull_txs(ctx, hashes.as_slice()).await {
             Err(SynchronizerError::Internal(_)) => (),
             _ => panic!("should return SynchronizerError::Internal"),
         }
     }
 
-    #[test]
-    fn test_pull_txs_with_disconnected_done_tx() {
+    #[runtime::test]
+    async fn test_pull_txs_with_disconnected_done_tx() {
         let hashes = vec![Hash::default()];
         let ctx = Context::new().with_value(P2P_SESSION_ID, 1usize);
 
         let (outbound, done_tx) = new_outbound::<Vec<SignedTransaction>>();
         drop(done_tx);
 
-        match block_on(outbound.pull_txs(ctx, hashes.as_slice())) {
+        match outbound.pull_txs(ctx, hashes.as_slice()).await {
             Err(SynchronizerError::Internal(str)) => assert!(str.contains("done_rx return None")),
             _ => panic!("should return SynchronizerError::Internal"),
         }
     }
 
-    #[test]
-    fn test_pull_txs_timeout() {
+    #[runtime::test]
+    async fn test_pull_txs_timeout() {
         let hashes = vec![Hash::default()];
         let ctx = Context::new().with_value(P2P_SESSION_ID, 1usize);
         let bytes = encode_bytes(&PullTxs::from(1, hashes.clone()), Method::SyncPullTxs);
@@ -250,7 +248,7 @@ mod tests {
 
         let (outbound, _done_tx) = new_outbound::<Vec<SignedTransaction>>();
 
-        match block_on(outbound.pull_txs(ctx, hashes.as_slice())) {
+        match outbound.pull_txs(ctx, hashes.as_slice()).await {
             Err(SynchronizerError::Internal(str)) => assert!(str.contains("timeout")),
             _ => panic!("should return SynchronizerError::Internal indicates timeout"),
         }

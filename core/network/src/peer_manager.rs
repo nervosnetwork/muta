@@ -3,15 +3,14 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
 
-use futures::compat::Stream01CompatExt;
 use futures::future::{ready, FutureObj};
-use futures::prelude::{FutureExt, Stream, StreamExt, TryFutureExt};
+use futures::prelude::{Stream, StreamExt};
 use futures::task::{AtomicWaker, Context, Poll};
+use futures_timer::Interval;
 use log::{debug, error};
 use parking_lot::RwLock;
 use rand::seq::SliceRandom;
 use std::collections::HashSet;
-use tokio::timer::Interval;
 
 use crate::p2p::{multiaddr::Multiaddr, DialProtocol, Dialer};
 
@@ -80,15 +79,14 @@ impl DefaultPeerManager {
         self.dialer = Some(dialer);
 
         let job = async move {
-            let routine_job = Interval::new_interval(Duration::from_secs(routine_interval))
-                .compat()
-                .for_each(move |_| {
+            let routine_job =
+                Interval::new(Duration::from_secs(routine_interval)).for_each(move |_| {
                     waker.wake();
 
                     ready(())
                 });
 
-            tokio::spawn(routine_job.unit_error().boxed().compat());
+            runtime::spawn(routine_job);
             self.for_each(async move |_| ()).await;
         };
 

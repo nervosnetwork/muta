@@ -6,9 +6,6 @@ use std::fs::File;
 use std::path::Path;
 use std::sync::Arc;
 
-use futures::executor::block_on;
-use futures::prelude::{FutureExt, TryFutureExt};
-
 use components_database::rocks::{Config as RocksDBConfig, RocksDB};
 use components_executor::evm::{EVMBlockDataProvider, EVMExecutor};
 use components_executor::TrieDB;
@@ -31,7 +28,8 @@ use core_types::{Address, Block, BlockHeader, Genesis, Hash, Proof};
 mod config;
 use config::Config;
 
-fn main() {
+#[runtime::main(runtime_tokio::Tokio)]
+async fn main() {
     common_logger::init(common_logger::Flag::Main);
     let matches = clap::App::new("Muta")
         .version("0.1")
@@ -58,13 +56,15 @@ fn main() {
     if let Some(matches) = matches.subcommand_matches("init") {
         let genesis_path = matches.value_of("genesis.json").unwrap();
         log::info!("Genesis path: {}", genesis_path);
-        handle_init(&cfg, genesis_path).unwrap();
+        handle_init(&cfg, genesis_path).await.unwrap();
     }
 
-    start(&cfg);
+    start(&cfg).await;
 }
 
-fn start(cfg: &Config) {
+// clippy bug
+#[allow(clippy::needless_lifetimes)]
+async fn start(cfg: &Config) {
     // new context
     let ctx = Context::new();
 
@@ -83,7 +83,7 @@ fn start(cfg: &Config) {
     let trie_db = Arc::new(TrieDB::new(Arc::clone(&state_db)));
 
     // new executor
-    let block = block_on(storage.get_latest_block(ctx.clone())).unwrap();
+    let block = storage.get_latest_block(ctx.clone()).await.unwrap();
     let executor = Arc::new(
         EVMExecutor::from_existing(
             trie_db,
@@ -130,7 +130,7 @@ fn start(cfg: &Config) {
         verifier_list.push(Address::from_hex(address).unwrap());
     }
 
-    let proof = block_on(storage.get_latest_proof(ctx.clone())).unwrap();
+    let proof = storage.get_latest_proof(ctx.clone()).await.unwrap();
     let status = ConsensusStatus {
         height: block.header.height,
         timestamp: block.header.timestamp,
@@ -174,7 +174,7 @@ fn start(cfg: &Config) {
         Arc::clone(&consensus),
         Arc::clone(&storage),
     );
-    std::thread::spawn(move || tokio::run(network.run().unit_error().boxed().compat()));
+    runtime::spawn(network.run());
 
     // start synchronizer
     let sub_block2 = pubsub
@@ -185,7 +185,7 @@ fn start(cfg: &Config) {
         Arc::clone(&storage),
         cfg.synchronzer.broadcast_status_interval,
     );
-    synchronizer_manager.start(sub_block2);
+    runtime::spawn(synchronizer_manager.start(sub_block2));
 
     // start jsonrpc
     let sub_block = pubsub
@@ -208,12 +208,19 @@ fn start(cfg: &Config) {
         Arc::clone(&secp),
         Arc::clone(&peer_count),
     );
-    if let Err(e) = components_jsonrpc::listen(jrpc_config, jrpc_state, sub_block) {
-        log::error!("Failed to start jrpc server: {}", e);
-    };
+
+    let handle = std::thread::spawn(move || {
+        if let Err(e) = components_jsonrpc::listen(jrpc_config, jrpc_state, sub_block) {
+            log::error!("Failed to start jrpc server: {}", e);
+        };
+    });
+
+    handle.join().unwrap();
 }
 
-fn handle_init(cfg: &Config, genesis_path: impl AsRef<Path>) -> Result<(), Box<dyn Error>> {
+// clippy bug
+#[allow(clippy::needless_lifetimes)]
+async fn handle_init(cfg: &Config, genesis_path: impl AsRef<Path>) -> Result<(), Box<dyn Error>> {
     let mut r = File::open(genesis_path)?;
     let genesis: Genesis = serde_json::from_reader(&mut r)?;
     log::info!("Genesis data: {:?}", genesis);
@@ -227,7 +234,7 @@ fn handle_init(cfg: &Config, genesis_path: impl AsRef<Path>) -> Result<(), Box<d
     let block_disk_db = Arc::new(RocksDB::new(path_block, &db_cfg)?);
     let block_db = Arc::new(BlockStorage::new(block_disk_db));
 
-    if block_on(block_db.get_latest_block(ctx.clone())).is_ok() {
+    if block_db.get_latest_block(ctx.clone()).await.is_ok() {
         log::error!("There is already a chain, you should specify a new path");
         return Ok(());
     }
@@ -245,23 +252,28 @@ fn handle_init(cfg: &Config, genesis_path: impl AsRef<Path>) -> Result<(), Box<d
     )?;
     log::info!("State root hash: {:?}", state_root_hash);
 
-    let mut block_header = BlockHeader::default();
-    block_header.prevhash = Hash::from_hex(&genesis.prevhash)?;
-    block_header.timestamp = genesis.timestamp;
-    block_header.state_root = state_root_hash;
-    block_header.quota_limit = cfg.txpool.quota_limit;
-    let mut block = Block::default();
-    block.hash = block_header.hash();
-    block.header = block_header;
+    let block_header = BlockHeader {
+        prevhash: Hash::from_hex(&genesis.prevhash)?,
+        timestamp: genesis.timestamp,
+        state_root: state_root_hash,
+        quota_limit: cfg.txpool.quota_limit,
+        ..Default::default()
+    };
+    let block = Block {
+        hash: block_header.hash(),
+        header: block_header,
+        ..Default::default()
+    };
     log::info!("init state {:?}", block);
-    block_on(block_db.insert_block(ctx.clone(), block))?;
+    block_db.insert_block(ctx.clone(), block).await?;
 
     // init proof
-    block_on(block_db.update_latest_proof(ctx.clone(), Proof {
+    let proof = Proof {
         height: 0,
         round: 0,
         ..Default::default()
-    }))?;
+    };
+    block_db.update_latest_proof(ctx.clone(), proof).await?;
 
     Ok(())
 }

@@ -197,8 +197,6 @@ mod tests {
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::{Arc, Mutex};
 
-    use futures::executor::block_on;
-
     use core_context::{Context, P2P_SESSION_ID};
     use core_network_message::common::{PullTxs, PushTxs};
     use core_network_message::sync::{BroadcastStatus, PullBlocks, PushBlocks};
@@ -309,45 +307,45 @@ mod tests {
         SyncReactor::new(synchronizer, callback, outbound)
     }
 
-    #[test]
-    fn test_react_with_unknown_method() {
+    #[runtime::test]
+    async fn test_react_with_unknown_method() {
         let reactor = new_sync_reactor();
         let ctx = Context::new();
         let method = Method::Vote;
 
-        match block_on(reactor.react(ctx, method, vec![1, 2, 3])) {
+        match reactor.react(ctx, method, vec![1, 2, 3]).await {
             Err(Error::UnknownMethod(m)) => assert_eq!(m, method.to_u32()),
             _ => panic!("should return Error::UnknownMethod"),
         }
     }
 
-    #[test]
-    fn test_react_broadcast_status() {
+    #[runtime::test]
+    async fn test_react_broadcast_status() {
         let reactor = new_sync_reactor();
         let status = BroadcastStatus::from(Hash::default(), 20);
         let data = <BroadcastStatus as Codec>::encode(&status).unwrap();
 
         let ctx = Context::new();
         let method = Method::SyncBroadcastStatus;
-        let maybe_ok = block_on(reactor.react(ctx, method, data.to_vec()));
+        let maybe_ok = reactor.react(ctx, method, data.to_vec()).await;
 
         assert_eq!(maybe_ok.unwrap(), ())
     }
 
-    #[test]
-    fn test_react_broadcast_status_with_bad_data() {
+    #[runtime::test]
+    async fn test_react_broadcast_status_with_bad_data() {
         let reactor = new_sync_reactor();
         let ctx = Context::new();
         let method = Method::SyncBroadcastStatus;
 
-        match block_on(reactor.react(ctx, method, vec![1, 2, 3])) {
+        match reactor.react(ctx, method, vec![1, 2, 3]).await {
             Err(Error::MsgCodecError(_)) => (),
             _ => panic!("should return Error::MsgCodecError"),
         }
     }
 
-    #[test]
-    fn test_react_broadcast_status_with_sync_failure() {
+    #[runtime::test]
+    async fn test_react_broadcast_status_with_sync_failure() {
         let reactor = new_sync_reactor();
         let status = BroadcastStatus::from(Hash::default(), 20);
         let data = <BroadcastStatus as Codec>::encode(&status).unwrap();
@@ -356,7 +354,7 @@ mod tests {
         let method = Method::SyncBroadcastStatus;
 
         reactor.sync.reply_err(true);
-        match block_on(reactor.react(ctx, method, data.to_vec())) {
+        match reactor.react(ctx, method, data.to_vec()).await {
             Err(Error::SynchronizerError(SynchronizerError::Internal(str))) => {
                 assert!(str.contains("mock error"))
             }
@@ -364,8 +362,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_react_pull_blocks() {
+    #[runtime::test]
+    async fn test_react_pull_blocks() {
         let reactor = new_sync_reactor();
         let pull_blocks = PullBlocks::from(1, vec![1, 2]);
         let data = <PullBlocks as Codec>::encode(&pull_blocks).unwrap();
@@ -378,14 +376,14 @@ mod tests {
             <PushBlocks as DataEncoder>::encode(&push_blocks, Method::SyncPushBlocks).unwrap();
         let scope = Scope::Single(SessionId::new(1));
 
-        let maybe_ok = block_on(reactor.react(ctx, method, data.to_vec()));
+        let maybe_ok = reactor.react(ctx, method, data.to_vec()).await;
 
         assert_eq!(maybe_ok.unwrap(), ());
         assert_eq!(reactor.outbound.broadcasted_data(), Some((bytes, scope)));
     }
 
-    #[test]
-    fn test_react_pull_blocks_without_session_id() {
+    #[runtime::test]
+    async fn test_react_pull_blocks_without_session_id() {
         let reactor = new_sync_reactor();
         let pull_blocks = PullBlocks::from(1, vec![1, 2]);
         let data = <PullBlocks as Codec>::encode(&pull_blocks).unwrap();
@@ -393,26 +391,26 @@ mod tests {
         let ctx = Context::new();
         let method = Method::SyncPullBlocks;
 
-        match block_on(reactor.react(ctx, method, data.to_vec())) {
+        match reactor.react(ctx, method, data.to_vec()).await {
             Err(Error::SessionIdNotFound) => (),
             _ => panic!("should return Error::SessionIdNotFound"),
         }
     }
 
-    #[test]
-    fn test_react_pull_blocks_with_bad_data() {
+    #[runtime::test]
+    async fn test_react_pull_blocks_with_bad_data() {
         let reactor = new_sync_reactor();
         let ctx = Context::new().with_value(P2P_SESSION_ID, 1);
         let method = Method::SyncPullBlocks;
 
-        match block_on(reactor.react(ctx, method, vec![1, 2, 3])) {
+        match reactor.react(ctx, method, vec![1, 2, 3]).await {
             Err(Error::MsgCodecError(_)) => (),
             _ => panic!("should return Error::MsgCodecError"),
         }
     }
 
-    #[test]
-    fn test_react_pull_blocks_with_sync_failure() {
+    #[runtime::test]
+    async fn test_react_pull_blocks_with_sync_failure() {
         let reactor = new_sync_reactor();
         let pull_blocks = PullBlocks::from(1, vec![1, 2]);
         let data = <PullBlocks as Codec>::encode(&pull_blocks).unwrap();
@@ -421,7 +419,7 @@ mod tests {
         let method = Method::SyncPullBlocks;
         reactor.sync.reply_err(true);
 
-        match block_on(reactor.react(ctx, method, data.to_vec())) {
+        match reactor.react(ctx, method, data.to_vec()).await {
             Err(Error::SynchronizerError(SynchronizerError::Internal(str))) => {
                 assert!(str.contains("mock error"))
             }
@@ -429,8 +427,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_react_pull_blocks_with_broadcast_failure() {
+    #[runtime::test]
+    async fn test_react_pull_blocks_with_broadcast_failure() {
         let reactor = new_sync_reactor();
         let pull_blocks = PullBlocks::from(1, vec![1, 2]);
         let data = <PullBlocks as Codec>::encode(&pull_blocks).unwrap();
@@ -439,13 +437,13 @@ mod tests {
         let method = Method::SyncPullBlocks;
         reactor.outbound.reply_err(true);
 
-        let maybe_ok = block_on(reactor.react(ctx, method, data.to_vec()));
+        let maybe_ok = reactor.react(ctx, method, data.to_vec()).await;
         assert_eq!(maybe_ok.unwrap(), ());
         assert_eq!(reactor.outbound.broadcasted_data(), None);
     }
 
-    #[test]
-    fn test_react_push_blocks() {
+    #[runtime::test]
+    async fn test_react_push_blocks() {
         let reactor = new_sync_reactor();
         let push_blocks = PushBlocks::from(1, vec![Block::default()]);
         let data = <PushBlocks as Codec>::encode(&push_blocks).unwrap();
@@ -454,15 +452,15 @@ mod tests {
         let method = Method::SyncPushBlocks;
         let rx = reactor.callback.insert::<Vec<Block>>(1, 1);
 
-        let maybe_ok = block_on(reactor.react(ctx, method, data.to_vec()));
+        let maybe_ok = reactor.react(ctx, method, data.to_vec()).await;
         assert_eq!(maybe_ok.unwrap(), ());
 
         let blocks = rx.try_recv().unwrap();
         assert_eq!(blocks.len(), 1);
     }
 
-    #[test]
-    fn test_react_push_blocks_without_session_id() {
+    #[runtime::test]
+    async fn test_react_push_blocks_without_session_id() {
         let reactor = new_sync_reactor();
         let push_blocks = PushBlocks::from(1, vec![Block::default()]);
         let data = <PushBlocks as Codec>::encode(&push_blocks).unwrap();
@@ -470,26 +468,26 @@ mod tests {
         let ctx = Context::new();
         let method = Method::SyncPushBlocks;
 
-        match block_on(reactor.react(ctx, method, data.to_vec())) {
+        match reactor.react(ctx, method, data.to_vec()).await {
             Err(Error::SessionIdNotFound) => (),
             _ => panic!("should return Error::SessionIdNotFound"),
         }
     }
 
-    #[test]
-    fn test_react_push_blocks_with_bad_data() {
+    #[runtime::test]
+    async fn test_react_push_blocks_with_bad_data() {
         let reactor = new_sync_reactor();
         let ctx = Context::new().with_value(P2P_SESSION_ID, 1);
         let method = Method::SyncPushBlocks;
 
-        match block_on(reactor.react(ctx, method, vec![1, 2, 3])) {
+        match reactor.react(ctx, method, vec![1, 2, 3]).await {
             Err(Error::MsgCodecError(_)) => (),
             _ => panic!("should return Error::MsgCodecError"),
         }
     }
 
-    #[test]
-    fn test_react_push_blocks_without_cb_tx() {
+    #[runtime::test]
+    async fn test_react_push_blocks_without_cb_tx() {
         let reactor = new_sync_reactor();
         let push_blocks = PushBlocks::from(1, vec![Block::default()]);
         let data = <PushBlocks as Codec>::encode(&push_blocks).unwrap();
@@ -497,14 +495,14 @@ mod tests {
         let ctx = Context::new().with_value(P2P_SESSION_ID, 1);
         let method = Method::SyncPushBlocks;
 
-        match block_on(reactor.react(ctx, method, data.to_vec())) {
+        match reactor.react(ctx, method, data.to_vec()).await {
             Err(Error::CallbackItemNotFound(id)) => assert_eq!(id, 1),
             _ => panic!("should return Error::CallbackItemNotFound"),
         }
     }
 
-    #[test]
-    fn test_react_push_blocks_with_wrong_cb_tx() {
+    #[runtime::test]
+    async fn test_react_push_blocks_with_wrong_cb_tx() {
         let reactor = new_sync_reactor();
         let push_blocks = PushBlocks::from(1, vec![Block::default()]);
         let data = <PushBlocks as Codec>::encode(&push_blocks).unwrap();
@@ -513,14 +511,14 @@ mod tests {
         let method = Method::SyncPushBlocks;
         let _rx = reactor.callback.insert::<Vec<String>>(1, 1);
 
-        match block_on(reactor.react(ctx, method, data.to_vec())) {
+        match reactor.react(ctx, method, data.to_vec()).await {
             Err(Error::CallbackItemWrongType(id)) => assert_eq!(id, 1),
             _ => panic!("should return Error::CallbackItemWrongType"),
         }
     }
 
-    #[test]
-    fn test_react_push_blocks_with_bad_ser_block() {
+    #[runtime::test]
+    async fn test_react_push_blocks_with_bad_ser_block() {
         let reactor = new_sync_reactor();
         let mut ser_block = SerBlock::default();
         ser_block.header = None;
@@ -535,14 +533,14 @@ mod tests {
         let method = Method::SyncPushBlocks;
         let _rx = reactor.callback.insert::<Vec<Block>>(1, 1);
 
-        match block_on(reactor.react(ctx, method, data.to_vec())) {
+        match reactor.react(ctx, method, data.to_vec()).await {
             Err(Error::SerCodecError(_)) => (),
             _ => panic!("should return Error::SerCodecError"),
         }
     }
 
-    #[test]
-    fn test_react_push_blocks_with_tx_failure() {
+    #[runtime::test]
+    async fn test_react_push_blocks_with_tx_failure() {
         let reactor = new_sync_reactor();
         let push_blocks = PushBlocks::from(1, vec![Block::default()]);
         let data = <PushBlocks as Codec>::encode(&push_blocks).unwrap();
@@ -552,14 +550,14 @@ mod tests {
         let rx = reactor.callback.insert::<Vec<Block>>(1, 1);
         drop(rx);
 
-        match block_on(reactor.react(ctx, method, data.to_vec())) {
+        match reactor.react(ctx, method, data.to_vec()).await {
             Err(Error::ChannelTrySendError(_)) => (),
             _ => panic!("should return Error::ChannelTrySendError"),
         }
     }
 
-    #[test]
-    fn test_react_pull_txs() {
+    #[runtime::test]
+    async fn test_react_pull_txs() {
         let reactor = new_sync_reactor();
         let pull_txs = PullTxs::from(1, vec![Hash::default()]);
         let data = <PullTxs as Codec>::encode(&pull_txs).unwrap();
@@ -571,37 +569,37 @@ mod tests {
         let ctx = Context::new().with_value(P2P_SESSION_ID, 1);
         let method = Method::SyncPullTxs;
 
-        let maybe_ok = block_on(reactor.react(ctx, method, data.to_vec()));
+        let maybe_ok = reactor.react(ctx, method, data.to_vec()).await;
 
         assert_eq!(maybe_ok.unwrap(), ());
         assert_eq!(reactor.outbound.broadcasted_data(), Some((bytes, scope)));
     }
 
-    #[test]
-    fn test_pull_txs_without_session_id() {
+    #[runtime::test]
+    async fn test_pull_txs_without_session_id() {
         let reactor = new_sync_reactor();
         let ctx = Context::new();
 
-        match block_on(reactor.react(ctx, Method::SyncPullTxs, vec![1, 2, 3])) {
+        match reactor.react(ctx, Method::SyncPullTxs, vec![1, 2, 3]).await {
             Err(Error::SessionIdNotFound) => (),
             _ => panic!("should return Error::SessionIdNotFound"),
         }
     }
 
-    #[test]
-    fn test_pull_txs_with_bad_data() {
+    #[runtime::test]
+    async fn test_pull_txs_with_bad_data() {
         let reactor = new_sync_reactor();
 
         let ctx = Context::new().with_value(P2P_SESSION_ID, 1);
 
-        match block_on(reactor.react(ctx, Method::SyncPullTxs, vec![1, 2, 3])) {
+        match reactor.react(ctx, Method::SyncPullTxs, vec![1, 2, 3]).await {
             Err(Error::MsgCodecError(_)) => (),
             _ => panic!("should return Error::MsgCodecError"),
         }
     }
 
-    #[test]
-    fn test_pull_txs_with_bad_ser_hash() {
+    #[runtime::test]
+    async fn test_pull_txs_with_bad_ser_hash() {
         let reactor = new_sync_reactor();
         let pull_txs = PullTxs {
             uid:    1,
@@ -612,14 +610,14 @@ mod tests {
         let ctx = Context::new().with_value(P2P_SESSION_ID, 1);
         let method = Method::SyncPullTxs;
 
-        match block_on(reactor.react(ctx, method, data.to_vec())) {
+        match reactor.react(ctx, method, data.to_vec()).await {
             Err(Error::SerCodecError(_)) => (),
             _ => panic!("should return Error::SerCodecError"),
         }
     }
 
-    #[test]
-    fn test_pull_txs_with_sync_get_txs_failure() {
+    #[runtime::test]
+    async fn test_pull_txs_with_sync_get_txs_failure() {
         let reactor = new_sync_reactor();
         let pull_txs = PullTxs::from(1, vec![Hash::default()]);
         let data = <PullTxs as Codec>::encode(&pull_txs).unwrap();
@@ -628,7 +626,7 @@ mod tests {
         let method = Method::SyncPullTxs;
 
         reactor.sync.reply_err(true);
-        match block_on(reactor.react(ctx, method, data.to_vec())) {
+        match reactor.react(ctx, method, data.to_vec()).await {
             Err(Error::SynchronizerError(SynchronizerError::Internal(str))) => {
                 assert!(str.contains("mock error"))
             }
@@ -636,8 +634,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_pull_txs_with_outbound_failure() {
+    #[runtime::test]
+    async fn test_pull_txs_with_outbound_failure() {
         let reactor = new_sync_reactor();
         let pull_txs = PullTxs::from(1, vec![Hash::default()]);
         let data = <PullTxs as Codec>::encode(&pull_txs).unwrap();
@@ -646,14 +644,14 @@ mod tests {
         let method = Method::SyncPullTxs;
 
         reactor.outbound.reply_err(true);
-        let maybe_ok = block_on(reactor.react(ctx, method, data.to_vec()));
+        let maybe_ok = reactor.react(ctx, method, data.to_vec()).await;
 
         assert_eq!(maybe_ok.unwrap(), ());
         assert_eq!(reactor.outbound.broadcasted_data(), None);
     }
 
-    #[test]
-    fn test_react_push_txs() {
+    #[runtime::test]
+    async fn test_react_push_txs() {
         let reactor = new_sync_reactor();
         let push_txs = PushTxs::from(1, vec![SignedTransaction::default()]);
         let data = <PushTxs as Codec>::encode(&push_txs).unwrap();
@@ -662,35 +660,35 @@ mod tests {
         let method = Method::SyncPushTxs;
         let rx = reactor.callback.insert::<Vec<SignedTransaction>>(1, 2);
 
-        let maybe_ok = block_on(reactor.react(ctx, method, data.to_vec()));
+        let maybe_ok = reactor.react(ctx, method, data.to_vec()).await;
         assert_eq!(maybe_ok.unwrap(), ());
         assert_eq!(rx.try_recv().unwrap(), vec![SignedTransaction::default()]);
     }
 
-    #[test]
-    fn test_react_push_txs_without_session_id() {
+    #[runtime::test]
+    async fn test_react_push_txs_without_session_id() {
         let reactor = new_sync_reactor();
         let ctx = Context::new();
 
-        match block_on(reactor.react(ctx, Method::SyncPushTxs, vec![1, 2])) {
+        match reactor.react(ctx, Method::SyncPushTxs, vec![1, 2]).await {
             Err(Error::SessionIdNotFound) => (),
             _ => panic!("should return Error::SessionIdNotFound"),
         }
     }
 
-    #[test]
-    fn test_react_push_txs_with_bad_data() {
+    #[runtime::test]
+    async fn test_react_push_txs_with_bad_data() {
         let reactor = new_sync_reactor();
         let ctx = Context::new().with_value(P2P_SESSION_ID, 1);
 
-        match block_on(reactor.react(ctx, Method::SyncPushTxs, vec![1, 2])) {
+        match reactor.react(ctx, Method::SyncPushTxs, vec![1, 2]).await {
             Err(Error::MsgCodecError(_)) => (),
             _ => panic!("should return Error::MsgCodecError"),
         }
     }
 
-    #[test]
-    fn test_react_push_txs_without_cb_tx() {
+    #[runtime::test]
+    async fn test_react_push_txs_without_cb_tx() {
         let reactor = new_sync_reactor();
         let push_txs = PushTxs::from(1, vec![SignedTransaction::default()]);
         let data = <PushTxs as Codec>::encode(&push_txs).unwrap();
@@ -698,14 +696,14 @@ mod tests {
         let ctx = Context::new().with_value(P2P_SESSION_ID, 1);
         let method = Method::SyncPushTxs;
 
-        match block_on(reactor.react(ctx, method, data.to_vec())) {
+        match reactor.react(ctx, method, data.to_vec()).await {
             Err(Error::CallbackItemNotFound(id)) => assert_eq!(id, 1),
             _ => panic!("should return Error::CallbackItemNotFound"),
         }
     }
 
-    #[test]
-    fn test_react_push_txs_with_wrong_cb_type() {
+    #[runtime::test]
+    async fn test_react_push_txs_with_wrong_cb_type() {
         let reactor = new_sync_reactor();
         let push_txs = PushTxs::from(1, vec![SignedTransaction::default()]);
         let data = <PushTxs as Codec>::encode(&push_txs).unwrap();
@@ -714,14 +712,14 @@ mod tests {
         let method = Method::SyncPushTxs;
         let _rx = reactor.callback.insert::<Vec<String>>(1, 1);
 
-        match block_on(reactor.react(ctx, method, data.to_vec())) {
+        match reactor.react(ctx, method, data.to_vec()).await {
             Err(Error::CallbackItemWrongType(id)) => assert_eq!(id, 1),
             _ => panic!("should return Error::CallbackItemWrongType"),
         }
     }
 
-    #[test]
-    fn test_react_push_txs_with_bad_ser_stxs() {
+    #[runtime::test]
+    async fn test_react_push_txs_with_bad_ser_stxs() {
         let reactor = new_sync_reactor();
         let mut ser_stx = SerSignedTransaction::default();
         ser_stx.untx = None;
@@ -736,14 +734,14 @@ mod tests {
         let method = Method::SyncPushTxs;
         let _rx = reactor.callback.insert::<Vec<SignedTransaction>>(1, 1);
 
-        match block_on(reactor.react(ctx, method, data.to_vec())) {
+        match reactor.react(ctx, method, data.to_vec()).await {
             Err(Error::SerCodecError(_)) => (),
             _ => panic!("should return Error::SerCodecError"),
         }
     }
 
-    #[test]
-    fn test_react_push_txs_with_cb_tx_failure() {
+    #[runtime::test]
+    async fn test_react_push_txs_with_cb_tx_failure() {
         let reactor = new_sync_reactor();
         let push_txs = PushTxs::from(1, vec![SignedTransaction::default()]);
         let data = <PushTxs as Codec>::encode(&push_txs).unwrap();
@@ -753,7 +751,7 @@ mod tests {
         let rx = reactor.callback.insert::<Vec<SignedTransaction>>(1, 1);
         drop(rx);
 
-        match block_on(reactor.react(ctx, method, data.to_vec())) {
+        match reactor.react(ctx, method, data.to_vec()).await {
             Err(Error::ChannelTrySendError(_)) => (),
             _ => panic!("should return Error::ChannelTrySendError"),
         }

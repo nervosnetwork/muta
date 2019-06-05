@@ -134,11 +134,11 @@ impl Broadcast {
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
-    use std::thread::{spawn, JoinHandle};
 
     use futures::channel::{mpsc, oneshot};
     use futures::executor::block_on;
     use futures::prelude::StreamExt;
+    use runtime::task::JoinHandle;
     use uuid::Uuid;
 
     use crate::broadcast::mock_hash_map::{State, StateRx};
@@ -183,9 +183,9 @@ mod tests {
     }
 
     impl Control {
-        pub fn shutdown(self) {
+        pub async fn shutdown(self) {
             self.shutdown_tx.send(()).unwrap();
-            self.handle.join().unwrap();
+            self.handle.await;
         }
 
         pub async fn get_next_state(&mut self) -> State {
@@ -240,7 +240,7 @@ mod tests {
         let (shutdown_tx, shutdown_rx) = oneshot::channel();
 
         let broadcast = Broadcast::broadcast(pubs, subs, pending_acts, act_rx, shutdown_rx);
-        let handle = spawn(move || block_on(broadcast));
+        let handle = runtime::spawn(broadcast);
 
         Control {
             act_tx,
@@ -251,8 +251,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_new_pub() {
+    #[runtime::test]
+    async fn test_new_pub() {
         let mut ctrl = new_broadcast();
 
         let topic = "test".to_owned();
@@ -265,11 +265,11 @@ mod tests {
         assert_eq!(topic, "test");
         assert_eq!(len, 1);
 
-        ctrl.shutdown();
+        ctrl.shutdown().await;
     }
 
-    #[test]
-    fn test_remove_pub() {
+    #[runtime::test]
+    async fn test_remove_pub() {
         let mut ctrl = new_broadcast();
 
         let topic = "test";
@@ -288,11 +288,11 @@ mod tests {
         let (_, len) = block_on(ctrl.get_next_state());
         assert_eq!(len, 0);
 
-        ctrl.shutdown();
+        ctrl.shutdown().await;
     }
 
-    #[test]
-    fn test_new_sub() {
+    #[runtime::test]
+    async fn test_new_sub() {
         let mut ctrl = new_broadcast();
 
         let topic = "test".to_owned();
@@ -309,11 +309,11 @@ mod tests {
         assert_eq!(sub_uuid, uuid.to_string());
         assert_eq!(len, 1);
 
-        ctrl.shutdown();
+        ctrl.shutdown().await;
     }
 
-    #[test]
-    fn test_remove_sub() {
+    #[runtime::test]
+    async fn test_remove_sub() {
         let mut ctrl = new_broadcast();
         let topic = "test";
 
@@ -329,11 +329,11 @@ mod tests {
         let (_, len) = block_on(ctrl.get_next_state());
         assert_eq!(len, 0);
 
-        ctrl.shutdown();
+        ctrl.shutdown().await;
     }
 
-    #[test]
-    fn test_broadcast() {
+    #[runtime::test]
+    async fn test_broadcast() {
         let mut ctrl = new_broadcast();
         let topic = "test";
         let msg = "coaerl & tsuaedy".to_owned();
@@ -348,11 +348,11 @@ mod tests {
 
         assert_eq!(recv_msg, msg);
 
-        ctrl.shutdown();
+        ctrl.shutdown().await;
     }
 
-    #[test]
-    fn test_broadcast_use_wrong_recv_msg_type() {
+    #[runtime::test]
+    async fn test_broadcast_use_wrong_recv_msg_type() {
         let mut ctrl = new_broadcast();
         let topic = "test";
         let msg = "coalre & tdusaey".to_owned();
@@ -367,15 +367,15 @@ mod tests {
 
         assert!(msg.is_none());
 
-        ctrl.shutdown();
+        ctrl.shutdown().await;
     }
 
-    #[test]
-    fn test_broadcast_shutdown() {
+    #[runtime::test]
+    async fn test_broadcast_shutdown() {
         let ctrl = new_broadcast();
         let act_tx = ctrl.act_tx.clone();
 
-        ctrl.shutdown();
+        ctrl.shutdown().await;
 
         assert!(act_tx.is_closed());
     }

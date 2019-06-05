@@ -447,8 +447,8 @@ mod tests {
         assert_eq!(outbound.broadcaster.broadcasted_bytes(), None);
     }
 
-    #[test]
-    fn test_rpc() {
+    #[runtime::test]
+    async fn test_rpc() {
         let data = b"son of sun".to_vec();
         let method = Method::Proposal;
         let msg_bytes = encode_bytes(&data, method);
@@ -458,10 +458,11 @@ mod tests {
             .with_value(P2P_SESSION_ID, 1)
             .with_value::<CallId>(CALL_ID_KEY, CallId::new(1));
         let (outbound, done_tx) = new_outbound::<Vec<u8>>();
+        let method = Method::Proposal;
 
         let expect_resp = b"you".to_vec();
         done_tx.try_send(expect_resp.clone()).unwrap();
-        let resp: Vec<u8> = block_on(outbound.clone().rpc(ctx, Method::Proposal, data)).unwrap();
+        let resp: Vec<u8> = outbound.clone().rpc(ctx, method, data).await.unwrap();
 
         assert_eq!(resp, expect_resp);
         assert_eq!(
@@ -476,65 +477,70 @@ mod tests {
         let data = b"fish same".to_vec();
         let ctx = Context::new();
         let (outbound, _) = new_outbound::<()>();
+        let method = Method::Proposal;
 
-        block_on(outbound.rpc::<Vec<u8>, Vec<u8>>(ctx, Method::Proposal, data)).unwrap();
+        block_on(outbound.rpc::<Vec<u8>, Vec<u8>>(ctx, method, data)).unwrap();
     }
 
-    #[test]
-    fn test_rpc_without_ctx_session_id() {
+    #[runtime::test]
+    async fn test_rpc_without_ctx_session_id() {
         let data = b"shell out of ghost".to_vec();
         let ctx = Context::new().with_value::<CallId>(CALL_ID_KEY, CallId::new(1));
+        let method = Method::Proposal;
         let (outbound, _) = new_outbound::<()>();
 
-        match block_on(outbound.rpc::<Vec<u8>, Vec<u8>>(ctx, Method::Proposal, data)) {
+        match outbound.rpc::<Vec<u8>, Vec<u8>>(ctx, method, data).await {
             Err(str) => assert!(str.contains("session id not found")),
             _ => panic!("should return error string contains 'session id not found'"),
         }
     }
 
-    #[test]
-    fn test_rpc_with_broadcast_failure() {
+    #[runtime::test]
+    async fn test_rpc_with_broadcast_failure() {
         let data = b"taqikema".to_vec();
         let ctx = Context::new()
             .with_value(P2P_SESSION_ID, 1)
             .with_value::<CallId>(CALL_ID_KEY, CallId::new(1));
+        let method = Method::Vote;
 
         let (outbound, _) = new_outbound::<()>();
         outbound.broadcaster.reply_err(true);
 
-        match block_on(outbound.rpc::<Vec<u8>, Vec<u8>>(ctx, Method::Vote, data)) {
+        match outbound.rpc::<Vec<u8>, Vec<u8>>(ctx, method, data).await {
             Err(str) => assert!(str.contains("mock err")),
             _ => panic!("should return error string contains 'mock err'"),
         }
     }
 
-    #[test]
-    fn test_rpc_with_disconnected_done_channel() {
+    #[runtime::test]
+    async fn test_rpc_with_disconnected_done_channel() {
         let data = b"taqikema".to_vec();
         let ctx = Context::new()
             .with_value(P2P_SESSION_ID, 1)
             .with_value::<CallId>(CALL_ID_KEY, CallId::new(1));
+        let method = Method::Vote;
 
         let (outbound, done_tx) = new_outbound::<Vec<u8>>();
         drop(done_tx);
 
-        match block_on(outbound.rpc::<Vec<u8>, Vec<u8>>(ctx, Method::Vote, data)) {
+        match outbound.rpc::<Vec<u8>, Vec<u8>>(ctx, method, data).await {
             Err(str) => assert!(str.contains("done_rx return None")),
             _ => panic!("should return error string contains 'done_rx return None'"),
         }
     }
 
-    #[test]
-    fn test_rpc_timeout() {
+    #[runtime::test]
+    async fn test_rpc_timeout() {
         let data = b"death strand".to_vec();
         let ctx = Context::new()
             .with_value(P2P_SESSION_ID, 1)
             .with_value::<CallId>(CALL_ID_KEY, CallId::new(1));
+        let method = Method::Vote;
 
         // hold _done_tx, but do not send anything
         let (outbound, _done_tx) = new_outbound::<Vec<u8>>();
 
-        match block_on(outbound.rpc::<Vec<u8>, Vec<u8>>(ctx, Method::Vote, data)) {
+        match outbound.rpc::<Vec<u8>, Vec<u8>>(ctx, method, data).await {
             Err(str) => assert!(str.contains("timeout")),
             _ => panic!("should return error string contains 'timeout'"),
         }

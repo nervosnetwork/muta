@@ -36,8 +36,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use futures::executor::block_on;
-
     use core_context::{Context, P2P_SESSION_ID};
     use core_network_message::{common::PullTxs, tx_pool::BroadcastTxs, Method};
     use core_runtime::{network::TransactionPool, TransactionPoolError};
@@ -72,8 +70,8 @@ mod tests {
         assert_eq!(outbound.broadcaster.broadcasted_bytes(), None);
     }
 
-    #[test]
-    fn test_pull_txs() {
+    #[runtime::test]
+    async fn test_pull_txs() {
         let hashes = vec![Hash::default(), Hash::default()];
         let ctx = Context::new().with_value(P2P_SESSION_ID, 1usize);
         let bytes = encode_bytes(&PullTxs::from(1, hashes.clone()), Method::PullTxs);
@@ -83,7 +81,7 @@ mod tests {
         let (outbound, done_tx) = new_outbound::<Vec<SignedTransaction>>();
         done_tx.try_send(expect_resp.clone()).unwrap();
 
-        let resp = block_on(outbound.pull_txs(ctx, hashes)).unwrap();
+        let resp = outbound.pull_txs(ctx, hashes).await.unwrap();
         assert_eq!(resp, expect_resp);
         assert_eq!(
             outbound.broadcaster.broadcasted_bytes(),
@@ -91,13 +89,13 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_pull_txs_without_session_id() {
+    #[runtime::test]
+    async fn test_pull_txs_without_session_id() {
         let hashes = vec![Hash::default()];
         let ctx = Context::new();
 
         let (outbound, _) = new_outbound::<()>();
-        match block_on(outbound.pull_txs(ctx, hashes)) {
+        match outbound.pull_txs(ctx, hashes).await {
             Err(TransactionPoolError::Internal(str)) => {
                 assert!(str.contains("session id not found"))
             }
@@ -105,29 +103,29 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_pull_txs_but_broadcast_fail() {
+    #[runtime::test]
+    async fn test_pull_txs_but_broadcast_fail() {
         let hashes = vec![Hash::default()];
         let ctx = Context::new().with_value(P2P_SESSION_ID, 1usize);
 
         let (outbound, _) = new_outbound::<()>();
         outbound.broadcaster.reply_err(true);
 
-        match block_on(outbound.pull_txs(ctx, hashes)) {
+        match outbound.pull_txs(ctx, hashes).await {
             Err(TransactionPoolError::Internal(_)) => (),
             _ => panic!("should return TransactionPoolError::Internal"),
         }
     }
 
-    #[test]
-    fn test_pull_txs_with_disconnected_done_tx() {
+    #[runtime::test]
+    async fn test_pull_txs_with_disconnected_done_tx() {
         let hashes = vec![Hash::default()];
         let ctx = Context::new().with_value(P2P_SESSION_ID, 1usize);
 
         let (outbound, done_tx) = new_outbound::<Vec<SignedTransaction>>();
         drop(done_tx);
 
-        match block_on(outbound.pull_txs(ctx, hashes)) {
+        match outbound.pull_txs(ctx, hashes).await {
             Err(TransactionPoolError::Internal(str)) => {
                 assert!(str.contains("done_rx return None"))
             }
@@ -135,8 +133,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_pull_txs_timeout() {
+    #[runtime::test]
+    async fn test_pull_txs_timeout() {
         let hashes = vec![Hash::default()];
         let ctx = Context::new().with_value(P2P_SESSION_ID, 1usize);
         let bytes = encode_bytes(&PullTxs::from(1, hashes.clone()), Method::PullTxs);
@@ -144,7 +142,7 @@ mod tests {
 
         let (outbound, _done_tx) = new_outbound::<Vec<SignedTransaction>>();
 
-        match block_on(outbound.pull_txs(ctx, hashes)) {
+        match outbound.pull_txs(ctx, hashes).await {
             Err(TransactionPoolError::Internal(str)) => assert!(str.contains("timeout")),
             _ => panic!("should return TransactionPoolError::Internal indicates timeout"),
         }

@@ -13,7 +13,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 
 use futures::future::{ready, BoxFuture};
-use futures::prelude::{FutureExt, Stream, TryFutureExt};
+use futures::prelude::{FutureExt, Stream};
 use futures::task::{Context as TaskContext, Poll};
 use log::{error, info};
 
@@ -142,7 +142,7 @@ impl Stream for InboundHandle {
             }
             Poll::Ready(Some(session_msg)) => {
                 let job = self.handle_msg(session_msg);
-                tokio::spawn(job.unit_error().boxed().compat());
+                runtime::spawn(job);
 
                 Poll::Ready(Some(()))
             }
@@ -174,7 +174,6 @@ mod tests {
     use std::io::ErrorKind;
     use std::sync::Arc;
 
-    use futures::executor::block_on;
     use futures::prelude::StreamExt;
 
     use common_channel::{bounded, Sender};
@@ -312,38 +311,38 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_handle_body() {
+    #[runtime::test]
+    async fn test_handle_body() {
         let reactors = mock_reactors();
 
         let bytes = encode_bytes(&b"cici hunter".to_vec(), Method::Vote);
         let ctx = Context::new();
 
-        let maybe_ok = block_on(InboundHandle::handle_body(reactors, ctx, bytes));
+        let maybe_ok = InboundHandle::handle_body(reactors, ctx, bytes).await;
         assert_eq!(maybe_ok.unwrap(), ());
     }
 
-    #[test]
-    fn test_handle_body_with_bad_data() {
+    #[runtime::test]
+    async fn test_handle_body_with_bad_data() {
         let reactors = mock_reactors();
 
         let bytes = Bytes::from(b"bad bytes".to_vec());
         let ctx = Context::new();
 
-        match block_on(InboundHandle::handle_body(reactors, ctx, bytes)) {
+        match InboundHandle::handle_body(reactors, ctx, bytes).await {
             Err(Error::MsgCodecError(NetMessageError::DecodeError(_))) => (), // pass
             _ => panic!("should return Error::MsgCodecError"),
         }
     }
 
-    #[test]
-    fn test_handle_body_with_wrong_size_data() {
+    #[runtime::test]
+    async fn test_handle_body_with_wrong_size_data() {
         let reactors = mock_reactors();
 
         let bytes = mock_wrong_size_data();
         let ctx = Context::new();
 
-        match block_on(InboundHandle::handle_body(reactors, ctx, bytes)) {
+        match InboundHandle::handle_body(reactors, ctx, bytes).await {
             Err(Error::IoError(err)) => {
                 assert_eq!(err.kind(), ErrorKind::UnexpectedEof);
                 assert!(format!("{:?}", err.get_ref()).contains("data corruption"));
@@ -352,71 +351,71 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_handle_body_with_wrong_method_data() {
+    #[runtime::test]
+    async fn test_handle_body_with_wrong_method_data() {
         let reactors = mock_reactors();
 
         let bytes = mock_wrong_method_data();
         let ctx = Context::new();
 
-        match block_on(InboundHandle::handle_body(reactors, ctx, bytes)) {
+        match InboundHandle::handle_body(reactors, ctx, bytes).await {
             Err(Error::UnknownMethod(m)) => assert_eq!(m, 9_999_999),
             _ => panic!("should return Error::UnknownMethod"),
         }
     }
 
-    #[test]
-    fn test_handle_body_with_unknown_method() {
+    #[runtime::test]
+    async fn test_handle_body_with_unknown_method() {
         let reactors = mock_reactors();
 
         let bytes = encode_bytes(&b"hameihameiha".to_vec(), Method::SyncPullTxs);
         let ctx = Context::new();
 
-        match block_on(InboundHandle::handle_body(reactors, ctx, bytes)) {
+        match InboundHandle::handle_body(reactors, ctx, bytes).await {
             Err(Error::UnknownMethod(m)) => assert_eq!(m, Method::SyncPullTxs.to_u32()),
             _ => panic!("should return Error::UnknownMethod"),
         }
     }
 
-    #[test]
-    fn test_handle_body_with_reactor_error() {
+    #[runtime::test]
+    async fn test_handle_body_with_reactor_error() {
         let reactors = mock_reactors();
 
         let bytes = encode_bytes(&b"13".to_vec(), Method::PullTxs);
         let ctx = Context::new();
 
-        match block_on(InboundHandle::handle_body(reactors, ctx, bytes)) {
+        match InboundHandle::handle_body(reactors, ctx, bytes).await {
             Err(Error::UnknownMethod(m)) => assert_eq!(m, 9_999_999),
             _ => panic!("should return Error::UnknownMethod"),
         }
     }
 
-    #[test]
-    fn test_handle_msg() {
+    #[runtime::test]
+    async fn test_handle_msg() {
         let (inbound, _) = mock_inbound();
 
         let bytes = encode_bytes(&b"cici hunter".to_vec(), Method::Vote);
         let sess_msg = mock_sess_msg(bytes);
 
-        assert_eq!(block_on(inbound.handle_msg(sess_msg)), ());
+        assert_eq!(inbound.handle_msg(sess_msg).await, ());
     }
 
     // TODO: test logger
-    #[test]
-    fn test_handle_msg_with_bad_data() {
+    #[runtime::test]
+    async fn test_handle_msg_with_bad_data() {
         let (inbound, _) = mock_inbound();
 
         let bytes = Bytes::from(b"bad bytes".to_vec());
         let sess_msg = mock_sess_msg(bytes);
 
-        assert_eq!(block_on(inbound.handle_msg(sess_msg)), ());
+        assert_eq!(inbound.handle_msg(sess_msg).await, ());
     }
 
-    #[test]
-    fn test_inbound_stop() {
+    #[runtime::test]
+    async fn test_inbound_stop() {
         let (mut inbound, tx) = mock_inbound();
         drop(tx);
 
-        assert_eq!(block_on(inbound.next()), None);
+        assert_eq!(inbound.next().await, None);
     }
 }

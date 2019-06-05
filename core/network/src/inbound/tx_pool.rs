@@ -170,7 +170,6 @@ mod tests {
     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
     use std::sync::{Arc, Mutex};
 
-    use futures::executor::block_on;
     use futures::future::{err, ok};
 
     use core_context::{Context, P2P_SESSION_ID};
@@ -300,8 +299,8 @@ mod tests {
         (reactor, cb)
     }
 
-    #[test]
-    fn test_react_with_unknown_method() {
+    #[runtime::test]
+    async fn test_react_with_unknown_method() {
         let (reactor, _) = new_tx_pool_reactor();
 
         let stxs = vec![SignedTransaction::default(), SignedTransaction::default()];
@@ -311,14 +310,14 @@ mod tests {
         let ctx = Context::new();
         let method = Method::SyncPullTxs;
 
-        match block_on(reactor.react(ctx, method, data.to_vec())) {
+        match reactor.react(ctx, method, data.to_vec()).await {
             Err(Error::UnknownMethod(m)) => assert_eq!(m, method.to_u32()),
             _ => panic!("should return Error::UnknownMethod"),
         }
     }
 
-    #[test]
-    fn test_react_broadcast_txs() {
+    #[runtime::test]
+    async fn test_react_broadcast_txs() {
         let (reactor, _) = new_tx_pool_reactor();
         let stxs = vec![SignedTransaction::default(), SignedTransaction::default()];
         let broadcast_txs = BroadcastTxs::from(stxs);
@@ -326,27 +325,27 @@ mod tests {
 
         let ctx = Context::new();
         let method = Method::BroadcastTxs;
-        let maybe_ok = block_on(reactor.react(ctx, method, data.to_vec()));
+        let maybe_ok = reactor.react(ctx, method, data.to_vec()).await;
 
         assert_eq!(maybe_ok.unwrap(), ());
         assert_eq!(reactor.tx_pool.count(), 2);
     }
 
-    #[test]
-    fn test_react_broadcast_txs_with_bad_data() {
+    #[runtime::test]
+    async fn test_react_broadcast_txs_with_bad_data() {
         let (reactor, _) = new_tx_pool_reactor();
 
         let ctx = Context::new();
         let method = Method::BroadcastTxs;
 
-        match block_on(reactor.react(ctx, method, vec![1, 2, 3])) {
+        match reactor.react(ctx, method, vec![1, 2, 3]).await {
             Err(Error::MsgCodecError(_)) => (),
             _ => panic!("should return Error::MsgCodecError"),
         }
     }
 
-    #[test]
-    fn test_react_broadcast_txs_with_des_failure() {
+    #[runtime::test]
+    async fn test_react_broadcast_txs_with_des_failure() {
         let (reactor, _) = new_tx_pool_reactor();
         let mut ser_stx = SerSignedTransaction::default();
         ser_stx.untx = None;
@@ -357,14 +356,14 @@ mod tests {
         let ctx = Context::new();
         let method = Method::BroadcastTxs;
 
-        match block_on(reactor.react(ctx, method, data.to_vec())) {
+        match reactor.react(ctx, method, data.to_vec()).await {
             Err(Error::SerCodecError(_)) => (),
             _ => panic!("should return Error::SerCodecError"),
         }
     }
 
-    #[test]
-    fn test_react_broadcast_txs_with_insertion_failure() {
+    #[runtime::test]
+    async fn test_react_broadcast_txs_with_insertion_failure() {
         let (reactor, _) = new_tx_pool_reactor();
         let broadcast_txs = BroadcastTxs::from(vec![SignedTransaction::default()]);
         let data = <BroadcastTxs as Codec>::encode(&broadcast_txs).unwrap();
@@ -373,19 +372,22 @@ mod tests {
         let method = Method::BroadcastTxs;
         reactor.tx_pool.reply_err(true);
 
-        let maybe_ok = block_on(reactor.react(ctx, method, data.to_vec()));
+        let maybe_ok = reactor.react(ctx, method, data.to_vec()).await;
 
         assert_eq!(maybe_ok.unwrap(), ());
         assert_eq!(reactor.tx_pool.count(), 0);
     }
 
-    #[test]
-    fn test_react_pull_txs() {
+    #[runtime::test]
+    async fn test_react_pull_txs() {
         let (reactor, _) = new_tx_pool_reactor();
         let pull_txs = PullTxs::from(1, vec![Hash::default(), Hash::default()]);
         let data = <PullTxs as Codec>::encode(&pull_txs).unwrap().to_vec();
 
-        let stxs = block_on(reactor.tx_pool.get_batch(Context::new(), &[])).unwrap();
+        let stxs = {
+            let maybe_stxs = reactor.tx_pool.get_batch(Context::new(), &[]).await;
+            maybe_stxs.unwrap()
+        };
         let push_txs = PushTxs::from(1, stxs);
         let bytes = <PushTxs as DataEncoder>::encode(&push_txs, Method::PushTxs).unwrap();
 
@@ -393,15 +395,15 @@ mod tests {
         let scope = Scope::Single(SessionId::new(1));
         let method = Method::PullTxs;
 
-        let maybe_ok = block_on(reactor.react(ctx, method, data));
+        let maybe_ok = reactor.react(ctx, method, data).await;
 
         assert_eq!(maybe_ok.unwrap(), ());
         assert_eq!(reactor.tx_pool.count(), 2);
         assert_eq!(reactor.outbound.broadcasted_data(), Some((bytes, scope)));
     }
 
-    #[test]
-    fn test_react_pull_txs_without_session_id() {
+    #[runtime::test]
+    async fn test_react_pull_txs_without_session_id() {
         let (reactor, _) = new_tx_pool_reactor();
         let pull_txs = PullTxs::from(1, vec![Hash::default(), Hash::default()]);
         let data = <PullTxs as Codec>::encode(&pull_txs).unwrap().to_vec();
@@ -409,26 +411,26 @@ mod tests {
         let ctx = Context::new();
         let method = Method::PullTxs;
 
-        match block_on(reactor.react(ctx, method, data)) {
+        match reactor.react(ctx, method, data).await {
             Err(Error::SessionIdNotFound) => (),
             _ => panic!("should return Error::SessionIdNotFound"),
         }
     }
 
-    #[test]
-    fn test_react_pull_txs_with_bad_data() {
+    #[runtime::test]
+    async fn test_react_pull_txs_with_bad_data() {
         let (reactor, _) = new_tx_pool_reactor();
         let ctx = Context::new().with_value(P2P_SESSION_ID, 1);
         let method = Method::PullTxs;
 
-        match block_on(reactor.react(ctx, method, vec![1, 2, 3, 4])) {
+        match reactor.react(ctx, method, vec![1, 2, 3, 4]).await {
             Err(Error::MsgCodecError(_)) => (),
             _ => panic!("should return Error::MsgCodecError"),
         }
     }
 
-    #[test]
-    fn test_react_pull_txs_with_bad_hash() {
+    #[runtime::test]
+    async fn test_react_pull_txs_with_bad_hash() {
         let (reactor, _) = new_tx_pool_reactor();
         let pull_txs = PullTxs {
             uid:    1,
@@ -439,14 +441,14 @@ mod tests {
         let ctx = Context::new().with_value(P2P_SESSION_ID, 1);
         let method = Method::PullTxs;
 
-        match block_on(reactor.react(ctx, method, data)) {
+        match reactor.react(ctx, method, data).await {
             Err(Error::SerCodecError(_)) => (),
             _ => panic!("should return Error::SerCodecError"),
         }
     }
 
-    #[test]
-    fn test_react_pull_txs_with_get_batch_failure() {
+    #[runtime::test]
+    async fn test_react_pull_txs_with_get_batch_failure() {
         let (reactor, _) = new_tx_pool_reactor();
         let pull_txs = PullTxs::from(1, vec![Hash::default(), Hash::default()]);
         let data = <PullTxs as Codec>::encode(&pull_txs).unwrap().to_vec();
@@ -455,14 +457,14 @@ mod tests {
         let method = Method::PullTxs;
         reactor.tx_pool.reply_err(true);
 
-        match block_on(reactor.react(ctx, method, data)) {
+        match reactor.react(ctx, method, data).await {
             Err(Error::TransactionPoolError(TransactionPoolError::TransactionNotFound)) => (),
             _ => panic!("should return Error::TransactionPoolError"),
         }
     }
 
-    #[test]
-    fn test_react_pull_txs_with_broadcast_failure() {
+    #[runtime::test]
+    async fn test_react_pull_txs_with_broadcast_failure() {
         let (reactor, _) = new_tx_pool_reactor();
         let pull_txs = PullTxs::from(1, vec![Hash::default(), Hash::default()]);
         let data = <PullTxs as Codec>::encode(&pull_txs).unwrap().to_vec();
@@ -471,13 +473,13 @@ mod tests {
         let method = Method::PullTxs;
         reactor.outbound.reply_err(true);
 
-        let maybe_ok = block_on(reactor.react(ctx, method, data));
+        let maybe_ok = reactor.react(ctx, method, data).await;
         assert_eq!(maybe_ok.unwrap(), ());
         assert_eq!(reactor.outbound.broadcasted_data(), None);
     }
 
-    #[test]
-    fn test_react_push_txs() {
+    #[runtime::test]
+    async fn test_react_push_txs() {
         let (reactor, cb) = new_tx_pool_reactor();
         let push_txs = PushTxs::from(1, vec![SignedTransaction::default()]);
         let data = <PushTxs as Codec>::encode(&push_txs).unwrap().to_vec();
@@ -486,14 +488,14 @@ mod tests {
         let rx = cb.insert::<Vec<SignedTransaction>>(1, 1);
         let method = Method::PushTxs;
 
-        let maybe_ok = block_on(reactor.react(ctx, method, data));
+        let maybe_ok = reactor.react(ctx, method, data).await;
 
         assert_eq!(maybe_ok.unwrap(), ());
         assert_eq!(rx.try_recv().unwrap(), vec![SignedTransaction::default()]);
     }
 
-    #[test]
-    fn test_react_push_txs_without_session_id() {
+    #[runtime::test]
+    async fn test_react_push_txs_without_session_id() {
         let (reactor, _) = new_tx_pool_reactor();
         let push_txs = PushTxs::from(1, vec![SignedTransaction::default()]);
         let data = <PushTxs as Codec>::encode(&push_txs).unwrap().to_vec();
@@ -501,27 +503,27 @@ mod tests {
         let ctx = Context::new();
         let method = Method::PushTxs;
 
-        match block_on(reactor.react(ctx, method, data)) {
+        match reactor.react(ctx, method, data).await {
             Err(Error::SessionIdNotFound) => (),
             _ => panic!("should return Error::SessionIdNotFound"),
         }
     }
 
-    #[test]
-    fn test_react_push_txs_with_bad_data() {
+    #[runtime::test]
+    async fn test_react_push_txs_with_bad_data() {
         let (reactor, _) = new_tx_pool_reactor();
 
         let ctx = Context::new().with_value(P2P_SESSION_ID, 1);
         let method = Method::PushTxs;
 
-        match block_on(reactor.react(ctx, method, vec![1, 2, 3])) {
+        match reactor.react(ctx, method, vec![1, 2, 3]).await {
             Err(Error::MsgCodecError(_)) => (),
             _ => panic!("should return Error::MsgCodecError"),
         }
     }
 
-    #[test]
-    fn test_react_push_txs_with_cb_item_not_found() {
+    #[runtime::test]
+    async fn test_react_push_txs_with_cb_item_not_found() {
         let (reactor, _) = new_tx_pool_reactor();
         let push_txs = PushTxs::from(1, vec![SignedTransaction::default()]);
         let data = <PushTxs as Codec>::encode(&push_txs).unwrap().to_vec();
@@ -529,14 +531,14 @@ mod tests {
         let ctx = Context::new().with_value(P2P_SESSION_ID, 1);
         let method = Method::PushTxs;
 
-        match block_on(reactor.react(ctx, method, data)) {
+        match reactor.react(ctx, method, data).await {
             Err(Error::CallbackItemNotFound(id)) => assert_eq!(id, 1),
             _ => panic!("should return Error::CallbackItemNotFound"),
         }
     }
 
-    #[test]
-    fn test_react_push_txs_with_cb_item_wrong_type() {
+    #[runtime::test]
+    async fn test_react_push_txs_with_cb_item_wrong_type() {
         let (reactor, cb) = new_tx_pool_reactor();
         let push_txs = PushTxs::from(1, vec![SignedTransaction::default()]);
         let data = <PushTxs as Codec>::encode(&push_txs).unwrap().to_vec();
@@ -545,14 +547,14 @@ mod tests {
         let method = Method::PushTxs;
         let _rx = cb.insert::<Vec<String>>(1, 1);
 
-        match block_on(reactor.react(ctx, method, data)) {
+        match reactor.react(ctx, method, data).await {
             Err(Error::CallbackItemWrongType(id)) => assert_eq!(id, 1),
             _ => panic!("should return Error::CallbackItemWrongType"),
         }
     }
 
-    #[test]
-    fn test_react_push_txs_with_des_failure() {
+    #[runtime::test]
+    async fn test_react_push_txs_with_des_failure() {
         let (reactor, cb) = new_tx_pool_reactor();
         let mut ser_stx = SerSignedTransaction::default();
         ser_stx.untx = None;
@@ -567,14 +569,14 @@ mod tests {
         let method = Method::PushTxs;
         let _rx = cb.insert::<Vec<SignedTransaction>>(1, 1);
 
-        match block_on(reactor.react(ctx, method, data)) {
+        match reactor.react(ctx, method, data).await {
             Err(Error::SerCodecError(_)) => (),
             _ => panic!("should return Error::SerCodecError"),
         }
     }
 
-    #[test]
-    fn test_react_push_txs_with_try_send_failure() {
+    #[runtime::test]
+    async fn test_react_push_txs_with_try_send_failure() {
         let (reactor, cb) = new_tx_pool_reactor();
         let push_txs = PushTxs::from(1, vec![SignedTransaction::default()]);
         let data = <PushTxs as Codec>::encode(&push_txs).unwrap().to_vec();
@@ -584,7 +586,7 @@ mod tests {
         let rx = cb.insert::<Vec<SignedTransaction>>(1, 1);
         drop(rx);
 
-        match block_on(reactor.react(ctx, method, data)) {
+        match reactor.react(ctx, method, data).await {
             Err(Error::ChannelTrySendError(_)) => (),
             _ => panic!("should return Error::ChannelTrySendError"),
         }

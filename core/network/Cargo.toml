@@ -21,6 +21,5 @@ serde_derive = "1.0"
 serde = "1.0"
 rand = "0.6"
 parking_lot = "0.8"
-# FIXME: wait 0.2? https://github.com/tokio-rs/tokio/pull/1097
-tokio = "0.1"
-futures-timer = "0.2.0"
+runtime = "0.3.0-alpha.4"
+futures-timer = "0.2"

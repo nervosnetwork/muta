@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use std::{marker::Unpin, pin::Pin};
 
-use futures::prelude::{FutureExt, Stream, StreamExt, TryFutureExt};
+use futures::prelude::{Stream, StreamExt};
 use futures::task::{Context as FutTaskContext, Poll};
 use log::error;
 
@@ -153,31 +153,13 @@ where
     pub async fn run(mut self) {
         // TODO: remove unwrap
         let conn_pool = self.conn_pool.take().unwrap();
-        tokio::spawn(
-            conn_pool
-                .for_each(async move |_| ())
-                .unit_error()
-                .boxed()
-                .compat(),
-        );
+        runtime::spawn(conn_pool.for_each(async move |_| ()));
 
         let inbound = self.inbound.take().unwrap();
-        tokio::spawn(
-            inbound
-                .for_each(async move |_| ())
-                .unit_error()
-                .boxed()
-                .compat(),
-        );
+        runtime::spawn(inbound.for_each(async move |_| ()));
 
         let peer_mgr = self.peer_mgr.clone();
-        tokio::spawn(
-            peer_mgr
-                .run(self.dialer.clone(), PEER_MANAGER_ROUTINE_INTERVAL)
-                .unit_error()
-                .boxed()
-                .compat(),
-        );
+        runtime::spawn(peer_mgr.run(self.dialer.clone(), PEER_MANAGER_ROUTINE_INTERVAL));
 
         self.for_each(async move |_| ()).await
     }

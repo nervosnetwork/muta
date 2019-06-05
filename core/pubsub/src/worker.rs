@@ -1,10 +1,8 @@
 use std::future::Future;
-use std::thread::{self as thread, JoinHandle};
 
 use futures::channel::oneshot::Sender;
-use futures::executor::block_on;
 use futures::future::FutureObj;
-use log::error;
+use runtime::task::JoinHandle;
 
 type TaskFut = FutureObj<'static, ()>;
 
@@ -44,15 +42,12 @@ impl Worker {
     }
 
     /// Start task in single thread
-    ///
-    /// FIXME: Use `tokio` to spawn task, `tokio::run` is unreliable right now,
-    /// may panic, complain that 'not yet implemented'.
     pub fn start_loop(self) -> Self {
         let shutdown_tx = self.shutdown_tx;
 
         let task = {
             if let Task::Idle(task) = self.task {
-                Task::Running(thread::spawn(move || block_on(task)))
+                Task::Running(runtime::spawn(task))
             } else {
                 self.task
             }
@@ -77,12 +72,10 @@ impl Worker {
         (fut, ctrl)
     }
 
-    pub fn shutdown(self) -> Result<(), ()> {
+    pub async fn shutdown(self) -> Result<(), ()> {
         if let Task::Running(thread_handle) = self.task {
             self.shutdown_tx.send(())?;
-            thread_handle.join().map_err(|err| {
-                error!("Pubsub: worker thread join error: {:?}", err);
-            })?;
+            thread_handle.await;
         }
 
         Ok(())

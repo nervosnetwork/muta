@@ -96,7 +96,6 @@ mod tests {
     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
     use std::sync::Arc;
 
-    use futures::executor::block_on;
     use futures::future::{err, ok};
 
     use core_context::Context;
@@ -160,21 +159,21 @@ mod tests {
         ConsensusReactor::new(cons)
     }
 
-    #[test]
-    fn test_react_with_unknown_method() {
+    #[runtime::test]
+    async fn test_react_with_unknown_method() {
         let reactor = new_cons_reactor();
         let ctx = Context::new();
         let method = Method::SyncPullTxs;
         let data = b"software from".to_vec();
 
-        match block_on(reactor.react(ctx, method, data)) {
+        match reactor.react(ctx, method, data).await {
             Err(Error::UnknownMethod(m)) => assert_eq!(m, method.to_u32()),
             _ => panic!("should return Error::UnknownMethod"),
         }
     }
 
-    #[test]
-    fn test_react_proposal() {
+    #[runtime::test]
+    async fn test_react_proposal() {
         let reactor = new_cons_reactor();
 
         let proposal = Proposal::from(b"fish man?".to_vec());
@@ -182,26 +181,26 @@ mod tests {
         let ctx = Context::new();
         let method = Method::Proposal;
 
-        let maybe_ok = block_on(reactor.react(ctx, method, data));
+        let maybe_ok = reactor.react(ctx, method, data).await;
 
         assert_eq!(maybe_ok.unwrap(), ());
         assert_eq!(reactor.consensus.count(), 1);
     }
 
-    #[test]
-    fn test_react_proposal_with_bad_data() {
+    #[runtime::test]
+    async fn test_react_proposal_with_bad_data() {
         let reactor = new_cons_reactor();
         let ctx = Context::new();
         let method = Method::Proposal;
 
-        match block_on(reactor.react(ctx, method, vec![1, 2, 3])) {
+        match reactor.react(ctx, method, vec![1, 2, 3]).await {
             Err(Error::MsgCodecError(_)) => (),
             _ => panic!("should return Error::MsgCodecError"),
         }
     }
 
-    #[test]
-    fn test_react_proposal_with_consensus_faiure() {
+    #[runtime::test]
+    async fn test_react_proposal_with_consensus_faiure() {
         let reactor = new_cons_reactor();
         let ctx = Context::new();
         let method = Method::Proposal;
@@ -210,7 +209,7 @@ mod tests {
         let data = <Proposal as Codec>::encode(&proposal).unwrap().to_vec();
 
         reactor.consensus.reply_err(true);
-        match block_on(reactor.react(ctx, method, data)) {
+        match reactor.react(ctx, method, data).await {
             Err(Error::ConsensusError(ConsensusError::Internal(str))) => {
                 assert!(str.contains("mock error"))
             }
@@ -218,8 +217,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_react_vote() {
+    #[runtime::test]
+    async fn test_react_vote() {
         let reactor = new_cons_reactor();
 
         let vote = Vote::from(b"7ff ch 2".to_vec());
@@ -227,26 +226,26 @@ mod tests {
         let ctx = Context::new();
         let method = Method::Vote;
 
-        let maybe_ok = block_on(reactor.react(ctx, method, data));
+        let maybe_ok = reactor.react(ctx, method, data).await;
 
         assert_eq!(maybe_ok.unwrap(), ());
         assert_eq!(reactor.consensus.count(), 1);
     }
 
-    #[test]
-    fn test_react_vote_with_bad_data() {
+    #[runtime::test]
+    async fn test_react_vote_with_bad_data() {
         let reactor = new_cons_reactor();
         let ctx = Context::new();
         let method = Method::Vote;
 
-        match block_on(reactor.react(ctx, method, vec![1, 2, 3])) {
+        match reactor.react(ctx, method, vec![1, 2, 3]).await {
             Err(Error::MsgCodecError(_)) => (),
             _ => panic!("should return Error::MsgCodecError"),
         }
     }
 
-    #[test]
-    fn test_react_vote_with_consensus_faiure() {
+    #[runtime::test]
+    async fn test_react_vote_with_consensus_faiure() {
         let reactor = new_cons_reactor();
         let ctx = Context::new();
         let method = Method::Vote;
@@ -255,7 +254,7 @@ mod tests {
         let data = <Vote as Codec>::encode(&vote).unwrap().to_vec();
 
         reactor.consensus.reply_err(true);
-        match block_on(reactor.react(ctx, method, data)) {
+        match reactor.react(ctx, method, data).await {
             Err(Error::ConsensusError(ConsensusError::Internal(str))) => {
                 assert!(str.contains("mock error"))
             }
