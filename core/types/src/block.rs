@@ -1,5 +1,5 @@
 use rlp::{Encodable, RlpStream};
-use serde::{Deserialize, Serialize};
+use serde_derive::{Deserialize, Serialize};
 
 use crate::{Address, Bloom, Hash};
 
