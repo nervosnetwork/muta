@@ -3,6 +3,7 @@ use tentacle::context::{ProtocolContext, ProtocolContextMutRef};
 use tentacle::service::{ProtocolHandle, ProtocolMeta};
 use tentacle::{builder::MetaBuilder, bytes::Bytes, traits::ServiceProtocol};
 use tentacle::{multiaddr::Multiaddr, ProtocolId, SessionId};
+use tokio::codec::LengthDelimitedCodec;
 
 use common_channel::Sender;
 
@@ -23,6 +24,8 @@ pub const PROTOCOL_NAME: &str = "transmission";
 
 /// Protocol support versions
 pub const SUPPORT_VERSIONS: [&str; 1] = ["0.2"];
+
+const MAX_FRAME_LENGTH: usize = 1024 * 1024 * 100;
 
 pub struct SessionMessage {
     pub id:   SessionId,
@@ -49,6 +52,12 @@ impl TransmissionProtocol {
             .name(name!(PROTOCOL_NAME))
             .support_versions(support_versions!(SUPPORT_VERSIONS))
             .service_handle(service_handle)
+            .codec(|| {
+                let mut codec = LengthDelimitedCodec::new();
+                codec.set_max_frame_length(MAX_FRAME_LENGTH);
+
+                Box::new(codec)
+            })
             .build()
     }
 }

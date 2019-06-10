@@ -13,6 +13,7 @@ core-serialization = { path = "../serialization" }
 core-runtime = { path = "../runtime" }
 core-types = { path = "../types" }
 
+tokio = "0.1"
 tentacle = "0.2"
 tentacle-discovery = "0.2"
 log = "0.4"
