@@ -4,7 +4,6 @@ use std::sync::Arc;
 use futures::future::BoxFuture;
 use futures::prelude::{StreamExt, TryFutureExt};
 use futures::stream;
-use log::error;
 
 use core_context::Context;
 use core_network_message::common::{PullTxs, PushTxs};
@@ -90,7 +89,7 @@ where
             if let Err(err) = tx_pool.insert(ctx.clone(), stx.untx).await {
                 let hash = stx.hash.as_hex();
 
-                error!("net [in]: tx_pool: [hash: {}, err: {:?}]", hash, err);
+                log::warn!("net [in]: tx_pool: [hash: {}, err: {:?}]", hash, err);
             }
         }
 
