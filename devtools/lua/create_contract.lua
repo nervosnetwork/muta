@@ -135,7 +135,7 @@ request = function()
     -- print(string.format("thread: %d, nonce: %s", id, nonce))
     local tx = {
         nonce = local_nonce,
-        quota = 210000,
+        quota = 150000,
         valid_until_block = valid_until_block,
         data = hex.decode(data),
     }

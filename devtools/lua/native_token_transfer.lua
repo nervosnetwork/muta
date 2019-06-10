@@ -127,7 +127,7 @@ request = function()
     local tx = {
         to = to_addr,
         nonce = nonce,
-        quota = 210000,
+        quota = 30000,
         valid_until_block = valid_until_block,
         value = hex.decode('0000000000000000000000000000000000000000000000000000000000000001'),
     }
