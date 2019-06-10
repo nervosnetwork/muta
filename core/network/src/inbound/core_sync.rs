@@ -43,7 +43,10 @@ where
 {
     #[allow(clippy::needless_lifetimes)]
     pub async fn sync_blocks(&self, ctx: Context, global_height: u64) -> SyncResult<()> {
-        let mut current_height = self.current_height.lock().await;
+        let mut current_height = self
+            .current_height
+            .try_lock()
+            .ok_or_else(|| SynchronizerError::SynchLocked)?;
 
         if global_height <= *current_height {
             return Ok(());

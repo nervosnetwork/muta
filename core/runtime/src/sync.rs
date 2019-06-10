@@ -27,6 +27,7 @@ pub enum SynchronizerError {
     Internal(String),
     Storage(StorageError),
     Consensus(ConsensusError),
+    SynchLocked,
 }
 
 impl Error for SynchronizerError {}
@@ -36,6 +37,7 @@ impl fmt::Display for SynchronizerError {
             SynchronizerError::Internal(ref err) => format!("internal error {:?}", err),
             SynchronizerError::Storage(ref err) => format!("storage error {:?}", err),
             SynchronizerError::Consensus(ref err) => format!("consensus error {:?}", err),
+            SynchronizerError::SynchLocked => "locked in synchronizing blocks".to_owned(),
         };
         write!(f, "{}", printable)
     }
