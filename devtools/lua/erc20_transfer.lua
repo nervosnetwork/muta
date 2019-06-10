@@ -85,7 +85,7 @@ deploy_erc20 = function ()
     local tx = {
         to = "",
         nonce = string.format('deploy_erc20-%s', math.random()),
-        quota = 55000,
+        quota = 5000000,
         valid_until_block = valid_until_block,
         value = hex.decode('0000000000000000000000000000000000000000000000000000000000000000'),
         data = hex.decode(consts.bnb_bin..data),
@@ -167,7 +167,7 @@ request = function()
     -- print(string.format("thread: %d, nonce: %s", id, nonce))
     local tx = {
         nonce = nonce,
-        quota = 210000,
+        quota = 55000,
         valid_until_block = valid_until_block,
         value = hex.decode('0000000000000000000000000000000000000000000000000000000000000000'),
         data = bnb_transfer_data,
