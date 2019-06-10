@@ -198,7 +198,9 @@ where
         proposal: Proposal,
         latest_proof: Proof,
     ) -> ConsensusResult<ConsensusStatus> {
-        let _lock = self.lock.lock().await;
+        if self.lock.try_lock().is_none() {
+            return Err(ConsensusError::Internal("locked in sync".to_owned()));
+        }
 
         let status = self.get_status();
         if status.height + 1 != proposal.height {
@@ -332,7 +334,9 @@ where
         signed_txs: Vec<SignedTransaction>,
         proof: Proof,
     ) -> ConsensusResult<ConsensusStatus> {
-        let _lock = self.lock.lock().await;
+        if self.lock.try_lock().is_none() {
+            return Err(ConsensusError::Internal("locked in consensus".to_owned()));
+        }
 
         let status = self.get_status();
         if status.height + 1 != block.header.height {

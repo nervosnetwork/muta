@@ -1,4 +1,3 @@
-use std::cmp;
 use std::collections::HashMap;
 use std::convert::TryInto;
 use std::sync::Arc;
@@ -7,7 +6,7 @@ use bft_rs::{
     Address as BFTAddress, BftMsg, BftSupport, Commit, Node as BftNode, Signature,
     Status as BftStatus,
 };
-use futures::executor::{ThreadPool, ThreadPoolBuilder};
+use futures::executor::block_on;
 use parking_lot::RwLock;
 
 use core_context::{Context, P2P_SESSION_ID};
@@ -34,9 +33,6 @@ where
     N: Network + 'static,
 {
     engine: Arc<Engine<E, T, S, C>>,
-    // Because "bft-rs" is not in the futures runtime,
-    // to ensure performance use a separate thread pool to run the futures in "support".
-    thread_pool: ThreadPool,
 
     network:         N,
     proposal_origin: RwLock<HashMap<Hash, ProposalOriginValue>>,
@@ -51,14 +47,8 @@ where
     N: Network + 'static,
 {
     pub(crate) fn new(engine: Arc<Engine<E, T, S, C>>, network: N) -> ConsensusResult<Self> {
-        let thread_pool = ThreadPoolBuilder::new()
-            .pool_size(cmp::max(4, num_cpus::get() / 4))
-            .create()
-            .map_err(|e| ConsensusError::Internal(e.to_string()))?;
-
         Ok(Self {
             engine,
-            thread_pool,
             network,
 
             proposal_origin: RwLock::new(HashMap::new()),
@@ -116,8 +106,7 @@ where
             Ok(())
         };
 
-        let mut pool = self.thread_pool.clone();
-        pool.run(fut)
+        block_on(fut)
     }
 
     /// A user-defined function for transactions validation.
@@ -163,8 +152,7 @@ where
             Ok(())
         };
 
-        let mut pool = self.thread_pool.clone();
-        pool.run(fut)
+        block_on(fut)
     }
 
     /// A user-defined function for transmitting signed_proposals and
@@ -231,8 +219,7 @@ where
             })
         };
 
-        let mut pool = self.thread_pool.clone();
-        pool.run(fut)
+        block_on(fut)
     }
 
     /// A user-defined function for feeding the bft consensus.
@@ -246,8 +233,8 @@ where
             let encoded = AsyncCodec::encode(ser_proposal).await?;
             Ok((encoded, proposal_hash.as_bytes().to_vec()))
         };
-        let mut pool = self.thread_pool.clone();
-        pool.run(fut)
+
+        block_on(fut)
     }
 
     /// A user-defined function for signing a [`hash`].
