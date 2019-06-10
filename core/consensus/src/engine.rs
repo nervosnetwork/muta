@@ -198,7 +198,8 @@ where
         proposal: Proposal,
         latest_proof: Proof,
     ) -> ConsensusResult<ConsensusStatus> {
-        if self.lock.try_lock().is_none() {
+        let lock = self.lock.try_lock();
+        if lock.is_none() {
             return Err(ConsensusError::Internal("locked in sync".to_owned()));
         }
 
@@ -334,7 +335,8 @@ where
         signed_txs: Vec<SignedTransaction>,
         proof: Proof,
     ) -> ConsensusResult<ConsensusStatus> {
-        if self.lock.try_lock().is_none() {
+        let lock = self.lock.try_lock();
+        if lock.is_none() {
             return Err(ConsensusError::Internal("locked in consensus".to_owned()));
         }
 
@@ -388,6 +390,11 @@ where
         };
 
         let exec_result = self.exec_block(ctx.clone(), signed_txs, execution_context)?;
+        if exec_result.state_root != block.header.state_root {
+            return Err(ConsensusError::Internal(
+                "evm exec state_root not match that in block header".to_owned(),
+            ));
+        }
         self.insert_block(ctx.clone(), block, proof, exec_result)
             .await
     }
