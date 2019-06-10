@@ -98,17 +98,13 @@ where
         let mut inner = inner.build(handle);
         let control = inner.control().clone();
 
+        peer_mgr.add_bootstraps(config.bootstrap_addresses.clone());
+
+        // TODO: move this logic to peer manager service
         for addr in config.bootstrap_addresses.iter() {
-            match inner.dial(addr.to_owned(), DialProtocol::All) {
-                Ok(_) => peer_mgr.set_connected(addr),
-                Err(err) => warn!("net [p2p]: dail bootstrap [addr: {}, error: {}]", addr, err),
+            if let Err(err) = inner.dial(addr.to_owned(), DialProtocol::All) {
+                error!("net [p2p]: dail bootstrap [addr: {}, error: {}]", addr, err);
             }
-        }
-        if peer_mgr.connected_count() == 0 && !config.bootstrap_addresses.is_empty() {
-            Err(io::Error::new(
-                io::ErrorKind::NotConnected,
-                "fail to bootstrap",
-            ))?;
         }
 
         inner.listen(config.listening_address.to_owned())?;
@@ -218,7 +214,28 @@ where
                     self.peer_mgr.add_addrs(vec![address.clone()]);
                     self.peer_mgr.set_connected(&address);
                 }
-                _ => error!("net [p2p]: dialer or listen error: {}", error),
+                TentacleError::IoError(ref err)
+                    if err.kind() == io::ErrorKind::TimedOut
+                        && err.kind() == io::ErrorKind::Interrupted =>
+                {
+                    if self.peer_mgr.is_connected(&address) {
+                        self.peer_mgr.set_disconnected(&address);
+                    }
+                }
+                _ => {
+                    warn!(
+                        "net [p2p]: dialer or listen: [addr: {}, err: {}]",
+                        address, error
+                    );
+
+                    if !self.peer_mgr.is_bootstrap(&address) {
+                        warn!("net [p2p]: remove address: {}", address);
+                        self.peer_mgr.remove_addrs(vec![&address]);
+                    } else if self.peer_mgr.is_connected(&address) {
+                        warn!("net [p2p]: disconnect address: {}", address);
+                        self.peer_mgr.set_disconnected(&address);
+                    }
+                }
             },
             ServiceError::ProtocolSelectError {
                 session_context,

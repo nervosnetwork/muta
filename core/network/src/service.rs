@@ -13,7 +13,7 @@ use crate::peer_manager::{DefaultPeerManager, PeerCount};
 use crate::{callback_map::Callback, config::ConnectionPoolConfig, context::Context};
 use crate::{Config, DefaultOutboundHandle, Error, InboundHandle, Reactors};
 
-pub const PEER_MANAGER_ROUTINE_INTERVAL: u64 = 5;
+pub const PEER_MANAGER_ROUTINE_INTERVAL: u64 = 30;
 
 pub struct PartialService {
     ctx:    Context,

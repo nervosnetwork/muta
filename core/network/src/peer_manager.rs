@@ -34,6 +34,8 @@ pub trait PeerManager {
 
     fn is_connected(&self, addr: &Multiaddr) -> bool;
 
+    fn is_bootstrap(&self, addr: &Multiaddr) -> bool;
+
     /// Return number of addresses in pool
     fn pool_count(&self) -> usize;
 
@@ -44,6 +46,8 @@ pub trait PeerManager {
 
     /// Add addresses
     fn add_addrs(&mut self, addrs: Vec<Multiaddr>);
+
+    fn add_bootstraps(&mut self, addrs: Vec<Multiaddr>);
 
     /// Remove addresses
     fn remove_addrs(&mut self, addrs: Vec<&Multiaddr>);
@@ -189,7 +193,6 @@ macro_rules! to_vec {
 impl PeerManager for DefaultPeerManager {
     fn set_disconnected(&mut self, addr: &Multiaddr) {
         self.connected.write().remove(addr);
-        self.waker.wake();
     }
 
     fn set_connected(&mut self, addr: &Multiaddr) {
@@ -203,6 +206,10 @@ impl PeerManager for DefaultPeerManager {
 
     fn is_connected(&self, addr: &Multiaddr) -> bool {
         self.connected.read().contains(addr)
+    }
+
+    fn is_bootstrap(&self, addr: &Multiaddr) -> bool {
+        self.bootstrap.read().contains(addr)
     }
 
     fn pool_count(&self) -> usize {
@@ -221,6 +228,10 @@ impl PeerManager for DefaultPeerManager {
     fn add_addrs(&mut self, addrs: Vec<Multiaddr>) {
         self.pool.write().extend(addrs);
         self.waker.wake();
+    }
+
+    fn add_bootstraps(&mut self, addrs: Vec<Multiaddr>) {
+        self.bootstrap.write().extend(addrs);
     }
 
     fn remove_addrs(&mut self, addrs: Vec<&Multiaddr>) {
