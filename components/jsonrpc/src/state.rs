@@ -248,7 +248,7 @@ where
     ) -> RpcResult<cita::Block> {
         let mut res_block = cita::Block {
             version: 0,
-            hash:    raw_block.header.hash(),
+            hash:    raw_block.hash,
             header:  cita::BlockHeader {
                 timestamp:         raw_block.header.timestamp * 1000, // ms
                 prev_hash:         raw_block.header.prevhash,

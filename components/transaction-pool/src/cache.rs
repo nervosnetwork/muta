@@ -58,17 +58,17 @@ impl TxCache {
     // TODO: concurrently get
     pub fn get_count(&self, count: usize) -> Vec<SignedTransaction> {
         let mut all_txs = vec![];
-        let mut leaf_count = count;
+        let mut left_count = count;
 
         // TODO: Make sure each bucket is average.
         for bucket in self.buckets.iter() {
-            let txs = bucket.get_count(leaf_count);
+            let txs = bucket.get_count(left_count);
             let txs_len = txs.len();
             all_txs.extend(txs);
 
             // Avoid overflow
-            if leaf_count > txs_len {
-                leaf_count -= txs_len
+            if left_count > txs_len {
+                left_count -= txs_len
             } else {
                 break;
             }
