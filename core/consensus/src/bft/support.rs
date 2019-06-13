@@ -95,12 +95,6 @@ where
                 .await?
                 .try_into()?;
 
-            // Ignore the self proposal
-            let status = self.engine.get_status();
-            if proposal.proposer == status.node_address {
-                return Ok(());
-            }
-
             let ctx = Context::new();
             self.engine.verify_proposal(ctx.clone(), &proposal)?;
             Ok(())
@@ -121,6 +115,7 @@ where
         signed_proposal_hash: &[u8],
         _height: u64,
         _round: u64,
+        proposer: &[u8],
     ) -> Result<(), Self::Error> {
         let fut = async move {
             let proposal: Proposal = AsyncCodec::decode::<SerProposal>(proposal.to_vec())
@@ -132,8 +127,9 @@ where
             }
 
             // Ignore the self proposal
+            let proposer = Address::from_bytes(proposer)?;
             let status = self.engine.get_status();
-            if proposal.proposer == status.node_address {
+            if proposer == status.node_address {
                 return Ok(());
             }
 

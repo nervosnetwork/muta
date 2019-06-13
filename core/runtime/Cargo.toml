@@ -13,5 +13,4 @@ core-serialization = { path = "../serialization" }
 
 bytes = "0.4"
 cita-vm = "0.1"
-# TODO: upgrade bft-rs
-bft-rs = { git = "https://github.com/cryptape/bft-rs.git", features = [ "verify_req" ], rev = "861aa4f" }
+bft-rs = { git = "https://github.com/cryptape/bft-rs.git", features = [ "verify_req" ], branch = "bft_for_muta" }

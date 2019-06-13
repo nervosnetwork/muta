@@ -222,8 +222,6 @@ where
                     sig_txs.push(tx);
                 } else if let Some(tx) = callback_cache.get(hash) {
                     sig_txs.push(tx);
-                } else {
-                    return Err(TransactionPoolError::NotExpected);
                 }
             }
 
