@@ -158,11 +158,11 @@ def test_get_storage_at():
 
 
 def test_get_transaction_count():
-    pre = client.get_transaction_count(user1.address, 'latest')
     tx = client.sign_tx(user1.private_key, user2.address, "", 10, 100000)
-    client.sync_raw_transaction(tx)
-    new = client.get_transaction_count(user1.address, 'latest')
-    assert new == pre + 1
+    r = client.sync_raw_transaction(tx)
+    height = r['blockNumber']
+    r = client.get_transaction_count(user1.address, height)
+    assert r == 1
 
 
 def test_get_state_proof():
