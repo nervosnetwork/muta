@@ -612,7 +612,7 @@ where
         Ok(U256::from(r as u32))
     }
 
-    pub async fn get_transaction_proof(&self, hash: Hash) -> RpcResult<Vec<u8>> {
+    pub async fn get_transaction_proof(&self, hash: Hash) -> RpcResult<cita::Data> {
         let block = self.get_block_by_tx_hash(hash.clone()).await?;
         let block_receipts = self
             .storage
@@ -661,15 +661,14 @@ where
                 hash:     x.hash.clone(),
             })
             .collect();
-
-        Ok(rlp::encode(&cita::TxProof {
+        Ok(cita::Data::from(rlp::encode(&cita::TxProof {
             tx:                   resp_tx,
             receipt:              tx_receipt.clone(),
             receipt_proof:        resp_proof,
             block_header:         resp_block_header,
             next_proposal_header: resp_next_proposal_header,
             proposal_proof:       resp_third_proposal_proof,
-        }))
+        })))
     }
 
     pub async fn get_receipt_proof(&self, tx_hash: Hash) -> RpcResult<Vec<ProofNode>> {

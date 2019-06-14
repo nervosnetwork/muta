@@ -267,7 +267,7 @@ where
             let hash_str = get_string(params, 0, true)?;
             let hash = Hash::from_hex(clean_0x(&hash_str[..]))?;
             match app_state.get_transaction_proof(hash).await {
-                Ok(ok) => Ok(Value::from(hex::encode(ok))),
+                Ok(ok) => Ok(serde_json::to_value(ok).unwrap()),
                 Err(RpcError::StorageError(StorageError::None(_))) => Ok(Value::Null),
                 Err(e) => Err(convention::ErrorData::from(e)),
             }
