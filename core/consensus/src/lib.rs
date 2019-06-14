@@ -5,24 +5,14 @@
 
 mod bft;
 mod engine;
-// mod solo;
 mod synchronizer;
 
 pub use bft::Bft;
 pub use engine::Engine;
-// pub use solo::Solo;
 pub use synchronizer::SynchronizerManager;
 
 use core_runtime::ConsensusError;
 use core_types::{Address, Hash, Proof};
-
-// #[derive(Debug, Deserialize)]
-// pub enum ConsensusMode {
-//     // Single node.
-//     Solo,
-//     // +2/3 byzantine consensus algorithm.
-//     BFT,
-// }
 
 /// The necessary state to complete the consensus will be updated with each
 /// block.
