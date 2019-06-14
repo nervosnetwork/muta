@@ -193,19 +193,25 @@ def test_get_filter():
     bnb = pymuta.Bnb(client, user0)
     bnb.deploy()
 
-    filter_id = client.new_filter({"fromBlock": "0x00", "toBlock": "latest", "address": bnb.address})
+    for data in [
+        {"fromBlock": "0x00", "toBlock": "latest", "address": bnb.address},
+        {"address": bnb.address},
+    ]:
+        filter_id = client.new_filter(data)
 
-    r = bnb.transfer(user1.address, 10)
-    assert bnb.balance_of(user0.address) == 400000000 - 10
-    assert bnb.balance_of(user1.address) == 10
+        balance_user0 = bnb.balance_of(user0.address)
+        balance_user1 = bnb.balance_of(user1.address)
+        r = bnb.transfer(user1.address, 10)
+        assert bnb.balance_of(user0.address) == balance_user0 - 10
+        assert bnb.balance_of(user1.address) == balance_user1 + 10
 
-    block_number = r['blockNumber']
-    logs = r['logs']  # address, blockHash, blockNumber, data, logIndex, topics
+        block_number = r['blockNumber']
+        logs = r['logs']  # address, blockHash, blockNumber, data, logIndex, topics
 
-    r = client.get_filter_changes(filter_id)
-    assert r[0]['address'] == bnb.address.lower()
-    assert r[0]['blockHash'] == logs[0]['blockHash']
-    assert r[0]['blockNumber'] == logs[0]['blockNumber']
+        r = client.get_filter_changes(filter_id)
+        assert r[0]['address'] == bnb.address.lower()
+        assert r[0]['blockHash'] == logs[0]['blockHash']
+        assert r[0]['blockNumber'] == logs[0]['blockNumber']
 
 
 if __name__ == '__main__':

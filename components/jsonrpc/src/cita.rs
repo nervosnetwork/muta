@@ -491,9 +491,9 @@ pub type Topic = VariadicValue<Data32>;
 #[serde(deny_unknown_fields)]
 pub struct Filter {
     #[serde(rename = "fromBlock")]
-    pub from_block: String,
+    pub from_block: Option<String>,
     #[serde(rename = "toBlock")]
-    pub to_block: String,
+    pub to_block: Option<String>,
     pub address: Option<FilterAddress>,
     pub topics: Option<Vec<Topic>>,
     #[serde(skip_serializing_if = "Option::is_none")]

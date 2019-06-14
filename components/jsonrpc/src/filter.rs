@@ -64,8 +64,8 @@ impl Filter {
 impl From<RpcFilter> for Filter {
     fn from(v: RpcFilter) -> Filter {
         Filter {
-            from_block: v.from_block,
-            to_block:   v.to_block,
+            from_block: v.from_block.unwrap_or_else(|| String::from("0x00")),
+            to_block:   v.to_block.unwrap_or_else(|| String::from("latest")),
             address:    v.address.and_then(|address| match address {
                 VariadicValue::Null => None,
                 VariadicValue::Single(a) => Some(vec![Address::from_bytes(
