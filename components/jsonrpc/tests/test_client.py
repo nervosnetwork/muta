@@ -166,7 +166,15 @@ def test_get_transaction_count():
 
 
 def test_get_state_proof():
+    # Not exists
     r = client.get_state_proof(user0.address, '0x0000000000000000000000000000000000000000000000000000000000000000')
+    assert r['message'] == 'StateProofNotFoundError'
+
+    # Exists
+    ss = pymuta.SimpleStorage(client, user0)
+    ss.deploy()
+    ss.set(1)
+    r = client.get_state_proof(ss.address, '0x0000000000000000000000000000000000000000000000000000000000000001')
     assert r
 
 

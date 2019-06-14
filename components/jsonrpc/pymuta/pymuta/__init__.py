@@ -87,7 +87,7 @@ class Client:
         recv_data = resp.json()
         if c_logs:
             print("->", recv_data)
-        return recv_data['result']
+        return recv_data['result'] if 'result' in recv_data else recv_data['error']
 
     def block_number(self) -> int:
         a = self.send('blockNumber')

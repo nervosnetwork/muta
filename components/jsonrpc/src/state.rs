@@ -570,6 +570,9 @@ where
         let storage_proof =
             self.executor
                 .get_storage_proof(Context::new(), state_root, &addr, &key)?;
+        if storage_proof.is_empty() {
+            return Err(RpcError::StateProofNotFoundError);
+        }
         let state_proof = cita::StateProof {
             address:       addr,
             account_proof: account_proof.into_iter().map(cita::Data::from).collect(),

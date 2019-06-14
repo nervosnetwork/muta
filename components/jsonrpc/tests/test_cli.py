@@ -182,7 +182,10 @@ def test_get_transaction_count():
 
 
 def test_get_state_proof():
-    r = call(f'{prefix} getStateProof --address {user0.address} --key 0x0000000000000000000000000000000000000000000000000000000000000000')
+    ss = pymuta.SimpleStorage(client, user0)
+    ss.deploy()
+    ss.set(1)
+    r = call(f'{prefix} getStateProof --address {ss.address} --key 0x0000000000000000000000000000000000000000000000000000000000000000')
     assert r
 
 

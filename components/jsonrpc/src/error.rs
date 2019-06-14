@@ -21,6 +21,7 @@ pub enum RpcError {
     TypesError(TypesError),
     IO(io::Error),
     DatabaseError(DatabaseError),
+    StateProofNotFoundError,
 }
 
 impl error::Error for RpcError {}
@@ -36,6 +37,7 @@ impl fmt::Display for RpcError {
             RpcError::TypesError(e) => return write!(f, "{}", e),
             RpcError::IO(e) => return write!(f, "{}", e),
             RpcError::DatabaseError(e) => return write!(f, "{}", e),
+            RpcError::StateProofNotFoundError => return write!(f, "get state proof failed"),
         };
     }
 }
