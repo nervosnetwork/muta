@@ -18,7 +18,7 @@ use crate::convention;
 use crate::error::RpcError;
 use crate::filter::Filter;
 use crate::state::AppState;
-use crate::util::clean_0x;
+use crate::util::{clean_0x, u64_from_string};
 
 fn rpc_handle<E: 'static, T: 'static, S: 'static, C: 'static, P: 'static>(
     reqjson: web::Json<convention::Call>,
@@ -188,7 +188,7 @@ where
         // Get Filter logs by filter id
         "getFilterChanges" => {
             let id = get_string(params, 0, true)?;
-            let id_u64 = u64::from_str_radix(clean_0x(&id[..]), 16)?;
+            let id_u64 = u64_from_string(&id)?;
             let r = app_state
                 .filterdb
                 .write()
@@ -327,7 +327,7 @@ where
         }
         "uninstallFilter" => {
             let id = get_string(params, 0, true)?;
-            let id_u64 = u64::from_str_radix(clean_0x(&id[..]), 16)?;
+            let id_u64 = u64_from_string(&id)?;
             let r = app_state
                 .filterdb
                 .write()

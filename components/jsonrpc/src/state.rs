@@ -233,10 +233,7 @@ where
                 let b = self.storage.get_latest_block(Context::new()).await?;
                 Ok(b.header.height)
             }
-            x => {
-                let h = util::clean_0x(x);
-                Ok(u64::from_str_radix(h, 16).map_err(|e| RpcError::Str(format!("{:?}", e)))?)
-            }
+            x => Ok(util::u64_from_string(x)?),
         }
     }
 
