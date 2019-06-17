@@ -513,6 +513,10 @@ version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "build-info"
+version = "0.1.0"
+
+[[package]]
 name = "build_const"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2108,6 +2112,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "muta"
 version = "0.1.0"
 dependencies = [
+ "build-info 0.1.0",
  "clap 2.33.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "common-cita 0.1.0",
  "common-config-parser 0.1.0",

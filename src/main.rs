@@ -28,11 +28,14 @@ use core_types::{Address, Block, BlockHeader, Genesis, Hash, Proof};
 mod config;
 use config::Config;
 
+mod version;
+use version::get_version;
+
 #[runtime::main(runtime_tokio::Tokio)]
 async fn main() {
     common_logger::init(common_logger::Flag::Main);
-    let matches = clap::App::new("Muta")
-        .version("0.1")
+    let matches = clap::App::new("MUTA")
+        .version(&*format!("{}", get_version()))
         .author("Cryptape Technologies <contact@cryptape.com>")
         .arg(
             clap::Arg::from_usage("-c --config=[FILE] 'a required file for the configuration'")

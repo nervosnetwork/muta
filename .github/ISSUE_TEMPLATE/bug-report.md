@@ -17,7 +17,7 @@ labels: t:bug
 **Anything else we need to know?**:
 
 **Environment**:
-- Muta version or commit hash:
+- Muta version or commit hash (`muta -V`):
 - OS (e.g: `cat /etc/os-release`):
 - Kernel (e.g. `uname -a`):
 - Others:
