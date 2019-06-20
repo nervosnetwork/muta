@@ -571,10 +571,10 @@ where
             return Err(RpcError::StateProofNotFoundError);
         }
         let state_proof = cita::StateProof {
-            address:       addr,
+            address: addr,
             account_proof: account_proof.into_iter().map(cita::Data::from).collect(),
-            key:           key.clone(),
-            value_proof:   storage_proof.into_iter().map(cita::Data::from).collect(),
+            key,
+            value_proof: storage_proof.into_iter().map(cita::Data::from).collect(),
         };
 
         Ok(rlp::encode(&state_proof))
@@ -698,8 +698,7 @@ where
     }
 
     pub async fn send_raw_transaction(&self, signed_data: Vec<u8>) -> RpcResult<cita::TxResponse> {
-        let ser_untx =
-            AsyncCodec::decode::<cita::UnverifiedTransaction>(signed_data.clone()).await?;
+        let ser_untx = AsyncCodec::decode::<cita::UnverifiedTransaction>(signed_data).await?;
         if ser_untx.transaction.is_none() {
             return Err(RpcError::Str("Transaction not found!".into()));
         };

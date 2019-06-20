@@ -195,7 +195,7 @@ async fn start(cfg: &Config) {
         .subscribe::<Block>(PUBSUB_BROADCAST_BLOCK.to_owned())
         .unwrap();
 
-    // run json rpc
+    // run jsonrpc
     let mut jrpc_config = components_jsonrpc::Config::default();
     jrpc_config.listen = cfg.rpc.address.clone();
     jrpc_config.workers = if cfg.rpc.workers != 0 {
