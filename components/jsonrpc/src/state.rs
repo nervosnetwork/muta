@@ -601,12 +601,10 @@ where
 
     pub async fn get_transaction_count(&self, addr: Address, number: String) -> RpcResult<U256> {
         let b = self.get_block(number).await?;
-        let txs = self
-            .storage
-            .get_transactions(Context::new(), b.tx_hashes.as_slice())
-            .await?;
-        let r = txs.iter().filter(|x| x.sender == addr).count();
-        Ok(U256::from(r as u32))
+        let r = self
+            .executor
+            .get_nonce(Context::new(), &b.header.state_root, &addr)?;
+        Ok(r)
     }
 
     pub async fn get_transaction_proof(&self, hash: Hash) -> RpcResult<cita::Data> {
