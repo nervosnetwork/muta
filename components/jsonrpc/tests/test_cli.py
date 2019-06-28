@@ -37,7 +37,7 @@ prefix = f'{c_cita_cli} rpc --url {pymuta.c_server} --no-color'
 
 def test_peer_count():
     r = call(f'{prefix} peerCount')
-    assert r == '0x1'
+    assert int(r, 16) != 0
 
 
 def test_block_number():
