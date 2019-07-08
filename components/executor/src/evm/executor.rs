@@ -431,16 +431,16 @@ fn build_receipt_with_ok(signed_tx: &SignedTransaction, result: InterpreterResul
     let quota = signed_tx.untx.transaction.quota;
 
     match result {
-        InterpreterResult::Normal(_data, quota_used, logs) => {
-            receipt.quota_used = quota - quota_used;
+        InterpreterResult::Normal(_data, quota_left, logs) => {
+            receipt.quota_used = quota - quota_left;
             receipt.logs = transform_logs(logs);
             receipt.logs_bloom = logs_to_bloom(&receipt.logs);
         }
-        InterpreterResult::Revert(_data, quota_used) => {
-            receipt.quota_used = quota - quota_used;
+        InterpreterResult::Revert(_data, quota_left) => {
+            receipt.quota_used = quota - quota_left;
         }
-        InterpreterResult::Create(_data, quota_used, logs, contract_address) => {
-            receipt.quota_used = quota - quota_used;
+        InterpreterResult::Create(_data, quota_left, logs, contract_address) => {
+            receipt.quota_used = quota - quota_left;
             receipt.logs = transform_logs(logs);
             receipt.logs_bloom = logs_to_bloom(&receipt.logs);
 
