@@ -106,47 +106,6 @@ use_field_init_shorthand = true
 #     let lorem = ipsum.map(|dolor| dolor.sit())?;
 # }
 use_try_shorthand = true
-# Format doc comments.
-#
-# Default value: false
-# Possible values: true, false
-# Stable: No (tracking issue: #3348)
-# false (default):
-# /// Adds one to the number given.
-# ///
-# /// # Examples
-# ///
-# /// ```rust
-# /// let five=5;
-# ///
-# /// assert_eq!(
-# ///     6,
-# ///     add_one(5)
-# /// );
-# /// # fn add_one(x: i32) -> i32 {
-# /// #     x + 1
-# /// # }
-# /// ```
-# fn add_one(x: i32) -> i32 {
-#     x + 1
-# }
-# true
-# /// Adds one to the number given.
-# ///
-# /// # Examples
-# ///
-# /// ```rust
-# /// let five = 5;
-# ///
-# /// assert_eq!(6, add_one(5));
-# /// # fn add_one(x: i32) -> i32 {
-# /// #     x + 1
-# /// # }
-# /// ```
-# fn add_one(x: i32) -> i32 {
-#     x + 1
-# }
-format_doc_comments = true
 # Break comments to fit on the line
 #
 # Default value: false

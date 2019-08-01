@@ -6,3 +6,27 @@ edition = "2018"
 
 [dependencies]
 runtime = "0.3.0-alpha.6"
+
+[workspace]
+members = [
+  "common/channel",
+  "common/config-parser",
+  "common/crypto",
+  "common/logger",
+  "common/merkle",
+  "common/metrics",
+  "common/pubsub",
+
+  "core/api",
+  "core/bank",
+  "core/consensus",
+  "core/database",
+  "core/executor",
+  "core/mempool",
+  "core/network",
+  "core/storage",
+
+  "protocol/codec",
+  "protocol/traits",
+  "protocol/types",
+]
