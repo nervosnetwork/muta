@@ -7,3 +7,9 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+protocol = { path = "../../protocol" }
+
+bytes = "0.4"
+parking_lot = "0.9"
+async-trait = "0.1"
+rocksdb = "0.12"

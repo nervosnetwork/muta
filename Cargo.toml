@@ -5,6 +5,9 @@ authors = ["Cryptape Technologies <contact@cryptape.com>"]
 edition = "2018"
 
 [dependencies]
+protocol = { path = "./protocol" }
+core-storage = { path = "./core/storage" }
+
 runtime = "0.3.0-alpha.6"
 
 [workspace]
@@ -20,13 +23,10 @@ members = [
   "core/api",
   "core/bank",
   "core/consensus",
-  "core/database",
   "core/executor",
   "core/mempool",
   "core/network",
   "core/storage",
 
-  "protocol/codec",
-  "protocol/traits",
-  "protocol/types",
+  "protocol",
 ]

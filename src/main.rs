@@ -1,17 +1,17 @@
 #![feature(async_await)]
 
-use runtime::net::UdpSocket;
+use std::sync::Arc;
+
+use core_storage::{adapter::rocks::RocksAdapter, ImplStorage};
+use protocol::traits::Storage;
+use protocol::ProtocolError;
 
 #[runtime::main]
-async fn main() -> std::io::Result<()> {
-    let mut socket = UdpSocket::bind("127.0.0.1:8080")?;
-    let mut buf = vec![0u8; 1024];
+async fn main() -> Result<(), ProtocolError> {
+    let storage = ImplStorage::new(Arc::new(RocksAdapter::new(
+        "./devtools/data/storage".to_owned(),
+    )?));
+    storage.insert_transactions(vec![]).await?;
 
-    println!("Listening on {}", socket.local_addr()?);
-
-    loop {
-        let (recv, peer) = socket.recv_from(&mut buf).await?;
-        let sent = socket.send_to(&buf[..recv], &peer).await?;
-        println!("Sent {} out of {} bytes to {}", sent, recv, peer);
-    }
+    Ok(())
 }
