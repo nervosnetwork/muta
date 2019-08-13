@@ -1,4 +1,8 @@
-use crate::types::primitive::{Address, Balance, Hash};
+use bytes::Bytes;
+
+use crate::types::primitive::{
+    AccountAddress, AssetID, Balance, ContractAddress, ContractType, Fee, Hash,
+};
 
 #[derive(Clone, Debug)]
 pub struct RawTransaction {
@@ -10,32 +14,26 @@ pub struct RawTransaction {
 }
 
 #[derive(Clone, Debug)]
-pub struct Fee {
-    pub asset_id: Hash,
-    pub cycle:    u64,
-}
-
-#[derive(Clone, Debug)]
 pub enum TransactionAction {
     Transfer {
-        receiver: Address,
-        asset_id: Hash,
+        receiver: AccountAddress,
+        asset_id: AssetID,
         amount:   Balance,
     },
     Approve {
-        spender:  Address,
-        asset_id: Hash,
+        spender:  ContractAddress,
+        asset_id: AssetID,
         max:      Balance,
     },
     Deploy {
-        code:          Vec<u8>,
+        code:          Bytes,
         contract_type: ContractType,
     },
     Call {
-        contract: Address,
+        contract: ContractAddress,
         method:   String,
-        args:     Vec<u8>,
-        asset_id: Hash,
+        args:     Vec<Bytes>,
+        asset_id: AssetID,
         amount:   Balance,
     },
 }
@@ -44,13 +42,6 @@ pub enum TransactionAction {
 pub struct SignedTransaction {
     pub raw:       RawTransaction,
     pub tx_hash:   Hash,
-    pub pubkey:    Vec<u8>,
-    pub signature: Vec<u8>,
-}
-
-#[derive(Clone, Debug)]
-pub enum ContractType {
-    Asset,
-    Library,
-    App,
+    pub pubkey:    Bytes,
+    pub signature: Bytes,
 }

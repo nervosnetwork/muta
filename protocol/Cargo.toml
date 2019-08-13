@@ -7,7 +7,10 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+derive_more = "0.15"
 async-trait = "0.1"
+ethbloom = "0.6"
 bytes = "0.4"
+sha3 = "0.8"
 uint = "0.8"
 hex = "0.3"

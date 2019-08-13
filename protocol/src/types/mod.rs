@@ -1,41 +1,36 @@
+mod epoch;
 mod primitive;
+mod receipt;
 mod transaction;
 
 use std::error::Error;
-use std::fmt;
 
 use crate::{ProtocolError, ProtocolErrorKind};
 
-pub use primitive::{Address, Hash};
-pub use transaction::{ContractType, Fee, RawTransaction, SignedTransaction, TransactionAction};
+pub use epoch::{Epoch, EpochHeader, Pill, Proof, Validator};
+pub use ethbloom::{Bloom, BloomRef, Input as BloomInput};
+pub use primitive::{
+    AccountAddress, AssetID, Balance, ContractAddress, ContractType, Fee, Hash, MerkleRoot,
+};
+pub use receipt::{Receipt, ReceiptResult};
+pub use transaction::{RawTransaction, SignedTransaction, TransactionAction};
 
-#[derive(Debug)]
+#[derive(Debug, Display, From)]
 pub enum TypesError {
-    HashLengthMismatch { expect: usize, real: usize },
+    #[display(fmt = "Expect {:?}, get {:?}.", expect, real)]
+    LengthMismatch { expect: usize, real: usize },
+
+    #[display(fmt = "{:?}", error)]
     FromHex { error: hex::FromHexError },
+
+    #[display(fmt = "{:?} is an invalid address", address)]
+    InvalidAddress { address: String },
 }
 
 impl Error for TypesError {}
 
-impl fmt::Display for TypesError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let printable = match self {
-            TypesError::HashLengthMismatch { expect, real } => {
-                format!("Expect {:?} to get {:?}.", expect, real)
-            }
-            TypesError::FromHex { error } => format!("{:?}.", error),
-        };
-        write!(f, "{}", printable)
-    }
-}
 impl From<TypesError> for ProtocolError {
     fn from(error: TypesError) -> ProtocolError {
         ProtocolError::new(ProtocolErrorKind::Types, Box::new(error))
-    }
-}
-
-impl From<hex::FromHexError> for TypesError {
-    fn from(error: hex::FromHexError) -> Self {
-        TypesError::FromHex { error }
     }
 }
