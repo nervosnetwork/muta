@@ -1,7 +1,7 @@
-mod epoch;
-mod primitive;
-mod receipt;
-mod transaction;
+pub(crate) mod epoch;
+pub(crate) mod primitive;
+pub(crate) mod receipt;
+pub(crate) mod transaction;
 
 use std::error::Error;
 
