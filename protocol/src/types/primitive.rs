@@ -14,7 +14,7 @@ use crate::ProtocolResult;
 /// Hash length
 const HASH_LEN: usize = 32;
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Hash([u8; HASH_LEN]);
 
 /// Merkel root hash
@@ -91,11 +91,11 @@ pub enum ContractType {
 
 /// The address consists of 21 bytes, the first of which is a magic number that
 /// identifies which type the address belongs to.
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 struct Address([u8; ADDRESS_LEN]);
 
 /// Note: the account address here is an external account, not a contract.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct AccountAddress {
     inner: Address,
 }
