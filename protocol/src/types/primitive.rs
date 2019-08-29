@@ -1,11 +1,8 @@
 #![allow(clippy::all)]
-construct_uint! {
-    pub struct Balance(4);
-}
-
 use std::fmt;
 
 use bytes::Bytes;
+use num_bigint::BigUint;
 use sha3::{Digest, Sha3_256};
 
 use crate::types::TypesError;
@@ -16,7 +13,8 @@ const HASH_LEN: usize = 32;
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Hash([u8; HASH_LEN]);
-
+/// Balance
+pub type Balance = BigUint;
 /// Merkel root hash
 pub type MerkleRoot = Hash;
 /// Asset ID

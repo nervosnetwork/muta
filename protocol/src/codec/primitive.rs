@@ -106,10 +106,7 @@ pub struct Fee {
 
 impl From<protocol_primitive::Balance> for Balance {
     fn from(balance: protocol_primitive::Balance) -> Balance {
-        let mut bytes = [0u8; 32];
-        balance.to_big_endian(&mut bytes);
-
-        let value = Bytes::from(bytes.as_ref()).to_vec();
+        let value = balance.to_bytes_be();
         Balance { value }
     }
 }
@@ -118,10 +115,9 @@ impl TryFrom<Balance> for protocol_primitive::Balance {
     type Error = ProtocolError;
 
     fn try_from(ser_balance: Balance) -> Result<protocol_primitive::Balance, Self::Error> {
-        let bytes: Bytes = Bytes::from(ser_balance.value);
-        ensure_len(bytes.len(), 8 * 4)?;
-
-        Ok(protocol_primitive::Balance::from_big_endian(&bytes))
+        Ok(protocol_primitive::Balance::from_bytes_be(
+            &ser_balance.value,
+        ))
     }
 }
 
@@ -336,6 +332,7 @@ impl_default_bytes_codec_for!(primitive, [
 // Util
 // #####################
 
+#[allow(dead_code)]
 fn ensure_len(real: usize, expect: usize) -> Result<(), CodecError> {
     if real != expect {
         return Err(CodecError::WrongBytesLength { expect, real });

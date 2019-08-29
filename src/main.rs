@@ -1,5 +1,3 @@
-#![feature(async_await)]
-
 use std::sync::Arc;
 
 use core_storage::{adapter::rocks::RocksAdapter, ImplStorage};

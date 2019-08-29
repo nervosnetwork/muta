@@ -18,12 +18,7 @@ pub struct MixedTxHashes {
 pub trait MemPool<Adapter: MemPoolAdapter>: Send + Sync {
     async fn insert(&self, ctx: Context, tx: SignedTransaction) -> ProtocolResult<()>;
 
-    async fn package(
-        &self,
-        ctx: Context,
-        count: u64,
-        cycle_limit: u64,
-    ) -> ProtocolResult<MixedTxHashes>;
+    async fn package(&self, ctx: Context) -> ProtocolResult<MixedTxHashes>;
 
     async fn flush(&self, ctx: Context, tx_hashes: Vec<Hash>) -> ProtocolResult<()>;
 
@@ -52,9 +47,9 @@ pub trait MemPoolAdapter: Send + Sync {
         &self,
         ctx: Context,
         tx_hashes: Vec<Hash>,
-    ) -> ProtocolResult<SignedTransaction>;
+    ) -> ProtocolResult<Vec<SignedTransaction>>;
 
-    async fn broadcast_txs(&self, ctx: Context, txs: Vec<SignedTransaction>) -> ProtocolResult<()>;
+    async fn broadcast_tx(&self, ctx: Context, tx: SignedTransaction) -> ProtocolResult<()>;
 
     async fn check_signature(&self, ctx: Context, tx: SignedTransaction) -> ProtocolResult<()>;
 

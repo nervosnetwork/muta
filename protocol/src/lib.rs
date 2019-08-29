@@ -1,7 +1,3 @@
-#![feature(async_await)]
-
-#[macro_use]
-extern crate uint;
 #[macro_use]
 extern crate derive_more;
 

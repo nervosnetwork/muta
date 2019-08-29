@@ -8,7 +8,7 @@ edition = "2018"
 protocol = { path = "./protocol" }
 core-storage = { path = "./core/storage" }
 
-runtime = "0.3.0-alpha.6"
+runtime = "0.3.0-alpha.7"
 
 [workspace]
 members = [
