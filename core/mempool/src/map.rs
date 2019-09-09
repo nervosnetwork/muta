@@ -143,11 +143,11 @@ mod tests {
 
     use crate::map::Map;
 
-    const GEN_TX_SIZE: usize = 100_000;
+    const GEN_TX_SIZE: usize = 1000;
 
     #[bench]
-    fn bench_insert_sharding(b: &mut Bencher) {
-        let txs = gen_txs(GEN_TX_SIZE);
+    fn bench_map_insert(b: &mut Bencher) {
+        let txs = mock_txs(GEN_TX_SIZE);
 
         b.iter(move || {
             let cache = Map::new(GEN_TX_SIZE);
@@ -158,8 +158,8 @@ mod tests {
     }
 
     #[bench]
-    fn bench_insert_std(b: &mut Bencher) {
-        let txs = gen_txs(GEN_TX_SIZE);
+    fn bench_std_map_insert(b: &mut Bencher) {
+        let txs = mock_txs(GEN_TX_SIZE);
 
         b.iter(move || {
             let cache = Arc::new(RwLock::new(HashMap::new()));
@@ -170,8 +170,8 @@ mod tests {
     }
 
     #[bench]
-    fn bench_insert_chashmap(b: &mut Bencher) {
-        let txs = gen_txs(GEN_TX_SIZE);
+    fn bench_chashmap_insert(b: &mut Bencher) {
+        let txs = mock_txs(GEN_TX_SIZE);
 
         b.iter(move || {
             let cache = CHashMap::new();
@@ -181,7 +181,7 @@ mod tests {
         });
     }
 
-    fn gen_txs(size: usize) -> Vec<(Hash, Hash)> {
+    fn mock_txs(size: usize) -> Vec<(Hash, Hash)> {
         let mut txs = Vec::with_capacity(size);
         for _ in 0..size {
             let tx: Vec<u8> = (0..10).map(|_| random::<u8>()).collect();

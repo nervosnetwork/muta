@@ -1,23 +1,24 @@
 #![feature(test)]
 
-mod error;
 mod map;
+mod test;
 mod tx_cache;
 
+use std::error::Error;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use async_trait::async_trait;
+use derive_more::{Display, From};
 
 use protocol::traits::{Context, MemPool, MemPoolAdapter, MixedTxHashes};
 use protocol::types::{Hash, SignedTransaction};
-use protocol::ProtocolResult;
+use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
-use crate::error::MemPoolError;
 use crate::map::Map;
 use crate::tx_cache::TxCache;
 
 /// Memory pool for caching transactions.
-struct HashMemPool<Adapter: MemPoolAdapter> {
+pub struct HashMemPool<Adapter: MemPoolAdapter> {
     /// Pool size limit.
     pool_size: usize,
     /// A system param limits the life time of an off-chain transaction.
@@ -57,6 +58,18 @@ where
             current_epoch_id: AtomicU64::new(current_epoch_id),
         }
     }
+
+    pub fn get_tx_cache(&self) -> &TxCache {
+        &self.tx_cache
+    }
+
+    pub fn get_callback_cache(&self) -> &Map<SignedTransaction> {
+        &self.callback_cache
+    }
+
+    pub fn get_adapter(&self) -> &Adapter {
+        &self.adapter
+    }
 }
 
 #[async_trait]
@@ -66,40 +79,19 @@ where
 {
     async fn insert(&self, ctx: Context, tx: SignedTransaction) -> ProtocolResult<()> {
         let tx_hash = &tx.tx_hash;
-        // 1. check size
-        if self.tx_cache.len() >= self.pool_size {
-            return Err(MemPoolError::ReachLimit {
-                pool_size: self.pool_size,
-            }
-            .into());
-        }
-        // 2. check pool exist
-        if self.tx_cache.contain(tx_hash) {
-            return Err(MemPoolError::Dup {
-                tx_hash: tx_hash.clone(),
-            }
-            .into());
-        }
 
-        // 3. check signature
+        self.tx_cache.check_reach_limit(self.pool_size)?;
+        self.tx_cache.check_exist(tx_hash)?;
         self.adapter
             .check_signature(ctx.clone(), tx.clone())
             .await?;
-
-        // 4. check transaction
         self.adapter
             .check_transaction(ctx.clone(), tx.clone())
             .await?;
-
-        // 5. check storage exist
         self.adapter
             .check_storage_exist(ctx.clone(), tx_hash.clone())
             .await?;
-
-        // 6. do insert
         self.tx_cache.insert_new_tx(tx.clone())?;
-
-        // 7. network broadcast
         self.adapter.broadcast_tx(ctx.clone(), tx).await?;
 
         Ok(())
@@ -187,5 +179,33 @@ where
             });
         }
         Ok(())
+    }
+}
+
+#[derive(Debug, Display, From)]
+pub enum MemPoolError {
+    #[display(fmt = "Tx: {:?} inserts failed", tx_hash)]
+    Insert { tx_hash: Hash },
+    #[display(fmt = "Mempool reaches limit: {}", pool_size)]
+    ReachLimit { pool_size: usize },
+    #[display(fmt = "Tx: {:?} exists in pool", tx_hash)]
+    Dup { tx_hash: Hash },
+    #[display(fmt = "Pull txs, require: {}, response: {}", require, response)]
+    EnsureBreak { require: usize, response: usize },
+    #[display(fmt = "Fetch full txs, require: {}, response: {}", require, response)]
+    MisMatch { require: usize, response: usize },
+    #[display(fmt = "Tx inserts candidate_queue failed, len: {}", len)]
+    InsertCandidate { len: usize },
+    #[display(fmt = "Tx: {:?} check_sig failed", tx_hash)]
+    CheckSig { tx_hash: Hash },
+    #[display(fmt = "Check_hash failed, expect: {:?}, get: {:?}", expect, actual)]
+    CheckHash { expect: Hash, actual: Hash },
+}
+
+impl Error for MemPoolError {}
+
+impl From<MemPoolError> for ProtocolError {
+    fn from(error: MemPoolError) -> ProtocolError {
+        ProtocolError::new(ProtocolErrorKind::Mempool, Box::new(error))
     }
 }

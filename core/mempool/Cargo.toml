@@ -8,19 +8,23 @@ edition = "2018"
 
 [dependencies]
 protocol = { path = "../../protocol" }
+common-crypto = { path = "../../common/crypto"}
 
 futures-preview = "0.3.0-alpha.18"
+runtime-tokio = "0.3.0-alpha.6"
 runtime = "0.3.0-alpha.7"
 crossbeam-queue = "0.1"
 derive_more = "0.15"
 async-trait = "0.1"
 parking_lot = "0.8"
+num-traits = "0.2"
 bytes = "0.4"
 rayon = "1.0"
+rand = "0.6"
 hex = "0.3"
 
 [dev-dependencies]
-num-traits = "0.2"
 chashmap = "2.2"
-rand = "0.7.0"
+
+
 

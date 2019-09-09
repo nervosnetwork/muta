@@ -7,8 +7,8 @@ use protocol::traits::MixedTxHashes;
 use protocol::types::{Hash, SignedTransaction};
 use protocol::ProtocolResult;
 
-use crate::error::MemPoolError;
 use crate::map::Map;
+use crate::MemPoolError;
 
 /// Wrap `SignedTransaction` with two marks for mempool management.
 ///
@@ -161,7 +161,7 @@ impl TxCache {
     pub fn show_unknown(&self, tx_hashes: Vec<Hash>) -> Vec<Hash> {
         tx_hashes
             .into_iter()
-            .filter(|tx_hash| self.contain(tx_hash))
+            .filter(|tx_hash| !self.contain(tx_hash))
             .collect()
     }
 
@@ -220,7 +220,7 @@ impl TxCache {
                 cycle_count += shared_tx.tx.raw.fee.cycle;
                 if cycle_count > cycle_limit {
                     stage = stage.next();
-                    cycle_count = 0;
+                    cycle_count = shared_tx.tx.raw.fee.cycle;
                 }
 
                 match stage {
@@ -246,6 +246,25 @@ impl TxCache {
     }
 
     #[inline]
+    pub fn check_exist(&self, tx_hash: &Hash) -> ProtocolResult<()> {
+        if self.contain(tx_hash) {
+            return Err(MemPoolError::Dup {
+                tx_hash: tx_hash.clone(),
+            }
+            .into());
+        }
+        Ok(())
+    }
+
+    #[inline]
+    pub fn check_reach_limit(&self, pool_size: usize) -> ProtocolResult<()> {
+        if self.len() >= pool_size {
+            return Err(MemPoolError::ReachLimit { pool_size }.into());
+        }
+        Ok(())
+    }
+
+    #[inline]
     pub fn contain(&self, tx_hash: &Hash) -> bool {
         self.map.contains_key(tx_hash)
     }
@@ -256,7 +275,7 @@ impl TxCache {
     }
 
     #[allow(dead_code)]
-    fn queue_len(&self) -> usize {
+    pub fn queue_len(&self) -> usize {
         if self.is_zero.load(Ordering::Relaxed) {
             self.queue_0.len()
         } else {
@@ -348,11 +367,11 @@ mod tests {
     use crate::tx_cache::TxCache;
     use std::thread::JoinHandle;
 
-    const POOL_SIZE: usize = 100_000;
+    const POOL_SIZE: usize = 1000;
     const BYTES_LEN: usize = 10;
-    const TX_NUM: usize = 100_000;
+    const TX_NUM: usize = 1000;
     const TX_CYCLE: u64 = 1;
-    const CYCLE_LIMIT: u64 = 50000;
+    const CYCLE_LIMIT: u64 = 500;
     const CURRENT_H: u64 = 100;
     const TIMEOUT: u64 = 150;
 

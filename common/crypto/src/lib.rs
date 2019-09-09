@@ -1,7 +1,4 @@
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
-}
+pub use ophelia::{Crypto, PrivateKey, PublicKey, Signature};
+pub use ophelia_secp256k1::{
+    Secp256k1, Secp256k1PrivateKey, Secp256k1PublicKey, Secp256k1Signature,
+};
