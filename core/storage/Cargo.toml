@@ -9,7 +9,9 @@ edition = "2018"
 [dependencies]
 protocol = { path = "../../protocol" }
 
-bytes = "0.4"
+futures-preview = "0.3.0-alpha.18"
+derive_more = "0.15"
 parking_lot = "0.9"
 async-trait = "0.1"
 rocksdb = "0.12"
+bytes = "0.4"

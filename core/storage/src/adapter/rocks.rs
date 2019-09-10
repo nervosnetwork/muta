@@ -1,12 +1,16 @@
 use std::error::Error;
-use std::fmt;
+use std::pin::Pin;
 use std::sync::Arc;
+use std::task::{Context, Poll};
 
 use async_trait::async_trait;
 use bytes::Bytes;
+use derive_more::{Display, From};
+use futures::stream::Stream;
 use rocksdb::{ColumnFamily, Options, WriteBatch, DB};
 
-use protocol::traits::{StorageAdapter, StorageCategory};
+use protocol::codec::{ProtocolCodec, ProtocolCodecSync};
+use protocol::traits::{StorageAdapter, StorageBatchModify, StorageCategory, StorageSchema};
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
 #[derive(Debug)]
@@ -32,99 +36,189 @@ impl RocksAdapter {
     }
 }
 
+macro_rules! db {
+    ($db:expr, $op:ident, $column:expr, $key:expr) => {
+        $db.$op($column, $key).map_err(RocksAdapterError::from)
+    };
+    ($db:expr, $op:ident, $column:expr, $key:expr, $val:expr) => {
+        $db.$op($column, $key, $val)
+            .map_err(RocksAdapterError::from)
+    };
+}
+
 #[async_trait]
 impl StorageAdapter for RocksAdapter {
-    async fn get(&self, c: StorageCategory, key: Bytes) -> ProtocolResult<Option<Bytes>> {
-        let column = get_column(&self.db, c)?;
-        let v = self
-            .db
-            .get_cf(column, key)
-            .map_err(RocksAdapterError::from)?;
-
-        Ok(v.map(|v| Bytes::from(v.to_vec())))
-    }
-
-    async fn get_batch(
+    async fn insert<S: StorageSchema>(
         &self,
-        c: StorageCategory,
-        keys: Vec<Bytes>,
-    ) -> ProtocolResult<Vec<Option<Bytes>>> {
-        let column = get_column(&self.db, c)?;
-
-        let mut values = Vec::with_capacity(keys.len());
-        for key in keys {
-            let v = self
-                .db
-                .get_cf(column, key)
-                .map_err(RocksAdapterError::from)?;
-
-            values.push(v.map(|v| Bytes::from(v.to_vec())));
-        }
-
-        Ok(values)
-    }
-
-    async fn insert(&self, c: StorageCategory, key: Bytes, value: Bytes) -> ProtocolResult<()> {
-        let column = get_column(&self.db, c)?;
-        self.db
-            .put_cf(column, key.to_vec(), value.to_vec())
-            .map_err(RocksAdapterError::from)?;
-        Ok(())
-    }
-
-    async fn insert_batch(
-        &self,
-        c: StorageCategory,
-        keys: Vec<Bytes>,
-        values: Vec<Bytes>,
+        mut key: <S as StorageSchema>::Key,
+        mut val: <S as StorageSchema>::Value,
     ) -> ProtocolResult<()> {
-        if keys.len() != values.len() {
-            return Err(RocksAdapterError::InsertParameter.into());
+        let column = get_column::<S>(&self.db)?;
+        let key = key.encode().await?.to_vec();
+        let val = val.encode().await?.to_vec();
+
+        db!(self.db, put_cf, column, key, val)?;
+
+        Ok(())
+    }
+
+    async fn get<S: StorageSchema>(
+        &self,
+        mut key: <S as StorageSchema>::Key,
+    ) -> ProtocolResult<Option<<S as StorageSchema>::Value>> {
+        let column = get_column::<S>(&self.db)?;
+        let key = key.encode().await?;
+
+        let opt_bytes =
+            { db!(self.db, get_cf, column, key)?.map(|db_vec| Bytes::from(db_vec.to_vec())) };
+
+        if let Some(bytes) = opt_bytes {
+            let val = <_>::decode(bytes).await?;
+
+            Ok(Some(val))
+        } else {
+            Ok(None)
+        }
+    }
+
+    async fn remove<S: StorageSchema>(
+        &self,
+        mut key: <S as StorageSchema>::Key,
+    ) -> ProtocolResult<()> {
+        let column = get_column::<S>(&self.db)?;
+        let key = key.encode().await?.to_vec();
+
+        db!(self.db, delete_cf, column, key)?;
+
+        Ok(())
+    }
+
+    async fn contains<S: StorageSchema>(
+        &self,
+        mut key: <S as StorageSchema>::Key,
+    ) -> ProtocolResult<bool> {
+        let column = get_column::<S>(&self.db)?;
+        let key = key.encode().await?.to_vec();
+        let val = db!(self.db, get_cf, column, key)?;
+
+        Ok(val.is_some())
+    }
+
+    fn iter<S: StorageSchema + 'static>(
+        &self,
+        keys: Vec<<S as StorageSchema>::Key>,
+    ) -> Box<dyn Stream<Item = ProtocolResult<Option<<S as StorageSchema>::Value>>>> {
+        let iter: RocksIterator<S> = RocksIterator::new(Arc::clone(&self.db), keys);
+
+        Box::new(iter)
+    }
+
+    async fn batch_modify<S: StorageSchema>(
+        &self,
+        keys: Vec<<S as StorageSchema>::Key>,
+        vals: Vec<StorageBatchModify<S>>,
+    ) -> ProtocolResult<()> {
+        if keys.len() != vals.len() {
+            return Err(RocksAdapterError::BatchLengthMismatch.into());
         }
 
-        let column = get_column(&self.db, c)?;
+        let column = get_column::<S>(&self.db)?;
+        let mut pairs: Vec<(Bytes, Option<Bytes>)> = Vec::with_capacity(keys.len());
+
+        for (mut key, value) in keys.into_iter().zip(vals.into_iter()) {
+            let key = key.encode().await?;
+
+            let value = match value {
+                StorageBatchModify::Insert(mut value) => Some(value.encode().await?),
+                StorageBatchModify::Remove => None,
+            };
+
+            pairs.push((key, value))
+        }
 
         let mut batch = WriteBatch::default();
-        for (key, value) in keys.into_iter().zip(values.into_iter()) {
-            batch
-                .put_cf(column, key, value)
-                .map_err(RocksAdapterError::from)?;
+        for (key, value) in pairs.into_iter() {
+            match value {
+                Some(value) => db!(batch, put_cf, column, key, value)?,
+                None => db!(batch, delete_cf, column, key)?,
+            }
         }
 
         self.db.write(batch).map_err(RocksAdapterError::from)?;
         Ok(())
     }
+}
 
-    async fn contains(&self, c: StorageCategory, key: Bytes) -> ProtocolResult<bool> {
-        let column = get_column(&self.db, c)?;
-        let v = self
-            .db
-            .get_cf(column, key)
-            .map_err(RocksAdapterError::from)?;
+pub struct RocksIterator<S: StorageSchema + 'static> {
+    db:   Arc<DB>,
+    keys: Box<dyn Iterator<Item = <S as StorageSchema>::Key>>,
+}
 
-        Ok(v.is_some())
+impl<S> RocksIterator<S>
+where
+    S: StorageSchema + 'static,
+    <S as StorageSchema>::Key: 'static,
+{
+    pub fn new(db: Arc<DB>, keys: Vec<<S as StorageSchema>::Key>) -> Self {
+        let keys = Box::new(keys.into_iter());
+
+        RocksIterator { db, keys }
     }
+}
 
-    async fn remove(&self, c: StorageCategory, key: Bytes) -> ProtocolResult<()> {
-        let column = get_column(&self.db, c)?;
-        self.db
-            .delete_cf(column, key)
-            .map_err(RocksAdapterError::from)?;
-        Ok(())
+impl<S> Stream for RocksIterator<S>
+where
+    S: StorageSchema + 'static,
+    <S as StorageSchema>::Key: 'static,
+{
+    type Item = ProtocolResult<Option<<S as StorageSchema>::Value>>;
+
+    fn poll_next(mut self: Pin<&mut Self>, _ctx: &mut Context) -> Poll<Option<Self::Item>> {
+        let key = match self.keys.next() {
+            Some(key) => key,
+            None => return Poll::Ready(None),
+        };
+
+        let next = || -> _ {
+            let column = get_column::<S>(&self.db)?;
+            let key = key.encode_sync()?;
+
+            let opt_bytes =
+                db!(self.db, get_cf, column, key)?.map(|db_vec| Bytes::from(db_vec.to_vec()));
+
+            if let Some(bytes) = opt_bytes {
+                let val = <_>::decode_sync(bytes)?;
+
+                Ok(Some(val))
+            } else {
+                Ok(None)
+            }
+        };
+
+        Poll::Ready(Some(next()))
     }
+}
 
-    async fn remove_batch(&self, c: StorageCategory, keys: Vec<Bytes>) -> ProtocolResult<()> {
-        let column = get_column(&self.db, c)?;
+#[derive(Debug, Display, From)]
+pub enum RocksAdapterError {
+    #[display(fmt = "category {} not found", _0)]
+    CategoryNotFound(&'static str),
 
-        let mut batch = WriteBatch::default();
-        for key in keys {
-            batch
-                .delete_cf(column, key)
-                .map_err(RocksAdapterError::from)?;
-        }
+    #[display(fmt = "rocksdb {}", _0)]
+    RocksDB(rocksdb::Error),
 
-        self.db.write(batch).map_err(RocksAdapterError::from)?;
-        Ok(())
+    #[display(fmt = "parameters do not match")]
+    InsertParameter,
+
+    #[display(fmt = "batch length dont match")]
+    BatchLengthMismatch,
+}
+
+impl Error for RocksAdapterError {}
+
+impl From<RocksAdapterError> for ProtocolError {
+    fn from(err: RocksAdapterError) -> ProtocolError {
+        ProtocolError::new(ProtocolErrorKind::Storage, Box::new(err))
     }
 }
 
@@ -140,47 +234,12 @@ fn map_category(c: StorageCategory) -> &'static str {
     }
 }
 
-fn get_column(db: &DB, c: StorageCategory) -> Result<ColumnFamily, RocksAdapterError> {
+fn get_column<S: StorageSchema>(db: &DB) -> Result<ColumnFamily, RocksAdapterError> {
+    let category = map_category(S::category());
+
     let column = db
-        .cf_handle(map_category(c))
-        .ok_or_else(|| RocksAdapterError::CategoryNotFound { c })?;
+        .cf_handle(category)
+        .ok_or_else(|| RocksAdapterError::from(category))?;
+
     Ok(column)
-}
-
-#[derive(Debug)]
-pub enum RocksAdapterError {
-    CategoryNotFound { c: StorageCategory },
-    RocksDB { error: rocksdb::Error },
-    InsertParameter,
-}
-
-impl Error for RocksAdapterError {}
-
-impl fmt::Display for RocksAdapterError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let printable = match self {
-            RocksAdapterError::CategoryNotFound { c } => format!("category {:?} not found", c),
-            RocksAdapterError::RocksDB { error } => format!("rocksdb {:?}", error),
-            RocksAdapterError::InsertParameter => "parameters do not match".to_owned(),
-        };
-        write!(f, "{}", printable)
-    }
-}
-
-impl From<RocksAdapterError> for ProtocolError {
-    fn from(err: RocksAdapterError) -> ProtocolError {
-        ProtocolError::new(ProtocolErrorKind::Storage, Box::new(err))
-    }
-}
-
-impl From<rocksdb::Error> for RocksAdapterError {
-    fn from(error: rocksdb::Error) -> Self {
-        RocksAdapterError::RocksDB { error }
-    }
-}
-
-impl From<StorageCategory> for RocksAdapterError {
-    fn from(c: StorageCategory) -> Self {
-        RocksAdapterError::CategoryNotFound { c }
-    }
 }

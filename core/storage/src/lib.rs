@@ -7,8 +7,11 @@ pub mod adapter;
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use bytes::Bytes;
 
-use protocol::traits::{Storage, StorageAdapter, StorageCategory};
+use protocol::traits::{
+    Storage, StorageAdapter, StorageBatchModify, StorageCategory, StorageSchema,
+};
 use protocol::types::{Hash, SignedTransaction};
 use protocol::ProtocolResult;
 
@@ -23,24 +26,46 @@ impl<Adapter: StorageAdapter> ImplStorage<Adapter> {
     }
 }
 
+pub struct TransactionSchema;
+
+impl StorageSchema for TransactionSchema {
+    type Key = Hash;
+    type Value = SignedTransaction;
+
+    fn category() -> StorageCategory {
+        StorageCategory::SignedTransaction
+    }
+}
+
 #[async_trait]
 impl<Adapter: StorageAdapter> Storage<Adapter> for ImplStorage<Adapter> {
-    async fn insert_transactions(&self, _signed_txs: Vec<SignedTransaction>) -> ProtocolResult<()> {
+    async fn insert_transactions(&self, signed_txs: Vec<SignedTransaction>) -> ProtocolResult<()> {
+        let mut hashes = Vec::with_capacity(signed_txs.len());
+
+        for _stx in signed_txs.iter() {
+            // FIXME: should be stx.hash() later
+            let hash = Hash::from_bytes(Bytes::from(vec![]))?;
+            hashes.push(hash)
+        }
+
+        let batch_insert = signed_txs
+            .into_iter()
+            .map(StorageBatchModify::Insert)
+            .collect::<Vec<_>>();
+
         self.adapter
-            .insert_batch(StorageCategory::SignedTransaction, vec![], vec![])
+            .batch_modify::<TransactionSchema>(hashes, batch_insert)
             .await?;
+
         Ok(())
     }
 
     async fn get_transaction_by_hash(
         &self,
-        _tx_hash: Hash,
+        tx_hash: Hash,
     ) -> ProtocolResult<Option<SignedTransaction>> {
-        unimplemented!();
-        // let adapter = Arc::clone(&self.adapter);
-        //
-        // async move {
-        //     adapter.get(tx_hash.as_bytes()).await.unwrap();
-        // }
+        let opt_stx = self.adapter.get::<TransactionSchema>(tx_hash).await?;
+
+        Ok(opt_stx)
     }
 }
