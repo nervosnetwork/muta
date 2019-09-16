@@ -1,7 +1,7 @@
 use std::convert::TryFrom;
 
 use bytes::Bytes;
-use prost::Message;
+use prost::{Message, Oneof};
 
 use crate::{
     codec::{
@@ -12,8 +12,6 @@ use crate::{
     types::primitive as protocol_primitive,
     ProtocolError, ProtocolResult,
 };
-
-use prost::Oneof;
 
 #[derive(Clone, Message)]
 pub struct Transfer {

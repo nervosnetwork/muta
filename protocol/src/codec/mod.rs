@@ -3,7 +3,9 @@
 
 #[macro_use]
 mod r#macro;
+pub mod epoch;
 pub mod primitive;
+pub mod receipt;
 pub mod transaction;
 
 use std::error::Error;

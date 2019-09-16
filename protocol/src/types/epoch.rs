@@ -23,7 +23,7 @@ pub struct EpochHeader {
     pub proposer:          AccountAddress,
     pub proof:             Proof,
     pub validator_version: u64,
-    pub validators:        Option<Vec<Validator>>,
+    pub validators:        Vec<Validator>,
 }
 
 #[derive(Clone, Debug)]
@@ -36,12 +36,17 @@ pub struct Proof {
 
 #[derive(Clone, Debug)]
 pub struct Validator {
-    address: AccountAddress,
-    weight:  u64,
+    pub address: AccountAddress,
+    pub weight:  u64,
 }
 
 #[derive(Clone, Debug)]
 pub struct Pill {
     pub epoch:          Epoch,
     pub propose_hashes: Vec<Hash>,
+}
+
+#[derive(Clone, Debug)]
+pub struct EpochId {
+    pub id: u64,
 }

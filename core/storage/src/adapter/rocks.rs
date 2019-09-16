@@ -1,15 +1,12 @@
 use std::error::Error;
-use std::pin::Pin;
 use std::sync::Arc;
-use std::task::{Context, Poll};
 
 use async_trait::async_trait;
 use bytes::Bytes;
 use derive_more::{Display, From};
-use futures::stream::Stream;
 use rocksdb::{ColumnFamily, Options, WriteBatch, DB};
 
-use protocol::codec::{ProtocolCodec, ProtocolCodecSync};
+use protocol::codec::ProtocolCodec;
 use protocol::traits::{StorageAdapter, StorageBatchModify, StorageCategory, StorageSchema};
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
@@ -104,15 +101,6 @@ impl StorageAdapter for RocksAdapter {
         Ok(val.is_some())
     }
 
-    fn iter<S: StorageSchema + 'static>(
-        &self,
-        keys: Vec<<S as StorageSchema>::Key>,
-    ) -> Box<dyn Stream<Item = ProtocolResult<Option<<S as StorageSchema>::Value>>>> {
-        let iter: RocksIterator<S> = RocksIterator::new(Arc::clone(&self.db), keys);
-
-        Box::new(iter)
-    }
-
     async fn batch_modify<S: StorageSchema>(
         &self,
         keys: Vec<<S as StorageSchema>::Key>,
@@ -146,56 +134,6 @@ impl StorageAdapter for RocksAdapter {
 
         self.db.write(batch).map_err(RocksAdapterError::from)?;
         Ok(())
-    }
-}
-
-pub struct RocksIterator<S: StorageSchema + 'static> {
-    db:   Arc<DB>,
-    keys: Box<dyn Iterator<Item = <S as StorageSchema>::Key>>,
-}
-
-impl<S> RocksIterator<S>
-where
-    S: StorageSchema + 'static,
-    <S as StorageSchema>::Key: 'static,
-{
-    pub fn new(db: Arc<DB>, keys: Vec<<S as StorageSchema>::Key>) -> Self {
-        let keys = Box::new(keys.into_iter());
-
-        RocksIterator { db, keys }
-    }
-}
-
-impl<S> Stream for RocksIterator<S>
-where
-    S: StorageSchema + 'static,
-    <S as StorageSchema>::Key: 'static,
-{
-    type Item = ProtocolResult<Option<<S as StorageSchema>::Value>>;
-
-    fn poll_next(mut self: Pin<&mut Self>, _ctx: &mut Context) -> Poll<Option<Self::Item>> {
-        let key = match self.keys.next() {
-            Some(key) => key,
-            None => return Poll::Ready(None),
-        };
-
-        let next = || -> _ {
-            let column = get_column::<S>(&self.db)?;
-            let key = key.encode_sync()?;
-
-            let opt_bytes =
-                db!(self.db, get_cf, column, key)?.map(|db_vec| Bytes::from(db_vec.to_vec()));
-
-            if let Some(bytes) = opt_bytes {
-                let val = <_>::decode_sync(bytes)?;
-
-                Ok(Some(val))
-            } else {
-                Ok(None)
-            }
-        };
-
-        Poll::Ready(Some(next()))
     }
 }
 

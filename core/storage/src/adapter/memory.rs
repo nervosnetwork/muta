@@ -1,16 +1,13 @@
 use std::collections::HashMap;
 use std::error::Error;
-use std::pin::Pin;
 use std::sync::Arc;
-use std::task::{Context, Poll};
 
 use async_trait::async_trait;
 use bytes::Bytes;
 use derive_more::{Display, From};
-use futures::stream::Stream;
 use parking_lot::RwLock;
 
-use protocol::codec::{ProtocolCodec, ProtocolCodecSync};
+use protocol::codec::ProtocolCodec;
 use protocol::traits::{StorageAdapter, StorageBatchModify, StorageSchema};
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
@@ -87,15 +84,6 @@ impl StorageAdapter for MemoryAdapter {
         Ok(self.db.read().get(&key).is_some())
     }
 
-    fn iter<S: StorageSchema + 'static>(
-        &self,
-        keys: Vec<<S as StorageSchema>::Key>,
-    ) -> Box<dyn Stream<Item = ProtocolResult<Option<<S as StorageSchema>::Value>>>> {
-        let iter: MemoryIterator<S> = MemoryIterator::new(Arc::clone(&self.db), keys);
-
-        Box::new(iter)
-    }
-
     async fn batch_modify<S: StorageSchema>(
         &self,
         keys: Vec<<S as StorageSchema>::Key>,
@@ -126,60 +114,6 @@ impl StorageAdapter for MemoryAdapter {
         }
 
         Ok(())
-    }
-}
-
-pub struct MemoryIterator<S: StorageSchema + 'static> {
-    db:   Arc<RwLock<HashMap<Vec<u8>, Vec<u8>>>>,
-    keys: Box<dyn Iterator<Item = <S as StorageSchema>::Key>>,
-}
-
-impl<S> MemoryIterator<S>
-where
-    S: StorageSchema + 'static,
-    <S as StorageSchema>::Key: 'static,
-{
-    pub fn new(
-        db: Arc<RwLock<HashMap<Vec<u8>, Vec<u8>>>>,
-        keys: Vec<<S as StorageSchema>::Key>,
-    ) -> Self {
-        let keys = Box::new(keys.into_iter());
-
-        MemoryIterator { db, keys }
-    }
-}
-
-impl<S> Stream for MemoryIterator<S>
-where
-    S: StorageSchema + 'static,
-    <S as StorageSchema>::Key: 'static,
-{
-    type Item = ProtocolResult<Option<<S as StorageSchema>::Value>>;
-
-    fn poll_next(mut self: Pin<&mut Self>, _ctx: &mut Context) -> Poll<Option<Self::Item>> {
-        let key = match self.keys.next() {
-            Some(key) => key,
-            None => return Poll::Ready(None),
-        };
-
-        let next = || -> _ {
-            let key = key.encode_sync()?.to_vec();
-            let opt_bytes = self
-                .db
-                .read()
-                .get(&key)
-                .map(|db_vec| Bytes::from(db_vec.to_vec()));
-
-            if let Some(bytes) = opt_bytes {
-                let val = <_>::decode_sync(bytes)?;
-
-                Ok(Some(val))
-            } else {
-                Ok(None)
-            }
-        };
-
-        Poll::Ready(Some(next()))
     }
 }
 

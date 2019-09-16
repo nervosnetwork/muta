@@ -7,7 +7,7 @@ use std::error::Error;
 
 use crate::{ProtocolError, ProtocolErrorKind};
 
-pub use epoch::{Epoch, EpochHeader, Pill, Proof, Validator};
+pub use epoch::{Epoch, EpochHeader, EpochId, Pill, Proof, Validator};
 pub use ethbloom::{Bloom, BloomRef, Input as BloomInput};
 pub use primitive::{
     AccountAddress, AssetID, Balance, ContractAddress, ContractType, Fee, Hash, MerkleRoot,
