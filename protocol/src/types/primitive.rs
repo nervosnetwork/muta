@@ -159,10 +159,7 @@ impl AccountAddress {
     }
 
     pub fn as_bytes(&self) -> Bytes {
-        let mut bytes = Bytes::from([ACCOUNT_ADDRESS_MAGIC].as_ref());
-        bytes.extend_from_slice(&self.inner.as_bytes());
-
-        bytes
+        self.inner.as_bytes()
     }
 }
 

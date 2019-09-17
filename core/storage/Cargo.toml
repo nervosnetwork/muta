@@ -16,3 +16,8 @@ parking_lot = "0.9"
 async-trait = "0.1"
 rocksdb = "0.12"
 bytes = "0.4"
+
+[dev-dependencies]
+num-traits = "0.2"
+rand = "0.6"
+hex = "0.3"

@@ -24,3 +24,6 @@ Cargo.lock
 
 # dev
 devtools/data
+
+# rocksdb
+**/rocksdb/

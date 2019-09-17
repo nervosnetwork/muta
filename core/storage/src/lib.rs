@@ -1,6 +1,9 @@
 // Remove this clippy bug with async await is resolved.
 // ISSUE: https://github.com/rust-lang/rust-clippy/issues/3988
 #![allow(clippy::needless_lifetimes)]
+#![feature(test)]
+
+mod test;
 
 pub mod adapter;
 
@@ -20,8 +23,8 @@ use protocol::types::{Epoch, EpochId, Hash, Proof, Receipt, SignedTransaction};
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
 lazy_static! {
-    static ref LATEST_EPOCH_KEY: Hash = Hash::digest(Bytes::from("latest_hash"));
-    static ref LATEST_PROOF_KEY: Hash = Hash::digest(Bytes::from("latest_proof"));
+    pub static ref LATEST_EPOCH_KEY: Hash = Hash::digest(Bytes::from("latest_hash"));
+    pub static ref LATEST_PROOF_KEY: Hash = Hash::digest(Bytes::from("latest_proof"));
 }
 
 #[derive(Debug)]
