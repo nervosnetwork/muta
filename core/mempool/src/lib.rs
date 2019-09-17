@@ -1,7 +1,8 @@
 #![feature(test)]
 
 mod map;
-mod test;
+#[cfg(test)]
+mod tests;
 mod tx_cache;
 
 use std::error::Error;

@@ -3,7 +3,8 @@
 #![allow(clippy::needless_lifetimes)]
 #![feature(test)]
 
-mod test;
+#[cfg(test)]
+mod tests;
 
 pub mod adapter;
 
