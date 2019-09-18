@@ -7,3 +7,10 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+async-trait = "0.1"
+bytes = "0.4"
+derive_more = "0.15"
+overlord = {git = "https://github.com/cryptape/overlord.git"}
+
+protocol = { path = "../../protocol" }
+common-crypto = { path = "../../common/crypto"}
