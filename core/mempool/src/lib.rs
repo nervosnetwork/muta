@@ -24,8 +24,6 @@ pub struct HashMemPool<Adapter: MemPoolAdapter> {
     pool_size: usize,
     /// A system param limits the life time of an off-chain transaction.
     timeout_gap: u64,
-    /// The max cycles accumulated in an `Epoch`.
-    cycle_limit: u64,
     /// A structure for caching new transactions and responsible transactions of
     /// propose-sync.
     tx_cache: TxCache,
@@ -45,14 +43,12 @@ where
     pub fn new(
         pool_size: usize,
         timeout_gap: u64,
-        cycle_limit: u64,
         current_epoch_id: u64,
         adapter: Adapter,
     ) -> Self {
         HashMemPool {
             pool_size,
             timeout_gap,
-            cycle_limit,
             tx_cache: TxCache::new(pool_size),
             callback_cache: Map::new(pool_size),
             adapter,
@@ -98,10 +94,10 @@ where
         Ok(())
     }
 
-    async fn package(&self, _ctx: Context) -> ProtocolResult<MixedTxHashes> {
+    async fn package(&self, _ctx: Context, cycle_limit: u64) -> ProtocolResult<MixedTxHashes> {
         let current_epoch_id = self.current_epoch_id.load(Ordering::SeqCst);
         self.tx_cache.package(
-            self.cycle_limit,
+            cycle_limit,
             current_epoch_id,
             current_epoch_id + self.timeout_gap,
         )

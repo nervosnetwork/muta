@@ -18,7 +18,7 @@ pub struct MixedTxHashes {
 pub trait MemPool<Adapter: MemPoolAdapter>: Send + Sync {
     async fn insert(&self, ctx: Context, tx: SignedTransaction) -> ProtocolResult<()>;
 
-    async fn package(&self, ctx: Context) -> ProtocolResult<MixedTxHashes>;
+    async fn package(&self, ctx: Context, cycle_limit: u64) -> ProtocolResult<MixedTxHashes>;
 
     async fn flush(&self, ctx: Context, tx_hashes: Vec<Hash>) -> ProtocolResult<()>;
 

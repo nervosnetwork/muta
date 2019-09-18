@@ -106,23 +106,16 @@ fn mock_txs(valid_size: usize, invalid_size: usize, timeout: u64) -> Vec<SignedT
 }
 
 fn default_mempool() -> HashMemPool<HashMemPoolAdapter> {
-    new_mempool(POOL_SIZE, CYCLE_LIMIT, TIMEOUT_GAP, CURRENT_EPOCH_ID)
+    new_mempool(POOL_SIZE, TIMEOUT_GAP, CURRENT_EPOCH_ID)
 }
 
 fn new_mempool(
     pool_size: usize,
-    cycle_limit: u64,
     timeout_gap: u64,
     current_epoch_id: u64,
 ) -> HashMemPool<HashMemPoolAdapter> {
     let adapter = HashMemPoolAdapter::new();
-    HashMemPool::new(
-        pool_size,
-        timeout_gap,
-        cycle_limit,
-        current_epoch_id,
-        adapter,
-    )
+    HashMemPool::new(pool_size, timeout_gap, current_epoch_id, adapter)
 }
 
 fn pub_key_to_address(pub_key: &Secp256k1PublicKey) -> ProtocolResult<Address> {
@@ -194,8 +187,8 @@ fn exec_flush(remove_hashes: Vec<Hash>, mempool: Arc<HashMemPool<HashMemPoolAdap
     });
 }
 
-fn exec_package(mempool: Arc<HashMemPool<HashMemPoolAdapter>>) -> MixedTxHashes {
-    executor::block_on(async { mempool.package(HashMap::new()).await.unwrap() })
+fn exec_package(mempool: Arc<HashMemPool<HashMemPoolAdapter>>, cycle_limit: u64) -> MixedTxHashes {
+    executor::block_on(async { mempool.package(HashMap::new(), cycle_limit).await.unwrap() })
 }
 
 fn exec_ensure_order_txs(require_hashes: Vec<Hash>, mempool: Arc<HashMemPool<HashMemPoolAdapter>>) {
