@@ -6,6 +6,8 @@ mod r#macro;
 pub mod epoch;
 pub mod primitive;
 pub mod receipt;
+#[cfg(test)]
+mod tests;
 pub mod transaction;
 
 use std::error::Error;

@@ -201,16 +201,7 @@ impl ContractAddress {
     }
 
     pub fn as_bytes(&self) -> Bytes {
-        let magic = match self.contract_type() {
-            ContractType::Asset => ASSET_CONTRACT_ADDRESS_MAGIC,
-            ContractType::Library => LIBRARY_CONTRACT_ADDRESS_MAGIC,
-            ContractType::App => APP_CONTRACT_ADDRESS_MAGIC,
-        };
-
-        let mut bytes = Bytes::from([magic].as_ref());
-        bytes.extend_from_slice(&self.inner.as_bytes());
-
-        bytes
+        self.inner.as_bytes()
     }
 
     pub fn contract_type(&self) -> ContractType {
