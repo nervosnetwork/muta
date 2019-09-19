@@ -111,7 +111,7 @@ impl ConnectionServiceKeeper {
                 let addre = addr.clone();
 
                 let kind = RemoveKind::UnableToConnect { addr: addre, err };
-                let unable_to_connect = PeerManagerEvent::RemoveUnknownAddr { addr, kind };
+                let unable_to_connect = PeerManagerEvent::RemoveAddr { addr, kind };
 
                 self.report_peer(unable_to_connect);
             }

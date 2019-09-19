@@ -7,6 +7,7 @@ mod error;
 mod event;
 mod message;
 mod peer_manager;
+mod protocols;
 mod traits;
 
 use protocol::traits::NContext as Context;
