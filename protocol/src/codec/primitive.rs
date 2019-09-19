@@ -47,7 +47,7 @@ pub struct Address {
 }
 
 #[derive(Clone, Message)]
-pub struct AccountAddress {
+pub struct UserAddress {
     #[prost(message, tag = "1")]
     pub value: Option<Address>,
 }
@@ -181,29 +181,27 @@ impl TryFrom<AssetID> for protocol_primitive::AssetID {
     }
 }
 
-// AccountAddress
+// UserAddress
 
-impl From<protocol_primitive::AccountAddress> for AccountAddress {
-    fn from(account: protocol_primitive::AccountAddress) -> AccountAddress {
+impl From<protocol_primitive::UserAddress> for UserAddress {
+    fn from(account: protocol_primitive::UserAddress) -> UserAddress {
         let value = account.as_bytes().to_vec();
         let address = Address { value };
 
-        AccountAddress {
+        UserAddress {
             value: Some(address),
         }
     }
 }
 
-impl TryFrom<AccountAddress> for protocol_primitive::AccountAddress {
+impl TryFrom<UserAddress> for protocol_primitive::UserAddress {
     type Error = ProtocolError;
 
-    fn try_from(
-        account: AccountAddress,
-    ) -> Result<protocol_primitive::AccountAddress, Self::Error> {
-        let address = field!(account.value, "AccountAddress", "value")?;
+    fn try_from(account: UserAddress) -> Result<protocol_primitive::UserAddress, Self::Error> {
+        let address = field!(account.value, "UserAddress", "value")?;
 
         let bytes = Bytes::from(address.value);
-        protocol_primitive::AccountAddress::from_bytes(bytes)
+        protocol_primitive::UserAddress::from_bytes(bytes)
     }
 }
 
@@ -322,7 +320,7 @@ impl TryFrom<Fee> for protocol_primitive::Fee {
 impl_default_bytes_codec_for!(primitive, [
     Balance,
     Hash,
-    AccountAddress,
+    UserAddress,
     ContractAddress,
     Asset,
     Fee

@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use derive_more::Display;
 
 use crate::codec::ProtocolCodec;
 use crate::types::epoch::{Epoch, Proof};

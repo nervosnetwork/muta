@@ -7,3 +7,11 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+protocol = { path = "../../protocol" }
+
+hasher = { version = "0.1", features = ['hash-keccak'] }
+cita_trie = "2.0"
+bytes = "0.4"
+lazy_static = "1.4"
+derive_more = "0.15"
+rlp = "0.4"

@@ -14,8 +14,8 @@ use num_traits::FromPrimitive;
 use rand::random;
 
 use protocol::types::{
-    AccountAddress, Epoch, EpochHeader, Fee, Hash, Proof, RawTransaction, Receipt, ReceiptResult,
-    SignedTransaction, TransactionAction,
+    Epoch, EpochHeader, Fee, Hash, Proof, RawTransaction, Receipt, ReceiptResult,
+    SignedTransaction, TransactionAction, UserAddress,
 };
 
 fn mock_signed_tx(tx_hash: Hash) -> SignedTransaction {
@@ -27,7 +27,7 @@ fn mock_signed_tx(tx_hash: Hash) -> SignedTransaction {
     let addr_str = "10CAB8EEA4799C21379C20EF5BAA2CC8AF1BEC475B";
 
     let action = TransactionAction::Transfer {
-        receiver: AccountAddress::from_hex(addr_str).unwrap(),
+        receiver: UserAddress::from_hex(addr_str).unwrap(),
         asset_id: nonce.clone(),
         amount:   FromPrimitive::from_i32(10).unwrap(),
     };
@@ -55,7 +55,7 @@ fn mock_receipt(tx_hash: Hash) -> Receipt {
     };
     let addr_str = "10CAB8EEA4799C21379C20EF5BAA2CC8AF1BEC475B";
     let result = ReceiptResult::Transfer {
-        receiver:      AccountAddress::from_hex(addr_str).unwrap(),
+        receiver:      UserAddress::from_hex(addr_str).unwrap(),
         before_amount: FromPrimitive::from_i32(10).unwrap(),
         after_amount:  FromPrimitive::from_i32(20).unwrap(),
     };
@@ -83,7 +83,7 @@ fn mock_epoch(epoch_id: u64, epoch_hash: Hash) -> Epoch {
         state_root: nonce.clone(),
         receipt_root: Vec::new(),
         cycles_used: 100,
-        proposer: AccountAddress::from_hex(addr_str).unwrap(),
+        proposer: UserAddress::from_hex(addr_str).unwrap(),
         proof: mock_proof(epoch_hash),
         validator_version: 1,
         validators: Vec::new(),

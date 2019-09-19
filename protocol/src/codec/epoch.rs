@@ -5,7 +5,7 @@ use prost::Message;
 
 use crate::{
     codec::{
-        primitive::{AccountAddress, Hash},
+        primitive::{Hash, UserAddress},
         CodecError, ProtocolCodecSync,
     },
     field, impl_default_bytes_codec_for,
@@ -60,7 +60,7 @@ pub struct EpochHeader {
     pub cycles_used: u64,
 
     #[prost(message, tag = "11")]
-    pub proposer: Option<AccountAddress>,
+    pub proposer: Option<UserAddress>,
 
     #[prost(message, tag = "12")]
     pub proof: Option<Proof>,
@@ -90,7 +90,7 @@ pub struct Proof {
 #[derive(Clone, Message)]
 pub struct Validator {
     #[prost(message, tag = "1")]
-    pub address: Option<AccountAddress>,
+    pub address: Option<UserAddress>,
 
     #[prost(uint64, tag = "2")]
     pub weight: u64,
@@ -161,7 +161,7 @@ impl From<epoch::EpochHeader> for EpochHeader {
         let pre_hash = Some(Hash::from(epoch_header.pre_hash));
         let order_root = Some(Hash::from(epoch_header.order_root));
         let state_root = Some(Hash::from(epoch_header.state_root));
-        let proposer = Some(AccountAddress::from(epoch_header.proposer));
+        let proposer = Some(UserAddress::from(epoch_header.proposer));
         let proof = Some(Proof::from(epoch_header.proof));
 
         let confirm_root = epoch_header
@@ -236,7 +236,7 @@ impl TryFrom<EpochHeader> for epoch::EpochHeader {
             state_root: protocol_primitive::Hash::try_from(state_root)?,
             receipt_root,
             cycles_used: epoch_header.cycles_used,
-            proposer: protocol_primitive::AccountAddress::try_from(proposer)?,
+            proposer: protocol_primitive::UserAddress::try_from(proposer)?,
             proof: epoch::Proof::try_from(proof)?,
             validator_version: epoch_header.validator_version,
             validators,
@@ -282,7 +282,7 @@ impl TryFrom<Proof> for epoch::Proof {
 
 impl From<epoch::Validator> for Validator {
     fn from(validator: epoch::Validator) -> Validator {
-        let address = Some(AccountAddress::from(validator.address));
+        let address = Some(UserAddress::from(validator.address));
 
         Validator {
             address,
@@ -298,7 +298,7 @@ impl TryFrom<Validator> for epoch::Validator {
         let address = field!(validator.address, "Validator", "address")?;
 
         let validator = epoch::Validator {
-            address: protocol_primitive::AccountAddress::try_from(address)?,
+            address: protocol_primitive::UserAddress::try_from(address)?,
             weight:  validator.weight,
         };
 

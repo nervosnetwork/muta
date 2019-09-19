@@ -5,12 +5,15 @@ pub(crate) mod transaction;
 
 use std::error::Error;
 
+use derive_more::{Display, From};
+
 use crate::{ProtocolError, ProtocolErrorKind};
 
 pub use epoch::{Epoch, EpochHeader, EpochId, Pill, Proof, Validator};
 pub use ethbloom::{Bloom, BloomRef, Input as BloomInput};
 pub use primitive::{
-    AccountAddress, AssetID, Balance, ContractAddress, ContractType, Fee, Hash, MerkleRoot,
+    Account, Address, ApprovedInfo, Asset, AssetID, AssetInfo, Balance, ContractAccount,
+    ContractAddress, ContractType, Fee, Hash, MerkleRoot, UserAccount, UserAddress,
 };
 pub use receipt::{Receipt, ReceiptResult};
 pub use transaction::{RawTransaction, SignedTransaction, TransactionAction};

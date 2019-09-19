@@ -9,8 +9,7 @@ use rand::random;
 use crate::types::{
     epoch::{Epoch, EpochHeader, EpochId, Pill, Proof, Validator},
     primitive::{
-        AccountAddress, Asset, AssetID, Balance, ContractAddress, ContractType, Fee, Hash,
-        MerkleRoot,
+        Asset, AssetID, Balance, ContractAddress, ContractType, Fee, Hash, MerkleRoot, UserAddress,
     },
     receipt::{Receipt, ReceiptResult},
     transaction::{RawTransaction, SignedTransaction, TransactionAction},
@@ -51,8 +50,8 @@ fn mock_asset_id() -> AssetID {
     Hash::digest(Bytes::from("asset_id"))
 }
 
-fn mock_account_address() -> AccountAddress {
-    AccountAddress::from_hex("10CAB8EEA4799C21379C20EF5BAA2CC8AF1BEC475B").unwrap()
+fn mock_account_address() -> UserAddress {
+    UserAddress::from_hex("10CAB8EEA4799C21379C20EF5BAA2CC8AF1BEC475B").unwrap()
 }
 
 fn mock_contract_address() -> ContractAddress {

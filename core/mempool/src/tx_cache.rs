@@ -361,7 +361,7 @@ mod tests {
     use test::Bencher;
 
     use protocol::types::{
-        AccountAddress, Fee, Hash, RawTransaction, SignedTransaction, TransactionAction,
+        Fee, Hash, RawTransaction, SignedTransaction, TransactionAction, UserAddress,
     };
 
     use crate::tx_cache::TxCache;
@@ -395,7 +395,7 @@ mod tests {
         let tx_hash = rand_hash.clone();
         let add_str = "10CAB8EEA4799C21379C20EF5BAA2CC8AF1BEC475B";
         let bytes = Bytes::from(hex::decode(add_str).unwrap());
-        let address = AccountAddress::from_bytes(bytes.clone()).unwrap();
+        let address = UserAddress::from_bytes(bytes.clone()).unwrap();
         let fee = Fee {
             asset_id: asset_id.clone(),
             cycle:    TX_CYCLE,

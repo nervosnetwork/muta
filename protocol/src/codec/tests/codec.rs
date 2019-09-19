@@ -24,7 +24,7 @@ fn test_codec() {
     test!(primitive, Hash, mock_hash);
     test!(primitive, MerkleRoot, mock_merkle_root);
     test!(primitive, AssetID, mock_asset_id);
-    test!(primitive, AccountAddress, mock_account_address);
+    test!(primitive, UserAddress, mock_account_address);
     test!(primitive, ContractAddress, mock_contract_address);
     test!(primitive, Asset, mock_asset);
     test!(primitive, Fee, mock_fee);

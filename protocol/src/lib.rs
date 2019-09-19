@@ -1,13 +1,12 @@
 #![feature(test)]
 
-#[macro_use]
-extern crate derive_more;
-
 pub mod codec;
 pub mod traits;
 pub mod types;
 
 use std::error::Error;
+
+use derive_more::{Constructor, Display};
 
 #[derive(Debug, Clone)]
 pub enum ProtocolErrorKind {

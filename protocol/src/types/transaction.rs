@@ -1,7 +1,7 @@
 use bytes::Bytes;
 
 use crate::types::primitive::{
-    AccountAddress, AssetID, Balance, ContractAddress, ContractType, Fee, Hash,
+    AssetID, Balance, ContractAddress, ContractType, Fee, Hash, UserAddress,
 };
 
 #[derive(Clone, Debug)]
@@ -16,7 +16,7 @@ pub struct RawTransaction {
 #[derive(Clone, Debug)]
 pub enum TransactionAction {
     Transfer {
-        receiver: AccountAddress,
+        receiver: UserAddress,
         asset_id: AssetID,
         amount:   Balance,
     },

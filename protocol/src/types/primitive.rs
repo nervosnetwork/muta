@@ -1,12 +1,18 @@
 #![allow(clippy::all)]
+use std::collections::BTreeMap;
 use std::fmt;
 
 use bytes::Bytes;
+use hasher::{Hasher, HasherKeccak};
+use lazy_static::lazy_static;
 use num_bigint::BigUint;
-use sha3::{Digest, Sha3_256};
 
 use crate::types::TypesError;
 use crate::ProtocolResult;
+
+lazy_static! {
+    static ref HASHER_INST: HasherKeccak = HasherKeccak::new();
+}
 
 /// Hash length
 const HASH_LEN: usize = 32;
@@ -26,7 +32,14 @@ impl Hash {
     /// hashing algorithms later.
     pub fn digest(bytes: Bytes) -> Self {
         let mut out = [0u8; HASH_LEN];
-        out.copy_from_slice(&Sha3_256::digest(&bytes));
+        out.copy_from_slice(&HASHER_INST.digest(&bytes));
+
+        Self(out)
+    }
+
+    pub fn from_empty() -> Self {
+        let mut out = [0u8; HASH_LEN];
+        out.copy_from_slice(&HASHER_INST.digest(&rlp::NULL_RLP));
 
         Self(out)
     }
@@ -77,7 +90,7 @@ const APP_CONTRACT_ADDRESS_MAGIC: u8 = 0x21;
 const LIBRARY_CONTRACT_ADDRESS_MAGIC: u8 = 0x22;
 
 /// Contract type
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum ContractType {
     // Asset contract
     Asset,
@@ -87,25 +100,31 @@ pub enum ContractType {
     Library,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Address {
+    User(UserAddress),
+    Contract(ContractAddress),
+}
+
 /// The address consists of 21 bytes, the first of which is a magic number that
 /// identifies which type the address belongs to.
 #[derive(Clone, PartialEq, Eq, Hash)]
-struct Address([u8; ADDRESS_LEN]);
+struct InnerAddress([u8; ADDRESS_LEN]);
 
 /// Note: the account address here is an external account, not a contract.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct AccountAddress {
-    inner: Address,
+pub struct UserAddress {
+    inner: InnerAddress,
 }
 
 /// Contract address.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ContractAddress {
-    inner:         Address,
+    inner:         InnerAddress,
     contract_type: ContractType,
 }
 
-impl Address {
+impl InnerAddress {
     pub fn from_bytes(bytes: Bytes) -> ProtocolResult<Self> {
         ensure_len(bytes.len(), ADDRESS_LEN)?;
 
@@ -123,13 +142,13 @@ impl Address {
     }
 }
 
-impl fmt::Debug for Address {
+impl fmt::Debug for InnerAddress {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", hex::encode(self.0.to_vec()))
     }
 }
 
-impl AccountAddress {
+impl UserAddress {
     pub fn from_bytes(bytes: Bytes) -> ProtocolResult<Self> {
         let magic = bytes.get(0).ok_or_else(|| TypesError::InvalidAddress {
             address: hex::encode(bytes.to_vec()),
@@ -142,8 +161,8 @@ impl AccountAddress {
             .into());
         }
 
-        let inner = Address::from_bytes(bytes)?;
-        Ok(AccountAddress { inner })
+        let inner = InnerAddress::from_bytes(bytes)?;
+        Ok(UserAddress { inner })
     }
 
     pub fn from_hex(s: &str) -> ProtocolResult<Self> {
@@ -181,7 +200,7 @@ impl ContractAddress {
             }
         };
 
-        let inner = Address::from_bytes(bytes)?;
+        let inner = InnerAddress::from_bytes(bytes)?;
         Ok(ContractAddress {
             inner,
             contract_type,
@@ -225,6 +244,37 @@ pub struct Fee {
     pub cycle:    u64,
 }
 
+#[derive(Clone, Debug)]
+pub enum Account {
+    User(UserAccount),
+    Contract(ContractAccount),
+}
+
+#[derive(Clone, Debug)]
+pub struct UserAccount {
+    pub nonce:  u64,
+    pub assets: BTreeMap<AssetID, AssetInfo>,
+}
+
+#[derive(Clone, Debug)]
+pub struct AssetInfo {
+    pub balance:  Balance,
+    pub approved: BTreeMap<ContractAddress, ApprovedInfo>,
+}
+
+#[derive(Clone, Debug)]
+pub struct ApprovedInfo {
+    pub max:  Balance,
+    pub used: Balance,
+}
+
+#[derive(Clone, Debug)]
+pub struct ContractAccount {
+    pub nonce:        u64,
+    pub assets:       BTreeMap<AssetID, Balance>,
+    pub storage_root: MerkleRoot,
+}
+
 fn clean_0x(s: &str) -> &str {
     if s.starts_with("0x") {
         &s[2..]
@@ -245,7 +295,7 @@ fn ensure_len(real: usize, expect: usize) -> ProtocolResult<()> {
 mod tests {
     use bytes::Bytes;
 
-    use super::{AccountAddress, ContractAddress, Hash};
+    use super::{ContractAddress, Hash, UserAddress};
 
     #[test]
     fn test_hash() {
@@ -261,7 +311,7 @@ mod tests {
         let add_str = "10CAB8EEA4799C21379C20EF5BAA2CC8AF1BEC475B";
         let bytes = Bytes::from(hex::decode(add_str).unwrap());
 
-        let address = AccountAddress::from_bytes(bytes).unwrap();
+        let address = UserAddress::from_bytes(bytes).unwrap();
         assert_eq!(add_str, address.as_hex().to_uppercase());
 
         // asset contract  address

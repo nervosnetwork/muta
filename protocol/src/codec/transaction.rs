@@ -5,7 +5,7 @@ use prost::{Message, Oneof};
 
 use crate::{
     codec::{
-        primitive::{AccountAddress, AssetID, Balance, ContractAddress, ContractType, Fee, Hash},
+        primitive::{AssetID, Balance, ContractAddress, ContractType, Fee, Hash, UserAddress},
         CodecError, ProtocolCodecSync,
     },
     field, impl_default_bytes_codec_for,
@@ -16,7 +16,7 @@ use crate::{
 #[derive(Clone, Message)]
 pub struct Transfer {
     #[prost(message, tag = "1")]
-    pub receiver: Option<AccountAddress>,
+    pub receiver: Option<UserAddress>,
 
     #[prost(message, tag = "2")]
     pub asset_id: Option<AssetID>,
@@ -127,7 +127,7 @@ impl From<transaction::TransactionAction> for TransactionAction {
                 amount,
             } => {
                 let transfer = Transfer {
-                    receiver: Some(AccountAddress::from(receiver)),
+                    receiver: Some(UserAddress::from(receiver)),
                     asset_id: Some(AssetID::from(asset_id)),
                     amount:   Some(Balance::from(amount)),
                 };
@@ -194,7 +194,7 @@ impl TryFrom<TransactionAction> for transaction::TransactionAction {
                 let amount = field!(transfer.amount, "TransactionAction::Transfer", "amount")?;
 
                 let action = transaction::TransactionAction::Transfer {
-                    receiver: protocol_primitive::AccountAddress::try_from(receiver)?,
+                    receiver: protocol_primitive::UserAddress::try_from(receiver)?,
                     asset_id: protocol_primitive::AssetID::try_from(asset_id)?,
                     amount:   protocol_primitive::Balance::try_from(amount)?,
                 };

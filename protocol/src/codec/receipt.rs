@@ -5,7 +5,7 @@ use prost::{Message, Oneof};
 
 use crate::{
     codec::{
-        primitive::{AccountAddress, AssetID, Balance, ContractAddress, ContractType, Fee, Hash},
+        primitive::{AssetID, Balance, ContractAddress, ContractType, Fee, Hash, UserAddress},
         CodecError, ProtocolCodecSync,
     },
     field, impl_default_bytes_codec_for,
@@ -53,7 +53,7 @@ pub enum ReceiptResult {
 #[derive(Clone, Message)]
 pub struct Transfer {
     #[prost(message, tag = "1")]
-    pub receiver: Option<AccountAddress>,
+    pub receiver: Option<UserAddress>,
     #[prost(message, tag = "2")]
     pub before_amount: Option<Balance>,
     #[prost(message, tag = "3")]
@@ -111,7 +111,7 @@ impl From<receipt::ReceiptResult> for ReceiptResult {
                 after_amount,
             } => {
                 let transfer = Transfer {
-                    receiver:      Some(AccountAddress::from(receiver)),
+                    receiver:      Some(UserAddress::from(receiver)),
                     before_amount: Some(Balance::from(before_amount)),
                     after_amount:  Some(Balance::from(after_amount)),
                 };
@@ -183,7 +183,7 @@ impl TryFrom<ReceiptResult> for receipt::ReceiptResult {
                 )?;
 
                 let result = receipt::ReceiptResult::Transfer {
-                    receiver:      protocol_primitive::AccountAddress::try_from(receiver)?,
+                    receiver:      protocol_primitive::UserAddress::try_from(receiver)?,
                     before_amount: protocol_primitive::Balance::try_from(before_amount)?,
                     after_amount:  protocol_primitive::Balance::try_from(after_amount)?,
                 };

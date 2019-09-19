@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use async_trait::async_trait;
 
-use crate::types::{AccountAddress, Epoch, Hash, Proof, Receipt, SignedTransaction};
+use crate::types::{Epoch, Hash, Proof, Receipt, SignedTransaction, UserAddress};
 use crate::{traits::mempool::MixedTxHashes, ProtocolResult};
 
 #[allow(dead_code)]
@@ -11,7 +11,7 @@ pub type Context = HashMap<String, String>;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum MessageTarget {
     Broadcast,
-    Specified(AccountAddress),
+    Specified(UserAddress),
 }
 
 #[async_trait]

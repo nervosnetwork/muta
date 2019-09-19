@@ -1,7 +1,7 @@
 use bytes::Bytes;
 
 use crate::types::{
-    AccountAddress, AssetID, Balance, Bloom, ContractAddress, ContractType, Fee, Hash, MerkleRoot,
+    AssetID, Balance, Bloom, ContractAddress, ContractType, Fee, Hash, MerkleRoot, UserAddress,
 };
 
 #[derive(Clone, Debug)]
@@ -16,7 +16,7 @@ pub struct Receipt {
 #[derive(Clone, Debug)]
 pub enum ReceiptResult {
     Transfer {
-        receiver:      AccountAddress,
+        receiver:      UserAddress,
         before_amount: Balance,
         after_amount:  Balance,
     },

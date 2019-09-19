@@ -23,7 +23,7 @@ use common_crypto::{
 use protocol::codec::ProtocolCodec;
 use protocol::traits::{Context, MemPool, MemPoolAdapter, MixedTxHashes};
 use protocol::types::{
-    AccountAddress as Address, Fee, Hash, RawTransaction, SignedTransaction, TransactionAction,
+    Fee, Hash, RawTransaction, SignedTransaction, TransactionAction, UserAddress as Address,
 };
 use protocol::ProtocolResult;
 
