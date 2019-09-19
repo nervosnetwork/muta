@@ -93,6 +93,12 @@ impl From<ErrorKind> for NetworkError {
     }
 }
 
+impl From<Box<bincode::ErrorKind>> for NetworkError {
+    fn from(kind: Box<bincode::ErrorKind>) -> NetworkError {
+        NetworkError::SerdeError(Box::new(kind))
+    }
+}
+
 impl From<NetworkError> for ProtocolError {
     fn from(err: NetworkError) -> ProtocolError {
         ProtocolError::new(ProtocolErrorKind::Network, Box::new(err))

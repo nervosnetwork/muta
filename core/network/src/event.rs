@@ -93,14 +93,19 @@ pub enum PeerManagerEvent {
     RetryPeerLater { pid: PeerId, kind: RetryKind },
 
     // Address
-    // FIXME
-    #[allow(dead_code)]
     #[display(fmt = "add unknown addr {}", addr)]
     AddUnknownAddr { addr: Multiaddr },
 
+    #[display(fmt = "add multi unknown addrs {:?}", addrs)]
+    AddMultiUnknownAddrs { addrs: Vec<Multiaddr> },
+
+    // FIXME
+    #[allow(dead_code)]
     #[display(fmt = "add session {} addr {}", sid, addr)]
     AddSessionAddr { sid: SessionId, addr: Multiaddr },
 
+    // FIXME
+    #[allow(dead_code)]
     #[display(fmt = "add session {} multi addrs {:?}", sid, addrs)]
     AddSessionMultiAddrs {
         sid:   SessionId,
@@ -108,7 +113,7 @@ pub enum PeerManagerEvent {
     },
 
     #[display(fmt = "remove unknown addr {}, kind: {}", addr, kind)]
-    RemoveUnknownAddr { addr: Multiaddr, kind: RemoveKind },
+    RemoveAddr { addr: Multiaddr, kind: RemoveKind },
 
     #[display(fmt = "retry unknown addr {}, kind: {}", addr, kind)]
     RetryAddrLater { addr: Multiaddr, kind: RetryKind },
