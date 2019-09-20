@@ -1,4 +1,8 @@
-use protocol::traits::{Cloneable, Context, Priority};
+use async_trait::async_trait;
+use protocol::{
+    traits::{Cloneable, Context, Priority},
+    types::UserAddress,
+};
 use tentacle::{
     bytes::Bytes,
     service::TargetSession,
@@ -17,8 +21,11 @@ pub trait NetworkProtocol {
     fn message_proto_id() -> ProtocolId;
 }
 
+#[rustfmt::skip]
+#[async_trait]
 pub trait MessageSender {
     fn send(&self, tar: TargetSession, msg: Bytes, pri: Priority) -> Result<(), NetworkError>;
+    async fn users_send(&self, users: Vec<UserAddress>, msg: Bytes, pri: Priority) -> Result<(), NetworkError>;
 }
 
 pub trait Compression {

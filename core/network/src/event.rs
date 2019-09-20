@@ -1,10 +1,13 @@
 use std::error::Error;
 
 use derive_more::{Display, From};
+use futures::channel::oneshot::Sender;
+use protocol::{traits::Priority, types::UserAddress};
 use tentacle::{
+    bytes::Bytes,
     multiaddr::Multiaddr,
     secio::{PeerId, PublicKey},
-    service::DialProtocol,
+    service::{DialProtocol, TargetSession},
     ProtocolId, SessionId,
 };
 
@@ -18,6 +21,13 @@ pub enum ConnectionEvent {
 
     #[display(fmt = "disconnect session {}", _0)]
     Disconnect(SessionId),
+
+    #[display(fmt = "send message to {:?}", tar)]
+    SendMsg {
+        tar: TargetSession,
+        msg: Bytes,
+        pri: Priority,
+    },
 }
 
 #[derive(Debug, Display, From)]
@@ -65,6 +75,14 @@ pub enum RemoveKind {
 
     #[display(fmt = "bad session peer: {}", _0)]
     BadSessionPeer(String),
+}
+
+#[derive(Debug, Display)]
+#[display(fmt = "multi users message, addrs: {:?}", user_addrs)]
+pub struct MultiUsersMessage {
+    pub user_addrs: Vec<UserAddress>,
+    pub msg:        Bytes,
+    pub pri:        Priority,
 }
 
 #[derive(Debug, Display)]
@@ -124,4 +142,11 @@ pub enum PeerManagerEvent {
 
     #[display(fmt = "rmeove listen addr {}", addr)]
     RemoveListenAddr { addr: Multiaddr },
+
+    // Account addresses
+    #[display(fmt = "try route multi accounts message: {}", users_msg)]
+    RouteMultiUsersMessage {
+        users_msg: MultiUsersMessage,
+        miss_tx:   Sender<Vec<UserAddress>>,
+    },
 }

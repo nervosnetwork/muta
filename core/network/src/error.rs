@@ -3,7 +3,7 @@ use std::{error::Error, num::ParseIntError};
 use derive_more::{Display, From};
 use tentacle::{ProtocolId, SessionId};
 
-use protocol::{ProtocolError, ProtocolErrorKind};
+use protocol::{types::UserAddress, ProtocolError, ProtocolErrorKind};
 
 #[derive(Debug, Display, From)]
 pub enum ErrorKind {
@@ -80,6 +80,9 @@ pub enum NetworkError {
 
     #[display(fmt = "malformat or exceed maximum length, /[scheme]/[name]/[method] etc")]
     NotEndpoint,
+
+    #[display(fmt = "{:?} account addrs aren't connecting, try connect them", miss)]
+    PartialRouteMessage { miss: Vec<UserAddress> },
 
     #[display(fmt = "internal error: {}", _0)]
     Internal(Box<dyn Error + Send>),

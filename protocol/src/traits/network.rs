@@ -5,7 +5,9 @@ use bytes::Bytes;
 use derive_more::Display;
 use serde::{Deserialize, Serialize};
 
-use crate::{traits::Context, ProtocolError, ProtocolErrorKind, ProtocolResult};
+use crate::{
+    traits::Context, types::UserAddress, ProtocolError, ProtocolErrorKind, ProtocolResult,
+};
 
 #[derive(Debug)]
 pub enum Priority {
@@ -51,6 +53,17 @@ where
 #[async_trait]
 pub trait Gossip {
     async fn broadcast<M>(&self, cx: Context, end: &str, msg: M, p: Priority) -> ProtocolResult<()>
+    where
+        M: MessageCodec;
+
+    async fn users_cast<M>(
+        &self,
+        cx: Context,
+        end: &str,
+        users: Vec<UserAddress>,
+        msg: M,
+        p: Priority,
+    ) -> ProtocolResult<()>
     where
         M: MessageCodec;
 }

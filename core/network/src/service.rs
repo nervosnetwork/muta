@@ -17,6 +17,7 @@ use futures::{
 use log::{debug, error, info};
 use protocol::{
     traits::{Context, Gossip, MessageCodec, MessageHandler, Priority, Rpc},
+    types::UserAddress,
     ProtocolResult,
 };
 
@@ -51,6 +52,20 @@ impl Gossip for NetworkServiceHandle {
         M: MessageCodec,
     {
         self.gossip.broadcast(cx, end, msg, p).await
+    }
+
+    async fn users_cast<M>(
+        &self,
+        cx: Context,
+        end: &str,
+        users: Vec<UserAddress>,
+        msg: M,
+        p: Priority,
+    ) -> ProtocolResult<()>
+    where
+        M: MessageCodec,
+    {
+        self.gossip.users_cast(cx, end, users, msg, p).await
     }
 }
 
@@ -142,7 +157,7 @@ impl NetworkService {
         // Build connection service
         let keeper = ConnectionServiceKeeper::new(mgr_tx.clone(), sys_tx.clone());
         let conn_srv = ConnectionService::<CoreProtocol>::new(proto, conn_config, keeper, conn_rx);
-        let conn_ctrl = conn_srv.control();
+        let conn_ctrl = conn_srv.control(mgr_tx.clone());
 
         // Build public service components
         let rpc_map = Arc::new(RpcMap::new());

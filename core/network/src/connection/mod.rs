@@ -13,17 +13,23 @@ use std::{
 
 use futures::{
     channel::mpsc::UnboundedReceiver,
+    channel::mpsc::UnboundedSender,
     compat::{Compat01As03, Stream01CompatExt},
     pin_mut,
     stream::Stream,
 };
 use log::{debug, error};
+use protocol::traits::Priority;
 use tentacle::{
     builder::ServiceBuilder, error::Error as TentacleError, multiaddr::Multiaddr,
     secio::SecioKeyPair, service::Service,
 };
 
-use crate::{error::NetworkError, event::ConnectionEvent, traits::NetworkProtocol};
+use crate::{
+    error::NetworkError,
+    event::{ConnectionEvent, PeerManagerEvent},
+    traits::NetworkProtocol,
+};
 
 pub struct ConnectionConfig {
     /// Secio keypair for stream encryption and peer identity
@@ -79,10 +85,13 @@ impl<P: NetworkProtocol> ConnectionService<P> {
         Ok(())
     }
 
-    pub fn control(&self) -> ConnectionServiceControl<P> {
+    pub fn control(
+        &self,
+        mgr_tx: UnboundedSender<PeerManagerEvent>,
+    ) -> ConnectionServiceControl<P> {
         let control_ref = self.inner.get_ref().control();
 
-        ConnectionServiceControl::new(control_ref.clone())
+        ConnectionServiceControl::new(control_ref.clone(), mgr_tx)
     }
 
     // NOTE: control.dial() and control.disconnect() both return same two
@@ -154,6 +163,21 @@ impl<P: NetworkProtocol> ConnectionService<P> {
                     let pending_disconnect = ConnectionEvent::Disconnect(sid);
 
                     self.pending_events.push_back(pending_disconnect);
+                }
+            }
+
+            ConnectionEvent::SendMsg { tar, msg, pri } => {
+                let proto_id = P::message_proto_id();
+                let tar2 = tar.clone();
+                let msg2 = msg.clone();
+
+                if let Err(()) = match pri {
+                    Priority::High => try_do!(control.quick_filter_broadcast(tar2, proto_id, msg2)),
+                    Priority::Normal => try_do!(control.filter_broadcast(tar2, proto_id, msg2)),
+                } {
+                    let pending_send_msg = ConnectionEvent::SendMsg { tar, msg, pri };
+
+                    self.pending_events.push_back(pending_send_msg);
                 }
             }
         }

@@ -6,8 +6,10 @@ use std::{
     time::{Duration, Instant},
 };
 
+use protocol::types::UserAddress;
 use serde_derive::{Deserialize, Serialize};
 use tentacle::{
+    bytes::Bytes,
     multiaddr::Multiaddr,
     secio::{PeerId, PublicKey},
 };
@@ -25,9 +27,10 @@ pub(super) struct PeerState {
 
 #[derive(Debug, Clone)]
 pub struct Peer {
-    id:     Arc<PeerId>,
-    pubkey: Arc<PublicKey>,
-    state:  PeerState,
+    id:        Arc<PeerId>,
+    user_addr: Arc<UserAddress>,
+    pubkey:    Arc<PublicKey>,
+    state:     PeerState,
 }
 
 impl PeerState {
@@ -46,22 +49,28 @@ impl PeerState {
             next_retry:  Instant::now(),
         }
     }
+
+    pub(super) fn addrs(&self) -> Vec<&Multiaddr> {
+        self.addr_set.iter().collect()
+    }
 }
 
 impl Peer {
     pub fn new(pid: PeerId, pubkey: PublicKey) -> Self {
         Peer {
-            id:     Arc::new(pid),
-            pubkey: Arc::new(pubkey),
-            state:  PeerState::new(),
+            id:        Arc::new(pid),
+            user_addr: Arc::new(Peer::pubkey_to_addr(&pubkey)),
+            pubkey:    Arc::new(pubkey),
+            state:     PeerState::new(),
         }
     }
 
     pub fn from_pair(pk_addr: (PublicKey, Multiaddr)) -> Self {
         Peer {
-            id:     Arc::new(pk_addr.0.peer_id()),
-            pubkey: Arc::new(pk_addr.0),
-            state:  PeerState::from_addrs(vec![pk_addr.1]),
+            id:        Arc::new(pk_addr.0.peer_id()),
+            user_addr: Arc::new(Peer::pubkey_to_addr(&pk_addr.0)),
+            pubkey:    Arc::new(pk_addr.0),
+            state:     PeerState::from_addrs(vec![pk_addr.1]),
         }
     }
 
@@ -71,6 +80,10 @@ impl Peer {
 
     pub fn pubkey(&self) -> &PublicKey {
         &self.pubkey
+    }
+
+    pub fn user_addr(&self) -> &UserAddress {
+        &self.user_addr
     }
 
     pub(super) fn state(&self) -> &PeerState {
@@ -118,5 +131,13 @@ impl Peer {
 
     pub fn reset_retry(&mut self) {
         self.state.retry_count = 0
+    }
+
+    // # Panic
+    pub(super) fn pubkey_to_addr(pubkey: &PublicKey) -> UserAddress {
+        let pubkey_bytes = Bytes::from(pubkey.inner_ref().clone());
+
+        UserAddress::from_pubkey_bytes(pubkey_bytes)
+            .expect("convert from secp256k1 public key should always success")
     }
 }

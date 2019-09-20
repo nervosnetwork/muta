@@ -192,6 +192,18 @@ impl UserAddress {
         Ok(UserAddress { inner })
     }
 
+    pub fn from_pubkey_bytes(bytes: Bytes) -> ProtocolResult<Self> {
+        let mut hash_val = Hash::digest(bytes).as_hex();
+
+        hash_val.truncate(40);
+        hash_val.insert_str(0, &hex::encode([ACCOUNT_ADDRESS_MAGIC]));
+
+        let decoded =
+            hex::decode(hash_val.clone()).map_err(|error| TypesError::FromHex { error })?;
+
+        Self::from_bytes(decoded.into())
+    }
+
     pub fn from_hex(s: &str) -> ProtocolResult<Self> {
         let s = clean_0x(s);
         let bytes = hex::decode(s).map_err(TypesError::from)?;
@@ -331,6 +343,17 @@ mod tests {
 
         let bytes = hash.as_bytes();
         Hash::from_bytes(bytes).unwrap();
+    }
+
+    #[test]
+    fn test_from_pubkey_bytes() {
+        let pubkey = "031313016e9670deb49779c1b0c646d6a25a545712658f9781995f623bcd0d0b3d";
+        let expect_addr = "10c38f8210896e11a75e1a1f13805d39088d157d7f";
+
+        let pubkey_bytes = Bytes::from(hex::decode(pubkey).unwrap());
+        let addr = UserAddress::from_pubkey_bytes(pubkey_bytes).unwrap();
+
+        assert_eq!(addr.as_hex(), expect_addr);
     }
 
     #[test]

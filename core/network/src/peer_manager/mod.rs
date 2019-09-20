@@ -29,18 +29,19 @@ use futures::{
 };
 use log::{debug, error};
 use parking_lot::RwLock;
+use protocol::types::UserAddress;
 use rand::seq::IteratorRandom;
 use tentacle::{
     multiaddr::Multiaddr,
     secio::{PeerId, PublicKey},
-    service::DialProtocol,
+    service::{DialProtocol, TargetSession},
     SessionId,
 };
 
 use crate::{
     common::HeartBeat,
     error::NetworkError,
-    event::{ConnectionEvent, PeerManagerEvent},
+    event::{ConnectionEvent, MultiUsersMessage, PeerManagerEvent},
 };
 
 const MAX_RETRY_COUNT: usize = 6;
@@ -100,14 +101,24 @@ impl Eq for UnknownAddr {}
 struct Inner {
     connecting: RwLock<HashSet<PeerId>>,
     addr_pid:   RwLock<HashMap<Multiaddr, PeerId>>,
+    user_pid:   RwLock<HashMap<UserAddress, PeerId>>,
     pool:       RwLock<HashMap<PeerId, Peer>>,
 }
 
 impl Inner {
+    pub fn user_peer(&self, user: &UserAddress) -> Option<Peer> {
+        let user_pid = self.user_pid.read();
+        let pool = self.pool.read();
+
+        user_pid.get(user).and_then(|pid| pool.get(pid).cloned())
+    }
+
     pub fn add_peer(&self, peer_id: PeerId, pubkey: PublicKey, addr: Multiaddr) {
         let mut pool = self.pool.write();
         let mut addr_pid = self.addr_pid.write();
+        let mut user_pid = self.user_pid.write();
 
+        user_pid.insert(Peer::pubkey_to_addr(&pubkey), peer_id.clone());
         addr_pid.insert(addr.clone(), peer_id.clone());
 
         pool.entry(peer_id.clone())
@@ -148,6 +159,8 @@ impl Inner {
 
         let mut addr_pid = self.addr_pid.write();
         if let Some(peer) = self.pool.write().remove(peer_id) {
+            self.user_pid.write().remove(peer.user_addr());
+
             for addr in peer.addrs().into_iter() {
                 addr_pid.remove(addr);
             }
@@ -155,9 +168,11 @@ impl Inner {
     }
 
     pub fn register_self(&self, peer_id: PeerId, pubkey: PublicKey) {
+        let user_addr = Peer::pubkey_to_addr(&pubkey);
         let peer = Peer::new(peer_id.clone(), pubkey);
 
         self.pool.write().insert(peer_id.clone(), peer);
+        self.user_pid.write().insert(user_addr, peer_id.clone());
         self.connect_peer(peer_id);
     }
 
@@ -224,13 +239,22 @@ impl Inner {
 
     pub fn insert_peers(&self, peers: Vec<(PublicKey, PeerState)>) {
         let mut pool = self.pool.write();
+        let mut user_pid = self.user_pid.write();
+        let mut addr_pid = self.addr_pid.write();
 
         for (pubkey, state) in peers.into_iter() {
             let peer_id = pubkey.peer_id();
+            let user_addr = Peer::pubkey_to_addr(&pubkey);
+
+            user_pid.insert(user_addr, peer_id.clone());
+
+            for addr in state.addrs().into_iter() {
+                addr_pid.insert(addr.clone(), peer_id.clone());
+            }
 
             pool.entry(peer_id.clone())
-                .or_insert_with(|| Peer::new(peer_id, pubkey))
-                .set_state(state)
+                .or_insert_with(|| Peer::new(peer_id.clone(), pubkey))
+                .set_state(state);
         }
     }
 }
@@ -240,6 +264,7 @@ impl Default for Inner {
         Inner {
             connecting: Default::default(),
             addr_pid:   Default::default(),
+            user_pid:   Default::default(),
             pool:       Default::default(),
         }
     }
@@ -516,6 +541,56 @@ impl PeerManager {
             }
             PeerManagerEvent::RemoveListenAddr { addr } => {
                 self.inner.remove_peer_addr(&self.config.our_id, &addr);
+            }
+            PeerManagerEvent::RouteMultiUsersMessage { users_msg, miss_tx } => {
+                let mut no_peers = vec![];
+                let mut connected = vec![];
+                let mut unconnected_peers = vec![];
+
+                for user_addr in users_msg.user_addrs.into_iter() {
+                    if let Some(peer) = self.inner.user_peer(&user_addr) {
+                        if let Some(sid) = self.peer_session.get(&peer.pid()) {
+                            connected.push(*sid);
+                        } else {
+                            unconnected_peers.push(peer);
+                        }
+                    } else {
+                        no_peers.push(user_addr);
+                    }
+                }
+
+                debug!("network: peer manager: no peers {:?}", no_peers);
+
+                // Send message to connected users
+                let tar = TargetSession::Multi(connected);
+                let MultiUsersMessage { msg, pri, .. } = users_msg;
+                let send_msg = ConnectionEvent::SendMsg { tar, msg, pri };
+
+                if self.conn_tx.unbounded_send(send_msg).is_err() {
+                    debug!("network: connection service exit");
+                }
+
+                // Try connect to unconnected peers
+                let unconnected_addrs = unconnected_peers
+                    .iter()
+                    .map(Peer::owned_addrs)
+                    .flatten()
+                    .collect::<Vec<_>>();
+
+                self.connect_peers(unconnected_addrs);
+
+                // Report missed user addresses
+                let mut missed_accounts = unconnected_peers
+                    .iter()
+                    .map(Peer::user_addr)
+                    .cloned()
+                    .collect::<Vec<_>>();
+
+                missed_accounts.extend(no_peers);
+
+                if miss_tx.send(missed_accounts).is_err() {
+                    debug!("network: peer manager route multi accounts message dropped")
+                }
             }
         }
     }
