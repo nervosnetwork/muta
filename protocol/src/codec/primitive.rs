@@ -57,6 +57,7 @@ pub enum ContractType {
     Asset = 0,
     Library = 1,
     App = 2,
+    Native = 3,
 }
 
 #[derive(Clone, Message)]
@@ -216,6 +217,7 @@ impl From<protocol_primitive::ContractAddress> for ContractAddress {
             protocol_primitive::ContractType::Asset => ContractType::Asset,
             protocol_primitive::ContractType::Library => ContractType::Library,
             protocol_primitive::ContractType::App => ContractType::App,
+            protocol_primitive::ContractType::Native => ContractType::Native,
         };
 
         ContractAddress {

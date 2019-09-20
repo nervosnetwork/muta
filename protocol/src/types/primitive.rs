@@ -17,7 +17,7 @@ lazy_static! {
 /// Hash length
 const HASH_LEN: usize = 32;
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Hash([u8; HASH_LEN]);
 /// Balance
 pub type Balance = BigUint;
@@ -88,9 +88,11 @@ const ASSET_CONTRACT_ADDRESS_MAGIC: u8 = 0x20;
 const APP_CONTRACT_ADDRESS_MAGIC: u8 = 0x21;
 /// Magic number of library contract address.
 const LIBRARY_CONTRACT_ADDRESS_MAGIC: u8 = 0x22;
+/// Magic number of native contract address.
+const NATIVE_CONTRACT_ADDRESS_MAGIC: u8 = 0x23;
 
 /// Contract type
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum ContractType {
     // Asset contract
     Asset,
@@ -98,27 +100,52 @@ pub enum ContractType {
     App,
     // Library contract, the code in the contract is not allowed to change the state world.
     Library,
+    // Native contract.
+    Native,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Address {
     User(UserAddress),
     Contract(ContractAddress),
 }
 
+impl Address {
+    pub fn from_bytes(bytes: Bytes) -> ProtocolResult<Self> {
+        if let Some(flag) = bytes.get(0) {
+            match *flag {
+                ACCOUNT_ADDRESS_MAGIC => Ok(Address::User(UserAddress::from_bytes(bytes)?)),
+                _ => Ok(Address::Contract(ContractAddress::from_bytes(bytes)?)),
+            }
+        } else {
+            Err(TypesError::InvalidAddress {
+                address: hex::encode(bytes.to_vec()),
+            }
+            .into())
+        }
+    }
+
+    pub fn as_bytes(&self) -> Bytes {
+        match self {
+            Address::User(user) => user.as_bytes(),
+            Address::Contract(contract) => contract.as_bytes(),
+        }
+    }
+}
+
 /// The address consists of 21 bytes, the first of which is a magic number that
 /// identifies which type the address belongs to.
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 struct InnerAddress([u8; ADDRESS_LEN]);
 
 /// Note: the account address here is an external account, not a contract.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct UserAddress {
     inner: InnerAddress,
 }
 
 /// Contract address.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ContractAddress {
     inner:         InnerAddress,
     contract_type: ContractType,
@@ -192,6 +219,7 @@ impl ContractAddress {
             ASSET_CONTRACT_ADDRESS_MAGIC => ContractType::Asset,
             APP_CONTRACT_ADDRESS_MAGIC => ContractType::App,
             LIBRARY_CONTRACT_ADDRESS_MAGIC => ContractType::Library,
+            NATIVE_CONTRACT_ADDRESS_MAGIC => ContractType::Native,
             _ => {
                 return Err(TypesError::InvalidAddress {
                     address: hex::encode(bytes.to_vec()),
