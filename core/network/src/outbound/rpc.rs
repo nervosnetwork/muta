@@ -3,7 +3,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use futures::future::TryFutureExt;
 use protocol::{
-    traits::{MessageCodec, Priority, Rpc},
+    traits::{Context, MessageCodec, Priority, Rpc},
     ProtocolResult,
 };
 use tentacle::{bytes::Bytes, service::TargetSession, SessionId};
@@ -14,7 +14,6 @@ use crate::{
     message::NetworkMessage,
     rpc_map::RpcMap,
     traits::{Compression, MessageSender, NetworkContext},
-    Context,
 };
 
 #[derive(Clone)]

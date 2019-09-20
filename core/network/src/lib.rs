@@ -1,7 +1,6 @@
-// TODO: Temporary allow for separated PRs, remove it in last PR.
-#![allow(dead_code, unused_imports)]
 mod common;
 mod compression;
+mod config;
 mod connection;
 mod endpoint;
 mod error;
@@ -12,8 +11,9 @@ mod peer_manager;
 mod protocols;
 mod reactor;
 mod rpc_map;
+mod service;
 mod traits;
 
-pub use message::serde;
-
-use protocol::traits::NContext as Context;
+pub use config::NetworkConfig;
+pub use message::{serde, serde_multi};
+pub use service::{NetworkService, NetworkServiceHandle};

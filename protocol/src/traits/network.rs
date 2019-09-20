@@ -1,19 +1,17 @@
-use std::{collections::HashMap, error::Error, fmt::Debug};
+use std::{error::Error, fmt::Debug};
 
 use async_trait::async_trait;
 use bytes::Bytes;
 use derive_more::Display;
 use serde::{Deserialize, Serialize};
 
-use crate::{ProtocolError, ProtocolErrorKind, ProtocolResult};
+use crate::{traits::Context, ProtocolError, ProtocolErrorKind, ProtocolResult};
 
 #[derive(Debug)]
 pub enum Priority {
     High,
     Normal,
 }
-
-pub type Context = HashMap<String, usize>;
 
 #[async_trait]
 pub trait MessageCodec: Sized + Send + Debug + 'static {

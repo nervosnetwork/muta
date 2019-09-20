@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use protocol::{
-    traits::{Gossip, MessageCodec, Priority},
+    traits::{Context, Gossip, MessageCodec, Priority},
     ProtocolResult,
 };
 use tentacle::{bytes::Bytes, service::TargetSession};
@@ -10,7 +10,6 @@ use crate::{
     error::NetworkError,
     message::NetworkMessage,
     traits::{Compression, MessageSender},
-    Context,
 };
 
 #[derive(Clone)]

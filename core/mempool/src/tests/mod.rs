@@ -2,7 +2,6 @@ extern crate test;
 
 mod mempool;
 
-use std::collections::HashMap;
 use std::convert::{From, TryFrom};
 use std::sync::Arc;
 
@@ -168,7 +167,7 @@ fn concurrent_broadcast(
         executor::block_on(async {
             mempool
                 .get_adapter()
-                .broadcast_tx(HashMap::new(), signed_tx.clone())
+                .broadcast_tx(Context::new(), signed_tx.clone())
                 .await
                 .unwrap();
         })
@@ -177,24 +176,24 @@ fn concurrent_broadcast(
 
 fn exec_insert(signed_tx: &SignedTransaction, mempool: Arc<HashMemPool<HashMemPoolAdapter>>) {
     executor::block_on(async {
-        let _ = mempool.insert(HashMap::new(), signed_tx.clone()).await;
+        let _ = mempool.insert(Context::new(), signed_tx.clone()).await;
     });
 }
 
 fn exec_flush(remove_hashes: Vec<Hash>, mempool: Arc<HashMemPool<HashMemPoolAdapter>>) {
     executor::block_on(async {
-        mempool.flush(HashMap::new(), remove_hashes).await.unwrap();
+        mempool.flush(Context::new(), remove_hashes).await.unwrap();
     });
 }
 
 fn exec_package(mempool: Arc<HashMemPool<HashMemPoolAdapter>>, cycle_limit: u64) -> MixedTxHashes {
-    executor::block_on(async { mempool.package(HashMap::new(), cycle_limit).await.unwrap() })
+    executor::block_on(async { mempool.package(Context::new(), cycle_limit).await.unwrap() })
 }
 
 fn exec_ensure_order_txs(require_hashes: Vec<Hash>, mempool: Arc<HashMemPool<HashMemPoolAdapter>>) {
     executor::block_on(async {
         mempool
-            .ensure_order_txs(HashMap::new(), require_hashes)
+            .ensure_order_txs(Context::new(), require_hashes)
             .await
             .unwrap();
     })
@@ -203,7 +202,7 @@ fn exec_ensure_order_txs(require_hashes: Vec<Hash>, mempool: Arc<HashMemPool<Has
 fn exec_sync_propose_txs(require_hashes: Vec<Hash>, mempool: Arc<HashMemPool<HashMemPoolAdapter>>) {
     executor::block_on(async {
         mempool
-            .sync_propose_txs(HashMap::new(), require_hashes)
+            .sync_propose_txs(Context::new(), require_hashes)
             .await
             .unwrap();
     })
@@ -215,7 +214,7 @@ fn exec_get_full_txs(
 ) -> Vec<SignedTransaction> {
     executor::block_on(async {
         mempool
-            .get_full_txs(HashMap::new(), require_hashes)
+            .get_full_txs(Context::new(), require_hashes)
             .await
             .unwrap()
     })

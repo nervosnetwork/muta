@@ -7,14 +7,14 @@ use std::{
     marker::PhantomData,
     pin::Pin,
     sync::Arc,
-    task::{Context, Poll},
+    task::{Context as TaskContext, Poll},
 };
 
 use async_trait::async_trait;
 use futures::{channel::mpsc::UnboundedReceiver, future::TryFutureExt, pin_mut, stream::Stream};
 use log::warn;
 use protocol::{
-    traits::{MessageCodec, MessageHandler},
+    traits::{Context, MessageCodec, MessageHandler},
     ProtocolError, ProtocolResult,
 };
 use tentacle::bytes::Bytes;
@@ -63,7 +63,7 @@ where
         let SessionMessage { sid, msg: net_msg } = smsg;
 
         let endpoint = net_msg.url.to_owned();
-        let mut ctx = crate::Context::new();
+        let mut ctx = Context::new();
         ctx.set_session_id(sid);
 
         let react = async move {
@@ -103,7 +103,7 @@ where
 {
     type Output = ();
 
-    fn poll(mut self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
+    fn poll(mut self: Pin<&mut Self>, ctx: &mut TaskContext<'_>) -> Poll<Self::Output> {
         loop {
             let smsg_rx = &mut self.as_mut().smsg_rx;
             pin_mut!(smsg_rx);
@@ -139,7 +139,7 @@ where
 {
     type Message = M;
 
-    async fn process(&self, _: crate::Context, _: &mut Self::Message) -> ProtocolResult<()> {
+    async fn process(&self, _: Context, _: &mut Self::Message) -> ProtocolResult<()> {
         Ok(())
     }
 }

@@ -1,4 +1,4 @@
-use protocol::traits::{NContext, Priority};
+use protocol::traits::{Cloneable, Context, Priority};
 use tentacle::{
     bytes::Bytes,
     service::TargetSession,
@@ -26,32 +26,41 @@ pub trait Compression {
     fn decompress(&self, bytes: Bytes) -> Result<Bytes, NetworkError>;
 }
 
-pub trait NetworkContext {
+pub trait NetworkContext: Sized {
     fn session_id(&self) -> Result<SessionId, NetworkError>;
-    fn set_session_id(&mut self, sid: SessionId);
+    fn set_session_id(&mut self, sid: SessionId) -> Self;
     fn rpc_id(&self) -> Result<u64, NetworkError>;
-    fn set_rpc_id(&mut self, rid: u64);
+    fn set_rpc_id(&mut self, rid: u64) -> Self;
 }
 
-impl NetworkContext for NContext {
+#[derive(Debug, Clone)]
+struct CtxSessionId(SessionId);
+
+impl Cloneable for CtxSessionId {}
+
+#[derive(Debug, Clone)]
+struct CtxRpcId(u64);
+
+impl Cloneable for CtxRpcId {}
+
+impl NetworkContext for Context {
     fn session_id(&self) -> Result<SessionId, NetworkError> {
-        self.get("session_id")
-            .map(|ref_sid| SessionId::new(*ref_sid))
+        self.get::<CtxSessionId>("session_id")
+            .map(|ctx_sid| ctx_sid.0)
             .ok_or_else(|| ErrorKind::NoSessionId.into())
     }
 
-    fn set_session_id(&mut self, sid: SessionId) {
-        self.insert("session_id".to_owned(), sid.value());
+    fn set_session_id(&mut self, sid: SessionId) -> Self {
+        self.with_value::<CtxSessionId>("session_id", CtxSessionId(sid))
     }
 
     fn rpc_id(&self) -> Result<u64, NetworkError> {
-        self.get("rpc_id")
-            .map(|ref_rid| *ref_rid as u64)
+        self.get::<CtxRpcId>("rpc_id")
+            .map(|ctx_rid| ctx_rid.0)
             .ok_or_else(|| ErrorKind::NoRpcId.into())
     }
 
-    fn set_rpc_id(&mut self, rid: u64) {
-        // FIXME: truncated rid
-        self.insert("rpc_id".to_owned(), rid as usize);
+    fn set_rpc_id(&mut self, rid: u64) -> Self {
+        self.with_value::<CtxRpcId>("rpc_id", CtxRpcId(rid))
     }
 }

@@ -1,12 +1,10 @@
-use std::collections::HashMap;
-
 use async_trait::async_trait;
 
-use crate::types::{Hash, SignedTransaction};
-use crate::ProtocolResult;
-
-#[allow(dead_code)]
-pub type Context = HashMap<String, String>;
+use crate::{
+    traits::Context,
+    types::{Hash, SignedTransaction},
+    ProtocolResult,
+};
 
 #[allow(dead_code)]
 pub struct MixedTxHashes {
