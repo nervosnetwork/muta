@@ -40,7 +40,7 @@ struct TakeMyMoney<N: Rpc> {
 impl<N: Rpc + Send + Sync + 'static> MessageHandler for TakeMyMoney<N> {
     type Message = Cyber7702Released;
 
-    async fn process(&self, ctx: Context, msg: &mut Self::Message) -> ProtocolResult<()> {
+    async fn process(&self, ctx: Context, msg: Self::Message) -> ProtocolResult<()> {
         println!("Rush to {}. Shut up, take my money", msg.shop);
 
         let copy: ACopy = self
@@ -75,7 +75,7 @@ struct Checkout<N: Rpc> {
 impl<N: Rpc + Send + Sync + 'static> MessageHandler for Checkout<N> {
     type Message = BuyACopy;
 
-    async fn process(&self, ctx: Context, _msg: &mut Self::Message) -> ProtocolResult<()> {
+    async fn process(&self, ctx: Context, _msg: Self::Message) -> ProtocolResult<()> {
         self.dealer
             .response(
                 ctx,
@@ -143,7 +143,7 @@ pub async fn main() {
         let peer_addr = SocketAddr::new(IP_ADDR, port);
         let peer_conf = base_conf
             .clone()
-            .bootstraps(vec![(bt_pubkey.encode().into(), bt_addr)])
+            .bootstraps(vec![(bt_pubkey.encode(), bt_addr)])
             .unwrap();
 
         let mut peer = NetworkService::new(peer_conf);

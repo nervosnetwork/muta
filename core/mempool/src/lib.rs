@@ -1,9 +1,16 @@
 #![feature(test)]
 
+mod adapter;
+mod context;
 mod map;
 #[cfg(test)]
 mod tests;
 mod tx_cache;
+
+pub use adapter::message::{
+    NewTxsHandler, PullTxsHandler, END_GOSSIP_NEW_TXS, END_RESP_PULL_TXS, END_RPC_PULL_TXS,
+};
+pub use adapter::DefaultMemPoolAdapter;
 
 use std::error::Error;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -15,6 +22,7 @@ use protocol::traits::{Context, MemPool, MemPoolAdapter, MixedTxHashes};
 use protocol::types::{Hash, SignedTransaction};
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
+use crate::context::TxContext;
 use crate::map::Map;
 use crate::tx_cache::TxCache;
 
@@ -89,7 +97,10 @@ where
             .check_storage_exist(ctx.clone(), tx_hash.clone())
             .await?;
         self.tx_cache.insert_new_tx(tx.clone())?;
-        self.adapter.broadcast_tx(ctx.clone(), tx).await?;
+
+        if !ctx.is_network_origin_txs() {
+            self.adapter.broadcast_tx(ctx, tx).await?;
+        }
 
         Ok(())
     }
@@ -183,20 +194,39 @@ where
 pub enum MemPoolError {
     #[display(fmt = "Tx: {:?} inserts failed", tx_hash)]
     Insert { tx_hash: Hash },
+
     #[display(fmt = "Mempool reaches limit: {}", pool_size)]
     ReachLimit { pool_size: usize },
+
     #[display(fmt = "Tx: {:?} exists in pool", tx_hash)]
     Dup { tx_hash: Hash },
+
     #[display(fmt = "Pull txs, require: {}, response: {}", require, response)]
     EnsureBreak { require: usize, response: usize },
+
     #[display(fmt = "Fetch full txs, require: {}, response: {}", require, response)]
     MisMatch { require: usize, response: usize },
+
     #[display(fmt = "Tx inserts candidate_queue failed, len: {}", len)]
     InsertCandidate { len: usize },
+
     #[display(fmt = "Tx: {:?} check_sig failed", tx_hash)]
     CheckSig { tx_hash: Hash },
+
     #[display(fmt = "Check_hash failed, expect: {:?}, get: {:?}", expect, actual)]
     CheckHash { expect: Hash, actual: Hash },
+
+    #[display(fmt = "Tx: {:?} already commit", tx_hash)]
+    CommittedTx { tx_hash: Hash },
+
+    #[display(fmt = "Tx: {:?} doesn't match our chain id", tx_hash)]
+    WrongChain { tx_hash: Hash },
+
+    #[display(fmt = "Tx: {:?} timeout {}", tx_hash, timeout)]
+    Timeout { tx_hash: Hash, timeout: u64 },
+
+    #[display(fmt = "Tx: {:?} invalid timeout", tx_hash)]
+    InvalidTimeout { tx_hash: Hash },
 }
 
 impl Error for MemPoolError {}

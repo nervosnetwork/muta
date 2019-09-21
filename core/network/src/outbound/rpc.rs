@@ -47,8 +47,8 @@ where
 #[async_trait]
 impl<S, C> Rpc for NetworkRpc<S, C>
 where
-    S: MessageSender + Sync + Clone,
-    C: Compression + Sync + Clone,
+    S: MessageSender + Send + Sync + Clone,
+    C: Compression + Send + Sync + Clone,
 {
     async fn call<M, R>(&self, cx: Context, end: &str, mut msg: M, p: Priority) -> ProtocolResult<R>
     where

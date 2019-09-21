@@ -68,15 +68,15 @@ where
 
         let react = async move {
             let endpoint = net_msg.url.parse::<Endpoint>()?;
-            let mut content = M::decode(Bytes::from(net_msg.content)).await?;
+            let content = M::decode(Bytes::from(net_msg.content)).await?;
 
             match endpoint.scheme() {
-                EndpointScheme::Gossip => handler.process(ctx, &mut content).await?,
+                EndpointScheme::Gossip => handler.process(ctx, content).await?,
                 EndpointScheme::RpcCall => {
                     let rpc_endpoint = RpcEndpoint::try_from(endpoint)?;
 
                     ctx.set_rpc_id(rpc_endpoint.rpc_id().value());
-                    handler.process(ctx, &mut content).await?
+                    handler.process(ctx, content).await?
                 }
                 EndpointScheme::RpcResponse => {
                     let rpc_endpoint = RpcEndpoint::try_from(endpoint)?;
@@ -139,7 +139,7 @@ where
 {
     type Message = M;
 
-    async fn process(&self, _: Context, _: &mut Self::Message) -> ProtocolResult<()> {
+    async fn process(&self, _: Context, _: Self::Message) -> ProtocolResult<()> {
         Ok(())
     }
 }

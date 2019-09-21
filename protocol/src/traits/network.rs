@@ -51,7 +51,7 @@ where
 }
 
 #[async_trait]
-pub trait Gossip {
+pub trait Gossip: Send + Sync {
     async fn broadcast<M>(&self, cx: Context, end: &str, msg: M, p: Priority) -> ProtocolResult<()>
     where
         M: MessageCodec;
@@ -69,7 +69,7 @@ pub trait Gossip {
 }
 
 #[async_trait]
-pub trait Rpc {
+pub trait Rpc: Send + Sync {
     async fn call<M, R>(&self, ctx: Context, end: &str, msg: M, pri: Priority) -> ProtocolResult<R>
     where
         M: MessageCodec,
@@ -84,5 +84,5 @@ pub trait Rpc {
 pub trait MessageHandler: Sync + Send + 'static {
     type Message: MessageCodec;
 
-    async fn process(&self, ctx: Context, msg: &mut Self::Message) -> ProtocolResult<()>;
+    async fn process(&self, ctx: Context, msg: Self::Message) -> ProtocolResult<()>;
 }
