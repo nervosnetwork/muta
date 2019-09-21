@@ -101,6 +101,7 @@ fn mock_proof(epoch_hash: Hash) -> Proof {
         round: 0,
         epoch_hash,
         signature: Default::default(),
+        bitmap: Default::default(),
     }
 }
 

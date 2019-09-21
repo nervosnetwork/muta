@@ -17,11 +17,11 @@ bytes = "0.4"
 hex = "0.3"
 prost = "0.5"
 hasher = { version = "0.1", features = ['hash-keccak'] }
+creep = "0.1"
 serde = "1.0"
 bincode = "1.1"
 serde_derive = "1.0"
 rlp = "0.4"
-creep = "0.1"
 
 [dev-dependencies]
 num-traits = "0.2"

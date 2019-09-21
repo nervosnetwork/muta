@@ -34,6 +34,12 @@ pub struct ProtocolError {
     error: Box<dyn Error + Send>,
 }
 
+impl From<ProtocolError> for Box<dyn Error + Send> {
+    fn from(error: ProtocolError) -> Self {
+        Box::new(error) as Box<dyn Error + Send>
+    }
+}
+
 impl Error for ProtocolError {}
 
 pub type ProtocolResult<T> = Result<T, ProtocolError>;

@@ -1,15 +1,19 @@
 use async_trait::async_trait;
+use creep::Context;
 
-use crate::{
-    traits::Context,
-    types::{Hash, SignedTransaction},
-    ProtocolResult,
-};
+use crate::types::{Hash, SignedTransaction};
+use crate::ProtocolResult;
 
 #[allow(dead_code)]
 pub struct MixedTxHashes {
     pub order_tx_hashes:   Vec<Hash>,
     pub propose_tx_hashes: Vec<Hash>,
+}
+
+impl MixedTxHashes {
+    pub fn clap(self) -> (Vec<Hash>, Vec<Hash>) {
+        (self.order_tx_hashes, self.propose_tx_hashes)
+    }
 }
 
 #[async_trait]

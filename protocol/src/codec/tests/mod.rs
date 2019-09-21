@@ -173,8 +173,9 @@ fn mock_sign_tx(atype: AType) -> SignedTransaction {
 
 fn mock_validator() -> Validator {
     Validator {
-        address: mock_account_address(),
-        weight:  1,
+        address:        mock_account_address(),
+        propose_weight: 1u8,
+        vote_weight:    1u8,
     }
 }
 
@@ -184,6 +185,7 @@ fn mock_proof() -> Proof {
         round:      0,
         epoch_hash: mock_hash(),
         signature:  Default::default(),
+        bitmap:     Default::default(),
     }
 }
 

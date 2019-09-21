@@ -14,6 +14,9 @@ lazy_static! {
     static ref HASHER_INST: HasherKeccak = HasherKeccak::new();
 }
 
+/// The epoch ID of the genesis epoch.
+pub const GENESIS_EPOCH_ID: u64 = 0;
+
 /// Hash length
 const HASH_LEN: usize = 32;
 

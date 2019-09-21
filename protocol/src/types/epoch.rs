@@ -32,12 +32,14 @@ pub struct Proof {
     pub round:      u64,
     pub epoch_hash: Hash,
     pub signature:  Bytes,
+    pub bitmap:     Bytes,
 }
 
 #[derive(Clone, Debug)]
 pub struct Validator {
-    pub address: UserAddress,
-    pub weight:  u64,
+    pub address:        UserAddress,
+    pub propose_weight: u8,
+    pub vote_weight:    u8,
 }
 
 #[derive(Clone, Debug)]

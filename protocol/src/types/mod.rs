@@ -14,6 +14,7 @@ pub use ethbloom::{Bloom, BloomRef, Input as BloomInput};
 pub use primitive::{
     Account, Address, ApprovedInfo, Asset, AssetID, AssetInfo, Balance, ContractAccount,
     ContractAddress, ContractType, Fee, Hash, MerkleRoot, UserAccount, UserAddress,
+    GENESIS_EPOCH_ID,
 };
 pub use receipt::{Receipt, ReceiptResult};
 pub use transaction::{RawTransaction, SignedTransaction, TransactionAction};

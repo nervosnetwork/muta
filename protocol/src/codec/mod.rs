@@ -18,6 +18,8 @@ use derive_more::{Display, From};
 
 use crate::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
+pub use serde::{Deserialize, Serialize};
+
 #[async_trait]
 pub trait ProtocolCodec: Sized + Send + ProtocolCodecSync {
     // Note: We take mut reference so that it can be pinned. This removes Sync

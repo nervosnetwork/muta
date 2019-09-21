@@ -1,12 +1,8 @@
-use std::collections::HashMap;
-
 use async_trait::async_trait;
+use creep::Context;
 
-use crate::types::{Epoch, Hash, Proof, Receipt, SignedTransaction, UserAddress};
+use crate::types::{Epoch, Hash, Proof, Receipt, SignedTransaction, UserAddress, Validator};
 use crate::{traits::mempool::MixedTxHashes, ProtocolResult};
-
-#[allow(dead_code)]
-pub type Context = HashMap<String, String>;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum MessageTarget {
@@ -51,11 +47,22 @@ pub trait ConsensusAdapter: Send + Sync {
     /// Check the correctness of the given transactions.
     async fn check_txs(&self, ctx: Context, txs: Vec<Hash>) -> ProtocolResult<()>;
 
+    /// Synchronous signed transactions.
+    async fn sync_txs(&self, ctx: Context, txs: Vec<Hash>) -> ProtocolResult<()>;
+
+    /// Get the signed transactions corresponding to the given hashes.
+    async fn get_full_txs(
+        &self,
+        ctx: Context,
+        txs: Vec<Hash>,
+    ) -> ProtocolResult<Vec<SignedTransaction>>;
+
     /// Consensus transmit a message to the given target.
     async fn transmit(
         &self,
         ctx: Context,
         msg: Vec<u8>,
+        end: &str,
         target: MessageTarget,
     ) -> ProtocolResult<()>;
 
@@ -78,4 +85,11 @@ pub trait ConsensusAdapter: Send + Sync {
         ctx: Context,
         signed_txs: Vec<SignedTransaction>,
     ) -> ProtocolResult<()>;
+
+    /// Get the validator list of the given last epoch.
+    async fn get_last_validators(
+        &self,
+        ctx: Context,
+        epoch_id: u64,
+    ) -> ProtocolResult<Vec<Validator>>;
 }

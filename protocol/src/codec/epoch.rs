@@ -85,6 +85,9 @@ pub struct Proof {
 
     #[prost(bytes, tag = "4")]
     pub signature: Vec<u8>,
+
+    #[prost(bytes, tag = "5")]
+    pub bitmap: Vec<u8>,
 }
 
 #[derive(Clone, Message)]
@@ -92,8 +95,11 @@ pub struct Validator {
     #[prost(message, tag = "1")]
     pub address: Option<UserAddress>,
 
-    #[prost(uint64, tag = "2")]
-    pub weight: u64,
+    #[prost(uint32, tag = "2")]
+    pub propose_weight: u32,
+
+    #[prost(uint32, tag = "3")]
+    pub vote_weight: u32,
 }
 
 #[derive(Clone, Message)]
@@ -257,6 +263,7 @@ impl From<epoch::Proof> for Proof {
             round: proof.round,
             epoch_hash,
             signature: proof.signature.to_vec(),
+            bitmap: proof.bitmap.to_vec(),
         }
     }
 }
@@ -272,6 +279,7 @@ impl TryFrom<Proof> for epoch::Proof {
             round:      proof.round,
             epoch_hash: protocol_primitive::Hash::try_from(epoch_hash)?,
             signature:  Bytes::from(proof.signature),
+            bitmap:     Bytes::from(proof.bitmap),
         };
 
         Ok(proof)
@@ -286,7 +294,8 @@ impl From<epoch::Validator> for Validator {
 
         Validator {
             address,
-            weight: validator.weight,
+            propose_weight: u32::from(validator.propose_weight),
+            vote_weight: u32::from(validator.vote_weight),
         }
     }
 }
@@ -298,8 +307,9 @@ impl TryFrom<Validator> for epoch::Validator {
         let address = field!(validator.address, "Validator", "address")?;
 
         let validator = epoch::Validator {
-            address: protocol_primitive::UserAddress::try_from(address)?,
-            weight:  validator.weight,
+            address:        protocol_primitive::UserAddress::try_from(address)?,
+            propose_weight: validator.propose_weight as u8,
+            vote_weight:    validator.vote_weight as u8,
         };
 
         Ok(validator)
@@ -366,3 +376,14 @@ impl TryFrom<EpochId> for epoch::EpochId {
 // #################
 
 impl_default_bytes_codec_for!(epoch, [Epoch, EpochHeader, Proof, Validator, Pill, EpochId]);
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn test_u8_convert_u32() {
+        for i in u8::min_value()..u8::max_value() {
+            let j = u32::from(i);
+            assert_eq!(i, (j as u8));
+        }
+    }
+}

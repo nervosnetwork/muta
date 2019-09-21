@@ -8,9 +8,17 @@ edition = "2018"
 
 [dependencies]
 async-trait = "0.1"
+bincode = "1.1"
 bytes = "0.4"
+creep = "0.1"
 derive_more = "0.15"
-overlord = {git = "https://github.com/cryptape/overlord.git"}
+overlord = { git = "https://github.com/cryptape/overlord.git" }
+parking_lot = "0.9"
+rlp = "0.4"
+serde = {version = "1.0", features = ["derive"]}
 
-protocol = { path = "../../protocol" }
 common-crypto = { path = "../../common/crypto"}
+core-mempool = { path = "../../core/mempool"}
+core-storage = { path = "../../core/storage"}
+core-network = { path = "../../core/network"}
+protocol = { path = "../../protocol" }
