@@ -63,8 +63,7 @@ where
         let SessionMessage { sid, msg: net_msg } = smsg;
 
         let endpoint = net_msg.url.to_owned();
-        let mut ctx = Context::new();
-        ctx.set_session_id(sid);
+        let mut ctx = Context::new().set_session_id(sid);
 
         let react = async move {
             let endpoint = net_msg.url.parse::<Endpoint>()?;
@@ -75,7 +74,7 @@ where
                 EndpointScheme::RpcCall => {
                     let rpc_endpoint = RpcEndpoint::try_from(endpoint)?;
 
-                    ctx.set_rpc_id(rpc_endpoint.rpc_id().value());
+                    let ctx = ctx.set_rpc_id(rpc_endpoint.rpc_id().value());
                     handler.process(ctx, content).await?
                 }
                 EndpointScheme::RpcResponse => {

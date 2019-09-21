@@ -57,6 +57,7 @@ impl NetworkContext for Context {
             .ok_or_else(|| ErrorKind::NoSessionId.into())
     }
 
+    #[must_use]
     fn set_session_id(&mut self, sid: SessionId) -> Self {
         self.with_value::<CtxSessionId>("session_id", CtxSessionId(sid))
     }
@@ -67,6 +68,7 @@ impl NetworkContext for Context {
             .ok_or_else(|| ErrorKind::NoRpcId.into())
     }
 
+    #[must_use]
     fn set_rpc_id(&mut self, rid: u64) -> Self {
         self.with_value::<CtxRpcId>("rpc_id", CtxRpcId(rid))
     }
