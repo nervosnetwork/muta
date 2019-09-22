@@ -110,6 +110,8 @@ impl<Adapter: StorageAdapter> Storage<Adapter> for ImplStorage<Adapter> {
             id: epoch.header.epoch_id,
         };
         let mut header = epoch.header.clone();
+
+        // TODO(@yejiayu): rlp.
         let epoch_hash = Hash::digest(header.encode().await?);
 
         self.adapter
@@ -158,6 +160,7 @@ impl<Adapter: StorageAdapter> Storage<Adapter> for ImplStorage<Adapter> {
     }
 
     async fn get_epoch_by_epoch_id(&self, epoch_id: u64) -> ProtocolResult<Epoch> {
+        println!("{:?} epochid", epoch_id);
         let epoch_id = EpochId { id: epoch_id };
         let epoch = get!(self, epoch_id, EpochSchema);
 

@@ -1,0 +1,42 @@
+{
+    "timestamp": 0,
+    "prevhash": "44915be5b6c20b0678cf05fcddbbaa832e25d7e6ac538784cd5c24de00d47472",
+    "state_alloc": [
+        {
+            "address": "10f3f6097052714c4a84a525e4975e7b9241a06e98",
+            "assets": [
+                {
+                    "asset_id": "0x20",
+                    "balance": "400000000000000000"
+                }
+            ]
+        },
+        {
+            "address": "10fa7ac58e5fd3c965d704a35e9527d577953997d5",
+            "assets": [
+                {
+                    "asset_id": "0x20",
+                    "balance": "400000000000000000"
+                }
+            ]
+        },
+        {
+            "address": "1026141639d691021ae7cccf96f05df9605b9d8fc1",
+            "assets": [
+                {
+                    "asset_id": "0x20",
+                    "balance": "400000000000000000"
+                }
+            ]
+        },
+        {
+            "address": "10a415419e2d6ce0cf8db5517fd4fa38167075e2ad",
+            "assets": [
+                {
+                    "asset_id": "0x20",
+                    "balance": "400000000000000000"
+                }
+            ]
+        }
+    ]
+}

@@ -1,4 +1,5 @@
 pub(crate) mod epoch;
+pub(crate) mod genesis;
 pub(crate) mod primitive;
 pub(crate) mod receipt;
 pub(crate) mod transaction;
@@ -11,6 +12,7 @@ use crate::{ProtocolError, ProtocolErrorKind};
 
 pub use epoch::{Epoch, EpochHeader, EpochId, Pill, Proof, Validator};
 pub use ethbloom::{Bloom, BloomRef, Input as BloomInput};
+pub use genesis::{Genesis, GenesisStateAlloc, GenesisStateAsset};
 pub use primitive::{
     Account, Address, ApprovedInfo, Asset, AssetID, AssetInfo, Balance, ContractAccount,
     ContractAddress, ContractType, Fee, Hash, MerkleRoot, UserAccount, UserAddress,

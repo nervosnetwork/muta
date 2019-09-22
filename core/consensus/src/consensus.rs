@@ -1,4 +1,3 @@
-use std::marker::PhantomData;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -7,48 +6,27 @@ use overlord::types::{AggregatedVote, Node, OverlordMsg, SignedProposal, SignedV
 use overlord::{Overlord, OverlordHandler};
 use rlp::decode;
 
-use common_crypto::{Secp256k1PrivateKey, Secp256k1PublicKey};
+use common_crypto::{PrivateKey, Secp256k1PrivateKey};
 
-use protocol::traits::{Consensus, Gossip, MemPool, MemPoolAdapter, Storage, StorageAdapter};
+use protocol::traits::{Consensus, ConsensusAdapter};
 use protocol::types::{Epoch, Hash, Proof, SignedTransaction, UserAddress, Validator};
 use protocol::ProtocolResult;
 
-use crate::adapter::OverlordConsensusAdapter;
 use crate::engine::ConsensusEngine;
 use crate::fixed_types::{FixedPill, FixedSignedTxs};
 use crate::util::OverlordCrypto;
 use crate::{ConsensusError, MsgType};
 
-pub type OverlordRuntime<G, M, S, MA, SA> =
-    Overlord<FixedPill, FixedSignedTxs, ConsensusEngine<G, M, S, MA, SA>, OverlordCrypto>;
-
 /// Provide consensus
-pub struct ConsensusProvider<
-    MA: MemPoolAdapter + 'static,
-    SA: StorageAdapter + 'static,
-    G: Gossip + Send + Sync,
-    M: MemPool<MA>,
-    S: Storage<SA>,
-> {
+pub struct OverlordConsensus<Adapter: ConsensusAdapter + 'static> {
     /// Overlord consensus protocol instance.
-    overlord: Option<OverlordRuntime<G, M, S, MA, SA>>,
+    inner: Arc<Overlord<FixedPill, FixedSignedTxs, ConsensusEngine<Adapter>, OverlordCrypto>>,
     /// An overlord consensus protocol handler.
     handler: OverlordHandler<FixedPill>,
-
-    mempool_adapter: PhantomData<MA>,
-    storage_adapter: PhantomData<SA>,
 }
 
 #[async_trait]
-impl<MA, SA, G, M, S> Consensus<OverlordConsensusAdapter<G, M, S, MA, SA>>
-    for ConsensusProvider<MA, SA, G, M, S>
-where
-    MA: MemPoolAdapter + 'static,
-    SA: StorageAdapter + 'static,
-    G: Gossip + Send + Sync,
-    M: MemPool<MA> + 'static,
-    S: Storage<SA> + 'static,
-{
+impl<Adapter: ConsensusAdapter + 'static> Consensus<Adapter> for OverlordConsensus<Adapter> {
     async fn set_proposal(&self, ctx: Context, proposal: Vec<u8>) -> ProtocolResult<()> {
         let signed_proposal: SignedProposal<FixedPill> =
             decode(&proposal).map_err(|_| ConsensusError::DecodeErr(MsgType::SignedProposal))?;
@@ -87,40 +65,28 @@ where
     }
 }
 
-impl<MA, SA, G, M, S> ConsensusProvider<MA, SA, G, M, S>
-where
-    MA: MemPoolAdapter + 'static,
-    SA: StorageAdapter + 'static,
-    G: Gossip + Send + Sync + 'static,
-    M: MemPool<MA> + 'static,
-    S: Storage<SA> + 'static,
-{
+impl<Adapter: ConsensusAdapter + 'static> OverlordConsensus<Adapter> {
     pub fn new(
         init_epoch_id: u64,
         chain_id: Hash,
         address: UserAddress,
         cycle_limit: u64,
         validators: Vec<Validator>,
-        pub_key: Secp256k1PublicKey,
         priv_key: Secp256k1PrivateKey,
-        gossip_network: Arc<G>,
-        menpool_adapter: Arc<M>,
-        storage_adapter: Arc<S>,
+        adapter: Arc<Adapter>,
     ) -> Self {
         let engine = ConsensusEngine::new(
             chain_id,
             address.clone(),
             cycle_limit,
             validators.clone(),
-            gossip_network,
-            menpool_adapter,
-            storage_adapter,
+            Arc::clone(&adapter),
         );
 
-        let crypto = OverlordCrypto::new(pub_key, priv_key);
+        let crypto = OverlordCrypto::new(priv_key.pub_key(), priv_key);
 
-        let mut overlord = Overlord::new(address.as_bytes(), engine, crypto);
-        let overlord_handler = overlord.take_handler();
+        let overlord = Overlord::new(address.as_bytes(), engine, crypto);
+        let overlord_handler = overlord.get_handler();
         overlord_handler
             .send_msg(
                 Context::new(),
@@ -128,17 +94,19 @@ where
             )
             .unwrap();
 
-        ConsensusProvider {
-            overlord:        Some(overlord),
-            handler:         overlord_handler,
-            mempool_adapter: PhantomData,
-            storage_adapter: PhantomData,
+        Self {
+            inner:   Arc::new(overlord),
+            handler: overlord_handler,
         }
     }
 
-    pub fn take_overlord(&mut self) -> OverlordRuntime<G, M, S, MA, SA> {
-        assert!(self.overlord.is_some());
-        self.overlord.take().unwrap()
+    pub async fn run(&self, interval: u64) -> ProtocolResult<()> {
+        self.inner
+            .run(interval)
+            .await
+            .map_err(|e| ConsensusError::OverlordErr(Box::new(e)))?;
+
+        Ok(())
     }
 }
 
@@ -154,7 +122,7 @@ fn handle_genesis(epoch_id: u64, validators: Vec<Validator>) -> Status {
 
     authority_list.sort();
     Status {
-        epoch_id,
+        epoch_id: epoch_id + 1,
         interval: None,
         authority_list,
     }

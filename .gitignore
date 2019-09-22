@@ -23,7 +23,7 @@ Cargo.lock
 .vscode/
 
 # dev
-devtools/data
+devtools/chain/data
 
 # rocksdb
 **/rocksdb/

@@ -6,22 +6,18 @@ use async_trait::async_trait;
 use bincode::serialize;
 use bytes::Bytes;
 use overlord::types::{Commit, Node, OverlordMsg, Status};
-use overlord::Consensus as Overlord;
+use overlord::Consensus as Engine;
 use parking_lot::RwLock;
 use rlp::Encodable;
 
 use protocol::codec::ProtocolCodec;
-use protocol::traits::{
-    ConsensusAdapter, Context, Gossip, MemPool, MemPoolAdapter, MessageTarget, Storage,
-    StorageAdapter,
-};
+use protocol::traits::{ConsensusAdapter, Context, MessageTarget};
 use protocol::types::{
     Bloom, Epoch, EpochHeader, Fee, Hash, MerkleRoot, Pill, Proof, UserAddress, Validator,
     GENESIS_EPOCH_ID,
 };
 use protocol::ProtocolError;
 
-use crate::adapter::OverlordConsensusAdapter;
 use crate::fixed_types::{FixedPill, FixedSignedTxs};
 use crate::message::{
     Proposal, Vote, END_GOSSIP_AGGREGATED_VOTE, END_GOSSIP_SIGNED_PROPOSAL, END_GOSSIP_SIGNED_VOTE,
@@ -33,13 +29,7 @@ const INIT_ROUND: u64 = 0;
 
 /// validator is for create new epoch, and authority is for build overlord
 /// status.
-pub struct ConsensusEngine<
-    G: Gossip,
-    M: MemPool<MA>,
-    S: Storage<SA>,
-    MA: MemPoolAdapter,
-    SA: StorageAdapter,
-> {
+pub struct ConsensusEngine<Adapter> {
     chain_id:       Hash,
     address:        UserAddress,
     cycle_limit:    u64,
@@ -47,17 +37,12 @@ pub struct ConsensusEngine<
     latest_header:  RwLock<HeaderCache>,
     validators:     Vec<Validator>,
     authority:      Vec<Node>,
-    adapter:        OverlordConsensusAdapter<G, M, S, MA, SA>,
+    adapter:        Arc<Adapter>,
 }
 
 #[async_trait]
-impl<G, M, S, MA, SA> Overlord<FixedPill, FixedSignedTxs> for ConsensusEngine<G, M, S, MA, SA>
-where
-    G: Gossip + Sync + Send,
-    M: MemPool<MA>,
-    S: Storage<SA>,
-    MA: MemPoolAdapter + 'static,
-    SA: StorageAdapter + 'static,
+impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill, FixedSignedTxs>
+    for ConsensusEngine<Adapter>
 {
     async fn get_epoch(
         &self,
@@ -164,7 +149,7 @@ where
             bitmap:     tmp.signature.address_bitmap,
         };
 
-        self.adapter.save_proof(ctx.clone(), proof).await?;
+        self.adapter.save_proof(ctx.clone(), proof.clone()).await?;
 
         // Get full transactions from mempool temporarily.
         // Storage save the signed transactions.
@@ -185,12 +170,16 @@ where
             .flush_mempool(ctx.clone(), epoch.ordered_tx_hashes.clone())
             .await?;
 
-        let _prev_hash = Hash::digest(epoch.encode().await?);
+        let prev_hash = Hash::digest(epoch.encode().await?);
 
         // TODO: update header cache.
+        let mut header = self.latest_header.write();
+        header.epoch_id = epoch_id + 1;
+        header.prev_hash = prev_hash;
+        header.proof = proof;
 
         let status = Status {
-            epoch_id:       epoch_id + 1,
+            epoch_id:       header.epoch_id,
             interval:       None,
             authority_list: self.authority.clone(),
         };
@@ -269,24 +258,14 @@ where
     }
 }
 
-impl<G, M, S, MA, SA> ConsensusEngine<G, M, S, MA, SA>
-where
-    G: Gossip + Sync + Send,
-    M: MemPool<MA>,
-    S: Storage<SA>,
-    MA: MemPoolAdapter + 'static,
-    SA: StorageAdapter + 'static,
-{
+impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
     pub fn new(
         chain_id: Hash,
         address: UserAddress,
         cycle_limit: u64,
         validators: Vec<Validator>,
-        network: Arc<G>,
-        mempool: Arc<M>,
-        storage: Arc<S>,
+        adapter: Arc<Adapter>,
     ) -> Self {
-        let adapter = OverlordConsensusAdapter::new(network, mempool, storage);
         let mut authority = validators
             .clone()
             .into_iter()
@@ -299,7 +278,7 @@ where
 
         authority.sort();
 
-        ConsensusEngine {
+        Self {
             chain_id,
             address,
             cycle_limit,
@@ -336,7 +315,7 @@ impl Default for HeaderCache {
         };
 
         HeaderCache {
-            epoch_id:     GENESIS_EPOCH_ID,
+            epoch_id:     GENESIS_EPOCH_ID + 1,
             prev_hash:    Hash::from_empty(),
             logs_bloom:   Bloom::zero(),
             order_root:   MerkleRoot::from_empty(),

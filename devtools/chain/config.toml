@@ -1,0 +1,25 @@
+# chain id
+chain_id = "b6a4d7da21443f5e816e8700eea87610e6d769657d6b8ec73028457bf2ca4036"  # by sha256(Muta)
+
+# crypto
+privkey = "67df77adbc271f558df88504cf3a3f87bfdd2d55b11e86c55c4fd978a935a836"
+
+# db config
+data_path = "./devtools/chain/data"
+
+[network]
+listening_address = "0.0.0.0:1337"
+
+[[network.bootstraps]]
+pubkey = "0c000000080008000000040008000000040000002100000002d3071ef493b3a661e892a19dc02904569f98c81337ffa3fe69acd6c53aed9395000000"
+address = "0.0.0.0:1888"
+
+[mempool]
+timeout_gap = 20
+pool_size = 20000
+
+[consensus]
+cycles_limit = 99999999
+interval = 3000
+verifier_list = [ "10f3f6097052714c4a84a525e4975e7b9241a06e98" ]
+

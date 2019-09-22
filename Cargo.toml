@@ -5,10 +5,25 @@ authors = ["Cryptape Technologies <contact@cryptape.com>"]
 edition = "2018"
 
 [dependencies]
+common-logger = { path = "./common/logger" }
+common-config-parser = { path = "./common/config-parser" }
+common-crypto = { path = "./common/crypto" }
 protocol = { path = "./protocol" }
 core-storage = { path = "./core/storage" }
+core-mempool = { path = "./core/mempool" }
+core-network = { path = "./core/network" }
+core-consensus = { path = "./core/consensus" }
 
+parking_lot = "0.9"
 runtime = "0.3.0-alpha.7"
+runtime-tokio = "0.3.0-alpha.6"
+serde = "1.0"
+serde_derive = "1.0"
+serde_json = "1.0"
+log = "0.4"
+clap = "2.33"
+bytes = "0.4"
+hex = "0.3"
 
 [workspace]
 members = [

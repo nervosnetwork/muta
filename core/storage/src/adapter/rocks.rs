@@ -1,4 +1,5 @@
 use std::error::Error;
+use std::path::Path;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -16,7 +17,7 @@ pub struct RocksAdapter {
 }
 
 impl RocksAdapter {
-    pub fn new(path: String) -> ProtocolResult<Self> {
+    pub fn new<P: AsRef<Path>>(path: P) -> ProtocolResult<Self> {
         let mut opts = Options::default();
         opts.create_if_missing(true);
         opts.create_missing_column_families(true);

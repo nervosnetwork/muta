@@ -1,9 +1,10 @@
-mod adapter;
-pub mod consensus;
 mod engine;
 mod fixed_types;
-pub mod message;
 mod util;
+
+pub mod adapter;
+pub mod consensus;
+pub mod message;
 
 use std::error::Error;
 

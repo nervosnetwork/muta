@@ -12,7 +12,7 @@ bincode = "1.1"
 bytes = "0.4"
 creep = "0.1"
 derive_more = "0.15"
-overlord = { git = "https://github.com/cryptape/overlord.git" }
+overlord = { git = "https://github.com/cryptape/overlord.git", branch = "dev" }
 parking_lot = "0.9"
 rlp = "0.4"
 serde = {version = "1.0", features = ["derive"]}

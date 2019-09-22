@@ -6,7 +6,10 @@ use rlp_types::RlpSignedTransaction;
 
 use std::{
     marker::PhantomData,
-    sync::atomic::{AtomicU64, Ordering},
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc,
+    },
 };
 
 use async_trait::async_trait;
@@ -20,9 +23,9 @@ use protocol::{
 
 use crate::MemPoolError;
 
-pub struct DefaultMemPoolAdapter<N, S, SA, C> {
+pub struct DefaultMemPoolAdapter<C, N, S, SA> {
     network: N,
-    storage: S,
+    storage: Arc<S>,
 
     timeout_gap: AtomicU64,
 
@@ -30,14 +33,14 @@ pub struct DefaultMemPoolAdapter<N, S, SA, C> {
     pin_sa: PhantomData<SA>,
 }
 
-impl<N, S, SA, C> DefaultMemPoolAdapter<N, S, SA, C>
+impl<C, N, S, SA> DefaultMemPoolAdapter<C, N, S, SA>
 where
+    C: Crypto,
     N: Rpc + Gossip,
     S: Storage<SA>,
     SA: StorageAdapter,
-    C: Crypto,
 {
-    pub fn new(network: N, storage: S, timeout_gap: u64) -> Self {
+    pub fn new(network: N, storage: Arc<S>, timeout_gap: u64) -> Self {
         DefaultMemPoolAdapter {
             network,
             storage,
@@ -50,12 +53,12 @@ where
 }
 
 #[async_trait]
-impl<N, S, SA, C> MemPoolAdapter for DefaultMemPoolAdapter<N, S, SA, C>
+impl<C, N, S, SA> MemPoolAdapter for DefaultMemPoolAdapter<C, N, S, SA>
 where
+    C: Crypto + Send + Sync + 'static,
     N: Rpc + Gossip + 'static,
     S: Storage<SA> + 'static,
     SA: StorageAdapter + 'static,
-    C: Crypto + Send + Sync + 'static,
 {
     async fn pull_txs(
         &self,
