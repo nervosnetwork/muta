@@ -1,33 +1,52 @@
 pub mod contract;
 
-use async_trait::async_trait;
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use bytes::Bytes;
 
-use crate::types::{Address, ContractAddress};
+use crate::types::{
+    Address, Bloom, CarryingAsset, ContractAddress, Fee, Hash, MerkleRoot, Receipt,
+    SignedTransaction,
+};
 use crate::ProtocolResult;
 
-#[async_trait]
-pub trait Executor<Adapter: ExecutorAdapter>: Send + Sync {
-    type Adapter: ExecutorAdapter;
-
-    fn exec(&self) -> ProtocolResult<()>;
+#[derive(Clone, Debug)]
+pub struct ExecutorExecResp {
+    pub receipts:        Vec<Receipt>,
+    pub all_cycles_used: Vec<Fee>,
+    pub logs_bloom:      Bloom,
+    pub state_root:      MerkleRoot,
 }
 
-#[async_trait]
-pub trait ExecutorAdapter: Send + Sync {
-    fn get_epoch_header(&self) -> ProtocolResult<()>;
+pub trait Executor {
+    fn exec(
+        &mut self,
+        epoch_id: u64,
+        cycles_price: u64,
+        coinbase: Address,
+        signed_txs: Vec<SignedTransaction>,
+    ) -> ProtocolResult<ExecutorExecResp>;
 }
 
 #[derive(Clone, Debug)]
 pub struct InvokeContext {
-    cycle_used: u64,
-    caller:     Address,
+    pub chain_id:       Hash,
+    pub cycles_used:    Fee,
+    pub cycles_limit:   Fee,
+    pub cycles_price:   u64,
+    pub epoch_id:       u64,
+    pub caller:         Address,
+    pub carrying_asset: Option<CarryingAsset>,
+    pub coinbase:       Address,
 }
+
+pub type RcInvokeContext = Rc<RefCell<InvokeContext>>;
 
 pub trait Dispatcher {
     fn invoke(
         &self,
-        ictx: InvokeContext,
+        ictx: RcInvokeContext,
         address: ContractAddress,
         method: &str,
         args: Vec<Bytes>,

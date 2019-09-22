@@ -22,7 +22,8 @@ use common_crypto::{
 use protocol::codec::ProtocolCodec;
 use protocol::traits::{Context, MemPool, MemPoolAdapter, MixedTxHashes};
 use protocol::types::{
-    Fee, Hash, RawTransaction, SignedTransaction, TransactionAction, UserAddress as Address,
+    CarryingAsset, Fee, Hash, RawTransaction, SignedTransaction, TransactionAction,
+    UserAddress as Address,
 };
 use protocol::ProtocolResult;
 
@@ -233,9 +234,11 @@ fn mock_signed_tx(
         cycle:    TX_CYCLE,
     };
     let action = TransactionAction::Transfer {
-        receiver: address.clone(),
-        asset_id: nonce.clone(),
-        amount:   FromPrimitive::from_i32(AMOUNT).unwrap(),
+        receiver:       address.clone(),
+        carrying_asset: CarryingAsset {
+            asset_id: nonce.clone(),
+            amount:   FromPrimitive::from_i32(AMOUNT).unwrap(),
+        },
     };
     let mut raw = RawTransaction {
         chain_id: nonce.clone(),

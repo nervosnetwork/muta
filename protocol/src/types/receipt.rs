@@ -17,6 +17,7 @@ pub struct Receipt {
 pub enum ReceiptResult {
     Transfer {
         receiver:      UserAddress,
+        asset_id:      AssetID,
         before_amount: Balance,
         after_amount:  Balance,
     },

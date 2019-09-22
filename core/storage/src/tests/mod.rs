@@ -14,7 +14,7 @@ use num_traits::FromPrimitive;
 use rand::random;
 
 use protocol::types::{
-    Epoch, EpochHeader, Fee, Hash, Proof, RawTransaction, Receipt, ReceiptResult,
+    CarryingAsset, Epoch, EpochHeader, Fee, Hash, Proof, RawTransaction, Receipt, ReceiptResult,
     SignedTransaction, TransactionAction, UserAddress,
 };
 
@@ -27,9 +27,11 @@ fn mock_signed_tx(tx_hash: Hash) -> SignedTransaction {
     let addr_str = "10CAB8EEA4799C21379C20EF5BAA2CC8AF1BEC475B";
 
     let action = TransactionAction::Transfer {
-        receiver: UserAddress::from_hex(addr_str).unwrap(),
-        asset_id: nonce.clone(),
-        amount:   FromPrimitive::from_i32(10).unwrap(),
+        receiver:       UserAddress::from_hex(addr_str).unwrap(),
+        carrying_asset: CarryingAsset {
+            asset_id: nonce.clone(),
+            amount:   FromPrimitive::from_i32(10).unwrap(),
+        },
     };
     let raw = RawTransaction {
         chain_id: nonce.clone(),
@@ -56,6 +58,7 @@ fn mock_receipt(tx_hash: Hash) -> Receipt {
     let addr_str = "10CAB8EEA4799C21379C20EF5BAA2CC8AF1BEC475B";
     let result = ReceiptResult::Transfer {
         receiver:      UserAddress::from_hex(addr_str).unwrap(),
+        asset_id:      nonce.clone(),
         before_amount: FromPrimitive::from_i32(10).unwrap(),
         after_amount:  FromPrimitive::from_i32(20).unwrap(),
     };

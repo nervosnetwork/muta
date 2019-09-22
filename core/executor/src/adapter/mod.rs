@@ -1,3 +1,5 @@
 mod contract;
 
-pub use contract::{GeneralContractStateAdapter, GeneralContractStateAdapterError};
+pub use contract::{
+    GeneralContractStateAdapter, GeneralContractStateAdapterError, RcGeneralContractStateAdapter,
+};

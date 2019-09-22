@@ -37,7 +37,6 @@ members = [
   "common/pubsub",
 
   "core/api",
-  "core/bank",
   "core/consensus",
   "core/executor",
   "core/mempool",

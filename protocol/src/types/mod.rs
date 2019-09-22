@@ -19,7 +19,7 @@ pub use primitive::{
     GENESIS_EPOCH_ID,
 };
 pub use receipt::{Receipt, ReceiptResult};
-pub use transaction::{RawTransaction, SignedTransaction, TransactionAction};
+pub use transaction::{CarryingAsset, RawTransaction, SignedTransaction, TransactionAction};
 
 #[derive(Debug, Display, From)]
 pub enum TypesError {

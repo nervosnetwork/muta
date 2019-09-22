@@ -55,8 +55,10 @@ pub struct Transfer {
     #[prost(message, tag = "1")]
     pub receiver: Option<UserAddress>,
     #[prost(message, tag = "2")]
-    pub before_amount: Option<Balance>,
+    pub asset_id: Option<AssetID>,
     #[prost(message, tag = "3")]
+    pub before_amount: Option<Balance>,
+    #[prost(message, tag = "4")]
     pub after_amount: Option<Balance>,
 }
 
@@ -107,11 +109,13 @@ impl From<receipt::ReceiptResult> for ReceiptResult {
         match result {
             receipt::ReceiptResult::Transfer {
                 receiver,
+                asset_id,
                 before_amount,
                 after_amount,
             } => {
                 let transfer = Transfer {
                     receiver:      Some(UserAddress::from(receiver)),
+                    asset_id:      Some(AssetID::from(asset_id)),
                     before_amount: Some(Balance::from(before_amount)),
                     after_amount:  Some(Balance::from(after_amount)),
                 };
@@ -171,6 +175,7 @@ impl TryFrom<ReceiptResult> for receipt::ReceiptResult {
         match result {
             ReceiptResult::Transfer(transfer) => {
                 let receiver = field!(transfer.receiver, "ReceiptResult::Transfer", "receiver")?;
+                let asset_id = field!(transfer.asset_id, "ReceiptResult::Transfer", "asset_id")?;
                 let before_amount = field!(
                     transfer.before_amount,
                     "ReceiptResult::Transfer",
@@ -184,6 +189,7 @@ impl TryFrom<ReceiptResult> for receipt::ReceiptResult {
 
                 let result = receipt::ReceiptResult::Transfer {
                     receiver:      protocol_primitive::UserAddress::try_from(receiver)?,
+                    asset_id:      protocol_primitive::AssetID::try_from(asset_id)?,
                     before_amount: protocol_primitive::Balance::try_from(before_amount)?,
                     after_amount:  protocol_primitive::Balance::try_from(after_amount)?,
                 };

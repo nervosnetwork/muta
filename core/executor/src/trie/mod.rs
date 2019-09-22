@@ -14,13 +14,15 @@ lazy_static! {
     static ref HASHER_INST: Arc<HasherKeccak> = Arc::new(HasherKeccak::new());
 }
 
-pub struct MPTTrie {
+pub trait TrieDB = cita_trie::DB;
+
+pub struct MPTTrie<DB: TrieDB> {
     root: MerkleRoot,
-    trie: PatriciaTrie<cita_trie::MemoryDB, HasherKeccak>,
+    trie: PatriciaTrie<DB, HasherKeccak>,
 }
 
-impl MPTTrie {
-    pub fn new(db: Arc<cita_trie::MemoryDB>) -> Self {
+impl<DB: TrieDB> MPTTrie<DB> {
+    pub fn new(db: Arc<DB>) -> Self {
         let trie = PatriciaTrie::new(db, Arc::clone(&HASHER_INST));
 
         Self {
@@ -29,23 +31,23 @@ impl MPTTrie {
         }
     }
 
-    pub fn from(root: MerkleRoot, db: Arc<cita_trie::MemoryDB>) -> ProtocolResult<Self> {
+    pub fn from(root: MerkleRoot, db: Arc<DB>) -> ProtocolResult<Self> {
         let trie = PatriciaTrie::from(db, Arc::clone(&HASHER_INST), &root.as_bytes())
             .map_err(MPTTrieError::from)?;
 
         Ok(Self { root, trie })
     }
 
-    pub fn get(&self, key: Bytes) -> ProtocolResult<Option<Bytes>> {
+    pub fn get(&self, key: &Bytes) -> ProtocolResult<Option<Bytes>> {
         Ok(self
             .trie
-            .get(&key)
+            .get(key)
             .map_err(MPTTrieError::from)?
             .map(Bytes::from))
     }
 
-    pub fn contains(&self, key: Bytes) -> ProtocolResult<bool> {
-        Ok(self.trie.contains(&key).map_err(MPTTrieError::from)?)
+    pub fn contains(&self, key: &Bytes) -> ProtocolResult<bool> {
+        Ok(self.trie.contains(key).map_err(MPTTrieError::from)?)
     }
 
     pub fn insert(&mut self, key: Bytes, value: Bytes) -> ProtocolResult<()> {

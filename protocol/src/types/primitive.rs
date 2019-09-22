@@ -128,6 +128,14 @@ impl Address {
         }
     }
 
+    pub fn from_hex(s: &str) -> ProtocolResult<Self> {
+        let s = clean_0x(s);
+        let bytes = hex::decode(s).map_err(TypesError::from)?;
+
+        let bytes = Bytes::from(bytes);
+        Self::from_bytes(bytes)
+    }
+
     pub fn as_bytes(&self) -> Bytes {
         match self {
             Address::User(user) => user.as_bytes(),
@@ -250,6 +258,49 @@ impl ContractAddress {
         })
     }
 
+    pub fn from_code(
+        code: Bytes,
+        nonce: u64,
+        contract_type: ContractType,
+    ) -> ProtocolResult<ContractAddress> {
+        let nonce_bytes: [u8; 8] = nonce.to_be_bytes();
+        let hash_bytes = Hash::digest(Bytes::from(
+            [code, Bytes::from(nonce_bytes.to_vec())].concat(),
+        ))
+        .as_bytes();
+
+        match contract_type {
+            ContractType::Asset => Self::from_bytes(Bytes::from(
+                [
+                    Bytes::from([ASSET_CONTRACT_ADDRESS_MAGIC].to_vec()),
+                    hash_bytes,
+                ]
+                .concat(),
+            )),
+            ContractType::App => Self::from_bytes(Bytes::from(
+                [
+                    Bytes::from([APP_CONTRACT_ADDRESS_MAGIC].to_vec()),
+                    hash_bytes,
+                ]
+                .concat(),
+            )),
+            ContractType::Library => Self::from_bytes(Bytes::from(
+                [
+                    Bytes::from([LIBRARY_CONTRACT_ADDRESS_MAGIC].to_vec()),
+                    hash_bytes,
+                ]
+                .concat(),
+            )),
+            ContractType::Native => Self::from_bytes(Bytes::from(
+                [
+                    Bytes::from([NATIVE_CONTRACT_ADDRESS_MAGIC].to_vec()),
+                    hash_bytes,
+                ]
+                .concat(),
+            )),
+        }
+    }
+
     pub fn from_hex(s: &str) -> ProtocolResult<Self> {
         let s = clean_0x(s);
         let bytes = hex::decode(s).map_err(TypesError::from)?;
@@ -271,7 +322,7 @@ impl ContractAddress {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Asset {
     pub id:              AssetID,
     pub name:            String,

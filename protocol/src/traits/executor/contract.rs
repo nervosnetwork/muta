@@ -1,7 +1,10 @@
-use crate::traits::executor::{ContractSchema, InvokeContext};
-use crate::types::{Address, Asset, AssetID, Balance, ContractAddress, MerkleRoot};
+use crate::traits::executor::{ContractSchema, RcInvokeContext};
+use crate::types::{Account, Address, Asset, AssetID, Balance, ContractAddress, MerkleRoot};
 use crate::ProtocolResult;
 
+// As the world state access layer, the ContractStateAdapter provides `cache`
+// `stash` and `commit`, and all native-contract that interact with the
+// `world state` should rely on it.
 pub trait ContractStateAdapter {
     fn get<Schema: ContractSchema>(
         &self,
@@ -10,16 +13,21 @@ pub trait ContractStateAdapter {
 
     fn contains<Schema: ContractSchema>(&self, key: &Schema::Key) -> ProtocolResult<bool>;
 
+    // Insert a pair of data into the cache.
     fn insert_cache<Schema: ContractSchema>(
         &mut self,
         key: Schema::Key,
         value: Schema::Value,
     ) -> ProtocolResult<()>;
 
+    // Clear cache, called when executor fails.
     fn revert_cache(&mut self) -> ProtocolResult<()>;
 
+    // Put the data in the current cache into the stash space, which means that the
+    // data will be finilazy when 'commit' is invoked.
     fn stash(&mut self) -> ProtocolResult<()>;
 
+    // Persist the data of stash space to `world state` and empty stash space.
     fn commit(&mut self) -> ProtocolResult<MerkleRoot>;
 }
 
@@ -37,30 +45,38 @@ pub trait BankContract<Adapter: ContractStateAdapter> {
     // be modified unless `commit` is called.
     fn register(
         &mut self,
-        ictx: InvokeContext,
-        address: ContractAddress,
+        ictx: RcInvokeContext,
+        address: &ContractAddress,
         name: String,
         symbol: String,
         supply: Balance,
     ) -> ProtocolResult<Asset>;
 
-    fn get_asset(&self, ictx: InvokeContext, id: &AssetID) -> ProtocolResult<Asset>;
+    fn get_asset(&self, ictx: RcInvokeContext, id: &AssetID) -> ProtocolResult<Asset>;
 }
 
 pub trait AccountContract<Adapter: ContractStateAdapter> {
-    fn transfer(
-        &mut self,
-        ictx: InvokeContext,
-        id: &AssetID,
-        amount: Balance,
-        from: &Address,
-        to: &Address,
-    ) -> ProtocolResult<()>;
+    fn transfer(&mut self, ictx: RcInvokeContext, to: &Address) -> ProtocolResult<()>;
 
-    fn get_balance(
-        &self,
-        ictx: InvokeContext,
+    fn inc_nonce(&mut self, ictx: RcInvokeContext) -> ProtocolResult<()>;
+
+    fn add_balance(
+        &mut self,
         id: &AssetID,
         address: &Address,
-    ) -> ProtocolResult<Balance>;
+        amount: Balance,
+    ) -> ProtocolResult<()>;
+
+    fn sub_balance(
+        &mut self,
+        id: &AssetID,
+        address: &Address,
+        amount: Balance,
+    ) -> ProtocolResult<()>;
+
+    fn get_balance(&self, id: &AssetID, address: &Address) -> ProtocolResult<Balance>;
+
+    fn get_account(&self, address: &Address) -> ProtocolResult<Account>;
+
+    fn get_nonce(&self, address: &Address) -> ProtocolResult<u64>;
 }

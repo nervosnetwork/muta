@@ -12,7 +12,7 @@ use crate::types::{
         Asset, AssetID, Balance, ContractAddress, ContractType, Fee, Hash, MerkleRoot, UserAddress,
     },
     receipt::{Receipt, ReceiptResult},
-    transaction::{RawTransaction, SignedTransaction, TransactionAction},
+    transaction::{CarryingAsset, RawTransaction, SignedTransaction, TransactionAction},
 };
 
 enum ReceiptType {
@@ -84,6 +84,7 @@ fn mock_result(rtype: ReceiptType) -> ReceiptResult {
     match rtype {
         ReceiptType::Transfer => ReceiptResult::Transfer {
             receiver:      mock_account_address(),
+            asset_id:      mock_asset_id(),
             before_amount: mock_balance(),
             after_amount:  mock_balance(),
         },
@@ -125,9 +126,11 @@ fn mock_receipt(rtype: ReceiptType) -> Receipt {
 fn mock_action(atype: AType) -> TransactionAction {
     match atype {
         AType::Transfer => TransactionAction::Transfer {
-            receiver: mock_account_address(),
-            asset_id: mock_asset_id(),
-            amount:   mock_balance(),
+            receiver:       mock_account_address(),
+            carrying_asset: CarryingAsset {
+                asset_id: mock_asset_id(),
+                amount:   mock_balance(),
+            },
         },
         AType::Approve => TransactionAction::Approve {
             spender:  mock_contract_address(),
@@ -139,11 +142,13 @@ fn mock_action(atype: AType) -> TransactionAction {
             contract_type: ContractType::Library,
         },
         AType::Call => TransactionAction::Call {
-            contract: mock_contract_address(),
-            method:   "get".to_string(),
-            args:     vec![get_random_bytes(10), get_random_bytes(10)],
-            asset_id: mock_asset_id(),
-            amount:   mock_balance(),
+            contract:       mock_contract_address(),
+            method:         "get".to_string(),
+            args:           vec![get_random_bytes(10), get_random_bytes(10)],
+            carrying_asset: Some(CarryingAsset {
+                asset_id: mock_asset_id(),
+                amount:   mock_balance(),
+            }),
         },
     }
 }

@@ -14,15 +14,21 @@ use crate::{
 };
 
 #[derive(Clone, Message)]
+pub struct CarryingAsset {
+    #[prost(message, tag = "1")]
+    pub asset_id: Option<AssetID>,
+
+    #[prost(message, tag = "2")]
+    pub amount: Option<Balance>,
+}
+
+#[derive(Clone, Message)]
 pub struct Transfer {
     #[prost(message, tag = "1")]
     pub receiver: Option<UserAddress>,
 
     #[prost(message, tag = "2")]
-    pub asset_id: Option<AssetID>,
-
-    #[prost(message, tag = "3")]
-    pub amount: Option<Balance>,
+    pub carrying_asset: Option<CarryingAsset>,
 }
 
 #[derive(Clone, Message)]
@@ -58,10 +64,7 @@ pub struct Call {
     pub args: Vec<Vec<u8>>,
 
     #[prost(message, tag = "4")]
-    pub asset_id: Option<AssetID>,
-
-    #[prost(message, tag = "5")]
-    pub amount: Option<Balance>,
+    pub carrying_asset: Option<CarryingAsset>,
 }
 
 #[derive(Clone, Oneof)]
@@ -116,6 +119,30 @@ pub struct SignedTransaction {
 // Conversion
 // #################
 
+// CarryingAsset
+impl From<transaction::CarryingAsset> for CarryingAsset {
+    fn from(ca: transaction::CarryingAsset) -> CarryingAsset {
+        let asset_id = Some(AssetID::from(ca.asset_id));
+        let amount = Some(Balance::from(ca.amount));
+
+        CarryingAsset { asset_id, amount }
+    }
+}
+
+impl TryFrom<CarryingAsset> for transaction::CarryingAsset {
+    type Error = ProtocolError;
+
+    fn try_from(ca: CarryingAsset) -> Result<transaction::CarryingAsset, Self::Error> {
+        let asset_id = field!(ca.asset_id, "CarryingAsset", "asset_id")?;
+        let amount = field!(ca.amount, "CarryingAsset", "amount")?;
+
+        Ok(transaction::CarryingAsset {
+            asset_id: protocol_primitive::AssetID::try_from(asset_id)?,
+            amount:   protocol_primitive::Balance::try_from(amount)?,
+        })
+    }
+}
+
 // TransactionAction
 
 impl From<transaction::TransactionAction> for TransactionAction {
@@ -123,13 +150,14 @@ impl From<transaction::TransactionAction> for TransactionAction {
         match action {
             transaction::TransactionAction::Transfer {
                 receiver,
-                asset_id,
-                amount,
+                carrying_asset,
             } => {
                 let transfer = Transfer {
-                    receiver: Some(UserAddress::from(receiver)),
-                    asset_id: Some(AssetID::from(asset_id)),
-                    amount:   Some(Balance::from(amount)),
+                    receiver:       Some(UserAddress::from(receiver)),
+                    carrying_asset: Some(CarryingAsset {
+                        asset_id: Some(AssetID::from(carrying_asset.asset_id)),
+                        amount:   Some(Balance::from(carrying_asset.amount)),
+                    }),
                 };
 
                 TransactionAction::Transfer(transfer)
@@ -162,8 +190,7 @@ impl From<transaction::TransactionAction> for TransactionAction {
                 contract,
                 method,
                 args,
-                asset_id,
-                amount,
+                carrying_asset,
             } => {
                 let args = args.into_iter().map(|arg| arg.to_vec()).collect::<Vec<_>>();
 
@@ -171,8 +198,16 @@ impl From<transaction::TransactionAction> for TransactionAction {
                     contract: Some(ContractAddress::from(contract)),
                     method,
                     args,
-                    asset_id: Some(AssetID::from(asset_id)),
-                    amount: Some(Balance::from(amount)),
+                    carrying_asset: {
+                        if let Some(ca) = carrying_asset {
+                            Some(CarryingAsset {
+                                asset_id: Some(AssetID::from(ca.asset_id)),
+                                amount:   Some(Balance::from(ca.amount)),
+                            })
+                        } else {
+                            None
+                        }
+                    },
                 };
 
                 TransactionAction::Call(call)
@@ -189,14 +224,15 @@ impl TryFrom<TransactionAction> for transaction::TransactionAction {
             TransactionAction::Transfer(transfer) => {
                 let receiver =
                     field!(transfer.receiver, "TransactionAction::Transfer", "receiver")?;
-                let asset_id =
-                    field!(transfer.asset_id, "TransactionAction::Transfer", "asset_id")?;
-                let amount = field!(transfer.amount, "TransactionAction::Transfer", "amount")?;
+                let carrying_asset = field!(
+                    transfer.carrying_asset,
+                    "TransactionAction::Transfer",
+                    "carrying_asset"
+                )?;
 
                 let action = transaction::TransactionAction::Transfer {
-                    receiver: protocol_primitive::UserAddress::try_from(receiver)?,
-                    asset_id: protocol_primitive::AssetID::try_from(asset_id)?,
-                    amount:   protocol_primitive::Balance::try_from(amount)?,
+                    receiver:       protocol_primitive::UserAddress::try_from(receiver)?,
+                    carrying_asset: transaction::CarryingAsset::try_from(carrying_asset)?,
                 };
 
                 Ok(action)
@@ -231,16 +267,20 @@ impl TryFrom<TransactionAction> for transaction::TransactionAction {
             }
             TransactionAction::Call(call) => {
                 let contract = field!(call.contract, "TransactionAction::Call", "contract")?;
-                let asset_id = field!(call.asset_id, "Transaction::Call", "asset_id")?;
-                let amount = field!(call.amount, "Transaction::Call", "amount")?;
                 let args = call.args.into_iter();
+                let opt_carrying_asset = call.carrying_asset;
 
                 let action = transaction::TransactionAction::Call {
-                    contract: protocol_primitive::ContractAddress::try_from(contract)?,
-                    method:   call.method,
-                    args:     args.map(Bytes::from).collect::<Vec<_>>(),
-                    asset_id: protocol_primitive::AssetID::try_from(asset_id)?,
-                    amount:   protocol_primitive::Balance::try_from(amount)?,
+                    contract:       protocol_primitive::ContractAddress::try_from(contract)?,
+                    method:         call.method,
+                    args:           args.map(Bytes::from).collect::<Vec<_>>(),
+                    carrying_asset: {
+                        if let Some(carrying_asset) = opt_carrying_asset {
+                            Some(transaction::CarryingAsset::try_from(carrying_asset)?)
+                        } else {
+                            None
+                        }
+                    },
                 };
 
                 Ok(action)

@@ -1,5 +1,7 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::error::Error;
+use std::rc::Rc;
 
 use bytes::Bytes;
 use derive_more::{Display, From};
@@ -9,19 +11,21 @@ use protocol::traits::executor::{ContractSchema, ContractSer};
 use protocol::types::MerkleRoot;
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
-use crate::trie::MPTTrie;
+use crate::trie::{MPTTrie, TrieDB};
 
-pub struct GeneralContractStateAdapter {
-    trie: MPTTrie,
+pub type RcGeneralContractStateAdapter<DB> = Rc<RefCell<GeneralContractStateAdapter<DB>>>;
 
-    // TODO(@yejiayu): The value of "map" should be changed to Box<dyn Any> to avoid multiple
+pub struct GeneralContractStateAdapter<DB: TrieDB> {
+    trie: MPTTrie<DB>,
+
+    // TODO(@yejiayu): The value of HashMap should be changed to Box<dyn Any> to avoid multiple
     // serializations.
     cache_map: HashMap<Bytes, Bytes>,
     stash_map: HashMap<Bytes, Bytes>,
 }
 
-impl GeneralContractStateAdapter {
-    pub fn new(trie: MPTTrie) -> Self {
+impl<DB: TrieDB> GeneralContractStateAdapter<DB> {
+    pub fn new(trie: MPTTrie<DB>) -> Self {
         Self {
             trie,
 
@@ -31,22 +35,24 @@ impl GeneralContractStateAdapter {
     }
 }
 
-impl ContractStateAdapter for GeneralContractStateAdapter {
+impl<DB: TrieDB> ContractStateAdapter for GeneralContractStateAdapter<DB> {
     fn get<Schema: ContractSchema>(
         &self,
         key: &<Schema as ContractSchema>::Key,
     ) -> ProtocolResult<Option<<Schema as ContractSchema>::Value>> {
-        if let Some(value_bytes) = self.cache_map.get(&key.encode()?) {
+        let encoded_key = key.encode()?;
+
+        if let Some(value_bytes) = self.cache_map.get(&encoded_key) {
             let inst = <_>::decode(value_bytes.clone())?;
             return Ok(Some(inst));
         }
 
-        if let Some(value_bytes) = self.stash_map.get(&key.encode()?) {
+        if let Some(value_bytes) = self.stash_map.get(&encoded_key) {
             let inst = <_>::decode(value_bytes.clone())?;
             return Ok(Some(inst));
         }
 
-        if let Some(value_bytes) = self.trie.get(key.encode()?)? {
+        if let Some(value_bytes) = self.trie.get(&encoded_key)? {
             return Ok(Some(Schema::Value::decode(value_bytes)?));
         }
 
@@ -57,7 +63,17 @@ impl ContractStateAdapter for GeneralContractStateAdapter {
         &self,
         key: &<Schema as ContractSchema>::Key,
     ) -> ProtocolResult<bool> {
-        Ok(self.get::<Schema>(key)?.is_some())
+        let encoded_key = key.encode()?;
+
+        if self.cache_map.contains_key(&encoded_key) {
+            return Ok(true);
+        };
+
+        if self.stash_map.contains_key(&encoded_key) {
+            return Ok(true);
+        };
+
+        self.trie.contains(&encoded_key)
     }
 
     fn insert_cache<Schema: ContractSchema>(

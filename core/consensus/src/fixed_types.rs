@@ -155,7 +155,7 @@ mod test {
 
     use protocol::codec::ProtocolCodec;
     use protocol::types::{
-        Fee, Hash, RawTransaction, SignedTransaction, TransactionAction, UserAddress,
+        CarryingAsset, Fee, Hash, RawTransaction, SignedTransaction, TransactionAction, UserAddress,
     };
 
     use super::FixedSignedTxs;
@@ -177,9 +177,11 @@ mod test {
             cycle:    random::<u64>(),
         };
         let action = TransactionAction::Transfer {
-            receiver: address.clone(),
-            asset_id: nonce.clone(),
-            amount:   FromPrimitive::from_i32(42).unwrap(),
+            receiver:       address.clone(),
+            carrying_asset: CarryingAsset {
+                asset_id: nonce.clone(),
+                amount:   FromPrimitive::from_i32(42).unwrap(),
+            },
         };
         let mut raw = RawTransaction {
             chain_id: nonce.clone(),

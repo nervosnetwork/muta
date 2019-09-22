@@ -16,9 +16,8 @@ pub struct RawTransaction {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TransactionAction {
     Transfer {
-        receiver: UserAddress,
-        asset_id: AssetID,
-        amount:   Balance,
+        receiver:       UserAddress,
+        carrying_asset: CarryingAsset,
     },
     Approve {
         spender:  ContractAddress,
@@ -30,12 +29,17 @@ pub enum TransactionAction {
         contract_type: ContractType,
     },
     Call {
-        contract: ContractAddress,
-        method:   String,
-        args:     Vec<Bytes>,
-        asset_id: AssetID,
-        amount:   Balance,
+        contract:       ContractAddress,
+        method:         String,
+        args:           Vec<Bytes>,
+        carrying_asset: Option<CarryingAsset>,
     },
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CarryingAsset {
+    pub asset_id: AssetID,
+    pub amount:   Balance,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

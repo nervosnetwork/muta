@@ -361,7 +361,7 @@ mod tests {
     use test::Bencher;
 
     use protocol::types::{
-        Fee, Hash, RawTransaction, SignedTransaction, TransactionAction, UserAddress,
+        CarryingAsset, Fee, Hash, RawTransaction, SignedTransaction, TransactionAction, UserAddress,
     };
 
     use crate::tx_cache::TxCache;
@@ -401,9 +401,11 @@ mod tests {
             cycle:    TX_CYCLE,
         };
         let action = TransactionAction::Transfer {
-            receiver: address.clone(),
-            asset_id,
-            amount: FromPrimitive::from_i32(10_000).unwrap(),
+            receiver:       address.clone(),
+            carrying_asset: CarryingAsset {
+                asset_id,
+                amount: FromPrimitive::from_i32(10_000).unwrap(),
+            },
         };
         let raw = RawTransaction {
             chain_id,
