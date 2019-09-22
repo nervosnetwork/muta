@@ -1,0 +1,10 @@
+[Unit]
+Description=muta
+
+[Service]
+Type=simple
+ExecStart=/bin/sh -c 'cd /home/cita/muta_chain && RUST_LOG=error ./muta -c ./config.toml init >>muta.log 2>&1'
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
