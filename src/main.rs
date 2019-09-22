@@ -1,3 +1,5 @@
+#![feature(async_closure)]
+
 mod config;
 
 use std::convert::TryFrom;
@@ -151,7 +153,7 @@ async fn start(cfg: &Config) -> ProtocolResult<()> {
 
     // Init mempool
     let current_epoch = storage.get_latest_epoch().await.unwrap();
-    let mempool_adapter = DefaultMemPoolAdapter::<Secp256k1, _, _, _>::new(
+    let mempool_adapter = DefaultMemPoolAdapter::<Secp256k1, _, _>::new(
         network_service.handle(),
         Arc::clone(&storage),
         cfg.mempool.timeout_gap,
@@ -210,6 +212,9 @@ async fn start(cfg: &Config) -> ProtocolResult<()> {
 
     // Run network
     runtime::spawn(network_service);
+
+    // Run GraphQL serve2
+    runtime::spawn(core_api::start_rpc());
 
     // Run consensus
     overlord_consensus

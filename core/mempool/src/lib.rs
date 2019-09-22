@@ -78,7 +78,7 @@ where
 }
 
 #[async_trait]
-impl<Adapter> MemPool<Adapter> for HashMemPool<Adapter>
+impl<Adapter> MemPool for HashMemPool<Adapter>
 where
     Adapter: MemPoolAdapter,
 {

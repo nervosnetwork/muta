@@ -98,7 +98,7 @@ macro_rules! get {
 }
 
 #[async_trait]
-impl<Adapter: StorageAdapter> Storage<Adapter> for ImplStorage<Adapter> {
+impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
     async fn insert_transactions(&self, signed_txs: Vec<SignedTransaction>) -> ProtocolResult<()> {
         batch_insert!(self, signed_txs, TransactionSchema);
 
@@ -160,7 +160,6 @@ impl<Adapter: StorageAdapter> Storage<Adapter> for ImplStorage<Adapter> {
     }
 
     async fn get_epoch_by_epoch_id(&self, epoch_id: u64) -> ProtocolResult<Epoch> {
-        println!("{:?} epochid", epoch_id);
         let epoch_id = EpochId { id: epoch_id };
         let epoch = get!(self, epoch_id, EpochSchema);
 

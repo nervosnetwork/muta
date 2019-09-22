@@ -22,7 +22,7 @@ pub trait StorageSchema {
 }
 
 #[async_trait]
-pub trait Storage<Adapter: StorageAdapter>: Send + Sync {
+pub trait Storage: Send + Sync {
     async fn insert_transactions(&self, signed_txs: Vec<SignedTransaction>) -> ProtocolResult<()>;
 
     async fn insert_epoch(&self, epoch: Epoch) -> ProtocolResult<()>;

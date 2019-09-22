@@ -1,4 +1,3 @@
-use std::marker::PhantomData;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -7,7 +6,7 @@ use overlord::Codec;
 use rlp::encode;
 use serde::{Deserialize, Serialize};
 
-use protocol::traits::{Consensus, ConsensusAdapter, Context, MessageHandler};
+use protocol::traits::{Consensus, Context, MessageHandler};
 use protocol::ProtocolResult;
 
 pub const END_GOSSIP_SIGNED_PROPOSAL: &str = "/gossip/consensus/signed_proposal";
@@ -41,27 +40,18 @@ impl From<AggregatedVote> for QC {
     }
 }
 
-pub struct ProposalMessageHandler<Adapter: ConsensusAdapter, C: Consensus<Adapter>> {
+pub struct ProposalMessageHandler<C> {
     consensus: Arc<C>,
-
-    pin_a: PhantomData<Adapter>,
 }
 
-impl<Adapter: ConsensusAdapter + 'static, C: Consensus<Adapter> + 'static>
-    ProposalMessageHandler<Adapter, C>
-{
+impl<C: Consensus + 'static> ProposalMessageHandler<C> {
     pub fn new(consensus: Arc<C>) -> Self {
-        Self {
-            consensus,
-            pin_a: PhantomData,
-        }
+        Self { consensus }
     }
 }
 
 #[async_trait]
-impl<Adapter: ConsensusAdapter + 'static, C: Consensus<Adapter> + 'static> MessageHandler
-    for ProposalMessageHandler<Adapter, C>
-{
+impl<C: Consensus + 'static> MessageHandler for ProposalMessageHandler<C> {
     type Message = Proposal;
 
     async fn process(&self, ctx: Context, msg: Self::Message) -> ProtocolResult<()> {
@@ -69,27 +59,18 @@ impl<Adapter: ConsensusAdapter + 'static, C: Consensus<Adapter> + 'static> Messa
     }
 }
 
-pub struct VoteMessageHandler<Adapter: ConsensusAdapter, C: Consensus<Adapter>> {
+pub struct VoteMessageHandler<C> {
     consensus: Arc<C>,
-
-    pin_a: PhantomData<Adapter>,
 }
 
-impl<Adapter: ConsensusAdapter + 'static, C: Consensus<Adapter> + 'static>
-    VoteMessageHandler<Adapter, C>
-{
+impl<C: Consensus + 'static> VoteMessageHandler<C> {
     pub fn new(consensus: Arc<C>) -> Self {
-        Self {
-            consensus,
-            pin_a: PhantomData,
-        }
+        Self { consensus }
     }
 }
 
 #[async_trait]
-impl<Adapter: ConsensusAdapter + 'static, C: Consensus<Adapter> + 'static> MessageHandler
-    for VoteMessageHandler<Adapter, C>
-{
+impl<C: Consensus + 'static> MessageHandler for VoteMessageHandler<C> {
     type Message = Vote;
 
     async fn process(&self, ctx: Context, msg: Self::Message) -> ProtocolResult<()> {
@@ -97,27 +78,18 @@ impl<Adapter: ConsensusAdapter + 'static, C: Consensus<Adapter> + 'static> Messa
     }
 }
 
-pub struct QCMessageHandler<Adapter: ConsensusAdapter, C: Consensus<Adapter>> {
+pub struct QCMessageHandler<C> {
     consensus: Arc<C>,
-
-    pin_a: PhantomData<Adapter>,
 }
 
-impl<Adapter: ConsensusAdapter + 'static, C: Consensus<Adapter> + 'static>
-    QCMessageHandler<Adapter, C>
-{
+impl<C: Consensus + 'static> QCMessageHandler<C> {
     pub fn new(consensus: Arc<C>) -> Self {
-        Self {
-            consensus,
-            pin_a: PhantomData,
-        }
+        Self { consensus }
     }
 }
 
 #[async_trait]
-impl<Adapter: ConsensusAdapter + 'static, C: Consensus<Adapter> + 'static> MessageHandler
-    for QCMessageHandler<Adapter, C>
-{
+impl<C: Consensus + 'static> MessageHandler for QCMessageHandler<C> {
     type Message = QC;
 
     async fn process(&self, ctx: Context, msg: Self::Message) -> ProtocolResult<()> {

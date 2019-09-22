@@ -11,7 +11,7 @@ pub enum MessageTarget {
 }
 
 #[async_trait]
-pub trait Consensus<Adapter: ConsensusAdapter>: Send + Sync {
+pub trait Consensus: Send + Sync {
     /// Network set a received signed proposal to consensus.
     async fn set_proposal(&self, ctx: Context, proposal: Vec<u8>) -> ProtocolResult<()>;
 

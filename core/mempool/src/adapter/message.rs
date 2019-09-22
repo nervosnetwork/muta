@@ -1,8 +1,8 @@
-use std::{marker::PhantomData, sync::Arc};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use protocol::{
-    traits::{Context, MemPool, MemPoolAdapter, MessageHandler, Priority, Rpc},
+    traits::{Context, MemPool, MessageHandler, Priority, Rpc},
     types::{Hash, SignedTransaction},
     ProtocolResult,
 };
@@ -20,31 +20,23 @@ pub struct MsgNewTxs {
     pub stx: SignedTransaction,
 }
 
-pub struct NewTxsHandler<M, MA> {
+pub struct NewTxsHandler<M> {
     mem_pool: Arc<M>,
-
-    pin_ma: PhantomData<MA>,
 }
 
-impl<M, MA> NewTxsHandler<M, MA>
+impl<M> NewTxsHandler<M>
 where
-    M: MemPool<MA>,
-    MA: MemPoolAdapter,
+    M: MemPool,
 {
     pub fn new(mem_pool: Arc<M>) -> Self {
-        NewTxsHandler {
-            mem_pool,
-
-            pin_ma: PhantomData,
-        }
+        NewTxsHandler { mem_pool }
     }
 }
 
 #[async_trait]
-impl<M, MA> MessageHandler for NewTxsHandler<M, MA>
+impl<M> MessageHandler for NewTxsHandler<M>
 where
-    M: MemPool<MA> + 'static,
-    MA: MemPoolAdapter + 'static,
+    M: MemPool + 'static,
 {
     type Message = MsgNewTxs;
 
@@ -67,35 +59,26 @@ pub struct MsgPushTxs {
     pub sig_txs: Vec<SignedTransaction>,
 }
 
-pub struct PullTxsHandler<N, M, MA> {
+pub struct PullTxsHandler<N, M> {
     network:  N,
     mem_pool: Arc<M>,
-
-    pin_ma: PhantomData<MA>,
 }
 
-impl<N, M, MA> PullTxsHandler<N, M, MA>
+impl<N, M> PullTxsHandler<N, M>
 where
     N: Rpc + 'static,
-    M: MemPool<MA> + 'static,
-    MA: MemPoolAdapter + 'static,
+    M: MemPool + 'static,
 {
     pub fn new(network: N, mem_pool: Arc<M>) -> Self {
-        PullTxsHandler {
-            network,
-            mem_pool,
-
-            pin_ma: PhantomData,
-        }
+        PullTxsHandler { network, mem_pool }
     }
 }
 
 #[async_trait]
-impl<N, M, MA> MessageHandler for PullTxsHandler<N, M, MA>
+impl<N, M> MessageHandler for PullTxsHandler<N, M>
 where
     N: Rpc + 'static,
-    M: MemPool<MA> + 'static,
-    MA: MemPoolAdapter + 'static,
+    M: MemPool + 'static,
 {
     type Message = MsgPullTxs;
 

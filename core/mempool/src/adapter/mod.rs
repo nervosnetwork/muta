@@ -16,29 +16,27 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use common_crypto::Crypto;
 use protocol::{
-    traits::{Context, Gossip, MemPoolAdapter, Priority, Rpc, Storage, StorageAdapter},
+    traits::{Context, Gossip, MemPoolAdapter, Priority, Rpc, Storage},
     types::{Hash, SignedTransaction},
     ProtocolResult,
 };
 
 use crate::MemPoolError;
 
-pub struct DefaultMemPoolAdapter<C, N, S, SA> {
+pub struct DefaultMemPoolAdapter<C, N, S> {
     network: N,
     storage: Arc<S>,
 
     timeout_gap: AtomicU64,
 
-    pin_c:  PhantomData<C>,
-    pin_sa: PhantomData<SA>,
+    pin_c: PhantomData<C>,
 }
 
-impl<C, N, S, SA> DefaultMemPoolAdapter<C, N, S, SA>
+impl<C, N, S> DefaultMemPoolAdapter<C, N, S>
 where
     C: Crypto,
     N: Rpc + Gossip,
-    S: Storage<SA>,
-    SA: StorageAdapter,
+    S: Storage,
 {
     pub fn new(network: N, storage: Arc<S>, timeout_gap: u64) -> Self {
         DefaultMemPoolAdapter {
@@ -47,18 +45,16 @@ where
             timeout_gap: AtomicU64::new(timeout_gap),
 
             pin_c: PhantomData,
-            pin_sa: PhantomData,
         }
     }
 }
 
 #[async_trait]
-impl<C, N, S, SA> MemPoolAdapter for DefaultMemPoolAdapter<C, N, S, SA>
+impl<C, N, S> MemPoolAdapter for DefaultMemPoolAdapter<C, N, S>
 where
     C: Crypto + Send + Sync + 'static,
     N: Rpc + Gossip + 'static,
-    S: Storage<SA> + 'static,
-    SA: StorageAdapter + 'static,
+    S: Storage + 'static,
 {
     async fn pull_txs(
         &self,

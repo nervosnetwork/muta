@@ -1,39 +1,25 @@
-use std::marker::PhantomData;
 use std::sync::Arc;
 
 use async_trait::async_trait;
 
 use protocol::traits::{
-    ConsensusAdapter, Context, Gossip, MemPool, MemPoolAdapter, MessageTarget, MixedTxHashes,
-    Priority, Storage, StorageAdapter,
+    ConsensusAdapter, Context, Gossip, MemPool, MessageTarget, MixedTxHashes, Priority, Storage,
 };
 use protocol::types::{Epoch, Hash, Proof, Receipt, SignedTransaction, Validator};
 use protocol::ProtocolResult;
 
-// use crate::ConsensusError;
-
-pub struct OverlordConsensusAdapter<
-    G: Gossip,
-    M: MemPool<MA>,
-    S: Storage<SA>,
-    MA: MemPoolAdapter,
-    SA: StorageAdapter,
-> {
-    network:         Arc<G>,
-    mempool:         Arc<M>,
-    storage:         Arc<S>,
-    mempool_adapter: PhantomData<MA>,
-    storage_adapter: PhantomData<SA>,
+pub struct OverlordConsensusAdapter<G: Gossip, M: MemPool, S: Storage> {
+    network: Arc<G>,
+    mempool: Arc<M>,
+    storage: Arc<S>,
 }
 
 #[async_trait]
-impl<G, M, S, MA, SA> ConsensusAdapter for OverlordConsensusAdapter<G, M, S, MA, SA>
+impl<G, M, S> ConsensusAdapter for OverlordConsensusAdapter<G, M, S>
 where
     G: Gossip + Sync + Send,
-    M: MemPool<MA>,
-    S: Storage<SA>,
-    MA: MemPoolAdapter + 'static,
-    SA: StorageAdapter + 'static,
+    M: MemPool,
+    S: Storage,
 {
     async fn get_txs_from_mempool(
         &self,
@@ -112,18 +98,14 @@ where
     }
 }
 
-impl<G, M, S, MA, SA> OverlordConsensusAdapter<G, M, S, MA, SA>
+impl<G, M, S> OverlordConsensusAdapter<G, M, S>
 where
     G: Gossip + Sync + Send,
-    M: MemPool<MA>,
-    S: Storage<SA>,
-    MA: MemPoolAdapter + 'static,
-    SA: StorageAdapter + 'static,
+    M: MemPool,
+    S: Storage,
 {
     pub fn new(network: Arc<G>, mempool: Arc<M>, storage: Arc<S>) -> Self {
         OverlordConsensusAdapter {
-            mempool_adapter: PhantomData,
-            storage_adapter: PhantomData,
             network,
             mempool,
             storage,

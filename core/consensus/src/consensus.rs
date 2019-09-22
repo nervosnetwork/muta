@@ -26,7 +26,7 @@ pub struct OverlordConsensus<Adapter: ConsensusAdapter + 'static> {
 }
 
 #[async_trait]
-impl<Adapter: ConsensusAdapter + 'static> Consensus<Adapter> for OverlordConsensus<Adapter> {
+impl<Adapter: ConsensusAdapter + 'static> Consensus for OverlordConsensus<Adapter> {
     async fn set_proposal(&self, ctx: Context, proposal: Vec<u8>) -> ProtocolResult<()> {
         let signed_proposal: SignedProposal<FixedPill> =
             decode(&proposal).map_err(|_| ConsensusError::DecodeErr(MsgType::SignedProposal))?;

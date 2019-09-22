@@ -17,7 +17,7 @@ impl MixedTxHashes {
 }
 
 #[async_trait]
-pub trait MemPool<Adapter: MemPoolAdapter>: Send + Sync {
+pub trait MemPool: Send + Sync {
     async fn insert(&self, ctx: Context, tx: SignedTransaction) -> ProtocolResult<()>;
 
     async fn package(&self, ctx: Context, cycle_limit: u64) -> ProtocolResult<MixedTxHashes>;
