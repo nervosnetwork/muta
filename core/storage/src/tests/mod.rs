@@ -82,7 +82,7 @@ fn mock_epoch(epoch_id: u64, epoch_hash: Hash) -> Epoch {
         confirm_root: Vec::new(),
         state_root: nonce.clone(),
         receipt_root: Vec::new(),
-        cycles_used: 100,
+        cycles_used: Vec::new(),
         proposer: UserAddress::from_hex(addr_str).unwrap(),
         proof: mock_proof(epoch_hash),
         validator_version: 1,

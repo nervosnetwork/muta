@@ -22,3 +22,8 @@ core-mempool = { path = "../../core/mempool"}
 core-storage = { path = "../../core/storage"}
 core-network = { path = "../../core/network"}
 protocol = { path = "../../protocol" }
+
+[dev-dependencies]
+futures-preview = "0.3.0-alpha.18"
+num-traits = "0.2"
+rand = "0.7"

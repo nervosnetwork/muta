@@ -1,6 +1,6 @@
 use bytes::Bytes;
 
-use crate::types::{Bloom, Hash, MerkleRoot, UserAddress};
+use crate::types::{Bloom, Fee, Hash, MerkleRoot, UserAddress};
 
 #[derive(Clone, Debug)]
 pub struct Epoch {
@@ -19,14 +19,14 @@ pub struct EpochHeader {
     pub confirm_root:      Vec<MerkleRoot>,
     pub state_root:        MerkleRoot,
     pub receipt_root:      Vec<MerkleRoot>,
-    pub cycles_used:       u64,
+    pub cycles_used:       Vec<Fee>,
     pub proposer:          UserAddress,
     pub proof:             Proof,
     pub validator_version: u64,
     pub validators:        Vec<Validator>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash)]
 pub struct Proof {
     pub epoch_id:   u64,
     pub round:      u64,

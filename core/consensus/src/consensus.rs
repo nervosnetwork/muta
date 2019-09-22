@@ -3,62 +3,54 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use creep::Context;
-use overlord::types::{AggregatedVote, OverlordMsg, SignedProposal, SignedVote};
-use overlord::{Codec, Consensus as OverlordConsensus, Crypto, Overlord, OverlordHandler};
+use overlord::types::{AggregatedVote, Node, OverlordMsg, SignedProposal, SignedVote, Status};
+use overlord::{Overlord, OverlordHandler};
 use rlp::decode;
 
-use protocol::traits::{
-    Consensus, ConsensusAdapter, Gossip, MemPool, MemPoolAdapter, Storage, StorageAdapter,
-};
-use protocol::types::{Epoch, Proof, SignedTransaction, UserAddress};
+use common_crypto::{Secp256k1PrivateKey, Secp256k1PublicKey};
+
+use protocol::traits::{Consensus, Gossip, MemPool, MemPoolAdapter, Storage, StorageAdapter};
+use protocol::types::{Epoch, Hash, Proof, SignedTransaction, UserAddress, Validator};
 use protocol::ProtocolResult;
 
 use crate::adapter::OverlordConsensusAdapter;
+use crate::engine::ConsensusEngine;
+use crate::fixed_types::{FixedPill, FixedSignedTxs};
+use crate::util::OverlordCrypto;
 use crate::{ConsensusError, MsgType};
+
+pub type OverlordRuntime<G, M, S, MA, SA> =
+    Overlord<FixedPill, FixedSignedTxs, ConsensusEngine<G, M, S, MA, SA>, OverlordCrypto>;
 
 /// Provide consensus
 pub struct ConsensusProvider<
-    CA: ConsensusAdapter,
-    MA: MemPoolAdapter,
-    SA: StorageAdapter,
-    G: Gossip,
+    MA: MemPoolAdapter + 'static,
+    SA: StorageAdapter + 'static,
+    G: Gossip + Send + Sync,
     M: MemPool<MA>,
     S: Storage<SA>,
-    C: Codec,
-    E: Codec,
-    F: OverlordConsensus<C, E>,
-    T: Crypto,
 > {
     /// Overlord consensus protocol instance.
-    overlord: Option<Overlord<C, E, F, T>>,
+    overlord: Option<OverlordRuntime<G, M, S, MA, SA>>,
     /// An overlord consensus protocol handler.
-    handler: OverlordHandler<C>,
-    /// Supply necessary functions from other modules.
-    adapter: CA,
-    /// **TODO** to be changed into `Engine`
-    overlord_adapter: OverlordConsensusAdapter<G, M, S, MA, SA>,
+    handler: OverlordHandler<FixedPill>,
 
     mempool_adapter: PhantomData<MA>,
     storage_adapter: PhantomData<SA>,
 }
 
 #[async_trait]
-impl<CA, MA, SA, G, M, S, C, E, F, T> Consensus<CA>
-    for ConsensusProvider<CA, MA, SA, G, M, S, C, E, F, T>
+impl<MA, SA, G, M, S> Consensus<OverlordConsensusAdapter<G, M, S, MA, SA>>
+    for ConsensusProvider<MA, SA, G, M, S>
 where
-    CA: ConsensusAdapter + 'static,
     MA: MemPoolAdapter + 'static,
     SA: StorageAdapter + 'static,
     G: Gossip + Send + Sync,
     M: MemPool<MA> + 'static,
     S: Storage<SA> + 'static,
-    C: Codec + Send + Sync + 'static,
-    E: Codec + Send + Sync + 'static,
-    F: OverlordConsensus<C, E> + 'static,
-    T: Crypto + Send + Sync + 'static,
 {
     async fn set_proposal(&self, ctx: Context, proposal: Vec<u8>) -> ProtocolResult<()> {
-        let signed_proposal: SignedProposal<C> =
+        let signed_proposal: SignedProposal<FixedPill> =
             decode(&proposal).map_err(|_| ConsensusError::DecodeErr(MsgType::SignedProposal))?;
         self.handler
             .send_msg(ctx, OverlordMsg::SignedProposal(signed_proposal))
@@ -95,51 +87,75 @@ where
     }
 }
 
-impl<CA, MA, SA, G, M, S, C, E, F, T> ConsensusProvider<CA, MA, SA, G, M, S, C, E, F, T>
+impl<MA, SA, G, M, S> ConsensusProvider<MA, SA, G, M, S>
 where
-    CA: ConsensusAdapter + 'static,
     MA: MemPoolAdapter + 'static,
     SA: StorageAdapter + 'static,
-    G: Gossip + Send + Sync,
+    G: Gossip + Send + Sync + 'static,
     M: MemPool<MA> + 'static,
     S: Storage<SA> + 'static,
-    C: Codec + Send + Sync + 'static,
-    E: Codec + Send + Sync + 'static,
-    F: OverlordConsensus<C, E> + 'static,
-    T: Crypto + Send + Sync + 'static,
 {
     pub fn new(
+        init_epoch_id: u64,
+        chain_id: Hash,
         address: UserAddress,
         cycle_limit: u64,
-        overlord_adapter: F,
-        crypto: T,
-        consensus_adapter: CA,
+        validators: Vec<Validator>,
+        pub_key: Secp256k1PublicKey,
+        priv_key: Secp256k1PrivateKey,
         gossip_network: Arc<G>,
         menpool_adapter: Arc<M>,
         storage_adapter: Arc<S>,
     ) -> Self {
-        let mut overlord = Overlord::new(address.as_bytes(), overlord_adapter, crypto);
+        let engine = ConsensusEngine::new(
+            chain_id,
+            address.clone(),
+            cycle_limit,
+            validators.clone(),
+            gossip_network,
+            menpool_adapter,
+            storage_adapter,
+        );
+
+        let crypto = OverlordCrypto::new(pub_key, priv_key);
+
+        let mut overlord = Overlord::new(address.as_bytes(), engine, crypto);
         let overlord_handler = overlord.take_handler();
+        overlord_handler
+            .send_msg(
+                Context::new(),
+                OverlordMsg::RichStatus(handle_genesis(init_epoch_id, validators)),
+            )
+            .unwrap();
 
         ConsensusProvider {
-            overlord:         Some(overlord),
-            handler:          overlord_handler,
-            adapter:          consensus_adapter,
-            overlord_adapter: OverlordConsensusAdapter::new(
-                address,
-                cycle_limit,
-                gossip_network,
-                menpool_adapter,
-                storage_adapter,
-            ),
-
+            overlord:        Some(overlord),
+            handler:         overlord_handler,
             mempool_adapter: PhantomData,
             storage_adapter: PhantomData,
         }
     }
 
-    pub fn take_overlord(&mut self) -> Overlord<C, E, F, T> {
+    pub fn take_overlord(&mut self) -> OverlordRuntime<G, M, S, MA, SA> {
         assert!(self.overlord.is_some());
         self.overlord.take().unwrap()
+    }
+}
+
+fn handle_genesis(epoch_id: u64, validators: Vec<Validator>) -> Status {
+    let mut authority_list = validators
+        .into_iter()
+        .map(|v| Node {
+            address:        v.address.as_bytes(),
+            propose_weight: v.propose_weight,
+            vote_weight:    v.vote_weight,
+        })
+        .collect::<Vec<_>>();
+
+    authority_list.sort();
+    Status {
+        epoch_id,
+        interval: None,
+        authority_list,
     }
 }

@@ -281,7 +281,7 @@ pub struct Asset {
     pub storage_root:    MerkleRoot,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct Fee {
     pub asset_id: AssetID,
     pub cycle:    u64,

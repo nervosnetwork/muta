@@ -1,6 +1,6 @@
-use std::collections::{HashMap, HashSet};
-use std::error::Error;
+use std::collections::HashSet;
 use std::time::{SystemTime, UNIX_EPOCH};
+use std::{error::Error, sync::Arc};
 
 use async_trait::async_trait;
 use bincode::serialize;
@@ -10,12 +10,14 @@ use overlord::Consensus as Overlord;
 use parking_lot::RwLock;
 use rlp::Encodable;
 
+use protocol::codec::ProtocolCodec;
 use protocol::traits::{
     ConsensusAdapter, Context, Gossip, MemPool, MemPoolAdapter, MessageTarget, Storage,
     StorageAdapter,
 };
 use protocol::types::{
-    Bloom, Epoch, EpochHeader, Hash, MerkleRoot, Pill, Proof, Receipt, UserAddress,
+    Bloom, Epoch, EpochHeader, Fee, Hash, MerkleRoot, Pill, Proof, UserAddress, Validator,
+    GENESIS_EPOCH_ID,
 };
 use protocol::ProtocolError;
 
@@ -27,6 +29,10 @@ use crate::message::{
 };
 use crate::ConsensusError;
 
+const INIT_ROUND: u64 = 0;
+
+/// validator is for create new epoch, and authority is for build overlord
+/// status.
 pub struct ConsensusEngine<
     G: Gossip,
     M: MemPool<MA>,
@@ -38,9 +44,9 @@ pub struct ConsensusEngine<
     address:        UserAddress,
     cycle_limit:    u64,
     exemption_hash: RwLock<HashSet<Bytes>>,
-    state_root:     MerkleRoot,
-    order_root:     MerkleRoot,
-    header_cache:   HashMap<u64, HeaderCache>,
+    latest_header:  RwLock<HeaderCache>,
+    validators:     Vec<Validator>,
+    authority:      Vec<Node>,
     adapter:        OverlordConsensusAdapter<G, M, S, MA, SA>,
 }
 
@@ -65,31 +71,33 @@ where
             .await?
             .clap();
 
-        let proposal_proof = self
-            .adapter
-            .get_proof()
-            .ok_or_else(|| ProtocolError::from(ConsensusError::MissingProof(epoch_id)))?;
+        let cache = {
+            let header = self.latest_header.read();
 
-        let cache = self
-            .header_cache
-            .get(&epoch_id)
-            .ok_or_else(|| ProtocolError::from(ConsensusError::MissingEpochHeader(epoch_id)))?;
+            if header.epoch_id == epoch_id {
+                header.clone()
+            } else {
+                return Err(
+                    ProtocolError::from(ConsensusError::MissingEpochHeader(epoch_id)).into(),
+                );
+            }
+        };
 
         let header = EpochHeader {
             chain_id:          self.chain_id.clone(),
-            pre_hash:          Hash::from_empty(),
+            pre_hash:          cache.prev_hash,
             epoch_id:          tmp,
             timestamp:         time_now(),
             logs_bloom:        cache.logs_bloom,
-            order_root:        MerkleRoot::from_empty(),
-            confirm_root:      Vec::new(),
-            state_root:        cache.state_root.clone(),
-            receipt_root:      Vec::new(),
-            cycles_used:       0u64,
+            order_root:        cache.order_root,
+            confirm_root:      cache.confirm_root,
+            state_root:        cache.state_root,
+            receipt_root:      cache.receipt_root,
+            cycles_used:       cache.cycles_used,
             proposer:          self.address.clone(),
-            proof:             proposal_proof,
+            proof:             cache.proof,
             validator_version: 0u64,
-            validators:        Vec::new(),
+            validators:        self.validators.clone(),
         };
         let epoch = Epoch {
             header,
@@ -144,9 +152,11 @@ where
         epoch_id: u64,
         commit: Commit<FixedPill>,
     ) -> Result<Status, Box<dyn Error + Send>> {
-        let pill = commit.content;
+        let pill = commit.content.inner;
         let tmp = commit.proof;
-        let _proof = Proof {
+
+        // Sorage save the lastest proof.
+        let proof = Proof {
             epoch_id:   tmp.epoch_id,
             round:      tmp.round,
             epoch_hash: Hash::from_bytes(tmp.epoch_hash)?,
@@ -154,21 +164,35 @@ where
             bitmap:     tmp.signature.address_bitmap,
         };
 
+        self.adapter.save_proof(ctx.clone(), proof).await?;
+
+        // Get full transactions from mempool temporarily.
+        // Storage save the signed transactions.
         let full_txs = self
             .adapter
-            .get_full_txs(ctx.clone(), pill.inner.epoch.ordered_tx_hashes)
+            .get_full_txs(ctx.clone(), pill.epoch.ordered_tx_hashes.clone())
             .await?;
 
         self.adapter
             .save_signed_txs(ctx.clone(), full_txs.clone())
             .await?;
 
+        // Storage save the epoch.
+        let mut epoch = pill.epoch;
+        self.adapter.save_epoch(ctx.clone(), epoch.clone()).await?;
+
+        self.adapter
+            .flush_mempool(ctx.clone(), epoch.ordered_tx_hashes.clone())
+            .await?;
+
+        let _prev_hash = Hash::digest(epoch.encode().await?);
+
         // TODO: update header cache.
 
         let status = Status {
             epoch_id:       epoch_id + 1,
             interval:       None,
-            authority_list: vec![],
+            authority_list: self.authority.clone(),
         };
         Ok(status)
     }
@@ -191,6 +215,7 @@ where
             }
             _ => unreachable!(),
         };
+
         self.adapter
             .transmit(ctx, msg, end, MessageTarget::Broadcast)
             .await?;
@@ -210,6 +235,7 @@ where
             }
             _ => unreachable!(),
         };
+
         self.adapter
             .transmit(
                 ctx,
@@ -251,35 +277,75 @@ where
     MA: MemPoolAdapter + 'static,
     SA: StorageAdapter + 'static,
 {
-    fn new(
+    pub fn new(
         chain_id: Hash,
         address: UserAddress,
         cycle_limit: u64,
-        adapter: OverlordConsensusAdapter<G, M, S, MA, SA>,
+        validators: Vec<Validator>,
+        network: Arc<G>,
+        mempool: Arc<M>,
+        storage: Arc<S>,
     ) -> Self {
+        let adapter = OverlordConsensusAdapter::new(network, mempool, storage);
+        let mut authority = validators
+            .clone()
+            .into_iter()
+            .map(|v| Node {
+                address:        v.address.as_bytes(),
+                propose_weight: v.propose_weight,
+                vote_weight:    v.vote_weight,
+            })
+            .collect::<Vec<_>>();
+
+        authority.sort();
+
         ConsensusEngine {
             chain_id,
             address,
             cycle_limit,
             exemption_hash: RwLock::new(HashSet::new()),
-            state_root: Hash::from_empty(),
-            order_root: Hash::from_empty(),
-            header_cache: HashMap::new(),
+            latest_header: RwLock::new(HeaderCache::default()),
+            validators,
+            authority,
             adapter,
         }
     }
 }
 
+#[derive(Clone, Debug, Hash)]
 struct HeaderCache {
-    receipts:       Vec<Receipt>,
-    all_cycle_used: u64,
-    logs_bloom:     Bloom,
-    state_root:     MerkleRoot,
+    pub epoch_id:     u64,
+    pub prev_hash:    Hash,
+    pub logs_bloom:   Bloom,
+    pub order_root:   MerkleRoot,
+    pub confirm_root: Vec<MerkleRoot>,
+    pub state_root:   MerkleRoot,
+    pub receipt_root: Vec<MerkleRoot>,
+    pub cycles_used:  Vec<Fee>,
+    pub proof:        Proof,
 }
 
-impl HeaderCache {
-    fn get_all_cycle_used(&self) -> u64 {
-        self.all_cycle_used
+impl Default for HeaderCache {
+    fn default() -> Self {
+        let genesis_proof = Proof {
+            epoch_id:   GENESIS_EPOCH_ID,
+            round:      INIT_ROUND,
+            epoch_hash: Hash::from_empty(),
+            signature:  Bytes::default(),
+            bitmap:     Bytes::default(),
+        };
+
+        HeaderCache {
+            epoch_id:     GENESIS_EPOCH_ID,
+            prev_hash:    Hash::from_empty(),
+            logs_bloom:   Bloom::zero(),
+            order_root:   MerkleRoot::from_empty(),
+            confirm_root: Vec::new(),
+            state_root:   MerkleRoot::from_empty(),
+            receipt_root: Vec::new(),
+            cycles_used:  Vec::new(),
+            proof:        genesis_proof,
+        }
     }
 }
 

@@ -1,14 +1,15 @@
-#![allow(dead_code)]
-
-pub mod adapter;
+mod adapter;
 pub mod consensus;
 mod engine;
 mod fixed_types;
 pub mod message;
+mod util;
 
 use std::error::Error;
 
 use derive_more::{Display, From};
+
+use common_crypto::CryptoError;
 
 use protocol::types::Hash;
 use protocol::{ProtocolError, ProtocolErrorKind};
@@ -54,7 +55,7 @@ pub enum ConsensusError {
 
     /// This boxed error should be a `CryptoError`.
     #[display(fmt = "Crypto error {:?}", _0)]
-    CryptoErr(Box<dyn Error + Send>),
+    CryptoErr(Box<CryptoError>),
 
     /// Other error used for very few errors.
     #[display(fmt = "{:?}", _0)]

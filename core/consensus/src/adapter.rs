@@ -1,15 +1,13 @@
-use std::collections::HashSet;
 use std::marker::PhantomData;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use bytes::Bytes;
 
 use protocol::traits::{
     ConsensusAdapter, Context, Gossip, MemPool, MemPoolAdapter, MessageTarget, MixedTxHashes,
     Priority, Storage, StorageAdapter,
 };
-use protocol::types::{Epoch, Hash, Proof, Receipt, SignedTransaction, UserAddress, Validator};
+use protocol::types::{Epoch, Hash, Proof, Receipt, SignedTransaction, Validator};
 use protocol::ProtocolResult;
 
 // use crate::ConsensusError;
@@ -21,11 +19,6 @@ pub struct OverlordConsensusAdapter<
     MA: MemPoolAdapter,
     SA: StorageAdapter,
 > {
-    address:        UserAddress,
-    proof:          Option<Proof>,
-    cycle_limit:    u64,
-    exemption_hash: HashSet<Bytes>,
-
     network:         Arc<G>,
     mempool:         Arc<M>,
     storage:         Arc<S>,
@@ -97,6 +90,10 @@ where
         self.storage.insert_receipts(receipts).await
     }
 
+    async fn save_proof(&self, _ctx: Context, proof: Proof) -> ProtocolResult<()> {
+        self.storage.update_latest_proof(proof).await
+    }
+
     async fn save_signed_txs(
         &self,
         _ctx: Context,
@@ -123,36 +120,13 @@ where
     MA: MemPoolAdapter + 'static,
     SA: StorageAdapter + 'static,
 {
-    pub fn new(
-        address: UserAddress,
-        cycle_limit: u64,
-        network: Arc<G>,
-        mempool: Arc<M>,
-        storage: Arc<S>,
-    ) -> Self {
+    pub fn new(network: Arc<G>, mempool: Arc<M>, storage: Arc<S>) -> Self {
         OverlordConsensusAdapter {
-            address,
-            proof: None,
-            cycle_limit,
-            exemption_hash: HashSet::new(),
-
             mempool_adapter: PhantomData,
             storage_adapter: PhantomData,
             network,
             mempool,
             storage,
         }
-    }
-
-    pub fn is_hold_proof(&self) -> bool {
-        self.proof.is_some()
-    }
-
-    pub fn get_proof(&self) -> Option<Proof> {
-        self.proof.clone()
-    }
-
-    pub fn update_proof(&mut self, proof: Proof) {
-        self.proof = Some(proof);
     }
 }

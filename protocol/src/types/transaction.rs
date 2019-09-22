@@ -4,7 +4,7 @@ use crate::types::primitive::{
     AssetID, Balance, ContractAddress, ContractType, Fee, Hash, UserAddress,
 };
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RawTransaction {
     pub chain_id: Hash,
     pub nonce:    Hash,
@@ -13,7 +13,7 @@ pub struct RawTransaction {
     pub action:   TransactionAction,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TransactionAction {
     Transfer {
         receiver: UserAddress,
@@ -38,7 +38,7 @@ pub enum TransactionAction {
     },
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SignedTransaction {
     pub raw:       RawTransaction,
     pub tx_hash:   Hash,

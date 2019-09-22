@@ -204,7 +204,7 @@ fn mock_epoch_header() -> EpochHeader {
         confirm_root:      vec![mock_hash(), mock_hash()],
         state_root:        mock_merkle_root(),
         receipt_root:      vec![mock_hash(), mock_hash()],
-        cycles_used:       10,
+        cycles_used:       Vec::new(),
         proposer:          mock_account_address(),
         proof:             mock_proof(),
         validator_version: 1,

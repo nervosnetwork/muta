@@ -79,6 +79,9 @@ pub trait ConsensusAdapter: Send + Sync {
     /// Save some receipts to the database.
     async fn save_receipts(&self, ctx: Context, receipts: Vec<Receipt>) -> ProtocolResult<()>;
 
+    ///
+    async fn save_proof(&self, ctx: Context, proof: Proof) -> ProtocolResult<()>;
+
     /// Save some signed transactions to the database.
     async fn save_signed_txs(
         &self,
