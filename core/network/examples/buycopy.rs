@@ -100,15 +100,19 @@ pub async fn main() {
 
     let base_conf = NetworkConfig::new();
 
-    let bt_seckey = "8".repeat(32);
-    let bt_keypair = SecioKeyPair::secp256k1_raw_key(bt_seckey).unwrap();
-    let bt_pubkey = bt_keypair.to_public_key();
+    let bt_seckey_bytes = "8".repeat(32);
+    let bt_seckey = hex::encode(&bt_seckey_bytes);
+    let bt_keypair = SecioKeyPair::secp256k1_raw_key(bt_seckey_bytes).expect("keypair");
+    let bt_pubkey = hex::encode(bt_keypair.to_public_key().inner());
     let bt_addr = SocketAddr::new(IP_ADDR, 1337);
 
     if std::env::args().nth(1) == Some("server".to_string()) {
         info!("Starting server");
 
-        let bt_conf = base_conf.clone().skp(bt_keypair);
+        let bt_conf = base_conf
+            .clone()
+            .secio_keypair(bt_seckey)
+            .expect("set keypair");
 
         let mut bootstrap = NetworkService::new(bt_conf);
         let handle = bootstrap.handle();
@@ -143,7 +147,7 @@ pub async fn main() {
         let peer_addr = SocketAddr::new(IP_ADDR, port);
         let peer_conf = base_conf
             .clone()
-            .bootstraps(vec![(bt_pubkey.encode(), bt_addr)])
+            .bootstraps(vec![(bt_pubkey, bt_addr)])
             .unwrap();
 
         let mut peer = NetworkService::new(peer_conf);

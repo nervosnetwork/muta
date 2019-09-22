@@ -27,9 +27,10 @@ snap = "0.2"
 tentacle = { version = "0.2", features = [ "flatc" ] }
 tentacle-ping = { version = "0.3", features = [ "flatc" ] }
 tentacle-discovery = { version = "0.2", features = [ "flatc" ] }
+hex = "0.4"
 
 [dev-dependencies]
 env_logger = "0.6"
 runtime-tokio = "0.3.0-alpha.6"
-quickcheck = "0.9.0"
-quickcheck_macros = "0.8.0"
+quickcheck = "0.9"
+quickcheck_macros = "0.8"

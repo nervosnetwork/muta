@@ -7,7 +7,6 @@ use std::{
 
 use protocol::ProtocolResult;
 use tentacle::{
-    bytes::Bytes,
     multiaddr::{Multiaddr, Protocol},
     secio::{PublicKey, SecioKeyPair},
 };
@@ -40,8 +39,8 @@ pub const DEFAULT_DISCOVERY_SYNC_INTERVAL: u64 = 3;
 pub const DEFAULT_PEER_MANAGER_HEART_BEAT_INTERVAL: u64 = 10;
 pub const DEFAULT_SELF_HEART_BEAT_INTERVAL: u64 = 15;
 
-pub type PublicKeyBytes = Bytes;
-pub type PrivateKeyBytes = Bytes;
+pub type PublicKeyHexStr = String;
+pub type PrivateKeyHexStr = String;
 
 #[derive(Debug, Clone)]
 pub struct NetworkConfig {
@@ -108,10 +107,13 @@ impl NetworkConfig {
         self
     }
 
-    pub fn bootstraps(mut self, pairs: Vec<(PublicKeyBytes, SocketAddr)>) -> ProtocolResult<Self> {
-        let to_peer = |(pk_bytes, socket_addr): (PublicKeyBytes, SocketAddr)| -> _ {
-            let pk = PublicKey::decode(pk_bytes.as_ref())
-                .ok_or_else(|| NetworkError::InvalidPublicKey)?;
+    // TODO: Remove explicit secp256k1
+    pub fn bootstraps(mut self, pairs: Vec<(PublicKeyHexStr, SocketAddr)>) -> ProtocolResult<Self> {
+        let to_peer = |(pk_hex, socket_addr): (PublicKeyHexStr, SocketAddr)| -> _ {
+            let pk = hex::decode(pk_hex)
+                .map(PublicKey::Secp256k1)
+                .map_err(|_| NetworkError::InvalidPublicKey)?;
+
             let multi_addr = socket_to_multi_addr(socket_addr);
 
             Ok(Peer::from_pair((pk, multi_addr)))
@@ -136,19 +138,16 @@ impl NetworkConfig {
         self
     }
 
-    pub fn secio_keypair(mut self, sk_bytes: PrivateKeyBytes) -> ProtocolResult<Self> {
-        let skp = SecioKeyPair::secp256k1_raw_key(sk_bytes)
-            .map_err(|_| NetworkError::InvalidPrivateKey)?;
+    pub fn secio_keypair(mut self, sk_hex: PrivateKeyHexStr) -> ProtocolResult<Self> {
+        let maybe_skp = hex::decode(sk_hex).map(SecioKeyPair::secp256k1_raw_key);
 
-        self.secio_keypair = skp;
-        Ok(self)
-    }
+        if let Ok(Ok(skp)) = maybe_skp {
+            self.secio_keypair = skp;
 
-    // TODO: #[cfg(test)]
-    pub fn skp(mut self, skp: SecioKeyPair) -> Self {
-        self.secio_keypair = skp;
-
-        self
+            Ok(self)
+        } else {
+            Err(NetworkError::InvalidPrivateKey.into())
+        }
     }
 
     pub fn ping_interval(mut self, interval: u64) -> Self {

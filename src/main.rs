@@ -132,13 +132,13 @@ async fn start(cfg: &Config) -> ProtocolResult<()> {
 
     // Init network
     let network_config = NetworkConfig::new();
+    let network_privkey = cfg.privkey.clone();
+
     let mut bootstrap_pairs = vec![];
     for bootstrap in cfg.network.bootstraps.iter() {
-        let pubkey = Bytes::from(hex::decode(bootstrap.pubkey.clone()).unwrap());
-        bootstrap_pairs.push((pubkey, bootstrap.address));
+        bootstrap_pairs.push((bootstrap.pubkey.to_owned(), bootstrap.address));
     }
 
-    let network_privkey = Bytes::from(hex::decode(cfg.privkey.clone()).unwrap());
     let network_config = network_config
         .bootstraps(bootstrap_pairs)
         .unwrap()

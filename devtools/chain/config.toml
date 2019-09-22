@@ -2,7 +2,7 @@
 chain_id = "b6a4d7da21443f5e816e8700eea87610e6d769657d6b8ec73028457bf2ca4036"  # by sha256(Muta)
 
 # crypto
-privkey = "67df77adbc271f558df88504cf3a3f87bfdd2d55b11e86c55c4fd978a935a836"
+privkey = "2064ac2004ae939edbfacdc22b01322c78d9d4ba1fc1f9eb8fd804653dd4bae0"
 
 # db config
 data_path = "./devtools/chain/data"
@@ -11,7 +11,7 @@ data_path = "./devtools/chain/data"
 listening_address = "0.0.0.0:1337"
 
 [[network.bootstraps]]
-pubkey = "0c000000080008000000040008000000040000002100000002d3071ef493b3a661e892a19dc02904569f98c81337ffa3fe69acd6c53aed9395000000"
+pubkey = "02a8684e741e51e7ac2a6a22d699474c20c730f833c4505e480dbc5a714b171e06"
 address = "0.0.0.0:1888"
 
 [mempool]
