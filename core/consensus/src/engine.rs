@@ -3,7 +3,6 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use std::{error::Error, sync::Arc};
 
 use async_trait::async_trait;
-use bincode::serialize;
 use bytes::Bytes;
 use overlord::types::{Commit, Node, OverlordMsg, Status};
 use overlord::Consensus as Engine;
@@ -20,8 +19,7 @@ use protocol::ProtocolError;
 
 use crate::fixed_types::{FixedPill, FixedSignedTxs};
 use crate::message::{
-    Proposal, Vote, END_GOSSIP_AGGREGATED_VOTE, END_GOSSIP_SIGNED_PROPOSAL, END_GOSSIP_SIGNED_VOTE,
-    QC,
+    END_GOSSIP_AGGREGATED_VOTE, END_GOSSIP_SIGNED_PROPOSAL, END_GOSSIP_SIGNED_VOTE,
 };
 use crate::ConsensusError;
 
@@ -194,12 +192,12 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill, FixedSignedTxs>
     ) -> Result<(), Box<dyn Error + Send>> {
         let (end, msg) = match msg {
             OverlordMsg::SignedProposal(sp) => {
-                let bytes =
-                    serialize(&Proposal::from(sp)).map_err(|e| e as Box<dyn Error + Send>)?;
+                let bytes = sp.rlp_bytes();
                 (END_GOSSIP_SIGNED_PROPOSAL, bytes)
             }
+
             OverlordMsg::AggregatedVote(av) => {
-                let bytes = serialize(&QC::from(av)).map_err(|e| e as Box<dyn Error + Send>)?;
+                let bytes = av.rlp_bytes();
                 (END_GOSSIP_AGGREGATED_VOTE, bytes)
             }
             _ => unreachable!(),
@@ -219,9 +217,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill, FixedSignedTxs>
         msg: OverlordMsg<FixedPill>,
     ) -> Result<(), Box<dyn Error + Send>> {
         let msg = match msg {
-            OverlordMsg::SignedVote(sv) => {
-                serialize(&Vote::from(sv)).map_err(|e| e as Box<dyn Error + Send>)?
-            }
+            OverlordMsg::SignedVote(sv) => sv.rlp_bytes(),
             _ => unreachable!(),
         };
 

@@ -39,7 +39,7 @@ impl Crypto for OverlordCrypto {
         mut signature: Bytes,
         hash: Bytes,
     ) -> Result<Bytes, Box<dyn Error + Send>> {
-        let tmp = signature.split_off(32);
+        let tmp = signature.split_off(33);
         let pub_key = signature;
         let signature = tmp;
 
