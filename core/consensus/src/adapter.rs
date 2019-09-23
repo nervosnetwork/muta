@@ -51,9 +51,21 @@ where
         ctx: Context,
         msg: Vec<u8>,
         end: &str,
-        _target: MessageTarget,
+        target: MessageTarget,
     ) -> ProtocolResult<()> {
-        self.network.broadcast(ctx, end, msg, Priority::High).await
+        match target {
+            MessageTarget::Broadcast => {
+                self.network
+                    .broadcast(ctx.clone(), end, msg, Priority::High)
+                    .await
+            }
+
+            MessageTarget::Specified(addr) => {
+                self.network
+                    .users_cast(ctx, end, vec![addr], msg, Priority::High)
+                    .await
+            }
+        }
     }
 
     async fn execute(
