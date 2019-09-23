@@ -5,7 +5,7 @@ use serde_derive::Deserialize;
 
 #[derive(Debug, Deserialize)]
 pub struct ConfigNetwork {
-    pub bootstraps:        Vec<ConfigNetworkBootstrap>,
+    pub bootstraps:        Option<Vec<ConfigNetworkBootstrap>>,
     pub listening_address: SocketAddr,
 }
 

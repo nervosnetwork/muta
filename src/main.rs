@@ -137,8 +137,10 @@ async fn start(cfg: &Config) -> ProtocolResult<()> {
     let network_privkey = cfg.privkey.clone();
 
     let mut bootstrap_pairs = vec![];
-    for bootstrap in cfg.network.bootstraps.iter() {
-        bootstrap_pairs.push((bootstrap.pubkey.to_owned(), bootstrap.address));
+    if let Some(bootstrap) = &cfg.network.bootstraps {
+        for bootstrap in bootstrap.iter() {
+            bootstrap_pairs.push((bootstrap.pubkey.to_owned(), bootstrap.address));
+        }
     }
 
     let network_config = network_config
