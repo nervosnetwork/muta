@@ -2,7 +2,7 @@
 chain_id = "b6a4d7da21443f5e816e8700eea87610e6d769657d6b8ec73028457bf2ca4036"  # by sha256(Muta)
 
 # crypto
-privkey = "2064ac2004ae939edbfacdc22b01322c78d9d4ba1fc1f9eb8fd804653dd4bae0"
+privkey = "45c56be699dca666191ad3446897e0f480da234da896270202514a0e1a587c3f"
 
 # db config
 data_path = "./devtools/chain/data"
@@ -11,7 +11,7 @@ data_path = "./devtools/chain/data"
 listening_address = "0.0.0.0:1337"
 
 [[network.bootstraps]]
-pubkey = "02a8684e741e51e7ac2a6a22d699474c20c730f833c4505e480dbc5a714b171e06"
+pubkey = "031288a6788678c25952eba8693b2f278f66e2187004b64ac09416d07f83f96d5b"
 address = "0.0.0.0:1888"
 
 [mempool]
@@ -21,5 +21,5 @@ pool_size = 20000
 [consensus]
 cycles_limit = 99999999
 interval = 3000
-verifier_list = [ "10f3f6097052714c4a84a525e4975e7b9241a06e98" ]
+verifier_list = [ "10f8389d774afdad8755ef8e629e5a154fddc6325a" ]
 
