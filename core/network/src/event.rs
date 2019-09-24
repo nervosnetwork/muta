@@ -130,7 +130,7 @@ pub enum PeerManagerEvent {
         addrs: Vec<Multiaddr>,
     },
 
-    #[display(fmt = "remove unknown addr {}, kind: {}", addr, kind)]
+    #[display(fmt = "remove addr {}, kind: {}", addr, kind)]
     RemoveAddr { addr: Multiaddr, kind: RemoveKind },
 
     #[display(fmt = "retry unknown addr {}, kind: {}", addr, kind)]

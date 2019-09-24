@@ -74,7 +74,7 @@ impl Peer {
         }
     }
 
-    pub fn pid(&self) -> &PeerId {
+    pub fn id(&self) -> &PeerId {
         &self.id
     }
 

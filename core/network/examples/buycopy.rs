@@ -76,20 +76,17 @@ impl<N: Rpc + Send + Sync + 'static> MessageHandler for Checkout<N> {
     type Message = BuyACopy;
 
     async fn process(&self, ctx: Context, _msg: Self::Message) -> ProtocolResult<()> {
+        let acopy = ACopy {
+            hash: Hash::digest(Bytes::new()),
+            gifs: vec![
+                Hash::digest("jacket".into()),
+                Hash::digest("map".into()),
+                Hash::digest("book".into()),
+            ],
+        };
+
         self.dealer
-            .response(
-                ctx,
-                SHOP_CHANNEL,
-                ACopy {
-                    hash: Hash::digest(Bytes::new()),
-                    gifs: vec![
-                        Hash::digest("jacket".into()),
-                        Hash::digest("map".into()),
-                        Hash::digest("book".into()),
-                    ],
-                },
-                Priority::High,
-            )
+            .response(ctx, SHOP_CHANNEL, acopy, Priority::High)
             .await
     }
 }

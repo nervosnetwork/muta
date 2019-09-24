@@ -27,7 +27,7 @@ use futures::{
     stream::Stream,
     task::AtomicWaker,
 };
-use log::{debug, error};
+use log::{debug, error, info};
 use parking_lot::RwLock;
 use protocol::types::UserAddress;
 use rand::seq::IteratorRandom;
@@ -62,6 +62,7 @@ impl UnknownAddr {
 
     pub fn increase_retry_count(&mut self) {
         self.retry_count += 1;
+
         debug_assert!(self.retry_count < MAX_RETRY_COUNT + 1);
     }
 
@@ -113,17 +114,18 @@ impl Inner {
         user_pid.get(user).and_then(|pid| pool.get(pid).cloned())
     }
 
-    pub fn add_peer(&self, peer_id: PeerId, pubkey: PublicKey, addr: Multiaddr) {
+    pub fn add_peer(&self, peer: Peer) {
         let mut pool = self.pool.write();
         let mut addr_pid = self.addr_pid.write();
         let mut user_pid = self.user_pid.write();
 
-        user_pid.insert(Peer::pubkey_to_addr(&pubkey), peer_id.clone());
-        addr_pid.insert(addr.clone(), peer_id.clone());
+        user_pid.insert(Peer::pubkey_to_addr(peer.pubkey()), peer.id().clone());
 
-        pool.entry(peer_id.clone())
-            .or_insert_with(|| Peer::new(peer_id, pubkey))
-            .add_addr(addr)
+        for addr in peer.addrs().into_iter() {
+            addr_pid.insert(addr.clone(), peer.id().clone());
+        }
+
+        pool.insert(peer.id().clone(), peer);
     }
 
     pub fn add_peer_addr(&self, peer_id: &PeerId, addr: Multiaddr) {
@@ -136,6 +138,8 @@ impl Inner {
             return;
         }
 
+        self.addr_pid.write().insert(addr.clone(), peer_id.clone());
+
         pool.entry(peer_id.to_owned())
             .and_modify(|peer| peer.add_addr(addr));
     }
@@ -146,6 +150,10 @@ impl Inner {
         if let Some(peer) = self.pool.write().get_mut(peer_id) {
             peer.remove_addr(addr);
         }
+    }
+
+    pub fn addr_peer_id(&self, addr: &Multiaddr) -> Option<PeerId> {
+        self.addr_pid.read().get(addr).cloned()
     }
 
     pub fn try_remove_addr(&self, addr: &Multiaddr) {
@@ -195,7 +203,7 @@ impl Inner {
 
         let peers = pool
             .values()
-            .filter(|peer| !connecting.contains(peer.pid()) && !peer.retry_ready())
+            .filter(|peer| !connecting.contains(peer.id()) && peer.retry_ready())
             .choose_multiple(&mut rng, max);
 
         peers.into_iter().map(Peer::owned_addrs).flatten().collect()
@@ -314,6 +322,7 @@ pub struct PeerManager {
     // query purpose
     peer_session: HashMap<PeerId, SessionId>,
     session_peer: HashMap<SessionId, PeerId>,
+    bootstraps:   HashSet<Multiaddr>,
 
     // unknown
     unknown_addrs: HashSet<UnknownAddr>,
@@ -349,6 +358,7 @@ impl PeerManager {
 
             peer_session: Default::default(),
             session_peer: Default::default(),
+            bootstraps: Default::default(),
 
             unknown_addrs: Default::default(),
 
@@ -382,10 +392,29 @@ impl PeerManager {
     }
 
     pub fn bootstrap(&mut self) {
-        let peers = self.config.bootstraps.iter();
-        let addrs = peers.map(Peer::owned_addrs).flatten().collect();
+        let peers = &self.config.bootstraps;
+
+        // Insert bootstrap peers
+        for peer in peers.iter() {
+            info!(
+                "network: peer manager: bootstrap peer {:?} addrs {:?}",
+                peer.id(),
+                peer.addrs()
+            );
+
+            self.inner.add_peer(peer.clone());
+        }
+
+        // Collect bootstrap addrs
+        let addrs: Vec<Multiaddr> = peers.iter().map(Peer::owned_addrs).flatten().collect();
         debug!("network: peer manager: bootstrap addrs {:?}", addrs);
 
+        // Insert bootstrap addrs, so that we can check if an addr is bootstrap
+        for addr in addrs.iter() {
+            self.bootstraps.insert(addr.clone());
+        }
+
+        // Connect bootstrap addrs
         self.connect_peers(addrs)
     }
 
@@ -439,9 +468,9 @@ impl PeerManager {
         }
     }
 
-    fn add_peer(&mut self, pid: PeerId, pubkey: PublicKey, addr: Multiaddr) {
+    fn add_peer(&mut self, pubkey: PublicKey, addr: Multiaddr) {
         self.unknown_addrs.remove(&UnknownAddr::new(addr.clone()));
-        self.inner.add_peer(pid.clone(), pubkey, addr);
+        self.inner.add_peer(Peer::from_pair((pubkey, addr)));
     }
 
     fn remove_peer(&mut self, pid: &PeerId) {
@@ -460,8 +489,8 @@ impl PeerManager {
 
     fn process_event(&mut self, event: PeerManagerEvent) {
         match event {
-            PeerManagerEvent::AddPeer { pid, pubkey, addr } => {
-                self.add_peer(pid, pubkey, addr);
+            PeerManagerEvent::AddPeer { pubkey, addr, .. } => {
+                self.add_peer(pubkey, addr);
             }
             PeerManagerEvent::UpdatePeerSession { pid, sid } => {
                 if let Some(sid) = sid {
@@ -525,7 +554,14 @@ impl PeerManager {
             }
             PeerManagerEvent::RemoveAddr { addr, .. } => {
                 self.unknown_addrs.remove(&addr.clone().into());
-                self.inner.try_remove_addr(&addr);
+
+                if !self.bootstraps.contains(&addr) {
+                    self.inner.try_remove_addr(&addr);
+                } else if let Some(pid) = self.inner.addr_peer_id(&addr) {
+                    debug!("network: peer manager: bootstrap peer {:?} retry", pid);
+
+                    self.inner.increase_retry_count(&pid);
+                }
             }
             PeerManagerEvent::RetryAddrLater { addr, .. } => {
                 if let Some(mut addr) = self.unknown_addrs.take(&addr.into()) {
@@ -549,7 +585,7 @@ impl PeerManager {
 
                 for user_addr in users_msg.user_addrs.into_iter() {
                     if let Some(peer) = self.inner.user_peer(&user_addr) {
-                        if let Some(sid) = self.peer_session.get(&peer.pid()) {
+                        if let Some(sid) = self.peer_session.get(&peer.id()) {
                             connected.push(*sid);
                         } else {
                             unconnected_peers.push(peer);
