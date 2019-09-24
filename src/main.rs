@@ -220,7 +220,7 @@ async fn start(cfg: &Config) -> ProtocolResult<()> {
 
     // Run consensus
     overlord_consensus
-        .run(cfg.consensus.interval)
+        .run(cfg.consensus.interval, Some(cfg.consensus.duration.clone()))
         .await
         .unwrap();
 

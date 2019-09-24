@@ -12,6 +12,7 @@ bincode = "1.1"
 bytes = "0.4"
 creep = "0.1"
 derive_more = "0.15"
+futures-preview = "0.3.0-alpha.18"
 overlord = { git = "https://github.com/cryptape/overlord.git", branch = "dev" }
 parking_lot = "0.9"
 rlp = "0.4"
@@ -24,6 +25,5 @@ core-network = { path = "../../core/network"}
 protocol = { path = "../../protocol" }
 
 [dev-dependencies]
-futures-preview = "0.3.0-alpha.18"
 num-traits = "0.2"
 rand = "0.7"

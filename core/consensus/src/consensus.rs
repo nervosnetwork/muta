@@ -3,7 +3,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use creep::Context;
 use overlord::types::{AggregatedVote, Node, OverlordMsg, SignedProposal, SignedVote, Status};
-use overlord::{Overlord, OverlordHandler};
+use overlord::{DurationConfig, Overlord, OverlordHandler};
 use rlp::decode;
 
 use common_crypto::{PrivateKey, Secp256k1PrivateKey};
@@ -18,11 +18,14 @@ use crate::util::OverlordCrypto;
 use crate::{ConsensusError, MsgType};
 
 /// Provide consensus
+#[allow(dead_code)]
 pub struct OverlordConsensus<Adapter: ConsensusAdapter + 'static> {
     /// Overlord consensus protocol instance.
     inner: Arc<Overlord<FixedPill, FixedSignedTxs, ConsensusEngine<Adapter>, OverlordCrypto>>,
     /// An overlord consensus protocol handler.
     handler: OverlordHandler<FixedPill>,
+    /// A consensus engine for synchronous.
+    engine: Arc<ConsensusEngine<Adapter>>,
 }
 
 #[async_trait]
@@ -75,17 +78,17 @@ impl<Adapter: ConsensusAdapter + 'static> OverlordConsensus<Adapter> {
         priv_key: Secp256k1PrivateKey,
         adapter: Arc<Adapter>,
     ) -> Self {
-        let engine = ConsensusEngine::new(
+        let engine = Arc::new(ConsensusEngine::new(
             chain_id,
             address.clone(),
             cycle_limit,
             validators.clone(),
             Arc::clone(&adapter),
-        );
+        ));
 
         let crypto = OverlordCrypto::new(priv_key.pub_key(), priv_key);
 
-        let overlord = Overlord::new(address.as_bytes(), engine, crypto);
+        let overlord = Overlord::new(address.as_bytes(), Arc::clone(&engine), crypto);
         let overlord_handler = overlord.get_handler();
         overlord_handler
             .send_msg(
@@ -95,14 +98,19 @@ impl<Adapter: ConsensusAdapter + 'static> OverlordConsensus<Adapter> {
             .unwrap();
 
         Self {
-            inner:   Arc::new(overlord),
+            inner: Arc::new(overlord),
             handler: overlord_handler,
+            engine,
         }
     }
 
-    pub async fn run(&self, interval: u64) -> ProtocolResult<()> {
+    pub async fn run(
+        &self,
+        interval: u64,
+        timer_config: Option<DurationConfig>,
+    ) -> ProtocolResult<()> {
         self.inner
-            .run(interval)
+            .run(interval, timer_config)
             .await
             .map_err(|e| ConsensusError::OverlordErr(Box::new(e)))?;
 

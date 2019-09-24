@@ -3,6 +3,8 @@ use std::path::PathBuf;
 
 use serde_derive::Deserialize;
 
+use core_consensus::DurationConfig;
+
 #[derive(Debug, Deserialize)]
 pub struct ConfigNetwork {
     pub bootstraps:        Option<Vec<ConfigNetworkBootstrap>>,
@@ -25,6 +27,7 @@ pub struct ConfigMempool {
 pub struct ConfigConsensus {
     pub cycles_limit:  u64,
     pub interval:      u64,
+    pub duration:      DurationConfig,
     pub verifier_list: Vec<String>,
 }
 

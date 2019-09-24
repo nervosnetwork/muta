@@ -6,6 +6,8 @@ pub mod adapter;
 pub mod consensus;
 pub mod message;
 
+pub use overlord::DurationConfig;
+
 use std::error::Error;
 
 use derive_more::{Display, From};

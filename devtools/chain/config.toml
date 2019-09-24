@@ -23,3 +23,10 @@ cycles_limit = 99999999
 interval = 3000
 verifier_list = [ "10f8389d774afdad8755ef8e629e5a154fddc6325a" ]
 
+[[consensus.duration]]
+propose_numerator = 24
+propose_denominator = 30
+prevote_numerator = 6
+prevote_denominator = 30
+precommit_numerator = 6
+precommit_denominator = 30

@@ -4,6 +4,7 @@ use std::{error::Error, sync::Arc};
 
 use async_trait::async_trait;
 use bytes::Bytes;
+use futures::lock::Mutex;
 use overlord::types::{Commit, Node, OverlordMsg, Status};
 use overlord::Consensus as Engine;
 use parking_lot::RwLock;
@@ -36,6 +37,8 @@ pub struct ConsensusEngine<Adapter> {
     validators:     Vec<Validator>,
     authority:      Vec<Node>,
     adapter:        Arc<Adapter>,
+
+    lock: Mutex<()>,
 }
 
 #[async_trait]
@@ -135,6 +138,13 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill, FixedSignedTxs>
         epoch_id: u64,
         commit: Commit<FixedPill>,
     ) -> Result<Status, Box<dyn Error + Send>> {
+        let lock = self.lock.try_lock();
+        if lock.is_none() {
+            return Err(
+                ProtocolError::from(ConsensusError::Other("lock in sync".to_string())).into(),
+            );
+        }
+
         let pill = commit.content.inner;
         let tmp = commit.proof;
 
@@ -283,6 +293,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
             validators,
             authority,
             adapter,
+            lock: Mutex::new(()),
         }
     }
 }
