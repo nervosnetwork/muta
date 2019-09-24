@@ -11,6 +11,12 @@ pub struct DefaultAPIAdapter<M, S> {
     storage: Arc<S>,
 }
 
+impl<M: MemPool, S: Storage> DefaultAPIAdapter<M, S> {
+    pub fn new(mempool: Arc<M>, storage: Arc<S>) -> Self {
+        Self { mempool, storage }
+    }
+}
+
 #[async_trait]
 impl<M: MemPool, S: Storage> APIAdapter for DefaultAPIAdapter<M, S> {
     async fn insert_signed_txs(

@@ -6,6 +6,13 @@ use serde_derive::Deserialize;
 use core_consensus::DurationConfig;
 
 #[derive(Debug, Deserialize)]
+pub struct ConfigGraphQL {
+    pub listening_address: SocketAddr,
+    pub graphql_uri:       String,
+    pub graphiql_uri:      String,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct ConfigNetwork {
     pub bootstraps:        Option<Vec<ConfigNetworkBootstrap>>,
     pub listening_address: SocketAddr,
@@ -40,6 +47,7 @@ pub struct Config {
     // db config
     pub data_path: PathBuf,
 
+    pub graphql:   ConfigGraphQL,
     pub network:   ConfigNetwork,
     pub mempool:   ConfigMempool,
     pub consensus: ConfigConsensus,

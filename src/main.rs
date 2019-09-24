@@ -10,6 +10,8 @@ use std::sync::Arc;
 use bytes::Bytes;
 
 use common_crypto::{PrivateKey, PublicKey, Secp256k1, Secp256k1PrivateKey};
+use core_api::adapter::DefaultAPIAdapter;
+use core_api::config::GraphQLConfig;
 use core_consensus::adapter::OverlordConsensusAdapter;
 use core_consensus::consensus::OverlordConsensus;
 use core_consensus::message::{
@@ -215,8 +217,15 @@ async fn start(cfg: &Config) -> ProtocolResult<()> {
     // Run network
     runtime::spawn(network_service);
 
-    // Run GraphQL serve2
-    runtime::spawn(core_api::start_rpc());
+    // Init graphql
+    let api_adapter = DefaultAPIAdapter::new(Arc::clone(&mempool), Arc::clone(&storage));
+    let mut graphql_config = GraphQLConfig::default();
+    graphql_config.listening_address = cfg.graphql.listening_address;
+    graphql_config.graphql_uri = cfg.graphql.graphql_uri.clone();
+    graphql_config.graphiql_uri = cfg.graphql.graphiql_uri.clone();
+
+    // Run GraphQL server
+    runtime::spawn(core_api::start_graphql(graphql_config, api_adapter));
 
     // Run consensus
     overlord_consensus

@@ -1,9 +1,6 @@
 pub mod message;
 mod rlp_types;
 
-use message::{MsgNewTxs, MsgPullTxs, MsgPushTxs, END_GOSSIP_NEW_TXS, END_RPC_PULL_TXS};
-use rlp_types::RlpSignedTransaction;
-
 use std::{
     marker::PhantomData,
     sync::{
@@ -14,6 +11,7 @@ use std::{
 
 use async_trait::async_trait;
 use bytes::Bytes;
+
 use common_crypto::Crypto;
 use protocol::{
     traits::{Context, Gossip, MemPoolAdapter, Priority, Rpc, Storage},
@@ -21,6 +19,10 @@ use protocol::{
     ProtocolResult,
 };
 
+use crate::adapter::message::{
+    MsgNewTxs, MsgPullTxs, MsgPushTxs, END_GOSSIP_NEW_TXS, END_RPC_PULL_TXS,
+};
+use crate::adapter::rlp_types::RlpRawTransaction;
 use crate::MemPoolError;
 
 pub struct DefaultMemPoolAdapter<C, N, S> {
@@ -97,7 +99,7 @@ where
     // TODO: Cycle limit?
     async fn check_transaction(&self, _ctx: Context, stx: SignedTransaction) -> ProtocolResult<()> {
         // Verify transaction hash
-        let rlp_stx = rlp::encode(&RlpSignedTransaction::from(&stx));
+        let rlp_stx = rlp::encode(&RlpRawTransaction { inner: &stx.raw });
         let stx_hash = Hash::digest(Bytes::from(rlp_stx));
 
         if stx_hash != stx.tx_hash {
@@ -148,7 +150,7 @@ where
             Ok(_) => Err(MemPoolError::CommittedTx { tx_hash }.into()),
             Err(err) => {
                 // TODO: downcast to StorageError
-                if err.to_string().contains("get none") {
+                if err.to_string().contains("GetNone") {
                     Ok(())
                 } else {
                     Err(err)

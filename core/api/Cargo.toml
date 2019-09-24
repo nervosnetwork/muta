@@ -8,8 +8,14 @@ edition = "2018"
 
 [dependencies]
 protocol = { path = "../../protocol" }
+common-crypto = { path = "../../common/crypto"}
 
 http = "0.1"
 tide = { git = "https://github.com/rustasync/tide", rev = "af0b900" }
 juniper = "0.13"
+juniper_codegen = "0.13"
 async-trait = "0.1"
+hex = "0.3"
+rlp = "0.4"
+bytes = "0.4"
+futures-preview = { version = "0.3.0-alpha.18" }

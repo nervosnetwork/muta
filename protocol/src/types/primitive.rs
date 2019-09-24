@@ -142,6 +142,13 @@ impl Address {
             Address::Contract(contract) => contract.as_bytes(),
         }
     }
+
+    pub fn as_hex(&self) -> String {
+        match self {
+            Address::User(user) => user.as_hex(),
+            Address::Contract(contract) => contract.as_hex(),
+        }
+    }
 }
 
 /// The address consists of 21 bytes, the first of which is a magic number that
