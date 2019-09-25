@@ -1,6 +1,16 @@
 ERBOSE := $(if ${CI},--verbose,)
 
-CARGO := cargo
+ifneq ("$(wildcard /usr/lib/librocksdb.so)","")
+	SYS_LIB_DIR := /usr/lib
+else ifneq ("$(wildcard /usr/lib64/librocksdb.so)","")
+	SYS_LIB_DIR := /usr/lib64
+else
+	USE_SYS_ROCKSDB :=
+endif
+
+SYS_ROCKSDB := $(if ${USE_SYS_ROCKSDB},ROCKSDB_LIB_DIR=${SYS_LIB_DIR},)
+
+CARGO := env ${SYS_ROCKSDB} cargo
 
 test:
 	${CARGO} test ${VERBOSE} --all -- --nocapture
