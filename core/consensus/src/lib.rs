@@ -1,9 +1,9 @@
 mod engine;
-mod fixed_types;
 mod util;
 
 pub mod adapter;
 pub mod consensus;
+pub mod fixed_types;
 pub mod message;
 
 pub use overlord::DurationConfig;
