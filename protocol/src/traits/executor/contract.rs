@@ -60,6 +60,8 @@ pub trait AccountContract<Adapter: ContractStateAdapter> {
 
     fn inc_nonce(&mut self, ictx: RcInvokeContext) -> ProtocolResult<()>;
 
+    fn create_account(&mut self, address: &Address) -> ProtocolResult<Account>;
+
     fn add_balance(
         &mut self,
         id: &AssetID,

@@ -1,4 +1,5 @@
 #![feature(test)]
+#![feature(trait_alias)]
 
 pub mod codec;
 pub mod traits;
@@ -12,7 +13,6 @@ use derive_more::{Constructor, Display};
 pub enum ProtocolErrorKind {
     // traits
     API,
-    Bank,
     Consensus,
     Executor,
     Mempool,

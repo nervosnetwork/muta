@@ -7,11 +7,11 @@ use bytes::Bytes;
 use derive_more::{Display, From};
 
 use protocol::traits::executor::contract::ContractStateAdapter;
-use protocol::traits::executor::{ContractSchema, ContractSer};
+use protocol::traits::executor::{ContractSchema, ContractSer, TrieDB};
 use protocol::types::MerkleRoot;
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
-use crate::trie::{MPTTrie, TrieDB};
+use crate::trie::MPTTrie;
 
 pub type RcGeneralContractStateAdapter<DB> = Rc<RefCell<GeneralContractStateAdapter<DB>>>;
 

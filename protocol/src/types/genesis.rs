@@ -2,9 +2,10 @@ use serde_derive::Deserialize;
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct Genesis {
-    pub timestamp:   u64,
-    pub prevhash:    String,
-    pub state_alloc: Vec<GenesisStateAlloc>,
+    pub timestamp:    u64,
+    pub prevhash:     String,
+    pub system_token: GenesisSystemToken,
+    pub state_alloc:  Vec<GenesisStateAlloc>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -19,6 +20,14 @@ pub struct GenesisStateAsset {
     pub balance:  String,
 }
 
+#[derive(Clone, Debug, Deserialize)]
+pub struct GenesisSystemToken {
+    pub code:   String,
+    pub name:   String,
+    pub symbol: String,
+    pub supply: u64,
+}
+
 #[cfg(test)]
 mod tests {
     use super::Genesis;
@@ -28,6 +37,12 @@ mod tests {
         let genesis_string = r#"{
             "timestamp": 100000,
             "prevhash": "0x0000000000",
+            "system_token": {
+                "code": "",
+                "name": "Muta system token",
+                "symbol": "MST",
+                "supply": 21000000000
+            },
             "state_alloc": [
                 {
                     "address": "0xfffff",

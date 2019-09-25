@@ -2,14 +2,17 @@ pub mod contract;
 
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::Arc;
 
 use bytes::Bytes;
 
 use crate::types::{
-    Address, Bloom, CarryingAsset, ContractAddress, Fee, Hash, MerkleRoot, Receipt,
+    Address, Bloom, CarryingAsset, ContractAddress, Fee, Genesis, Hash, MerkleRoot, Receipt,
     SignedTransaction,
 };
 use crate::ProtocolResult;
+
+pub trait TrieDB = cita_trie::DB;
 
 #[derive(Clone, Debug)]
 pub struct ExecutorExecResp {
@@ -19,14 +22,21 @@ pub struct ExecutorExecResp {
     pub state_root:      MerkleRoot,
 }
 
-pub trait Executor {
-    fn exec(
-        &mut self,
+pub trait ExecutorFactory<DB: TrieDB>: Send + Sync {
+    fn from_root(
+        chain_id: Hash,
+        state_root: MerkleRoot,
+        db: Arc<DB>,
         epoch_id: u64,
         cycles_price: u64,
         coinbase: Address,
-        signed_txs: Vec<SignedTransaction>,
-    ) -> ProtocolResult<ExecutorExecResp>;
+    ) -> ProtocolResult<Box<dyn Executor>>;
+}
+
+pub trait Executor {
+    fn create_genesis(&mut self, genesis: &Genesis) -> ProtocolResult<MerkleRoot>;
+
+    fn exec(&mut self, signed_txs: Vec<SignedTransaction>) -> ProtocolResult<ExecutorExecResp>;
 }
 
 #[derive(Clone, Debug)]
