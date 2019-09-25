@@ -11,11 +11,10 @@ use parking_lot::RwLock;
 use rlp::Encodable;
 
 use protocol::codec::ProtocolCodec;
-use protocol::traits::{ConsensusAdapter, Context, MessageTarget};
-use protocol::types::{
-    Bloom, Epoch, EpochHeader, Hash, MerkleRoot, Pill, Proof, UserAddress, Validator,
-    GENESIS_EPOCH_ID,
+use protocol::traits::{
+    ConsensusAdapter, Context, CurrentConsensusStatus, MessageTarget, NodeInfo,
 };
+use protocol::types::{Epoch, EpochHeader, Hash, Pill, Proof, UserAddress, Validator};
 use protocol::ProtocolError;
 
 use crate::fixed_types::{FixedPill, FixedSignedTxs};
@@ -24,21 +23,15 @@ use crate::message::{
 };
 use crate::ConsensusError;
 
-const INIT_ROUND: u64 = 0;
-
 /// validator is for create new epoch, and authority is for build overlord
 /// status.
 pub struct ConsensusEngine<Adapter> {
-    chain_id:       Hash,
-    address:        UserAddress,
-    cycle_limit:    u64,
-    exemption_hash: RwLock<HashSet<Bytes>>,
-    latest_header:  RwLock<HeaderCache>,
-    validators:     Vec<Validator>,
-    authority:      Vec<Node>,
-    adapter:        Arc<Adapter>,
+    current_consensus_status: Arc<RwLock<CurrentConsensusStatus>>,
+    node_info:                NodeInfo,
+    exemption_hash:           RwLock<HashSet<Bytes>>,
 
-    lock: Mutex<()>,
+    adapter: Arc<Adapter>,
+    lock:    Mutex<()>,
 }
 
 #[async_trait]
@@ -50,40 +43,34 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill, FixedSignedTxs>
         ctx: Context,
         epoch_id: u64,
     ) -> Result<(FixedPill, Bytes), Box<dyn Error + Send>> {
+        let current_consensus_status = { self.current_consensus_status.read().clone() };
+
         let tmp = epoch_id;
         let (ordered_tx_hashes, propose_hashes) = self
             .adapter
-            .get_txs_from_mempool(ctx, epoch_id, self.cycle_limit)
+            .get_txs_from_mempool(ctx, epoch_id, current_consensus_status.cycles_limit)
             .await?
             .clap();
 
-        let cache = {
-            let header = self.latest_header.read();
-
-            if header.epoch_id == epoch_id {
-                header.clone()
-            } else {
-                return Err(
-                    ProtocolError::from(ConsensusError::MissingEpochHeader(epoch_id)).into(),
-                );
-            }
-        };
+        if current_consensus_status.epoch_id == epoch_id {
+            return Err(ProtocolError::from(ConsensusError::MissingEpochHeader(epoch_id)).into());
+        }
 
         let header = EpochHeader {
-            chain_id:          self.chain_id.clone(),
-            pre_hash:          cache.prev_hash,
+            chain_id:          self.node_info.chain_id.clone(),
+            pre_hash:          current_consensus_status.prev_hash,
             epoch_id:          tmp,
             timestamp:         time_now(),
-            logs_bloom:        cache.logs_bloom,
-            order_root:        cache.order_root,
-            confirm_root:      cache.confirm_root,
-            state_root:        cache.state_root,
-            receipt_root:      cache.receipt_root,
-            cycles_used:       cache.cycles_used,
-            proposer:          self.address.clone(),
-            proof:             cache.proof,
+            logs_bloom:        current_consensus_status.logs_bloom,
+            order_root:        current_consensus_status.order_root.clone(),
+            confirm_root:      current_consensus_status.confirm_root.clone(),
+            state_root:        current_consensus_status.state_root.clone(),
+            receipt_root:      current_consensus_status.receipt_root.clone(),
+            cycles_used:       current_consensus_status.cycles_used,
+            proposer:          self.node_info.self_address.clone(),
+            proof:             current_consensus_status.proof.clone(),
             validator_version: 0u64,
-            validators:        self.validators.clone(),
+            validators:        current_consensus_status.validators.clone(),
         };
         let epoch = Epoch {
             header,
@@ -96,8 +83,11 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill, FixedSignedTxs>
         });
         let hash = Hash::digest(Bytes::from(fixed_pill.rlp_bytes())).as_bytes();
 
-        let mut set = self.exemption_hash.write();
-        set.insert(hash.clone());
+        {
+            let mut set = self.exemption_hash.write();
+            set.insert(hash.clone());
+        }
+
         Ok((fixed_pill, hash))
     }
 
@@ -180,16 +170,20 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill, FixedSignedTxs>
 
         let prev_hash = Hash::digest(epoch.encode().await?);
 
-        // TODO: update header cache.
-        let mut header = self.latest_header.write();
-        header.epoch_id = epoch_id + 1;
-        header.prev_hash = prev_hash;
-        header.proof = proof;
+        // TODO: update current consensus status
+        let current_consensus_status = {
+            let mut current_consensus_status = self.current_consensus_status.write();
+            current_consensus_status.epoch_id = epoch_id + 1;
+            current_consensus_status.prev_hash = prev_hash;
+            current_consensus_status.proof = proof;
+
+            current_consensus_status.clone()
+        };
 
         let status = Status {
-            epoch_id:       header.epoch_id,
-            interval:       None,
-            authority_list: self.authority.clone(),
+            epoch_id:       current_consensus_status.epoch_id,
+            interval:       Some(current_consensus_status.consensus_interval),
+            authority_list: covert_to_overlord_authority(&current_consensus_status.validators),
         };
         Ok(status)
     }
@@ -266,73 +260,31 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill, FixedSignedTxs>
 
 impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
     pub fn new(
-        chain_id: Hash,
-        address: UserAddress,
-        cycle_limit: u64,
-        validators: Vec<Validator>,
+        current_consensus_status: Arc<RwLock<CurrentConsensusStatus>>,
+        node_info: NodeInfo,
         adapter: Arc<Adapter>,
     ) -> Self {
-        let mut authority = validators
-            .clone()
-            .into_iter()
-            .map(|v| Node {
-                address:        v.address.as_bytes(),
-                propose_weight: v.propose_weight,
-                vote_weight:    v.vote_weight,
-            })
-            .collect::<Vec<_>>();
-
-        authority.sort();
-
         Self {
-            chain_id,
-            address,
-            cycle_limit,
+            current_consensus_status,
+            node_info,
             exemption_hash: RwLock::new(HashSet::new()),
-            latest_header: RwLock::new(HeaderCache::default()),
-            validators,
-            authority,
             adapter,
             lock: Mutex::new(()),
         }
     }
 }
 
-#[derive(Clone, Debug, Hash)]
-struct HeaderCache {
-    pub epoch_id:     u64,
-    pub prev_hash:    Hash,
-    pub logs_bloom:   Bloom,
-    pub order_root:   MerkleRoot,
-    pub confirm_root: Vec<MerkleRoot>,
-    pub state_root:   MerkleRoot,
-    pub receipt_root: Vec<MerkleRoot>,
-    pub cycles_used:  u64,
-    pub proof:        Proof,
-}
-
-impl Default for HeaderCache {
-    fn default() -> Self {
-        let genesis_proof = Proof {
-            epoch_id:   GENESIS_EPOCH_ID,
-            round:      INIT_ROUND,
-            epoch_hash: Hash::from_empty(),
-            signature:  Bytes::default(),
-            bitmap:     Bytes::default(),
-        };
-
-        HeaderCache {
-            epoch_id:     GENESIS_EPOCH_ID + 1,
-            prev_hash:    Hash::from_empty(),
-            logs_bloom:   Bloom::zero(),
-            order_root:   MerkleRoot::from_empty(),
-            confirm_root: Vec::new(),
-            state_root:   MerkleRoot::from_empty(),
-            receipt_root: Vec::new(),
-            cycles_used:  0,
-            proof:        genesis_proof,
-        }
-    }
+fn covert_to_overlord_authority(validators: &[Validator]) -> Vec<Node> {
+    let mut authority = validators
+        .iter()
+        .map(|v| Node {
+            address:        v.address.as_bytes(),
+            propose_weight: v.propose_weight,
+            vote_weight:    v.vote_weight,
+        })
+        .collect::<Vec<_>>();
+    authority.sort();
+    authority
 }
 
 fn time_now() -> u64 {
