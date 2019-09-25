@@ -51,11 +51,6 @@ impl Encodable for FixedPill {
             .iter()
             .map(|root| root.as_hex())
             .collect::<Vec<_>>();
-        let cycles_used = header
-            .cycles_used
-            .iter()
-            .map(|fee| fee.encode_sync().unwrap().as_ref().to_vec())
-            .collect::<Vec<_>>();
         let validators = header
             .validators
             .iter()
@@ -72,7 +67,7 @@ impl Encodable for FixedPill {
             .append_list::<String, String>(&confirm_root)
             .append(&header.state_root.as_hex())
             .append_list::<String, String>(&receipt_root)
-            .append_list::<Vec<u8>, Vec<u8>>(&cycles_used)
+            .append(&header.cycles_used)
             .append(&header.proposer.as_hex())
             .append(&FixedProof::from(header.proof.clone()))
             .append(&header.validator_version)

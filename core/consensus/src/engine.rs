@@ -13,7 +13,7 @@ use rlp::Encodable;
 use protocol::codec::ProtocolCodec;
 use protocol::traits::{ConsensusAdapter, Context, MessageTarget};
 use protocol::types::{
-    Bloom, Epoch, EpochHeader, Fee, Hash, MerkleRoot, Pill, Proof, UserAddress, Validator,
+    Bloom, Epoch, EpochHeader, Hash, MerkleRoot, Pill, Proof, UserAddress, Validator,
     GENESIS_EPOCH_ID,
 };
 use protocol::ProtocolError;
@@ -307,7 +307,7 @@ struct HeaderCache {
     pub confirm_root: Vec<MerkleRoot>,
     pub state_root:   MerkleRoot,
     pub receipt_root: Vec<MerkleRoot>,
-    pub cycles_used:  Vec<Fee>,
+    pub cycles_used:  u64,
     pub proof:        Proof,
 }
 
@@ -329,7 +329,7 @@ impl Default for HeaderCache {
             confirm_root: Vec::new(),
             state_root:   MerkleRoot::from_empty(),
             receipt_root: Vec::new(),
-            cycles_used:  Vec::new(),
+            cycles_used:  0,
             proof:        genesis_proof,
         }
     }

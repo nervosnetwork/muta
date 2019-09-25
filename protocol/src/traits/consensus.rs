@@ -1,13 +1,30 @@
 use async_trait::async_trait;
 use creep::Context;
 
-use crate::types::{Epoch, Hash, Proof, Receipt, SignedTransaction, UserAddress, Validator};
+use crate::types::{
+    Bloom, Epoch, Hash, MerkleRoot, Proof, Receipt, SignedTransaction, UserAddress, Validator,
+};
 use crate::{traits::mempool::MixedTxHashes, ProtocolResult};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum MessageTarget {
     Broadcast,
     Specified(UserAddress),
+}
+
+#[derive(Clone, Debug)]
+pub struct CurrentConsensusStatus {
+    pub cycles_price: u64,
+    pub cycles_limit: u64,
+    pub epoch_id:     u64,
+    pub prev_hash:    Hash,
+    pub logs_bloom:   Bloom,
+    pub order_root:   MerkleRoot,
+    pub confirm_root: Vec<MerkleRoot>,
+    pub state_root:   MerkleRoot,
+    pub receipt_root: Vec<MerkleRoot>,
+    pub cycles_used:  u64,
+    pub proof:        Proof,
 }
 
 #[async_trait]
