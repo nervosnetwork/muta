@@ -1,0 +1,196 @@
+alias:
+  - &restore-source-codes-cache
+    key: codes-{{ .Environment.CIRCLE_SHA1 }}
+
+  - &save-source-codes-cache
+    <<: *restore-source-codes-cache
+    paths: ~/muta-chain
+
+  - &restore-dependencies-cache
+    key: deps-{{ checksum "Cargo.lock" }}
+
+  - &save-dependencies-cache
+    <<: *restore-dependencies-cache
+    paths:
+      - /opt/.cargo/git
+      - /opt/.cargo/registry
+
+  - &restore-clippy-cache
+    key: clippy-{{ .Environment.CIRCLE_BRANCH }}-{{ checksum "~/build-cache.key" }}
+    keys:
+      - clippy-{{ .Environment.CIRCLE_BRANCH }}-{{ checksum "~/build-cache.key" }}
+      - clippy-{{ .Environment.CIRCLE_BRANCH }}-
+      - clippy-
+      - build-
+
+  - &save-clippy-cache
+    <<: *restore-clippy-cache
+    paths: ~/muta-chain/target
+
+  - &before-restore-security-audit-cache
+    name: Before Restore Security Audit Cache
+    command: |
+      ver=$(cargo search cargo-audit | grep "^cargo-audit = " | awk '{ print $3 }' | tr -d '"')
+      date +"${ver}~%Y-%U" | tee /opt/.cargo/cargo-audit.version
+
+  - &restore-security-audit-cache
+    key: audit-{{ checksum "/opt/.cargo/cargo-audit.version" }}
+
+  - &save-security-audit-cache
+    <<: *restore-security-audit-cache
+    paths:
+      - /opt/.cargo/bin/cargo-audit
+
+  - &before-restore-sweep-cache
+    name: Before Restore Sweep Cache
+    command: |
+      ver=$(cargo search cargo-sweep | grep "^cargo-sweep = " | awk '{ print $3 }' | tr -d '"')
+      date +"${ver}~%Y-%U" | tee /opt/.cargo/cargo-sweep.version
+
+  - &restore-sweep-cache
+    key: sweep-{{ checksum "/opt/.cargo/cargo-sweep.version" }}
+
+  - &save-sweep-cache
+    <<: *restore-sweep-cache
+    paths:
+      - /opt/.cargo/bin/cargo-sweep
+
+  - &restore-release-cache
+    key: release-{{ .Environment.CIRCLE_SHA1 }}
+
+  - &after-restore-release-cache
+    name: After Restore Release Cache
+    command: |
+      rm -rf target/install
+      mv -vf target/release-cache target/install
+
+  - &before-save-release-cache
+    name: Before Save Release Cache
+    command: |
+      rm -rf target/release-cache
+      mv -vf target/install target/release-cache
+
+  - &save-release-cache
+    <<: *restore-release-cache
+    paths: ~/muta-chain/target/release-cache
+
+  - &before-restore-build-cache
+    name: Before Restore Build Cache
+    command: date +"%Y-%U" | tee ~/build-cache.key
+
+  - &restore-build-cache
+    key: build-{{ .Environment.CIRCLE_BRANCH }}-{{ checksum "~/build-cache.key" }}
+    keys:
+      - build-{{ .Environment.CIRCLE_BRANCH }}-{{ checksum "~/build-cache.key" }}
+      - build-{{ .Environment.CIRCLE_BRANCH }}-
+      - build-
+
+  - &before-save-build-cache
+    name: Before Save Build Cache
+    command: rm -rf target/install target/release-cache
+
+  - &save-build-cache
+    <<: *restore-build-cache
+    paths: ~/muta-chain/target
+
+  - &clean-build-cache-if-too-large
+    name: Clean Cache If Too Large
+    command: |
+      target_mb=$(du -sm ~/muta-chain/target/ | awk '{ print $1 }')
+      if [ ${target_mb} -gt 2047 ]; then
+          echo "[Info ] The target has ${target_mb} MiBytes data, CLEAN them."
+          cargo clean
+      else
+          echo "[Info ] The target has ${target_mb} MiBytes data, SKIP them."
+      fi
+
+  - &shout-out-if-cargo-lock-diff
+    name: Shout out if cargo lock diff after build
+    command: |
+      if [ $(git status --short Cargo.lock | wc -l) -ne 0 ]; then
+          echo "[Error] Please update Cargo.lock BEFORE commit."
+          git diff Cargo.lock
+          exit 1
+      fi
+
+  - &before-restore-tarpaulin-cache
+    name: Before Restore Tarpaulin Cache
+    command: |
+      ver=$(cargo search cargo-tarpaulin | grep "^cargo-tarpaulin = " | awk '{ print $3 }' | tr -d '"')
+      date +"${ver}~%Y-%U" | tee /opt/.cargo/cargo-tarpaulin.version
+
+  - &restore-tarpaulin-cache
+    key: tarpaulin-{{ checksum "/opt/.cargo/cargo-tarpaulin.version" }}
+
+  - &save-tarpaulin-cache
+    <<: *restore-tarpaulin-cache
+    paths:
+      - /opt/.cargo/bin/cargo-tarpaulin
+
+  - &job-default
+    docker:
+      - image: cita/cita-build:ubuntu-18.04-20190304-rocksdb
+    working_directory: ~/muta-chain
+    resource_class: medium+
+
+version: 2
+jobs:
+  build:
+    <<: *job-default
+    environment:
+      FMT: true
+      CHECK: true
+      USE_SYS_ROCKSDB: true
+    steps:
+      # checkout source code
+      - restore_cache: *restore-source-codes-cache
+      - checkout
+      - save_cache: *save-source-codes-cache
+      # dependencies and build
+      - restore_cache: *restore-dependencies-cache
+      - run: *before-restore-build-cache
+      - restore_cache: *restore-build-cache
+      - run: *before-restore-sweep-cache
+      - restore_cache: *restore-sweep-cache
+      - run:
+          name: install
+          command: ./devtools/ci/install.sh
+          no_output_timeout: 20m
+      - run:
+          name: build
+          command: ./devtools/ci/script.sh
+          no_output_timeout: 20m
+      - save_cache: *save-dependencies-cache
+      - save_cache: *save-sweep-cache
+      - run: *before-save-build-cache
+      # already do 'cargo sweep' inside devtools/ci/script.sh
+      # - run: *clean-build-cache-if-too-large
+      - save_cache: *save-build-cache
+      # already check inside devtools/ci/script.sh
+      # - run: *shout-out-if-cargo-lock-diff
+
+  test:
+    <<: *job-default
+    environment:
+      TEST: true
+      USE_SYS_ROCKSDB: true
+    steps:
+      - restore_cache: *restore-source-codes-cache
+      - restore_cache: *restore-dependencies-cache
+      - run: *before-restore-build-cache
+      - restore_cache: *restore-build-cache
+      - run: *before-restore-sweep-cache
+      - restore_cache: *restore-sweep-cache
+      - run:
+          name: test
+          command: ./devtools/ci/script.sh
+          no_output_timeout: 20m
+
+workflows:
+  version: 2
+  build_and_check:
+    jobs:
+      - build
+      - test:
+          requires:
+            - build
