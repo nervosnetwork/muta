@@ -1,0 +1,234 @@
+# Convert /* */ comments to // comments where possible
+#
+# Default value: false
+# Possible values: true, false
+# Stable: No (tracking issue: #3350)
+# false (default):
+# // Lorem ipsum:
+# fn dolor() -> usize {}
+#
+# /* sit amet: */
+# fn adipiscing() -> usize {}
+# true:
+# // Lorem ipsum:
+# fn dolor() -> usize {}
+#
+# // sit amet:
+# fn adipiscing() -> usize {}
+normalize_comments = true
+# Reorder impl items. type and const are put first, then macros and methods.
+#
+# Default value: false
+# Possible values: true, false
+# Stable: No (tracking issue: #3363)
+# false (default)
+# struct Dummy;
+#
+# impl Iterator for Dummy {
+#     fn next(&mut self) -> Option<Self::Item> {
+#         None
+#     }
+#
+#     type Item = i32;
+# }
+# true
+# struct Dummy;
+#
+# impl Iterator for Dummy {
+#     type Item = i32;
+#
+#     fn next(&mut self) -> Option<Self::Item> {
+#         None
+#     }
+# }
+reorder_impl_items = true
+# The maximum diff of width between struct fields to be aligned with each other.
+#
+# Default value : 0
+# Possible values: any non-negative integer
+# Stable: No (tracking issue: #3371)
+# 0 (default):
+# struct Foo {
+#     x: u32,
+#     yy: u32,
+#     zzz: u32,
+# }
+# 20:
+# struct Foo {
+#     x:   u32,
+#     yy:  u32,
+#     zzz: u32,
+# }
+struct_field_align_threshold = 20
+# Use field initialize shorthand if possible.
+#
+# Default value: false
+# Possible values: true, false
+# Stable: Yes
+# false (default):
+# struct Foo {
+#     x: u32,
+#     y: u32,
+#     z: u32,
+# }
+#
+# fn main() {
+#     let x = 1;
+#     let y = 2;
+#     let z = 3;
+#     let a = Foo { x: x, y: y, z: z };
+# }
+# true:
+# struct Foo {
+#     x: u32,
+#     y: u32,
+#     z: u32,
+# }
+#
+# fn main() {
+#     let x = 1;
+#     let y = 2;
+#     let z = 3;
+#     let a = Foo { x, y, z };
+# }
+use_field_init_shorthand = true
+# Replace uses of the try! macro by the ? shorthand
+#
+# Default value: false
+# Possible values: true, false
+# Stable: Yes
+# false (default):
+# fn main() {
+#     let lorem = try!(ipsum.map(|dolor| dolor.sit()));
+# }
+# true:
+# fn main() {
+#     let lorem = ipsum.map(|dolor| dolor.sit())?;
+# }
+use_try_shorthand = true
+# Format doc comments.
+#
+# Default value: false
+# Possible values: true, false
+# Stable: No (tracking issue: #3348)
+# false (default):
+# /// Adds one to the number given.
+# ///
+# /// # Examples
+# ///
+# /// ```rust
+# /// let five=5;
+# ///
+# /// assert_eq!(
+# ///     6,
+# ///     add_one(5)
+# /// );
+# /// # fn add_one(x: i32) -> i32 {
+# /// #     x + 1
+# /// # }
+# /// ```
+# fn add_one(x: i32) -> i32 {
+#     x + 1
+# }
+# true
+# /// Adds one to the number given.
+# ///
+# /// # Examples
+# ///
+# /// ```rust
+# /// let five = 5;
+# ///
+# /// assert_eq!(6, add_one(5));
+# /// # fn add_one(x: i32) -> i32 {
+# /// #     x + 1
+# /// # }
+# /// ```
+# fn add_one(x: i32) -> i32 {
+#     x + 1
+# }
+format_doc_comments = true
+# Break comments to fit on the line
+#
+# Default value: false
+# Possible values: true, false
+# Stable: No (tracking issue: #3347)
+# false (default):
+# // Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
+# true:
+# // Lorem ipsum dolor sit amet, consectetur adipiscing elit,
+# // sed do eiusmod tempor incididunt ut labore et dolore
+# // magna aliqua. Ut enim ad minim veniam, quis nostrud
+# // exercitation ullamco laboris nisi ut aliquip ex ea
+# // commodo consequat.
+wrap_comments = true
+# When structs, slices, arrays, and block/array-like macros are used as the last argument in an expression list, allow them to overflow (like blocks/closures) instead of being indented on a new line.
+#
+# Default value: false
+# Possible values: true, false
+# Stable: No (tracking issue: #3370)
+# false (default):
+# fn example() {
+#     foo(ctx, |param| {
+#         action();
+#         foo(param)
+#     });
+#
+#     foo(
+#         ctx,
+#         Bar {
+#             x: value,
+#             y: value2,
+#         },
+#     );
+#
+#     foo(
+#         ctx,
+#         &[
+#             MAROON_TOMATOES,
+#             PURPLE_POTATOES,
+#             ORGANE_ORANGES,
+#             GREEN_PEARS,
+#             RED_APPLES,
+#         ],
+#     );
+#
+#     foo(
+#         ctx,
+#         vec![
+#             MAROON_TOMATOES,
+#             PURPLE_POTATOES,
+#             ORGANE_ORANGES,
+#             GREEN_PEARS,
+#             RED_APPLES,
+#         ],
+#     );
+# }
+# true:
+# fn example() {
+#     foo(ctx, |param| {
+#         action();
+#         foo(param)
+#     });
+#
+#     foo(ctx, Bar {
+#         x: value,
+#         y: value2,
+#     });
+#
+#     foo(ctx, &[
+#         MAROON_TOMATOES,
+#         PURPLE_POTATOES,
+#         ORGANE_ORANGES,
+#         GREEN_PEARS,
+#         RED_APPLES,
+#     ]);
+#
+#     foo(ctx, vec![
+#         MAROON_TOMATOES,
+#         PURPLE_POTATOES,
+#         ORGANE_ORANGES,
+#         GREEN_PEARS,
+#         RED_APPLES,
+#     ]);
+# }
+overflow_delimited_expr = true
