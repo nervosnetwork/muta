@@ -5,7 +5,7 @@ use prost::Message;
 
 use crate::{
     codec::{
-        primitive::{Fee, Hash, UserAddress},
+        primitive::{Hash, UserAddress},
         CodecError, ProtocolCodecSync,
     },
     field, impl_default_bytes_codec_for,
@@ -56,8 +56,8 @@ pub struct EpochHeader {
     #[prost(message, repeated, tag = "9")]
     pub receipt_root: Vec<Hash>,
 
-    #[prost(message, repeated, tag = "10")]
-    pub cycles_used: Vec<Fee>,
+    #[prost(uint64, tag = "10")]
+    pub cycles_used: u64,
 
     #[prost(message, tag = "11")]
     pub proposer: Option<UserAddress>,
@@ -180,11 +180,6 @@ impl From<epoch::EpochHeader> for EpochHeader {
             .into_iter()
             .map(Hash::from)
             .collect::<Vec<_>>();
-        let cycles_used = epoch_header
-            .cycles_used
-            .into_iter()
-            .map(Fee::from)
-            .collect::<Vec<_>>();
         let validators = epoch_header
             .validators
             .into_iter()
@@ -201,7 +196,7 @@ impl From<epoch::EpochHeader> for EpochHeader {
             confirm_root,
             state_root,
             receipt_root,
-            cycles_used,
+            cycles_used: epoch_header.cycles_used,
             proposer,
             proof,
             validator_version: epoch_header.validator_version,
@@ -231,11 +226,6 @@ impl TryFrom<EpochHeader> for epoch::EpochHeader {
             receipt_root.push(protocol_primitive::Hash::try_from(root)?);
         }
 
-        let mut cycles_used = Vec::new();
-        for fee in epoch_header.cycles_used {
-            cycles_used.push(protocol_primitive::Fee::try_from(fee)?);
-        }
-
         let mut validators = Vec::new();
         for validator in epoch_header.validators {
             validators.push(epoch::Validator::try_from(validator)?);
@@ -251,7 +241,7 @@ impl TryFrom<EpochHeader> for epoch::EpochHeader {
             confirm_root,
             state_root: protocol_primitive::Hash::try_from(state_root)?,
             receipt_root,
-            cycles_used,
+            cycles_used: epoch_header.cycles_used,
             proposer: protocol_primitive::UserAddress::try_from(proposer)?,
             proof: epoch::Proof::try_from(proof)?,
             validator_version: epoch_header.validator_version,

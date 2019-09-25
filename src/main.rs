@@ -119,7 +119,7 @@ async fn handle_init(cfg: &Config, genesis_path: impl AsRef<Path>) -> ProtocolRe
 
     // Build genesis block.
     let genesis_epoch_header = EpochHeader {
-        chain_id:          Hash::from_hex(&cfg.chain_id).unwrap(),
+        chain_id:          chain_id.clone(),
         epoch_id:          0,
         pre_hash:          Hash::from_empty(),
         timestamp:         genesis.timestamp,
@@ -128,7 +128,7 @@ async fn handle_init(cfg: &Config, genesis_path: impl AsRef<Path>) -> ProtocolRe
         confirm_root:      vec![],
         state_root:        genesis_state_root,
         receipt_root:      vec![Hash::from_empty()],
-        cycles_used:       vec![],
+        cycles_used:       0,
         proposer:          UserAddress::from_hex("100000000000000000000000000000000000000000")
             .unwrap(),
         proof:             Proof {

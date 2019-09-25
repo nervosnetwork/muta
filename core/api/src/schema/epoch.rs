@@ -1,4 +1,4 @@
-use crate::schema::{Address, Fee, Hash, MerkleRoot, Uint64};
+use crate::schema::{Address, Hash, MerkleRoot, Uint64};
 
 #[derive(GraphQLObject, Clone)]
 #[graphql(description = "Epoch")]
@@ -18,7 +18,7 @@ pub struct EpochHeader {
     pub confirm_root: Vec<MerkleRoot>,
     pub state_root:   MerkleRoot,
     pub receipt_root: Vec<MerkleRoot>,
-    pub cycles_used:  Vec<Fee>,
+    pub cycles_used:  Uint64,
     pub proposer:     Address,
     // proof:             Proof,
     pub validator_version: Uint64,
@@ -44,11 +44,7 @@ impl From<protocol::types::EpochHeader> for EpochHeader {
                 .into_iter()
                 .map(MerkleRoot::from)
                 .collect(),
-            cycles_used:       epoch_header
-                .cycles_used
-                .into_iter()
-                .map(Fee::from)
-                .collect(),
+            cycles_used:       Uint64::from(epoch_header.cycles_used),
             proposer:          Address::from(protocol::types::Address::User(epoch_header.proposer)),
             validator_version: Uint64::from(epoch_header.validator_version),
         }
