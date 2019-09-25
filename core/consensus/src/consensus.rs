@@ -4,12 +4,12 @@ use async_trait::async_trait;
 use creep::Context;
 use overlord::types::{AggregatedVote, Node, OverlordMsg, SignedProposal, SignedVote, Status};
 use overlord::{DurationConfig, Overlord, OverlordHandler};
-use rlp::decode;
+use parking_lot::RwLock;
 
 use common_crypto::{PrivateKey, Secp256k1PrivateKey};
 
-use protocol::traits::{Consensus, ConsensusAdapter};
-use protocol::types::{Epoch, Hash, Proof, SignedTransaction, UserAddress, Validator};
+use protocol::traits::{Consensus, ConsensusAdapter, CurrentConsensusStatus, NodeInfo};
+use protocol::types::{Epoch, Proof, SignedTransaction, Validator};
 use protocol::ProtocolResult;
 
 use crate::engine::ConsensusEngine;
@@ -31,8 +31,8 @@ pub struct OverlordConsensus<Adapter: ConsensusAdapter + 'static> {
 #[async_trait]
 impl<Adapter: ConsensusAdapter + 'static> Consensus for OverlordConsensus<Adapter> {
     async fn set_proposal(&self, ctx: Context, proposal: Vec<u8>) -> ProtocolResult<()> {
-        let signed_proposal: SignedProposal<FixedPill> =
-            decode(&proposal).map_err(|_| ConsensusError::DecodeErr(MsgType::SignedProposal))?;
+        let signed_proposal: SignedProposal<FixedPill> = rlp::decode(&proposal)
+            .map_err(|_| ConsensusError::DecodeErr(MsgType::SignedProposal))?;
         self.handler
             .send_msg(ctx, OverlordMsg::SignedProposal(signed_proposal))
             .map_err(|e| ConsensusError::OverlordErr(Box::new(e)))?;
@@ -41,7 +41,7 @@ impl<Adapter: ConsensusAdapter + 'static> Consensus for OverlordConsensus<Adapte
 
     async fn set_vote(&self, ctx: Context, vote: Vec<u8>) -> ProtocolResult<()> {
         let signed_vote: SignedVote =
-            decode(&vote).map_err(|_| ConsensusError::DecodeErr(MsgType::SignedVote))?;
+            rlp::decode(&vote).map_err(|_| ConsensusError::DecodeErr(MsgType::SignedVote))?;
         self.handler
             .send_msg(ctx, OverlordMsg::SignedVote(signed_vote))
             .map_err(|e| ConsensusError::OverlordErr(Box::new(e)))?;
@@ -50,7 +50,7 @@ impl<Adapter: ConsensusAdapter + 'static> Consensus for OverlordConsensus<Adapte
 
     async fn set_qc(&self, ctx: Context, qc: Vec<u8>) -> ProtocolResult<()> {
         let aggregated_vote: AggregatedVote =
-            decode(&qc).map_err(|_| ConsensusError::DecodeErr(MsgType::AggregateVote))?;
+            rlp::decode(&qc).map_err(|_| ConsensusError::DecodeErr(MsgType::AggregateVote))?;
         self.handler
             .send_msg(ctx, OverlordMsg::AggregatedVote(aggregated_vote))
             .map_err(|e| ConsensusError::OverlordErr(Box::new(e)))?;
@@ -70,30 +70,35 @@ impl<Adapter: ConsensusAdapter + 'static> Consensus for OverlordConsensus<Adapte
 
 impl<Adapter: ConsensusAdapter + 'static> OverlordConsensus<Adapter> {
     pub fn new(
-        init_epoch_id: u64,
-        chain_id: Hash,
-        address: UserAddress,
-        cycle_limit: u64,
-        validators: Vec<Validator>,
+        current_consensus_status: CurrentConsensusStatus,
+        node_info: NodeInfo,
         priv_key: Secp256k1PrivateKey,
         adapter: Arc<Adapter>,
     ) -> Self {
+        let current_consensus_status = Arc::new(RwLock::new(current_consensus_status));
+
         let engine = Arc::new(ConsensusEngine::new(
-            chain_id,
-            address.clone(),
-            cycle_limit,
-            validators.clone(),
+            Arc::clone(&current_consensus_status),
+            node_info.clone(),
             Arc::clone(&adapter),
         ));
 
         let crypto = OverlordCrypto::new(priv_key.pub_key(), priv_key);
-
-        let overlord = Overlord::new(address.as_bytes(), Arc::clone(&engine), crypto);
+        let overlord = Overlord::new(
+            node_info.self_address.as_bytes(),
+            Arc::clone(&engine),
+            crypto,
+        );
         let overlord_handler = overlord.get_handler();
+
         overlord_handler
             .send_msg(
                 Context::new(),
-                OverlordMsg::RichStatus(handle_genesis(init_epoch_id, validators)),
+                OverlordMsg::RichStatus(gen_overlord_status(
+                    current_consensus_status.read().epoch_id,
+                    current_consensus_status.read().consensus_interval,
+                    current_consensus_status.read().validators.clone(),
+                )),
             )
             .unwrap();
 
@@ -118,7 +123,7 @@ impl<Adapter: ConsensusAdapter + 'static> OverlordConsensus<Adapter> {
     }
 }
 
-fn handle_genesis(epoch_id: u64, validators: Vec<Validator>) -> Status {
+fn gen_overlord_status(epoch_id: u64, interval: u64, validators: Vec<Validator>) -> Status {
     let mut authority_list = validators
         .into_iter()
         .map(|v| Node {
@@ -131,7 +136,7 @@ fn handle_genesis(epoch_id: u64, validators: Vec<Validator>) -> Status {
     authority_list.sort();
     Status {
         epoch_id: epoch_id + 1,
-        interval: None,
+        interval: Some(interval),
         authority_list,
     }
 }

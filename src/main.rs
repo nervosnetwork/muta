@@ -25,9 +25,9 @@ use core_network::{NetworkConfig, NetworkService};
 use core_storage::{adapter::rocks::RocksAdapter, ImplStorage};
 
 use protocol::traits::executor::ExecutorFactory;
-use protocol::traits::Storage;
+use protocol::traits::{CurrentConsensusStatus, NodeInfo, Storage};
 use protocol::types::{
-    Address, Bloom, Epoch, EpochHeader, Genesis, Hash, MerkleRoot, Proof, UserAddress, Validator,
+    Address, Bloom, Epoch, EpochHeader, Genesis, Hash, MerkleRoot, Proof, UserAddress,
 };
 use protocol::ProtocolResult;
 
@@ -204,27 +204,36 @@ async fn start(cfg: &Config) -> ProtocolResult<()> {
     ));
 
     // Init Consensus
-    let verifier_list: Vec<Validator> = cfg
-        .consensus
-        .verifier_list
-        .iter()
-        .map(|v| Validator {
-            address:        UserAddress::from_hex(v).unwrap(),
-            propose_weight: 1,
-            vote_weight:    1,
-        })
-        .collect();
     let consensus_adapter = Arc::new(OverlordConsensusAdapter::new(
         Arc::new(network_service.handle()),
         Arc::clone(&mempool),
         Arc::clone(&storage),
     ));
+    let node_info = NodeInfo {
+        chain_id:     chain_id.clone(),
+        self_address: my_address.clone(),
+    };
+    let current_header = &current_epoch.header;
+    // TODO: pre hash.
+    let current_consensus_status = CurrentConsensusStatus {
+        cycles_price:       cfg.consensus.cycles_price,
+        cycles_limit:       cfg.consensus.cycles_limit,
+        epoch_id:           current_epoch.header.epoch_id,
+        prev_hash:          Hash::from_empty(),
+        logs_bloom:         current_header.logs_bloom,
+        order_root:         current_header.order_root.clone(),
+        confirm_root:       current_header.confirm_root.clone(),
+        state_root:         current_header.state_root.clone(),
+        receipt_root:       current_header.receipt_root.clone(),
+        cycles_used:        current_header.cycles_used,
+        proof:              current_header.proof.clone(),
+        validators:         current_header.validators.clone(),
+        consensus_interval: cfg.consensus.interval,
+    };
+
     let overlord_consensus = Arc::new(OverlordConsensus::new(
-        current_epoch.header.epoch_id,
-        chain_id.clone(),
-        my_address,
-        cfg.consensus.cycles_limit,
-        verifier_list,
+        current_consensus_status,
+        node_info,
         my_privkey,
         consensus_adapter,
     ));
