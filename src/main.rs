@@ -18,11 +18,17 @@ use core_consensus::message::{
     ProposalMessageHandler, QCMessageHandler, VoteMessageHandler, END_GOSSIP_AGGREGATED_VOTE,
     END_GOSSIP_SIGNED_PROPOSAL, END_GOSSIP_SIGNED_VOTE,
 };
+use core_executor::trie::RocksTrieDB;
+use core_executor::TransactionExecutorFactory;
 use core_mempool::{DefaultMemPoolAdapter, HashMemPool};
 use core_network::{NetworkConfig, NetworkService};
 use core_storage::{adapter::rocks::RocksAdapter, ImplStorage};
+
+use protocol::traits::executor::ExecutorFactory;
 use protocol::traits::Storage;
-use protocol::types::{Bloom, Epoch, EpochHeader, Genesis, Hash, Proof, UserAddress, Validator};
+use protocol::types::{
+    Address, Bloom, Epoch, EpochHeader, Genesis, Hash, MerkleRoot, Proof, UserAddress, Validator,
+};
 use protocol::ProtocolResult;
 
 use crate::config::Config;
@@ -62,6 +68,15 @@ async fn main() {
 }
 
 async fn handle_init(cfg: &Config, genesis_path: impl AsRef<Path>) -> ProtocolResult<()> {
+    let chain_id = Hash::from_hex(&cfg.chain_id).unwrap();
+
+    // self private key
+    let my_privkey =
+        Secp256k1PrivateKey::try_from(hex::decode(cfg.privkey.clone()).unwrap().as_ref()).unwrap();
+    let my_pubkey = my_privkey.pub_key();
+    let my_address = UserAddress::from_pubkey_bytes(my_pubkey.to_bytes()).unwrap();
+
+    // Read genesis.
     let mut r = File::open(genesis_path).unwrap();
     let genesis: Genesis = serde_json::from_reader(&mut r).unwrap();
     log::info!("Genesis data: {:?}", genesis);
@@ -84,6 +99,25 @@ async fn handle_init(cfg: &Config, genesis_path: impl AsRef<Path>) -> ProtocolRe
         }
     };
 
+    // Init trie db
+    let path_state = cfg.data_path_for_state();
+    let trie_db = Arc::new(RocksTrieDB::new(path_state, cfg.executor.light).unwrap());
+
+    // Init genesis
+    let genesis_state_root = {
+        let mut executor = TransactionExecutorFactory::from_root(
+            chain_id.clone(),
+            MerkleRoot::from_empty(),
+            Arc::clone(&trie_db),
+            0,
+            cfg.consensus.cycles_price,
+            Address::User(my_address),
+        )?;
+
+        executor.create_genesis(&genesis)?
+    };
+
+    // Build genesis block.
     let genesis_epoch_header = EpochHeader {
         chain_id:          Hash::from_hex(&cfg.chain_id).unwrap(),
         epoch_id:          0,
@@ -92,7 +126,7 @@ async fn handle_init(cfg: &Config, genesis_path: impl AsRef<Path>) -> ProtocolRe
         logs_bloom:        Bloom::default(),
         order_root:        Hash::from_empty(),
         confirm_root:      vec![],
-        state_root:        Hash::from_empty(),
+        state_root:        genesis_state_root,
         receipt_root:      vec![Hash::from_empty()],
         cycles_used:       vec![],
         proposer:          UserAddress::from_hex("100000000000000000000000000000000000000000")

@@ -1,3 +1,7 @@
+mod trie_db;
+
+pub use trie_db::RocksTrieDB;
+
 use std::error::Error;
 use std::sync::Arc;
 
@@ -7,14 +11,13 @@ use derive_more::{Display, From};
 use hasher::HasherKeccak;
 use lazy_static::lazy_static;
 
+use protocol::traits::executor::TrieDB;
 use protocol::types::{Hash, MerkleRoot};
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
 lazy_static! {
     static ref HASHER_INST: Arc<HasherKeccak> = Arc::new(HasherKeccak::new());
 }
-
-pub trait TrieDB = cita_trie::DB;
 
 pub struct MPTTrie<DB: TrieDB> {
     root: MerkleRoot,

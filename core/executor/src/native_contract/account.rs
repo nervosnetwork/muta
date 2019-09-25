@@ -53,6 +53,10 @@ impl<StateAdapter: ContractStateAdapter> AccountContract<StateAdapter>
         Ok(())
     }
 
+    fn create_account(&mut self, address: &Address) -> ProtocolResult<Account> {
+        self.find_or_create(address)
+    }
+
     fn add_balance(
         &mut self,
         id: &AssetID,

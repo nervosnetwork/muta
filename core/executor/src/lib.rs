@@ -1,36 +1,43 @@
-#![feature(trait_alias)]
-
 mod adapter;
 mod cycles;
 mod fixed_types;
 mod native_contract;
 #[cfg(test)]
 mod tests;
-mod trie;
+pub mod trie;
 
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::error::Error;
+use std::num::ParseIntError;
 use std::rc::Rc;
 use std::sync::Arc;
+use std::u64;
 
 use bytes::Bytes;
+use derive_more::{Display, From};
 
 use protocol::traits::executor::contract::{AccountContract, BankContract, ContractStateAdapter};
-use protocol::traits::executor::{Executor, ExecutorExecResp, InvokeContext, RcInvokeContext};
-use protocol::types::{
-    Address, Balance, Bloom, ContractAddress, ContractType, Fee, Hash, MerkleRoot, Receipt,
-    ReceiptResult, SignedTransaction, TransactionAction, UserAddress,
+use protocol::traits::executor::{
+    Executor, ExecutorExecResp, ExecutorFactory, InvokeContext, RcInvokeContext, TrieDB,
 };
-use protocol::ProtocolResult;
+use protocol::types::{
+    Address, Balance, Bloom, ContractAddress, ContractType, Fee, Genesis, Hash, MerkleRoot,
+    Receipt, ReceiptResult, SignedTransaction, TransactionAction, UserAddress,
+};
+use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
 use crate::adapter::{GeneralContractStateAdapter, RcGeneralContractStateAdapter};
 use crate::native_contract::{
     NativeAccountContract, NativeBankContract, ACCOUNT_CONTRACT_ADDRESS, BANK_CONTRACT_ADDRESS,
 };
-use crate::trie::{MPTTrie, TrieDB};
+use crate::trie::MPTTrie;
 
 pub struct TransactionExecutor<DB: TrieDB> {
-    chain_id: Hash,
+    chain_id:     Hash,
+    epoch_id:     u64,
+    cycles_price: u64,
+    coinbase:     Address,
 
     trie:              MPTTrie<DB>,
     account_contract:  NativeAccountContract<GeneralContractStateAdapter<DB>>,
@@ -39,23 +46,71 @@ pub struct TransactionExecutor<DB: TrieDB> {
 }
 
 impl<DB: TrieDB> Executor for TransactionExecutor<DB> {
-    fn exec(
-        &mut self,
-        epoch_id: u64,
-        cycles_price: u64,
-        coinbase: Address,
-        signed_txs: Vec<SignedTransaction>,
-    ) -> ProtocolResult<ExecutorExecResp> {
+    fn create_genesis(&mut self, genesis: &Genesis) -> ProtocolResult<MerkleRoot> {
+        let ictx = InvokeContext {
+            chain_id:       self.chain_id.clone(),
+            cycles_price:   self.cycles_price,
+            epoch_id:       0,
+            coinbase:       self.coinbase.clone(),
+            caller:         self.coinbase.clone(),
+            cycles_used:    Fee {
+                asset_id: Hash::from_empty(),
+                cycle:    0,
+            },
+            cycles_limit:   Fee {
+                asset_id: Hash::from_empty(),
+                cycle:    999_999_999_999,
+            },
+            carrying_asset: None,
+        };
+        let ictx = Rc::new(RefCell::new(ictx));
+
+        // create system token
+        let system_token = &genesis.system_token;
+        let code = Bytes::from(
+            hex::decode(system_token.code.clone()).map_err(TransactionExecutorError::from)?,
+        );
+        let token_contract_address = ContractAddress::from_code(code, 0, ContractType::Asset)?;
+
+        self.bank_account.register(
+            Rc::clone(&ictx),
+            &token_contract_address,
+            system_token.name.clone(),
+            system_token.symbol.clone(),
+            Balance::from(system_token.supply),
+        )?;
+
+        for alloc in &genesis.state_alloc {
+            let address = Address::from_hex(&alloc.address)?;
+            self.account_contract.create_account(&address)?;
+
+            for asset in &alloc.assets {
+                let asset_id = Hash::from_hex(&asset.asset_id)?;
+                let balance_byets =
+                    hex::decode(asset.balance.clone()).map_err(TransactionExecutorError::from)?;
+
+                self.account_contract.add_balance(
+                    &asset_id,
+                    &address,
+                    Balance::from_bytes_be(balance_byets.as_ref()),
+                )?;
+            }
+        }
+
+        self.commit()
+    }
+
+    fn exec(&mut self, signed_txs: Vec<SignedTransaction>) -> ProtocolResult<ExecutorExecResp> {
         let mut receipts = Vec::with_capacity(signed_txs.len());
 
         for signed_tx in signed_txs.into_iter() {
             let tx_hash = signed_tx.tx_hash.clone();
 
             let ictx = gen_invoke_ctx(
-                epoch_id,
-                cycles_price,
+                self.epoch_id,
+                self.cycles_price,
                 &self.chain_id,
-                &coinbase,
+                &self.coinbase,
                 &signed_tx,
             )?;
 
@@ -93,7 +148,7 @@ impl<DB: TrieDB> Executor for TransactionExecutor<DB> {
         for cycles_used in all_cycles_used.iter() {
             self.account_contract.add_balance(
                 &cycles_used.asset_id,
-                &coinbase,
+                &self.coinbase,
                 Balance::from(cycles_used.cycle),
             )?;
         }
@@ -114,46 +169,6 @@ impl<DB: TrieDB> Executor for TransactionExecutor<DB> {
 }
 
 impl<DB: TrieDB> TransactionExecutor<DB> {
-    pub fn new(chain_id: Hash, db: Arc<DB>) -> ProtocolResult<Self> {
-        let mut trie = MPTTrie::new(Arc::clone(&db));
-        let root = trie.commit()?;
-
-        Self::from(chain_id, root, Arc::clone(&db))
-    }
-
-    pub fn from(chain_id: Hash, state_root: MerkleRoot, db: Arc<DB>) -> ProtocolResult<Self> {
-        let trie = MPTTrie::from(state_root.clone(), Arc::clone(&db))?;
-
-        let mut state_adapter_map = HashMap::new();
-
-        // gen account contract
-        let account_state_adapter =
-            gen_contract_state(&trie, &ACCOUNT_CONTRACT_ADDRESS, Arc::clone(&db))?;
-        let account_contract = NativeAccountContract::new(Rc::clone(&account_state_adapter));
-        state_adapter_map.insert(
-            ACCOUNT_CONTRACT_ADDRESS.clone(),
-            Rc::clone(&account_state_adapter),
-        );
-
-        // gen bank contract
-        let bank_state_adapter =
-            gen_contract_state(&trie, &BANK_CONTRACT_ADDRESS, Arc::clone(&db))?;
-        let bank_account =
-            NativeBankContract::new(chain_id.clone(), Rc::clone(&bank_state_adapter));
-        state_adapter_map.insert(
-            BANK_CONTRACT_ADDRESS.clone(),
-            Rc::clone(&bank_state_adapter),
-        );
-
-        Ok(Self {
-            chain_id,
-            trie,
-            account_contract,
-            bank_account,
-            state_adapter_map,
-        })
-    }
-
     fn dispatch(
         &mut self,
         ictx: RcInvokeContext,
@@ -225,9 +240,9 @@ impl<DB: TrieDB> TransactionExecutor<DB> {
                 self.bank_account.register(
                     Rc::clone(&ictx),
                     &address,
-                    "muta-token".to_owned(),
+                    "Muta token".to_owned(),
                     "MTT".to_owned(),
-                    Balance::from(21_000_000u64),
+                    Balance::from(21_000_000_000_000_000u64),
                 )?;
 
                 Ok(ReceiptResult::Deploy {
@@ -261,6 +276,60 @@ impl<DB: TrieDB> TransactionExecutor<DB> {
         }
 
         self.trie.commit()
+    }
+}
+
+pub struct TransactionExecutorFactory;
+
+impl<DB: 'static + TrieDB> ExecutorFactory<DB> for TransactionExecutorFactory {
+    fn from_root(
+        chain_id: Hash,
+        state_root: MerkleRoot,
+        db: Arc<DB>,
+        epoch_id: u64,
+        cycles_price: u64,
+        coinbase: Address,
+    ) -> ProtocolResult<Box<dyn Executor>> {
+        let trie = {
+            if state_root == Hash::from_empty() {
+                MPTTrie::new(Arc::clone(&db))
+            } else {
+                MPTTrie::from(state_root.clone(), Arc::clone(&db))?
+            }
+        };
+
+        let mut state_adapter_map = HashMap::new();
+
+        // gen account contract
+        let account_state_adapter =
+            gen_contract_state(&trie, &ACCOUNT_CONTRACT_ADDRESS, Arc::clone(&db))?;
+        let account_contract = NativeAccountContract::new(Rc::clone(&account_state_adapter));
+        state_adapter_map.insert(
+            ACCOUNT_CONTRACT_ADDRESS.clone(),
+            Rc::clone(&account_state_adapter),
+        );
+
+        // gen bank contract
+        let bank_state_adapter =
+            gen_contract_state(&trie, &BANK_CONTRACT_ADDRESS, Arc::clone(&db))?;
+        let bank_account =
+            NativeBankContract::new(chain_id.clone(), Rc::clone(&bank_state_adapter));
+        state_adapter_map.insert(
+            BANK_CONTRACT_ADDRESS.clone(),
+            Rc::clone(&bank_state_adapter),
+        );
+
+        Ok(Box::new(TransactionExecutor {
+            chain_id,
+            epoch_id,
+            cycles_price,
+            coinbase,
+
+            trie,
+            account_contract,
+            bank_account,
+            state_adapter_map,
+        }))
     }
 }
 
@@ -325,4 +394,18 @@ fn gen_invoke_ctx(
         carrying_asset,
     };
     Ok(Rc::new(RefCell::new(ctx)))
+}
+
+#[derive(Debug, Display, From)]
+pub enum TransactionExecutorError {
+    FromHex(hex::FromHexError),
+    ParseInt(ParseIntError),
+}
+
+impl Error for TransactionExecutorError {}
+
+impl From<TransactionExecutorError> for ProtocolError {
+    fn from(err: TransactionExecutorError) -> ProtocolError {
+        ProtocolError::new(ProtocolErrorKind::Executor, Box::new(err))
+    }
 }

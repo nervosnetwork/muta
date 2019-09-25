@@ -33,9 +33,15 @@ pub struct ConfigMempool {
 #[derive(Debug, Deserialize)]
 pub struct ConfigConsensus {
     pub cycles_limit:  u64,
+    pub cycles_price:  u64,
     pub interval:      u64,
     pub duration:      DurationConfig,
     pub verifier_list: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ConfigExecutor {
+    pub light: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -51,15 +57,16 @@ pub struct Config {
     pub network:   ConfigNetwork,
     pub mempool:   ConfigMempool,
     pub consensus: ConfigConsensus,
+    pub executor:  ConfigExecutor,
 }
 
 impl Config {
-    // pub fn data_path_for_state(&self) -> PathBuf {
-    //     let mut path_state = self.data_path.clone();
-    //     path_state.push("rocksdb");
-    //     path_state.push("state_data");
-    //     path_state
-    // }
+    pub fn data_path_for_state(&self) -> PathBuf {
+        let mut path_state = self.data_path.clone();
+        path_state.push("rocksdb");
+        path_state.push("state_data");
+        path_state
+    }
 
     pub fn data_path_for_block(&self) -> PathBuf {
         let mut path_state = self.data_path.clone();

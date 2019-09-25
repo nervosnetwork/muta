@@ -25,6 +25,7 @@ pool_size = 20000
 
 [consensus]
 cycles_limit = 99999999
+cycles_price = 1
 interval = 3000
 verifier_list = [ "10f8389d774afdad8755ef8e629e5a154fddc6325a" ]
 
@@ -35,3 +36,6 @@ prevote_numerator = 6
 prevote_denominator = 30
 precommit_numerator = 6
 precommit_denominator = 30
+
+[executor]
+light = false

@@ -75,6 +75,12 @@ impl Hash {
     }
 }
 
+impl Default for Hash {
+    fn default() -> Self {
+        Hash::from_empty()
+    }
+}
+
 impl fmt::Debug for Hash {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.as_hex())
@@ -271,10 +277,11 @@ impl ContractAddress {
         contract_type: ContractType,
     ) -> ProtocolResult<ContractAddress> {
         let nonce_bytes: [u8; 8] = nonce.to_be_bytes();
-        let hash_bytes = Hash::digest(Bytes::from(
+        let mut hash_bytes = Hash::digest(Bytes::from(
             [code, Bytes::from(nonce_bytes.to_vec())].concat(),
         ))
         .as_bytes();
+        hash_bytes.truncate(20);
 
         match contract_type {
             ContractType::Asset => Self::from_bytes(Bytes::from(
