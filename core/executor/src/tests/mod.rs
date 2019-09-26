@@ -46,13 +46,9 @@ fn mock_invoke_context(
         epoch_id: 1,
         coinbase: caller.clone(),
         caller,
-        origin,
         cycles_used,
         cycles_limit,
         carrying_asset,
-        method: None,
-        args: None,
-        contract_address: None,
     };
 
     Rc::new(RefCell::new(ictx))
