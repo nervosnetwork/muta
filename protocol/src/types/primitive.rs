@@ -399,7 +399,7 @@ pub enum Account {
     Contract(ContractAccount),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct UserAccount {
     pub nonce:  u64,
     pub assets: BTreeMap<AssetID, AssetInfo>,
@@ -417,7 +417,7 @@ pub struct ApprovedInfo {
     pub used: Balance,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct ContractAccount {
     pub nonce:        u64,
     pub assets:       BTreeMap<AssetID, Balance>,

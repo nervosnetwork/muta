@@ -319,7 +319,7 @@ fn cover_to_call_signed_tx(
             args: action
                 .args
                 .iter()
-                .map(|a| bytes::Bytes::from(a.0.as_bytes()))
+                .map(|a| bytes::Bytes::from(a.as_bytes()))
                 .collect(),
             carrying_asset,
         },
@@ -401,7 +401,7 @@ fn cover_call_action(
         args:           input_action
             .args
             .iter()
-            .map(|a| bytes::Bytes::from(a.0.as_bytes()))
+            .map(|a| bytes::Bytes::from(a.as_bytes()))
             .collect(),
         carrying_asset: input_action
             .carrying_asset

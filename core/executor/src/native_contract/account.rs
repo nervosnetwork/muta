@@ -142,14 +142,14 @@ impl<StateAdapter: ContractStateAdapter> AccountContract<StateAdapter>
         let fixed_account = self
             .state_adapter
             .borrow()
-            .get::<FixedAccountSchema>(&FixedAddress::new(address.clone()))?
-            .ok_or(NativeAccountContractError::AccountNotFound {
-                address: address.clone(),
-            })?;
+            .get::<FixedAccountSchema>(&FixedAddress::new(address.clone()))?;
 
-        match fixed_account.inner {
-            Account::User(user) => self.get_balance_with_user(id, &user),
-            Account::Contract(contract) => self.get_balance_with_contract(id, &contract),
+        match fixed_account {
+            None => Ok(Balance::default()),
+            Some(fixed_account) => match fixed_account.inner {
+                Account::User(user) => self.get_balance_with_user(id, &user),
+                Account::Contract(contract) => self.get_balance_with_contract(id, &contract),
+            },
         }
     }
 
@@ -157,11 +157,15 @@ impl<StateAdapter: ContractStateAdapter> AccountContract<StateAdapter>
         let fixed_accoount = self
             .state_adapter
             .borrow()
-            .get::<FixedAccountSchema>(&FixedAddress::new(address.clone()))?
-            .ok_or(NativeAccountContractError::AccountNotFound {
-                address: address.clone(),
-            })?;
-        Ok(fixed_accoount.inner)
+            .get::<FixedAccountSchema>(&FixedAddress::new(address.clone()))?;
+
+        Ok(match fixed_accoount {
+            None => match address {
+                Address::User(_user) => Account::User(UserAccount::default()),
+                Address::Contract(_contract) => Account::Contract(ContractAccount::default()),
+            },
+            Some(fixed_accoount) => fixed_accoount.inner,
+        })
     }
 
     fn get_nonce(&self, address: &Address) -> ProtocolResult<u64> {

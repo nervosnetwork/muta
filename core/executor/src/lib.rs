@@ -119,7 +119,7 @@ impl<DB: TrieDB> Executor for TransactionExecutor<DB> {
                 &signed_tx,
             )?;
 
-            let res = match self.dispatch(Rc::clone(&ictx), signed_tx) {
+            let res = match self.dispatch(Rc::clone(&ictx), signed_tx.clone()) {
                 Ok(res) => {
                     self.stash()?;
                     res
@@ -132,6 +132,7 @@ impl<DB: TrieDB> Executor for TransactionExecutor<DB> {
                     }
                 }
             };
+            dbg!(&ictx, &signed_tx, &res);
 
             self.account_contract.inc_nonce(Rc::clone(&ictx))?;
 

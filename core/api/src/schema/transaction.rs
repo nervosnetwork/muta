@@ -45,7 +45,7 @@ pub struct InputTransferAction {
 pub struct InputCallAction {
     pub contract:       Address,
     pub method:         String,
-    pub args:           Vec<Bytes>,
+    pub args:           Vec<String>,
     pub carrying_asset: Option<CarryingAsset>,
 }
 
