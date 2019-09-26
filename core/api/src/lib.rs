@@ -324,7 +324,6 @@ fn cover_to_call_signed_tx(
             carrying_asset,
         },
     };
-    dbg!(&raw);
 
     let rlp_stx = rlp::encode(&RlpRawTransaction { inner: &raw });
     let hash = protocol::types::Hash::digest(bytes::Bytes::from(rlp_stx));
