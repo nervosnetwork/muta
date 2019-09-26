@@ -8,7 +8,7 @@ use bytes::Bytes;
 
 use crate::types::{
     Address, Bloom, CarryingAsset, ContractAddress, Fee, Genesis, Hash, MerkleRoot, Receipt,
-    SignedTransaction,
+    SignedTransaction, UserAddress,
 };
 use crate::ProtocolResult;
 
@@ -47,31 +47,41 @@ pub struct InvokeContext {
     pub cycles_price:   u64,
     pub epoch_id:       u64,
     pub caller:         Address,
-    pub carrying_asset: Option<CarryingAsset>,
     pub coinbase:       Address,
+    pub carrying_asset: Option<CarryingAsset>,
 }
 
 pub type RcInvokeContext = Rc<RefCell<InvokeContext>>;
 
 pub trait Dispatcher {
-    fn invoke(
-        &self,
-        ictx: RcInvokeContext,
-        address: ContractAddress,
-        method: &str,
-        args: Vec<Bytes>,
-    ) -> ProtocolResult<Bytes>;
+    fn invoke(&self, ictx: RcInvokeContext) -> ProtocolResult<Bytes>;
 }
 
 pub trait ContractSchema {
-    type Key: ContractSer + Clone + std::hash::Hash + PartialEq + Eq + PartialOrd + Ord;
-    type Value: ContractSer + Clone;
+    type Key: ContractSer + std::hash::Hash + Eq;
+    type Value: ContractSer;
 }
 
-pub trait ContractSer {
+pub trait ContractSer: Clone {
     fn encode(&self) -> ProtocolResult<Bytes>;
 
-    fn decode(bytes: Bytes) -> ProtocolResult<Self>
-    where
-        Self: Sized;
+    fn decode(bytes: Bytes) -> ProtocolResult<Self>;
 }
+
+#[derive(Clone, Debug)]
+pub struct CallContext {
+    pub chain_id:         Hash,
+    pub cycles_used:      Fee,
+    pub cycles_limit:     Fee,
+    pub cycles_price:     u64,
+    pub epoch_id:         u64,
+    pub caller:           Address,
+    pub origin:           UserAddress,
+    pub coinbase:         Address,
+    pub carrying_asset:   Option<CarryingAsset>,
+    pub method:           String,
+    pub args:             Vec<Bytes>,
+    pub contract_address: ContractAddress,
+}
+
+pub type RcCallContext = Rc<RefCell<CallContext>>;

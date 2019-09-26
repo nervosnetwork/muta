@@ -6,6 +6,7 @@ use bytes::Bytes;
 use hasher::{Hasher, HasherKeccak};
 use lazy_static::lazy_static;
 use num_bigint::BigUint;
+use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::types::TypesError;
 use crate::ProtocolResult;
@@ -78,6 +79,26 @@ impl Hash {
 impl Default for Hash {
     fn default() -> Self {
         Hash::from_empty()
+    }
+}
+
+impl Serialize for Hash {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let hex = self.as_hex();
+        serializer.serialize_str(&hex)
+    }
+}
+
+impl<'de> Deserialize<'de> for Hash {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        Self::from_hex(&s).map_err(de::Error::custom)
     }
 }
 
@@ -242,6 +263,26 @@ impl UserAddress {
 
     pub fn as_bytes(&self) -> Bytes {
         self.inner.as_bytes()
+    }
+}
+
+impl Serialize for UserAddress {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let hex = self.as_hex();
+        serializer.serialize_str(&hex)
+    }
+}
+
+impl<'de> Deserialize<'de> for UserAddress {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        Self::from_hex(&s).map_err(de::Error::custom)
     }
 }
 

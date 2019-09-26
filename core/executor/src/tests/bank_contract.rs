@@ -3,7 +3,7 @@ use std::rc::Rc;
 
 use protocol::traits::executor::contract::BankContract;
 use protocol::traits::executor::InvokeContext;
-use protocol::types::{Address, AssetID, Balance, ContractAddress, Fee, Hash};
+use protocol::types::{AssetID, Balance, ContractAddress, Fee, Hash, UserAddress};
 
 use crate::native_contract::NativeBankContract;
 use crate::tests::{create_state_adapter, mock_invoke_context};
@@ -13,7 +13,7 @@ fn test_bank_contract() {
     let chain_id =
         Hash::from_hex("0000000000000000000000000000000000000000000000000000000000000000").unwrap();
     let address = ContractAddress::from_hex("200000000000000000000000000000000000000000").unwrap();
-    let caller = Address::from_hex("230000000000000000000000000000000000000010").unwrap();
+    let origin = UserAddress::from_hex("100000000000000000000000000000000000000010").unwrap();
     let state = Rc::new(RefCell::new(create_state_adapter()));
     let mut bank = NativeBankContract::new(chain_id, state);
     let fee_asset =
@@ -27,7 +27,7 @@ fn test_bank_contract() {
         asset_id: fee_asset.clone(),
         cycle:    1_000_000,
     };
-    let ctx = mock_invoke_context(caller, None, cycles_used, cycles_limit);
+    let ctx = mock_invoke_context(origin, None, cycles_used, cycles_limit);
     let name = "Muta token".to_owned();
     let symbol = "MTT".to_owned();
     let supply = Balance::from(1e18 as u64);

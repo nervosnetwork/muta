@@ -17,9 +17,11 @@ use std::u64;
 use bytes::Bytes;
 use derive_more::{Display, From};
 
+use dex::{DexContract, NativeDexAdapter};
 use protocol::traits::executor::contract::{AccountContract, BankContract, ContractStateAdapter};
 use protocol::traits::executor::{
-    Executor, ExecutorExecResp, ExecutorFactory, InvokeContext, RcInvokeContext, TrieDB,
+    CallContext, Executor, ExecutorExecResp, ExecutorFactory, InvokeContext, RcCallContext,
+    RcInvokeContext, TrieDB,
 };
 use protocol::types::{
     Address, Balance, Bloom, ContractAddress, ContractType, Fee, Genesis, Hash, MerkleRoot,
@@ -30,6 +32,7 @@ use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 use crate::adapter::{GeneralContractStateAdapter, RcGeneralContractStateAdapter};
 use crate::native_contract::{
     NativeAccountContract, NativeBankContract, ACCOUNT_CONTRACT_ADDRESS, BANK_CONTRACT_ADDRESS,
+    DEX_CONTRACT_ADDRESS,
 };
 use crate::trie::MPTTrie;
 
@@ -42,7 +45,8 @@ pub struct TransactionExecutor<DB: TrieDB> {
     trie:              MPTTrie<DB>,
     account_contract:  NativeAccountContract<GeneralContractStateAdapter<DB>>,
     bank_account:      NativeBankContract<GeneralContractStateAdapter<DB>>,
-    state_adapter_map: HashMap<Address, RcGeneralContractStateAdapter<DB>>,
+    dex_contract:      DexContract<NativeDexAdapter<GeneralContractStateAdapter<DB>>>,
+    state_adapter_map: HashMap<ContractAddress, RcGeneralContractStateAdapter<DB>>,
 }
 
 impl<DB: TrieDB> Executor for TransactionExecutor<DB> {
@@ -185,10 +189,47 @@ impl<DB: TrieDB> TransactionExecutor<DB> {
                 code,
                 contract_type,
             } => self.handle_deploy(Rc::clone(&ictx), code, contract_type)?,
+            TransactionAction::Call {
+                contract,
+                method,
+                args,
+                carrying_asset,
+            } => {
+                let borrow_ictx = ictx.borrow();
+                let from_address = UserAddress::from_pubkey_bytes(signed_tx.pubkey.clone())?;
+                let call_ctx = Rc::new(RefCell::new(CallContext {
+                    origin:           from_address,
+                    chain_id:         borrow_ictx.chain_id.clone(),
+                    cycles_used:      borrow_ictx.cycles_used.clone(),
+                    cycles_limit:     borrow_ictx.cycles_limit.clone(),
+                    cycles_price:     borrow_ictx.cycles_price.clone(),
+                    epoch_id:         borrow_ictx.epoch_id.clone(),
+                    caller:           borrow_ictx.caller.clone(),
+                    coinbase:         borrow_ictx.coinbase.clone(),
+                    carrying_asset:   carrying_asset.clone(),
+                    method:           method.clone(),
+                    args:             args.clone(),
+                    contract_address: contract.clone(),
+                }));
+                if *contract == *DEX_CONTRACT_ADDRESS {
+                    self.handle_dex(call_ctx)?
+                } else {
+                    panic!("unsupported contract address")
+                }
+            }
             _ => panic!("Unsupported transaction"),
         };
 
         Ok(res)
+    }
+
+    fn handle_dex(&mut self, ictx: RcCallContext) -> ProtocolResult<ReceiptResult> {
+        let return_value = self.dex_contract.call(ictx)?;
+        Ok(ReceiptResult::Call {
+            contract: DEX_CONTRACT_ADDRESS.clone(),
+            return_value,
+            logs_bloom: Box::new(Bloom::default()),
+        })
     }
 
     fn handle_transfer(
@@ -319,6 +360,15 @@ impl<DB: 'static + TrieDB> ExecutorFactory<DB> for TransactionExecutorFactory {
             Rc::clone(&bank_state_adapter),
         );
 
+        // gen dex contract
+        let dex_state = gen_contract_state(&trie, &DEX_CONTRACT_ADDRESS, Arc::clone(&db))?;
+        let dex_adapter = NativeDexAdapter::new(dex_state);
+        let dex_contract = DexContract::new(Rc::new(RefCell::new(dex_adapter)));
+        state_adapter_map.insert(
+            BANK_CONTRACT_ADDRESS.clone(),
+            Rc::clone(&bank_state_adapter),
+        );
+
         Ok(Box::new(TransactionExecutor {
             chain_id,
             epoch_id,
@@ -329,13 +379,14 @@ impl<DB: 'static + TrieDB> ExecutorFactory<DB> for TransactionExecutorFactory {
             account_contract,
             bank_account,
             state_adapter_map,
+            dex_contract,
         }))
     }
 }
 
 fn gen_contract_state<DB: TrieDB>(
     trie: &MPTTrie<DB>,
-    address: &Address,
+    address: &ContractAddress,
     db: Arc<DB>,
 ) -> ProtocolResult<RcGeneralContractStateAdapter<DB>> {
     let trie = {
@@ -374,13 +425,7 @@ fn gen_invoke_ctx(
     coinbase: &Address,
     signed_tx: &SignedTransaction,
 ) -> ProtocolResult<RcInvokeContext> {
-    let carrying_asset = match &signed_tx.raw.action {
-        TransactionAction::Transfer { carrying_asset, .. } => Some(carrying_asset.clone()),
-        TransactionAction::Call { carrying_asset, .. } => carrying_asset.clone(),
-        _ => None,
-    };
-
-    let ctx = InvokeContext {
+    let mut ctx = InvokeContext {
         chain_id: chain_id.clone(),
         cycles_used: Fee {
             asset_id: signed_tx.raw.fee.asset_id.clone(),
@@ -391,7 +436,16 @@ fn gen_invoke_ctx(
         coinbase: coinbase.clone(),
         epoch_id,
         cycles_price,
-        carrying_asset,
+        carrying_asset: None,
+    };
+    match &signed_tx.raw.action {
+        TransactionAction::Transfer { carrying_asset, .. } => {
+            ctx.carrying_asset = Some(carrying_asset.clone());
+        }
+        TransactionAction::Call { carrying_asset, .. } => {
+            ctx.carrying_asset = carrying_asset.clone();
+        }
+        _ => {}
     };
     Ok(Rc::new(RefCell::new(ctx)))
 }

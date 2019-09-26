@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use protocol::traits::executor::contract::AccountContract;
-use protocol::types::{Address, AssetID, Balance, CarryingAsset, Fee};
+use protocol::types::{Address, AssetID, Balance, CarryingAsset, Fee, UserAddress};
 
 use crate::native_contract::NativeAccountContract;
 use crate::tests::{create_state_adapter, mock_invoke_context};
@@ -18,10 +18,11 @@ fn test_account_contract() {
     let fee_asset =
         AssetID::from_hex("0000000000000000000000000000000000000000000000000000000000000004")
             .unwrap();
-    let user1 = Address::from_hex("100000000000000000000000000000000000000001").unwrap();
+    let user1 = UserAddress::from_hex("100000000000000000000000000000000000000001").unwrap();
+    let user1_addr = Address::User(user1.clone());
     let user2 = Address::from_hex("100000000000000000000000000000000000000002").unwrap();
     account
-        .add_balance(&asset, &user1, 10000u64.into())
+        .add_balance(&asset, &user1_addr, 10000u64.into())
         .unwrap();
 
     let cycles_used = Fee {
@@ -43,7 +44,7 @@ fn test_account_contract() {
         cycles_limit,
     );
     account.transfer(Rc::clone(&ctx), &user2).unwrap();
-    let user1_balance = account.get_balance(&asset, &user1).unwrap();
+    let user1_balance = account.get_balance(&asset, &user1_addr).unwrap();
     assert_eq!(user1_balance, Balance::from(9000u64));
     let user2_balance = account.get_balance(&asset, &user2).unwrap();
     assert_eq!(user2_balance, Balance::from(1000u64));

@@ -44,6 +44,7 @@ members = [
   "core/mempool",
   "core/network",
   "core/storage",
+  "core/dex",
 
   "protocol",
 ]

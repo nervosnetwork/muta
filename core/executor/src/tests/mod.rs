@@ -8,7 +8,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use protocol::traits::executor::{InvokeContext, RcInvokeContext};
-use protocol::types::{Address, CarryingAsset, Fee, Hash, MerkleRoot};
+use protocol::types::{Address, CarryingAsset, Fee, Hash, MerkleRoot, UserAddress};
 
 use crate::adapter::GeneralContractStateAdapter;
 use crate::trie::MPTTrie;
@@ -34,20 +34,25 @@ fn create_state_adapter() -> GeneralContractStateAdapter<cita_trie::MemoryDB> {
 }
 
 fn mock_invoke_context(
-    caller: Address,
+    origin: UserAddress,
     carrying_asset: Option<CarryingAsset>,
     cycles_used: Fee,
     cycles_limit: Fee,
 ) -> RcInvokeContext {
+    let caller = Address::User(origin.clone());
     let ictx = InvokeContext {
         chain_id: Hash::from_empty(),
         cycles_price: 1,
         epoch_id: 1,
         coinbase: caller.clone(),
         caller,
+        origin,
         cycles_used,
         cycles_limit,
         carrying_asset,
+        method: None,
+        args: None,
+        contract_address: None,
     };
 
     Rc::new(RefCell::new(ictx))
