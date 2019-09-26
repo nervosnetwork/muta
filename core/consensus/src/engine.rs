@@ -45,32 +45,31 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill, FixedSignedTxs>
     ) -> Result<(FixedPill, Bytes), Box<dyn Error + Send>> {
         let current_consensus_status = { self.current_consensus_status.read().clone() };
 
-        let tmp = epoch_id;
         let (ordered_tx_hashes, propose_hashes) = self
             .adapter
             .get_txs_from_mempool(ctx, epoch_id, current_consensus_status.cycles_limit)
             .await?
             .clap();
 
-        if current_consensus_status.epoch_id == epoch_id {
+        if current_consensus_status.epoch_id != epoch_id {
             return Err(ProtocolError::from(ConsensusError::MissingEpochHeader(epoch_id)).into());
         }
 
         let header = EpochHeader {
-            chain_id:          self.node_info.chain_id.clone(),
-            pre_hash:          current_consensus_status.prev_hash,
-            epoch_id:          tmp,
-            timestamp:         time_now(),
-            logs_bloom:        current_consensus_status.logs_bloom,
-            order_root:        current_consensus_status.order_root.clone(),
-            confirm_root:      current_consensus_status.confirm_root.clone(),
-            state_root:        current_consensus_status.state_root.clone(),
-            receipt_root:      current_consensus_status.receipt_root.clone(),
-            cycles_used:       current_consensus_status.cycles_used,
-            proposer:          self.node_info.self_address.clone(),
-            proof:             current_consensus_status.proof.clone(),
+            chain_id: self.node_info.chain_id.clone(),
+            pre_hash: current_consensus_status.prev_hash,
+            epoch_id,
+            timestamp: time_now(),
+            logs_bloom: current_consensus_status.logs_bloom,
+            order_root: current_consensus_status.order_root.clone(),
+            confirm_root: current_consensus_status.confirm_root.clone(),
+            state_root: current_consensus_status.state_root.clone(),
+            receipt_root: current_consensus_status.receipt_root.clone(),
+            cycles_used: current_consensus_status.cycles_used,
+            proposer: self.node_info.self_address.clone(),
+            proof: current_consensus_status.proof.clone(),
             validator_version: 0u64,
-            validators:        current_consensus_status.validators.clone(),
+            validators: current_consensus_status.validators.clone(),
         };
         let epoch = Epoch {
             header,
@@ -136,15 +135,14 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill, FixedSignedTxs>
         }
 
         let pill = commit.content.inner;
-        let tmp = commit.proof;
 
         // Sorage save the lastest proof.
         let proof = Proof {
-            epoch_id:   tmp.epoch_id,
-            round:      tmp.round,
-            epoch_hash: Hash::from_bytes(tmp.epoch_hash)?,
-            signature:  tmp.signature.signature,
-            bitmap:     tmp.signature.address_bitmap,
+            epoch_id:   commit.proof.epoch_id,
+            round:      commit.proof.round,
+            epoch_hash: Hash::from_bytes(commit.proof.epoch_hash)?,
+            signature:  commit.proof.signature.signature,
+            bitmap:     commit.proof.signature.address_bitmap,
         };
 
         self.adapter.save_proof(ctx.clone(), proof.clone()).await?;
@@ -181,7 +179,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill, FixedSignedTxs>
         };
 
         let status = Status {
-            epoch_id:       current_consensus_status.epoch_id,
+            epoch_id:       epoch_id + 1,
             interval:       Some(current_consensus_status.consensus_interval),
             authority_list: covert_to_overlord_authority(&current_consensus_status.validators),
         };

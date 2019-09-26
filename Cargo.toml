@@ -26,6 +26,7 @@ log = "0.4"
 clap = "2.33"
 bytes = "0.4"
 hex = "0.3"
+rlp = "0.4"
 
 [workspace]
 members = [

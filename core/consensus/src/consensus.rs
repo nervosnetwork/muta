@@ -135,7 +135,7 @@ fn gen_overlord_status(epoch_id: u64, interval: u64, validators: Vec<Validator>)
 
     authority_list.sort();
     Status {
-        epoch_id: epoch_id + 1,
+        epoch_id,
         interval: Some(interval),
         authority_list,
     }

@@ -14,6 +14,7 @@ use core_api::adapter::DefaultAPIAdapter;
 use core_api::config::GraphQLConfig;
 use core_consensus::adapter::OverlordConsensusAdapter;
 use core_consensus::consensus::OverlordConsensus;
+use core_consensus::fixed_types::FixedPill;
 use core_consensus::message::{
     ProposalMessageHandler, QCMessageHandler, VoteMessageHandler, END_GOSSIP_AGGREGATED_VOTE,
     END_GOSSIP_SIGNED_PROPOSAL, END_GOSSIP_SIGNED_VOTE,
@@ -27,7 +28,8 @@ use core_storage::{adapter::rocks::RocksAdapter, ImplStorage};
 use protocol::traits::executor::ExecutorFactory;
 use protocol::traits::{CurrentConsensusStatus, NodeInfo, Storage};
 use protocol::types::{
-    Address, Bloom, Epoch, EpochHeader, Genesis, Hash, MerkleRoot, Proof, UserAddress,
+    Address, Bloom, Epoch, EpochHeader, Genesis, Hash, MerkleRoot, Pill, Proof, UserAddress,
+    Validator,
 };
 use protocol::ProtocolResult;
 
@@ -214,12 +216,18 @@ async fn start(cfg: &Config) -> ProtocolResult<()> {
         self_address: my_address.clone(),
     };
     let current_header = &current_epoch.header;
-    // TODO: pre hash.
+
+    let prevhash = Hash::digest(Bytes::from(rlp::encode(&FixedPill {
+        inner: Pill {
+            epoch:          current_epoch.clone(),
+            propose_hashes: vec![],
+        },
+    })));
     let current_consensus_status = CurrentConsensusStatus {
         cycles_price:       cfg.consensus.cycles_price,
         cycles_limit:       cfg.consensus.cycles_limit,
-        epoch_id:           current_epoch.header.epoch_id,
-        prev_hash:          Hash::from_empty(),
+        epoch_id:           current_epoch.header.epoch_id + 1,
+        prev_hash:          prevhash,
         logs_bloom:         current_header.logs_bloom,
         order_root:         current_header.order_root.clone(),
         confirm_root:       current_header.confirm_root.clone(),
@@ -227,7 +235,16 @@ async fn start(cfg: &Config) -> ProtocolResult<()> {
         receipt_root:       current_header.receipt_root.clone(),
         cycles_used:        current_header.cycles_used,
         proof:              current_header.proof.clone(),
-        validators:         current_header.validators.clone(),
+        validators:         cfg
+            .consensus
+            .verifier_list
+            .iter()
+            .map(|v| Validator {
+                address:        UserAddress::from_hex(v).unwrap(),
+                propose_weight: 1,
+                vote_weight:    1,
+            })
+            .collect(),
         consensus_interval: cfg.consensus.interval,
     };
 
