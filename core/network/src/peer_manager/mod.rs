@@ -21,7 +21,10 @@ use std::{
 };
 
 use futures::{
-    channel::mpsc::{UnboundedReceiver, UnboundedSender},
+    channel::{
+        mpsc::{UnboundedReceiver, UnboundedSender},
+        oneshot,
+    },
     future::TryFutureExt,
     pin_mut,
     stream::Stream,
@@ -493,6 +496,61 @@ impl PeerManager {
         condidates.into_iter().choose_multiple(&mut rng, max)
     }
 
+    fn route_multi_users_message(
+        &mut self,
+        users_msg: MultiUsersMessage,
+        miss_tx: oneshot::Sender<Vec<UserAddress>>,
+    ) {
+        let mut no_peers = vec![];
+        let mut connected = vec![];
+        let mut unconnected_peers = vec![];
+
+        for user_addr in users_msg.user_addrs.into_iter() {
+            if let Some(peer) = self.inner.user_peer(&user_addr) {
+                if let Some(sid) = self.peer_session.get(&peer.id()) {
+                    connected.push(*sid);
+                } else {
+                    unconnected_peers.push(peer);
+                }
+            } else {
+                no_peers.push(user_addr);
+            }
+        }
+
+        warn!("network: peer manager: no peers {:?}", no_peers);
+
+        // Send message to connected users
+        let tar = TargetSession::Multi(connected);
+        let MultiUsersMessage { msg, pri, .. } = users_msg;
+        let send_msg = ConnectionEvent::SendMsg { tar, msg, pri };
+
+        if self.conn_tx.unbounded_send(send_msg).is_err() {
+            debug!("network: connection service exit");
+        }
+
+        // Try connect to unconnected peers
+        let unconnected_addrs = unconnected_peers
+            .iter()
+            .map(Peer::owned_addrs)
+            .flatten()
+            .collect::<Vec<_>>();
+
+        self.connect_peers(unconnected_addrs);
+
+        // Report missed user addresses
+        let mut missed_accounts = unconnected_peers
+            .iter()
+            .map(Peer::user_addr)
+            .cloned()
+            .collect::<Vec<_>>();
+
+        missed_accounts.extend(no_peers);
+
+        if miss_tx.send(missed_accounts).is_err() {
+            debug!("network: peer manager route multi accounts message dropped")
+        }
+    }
+
     fn process_event(&mut self, event: PeerManagerEvent) {
         match event {
             PeerManagerEvent::AddPeer { pubkey, addr, .. } => {
@@ -615,54 +673,7 @@ impl PeerManager {
                 self.inner.remove_peer_addr(&self.config.our_id, &addr);
             }
             PeerManagerEvent::RouteMultiUsersMessage { users_msg, miss_tx } => {
-                let mut no_peers = vec![];
-                let mut connected = vec![];
-                let mut unconnected_peers = vec![];
-
-                for user_addr in users_msg.user_addrs.into_iter() {
-                    if let Some(peer) = self.inner.user_peer(&user_addr) {
-                        if let Some(sid) = self.peer_session.get(&peer.id()) {
-                            connected.push(*sid);
-                        } else {
-                            unconnected_peers.push(peer);
-                        }
-                    } else {
-                        no_peers.push(user_addr);
-                    }
-                }
-
-                warn!("network: peer manager: no peers {:?}", no_peers);
-
-                // Send message to connected users
-                let tar = TargetSession::Multi(connected);
-                let MultiUsersMessage { msg, pri, .. } = users_msg;
-                let send_msg = ConnectionEvent::SendMsg { tar, msg, pri };
-
-                if self.conn_tx.unbounded_send(send_msg).is_err() {
-                    debug!("network: connection service exit");
-                }
-
-                // Try connect to unconnected peers
-                let unconnected_addrs = unconnected_peers
-                    .iter()
-                    .map(Peer::owned_addrs)
-                    .flatten()
-                    .collect::<Vec<_>>();
-
-                self.connect_peers(unconnected_addrs);
-
-                // Report missed user addresses
-                let mut missed_accounts = unconnected_peers
-                    .iter()
-                    .map(Peer::user_addr)
-                    .cloned()
-                    .collect::<Vec<_>>();
-
-                missed_accounts.extend(no_peers);
-
-                if miss_tx.send(missed_accounts).is_err() {
-                    debug!("network: peer manager route multi accounts message dropped")
-                }
+                self.route_multi_users_message(users_msg, miss_tx);
             }
         }
     }
