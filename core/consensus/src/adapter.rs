@@ -1,25 +1,39 @@
+use std::marker::PhantomData;
 use std::sync::Arc;
 
 use async_trait::async_trait;
 
+use protocol::traits::executor::{ExecutorExecResp, ExecutorFactory, TrieDB};
 use protocol::traits::{
-    ConsensusAdapter, Context, Gossip, MemPool, MessageTarget, MixedTxHashes, Priority, Storage,
+    ConsensusAdapter, Context, CurrentConsensusStatus, Gossip, MemPool, MessageTarget,
+    MixedTxHashes, NodeInfo, Priority, Storage,
 };
-use protocol::types::{Epoch, Hash, Proof, Receipt, SignedTransaction, Validator};
+use protocol::types::{Address, Epoch, Hash, Proof, Receipt, SignedTransaction, Validator};
 use protocol::ProtocolResult;
 
-pub struct OverlordConsensusAdapter<G: Gossip, M: MemPool, S: Storage> {
+pub struct OverlordConsensusAdapter<
+    EF: ExecutorFactory<DB>,
+    G: Gossip,
+    M: MemPool,
+    S: Storage,
+    DB: TrieDB,
+> {
     network: Arc<G>,
     mempool: Arc<M>,
     storage: Arc<S>,
+    trie_db: Arc<DB>,
+
+    pin_ef: PhantomData<EF>,
 }
 
 #[async_trait]
-impl<G, M, S> ConsensusAdapter for OverlordConsensusAdapter<G, M, S>
+impl<EF, G, M, S, DB> ConsensusAdapter for OverlordConsensusAdapter<EF, G, M, S, DB>
 where
+    EF: ExecutorFactory<DB>,
     G: Gossip + Sync + Send,
     M: MemPool,
     S: Storage,
+    DB: TrieDB,
 {
     async fn get_txs_from_mempool(
         &self,
@@ -71,9 +85,20 @@ where
     async fn execute(
         &self,
         _ctx: Context,
-        _signed_txs: Vec<SignedTransaction>,
-    ) -> ProtocolResult<()> {
-        Ok(())
+        node_info: NodeInfo,
+        status: CurrentConsensusStatus,
+        coinbase: Address,
+        signed_txs: Vec<SignedTransaction>,
+    ) -> ProtocolResult<ExecutorExecResp> {
+        let mut executor = EF::from_root(
+            node_info.chain_id,
+            status.state_root,
+            Arc::clone(&self.trie_db),
+            status.epoch_id,
+            status.cycles_price,
+            coinbase,
+        )?;
+        executor.exec(signed_txs)
     }
 
     async fn flush_mempool(&self, ctx: Context, txs: Vec<Hash>) -> ProtocolResult<()> {
@@ -110,17 +135,22 @@ where
     }
 }
 
-impl<G, M, S> OverlordConsensusAdapter<G, M, S>
+impl<EF, G, M, S, DB> OverlordConsensusAdapter<EF, G, M, S, DB>
 where
+    EF: ExecutorFactory<DB>,
     G: Gossip + Sync + Send,
     M: MemPool,
     S: Storage,
+    DB: TrieDB,
 {
-    pub fn new(network: Arc<G>, mempool: Arc<M>, storage: Arc<S>) -> Self {
+    pub fn new(network: Arc<G>, mempool: Arc<M>, storage: Arc<S>, trie_db: Arc<DB>) -> Self {
         OverlordConsensusAdapter {
             network,
             mempool,
             storage,
+            trie_db,
+
+            pin_ef: PhantomData,
         }
     }
 }
