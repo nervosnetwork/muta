@@ -14,7 +14,7 @@ use protocol::codec::ProtocolCodec;
 use protocol::traits::{
     ConsensusAdapter, Context, CurrentConsensusStatus, MessageTarget, NodeInfo,
 };
-use protocol::types::{Epoch, EpochHeader, Hash, Pill, Proof, UserAddress, Validator};
+use protocol::types::{Address, Epoch, EpochHeader, Hash, Pill, Proof, UserAddress, Validator};
 use protocol::ProtocolError;
 
 use crate::fixed_types::{FixedPill, FixedSignedTxs};
@@ -154,11 +154,25 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill, FixedSignedTxs>
             .get_full_txs(ctx.clone(), pill.epoch.ordered_tx_hashes.clone())
             .await?;
 
+        // Execute transactions
+        let node_info = self.node_info.clone();
+        let status = self.current_consensus_status.read().clone();
+        let coinbase = Address::User(pill.epoch.header.proposer.clone());
+        let exec_resp = self
+            .adapter
+            .execute(ctx.clone(), node_info, status, coinbase, full_txs.clone())
+            .await?;
+
+        // Save receipts
+        self.adapter
+            .save_receipts(ctx.clone(), exec_resp.receipts.clone())
+            .await?;
+        // Save signed transactions
         self.adapter
             .save_signed_txs(ctx.clone(), full_txs.clone())
             .await?;
 
-        // Storage save the epoch.
+        // Save the epoch.
         let mut epoch = pill.epoch;
         self.adapter.save_epoch(ctx.clone(), epoch.clone()).await?;
 
@@ -174,6 +188,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill, FixedSignedTxs>
             current_consensus_status.epoch_id = epoch_id + 1;
             current_consensus_status.prev_hash = prev_hash;
             current_consensus_status.proof = proof;
+            current_consensus_status.state_root = exec_resp.state_root.clone();
 
             current_consensus_status.clone()
         };
