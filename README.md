@@ -11,7 +11,7 @@ Muta is a high-performance blockchain framework.
 - [Layout](docs/layout.md)
 - [How to develop a core crate](docs/how_to_deploy_a_core_crate.md)
 
-## Complile and Run
+## Compile and Run
 
 The first step to compile muta is to install rust. Generally speaking, you'll need an Internet connection to run the commands in this section, as we'll be downloading Rust from the Internet.
 
