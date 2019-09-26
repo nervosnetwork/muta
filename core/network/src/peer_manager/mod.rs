@@ -27,7 +27,7 @@ use futures::{
     stream::Stream,
     task::AtomicWaker,
 };
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 use parking_lot::RwLock;
 use protocol::types::UserAddress;
 use rand::seq::IteratorRandom;
@@ -114,12 +114,18 @@ impl Inner {
         user_pid.get(user).and_then(|pid| pool.get(pid).cloned())
     }
 
+    pub fn pid_user_addr(&self, pid: &PeerId) -> Option<UserAddress> {
+        let pool = self.pool.read();
+
+        pool.get(pid).map(|peer| peer.user_addr().clone())
+    }
+
     pub fn add_peer(&self, peer: Peer) {
         let mut pool = self.pool.write();
         let mut addr_pid = self.addr_pid.write();
         let mut user_pid = self.user_pid.write();
 
-        user_pid.insert(Peer::pubkey_to_addr(peer.pubkey()), peer.id().clone());
+        user_pid.insert(peer.user_addr().clone(), peer.id().clone());
 
         for addr in peer.addrs().into_iter() {
             addr_pid.insert(addr.clone(), peer.id().clone());
@@ -490,29 +496,59 @@ impl PeerManager {
     fn process_event(&mut self, event: PeerManagerEvent) {
         match event {
             PeerManagerEvent::AddPeer { pubkey, addr, .. } => {
+                let user_addr = Peer::pubkey_to_addr(&pubkey).as_hex();
+
+                info!(
+                    "network: connected: user addr: {}, multiaddr: {}",
+                    user_addr, addr
+                );
+
                 self.add_peer(pubkey, addr);
             }
             PeerManagerEvent::UpdatePeerSession { pid, sid } => {
+                let user_addr = self.inner.pid_user_addr(&pid);
+
                 if let Some(sid) = sid {
+                    info!(
+                        "network: connected: user addr {:?} session id {}",
+                        user_addr, sid
+                    );
+
                     self.attach_peer_session(pid, sid);
                 } else {
+                    info!("network: disconnect: user addr {:?}", user_addr);
+
                     self.detach_peer_session(&pid);
                 }
             }
             PeerManagerEvent::PeerAlive { pid } => {
+                let user_addr = self.inner.pid_user_addr(&pid);
+                info!("network: peer alive, user addr {:?}", user_addr);
+
                 self.inner.reset_retry(&pid);
             }
             PeerManagerEvent::RemovePeer { pid, .. } => {
+                let user_addr = self.inner.pid_user_addr(&pid);
+                info!("network: remove, user addr {:?}", user_addr);
+
                 self.remove_peer(&pid);
             }
             PeerManagerEvent::RemovePeerBySession { sid, .. } => {
                 if let Some(pid) = self.session_peer.get(&sid).cloned() {
+                    let user_addr = self.inner.pid_user_addr(&pid);
+                    info!("network: remove, user addr {:?}", user_addr);
+
                     self.remove_peer(&pid);
                 } else {
+                    info!("network: disconnect session {}", sid);
+
                     self.detach_session_id(sid);
                 }
             }
             PeerManagerEvent::RetryPeerLater { pid, .. } => {
+                let user_addr = self.inner.pid_user_addr(&pid);
+                info!("network: retry user addr {:?} later", user_addr);
+
                 self.inner.increase_retry_count(&pid);
 
                 // TODO: reduce score base on kind, may be ban this peer for a
@@ -595,7 +631,7 @@ impl PeerManager {
                     }
                 }
 
-                debug!("network: peer manager: no peers {:?}", no_peers);
+                warn!("network: peer manager: no peers {:?}", no_peers);
 
                 // Send message to connected users
                 let tar = TargetSession::Multi(connected);
