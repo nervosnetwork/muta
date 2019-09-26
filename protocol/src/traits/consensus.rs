@@ -2,9 +2,10 @@ use async_trait::async_trait;
 use creep::Context;
 
 use crate::types::{
-    Bloom, Epoch, Hash, MerkleRoot, Proof, Receipt, SignedTransaction, UserAddress, Validator,
+    Address, Bloom, Epoch, Hash, MerkleRoot, Proof, Receipt, SignedTransaction, UserAddress,
+    Validator,
 };
-use crate::{traits::mempool::MixedTxHashes, ProtocolResult};
+use crate::{traits::executor::ExecutorExecResp, traits::mempool::MixedTxHashes, ProtocolResult};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum MessageTarget {
@@ -92,8 +93,14 @@ pub trait ConsensusAdapter: Send + Sync {
     ) -> ProtocolResult<()>;
 
     /// Execute some transactions.
-    async fn execute(&self, ctx: Context, signed_txs: Vec<SignedTransaction>)
-        -> ProtocolResult<()>;
+    async fn execute(
+        &self,
+        ctx: Context,
+        node_info: NodeInfo,
+        status: CurrentConsensusStatus,
+        coinbase: Address,
+        signed_txs: Vec<SignedTransaction>,
+    ) -> ProtocolResult<ExecutorExecResp>;
 
     /// Flush the given transactions in the mempool.
     async fn flush_mempool(&self, ctx: Context, txs: Vec<Hash>) -> ProtocolResult<()>;

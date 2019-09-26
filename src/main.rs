@@ -205,11 +205,22 @@ async fn start(cfg: &Config) -> ProtocolResult<()> {
         mempool_adapter,
     ));
 
+    // Init trie db
+    let path_state = cfg.data_path_for_state();
+    let trie_db = Arc::new(RocksTrieDB::new(path_state, cfg.executor.light).unwrap());
+
     // Init Consensus
-    let consensus_adapter = Arc::new(OverlordConsensusAdapter::new(
+    let consensus_adapter = Arc::new(OverlordConsensusAdapter::<
+        TransactionExecutorFactory,
+        _,
+        _,
+        _,
+        _,
+    >::new(
         Arc::new(network_service.handle()),
         Arc::clone(&mempool),
         Arc::clone(&storage),
+        Arc::clone(&trie_db),
     ));
     let node_info = NodeInfo {
         chain_id:     chain_id.clone(),
