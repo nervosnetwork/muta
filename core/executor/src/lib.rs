@@ -97,6 +97,7 @@ impl<DB: TrieDB> Executor for TransactionExecutor<DB> {
             }
         }
 
+        self.stash()?;
         self.commit()
     }
 
