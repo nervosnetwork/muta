@@ -8,6 +8,7 @@ edition = "2018"
 
 [dependencies]
 protocol = { path = "../../protocol" }
+core-mempool = { path = "../mempool" }
 common-crypto = { path = "../../common/crypto"}
 
 http = "0.1"

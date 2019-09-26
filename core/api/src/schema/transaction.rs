@@ -41,6 +41,22 @@ pub struct InputTransferAction {
 }
 
 #[derive(GraphQLInputObject, Clone)]
+#[graphql(description = "input call action.")]
+pub struct InputCallAction {
+    pub contract:       Address,
+    pub method:         String,
+    pub args:           Vec<Bytes>,
+    pub carrying_asset: Option<CarryingAsset>,
+}
+
+#[derive(GraphQLInputObject, Clone)]
+#[graphql(description = "carrying asset")]
+pub struct CarryingAsset {
+    pub amount:   Balance,
+    pub asset_id: AssetID,
+}
+
+#[derive(GraphQLInputObject, Clone)]
 #[graphql(description = "input deploy action.")]
 pub struct InputDeployAction {
     pub code:          Bytes,

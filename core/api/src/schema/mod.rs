@@ -3,13 +3,13 @@ mod transaction;
 
 pub use epoch::{Epoch, EpochHeader};
 pub use transaction::{
-    ContractType, InputDeployAction, InputRawTransaction, InputTransactionEncryption,
-    InputTransferAction,
+    ContractType, InputCallAction, InputDeployAction, InputRawTransaction,
+    InputTransactionEncryption, InputTransferAction,
 };
 
 #[derive(GraphQLScalarValue, Clone)]
 #[graphql(description = "Keccak hash of hex string")]
-pub struct Hash(String);
+pub struct Hash(pub String);
 pub type MerkleRoot = Hash;
 pub type AssetID = Hash;
 
@@ -27,7 +27,7 @@ pub struct Balance(String);
 
 #[derive(GraphQLScalarValue, Clone)]
 #[graphql(description = "Bytes corresponding hex string.")]
-pub struct Bytes(String);
+pub struct Bytes(pub String);
 
 #[derive(GraphQLObject, Clone)]
 #[graphql(description = "Transaction fee")]

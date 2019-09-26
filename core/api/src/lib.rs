@@ -15,11 +15,13 @@ use juniper::{FieldError, FieldResult};
 use tide::{error::ResultExt, response, App, EndpointResult};
 
 use common_crypto::{HashValue, PrivateKey, PublicKey, Secp256k1PrivateKey, Signature};
+use core_mempool::RlpRawTransaction;
 use protocol::traits::{APIAdapter, Context};
+use protocol::types::{CarryingAsset, SignedTransaction};
 
 use crate::config::GraphQLConfig;
 use crate::schema::{
-    Bytes, ContractType, Epoch, Hash, InputDeployAction, InputRawTransaction,
+    Bytes, ContractType, Epoch, Hash, InputCallAction, InputDeployAction, InputRawTransaction,
     InputTransactionEncryption, InputTransferAction,
 };
 
@@ -62,6 +64,28 @@ struct Mutation;
 // Switch to async/await fn https://github.com/graphql-rust/juniper/issues/2
 #[juniper::object(Context = State)]
 impl Mutation {
+    #[graphql(
+        name = "sendCallTransaction",
+        description = "Send a transfer transaction to the blockchain."
+    )]
+    fn send_call_transaction(
+        state_ctx: &State,
+        input_raw: InputRawTransaction,
+        input_action: InputCallAction,
+        input_encryption: InputTransactionEncryption,
+    ) -> FieldResult<Hash> {
+        let action = cover_call_action(&input_action)?;
+        let signed_tx = cover_to_signed_tx(&action, &input_raw, &input_encryption)?;
+        block_on(
+            state_ctx
+                .adapter
+                .insert_signed_txs(Context::new(), signed_tx),
+        )
+        .map_err(FieldError::from)?;
+
+        Ok(input_encryption.tx_hash)
+    }
+
     #[graphql(
         name = "sendTransferTransaction",
         description = "Send a transfer transaction to the blockchain."
@@ -155,6 +179,27 @@ impl Mutation {
 
         Ok(tx_hash)
     }
+
+    #[graphql(
+        name = "sendUnsafeCallTransaction",
+        deprecated = "Don't use it! This is just for development testing."
+    )]
+    fn send_unsafe_call_transaction(
+        state_ctx: &State,
+        input_raw: InputRawTransaction,
+        input_action: InputCallAction,
+        input_privkey: Bytes,
+    ) -> FieldResult<Hash> {
+        let signed_tx = cover_to_call_signed_tx(&input_raw, &input_action, input_privkey)?;
+        block_on(
+            state_ctx
+                .adapter
+                .insert_signed_txs(Context::new(), signed_tx.clone()),
+        )
+        .map_err(FieldError::from)?;
+
+        Ok(Hash(signed_tx.tx_hash.as_hex()))
+    }
 }
 
 // Adding `Query` and `Mutation` together we get `Schema`, which describes,
@@ -243,6 +288,56 @@ fn calculate_hash_of_transfer(
     Ok(Hash::from(hash))
 }
 
+fn cover_to_call_signed_tx(
+    raw: &InputRawTransaction,
+    action: &InputCallAction,
+    input_privkey: Bytes,
+) -> FieldResult<SignedTransaction> {
+    let carrying_asset = match &action.carrying_asset {
+        None => None,
+        Some(asset) => Some(CarryingAsset {
+            asset_id: protocol::types::AssetID::from_hex(&asset.asset_id.as_hex())?,
+            amount:   protocol::types::Balance::from_bytes_be(
+                hex_to_vec_u8(&asset.amount.as_hex())?.as_ref(),
+            ),
+        }),
+    };
+    let raw = protocol::types::RawTransaction {
+        chain_id: protocol::types::Hash::from_hex(&raw.chain_id.as_hex())
+            .map_err(FieldError::from)?,
+        nonce:    protocol::types::Hash::from_hex(&raw.nonce.as_hex()).map_err(FieldError::from)?,
+        timeout:  hex_to_u64(&raw.timeout.as_hex())?,
+        fee:      protocol::types::Fee {
+            asset_id: protocol::types::AssetID::from_hex(&raw.fee_asset_id.as_hex())
+                .map_err(FieldError::from)?,
+            cycle:    hex_to_u64(&raw.fee_cycle.as_hex())?,
+        },
+        action:   protocol::types::TransactionAction::Call {
+            contract: protocol::types::ContractAddress::from_hex(&action.contract.as_hex())
+                .map_err(FieldError::from)?,
+            method: action.method.clone(),
+            args: action
+                .args
+                .iter()
+                .map(|a| bytes::Bytes::from(a.0.as_bytes()))
+                .collect(),
+            carrying_asset,
+        },
+    };
+    dbg!(&raw);
+
+    let rlp_stx = rlp::encode(&RlpRawTransaction { inner: &raw });
+    let hash = protocol::types::Hash::digest(bytes::Bytes::from(rlp_stx));
+    let input_encryption = gen_input_tx_encryption(input_privkey, Hash(hash.as_hex()))?;
+    let signed_tx = protocol::types::SignedTransaction {
+        raw,
+        tx_hash: hash,
+        pubkey: bytes::Bytes::from(hex_to_vec_u8(&input_encryption.pubkey.as_hex())?),
+        signature: bytes::Bytes::from(hex_to_vec_u8(&input_encryption.signature.as_hex())?),
+    };
+    Ok(signed_tx)
+}
+
 fn calculate_hash_of_deploy(
     raw: &InputRawTransaction,
     action: &InputDeployAction,
@@ -295,6 +390,35 @@ fn cover_to_signed_tx(
     };
 
     Ok(signed_tx)
+}
+
+fn cover_call_action(
+    input_action: &InputCallAction,
+) -> FieldResult<protocol::types::TransactionAction> {
+    let action = protocol::types::TransactionAction::Call {
+        contract:       protocol::types::ContractAddress::from_hex(&input_action.contract.as_hex())
+            .map_err(FieldError::from)?,
+        method:         input_action.method.clone(),
+        args:           input_action
+            .args
+            .iter()
+            .map(|a| bytes::Bytes::from(a.0.as_bytes()))
+            .collect(),
+        carrying_asset: input_action
+            .carrying_asset
+            .as_ref()
+            .map(|asset| -> FieldResult<CarryingAsset> {
+                Ok(CarryingAsset {
+                    asset_id: protocol::types::AssetID::from_hex(&asset.asset_id.as_hex())
+                        .map_err(FieldError::from)?,
+                    amount:   protocol::types::Balance::from_bytes_be(
+                        hex_to_vec_u8(&asset.amount.as_hex())?.as_ref(),
+                    ),
+                })
+            })
+            .transpose()?,
+    };
+    Ok(action)
 }
 
 fn cover_transfer_action(

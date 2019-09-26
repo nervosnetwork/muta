@@ -1,5 +1,5 @@
 pub mod message;
-mod rlp_types;
+pub mod rlp_types;
 
 use std::{
     marker::PhantomData,

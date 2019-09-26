@@ -59,9 +59,28 @@ impl<'a> Encodable for RlpRawTransaction<'a> {
                 };
                 s.append(&type_flag);
             }
-            TransactionAction::Call { .. } => {
-                // TODO(@yejiayu): The interface for `call` is about to be modified.
-                unimplemented!()
+            TransactionAction::Call {
+                contract,
+                method,
+                args,
+                carrying_asset,
+            } => {
+                s.append(&contract.as_bytes().to_vec());
+                s.append(&method.as_bytes());
+                s.begin_list(args.len());
+                for arg in args.iter() {
+                    s.append(&arg.as_ref());
+                }
+                match carrying_asset {
+                    None => {
+                        s.append_empty_data();
+                        s.append_empty_data();
+                    }
+                    Some(asset) => {
+                        s.append(&asset.asset_id.as_bytes().to_vec());
+                        s.append(&asset.amount.to_bytes_be());
+                    }
+                }
             }
         };
     }

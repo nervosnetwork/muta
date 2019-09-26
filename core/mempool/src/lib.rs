@@ -10,6 +10,7 @@ mod tx_cache;
 pub use adapter::message::{
     NewTxsHandler, PullTxsHandler, END_GOSSIP_NEW_TXS, END_RESP_PULL_TXS, END_RPC_PULL_TXS,
 };
+pub use adapter::rlp_types::RlpRawTransaction;
 pub use adapter::DefaultMemPoolAdapter;
 
 use std::error::Error;
