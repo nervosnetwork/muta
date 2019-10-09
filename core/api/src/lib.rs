@@ -27,7 +27,7 @@ use crate::schema::{
 
 pub async fn start_graphql<Adapter: APIAdapter + 'static>(cfg: GraphQLConfig, adapter: Adapter) {
     let state = State {
-        adapter: Arc::new(Box::new(adapter)),
+        adapter: Arc::new(adapter),
     };
 
     let mut app = App::with_state(Arc::new(state));
@@ -39,7 +39,7 @@ pub async fn start_graphql<Adapter: APIAdapter + 'static>(cfg: GraphQLConfig, ad
 // This is accessible as state in Tide, and as executor context in Juniper.
 #[derive(Clone)]
 struct State {
-    adapter: Arc<Box<dyn APIAdapter>>,
+    adapter: Arc<dyn APIAdapter>,
 }
 
 impl juniper::Context for State {}
