@@ -27,7 +27,7 @@ use crate::schema::{
 
 pub async fn start_graphql<Adapter: APIAdapter + 'static>(cfg: GraphQLConfig, adapter: Adapter) {
     let state = State {
-        adapter: Arc::new(Box::new(adapter)),
+        adapter: Arc::new(adapter),
     };
 
     let mut app = App::with_state(Arc::new(state));
@@ -39,7 +39,7 @@ pub async fn start_graphql<Adapter: APIAdapter + 'static>(cfg: GraphQLConfig, ad
 // This is accessible as state in Tide, and as executor context in Juniper.
 #[derive(Clone)]
 struct State {
-    adapter: Arc<Box<dyn APIAdapter>>,
+    adapter: Arc<dyn APIAdapter>,
 }
 
 impl juniper::Context for State {}
@@ -140,11 +140,9 @@ impl Mutation {
         input_action: InputTransferAction,
         input_privkey: Bytes,
     ) -> FieldResult<Hash> {
-        let tx_hash = calculate_hash_of_transfer(&input_raw, &input_action)?;
-        let input_encryption = gen_input_tx_encryption(input_privkey, tx_hash.clone())?;
-
         let action = cover_transfer_action(&input_action)?;
-        let signed_tx = cover_to_signed_tx(&action, &input_raw, &input_encryption)?;
+        let raw = convert_tx_action_to_raw_tx(&input_raw, action)?;
+        let (signed_tx, tx_hash) = covert_raw_to_signed_tx(raw, input_privkey)?;
         block_on(
             state_ctx
                 .adapter
@@ -165,11 +163,9 @@ impl Mutation {
         input_action: InputDeployAction,
         input_privkey: Bytes,
     ) -> FieldResult<Hash> {
-        let tx_hash = calculate_hash_of_deploy(&input_raw, &input_action)?;
-        let input_encryption = gen_input_tx_encryption(input_privkey, tx_hash.clone())?;
-
         let action = cover_deploy_action(&input_action)?;
-        let signed_tx = cover_to_signed_tx(&action, &input_raw, &input_encryption)?;
+        let raw = convert_tx_action_to_raw_tx(&input_raw, action)?;
+        let (signed_tx, tx_hash) = covert_raw_to_signed_tx(raw, input_privkey)?;
         block_on(
             state_ctx
                 .adapter
@@ -190,15 +186,17 @@ impl Mutation {
         input_action: InputCallAction,
         input_privkey: Bytes,
     ) -> FieldResult<Hash> {
-        let signed_tx = cover_to_call_signed_tx(&input_raw, &input_action, input_privkey)?;
+        let action = cover_call_action(&input_action)?;
+        let raw = convert_tx_action_to_raw_tx(&input_raw, action)?;
+        let (signed_tx, tx_hash) = covert_raw_to_signed_tx(raw, input_privkey)?;
         block_on(
             state_ctx
                 .adapter
-                .insert_signed_txs(Context::new(), signed_tx.clone()),
+                .insert_signed_txs(Context::new(), signed_tx),
         )
         .map_err(FieldError::from)?;
 
-        Ok(Hash(signed_tx.tx_hash.as_hex()))
+        Ok(tx_hash)
     }
 }
 
@@ -266,99 +264,38 @@ fn gen_input_tx_encryption(
 // Convert from graphql type to protocol type
 // #####################
 
-const TRANSFER_TRANSACTION_FIELD_LENGTH: usize = 8;
-const DEPLOY_TRANSACTION_FIELD_LENGTH: usize = 7;
-fn calculate_hash_of_transfer(
+fn convert_tx_action_to_raw_tx(
     raw: &InputRawTransaction,
-    action: &InputTransferAction,
-) -> FieldResult<Hash> {
-    let mut stream = rlp::RlpStream::new_list(TRANSFER_TRANSACTION_FIELD_LENGTH);
-
-    stream.append(&hex_to_vec_u8(&raw.chain_id.as_hex())?);
-    stream.append(&hex_to_vec_u8(&raw.fee_cycle.as_hex())?);
-    stream.append(&hex_to_vec_u8(&raw.fee_asset_id.as_hex())?);
-    stream.append(&hex_to_vec_u8(&raw.nonce.as_hex())?);
-    stream.append(&hex_to_vec_u8(&raw.timeout.as_hex())?);
-
-    stream.append(&hex_to_vec_u8(&action.carrying_amount.as_hex())?);
-    stream.append(&hex_to_vec_u8(&action.carrying_asset_id.as_hex())?);
-    stream.append(&hex_to_vec_u8(&action.receiver.as_hex())?);
-
-    let hash = protocol::types::Hash::digest(bytes::Bytes::from(stream.out()));
-    Ok(Hash::from(hash))
-}
-
-fn cover_to_call_signed_tx(
-    raw: &InputRawTransaction,
-    action: &InputCallAction,
-    input_privkey: Bytes,
-) -> FieldResult<SignedTransaction> {
-    let carrying_asset = match &action.carrying_asset {
-        None => None,
-        Some(asset) => Some(CarryingAsset {
-            asset_id: protocol::types::AssetID::from_hex(&asset.asset_id.as_hex())?,
-            amount:   protocol::types::Balance::from_bytes_be(
-                hex_to_vec_u8(&asset.amount.as_hex())?.as_ref(),
-            ),
-        }),
-    };
-    let raw = protocol::types::RawTransaction {
+    action: protocol::types::TransactionAction,
+) -> FieldResult<protocol::types::RawTransaction> {
+    Ok(protocol::types::RawTransaction {
         chain_id: protocol::types::Hash::from_hex(&raw.chain_id.as_hex())
             .map_err(FieldError::from)?,
-        nonce:    protocol::types::Hash::from_hex(&raw.nonce.as_hex()).map_err(FieldError::from)?,
-        timeout:  hex_to_u64(&raw.timeout.as_hex())?,
-        fee:      protocol::types::Fee {
+        nonce: protocol::types::Hash::from_hex(&raw.nonce.as_hex()).map_err(FieldError::from)?,
+        timeout: hex_to_u64(&raw.timeout.as_hex())?,
+        fee: protocol::types::Fee {
             asset_id: protocol::types::AssetID::from_hex(&raw.fee_asset_id.as_hex())
                 .map_err(FieldError::from)?,
             cycle:    hex_to_u64(&raw.fee_cycle.as_hex())?,
         },
-        action:   protocol::types::TransactionAction::Call {
-            contract: protocol::types::ContractAddress::from_hex(&action.contract.as_hex())
-                .map_err(FieldError::from)?,
-            method: action.method.clone(),
-            args: action
-                .args
-                .iter()
-                .map(|a| bytes::Bytes::from(a.as_bytes()))
-                .collect(),
-            carrying_asset,
-        },
-    };
+        action,
+    })
+}
 
+fn covert_raw_to_signed_tx(
+    raw: protocol::types::RawTransaction,
+    input_privkey: Bytes,
+) -> FieldResult<(SignedTransaction, Hash)> {
     let rlp_stx = rlp::encode(&RlpRawTransaction { inner: &raw });
     let hash = protocol::types::Hash::digest(bytes::Bytes::from(rlp_stx));
     let input_encryption = gen_input_tx_encryption(input_privkey, Hash(hash.as_hex()))?;
     let signed_tx = protocol::types::SignedTransaction {
         raw,
-        tx_hash: hash,
+        tx_hash: hash.clone(),
         pubkey: bytes::Bytes::from(hex_to_vec_u8(&input_encryption.pubkey.as_hex())?),
         signature: bytes::Bytes::from(hex_to_vec_u8(&input_encryption.signature.as_hex())?),
     };
-    Ok(signed_tx)
-}
-
-fn calculate_hash_of_deploy(
-    raw: &InputRawTransaction,
-    action: &InputDeployAction,
-) -> FieldResult<Hash> {
-    let mut stream = rlp::RlpStream::new_list(DEPLOY_TRANSACTION_FIELD_LENGTH);
-
-    stream.append(&hex_to_vec_u8(&raw.chain_id.as_hex())?);
-    stream.append(&hex_to_vec_u8(&raw.fee_cycle.as_hex())?);
-    stream.append(&hex_to_vec_u8(&raw.fee_asset_id.as_hex())?);
-    stream.append(&hex_to_vec_u8(&raw.nonce.as_hex())?);
-    stream.append(&hex_to_vec_u8(&raw.timeout.as_hex())?);
-
-    stream.append(&hex_to_vec_u8(&action.code.as_hex())?);
-    let type_flag: u32 = match action.contract_type {
-        ContractType::Asset => 0,
-        ContractType::App => 1,
-        ContractType::Library => 2,
-    };
-    stream.append(&type_flag);
-
-    let hash = protocol::types::Hash::digest(bytes::Bytes::from(stream.out()));
-    Ok(Hash::from(hash))
+    Ok((signed_tx, input_encryption.tx_hash))
 }
 
 fn cover_to_signed_tx(
