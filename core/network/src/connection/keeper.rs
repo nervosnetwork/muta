@@ -200,24 +200,20 @@ impl ServiceHandle for ConnectionServiceKeeper {
         match evt {
             ServiceEvent::SessionOpen { session_context } => {
                 let pubkey = peer_pubkey!(&session_context).clone();
-                let pid = pubkey.peer_id();
-                let pidd = pid.clone();
                 let addr = session_context.address.clone();
-                let sid = Some(session_context.id);
+                let sid = session_context.id;
 
-                let add_peer_addr = PeerManagerEvent::AddPeer { pid: pidd, pubkey, addr };
-                let attach_session = PeerManagerEvent::UpdatePeerSession { pid, sid };
+                let attach_peer_session = PeerManagerEvent::AttachPeerSession { pubkey, addr, sid };
 
-                self.report_peer(add_peer_addr);
-                self.report_peer(attach_session);
+                self.report_peer(attach_peer_session);
             }
             ServiceEvent::SessionClose { session_context } => {
                 let pid = peer_pubkey!(&session_context).peer_id();
-                let sid = None;
+                let sid = session_context.id;
 
-                let detach_session = PeerManagerEvent::UpdatePeerSession { pid, sid };
+                let detach_peer_session = PeerManagerEvent::DetachPeerSession { pid, sid };
 
-                self.report_peer(detach_session);
+                self.report_peer(detach_peer_session);
             }
             ServiceEvent::ListenStarted { address } => {
                 let start_listen = PeerManagerEvent::AddListenAddr { addr: address };

@@ -217,8 +217,6 @@ impl<P: NetworkProtocol + Unpin> Future for ConnectionService<P> {
 
         // Advance service state
         loop {
-            debug!("network: connection service: advance state");
-
             let inner = &mut serv_mut.inner;
             pin_mut!(inner);
 

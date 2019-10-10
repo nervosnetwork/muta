@@ -110,6 +110,10 @@ struct Inner {
 }
 
 impl Inner {
+    pub fn peer_exist(&self, pid: &PeerId) -> bool {
+        self.pool.read().contains_key(pid)
+    }
+
     pub fn user_peer(&self, user: &UserAddress) -> Option<Peer> {
         let user_pid = self.user_pid.read();
         let pool = self.pool.read();
@@ -553,31 +557,45 @@ impl PeerManager {
 
     fn process_event(&mut self, event: PeerManagerEvent) {
         match event {
-            PeerManagerEvent::AddPeer { pubkey, addr, .. } => {
+            PeerManagerEvent::AttachPeerSession { pubkey, addr, sid } => {
                 let user_addr = Peer::pubkey_to_addr(&pubkey).as_hex();
+                let pid = pubkey.peer_id();
 
-                info!(
-                    "network: connected: user addr: {}, multiaddr: {}",
-                    user_addr, addr
-                );
+                if !self.inner.peer_exist(&pid) {
+                    info!("network: new peer {:?} user addr {}", pid, user_addr);
 
-                self.add_peer(pubkey, addr);
-            }
-            PeerManagerEvent::UpdatePeerSession { pid, sid } => {
-                let user_addr = self.inner.pid_user_addr(&pid);
+                    self.add_peer(pubkey, addr.clone());
+                } else {
+                    self.inner.add_peer_addr(&pid, addr.clone());
+                }
 
-                if let Some(sid) = sid {
-                    info!(
-                        "network: connected: user addr {:?} session id {}",
-                        user_addr, sid
+                if self.peer_session.contains_key(&pid) {
+                    warn!(
+                        "network: repeated connection: pid {:?} session {:?}",
+                        pid, sid
                     );
 
-                    self.attach_peer_session(pid, sid);
-                } else {
-                    info!("network: disconnect: user addr {:?}", user_addr);
-
-                    self.detach_peer_session(&pid);
+                    return;
                 }
+
+                info!(
+                    "network: pid {:?} user addr {} connected, session {:?}",
+                    pid, user_addr, sid
+                );
+                debug!("network: pid {:?} multi_addr {}", pid, addr);
+
+                self.attach_peer_session(pid, sid);
+            }
+            PeerManagerEvent::DetachPeerSession { pid, sid } => {
+                if self.peer_session.get(&pid) != Some(&sid) {
+                    debug!("network: detach repeated connection: session {:?}", sid);
+                    return;
+                }
+
+                let user_addr = self.inner.pid_user_addr(&pid);
+                info!("network: detach session user addr {:?}", user_addr);
+
+                self.detach_peer_session(&pid);
             }
             PeerManagerEvent::PeerAlive { pid } => {
                 let user_addr = self.inner.pid_user_addr(&pid);

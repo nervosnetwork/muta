@@ -88,15 +88,15 @@ pub struct MultiUsersMessage {
 #[derive(Debug, Display)]
 pub enum PeerManagerEvent {
     // Peer
-    #[display(fmt = "add peer {:?} addr {}", pid, addr)]
-    AddPeer {
-        pid:    PeerId,
+    #[display(fmt = "attach peer addr {} session {:?}", addr, sid)]
+    AttachPeerSession {
         pubkey: PublicKey,
         addr:   Multiaddr,
+        sid:    SessionId,
     },
 
-    #[display(fmt = "update peer {:?} session {:?}", pid, sid)]
-    UpdatePeerSession { pid: PeerId, sid: Option<SessionId> },
+    #[display(fmt = "detach peer {:?} session {:?}", pid, sid)]
+    DetachPeerSession { pid: PeerId, sid: SessionId },
 
     #[display(fmt = "peer {:?} alive", pid)]
     PeerAlive { pid: PeerId },
