@@ -1,8 +1,10 @@
 use std::collections::BTreeMap;
+use std::convert::From;
+use std::str::FromStr;
 
 use bytes::Bytes;
 use num_bigint::BigUint;
-use serde::{Deserialize, Serialize};
+use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
 use protocol::traits::executor::{ContractSchema, ContractSer};
 use protocol::types::{AssetID, UserAddress};
@@ -16,6 +18,36 @@ pub const TRADING_PAIRS_KEY: &str = "trading_pairs";
 pub const ADMINS_KEY: &str = "admins";
 pub const BALANCES_KEY_PREFIX: &str = "b";
 pub const ORDERS_KEY_PREFIX: &str = "o";
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Ser<T>(pub T);
+
+impl Serialize for Ser<BigUint> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let hex = format!("{}", self.0);
+        serializer.serialize_str(&hex)
+    }
+}
+
+impl<'de> Deserialize<'de> for Ser<BigUint> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        let biguint = BigUint::from_str(&s).map_err(de::Error::custom)?;
+        Ok(Ser(biguint))
+    }
+}
+
+impl From<BigUint> for Ser<BigUint> {
+    fn from(item: BigUint) -> Self {
+        Ser(item)
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct Config {
@@ -75,6 +107,25 @@ pub struct UserBalance {
     pub locked:    BTreeMap<AssetID, BigUint>,
 }
 
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SerUserBalance {
+    pub available: BTreeMap<AssetID, Ser<BigUint>>,
+    pub locked:    BTreeMap<AssetID, Ser<BigUint>>,
+}
+
+impl From<UserBalance> for SerUserBalance {
+    fn from(item: UserBalance) -> Self {
+        let mut res: SerUserBalance = Default::default();
+        for (asset_id, amount) in item.available.into_iter() {
+            res.available.insert(asset_id, Ser(amount));
+        }
+        for (asset_id, amount) in item.locked.into_iter() {
+            res.available.insert(asset_id, Ser(amount));
+        }
+        res
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DepositArgs {
     user: UserAddress,
@@ -105,6 +156,24 @@ pub struct PlaceOrderArgs {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CancelOrderArgs {
     pub order_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GetBalanceArgs {
+    pub user: UserAddress,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GetOrderbookArgs {
+    pub version:         u64,
+    pub trading_pair_id: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GetPendingOrdersArgs {
+    pub version:         u64,
+    pub trading_pair_id: u64,
+    pub user:            UserAddress,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]

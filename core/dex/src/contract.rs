@@ -13,8 +13,9 @@ use protocol::ProtocolResult;
 use crate::adapter::DexAdapter;
 use crate::error::DexError;
 use crate::types::{
-    CancelOrderArgs, Config, Deal, Order, OrderBook, OrderSide, OrderState, PlaceOrderArgs,
-    TradingPair, UserBalance, WithdrawArgs,
+    CancelOrderArgs, Config, Deal, GetBalanceArgs, GetOrderbookArgs, GetPendingOrdersArgs, Order,
+    OrderBook, OrderSide, OrderState, PlaceOrderArgs, SerUserBalance, TradingPair, UserBalance,
+    WithdrawArgs,
 };
 
 pub struct DexContract<Adapter: DexAdapter> {
@@ -85,10 +86,51 @@ where
                 serde_json::to_string(res)
             }
             "clear" => serde_json::to_string(&self.clear()?),
+            "get_balance" => {
+                let args: GetBalanceArgs = serde_json::from_slice(&args[0])
+                    .map_err(|_| DexError::ArgsError("args invalid".to_owned()))?;
+                let user_balance = self.get_balance(&args.user)?;
+                let res = SerUserBalance::from(user_balance);
+                serde_json::to_string(&res)
+            }
+            "get_orderbook" => {
+                let args: GetOrderbookArgs = serde_json::from_slice(&args[0])
+                    .map_err(|_| DexError::ArgsError("args invalid".to_owned()))?;
+                let res = &self.get_orderbook(args.version, args.trading_pair_id)?;
+                serde_json::to_string(res)
+            }
+            "get_pending_orders" => {
+                let args: GetPendingOrdersArgs = serde_json::from_slice(&args[0])
+                    .map_err(|_| DexError::ArgsError("args invalid".to_owned()))?;
+                let res =
+                    &self.get_pending_orders(args.version, args.trading_pair_id, &args.user)?;
+                serde_json::to_string(res)
+            }
             _ => return Err(DexError::Contract("unknown method".to_owned()).into()),
         }
         .unwrap();
         Ok(Bytes::from(res.as_bytes()))
+    }
+
+    pub fn get_balance(&self, user: &UserAddress) -> ProtocolResult<UserBalance> {
+        self.adapter.borrow().get_balance(user)
+    }
+
+    pub fn get_orderbook(&self, version: u64, trading_pair_id: u64) -> ProtocolResult<OrderBook> {
+        self.adapter
+            .borrow()
+            .get_orderbook(version, trading_pair_id)
+    }
+
+    pub fn get_pending_orders(
+        &self,
+        version: u64,
+        trading_pair_id: u64,
+        user: &UserAddress,
+    ) -> ProtocolResult<Vec<Order>> {
+        self.adapter
+            .borrow()
+            .get_pending_orders(version, trading_pair_id, user)
     }
 
     pub fn update_fee_account(&mut self, new_account: UserAddress) -> ProtocolResult<()> {

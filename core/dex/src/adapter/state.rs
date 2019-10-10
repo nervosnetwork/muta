@@ -203,6 +203,35 @@ impl<StateAdapter: ContractStateAdapter> DexAdapter for NativeDexAdapter<StateAd
         Ok(order.id.clone())
     }
 
+    fn get_pending_orders(
+        &self,
+        version: u64,
+        trading_pair_id: u64,
+        user: &UserAddress,
+    ) -> ProtocolResult<Vec<Order>> {
+        let key = FixedPendingOrderKey {
+            version,
+            trading_pair_id,
+        };
+        let pending_orders: PendingOrders = self
+            .state_adapter
+            .borrow()
+            .get::<FixedPendingOrderSchema>(&key)?
+            .unwrap_or_default();
+        let orders = pending_orders
+            .inner
+            .into_iter()
+            .map(|(_, o)| o)
+            .filter(|o| {
+                o.version == version
+                    && o.trading_pair_id == trading_pair_id
+                    && o.state == OrderState::Pending
+                    && &o.user == user
+            })
+            .collect::<Vec<_>>();
+        Ok(orders)
+    }
+
     fn get_orderbook(&self, version: u64, trading_pair_id: u64) -> ProtocolResult<OrderBook> {
         let key = FixedPendingOrderKey {
             version,
@@ -212,7 +241,8 @@ impl<StateAdapter: ContractStateAdapter> DexAdapter for NativeDexAdapter<StateAd
             .state_adapter
             .borrow()
             .get::<FixedPendingOrderSchema>(&key)?
-            .ok_or_else(|| DexError::Adapter("invalid pending order data".to_string()))?;
+            .unwrap_or_default();
+
         let mut order_book = OrderBook {
             version,
             trading_pair_id,

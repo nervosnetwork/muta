@@ -16,4 +16,10 @@ pub trait DexAdapter {
     fn get_order(&self, id: &str) -> ProtocolResult<Option<Order>>;
     fn set_order(&mut self, order: Order) -> ProtocolResult<String>;
     fn get_orderbook(&self, version: u64, trading_pair_id: u64) -> ProtocolResult<OrderBook>;
+    fn get_pending_orders(
+        &self,
+        version: u64,
+        trading_pair_id: u64,
+        user: &UserAddress,
+    ) -> ProtocolResult<Vec<Order>>;
 }
