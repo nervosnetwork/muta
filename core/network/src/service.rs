@@ -266,8 +266,6 @@ impl Future for NetworkService {
     type Output = ();
 
     fn poll(mut self: Pin<&mut Self>, ctx: &mut TaskContext<'_>) -> Poll<Self::Output> {
-        debug!("network: service polled");
-
         self.hb_waker.register(ctx.waker());
 
         macro_rules! service_ready {

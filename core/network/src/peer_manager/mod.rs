@@ -147,7 +147,7 @@ impl Inner {
         if !pool.contains_key(&peer_id) {
             debug_assert!(false, "peer {:?} not found", peer_id);
 
-            error!("network: peer manager: peer {:?} not found", peer_id);
+            error!("network: peer {:?} not found", peer_id);
             return;
         }
 
@@ -329,8 +329,9 @@ impl PeerManagerHandle {
 
 pub struct PeerManager {
     // core peer pool
-    inner:  Arc<Inner>,
-    config: PeerManagerConfig,
+    inner:   Arc<Inner>,
+    config:  PeerManagerConfig,
+    peer_id: PeerId,
 
     // query purpose
     peer_session: HashMap<PeerId, SessionId>,
@@ -361,6 +362,7 @@ impl PeerManager {
         let waker = Arc::new(AtomicWaker::new());
         let heart_beat = HeartBeat::new(Arc::clone(&waker), config.routine_interval);
         let persistence = Box::new(NoopPersistence);
+        let peer_id = config.our_id.clone();
 
         // Register our self
         inner.register_self(config.our_id.clone(), config.pubkey.clone());
@@ -368,6 +370,7 @@ impl PeerManager {
         PeerManager {
             inner,
             config,
+            peer_id,
 
             peer_session: Default::default(),
             session_peer: Default::default(),
@@ -409,18 +412,13 @@ impl PeerManager {
 
         // Insert bootstrap peers
         for peer in peers.iter() {
-            info!(
-                "network: peer manager: bootstrap peer {:?} addrs {:?}",
-                peer.id(),
-                peer.addrs()
-            );
+            info!("network: {:?}: bootstrap peer: {}", self.peer_id, peer);
 
             self.inner.add_peer(peer.clone());
         }
 
         // Collect bootstrap addrs
         let addrs: Vec<Multiaddr> = peers.iter().map(Peer::owned_addrs).flatten().collect();
-        debug!("network: peer manager: bootstrap addrs {:?}", addrs);
 
         // Insert bootstrap addrs, so that we can check if an addr is bootstrap
         for addr in addrs.iter() {
@@ -434,6 +432,8 @@ impl PeerManager {
     // TODO: Store protocol in Peer or remove it? Right now, `proto`
     // is ignored in ConnectionService.
     fn connect_peers(&mut self, addrs: Vec<Multiaddr>) {
+        info!("network: {:?}: connect addrs {:?}", self.peer_id, addrs);
+
         let connect = ConnectionEvent::Connect {
             addrs,
             proto: DialProtocol::All,
@@ -450,7 +450,7 @@ impl PeerManager {
         if !self.session_peer.contains_key(&sid) {
             debug_assert!(false, "session {} no peer id", sid);
 
-            error!("network: peer manager: fatal!!! session {} no peer id", sid);
+            error!("network: fatal!!! session {} no peer id", sid);
             return;
         }
 
@@ -521,7 +521,7 @@ impl PeerManager {
             }
         }
 
-        warn!("network: peer manager: no peers {:?}", no_peers);
+        warn!("network: no peers {:?}", no_peers);
 
         // Send message to connected users
         let tar = TargetSession::Multi(connected);
@@ -529,7 +529,7 @@ impl PeerManager {
         let send_msg = ConnectionEvent::SendMsg { tar, msg, pri };
 
         if self.conn_tx.unbounded_send(send_msg).is_err() {
-            debug!("network: connection service exit");
+            error!("network: connection service exit");
         }
 
         // Try connect to unconnected peers
@@ -551,7 +551,7 @@ impl PeerManager {
         missed_accounts.extend(no_peers);
 
         if miss_tx.send(missed_accounts).is_err() {
-            debug!("network: peer manager route multi accounts message dropped")
+            warn!("network: route multi accounts message dropped")
         }
     }
 
@@ -562,7 +562,10 @@ impl PeerManager {
                 let pid = pubkey.peer_id();
 
                 if !self.inner.peer_exist(&pid) {
-                    info!("network: new peer {:?} user addr {}", pid, user_addr);
+                    info!(
+                        "network: {:?}: new peer {:?}, user addr {}, session {:?}",
+                        self.peer_id, pid, user_addr, sid
+                    );
 
                     self.add_peer(pubkey, addr.clone());
                 } else {
@@ -571,18 +574,12 @@ impl PeerManager {
 
                 if self.peer_session.contains_key(&pid) {
                     warn!(
-                        "network: repeated connection: pid {:?} session {:?}",
-                        pid, sid
+                        "network: {:?}: repeated connection: pid {:?} session {:?}",
+                        self.peer_id, pid, sid
                     );
 
                     return;
                 }
-
-                info!(
-                    "network: pid {:?} user addr {} connected, session {:?}",
-                    pid, user_addr, sid
-                );
-                debug!("network: pid {:?} multi_addr {}", pid, addr);
 
                 self.attach_peer_session(pid, sid);
             }
@@ -670,7 +667,10 @@ impl PeerManager {
                 if !self.bootstraps.contains(&addr) {
                     self.inner.try_remove_addr(&addr);
                 } else if let Some(pid) = self.inner.addr_peer_id(&addr) {
-                    debug!("network: peer manager: bootstrap peer {:?} retry", pid);
+                    debug!(
+                        "network: {:?}: bootstrap peer {:?} retry",
+                        self.peer_id, pid
+                    );
 
                     self.inner.increase_retry_count(&pid);
                 }
@@ -703,7 +703,7 @@ impl Drop for PeerManager {
         let peer_box = self.inner.package_peers();
 
         if let Err(err) = self.persistence.save(peer_box) {
-            error!("network: peer manager: persistence: {}", err);
+            error!("network: persistence: {}", err);
         }
     }
 }
@@ -712,14 +712,12 @@ impl Future for PeerManager {
     type Output = ();
 
     fn poll(mut self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
-        debug!("netowrk: peer manager polled");
-
         self.hb_waker.register(ctx.waker());
 
         // Spawn heart beat
         if let Some(heart_beat) = self.heart_beat.take() {
             let heart_beat = heart_beat.map_err(|_| {
-                error!("network: peer manager: fatal: asystole, fallback to passive mode");
+                error!("network: fatal: asystole, fallback to passive mode");
             });
 
             runtime::spawn(heart_beat);
@@ -732,7 +730,8 @@ impl Future for PeerManager {
 
             // service ready in common
             let event = crate::service_ready!("peer manager", event_rx.poll_next(ctx));
-            debug!("network: peer manager: event [{}]", event);
+
+            debug!("network: {:?}: event {}", self.peer_id, event);
 
             self.process_event(event);
         }
@@ -740,14 +739,13 @@ impl Future for PeerManager {
         // Check connecting count
         let connecting_count = self.inner.connecting_count();
         if connecting_count < self.config.max_connections {
-            debug!("network: peer manager: connections not fullfill");
-
             let remain_count = self.config.max_connections - connecting_count;
             let unconnected_addrs = self.unconnected_addrs(remain_count);
+            let candidate_count = unconnected_addrs.len();
 
-            debug!(
-                "network: peer manager: {} candidate addrs found",
-                unconnected_addrs.len()
+            info!(
+                "network: {:?}: connections not fullfill, {} candidate addrs found",
+                self.peer_id, candidate_count
             );
 
             if !unconnected_addrs.is_empty() {

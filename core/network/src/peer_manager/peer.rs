@@ -6,6 +6,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+use derive_more::Display;
 use protocol::types::UserAddress;
 use serde_derive::{Deserialize, Serialize};
 use tentacle::{
@@ -16,7 +17,9 @@ use tentacle::{
 
 pub const BACKOFF_BASE: usize = 5;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+// TODO: display next_retry
+#[derive(Debug, Clone, Serialize, Deserialize, Display)]
+#[display(fmt = "addrs: {:?}, retry: {}", addr_set, retry_count)]
 pub(super) struct PeerState {
     addr_set: HashSet<Multiaddr>,
     #[serde(skip)]
@@ -25,7 +28,13 @@ pub(super) struct PeerState {
     next_retry: Instant,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Display)]
+#[display(
+    fmt = "peer id: {:?}, user addr: {:?}, state: {}",
+    id,
+    user_addr,
+    state
+)]
 pub struct Peer {
     id:        Arc<PeerId>,
     user_addr: Arc<UserAddress>,
