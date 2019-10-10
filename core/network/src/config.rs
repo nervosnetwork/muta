@@ -42,7 +42,7 @@ pub const DEFAULT_SELF_HEART_BEAT_INTERVAL: u64 = 15;
 pub type PublicKeyHexStr = String;
 pub type PrivateKeyHexStr = String;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct NetworkConfig {
     // connection
     pub default_listen:   Multiaddr,
