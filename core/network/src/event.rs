@@ -88,10 +88,10 @@ pub struct MultiUsersMessage {
 #[derive(Debug, Display)]
 pub enum PeerManagerEvent {
     // Peer
-    #[display(fmt = "attach peer addr {} session {:?}", addr, sid)]
+    #[display(fmt = "attach peer addr {:?} session {:?}", addr, sid)]
     AttachPeerSession {
         pubkey: PublicKey,
-        addr:   Multiaddr,
+        addr:   Option<Multiaddr>,
         sid:    SessionId,
     },
 

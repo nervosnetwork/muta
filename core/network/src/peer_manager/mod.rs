@@ -502,9 +502,14 @@ impl PeerManager {
         }
     }
 
-    fn add_peer(&mut self, pubkey: PublicKey, addr: Multiaddr) {
-        self.unknown_addrs.remove(&UnknownAddr::new(addr.clone()));
-        self.inner.add_peer(Peer::from_pair((pubkey, addr)));
+    fn add_peer(&mut self, pubkey: PublicKey, addr: Option<Multiaddr>) {
+        if let Some(addr) = addr {
+            self.unknown_addrs.remove(&UnknownAddr::new(addr.clone()));
+            self.inner.add_peer(Peer::from_pair((pubkey, addr)));
+        } else {
+            let pid = pubkey.peer_id();
+            self.inner.add_peer(Peer::new(pid, pubkey));
+        }
     }
 
     fn remove_peer(&mut self, pid: &PeerId) {
@@ -589,8 +594,8 @@ impl PeerManager {
                     );
 
                     self.add_peer(pubkey, addr.clone());
-                } else {
-                    self.inner.add_peer_addr(&pid, addr.clone());
+                } else if let Some(addr) = addr.clone() {
+                    self.inner.add_peer_addr(&pid, addr);
                 }
 
                 if self.peer_session.contains_key(&pid) {
