@@ -1,6 +1,6 @@
 use protocol::types::{Hash, UserAddress};
 use rand::{rngs::OsRng, RngCore};
-use tentacle::secio::SecioKeyPair;
+use tentacle_secio::SecioKeyPair;
 
 pub fn main() {
     let mut seed = [0u8; 32];
