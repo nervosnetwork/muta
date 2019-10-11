@@ -1,4 +1,5 @@
 mod disc;
+mod exchange;
 mod peer;
 mod persist;
 
@@ -6,6 +7,7 @@ use peer::PeerState;
 use persist::{NoopPersistence, PeerPersistence, Persistence};
 
 pub use disc::DiscoveryAddrManager;
+pub use exchange::PeerListenExchange;
 pub use peer::Peer;
 
 use std::{
@@ -107,11 +109,16 @@ struct Inner {
     addr_pid:   RwLock<HashMap<Multiaddr, PeerId>>,
     user_pid:   RwLock<HashMap<UserAddress, PeerId>>,
     pool:       RwLock<HashMap<PeerId, Peer>>,
+    listen:     RwLock<Option<Multiaddr>>,
 }
 
 impl Inner {
     pub fn peer_exist(&self, pid: &PeerId) -> bool {
         self.pool.read().contains_key(pid)
+    }
+
+    pub fn listen(&self) -> Option<Multiaddr> {
+        self.listen.read().clone()
     }
 
     pub fn user_peer(&self, user: &UserAddress) -> Option<Peer> {
@@ -125,6 +132,10 @@ impl Inner {
         let pool = self.pool.read();
 
         pool.get(pid).map(|peer| peer.user_addr().clone())
+    }
+
+    pub fn set_listen(&self, addr: Multiaddr) {
+        *self.listen.write() = Some(addr);
     }
 
     pub fn add_peer(&self, peer: Peer) {
@@ -287,6 +298,7 @@ impl Default for Inner {
             addr_pid:   Default::default(),
             user_pid:   Default::default(),
             pool:       Default::default(),
+            listen:     Default::default(),
         }
     }
 }
@@ -313,6 +325,7 @@ pub struct PeerManagerConfig {
     pub persistence_path: PathBuf,
 }
 
+#[derive(Clone)]
 pub struct PeerManagerHandle {
     inner: Arc<Inner>,
 }
@@ -405,6 +418,14 @@ impl PeerManager {
         self.inner.insert_peers(peer_box);
 
         Ok(())
+    }
+
+    pub fn set_listen(&self, addr: Multiaddr) {
+        self.inner.set_listen(addr)
+    }
+
+    pub fn listen(&self) -> Option<Multiaddr> {
+        self.inner.listen()
     }
 
     pub fn bootstrap(&mut self) {
@@ -593,6 +614,9 @@ impl PeerManager {
                 info!("network: detach session user addr {:?}", user_addr);
 
                 self.detach_peer_session(&pid);
+            }
+            PeerManagerEvent::AddPeerAddr { pid, addr } => {
+                self.inner.add_peer_addr(&pid, addr);
             }
             PeerManagerEvent::PeerAlive { pid } => {
                 let user_addr = self.inner.pid_user_addr(&pid);

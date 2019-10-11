@@ -12,7 +12,7 @@ use futures::{
     pin_mut,
     stream::Stream,
 };
-use log::{debug, error, warn};
+use log::{error, warn};
 use parking_lot::RwLock;
 
 use crate::{

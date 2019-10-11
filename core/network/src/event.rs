@@ -98,6 +98,9 @@ pub enum PeerManagerEvent {
     #[display(fmt = "detach peer {:?} session {:?}", pid, sid)]
     DetachPeerSession { pid: PeerId, sid: SessionId },
 
+    #[display(fmt = "add peer {:?} addr {}", pid, addr)]
+    AddPeerAddr { pid: PeerId, addr: Multiaddr },
+
     #[display(fmt = "peer {:?} alive", pid)]
     PeerAlive { pid: PeerId },
 

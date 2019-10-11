@@ -5,6 +5,8 @@ use protocol::{
 };
 use tentacle::{
     bytes::Bytes,
+    multiaddr::Multiaddr,
+    secio::PeerId,
     service::TargetSession,
     service::{DialProtocol, ProtocolMeta},
     ProtocolId, SessionId,
@@ -38,6 +40,12 @@ pub trait NetworkContext: Sized {
     fn set_session_id(&mut self, sid: SessionId) -> Self;
     fn rpc_id(&self) -> Result<u64, NetworkError>;
     fn set_rpc_id(&mut self, rid: u64) -> Self;
+}
+
+pub trait ListenExchangeManager {
+    fn listen_addr(&self) -> Multiaddr;
+    fn add_remote_listen_addr(&mut self, pid: PeerId, addr: Multiaddr);
+    fn misbehave(&mut self, sid: SessionId);
 }
 
 #[derive(Debug, Clone)]
