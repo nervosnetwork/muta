@@ -106,10 +106,12 @@ impl Eq for UnknownAddr {}
 // discovery protocol needs directly access to PeerManager.
 struct Inner {
     connecting: RwLock<HashSet<PeerId>>,
-    addr_pid:   RwLock<HashMap<Multiaddr, PeerId>>,
-    user_pid:   RwLock<HashMap<UserAddress, PeerId>>,
-    pool:       RwLock<HashMap<PeerId, Peer>>,
-    listen:     RwLock<Option<Multiaddr>>,
+    connected:  RwLock<HashSet<PeerId>>,
+
+    addr_pid: RwLock<HashMap<Multiaddr, PeerId>>,
+    user_pid: RwLock<HashMap<UserAddress, PeerId>>,
+    pool:     RwLock<HashMap<PeerId, Peer>>,
+    listen:   RwLock<Option<Multiaddr>>,
 }
 
 impl Inner {
@@ -188,6 +190,7 @@ impl Inner {
 
     pub fn remove_peer(&self, peer_id: &PeerId) {
         self.connecting.write().remove(peer_id);
+        self.connected.write().remove(peer_id);
 
         let mut addr_pid = self.addr_pid.write();
         if let Some(peer) = self.pool.write().remove(peer_id) {
@@ -205,32 +208,51 @@ impl Inner {
 
         self.pool.write().insert(peer_id.clone(), peer);
         self.user_pid.write().insert(user_addr, peer_id.clone());
-        self.connect_peer(peer_id);
+        self.connected.write().insert(peer_id);
     }
 
     pub fn connect_peer(&self, peer_id: PeerId) {
+        if self.connected.read().contains(&peer_id) {
+            warn!("network: peer {:?} already connected", peer_id);
+            return;
+        }
+
         self.connecting.write().insert(peer_id);
+    }
+
+    pub fn set_connected(&self, peer_id: PeerId) {
+        // Clean outbound connection
+        self.connecting.write().remove(&peer_id);
+        self.connected.write().insert(peer_id);
     }
 
     pub fn disconnect_peer(&self, peer_id: &PeerId) {
         self.connecting.write().remove(peer_id);
+        self.connected.write().remove(peer_id);
     }
 
-    pub fn connecting_count(&self) -> usize {
-        self.connecting.read().len()
+    pub fn connection_count(&self) -> usize {
+        self.connected.read().len() + self.connecting.read().len()
     }
 
-    pub fn unconnected_addrs(&self, max: usize) -> Vec<Multiaddr> {
+    pub fn unconnected_peer_addrs(&self, max: usize) -> Vec<Multiaddr> {
         let connecting = self.connecting.read();
+        let connected = self.connected.read();
         let pool = self.pool.read();
         let mut rng = rand::thread_rng();
 
-        let peers = pool
-            .values()
-            .filter(|peer| !connecting.contains(peer.id()) && peer.retry_ready())
-            .choose_multiple(&mut rng, max);
+        let qualified_peers = pool.values().filter(|peer| {
+            let pid = peer.id();
 
-        peers.into_iter().map(Peer::owned_addrs).flatten().collect()
+            !connected.contains(pid) && !connecting.contains(pid) && peer.retry_ready()
+        });
+
+        qualified_peers
+            .choose_multiple(&mut rng, max)
+            .into_iter()
+            .map(Peer::owned_addrs)
+            .flatten()
+            .collect()
     }
 
     pub fn increase_retry_count(&self, peer_id: &PeerId) {
@@ -294,11 +316,13 @@ impl Inner {
 impl Default for Inner {
     fn default() -> Self {
         Inner {
+            connected:  Default::default(),
             connecting: Default::default(),
-            addr_pid:   Default::default(),
-            user_pid:   Default::default(),
-            pool:       Default::default(),
-            listen:     Default::default(),
+
+            addr_pid: Default::default(),
+            user_pid: Default::default(),
+            pool:     Default::default(),
+            listen:   Default::default(),
         }
     }
 }
@@ -436,6 +460,7 @@ impl PeerManager {
             info!("network: {:?}: bootstrap peer: {}", self.peer_id, peer);
 
             self.inner.add_peer(peer.clone());
+            self.inner.connect_peer(peer.id().clone());
         }
 
         // Collect bootstrap addrs
@@ -481,7 +506,7 @@ impl PeerManager {
     }
 
     fn attach_peer_session(&mut self, pid: PeerId, sid: SessionId) {
-        self.inner.connect_peer(pid.clone());
+        self.inner.set_connected(pid.clone());
 
         self.peer_session.insert(pid.clone(), sid);
         self.session_peer.insert(sid, pid);
@@ -520,7 +545,7 @@ impl PeerManager {
     fn unconnected_addrs(&self, max: usize) -> Vec<Multiaddr> {
         let mut rng = rand::thread_rng();
 
-        let mut condidates = self.inner.unconnected_addrs(max);
+        let mut condidates = self.inner.unconnected_peer_addrs(max);
         condidates.extend(self.unknown_addrs.iter().take(max).cloned().map(Into::into));
 
         condidates.into_iter().choose_multiple(&mut rng, max)
@@ -766,9 +791,9 @@ impl Future for PeerManager {
         }
 
         // Check connecting count
-        let connecting_count = self.inner.connecting_count();
-        if connecting_count < self.config.max_connections {
-            let remain_count = self.config.max_connections - connecting_count;
+        let connection_count = self.inner.connection_count();
+        if connection_count < self.config.max_connections {
+            let remain_count = self.config.max_connections - connection_count;
             let unconnected_addrs = self.unconnected_addrs(remain_count);
             let candidate_count = unconnected_addrs.len();
 
