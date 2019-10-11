@@ -22,6 +22,11 @@ pub struct ExecutorExecResp {
     pub state_root:      MerkleRoot,
 }
 
+#[derive(Clone, Debug, Default)]
+pub struct ReadonlyResp {
+    pub return_value: Bytes,
+}
+
 pub trait ExecutorFactory<DB: TrieDB>: Send + Sync {
     fn from_root(
         chain_id: Hash,
@@ -37,6 +42,13 @@ pub trait Executor {
     fn create_genesis(&mut self, genesis: &Genesis) -> ProtocolResult<MerkleRoot>;
 
     fn exec(&mut self, signed_txs: Vec<SignedTransaction>) -> ProtocolResult<ExecutorExecResp>;
+
+    fn readonly(
+        &mut self,
+        contract: ContractAddress,
+        method: String,
+        args: Vec<Bytes>,
+    ) -> ProtocolResult<ReadonlyResp>;
 }
 
 #[derive(Clone, Debug)]

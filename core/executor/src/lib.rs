@@ -21,11 +21,11 @@ use dex::{DexContract, NativeDexAdapter};
 use protocol::traits::executor::contract::{AccountContract, BankContract, ContractStateAdapter};
 use protocol::traits::executor::{
     CallContext, Executor, ExecutorExecResp, ExecutorFactory, InvokeContext, RcCallContext,
-    RcInvokeContext, TrieDB,
+    RcInvokeContext, ReadonlyResp, TrieDB,
 };
 use protocol::types::{
-    Address, Balance, Bloom, ContractAddress, ContractType, Fee, Genesis, Hash, MerkleRoot,
-    Receipt, ReceiptResult, SignedTransaction, TransactionAction, UserAddress,
+    Address, AssetID, Balance, Bloom, ContractAddress, ContractType, Fee, Genesis, Hash,
+    MerkleRoot, Receipt, ReceiptResult, SignedTransaction, TransactionAction, UserAddress,
 };
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
@@ -103,6 +103,39 @@ impl<DB: TrieDB> Executor for TransactionExecutor<DB> {
 
         self.stash()?;
         self.commit()
+    }
+
+    fn readonly(
+        &mut self,
+        contract: ContractAddress,
+        method: String,
+        args: Vec<Bytes>,
+    ) -> ProtocolResult<ReadonlyResp> {
+        let from_address = UserAddress::from_hex("10")?;
+        let asset_id =
+            AssetID::from_hex("0000000000000000000000000000000000000000000000000000000000000000")
+                .unwrap();
+        let fee = Fee { asset_id, cycle: 0 };
+        let ictx = Rc::new(RefCell::new(CallContext {
+            origin: from_address,
+            chain_id: self.chain_id.clone(),
+            cycles_used: fee.clone(),
+            cycles_limit: fee.clone(),
+            cycles_price: self.cycles_price,
+            epoch_id: self.epoch_id,
+            caller: self.coinbase.clone(),
+            coinbase: self.coinbase.clone(),
+            carrying_asset: None,
+            method,
+            args,
+            contract_address: contract.clone(),
+        }));
+        if contract == *DEX_CONTRACT_ADDRESS {
+            let return_value = self.dex_contract.call(ictx)?;
+            Ok(ReadonlyResp { return_value })
+        } else {
+            panic!("Unsupported address");
+        }
     }
 
     fn exec(&mut self, signed_txs: Vec<SignedTransaction>) -> ProtocolResult<ExecutorExecResp> {
