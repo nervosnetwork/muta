@@ -1,7 +1,9 @@
 use async_trait::async_trait;
+use bytes::Bytes;
 
+use crate::traits::executor::ReadonlyResp;
 use crate::traits::Context;
-use crate::types::{Address, Balance, Epoch, Hash, Receipt, SignedTransaction};
+use crate::types::{Address, Balance, ContractAddress, Epoch, Hash, Receipt, SignedTransaction};
 use crate::ProtocolResult;
 
 #[async_trait]
@@ -19,4 +21,13 @@ pub trait APIAdapter: Send + Sync {
     async fn get_receipt_by_tx_hash(&self, ctx: Context, tx_hash: Hash) -> ProtocolResult<Receipt>;
 
     async fn get_balance(&self, ctx: Context, address: &Address) -> ProtocolResult<Balance>;
+
+    async fn readonly(
+        &self,
+        ctx: Context,
+        epoch_id: Option<u64>,
+        contract: ContractAddress,
+        method: String,
+        args: Vec<Bytes>,
+    ) -> ProtocolResult<ReadonlyResp>;
 }

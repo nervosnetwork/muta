@@ -22,7 +22,7 @@ use protocol::types::{CarryingAsset, SignedTransaction};
 use crate::config::GraphQLConfig;
 use crate::schema::{
     Bytes, ContractType, Epoch, Hash, InputCallAction, InputDeployAction, InputRawTransaction,
-    InputTransactionEncryption, InputTransferAction,
+    InputReadonly, InputTransactionEncryption, InputTransferAction,
 };
 
 pub async fn start_graphql<Adapter: APIAdapter + 'static>(cfg: GraphQLConfig, adapter: Adapter) {
@@ -57,6 +57,35 @@ impl Query {
         let epoch = block_on(state_ctx.adapter.get_latest_epoch(Context::new()))
             .map_err(FieldError::from)?;
         Ok(Epoch::from(epoch))
+    }
+
+    #[graphql(name = "Readonly", description = "execute readonly call to contract")]
+    fn readonly(state_ctx: &State, input_readonly: InputReadonly) -> FieldResult<String> {
+        let epoch_id = match input_readonly.epoch_id {
+            None => None,
+            Some(i) => Some(hex_to_u64(&i.as_hex())?),
+        };
+        let contract =
+            protocol::types::ContractAddress::from_hex(&input_readonly.contract.as_hex())
+                .map_err(FieldError::from)?;
+
+        let res = block_on(
+            state_ctx.adapter.readonly(
+                Context::new(),
+                epoch_id,
+                contract,
+                input_readonly.method.clone(),
+                input_readonly
+                    .args
+                    .iter()
+                    .map(|s| bytes::Bytes::from(s.as_bytes()))
+                    .collect(),
+            ),
+        )
+        .map_err(FieldError::from)?;
+
+        // Ok(res.return_value.as_ref().to_string())
+        Ok(String::from_utf8_lossy(res.return_value.as_ref()).to_string())
     }
 }
 

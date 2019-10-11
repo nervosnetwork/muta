@@ -15,6 +15,15 @@ pub enum ContractType {
 // #####################
 
 #[derive(GraphQLInputObject, Clone)]
+#[graphql(description = "input readonly params.")]
+pub struct InputReadonly {
+    pub epoch_id: Option<Uint64>,
+    pub contract: Address,
+    pub method:   String,
+    pub args:     Vec<String>,
+}
+
+#[derive(GraphQLInputObject, Clone)]
 #[graphql(description = "input raw transaction.")]
 pub struct InputRawTransaction {
     pub chain_id:     Hash,

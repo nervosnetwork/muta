@@ -3,7 +3,7 @@ mod transaction;
 
 pub use epoch::{Epoch, EpochHeader};
 pub use transaction::{
-    ContractType, InputCallAction, InputDeployAction, InputRawTransaction,
+    ContractType, InputCallAction, InputDeployAction, InputRawTransaction, InputReadonly,
     InputTransactionEncryption, InputTransferAction,
 };
 
