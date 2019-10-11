@@ -1,4 +1,5 @@
 language: rust
+dist: bionic
 sudo: false
 
 cache:
@@ -15,7 +16,8 @@ addons:
   apt:
     packages:
     - gcc
-    - librocksdb
+    - librocksdb5.8
+    - librocksdb-dev
 
 matrix:
   include:
