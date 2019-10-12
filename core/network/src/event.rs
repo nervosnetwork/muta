@@ -126,8 +126,8 @@ pub enum PeerManagerEvent {
     #[display(fmt = "remove addr {}, kind: {}", addr, kind)]
     RemoveAddr { addr: Multiaddr, kind: RemoveKind },
 
-    #[display(fmt = "retry unknown addr {}, kind: {}", addr, kind)]
-    RetryAddrLater { addr: Multiaddr, kind: RetryKind },
+    #[display(fmt = "re-connect later, addr {}, kind: {}", addr, kind)]
+    ReconnectLater { addr: Multiaddr, kind: RetryKind },
 
     // Self
     #[display(fmt = "add listen addr {}", addr)]

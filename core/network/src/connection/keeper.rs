@@ -109,7 +109,7 @@ impl ConnectionServiceKeeper {
                     RetryKind::Interrupted
                 };
 
-                let retry_connect_later = PeerManagerEvent::RetryAddrLater { addr, kind };
+                let retry_connect_later = PeerManagerEvent::ReconnectLater { addr, kind };
 
                 self.report_peer(retry_connect_later);
             }

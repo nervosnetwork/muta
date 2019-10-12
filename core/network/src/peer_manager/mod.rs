@@ -600,9 +600,42 @@ impl PeerManager {
         }
     }
 
-    fn remove_peer(&mut self, pid: &PeerId) {
+    fn is_bootstrap_peer(&self, pid: &PeerId) -> bool {
+        for bootstrap in self.config.bootstraps.iter() {
+            if bootstrap.id() == pid {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    fn cleanly_remove_peer(&mut self, pid: &PeerId) {
+        // Clean up session mapping
         self.detach_peer_session(&pid);
+
+        if self.is_bootstrap_peer(pid) {
+            error!("network: reset max bootstrap {:?} retry count", pid);
+
+            // Reset bootstrap to reasonable retry count
+            self.inner.reset_retry(&pid);
+            self.inner.increase_retry_count(&pid);
+            self.inner.increase_retry_count(&pid);
+
+            return;
+        }
+
         self.inner.remove_peer(&pid);
+    }
+
+    // TODO: reduce score base on kind, may be ban this peer for a
+    // while
+    fn increase_peer_retry(&mut self, pid: &PeerId) {
+        self.inner.increase_retry_count(&pid);
+
+        if self.inner.reach_max_retry(&pid) {
+            self.cleanly_remove_peer(&pid);
+        }
     }
 
     fn unconnected_addrs(&self, max: usize) -> Vec<Multiaddr> {
@@ -722,34 +755,28 @@ impl PeerManager {
                 self.inner.reset_retry(&pid);
             }
             PeerManagerEvent::RemovePeer { pid, .. } => {
-                let user_addr = self.inner.pid_user_addr(&pid);
-                info!("network: remove, user addr {:?}", user_addr);
+                info!("network: {:?}: remove peer {:?}", self.peer_id, pid);
 
-                self.remove_peer(&pid);
+                self.cleanly_remove_peer(&pid);
             }
             PeerManagerEvent::RemovePeerBySession { sid, .. } => {
                 if let Some(pid) = self.session_peer.get(&sid).cloned() {
-                    let user_addr = self.inner.pid_user_addr(&pid);
-                    info!("network: remove, user addr {:?}", user_addr);
+                    info!("network: {:?}: remove peer {:?}", self.peer_id, pid);
 
-                    self.remove_peer(&pid);
+                    self.cleanly_remove_peer(&pid);
                 } else {
-                    info!("network: disconnect session {}", sid);
+                    info!("network: {:?}: disconnect session {}", self.peer_id, sid);
 
                     self.detach_session_id(sid);
                 }
             }
             PeerManagerEvent::RetryPeerLater { pid, .. } => {
-                let user_addr = self.inner.pid_user_addr(&pid);
-                info!("network: retry user addr {:?} later", user_addr);
+                info!(
+                    "network: {:?}: reconnect peer later {:?}",
+                    self.peer_id, pid
+                );
 
-                self.inner.increase_retry_count(&pid);
-
-                // TODO: reduce score base on kind, may be ban this peer for a
-                // while
-                if self.inner.reach_max_retry(&pid) {
-                    self.remove_peer(&pid);
-                }
+                self.increase_peer_retry(&pid);
 
                 if !self.peer_session.contains_key(&pid) {
                     debug!("network: retry peer {:?} but session id not found", pid);
@@ -792,16 +819,26 @@ impl PeerManager {
                         self.peer_id, pid
                     );
 
-                    self.inner.increase_retry_count(&pid);
+                    self.increase_peer_retry(&pid);
                 }
             }
-            PeerManagerEvent::RetryAddrLater { addr, .. } => {
-                if let Some(mut addr) = self.unknown_addrs.take(&addr.into()) {
+            PeerManagerEvent::ReconnectLater { addr, .. } => {
+                if let Some(mut addr) = self.unknown_addrs.take(&addr.clone().into()) {
                     addr.increase_retry_count();
 
                     if !addr.reach_max_retry() {
                         self.unknown_addrs.insert(addr);
                     }
+                }
+
+                if let Some(pid) = self.inner.addr_pid(&addr) {
+                    // If peer is already connected, don't need to reconnect
+                    // this address.
+                    if self.inner.peer_connected(&pid) {
+                        return;
+                    }
+
+                    self.increase_peer_retry(&pid);
                 }
             }
             PeerManagerEvent::AddListenAddr { addr } => {
