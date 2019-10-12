@@ -123,8 +123,8 @@ pub enum PeerManagerEvent {
     #[display(fmt = "add session {} addr {}", sid, addr)]
     RepeatedOutboundSession { sid: SessionId, addr: Multiaddr },
 
-    #[display(fmt = "remove addr {}, kind: {}", addr, kind)]
-    RemoveAddr { addr: Multiaddr, kind: RemoveKind },
+    #[display(fmt = "unconnectable addr {}, kind: {}", addr, kind)]
+    UnconnectableAddress { addr: Multiaddr, kind: RemoveKind },
 
     #[display(fmt = "re-connect later, addr {}, kind: {}", addr, kind)]
     ReconnectLater { addr: Multiaddr, kind: RetryKind },

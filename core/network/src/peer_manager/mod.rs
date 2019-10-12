@@ -189,10 +189,6 @@ impl Inner {
         }
     }
 
-    pub fn exact_match_pid(&self, addr: &Multiaddr) -> Option<PeerId> {
-        self.addr_pid.read().get(addr).cloned()
-    }
-
     // /ip4/[ip]/[tcp]/[port]
     // /ip4/[ip]/[tcp]/[port]/[p2p]/[peerid]
     pub fn match_pid(&self, addr: &Multiaddr) -> Option<PeerId> {
@@ -203,7 +199,7 @@ impl Inner {
             return Some(pid.clone());
         }
 
-        // Try root address match
+        // Try root match
         let comps = addr.iter().collect::<Vec<_>>();
         debug_assert!(
             comps.len() > 1,
@@ -840,23 +836,16 @@ impl PeerManager {
             PeerManagerEvent::RepeatedOutboundSession { sid, addr } => {
                 self.add_session_addr(sid, addr);
             }
-            PeerManagerEvent::RemoveAddr { addr, .. } => {
+            // TODO: ban unconnectable address for a while instead of repeated
+            // connection attempts.
+            PeerManagerEvent::UnconnectableAddress { addr, .. } => {
                 self.unknown_addrs.remove(&addr.clone().into());
 
-                if !self.bootstraps.contains(&addr) {
-                    self.inner.try_remove_addr(&addr);
-                } else if let Some(pid) = self.inner.exact_match_pid(&addr) {
-                    if self.inner.peer_connected(&pid) {
-                        return;
-                    }
-
-                    debug!(
-                        "network: {:?}: bootstrap peer {:?} retry",
-                        self.peer_id, pid
-                    );
-
-                    self.increase_peer_retry(&pid);
+                if self.bootstraps.contains(&addr) {
+                    error!("network: unconnectable bootstrap address {}", addr);
                 }
+
+                self.inner.try_remove_addr(&addr);
             }
             PeerManagerEvent::ReconnectLater { addr, .. } => {
                 if let Some(mut unknown) = self.unknown_addrs.take(&addr.clone().into()) {
