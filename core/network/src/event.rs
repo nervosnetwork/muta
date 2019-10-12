@@ -123,14 +123,6 @@ pub enum PeerManagerEvent {
     #[display(fmt = "add session {} addr {}", sid, addr)]
     RepeatedOutboundSession { sid: SessionId, addr: Multiaddr },
 
-    // FIXME
-    #[allow(dead_code)]
-    #[display(fmt = "add session {} multi addrs {:?}", sid, addrs)]
-    AddSessionMultiAddrs {
-        sid:   SessionId,
-        addrs: Vec<Multiaddr>,
-    },
-
     #[display(fmt = "remove addr {}, kind: {}", addr, kind)]
     RemoveAddr { addr: Multiaddr, kind: RemoveKind },
 
