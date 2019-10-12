@@ -26,7 +26,7 @@ pool_size = 20000
 [consensus]
 cycles_limit = 99999999
 cycles_price = 1
-interval = 3000
+interval = 100
 verifier_list = [ "10f8389d774afdad8755ef8e629e5a154fddc6325a" ]
 
 [consensus.duration]

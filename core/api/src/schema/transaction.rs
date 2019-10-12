@@ -14,7 +14,7 @@ pub enum ContractType {
 // GraphQLInputObject
 // #####################
 
-#[derive(GraphQLInputObject, Clone)]
+#[derive(GraphQLInputObject, Clone, Debug)]
 #[graphql(description = "input readonly params.")]
 pub struct InputReadonly {
     pub epoch_id: Option<Uint64>,

@@ -7,29 +7,29 @@ pub use transaction::{
     InputTransactionEncryption, InputTransferAction,
 };
 
-#[derive(GraphQLScalarValue, Clone)]
+#[derive(GraphQLScalarValue, Clone, Debug)]
 #[graphql(description = "Keccak hash of hex string")]
 pub struct Hash(pub String);
 pub type MerkleRoot = Hash;
 pub type AssetID = Hash;
 
-#[derive(GraphQLScalarValue, Clone)]
+#[derive(GraphQLScalarValue, Clone, Debug)]
 #[graphql(description = "21 bytes of account address, the first bytes of which is the identifier.")]
 pub struct Address(String);
 
-#[derive(GraphQLScalarValue, Clone)]
+#[derive(GraphQLScalarValue, Clone, Debug)]
 #[graphql(description = "Uint64")]
 pub struct Uint64(String);
 
-#[derive(GraphQLScalarValue, Clone)]
+#[derive(GraphQLScalarValue, Clone, Debug)]
 #[graphql(description = "uint256")]
 pub struct Balance(String);
 
-#[derive(GraphQLScalarValue, Clone)]
+#[derive(GraphQLScalarValue, Clone, Debug)]
 #[graphql(description = "Bytes corresponding hex string.")]
 pub struct Bytes(pub String);
 
-#[derive(GraphQLObject, Clone)]
+#[derive(GraphQLObject, Clone, Debug)]
 #[graphql(description = "Transaction fee")]
 pub struct Fee {
     asset_id: AssetID,

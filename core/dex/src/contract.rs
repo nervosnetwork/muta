@@ -32,10 +32,11 @@ where
 
     pub fn call(&mut self, ictx: RcCallContext) -> ProtocolResult<Bytes> {
         let ctx = ictx.borrow();
+        // dbg!(&ctx);
         let user = &ctx.origin;
         let method = ctx.method.clone();
         let args = ctx.args.clone();
-        let carrying_asset_option = &ctx.carrying_asset;
+        let _carrying_asset_option = &ctx.carrying_asset;
 
         let res = match method.as_str() {
             "update_fee_account" => serde_json::to_string(
@@ -57,15 +58,18 @@ where
                 )?,
             ),
             "deposit" => {
-                let carrying_asset = carrying_asset_option
-                    .clone()
-                    .ok_or_else(|| DexError::Contract("no carrying asset".to_owned()))?;
-                let res = &self.deposit(
-                    user.clone(),
-                    carrying_asset.asset_id,
-                    &carrying_asset.amount,
-                )?;
-                serde_json::to_string(res)
+                // let carrying_asset = carrying_asset_option
+                //     .clone()
+                //     .ok_or_else(|| DexError::Contract("no carrying asset".to_owned()))?;
+                // let res = &self.deposit(
+                //     user.clone(),
+                //     carrying_asset.asset_id,
+                //     &carrying_asset.amount,
+                // )?;
+                let args: WithdrawArgs = serde_json::from_slice(&args[0])
+                    .map_err(|_| DexError::ArgsError("args invalid".to_owned()))?;
+                let res = &self.deposit(user.clone(), args.asset_id, &args.amount)?;
+                serde_json::to_string(&res)
             }
             "withdraw" => {
                 let args: WithdrawArgs = serde_json::from_slice(&args[0])
@@ -86,6 +90,10 @@ where
                 serde_json::to_string(res)
             }
             "clear" => serde_json::to_string(&self.clear()?),
+            "get_trading_pairs" => {
+                let res = self.get_trading_pairs()?;
+                serde_json::to_string(&res)
+            }
             "get_balance" => {
                 let args: GetBalanceArgs = serde_json::from_slice(&args[0])
                     .map_err(|_| DexError::ArgsError("args invalid".to_owned()))?;
@@ -110,6 +118,10 @@ where
         }
         .unwrap();
         Ok(Bytes::from(res.as_bytes()))
+    }
+
+    pub fn get_trading_pairs(&self) -> ProtocolResult<Vec<TradingPair>> {
+        self.adapter.borrow().get_trading_pairs()
     }
 
     pub fn get_balance(&self, user: &UserAddress) -> ProtocolResult<UserBalance> {
@@ -230,7 +242,6 @@ where
             .locked
             .entry(asset_id.clone())
             .or_insert_with(BigUint::zero) += amount;
-
         self.adapter
             .borrow_mut()
             .set_balance(user.clone(), user_balance)?;

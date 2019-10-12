@@ -120,7 +120,7 @@ impl From<UserBalance> for SerUserBalance {
             res.available.insert(asset_id, Ser(amount));
         }
         for (asset_id, amount) in item.locked.into_iter() {
-            res.available.insert(asset_id, Ser(amount));
+            res.locked.insert(asset_id, Ser(amount));
         }
         res
     }
@@ -250,7 +250,7 @@ impl rlp::Decodable for TradingPair {
             symbol:      r.at(0)?.as_val()?,
             base_asset:  AssetID::from_bytes(Bytes::from(r.at(1)?.data()?))
                 .map_err(|_| rlp::DecoderError::Custom("base_asset invalid"))?,
-            quote_asset: AssetID::from_bytes(Bytes::from(r.at(1)?.data()?))
+            quote_asset: AssetID::from_bytes(Bytes::from(r.at(2)?.data()?))
                 .map_err(|_| rlp::DecoderError::Custom("quote_asset invalid"))?,
         })
     }
@@ -259,20 +259,18 @@ impl rlp::Decodable for TradingPair {
 impl rlp::Encodable for UserBalance {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
         s.begin_list(2);
-        s.begin_unbounded_list();
+        s.begin_list(self.available.len());
         for (asset_id, amount) in self.available.iter() {
             s.begin_list(2);
             s.append(&asset_id.as_bytes().to_vec());
             s.append(&amount.to_bytes_be());
         }
-        s.complete_unbounded_list();
-        s.begin_unbounded_list();
+        s.begin_list(self.locked.len());
         for (asset_id, amount) in self.locked.iter() {
             s.begin_list(2);
             s.append(&asset_id.as_bytes().to_vec());
             s.append(&amount.to_bytes_be());
         }
-        s.complete_unbounded_list();
     }
 }
 
@@ -296,7 +294,7 @@ impl rlp::Decodable for UserBalance {
             let amount = BigUint::from_bytes_be(available.at(1)?.data()?);
             user_balance.available.insert(asset_id, amount);
         }
-        for locked in r.at(0)?.iter() {
+        for locked in r.at(1)?.iter() {
             let asset_id = bytes_to_assetid(locked.at(0)?.data()?, "locked asset_id invalid")?;
             let amount = BigUint::from_bytes_be(locked.at(1)?.data()?);
             user_balance.locked.insert(asset_id, amount);

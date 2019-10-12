@@ -54,7 +54,7 @@ impl<StateAdapter: ContractStateAdapter> NativeDexAdapter<StateAdapter> {
             .state_adapter
             .borrow()
             .get::<FixedPendingOrderSchema>(&key)?
-            .ok_or_else(|| DexError::Adapter("invalid pending order data".to_string()))?;
+            .unwrap_or_default();
         if order.state == OrderState::Pending {
             pending_orders.inner.insert(order.id.clone(), order);
         } else {

@@ -111,7 +111,7 @@ impl<DB: TrieDB> Executor for TransactionExecutor<DB> {
         method: String,
         args: Vec<Bytes>,
     ) -> ProtocolResult<ReadonlyResp> {
-        let from_address = UserAddress::from_hex("10")?;
+        let from_address = UserAddress::from_hex("100000000000000000000000000000000000000000")?;
         let asset_id =
             AssetID::from_hex("0000000000000000000000000000000000000000000000000000000000000000")
                 .unwrap();
@@ -397,12 +397,9 @@ impl<DB: 'static + TrieDB> ExecutorFactory<DB> for TransactionExecutorFactory {
 
         // gen dex contract
         let dex_state = gen_contract_state(&trie, &DEX_CONTRACT_ADDRESS, Arc::clone(&db))?;
-        let dex_adapter = NativeDexAdapter::new(dex_state);
+        let dex_adapter = NativeDexAdapter::new(Rc::clone(&dex_state));
         let dex_contract = DexContract::new(Rc::new(RefCell::new(dex_adapter)));
-        state_adapter_map.insert(
-            BANK_CONTRACT_ADDRESS.clone(),
-            Rc::clone(&bank_state_adapter),
-        );
+        state_adapter_map.insert(DEX_CONTRACT_ADDRESS.clone(), Rc::clone(&dex_state));
 
         Ok(Box::new(TransactionExecutor {
             chain_id,

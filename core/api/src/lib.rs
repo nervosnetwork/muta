@@ -68,7 +68,6 @@ impl Query {
         let contract =
             protocol::types::ContractAddress::from_hex(&input_readonly.contract.as_hex())
                 .map_err(FieldError::from)?;
-
         let res = block_on(
             state_ctx.adapter.readonly(
                 Context::new(),
@@ -84,7 +83,6 @@ impl Query {
         )
         .map_err(FieldError::from)?;
 
-        // Ok(res.return_value.as_ref().to_string())
         Ok(String::from_utf8_lossy(res.return_value.as_ref()).to_string())
     }
 }
