@@ -178,20 +178,21 @@ impl Inner {
         }
     }
 
-    pub fn exact_addr_pid(&self, addr: &Multiaddr) -> Option<PeerId> {
+    pub fn exact_match_pid(&self, addr: &Multiaddr) -> Option<PeerId> {
         self.addr_pid.read().get(addr).cloned()
     }
 
     // /ip4/[ip]/[tcp]/[port]
     // /ip4/[ip]/[tcp]/[port]/[p2p]/[peerid]
-    pub fn addr_pid(&self, addr: &Multiaddr) -> Option<PeerId> {
+    pub fn match_pid(&self, addr: &Multiaddr) -> Option<PeerId> {
         let addr_pid = self.addr_pid.read();
 
+        // exact match
         if let Some(pid) = addr_pid.get(addr) {
             return Some(pid.clone());
         }
 
-        // Try root addr
+        // Try root address match
         let comps = addr.iter().collect::<Vec<_>>();
         debug_assert!(
             comps.len() > 1,
@@ -202,22 +203,29 @@ impl Inner {
             return None;
         }
 
-        let root = {
-            let root = Multiaddr::empty()
-                .with(comps[0].clone())
-                .with(comps[1].clone());
+        let root = Multiaddr::empty()
+            .with(comps[0].clone())
+            .with(comps[1].clone());
 
-            match comps.get(2) {
-                Some(Protocol::P2p(_)) | None => root,
+        // Currently support P2P address match
+        if let Some(match_pid) = addr_pid.get(&root) {
+            return match comps.get(2) {
+                Some(Protocol::P2p(addr_pid)) if match_pid.as_bytes() == addr_pid.as_bytes() => {
+                    Some(match_pid.clone())
+                }
+                // Root exact match
+                None => Some(match_pid.clone()),
+                // Not match means this address is other peer's outdated address
+                Some(Protocol::P2p(_)) => None,
                 _ => {
                     warn!("network: unsupported multiaddr {}", addr);
 
-                    root
+                    None
                 }
-            }
-        };
+            };
+        }
 
-        addr_pid.get(&root).cloned()
+        None
     }
 
     pub fn try_remove_addr(&self, addr: &Multiaddr) {
@@ -585,7 +593,7 @@ impl PeerManager {
     }
 
     fn identify_addr(&mut self, addr: Multiaddr) {
-        match self.inner.addr_pid(&addr) {
+        match self.inner.match_pid(&addr) {
             // Only add identified addr to connected peer, offline peer address
             // maybe outdated
             Some(ref pid) if self.inner.peer_connected(pid) => self.inner.add_peer_addr(&pid, addr),
@@ -809,7 +817,7 @@ impl PeerManager {
 
                 if !self.bootstraps.contains(&addr) {
                     self.inner.try_remove_addr(&addr);
-                } else if let Some(pid) = self.inner.exact_addr_pid(&addr) {
+                } else if let Some(pid) = self.inner.exact_match_pid(&addr) {
                     if self.inner.peer_connected(&pid) {
                         return;
                     }
@@ -831,7 +839,7 @@ impl PeerManager {
                     }
                 }
 
-                if let Some(pid) = self.inner.addr_pid(&addr) {
+                if let Some(pid) = self.inner.match_pid(&addr) {
                     // If peer is already connected, don't need to reconnect
                     // this address.
                     if self.inner.peer_connected(&pid) {
