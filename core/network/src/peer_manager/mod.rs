@@ -708,7 +708,11 @@ impl PeerManager {
             }
             PeerManagerEvent::PeerAlive { pid } => {
                 let user_addr = self.inner.pid_user_addr(&pid);
-                info!("network: peer alive, user addr {:?}", user_addr);
+
+                debug!(
+                    "network: {:?}: peer alive, user addr {:?}",
+                    self.peer_id, user_addr
+                );
 
                 self.inner.reset_retry(&pid);
             }
