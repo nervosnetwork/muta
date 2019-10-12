@@ -17,6 +17,7 @@ use std::{
     hash::{Hash, Hasher},
     path::PathBuf,
     pin::Pin,
+    sync::atomic::{AtomicBool, Ordering},
     sync::Arc,
     task::{Context, Poll},
     time::Duration,
@@ -54,6 +55,7 @@ const MAX_RETRY_COUNT: usize = 6;
 #[derive(Debug, Clone)]
 pub struct UnknownAddr {
     addr:        Multiaddr,
+    connecting:  Arc<AtomicBool>,
     retry_count: usize,
 }
 
@@ -61,8 +63,17 @@ impl UnknownAddr {
     pub fn new(addr: Multiaddr) -> Self {
         UnknownAddr {
             addr,
+            connecting: Arc::new(AtomicBool::new(false)),
             retry_count: 0,
         }
+    }
+
+    pub fn connecting(&self) -> bool {
+        self.connecting.load(Ordering::SeqCst)
+    }
+
+    pub fn set_connecting(&self, state: bool) {
+        self.connecting.store(state, Ordering::SeqCst);
     }
 
     pub fn increase_retry_count(&mut self) {
@@ -646,11 +657,28 @@ impl PeerManager {
         }
     }
 
+    fn unconnected_unknowns(&self, max: usize) -> Vec<&UnknownAddr> {
+        self.unknown_addrs
+            .iter()
+            .filter(|unknown| !unknown.connecting())
+            .take(max)
+            .collect()
+    }
+
     fn unconnected_addrs(&self, max: usize) -> Vec<Multiaddr> {
         let mut rng = rand::thread_rng();
 
         let mut condidates = self.inner.unconnected_peer_addrs(max);
-        condidates.extend(self.unknown_addrs.iter().take(max).cloned().map(Into::into));
+        let unknown_condidates = self.unconnected_unknowns(max);
+
+        if !unknown_condidates.is_empty() {
+            let addrs = unknown_condidates.into_iter().map(|unknown| {
+                unknown.set_connecting(true);
+                unknown.addr.clone()
+            });
+
+            condidates.extend(addrs);
+        }
 
         condidates.into_iter().choose_multiple(&mut rng, max)
     }
@@ -831,11 +859,12 @@ impl PeerManager {
                 }
             }
             PeerManagerEvent::ReconnectLater { addr, .. } => {
-                if let Some(mut addr) = self.unknown_addrs.take(&addr.clone().into()) {
-                    addr.increase_retry_count();
+                if let Some(mut unknown) = self.unknown_addrs.take(&addr.clone().into()) {
+                    unknown.set_connecting(false);
+                    unknown.increase_retry_count();
 
-                    if !addr.reach_max_retry() {
-                        self.unknown_addrs.insert(addr);
+                    if !unknown.reach_max_retry() {
+                        self.unknown_addrs.insert(unknown);
                     }
                 }
 
