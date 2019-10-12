@@ -37,7 +37,7 @@ use parking_lot::RwLock;
 use protocol::types::UserAddress;
 use rand::seq::IteratorRandom;
 use tentacle::{
-    multiaddr::Multiaddr,
+    multiaddr::{Multiaddr, Protocol},
     secio::{PeerId, PublicKey},
     service::{DialProtocol, TargetSession},
     SessionId,
@@ -178,10 +178,46 @@ impl Inner {
         }
     }
 
-    // /ip4/[ip]/[tcp]/[port]
-    // /ip4/[ip]/[tcp]/[port]/[p2p]/[peerid]
     pub fn exact_addr_pid(&self, addr: &Multiaddr) -> Option<PeerId> {
         self.addr_pid.read().get(addr).cloned()
+    }
+
+    // /ip4/[ip]/[tcp]/[port]
+    // /ip4/[ip]/[tcp]/[port]/[p2p]/[peerid]
+    pub fn addr_pid(&self, addr: &Multiaddr) -> Option<PeerId> {
+        let addr_pid = self.addr_pid.read();
+
+        if let Some(pid) = addr_pid.get(addr) {
+            return Some(pid.clone());
+        }
+
+        // Try root addr
+        let comps = addr.iter().collect::<Vec<_>>();
+        debug_assert!(
+            comps.len() > 1,
+            "network: multiaddr should contains at least 2 components",
+        );
+
+        if comps.len() < 2 {
+            return None;
+        }
+
+        let root = {
+            let root = Multiaddr::empty()
+                .with(comps[0].clone())
+                .with(comps[1].clone());
+
+            match comps.get(2) {
+                Some(Protocol::P2p(_)) | None => root,
+                _ => {
+                    warn!("network: unsupported multiaddr {}", addr);
+
+                    root
+                }
+            }
+        };
+
+        addr_pid.get(&root).cloned()
     }
 
     pub fn try_remove_addr(&self, addr: &Multiaddr) {
@@ -543,6 +579,22 @@ impl PeerManager {
         }
     }
 
+    fn identify_addr(&mut self, addr: Multiaddr) {
+        match self.inner.addr_pid(&addr) {
+            // Only add identified addr to connected peer, offline peer address
+            // maybe outdated
+            Some(ref pid) if self.inner.peer_connected(pid) => self.inner.add_peer_addr(&pid, addr),
+            _ => {
+                info!(
+                    "network: {:?}: discover unknown addr {}",
+                    self.peer_id, addr
+                );
+
+                self.unknown_addrs.insert(UnknownAddr::new(addr));
+            }
+        }
+    }
+
     fn remove_peer(&mut self, pid: &PeerId) {
         self.detach_peer_session(&pid);
         self.inner.remove_peer(&pid);
@@ -705,12 +757,12 @@ impl PeerManager {
                     }
                 }
             }
-            PeerManagerEvent::AddUnknownAddr { addr } => {
-                self.unknown_addrs.insert(UnknownAddr::new(addr));
+            PeerManagerEvent::DiscoverNewAddr { addr } => {
+                self.identify_addr(addr);
             }
-            PeerManagerEvent::AddMultiUnknownAddrs { addrs } => {
+            PeerManagerEvent::DiscoverMultiAddrs { addrs } => {
                 for addr in addrs.into_iter() {
-                    self.unknown_addrs.insert(UnknownAddr::new(addr));
+                    self.identify_addr(addr);
                 }
             }
             PeerManagerEvent::AddSessionAddr { sid, addr } => {
@@ -807,7 +859,7 @@ impl Future for PeerManager {
             let unconnected_addrs = self.unconnected_addrs(remain_count);
             let candidate_count = unconnected_addrs.len();
 
-            info!(
+            debug!(
                 "network: {:?}: connections not fullfill, {} candidate addrs found",
                 self.peer_id, candidate_count
             );

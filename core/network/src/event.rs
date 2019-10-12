@@ -114,11 +114,11 @@ pub enum PeerManagerEvent {
     RetryPeerLater { pid: PeerId, kind: RetryKind },
 
     // Address
-    #[display(fmt = "add unknown addr {}", addr)]
-    AddUnknownAddr { addr: Multiaddr },
+    #[display(fmt = "discover addr {}", addr)]
+    DiscoverNewAddr { addr: Multiaddr },
 
-    #[display(fmt = "add multi unknown addrs {:?}", addrs)]
-    AddMultiUnknownAddrs { addrs: Vec<Multiaddr> },
+    #[display(fmt = "discover multi addrs {:?}", addrs)]
+    DiscoverMultiAddrs { addrs: Vec<Multiaddr> },
 
     // FIXME
     #[allow(dead_code)]
