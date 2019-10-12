@@ -604,6 +604,8 @@ impl PeerManager {
             // Only add identified addr to connected peer, offline peer address
             // maybe outdated
             Some(ref pid) if self.inner.peer_connected(pid) => self.inner.add_peer_addr(&pid, addr),
+            // Match an offline peer, noop, peer maybe next connection condidate
+            Some(_) => (),
             _ => {
                 info!(
                     "network: {:?}: discover unknown addr {}",
