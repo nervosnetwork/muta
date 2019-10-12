@@ -777,11 +777,6 @@ impl PeerManager {
             PeerManagerEvent::RepeatedOutboundSession { sid, addr } => {
                 self.add_session_addr(sid, addr);
             }
-            PeerManagerEvent::AddSessionMultiAddrs { sid, addrs } => {
-                for addr in addrs.into_iter() {
-                    self.add_session_addr(sid, addr);
-                }
-            }
             PeerManagerEvent::RemoveAddr { addr, .. } => {
                 self.unknown_addrs.remove(&addr.clone().into());
 
