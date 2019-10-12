@@ -178,7 +178,9 @@ impl Inner {
         }
     }
 
-    pub fn addr_peer_id(&self, addr: &Multiaddr) -> Option<PeerId> {
+    // /ip4/[ip]/[tcp]/[port]
+    // /ip4/[ip]/[tcp]/[port]/[p2p]/[peerid]
+    pub fn exact_addr_pid(&self, addr: &Multiaddr) -> Option<PeerId> {
         self.addr_pid.read().get(addr).cloned()
     }
 
@@ -209,6 +211,10 @@ impl Inner {
         self.pool.write().insert(peer_id.clone(), peer);
         self.user_pid.write().insert(user_addr, peer_id.clone());
         self.connected.write().insert(peer_id);
+    }
+
+    pub fn peer_connected(&self, peer_id: &PeerId) -> bool {
+        self.connected.read().contains(peer_id)
     }
 
     pub fn connect_peer(&self, peer_id: PeerId) {
@@ -720,7 +726,11 @@ impl PeerManager {
 
                 if !self.bootstraps.contains(&addr) {
                     self.inner.try_remove_addr(&addr);
-                } else if let Some(pid) = self.inner.addr_peer_id(&addr) {
+                } else if let Some(pid) = self.inner.exact_addr_pid(&addr) {
+                    if self.inner.peer_connected(&pid) {
+                        return;
+                    }
+
                     debug!(
                         "network: {:?}: bootstrap peer {:?} retry",
                         self.peer_id, pid
