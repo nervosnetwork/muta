@@ -120,10 +120,8 @@ pub enum PeerManagerEvent {
     #[display(fmt = "discover multi addrs {:?}", addrs)]
     DiscoverMultiAddrs { addrs: Vec<Multiaddr> },
 
-    // FIXME
-    #[allow(dead_code)]
     #[display(fmt = "add session {} addr {}", sid, addr)]
-    AddSessionAddr { sid: SessionId, addr: Multiaddr },
+    RepeatedOutboundSession { sid: SessionId, addr: Multiaddr },
 
     // FIXME
     #[allow(dead_code)]

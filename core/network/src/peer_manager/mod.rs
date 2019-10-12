@@ -543,6 +543,11 @@ impl PeerManager {
         }
 
         if let Some(pid) = self.session_peer.get(&sid) {
+            debug!(
+                "network: {:?}: add session addr {} to peer {:?}",
+                self.peer_id, addr, pid
+            );
+
             self.inner.add_peer_addr(&pid, addr);
         }
     }
@@ -769,7 +774,7 @@ impl PeerManager {
                     self.identify_addr(addr);
                 }
             }
-            PeerManagerEvent::AddSessionAddr { sid, addr } => {
+            PeerManagerEvent::RepeatedOutboundSession { sid, addr } => {
                 self.add_session_addr(sid, addr);
             }
             PeerManagerEvent::AddSessionMultiAddrs { sid, addrs } => {
