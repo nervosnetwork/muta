@@ -120,7 +120,7 @@ pub enum PeerManagerEvent {
     #[display(fmt = "discover multi addrs {:?}", addrs)]
     DiscoverMultiAddrs { addrs: Vec<Multiaddr> },
 
-    #[display(fmt = "add session {} addr {}", sid, addr)]
+    #[display(fmt = "repeated outbound session {} addr {}", sid, addr)]
     RepeatedOutboundSession { sid: SessionId, addr: Multiaddr },
 
     #[display(fmt = "unconnectable addr {}, kind: {}", addr, kind)]
