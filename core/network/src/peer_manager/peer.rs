@@ -1,7 +1,6 @@
 use std::{
     collections::HashSet,
     default::Default,
-    iter::FromIterator,
     sync::Arc,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
@@ -16,6 +15,7 @@ use tentacle::{
 };
 
 pub const BACKOFF_BASE: usize = 5;
+pub const VALID_ATTEMPT_MARGIN: u64 = 4;
 
 // TODO: display next_retry
 #[derive(Debug, Clone, Serialize, Deserialize, Display)]
@@ -41,6 +41,10 @@ pub(super) struct PeerState {
 
     // Disconnect as (timestamp)
     disconnect_at: u64,
+
+    // Attempt at (timestamp)
+    #[serde(skip)]
+    attempt_at: u64,
 
     // Alive (seconds)
     alive: u64,
@@ -68,19 +72,16 @@ impl PeerState {
             next_retry:    Instant::now(),
             connect_at:    0,
             disconnect_at: 0,
+            attempt_at:    0,
             alive:         0,
         }
     }
 
     pub fn from_addrs(addrs: Vec<Multiaddr>) -> Self {
-        PeerState {
-            addr_set:      HashSet::from_iter(addrs),
-            retry_count:   0,
-            next_retry:    Instant::now(),
-            connect_at:    0,
-            disconnect_at: 0,
-            alive:         0,
-        }
+        let mut state = PeerState::new();
+        state.addr_set.extend(addrs.into_iter());
+
+        state
     }
 
     pub(super) fn addrs(&self) -> Vec<&Multiaddr> {
@@ -174,7 +175,16 @@ impl Peer {
     }
 
     pub fn increase_retry(&mut self) {
+        let last_attempt = UNIX_EPOCH + Duration::from_secs(self.state.attempt_at);
+
+        // Every time we try connect to a peer, we use all addresses. If
+        // fail, we should only increase once.
+        if duration_since(SystemTime::now(), last_attempt).as_secs() < VALID_ATTEMPT_MARGIN {
+            return;
+        }
+
         self.state.retry_count += 1;
+        self.state.attempt_at = duration_since(SystemTime::now(), UNIX_EPOCH).as_secs();
 
         let secs = BACKOFF_BASE.pow(self.state.retry_count) as u64;
         self.state.next_retry = Instant::now() + Duration::from_secs(secs);
