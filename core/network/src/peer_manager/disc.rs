@@ -50,7 +50,7 @@ impl DiscoveryAddrManager {
 
 impl AddressManager for DiscoveryAddrManager {
     fn add_new_addr(&mut self, _sid: SessionId, addr: Multiaddr) {
-        let add_addr = PeerManagerEvent::DiscoverNewAddr { addr };
+        let add_addr = PeerManagerEvent::DiscoverAddr { addr };
 
         self.reporter.report(add_addr);
     }

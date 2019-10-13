@@ -125,7 +125,7 @@ pub enum PeerManagerEvent {
 
     // Address
     #[display(fmt = "discover addr {}", addr)]
-    DiscoverNewAddr { addr: Multiaddr },
+    DiscoverAddr { addr: Multiaddr },
 
     #[display(fmt = "discover multi addrs {:?}", addrs)]
     DiscoverMultiAddrs { addrs: Vec<Multiaddr> },

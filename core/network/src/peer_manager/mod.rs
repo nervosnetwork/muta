@@ -874,7 +874,7 @@ impl PeerManager {
                     }
                 }
             }
-            PeerManagerEvent::DiscoverNewAddr { addr } => {
+            PeerManagerEvent::DiscoverAddr { addr } => {
                 self.identify_addr(addr);
             }
             PeerManagerEvent::DiscoverMultiAddrs { addrs } => {
