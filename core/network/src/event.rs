@@ -111,9 +111,6 @@ pub enum PeerManagerEvent {
         ty:  SessionType,
     },
 
-    #[display(fmt = "add peer {:?} addr {}", pid, addr)]
-    AddPeerAddr { pid: PeerId, addr: Multiaddr },
-
     #[display(fmt = "peer {:?} alive", pid)]
     PeerAlive { pid: PeerId },
 
@@ -132,6 +129,12 @@ pub enum PeerManagerEvent {
 
     #[display(fmt = "discover multi addrs {:?}", addrs)]
     DiscoverMultiAddrs { addrs: Vec<Multiaddr> },
+
+    #[display(fmt = "identify pid {:?} addrs {:?}", pid, addrs)]
+    IdentifiedAddrs {
+        pid:   PeerId,
+        addrs: Vec<Multiaddr>,
+    },
 
     #[display(fmt = "repeated connection type {} session {} addr {}", ty, sid, addr)]
     RepeatedConnection {

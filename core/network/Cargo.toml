@@ -27,6 +27,7 @@ snap = "0.2"
 tentacle = { version = "0.2", features = [ "flatc" ] }
 tentacle-ping = { version = "0.3", features = [ "flatc" ] }
 tentacle-discovery = { version = "0.2", features = [ "flatc" ] }
+tentacle-identify =  { version = "0.2", features = [ "flatc" ] }
 hex = "0.4"
 
 [dev-dependencies]

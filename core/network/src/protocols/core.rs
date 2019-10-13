@@ -6,27 +6,26 @@ use tentacle::{
     ProtocolId,
 };
 use tentacle_discovery::AddressManager;
+use tentacle_identify::Callback;
 
 use crate::{
     event::PeerManagerEvent,
     message::RawSessionMessage,
-    protocols::{
-        discovery::Discovery, listen_exchange::ListenExchange, ping::Ping, transmitter::Transmitter,
-    },
-    traits::{ListenExchangeManager, NetworkProtocol},
+    protocols::{discovery::Discovery, identify::Identify, ping::Ping, transmitter::Transmitter},
+    traits::NetworkProtocol,
 };
 
-pub const LISTEN_EXCHANGE_PROTOCOL_ID: usize = 1;
-pub const PING_PROTOCOL_ID: usize = 2;
+pub const PING_PROTOCOL_ID: usize = 1;
+pub const IDENTIFY_PROTOCOL_ID: usize = 2;
 pub const DISCOVERY_PROTOCOL_ID: usize = 3;
 pub const TRANSMITTER_PROTOCOL_ID: usize = 4;
 
 #[derive(Default)]
-pub struct CoreProtocolBuilder<M, E> {
-    ping:            Option<Ping>,
-    listen_exchange: Option<ListenExchange<E>>,
-    discovery:       Option<Discovery<M>>,
-    transmitter:     Option<Transmitter>,
+pub struct CoreProtocolBuilder<M, C> {
+    ping:        Option<Ping>,
+    identify:    Option<Identify<C>>,
+    discovery:   Option<Discovery<M>>,
+    transmitter: Option<Transmitter>,
 }
 
 pub struct CoreProtocol {
@@ -34,10 +33,10 @@ pub struct CoreProtocol {
 }
 
 impl CoreProtocol {
-    pub fn build<M, E>() -> CoreProtocolBuilder<M, E>
+    pub fn build<M, C>() -> CoreProtocolBuilder<M, C>
     where
         M: AddressManager + Send + 'static,
-        E: ListenExchangeManager + Send + 'static,
+        C: Callback + Send + 'static,
     {
         CoreProtocolBuilder::new()
     }
@@ -46,8 +45,8 @@ impl CoreProtocol {
 impl NetworkProtocol for CoreProtocol {
     fn target() -> DialProtocol {
         DialProtocol::Multi(vec![
-            ProtocolId::new(LISTEN_EXCHANGE_PROTOCOL_ID),
             ProtocolId::new(PING_PROTOCOL_ID),
+            ProtocolId::new(IDENTIFY_PROTOCOL_ID),
             ProtocolId::new(DISCOVERY_PROTOCOL_ID),
             ProtocolId::new(TRANSMITTER_PROTOCOL_ID),
         ])
@@ -62,17 +61,17 @@ impl NetworkProtocol for CoreProtocol {
     }
 }
 
-impl<M, E> CoreProtocolBuilder<M, E>
+impl<M, C> CoreProtocolBuilder<M, C>
 where
     M: AddressManager + Send + 'static,
-    E: ListenExchangeManager + Send + 'static,
+    C: Callback + Send + 'static,
 {
     pub fn new() -> Self {
         CoreProtocolBuilder {
-            ping:            None,
-            listen_exchange: None,
-            discovery:       None,
-            transmitter:     None,
+            ping:        None,
+            identify:    None,
+            discovery:   None,
+            transmitter: None,
         }
     }
 
@@ -85,6 +84,13 @@ where
         let ping = Ping::new(interval, timeout, event_tx);
 
         self.ping = Some(ping);
+        self
+    }
+
+    pub fn identify(mut self, callback: C) -> Self {
+        let identify = Identify::new(callback);
+
+        self.identify = Some(identify);
         self
     }
 
@@ -102,26 +108,19 @@ where
         self
     }
 
-    pub fn listen_exchange(mut self, exchange: E) -> Self {
-        let listen_exchange = ListenExchange::new(exchange);
-
-        self.listen_exchange = Some(listen_exchange);
-        self
-    }
-
     pub fn build(self) -> CoreProtocol {
         let mut metas = Vec::with_capacity(4);
 
         let CoreProtocolBuilder {
             ping,
-            listen_exchange,
+            identify,
             discovery,
             transmitter,
         } = self;
 
         // Panic early during protocol setup not runtime
         assert!(ping.is_some(), "init: missing protocol ping");
-        assert!(listen_exchange.is_some(), "init: missing protocol exchange");
+        assert!(identify.is_some(), "init: missing protocol identify");
         assert!(discovery.is_some(), "init: missing protocol discovery");
         assert!(transmitter.is_some(), "init: missing protocol transmitter");
 
@@ -129,8 +128,8 @@ where
             metas.push(ping.build_meta(PING_PROTOCOL_ID.into()));
         }
 
-        if let Some(listen_exchange) = listen_exchange {
-            metas.push(listen_exchange.build_meta(LISTEN_EXCHANGE_PROTOCOL_ID.into()));
+        if let Some(identify) = identify {
+            metas.push(identify.build_meta(IDENTIFY_PROTOCOL_ID.into()));
         }
 
         if let Some(discovery) = discovery {

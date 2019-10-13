@@ -32,7 +32,7 @@ use crate::{
     event::{ConnectionEvent, PeerManagerEvent},
     message::RawSessionMessage,
     outbound::{NetworkGossip, NetworkRpc},
-    peer_manager::{DiscoveryAddrManager, PeerListenExchange, PeerManager, PeerManagerConfig},
+    peer_manager::{DiscoveryAddrManager, IdentifyCallback, PeerManager, PeerManagerConfig},
     protocols::CoreProtocol,
     reactor::{MessageRouter, Reactor},
     rpc_map::RpcMap,
@@ -148,10 +148,10 @@ impl NetworkService {
         // Build service protocol
         let disc_sync_interval = config.discovery_sync_interval;
         let disc_addr_mgr = DiscoveryAddrManager::new(peer_mgr_handle.clone(), mgr_tx.clone());
-        let peer_listen_exchange = PeerListenExchange::new(peer_mgr_handle, mgr_tx.clone());
+        let ident_callback = IdentifyCallback::new(peer_mgr_handle, mgr_tx.clone());
         let proto = CoreProtocol::build()
             .ping(config.ping_interval, config.ping_timeout, mgr_tx.clone())
-            .listen_exchange(peer_listen_exchange)
+            .identify(ident_callback)
             .discovery(disc_addr_mgr, disc_sync_interval)
             .transmitter(raw_msg_tx.clone())
             .build();

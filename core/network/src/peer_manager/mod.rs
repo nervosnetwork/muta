@@ -1,5 +1,5 @@
 mod disc;
-mod exchange;
+mod ident;
 mod peer;
 mod persist;
 
@@ -7,7 +7,7 @@ use peer::PeerState;
 use persist::{NoopPersistence, PeerPersistence, Persistence};
 
 pub use disc::DiscoveryAddrManager;
-pub use exchange::PeerListenExchange;
+pub use ident::IdentifyCallback;
 pub use peer::Peer;
 
 use std::{
@@ -439,6 +439,13 @@ impl PeerManagerHandle {
 
         peers.into_iter().map(Peer::owned_addrs).flatten().collect()
     }
+
+    pub fn listen_addrs(&self) -> Vec<Multiaddr> {
+        let listen = self.inner.listen();
+        debug_assert!(listen.is_some(), "listen should alway be set");
+
+        listen.map(|addr| vec![addr]).unwrap_or_else(|| Vec::new())
+    }
 }
 
 pub struct PeerManager {
@@ -818,9 +825,6 @@ impl PeerManager {
                     }
                 }
             }
-            PeerManagerEvent::AddPeerAddr { pid, addr } => {
-                self.inner.add_peer_addr(&pid, addr);
-            }
             PeerManagerEvent::PeerAlive { pid } => {
                 let user_addr = self.inner.pid_user_addr(&pid);
 
@@ -876,6 +880,16 @@ impl PeerManager {
             PeerManagerEvent::DiscoverMultiAddrs { addrs } => {
                 for addr in addrs.into_iter() {
                     self.identify_addr(addr);
+                }
+            }
+            PeerManagerEvent::IdentifiedAddrs { pid, addrs } => {
+                info!(
+                    "network: {:?}: add peer {:?} multi identified addrs {:?}",
+                    self.peer_id, pid, addrs
+                );
+
+                for addr in addrs.into_iter() {
+                    self.inner.add_peer_addr(&pid, addr);
                 }
             }
             // NOTE: Alice may disconnect to Bob, but bob didn't know
