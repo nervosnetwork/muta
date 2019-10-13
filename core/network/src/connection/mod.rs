@@ -58,7 +58,9 @@ impl<P: NetworkProtocol> ConnectionService<P> {
         keeper: ConnectionServiceKeeper,
         event_rx: UnboundedReceiver<ConnectionEvent>,
     ) -> Self {
-        let mut builder = ServiceBuilder::default().key_pair(config.secio_keypair);
+        let mut builder = ServiceBuilder::default()
+            .key_pair(config.secio_keypair)
+            .forever(true);
 
         if let Some(max) = config.max_frame_length {
             builder = builder.max_frame_length(max);
