@@ -47,7 +47,7 @@ use tentacle::{
 use crate::{
     common::HeartBeat,
     error::NetworkError,
-    event::{ConnectionEvent, MultiUsersMessage, PeerManagerEvent},
+    event::{ConnectionEvent, ConnectionType, MultiUsersMessage, PeerManagerEvent},
 };
 
 const MAX_RETRY_COUNT: usize = 6;
@@ -835,8 +835,17 @@ impl PeerManager {
                     self.identify_addr(addr);
                 }
             }
-            PeerManagerEvent::RepeatedOutboundSession { sid, addr } => {
-                self.add_session_addr(sid, addr);
+            PeerManagerEvent::RepeatedConnection { ty, sid, addr } => {
+                info!(
+                    "network: {:?}: repeated connection, ty {}, session {:?} addr {}",
+                    self.peer_id, ty, sid, addr
+                );
+
+                // TODO: For ConnectionType::Listen, records repeated count,
+                // reduce that peer's score, eventually ban it for a while.
+                if ty == ConnectionType::Dialer {
+                    self.add_session_addr(sid, addr);
+                }
             }
             // TODO: ban unconnectable address for a while instead of repeated
             // connection attempts.

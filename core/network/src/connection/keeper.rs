@@ -12,7 +12,7 @@ use tentacle::{
 
 use crate::{
     error::{ErrorKind, NetworkError},
-    event::{PeerManagerEvent, RemoveKind, RetryKind},
+    event::{ConnectionType, PeerManagerEvent, RemoveKind, RetryKind},
 };
 
 // This macro tries to extract PublicKey from SessionContext, it's Optional.
@@ -79,7 +79,7 @@ impl ConnectionServiceKeeper {
         }
     }
 
-    fn process_connect_error(&self, conn_type: ConnectType, error: TentacleError, addr: Multiaddr) {
+    fn process_connect_error(&self, ty: ConnectionType, error: TentacleError, addr: Multiaddr) {
         use std::io;
 
         match error {
@@ -89,15 +89,10 @@ impl ConnectionServiceKeeper {
                 self.report_peer(connect_self);
             }
             TentacleError::RepeatedConnection(sid) => {
-                if conn_type == ConnectType::Listen {
-                    // Inbound repeated connection, addr is remote peer's
-                    // listen addr.
-                    return;
-                }
+                // For ConnectionType::Listen, addr is remote peer's listen addr
+                let repeated_connection = PeerManagerEvent::RepeatedConnection { ty, sid, addr };
 
-                let repeated_session = PeerManagerEvent::RepeatedOutboundSession { sid, addr };
-
-                self.report_peer(repeated_session);
+                self.report_peer(repeated_connection);
             }
             TentacleError::IoError(ref err)
                 if err.kind() == io::ErrorKind::TimedOut
@@ -126,21 +121,15 @@ impl ConnectionServiceKeeper {
     }
 }
 
-#[derive(PartialEq, Eq)]
-enum ConnectType {
-    Dialer,
-    Listen,
-}
-
 #[rustfmt::skip]
 impl ServiceHandle for ConnectionServiceKeeper {
     fn handle_error(&mut self, _ctx: &mut ServiceContext, err: ServiceError) {
         match err {
             ServiceError::DialerError { error, address } => {
-                self.process_connect_error(ConnectType::Dialer, error, address)
+                self.process_connect_error(ConnectionType::Dialer, error, address)
             }
             ServiceError::ListenError { error, address } => {
-                self.process_connect_error(ConnectType::Listen, error, address)
+                self.process_connect_error(ConnectionType::Listen, error, address)
             }
             ServiceError::ProtocolSelectError { session_context, proto_name } => {
                 let pid = peer_pubkey!(&session_context).peer_id();

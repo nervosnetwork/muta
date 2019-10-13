@@ -85,6 +85,14 @@ pub struct MultiUsersMessage {
     pub pri:        Priority,
 }
 
+#[derive(Debug, Display, PartialEq, Eq)]
+pub enum ConnectionType {
+    #[display(fmt = "Inbound connection")]
+    Listen,
+    #[display(fmt = "Outbound connection")]
+    Dialer,
+}
+
 #[derive(Debug, Display)]
 pub enum PeerManagerEvent {
     // Peer
@@ -120,8 +128,12 @@ pub enum PeerManagerEvent {
     #[display(fmt = "discover multi addrs {:?}", addrs)]
     DiscoverMultiAddrs { addrs: Vec<Multiaddr> },
 
-    #[display(fmt = "repeated outbound session {} addr {}", sid, addr)]
-    RepeatedOutboundSession { sid: SessionId, addr: Multiaddr },
+    #[display(fmt = "repeated connection type {} session {} addr {}", ty, sid, addr)]
+    RepeatedConnection {
+        ty:   ConnectionType,
+        sid:  SessionId,
+        addr: Multiaddr,
+    },
 
     #[display(fmt = "unconnectable addr {}, kind: {}", addr, kind)]
     UnconnectableAddress { addr: Multiaddr, kind: RemoveKind },
