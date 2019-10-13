@@ -6,7 +6,7 @@ use tentacle::{
     context::ServiceContext,
     error::Error as TentacleError,
     multiaddr::Multiaddr,
-    service::{ServiceError, ServiceEvent, SessionType},
+    service::{ServiceError, ServiceEvent},
     traits::ServiceHandle,
 };
 
@@ -203,26 +203,20 @@ impl ServiceHandle for ConnectionServiceKeeper {
         match evt {
             ServiceEvent::SessionOpen { session_context } => {
                 let pubkey = peer_pubkey!(&session_context).clone();
-                let mut addr = Some(session_context.address.clone());
+                let addr = session_context.address.clone();
                 let sid = session_context.id;
-
-                if session_context.ty == SessionType::Inbound {
-                    // Inbound address is useless, we cannot use it to connect
-                    // to that peer.
-                    debug!("network: inbound addr {}", session_context.address);
-
-                    addr = None;
-                }
-
-                let attach_peer_session = PeerManagerEvent::AttachPeerSession { pubkey, addr, sid };
+                let ty = session_context.ty;
+                
+                let attach_peer_session = PeerManagerEvent::AttachPeerSession { pubkey, addr, sid, ty };
 
                 self.report_peer(attach_peer_session);
             }
             ServiceEvent::SessionClose { session_context } => {
                 let pid = peer_pubkey!(&session_context).peer_id();
                 let sid = session_context.id;
+                let ty = session_context.ty;
 
-                let detach_peer_session = PeerManagerEvent::DetachPeerSession { pid, sid };
+                let detach_peer_session = PeerManagerEvent::DetachPeerSession { pid, sid, ty };
 
                 self.report_peer(detach_peer_session);
             }

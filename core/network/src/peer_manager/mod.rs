@@ -40,7 +40,7 @@ use rand::seq::IteratorRandom;
 use tentacle::{
     multiaddr::{Multiaddr, Protocol},
     secio::{PeerId, PublicKey},
-    service::{DialProtocol, TargetSession},
+    service::{DialProtocol, SessionType, TargetSession},
     SessionId,
 };
 
@@ -51,6 +51,7 @@ use crate::{
 };
 
 const MAX_RETRY_COUNT: usize = 6;
+const ALIVE_RETRY_MARGIN: u64 = 3; // seconds
 
 #[derive(Debug, Clone)]
 pub struct UnknownAddr {
@@ -277,15 +278,30 @@ impl Inner {
         self.connecting.write().insert(peer_id);
     }
 
-    pub fn set_connected(&self, peer_id: PeerId) {
+    pub fn set_connected(&self, peer_id: &PeerId) {
         // Clean outbound connection
-        self.connecting.write().remove(&peer_id);
-        self.connected.write().insert(peer_id);
+        self.connecting.write().remove(peer_id);
+        self.connected.write().insert(peer_id.clone());
+
+        let mut pool = self.pool.write();
+        if let Some(peer) = pool.get_mut(peer_id) {
+            peer.update_connect();
+        }
     }
 
     pub fn disconnect_peer(&self, peer_id: &PeerId) {
         self.connecting.write().remove(peer_id);
         self.connected.write().remove(peer_id);
+
+        let mut pool = self.pool.write();
+        if let Some(peer) = pool.get_mut(peer_id) {
+            peer.update_disconnect();
+            peer.update_alive();
+        }
+    }
+
+    pub fn peer_alive(&self, peer_id: &PeerId) -> Option<u64> {
+        self.pool.read().get(peer_id).map(Peer::alive)
     }
 
     pub fn connection_count(&self) -> usize {
@@ -568,7 +584,7 @@ impl PeerManager {
     }
 
     fn attach_peer_session(&mut self, pid: PeerId, sid: SessionId) {
-        self.inner.set_connected(pid.clone());
+        self.inner.set_connected(&pid);
 
         self.peer_session.insert(pid.clone(), sid);
         self.session_peer.insert(sid, pid);
@@ -738,9 +754,25 @@ impl PeerManager {
 
     fn process_event(&mut self, event: PeerManagerEvent) {
         match event {
-            PeerManagerEvent::AttachPeerSession { pubkey, addr, sid } => {
+            PeerManagerEvent::AttachPeerSession {
+                pubkey,
+                addr,
+                sid,
+                ty,
+            } => {
                 let user_addr = Peer::pubkey_to_addr(&pubkey).as_hex();
                 let pid = pubkey.peer_id();
+
+                let peer_listen = match ty {
+                    SessionType::Inbound => {
+                        // Inbound address is useless, we cannot use it to
+                        // connect to that peer.
+                        debug!("network: {:?}: inbound addr {:?}", self.peer_id, addr);
+
+                        None
+                    }
+                    SessionType::Outbound => Some(addr),
+                };
 
                 if !self.inner.peer_exist(&pid) {
                     info!(
@@ -748,32 +780,29 @@ impl PeerManager {
                         self.peer_id, pid, user_addr, sid
                     );
 
-                    self.add_peer(pubkey, addr.clone());
-                } else if let Some(addr) = addr.clone() {
+                    self.add_peer(pubkey, peer_listen);
+                } else if let Some(addr) = peer_listen {
                     self.inner.add_peer_addr(&pid, addr);
-                }
-
-                if self.peer_session.contains_key(&pid) {
-                    warn!(
-                        "network: {:?}: repeated connection: pid {:?} session {:?}",
-                        self.peer_id, pid, sid
-                    );
-
-                    return;
                 }
 
                 self.attach_peer_session(pid, sid);
             }
-            PeerManagerEvent::DetachPeerSession { pid, sid } => {
-                if self.peer_session.get(&pid) != Some(&sid) {
-                    debug!("network: detach repeated connection: session {:?}", sid);
-                    return;
-                }
-
+            PeerManagerEvent::DetachPeerSession { pid, .. } => {
                 let user_addr = self.inner.pid_user_addr(&pid);
                 info!("network: detach session user addr {:?}", user_addr);
 
                 self.detach_peer_session(&pid);
+
+                if let Some(alive) = self.inner.peer_alive(&pid) {
+                    if alive < ALIVE_RETRY_MARGIN {
+                        warn!(
+                            "network: {:?}: peer {:?} connection live too short",
+                            self.peer_id, pid
+                        );
+
+                        self.increase_peer_retry(&pid);
+                    }
+                }
             }
             PeerManagerEvent::AddPeerAddr { pid, addr } => {
                 self.inner.add_peer_addr(&pid, addr);
@@ -835,10 +864,19 @@ impl PeerManager {
                     self.identify_addr(addr);
                 }
             }
+            // NOTE: Alice may disconnect to Bob, but bob didn't know
+            // that, so the next time, Alice try to connect to Bob will
+            // cause repeated connection. The only way to fix this right
+            // now is wait for time out.
             PeerManagerEvent::RepeatedConnection { ty, sid, addr } => {
+                let remote_addr = match ty {
+                    ConnectionType::Dialer => Some(&addr),
+                    ConnectionType::Listen => None,
+                };
+
                 info!(
-                    "network: {:?}: repeated connection, ty {}, session {:?} addr {}",
-                    self.peer_id, ty, sid, addr
+                    "network: {:?}: repeated connection, ty {}, session {:?} remote_addr {:?}",
+                    self.peer_id, ty, sid, remote_addr
                 );
 
                 // TODO: For ConnectionType::Listen, records repeated count,

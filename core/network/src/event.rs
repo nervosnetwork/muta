@@ -7,7 +7,7 @@ use tentacle::{
     bytes::Bytes,
     multiaddr::Multiaddr,
     secio::{PeerId, PublicKey},
-    service::{DialProtocol, TargetSession},
+    service::{DialProtocol, SessionType, TargetSession},
     ProtocolId, SessionId,
 };
 
@@ -87,24 +87,29 @@ pub struct MultiUsersMessage {
 
 #[derive(Debug, Display, PartialEq, Eq)]
 pub enum ConnectionType {
-    #[display(fmt = "Inbound connection")]
+    #[display(fmt = "Receive an repeated connection")]
     Listen,
-    #[display(fmt = "Outbound connection")]
+    #[display(fmt = "Dial an repeated connection")]
     Dialer,
 }
 
 #[derive(Debug, Display)]
 pub enum PeerManagerEvent {
     // Peer
-    #[display(fmt = "attach peer addr {:?} session {:?}", addr, sid)]
+    #[display(fmt = "attach peer addr {:?} session {:?} ty {:?}", addr, sid, ty)]
     AttachPeerSession {
         pubkey: PublicKey,
-        addr:   Option<Multiaddr>,
+        addr:   Multiaddr,
         sid:    SessionId,
+        ty:     SessionType,
     },
 
-    #[display(fmt = "detach peer {:?} session {:?}", pid, sid)]
-    DetachPeerSession { pid: PeerId, sid: SessionId },
+    #[display(fmt = "detach peer {:?} session {:?} ty {:?}", pid, sid, ty)]
+    DetachPeerSession {
+        pid: PeerId,
+        sid: SessionId,
+        ty:  SessionType,
+    },
 
     #[display(fmt = "add peer {:?} addr {}", pid, addr)]
     AddPeerAddr { pid: PeerId, addr: Multiaddr },

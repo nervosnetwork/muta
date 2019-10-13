@@ -3,7 +3,7 @@ use std::{
     default::Default,
     iter::FromIterator,
     sync::Arc,
-    time::{Duration, Instant},
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
 use derive_more::Display;
@@ -19,13 +19,31 @@ pub const BACKOFF_BASE: usize = 5;
 
 // TODO: display next_retry
 #[derive(Debug, Clone, Serialize, Deserialize, Display)]
-#[display(fmt = "addrs: {:?}, retry: {}", addr_set, retry_count)]
+#[display(
+    fmt = "addrs: {:?}, retry: {}, last_connect: {}, alive: {}",
+    addr_set,
+    retry_count,
+    connect_at,
+    alive
+)]
 pub(super) struct PeerState {
+    // Peer listen address set
     addr_set: HashSet<Multiaddr>,
+
     #[serde(skip)]
     retry_count: u32,
+
     #[serde(skip, default = "Instant::now")]
     next_retry: Instant,
+
+    // Connect at (timestamp)
+    connect_at: u64,
+
+    // Disconnect as (timestamp)
+    disconnect_at: u64,
+
+    // Alive (seconds)
+    alive: u64,
 }
 
 #[derive(Debug, Clone, Display)]
@@ -45,17 +63,23 @@ pub struct Peer {
 impl PeerState {
     pub fn new() -> Self {
         PeerState {
-            addr_set:    Default::default(),
-            retry_count: 0,
-            next_retry:  Instant::now(),
+            addr_set:      Default::default(),
+            retry_count:   0,
+            next_retry:    Instant::now(),
+            connect_at:    0,
+            disconnect_at: 0,
+            alive:         0,
         }
     }
 
     pub fn from_addrs(addrs: Vec<Multiaddr>) -> Self {
         PeerState {
-            addr_set:    HashSet::from_iter(addrs),
-            retry_count: 0,
-            next_retry:  Instant::now(),
+            addr_set:      HashSet::from_iter(addrs),
+            retry_count:   0,
+            next_retry:    Instant::now(),
+            connect_at:    0,
+            disconnect_at: 0,
+            alive:         0,
         }
     }
 
@@ -123,6 +147,24 @@ impl Peer {
         self.state.addr_set.remove(addr);
     }
 
+    pub fn update_connect(&mut self) {
+        self.state.connect_at = duration_since(SystemTime::now(), UNIX_EPOCH).as_secs();
+    }
+
+    pub fn update_disconnect(&mut self) {
+        self.state.disconnect_at = duration_since(SystemTime::now(), UNIX_EPOCH).as_secs();
+    }
+
+    pub fn update_alive(&mut self) {
+        let connect_at = UNIX_EPOCH + Duration::from_secs(self.state.connect_at);
+
+        self.state.alive = duration_since(SystemTime::now(), connect_at).as_secs();
+    }
+
+    pub fn alive(&self) -> u64 {
+        self.state.alive
+    }
+
     pub fn retry_ready(&self) -> bool {
         Instant::now() > self.state.next_retry
     }
@@ -148,5 +190,12 @@ impl Peer {
 
         UserAddress::from_pubkey_bytes(pubkey_bytes)
             .expect("convert from secp256k1 public key should always success")
+    }
+}
+
+fn duration_since(now: SystemTime, early: SystemTime) -> Duration {
+    match now.duration_since(early) {
+        Ok(duration) => duration,
+        Err(e) => e.duration(),
     }
 }
