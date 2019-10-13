@@ -51,7 +51,7 @@ use crate::{
 };
 
 const MAX_RETRY_COUNT: usize = 6;
-const ALIVE_RETRY_MARGIN: u64 = 3; // seconds
+const ALIVE_RETRY_INTERVAL: u64 = 3; // seconds
 
 #[derive(Debug, Clone)]
 pub struct UnknownAddr {
@@ -794,7 +794,7 @@ impl PeerManager {
                 self.detach_peer_session(&pid);
 
                 if let Some(alive) = self.inner.peer_alive(&pid) {
-                    if alive < ALIVE_RETRY_MARGIN {
+                    if alive < ALIVE_RETRY_INTERVAL {
                         warn!(
                             "network: {:?}: peer {:?} connection live too short",
                             self.peer_id, pid

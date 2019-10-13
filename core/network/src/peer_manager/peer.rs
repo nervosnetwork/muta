@@ -15,7 +15,7 @@ use tentacle::{
 };
 
 pub const BACKOFF_BASE: usize = 5;
-pub const VALID_ATTEMPT_MARGIN: u64 = 4;
+pub const VALID_ATTEMPT_INTERVAL: u64 = 4;
 
 // TODO: display next_retry
 #[derive(Debug, Clone, Serialize, Deserialize, Display)]
@@ -179,7 +179,7 @@ impl Peer {
 
         // Every time we try connect to a peer, we use all addresses. If
         // fail, we should only increase once.
-        if duration_since(SystemTime::now(), last_attempt).as_secs() < VALID_ATTEMPT_MARGIN {
+        if duration_since(SystemTime::now(), last_attempt).as_secs() < VALID_ATTEMPT_INTERVAL {
             return;
         }
 
