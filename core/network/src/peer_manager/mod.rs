@@ -148,6 +148,10 @@ impl Inner {
         pool.get(pid).map(|peer| peer.user_addr().clone())
     }
 
+    pub fn peer_addrs(&self, pid: &PeerId) -> Option<Vec<Multiaddr>> {
+        self.pool.read().get(pid).map(Peer::owned_addrs)
+    }
+
     pub fn set_listen(&self, addr: Multiaddr) {
         *self.listen.write() = Some(addr);
     }
@@ -269,13 +273,13 @@ impl Inner {
         self.connected.read().contains(peer_id)
     }
 
-    pub fn connect_peer(&self, peer_id: PeerId) {
-        if self.connected.read().contains(&peer_id) {
+    pub fn connect_peer(&self, peer_id: &PeerId) {
+        if self.connected.read().contains(peer_id) {
             warn!("network: peer {:?} already connected", peer_id);
             return;
         }
 
-        self.connecting.write().insert(peer_id);
+        self.connecting.write().insert(peer_id.clone());
     }
 
     pub fn set_connected(&self, peer_id: &PeerId) {
@@ -308,7 +312,7 @@ impl Inner {
         self.connected.read().len() + self.connecting.read().len()
     }
 
-    pub fn unconnected_peer_addrs(&self, max: usize) -> Vec<Multiaddr> {
+    pub fn unconnected_peers(&self, max: usize) -> Vec<PeerId> {
         let connecting = self.connecting.read();
         let connected = self.connected.read();
         let pool = self.pool.read();
@@ -323,8 +327,8 @@ impl Inner {
         qualified_peers
             .choose_multiple(&mut rng, max)
             .into_iter()
-            .map(Peer::owned_addrs)
-            .flatten()
+            .map(Peer::id)
+            .cloned()
             .collect()
     }
 
@@ -533,7 +537,7 @@ impl PeerManager {
             info!("network: {:?}: bootstrap peer: {}", self.peer_id, peer);
 
             self.inner.add_peer(peer.clone());
-            self.inner.connect_peer(peer.id().clone());
+            self.inner.connect_peer(peer.id());
         }
 
         // Collect bootstrap addrs
@@ -680,11 +684,21 @@ impl PeerManager {
     }
 
     fn unconnected_addrs(&self, max: usize) -> Vec<Multiaddr> {
-        let mut rng = rand::thread_rng();
+        let mut condidates = Vec::new();
+        let mut remain = max;
 
-        let mut condidates = self.inner.unconnected_peer_addrs(max);
-        let unknown_condidates = self.unconnected_unknowns(max);
+        let condidate_pids = self.inner.unconnected_peers(max);
+        if !condidate_pids.is_empty() {
+            let addrs = condidate_pids.iter().map(|pid| {
+                self.inner.connect_peer(pid);
+                self.inner.peer_addrs(pid).unwrap_or_else(|| Vec::new())
+            });
 
+            condidates = addrs.flatten().collect();
+            remain -= condidate_pids.len();
+        }
+
+        let unknown_condidates = self.unconnected_unknowns(remain);
         if !unknown_condidates.is_empty() {
             let addrs = unknown_condidates.into_iter().map(|unknown| {
                 unknown.set_connecting(true);
@@ -694,7 +708,7 @@ impl PeerManager {
             condidates.extend(addrs);
         }
 
-        condidates.into_iter().choose_multiple(&mut rng, max)
+        condidates
     }
 
     fn route_multi_users_message(
