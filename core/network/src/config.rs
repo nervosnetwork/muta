@@ -32,12 +32,12 @@ pub const DEFAULT_PEER_FILE_NAME: &str = "peers";
 pub const DEFAULT_PEER_FILE_EXT: &str = "dat";
 pub const DEFAULT_PEER_PERSISTENCE_PATH: &str = "./peers.dat";
 
-pub const DEFAULT_PING_INTERVAL: u64 = 5;
-pub const DEFAULT_PING_TIMEOUT: u64 = 10;
-pub const DEFAULT_DISCOVERY_SYNC_INTERVAL: u64 = 3;
+pub const DEFAULT_PING_INTERVAL: u64 = 15;
+pub const DEFAULT_PING_TIMEOUT: u64 = 30;
+pub const DEFAULT_DISCOVERY_SYNC_INTERVAL: u64 = 60 * 60; // 1 hour
 
-pub const DEFAULT_PEER_MANAGER_HEART_BEAT_INTERVAL: u64 = 10;
-pub const DEFAULT_SELF_HEART_BEAT_INTERVAL: u64 = 15;
+pub const DEFAULT_PEER_MANAGER_HEART_BEAT_INTERVAL: u64 = 30;
+pub const DEFAULT_SELF_HEART_BEAT_INTERVAL: u64 = 35;
 
 pub type PublicKeyHexStr = String;
 pub type PrivateKeyHexStr = String;
