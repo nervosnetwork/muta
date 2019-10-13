@@ -19,6 +19,7 @@ use protocol::{
 
 const END_TEST_BROADCAST: &str = "/gossip/test/message";
 const TEST_MESSAGE: &str = "spike lee action started";
+const BROADCAST_TEST_TIMEOUT: u64 = 30;
 
 enum TestResult {
     TimeOut,
@@ -120,7 +121,7 @@ async fn test_broadcast() {
                 .duration_since(start)
                 .expect("duration")
                 .as_secs()
-                > 10
+                > BROADCAST_TEST_TIMEOUT
             {
                 test_tx_clone
                     .unbounded_send(TestResult::TimeOut)
