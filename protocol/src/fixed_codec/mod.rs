@@ -1,3 +1,5 @@
+#[macro_use]
+mod r#macro;
 pub mod epoch;
 pub mod genesis;
 pub mod primitive;
