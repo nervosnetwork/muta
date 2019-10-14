@@ -1,0 +1,39 @@
+language: rust
+dist: bionic
+sudo: false
+
+cache:
+  cargo: true
+  apt: true
+
+git:
+  depth: 1
+  submodules: false
+
+if: 'branch IN (master, develop, staging, trying) OR type != push OR fork = true OR tag =~ ^v'
+
+addons:
+  apt:
+    packages:
+    - gcc
+    - librocksdb5.8
+    - librocksdb-dev
+
+matrix:
+  include:
+  - rust: nightly
+
+install: ./devtools/ci/install.sh
+script: ./devtools/ci/script.sh
+
+env:
+  global:
+    - RUST_BACKTRACE=full
+    - USE_SYS_ROCKSDB: true
+    - FMT: true
+    - CHECK: true
+    - TEST: true
+
+before_cache:
+  - rm -rf ./target/debug/incremental/
+  - cargo sweep -f
