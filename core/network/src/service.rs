@@ -32,7 +32,7 @@ use crate::{
     event::{ConnectionEvent, PeerManagerEvent},
     message::RawSessionMessage,
     outbound::{NetworkGossip, NetworkRpc},
-    peer_manager::{DiscoveryAddrManager, PeerManager, PeerManagerConfig},
+    peer_manager::{DiscoveryAddrManager, IdentifyCallback, PeerManager, PeerManagerConfig},
     protocols::CoreProtocol,
     reactor::{MessageRouter, Reactor},
     rpc_map::RpcMap,
@@ -147,9 +147,11 @@ impl NetworkService {
 
         // Build service protocol
         let disc_sync_interval = config.discovery_sync_interval;
-        let disc_addr_mgr = DiscoveryAddrManager::new(peer_mgr_handle, mgr_tx.clone());
+        let disc_addr_mgr = DiscoveryAddrManager::new(peer_mgr_handle.clone(), mgr_tx.clone());
+        let ident_callback = IdentifyCallback::new(peer_mgr_handle, mgr_tx.clone());
         let proto = CoreProtocol::build()
             .ping(config.ping_interval, config.ping_timeout, mgr_tx.clone())
+            .identify(ident_callback)
             .discovery(disc_addr_mgr, disc_sync_interval)
             .transmitter(raw_msg_tx.clone())
             .build();
@@ -246,9 +248,18 @@ impl NetworkService {
 
     pub fn listen(&mut self, socket_addr: SocketAddr) -> ProtocolResult<()> {
         if let Some(NetworkConnectionService::NoListen(conn_srv)) = &mut self.net_conn_srv {
-            debug!("network: connection: listen to {}", socket_addr);
+            debug!("network: listen to {}", socket_addr);
 
-            conn_srv.listen(socket_to_multi_addr(socket_addr))?;
+            let addr = socket_to_multi_addr(socket_addr);
+
+            conn_srv.listen(addr.clone())?;
+
+            // Update peer manager listen
+            if let Some(peer_mgr) = self.peer_mgr.take() {
+                peer_mgr.set_listen(addr);
+
+                self.peer_mgr = Some(peer_mgr);
+            }
 
             // Update service state
             if let Some(NetworkConnectionService::NoListen(conn_srv)) = self.net_conn_srv.take() {
@@ -266,8 +277,6 @@ impl Future for NetworkService {
     type Output = ();
 
     fn poll(mut self: Pin<&mut Self>, ctx: &mut TaskContext<'_>) -> Poll<Self::Output> {
-        debug!("network: service polled");
-
         self.hb_waker.register(ctx.waker());
 
         macro_rules! service_ready {
@@ -301,6 +310,10 @@ impl Future for NetworkService {
         }
 
         if let Some(peer_mgr) = self.peer_mgr.take() {
+            if peer_mgr.listen().is_none() {
+                peer_mgr.set_listen(self.config.default_listen.clone());
+            }
+
             runtime::spawn(peer_mgr);
         }
 

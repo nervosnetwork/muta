@@ -27,6 +27,7 @@ snap = "0.2"
 tentacle = { version = "0.2", features = [ "flatc" ] }
 tentacle-ping = { version = "0.3", features = [ "flatc" ] }
 tentacle-discovery = { version = "0.2", features = [ "flatc" ] }
+tentacle-identify =  { version = "0.2", features = [ "flatc" ] }
 hex = "0.4"
 
 [dev-dependencies]
@@ -34,3 +35,12 @@ env_logger = "0.6"
 runtime-tokio = "0.3.0-alpha.6"
 quickcheck = "0.9"
 quickcheck_macros = "0.8"
+lazy_static = "1.4"
+
+[features]
+allow_global_ip = []
+
+[[test]]
+name = "broadcast"
+path = "tests/gossip_test.rs"
+required-features = [ "allow_global_ip" ]

@@ -95,8 +95,6 @@ impl<N: Rpc + Send + Sync + 'static> MessageHandler for Checkout<N> {
 pub async fn main() {
     env_logger::init();
 
-    let base_conf = NetworkConfig::new();
-
     let bt_seckey_bytes = "8".repeat(32);
     let bt_seckey = hex::encode(&bt_seckey_bytes);
     let bt_keypair = SecioKeyPair::secp256k1_raw_key(bt_seckey_bytes).expect("keypair");
@@ -106,8 +104,7 @@ pub async fn main() {
     if std::env::args().nth(1) == Some("server".to_string()) {
         info!("Starting server");
 
-        let bt_conf = base_conf
-            .clone()
+        let bt_conf = NetworkConfig::new()
             .secio_keypair(bt_seckey)
             .expect("set keypair");
 
@@ -142,8 +139,7 @@ pub async fn main() {
 
         let port = std::env::args().nth(1).unwrap().parse::<u16>().unwrap();
         let peer_addr = SocketAddr::new(IP_ADDR, port);
-        let peer_conf = base_conf
-            .clone()
+        let peer_conf = NetworkConfig::new()
             .bootstraps(vec![(bt_pubkey, bt_addr)])
             .unwrap();
 

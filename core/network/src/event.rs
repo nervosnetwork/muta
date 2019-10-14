@@ -7,7 +7,7 @@ use tentacle::{
     bytes::Bytes,
     multiaddr::Multiaddr,
     secio::{PeerId, PublicKey},
-    service::{DialProtocol, TargetSession},
+    service::{DialProtocol, SessionType, TargetSession},
     ProtocolId, SessionId,
 };
 
@@ -85,18 +85,37 @@ pub struct MultiUsersMessage {
     pub pri:        Priority,
 }
 
+#[derive(Debug, Display, PartialEq, Eq)]
+pub enum ConnectionType {
+    #[display(fmt = "Receive an repeated connection")]
+    Listen,
+    #[display(fmt = "Dial an repeated connection")]
+    Dialer,
+}
+
+#[derive(Debug, Display)]
+#[display(fmt = "session {:?} addr {:?} ty {:?}", sid, addr, ty)]
+pub struct Session {
+    pub sid:  SessionId,
+    pub addr: Multiaddr,
+    pub ty:   SessionType,
+}
+
 #[derive(Debug, Display)]
 pub enum PeerManagerEvent {
     // Peer
-    #[display(fmt = "add peer {:?} addr {}", pid, addr)]
-    AddPeer {
-        pid:    PeerId,
-        pubkey: PublicKey,
-        addr:   Multiaddr,
+    #[display(fmt = "attach peer session {}", session)]
+    AttachPeerSession {
+        pubkey:  PublicKey,
+        session: Session,
     },
 
-    #[display(fmt = "update peer {:?} session {:?}", pid, sid)]
-    UpdatePeerSession { pid: PeerId, sid: Option<SessionId> },
+    #[display(fmt = "detach peer {:?} session {:?} ty {:?}", pid, sid, ty)]
+    DetachPeerSession {
+        pid: PeerId,
+        sid: SessionId,
+        ty:  SessionType,
+    },
 
     #[display(fmt = "peer {:?} alive", pid)]
     PeerAlive { pid: PeerId },
@@ -111,30 +130,30 @@ pub enum PeerManagerEvent {
     RetryPeerLater { pid: PeerId, kind: RetryKind },
 
     // Address
-    #[display(fmt = "add unknown addr {}", addr)]
-    AddUnknownAddr { addr: Multiaddr },
+    #[display(fmt = "discover addr {}", addr)]
+    DiscoverAddr { addr: Multiaddr },
 
-    #[display(fmt = "add multi unknown addrs {:?}", addrs)]
-    AddMultiUnknownAddrs { addrs: Vec<Multiaddr> },
+    #[display(fmt = "discover multi addrs {:?}", addrs)]
+    DiscoverMultiAddrs { addrs: Vec<Multiaddr> },
 
-    // FIXME
-    #[allow(dead_code)]
-    #[display(fmt = "add session {} addr {}", sid, addr)]
-    AddSessionAddr { sid: SessionId, addr: Multiaddr },
-
-    // FIXME
-    #[allow(dead_code)]
-    #[display(fmt = "add session {} multi addrs {:?}", sid, addrs)]
-    AddSessionMultiAddrs {
-        sid:   SessionId,
+    #[display(fmt = "identify pid {:?} addrs {:?}", pid, addrs)]
+    IdentifiedAddrs {
+        pid:   PeerId,
         addrs: Vec<Multiaddr>,
     },
 
-    #[display(fmt = "remove addr {}, kind: {}", addr, kind)]
-    RemoveAddr { addr: Multiaddr, kind: RemoveKind },
+    #[display(fmt = "repeated connection type {} session {} addr {}", ty, sid, addr)]
+    RepeatedConnection {
+        ty:   ConnectionType,
+        sid:  SessionId,
+        addr: Multiaddr,
+    },
 
-    #[display(fmt = "retry unknown addr {}, kind: {}", addr, kind)]
-    RetryAddrLater { addr: Multiaddr, kind: RetryKind },
+    #[display(fmt = "unconnectable addr {}, kind: {}", addr, kind)]
+    UnconnectableAddress { addr: Multiaddr, kind: RemoveKind },
+
+    #[display(fmt = "re-connect later, addr {}, kind: {}", addr, kind)]
+    ReconnectLater { addr: Multiaddr, kind: RetryKind },
 
     // Self
     #[display(fmt = "add listen addr {}", addr)]

@@ -1,32 +1,29 @@
-use std::time::Duration;
-
 use tentacle::{
     builder::MetaBuilder,
     service::{ProtocolHandle, ProtocolMeta},
     ProtocolId,
 };
-use tentacle_discovery::AddressManager;
 
-pub const NAME: &str = "chain_discovery";
+use tentacle_identify::{Callback, IdentifyProtocol};
+
+pub const NAME: &str = "chain_identify";
 pub const SUPPORT_VERSIONS: [&str; 1] = ["0.1"];
 
-pub struct Discovery<M> {
-    inner: tentacle_discovery::DiscoveryProtocol<M>,
+pub struct Identify<C> {
+    inner: IdentifyProtocol<C>,
 }
 
-impl<M: AddressManager + Send + 'static> Discovery<M> {
-    pub fn new(addr_mgr: M, sync_interval: Duration) -> Self {
-        let inner_discovery = tentacle_discovery::Discovery::new(addr_mgr, Some(sync_interval));
+impl<C: Callback + Send + 'static> Identify<C> {
+    pub fn new(callback: C) -> Self {
+        let inner = IdentifyProtocol::new(callback);
 
         #[cfg(feature = "allow_global_ip")]
         log::info!("network: allow global ip");
 
         #[cfg(feature = "allow_global_ip")]
-        let inner_discovery = inner_discovery.global_ip_only(false);
+        let inner = inner.global_ip_only(false);
 
-        let inner = tentacle_discovery::DiscoveryProtocol::new(inner_discovery);
-
-        Discovery { inner }
+        Identify { inner }
     }
 
     pub fn build_meta(self, protocol_id: ProtocolId) -> ProtocolMeta {

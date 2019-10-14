@@ -58,7 +58,9 @@ impl<P: NetworkProtocol> ConnectionService<P> {
         keeper: ConnectionServiceKeeper,
         event_rx: UnboundedReceiver<ConnectionEvent>,
     ) -> Self {
-        let mut builder = ServiceBuilder::default().key_pair(config.secio_keypair);
+        let mut builder = ServiceBuilder::default()
+            .key_pair(config.secio_keypair)
+            .forever(true);
 
         if let Some(max) = config.max_frame_length {
             builder = builder.max_frame_length(max);
@@ -188,8 +190,6 @@ impl<P: NetworkProtocol + Unpin> Future for ConnectionService<P> {
     type Output = ();
 
     fn poll(mut self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
-        debug!("network: connection service polled");
-
         let serv_mut = &mut self.as_mut();
 
         // Process commands
@@ -197,7 +197,7 @@ impl<P: NetworkProtocol + Unpin> Future for ConnectionService<P> {
         // Pending commands first
         let mut pending_events = std::mem::replace(&mut serv_mut.pending_events, VecDeque::new());
         for event in pending_events.drain(..) {
-            debug!("network: connection service: pending event {}", event);
+            debug!("network: pending event {}", event);
 
             serv_mut.process_event(event);
         }
@@ -205,20 +205,17 @@ impl<P: NetworkProtocol + Unpin> Future for ConnectionService<P> {
         // Now received events
         // No-empty means service is temporary unavailable, try later
         while serv_mut.pending_events.is_empty() {
-            debug!("network: connection service: pending event is empty");
             let event_rx = &mut serv_mut.event_rx;
             pin_mut!(event_rx);
 
             let event = crate::service_ready!("connection service", event_rx.poll_next(ctx));
-            debug!("network: connection service: event [{}]", event);
+            debug!("network: event [{}]", event);
 
             serv_mut.process_event(event);
         }
 
         // Advance service state
         loop {
-            debug!("network: connection service: advance state");
-
             let inner = &mut serv_mut.inner;
             pin_mut!(inner);
 

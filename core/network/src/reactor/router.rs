@@ -12,7 +12,7 @@ use futures::{
     pin_mut,
     stream::Stream,
 };
-use log::{debug, error, warn};
+use log::{error, warn};
 use parking_lot::RwLock;
 
 use crate::{
@@ -104,8 +104,6 @@ where
     type Output = ();
 
     fn poll(mut self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
-        debug!("network: router service polled");
-
         loop {
             let raw_msg_rx = &mut self.as_mut().raw_msg_rx;
             pin_mut!(raw_msg_rx);

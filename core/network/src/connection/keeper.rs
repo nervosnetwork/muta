@@ -12,7 +12,7 @@ use tentacle::{
 
 use crate::{
     error::{ErrorKind, NetworkError},
-    event::{PeerManagerEvent, RemoveKind, RetryKind},
+    event::{ConnectionType, PeerManagerEvent, RemoveKind, RetryKind, Session},
 };
 
 // This macro tries to extract PublicKey from SessionContext, it's Optional.
@@ -79,7 +79,7 @@ impl ConnectionServiceKeeper {
         }
     }
 
-    fn process_connect_error(&self, error: TentacleError, addr: Multiaddr) {
+    fn process_connect_error(&self, ty: ConnectionType, error: TentacleError, addr: Multiaddr) {
         use std::io;
 
         match error {
@@ -89,9 +89,10 @@ impl ConnectionServiceKeeper {
                 self.report_peer(connect_self);
             }
             TentacleError::RepeatedConnection(sid) => {
-                let repeated_connect = PeerManagerEvent::AddSessionAddr { sid, addr };
+                // For ConnectionType::Listen, addr is remote peer's listen addr
+                let repeated_connection = PeerManagerEvent::RepeatedConnection { ty, sid, addr };
 
-                self.report_peer(repeated_connect);
+                self.report_peer(repeated_connection);
             }
             TentacleError::IoError(ref err)
                 if err.kind() == io::ErrorKind::TimedOut
@@ -102,7 +103,8 @@ impl ConnectionServiceKeeper {
                 } else {
                     RetryKind::Interrupted
                 };
-                let retry_connect_later = PeerManagerEvent::RetryAddrLater { addr, kind };
+
+                let retry_connect_later = PeerManagerEvent::ReconnectLater { addr, kind };
 
                 self.report_peer(retry_connect_later);
             }
@@ -111,7 +113,7 @@ impl ConnectionServiceKeeper {
                 let addre = addr.clone();
 
                 let kind = RemoveKind::UnableToConnect { addr: addre, err };
-                let unable_to_connect = PeerManagerEvent::RemoveAddr { addr, kind };
+                let unable_to_connect = PeerManagerEvent::UnconnectableAddress { addr, kind };
 
                 self.report_peer(unable_to_connect);
             }
@@ -123,11 +125,12 @@ impl ConnectionServiceKeeper {
 impl ServiceHandle for ConnectionServiceKeeper {
     fn handle_error(&mut self, _ctx: &mut ServiceContext, err: ServiceError) {
         match err {
-            ServiceError::DialerError { error, address }
-            | ServiceError::ListenError { error, address } => {
-                self.process_connect_error(error, address)
+            ServiceError::DialerError { error, address } => {
+                self.process_connect_error(ConnectionType::Dialer, error, address)
             }
-
+            ServiceError::ListenError { error, address } => {
+                self.process_connect_error(ConnectionType::Listen, error, address)
+            }
             ServiceError::ProtocolSelectError { session_context, proto_name } => {
                 let pid = peer_pubkey!(&session_context).peer_id();
 
@@ -200,24 +203,24 @@ impl ServiceHandle for ConnectionServiceKeeper {
         match evt {
             ServiceEvent::SessionOpen { session_context } => {
                 let pubkey = peer_pubkey!(&session_context).clone();
-                let pid = pubkey.peer_id();
-                let pidd = pid.clone();
-                let addr = session_context.address.clone();
-                let sid = Some(session_context.id);
+                let session = Session {
+                    sid: session_context.id,
+                    addr: session_context.address.clone(),
+                    ty: session_context.ty,
+                };
+                
+                let attach_peer_session = PeerManagerEvent::AttachPeerSession { pubkey, session };
 
-                let add_peer_addr = PeerManagerEvent::AddPeer { pid: pidd, pubkey, addr };
-                let attach_session = PeerManagerEvent::UpdatePeerSession { pid, sid };
-
-                self.report_peer(add_peer_addr);
-                self.report_peer(attach_session);
+                self.report_peer(attach_peer_session);
             }
             ServiceEvent::SessionClose { session_context } => {
                 let pid = peer_pubkey!(&session_context).peer_id();
-                let sid = None;
+                let sid = session_context.id;
+                let ty = session_context.ty;
 
-                let detach_session = PeerManagerEvent::UpdatePeerSession { pid, sid };
+                let detach_peer_session = PeerManagerEvent::DetachPeerSession { pid, sid, ty };
 
-                self.report_peer(detach_session);
+                self.report_peer(detach_peer_session);
             }
             ServiceEvent::ListenStarted { address } => {
                 let start_listen = PeerManagerEvent::AddListenAddr { addr: address };

@@ -50,13 +50,13 @@ impl DiscoveryAddrManager {
 
 impl AddressManager for DiscoveryAddrManager {
     fn add_new_addr(&mut self, _sid: SessionId, addr: Multiaddr) {
-        let add_addr = PeerManagerEvent::AddUnknownAddr { addr };
+        let add_addr = PeerManagerEvent::DiscoverAddr { addr };
 
         self.reporter.report(add_addr);
     }
 
     fn add_new_addrs(&mut self, _sid: SessionId, addrs: Vec<Multiaddr>) {
-        let add_multi_addrs = PeerManagerEvent::AddMultiUnknownAddrs { addrs };
+        let add_multi_addrs = PeerManagerEvent::DiscoverMultiAddrs { addrs };
 
         self.reporter.report(add_multi_addrs);
     }
