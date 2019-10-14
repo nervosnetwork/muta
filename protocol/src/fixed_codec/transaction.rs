@@ -1,7 +1,7 @@
 use bytes::Bytes;
 
 use crate::{ProtocolResult, impl_default_fixed_codec_for};
-use crate::fixed_codec::{FixedCodecError, ProtocolFixedCodec};
+use crate::fixed_codec::{FixedCodecError, ProtocolFixedCodec, bytes_to_u64};
 use crate::types::{
     transaction::{RawTransaction, TransactionAction, SignedTransaction, CarryingAsset},
     primitive::{ContractType, Hash, Balance, UserAddress, ContractAddress, Fee},
@@ -11,19 +11,19 @@ impl_default_fixed_codec_for!(transaction, [RawTransaction, SignedTransaction]);
 
 impl rlp::Encodable for RawTransaction {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
-        s.begin_list(5);
-        s.append(&self.chain_id.as_bytes().to_vec());
-        s.append(&self.fee);
-        s.append(&self.nonce.as_bytes().to_vec());
-        s.append(&self.timeout);
-        s.append(&self.action);
+        s.begin_list(5)
+            .append(&self.action)
+            .append(&self.chain_id.as_bytes().to_vec())
+            .append(&self.fee)
+            .append(&self.nonce.as_bytes().to_vec())
+            .append(&self.timeout.to_be_bytes().to_vec());
     }
 }
 
 impl rlp::Decodable for RawTransaction {
     fn decode(r: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
         if !r.is_list() && r.size() != 5 {
-            return Err(rlp::DecoderError::RlpInvalidLength);
+            return Err(rlp::DecoderError::RlpIncorrectListLen);
         }
 
         let mut values = Vec::with_capacity(5);
@@ -33,11 +33,11 @@ impl rlp::Decodable for RawTransaction {
             values.push(data)
         }
 
-        let chain_id = Hash::from_bytes(Bytes::from(values[0])).map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
-        let fee: Fee = rlp::decode(r.at(1)?.as_raw()).map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
-        let nonce = Hash::from_bytes(Bytes::from(values[2])).map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
-        let timeout = bytes_to_u64(values[3]);
-        let action: TransactionAction = rlp::decode(r.at(4)?.as_raw()).map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
+        let action: TransactionAction = rlp::decode(r.at(0)?.as_raw())?;
+        let chain_id = Hash::from_bytes(Bytes::from(values[1])).map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
+        let fee: Fee = rlp::decode(r.at(2)?.as_raw())?;
+        let nonce = Hash::from_bytes(Bytes::from(values[3])).map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
+        let timeout = bytes_to_u64(values[4]);
 
         Ok(RawTransaction {
             chain_id,
@@ -51,18 +51,18 @@ impl rlp::Decodable for RawTransaction {
 
 impl rlp::Encodable for SignedTransaction {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
-        s.begin_list(4);
-        s.append(&self.pubkey.to_vec());
-        s.append(&self.raw);
-        s.append(&self.signature.to_vec());
-        s.append(&self.tx_hash.as_bytes().to_vec());
+        s.begin_list(4)
+            .append(&self.pubkey.to_vec())
+            .append(&self.raw)
+            .append(&self.signature.to_vec())
+            .append(&self.tx_hash.as_bytes().to_vec());
     }
 }
 
 impl rlp::Decodable for SignedTransaction {
     fn decode(r: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
         if !r.is_list() && r.size() != 4 {
-            return Err(rlp::DecoderError::RlpInvalidLength);
+            return Err(rlp::DecoderError::RlpIncorrectListLen);
         }
 
         let mut values = Vec::with_capacity(4);
@@ -73,7 +73,7 @@ impl rlp::Decodable for SignedTransaction {
         }
 
         let pubkey = Bytes::from(values[0]);
-        let raw: RawTransaction = rlp::decode(r.at(1)?.as_raw()).map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
+        let raw: RawTransaction = rlp::decode(r.at(1)?.as_raw())?;
         let signature = Bytes::from(values[2]);
         let tx_hash = Hash::from_bytes(Bytes::from(values[3])).map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
 
@@ -88,9 +88,9 @@ impl rlp::Decodable for SignedTransaction {
 
 impl rlp::Encodable for CarryingAsset {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
-        s.begin_list(2);
-        s.append(&self.amount.to_bytes_be());
-        s.append(&self.asset_id.as_bytes().to_vec());
+        s.begin_list(2)
+            .append(&self.amount.to_bytes_be())
+            .append(&self.asset_id.as_bytes().to_vec());
     }
 }
 
@@ -117,21 +117,21 @@ impl rlp::Encodable for TransactionAction {
                 receiver,
                 carrying_asset,
             } => {
-                s.begin_list(3);
-                s.append(&TRANSFER_ACTION_FLAG);
-                s.append(carrying_asset);
-                s.append(&receiver.as_bytes().to_vec());
+                s.begin_list(3)
+                    .append(&TRANSFER_ACTION_FLAG)
+                    .append(carrying_asset)
+                    .append(&receiver.as_bytes().to_vec());
             }
             TransactionAction::Approve {
                 spender,
                 asset_id,
                 max,
             } => {
-                s.begin_list(4);
-                s.append(&APPROVE_ACTION_FLAG);
-                s.append(&asset_id.as_bytes().to_vec());
-                s.append(&max.to_bytes_be());
-                s.append(&spender.as_bytes().to_vec());
+                s.begin_list(4)
+                    .append(&APPROVE_ACTION_FLAG)
+                    .append(&asset_id.as_bytes().to_vec())
+                    .append(&max.to_bytes_be())
+                    .append(&spender.as_bytes().to_vec());
             }
             TransactionAction::Deploy {
                 code,
@@ -140,6 +140,7 @@ impl rlp::Encodable for TransactionAction {
                 s.begin_list(3);
                 s.append(&DEPLOY_ACTION_FLAG);
                 s.append(&code.to_vec());
+
                 let type_flag: u8 = match contract_type {
                     ContractType::Asset => 0,
                     ContractType::App => 1,
@@ -163,7 +164,8 @@ impl rlp::Decodable for TransactionAction {
         match flag {
             TRANSFER_ACTION_FLAG => {
                 let carrying_asset: CarryingAsset = rlp::decode(r.at(1)?.as_raw())?;
-                let receiver: UserAddress = UserAddress::from_bytes(Bytes::from(r.at(2)?.data()?)).map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
+                let receiver: UserAddress = UserAddress::from_bytes(Bytes::from(r.at(2)?.data()?))
+                    .map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
 
                 Ok(TransactionAction::Transfer{
                     receiver,
@@ -171,9 +173,12 @@ impl rlp::Decodable for TransactionAction {
                 })
             }
             APPROVE_ACTION_FLAG => {
-                let asset_id = Hash::from_bytes(Bytes::from(r.at(1)?.data()?)).map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
+                let asset_id = Hash::from_bytes(Bytes::from(r.at(1)?.data()?))
+                    .map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
                 let max = Balance::from_bytes_be(r.at(2)?.data()?);
-                let spender = ContractAddress::from_bytes(Bytes::from(r.at(3)?.data()?)).map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
+                let spender = ContractAddress::from_bytes(Bytes::from(r.at(3)?.data()?))
+                    .map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
+                    
                 Ok(TransactionAction::Approve{
                     spender,
                     asset_id,
@@ -203,10 +208,4 @@ impl rlp::Decodable for TransactionAction {
             _ => Err(rlp::DecoderError::RlpListLenWithZeroPrefix)
         }
     }
-}
-
-fn bytes_to_u64(bytes: &[u8]) -> u64 {
-    let mut nonce_bytes = [0u8; 8];
-    nonce_bytes.copy_from_slice(bytes);
-    u64::from_be_bytes(nonce_bytes)
 }

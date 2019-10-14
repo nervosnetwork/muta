@@ -2,9 +2,11 @@ use bytes::Bytes;
 
 use crate::{ProtocolResult, impl_default_fixed_codec_for};
 use crate::fixed_codec::{FixedCodecError, ProtocolFixedCodec};
-use crate::types::Bloom;
-use crate::types::primitive::{Hash, UserAddress, MerkleRoot};
-use crate::types::epoch::{Proof, Validator, Epoch, EpochHeader, Pill};
+use crate::types::{
+    Bloom,
+    primitive::{Hash, UserAddress, MerkleRoot},
+    epoch::{Proof, Validator, Epoch, EpochHeader, Pill},
+};
 
 impl_default_fixed_codec_for!(epoch, [Proof, Validator, Epoch, EpochHeader, Pill]);
 
@@ -12,7 +14,7 @@ impl rlp::Encodable for Proof {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
         s.begin_list(5)
             .append(&self.bitmap.to_vec())
-            .append(&self.epoch_hash.as_hex())
+            .append(&self.epoch_hash)
             .append(&self.epoch_id)
             .append(&self.round)
             .append(&self.signature.to_vec());
@@ -22,7 +24,7 @@ impl rlp::Encodable for Proof {
 impl rlp::Decodable for Proof {
     fn decode(r: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
         if !r.is_list() && r.size() != 5 {
-            return Err(rlp::DecoderError::RlpInvalidLength);
+            return Err(rlp::DecoderError::RlpIncorrectListLen);
         }
 
         let mut values = Vec::with_capacity(5);
@@ -33,9 +35,11 @@ impl rlp::Decodable for Proof {
         }
 
         let bitmap = Bytes::from(values[0]);
-        let epoch_hash = Hash::from_bytes(Bytes::from(values[1])).map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
-        let epoch_id = r.at(2)?.as_val().map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
-        let round = r.at(3)?.as_val().map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
+        // let epoch_hash = Hash::from_bytes(Bytes::from(values[1]))
+        //    .map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
+        let epoch_hash: Hash = rlp::decode(r.at(1)?.as_raw())?;
+        let epoch_id = r.at(2)?.as_val()?;
+        let round = r.at(3)?.as_val()?;
         let signature = Bytes::from(values[4]);
 
         Ok(Proof {
@@ -60,12 +64,13 @@ impl rlp::Encodable for Validator {
 impl rlp::Decodable for Validator {
     fn decode(r: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
         if !r.is_list() && r.size() != 3 {
-            return Err(rlp::DecoderError::RlpInvalidLength);
+            return Err(rlp::DecoderError::RlpIncorrectListLen);
         }
 
-        let address = UserAddress::from_bytes(Bytes::from(r.at(0)?.data()?)).map_err(|_|rlp::DecoderError::RlpInvalidLength)?;
-        let propose_weight = r.at(1)?.as_val().map_err(|_|rlp::DecoderError::RlpInvalidLength)?;
-        let vote_weight = r.at(2)?.as_val().map_err(|_|rlp::DecoderError::RlpInvalidLength)?;
+        let address = UserAddress::from_bytes(Bytes::from(r.at(0)?.data()?))
+            .map_err(|_|rlp::DecoderError::RlpInvalidLength)?;
+        let propose_weight = r.at(1)?.as_val()?;
+        let vote_weight = r.at(2)?.as_val()?;
 
         Ok(Validator {
             address,
@@ -77,29 +82,29 @@ impl rlp::Decodable for Validator {
 
 impl rlp::Encodable for EpochHeader {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
-        let confirm_root = self
-            .confirm_root
-            .iter()
-            .map(|root| root.as_hex())
-            .collect::<Vec<_>>();
-        let receipt_root = self
-            .receipt_root
-            .iter()
-            .map(|root| root.as_hex())
-            .collect::<Vec<_>>();
+        // let confirm_root = self
+        //     .confirm_root
+        //     .iter()
+        //     .map(|root| root.as_bytes().to_vec())
+        //     .collect::<Vec<_>>();
+        // let receipt_root = self
+        //     .receipt_root
+        //     .iter()
+        //     .map(|root| root.as_bytes().to_vec())
+        //     .collect::<Vec<_>>();
 
         s.begin_list(14)
-            .append(&self.chain_id.as_hex())
-            .append_list::<String, String>(&confirm_root)
+            .append(&self.chain_id)
+            .append_list(&self.confirm_root)
             .append(&self.cycles_used)
             .append(&self.epoch_id)
-            .append(&self.logs_bloom.to_low_u64_be())
-            .append(&self.order_root.as_hex())
-            .append(&self.pre_hash.as_hex())
+            .append(&self.logs_bloom)
+            .append(&self.order_root)
+            .append(&self.pre_hash)
             .append(&self.proof)
-            .append(&self.proposer.as_hex())
-            .append_list::<String, String>(&receipt_root)
-            .append(&self.state_root.as_hex())
+            .append(&self.proposer.as_bytes().to_vec())
+            .append_list(&self.receipt_root)
+            .append(&self.state_root)
             .append(&self.timestamp)
             .append(&self.validator_version)
             .append_list(&self.validators);
@@ -109,7 +114,7 @@ impl rlp::Encodable for EpochHeader {
 impl rlp::Decodable for EpochHeader {
     fn decode(r: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
         if !r.is_list() && r.size() != 14 {
-            return Err(rlp::DecoderError::RlpInvalidLength);
+            return Err(rlp::DecoderError::RlpIncorrectListLen);
         }
 
         let mut values = Vec::with_capacity(14);
@@ -119,29 +124,32 @@ impl rlp::Decodable for EpochHeader {
             values.push(data)
         }
 
-        let chain_id = Hash::from_bytes(Bytes::from(values[0])).map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
-        let confirm_root: Vec<String> = rlp::decode_list(r.at(1)?.as_raw());
+        let chain_id: Hash = rlp::decode(r.at(0)?.as_raw())?;
+        let confirm_root: Vec<Hash> = rlp::decode_list(r.at(1)?.as_raw());
         let cycles_used: u64 = r.at(2)?.as_val()?;
         let epoch_id: u64 = r.at(3)?.as_val()?;
-        let logs_bloom = Bloom::from_slice(values[4]);
-        let order_root = Hash::from_bytes(Bytes::from(values[5])).map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
-        let pre_hash = Hash::from_bytes(Bytes::from(values[6])).map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
+        // let logs_bloom = Bloom::from_slice(values[4]);
+        let logs_bloom: Bloom = rlp::decode(r.at(4)?.as_raw())?;
+        let order_root = rlp::decode(r.at(5)?.as_raw())?;
+        let pre_hash = rlp::decode(r.at(6)?.as_raw())?;
         let proof: Proof = rlp::decode(r.at(7)?.as_raw())?;
-        let proposer = UserAddress::from_bytes(Bytes::from(values[8])).map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
-        let receipt_root: Vec<String> = rlp::decode_list(r.at(9)?.as_raw());
-        let state_root = Hash::from_bytes(Bytes::from(values[10])).map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
+        let proposer = UserAddress::from_bytes(Bytes::from(values[8]))
+            .map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
+        let receipt_root: Vec<Hash> = rlp::decode_list(r.at(9)?.as_raw());
+        let state_root = rlp::decode(r.at(10)?.as_raw())?;
         let timestamp: u64 = r.at(11)?.as_val()?;
         let validator_version: u64 = r.at(12)?.as_val()?;
         let validators: Vec<Validator> = rlp::decode_list(r.at(13)?.as_raw());
 
-        let confirm_root = confirm_root
-            .iter()
-            .map(|root| MerkleRoot::from_hex(&root).unwrap())
-            .collect::<Vec<_>>();
-        let receipt_root = receipt_root
-            .iter()
-            .map(|root| MerkleRoot::from_hex(&root).unwrap())
-            .collect::<Vec<_>>();
+        //TODO: fix unwarp
+        // let confirm_root = confirm_root
+        //     .iter()
+        //     .map(|root| MerkleRoot::from_hex(&root).unwrap())
+        //     .collect::<Vec<_>>();
+        // let receipt_root = receipt_root
+        //     .iter()
+        //     .map(|root| MerkleRoot::from_hex(&root).unwrap())
+        //     .collect::<Vec<_>>();
 
         Ok(EpochHeader {
             chain_id,
@@ -179,12 +187,13 @@ impl rlp::Encodable for Epoch {
 impl rlp::Decodable for Epoch {
     fn decode(r: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
         if !r.is_list() && r.size() != 2 {
-            return Err(rlp::DecoderError::RlpInvalidLength);
+            return Err(rlp::DecoderError::RlpIncorrectListLen);
         }
 
         let header: EpochHeader = rlp::decode(r.at(0)?.as_raw())?;
         let ordered_tx_hashes: Vec<String> = rlp::decode_list(r.at(1)?.as_raw());
 
+        //TODO: fix unwrap
         let ordered_tx_hashes = ordered_tx_hashes
             .iter()
             .map(|hash| Hash::from_hex(&hash).unwrap())
@@ -214,12 +223,13 @@ impl rlp::Encodable for Pill {
 impl rlp::Decodable for Pill {
     fn decode(r: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
         if !r.is_list() && r.size() != 2 {
-            return Err(rlp::DecoderError::RlpInvalidLength);
+            return Err(rlp::DecoderError::RlpIncorrectListLen);
         }
 
         let epoch: Epoch = rlp::decode(r.at(0)?.as_raw())?;
         let propose_hashes: Vec<String> = rlp::decode_list(r.at(1)?.as_raw());
 
+        //TODO: fix unwrap
         let propose_hashes = propose_hashes
             .iter()
             .map(|hash| Hash::from_hex(&hash).unwrap())
