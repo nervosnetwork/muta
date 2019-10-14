@@ -84,14 +84,12 @@ impl<StateAdapter: ContractStateAdapter> BankContract<StateAdapter>
                 FixedAsset::new(asset.clone()),
             )?;
 
-        let mut fee = ictx.borrow().cycles_used.clone();
-        consume_cycles(
+        let cycles_used = consume_cycles(
             CyclesAction::BankRegister,
-            ictx.borrow().cycles_price,
-            &mut fee,
-            &ictx.borrow().cycles_limit,
+            ictx.borrow().cycles_used,
+            ictx.borrow().cycles_limit,
         )?;
-        ictx.borrow_mut().cycles_used = fee;
+        ictx.borrow_mut().cycles_used = cycles_used;
         Ok(asset)
     }
 

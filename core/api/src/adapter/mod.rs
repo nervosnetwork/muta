@@ -6,7 +6,9 @@ use bytes::Bytes;
 
 use protocol::traits::executor::{ExecutorFactory, ReadonlyResp, TrieDB};
 use protocol::traits::{APIAdapter, Context, MemPool, Storage};
-use protocol::types::{Address, Balance, ContractAddress, Epoch, Hash, Receipt, SignedTransaction};
+use protocol::types::{
+    Address, AssetID, Balance, ContractAddress, Epoch, Hash, Receipt, SignedTransaction,
+};
 use protocol::ProtocolResult;
 
 pub struct DefaultAPIAdapter<M, S, DB, EF>
@@ -72,8 +74,24 @@ where
         self.storage.get_receipt(tx_hash).await
     }
 
-    async fn get_balance(&self, _ctx: Context, _address: &Address) -> ProtocolResult<Balance> {
-        Ok(Balance::from(0u64))
+    async fn get_balance(
+        &self,
+        _ctx: Context,
+        address: &Address,
+        id: &AssetID,
+    ) -> ProtocolResult<Balance> {
+        let epoch: Epoch = self.storage.get_latest_epoch().await?;
+
+        let executor = EF::from_root(
+            epoch.header.chain_id,
+            epoch.header.state_root.clone(),
+            Arc::clone(&self.trie_db),
+            epoch.header.epoch_id,
+            0,
+            Address::User(epoch.header.proposer.clone()),
+        )?;
+
+        executor.get_balance(address, id)
     }
 
     async fn readonly(

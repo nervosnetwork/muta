@@ -46,8 +46,9 @@ fn mock_invoke_context(
         epoch_id: 1,
         coinbase: caller.clone(),
         caller,
-        cycles_used,
-        cycles_limit,
+        cycles_used: cycles_used.cycle,
+        cycles_limit: cycles_limit.cycle,
+        fee_asset_id: cycles_used.asset_id,
         carrying_asset,
     };
 
