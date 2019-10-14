@@ -7,8 +7,8 @@ use std::sync::Arc;
 use bytes::Bytes;
 
 use crate::types::{
-    Address, Bloom, CarryingAsset, ContractAddress, Fee, Genesis, Hash, MerkleRoot, Receipt,
-    SignedTransaction, UserAddress,
+    Address, AssetID, Balance, Bloom, CarryingAsset, ContractAddress, Fee, Genesis, Hash,
+    MerkleRoot, Receipt, SignedTransaction, UserAddress,
 };
 use crate::ProtocolResult;
 
@@ -49,13 +49,16 @@ pub trait Executor {
         method: String,
         args: Vec<Bytes>,
     ) -> ProtocolResult<ReadonlyResp>;
+
+    fn get_balance(&self, address: &Address, id: &AssetID) -> ProtocolResult<Balance>;
 }
 
 #[derive(Clone, Debug)]
 pub struct InvokeContext {
     pub chain_id:       Hash,
-    pub cycles_used:    Fee,
-    pub cycles_limit:   Fee,
+    pub cycles_used:    u64,
+    pub cycles_limit:   u64,
+    pub fee_asset_id:   AssetID,
     pub cycles_price:   u64,
     pub epoch_id:       u64,
     pub caller:         Address,
@@ -83,9 +86,10 @@ pub trait ContractSer: Clone {
 #[derive(Clone, Debug)]
 pub struct CallContext {
     pub chain_id:         Hash,
-    pub cycles_used:      Fee,
-    pub cycles_limit:     Fee,
+    pub cycles_used:      u64,
+    pub cycles_limit:     u64,
     pub cycles_price:     u64,
+    pub fee_asset_id:     AssetID,
     pub epoch_id:         u64,
     pub caller:           Address,
     pub origin:           UserAddress,

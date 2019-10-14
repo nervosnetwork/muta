@@ -4,7 +4,6 @@ use std::error::Error;
 use derive_more::{Display, From};
 use lazy_static::lazy_static;
 
-use protocol::types::Fee;
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
 const NATIVE_BASE_CYCLES: u64 = 10;
@@ -26,22 +25,19 @@ pub enum CyclesAction {
 
 pub fn consume_cycles(
     action: CyclesAction,
-    cycles_price: u64,
-    fee: &mut Fee,
-    limit: &Fee,
-) -> ProtocolResult<()> {
-    let cycles_used = fee.cycle
+    cycles_used: u64,
+    cycles_limit: u64,
+) -> ProtocolResult<u64> {
+    let cycles_used = cycles_used
         + CYCLES_TABLE
             .get(&action)
             .unwrap_or_else(|| panic!("cycles action {:?} uninitialized", action));
-    let cycles_used = cycles_used * cycles_price;
 
-    if cycles_used > limit.cycle {
+    if cycles_used > cycles_limit {
         return Err(CyclesError::OutOfCycles.into());
     }
 
-    fee.cycle = cycles_used;
-    Ok(())
+    Ok(cycles_used)
 }
 
 #[derive(Debug, Display, From)]

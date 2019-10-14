@@ -11,6 +11,7 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::num::ParseIntError;
 use std::rc::Rc;
+use std::str::FromStr;
 use std::sync::Arc;
 use std::u64;
 
@@ -57,14 +58,9 @@ impl<DB: TrieDB> Executor for TransactionExecutor<DB> {
             epoch_id:       0,
             coinbase:       self.coinbase.clone(),
             caller:         self.coinbase.clone(),
-            cycles_used:    Fee {
-                asset_id: Hash::from_empty(),
-                cycle:    0,
-            },
-            cycles_limit:   Fee {
-                asset_id: Hash::from_empty(),
-                cycle:    999_999_999_999,
-            },
+            cycles_used:    0,
+            cycles_limit:   999_999_999_999,
+            fee_asset_id:   Hash::from_empty(),
             carrying_asset: None,
         };
         let ictx = Rc::new(RefCell::new(ictx));
@@ -90,13 +86,10 @@ impl<DB: TrieDB> Executor for TransactionExecutor<DB> {
 
             for asset in &alloc.assets {
                 let asset_id = Hash::from_hex(&asset.asset_id)?;
-                let balance_byets =
-                    hex::decode(asset.balance.clone()).map_err(TransactionExecutorError::from)?;
-
                 self.account_contract.add_balance(
                     &asset_id,
                     &address,
-                    Balance::from_bytes_be(balance_byets.as_ref()),
+                    Balance::from_str(&asset.balance).expect("balance must be legal hex string"),
                 )?;
             }
         }
@@ -112,16 +105,14 @@ impl<DB: TrieDB> Executor for TransactionExecutor<DB> {
         args: Vec<Bytes>,
     ) -> ProtocolResult<ReadonlyResp> {
         let from_address = UserAddress::from_hex("100000000000000000000000000000000000000000")?;
-        let asset_id =
-            AssetID::from_hex("0000000000000000000000000000000000000000000000000000000000000000")
-                .unwrap();
-        let fee = Fee { asset_id, cycle: 0 };
+
         let ictx = Rc::new(RefCell::new(CallContext {
             origin: from_address,
             chain_id: self.chain_id.clone(),
-            cycles_used: fee.clone(),
-            cycles_limit: fee.clone(),
+            cycles_used: 0,
+            cycles_limit: 0,
             cycles_price: self.cycles_price,
+            fee_asset_id: AssetID::from_empty(),
             epoch_id: self.epoch_id,
             caller: self.coinbase.clone(),
             coinbase: self.coinbase.clone(),
@@ -136,6 +127,10 @@ impl<DB: TrieDB> Executor for TransactionExecutor<DB> {
         } else {
             panic!("Unsupported address");
         }
+    }
+
+    fn get_balance(&self, address: &Address, id: &AssetID) -> ProtocolResult<Balance> {
+        self.account_contract.get_balance(id, address)
     }
 
     fn exec(&mut self, signed_txs: Vec<SignedTransaction>) -> ProtocolResult<ExecutorExecResp> {
@@ -172,7 +167,10 @@ impl<DB: TrieDB> Executor for TransactionExecutor<DB> {
             let receipt = Receipt {
                 state_root: Hash::from_empty(),
                 epoch_id: ictx.borrow().epoch_id,
-                cycles_used: ictx.borrow().cycles_used.clone(),
+                cycles_used: Fee {
+                    asset_id: ictx.borrow().fee_asset_id.clone(),
+                    cycle:    ictx.borrow().cycles_used,
+                },
                 result: res,
                 tx_hash,
             };
@@ -238,6 +236,7 @@ impl<DB: TrieDB> TransactionExecutor<DB> {
                     cycles_used:      borrow_ictx.cycles_used.clone(),
                     cycles_limit:     borrow_ictx.cycles_limit.clone(),
                     cycles_price:     borrow_ictx.cycles_price,
+                    fee_asset_id:     borrow_ictx.fee_asset_id.clone(),
                     epoch_id:         borrow_ictx.epoch_id,
                     caller:           borrow_ictx.caller.clone(),
                     coinbase:         borrow_ictx.coinbase.clone(),
@@ -272,9 +271,9 @@ impl<DB: TrieDB> TransactionExecutor<DB> {
         ictx: RcInvokeContext,
         to: &Address,
     ) -> ProtocolResult<ReceiptResult> {
-        let from = &ictx.borrow().caller;
-        let carrying_asset = ictx
-            .borrow()
+        let cloned_ictx = { ictx.borrow().clone() };
+        let from = &cloned_ictx.caller;
+        let carrying_asset = cloned_ictx
             .carrying_asset
             .clone()
             .expect("in transfer, `carrying_asset` cannot be empty");
@@ -459,11 +458,9 @@ fn gen_invoke_ctx(
 ) -> ProtocolResult<RcInvokeContext> {
     let mut ctx = InvokeContext {
         chain_id: chain_id.clone(),
-        cycles_used: Fee {
-            asset_id: signed_tx.raw.fee.asset_id.clone(),
-            cycle:    0,
-        },
-        cycles_limit: signed_tx.raw.fee.clone(),
+        cycles_used: 0,
+        cycles_limit: signed_tx.raw.fee.cycle,
+        fee_asset_id: signed_tx.raw.fee.asset_id.clone(),
         caller: Address::User(UserAddress::from_pubkey_bytes(signed_tx.pubkey.clone())?),
         coinbase: coinbase.clone(),
         epoch_id,

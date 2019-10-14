@@ -21,8 +21,9 @@ use protocol::types::{CarryingAsset, SignedTransaction};
 
 use crate::config::GraphQLConfig;
 use crate::schema::{
-    Bytes, ContractType, Epoch, Hash, InputCallAction, InputDeployAction, InputRawTransaction,
-    InputReadonly, InputTransactionEncryption, InputTransferAction,
+    Address, AssetID, Balance, Bytes, ContractType, Epoch, Hash, InputCallAction,
+    InputDeployAction, InputRawTransaction, InputReadonly, InputTransactionEncryption,
+    InputTransferAction,
 };
 
 pub async fn start_graphql<Adapter: APIAdapter + 'static>(cfg: GraphQLConfig, adapter: Adapter) {
@@ -84,6 +85,16 @@ impl Query {
         .map_err(FieldError::from)?;
 
         Ok(String::from_utf8_lossy(res.return_value.as_ref()).to_string())
+    }
+
+    #[graphql(name = "getBalance", description = "Get account balance")]
+    fn get_latest_epoch(state_ctx: &State, address: Address, id: AssetID) -> FieldResult<Balance> {
+        let address = protocol::types::Address::from_hex(&address.as_hex())?;
+        let id = protocol::types::AssetID::from_hex(&id.as_hex())?;
+
+        let balance = block_on(state_ctx.adapter.get_balance(Context::new(), &address, &id))
+            .map_err(FieldError::from)?;
+        Ok(Balance::from(balance))
     }
 }
 
