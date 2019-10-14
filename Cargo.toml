@@ -30,6 +30,8 @@ rlp = "0.4"
 
 [workspace]
 members = [
+  "devtools/keypair",
+
   "common/channel",
   "common/config-parser",
   "common/crypto",
