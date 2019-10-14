@@ -6,7 +6,54 @@ use overlord::Codec;
 use rlp::{Encodable, RlpStream};
 
 use protocol::codec::{Deserialize, ProtocolCodecSync, Serialize};
-use protocol::types::{Hash, Pill, Proof, SignedTransaction, Validator};
+use protocol::types::{Epoch, Hash, Pill, Proof, SignedTransaction, Validator};
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub enum ConsensusRpcRequest {
+    PullEpochs(u64),
+    PullTxs(PullTxsRequest),
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub enum ConsensusRpcResponse {
+    PullEpochs(Box<FixedEpoch>),
+    PullTxs(Box<FixedSignedTxs>),
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct FixedEpochID {
+    pub inner: u64,
+}
+
+impl FixedEpochID {
+    pub fn new(inner: u64) -> Self {
+        FixedEpochID { inner }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct PullTxsRequest {
+    #[serde(with = "core_network::serde_multi")]
+    pub inner: Vec<Hash>,
+}
+
+impl PullTxsRequest {
+    pub fn new(inner: Vec<Hash>) -> Self {
+        PullTxsRequest { inner }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct FixedEpoch {
+    #[serde(with = "core_network::serde")]
+    pub inner: Epoch,
+}
+
+impl FixedEpoch {
+    pub fn new(inner: Epoch) -> Self {
+        FixedEpoch { inner }
+    }
+}
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct FixedSignedTxs {
@@ -27,7 +74,13 @@ impl Codec for FixedSignedTxs {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+impl FixedSignedTxs {
+    pub fn new(inner: Vec<SignedTransaction>) -> Self {
+        FixedSignedTxs { inner }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FixedPill {
     pub inner: Pill,
 }

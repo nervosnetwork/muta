@@ -35,4 +35,6 @@ If everything goes well, you’ll see this appear:
 [2019-09-25T15:26:14Z INFO  muta] Go with config: Config { .. }
 ```
 
+Go to [http://127.0.0.1:8000/graphiql](http://127.0.0.1:8000/graphiql) to communicate with the chain and read the documentations after the chain is running.
+
 The develop chain is worked on **LOCAL** and **SINGLE NODE**.
