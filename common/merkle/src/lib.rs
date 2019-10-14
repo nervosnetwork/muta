@@ -2,8 +2,7 @@ use bytes::Bytes;
 use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 use static_merkle_tree::Tree;
 
-use protocol::types::{Hash, Receipt};
-use protocol::{codec::ProtocolCodecSync, ProtocolResult};
+use protocol::types::Hash;
 
 #[derive(Debug, Clone)]
 pub struct ProofNode {
@@ -22,12 +21,12 @@ impl Merkle {
     }
 
     /// **TODO:** change codec into rlp
-    pub async fn from_receipts(receipts: &[Receipt]) -> ProtocolResult<Merkle> {
+    pub async fn from_receipts(receipts: &[Bytes]) -> Merkle {
         let hashes = receipts
             .par_iter()
-            .map(|receipt| Hash::digest(receipt.encode_sync().unwrap()))
+            .map(|receipt| Hash::digest(receipt.to_owned()))
             .collect();
-        Ok(Merkle::from_hashes(hashes))
+        Merkle::from_hashes(hashes)
     }
 
     pub fn get_root_hash(&self) -> Hash {
