@@ -17,6 +17,12 @@ impl<C: Callback + Send + 'static> Identify<C> {
     pub fn new(callback: C) -> Self {
         let inner = IdentifyProtocol::new(callback);
 
+        #[cfg(feature = "allow_global_ip")]
+        log::info!("network: allow global ip");
+
+        #[cfg(feature = "allow_global_ip")]
+        let inner = inner.global_ip_only(false);
+
         Identify { inner }
     }
 

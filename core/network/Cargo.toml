@@ -36,3 +36,6 @@ runtime-tokio = "0.3.0-alpha.6"
 quickcheck = "0.9"
 quickcheck_macros = "0.8"
 lazy_static = "1.4"
+
+[features]
+allow_global_ip = []

@@ -17,6 +17,13 @@ pub struct Discovery<M> {
 impl<M: AddressManager + Send + 'static> Discovery<M> {
     pub fn new(addr_mgr: M, sync_interval: Duration) -> Self {
         let inner_discovery = tentacle_discovery::Discovery::new(addr_mgr, Some(sync_interval));
+
+        #[cfg(feature = "allow_global_ip")]
+        log::info!("network: allow global ip");
+
+        #[cfg(feature = "allow_global_ip")]
+        let inner_discovery = inner_discovery.global_ip_only(false);
+
         let inner = tentacle_discovery::DiscoveryProtocol::new(inner_discovery);
 
         Discovery { inner }
