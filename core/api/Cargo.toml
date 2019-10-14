@@ -18,4 +18,4 @@ async-trait = "0.1"
 hex = "0.3"
 rlp = "0.4"
 bytes = "0.4"
-futures-preview = { version = "0.3.0-alpha.18" }
+futures-preview = { version = "0.3.0-alpha.19" }
