@@ -39,3 +39,8 @@ lazy_static = "1.4"
 
 [features]
 allow_global_ip = []
+
+[[test]]
+name = "broadcast"
+path = "tests/gossip_test.rs"
+required-features = [ "allow_global_ip" ]

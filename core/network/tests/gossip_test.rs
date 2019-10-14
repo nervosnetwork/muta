@@ -66,7 +66,7 @@ impl MessageHandler for NewsReader {
 // FIXME: sometimes timeout
 #[runtime::test(runtime_tokio::Tokio)]
 #[ignore]
-async fn test_broadcast() {
+async fn broadcast() {
     env_logger::init();
 
     let (test_tx, mut test_rx) = unbounded();
