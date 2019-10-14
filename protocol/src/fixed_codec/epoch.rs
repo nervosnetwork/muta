@@ -172,15 +172,15 @@ impl rlp::Decodable for EpochHeader {
 
 impl rlp::Encodable for Epoch {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
-        let ordered_tx_hashes = self
-            .ordered_tx_hashes
-            .iter()
-            .map(|root| root.as_hex())
-            .collect::<Vec<_>>();
+        // let ordered_tx_hashes = self
+        //     .ordered_tx_hashes
+        //     .iter()
+        //     .map(|root| root.as_hex())
+        //     .collect::<Vec<_>>();
 
         s.begin_list(2)
             .append(&self.header)
-            .append_list::<String, String>(&ordered_tx_hashes);
+            .append_list(&self.ordered_tx_hashes);
     }
 }
 
@@ -191,13 +191,13 @@ impl rlp::Decodable for Epoch {
         }
 
         let header: EpochHeader = rlp::decode(r.at(0)?.as_raw())?;
-        let ordered_tx_hashes: Vec<String> = rlp::decode_list(r.at(1)?.as_raw());
+        let ordered_tx_hashes: Vec<Hash> = rlp::decode_list(r.at(1)?.as_raw());
 
         //TODO: fix unwrap
-        let ordered_tx_hashes = ordered_tx_hashes
-            .iter()
-            .map(|hash| Hash::from_hex(&hash).unwrap())
-            .collect::<Vec<_>>();
+        // let ordered_tx_hashes = ordered_tx_hashes
+        //     .iter()
+        //     .map(|hash| Hash::from_hex(&hash).unwrap())
+        //     .collect::<Vec<_>>();
 
         Ok(Epoch {
             header,
@@ -208,15 +208,9 @@ impl rlp::Decodable for Epoch {
 
 impl rlp::Encodable for Pill {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
-        let propose_hashes = self
-            .propose_hashes
-            .iter()
-            .map(|root| root.as_hex())
-            .collect::<Vec<_>>();
-
         s.begin_list(2)
             .append(&self.epoch)
-            .append_list::<String, String>(&propose_hashes);
+            .append_list(&self.propose_hashes);
     }
 }
 
@@ -227,13 +221,7 @@ impl rlp::Decodable for Pill {
         }
 
         let epoch: Epoch = rlp::decode(r.at(0)?.as_raw())?;
-        let propose_hashes: Vec<String> = rlp::decode_list(r.at(1)?.as_raw());
-
-        //TODO: fix unwrap
-        let propose_hashes = propose_hashes
-            .iter()
-            .map(|hash| Hash::from_hex(&hash).unwrap())
-            .collect::<Vec<_>>();
+        let propose_hashes: Vec<Hash> = rlp::decode_list(r.at(1)?.as_raw());
 
         Ok(Pill {
             epoch,

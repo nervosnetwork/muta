@@ -8,17 +8,9 @@ use crate::{
     types::{Asset, AssetID, Fee, Balance, ContractAddress, Hash, Address, Account, AssetInfo, ApprovedInfo, UserAccount, MerkleRoot, ContractAccount},
 };
 
+impl_default_fixed_codec_for!(primitive, [Hash, Asset, Fee, Account]); 
+
 // AssetID, MerkleRoot are alias of Hash type
-impl ProtocolFixedCodec for Hash {
-    fn encode_fixed(&self) -> ProtocolResult<Bytes> {
-        Ok(self.as_bytes())
-    }
-
-    fn decode_fixed(bytes: Bytes) -> ProtocolResult<Self> {
-        AssetID::from_bytes(bytes)
-    }
-}
-
 impl rlp::Encodable for Hash {
     /// Append a value to the stream
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
@@ -49,16 +41,14 @@ impl ProtocolFixedCodec for Address {
     }
 }
 
-impl_default_fixed_codec_for!(primitive, [Asset, Fee, Account]); 
-
 impl rlp::Encodable for Asset {
     /// Append a value to the stream
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
         s.begin_list(6)
-            .append(&self.id.as_bytes().to_vec())
+            .append(&self.id)
             .append(&self.manage_contract.as_bytes().to_vec())
             .append(&self.name.as_bytes())
-            .append(&self.storage_root.as_bytes().to_vec())
+            .append(&self.storage_root)
             .append(&self.supply.to_bytes_be())
             .append(&self.symbol.as_bytes());
     }
@@ -78,14 +68,12 @@ impl rlp::Decodable for Asset {
             values.push(data)
         }
 
-        let id = Hash::from_bytes(Bytes::from(values[0]))
-            .map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
+        let id: Hash = rlp::decode(r.at(0)?.as_raw())?;
         let manage_contract = ContractAddress::from_bytes(Bytes::from(values[1]))
             .map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
         let name = String::from_utf8(values[2].to_vec())
             .map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
-        let storage_root = Hash::from_bytes(Bytes::from(values[3]))
-            .map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
+        let storage_root: Hash = rlp::decode(r.at(0)?.as_raw())?;
         let supply = Balance::from_bytes_be(values[4]);
         let symbol = String::from_utf8(values[5].to_vec())
             .map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
@@ -104,8 +92,8 @@ impl rlp::Decodable for Asset {
 impl rlp::Encodable for Fee {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
         s.begin_list(2)
-            .append(&self.asset_id.as_bytes().to_vec())
-            .append(&self.cycle.to_be_bytes().to_vec());
+            .append(&self.asset_id)
+            .append(&self.cycle);
     }
 }
 
@@ -115,9 +103,8 @@ impl rlp::Decodable for Fee {
             return Err(rlp::DecoderError::RlpIncorrectListLen);
         }
 
-        let asset_id = Hash::from_bytes(Bytes::from(r.at(0)?.data()?))
-            .map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
-        let cycle = bytes_to_u64(r.at(1)?.data()?);
+        let asset_id: Hash = rlp::decode(r.at(0)?.as_raw())?;
+        let cycle = r.at(1)?.as_val()?;
 
         Ok(Fee {
             asset_id,
@@ -150,7 +137,7 @@ impl rlp::Encodable for Account {
                 }
 
                 s.append_list(&asset_list);
-                s.append(&user.nonce.to_be_bytes().to_vec());
+                s.append(&user.nonce);
             }
             Account::Contract(contract) => {
                 s.begin_list(4);
@@ -168,8 +155,8 @@ impl rlp::Encodable for Account {
                 }
 
                 s.append_list(&asset_list);
-                s.append(&contract.nonce.to_be_bytes().to_vec());
-                s.append(&contract.storage_root.as_bytes().to_vec());
+                s.append(&contract.nonce);
+                s.append(&contract.storage_root);
             }
         }
     }
@@ -184,7 +171,7 @@ impl rlp::Decodable for Account {
         match flag {
             USER_ACCOUNT_FLAG => {
                 let asset_list: Vec<FixedUserAsset> = rlp::decode_list(r.at(1)?.as_raw());
-                let nonce = bytes_to_u64(r.at(2)?.data()?);
+                let nonce = r.at(2)?.as_val()?;
 
                 let mut assets = BTreeMap::new();
 
@@ -206,10 +193,8 @@ impl rlp::Decodable for Account {
                     assets.insert(v.id, v.balance);
                 }
 
-                let nonce = bytes_to_u64(r.at(2)?.data()?);
-                let storage_root_bytes = r.at(3)?.data()?;
-                let storage_root = MerkleRoot::from_bytes(Bytes::from(storage_root_bytes))
-                    .map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
+                let nonce = r.at(2)?.as_val()?;
+                let storage_root: Hash = rlp::decode(r.at(3)?.as_raw())?;
 
                 Ok(Account::Contract(ContractAccount {
                         nonce,

@@ -5,11 +5,12 @@ mod fixed_codec;
 use bytes::Bytes;
 use num_traits::FromPrimitive;
 use rand::random;
+use std::collections::BTreeMap;
 
 use crate::types::{
     epoch::{Epoch, EpochHeader, EpochId, Pill, Proof, Validator},
     primitive::{
-        Asset, AssetID, Balance, ContractAddress, ContractType, Fee, Hash, MerkleRoot, UserAddress,
+        Asset, AssetID, Balance, ContractAddress, ContractType, Fee, Hash, MerkleRoot, UserAddress, UserAccount, AssetInfo, ContractAccount, Account
     },
     receipt::{Receipt, ReceiptResult},
     transaction::{CarryingAsset, RawTransaction, SignedTransaction, TransactionAction},
@@ -73,6 +74,32 @@ fn mock_fee() -> Fee {
     Fee {
         asset_id: mock_asset_id(),
         cycle:    10,
+    }
+}
+
+fn mock_account() -> Account {
+    Account::Contract(mock_contract_account())
+}
+
+fn mock_user_account() -> UserAccount {
+    UserAccount {
+        nonce: 8,
+        assets: BTreeMap::default()
+    }
+}
+
+fn mock_contract_account() -> ContractAccount {
+    ContractAccount {
+        nonce: 8,
+        assets: BTreeMap::default(),
+        storage_root: mock_hash()
+    }
+}
+
+fn mock_asset_info() -> AssetInfo {
+    AssetInfo {
+        balance: mock_balance(),
+        approved: BTreeMap::default()
     }
 }
 
