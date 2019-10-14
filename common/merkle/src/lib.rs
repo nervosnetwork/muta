@@ -1,5 +1,4 @@
 use bytes::Bytes;
-use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 use static_merkle_tree::Tree;
 
 use protocol::types::Hash;
@@ -20,19 +19,10 @@ impl Merkle {
         Merkle { tree }
     }
 
-    /// **TODO:** change codec into rlp
-    pub async fn from_receipts(receipts: &[Bytes]) -> Merkle {
-        let hashes = receipts
-            .par_iter()
-            .map(|receipt| Hash::digest(receipt.to_owned()))
-            .collect();
-        Merkle::from_hashes(hashes)
-    }
-
-    pub fn get_root_hash(&self) -> Hash {
+    pub fn get_root_hash(&self) -> Option<Hash> {
         match self.tree.get_root_hash() {
-            Some(hash) => hash.clone(),
-            None => Merkle::empty_root(),
+            Some(hash) => Some(hash.clone()),
+            None => None,
         }
     }
 
@@ -49,12 +39,6 @@ impl Merkle {
                     })
                     .collect()
             })
-    }
-
-    pub fn empty_root() -> Hash {
-        let mut root = [];
-        root.copy_from_slice(&rlp::NULL_RLP[..]);
-        Hash::digest(Bytes::from(root.to_vec()))
     }
 }
 
