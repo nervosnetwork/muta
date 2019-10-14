@@ -385,6 +385,12 @@ dependencies = [
 [[package]]
 name = "common-merkle"
 version = "0.1.0"
+dependencies = [
+ "bytes 0.4.12 (registry+https://github.com/rust-lang/crates.io-index)",
+ "protocol 0.1.0",
+ "rayon 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "static_merkle_tree 1.0.0 (git+https://github.com/yejiayu/static-merkle-tree.git?branch=trait_scope)",
+]
 
 [[package]]
 name = "common-metrics"
@@ -2798,6 +2804,11 @@ version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "static_merkle_tree"
+version = "1.0.0"
+source = "git+https://github.com/yejiayu/static-merkle-tree.git?branch=trait_scope#5b285e5aecdf56d8249d2839379b717676e10672"
+
+[[package]]
 name = "stream-cipher"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3959,6 +3970,7 @@ dependencies = [
 "checksum spin 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)" = "6e63cff320ae2c57904679ba7cb63280a3dc4613885beafb148ee7bf9aa9042d"
 "checksum stable_deref_trait 1.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "dba1a27d3efae4351c8051072d619e3ade2820635c3958d826bfea39d59b54c8"
 "checksum static_assertions 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)" = "c19be23126415861cb3a23e501d34a708f7f9b2183c5252d690941c2e69199d5"
+"checksum static_merkle_tree 1.0.0 (git+https://github.com/yejiayu/static-merkle-tree.git?branch=trait_scope)" = "<none>"
 "checksum stream-cipher 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)" = "8131256a5896cabcf5eb04f4d6dacbe1aefda854b0d9896e09cb58829ec5638c"
 "checksum string 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "d24114bfcceb867ca7f71a0d3fe45d45619ec47a6fbfa98cb14e14250bfa5d6d"
 "checksum stringreader 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "913e7b03d63752f6cdd2df77da36749d82669904798fe8944b9ec3d23f159905"
