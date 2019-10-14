@@ -47,7 +47,7 @@ use tentacle::{
 use crate::{
     common::HeartBeat,
     error::NetworkError,
-    event::{ConnectionEvent, ConnectionType, MultiUsersMessage, PeerManagerEvent},
+    event::{ConnectionEvent, ConnectionType, MultiUsersMessage, PeerManagerEvent, Session},
 };
 
 const MAX_RETRY_COUNT: usize = 6;
@@ -444,7 +444,7 @@ impl PeerManagerHandle {
         let listen = self.inner.listen();
         debug_assert!(listen.is_some(), "listen should alway be set");
 
-        listen.map(|addr| vec![addr]).unwrap_or_else(|| Vec::new())
+        listen.map(|addr| vec![addr]).unwrap_or_else(Vec::new)
     }
 }
 
@@ -594,14 +594,59 @@ impl PeerManager {
         }
     }
 
-    fn attach_peer_session(&mut self, pid: PeerId, sid: SessionId) {
+    fn attach_peer_session(&mut self, pubkey: PublicKey, session: Session) {
+        let Session { sid, addr, ty } = session;
+
+        let user_addr = Peer::pubkey_to_addr(&pubkey).as_hex();
+        let pid = pubkey.peer_id();
+
+        let peer_listen = match ty {
+            SessionType::Inbound => {
+                // Inbound address is useless, we cannot use it to
+                // connect to that peer.
+                debug!("network: {:?}: inbound addr {:?}", self.peer_id, addr);
+
+                None
+            }
+            SessionType::Outbound => Some(addr),
+        };
+
+        if !self.inner.peer_exist(&pid) {
+            info!(
+                "network: {:?}: new peer {:?}, user addr {}, session {:?}",
+                self.peer_id, pid, user_addr, sid
+            );
+
+            self.add_peer(pubkey, peer_listen);
+        } else if let Some(addr) = peer_listen {
+            self.inner.add_peer_addr(&pid, addr);
+        }
+
         self.inner.set_connected(&pid);
 
         self.peer_session.insert(pid.clone(), sid);
         self.session_peer.insert(sid, pid);
     }
 
-    fn detach_peer_session(&mut self, pid: &PeerId) {
+    fn detach_peer_session(&mut self, pid: PeerId) {
+        let user_addr = self.inner.pid_user_addr(&pid);
+        info!("network: detach session user addr {:?}", user_addr);
+
+        self.close_peer_session(&pid);
+
+        if let Some(alive) = self.inner.peer_alive(&pid) {
+            if alive < ALIVE_RETRY_INTERVAL {
+                warn!(
+                    "network: {:?}: peer {:?} connection live too short",
+                    self.peer_id, pid
+                );
+
+                self.increase_peer_retry(&pid);
+            }
+        }
+    }
+
+    fn close_peer_session(&mut self, pid: &PeerId) {
         self.inner.disconnect_peer(pid);
 
         if let Some(sid) = self.peer_session.remove(pid) {
@@ -651,12 +696,12 @@ impl PeerManager {
             }
         }
 
-        return false;
+        false
     }
 
     fn cleanly_remove_peer(&mut self, pid: &PeerId) {
         // Clean up session mapping
-        self.detach_peer_session(&pid);
+        self.close_peer_session(&pid);
 
         if self.is_bootstrap_peer(pid) {
             error!("network: reset max bootstrap {:?} retry count", pid);
@@ -698,7 +743,7 @@ impl PeerManager {
         if !condidate_pids.is_empty() {
             let addrs = condidate_pids.iter().map(|pid| {
                 self.inner.connect_peer(pid);
-                self.inner.peer_addrs(pid).unwrap_or_else(|| Vec::new())
+                self.inner.peer_addrs(pid).unwrap_or_else(Vec::new)
             });
 
             condidates = addrs.flatten().collect();
@@ -775,55 +820,11 @@ impl PeerManager {
 
     fn process_event(&mut self, event: PeerManagerEvent) {
         match event {
-            PeerManagerEvent::AttachPeerSession {
-                pubkey,
-                addr,
-                sid,
-                ty,
-            } => {
-                let user_addr = Peer::pubkey_to_addr(&pubkey).as_hex();
-                let pid = pubkey.peer_id();
-
-                let peer_listen = match ty {
-                    SessionType::Inbound => {
-                        // Inbound address is useless, we cannot use it to
-                        // connect to that peer.
-                        debug!("network: {:?}: inbound addr {:?}", self.peer_id, addr);
-
-                        None
-                    }
-                    SessionType::Outbound => Some(addr),
-                };
-
-                if !self.inner.peer_exist(&pid) {
-                    info!(
-                        "network: {:?}: new peer {:?}, user addr {}, session {:?}",
-                        self.peer_id, pid, user_addr, sid
-                    );
-
-                    self.add_peer(pubkey, peer_listen);
-                } else if let Some(addr) = peer_listen {
-                    self.inner.add_peer_addr(&pid, addr);
-                }
-
-                self.attach_peer_session(pid, sid);
+            PeerManagerEvent::AttachPeerSession { pubkey, session } => {
+                self.attach_peer_session(pubkey, session);
             }
             PeerManagerEvent::DetachPeerSession { pid, .. } => {
-                let user_addr = self.inner.pid_user_addr(&pid);
-                info!("network: detach session user addr {:?}", user_addr);
-
-                self.detach_peer_session(&pid);
-
-                if let Some(alive) = self.inner.peer_alive(&pid) {
-                    if alive < ALIVE_RETRY_INTERVAL {
-                        warn!(
-                            "network: {:?}: peer {:?} connection live too short",
-                            self.peer_id, pid
-                        );
-
-                        self.increase_peer_retry(&pid);
-                    }
-                }
+                self.detach_peer_session(pid);
             }
             PeerManagerEvent::PeerAlive { pid } => {
                 let user_addr = self.inner.pid_user_addr(&pid);

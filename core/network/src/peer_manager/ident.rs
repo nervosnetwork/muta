@@ -58,7 +58,7 @@ impl IdentifyCallback {
 // and verify received signature?
 impl Callback for IdentifyCallback {
     fn identify(&mut self) -> &[u8] {
-        "Identify message".as_bytes()
+        b"Identify message"
     }
 
     fn received_identify(

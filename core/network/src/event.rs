@@ -94,14 +94,20 @@ pub enum ConnectionType {
 }
 
 #[derive(Debug, Display)]
+#[display(fmt = "session {:?} addr {:?} ty {:?}", sid, addr, ty)]
+pub struct Session {
+    pub sid:  SessionId,
+    pub addr: Multiaddr,
+    pub ty:   SessionType,
+}
+
+#[derive(Debug, Display)]
 pub enum PeerManagerEvent {
     // Peer
-    #[display(fmt = "attach peer addr {:?} session {:?} ty {:?}", addr, sid, ty)]
+    #[display(fmt = "attach peer session {}", session)]
     AttachPeerSession {
-        pubkey: PublicKey,
-        addr:   Multiaddr,
-        sid:    SessionId,
-        ty:     SessionType,
+        pubkey:  PublicKey,
+        session: Session,
     },
 
     #[display(fmt = "detach peer {:?} session {:?} ty {:?}", pid, sid, ty)]
