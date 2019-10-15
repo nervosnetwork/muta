@@ -1,11 +1,11 @@
 use bytes::Bytes;
 
-use crate::{ProtocolResult, impl_default_fixed_codec_for};
 use crate::fixed_codec::{FixedCodecError, ProtocolFixedCodec};
 use crate::types::{
+    primitive::{Balance, ContractType, Fee},
     receipt::{Receipt, ReceiptResult},
-    primitive::{Fee, ContractType, Balance},
 };
+use crate::{impl_default_fixed_codec_for, ProtocolResult};
 
 // Impl ProtocolFixedCodec trait for types
 impl_default_fixed_codec_for!(receipt, [Receipt, ReceiptResult]);
@@ -38,7 +38,7 @@ impl rlp::Decodable for Receipt {
             epoch_id,
             tx_hash,
             cycles_used,
-            result
+            result,
         })
     }
 }
@@ -57,7 +57,7 @@ impl rlp::Encodable for ReceiptResult {
                 receiver,
                 asset_id,
                 before_amount,
-                after_amount
+                after_amount,
             } => {
                 s.begin_list(5)
                     .append(&TRANSFER_RESULT_FLAG)
@@ -65,25 +65,23 @@ impl rlp::Encodable for ReceiptResult {
                     .append(asset_id)
                     .append(&before_amount.to_bytes_be())
                     .append(receiver);
-            },
+            }
             ReceiptResult::Approve {
                 spender,
                 asset_id,
-                max
+                max,
             } => {
                 s.begin_list(4)
                     .append(&APPROVE_RESULT_FLAG)
                     .append(asset_id)
                     .append(&max.to_bytes_be())
                     .append(spender);
-            },
+            }
             ReceiptResult::Deploy {
                 contract,
-                contract_type
+                contract_type,
             } => {
-                s.begin_list(3)
-                    .append(&DEPLOY_RESULT_FLAG)
-                    .append(contract);
+                s.begin_list(3).append(&DEPLOY_RESULT_FLAG).append(contract);
 
                 let type_flag: u8 = match &contract_type {
                     ContractType::Asset => 0,
@@ -92,23 +90,20 @@ impl rlp::Encodable for ReceiptResult {
                     ContractType::Native => 3,
                 };
                 s.append(&type_flag);
-            },
+            }
             ReceiptResult::Call {
                 contract,
                 return_value,
-                logs_bloom
+                logs_bloom,
             } => {
                 // TODO(@yejiayu): The interface for `call` is about to be modified.
                 unimplemented!()
             }
-            ReceiptResult::Fail {
-                system,
-                user
-            } => {
+            ReceiptResult::Fail { system, user } => {
                 s.begin_list(3)
                     .append(&FAIL_RESULT_FLAG)
                     .append(&system.as_bytes())
-                    .append(&user.as_bytes());    
+                    .append(&user.as_bytes());
             }
         }
     }
@@ -129,20 +124,20 @@ impl rlp::Decodable for ReceiptResult {
                     receiver,
                     asset_id,
                     before_amount,
-                    after_amount
+                    after_amount,
                 })
-            },
+            }
             APPROVE_RESULT_FLAG => {
                 let asset_id = rlp::decode(r.at(1)?.as_raw())?;
                 let max = Balance::from_bytes_be(r.at(2)?.data()?);
                 let spender = rlp::decode(r.at(3)?.as_raw())?;
-                    
-                Ok(ReceiptResult::Approve{
+
+                Ok(ReceiptResult::Approve {
                     spender,
                     asset_id,
-                    max
+                    max,
                 })
-            },
+            }
             DEPLOY_RESULT_FLAG => {
                 let contract = rlp::decode(r.at(1)?.as_raw())?;
                 let contract_type_flag: u8 = r.at(2)?.as_val()?;
@@ -154,26 +149,23 @@ impl rlp::Decodable for ReceiptResult {
                     _ => return Err(rlp::DecoderError::Custom("invalid contract type flag")),
                 };
 
-                Ok(ReceiptResult::Deploy{
+                Ok(ReceiptResult::Deploy {
                     contract,
-                    contract_type
+                    contract_type,
                 })
-            },
+            }
             CALL_RESULT_FLAG => {
                 // TODO(@yejiayu): The interface for `call` is about to be modified.
                 unimplemented!()
-            },
+            }
             FAIL_RESULT_FLAG => {
                 let system = String::from_utf8(r.at(1)?.data()?.to_vec())
                     .map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
                 let user = String::from_utf8(r.at(2)?.data()?.to_vec())
                     .map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
 
-                Ok(ReceiptResult::Fail {
-                    system,
-                    user
-                })
-            },
+                Ok(ReceiptResult::Fail { system, user })
+            }
             _ => Err(rlp::DecoderError::RlpListLenWithZeroPrefix),
         }
     }

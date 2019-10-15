@@ -1,4 +1,4 @@
-use crate::fixed_codec::{ProtocolFixedCodec};
+use crate::fixed_codec::ProtocolFixedCodec;
 use crate::types;
 
 use super::*;
@@ -25,7 +25,12 @@ fn test_fixed_codec() {
     test_eq!(transaction, RawTransaction, mock_raw_tx, AType::Transfer);
     test_eq!(transaction, RawTransaction, mock_raw_tx, AType::Approve);
     test_eq!(transaction, RawTransaction, mock_raw_tx, AType::Deploy);
-    test_eq!(transaction, SignedTransaction, mock_sign_tx, AType::Transfer);
+    test_eq!(
+        transaction,
+        SignedTransaction,
+        mock_sign_tx,
+        AType::Transfer
+    );
     test_eq!(transaction, SignedTransaction, mock_sign_tx, AType::Approve);
     test_eq!(transaction, SignedTransaction, mock_sign_tx, AType::Deploy);
 

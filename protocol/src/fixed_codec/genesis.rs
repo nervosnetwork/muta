@@ -1,12 +1,18 @@
 use bytes::Bytes;
 
 use crate::{
-    ProtocolResult, impl_default_fixed_codec_for,
     fixed_codec::{FixedCodecError, ProtocolFixedCodec},
+    impl_default_fixed_codec_for,
     types::genesis::{Genesis, GenesisStateAlloc, GenesisStateAsset, GenesisSystemToken},
+    ProtocolResult,
 };
 
-impl_default_fixed_codec_for!(genesis, [Genesis, GenesisStateAlloc, GenesisStateAsset, GenesisSystemToken]); 
+impl_default_fixed_codec_for!(genesis, [
+    Genesis,
+    GenesisStateAlloc,
+    GenesisStateAsset,
+    GenesisSystemToken
+]);
 
 impl rlp::Encodable for GenesisSystemToken {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
@@ -43,7 +49,7 @@ impl rlp::Decodable for GenesisSystemToken {
             code,
             name,
             supply,
-            symbol
+            symbol,
         })
     }
 }
@@ -67,10 +73,7 @@ impl rlp::Decodable for GenesisStateAsset {
         let balance = String::from_utf8(r.at(1)?.data()?.to_vec())
             .map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
 
-        Ok(GenesisStateAsset {
-            asset_id,
-            balance
-        })
+        Ok(GenesisStateAsset { asset_id, balance })
     }
 }
 
@@ -92,10 +95,7 @@ impl rlp::Decodable for GenesisStateAlloc {
             .map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
         let assets: Vec<GenesisStateAsset> = rlp::decode_list(r.at(1)?.as_raw());
 
-        Ok(GenesisStateAlloc {
-            address,
-            assets
-        })
+        Ok(GenesisStateAlloc { address, assets })
     }
 }
 
@@ -125,7 +125,7 @@ impl rlp::Decodable for Genesis {
             timestamp,
             prevhash,
             system_token,
-            state_alloc
+            state_alloc,
         })
     }
 }

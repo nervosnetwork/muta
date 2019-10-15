@@ -1,5 +1,3 @@
-extern crate test;
-
 mod fixed_codec;
 
 use bytes::Bytes;
@@ -9,15 +7,16 @@ use std::collections::BTreeMap;
 
 use crate::types::{
     epoch::{Epoch, EpochHeader, EpochId, Pill, Proof, Validator},
+    genesis::{Genesis, GenesisStateAlloc, GenesisStateAsset, GenesisSystemToken},
     primitive::{
-        Asset, AssetID, Balance, ContractAddress, ContractType, Fee, Hash, MerkleRoot, UserAddress, UserAccount, AssetInfo, ContractAccount, Account
+        Account, Asset, AssetID, AssetInfo, Balance, ContractAccount, ContractAddress,
+        ContractType, Fee, Hash, MerkleRoot, UserAccount, UserAddress,
     },
     receipt::{Receipt, ReceiptResult},
     transaction::{CarryingAsset, RawTransaction, SignedTransaction, TransactionAction},
-    genesis::{Genesis, GenesisStateAlloc, GenesisStateAsset, GenesisSystemToken},
 };
 
-enum ReceiptType {
+pub enum ReceiptType {
     Transfer,
     Approve,
     Deploy,
@@ -25,7 +24,7 @@ enum ReceiptType {
     Fail,
 }
 
-enum AType {
+pub enum AType {
     Transfer,
     Approve,
     Deploy,
@@ -36,31 +35,31 @@ enum AType {
 // Mock Primitive
 // #####################
 
-fn mock_balance() -> Balance {
+pub fn mock_balance() -> Balance {
     FromPrimitive::from_i32(100).unwrap()
 }
 
-fn mock_hash() -> Hash {
+pub fn mock_hash() -> Hash {
     Hash::digest(get_random_bytes(10))
 }
 
-fn mock_merkle_root() -> MerkleRoot {
+pub fn mock_merkle_root() -> MerkleRoot {
     Hash::digest(get_random_bytes(10))
 }
 
-fn mock_asset_id() -> AssetID {
+pub fn mock_asset_id() -> AssetID {
     Hash::digest(Bytes::from("asset_id"))
 }
 
-fn mock_account_address() -> UserAddress {
+pub fn mock_account_address() -> UserAddress {
     UserAddress::from_hex("10CAB8EEA4799C21379C20EF5BAA2CC8AF1BEC475B").unwrap()
 }
 
-fn mock_contract_address() -> ContractAddress {
+pub fn mock_contract_address() -> ContractAddress {
     ContractAddress::from_hex("20CAB8EEA4799C21379C20EF5BAA2CC8AF1BEC475B").unwrap()
 }
 
-fn mock_asset() -> Asset {
+pub fn mock_asset() -> Asset {
     Asset {
         id:              mock_asset_id(),
         name:            "test".to_string(),
@@ -71,40 +70,40 @@ fn mock_asset() -> Asset {
     }
 }
 
-fn mock_fee() -> Fee {
+pub fn mock_fee() -> Fee {
     Fee {
         asset_id: mock_asset_id(),
         cycle:    10,
     }
 }
 
-fn mock_account_user() -> Account {
+pub fn mock_account_user() -> Account {
     Account::User(mock_user_account())
 }
 
-fn mock_account_contract() -> Account {
+pub fn mock_account_contract() -> Account {
     Account::Contract(mock_contract_account())
 }
 
-fn mock_user_account() -> UserAccount {
+pub fn mock_user_account() -> UserAccount {
     UserAccount {
-        nonce: 8,
-        assets: BTreeMap::default()
-    }
-}
-
-fn mock_contract_account() -> ContractAccount {
-    ContractAccount {
-        nonce: 8,
+        nonce:  8,
         assets: BTreeMap::default(),
-        storage_root: mock_hash()
     }
 }
 
-fn mock_asset_info() -> AssetInfo {
+pub fn mock_contract_account() -> ContractAccount {
+    ContractAccount {
+        nonce:        8,
+        assets:       BTreeMap::default(),
+        storage_root: mock_hash(),
+    }
+}
+
+pub fn mock_asset_info() -> AssetInfo {
     AssetInfo {
-        balance: mock_balance(),
-        approved: BTreeMap::default()
+        balance:  mock_balance(),
+        approved: BTreeMap::default(),
     }
 }
 
@@ -112,7 +111,7 @@ fn mock_asset_info() -> AssetInfo {
 // Mock Receipt
 // #####################
 
-fn mock_result(rtype: ReceiptType) -> ReceiptResult {
+pub fn mock_result(rtype: ReceiptType) -> ReceiptResult {
     match rtype {
         ReceiptType::Transfer => ReceiptResult::Transfer {
             receiver:      mock_account_address(),
@@ -141,7 +140,7 @@ fn mock_result(rtype: ReceiptType) -> ReceiptResult {
     }
 }
 
-fn mock_receipt(rtype: ReceiptType) -> Receipt {
+pub fn mock_receipt(rtype: ReceiptType) -> Receipt {
     Receipt {
         state_root:  mock_merkle_root(),
         epoch_id:    13,
@@ -155,7 +154,7 @@ fn mock_receipt(rtype: ReceiptType) -> Receipt {
 // Mock Transaction
 // #####################
 
-fn mock_action(atype: AType) -> TransactionAction {
+pub fn mock_action(atype: AType) -> TransactionAction {
     match atype {
         AType::Transfer => TransactionAction::Transfer {
             receiver:       mock_account_address(),
@@ -185,7 +184,7 @@ fn mock_action(atype: AType) -> TransactionAction {
     }
 }
 
-fn mock_raw_tx(atype: AType) -> RawTransaction {
+pub fn mock_raw_tx(atype: AType) -> RawTransaction {
     RawTransaction {
         chain_id: mock_hash(),
         nonce:    mock_hash(),
@@ -195,7 +194,7 @@ fn mock_raw_tx(atype: AType) -> RawTransaction {
     }
 }
 
-fn mock_sign_tx(atype: AType) -> SignedTransaction {
+pub fn mock_sign_tx(atype: AType) -> SignedTransaction {
     SignedTransaction {
         raw:       mock_raw_tx(atype),
         tx_hash:   mock_hash(),
@@ -208,7 +207,7 @@ fn mock_sign_tx(atype: AType) -> SignedTransaction {
 // Mock Epoch
 // #####################
 
-fn mock_validator() -> Validator {
+pub fn mock_validator() -> Validator {
     Validator {
         address:        mock_account_address(),
         propose_weight: 1u8,
@@ -216,7 +215,7 @@ fn mock_validator() -> Validator {
     }
 }
 
-fn mock_proof() -> Proof {
+pub fn mock_proof() -> Proof {
     Proof {
         epoch_id:   4,
         round:      99,
@@ -226,11 +225,11 @@ fn mock_proof() -> Proof {
     }
 }
 
-fn mock_epoch_id() -> EpochId {
+pub fn mock_epoch_id() -> EpochId {
     EpochId { id: 10 }
 }
 
-fn mock_epoch_header() -> EpochHeader {
+pub fn mock_epoch_header() -> EpochHeader {
     EpochHeader {
         chain_id:          mock_hash(),
         epoch_id:          42,
@@ -254,14 +253,14 @@ fn mock_epoch_header() -> EpochHeader {
     }
 }
 
-fn mock_epoch(order_size: usize) -> Epoch {
+pub fn mock_epoch(order_size: usize) -> Epoch {
     Epoch {
         header:            mock_epoch_header(),
         ordered_tx_hashes: (0..order_size).map(|_| mock_hash()).collect(),
     }
 }
 
-fn mock_pill(order_size: usize, propose_size: usize) -> Pill {
+pub fn mock_pill(order_size: usize, propose_size: usize) -> Pill {
     Pill {
         epoch:          mock_epoch(order_size),
         propose_hashes: (0..propose_size).map(|_| mock_hash()).collect(),
@@ -272,49 +271,48 @@ fn mock_pill(order_size: usize, propose_size: usize) -> Pill {
 // Mock Genesis
 // #####################
 
-fn mock_genesis() -> Genesis {
+pub fn mock_genesis() -> Genesis {
     Genesis {
-        timestamp: 99,
-        prevhash: "prevhashtest".to_string(),
+        timestamp:    99,
+        prevhash:     "prevhashtest".to_string(),
         system_token: GenesisSystemToken {
-            code: "codetest".to_string(),
-            name: "nametest".to_string(),
+            code:   "codetest".to_string(),
+            name:   "nametest".to_string(),
             symbol: "symbol".to_string(),
-            supply: 7
+            supply: 7,
         },
-        state_alloc: vec![
+        state_alloc:  vec![
             GenesisStateAlloc {
                 address: "test".to_string(),
-                assets: vec![
+                assets:  vec![
                     GenesisStateAsset {
                         asset_id: "test".to_string(),
-                        balance: "test".to_string()
+                        balance:  "test".to_string(),
                     },
                     GenesisStateAsset {
                         asset_id: "test".to_string(),
-                        balance: "test".to_string()
+                        balance:  "test".to_string(),
                     },
-                ]
+                ],
             },
             GenesisStateAlloc {
                 address: "test".to_string(),
-                assets: vec![
+                assets:  vec![
                     GenesisStateAsset {
                         asset_id: "test".to_string(),
-                        balance: "test".to_string()
+                        balance:  "test".to_string(),
                     },
                     GenesisStateAsset {
                         asset_id: "test".to_string(),
-                        balance: "test".to_string()
+                        balance:  "test".to_string(),
                     },
-                ]
+                ],
             },
-        ]
+        ],
     }
 }
 
-fn get_random_bytes(len: usize) -> Bytes {
+pub fn get_random_bytes(len: usize) -> Bytes {
     let vec: Vec<u8> = (0..len).map(|_| random::<u8>()).collect();
     Bytes::from(vec)
 }
-

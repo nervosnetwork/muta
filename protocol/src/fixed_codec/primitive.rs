@@ -3,19 +3,30 @@ use std::collections::BTreeMap;
 use bytes::Bytes;
 
 use crate::{
-    ProtocolResult, impl_default_fixed_codec_for,
     fixed_codec::{FixedCodecError, ProtocolFixedCodec},
-    types::{Asset, AssetID, Fee, Balance, ContractAddress, Hash, Address, UserAddress, Account, AssetInfo, ApprovedInfo, UserAccount, ContractAccount},
+    impl_default_fixed_codec_for,
+    types::{
+        Account, Address, ApprovedInfo, Asset, AssetID, AssetInfo, Balance, ContractAccount,
+        ContractAddress, Fee, Hash, UserAccount, UserAddress,
+    },
+    ProtocolResult,
 };
 
 // Impl ProtocolFixedCodec trait for types
-impl_default_fixed_codec_for!(primitive, [Hash, Asset, Fee, Address, UserAddress, ContractAddress, Account]); 
+impl_default_fixed_codec_for!(primitive, [
+    Hash,
+    Asset,
+    Fee,
+    Address,
+    UserAddress,
+    ContractAddress,
+    Account
+]);
 
 // AssetID, MerkleRoot are alias of Hash type
 impl rlp::Encodable for Hash {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
-        s.begin_list(1)
-            .append(&self.as_bytes().to_vec());
+        s.begin_list(1).append(&self.as_bytes().to_vec());
     }
 }
 
@@ -67,9 +78,7 @@ impl rlp::Decodable for Asset {
 
 impl rlp::Encodable for Fee {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
-        s.begin_list(2)
-            .append(&self.asset_id)
-            .append(&self.cycle);
+        s.begin_list(2).append(&self.asset_id).append(&self.cycle);
     }
 }
 
@@ -82,10 +91,7 @@ impl rlp::Decodable for Fee {
         let asset_id: Hash = rlp::decode(r.at(0)?.as_raw())?;
         let cycle = r.at(1)?.as_val()?;
 
-        Ok(Fee {
-            asset_id,
-            cycle
-        })
+        Ok(Fee { asset_id, cycle })
     }
 }
 
@@ -93,13 +99,11 @@ impl rlp::Encodable for Address {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
         match self {
             Address::User(user) => {
-                s.begin_list(1)
-                    .append(&user.as_bytes().to_vec());
-            },
+                s.begin_list(1).append(&user.as_bytes().to_vec());
+            }
             Address::Contract(contract) => {
-                s.begin_list(1)
-                    .append(&contract.as_bytes().to_vec());
-            },
+                s.begin_list(1).append(&contract.as_bytes().to_vec());
+            }
         }
     }
 }
@@ -108,15 +112,14 @@ impl rlp::Decodable for Address {
     fn decode(r: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
         let address = Address::from_bytes(Bytes::from(r.at(0)?.data()?))
             .map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
-        
+
         Ok(address)
     }
 }
 
 impl rlp::Encodable for UserAddress {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
-        s.begin_list(1)
-            .append(&self.as_bytes().to_vec());
+        s.begin_list(1).append(&self.as_bytes().to_vec());
     }
 }
 
@@ -124,15 +127,14 @@ impl rlp::Decodable for UserAddress {
     fn decode(r: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
         let address = UserAddress::from_bytes(Bytes::from(r.at(0)?.data()?))
             .map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
-        
+
         Ok(address)
     }
 }
 
 impl rlp::Encodable for ContractAddress {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
-        s.begin_list(1)
-            .append(&self.as_bytes().to_vec());
+        s.begin_list(1).append(&self.as_bytes().to_vec());
     }
 }
 
@@ -140,7 +142,7 @@ impl rlp::Decodable for ContractAddress {
     fn decode(r: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
         let address = ContractAddress::from_bytes(Bytes::from(r.at(0)?.data()?))
             .map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
-        
+
         Ok(address)
     }
 }
@@ -226,10 +228,10 @@ impl rlp::Decodable for Account {
                 let storage_root: Hash = rlp::decode(r.at(3)?.as_raw())?;
 
                 Ok(Account::Contract(ContractAccount {
-                        nonce,
-                        assets,
-                        storage_root,
-                    }))
+                    nonce,
+                    assets,
+                    storage_root,
+                }))
             }
             _ => Err(rlp::DecoderError::RlpListLenWithZeroPrefix),
         }
@@ -312,7 +314,7 @@ impl rlp::Decodable for FixedUserAssetApproved {
         Ok(FixedUserAssetApproved {
             contract_address,
             max,
-            used
+            used,
         })
     }
 }
@@ -336,9 +338,6 @@ impl rlp::Decodable for FixedContractAsset {
         let balance = Balance::from_bytes_be(r.at(0)?.data()?);
         let id = rlp::decode(r.at(1)?.as_raw())?;
 
-        Ok(FixedContractAsset {
-            id,
-            balance
-        })
+        Ok(FixedContractAsset { id, balance })
     }
 }

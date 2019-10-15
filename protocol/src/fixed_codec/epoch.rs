@@ -1,12 +1,12 @@
 use bytes::Bytes;
 
-use crate::{ProtocolResult, impl_default_fixed_codec_for};
 use crate::fixed_codec::{FixedCodecError, ProtocolFixedCodec};
 use crate::types::{
+    epoch::{Epoch, EpochHeader, EpochId, Pill, Proof, Validator},
+    primitive::Hash,
     Bloom,
-    primitive::{Hash},
-    epoch::{Proof, Validator, Epoch, EpochHeader, Pill, EpochId},
 };
+use crate::{impl_default_fixed_codec_for, ProtocolResult};
 
 // Impl ProtocolFixedCodec trait for types
 impl_default_fixed_codec_for!(epoch, [Proof, Validator, Epoch, EpochHeader, Pill, EpochId]);
@@ -39,7 +39,7 @@ impl rlp::Decodable for Proof {
             round,
             epoch_hash,
             signature,
-            bitmap
+            bitmap,
         })
     }
 }
@@ -66,14 +66,13 @@ impl rlp::Decodable for Validator {
         Ok(Validator {
             address,
             propose_weight,
-            vote_weight
+            vote_weight,
         })
     }
 }
 
 impl rlp::Encodable for EpochHeader {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
-
         s.begin_list(14)
             .append(&self.chain_id)
             .append_list(&self.confirm_root)
@@ -127,7 +126,7 @@ impl rlp::Decodable for EpochHeader {
             proposer,
             proof,
             validator_version,
-            validators
+            validators,
         })
     }
 }
@@ -151,8 +150,8 @@ impl rlp::Decodable for Epoch {
 
         Ok(Epoch {
             header,
-            ordered_tx_hashes
-        })    
+            ordered_tx_hashes,
+        })
     }
 }
 
@@ -175,15 +174,14 @@ impl rlp::Decodable for Pill {
 
         Ok(Pill {
             epoch,
-            propose_hashes
-        })  
+            propose_hashes,
+        })
     }
 }
 
 impl rlp::Encodable for EpochId {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
-        s.begin_list(1)
-            .append(&self.id);
+        s.begin_list(1).append(&self.id);
     }
 }
 
@@ -191,8 +189,6 @@ impl rlp::Decodable for EpochId {
     fn decode(r: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
         let id = r.at(0)?.as_val()?;
 
-        Ok(EpochId {
-            id
-        })
+        Ok(EpochId { id })
     }
 }

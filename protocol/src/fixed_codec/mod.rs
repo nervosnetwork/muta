@@ -4,9 +4,9 @@ pub mod epoch;
 pub mod genesis;
 pub mod primitive;
 pub mod receipt;
-pub mod transaction;
 #[cfg(test)]
-mod tests;
+pub mod tests;
+pub mod transaction;
 
 use std::error::Error;
 

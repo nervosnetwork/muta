@@ -1,11 +1,11 @@
 use bytes::Bytes;
 
-use crate::{ProtocolResult, impl_default_fixed_codec_for};
 use crate::fixed_codec::{FixedCodecError, ProtocolFixedCodec};
 use crate::types::{
-    transaction::{RawTransaction, TransactionAction, SignedTransaction, CarryingAsset},
-    primitive::{ContractType, Hash, Balance, UserAddress, ContractAddress, Fee},
+    primitive::{Balance, ContractAddress, ContractType, Fee, Hash, UserAddress},
+    transaction::{CarryingAsset, RawTransaction, SignedTransaction, TransactionAction},
 };
+use crate::{impl_default_fixed_codec_for, ProtocolResult};
 
 // Impl ProtocolFixedCodec trait for types
 impl_default_fixed_codec_for!(transaction, [RawTransaction, SignedTransaction]);
@@ -38,7 +38,7 @@ impl rlp::Decodable for RawTransaction {
             nonce,
             timeout,
             fee,
-            action
+            action,
         })
     }
 }
@@ -68,7 +68,7 @@ impl rlp::Decodable for SignedTransaction {
             raw,
             tx_hash,
             pubkey,
-            signature
+            signature,
         })
     }
 }
@@ -85,10 +85,7 @@ impl rlp::Decodable for CarryingAsset {
     fn decode(r: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
         let amount = Balance::from_bytes_be(r.at(0)?.data()?);
         let asset_id = rlp::decode(r.at(1)?.as_raw())?;
-        Ok(CarryingAsset {
-            asset_id,
-            amount
-        })
+        Ok(CarryingAsset { asset_id, amount })
     }
 }
 
@@ -153,20 +150,20 @@ impl rlp::Decodable for TransactionAction {
                 let carrying_asset: CarryingAsset = rlp::decode(r.at(1)?.as_raw())?;
                 let receiver: UserAddress = rlp::decode(r.at(2)?.as_raw())?;
 
-                Ok(TransactionAction::Transfer{
+                Ok(TransactionAction::Transfer {
                     receiver,
-                    carrying_asset
+                    carrying_asset,
                 })
             }
             APPROVE_ACTION_FLAG => {
                 let asset_id = rlp::decode(r.at(1)?.as_raw())?;
                 let max = Balance::from_bytes_be(r.at(2)?.data()?);
                 let spender: ContractAddress = rlp::decode(r.at(3)?.as_raw())?;
-                    
-                Ok(TransactionAction::Approve{
+
+                Ok(TransactionAction::Approve {
                     spender,
                     asset_id,
-                    max
+                    max,
                 })
             }
             DEPLOY_ACTION_FLAG => {
@@ -180,16 +177,16 @@ impl rlp::Decodable for TransactionAction {
                     _ => return Err(rlp::DecoderError::Custom("invalid contract type flag")),
                 };
 
-                Ok(TransactionAction::Deploy{
+                Ok(TransactionAction::Deploy {
                     code,
-                    contract_type
+                    contract_type,
                 })
             }
             CALL_ACTION_FLAG => {
                 // TODO(@yejiayu): The interface for `call` is about to be modified.
                 unimplemented!()
             }
-            _ => Err(rlp::DecoderError::RlpListLenWithZeroPrefix)
+            _ => Err(rlp::DecoderError::RlpListLenWithZeroPrefix),
         }
     }
 }
