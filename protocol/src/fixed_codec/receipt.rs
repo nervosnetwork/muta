@@ -4,9 +4,10 @@ use crate::{ProtocolResult, impl_default_fixed_codec_for};
 use crate::fixed_codec::{FixedCodecError, ProtocolFixedCodec};
 use crate::types::{
     receipt::{Receipt, ReceiptResult},
-    primitive::{Hash, Fee, ContractType, UserAddress, ContractAddress, Balance},
+    primitive::{Fee, ContractType, Balance},
 };
 
+// Impl ProtocolFixedCodec trait for types
 impl_default_fixed_codec_for!(receipt, [Receipt, ReceiptResult]);
 
 impl rlp::Encodable for Receipt {
@@ -15,8 +16,8 @@ impl rlp::Encodable for Receipt {
             .append(&self.cycles_used)
             .append(&self.epoch_id)
             .append(&self.result)
-            .append(&self.state_root.as_bytes().to_vec())
-            .append(&self.tx_hash.as_bytes().to_vec());
+            .append(&self.state_root)
+            .append(&self.tx_hash);
     }
 }
 
@@ -26,20 +27,11 @@ impl rlp::Decodable for Receipt {
             return Err(rlp::DecoderError::RlpIncorrectListLen);
         }
 
-        let mut values = Vec::with_capacity(5);
-
-        for val in r {
-            let data = val.data()?;
-            values.push(data)
-        }
-
         let cycles_used: Fee = rlp::decode(r.at(0)?.as_raw())?;
         let epoch_id = r.at(1)?.as_val()?;
         let result: ReceiptResult = rlp::decode(r.at(2)?.as_raw())?;
-        let state_root = Hash::from_bytes(Bytes::from(r.at(3)?.data()?))
-            .map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
-        let tx_hash = Hash::from_bytes(Bytes::from(r.at(4)?.data()?))
-            .map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
+        let state_root = rlp::decode(r.at(3)?.as_raw())?;
+        let tx_hash = rlp::decode(r.at(4)?.as_raw())?;
 
         Ok(Receipt {
             state_root,
@@ -57,6 +49,7 @@ const DEPLOY_RESULT_FLAG: u8 = 2;
 const CALL_RESULT_FLAG: u8 = 3;
 const FAIL_RESULT_FLAG: u8 = 4;
 
+#[allow(unused_variables)]
 impl rlp::Encodable for ReceiptResult {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
         match self {
@@ -69,9 +62,9 @@ impl rlp::Encodable for ReceiptResult {
                 s.begin_list(5)
                     .append(&TRANSFER_RESULT_FLAG)
                     .append(&after_amount.to_bytes_be())
-                    .append(&asset_id.as_bytes().to_vec())
+                    .append(asset_id)
                     .append(&before_amount.to_bytes_be())
-                    .append(&receiver.as_bytes().to_vec());
+                    .append(receiver);
             },
             ReceiptResult::Approve {
                 spender,
@@ -80,9 +73,9 @@ impl rlp::Encodable for ReceiptResult {
             } => {
                 s.begin_list(4)
                     .append(&APPROVE_RESULT_FLAG)
-                    .append(&asset_id.as_bytes().to_vec())
+                    .append(asset_id)
                     .append(&max.to_bytes_be())
-                    .append(&spender.as_bytes().to_vec());
+                    .append(spender);
             },
             ReceiptResult::Deploy {
                 contract,
@@ -90,7 +83,7 @@ impl rlp::Encodable for ReceiptResult {
             } => {
                 s.begin_list(3)
                     .append(&DEPLOY_RESULT_FLAG)
-                    .append(&contract.as_bytes().to_vec());
+                    .append(contract);
 
                 let type_flag: u8 = match &contract_type {
                     ContractType::Asset => 0,
@@ -128,11 +121,9 @@ impl rlp::Decodable for ReceiptResult {
         match flag {
             TRANSFER_RESULT_FLAG => {
                 let after_amount = Balance::from_bytes_be(r.at(1)?.data()?);
-                let asset_id = Hash::from_bytes(Bytes::from(r.at(2)?.data()?))
-                    .map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
+                let asset_id = rlp::decode(r.at(2)?.as_raw())?;
                 let before_amount = Balance::from_bytes_be(r.at(3)?.data()?);
-                let receiver = UserAddress::from_bytes(Bytes::from(r.at(4)?.data()?))
-                    .map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
+                let receiver = rlp::decode(r.at(4)?.as_raw())?;
 
                 Ok(ReceiptResult::Transfer {
                     receiver,
@@ -142,11 +133,9 @@ impl rlp::Decodable for ReceiptResult {
                 })
             },
             APPROVE_RESULT_FLAG => {
-                let asset_id = Hash::from_bytes(Bytes::from(r.at(1)?.data()?))
-                    .map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
+                let asset_id = rlp::decode(r.at(1)?.as_raw())?;
                 let max = Balance::from_bytes_be(r.at(2)?.data()?);
-                let spender = ContractAddress::from_bytes(Bytes::from(r.at(3)?.data()?))
-                    .map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
+                let spender = rlp::decode(r.at(3)?.as_raw())?;
                     
                 Ok(ReceiptResult::Approve{
                     spender,
@@ -155,8 +144,7 @@ impl rlp::Decodable for ReceiptResult {
                 })
             },
             DEPLOY_RESULT_FLAG => {
-                let contract = ContractAddress::from_bytes(Bytes::from(r.at(1)?.data()?))
-                    .map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
+                let contract = rlp::decode(r.at(1)?.as_raw())?;
                 let contract_type_flag: u8 = r.at(2)?.as_val()?;
                 let contract_type = match contract_type_flag {
                     0 => ContractType::Asset,

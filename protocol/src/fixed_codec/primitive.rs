@@ -40,7 +40,6 @@ impl rlp::Encodable for Asset {
 }
 
 impl rlp::Decodable for Asset {
-    /// Decode a value from RLP bytes
     fn decode(r: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
         if !r.is_list() && r.size() != 6 {
             return Err(rlp::DecoderError::RlpIncorrectListLen);
@@ -262,7 +261,7 @@ impl rlp::Encodable for FixedUserAsset {
 
         s.append_list(&info_list);
         s.append(&self.balance.to_bytes_be());
-        s.append(&self.id.as_bytes().to_vec());
+        s.append(&self.id);
     }
 }
 
@@ -279,9 +278,7 @@ impl rlp::Decodable for FixedUserAsset {
         }
 
         let balance = Balance::from_bytes_be(r.at(1)?.data()?);
-        let id = AssetID::from_bytes(Bytes::from(r.at(2)?.data()?))
-                .map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
-
+        let id = rlp::decode(r.at(2)?.as_raw())?;
         Ok(FixedUserAsset {
             id,
             balance,
@@ -300,7 +297,7 @@ pub struct FixedUserAssetApproved {
 impl rlp::Encodable for FixedUserAssetApproved {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
         s.begin_list(3)
-            .append(&self.contract_address.as_bytes().to_vec())
+            .append(&self.contract_address)
             .append(&self.max.to_bytes_be())
             .append(&self.used.to_bytes_be());
     }
@@ -308,15 +305,14 @@ impl rlp::Encodable for FixedUserAssetApproved {
 
 impl rlp::Decodable for FixedUserAssetApproved {
     fn decode(r: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
-        let address_bytes = r.at(0)?.data()?;
-        let max_bytes = r.at(1)?.data()?;
-        let used_bytes = r.at(2)?.data()?;
+        let contract_address = rlp::decode(r.at(0)?.as_raw())?;
+        let max = Balance::from_bytes_be(r.at(1)?.data()?);
+        let used = Balance::from_bytes_be(r.at(2)?.data()?);
 
         Ok(FixedUserAssetApproved {
-            contract_address: ContractAddress::from_bytes(Bytes::from(address_bytes))
-                .map_err(|_| rlp::DecoderError::RlpInvalidLength)?,
-            max:              Balance::from_bytes_be(max_bytes),
-            used:             Balance::from_bytes_be(used_bytes),
+            contract_address,
+            max,
+            used
         })
     }
 }
@@ -331,19 +327,18 @@ impl rlp::Encodable for FixedContractAsset {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
         s.begin_list(2)
             .append(&self.balance.to_bytes_be())
-            .append(&self.id.as_bytes().to_vec());
+            .append(&self.id);
     }
 }
 
 impl rlp::Decodable for FixedContractAsset {
     fn decode(r: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
-        let balance_bytes = r.at(0)?.data()?;
-        let id_bytes = r.at(1)?.data()?;
+        let balance = Balance::from_bytes_be(r.at(0)?.data()?);
+        let id = rlp::decode(r.at(1)?.as_raw())?;
 
         Ok(FixedContractAsset {
-            id:      Hash::from_bytes(Bytes::from(id_bytes))
-                .map_err(|_| rlp::DecoderError::RlpInvalidLength)?,
-            balance: Balance::from_bytes_be(balance_bytes),
+            id,
+            balance
         })
     }
 }
