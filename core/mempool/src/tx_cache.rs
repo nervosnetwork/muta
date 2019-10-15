@@ -132,9 +132,9 @@ pub struct TxCache {
 impl TxCache {
     pub fn new(pool_size: usize) -> Self {
         TxCache {
-            queue_0:          ArrayQueue::new(pool_size),
-            queue_1:          ArrayQueue::new(pool_size),
-            map:              Map::new(pool_size),
+            queue_0:          ArrayQueue::new(pool_size * 2),
+            queue_1:          ArrayQueue::new(pool_size * 2),
+            map:              Map::new(pool_size * 2),
             is_zero:          AtomicBool::new(true),
             concurrent_count: AtomicUsize::new(0),
         }
