@@ -56,7 +56,6 @@ fn test_fixed_codec() {
     test_eq!(genesis, Genesis, mock_genesis);
 }
 
-
 #[bench]
 fn bench_signed_tx_serialize(b: &mut Bencher) {
     let txs: Vec<SignedTransaction> = (0..50_000).map(|_| mock_sign_tx(AType::Transfer)).collect();
@@ -97,4 +96,3 @@ fn bench_epoch_deserialize(b: &mut Bencher) {
         Epoch::decode_fixed(epoch.clone()).unwrap();
     });
 }
-
