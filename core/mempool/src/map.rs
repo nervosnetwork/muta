@@ -21,7 +21,7 @@ where
         for _ in 0..16 {
             buckets.push(Bucket {
                 // Allocate enough space to avoid triggering resize.
-                store: RwLock::new(HashMap::with_capacity(cache_size * 2)),
+                store: RwLock::new(HashMap::with_capacity(cache_size)),
             });
         }
         Self { buckets }
