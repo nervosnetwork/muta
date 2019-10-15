@@ -1,3 +1,7 @@
+extern crate test;
+
+use test::Bencher;
+
 use crate::fixed_codec::ProtocolFixedCodec;
 use crate::types;
 
@@ -51,3 +55,46 @@ fn test_fixed_codec() {
 
     test_eq!(genesis, Genesis, mock_genesis);
 }
+
+
+#[bench]
+fn bench_signed_tx_serialize(b: &mut Bencher) {
+    let txs: Vec<SignedTransaction> = (0..50_000).map(|_| mock_sign_tx(AType::Transfer)).collect();
+    b.iter(|| {
+        txs.iter().for_each(|signed_tx| {
+            signed_tx.encode_fixed().unwrap();
+        });
+    });
+}
+
+#[bench]
+fn bench_signed_tx_deserialize(b: &mut Bencher) {
+    let txs: Vec<Bytes> = (0..50_000)
+        .map(|_| mock_sign_tx(AType::Transfer).encode_fixed().unwrap())
+        .collect();
+
+    b.iter(|| {
+        txs.iter().for_each(|signed_tx| {
+            SignedTransaction::decode_fixed(signed_tx.clone()).unwrap();
+        });
+    });
+}
+
+#[bench]
+fn bench_epoch_serialize(b: &mut Bencher) {
+    let epoch = mock_epoch(50_000);
+
+    b.iter(|| {
+        epoch.encode_fixed().unwrap();
+    });
+}
+
+#[bench]
+fn bench_epoch_deserialize(b: &mut Bencher) {
+    let epoch = mock_epoch(50_000).encode_fixed().unwrap();
+
+    b.iter(|| {
+        Epoch::decode_fixed(epoch.clone()).unwrap();
+    });
+}
+
