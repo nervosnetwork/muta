@@ -31,9 +31,6 @@ fn test_insert() {
     // 1. insertion under pool size.
     insert!(normal(100, 100, 100));
 
-    // 2. insertion above pool size.
-    insert!(normal(100, 101, 100));
-
     // 3. repeat insertion
     insert!(repeat(5, 200, 200));
 
