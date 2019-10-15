@@ -1,9 +1,10 @@
 mod fixed_codec;
 
+use std::collections::BTreeMap;
+
 use bytes::Bytes;
 use num_traits::FromPrimitive;
 use rand::random;
-use std::collections::BTreeMap;
 
 use crate::types::{
     epoch::{Epoch, EpochHeader, EpochId, Pill, Proof, Validator},

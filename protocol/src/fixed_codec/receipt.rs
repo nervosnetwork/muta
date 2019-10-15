@@ -44,10 +44,9 @@ impl rlp::Decodable for Receipt {
 }
 
 const TRANSFER_RESULT_FLAG: u8 = 0;
-const APPROVE_RESULT_FLAG: u8 = 1;
-const DEPLOY_RESULT_FLAG: u8 = 2;
-const CALL_RESULT_FLAG: u8 = 3;
-const FAIL_RESULT_FLAG: u8 = 4;
+const DEPLOY_RESULT_FLAG: u8 = 1;
+const CALL_RESULT_FLAG: u8 = 2;
+const FAIL_RESULT_FLAG: u8 = 3;
 
 #[allow(unused_variables)]
 impl rlp::Encodable for ReceiptResult {
@@ -65,17 +64,6 @@ impl rlp::Encodable for ReceiptResult {
                     .append(asset_id)
                     .append(&before_amount.to_bytes_be())
                     .append(receiver);
-            }
-            ReceiptResult::Approve {
-                spender,
-                asset_id,
-                max,
-            } => {
-                s.begin_list(4)
-                    .append(&APPROVE_RESULT_FLAG)
-                    .append(asset_id)
-                    .append(&max.to_bytes_be())
-                    .append(spender);
             }
             ReceiptResult::Deploy {
                 contract,
@@ -105,6 +93,7 @@ impl rlp::Encodable for ReceiptResult {
                     .append(&system.as_bytes())
                     .append(&user.as_bytes());
             }
+            _ => {}
         }
     }
 }
@@ -125,17 +114,6 @@ impl rlp::Decodable for ReceiptResult {
                     asset_id,
                     before_amount,
                     after_amount,
-                })
-            }
-            APPROVE_RESULT_FLAG => {
-                let asset_id = rlp::decode(r.at(1)?.as_raw())?;
-                let max = Balance::from_bytes_be(r.at(2)?.data()?);
-                let spender = rlp::decode(r.at(3)?.as_raw())?;
-
-                Ok(ReceiptResult::Approve {
-                    spender,
-                    asset_id,
-                    max,
                 })
             }
             DEPLOY_RESULT_FLAG => {

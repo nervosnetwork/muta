@@ -34,9 +34,3 @@ impl From<FixedCodecError> for ProtocolError {
         ProtocolError::new(ProtocolErrorKind::FixedCodec, Box::new(err))
     }
 }
-
-pub fn bytes_to_u64(bytes: &[u8]) -> u64 {
-    let mut nonce_bytes = [0u8; 8];
-    nonce_bytes.copy_from_slice(bytes);
-    u64::from_be_bytes(nonce_bytes)
-}

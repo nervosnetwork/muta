@@ -2,7 +2,7 @@ use bytes::Bytes;
 
 use crate::fixed_codec::{FixedCodecError, ProtocolFixedCodec};
 use crate::types::{
-    primitive::{Balance, ContractAddress, ContractType, Fee, Hash, UserAddress},
+    primitive::{Balance, ContractType, Fee, Hash, UserAddress},
     transaction::{CarryingAsset, RawTransaction, SignedTransaction, TransactionAction},
 };
 use crate::{impl_default_fixed_codec_for, ProtocolResult};
@@ -90,9 +90,8 @@ impl rlp::Decodable for CarryingAsset {
 }
 
 const TRANSFER_ACTION_FLAG: u8 = 0;
-const APPROVE_ACTION_FLAG: u8 = 1;
-const DEPLOY_ACTION_FLAG: u8 = 2;
-const CALL_ACTION_FLAG: u8 = 3;
+const DEPLOY_ACTION_FLAG: u8 = 1;
+const CALL_ACTION_FLAG: u8 = 2;
 
 impl rlp::Encodable for TransactionAction {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
@@ -105,17 +104,6 @@ impl rlp::Encodable for TransactionAction {
                     .append(&TRANSFER_ACTION_FLAG)
                     .append(carrying_asset)
                     .append(receiver);
-            }
-            TransactionAction::Approve {
-                spender,
-                asset_id,
-                max,
-            } => {
-                s.begin_list(4)
-                    .append(&APPROVE_ACTION_FLAG)
-                    .append(asset_id)
-                    .append(&max.to_bytes_be())
-                    .append(spender);
             }
             TransactionAction::Deploy {
                 code,
@@ -137,6 +125,7 @@ impl rlp::Encodable for TransactionAction {
                 // TODO(@yejiayu): The interface for `call` is about to be modified.
                 unimplemented!()
             }
+            _ => {}
         }
     }
 }
@@ -153,17 +142,6 @@ impl rlp::Decodable for TransactionAction {
                 Ok(TransactionAction::Transfer {
                     receiver,
                     carrying_asset,
-                })
-            }
-            APPROVE_ACTION_FLAG => {
-                let asset_id = rlp::decode(r.at(1)?.as_raw())?;
-                let max = Balance::from_bytes_be(r.at(2)?.data()?);
-                let spender: ContractAddress = rlp::decode(r.at(3)?.as_raw())?;
-
-                Ok(TransactionAction::Approve {
-                    spender,
-                    asset_id,
-                    max,
                 })
             }
             DEPLOY_ACTION_FLAG => {
