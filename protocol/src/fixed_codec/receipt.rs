@@ -178,7 +178,7 @@ impl rlp::Decodable for ReceiptResult {
             FAIL_RESULT_FLAG => {
                 let system = String::from_utf8(r.at(1)?.data()?.to_vec())
                     .map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
-                let user = String::from_utf8(r.at(1)?.data()?.to_vec())
+                let user = String::from_utf8(r.at(2)?.data()?.to_vec())
                     .map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
 
                 Ok(ReceiptResult::Fail {

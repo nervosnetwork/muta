@@ -1,6 +1,6 @@
 use serde_derive::Deserialize;
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 pub struct Genesis {
     pub timestamp:    u64,
     pub prevhash:     String,
@@ -8,19 +8,19 @@ pub struct Genesis {
     pub state_alloc:  Vec<GenesisStateAlloc>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 pub struct GenesisStateAlloc {
     pub address: String,
     pub assets:  Vec<GenesisStateAsset>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 pub struct GenesisStateAsset {
     pub asset_id: String,
     pub balance:  String,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 pub struct GenesisSystemToken {
     pub code:   String,
     pub name:   String,

@@ -14,6 +14,7 @@ use crate::types::{
     },
     receipt::{Receipt, ReceiptResult},
     transaction::{CarryingAsset, RawTransaction, SignedTransaction, TransactionAction},
+    genesis::{Genesis, GenesisStateAlloc, GenesisStateAsset, GenesisSystemToken},
 };
 
 enum ReceiptType {
@@ -77,7 +78,11 @@ fn mock_fee() -> Fee {
     }
 }
 
-fn mock_account() -> Account {
+fn mock_account_user() -> Account {
+    Account::User(mock_user_account())
+}
+
+fn mock_account_contract() -> Account {
     Account::Contract(mock_contract_account())
 }
 
@@ -263,7 +268,53 @@ fn mock_pill(order_size: usize, propose_size: usize) -> Pill {
     }
 }
 
+// #####################
+// Mock Genesis
+// #####################
+
+fn mock_genesis() -> Genesis {
+    Genesis {
+        timestamp: 99,
+        prevhash: "prevhashtest".to_string(),
+        system_token: GenesisSystemToken {
+            code: "codetest".to_string(),
+            name: "nametest".to_string(),
+            symbol: "symbol".to_string(),
+            supply: 7
+        },
+        state_alloc: vec![
+            GenesisStateAlloc {
+                address: "test".to_string(),
+                assets: vec![
+                    GenesisStateAsset {
+                        asset_id: "test".to_string(),
+                        balance: "test".to_string()
+                    },
+                    GenesisStateAsset {
+                        asset_id: "test".to_string(),
+                        balance: "test".to_string()
+                    },
+                ]
+            },
+            GenesisStateAlloc {
+                address: "test".to_string(),
+                assets: vec![
+                    GenesisStateAsset {
+                        asset_id: "test".to_string(),
+                        balance: "test".to_string()
+                    },
+                    GenesisStateAsset {
+                        asset_id: "test".to_string(),
+                        balance: "test".to_string()
+                    },
+                ]
+            },
+        ]
+    }
+}
+
 fn get_random_bytes(len: usize) -> Bytes {
     let vec: Vec<u8> = (0..len).map(|_| random::<u8>()).collect();
     Bytes::from(vec)
 }
+

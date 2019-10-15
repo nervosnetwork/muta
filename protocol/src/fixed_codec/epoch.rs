@@ -4,7 +4,7 @@ use crate::{ProtocolResult, impl_default_fixed_codec_for};
 use crate::fixed_codec::{FixedCodecError, ProtocolFixedCodec};
 use crate::types::{
     Bloom,
-    primitive::{Hash, UserAddress, MerkleRoot},
+    primitive::{Hash, UserAddress},
     epoch::{Proof, Validator, Epoch, EpochHeader, Pill},
 };
 

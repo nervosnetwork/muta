@@ -4,7 +4,7 @@ use crate::types::{
     AssetID, Balance, Bloom, ContractAddress, ContractType, Fee, Hash, MerkleRoot, UserAddress,
 };
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Receipt {
     pub state_root:  MerkleRoot,
     pub epoch_id:    u64,
@@ -13,7 +13,7 @@ pub struct Receipt {
     pub result:      ReceiptResult,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ReceiptResult {
     Transfer {
         receiver:      UserAddress,
