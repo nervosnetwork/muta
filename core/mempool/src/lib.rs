@@ -11,6 +11,7 @@ pub use adapter::message::{
     NewTxsHandler, PullTxsHandler, END_GOSSIP_NEW_TXS, END_RESP_PULL_TXS, END_RPC_PULL_TXS,
 };
 pub use adapter::DefaultMemPoolAdapter;
+pub use adapter::{DEFAULT_BROADCAST_TXS_INTERVAL, DEFAULT_BROADCAST_TXS_SIZE};
 
 use std::error::Error;
 

@@ -2,13 +2,20 @@ pub mod message;
 
 use std::{
     marker::PhantomData,
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc,
-    },
+    mem,
+    sync::atomic::{AtomicU64, AtomicUsize, Ordering},
+    sync::Arc,
+    time::{Instant, Duration},
+    task::{Context as TaskContext, Poll},
+    future::Future,
+    pin::Pin,
 };
 
+use futures::{task::AtomicWaker, ready, pin_mut, channel::mpsc::{UnboundedReceiver, unbounded}};
+use futures_timer::Delay;
 use async_trait::async_trait;
+use bytes::Bytes;
+use parking_lot::Mutex;
 
 use common_crypto::Crypto;
 use protocol::{
@@ -23,11 +30,80 @@ use crate::adapter::message::{
 };
 use crate::MemPoolError;
 
+pub const DEFAULT_BROADCAST_TXS_SIZE: usize = 200;
+pub const DEFAULT_BROADCAST_TXS_INTERVAL: u64 = 200; // milliseconds
+
+struct IntervalTxsBroadcaster<G> {
+    waker: AtomicWaker,
+
+    delay:  Delay,
+    interval: Duration,
+
+    txs_cache: Vec<SignedTransaction>,
+    cache_size: usize,
+
+    gossip: G,
+}
+
+impl<G: Gossip + Unpin> IntervalTxsBroadcaster<G> {
+    pub fn new(gossip: G, interval: Duration, cache_size: usize, txs_cache: Arc<Mutex<Vec<SignedTransaction>>>) -> Self {
+        IntervalTxsBroadcaster {
+            waker: AtomicWaker::new(),
+            interval,
+            delay: Delay::new(interval),
+
+            txs_cache,
+            cache_size,
+
+            gossip,
+        }
+    }
+}
+
+impl<G: Gossip + Unpin> Future for IntervalTxsBroadcaster<G> {
+    type Output = <Delay as Future>::Output;
+
+    fn poll(mut self: Pin<&mut Self>, ctx: &mut TaskContext<'_>) -> Poll<Self::Output> {
+        let interval = self.interval;
+        let cache_size = self.cache_size;
+
+        loop {
+            let delay = &mut self.as_mut().delay;
+            pin_mut!(delay);
+
+            let _ = ready!(delay.poll(ctx));
+
+            {
+                let mut txs_cache = self.txs_cache.lock();
+
+                if !txs_cache.is_empty() {
+                    let batch_stxs = mem::replace(&mut *txs_cache, Vec::with_capacity(cache_size));
+                    let gossip_msg = MsgNewTxs { batch_stxs };
+
+                    self.gossip
+                        .broadcast(Context::new(), END_GOSSIP_NEW_TXS, gossip_msg, Priority::Normal))
+                }
+            }
+
+
+            self.delay.reset(Instant::now() + interval);
+            self.waker.wake();
+        }
+
+        Poll::Pending
+    }
+}
+
 pub struct DefaultMemPoolAdapter<C, N, S> {
     network: N,
     storage: Arc<S>,
 
-    timeout_gap: AtomicU64,
+    txs_cache:    Mutex<Vec<SignedTransaction>>,
+    broadcast_at: Mutex<Instant>,
+
+    timeout_gap:            AtomicU64,
+    broadcast_txs_size:     AtomicUsize,
+    broadcast_txs_interval: AtomicU64, // second
 
     pin_c: PhantomData<C>,
 }
@@ -38,11 +114,23 @@ where
     N: Rpc + Gossip,
     S: Storage,
 {
-    pub fn new(network: N, storage: Arc<S>, timeout_gap: u64) -> Self {
+    pub fn new(
+        network: N,
+        storage: Arc<S>,
+        timeout_gap: u64,
+        broadcast_txs_size: usize,
+        broadcast_txs_interval: u64,
+    ) -> Self {
         DefaultMemPoolAdapter {
             network,
             storage,
+
+            txs_cache: Mutex::new(Vec::with_capacity(broadcast_txs_size)),
+            broadcast_at: Mutex::new(Instant::now()),
+
             timeout_gap: AtomicU64::new(timeout_gap),
+            broadcast_txs_size: AtomicUsize::new(broadcast_txs_size),
+            broadcast_txs_interval: AtomicU64::new(broadcast_txs_interval),
 
             pin_c: PhantomData,
         }
@@ -72,7 +160,30 @@ where
     }
 
     async fn broadcast_tx(&self, ctx: Context, stx: SignedTransaction) -> ProtocolResult<()> {
-        let gossip_msg = MsgNewTxs { stx };
+        // broadcast txs size and interval never change
+        let broadcast_txs_size = self.broadcast_txs_size.load(Ordering::Relaxed);
+        let broadcast_txs_interval = self.broadcast_txs_interval.load(Ordering::Relaxed);
+
+        let batch_stxs = {
+            let mut txs_cache = self.txs_cache.lock();
+
+            txs_cache.push(stx);
+
+            // Refresh broadcast_at
+            if txs_cache.len() == 1 {
+                *self.broadcast_at.lock() = Instant::now();
+            }
+
+            if self.broadcast_at.lock().elapsed().as_secs() >= broadcast_txs_interval
+                || txs_cache.len() >= broadcast_txs_size
+            {
+                mem::replace(&mut *txs_cache, Vec::with_capacity(broadcast_txs_size))
+            } else {
+                return Ok(());
+            }
+        };
+
+        let gossip_msg = MsgNewTxs { batch_stxs };
 
         self.network
             .broadcast(ctx, END_GOSSIP_NEW_TXS, gossip_msg, Priority::Normal)
