@@ -34,7 +34,7 @@ pub struct TxWrapper {
 
 impl TxWrapper {
     #[allow(dead_code)]
-    fn new(tx: SignedTransaction) -> Self {
+    pub(crate) fn new(tx: SignedTransaction) -> Self {
         TxWrapper {
             tx,
             removed: AtomicBool::new(false),
@@ -42,7 +42,7 @@ impl TxWrapper {
         }
     }
 
-    fn propose(tx: SignedTransaction) -> Self {
+    pub(crate) fn propose(tx: SignedTransaction) -> Self {
         TxWrapper {
             tx,
             removed: AtomicBool::new(false),
@@ -50,12 +50,12 @@ impl TxWrapper {
         }
     }
 
-    fn set_removed(&self) {
+    pub(crate) fn set_removed(&self) {
         self.removed.store(true, Ordering::SeqCst);
     }
 
     #[inline]
-    fn is_removed(&self) -> bool {
+    pub(crate) fn is_removed(&self) -> bool {
         self.removed.load(Ordering::SeqCst)
     }
 
@@ -364,7 +364,8 @@ mod tests {
         CarryingAsset, Fee, Hash, RawTransaction, SignedTransaction, TransactionAction, UserAddress,
     };
 
-    use crate::tx_cache::TxCache;
+    use crate::map::Map;
+    use crate::tx_cache::{TxCache, TxWrapper};
     use std::thread::JoinHandle;
 
     const POOL_SIZE: usize = 1000;
@@ -424,7 +425,7 @@ mod tests {
 
     fn concurrent_insert(txs: Vec<SignedTransaction>, tx_cache: &TxCache) {
         txs.par_iter().for_each(|signed_tx| {
-            tx_cache.insert_new_tx(signed_tx.clone()).unwrap();
+            let _ = tx_cache.insert_new_tx(signed_tx.clone());
         });
     }
 
@@ -443,6 +444,40 @@ mod tests {
                 .package(CYCLE_LIMIT, CURRENT_H, TIMEOUT)
                 .unwrap();
         })
+    }
+
+    #[test]
+    fn test_concurrent_insert() {
+        let txs = gen_signed_txs(POOL_SIZE / 2);
+        let txs: Vec<SignedTransaction> = txs
+            .iter()
+            .flat_map(|tx| {
+                (0..5)
+                    .map(|_| tx.clone())
+                    .collect::<Vec<SignedTransaction>>()
+            })
+            .collect();
+        let tx_cache = TxCache::new(POOL_SIZE);
+        concurrent_insert(txs, &tx_cache);
+        assert_eq!(tx_cache.len(), POOL_SIZE / 2);
+    }
+
+    #[test]
+    fn test_insert_overlap() {
+        let txs = gen_signed_txs(1);
+        let tx = txs.get(0).unwrap();
+        let map = Map::new(POOL_SIZE);
+
+        let tx_wrapper_0 = TxWrapper::new(tx.clone());
+        tx_wrapper_0.set_removed();
+        map.insert(tx.tx_hash.clone(), Arc::new(tx_wrapper_0));
+        let shared_tx_0 = map.get(&tx.tx_hash).unwrap();
+        assert!(shared_tx_0.is_removed());
+
+        let tx_wrapper_1 = TxWrapper::new(tx.clone());
+        map.insert(tx.tx_hash.clone(), Arc::new(tx_wrapper_1));
+        let shared_tx_1 = map.get(&tx.tx_hash).unwrap();
+        assert!(shared_tx_1.is_removed());
     }
 
     #[bench]

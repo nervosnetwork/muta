@@ -1,6 +1,7 @@
+use std::collections::HashMap;
+
 use parking_lot::RwLock;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
-use std::collections::HashMap;
 
 use protocol::types::Hash;
 
@@ -94,7 +95,12 @@ where
     V: Send + Sync + Clone,
 {
     fn insert(&self, hash: Hash, value: V) -> Option<V> {
-        self.store.write().insert(hash, value)
+        let mut lock_data = self.store.write();
+        if lock_data.contains_key(&hash) {
+            Some(value)
+        } else {
+            lock_data.insert(hash, value)
+        }
     }
 
     fn contains_key(&self, tx_hash: &Hash) -> bool {
