@@ -106,9 +106,9 @@ where
 
         // check exist and then insert
         if self.contains_key(&hash) {
-            opt = Some(value.clone());
+            opt = Some(value);
         } else {
-            self.store.write().insert(hash.clone(), value.clone());
+            self.store.write().insert(hash, value);
         }
 
         // release lock
