@@ -28,6 +28,8 @@ fn test_fixed_codec() {
 
     test_eq!(transaction, RawTransaction, mock_raw_tx, AType::Transfer);
     test_eq!(transaction, RawTransaction, mock_raw_tx, AType::Deploy);
+    test_eq!(transaction, RawTransaction, mock_raw_tx, AType::Call);
+
     test_eq!(
         transaction,
         SignedTransaction,
@@ -38,9 +40,9 @@ fn test_fixed_codec() {
         transaction,
         SignedTransaction,
         mock_sign_tx,
-        AType::Transfer
+        AType::Deploy
     );
-    test_eq!(transaction, SignedTransaction, mock_sign_tx, AType::Deploy);
+    test_eq!(transaction, SignedTransaction, mock_sign_tx, AType::Call);
 
     test_eq!(epoch, Proof, mock_proof);
     test_eq!(epoch, EpochHeader, mock_epoch_header);

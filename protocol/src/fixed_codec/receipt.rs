@@ -48,7 +48,6 @@ const DEPLOY_RESULT_FLAG: u8 = 1;
 const CALL_RESULT_FLAG: u8 = 2;
 const FAIL_RESULT_FLAG: u8 = 3;
 
-#[allow(unused_variables)]
 impl rlp::Encodable for ReceiptResult {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
         match self {
