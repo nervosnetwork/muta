@@ -56,6 +56,16 @@ fn test_fixed_codec() {
     test_eq!(genesis, Genesis, mock_genesis);
 }
 
+#[test]
+fn test_signed_tx_serialize_size() {
+    let txs: Vec<Bytes> = (0..50_000)
+        .map(|_| mock_sign_tx(AType::Transfer).encode_fixed().unwrap())
+        .collect();
+    let size = &txs.iter().fold(0, |acc, x| acc + x.len());
+    println!("1 tx size {:?}", txs[1].len());
+    println!("50_000 tx size {:?}", size);
+}
+
 #[bench]
 fn bench_signed_tx_serialize(b: &mut Bencher) {
     let txs: Vec<SignedTransaction> = (0..50_000).map(|_| mock_sign_tx(AType::Transfer)).collect();
