@@ -424,7 +424,7 @@ mod tests {
 
     fn concurrent_insert(txs: Vec<SignedTransaction>, tx_cache: &TxCache) {
         txs.par_iter().for_each(|signed_tx| {
-            tx_cache.insert_new_tx(signed_tx.clone()).unwrap();
+            let _ = tx_cache.insert_new_tx(signed_tx.clone());
         });
     }
 
@@ -443,6 +443,22 @@ mod tests {
                 .package(CYCLE_LIMIT, CURRENT_H, TIMEOUT)
                 .unwrap();
         })
+    }
+
+    #[test]
+    fn test_concurrent_insert() {
+        let txs = gen_signed_txs(POOL_SIZE / 2);
+        let txs: Vec<SignedTransaction> = txs
+            .iter()
+            .flat_map(|tx| {
+                (0..5)
+                    .map(|_| tx.clone())
+                    .collect::<Vec<SignedTransaction>>()
+            })
+            .collect();
+        let tx_cache = TxCache::new(POOL_SIZE);
+        concurrent_insert(txs, &tx_cache);
+        assert_eq!(tx_cache.len(), POOL_SIZE / 2);
     }
 
     #[bench]
