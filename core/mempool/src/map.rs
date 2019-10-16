@@ -1,6 +1,4 @@
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
 
 use parking_lot::RwLock;
 use rayon::prelude::{IntoParallelIterator, ParallelIterator};
@@ -25,7 +23,6 @@ where
             buckets.push(Bucket {
                 // Allocate enough space to avoid triggering resize.
                 store: RwLock::new(HashMap::with_capacity(cache_size)),
-                lock:  Arc::new(AtomicBool::new(false)),
             });
         }
         Self { buckets }
@@ -91,7 +88,6 @@ fn get_index(hash: &Hash) -> usize {
 
 struct Bucket<V> {
     store: RwLock<HashMap<Hash, V>>,
-    lock:  Arc<AtomicBool>,
 }
 
 impl<V> Bucket<V>
@@ -99,21 +95,12 @@ where
     V: Send + Sync + Clone,
 {
     fn insert(&self, hash: Hash, value: V) -> Option<V> {
-        let mut opt = None;
-
-        // get lock
-        while self.lock.compare_and_swap(false, true, Ordering::Acquire) {}
-
-        // check exist and then insert
-        if self.contains_key(&hash) {
-            opt = Some(value);
+        let mut lock_data = self.store.write();
+        if lock_data.contains_key(&hash) {
+            Some(value)
         } else {
-            self.store.write().insert(hash, value);
+            lock_data.insert(hash, value)
         }
-
-        // release lock
-        self.lock.store(false, Ordering::Release);
-        opt
     }
 
     fn contains_key(&self, tx_hash: &Hash) -> bool {
