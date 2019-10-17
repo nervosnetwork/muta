@@ -16,4 +16,3 @@ macro_rules! impl_default_fixed_codec_for {
         )+
     )
 }
-

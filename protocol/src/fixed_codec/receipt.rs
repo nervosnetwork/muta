@@ -83,8 +83,11 @@ impl rlp::Encodable for ReceiptResult {
                 return_value,
                 logs_bloom,
             } => {
-                // TODO(@yejiayu): The interface for `call` is about to be modified.
-                unimplemented!()
+                s.begin_list(4)
+                    .append(&CALL_RESULT_FLAG)
+                    .append(contract)
+                    .append(logs_bloom.as_ref())
+                    .append(&return_value.to_vec());
             }
             ReceiptResult::Fail { system, user } => {
                 s.begin_list(3)
@@ -132,8 +135,16 @@ impl rlp::Decodable for ReceiptResult {
                 })
             }
             CALL_RESULT_FLAG => {
-                // TODO(@yejiayu): The interface for `call` is about to be modified.
-                unimplemented!()
+                let contract = rlp::decode(r.at(1)?.as_raw())?;
+                let bloom = rlp::decode(r.at(2)?.as_raw())?;
+                let logs_bloom = Box::new(bloom);
+                let return_value = Bytes::from(r.at(3)?.data()?);
+
+                Ok(ReceiptResult::Call {
+                    contract,
+                    return_value,
+                    logs_bloom,
+                })
             }
             FAIL_RESULT_FLAG => {
                 let system = String::from_utf8(r.at(1)?.data()?.to_vec())

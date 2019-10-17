@@ -36,12 +36,7 @@ fn test_fixed_codec() {
         mock_sign_tx,
         AType::Transfer
     );
-    test_eq!(
-        transaction,
-        SignedTransaction,
-        mock_sign_tx,
-        AType::Deploy
-    );
+    test_eq!(transaction, SignedTransaction, mock_sign_tx, AType::Deploy);
     test_eq!(transaction, SignedTransaction, mock_sign_tx, AType::Call);
 
     test_eq!(epoch, Proof, mock_proof);
@@ -53,6 +48,7 @@ fn test_fixed_codec() {
 
     test_eq!(receipt, Receipt, mock_receipt, ReceiptType::Transfer);
     test_eq!(receipt, Receipt, mock_receipt, ReceiptType::Deploy);
+    test_eq!(receipt, Receipt, mock_receipt, ReceiptType::Call);
     test_eq!(receipt, Receipt, mock_receipt, ReceiptType::Fail);
 
     test_eq!(genesis, Genesis, mock_genesis);
