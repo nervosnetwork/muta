@@ -784,7 +784,9 @@ impl PeerManager {
             }
         }
 
-        warn!("network: no peers {:?}", no_peers);
+        if !no_peers.is_empty() {
+            warn!("network: no peers {:?}", no_peers);
+        }
 
         // Send message to connected users
         let tar = TargetSession::Multi(connected);
