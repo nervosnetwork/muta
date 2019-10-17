@@ -921,6 +921,7 @@ impl PeerManager {
 
                 if self.bootstraps.contains(&addr) {
                     error!("network: unconnectable bootstrap address {}", addr);
+                    return;
                 }
 
                 self.inner.try_remove_addr(&addr);
