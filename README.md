@@ -26,7 +26,7 @@ And the next step, also the only step:
 ```shell
 $ git clone https://github.com/nervosnetwork/muta.git
 $ cd muta
-$ cargo run -- init
+$ cargo run
 ```
 
 If everything goes well, you’ll see this appear:

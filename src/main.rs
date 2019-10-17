@@ -46,13 +46,9 @@ async fn main() {
             clap::Arg::from_usage("-c --config=[FILE] 'a required file for the configuration'")
                 .default_value("./devtools/chain/config.toml"),
         )
-        .subcommand(
-            clap::SubCommand::with_name("init")
-                .about("Initializes a new genesis block and definition for the network")
-                .arg(
-                    clap::Arg::from_usage("<genesis.json> 'expects a genesis file'")
-                        .default_value("./devtools/chain/genesis.json"),
-                ),
+        .arg(
+            clap::Arg::from_usage("-g --genesis=[FILE] 'a required file for the genesis json'")
+                .default_value("./devtools/chain/genesis.json"),
         )
         .get_matches();
     let args_config = matches.value_of("config").unwrap();
@@ -60,11 +56,9 @@ async fn main() {
     log::info!("Go with config: {:?}", cfg);
 
     // init genesis
-    if let Some(matches) = matches.subcommand_matches("init") {
-        let genesis_path = matches.value_of("genesis.json").unwrap();
-        log::info!("Genesis path: {}", genesis_path);
-        handle_init(&cfg, genesis_path).await.unwrap();
-    }
+    let genesis_path = matches.value_of("genesis").unwrap();
+    log::info!("Genesis path: {}", genesis_path);
+    handle_init(&cfg, genesis_path).await.unwrap();
 
     start(&cfg).await.unwrap();
 }
