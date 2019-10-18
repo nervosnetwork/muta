@@ -276,8 +276,10 @@ impl Inner {
     }
 
     pub fn try_remove_addr(&self, addr: &Multiaddr) {
-        if let Some(pid) = self.addr_pid.read().get(addr) {
-            self.remove_peer_addr(&pid.clone(), addr);
+        let opt_pid = self.addr_pid.read().get(addr).cloned();
+
+        if let Some(pid) = opt_pid {
+            self.remove_peer_addr(&pid, addr);
         }
     }
 
