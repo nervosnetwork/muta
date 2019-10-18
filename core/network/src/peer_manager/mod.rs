@@ -15,6 +15,7 @@ use std::{
     collections::{HashMap, HashSet},
     future::Future,
     hash::{Hash, Hasher},
+    net::IpAddr,
     path::PathBuf,
     pin::Pin,
     sync::atomic::{AtomicBool, Ordering},
@@ -45,7 +46,7 @@ use tentacle::{
 };
 
 use crate::{
-    common::HeartBeat,
+    common::{multi_addr_ip, HeartBeat},
     error::NetworkError,
     event::{ConnectionEvent, ConnectionType, MultiUsersMessage, PeerManagerEvent, Session},
 };
@@ -123,10 +124,44 @@ struct Inner {
     addr_pid: RwLock<HashMap<Multiaddr, PeerId>>,
     user_pid: RwLock<HashMap<UserAddress, PeerId>>,
     pool:     RwLock<HashMap<PeerId, Peer>>,
-    listen:   RwLock<Option<Multiaddr>>,
+
+    // Self PeerId
+    peer_id: Arc<PeerId>,
+    listen:  RwLock<Option<Multiaddr>>,
 }
 
 impl Inner {
+    pub fn new(pid: PeerId) -> Self {
+        Inner {
+            connecting: Default::default(),
+            connected:  Default::default(),
+
+            addr_pid: Default::default(),
+            user_pid: Default::default(),
+            pool:     Default::default(),
+
+            peer_id: Arc::new(pid),
+            listen:  RwLock::new(None),
+        }
+    }
+
+    pub fn connected_peers(&self) -> Vec<PeerId> {
+        self.connected
+            .read()
+            .iter()
+            .filter(|pid| pid != &self.peer_id.as_ref())
+            .cloned()
+            .collect()
+    }
+
+    pub fn connection_ip(&self, pid: &PeerId) -> Option<IpAddr> {
+        if let Some(Some(ip)) = self.pool.read().get(pid).map(|peer| peer.connection_ip()) {
+            Some(ip)
+        } else {
+            None
+        }
+    }
+
     pub fn peer_exist(&self, pid: &PeerId) -> bool {
         self.pool.read().contains_key(pid)
     }
@@ -282,7 +317,7 @@ impl Inner {
         self.connecting.write().insert(peer_id.clone());
     }
 
-    pub fn set_connected(&self, peer_id: &PeerId) {
+    pub fn set_connected(&self, peer_id: &PeerId, ip: Option<IpAddr>) {
         // Clean outbound connection
         self.connecting.write().remove(peer_id);
         self.connected.write().insert(peer_id.clone());
@@ -290,6 +325,7 @@ impl Inner {
         let mut pool = self.pool.write();
         if let Some(peer) = pool.get_mut(peer_id) {
             peer.update_connect();
+            peer.set_connection_ip(ip);
         }
     }
 
@@ -301,6 +337,7 @@ impl Inner {
         if let Some(peer) = pool.get_mut(peer_id) {
             peer.update_disconnect();
             peer.update_alive();
+            peer.set_connection_ip(None);
         }
     }
 
@@ -309,7 +346,8 @@ impl Inner {
     }
 
     pub fn connection_count(&self) -> usize {
-        self.connected.read().len() + self.connecting.read().len()
+        // -1 to remove ourself
+        self.connected.read().len() + self.connecting.read().len() - 1
     }
 
     pub fn unconnected_peers(&self, max: usize) -> Vec<PeerId> {
@@ -390,20 +428,6 @@ impl Inner {
     }
 }
 
-impl Default for Inner {
-    fn default() -> Self {
-        Inner {
-            connected:  Default::default(),
-            connecting: Default::default(),
-
-            addr_pid: Default::default(),
-            user_pid: Default::default(),
-            pool:     Default::default(),
-            listen:   Default::default(),
-        }
-    }
-}
-
 // TODO: Store our secret key?
 #[derive(Debug)]
 pub struct PeerManagerConfig {
@@ -479,11 +503,12 @@ impl PeerManager {
         event_rx: UnboundedReceiver<PeerManagerEvent>,
         conn_tx: UnboundedSender<ConnectionEvent>,
     ) -> Self {
-        let inner = Arc::new(Inner::default());
+        let peer_id = config.our_id.clone();
+
+        let inner = Arc::new(Inner::new(peer_id.clone()));
         let waker = Arc::new(AtomicWaker::new());
         let heart_beat = HeartBeat::new(Arc::clone(&waker), config.routine_interval);
         let persistence = Box::new(NoopPersistence);
-        let peer_id = config.our_id.clone();
 
         // Register our self
         inner.register_self(config.our_id.clone(), config.pubkey.clone());
@@ -597,6 +622,7 @@ impl PeerManager {
     fn attach_peer_session(&mut self, pubkey: PublicKey, session: Session) {
         let Session { sid, addr, ty } = session;
 
+        let connection_ip = multi_addr_ip(&addr).ok();
         let user_addr = Peer::pubkey_to_addr(&pubkey).as_hex();
         let pid = pubkey.peer_id();
 
@@ -622,7 +648,7 @@ impl PeerManager {
             self.inner.add_peer_addr(&pid, addr);
         }
 
-        self.inner.set_connected(&pid);
+        self.inner.set_connected(&pid, connection_ip);
 
         self.peer_session.insert(pid.clone(), sid);
         self.session_peer.insert(sid, pid);
@@ -725,6 +751,15 @@ impl PeerManager {
         if self.inner.reach_max_retry(&pid) {
             self.cleanly_remove_peer(&pid);
         }
+    }
+
+    fn connected_peers_ip(&self) -> Vec<(PeerId, Option<IpAddr>)> {
+        let connected_pids = self.inner.connected_peers();
+
+        connected_pids
+            .into_iter()
+            .map(|pid| (pid.clone(), self.inner.connection_ip(&pid)))
+            .collect()
     }
 
     fn unconnected_unknowns(&self, max: usize) -> Vec<&UnknownAddr> {
@@ -999,6 +1034,12 @@ impl Future for PeerManager {
 
             self.process_event(event);
         }
+
+        info!(
+            "network: {:?}: connected peer_ip(s): {:?}",
+            self.peer_id,
+            self.connected_peers_ip()
+        );
 
         // Check connecting count
         let connection_count = self.inner.connection_count();
