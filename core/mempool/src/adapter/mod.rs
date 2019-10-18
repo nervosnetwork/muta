@@ -142,7 +142,7 @@ impl<G: Gossip + Unpin + Clone + 'static> Future for IntervalTxsBroadcaster<G> {
             let delay = &mut self.as_mut().delay;
             pin_mut!(delay);
 
-            let _ = ready!(delay.poll(ctx));
+            ready!(delay.poll(ctx));
 
             if !self.txs_cache.is_empty() {
                 self.do_broadcast();
