@@ -1,6 +1,7 @@
 use std::{
     collections::HashSet,
     default::Default,
+    net::IpAddr,
     sync::Arc,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
@@ -20,14 +21,17 @@ pub const VALID_ATTEMPT_INTERVAL: u64 = 4;
 // TODO: display next_retry
 #[derive(Debug, Clone, Serialize, Deserialize, Display)]
 #[display(
-    fmt = "addrs: {:?}, retry: {}, last_connect: {}, alive: {}",
-    addr_set,
+    fmt = "connection_ip: {:?}, retry: {}, last_connect: {}, alive: {}",
+    connection_ip,
     retry_count,
     connect_at,
     alive
 )]
 pub(super) struct PeerState {
-    // Peer listen address set
+    // Current connection ip
+    connection_ip: Option<IpAddr>,
+
+    // Peer address set (Multiple format, p2p, quic etc)
     addr_set: HashSet<Multiaddr>,
 
     #[serde(skip)]
@@ -67,6 +71,7 @@ pub struct Peer {
 impl PeerState {
     pub fn new() -> Self {
         PeerState {
+            connection_ip: None,
             addr_set:      Default::default(),
             retry_count:   0,
             next_retry:    Instant::now(),
@@ -79,6 +84,11 @@ impl PeerState {
 
     pub fn from_addrs(addrs: Vec<Multiaddr>) -> Self {
         let mut state = PeerState::new();
+
+        if addrs.is_empty() {
+            return state;
+        }
+
         state.addr_set.extend(addrs.into_iter());
 
         state
@@ -116,6 +126,10 @@ impl Peer {
         &self.pubkey
     }
 
+    pub fn connection_ip(&self) -> Option<IpAddr> {
+        self.state.connection_ip
+    }
+
     pub fn user_addr(&self) -> &UserAddress {
         &self.user_addr
     }
@@ -138,6 +152,10 @@ impl Peer {
 
     pub(super) fn set_state(&mut self, state: PeerState) {
         self.state = state
+    }
+
+    pub fn set_connection_ip(&mut self, ip: Option<IpAddr>) {
+        self.state.connection_ip = ip;
     }
 
     pub fn add_addr(&mut self, addr: Multiaddr) {

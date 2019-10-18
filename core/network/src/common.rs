@@ -1,6 +1,6 @@
 use std::{
     future::Future,
-    net::SocketAddr,
+    net::{IpAddr, SocketAddr},
     pin::Pin,
     sync::Arc,
     task::{Context, Poll},
@@ -9,7 +9,7 @@ use std::{
 
 use futures::{pin_mut, task::AtomicWaker};
 use futures_timer::Delay;
-use tentacle::multiaddr::{Multiaddr, Protocol};
+use tentacle::multiaddr::{Error as MultiaddrError, Multiaddr, Protocol};
 
 #[macro_export]
 macro_rules! loop_ready {
@@ -39,6 +39,20 @@ pub fn socket_to_multi_addr(socket_addr: SocketAddr) -> Multiaddr {
     multi_addr.push(Protocol::Tcp(socket_addr.port()));
 
     multi_addr
+}
+
+pub fn multi_addr_ip(addr: &Multiaddr) -> Result<IpAddr, MultiaddrError> {
+    let comps = addr.iter().collect::<Vec<_>>();
+
+    if comps.len() < 2 {
+        return Err(MultiaddrError::DataLessThanLen);
+    }
+
+    match comps[0] {
+        Protocol::Ip4(ip) => Ok(IpAddr::V4(ip)),
+        Protocol::Ip6(ip) => Ok(IpAddr::V6(ip)),
+        _ => Err(MultiaddrError::InvalidMultiaddr),
+    }
 }
 
 pub struct HeartBeat {
