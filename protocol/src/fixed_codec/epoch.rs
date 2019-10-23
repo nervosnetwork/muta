@@ -1,11 +1,9 @@
 use bytes::Bytes;
 
 use crate::fixed_codec::{FixedCodecError, ProtocolFixedCodec};
-use crate::types::{
-    epoch::{Epoch, EpochHeader, EpochId, Pill, Proof, Validator},
-    primitive::Hash,
-    Bloom,
-};
+use crate::types::epoch::{Epoch, EpochHeader, EpochId, Pill, Proof, Validator};
+use crate::types::primitive::Hash;
+use crate::types::Bloom;
 use crate::{impl_default_fixed_codec_for, ProtocolResult};
 
 // Impl ProtocolFixedCodec trait for types

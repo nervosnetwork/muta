@@ -1,9 +1,9 @@
 use bytes::Bytes;
 
 use crate::fixed_codec::{FixedCodecError, ProtocolFixedCodec};
-use crate::types::{
-    primitive::{Balance, ContractAddress, ContractType, Fee, Hash, UserAddress},
-    transaction::{CarryingAsset, RawTransaction, SignedTransaction, TransactionAction},
+use crate::types::primitive::{Balance, ContractAddress, ContractType, Fee, Hash, UserAddress};
+use crate::types::transaction::{
+    CarryingAsset, RawTransaction, SignedTransaction, TransactionAction,
 };
 use crate::{impl_default_fixed_codec_for, ProtocolResult};
 

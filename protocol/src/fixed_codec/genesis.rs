@@ -1,11 +1,8 @@
 use bytes::Bytes;
 
-use crate::{
-    fixed_codec::{FixedCodecError, ProtocolFixedCodec},
-    impl_default_fixed_codec_for,
-    types::genesis::{Genesis, GenesisStateAlloc, GenesisStateAsset, GenesisSystemToken},
-    ProtocolResult,
-};
+use crate::fixed_codec::{FixedCodecError, ProtocolFixedCodec};
+use crate::types::genesis::{Genesis, GenesisStateAlloc, GenesisStateAsset, GenesisSystemToken};
+use crate::{impl_default_fixed_codec_for, ProtocolResult};
 
 impl_default_fixed_codec_for!(genesis, [
     Genesis,

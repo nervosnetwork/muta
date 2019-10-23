@@ -2,15 +2,12 @@ use std::collections::BTreeMap;
 
 use bytes::Bytes;
 
-use crate::{
-    fixed_codec::{FixedCodecError, ProtocolFixedCodec},
-    impl_default_fixed_codec_for,
-    types::{
-        Account, Address, ApprovedInfo, Asset, AssetID, AssetInfo, Balance, ContractAccount,
-        ContractAddress, Fee, Hash, UserAccount, UserAddress,
-    },
-    ProtocolResult,
+use crate::fixed_codec::{FixedCodecError, ProtocolFixedCodec};
+use crate::types::{
+    Account, Address, ApprovedInfo, Asset, AssetID, AssetInfo, Balance, ContractAccount,
+    ContractAddress, Fee, Hash, UserAccount, UserAddress,
 };
+use crate::{impl_default_fixed_codec_for, ProtocolResult};
 
 // Impl ProtocolFixedCodec trait for types
 impl_default_fixed_codec_for!(primitive, [

@@ -6,15 +6,15 @@ use bytes::Bytes;
 use num_traits::FromPrimitive;
 use rand::random;
 
-use crate::types::{
-    epoch::{Epoch, EpochHeader, EpochId, Pill, Proof, Validator},
-    genesis::{Genesis, GenesisStateAlloc, GenesisStateAsset, GenesisSystemToken},
-    primitive::{
-        Account, Asset, AssetID, AssetInfo, Balance, ContractAccount, ContractAddress,
-        ContractType, Fee, Hash, MerkleRoot, UserAccount, UserAddress,
-    },
-    receipt::{Receipt, ReceiptResult},
-    transaction::{CarryingAsset, RawTransaction, SignedTransaction, TransactionAction},
+use crate::types::epoch::{Epoch, EpochHeader, EpochId, Pill, Proof, Validator};
+use crate::types::genesis::{Genesis, GenesisStateAlloc, GenesisStateAsset, GenesisSystemToken};
+use crate::types::primitive::{
+    Account, Asset, AssetID, AssetInfo, Balance, ContractAccount, ContractAddress, ContractType,
+    Fee, Hash, MerkleRoot, UserAccount, UserAddress,
+};
+use crate::types::receipt::{Receipt, ReceiptResult};
+use crate::types::transaction::{
+    CarryingAsset, RawTransaction, SignedTransaction, TransactionAction,
 };
 
 pub enum ReceiptType {

@@ -1,10 +1,8 @@
 use bytes::Bytes;
 
 use crate::fixed_codec::{FixedCodecError, ProtocolFixedCodec};
-use crate::types::{
-    primitive::{Balance, ContractType, Fee},
-    receipt::{Receipt, ReceiptResult},
-};
+use crate::types::primitive::{Balance, ContractType, Fee};
+use crate::types::receipt::{Receipt, ReceiptResult};
 use crate::{impl_default_fixed_codec_for, ProtocolResult};
 
 // Impl ProtocolFixedCodec trait for types
