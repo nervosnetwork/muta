@@ -352,31 +352,31 @@ pub struct Fee {
     pub cycle:    u64,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Account {
     User(UserAccount),
     Contract(ContractAccount),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct UserAccount {
     pub nonce:  u64,
     pub assets: BTreeMap<AssetID, AssetInfo>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct AssetInfo {
     pub balance:  Balance,
     pub approved: BTreeMap<ContractAddress, ApprovedInfo>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ApprovedInfo {
     pub max:  Balance,
     pub used: Balance,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ContractAccount {
     pub nonce:        u64,
     pub assets:       BTreeMap<AssetID, Balance>,

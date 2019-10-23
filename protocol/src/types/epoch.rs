@@ -2,13 +2,13 @@ use bytes::Bytes;
 
 use crate::types::{Bloom, Hash, MerkleRoot, UserAddress};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Epoch {
     pub header:            EpochHeader,
     pub ordered_tx_hashes: Vec<Hash>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct EpochHeader {
     pub chain_id:          Hash,
     pub epoch_id:          u64,
@@ -26,7 +26,7 @@ pub struct EpochHeader {
     pub validators:        Vec<Validator>,
 }
 
-#[derive(Clone, Debug, Hash)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct Proof {
     pub epoch_id:   u64,
     pub round:      u64,
@@ -35,20 +35,20 @@ pub struct Proof {
     pub bitmap:     Bytes,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Validator {
     pub address:        UserAddress,
     pub propose_weight: u8,
     pub vote_weight:    u8,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Pill {
     pub epoch:          Epoch,
     pub propose_hashes: Vec<Hash>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct EpochId {
     pub id: u64,
 }

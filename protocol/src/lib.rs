@@ -2,6 +2,7 @@
 #![feature(trait_alias)]
 
 pub mod codec;
+pub mod fixed_codec;
 pub mod traits;
 pub mod types;
 
@@ -21,6 +22,9 @@ pub enum ProtocolErrorKind {
 
     // codec
     Codec,
+
+    // fixed codec
+    FixedCodec,
 
     // types
     Types,

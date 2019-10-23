@@ -1,242 +1,108 @@
 extern crate test;
 
-mod codec;
+use std::convert::TryInto;
 
 use bytes::Bytes;
-use num_traits::FromPrimitive;
-use rand::random;
+use test::Bencher;
 
-use crate::types::{
-    epoch::{Epoch, EpochHeader, EpochId, Pill, Proof, Validator},
-    primitive::{
-        Asset, AssetID, Balance, ContractAddress, ContractType, Fee, Hash, MerkleRoot, UserAddress,
-    },
-    receipt::{Receipt, ReceiptResult},
-    transaction::{CarryingAsset, RawTransaction, SignedTransaction, TransactionAction},
-};
+use crate::codec::ProtocolCodecSync;
+use crate::types::epoch::Epoch;
+use crate::types::transaction::SignedTransaction;
+use crate::{codec, types};
 
-enum ReceiptType {
-    Transfer,
-    Approve,
-    Deploy,
-    Call,
-    Fail,
+use crate::fixed_codec::tests::*;
+
+macro_rules! test {
+    ($mod: ident, $r#type: ident, $mock_func: ident $(, $arg: expr)*) => {
+        {
+            let before_val = $mock_func($($arg),*);
+            let codec_val: codec::$mod::$r#type = before_val.into();
+            let after_val: types::$mod::$r#type = codec_val.try_into().unwrap();
+            after_val
+        }
+    };
 }
 
-enum AType {
-    Transfer,
-    Approve,
-    Deploy,
-    Call,
+#[test]
+fn test_codec() {
+    test!(primitive, Balance, mock_balance);
+    test!(primitive, Hash, mock_hash);
+    test!(primitive, MerkleRoot, mock_merkle_root);
+    test!(primitive, AssetID, mock_asset_id);
+    test!(primitive, UserAddress, mock_account_address);
+    test!(primitive, ContractAddress, mock_contract_address);
+    test!(primitive, Asset, mock_asset);
+    test!(primitive, Fee, mock_fee);
+
+    test!(receipt, ReceiptResult, mock_result, ReceiptType::Transfer);
+    test!(receipt, ReceiptResult, mock_result, ReceiptType::Approve);
+    test!(receipt, ReceiptResult, mock_result, ReceiptType::Deploy);
+    test!(receipt, ReceiptResult, mock_result, ReceiptType::Call);
+    test!(receipt, ReceiptResult, mock_result, ReceiptType::Fail);
+    test!(receipt, Receipt, mock_receipt, ReceiptType::Transfer);
+
+    test!(transaction, TransactionAction, mock_action, AType::Transfer);
+    test!(transaction, TransactionAction, mock_action, AType::Approve);
+    test!(transaction, TransactionAction, mock_action, AType::Deploy);
+    test!(transaction, TransactionAction, mock_action, AType::Call);
+    test!(transaction, RawTransaction, mock_raw_tx, AType::Approve);
+    test!(transaction, SignedTransaction, mock_sign_tx, AType::Deploy);
+
+    test!(epoch, Validator, mock_validator);
+    test!(epoch, Proof, mock_proof);
+    test!(epoch, EpochId, mock_epoch_id);
+    test!(epoch, EpochHeader, mock_epoch_header);
+    test!(epoch, Epoch, mock_epoch, 100);
+    test!(epoch, Pill, mock_pill, 100, 200);
 }
 
-// #####################
-// Mock Primitive
-// #####################
-
-fn mock_balance() -> Balance {
-    FromPrimitive::from_i32(100).unwrap()
+#[test]
+fn test_signed_tx_serialize_size() {
+    let txs: Vec<Bytes> = (0..50_000)
+        .map(|_| mock_sign_tx(AType::Transfer).encode_sync().unwrap())
+        .collect();
+    let size = &txs.iter().fold(0, |acc, x| acc + x.len());
+    println!("1 tx size {:?}", txs[1].len());
+    println!("50_000 tx size {:?}", size);
 }
 
-fn mock_hash() -> Hash {
-    Hash::digest(get_random_bytes(10))
+#[bench]
+fn bench_signed_tx_serialize(b: &mut Bencher) {
+    let txs: Vec<SignedTransaction> = (0..50_000).map(|_| mock_sign_tx(AType::Transfer)).collect();
+    b.iter(|| {
+        txs.iter().for_each(|signed_tx| {
+            signed_tx.encode_sync().unwrap();
+        });
+    });
 }
 
-fn mock_merkle_root() -> MerkleRoot {
-    Hash::digest(get_random_bytes(10))
+#[bench]
+fn bench_signed_tx_deserialize(b: &mut Bencher) {
+    let txs: Vec<Bytes> = (0..50_000)
+        .map(|_| mock_sign_tx(AType::Transfer).encode_sync().unwrap())
+        .collect();
+
+    b.iter(|| {
+        txs.iter().for_each(|signed_tx| {
+            SignedTransaction::decode_sync(signed_tx.clone()).unwrap();
+        });
+    });
 }
 
-fn mock_asset_id() -> AssetID {
-    Hash::digest(Bytes::from("asset_id"))
+#[bench]
+fn bench_epoch_serialize(b: &mut Bencher) {
+    let epoch = mock_epoch(50_000);
+
+    b.iter(|| {
+        epoch.encode_sync().unwrap();
+    });
 }
 
-fn mock_account_address() -> UserAddress {
-    UserAddress::from_hex("10CAB8EEA4799C21379C20EF5BAA2CC8AF1BEC475B").unwrap()
-}
+#[bench]
+fn bench_epoch_try_into(b: &mut Bencher) {
+    let epoch = mock_epoch(50_000).encode_sync().unwrap();
 
-fn mock_contract_address() -> ContractAddress {
-    ContractAddress::from_hex("20CAB8EEA4799C21379C20EF5BAA2CC8AF1BEC475B").unwrap()
-}
-
-fn mock_asset() -> Asset {
-    Asset {
-        id:              mock_asset_id(),
-        name:            "test".to_string(),
-        symbol:          "MT".to_string(),
-        supply:          mock_balance(),
-        manage_contract: mock_contract_address(),
-        storage_root:    mock_merkle_root(),
-    }
-}
-
-fn mock_fee() -> Fee {
-    Fee {
-        asset_id: mock_asset_id(),
-        cycle:    10,
-    }
-}
-
-// #####################
-// Mock Receipt
-// #####################
-
-fn mock_result(rtype: ReceiptType) -> ReceiptResult {
-    match rtype {
-        ReceiptType::Transfer => ReceiptResult::Transfer {
-            receiver:      mock_account_address(),
-            asset_id:      mock_asset_id(),
-            before_amount: mock_balance(),
-            after_amount:  mock_balance(),
-        },
-        ReceiptType::Approve => ReceiptResult::Approve {
-            spender:  mock_contract_address(),
-            asset_id: mock_asset_id(),
-            max:      mock_balance(),
-        },
-        ReceiptType::Deploy => ReceiptResult::Deploy {
-            contract:      mock_contract_address(),
-            contract_type: ContractType::Asset,
-        },
-        ReceiptType::Call => ReceiptResult::Call {
-            contract:     mock_contract_address(),
-            return_value: get_random_bytes(100),
-            logs_bloom:   Box::new(Default::default()),
-        },
-        ReceiptType::Fail => ReceiptResult::Fail {
-            system: "system".to_string(),
-            user:   "user".to_string(),
-        },
-    }
-}
-
-fn mock_receipt(rtype: ReceiptType) -> Receipt {
-    Receipt {
-        state_root:  mock_merkle_root(),
-        epoch_id:    13,
-        tx_hash:     mock_hash(),
-        cycles_used: mock_fee(),
-        result:      mock_result(rtype),
-    }
-}
-
-// #####################
-// Mock Transaction
-// #####################
-
-fn mock_action(atype: AType) -> TransactionAction {
-    match atype {
-        AType::Transfer => TransactionAction::Transfer {
-            receiver:       mock_account_address(),
-            carrying_asset: CarryingAsset {
-                asset_id: mock_asset_id(),
-                amount:   mock_balance(),
-            },
-        },
-        AType::Approve => TransactionAction::Approve {
-            spender:  mock_contract_address(),
-            asset_id: mock_asset_id(),
-            max:      mock_balance(),
-        },
-        AType::Deploy => TransactionAction::Deploy {
-            code:          get_random_bytes(100),
-            contract_type: ContractType::Library,
-        },
-        AType::Call => TransactionAction::Call {
-            contract:       mock_contract_address(),
-            method:         "get".to_string(),
-            args:           vec![get_random_bytes(10), get_random_bytes(10)],
-            carrying_asset: Some(CarryingAsset {
-                asset_id: mock_asset_id(),
-                amount:   mock_balance(),
-            }),
-        },
-    }
-}
-
-fn mock_raw_tx(atype: AType) -> RawTransaction {
-    RawTransaction {
-        chain_id: mock_hash(),
-        nonce:    mock_hash(),
-        timeout:  100,
-        fee:      mock_fee(),
-        action:   mock_action(atype),
-    }
-}
-
-fn mock_sign_tx(atype: AType) -> SignedTransaction {
-    SignedTransaction {
-        raw:       mock_raw_tx(atype),
-        tx_hash:   mock_hash(),
-        pubkey:    Default::default(),
-        signature: Default::default(),
-    }
-}
-
-// #####################
-// Mock Epoch
-// #####################
-
-fn mock_validator() -> Validator {
-    Validator {
-        address:        mock_account_address(),
-        propose_weight: 1u8,
-        vote_weight:    1u8,
-    }
-}
-
-fn mock_proof() -> Proof {
-    Proof {
-        epoch_id:   0,
-        round:      0,
-        epoch_hash: mock_hash(),
-        signature:  Default::default(),
-        bitmap:     Default::default(),
-    }
-}
-
-fn mock_epoch_id() -> EpochId {
-    EpochId { id: 10 }
-}
-
-fn mock_epoch_header() -> EpochHeader {
-    EpochHeader {
-        chain_id:          mock_hash(),
-        epoch_id:          42,
-        pre_hash:          mock_hash(),
-        timestamp:         420_000_000,
-        logs_bloom:        Default::default(),
-        order_root:        mock_merkle_root(),
-        confirm_root:      vec![mock_hash(), mock_hash()],
-        state_root:        mock_merkle_root(),
-        receipt_root:      vec![mock_hash(), mock_hash()],
-        cycles_used:       999_999,
-        proposer:          mock_account_address(),
-        proof:             mock_proof(),
-        validator_version: 1,
-        validators:        vec![
-            mock_validator(),
-            mock_validator(),
-            mock_validator(),
-            mock_validator(),
-        ],
-    }
-}
-
-fn mock_epoch(order_size: usize) -> Epoch {
-    Epoch {
-        header:            mock_epoch_header(),
-        ordered_tx_hashes: (0..order_size).map(|_| mock_hash()).collect(),
-    }
-}
-
-fn mock_pill(order_size: usize, propose_size: usize) -> Pill {
-    Pill {
-        epoch:          mock_epoch(order_size),
-        propose_hashes: (0..propose_size).map(|_| mock_hash()).collect(),
-    }
-}
-
-fn get_random_bytes(len: usize) -> Bytes {
-    let vec: Vec<u8> = (0..len).map(|_| random::<u8>()).collect();
-    Bytes::from(vec)
+    b.iter(|| {
+        Epoch::decode_sync(epoch.clone()).unwrap();
+    });
 }
