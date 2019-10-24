@@ -1,0 +1,92 @@
+version: '2'
+
+services:
+  bft_node1:
+    container_name: bft_node1
+    image: muta_run
+    hostname: bft_node1
+    environment:
+      - RUST_LOG 
+      - RUST_BACKTRACE 
+    volumes:
+      - ../../../target/docker_target/debug:/app
+      - ../../../target:/chain_data
+      - .:/chain_config
+    networks:
+      bft:
+        aliases:
+          - bft_node1
+        ipv4_address: 173.20.0.21
+    command: |
+      sh -c '
+      cd /chain_config;
+      /app/muta -c config-bft-1.toml init genesis.json;'
+
+  bft_node2:
+    container_name: bft_node2
+    image: muta_run
+    hostname: bft_node2
+    environment:
+      - RUST_LOG 
+      - RUST_BACKTRACE 
+    volumes:
+      - ../../../target/docker_target/debug:/app
+      - ../../../target:/chain_data
+      - .:/chain_config
+    networks:
+      bft:
+        aliases:
+          - bft_node2
+        ipv4_address: 173.20.0.22
+    command: |
+      sh -c '
+      cd /chain_config;
+      /app/muta -c config-bft-2.toml init genesis.json;'
+
+  bft_node3:
+    container_name: bft_node3
+    image: muta_run
+    hostname: bft_node3
+    environment:
+      - RUST_LOG 
+      - RUST_BACKTRACE 
+    volumes:
+      - ../../../target/docker_target/debug:/app
+      - ../../../target:/chain_data
+      - .:/chain_config
+    networks:
+      bft:
+        aliases:
+          - bft_node3
+        ipv4_address: 173.20.0.23
+    command: |
+      sh -c '
+      cd /chain_config;
+      /app/muta -c config-bft-3.toml init genesis.json;'
+
+  bft_node4:
+    container_name: bft_node4
+    image: muta_run
+    hostname: bft_node4
+    environment:
+      - RUST_LOG 
+      - RUST_BACKTRACE 
+    volumes:
+      - ../../../target/docker_target/debug:/app
+      - ../../../target:/chain_data
+      - .:/chain_config
+    networks:
+      bft:
+        aliases:
+          - bft_node4
+        ipv4_address: 173.20.0.24
+    command: |
+      sh -c '
+      cd /chain_config;
+      /app/muta -c config-bft-4.toml init genesis.json;'
+
+networks:
+  bft:
+    ipam:
+     config:
+       - subnet: 173.20.0.0/24

@@ -1,0 +1,47 @@
+# crypto
+privkey = "028590ad352d54387a9c8a0ecf7e180e68c4840c72f958fc5917657f506caa80"
+
+# db config
+data_path = "/chain_data/data/mul2"
+
+[rpc]
+address = "0.0.0.0:3030"
+workers = 4
+payload_size = 8388608
+
+[network]
+# private_key = "bcfa6d5fffa63edf3bd17b17422e416f9374d981322c4ccccf38de215e659b02"
+bootstrap_addresses = ["172.20.0.11:1337"]
+listening_address = "0.0.0.0:1337"
+max_connections = 40
+
+[txpool]
+pool_size = 100000
+until_block_limit = 10000
+quota_limit = 9999999999
+
+[consensus]
+tx_limit = 30000
+interval = 3000
+verifier_list = [ "7899EE7319601cbC2684709e0eC3A4807bb0Fd74" ]
+
+[synchronzer]
+broadcast_status_interval = 180000
+
+[rocksdb]
+# 1024 * 8 (8 KB)
+block_size = 8192
+# 1024 * 1024 * 8 (8 MiB)
+block_cache_size = 8388608
+# 1024 * 1024 * 256 (256 MiB)
+max_bytes_for_level_base = 268435456
+# 1024 * 1024 * 256 (256 MiB)
+max_bytes_for_level_multiplier = 268435456
+# 1024 * 1024 * 64 (64 MiB)
+write_buffer_size = 67108864
+# 1024 * 1024 * 64 (64 MiB)
+target_file_size_base = 67108864
+max_write_buffer_number = 4
+max_background_compactions = 2
+max_background_flushes = 2
+increase_parallelism = 3

@@ -1,0 +1,28 @@
+version: '2'
+
+services:
+  node0:
+    container_name: node0
+    image: muta_run
+    hostname: node0
+    environment:
+      - RUST_LOG=info,overlord=warn
+      - RUST_BACKTRACE
+    volumes:
+      - ../../../target/docker_target/debug:/app
+      - ../../../target:/chain_data
+      - .:/chain_config
+    ports:
+      - "1337:1337"
+      - "8000:8000"
+    networks:
+      single:
+        aliases:
+          - node0
+    command: |
+      sh -c '
+      cd /chain_config;
+      /app/muta-chain -c config-single.toml init genesis.json;'
+
+networks:
+  single:
