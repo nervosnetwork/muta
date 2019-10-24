@@ -297,9 +297,6 @@ pub enum NativeAccountContractError {
 
     #[display(fmt = "invalid address")]
     InvalidAddress,
-
-    #[display(fmt = "fixed codec {:?}", _0)]
-    FixedCodec(rlp::DecoderError),
 }
 
 impl Error for NativeAccountContractError {}
