@@ -47,7 +47,6 @@ impl<Adapter> HashMemPool<Adapter>
 where
     Adapter: MemPoolAdapter,
 {
-    #[allow(dead_code)]
     pub fn new(
         pool_size: usize,
         timeout_gap: u64,

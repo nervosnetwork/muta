@@ -97,13 +97,13 @@ where
     // TODO: Cycle limit?
     async fn check_transaction(&self, _ctx: Context, stx: SignedTransaction) -> ProtocolResult<()> {
         // Verify transaction hash
-        let rlp_stx = stx.encode_fixed()?;
-        let stx_hash = Hash::digest(rlp_stx);
+        let fixed_bytes = stx.raw.encode_fixed()?;
+        let tx_hash = Hash::digest(fixed_bytes);
 
-        if stx_hash != stx.tx_hash {
+        if tx_hash != stx.tx_hash {
             let wrong_hash = MemPoolError::CheckHash {
                 expect: stx.tx_hash,
-                actual: stx_hash,
+                actual: tx_hash,
             };
 
             return Err(wrong_hash.into());
