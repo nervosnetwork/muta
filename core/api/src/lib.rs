@@ -20,8 +20,8 @@ use protocol::traits::{APIAdapter, Context};
 
 use crate::config::GraphQLConfig;
 use crate::schema::{
-    Bytes, ContractType, Epoch, Hash, InputDeployAction, InputRawTransaction,
-    InputTransactionEncryption, InputTransferAction,
+    Address, AssetID, Balance, Bytes, ContractType, Epoch, Hash, InputDeployAction,
+    InputRawTransaction, InputTransactionEncryption, InputTransferAction, Uint64,
 };
 
 pub async fn start_graphql<Adapter: APIAdapter + 'static>(cfg: GraphQLConfig, adapter: Adapter) {
@@ -51,11 +51,34 @@ struct Query;
 // Switch to async/await fn https://github.com/graphql-rust/juniper/issues/2
 #[juniper::object(Context = State)]
 impl Query {
-    #[graphql(name = "getLatestEpoch", description = "get latest epoch")]
-    fn get_latest_epoch(state_ctx: &State) -> FieldResult<Epoch> {
-        let epoch = block_on(state_ctx.adapter.get_latest_epoch(Context::new()))
+    #[graphql(name = "getLatestEpoch", description = "get epoch")]
+    fn get_latest_epoch(state_ctx: &State, epoch_id: Option<Uint64>) -> FieldResult<Epoch> {
+        let epoch_id = opt_hex_to_u64(epoch_id.map(|id| id.as_hex()))?;
+
+        let epoch = block_on(state_ctx.adapter.get_epoch_by_id(Context::new(), epoch_id))
             .map_err(FieldError::from)?;
         Ok(Epoch::from(epoch))
+    }
+
+    #[graphql(name = "getBalance", description = "get balance")]
+    fn get_balance(
+        state_ctx: &State,
+        address: Address,
+        id: AssetID,
+        epoch_id: Option<Uint64>,
+    ) -> FieldResult<Balance> {
+        let epoch_id = opt_hex_to_u64(epoch_id.map(|id| id.as_hex()))?;
+        let address = protocol::types::Address::from_hex(&address.as_hex())?;
+        let id = protocol::types::AssetID::from_hex(&id.as_hex())?;
+
+        let balance = block_on(state_ctx.adapter.get_balance(
+            Context::new(),
+            &address,
+            &id,
+            epoch_id,
+        ))
+        .map_err(FieldError::from)?;
+        Ok(Balance::from(balance))
     }
 }
 
@@ -202,6 +225,16 @@ fn hex_to_vec_u8(s: &str) -> FieldResult<Vec<u8>> {
 fn hex_to_u64(s: &str) -> FieldResult<u64> {
     let n = u64::from_str_radix(s, 16).map_err(FieldError::from)?;
     Ok(n)
+}
+
+fn opt_hex_to_u64(s: Option<String>) -> FieldResult<Option<u64>> {
+    match s {
+        Some(s) => match hex_to_u64(&s) {
+            Ok(num) => Ok(Some(num)),
+            Err(e) => Err(e),
+        },
+        None => Ok(None),
+    }
 }
 
 fn gen_input_tx_encryption(

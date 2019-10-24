@@ -27,7 +27,7 @@ impl Codec for FixedSignedTxs {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FixedPill {
     pub inner: Pill,
 }

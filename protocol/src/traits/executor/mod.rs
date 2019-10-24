@@ -7,8 +7,8 @@ use std::sync::Arc;
 use bytes::Bytes;
 
 use crate::types::{
-    Address, Bloom, CarryingAsset, ContractAddress, Fee, Genesis, Hash, MerkleRoot, Receipt,
-    SignedTransaction,
+    Address, AssetID, Balance, Bloom, CarryingAsset, ContractAddress, Fee, Genesis, Hash,
+    MerkleRoot, Receipt, SignedTransaction,
 };
 use crate::ProtocolResult;
 
@@ -37,18 +37,21 @@ pub trait Executor {
     fn create_genesis(&mut self, genesis: &Genesis) -> ProtocolResult<MerkleRoot>;
 
     fn exec(&mut self, signed_txs: Vec<SignedTransaction>) -> ProtocolResult<ExecutorExecResp>;
+
+    fn get_balance(&self, address: &Address, id: &AssetID) -> ProtocolResult<Balance>;
 }
 
 #[derive(Clone, Debug)]
 pub struct InvokeContext {
     pub chain_id:       Hash,
-    pub cycles_used:    Fee,
-    pub cycles_limit:   Fee,
+    pub cycles_used:    u64,
+    pub cycles_limit:   u64,
+    pub fee_asset_id:   AssetID,
     pub cycles_price:   u64,
     pub epoch_id:       u64,
     pub caller:         Address,
-    pub carrying_asset: Option<CarryingAsset>,
     pub coinbase:       Address,
+    pub carrying_asset: Option<CarryingAsset>,
 }
 
 pub type RcInvokeContext = Rc<RefCell<InvokeContext>>;

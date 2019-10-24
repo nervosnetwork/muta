@@ -22,8 +22,8 @@ use protocol::traits::executor::{
     Executor, ExecutorExecResp, ExecutorFactory, InvokeContext, RcInvokeContext, TrieDB,
 };
 use protocol::types::{
-    Address, Balance, Bloom, ContractAddress, ContractType, Fee, Genesis, Hash, MerkleRoot,
-    Receipt, ReceiptResult, SignedTransaction, TransactionAction, UserAddress,
+    Address, AssetID, Balance, Bloom, ContractAddress, ContractType, Fee, Genesis, Hash,
+    MerkleRoot, Receipt, ReceiptResult, SignedTransaction, TransactionAction, UserAddress,
 };
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
@@ -53,14 +53,9 @@ impl<DB: TrieDB> Executor for TransactionExecutor<DB> {
             epoch_id:       0,
             coinbase:       self.coinbase.clone(),
             caller:         self.coinbase.clone(),
-            cycles_used:    Fee {
-                asset_id: Hash::from_empty(),
-                cycle:    0,
-            },
-            cycles_limit:   Fee {
-                asset_id: Hash::from_empty(),
-                cycle:    999_999_999_999,
-            },
+            cycles_used:    0,
+            cycles_limit:   999_999_999_999,
+            fee_asset_id:   Hash::from_empty(),
             carrying_asset: None,
         };
         let ictx = Rc::new(RefCell::new(ictx));
@@ -134,7 +129,10 @@ impl<DB: TrieDB> Executor for TransactionExecutor<DB> {
             let receipt = Receipt {
                 state_root: Hash::from_empty(),
                 epoch_id: ictx.borrow().epoch_id,
-                cycles_used: ictx.borrow().cycles_used.clone(),
+                cycles_used: Fee {
+                    asset_id: ictx.borrow().fee_asset_id.clone(),
+                    cycle:    ictx.borrow().cycles_used * self.cycles_price,
+                },
                 result: res,
                 tx_hash,
             };
@@ -167,6 +165,10 @@ impl<DB: TrieDB> Executor for TransactionExecutor<DB> {
             state_root: state_root.clone(),
         })
     }
+
+    fn get_balance(&self, address: &Address, id: &AssetID) -> ProtocolResult<Balance> {
+        self.account_contract.get_balance(id, address)
+    }
 }
 
 impl<DB: TrieDB> TransactionExecutor<DB> {
@@ -197,9 +199,10 @@ impl<DB: TrieDB> TransactionExecutor<DB> {
         ictx: RcInvokeContext,
         to: &Address,
     ) -> ProtocolResult<ReceiptResult> {
-        let from = &ictx.borrow().caller;
-        let carrying_asset = ictx
-            .borrow()
+        let cloned_ictx = { ictx.borrow().clone() };
+
+        let from = &cloned_ictx.caller;
+        let carrying_asset = cloned_ictx
             .carrying_asset
             .clone()
             .expect("in transfer, `carrying_asset` cannot be empty");
@@ -375,24 +378,25 @@ fn gen_invoke_ctx(
     coinbase: &Address,
     signed_tx: &SignedTransaction,
 ) -> ProtocolResult<RcInvokeContext> {
-    let carrying_asset = match &signed_tx.raw.action {
-        TransactionAction::Transfer { carrying_asset, .. } => Some(carrying_asset.clone()),
-        TransactionAction::Call { carrying_asset, .. } => carrying_asset.clone(),
-        _ => None,
-    };
-
-    let ctx = InvokeContext {
+    let mut ctx = InvokeContext {
         chain_id: chain_id.clone(),
-        cycles_used: Fee {
-            asset_id: signed_tx.raw.fee.asset_id.clone(),
-            cycle:    0,
-        },
-        cycles_limit: signed_tx.raw.fee.clone(),
+        cycles_used: 0,
+        cycles_limit: signed_tx.raw.fee.cycle,
+        fee_asset_id: signed_tx.raw.fee.asset_id.clone(),
         caller: Address::User(UserAddress::from_pubkey_bytes(signed_tx.pubkey.clone())?),
         coinbase: coinbase.clone(),
         epoch_id,
         cycles_price,
-        carrying_asset,
+        carrying_asset: None,
+    };
+    match &signed_tx.raw.action {
+        TransactionAction::Transfer { carrying_asset, .. } => {
+            ctx.carrying_asset = Some(carrying_asset.clone());
+        }
+        TransactionAction::Call { carrying_asset, .. } => {
+            ctx.carrying_asset = carrying_asset.clone();
+        }
+        _ => {}
     };
     Ok(Rc::new(RefCell::new(ctx)))
 }
