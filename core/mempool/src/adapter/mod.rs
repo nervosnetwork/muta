@@ -1,5 +1,4 @@
 pub mod message;
-mod rlp_types;
 
 use std::{
     marker::PhantomData,
@@ -10,10 +9,10 @@ use std::{
 };
 
 use async_trait::async_trait;
-use bytes::Bytes;
 
 use common_crypto::Crypto;
 use protocol::{
+    fixed_codec::ProtocolFixedCodec,
     traits::{Context, Gossip, MemPoolAdapter, Priority, Rpc, Storage},
     types::{Hash, SignedTransaction},
     ProtocolResult,
@@ -22,7 +21,6 @@ use protocol::{
 use crate::adapter::message::{
     MsgNewTxs, MsgPullTxs, MsgPushTxs, END_GOSSIP_NEW_TXS, END_RPC_PULL_TXS,
 };
-use crate::adapter::rlp_types::RlpRawTransaction;
 use crate::MemPoolError;
 
 pub struct DefaultMemPoolAdapter<C, N, S> {
@@ -99,8 +97,8 @@ where
     // TODO: Cycle limit?
     async fn check_transaction(&self, _ctx: Context, stx: SignedTransaction) -> ProtocolResult<()> {
         // Verify transaction hash
-        let rlp_stx = rlp::encode(&RlpRawTransaction { inner: &stx.raw });
-        let stx_hash = Hash::digest(Bytes::from(rlp_stx));
+        let rlp_stx = stx.encode_fixed()?;
+        let stx_hash = Hash::digest(rlp_stx);
 
         if stx_hash != stx.tx_hash {
             let wrong_hash = MemPoolError::CheckHash {
