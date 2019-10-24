@@ -8,5 +8,6 @@ WORKDIR /app
 COPY --from=cargo-build /code/target/debug/muta-chain .
 COPY ./devtools/chain/config.toml ./devtools/chain/config.toml
 COPY ./devtools/chain/genesis.json ./devtools/chain/genesis.json
+EXPOSE 1337 8000
 CMD ["./muta-chain"]
 

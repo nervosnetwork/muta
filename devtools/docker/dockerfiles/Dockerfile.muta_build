@@ -1,5 +1,7 @@
 FROM buildpack-deps:stretch
 
+RUN apt-get update && apt-get install -y cmake pkg-config libssl-dev git gcc build-essential clang libclang-dev
+
 ENV RUSTUP_HOME=/usr/local/rustup \
     CARGO_HOME=/usr/local/cargo \
     PATH=/usr/local/cargo/bin:$PATH
@@ -15,5 +17,3 @@ RUN set -eux; \
     rustup --version; \
     cargo --version; \
     rustc --version;
-
-RUN apt-get update && apt-get install -y cmake pkg-config libssl-dev git gcc build-essential clang libclang-dev
