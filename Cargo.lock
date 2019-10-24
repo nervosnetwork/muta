@@ -513,7 +513,6 @@ dependencies = [
  "protocol 0.1.0",
  "rand 0.6.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "rayon 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "rlp 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "runtime 0.3.0-alpha.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "runtime-tokio 0.3.0-alpha.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.101 (registry+https://github.com/rust-lang/crates.io-index)",
