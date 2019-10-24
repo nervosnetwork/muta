@@ -8,7 +8,7 @@ privkey = "45c56be699dca666191ad3446897e0f480da234da896270202514a0e1a587c3f"
 data_path = "./devtools/chain/data"
 
 [graphql]
-listening_address = "127.0.0.1:8000"
+listening_address = "0.0.0.0:8000"
 graphql_uri = "/graphql"
 graphiql_uri = "/graphiql"
 
