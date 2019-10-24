@@ -29,6 +29,8 @@ impl<StateAdapter: ContractStateAdapter> AccountContract<StateAdapter>
     for NativeAccountContract<StateAdapter>
 {
     fn transfer(&mut self, ictx: RcInvokeContext, to: &Address) -> ProtocolResult<()> {
+        let cloned_ictx = { ictx.borrow().clone() };
+
         let carrying_asset = ictx
             .borrow()
             .carrying_asset
@@ -42,14 +44,13 @@ impl<StateAdapter: ContractStateAdapter> AccountContract<StateAdapter>
         )?;
         self.add_balance(&carrying_asset.asset_id, to, carrying_asset.amount.clone())?;
 
-        let mut fee = ictx.borrow().cycles_used.clone();
-        consume_cycles(
+        let cycles_used = consume_cycles(
             CyclesAction::AccountTransfer,
-            ictx.borrow().cycles_price,
-            &mut fee,
-            &ictx.borrow().cycles_limit,
+            cloned_ictx.cycles_used,
+            cloned_ictx.cycles_limit,
         )?;
-        ictx.borrow_mut().cycles_used = fee;
+
+        ictx.borrow_mut().cycles_used = cycles_used;
         Ok(())
     }
 

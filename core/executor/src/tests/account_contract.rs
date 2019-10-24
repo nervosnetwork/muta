@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use protocol::traits::executor::contract::AccountContract;
-use protocol::types::{Address, AssetID, Balance, CarryingAsset, Fee};
+use protocol::types::{Address, AssetID, Balance, CarryingAsset};
 
 use crate::native_contract::NativeAccountContract;
 use crate::tests::{create_state_adapter, mock_invoke_context};
@@ -24,14 +24,6 @@ fn test_account_contract() {
         .add_balance(&asset, &user1, 10000u64.into())
         .unwrap();
 
-    let cycles_used = Fee {
-        asset_id: fee_asset.clone(),
-        cycle:    0,
-    };
-    let cycles_limit = Fee {
-        asset_id: fee_asset.clone(),
-        cycle:    1_000_000,
-    };
     let carrying_asset = CarryingAsset {
         asset_id: asset.clone(),
         amount:   1000u64.into(),
@@ -39,8 +31,9 @@ fn test_account_contract() {
     let ctx = mock_invoke_context(
         user1.clone(),
         Some(carrying_asset),
-        cycles_used,
-        cycles_limit,
+        0,
+        1_000_000,
+        fee_asset.clone(),
     );
     account.transfer(Rc::clone(&ctx), &user2).unwrap();
     let user1_balance = account.get_balance(&asset, &user1).unwrap();

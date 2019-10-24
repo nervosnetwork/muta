@@ -283,7 +283,11 @@ async fn start(cfg: &Config) -> ProtocolResult<()> {
     runtime::spawn(network_service);
 
     // Init graphql
-    let api_adapter = DefaultAPIAdapter::new(Arc::clone(&mempool), Arc::clone(&storage));
+    let api_adapter = DefaultAPIAdapter::<TransactionExecutorFactory, _, _, _>::new(
+        Arc::clone(&mempool),
+        Arc::clone(&storage),
+        Arc::clone(&trie_db),
+    );
     let mut graphql_config = GraphQLConfig::default();
     graphql_config.listening_address = cfg.graphql.listening_address;
     graphql_config.graphql_uri = cfg.graphql.graphql_uri.clone();
