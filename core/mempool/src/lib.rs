@@ -13,7 +13,6 @@ pub use adapter::message::{
 pub use adapter::DefaultMemPoolAdapter;
 
 use std::error::Error;
-use std::sync::atomic::{AtomicU64, Ordering};
 
 use async_trait::async_trait;
 use derive_more::{Display, From};
@@ -39,27 +38,19 @@ pub struct HashMemPool<Adapter: MemPoolAdapter> {
     callback_cache: Map<SignedTransaction>,
     /// Supply necessary functions from outer modules.
     adapter: Adapter,
-    /// Current epoch_id.
-    current_epoch_id: AtomicU64,
 }
 
 impl<Adapter> HashMemPool<Adapter>
 where
     Adapter: MemPoolAdapter,
 {
-    pub fn new(
-        pool_size: usize,
-        timeout_gap: u64,
-        current_epoch_id: u64,
-        adapter: Adapter,
-    ) -> Self {
+    pub fn new(pool_size: usize, timeout_gap: u64, adapter: Adapter) -> Self {
         HashMemPool {
             pool_size,
             timeout_gap,
             tx_cache: TxCache::new(pool_size),
             callback_cache: Map::new(pool_size),
             adapter,
-            current_epoch_id: AtomicU64::new(current_epoch_id),
         }
     }
 
@@ -104,8 +95,9 @@ where
         Ok(())
     }
 
-    async fn package(&self, _ctx: Context, cycle_limit: u64) -> ProtocolResult<MixedTxHashes> {
-        let current_epoch_id = self.current_epoch_id.load(Ordering::SeqCst);
+    async fn package(&self, ctx: Context, cycle_limit: u64) -> ProtocolResult<MixedTxHashes> {
+        let current_epoch_id = self.adapter.get_latest_epoch_id(ctx.clone()).await?;
+
         self.tx_cache.package(
             cycle_limit,
             current_epoch_id,
