@@ -13,7 +13,7 @@ use protocol::types::{
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
 use crate::cycles::{consume_cycles, CyclesAction};
-use crate::fixed_types::{FixedAccount, FixedAccountSchema, FixedAddress};
+use crate::fixed_types::FixedAccountSchema;
 
 pub struct NativeAccountContract<StateAdapter: ContractStateAdapter> {
     state_adapter: Rc<RefCell<StateAdapter>>,
@@ -79,10 +79,7 @@ impl<StateAdapter: ContractStateAdapter> AccountContract<StateAdapter>
 
         self.state_adapter
             .borrow_mut()
-            .insert_cache::<FixedAccountSchema>(
-                FixedAddress::new(address.clone()),
-                FixedAccount::new(modified_account),
-            )?;
+            .insert_cache::<FixedAccountSchema>(address.clone(), modified_account)?;
         Ok(())
     }
 
@@ -107,10 +104,7 @@ impl<StateAdapter: ContractStateAdapter> AccountContract<StateAdapter>
 
         self.state_adapter
             .borrow_mut()
-            .insert_cache::<FixedAccountSchema>(
-                FixedAddress::new(address.clone()),
-                FixedAccount::new(modified_account),
-            )?;
+            .insert_cache::<FixedAccountSchema>(address.clone(), modified_account)?;
         Ok(())
     }
 
@@ -132,10 +126,7 @@ impl<StateAdapter: ContractStateAdapter> AccountContract<StateAdapter>
 
         self.state_adapter
             .borrow_mut()
-            .insert_cache::<FixedAccountSchema>(
-                FixedAddress::new(caller.clone()),
-                FixedAccount::new(modified_account),
-            )?;
+            .insert_cache::<FixedAccountSchema>(caller.clone(), modified_account)?;
         Ok(())
     }
 
@@ -143,12 +134,12 @@ impl<StateAdapter: ContractStateAdapter> AccountContract<StateAdapter>
         let fixed_account = self
             .state_adapter
             .borrow()
-            .get::<FixedAccountSchema>(&FixedAddress::new(address.clone()))?
+            .get::<FixedAccountSchema>(&address.clone())?
             .ok_or(NativeAccountContractError::AccountNotFound {
                 address: address.clone(),
             })?;
 
-        match fixed_account.inner {
+        match fixed_account {
             Account::User(user) => self.get_balance_with_user(id, &user),
             Account::Contract(contract) => self.get_balance_with_contract(id, &contract),
         }
@@ -158,11 +149,11 @@ impl<StateAdapter: ContractStateAdapter> AccountContract<StateAdapter>
         let fixed_accoount = self
             .state_adapter
             .borrow()
-            .get::<FixedAccountSchema>(&FixedAddress::new(address.clone()))?
+            .get::<FixedAccountSchema>(&address.clone())?
             .ok_or(NativeAccountContractError::AccountNotFound {
                 address: address.clone(),
             })?;
-        Ok(fixed_accoount.inner)
+        Ok(fixed_accoount)
     }
 
     fn get_nonce(&self, address: &Address) -> ProtocolResult<u64> {
@@ -180,9 +171,9 @@ impl<StateAdapter: ContractStateAdapter> NativeAccountContract<StateAdapter> {
         if let Some(fixed_account) = self
             .state_adapter
             .borrow()
-            .get::<FixedAccountSchema>(&FixedAddress::new(address.clone()))?
+            .get::<FixedAccountSchema>(&address.clone())?
         {
-            return Ok(fixed_account.inner);
+            return Ok(fixed_account);
         }
 
         let account = match address {
@@ -297,9 +288,6 @@ pub enum NativeAccountContractError {
 
     #[display(fmt = "invalid address")]
     InvalidAddress,
-
-    #[display(fmt = "fixed codec {:?}", _0)]
-    FixedCodec(rlp::DecoderError),
 }
 
 impl Error for NativeAccountContractError {}

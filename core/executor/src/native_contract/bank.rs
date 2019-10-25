@@ -11,7 +11,7 @@ use protocol::types::{Asset, AssetID, Balance, ContractAddress, ContractType, Ha
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
 use crate::cycles::{consume_cycles, CyclesAction};
-use crate::fixed_types::{FixedAsset, FixedAssetID, FixedAssetSchema};
+use crate::fixed_types::FixedAssetSchema;
 
 /// Bank is the registration and query center for asset.
 ///
@@ -62,7 +62,7 @@ impl<StateAdapter: ContractStateAdapter> BankContract<StateAdapter>
         if self
             .state_adapter
             .borrow()
-            .contains::<FixedAssetSchema>(&FixedAssetID::new(asset_id.clone()))?
+            .contains::<FixedAssetSchema>(&asset_id)?
         {
             return Err(NativeBankContractError::AssetExists { id: asset_id }.into());
         }
@@ -79,10 +79,7 @@ impl<StateAdapter: ContractStateAdapter> BankContract<StateAdapter>
 
         self.state_adapter
             .borrow_mut()
-            .insert_cache::<FixedAssetSchema>(
-                FixedAssetID::new(asset_id.clone()),
-                FixedAsset::new(asset.clone()),
-            )?;
+            .insert_cache::<FixedAssetSchema>(asset_id.clone(), asset.clone())?;
 
         let cycles_used = consume_cycles(
             CyclesAction::BankRegister,
@@ -94,12 +91,12 @@ impl<StateAdapter: ContractStateAdapter> BankContract<StateAdapter>
     }
 
     fn get_asset(&self, _ictx: RcInvokeContext, id: &AssetID) -> ProtocolResult<Asset> {
-        let fixed_asset: FixedAsset = self
+        let fixed_asset: Asset = self
             .state_adapter
             .borrow()
-            .get::<FixedAssetSchema>(&FixedAssetID::new(id.clone()))?
+            .get::<FixedAssetSchema>(&id)?
             .ok_or(NativeBankContractError::NotFound { id: id.clone() })?;
-        Ok(fixed_asset.inner)
+        Ok(fixed_asset)
     }
 }
 
@@ -113,9 +110,6 @@ pub enum NativeBankContractError {
 
     #[display(fmt = "invalid address")]
     InvalidAddress,
-
-    #[display(fmt = "fixed codec {:?}", _0)]
-    FixedCodec(rlp::DecoderError),
 }
 
 impl Error for NativeBankContractError {}
