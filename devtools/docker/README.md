@@ -3,10 +3,10 @@
 ## use `docker` to run single node
 
 ```sh
-docker run -it --init -p 8000:8000 huwenchao/muta
+docker run -it --init -p 8000:8000 nervos/muta
 
 # you can mount the data dir to reserve the chain data after you stop the chain
-docker run -it --init -p 8000:8000 -v `pwd`/data:/app/devtools/chain/data huwenchao/muta
+docker run -it --init -p 8000:8000 -v `pwd`/data:/app/devtools/chain/data nervos/muta
 ```
 
 If you want to run the chain when developing, you can build the binary and mount it in docker instead of rebuild the image.
@@ -16,24 +16,24 @@ cd /path/to/muta
 
 # build muta
 # We mount `target` and `cargo/registry` to dirs under `target` to make it faster when recompile the binary.
-docker run -it --init --rm -v `pwd`:/code -v `pwd`/target/docker_target:/code/target -v `pwd`/target/cargo_cache:/usr/local/cargo/registry huwenchao/muta:build bash -c 'cd /code && cargo build'
+docker run -it --init --rm -v `pwd`:/code -v `pwd`/target/docker_target:/code/target -v `pwd`/target/cargo_cache:/usr/local/cargo/registry nervos/muta:build bash -c 'cd /code && cargo build'
 
 # use the new compiled binary to overide that inside docker image
-docker run -it --init --rm -p 8000:8000 -v `pwd`/target/docker_target/debug/muta-chain:/app/muta-chain huwenchao/muta
+docker run -it --init --rm -p 8000:8000 -v `pwd`/target/docker_target/debug/muta-chain:/app/muta-chain nervos/muta
 ```
 
 ## use `docker-compose` to run multiple nodes rapidly
 
 ### single node
 
-```
+```sh
 # get single node up
-$ docker-compose -f devtools/docker/dockercompose/docker-compose-single.yaml up
+docker-compose -f devtools/docker/dockercompose/docker-compose-single.yaml up
 
 # use graphql to interact with the node: <http://localhost:8000/graphiql>
 
 # go inside the node
-$ docker-compose -f devtools/docker/dockercompose/docker-compose-single.yaml exec node0 bash
+docker-compose -f devtools/docker/dockercompose/docker-compose-single.yaml exec node0 bash
 ```
 
 The chain data is in `target/data/single`.
@@ -45,11 +45,11 @@ The chain data is in `target/data/single`.
 Start 2 nodes, `node1` is in the validator list, and `node2` is follower, sync blocks from node1.
 Check the config if you want.
 
-```
-$ docker-compose -f devtools/docker/dockercompose/docker-compose-mul.yaml up
+```sh
+docker-compose -f devtools/docker/dockercompose/docker-compose-mul.yaml up
 
 # go inside node1
-$ docker-compose -f devtools/docker/dockercompose/docker-compose-mul.yaml exec node1 bash
+docker-compose -f devtools/docker/dockercompose/docker-compose-mul.yaml exec node1 bash
 ```
 
 The chain data is in `target/data/mul1` and `target/data/mul2`.
@@ -59,8 +59,8 @@ The chain data is in `target/data/mul1` and `target/data/mul2`.
 
 Start 4 nodes bft.
 
-```
-$ docker-compose -f devtools/docker/dockercompose/docker-compose-bft.yaml up
+```sh
+docker-compose -f devtools/docker/dockercompose/docker-compose-bft.yaml up
 ```
 
 The nodes names are `bft_node1` ~ `bft_node4` and chain data is in `target/data/bft1` ~ `target/data/bft4`.
@@ -68,14 +68,14 @@ The nodes names are `bft_node1` ~ `bft_node4` and chain data is in `target/data/
 
 ## rebuild docker image
 
-```
+```sh
 # rebuild it when we change cargo version or add new build dependencies
-docker build -t huwenchao/muta:build -f devtools/docker/dockerfiles/Dockerfile.muta_build .
+docker build -t nervos/muta:build -f devtools/docker/dockerfiles/Dockerfile.muta_build .
 
 # rebuild it when we add new dependencies to the run environment
-docker build -t huwenchao/muta:run -f devtools/docker/dockerfiles/Dockerfile.muta_run .
+docker build -t nervos/muta:run -f devtools/docker/dockerfiles/Dockerfile.muta_run .
 
-docker build -t huwenchao/muta:latest .
+docker build -t nervos/muta:latest .
 ```
 
 

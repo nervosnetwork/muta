@@ -3,7 +3,7 @@ version: '2'
 services:
   node1:
     container_name: node1
-    image: huwenchao/muta:latest
+    image: nervos/muta:latest
     hostname: node1
     environment:
       - RUST_LOG 
@@ -23,7 +23,7 @@ services:
 
   node2:
     container_name: node2
-    image: huwenchao/muta:latest
+    image: nervos/muta:latest
     hostname: node2
     environment:
       - RUST_LOG 

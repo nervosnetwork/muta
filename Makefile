@@ -50,9 +50,9 @@ info:
 	env
 
 docker-build:
-	docker build -t huwenchao/muta:build -f devtools/docker/dockerfiles/Dockerfile.muta_build .
-	docker build -t huwenchao/muta:run -f devtools/docker/dockerfiles/Dockerfile.muta_run .
-	docker build -t huwenchao/muta:latest .
+	docker build -t nervos/muta:build -f devtools/docker/dockerfiles/Dockerfile.muta_build .
+	docker build -t nervos/muta:run -f devtools/docker/dockerfiles/Dockerfile.muta_run .
+	docker build -t nervos/muta:latest .
 
 # For counting lines of code
 stats:

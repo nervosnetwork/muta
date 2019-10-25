@@ -3,7 +3,7 @@ version: '2'
 services:
   node0:
     container_name: node0
-    image: huwenchao/muta:latest
+    image: nervos/muta:latest
     hostname: node0
     environment:
       - RUST_BACKTRACE

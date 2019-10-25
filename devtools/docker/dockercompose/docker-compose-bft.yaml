@@ -3,7 +3,7 @@ version: '2'
 services:
   bft_node1:
     container_name: bft_node1
-    image: huwenchao/muta:latest
+    image: nervos/muta:latest
     hostname: bft_node1
     environment:
       - RUST_LOG 
@@ -23,7 +23,7 @@ services:
 
   bft_node2:
     container_name: bft_node2
-    image: huwenchao/muta:latest
+    image: nervos/muta:latest
     hostname: bft_node2
     environment:
       - RUST_LOG 
@@ -45,7 +45,7 @@ services:
 
   bft_node3:
     container_name: bft_node3
-    image: huwenchao/muta:latest
+    image: nervos/muta:latest
     hostname: bft_node3
     environment:
       - RUST_LOG 
@@ -67,7 +67,7 @@ services:
 
   bft_node4:
     container_name: bft_node4
-    image: huwenchao/muta:latest
+    image: nervos/muta:latest
     hostname: bft_node4
     environment:
       - RUST_LOG 
