@@ -3,15 +3,14 @@ version: '2'
 services:
   node1:
     container_name: node1
-    image: muta_run
+    image: huwenchao/muta:latest
     hostname: node1
     environment:
       - RUST_LOG 
       - RUST_BACKTRACE 
     volumes:
-      - ../../../target/docker_target/debug:/app
-      - ../../../target:/chain_data
-      - .:/chain_config
+      - ./config-mul-1.toml:/app/devtools/chain/config.toml
+      - ../../../target/data/mul1:/app/devtools/chain/data
     networks:
       multiple:
         aliases:
@@ -19,12 +18,12 @@ services:
         ipv4_address: 172.20.0.11
     command: |
       sh -c '
-      cd /chain_config;
-      /app/muta -c config-mul-1.toml init genesis.json;'
+      cd /app;
+      ./muta-chain;'
 
   node2:
     container_name: node2
-    image: muta_run
+    image: huwenchao/muta:latest
     hostname: node2
     environment:
       - RUST_LOG 
@@ -32,9 +31,8 @@ services:
     depends_on:
       - node1
     volumes:
-      - ../../../target/docker_target/debug:/app
-      - ../../../target:/chain_data
-      - .:/chain_config
+      - ./config-mul-2.toml:/app/devtools/chain/config.toml
+      - ../../../target/data/mul2:/app/devtools/chain/data
     networks:
       multiple:
         aliases:
@@ -42,8 +40,8 @@ services:
         ipv4_address: 172.20.0.12
     command: |
       sh -c '
-      cd /chain_config;
-      /app/muta -c config-mul-2.toml init genesis.json;'
+      cd /app;
+      ./muta-chain;'
 
 networks:
   multiple:

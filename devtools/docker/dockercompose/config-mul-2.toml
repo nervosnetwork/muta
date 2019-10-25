@@ -1,47 +1,41 @@
+# chain id
+chain_id = "b6a4d7da21443f5e816e8700eea87610e6d769657d6b8ec73028457bf2ca4036"  # by sha256(Muta)
+
 # crypto
-privkey = "028590ad352d54387a9c8a0ecf7e180e68c4840c72f958fc5917657f506caa80"
+privkey = "61b315af6f2c21a4716689e6b5fb65e0acdfda86f2e167d8ea1000b75372b90c"
 
 # db config
-data_path = "/chain_data/data/mul2"
+data_path = "./devtools/chain/data"
 
-[rpc]
-address = "0.0.0.0:3030"
-workers = 4
-payload_size = 8388608
+[graphql]
+listening_address = "0.0.0.0:8000"
+graphql_uri = "/graphql"
+graphiql_uri = "/graphiql"
 
 [network]
-# private_key = "bcfa6d5fffa63edf3bd17b17422e416f9374d981322c4ccccf38de215e659b02"
-bootstrap_addresses = ["172.20.0.11:1337"]
 listening_address = "0.0.0.0:1337"
-max_connections = 40
 
-[txpool]
-pool_size = 100000
-until_block_limit = 10000
-quota_limit = 9999999999
+[[network.bootstraps]]
+pubkey = "03d158fb85df6201708f2cbde51e0b7c2d8835a28aaea7ed243e5db1aa442b18b1"
+address = "172.20.0.11:1337"
+
+[mempool]
+timeout_gap = 200
+pool_size = 20000
 
 [consensus]
-tx_limit = 30000
+cycles_limit = 99999999
+cycles_price = 1
 interval = 3000
-verifier_list = [ "7899EE7319601cbC2684709e0eC3A4807bb0Fd74" ]
+verifier_list = [ "10ecc2746d8ad8ca82872bf0af59ebefbe003b2d0c" ]
 
-[synchronzer]
-broadcast_status_interval = 180000
+[consensus.duration]
+propose_numerator = 24
+propose_denominator = 30
+prevote_numerator = 6
+prevote_denominator = 30
+precommit_numerator = 6
+precommit_denominator = 30
 
-[rocksdb]
-# 1024 * 8 (8 KB)
-block_size = 8192
-# 1024 * 1024 * 8 (8 MiB)
-block_cache_size = 8388608
-# 1024 * 1024 * 256 (256 MiB)
-max_bytes_for_level_base = 268435456
-# 1024 * 1024 * 256 (256 MiB)
-max_bytes_for_level_multiplier = 268435456
-# 1024 * 1024 * 64 (64 MiB)
-write_buffer_size = 67108864
-# 1024 * 1024 * 64 (64 MiB)
-target_file_size_base = 67108864
-max_write_buffer_number = 4
-max_background_compactions = 2
-max_background_flushes = 2
-increase_parallelism = 3
+[executor]
+light = false
