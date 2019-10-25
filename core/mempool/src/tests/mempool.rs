@@ -17,7 +17,7 @@ macro_rules! insert {
         insert!(inner($valid * 10, 1, $valid, $invalid, $output));
     };
     (inner($pool_size: expr, $repeat: expr, $valid: expr, $invalid: expr, $output: expr)) => {
-        let mempool = Arc::new(new_mempool($pool_size, TIMEOUT_GAP, CURRENT_EPOCH_ID));
+        let mempool = Arc::new(new_mempool($pool_size, TIMEOUT_GAP));
         let txs = mock_txs($valid, $invalid, TIMEOUT);
         for _ in 0..$repeat {
             concurrent_insert(txs.clone(), Arc::clone(&mempool));
@@ -42,7 +42,6 @@ macro_rules! package {
     (normal($cycle_limit: expr, $insert: expr, $expect_order: expr, $expect_propose: expr)) => {
         package!(inner(
             $cycle_limit,
-            CURRENT_EPOCH_ID,
             TIMEOUT_GAP,
             TIMEOUT,
             $insert,
@@ -50,19 +49,11 @@ macro_rules! package {
             $expect_propose
         ));
     };
-    (timeout($current_epoch_id: expr, $timeout_gap: expr, $timeout: expr, $insert: expr, $expect: expr)) => {
-        package!(inner(
-            $insert,
-            $current_epoch_id,
-            $timeout_gap,
-            $timeout,
-            $insert,
-            $expect,
-            0
-        ));
+    (timeout($timeout_gap: expr, $timeout: expr, $insert: expr, $expect: expr)) => {
+        package!(inner($insert, $timeout_gap, $timeout, $insert, $expect, 0));
     };
-    (inner($cycle_limit: expr, $current_epoch_id: expr, $timeout_gap: expr, $timeout: expr, $insert: expr, $expect_order: expr, $expect_propose: expr)) => {
-        let mempool = &Arc::new(new_mempool($insert * 10, $timeout_gap, $current_epoch_id));
+    (inner($cycle_limit: expr, $timeout_gap: expr, $timeout: expr, $insert: expr, $expect_order: expr, $expect_propose: expr)) => {
+        let mempool = &Arc::new(new_mempool($insert * 10, $timeout_gap));
         let txs = mock_txs($insert, 0, $timeout);
         concurrent_insert(txs.clone(), Arc::clone(mempool));
         let mixed_tx_hashes = exec_package(Arc::clone(mempool), $cycle_limit);
@@ -85,16 +76,16 @@ fn test_package() {
     package!(normal(100, 201, 100, 100));
 
     // 4. current_epoch_id >= tx.timeout
-    package!(timeout(100, 50, 100, 10, 0));
-    package!(timeout(100, 50, 90, 10, 0));
+    package!(timeout(50, CURRENT_EPOCH_ID, 10, 0));
+    package!(timeout(50, CURRENT_EPOCH_ID - 10, 10, 0));
 
     // 5. current_epoch_id + timeout_gap < tx.timeout
-    package!(timeout(100, 50, 151, 10, 0));
-    package!(timeout(100, 50, 160, 10, 0));
+    package!(timeout(50, CURRENT_EPOCH_ID + 51, 10, 0));
+    package!(timeout(50, CURRENT_EPOCH_ID + 60, 10, 0));
 
     // 6. tx.timeout - timeout_gap =< current_epoch_id < tx.timeout
-    package!(timeout(100, 50, 150, 10, 10));
-    package!(timeout(100, 50, 101, 10, 10));
+    package!(timeout(50, CURRENT_EPOCH_ID + 50, 10, 10));
+    package!(timeout(50, CURRENT_EPOCH_ID + 1, 10, 10));
 }
 
 #[test]

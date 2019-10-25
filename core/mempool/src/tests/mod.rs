@@ -22,7 +22,7 @@ use common_crypto::{
 use protocol::codec::ProtocolCodec;
 use protocol::traits::{Context, MemPool, MemPoolAdapter, MixedTxHashes};
 use protocol::types::{
-    CarryingAsset, Epoch, Fee, Hash, RawTransaction, SignedTransaction, TransactionAction,
+    CarryingAsset, Fee, Hash, RawTransaction, SignedTransaction, TransactionAction,
     UserAddress as Address,
 };
 use protocol::ProtocolResult;
@@ -84,7 +84,7 @@ impl MemPoolAdapter for HashMemPoolAdapter {
     }
 
     async fn get_latest_epoch_id(&self, _ctx: Context) -> ProtocolResult<u64> {
-        Ok(0u64)
+        Ok(CURRENT_EPOCH_ID)
     }
 }
 
