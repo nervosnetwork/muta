@@ -2,8 +2,9 @@ use std::sync::Arc;
 
 use bytes::Bytes;
 
+use protocol::fixed_codec::ProtocolFixedCodec;
 use protocol::traits::executor::contract::ContractStateAdapter;
-use protocol::traits::executor::{ContractSchema, ContractSer};
+use protocol::traits::executor::ContractSchema;
 use protocol::ProtocolResult;
 
 use crate::adapter::GeneralContractStateAdapter;
@@ -26,12 +27,12 @@ impl FixedTestBytes {
     }
 }
 
-impl ContractSer for FixedTestBytes {
-    fn encode(&self) -> ProtocolResult<Bytes> {
+impl ProtocolFixedCodec for FixedTestBytes {
+    fn encode_fixed(&self) -> ProtocolResult<Bytes> {
         Ok(self.inner.clone())
     }
 
-    fn decode(bytes: Bytes) -> ProtocolResult<Self> {
+    fn decode_fixed(bytes: Bytes) -> ProtocolResult<Self> {
         Ok(FixedTestBytes { inner: bytes })
     }
 }
