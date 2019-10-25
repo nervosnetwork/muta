@@ -1,23 +1,25 @@
 # use docker for development
 
-## build `muta:build` and `muta:run` docker image
+## use `docker` to run single node
 
-```
-docker build -t huwenchao/muta:build -f devtools/docker/dockerfiles/Dockerfile.muta_build .
+```sh
+docker run -it --init -p 8000:8000 huwenchao/muta
 
-docker build -t huwenchao/muta:run -f devtools/docker/dockerfiles/Dockerfile.muta_run .
+# you can mount the data dir to reserve the chain data after you stop the chain
+docker run -it --init -p 8000:8000 -v `pwd`/data:/app/devtools/chain/data huwenchao/muta
 ```
 
-Use docker to build muta binary:
-```
+If you want to run the chain when developing, you can build the binary and mount it in docker instead of rebuild the image.
+
+```sh
+cd /path/to/muta
+
+# build muta
+# We mount `target` and `cargo/registry` to dirs under `target` to make it faster when recompile the binary.
 docker run -it --init --rm -v `pwd`:/code -v `pwd`/target/docker_target:/code/target -v `pwd`/target/cargo_cache:/usr/local/cargo/registry huwenchao/muta:build bash -c 'cd /code && cargo build'
-```
 
-We mount `target` and `cargo/registry` to dirs under `target` to make it faster when recompile the binary.
-
-Use the default config to run a single node muta chain:
-```
-docker run -it -v `pwd`:/app -v `pwd`/target/docker_target/debug/muta-chain:/app/muta-chain huwenchao/muta:run /bin/bash -c 'cd /app; ./muta-chain'
+# use the new compiled binary to overide that inside docker image
+docker run -it --init --rm -p 8000:8000 -v `pwd`/target/docker_target/debug/muta-chain:/app/muta-chain huwenchao/muta
 ```
 
 ## use `docker-compose` to run multiple nodes rapidly
@@ -62,6 +64,19 @@ $ docker-compose -f devtools/docker/dockercompose/docker-compose-bft.yaml up
 ```
 
 The nodes names are `bft_node1` ~ `bft_node4` and chain data is in `target/data/bft1` ~ `target/data/bft4`.
+
+
+## rebuild docker image
+
+```
+# rebuild it when we change cargo version or add new build dependencies
+docker build -t huwenchao/muta:build -f devtools/docker/dockerfiles/Dockerfile.muta_build .
+
+# rebuild it when we add new dependencies to the run environment
+docker build -t huwenchao/muta:run -f devtools/docker/dockerfiles/Dockerfile.muta_run .
+
+docker build -t huwenchao/muta:latest .
+```
 
 
 ## private keys used in multi node config
