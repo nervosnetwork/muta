@@ -6,8 +6,9 @@ use std::rc::Rc;
 use bytes::Bytes;
 use derive_more::{Display, From};
 
+use protocol::fixed_codec::ProtocolFixedCodec;
 use protocol::traits::executor::contract::ContractStateAdapter;
-use protocol::traits::executor::{ContractSchema, ContractSer, TrieDB};
+use protocol::traits::executor::{ContractSchema, TrieDB};
 use protocol::types::MerkleRoot;
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
@@ -40,20 +41,20 @@ impl<DB: TrieDB> ContractStateAdapter for GeneralContractStateAdapter<DB> {
         &self,
         key: &<Schema as ContractSchema>::Key,
     ) -> ProtocolResult<Option<<Schema as ContractSchema>::Value>> {
-        let encoded_key = key.encode()?;
+        let encoded_key = key.encode_fixed()?;
 
         if let Some(value_bytes) = self.cache_map.get(&encoded_key) {
-            let inst = <_>::decode(value_bytes.clone())?;
+            let inst = <_>::decode_fixed(value_bytes.clone())?;
             return Ok(Some(inst));
         }
 
         if let Some(value_bytes) = self.stash_map.get(&encoded_key) {
-            let inst = <_>::decode(value_bytes.clone())?;
+            let inst = <_>::decode_fixed(value_bytes.clone())?;
             return Ok(Some(inst));
         }
 
         if let Some(value_bytes) = self.trie.get(&encoded_key)? {
-            return Ok(Some(Schema::Value::decode(value_bytes)?));
+            return Ok(Some(Schema::Value::decode_fixed(value_bytes)?));
         }
 
         Ok(None)
@@ -63,7 +64,7 @@ impl<DB: TrieDB> ContractStateAdapter for GeneralContractStateAdapter<DB> {
         &self,
         key: &<Schema as ContractSchema>::Key,
     ) -> ProtocolResult<bool> {
-        let encoded_key = key.encode()?;
+        let encoded_key = key.encode_fixed()?;
 
         if self.cache_map.contains_key(&encoded_key) {
             return Ok(true);
@@ -81,7 +82,8 @@ impl<DB: TrieDB> ContractStateAdapter for GeneralContractStateAdapter<DB> {
         key: <Schema as ContractSchema>::Key,
         value: <Schema as ContractSchema>::Value,
     ) -> ProtocolResult<()> {
-        self.cache_map.insert(key.encode()?, value.encode()?);
+        self.cache_map
+            .insert(key.encode_fixed()?, value.encode_fixed()?);
         Ok(())
     }
 

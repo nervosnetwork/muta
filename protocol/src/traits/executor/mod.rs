@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 use bytes::Bytes;
 
+use crate::fixed_codec::ProtocolFixedCodec;
 use crate::types::{
     Address, AssetID, Balance, Bloom, CarryingAsset, ContractAddress, Fee, Genesis, Hash,
     MerkleRoot, Receipt, SignedTransaction,
@@ -67,14 +68,6 @@ pub trait Dispatcher {
 }
 
 pub trait ContractSchema {
-    type Key: ContractSer + Clone + std::hash::Hash + PartialEq + Eq + PartialOrd + Ord;
-    type Value: ContractSer + Clone;
-}
-
-pub trait ContractSer {
-    fn encode(&self) -> ProtocolResult<Bytes>;
-
-    fn decode(bytes: Bytes) -> ProtocolResult<Self>
-    where
-        Self: Sized;
+    type Key: ProtocolFixedCodec + Clone + std::hash::Hash + PartialEq + Eq + PartialOrd + Ord;
+    type Value: ProtocolFixedCodec + Clone;
 }
