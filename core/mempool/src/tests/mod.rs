@@ -82,6 +82,10 @@ impl MemPoolAdapter for HashMemPoolAdapter {
     async fn check_storage_exist(&self, _ctx: Context, _tx_hash: Hash) -> ProtocolResult<()> {
         Ok(())
     }
+
+    async fn get_latest_epoch_id(&self, _ctx: Context) -> ProtocolResult<u64> {
+        Ok(CURRENT_EPOCH_ID)
+    }
 }
 
 fn default_mock_txs(size: usize) -> Vec<SignedTransaction> {
@@ -106,16 +110,12 @@ fn mock_txs(valid_size: usize, invalid_size: usize, timeout: u64) -> Vec<SignedT
 }
 
 fn default_mempool() -> HashMemPool<HashMemPoolAdapter> {
-    new_mempool(POOL_SIZE, TIMEOUT_GAP, CURRENT_EPOCH_ID)
+    new_mempool(POOL_SIZE, TIMEOUT_GAP)
 }
 
-fn new_mempool(
-    pool_size: usize,
-    timeout_gap: u64,
-    current_epoch_id: u64,
-) -> HashMemPool<HashMemPoolAdapter> {
+fn new_mempool(pool_size: usize, timeout_gap: u64) -> HashMemPool<HashMemPoolAdapter> {
     let adapter = HashMemPoolAdapter::new();
-    HashMemPool::new(pool_size, timeout_gap, current_epoch_id, adapter)
+    HashMemPool::new(pool_size, timeout_gap, adapter)
 }
 
 fn pub_key_to_address(pub_key: &Secp256k1PublicKey) -> ProtocolResult<Address> {

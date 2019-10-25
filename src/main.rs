@@ -195,7 +195,6 @@ async fn start(cfg: &Config) -> ProtocolResult<()> {
     let mempool = Arc::new(HashMemPool::new(
         cfg.mempool.pool_size as usize,
         cfg.mempool.timeout_gap,
-        current_epoch.header.epoch_id,
         mempool_adapter,
     ));
 

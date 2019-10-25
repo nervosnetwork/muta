@@ -58,4 +58,6 @@ pub trait MemPoolAdapter: Send + Sync {
     async fn check_transaction(&self, ctx: Context, tx: SignedTransaction) -> ProtocolResult<()>;
 
     async fn check_storage_exist(&self, ctx: Context, tx_hash: Hash) -> ProtocolResult<()>;
+
+    async fn get_latest_epoch_id(&self, ctx: Context) -> ProtocolResult<u64>;
 }
