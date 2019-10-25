@@ -158,6 +158,7 @@ where
     }
 
     async fn get_latest_epoch_id(&self, _ctx: Context) -> ProtocolResult<u64> {
-        Ok(self.storage.get_latest_epoch().await?.header.epoch_id)
+        let epoch_id = self.storage.get_latest_epoch().await?.header.epoch_id;
+        Ok(epoch_id)
     }
 }
