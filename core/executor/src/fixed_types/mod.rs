@@ -1,5 +1,14 @@
+use bytes::Bytes;
+
 use protocol::traits::executor::ContractSchema;
 use protocol::types::{Account, Address, Asset, AssetID};
+
+#[allow(dead_code)]
+pub struct FixedBytesSchema;
+impl ContractSchema for FixedBytesSchema {
+    type Key = Bytes;
+    type Value = Bytes;
+}
 
 pub struct FixedAssetSchema;
 impl ContractSchema for FixedAssetSchema {

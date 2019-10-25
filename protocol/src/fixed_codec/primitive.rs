@@ -20,6 +20,16 @@ impl_default_fixed_codec_for!(primitive, [
     Account
 ]);
 
+impl ProtocolFixedCodec for Bytes {
+    fn encode_fixed(&self) -> ProtocolResult<Bytes> {
+        Ok(self.clone())
+    }
+
+    fn decode_fixed(bytes: Bytes) -> ProtocolResult<Self> {
+        Ok(bytes)
+    }
+}
+
 // AssetID, MerkleRoot are alias of Hash type
 impl rlp::Encodable for Hash {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
