@@ -34,7 +34,10 @@ pub struct InputRawTransaction {
     #[graphql(description = "Every transaction has its own id, unlike Ethereum's nonce,\
     the nonce in Muta is an hash")]
     pub nonce: Hash,
-    #[graphql(description = "")]
+    #[graphql(description = "For security and performance reasons, \
+    Muta will only deal with trade request over a period of time,\
+    the `timeout` should be `timeout > current_epoch_height` and `timeout < current_epoch_height + timeout_gap`,\
+    the `timeout_gap` generally equal to 20.")]
     pub timeout: Uint64,
 }
 
