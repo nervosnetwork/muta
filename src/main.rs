@@ -266,7 +266,7 @@ async fn start(cfg: &Config) -> ProtocolResult<()> {
         my_privkey,
         consensus_adapter,
     ));
-    
+
     // register consensus
     network_service
         .register_endpoint_handler(
