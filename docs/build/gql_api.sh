@@ -33,6 +33,9 @@ prologue="
 GraphQL provides a complete and understandable description of the data in your API,
 gives clients the power to ask for exactly what they need and nothing more,
 makes it easier to evolve APIs over time, and enables powerful developer tools.
+
+Muta has embeded a [Graph_i_QL](https://github.com/graphql/graphiql) for checking and calling API. Started a the Muta
+node, and then try open http://127.0.0.1:8000/graphiql in the browser.
 "
 
-graphql-markdown $endpoint --title "Muta GraphQL API" --prologue "$prologue" > $BASEDIR/graphql_api.md
+graphql-markdown $endpoint --title "Muta GraphQL API" --prologue "$prologue" > $BASEDIR/../graphql_api.md
