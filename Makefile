@@ -21,6 +21,10 @@ doc:
 doc-deps:
 	cargo doc --all
 
+# generate GraphQL API documentation
+doc-api:
+	bash docs/build/gql_api.sh
+
 check:
 	${CARGO} check ${VERBOSE} --all
 
@@ -61,5 +65,5 @@ security-audit:
 	@cargo audit
 
 .PHONY: build prod prod-test
-.PHONY: fmt test clippy doc doc-deps check stats
+.PHONY: fmt test clippy doc doc-deps doc-api check stats
 .PHONY: ci info security-audit

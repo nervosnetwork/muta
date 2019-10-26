@@ -8,7 +8,7 @@ pub use transaction::{
 };
 
 #[derive(GraphQLScalarValue, Clone)]
-#[graphql(description = "Keccak hash of hex string")]
+#[graphql(description = "The output digest of Keccak hash function")]
 pub struct Hash(String);
 pub type MerkleRoot = Hash;
 pub type AssetID = Hash;
