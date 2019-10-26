@@ -19,7 +19,7 @@ pub enum ContractType {
 // #####################
 
 #[derive(GraphQLInputObject, Clone)]
-#[graphql(description = "There was many types transaction in Muta, \
+#[graphql(description = "There was many types of transaction in Muta, \
 A transaction often require computing resources or write data to chain,\
 these resources are valuable so we need to pay some token for them.\
 InputRawTransaction describes information above")]

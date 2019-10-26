@@ -60,7 +60,15 @@ impl Query {
         Ok(Epoch::from(epoch))
     }
 
-    #[graphql(name = "getBalance", description = "Get the asset balance of an account")]
+    #[graphql(
+        name = "getBalance",
+        description = "Get the asset balance of an account",
+        arguments(id(
+            description="The asset id. Asset is the first-class in Muta, \
+            this means that your assets can be more than one in Muta, \
+            and the UDT(User Defined Token) will be supported in the future"
+        )),
+    )]
     fn get_balance(
         state_ctx: &State,
         address: Address,
