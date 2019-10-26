@@ -20,6 +20,7 @@ use core_consensus::message::{
     VoteMessageHandler, END_GOSSIP_AGGREGATED_VOTE, END_GOSSIP_RICH_EPOCH_ID,
     END_GOSSIP_SIGNED_PROPOSAL, END_GOSSIP_SIGNED_VOTE, RPC_RESP_SYNC_PULL, RPC_SYNC_PULL,
 };
+use core_consensus::{consensus::OverlordConsensus, fixed_types::ConsensusRpcResponse};
 use core_executor::trie::RocksTrieDB;
 use core_executor::TransactionExecutorFactory;
 use core_mempool::{DefaultMemPoolAdapter, HashMemPool, NewTxsHandler, END_GOSSIP_NEW_TXS};
@@ -234,11 +235,9 @@ async fn start(cfg: &Config) -> ProtocolResult<()> {
     };
     let current_header = &current_epoch.header;
 
-    let prevhash = Hash::digest(Bytes::from(rlp::encode(&FixedPill {
-        inner: Pill {
-            epoch:          current_epoch.clone(),
-            propose_hashes: vec![],
-        },
+    let prevhash = Hash::digest(Bytes::from(rlp::encode(&Pill {
+        epoch:          current_epoch.clone(),
+        propose_hashes: vec![],
     })));
 
     let current_consensus_status = CurrentConsensusStatus {

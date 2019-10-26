@@ -1,12 +1,16 @@
 use std::error::Error;
 
+use async_trait::async_trait;
 use bincode::{deserialize, serialize};
 use bytes::Bytes;
 use overlord::Codec;
-use rlp::{Encodable, RlpStream};
 
-use protocol::codec::{Deserialize, ProtocolCodecSync, Serialize};
-use protocol::types::{Epoch, Hash, Pill, Proof, SignedTransaction, Validator};
+use protocol::codec::{Deserialize, Serialize};
+use protocol::traits::MessageCodec;
+use protocol::types::{Epoch, Hash, Pill, SignedTransaction};
+use protocol::{fixed_codec::ProtocolFixedCodec, ProtocolResult};
+
+use crate::{ConsensusError, MsgType};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum ConsensusRpcRequest {
@@ -14,10 +18,76 @@ pub enum ConsensusRpcRequest {
     PullTxs(PullTxsRequest),
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub enum ConsensusRpcResponse {
-    PullEpochs(Box<FixedEpoch>),
+    PullEpochs(Box<Epoch>),
     PullTxs(Box<FixedSignedTxs>),
+}
+
+#[async_trait]
+impl MessageCodec for ConsensusRpcResponse {
+    async fn encode(&mut self) -> ProtocolResult<Bytes> {
+        let bytes = match self {
+            ConsensusRpcResponse::PullEpochs(ep) => {
+                let mut tmp = ep.encode_fixed()?;
+                tmp.extend_from_slice(b"a");
+                tmp
+            }
+
+            ConsensusRpcResponse::PullTxs(txs) => {
+                let mut tmp = Bytes::from(
+                    serialize(&txs).map_err(|_| ConsensusError::EncodeErr(MsgType::RpcPullTxs))?,
+                );
+                tmp.extend_from_slice(b"b");
+                tmp
+            }
+        };
+        Ok(bytes)
+    }
+
+    async fn decode(mut bytes: Bytes) -> ProtocolResult<Self> {
+        let flag = bytes.split_to(1);
+        match flag.as_ref() {
+            b"a" => {
+                let res: Epoch = ProtocolFixedCodec::decode_fixed(bytes)?;
+                Ok(ConsensusRpcResponse::PullEpochs(Box::new(res)))
+            }
+
+            b"b" => {
+                let res: FixedSignedTxs = deserialize(&bytes)
+                    .map_err(|_| ConsensusError::DecodeErr(MsgType::RpcPullTxs))?;
+                Ok(ConsensusRpcResponse::PullTxs(Box::new(res)))
+            }
+            _ => unreachable!(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FixedPill {
+    pub inner: Pill,
+}
+
+impl Codec for FixedPill {
+    fn encode(&self) -> Result<Bytes, Box<dyn Error + Send>> {
+        let bytes = self.inner.encode_fixed()?;
+        Ok(bytes)
+    }
+
+    fn decode(data: Bytes) -> Result<Self, Box<dyn Error + Send>> {
+        let inner: Pill = ProtocolFixedCodec::decode_fixed(data)?;
+        Ok(FixedPill { inner })
+    }
+}
+
+impl FixedPill {
+    pub fn get_ordered_hashes(&self) -> Vec<Hash> {
+        self.inner.epoch.ordered_tx_hashes.clone()
+    }
+
+    pub fn get_propose_hashes(&self) -> Vec<Hash> {
+        self.inner.propose_hashes.clone()
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -43,18 +113,6 @@ impl PullTxsRequest {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct FixedEpoch {
-    #[serde(with = "core_network::serde")]
-    pub inner: Epoch,
-}
-
-impl FixedEpoch {
-    pub fn new(inner: Epoch) -> Self {
-        FixedEpoch { inner }
-    }
-}
-
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct FixedSignedTxs {
     #[serde(with = "core_network::serde_multi")]
@@ -77,117 +135,6 @@ impl Codec for FixedSignedTxs {
 impl FixedSignedTxs {
     pub fn new(inner: Vec<SignedTransaction>) -> Self {
         FixedSignedTxs { inner }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct FixedPill {
-    pub inner: Pill,
-}
-
-impl From<Pill> for FixedPill {
-    fn from(inner: Pill) -> Self {
-        FixedPill { inner }
-    }
-}
-
-impl Encodable for FixedPill {
-    fn rlp_append(&self, s: &mut RlpStream) {
-        let header = &self.inner.epoch.header;
-        let confirm_root = header
-            .confirm_root
-            .iter()
-            .map(|root| root.as_hex())
-            .collect::<Vec<_>>();
-        let receipt_root = header
-            .receipt_root
-            .iter()
-            .map(|root| root.as_hex())
-            .collect::<Vec<_>>();
-        let validators = header
-            .validators
-            .iter()
-            .map(|v| FixedValidator::from(v.to_owned()))
-            .collect::<Vec<_>>();
-
-        s.begin_list(14)
-            .append(&header.chain_id.as_hex())
-            .append(&header.epoch_id)
-            .append(&header.pre_hash.as_hex())
-            .append(&header.timestamp)
-            .append(&header.logs_bloom.to_low_u64_be())
-            .append(&header.order_root.as_hex())
-            .append_list::<String, String>(&confirm_root)
-            .append(&header.state_root.as_hex())
-            .append_list::<String, String>(&receipt_root)
-            .append(&header.cycles_used)
-            .append(&header.proposer.as_hex())
-            .append(&FixedProof::from(header.proof.clone()))
-            .append(&header.validator_version)
-            .append_list(&validators);
-    }
-}
-
-impl FixedPill {
-    pub fn get_ordered_hashes(&self) -> Vec<Hash> {
-        self.inner.epoch.ordered_tx_hashes.clone()
-    }
-
-    pub fn get_propose_hashes(&self) -> Vec<Hash> {
-        self.inner.propose_hashes.clone()
-    }
-}
-
-impl Codec for FixedPill {
-    fn encode(&self) -> Result<Bytes, Box<dyn Error + Send>> {
-        let bytes = self.inner.encode_sync()?;
-        Ok(bytes)
-    }
-
-    fn decode(data: Bytes) -> Result<Self, Box<dyn Error + Send>> {
-        let res = FixedPill::from(Pill::decode_sync(data)?);
-        Ok(res)
-    }
-}
-
-struct FixedValidator {
-    inner: Validator,
-}
-
-impl From<Validator> for FixedValidator {
-    fn from(inner: Validator) -> Self {
-        FixedValidator { inner }
-    }
-}
-
-impl Encodable for FixedValidator {
-    fn rlp_append(&self, s: &mut RlpStream) {
-        let inner = &self.inner;
-        s.begin_list(3)
-            .append(&inner.address.as_hex())
-            .append(&inner.propose_weight)
-            .append(&inner.vote_weight);
-    }
-}
-
-struct FixedProof {
-    inner: Proof,
-}
-
-impl From<Proof> for FixedProof {
-    fn from(inner: Proof) -> Self {
-        FixedProof { inner }
-    }
-}
-
-impl Encodable for FixedProof {
-    fn rlp_append(&self, s: &mut RlpStream) {
-        let inner = &self.inner;
-        s.begin_list(4)
-            .append(&inner.epoch_id)
-            .append(&inner.round)
-            .append(&inner.epoch_hash.as_hex())
-            .append(&inner.signature.as_ref());
     }
 }
 

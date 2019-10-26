@@ -49,6 +49,10 @@ pub enum ConsensusError {
     #[display(fmt = "Decode {:?} message failed", _0)]
     DecodeErr(MsgType),
 
+    /// Encode consensus message error.
+    #[display(fmt = "Encode {:?} message failed", _0)]
+    EncodeErr(MsgType),
+
     /// Overlord consensus protocol error.
     #[display(fmt = "Overlord error {:?}", _0)]
     OverlordErr(Box<dyn Error + Send>),

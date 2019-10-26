@@ -21,7 +21,7 @@ use protocol::types::{
     Address, Epoch, EpochHeader, Hash, MerkleRoot, Pill, Proof, SignedTransaction, UserAddress,
     Validator,
 };
-use protocol::{ProtocolError, ProtocolResult};
+use protocol::{fixed_codec::ProtocolFixedCodec, ProtocolError, ProtocolResult};
 
 use crate::fixed_types::{FixedEpochID, FixedPill, FixedSignedTxs};
 use crate::message::{
@@ -84,11 +84,14 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill, FixedSignedTxs>
             ordered_tx_hashes,
         };
 
-        let fixed_pill = FixedPill::from(Pill {
+        let pill = Pill {
             epoch,
             propose_hashes,
-        });
-        let hash = Hash::digest(Bytes::from(fixed_pill.rlp_bytes())).as_bytes();
+        };
+        let fixed_pill = FixedPill {
+            inner: pill.clone(),
+        };
+        let hash = Hash::digest(pill.encode_fixed()?).as_bytes();
         let mut set = self.exemption_hash.write();
         set.insert(hash.clone());
 

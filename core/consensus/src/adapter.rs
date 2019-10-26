@@ -1,3 +1,4 @@
+use std::borrow::Borrow;
 use std::marker::PhantomData;
 use std::sync::Arc;
 
@@ -162,7 +163,10 @@ where
             .await?;
 
         match res {
-            ConsensusRpcResponse::PullEpochs(epoch) => Ok(epoch.inner),
+            ConsensusRpcResponse::PullEpochs(epoch) => {
+                let res: &Epoch = epoch.borrow();
+                Ok(res.to_owned())
+            }
             _ => Err(ConsensusError::RpcErr(MsgType::RpcPullEpochs).into()),
         }
     }
