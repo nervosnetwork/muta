@@ -21,7 +21,7 @@ use core_consensus::message::{
 };
 use core_executor::trie::RocksTrieDB;
 use core_executor::TransactionExecutorFactory;
-use core_mempool::{DefaultMemPoolAdapter, HashMemPool};
+use core_mempool::{DefaultMemPoolAdapter, HashMemPool, NewTxsHandler, END_GOSSIP_NEW_TXS};
 use core_network::{NetworkConfig, NetworkService};
 use core_storage::{adapter::rocks::RocksAdapter, ImplStorage};
 
@@ -198,6 +198,14 @@ async fn start(cfg: &Config) -> ProtocolResult<()> {
         mempool_adapter,
     ));
 
+    // register broadcast new transaction
+    network_service
+        .register_endpoint_handler(
+            END_GOSSIP_NEW_TXS,
+            Box::new(NewTxsHandler::new(Arc::clone(&mempool))),
+        )
+        .unwrap();
+
     // Init trie db
     let path_state = cfg.data_path_for_state();
     let trie_db = Arc::new(RocksTrieDB::new(path_state, cfg.executor.light).unwrap());
@@ -258,6 +266,7 @@ async fn start(cfg: &Config) -> ProtocolResult<()> {
         my_privkey,
         consensus_adapter,
     ));
+
     // register consensus
     network_service
         .register_endpoint_handler(
