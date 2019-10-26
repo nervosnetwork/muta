@@ -19,17 +19,17 @@ pub struct EpochHeader {
     pub chain_id:     Hash,
     #[graphql(description = "Known as the block height like other blockchain")]
     pub epoch_id:     Uint64,
-    #[graphql(description = "The merkle proof of the previous epoch")]
+    #[graphql(description = "The merkle root of the previous epoch")]
     pub pre_hash:     Hash,
     #[graphql(description = "A timestamp that records when the epoch was created")]
     pub timestamp:    Uint64,
-    #[graphql(description = "The merkle proof of ordered transactions")]
+    #[graphql(description = "The merkle root of ordered transactions")]
     pub order_root:   MerkleRoot,
-    #[graphql(description = "The merkle proofs of all the confirms")]
+    #[graphql(description = "The merkle roots of all the confirms")]
     pub confirm_root: Vec<MerkleRoot>,
-    #[graphql(description = "The merkle proof of state root")]
+    #[graphql(description = "The merkle root of state root")]
     pub state_root:   MerkleRoot,
-    #[graphql(description = "The merkle proof of receipts")]
+    #[graphql(description = "The merkle roots of receipts")]
     pub receipt_root: Vec<MerkleRoot>,
     #[graphql(description = "The sum of all transactions costs")]
     pub cycles_used:  Uint64,
