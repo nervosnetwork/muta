@@ -94,11 +94,13 @@ impl<Adapter: ConsensusAdapter + 'static> Consensus for OverlordConsensus<Adapte
         info!("self {}, chain {}", current_epoch_id, rich_epoch_id);
         info!("consensus: start synchronization");
 
+        let mut state_root = Hash::from_empty();
         let mut current_hash = if current_epoch_id != 0 {
             let mut current_epoch = self
                 .engine
                 .get_epoch_by_id(ctx.clone(), current_epoch_id)
                 .await?;
+            state_root = current_epoch.header.state_root.clone();
             let tmp = Hash::digest(current_epoch.encode().await?);
 
             // Check epoch for the first time.
@@ -140,10 +142,6 @@ impl<Adapter: ConsensusAdapter + 'static> Consensus for OverlordConsensus<Adapte
                 .pull_txs(ctx.clone(), epoch.ordered_tx_hashes.clone())
                 .await?;
 
-            let last_epoch = self
-                .engine
-                .get_epoch_by_id(ctx.clone(), epoch.header.epoch_id - 1)
-                .await?;
             // After get the signed transactions:
             // 1. Execute the signed transactions.
             // 2. Save the signed transactions.
@@ -151,20 +149,20 @@ impl<Adapter: ConsensusAdapter + 'static> Consensus for OverlordConsensus<Adapte
             // 4. Save the new epoch.
             // 5. Save the receipt.
             debug!("consensus: synchronization executor the epoch");
-
             let exec_resp = self
                 .engine
                 .exec(
-                    last_epoch.header.state_root.clone(),
+                    state_root.clone(),
                     epoch.header.epoch_id,
                     Address::User(epoch.header.proposer.clone()),
                     txs.clone(),
                 )
                 .await?;
+            state_root = exec_resp.state_root.clone();
 
             debug!("consensus: synchronization update the rich status");
             self.engine
-                .update_status(id, epoch.clone(), proof, exec_resp, txs)
+                .update_status(epoch.header.epoch_id, epoch.clone(), proof, exec_resp, txs)
                 .await?;
 
             // Update the previous hash and last epoch.
