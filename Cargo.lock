@@ -479,7 +479,7 @@ dependencies = [
  "hex 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "protocol 0.1.0",
- "rocksdb 0.12.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rocksdb 0.12.4 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
