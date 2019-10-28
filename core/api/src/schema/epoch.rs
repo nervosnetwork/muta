@@ -23,7 +23,7 @@ pub struct EpochHeader {
     pub chain_id: Hash,
     #[graphql(description = "Known as the block height like other blockchain")]
     pub epoch_id: Uint64,
-    #[graphql(description = "The merkle root of the previous epoch")]
+    #[graphql(description = "The hash of the serialized previous epoch")]
     pub pre_hash: Hash,
     #[graphql(description = "A timestamp that records when the epoch was created")]
     pub timestamp: Uint64,

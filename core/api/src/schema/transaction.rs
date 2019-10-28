@@ -5,7 +5,7 @@ use crate::schema::{Address, AssetID, Balance, Bytes, Hash, Uint64};
 pub enum ContractType {
     // Asset contract
     #[graphql(
-        description = "Asset contract often use for creating User Define Asset(also known as (User Define Token))"
+        description = "Asset contract often use for creating User Define Asset(also known as UDT(User Define Token))"
     )]
     Asset,
     // App contract, the code in the contract is allowed to change the state world.
