@@ -72,6 +72,7 @@ impl IntervalTxsBroadcaster {
                         Self::do_broadcast(&mut txs_cache, &gossip, err_tx.clone()).await
                     }
                 },
+                complete => break,
             };
         }
     }
