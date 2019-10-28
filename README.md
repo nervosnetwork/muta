@@ -38,3 +38,8 @@ If everything goes well, you’ll see this appear:
 Go to [http://127.0.0.1:8000/graphiql](http://127.0.0.1:8000/graphiql) to communicate with the chain and read the documentations after the chain is running.
 
 The develop chain is worked on **LOCAL** and **SINGLE NODE**.
+
+
+## How to Contribute
+
+The contribution workflow is described in [CONTRIBUTING.md](CONTRIBUTING.md), and security policy is described in [SECURITY.md](SECURITY.md).
