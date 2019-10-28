@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use serde_derive::Deserialize;
 
 use core_consensus::DurationConfig;
+use core_mempool::{DEFAULT_BROADCAST_TXS_INTERVAL, DEFAULT_BROADCAST_TXS_SIZE};
 
 #[derive(Debug, Deserialize)]
 pub struct ConfigGraphQL {
@@ -24,10 +25,23 @@ pub struct ConfigNetworkBootstrap {
     pub address: SocketAddr,
 }
 
+fn default_broadcast_txs_size() -> usize {
+    DEFAULT_BROADCAST_TXS_SIZE
+}
+
+fn default_broadcast_txs_interval() -> u64 {
+    DEFAULT_BROADCAST_TXS_INTERVAL
+}
+
 #[derive(Debug, Deserialize)]
 pub struct ConfigMempool {
     pub timeout_gap: u64,
     pub pool_size:   u64,
+
+    #[serde(default = "default_broadcast_txs_size")]
+    pub broadcast_txs_size: usize,
+    #[serde(default = "default_broadcast_txs_interval")]
+    pub broadcast_txs_interval: u64,
 }
 
 #[derive(Debug, Deserialize)]

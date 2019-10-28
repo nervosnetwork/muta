@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use futures::future::try_join_all;
 use protocol::{
     traits::{Context, MemPool, MessageHandler, Priority, Rpc},
     types::{Hash, SignedTransaction},
@@ -16,8 +17,8 @@ pub const END_RESP_PULL_TXS: &str = "/rpc_resp/mempool/pull_txs";
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct MsgNewTxs {
-    #[serde(with = "core_network::serde")]
-    pub stx: SignedTransaction,
+    #[serde(with = "core_network::serde_multi")]
+    pub batch_stxs: Vec<SignedTransaction>,
 }
 
 pub struct NewTxsHandler<M> {
@@ -43,7 +44,22 @@ where
     async fn process(&self, ctx: Context, msg: Self::Message) -> ProtocolResult<()> {
         let ctx = ctx.mark_network_origin_new_txs();
 
-        self.mem_pool.insert(ctx, msg.stx).await
+        let insert_stx = |stx| -> _ {
+            let mem_pool = Arc::clone(&self.mem_pool);
+            let ctx = ctx.clone();
+
+            runtime::spawn(async move { mem_pool.insert(ctx, stx).await })
+        };
+
+        // Concurrently insert them
+        try_join_all(
+            msg.batch_stxs
+                .into_iter()
+                .map(insert_stx)
+                .collect::<Vec<_>>(),
+        )
+        .await
+        .map(|_| ())
     }
 }
 

@@ -11,7 +11,7 @@ protocol = { path = "../../protocol" }
 common-crypto = { path = "../../common/crypto" }
 core-network = { path = "../network" }
 
-futures-preview = "0.3.0-alpha.19"
+futures-preview = { version = "0.3.0-alpha.19", features = [ "async-await" ] }
 runtime-tokio = "0.3.0-alpha.6"
 runtime = "0.3.0-alpha.7"
 crossbeam-queue = "0.1"
@@ -25,6 +25,8 @@ rand = "0.6"
 hex = "0.3"
 serde_derive = "1.0"
 serde = "1.0"
+futures-timer = "1.0"
+log = "0.4"
 
 [dev-dependencies]
 chashmap = "2.2"

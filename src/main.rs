@@ -191,6 +191,8 @@ async fn start(cfg: &Config) -> ProtocolResult<()> {
         network_service.handle(),
         Arc::clone(&storage),
         cfg.mempool.timeout_gap,
+        cfg.mempool.broadcast_txs_size,
+        cfg.mempool.broadcast_txs_interval,
     );
     let mempool = Arc::new(HashMemPool::new(
         cfg.mempool.pool_size as usize,
