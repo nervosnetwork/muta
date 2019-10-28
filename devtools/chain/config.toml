@@ -22,6 +22,8 @@ address = "0.0.0.0:1888"
 [mempool]
 timeout_gap = 20
 pool_size = 20000
+broadcast_txs_size = 200
+broadcast_txs_interval = 200
 
 [consensus]
 cycles_limit = 99999999
