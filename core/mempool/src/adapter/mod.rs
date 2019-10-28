@@ -213,8 +213,8 @@ where
         if let Some(mut err_rx) = self.err_rx.try_lock() {
             match err_rx.try_next() {
                 Ok(Some(err)) => return Err(err),
-                Ok(None) => return Ok(()),
-                Err(_) => return Err(ProtocolError::from(AdapterError::IntervalBroadcasterDrop)),
+                // Error means receiver channel is empty, is ok here
+                Ok(None) | Err(_) => return Ok(()),
             }
         }
 
