@@ -327,3 +327,204 @@ impl From<AdapterError> for ProtocolError {
         ProtocolError::new(ProtocolErrorKind::Mempool, Box::new(error))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::IntervalTxsBroadcaster;
+
+    use crate::{adapter::message::MsgNewTxs, tests::default_mock_txs};
+
+    use protocol::{
+        traits::{Context, Gossip, MessageCodec, Priority},
+        types::UserAddress,
+        ProtocolResult,
+    };
+
+    use async_trait::async_trait;
+    use bytes::Bytes;
+    use futures::{
+        channel::mpsc::{channel, unbounded, UnboundedSender},
+        stream::StreamExt,
+    };
+    use parking_lot::Mutex;
+
+    use std::{
+        ops::Sub,
+        sync::Arc,
+        time::{Duration, Instant},
+    };
+
+    #[derive(Clone)]
+    struct MockGossip {
+        msgs:      Arc<Mutex<Vec<Bytes>>>,
+        signal_tx: UnboundedSender<()>,
+    }
+
+    impl MockGossip {
+        pub fn new(signal_tx: UnboundedSender<()>) -> Self {
+            MockGossip {
+                msgs: Default::default(),
+                signal_tx,
+            }
+        }
+    }
+
+    #[async_trait]
+    impl Gossip for MockGossip {
+        async fn broadcast<M>(
+            &self,
+            _: Context,
+            _: &str,
+            mut msg: M,
+            _: Priority,
+        ) -> ProtocolResult<()>
+        where
+            M: MessageCodec,
+        {
+            let bytes = msg.encode().await.expect("encode message fail");
+            self.msgs.lock().push(bytes);
+
+            self.signal_tx
+                .unbounded_send(())
+                .expect("send broadcast signal fail");
+
+            Ok(())
+        }
+
+        async fn users_cast<M>(
+            &self,
+            _: Context,
+            _: &str,
+            _: Vec<UserAddress>,
+            _: M,
+            _: Priority,
+        ) -> ProtocolResult<()>
+        where
+            M: MessageCodec,
+        {
+            unreachable!()
+        }
+    }
+
+    macro_rules! pop_msg {
+        ($msgs:expr) => {{
+            let msg = $msgs.pop().expect("should have one message");
+            MsgNewTxs::decode(msg).await.expect("decode MsgNewTxs fail")
+        }};
+    }
+
+    #[runtime::test(runtime_tokio::Tokio)]
+    async fn test_interval_timer() {
+        let (tx, mut rx) = channel(1);
+        let interval = Duration::from_millis(200);
+        let now = Instant::now();
+
+        runtime::spawn(IntervalTxsBroadcaster::timer(tx, 200));
+        rx.next().await.expect("await interval signal fail");
+
+        assert!(now.elapsed().sub(interval).as_millis() < 100u128);
+    }
+
+    #[runtime::test(runtime_tokio::Tokio)]
+    async fn test_interval_broadcast_reach_cache_size() {
+        let (stx_tx, stx_rx) = unbounded();
+        let (err_tx, _err_rx) = unbounded();
+        let (_signal_tx, interval_reached) = channel(1);
+        let tx_size = 10;
+        let (broadcast_signal_tx, mut broadcast_signal_rx) = unbounded();
+        let gossip = MockGossip::new(broadcast_signal_tx);
+
+        runtime::spawn(IntervalTxsBroadcaster::broadcast(
+            stx_rx,
+            interval_reached,
+            tx_size,
+            gossip.clone(),
+            err_tx,
+        ));
+
+        for stx in default_mock_txs(11).into_iter() {
+            stx_tx.unbounded_send(stx).expect("send stx fail");
+        }
+
+        broadcast_signal_rx.next().await;
+        let mut msgs = gossip.msgs.lock().drain(..).collect::<Vec<_>>();
+        assert_eq!(msgs.len(), 1, "should only have one message");
+
+        let msg = pop_msg!(msgs);
+        assert_eq!(msg.batch_stxs.len(), 10, "should only have 10 stx");
+    }
+
+    #[runtime::test(runtime_tokio::Tokio)]
+    async fn test_interval_broadcast_reach_interval() {
+        let (stx_tx, stx_rx) = unbounded();
+        let (err_tx, _err_rx) = unbounded();
+        let (signal_tx, interval_reached) = channel(1);
+        let tx_size = 10;
+        let (broadcast_signal_tx, mut broadcast_signal_rx) = unbounded();
+        let gossip = MockGossip::new(broadcast_signal_tx);
+
+        runtime::spawn(IntervalTxsBroadcaster::timer(signal_tx, 200));
+        runtime::spawn(IntervalTxsBroadcaster::broadcast(
+            stx_rx,
+            interval_reached,
+            tx_size,
+            gossip.clone(),
+            err_tx,
+        ));
+
+        for stx in default_mock_txs(9).into_iter() {
+            stx_tx.unbounded_send(stx).expect("send stx fail");
+        }
+
+        broadcast_signal_rx.next().await;
+        let mut msgs = gossip.msgs.lock().drain(..).collect::<Vec<_>>();
+        assert_eq!(msgs.len(), 1, "should only have one message");
+
+        let msg = pop_msg!(msgs);
+        assert_eq!(msg.batch_stxs.len(), 9, "should only have 9 stx");
+    }
+
+    #[runtime::test(runtime_tokio::Tokio)]
+    async fn test_interval_broadcast() {
+        let (stx_tx, stx_rx) = unbounded();
+        let (err_tx, _err_rx) = unbounded();
+        let (signal_tx, interval_reached) = channel(1);
+        let tx_size = 10;
+        let (broadcast_signal_tx, mut broadcast_signal_rx) = unbounded();
+        let gossip = MockGossip::new(broadcast_signal_tx);
+
+        runtime::spawn(IntervalTxsBroadcaster::timer(signal_tx, 200));
+        runtime::spawn(IntervalTxsBroadcaster::broadcast(
+            stx_rx,
+            interval_reached,
+            tx_size,
+            gossip.clone(),
+            err_tx,
+        ));
+
+        for stx in default_mock_txs(19).into_iter() {
+            stx_tx.unbounded_send(stx).expect("send stx fail");
+        }
+
+        // Should got two broadcast
+        broadcast_signal_rx.next().await;
+        broadcast_signal_rx.next().await;
+
+        let mut msgs = gossip.msgs.lock().drain(..).collect::<Vec<_>>();
+        assert_eq!(msgs.len(), 2, "should only have two messages");
+
+        let msg = pop_msg!(msgs);
+        assert_eq!(
+            msg.batch_stxs.len(),
+            9,
+            "last message should only have 9 stx"
+        );
+
+        let msg = pop_msg!(msgs);
+        assert_eq!(
+            msg.batch_stxs.len(),
+            10,
+            "first message should only have 10 stx"
+        );
+    }
+}

@@ -88,7 +88,7 @@ impl MemPoolAdapter for HashMemPoolAdapter {
     }
 }
 
-fn default_mock_txs(size: usize) -> Vec<SignedTransaction> {
+pub fn default_mock_txs(size: usize) -> Vec<SignedTransaction> {
     mock_txs(size, 0, TIMEOUT)
 }
 
