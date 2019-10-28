@@ -1,0 +1,94 @@
+version: '2'
+
+services:
+  bft_node1:
+    container_name: bft_node1
+    image: nervos/muta:latest
+    hostname: bft_node1
+    environment:
+      - RUST_LOG 
+      - RUST_BACKTRACE 
+    volumes:
+      - ./config-bft-1.toml:/app/devtools/chain/config.toml
+      - ../../../target/data/bft1:/app/devtools/chain/data
+    networks:
+      bft:
+        aliases:
+          - bft_node1
+        ipv4_address: 173.20.0.21
+    command: |
+      sh -c '
+      cd /app;
+      ./muta-chain;'
+
+  bft_node2:
+    container_name: bft_node2
+    image: nervos/muta:latest
+    hostname: bft_node2
+    environment:
+      - RUST_LOG 
+      - RUST_BACKTRACE 
+    depends_on:
+      - bft_node1
+    volumes:
+      - ./config-bft-2.toml:/app/devtools/chain/config.toml
+      - ../../../target/data/bft2:/app/devtools/chain/data
+    networks:
+      bft:
+        aliases:
+          - bft_node2
+        ipv4_address: 173.20.0.22
+    command: |
+      sh -c '
+      cd /app;
+      ./muta-chain;'
+
+  bft_node3:
+    container_name: bft_node3
+    image: nervos/muta:latest
+    hostname: bft_node3
+    environment:
+      - RUST_LOG 
+      - RUST_BACKTRACE 
+    depends_on:
+      - bft_node1
+    volumes:
+      - ./config-bft-3.toml:/app/devtools/chain/config.toml
+      - ../../../target/data/bft3:/app/devtools/chain/data
+    networks:
+      bft:
+        aliases:
+          - bft_node3
+        ipv4_address: 173.20.0.23
+    command: |
+      sh -c '
+      cd /app;
+      ./muta-chain;'
+
+  bft_node4:
+    container_name: bft_node4
+    image: nervos/muta:latest
+    hostname: bft_node4
+    environment:
+      - RUST_LOG 
+      - RUST_BACKTRACE 
+    depends_on:
+      - bft_node1
+    volumes:
+      - ./config-bft-4.toml:/app/devtools/chain/config.toml
+      - ../../../target/data/bft4:/app/devtools/chain/data
+    networks:
+      bft:
+        aliases:
+          - bft_node4
+        ipv4_address: 173.20.0.24
+    command: |
+      sh -c '
+      cd /app;
+      ./muta-chain;'
+
+networks:
+  bft:
+    ipam:
+     config:
+       - subnet: 173.20.0.0/24

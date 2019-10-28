@@ -2,7 +2,7 @@
 chain_id = "b6a4d7da21443f5e816e8700eea87610e6d769657d6b8ec73028457bf2ca4036"  # by sha256(Muta)
 
 # crypto
-privkey = "45c56be699dca666191ad3446897e0f480da234da896270202514a0e1a587c3f"
+privkey = "037ddeb069fdfeede6993eb587b394bc1984a3ba21b8ea64d5b8679b0d673d77"
 
 # db config
 data_path = "./devtools/chain/data"
@@ -16,18 +16,23 @@ graphiql_uri = "/graphiql"
 listening_address = "0.0.0.0:1337"
 
 [[network.bootstraps]]
-pubkey = "031288a6788678c25952eba8693b2f278f66e2187004b64ac09416d07f83f96d5b"
-address = "0.0.0.0:1888"
+pubkey = "03d158fb85df6201708f2cbde51e0b7c2d8835a28aaea7ed243e5db1aa442b18b1"
+address = "173.20.0.21:1337"
 
 [mempool]
-timeout_gap = 20
+timeout_gap = 200
 pool_size = 20000
 
 [consensus]
 cycles_limit = 99999999
 cycles_price = 1
 interval = 3000
-verifier_list = [ "10f8389d774afdad8755ef8e629e5a154fddc6325a" ]
+verifier_list = [ 
+    "10ecc2746d8ad8ca82872bf0af59ebefbe003b2d0c",
+    "10c198d22b505a51f11f0358353f341abff4dfee61",
+    "10bbd58fe01f00aeb469175585bd2858b5b21c5092",
+    "104c52183d10fe7f65f3b22b45528d97212507bd6c" 
+]
 
 [consensus.duration]
 propose_numerator = 24
