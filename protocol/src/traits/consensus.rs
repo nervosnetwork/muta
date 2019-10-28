@@ -49,13 +49,7 @@ pub trait Consensus: Send + Sync {
 
     /// Update an epoch to consensus. This may be either a rich status from the
     /// executor or a synchronous epoch that need to be insert to the database.
-    async fn update_epoch(
-        &self,
-        ctx: Context,
-        epoch: Epoch,
-        signed_txs: Vec<SignedTransaction>,
-        proof: Proof,
-    ) -> ProtocolResult<()>;
+    async fn update_epoch(&self, ctx: Context, msg: Vec<u8>) -> ProtocolResult<()>;
 }
 
 #[async_trait]
@@ -95,9 +89,10 @@ pub trait ConsensusAdapter: Send + Sync {
     /// Execute some transactions.
     async fn execute(
         &self,
-        ctx: Context,
         node_info: NodeInfo,
-        status: CurrentConsensusStatus,
+        state_root: MerkleRoot,
+        epoch_id: u64,
+        cycles_price: u64,
         coinbase: Address,
         signed_txs: Vec<SignedTransaction>,
     ) -> ProtocolResult<ExecutorExecResp>;
@@ -127,4 +122,22 @@ pub trait ConsensusAdapter: Send + Sync {
         ctx: Context,
         epoch_id: u64,
     ) -> ProtocolResult<Vec<Validator>>;
+
+    /// Get the current epoch ID from storage.
+    async fn get_current_epoch_id(&self, ctx: Context) -> ProtocolResult<u64>;
+
+    /// Pull some epochs from other nodes from `begin` to `end`.
+    async fn pull_epoch(&self, ctx: Context, epoch_id: u64, end: &str) -> ProtocolResult<Epoch>;
+
+    /// Pull signed transactions corresponding to the given hashes from other
+    /// nodes.
+    async fn pull_txs(
+        &self,
+        ctx: Context,
+        hashes: Vec<Hash>,
+        end: &str,
+    ) -> ProtocolResult<Vec<SignedTransaction>>;
+
+    /// Get an epoch corresponding to the given epoch ID.
+    async fn get_epoch_by_id(&self, ctx: Context, epoch_id: u64) -> ProtocolResult<Epoch>;
 }

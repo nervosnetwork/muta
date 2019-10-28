@@ -2,22 +2,30 @@ use std::marker::PhantomData;
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use log::debug;
 
 use protocol::traits::executor::{ExecutorExecResp, ExecutorFactory, TrieDB};
 use protocol::traits::{
-    ConsensusAdapter, Context, CurrentConsensusStatus, Gossip, MemPool, MessageTarget,
-    MixedTxHashes, NodeInfo, Priority, Storage,
+    ConsensusAdapter, Context, Gossip, MemPool, MessageTarget, MixedTxHashes, NodeInfo, Priority,
+    Rpc, Storage,
 };
-use protocol::types::{Address, Epoch, Hash, Proof, Receipt, SignedTransaction, Validator};
+use protocol::types::{
+    Address, Epoch, Hash, MerkleRoot, Proof, Receipt, SignedTransaction, Validator,
+};
 use protocol::ProtocolResult;
+
+use crate::fixed_types::{ConsensusRpcRequest, ConsensusRpcResponse, PullTxsRequest};
+use crate::{ConsensusError, MsgType};
 
 pub struct OverlordConsensusAdapter<
     EF: ExecutorFactory<DB>,
     G: Gossip,
     M: MemPool,
+    R: Rpc,
     S: Storage,
     DB: TrieDB,
 > {
+    rpc:     Arc<R>,
     network: Arc<G>,
     mempool: Arc<M>,
     storage: Arc<S>,
@@ -27,10 +35,11 @@ pub struct OverlordConsensusAdapter<
 }
 
 #[async_trait]
-impl<EF, G, M, S, DB> ConsensusAdapter for OverlordConsensusAdapter<EF, G, M, S, DB>
+impl<EF, G, M, R, S, DB> ConsensusAdapter for OverlordConsensusAdapter<EF, G, M, R, S, DB>
 where
     EF: ExecutorFactory<DB>,
     G: Gossip + Sync + Send,
+    R: Rpc + Sync + Send,
     M: MemPool,
     S: Storage,
     DB: TrieDB,
@@ -84,18 +93,19 @@ where
 
     async fn execute(
         &self,
-        _ctx: Context,
         node_info: NodeInfo,
-        status: CurrentConsensusStatus,
+        state_root: MerkleRoot,
+        epoch_id: u64,
+        cycles_price: u64,
         coinbase: Address,
         signed_txs: Vec<SignedTransaction>,
     ) -> ProtocolResult<ExecutorExecResp> {
         let mut executor = EF::from_root(
             node_info.chain_id,
-            status.state_root,
+            state_root,
             Arc::clone(&self.trie_db),
-            status.epoch_id,
-            status.cycles_price,
+            epoch_id,
+            cycles_price,
             coinbase,
         )?;
         executor.exec(signed_txs)
@@ -133,18 +143,76 @@ where
         let epoch = self.storage.get_epoch_by_epoch_id(epoch_id).await?;
         Ok(epoch.header.validators)
     }
+
+    async fn get_current_epoch_id(&self, _ctx: Context) -> ProtocolResult<u64> {
+        let res = self.storage.get_latest_epoch().await?;
+        Ok(res.header.epoch_id)
+    }
+
+    async fn pull_epoch(&self, ctx: Context, epoch_id: u64, end: &str) -> ProtocolResult<Epoch> {
+        debug!("consensus: send rpc pull epoch {}", epoch_id);
+        let res = self
+            .rpc
+            .call::<ConsensusRpcRequest, ConsensusRpcResponse>(
+                ctx,
+                end,
+                ConsensusRpcRequest::PullEpochs(epoch_id),
+                Priority::High,
+            )
+            .await?;
+
+        match res {
+            ConsensusRpcResponse::PullEpochs(epoch) => Ok(epoch.inner),
+            _ => Err(ConsensusError::RpcErr(MsgType::RpcPullEpochs).into()),
+        }
+    }
+
+    async fn pull_txs(
+        &self,
+        ctx: Context,
+        hashes: Vec<Hash>,
+        end: &str,
+    ) -> ProtocolResult<Vec<SignedTransaction>> {
+        let msg = PullTxsRequest::new(hashes);
+        let res = self
+            .rpc
+            .call::<ConsensusRpcRequest, ConsensusRpcResponse>(
+                ctx,
+                end,
+                ConsensusRpcRequest::PullTxs(msg),
+                Priority::High,
+            )
+            .await?;
+
+        match res {
+            ConsensusRpcResponse::PullTxs(txs) => Ok(txs.inner),
+            _ => Err(ConsensusError::RpcErr(MsgType::RpcPullTxs).into()),
+        }
+    }
+
+    async fn get_epoch_by_id(&self, _ctx: Context, epoch_id: u64) -> ProtocolResult<Epoch> {
+        self.storage.get_epoch_by_epoch_id(epoch_id).await
+    }
 }
 
-impl<EF, G, M, S, DB> OverlordConsensusAdapter<EF, G, M, S, DB>
+impl<EF, G, M, R, S, DB> OverlordConsensusAdapter<EF, G, M, R, S, DB>
 where
     EF: ExecutorFactory<DB>,
     G: Gossip + Sync + Send,
+    R: Rpc + Sync + Send,
     M: MemPool,
     S: Storage,
     DB: TrieDB,
 {
-    pub fn new(network: Arc<G>, mempool: Arc<M>, storage: Arc<S>, trie_db: Arc<DB>) -> Self {
+    pub fn new(
+        rpc: Arc<R>,
+        network: Arc<G>,
+        mempool: Arc<M>,
+        storage: Arc<S>,
+        trie_db: Arc<DB>,
+    ) -> Self {
         OverlordConsensusAdapter {
+            rpc,
             network,
             mempool,
             storage,

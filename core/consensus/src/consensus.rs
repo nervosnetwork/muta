@@ -1,7 +1,10 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use bincode::deserialize;
 use creep::Context;
+use futures::lock::Mutex;
+use log::{debug, info};
 use overlord::types::{AggregatedVote, Node, OverlordMsg, SignedProposal, SignedVote, Status};
 use overlord::{DurationConfig, Overlord, OverlordHandler};
 use parking_lot::RwLock;
@@ -9,11 +12,11 @@ use parking_lot::RwLock;
 use common_crypto::{PrivateKey, Secp256k1PrivateKey};
 
 use protocol::traits::{Consensus, ConsensusAdapter, CurrentConsensusStatus, NodeInfo};
-use protocol::types::{Epoch, Proof, SignedTransaction, Validator};
-use protocol::ProtocolResult;
+use protocol::types::{Address, Hash, Proof, Validator};
+use protocol::{codec::ProtocolCodec, ProtocolResult};
 
 use crate::engine::ConsensusEngine;
-use crate::fixed_types::{FixedPill, FixedSignedTxs};
+use crate::fixed_types::{FixedEpochID, FixedPill, FixedSignedTxs};
 use crate::util::OverlordCrypto;
 use crate::{ConsensusError, MsgType};
 
@@ -26,6 +29,8 @@ pub struct OverlordConsensus<Adapter: ConsensusAdapter + 'static> {
     handler: OverlordHandler<FixedPill>,
     /// A consensus engine for synchronous.
     engine: Arc<ConsensusEngine<Adapter>>,
+    /// Synchronization lock.
+    lock: Mutex<()>,
 }
 
 #[async_trait]
@@ -57,13 +62,127 @@ impl<Adapter: ConsensusAdapter + 'static> Consensus for OverlordConsensus<Adapte
         Ok(())
     }
 
-    async fn update_epoch(
-        &self,
-        _ctx: Context,
-        _epoch: Epoch,
-        _signed_txs: Vec<SignedTransaction>,
-        _proof: Proof,
-    ) -> ProtocolResult<()> {
+    async fn update_epoch(&self, ctx: Context, msg: Vec<u8>) -> ProtocolResult<()> {
+        let sync_lock = self.lock.try_lock();
+        if sync_lock.is_none() {
+            // Synchronization is processing.
+            return Ok(());
+        }
+
+        // Reveive the rich epoch ID.
+        let epoch_id: FixedEpochID =
+            deserialize(&msg).map_err(|_| ConsensusError::DecodeErr(MsgType::RichEpochID))?;
+        let rich_epoch_id = epoch_id.inner - 1;
+
+        // TODO: fix to get_epoch_by_epoch_id()
+        let current_epoch_id = self
+            .engine
+            .get_current_epoch_id(ctx.clone())
+            .await
+            .unwrap_or(1u64);
+
+        if current_epoch_id >= rich_epoch_id - 1 {
+            return Ok(());
+        }
+
+        // Lock the consensus engine, block commit process.
+        let commit_lock = self.engine.lock.try_lock();
+        if commit_lock.is_none() {
+            return Ok(());
+        }
+
+        info!("self {}, chain {}", current_epoch_id, rich_epoch_id);
+        info!("consensus: start synchronization");
+
+        let mut state_root = Hash::from_empty();
+        let mut current_hash = if current_epoch_id != 0 {
+            let mut current_epoch = self
+                .engine
+                .get_epoch_by_id(ctx.clone(), current_epoch_id)
+                .await?;
+            state_root = current_epoch.header.state_root.clone();
+            let tmp = Hash::digest(current_epoch.encode().await?);
+
+            // Check epoch for the first time.
+            let epoch_header = self
+                .engine
+                .pull_epoch(ctx.clone(), current_epoch_id + 1)
+                .await?
+                .header;
+            self.check_proof(current_epoch_id + 1, epoch_header.proof.clone())?;
+            if tmp != epoch_header.pre_hash {
+                return Err(ConsensusError::SyncEpochHashErr(current_epoch_id + 1).into());
+            }
+            tmp
+        } else {
+            Hash::from_empty()
+        };
+
+        // Start to synchronization.
+        for id in (current_epoch_id + 1)..=rich_epoch_id {
+            info!("consensus: start synchronization epoch {}", id);
+
+            // First pull a new block.
+            debug!("consensus: synchronization pull epoch {}", id);
+            let mut epoch = self.engine.pull_epoch(ctx.clone(), id).await?;
+
+            // Check proof and previous hash.
+            debug!("consensus: synchronization check proof and previous hash");
+            let proof = epoch.header.proof.clone();
+            self.check_proof(id, proof.clone())?;
+            if id != 1 && current_hash != epoch.header.pre_hash {
+                return Err(ConsensusError::SyncEpochHashErr(id).into());
+            }
+            self.engine.save_proof(ctx.clone(), proof.clone()).await?;
+
+            // Then pull signed transactions.
+            debug!("consensus: synchronization pull signed transactions");
+            let txs = self
+                .engine
+                .pull_txs(ctx.clone(), epoch.ordered_tx_hashes.clone())
+                .await?;
+
+            // After get the signed transactions:
+            // 1. Execute the signed transactions.
+            // 2. Save the signed transactions.
+            // 3. Save the latest proof.
+            // 4. Save the new epoch.
+            // 5. Save the receipt.
+            debug!("consensus: synchronization executor the epoch");
+            let exec_resp = self
+                .engine
+                .exec(
+                    state_root.clone(),
+                    epoch.header.epoch_id,
+                    Address::User(epoch.header.proposer.clone()),
+                    txs.clone(),
+                )
+                .await?;
+            state_root = exec_resp.state_root.clone();
+
+            debug!("consensus: synchronization update the rich status");
+            self.engine
+                .update_status(epoch.header.epoch_id, epoch.clone(), proof, exec_resp, txs)
+                .await?;
+
+            // Update the previous hash and last epoch.
+            info!("consensus: finish synchronization {} epoch", id);
+            current_hash = Hash::digest(epoch.encode().await?);
+        }
+
+        debug!(
+            "consensus: synchronization send overlord rich status {}",
+            rich_epoch_id
+        );
+        let status = Status {
+            epoch_id:       rich_epoch_id + 1,
+            interval:       Some(self.engine.get_current_interval()),
+            authority_list: self.engine.get_current_authority_list(),
+        };
+
+        self.handler
+            .send_msg(ctx, OverlordMsg::RichStatus(status))
+            .map_err(|e| ConsensusError::OverlordErr(Box::new(e)))?;
         Ok(())
     }
 }
@@ -105,6 +224,7 @@ impl<Adapter: ConsensusAdapter + 'static> OverlordConsensus<Adapter> {
         Self {
             inner: Arc::new(overlord),
             handler: overlord_handler,
+            lock: Mutex::new(()),
             engine,
         }
     }
@@ -119,6 +239,10 @@ impl<Adapter: ConsensusAdapter + 'static> OverlordConsensus<Adapter> {
             .await
             .map_err(|e| ConsensusError::OverlordErr(Box::new(e)))?;
 
+        Ok(())
+    }
+
+    fn check_proof(&self, _epoch_id: u64, _proof: Proof) -> ProtocolResult<()> {
         Ok(())
     }
 }

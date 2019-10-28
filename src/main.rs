@@ -14,10 +14,11 @@ use core_api::adapter::DefaultAPIAdapter;
 use core_api::config::GraphQLConfig;
 use core_consensus::adapter::OverlordConsensusAdapter;
 use core_consensus::consensus::OverlordConsensus;
-use core_consensus::fixed_types::FixedPill;
+use core_consensus::fixed_types::{ConsensusRpcResponse, FixedPill};
 use core_consensus::message::{
-    ProposalMessageHandler, QCMessageHandler, VoteMessageHandler, END_GOSSIP_AGGREGATED_VOTE,
-    END_GOSSIP_SIGNED_PROPOSAL, END_GOSSIP_SIGNED_VOTE,
+    ProposalMessageHandler, QCMessageHandler, RichEpochIDMessageHandler, RpcHandler,
+    VoteMessageHandler, END_GOSSIP_AGGREGATED_VOTE, END_GOSSIP_RICH_EPOCH_ID,
+    END_GOSSIP_SIGNED_PROPOSAL, END_GOSSIP_SIGNED_VOTE, RPC_RESP_SYNC_PULL, RPC_SYNC_PULL,
 };
 use core_executor::trie::RocksTrieDB;
 use core_executor::TransactionExecutorFactory;
@@ -219,7 +220,9 @@ async fn start(cfg: &Config) -> ProtocolResult<()> {
         _,
         _,
         _,
+        _,
     >::new(
+        Arc::new(network_service.handle()),
         Arc::new(network_service.handle()),
         Arc::clone(&mempool),
         Arc::clone(&storage),
@@ -237,16 +240,17 @@ async fn start(cfg: &Config) -> ProtocolResult<()> {
             propose_hashes: vec![],
         },
     })));
+
     let current_consensus_status = CurrentConsensusStatus {
         cycles_price:       cfg.consensus.cycles_price,
         cycles_limit:       cfg.consensus.cycles_limit,
         epoch_id:           current_epoch.header.epoch_id + 1,
         prev_hash:          prevhash,
         logs_bloom:         current_header.logs_bloom,
-        order_root:         current_header.order_root.clone(),
-        confirm_root:       current_header.confirm_root.clone(),
+        order_root:         Hash::from_empty(),
+        confirm_root:       vec![Hash::from_empty()],
         state_root:         current_header.state_root.clone(),
-        receipt_root:       current_header.receipt_root.clone(),
+        receipt_root:       vec![Hash::from_empty()],
         cycles_used:        current_header.cycles_used,
         proof:              current_header.proof.clone(),
         validators:         cfg
@@ -287,6 +291,26 @@ async fn start(cfg: &Config) -> ProtocolResult<()> {
             END_GOSSIP_SIGNED_VOTE,
             Box::new(VoteMessageHandler::new(Arc::clone(&overlord_consensus))),
         )
+        .unwrap();
+    network_service
+        .register_endpoint_handler(
+            END_GOSSIP_RICH_EPOCH_ID,
+            Box::new(RichEpochIDMessageHandler::new(Arc::clone(
+                &overlord_consensus,
+            ))),
+        )
+        .unwrap();
+    network_service
+        .register_endpoint_handler(
+            RPC_SYNC_PULL,
+            Box::new(RpcHandler::new(
+                Arc::new(network_service.handle()),
+                Arc::clone(&storage),
+            )),
+        )
+        .unwrap();
+    network_service
+        .register_rpc_response::<ConsensusRpcResponse>(RPC_RESP_SYNC_PULL)
         .unwrap();
 
     // Run network

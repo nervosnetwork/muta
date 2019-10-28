@@ -3,13 +3,13 @@ use std::error::Error;
 use bytes::Bytes;
 use overlord::{types::AggregatedSignature, Crypto};
 
-use protocol::types::{Hash, UserAddress};
-use protocol::ProtocolError;
-
 use common_crypto::{
     Crypto as Secp256k1Crypto, PrivateKey, PublicKey, Secp256k1, Secp256k1PrivateKey,
     Secp256k1PublicKey, Signature,
 };
+
+use protocol::types::{Hash, UserAddress};
+use protocol::ProtocolError;
 
 use crate::ConsensusError;
 

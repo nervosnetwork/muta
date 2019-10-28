@@ -49,7 +49,7 @@ where
         HashMemPool {
             pool_size,
             timeout_gap,
-            tx_cache: TxCache::new(pool_size),
+            tx_cache: TxCache::new(pool_size * 2),
             callback_cache: Map::new(pool_size),
             adapter,
         }
