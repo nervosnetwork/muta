@@ -49,6 +49,11 @@ info:
 	pwd
 	env
 
+docker-build:
+	docker build -t nervos/muta:build -f devtools/docker/dockerfiles/Dockerfile.muta_build .
+	docker build -t nervos/muta:run -f devtools/docker/dockerfiles/Dockerfile.muta_run .
+	docker build -t nervos/muta:latest .
+
 # For counting lines of code
 stats:
 	@cargo count --version || cargo +nightly install --git https://github.com/kbknapp/cargo-count

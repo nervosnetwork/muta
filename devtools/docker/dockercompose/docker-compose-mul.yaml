@@ -1,0 +1,50 @@
+version: '2'
+
+services:
+  node1:
+    container_name: node1
+    image: nervos/muta:latest
+    hostname: node1
+    environment:
+      - RUST_LOG 
+      - RUST_BACKTRACE 
+    volumes:
+      - ./config-mul-1.toml:/app/devtools/chain/config.toml
+      - ../../../target/data/mul1:/app/devtools/chain/data
+    networks:
+      multiple:
+        aliases:
+          - node1
+        ipv4_address: 172.20.0.11
+    command: |
+      sh -c '
+      cd /app;
+      ./muta-chain;'
+
+  node2:
+    container_name: node2
+    image: nervos/muta:latest
+    hostname: node2
+    environment:
+      - RUST_LOG 
+      - RUST_BACKTRACE 
+    depends_on:
+      - node1
+    volumes:
+      - ./config-mul-2.toml:/app/devtools/chain/config.toml
+      - ../../../target/data/mul2:/app/devtools/chain/data
+    networks:
+      multiple:
+        aliases:
+          - node2
+        ipv4_address: 172.20.0.12
+    command: |
+      sh -c '
+      cd /app;
+      ./muta-chain;'
+
+networks:
+  multiple:
+    ipam:
+     config:
+       - subnet: 172.20.0.0/24
