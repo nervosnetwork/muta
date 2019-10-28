@@ -67,8 +67,10 @@ impl IntervalTxsBroadcaster {
                         debug!("mempool: default mempool adapter dropped")
                     }
                 },
-                _ = interval_rx.next() => {
-                    Self::do_broadcast(&mut txs_cache, &gossip, err_tx.clone()).await
+                signal = interval_rx.next() => {
+                    if signal.is_some() {
+                        Self::do_broadcast(&mut txs_cache, &gossip, err_tx.clone()).await
+                    }
                 },
             };
         }
