@@ -12,7 +12,7 @@ use parking_lot::RwLock;
 use rlp::Encodable;
 
 use common_merkle::Merkle;
-use protocol::codec::{ProtocolCodec, ProtocolCodecSync};
+use protocol::fixed_codec::ProtocolFixedCodec;
 use protocol::traits::{
     executor::ExecutorExecResp, ConsensusAdapter, Context, CurrentConsensusStatus, MessageTarget,
     NodeInfo,
@@ -21,7 +21,7 @@ use protocol::types::{
     Address, Epoch, EpochHeader, Hash, MerkleRoot, Pill, Proof, SignedTransaction, UserAddress,
     Validator,
 };
-use protocol::{fixed_codec::ProtocolFixedCodec, ProtocolError, ProtocolResult};
+use protocol::{ProtocolError, ProtocolResult};
 
 use crate::fixed_types::{FixedEpochID, FixedPill, FixedSignedTxs};
 use crate::message::{
@@ -363,8 +363,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
             .save_epoch(Context::new(), epoch.clone())
             .await?;
 
-        let mut epoch_bytes = epoch.clone();
-        let prev_hash = Hash::digest(epoch_bytes.encode().await?);
+        let prev_hash = Hash::digest(epoch.encode_fixed()?);
         {
             let mut current_consensus_status = self.current_consensus_status.write();
             current_consensus_status.epoch_id = epoch_id + 1;
@@ -389,7 +388,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
                     exec_resp
                         .receipts
                         .iter()
-                        .map(|receipt| Hash::digest(receipt.to_owned().encode_sync().unwrap()))
+                        .map(|receipt| Hash::digest(receipt.to_owned().encode_fixed().unwrap()))
                         .collect::<Vec<_>>(),
                 )
                 .get_root_hash()

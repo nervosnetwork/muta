@@ -14,13 +14,12 @@ use core_api::adapter::DefaultAPIAdapter;
 use core_api::config::GraphQLConfig;
 use core_consensus::adapter::OverlordConsensusAdapter;
 use core_consensus::consensus::OverlordConsensus;
-use core_consensus::fixed_types::{ConsensusRpcResponse, FixedPill};
+use core_consensus::fixed_types::ConsensusRpcResponse;
 use core_consensus::message::{
     ProposalMessageHandler, QCMessageHandler, RichEpochIDMessageHandler, RpcHandler,
     VoteMessageHandler, END_GOSSIP_AGGREGATED_VOTE, END_GOSSIP_RICH_EPOCH_ID,
     END_GOSSIP_SIGNED_PROPOSAL, END_GOSSIP_SIGNED_VOTE, RPC_RESP_SYNC_PULL, RPC_SYNC_PULL,
 };
-use core_consensus::{consensus::OverlordConsensus, fixed_types::ConsensusRpcResponse};
 use core_executor::trie::RocksTrieDB;
 use core_executor::TransactionExecutorFactory;
 use core_mempool::{DefaultMemPoolAdapter, HashMemPool, NewTxsHandler, END_GOSSIP_NEW_TXS};

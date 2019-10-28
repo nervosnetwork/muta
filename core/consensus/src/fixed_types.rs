@@ -254,7 +254,7 @@ mod test {
         use protocol::traits::MessageCodec;
 
         let mut origin = ConsensusRpcResponse::PullTxs(Box::new(FixedSignedTxs {
-            inner: (0..1).map(|_| gen_signed_tx()).collect::<Vec<_>>(),
+            inner: (0..1000).map(|_| gen_signed_tx()).collect::<Vec<_>>(),
         }));
         let bytes = origin.encode().await.unwrap();
         let res: ConsensusRpcResponse = MessageCodec::decode(bytes).await.unwrap();
