@@ -13,7 +13,7 @@ bytes = "0.4"
 creep = "0.1"
 derive_more = "0.15"
 futures-preview = "0.3.0-alpha.19"
-overlord = { git = "https://github.com/cryptape/overlord.git", branch = "dev" }
+overlord = { git = "https://github.com/cryptape/overlord.git", rev = "10ce94a0" }
 parking_lot = "0.9"
 rlp = "0.4"
 serde = {version = "1.0", features = ["derive"]}
