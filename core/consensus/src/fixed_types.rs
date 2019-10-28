@@ -18,7 +18,7 @@ pub enum ConsensusRpcRequest {
     PullTxs(PullTxsRequest),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ConsensusRpcResponse {
     PullEpochs(Box<Epoch>),
     PullTxs(Box<FixedSignedTxs>),
@@ -46,7 +46,9 @@ impl MessageCodec for ConsensusRpcResponse {
     }
 
     async fn decode(mut bytes: Bytes) -> ProtocolResult<Self> {
-        let flag = bytes.split_to(1);
+        let len = bytes.len();
+        let flag = bytes.split_off(len - 1);
+
         match flag.as_ref() {
             b"a" => {
                 let res: Epoch = ProtocolFixedCodec::decode_fixed(bytes)?;
@@ -148,12 +150,48 @@ mod test {
     use overlord::Codec;
     use rand::random;
 
-    use protocol::codec::ProtocolCodec;
     use protocol::types::{
-        CarryingAsset, Fee, Hash, RawTransaction, SignedTransaction, TransactionAction, UserAddress,
+        CarryingAsset, Epoch, EpochHeader, Fee, Hash, Proof, RawTransaction, SignedTransaction,
+        TransactionAction, UserAddress,
     };
 
-    use super::FixedSignedTxs;
+    use super::{ConsensusRpcResponse, FixedSignedTxs};
+
+    fn gen_epoch(epoch_id: u64, epoch_hash: Hash) -> Epoch {
+        let nonce = Hash::digest(Bytes::from("XXXX"));
+        let addr_str = "10CAB8EEA4799C21379C20EF5BAA2CC8AF1BEC475B";
+        let header = EpochHeader {
+            chain_id: nonce.clone(),
+            epoch_id,
+            pre_hash: nonce.clone(),
+            timestamp: 1000,
+            logs_bloom: Default::default(),
+            order_root: nonce.clone(),
+            confirm_root: Vec::new(),
+            state_root: nonce.clone(),
+            receipt_root: Vec::new(),
+            cycles_used: 999_999,
+            proposer: UserAddress::from_hex(addr_str).unwrap(),
+            proof: mock_proof(epoch_hash),
+            validator_version: 1,
+            validators: Vec::new(),
+        };
+
+        Epoch {
+            header,
+            ordered_tx_hashes: Vec::new(),
+        }
+    }
+
+    fn mock_proof(epoch_hash: Hash) -> Proof {
+        Proof {
+            epoch_id: 0,
+            round: 0,
+            epoch_hash,
+            signature: Default::default(),
+            bitmap: Default::default(),
+        }
+    }
 
     fn gen_random_bytes(len: usize) -> Vec<u8> {
         (0..len).map(|_| random::<u8>()).collect::<Vec<_>>()
@@ -165,6 +203,8 @@ mod test {
     }
 
     fn gen_signed_tx() -> SignedTransaction {
+        use protocol::codec::ProtocolCodec;
+
         let address = gen_user_address();
         let nonce = Hash::digest(Bytes::from(gen_random_bytes(10)));
         let fee = Fee {
@@ -198,7 +238,7 @@ mod test {
     }
 
     #[test]
-    fn test_codec() {
+    fn test_txs_codec() {
         for _ in 0..10 {
             let fixed_txs = FixedSignedTxs {
                 inner: (0..1000).map(|_| gen_signed_tx()).collect::<Vec<_>>(),
@@ -207,5 +247,23 @@ mod test {
             let bytes = fixed_txs.encode().unwrap();
             assert_eq!(fixed_txs, FixedSignedTxs::decode(bytes).unwrap());
         }
+    }
+
+    #[runtime::test]
+    async fn test_rpc_codec() {
+        use protocol::traits::MessageCodec;
+
+        let mut origin = ConsensusRpcResponse::PullTxs(Box::new(FixedSignedTxs {
+            inner: (0..1).map(|_| gen_signed_tx()).collect::<Vec<_>>(),
+        }));
+        let bytes = origin.encode().await.unwrap();
+        let res: ConsensusRpcResponse = MessageCodec::decode(bytes).await.unwrap();
+        assert_eq!(origin, res);
+
+        let epoch = gen_epoch(random::<u64>(), Hash::from_empty());
+        let mut origin = ConsensusRpcResponse::PullEpochs(Box::new(epoch));
+        let bytes = origin.encode().await.unwrap();
+        let res: ConsensusRpcResponse = MessageCodec::decode(bytes).await.unwrap();
+        assert_eq!(origin, res);
     }
 }
