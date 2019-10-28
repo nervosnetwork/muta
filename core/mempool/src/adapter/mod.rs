@@ -2,27 +2,24 @@ pub mod message;
 
 use std::{
     error::Error,
-    future::Future,
     marker::PhantomData,
-    pin::Pin,
     sync::atomic::{AtomicU64, Ordering},
     sync::Arc,
-    task::{Context as TaskContext, Poll},
-    time::{Duration, Instant},
+    time::Duration,
 };
 
 use async_trait::async_trait;
-use bytes::Bytes;
 use derive_more::Display;
 use futures::{
-    channel::mpsc::{unbounded, TrySendError, UnboundedReceiver, UnboundedSender},
+    channel::mpsc::{
+        channel, unbounded, Receiver, Sender, TrySendError, UnboundedReceiver, UnboundedSender,
+    },
     lock::Mutex,
-    pin_mut, ready,
-    stream::Stream,
-    task::AtomicWaker,
+    select,
+    stream::StreamExt,
 };
 use futures_timer::Delay;
-use log::error;
+use log::{debug, error};
 
 use common_crypto::Crypto;
 use protocol::{
@@ -40,51 +37,79 @@ use crate::MemPoolError;
 pub const DEFAULT_BROADCAST_TXS_SIZE: usize = 200;
 pub const DEFAULT_BROADCAST_TXS_INTERVAL: u64 = 200; // milliseconds
 
-struct IntervalTxsBroadcaster<G> {
-    waker: AtomicWaker,
+struct IntervalTxsBroadcaster;
 
-    delay:    Delay,
-    interval: Duration,
-
-    txs_cache:  Vec<SignedTransaction>,
-    cache_size: usize,
-
-    stx_rx: UnboundedReceiver<SignedTransaction>,
-    gossip: G,
-
-    err_tx: UnboundedSender<ProtocolError>,
-}
-
-impl<G: Gossip + Unpin + Clone + 'static> IntervalTxsBroadcaster<G> {
-    fn new(
-        interval: Duration,
-        cache_size: usize,
+impl IntervalTxsBroadcaster {
+    pub async fn broadcast<G>(
         stx_rx: UnboundedReceiver<SignedTransaction>,
+        interval_reached: Receiver<()>,
+        tx_size: usize,
         gossip: G,
         err_tx: UnboundedSender<ProtocolError>,
-    ) -> Self {
-        IntervalTxsBroadcaster {
-            waker: AtomicWaker::new(),
+    ) where
+        G: Gossip + Clone + Unpin + 'static,
+    {
+        let mut stx_rx = stx_rx.fuse();
+        let mut interval_rx = interval_reached.fuse();
 
-            delay: Delay::new(interval),
-            interval,
+        let mut txs_cache = Vec::with_capacity(tx_size);
 
-            txs_cache: Vec::with_capacity(cache_size),
-            cache_size,
+        loop {
+            select! {
+                opt_stx = stx_rx.next() => {
+                    if let Some(stx) = opt_stx {
+                        txs_cache.push(stx);
 
-            stx_rx,
-            gossip,
-
-            err_tx,
+                        if txs_cache.len() == tx_size {
+                            Self::do_broadcast(&mut txs_cache, &gossip, err_tx.clone()).await
+                        }
+                    } else {
+                        debug!("mempool: default mempool adapter dropped")
+                    }
+                },
+                _ = interval_rx.next() => {
+                    Self::do_broadcast(&mut txs_cache, &gossip, err_tx.clone()).await
+                },
+            };
         }
     }
 
-    fn do_broadcast(&mut self) {
-        let batch_stxs = self.txs_cache.drain(..).collect::<Vec<_>>();
+    pub async fn timer(mut signal_tx: Sender<()>, interval: u64) {
+        let interval = Duration::from_millis(interval);
+
+        loop {
+            Delay::new(interval).await;
+
+            if let Err(err) = signal_tx.try_send(()) {
+                // This means previous interval signal hasn't processed
+                // yet, simply drop this one.
+                if err.is_full() {
+                    debug!("mempool: interval signal channel full");
+                }
+
+                if err.is_disconnected() {
+                    error!("mempool: interval broadcaster dropped");
+                }
+            }
+        }
+    }
+
+    async fn do_broadcast<G>(
+        txs_cache: &mut Vec<SignedTransaction>,
+        gossip: &G,
+        err_tx: UnboundedSender<ProtocolError>,
+    ) where
+        G: Gossip + Unpin,
+    {
+        if txs_cache.is_empty() {
+            return;
+        }
+
+        let batch_stxs = txs_cache.drain(..).collect::<Vec<_>>();
         let gossip_msg = MsgNewTxs { batch_stxs };
 
-        let gossip = self.gossip.clone();
-        let err_tx = self.err_tx.clone();
+        let ctx = Context::new();
+        let end = END_GOSSIP_NEW_TXS;
 
         let report_if_err = move |ret: ProtocolResult<()>| {
             if let Err(err) = ret {
@@ -94,65 +119,11 @@ impl<G: Gossip + Unpin + Clone + 'static> IntervalTxsBroadcaster<G> {
             }
         };
 
-        runtime::spawn(async move {
-            let ctx = Context::new();
-            let end = END_GOSSIP_NEW_TXS;
-
-            report_if_err(
-                gossip
-                    .broadcast(ctx, end, gossip_msg, Priority::Normal)
-                    .await,
-            );
-        });
-    }
-}
-
-impl<G: Gossip + Unpin + Clone + 'static> Future for IntervalTxsBroadcaster<G> {
-    type Output = <Delay as Future>::Output;
-
-    fn poll(mut self: Pin<&mut Self>, ctx: &mut TaskContext<'_>) -> Poll<Self::Output> {
-        self.waker.register(ctx.waker());
-
-        macro_rules! loop_break {
-            ($poll:expr) => {
-                match $poll {
-                    Poll::Pending => break,
-                    Poll::Ready(Some(v)) => v,
-                    Poll::Ready(None) => return Poll::Ready(()),
-                }
-            };
-        }
-
-        // Insert received SignedTransaction first, if we reach specifed size,
-        // broadcast them.
-        loop {
-            let stx_rx = &mut self.as_mut().stx_rx;
-            pin_mut!(stx_rx);
-
-            let stx = loop_break!(stx_rx.poll_next(ctx));
-            self.txs_cache.push(stx);
-
-            if self.txs_cache.len() == self.cache_size {
-                self.do_broadcast();
-            }
-        }
-
-        // Check if we reach next broadcast interval
-        loop {
-            let delay = &mut self.as_mut().delay;
-            pin_mut!(delay);
-
-            ready!(delay.poll(ctx));
-
-            if !self.txs_cache.is_empty() {
-                self.do_broadcast();
-            }
-
-            let interval = self.interval;
-
-            self.delay.reset(Instant::now() + interval);
-            self.waker.wake();
-        }
+        report_if_err(
+            gossip
+                .broadcast(ctx, end, gossip_msg, Priority::Normal)
+                .await,
+        )
     }
 }
 
@@ -183,14 +154,20 @@ where
     ) -> Self {
         let (stx_tx, stx_rx) = unbounded();
         let (err_tx, err_rx) = unbounded();
+        let (signal_tx, interval_reached) = channel(1);
 
-        let interval = Duration::from_millis(broadcast_txs_interval);
-        let cache_size = broadcast_txs_size;
+        runtime::spawn(IntervalTxsBroadcaster::timer(
+            signal_tx,
+            broadcast_txs_interval,
+        ));
 
-        let broadcaster =
-            IntervalTxsBroadcaster::new(interval, cache_size, stx_rx, network.clone(), err_tx);
-
-        runtime::spawn(broadcaster);
+        runtime::spawn(IntervalTxsBroadcaster::broadcast(
+            stx_rx,
+            interval_reached,
+            broadcast_txs_size,
+            network.clone(),
+            err_tx,
+        ));
 
         DefaultMemPoolAdapter {
             network,
