@@ -13,7 +13,7 @@ use common_crypto::{PrivateKey, Secp256k1PrivateKey};
 
 use protocol::traits::{Consensus, ConsensusAdapter, CurrentConsensusStatus, NodeInfo};
 use protocol::types::{Address, Hash, Proof, Validator};
-use protocol::{codec::ProtocolCodec, ProtocolResult};
+use protocol::{fixed_codec::ProtocolFixedCodec, ProtocolResult};
 
 use crate::engine::ConsensusEngine;
 use crate::fixed_types::{FixedEpochID, FixedPill, FixedSignedTxs};
@@ -96,12 +96,12 @@ impl<Adapter: ConsensusAdapter + 'static> Consensus for OverlordConsensus<Adapte
 
         let mut state_root = Hash::from_empty();
         let mut current_hash = if current_epoch_id != 0 {
-            let mut current_epoch = self
+            let current_epoch = self
                 .engine
                 .get_epoch_by_id(ctx.clone(), current_epoch_id)
                 .await?;
             state_root = current_epoch.header.state_root.clone();
-            let tmp = Hash::digest(current_epoch.encode().await?);
+            let tmp = Hash::digest(current_epoch.encode_fixed()?);
 
             // Check epoch for the first time.
             let epoch_header = self
@@ -124,7 +124,7 @@ impl<Adapter: ConsensusAdapter + 'static> Consensus for OverlordConsensus<Adapte
 
             // First pull a new block.
             debug!("consensus: synchronization pull epoch {}", id);
-            let mut epoch = self.engine.pull_epoch(ctx.clone(), id).await?;
+            let epoch = self.engine.pull_epoch(ctx.clone(), id).await?;
 
             // Check proof and previous hash.
             debug!("consensus: synchronization check proof and previous hash");
@@ -167,7 +167,7 @@ impl<Adapter: ConsensusAdapter + 'static> Consensus for OverlordConsensus<Adapte
 
             // Update the previous hash and last epoch.
             info!("consensus: finish synchronization {} epoch", id);
-            current_hash = Hash::digest(epoch.encode().await?);
+            current_hash = Hash::digest(epoch.encode_fixed()?);
         }
 
         debug!(

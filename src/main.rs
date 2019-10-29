@@ -14,7 +14,7 @@ use core_api::adapter::DefaultAPIAdapter;
 use core_api::config::GraphQLConfig;
 use core_consensus::adapter::OverlordConsensusAdapter;
 use core_consensus::consensus::OverlordConsensus;
-use core_consensus::fixed_types::{ConsensusRpcResponse, FixedPill};
+use core_consensus::fixed_types::ConsensusRpcResponse;
 use core_consensus::message::{
     ProposalMessageHandler, QCMessageHandler, RichEpochIDMessageHandler, RpcHandler,
     VoteMessageHandler, END_GOSSIP_AGGREGATED_VOTE, END_GOSSIP_RICH_EPOCH_ID,
@@ -29,10 +29,9 @@ use core_storage::{adapter::rocks::RocksAdapter, ImplStorage};
 use protocol::traits::executor::ExecutorFactory;
 use protocol::traits::{CurrentConsensusStatus, NodeInfo, Storage};
 use protocol::types::{
-    Address, Bloom, Epoch, EpochHeader, Genesis, Hash, MerkleRoot, Pill, Proof, UserAddress,
-    Validator,
+    Address, Bloom, Epoch, EpochHeader, Genesis, Hash, MerkleRoot, Proof, UserAddress, Validator,
 };
-use protocol::ProtocolResult;
+use protocol::{fixed_codec::ProtocolFixedCodec, ProtocolResult};
 
 use crate::config::Config;
 
@@ -228,18 +227,13 @@ async fn start(cfg: &Config) -> ProtocolResult<()> {
         Arc::clone(&storage),
         Arc::clone(&trie_db),
     ));
+
     let node_info = NodeInfo {
         chain_id:     chain_id.clone(),
         self_address: my_address.clone(),
     };
     let current_header = &current_epoch.header;
-
-    let prevhash = Hash::digest(Bytes::from(rlp::encode(&FixedPill {
-        inner: Pill {
-            epoch:          current_epoch.clone(),
-            propose_hashes: vec![],
-        },
-    })));
+    let prevhash = Hash::digest(current_epoch.encode_fixed()?);
 
     let current_consensus_status = CurrentConsensusStatus {
         cycles_price:       cfg.consensus.cycles_price,

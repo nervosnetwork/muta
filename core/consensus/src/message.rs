@@ -11,9 +11,7 @@ use serde::{Deserialize, Serialize};
 use protocol::traits::{Consensus, Context, MessageHandler, Priority, Rpc, Storage};
 use protocol::ProtocolResult;
 
-use crate::fixed_types::{
-    ConsensusRpcRequest, ConsensusRpcResponse, FixedEpoch, FixedEpochID, FixedSignedTxs,
-};
+use crate::fixed_types::{ConsensusRpcRequest, ConsensusRpcResponse, FixedEpochID, FixedSignedTxs};
 
 pub const END_GOSSIP_SIGNED_PROPOSAL: &str = "/gossip/consensus/signed_proposal";
 pub const END_GOSSIP_SIGNED_VOTE: &str = "/gossip/consensus/signed_vote";
@@ -154,7 +152,7 @@ impl<R: Rpc + 'static, S: Storage + 'static> MessageHandler for RpcHandler<R, S>
                     .response(
                         ctx,
                         RPC_RESP_SYNC_PULL,
-                        ConsensusRpcResponse::PullEpochs(Box::new(FixedEpoch::new(res))),
+                        ConsensusRpcResponse::PullEpochs(Box::new(res)),
                         Priority::High,
                     )
                     .await
