@@ -8,7 +8,7 @@ use common_crypto::{
     Secp256k1PublicKey, Signature,
 };
 
-use protocol::types::{Hash, UserAddress};
+use protocol::types::{Address, Hash, MerkleRoot, SignedTransaction, UserAddress};
 use protocol::ProtocolError;
 
 use crate::ConsensusError;
@@ -72,4 +72,14 @@ impl OverlordCrypto {
             private_key,
         }
     }
+}
+
+#[derive(Clone, Debug)]
+pub struct ExecuteInfo {
+    pub epoch_id:     u64,
+    pub chain_id:     Hash,
+    pub signed_txs:   Vec<SignedTransaction>,
+    pub order_root:   MerkleRoot,
+    pub cycles_price: u64,
+    pub coinbase:     Address,
 }

@@ -36,7 +36,7 @@ pub struct EpochHeader {
     #[graphql(description = "The merkle roots of receipts")]
     pub receipt_root: Vec<MerkleRoot>,
     #[graphql(description = "The sum of all transactions costs")]
-    pub cycles_used: Uint64,
+    pub cycles_used: Vec<Uint64>,
     #[graphql(description = "The address descirbed who packed the epoch")]
     pub proposer: Address,
     // proof:             Proof,
@@ -53,18 +53,22 @@ impl From<protocol::types::EpochHeader> for EpochHeader {
             pre_hash:          Hash::from(epoch_header.pre_hash),
             timestamp:         Uint64::from(epoch_header.timestamp),
             order_root:        MerkleRoot::from(epoch_header.order_root),
+            state_root:        MerkleRoot::from(epoch_header.state_root),
             confirm_root:      epoch_header
                 .confirm_root
                 .into_iter()
                 .map(MerkleRoot::from)
                 .collect(),
-            state_root:        MerkleRoot::from(epoch_header.state_root),
             receipt_root:      epoch_header
                 .receipt_root
                 .into_iter()
                 .map(MerkleRoot::from)
                 .collect(),
-            cycles_used:       Uint64::from(epoch_header.cycles_used),
+            cycles_used:       epoch_header
+                .cycles_used
+                .into_iter()
+                .map(Uint64::from)
+                .collect(),
             proposer:          Address::from(protocol::types::Address::User(epoch_header.proposer)),
             validator_version: Uint64::from(epoch_header.validator_version),
         }

@@ -1,5 +1,6 @@
 #![feature(test)]
 #![feature(trait_alias)]
+#![warn(clippy::too_many_arguments)]
 
 pub mod codec;
 pub mod fixed_codec;

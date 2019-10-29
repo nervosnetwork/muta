@@ -5,13 +5,18 @@ pub mod consensus;
 pub mod fixed_types;
 pub mod message;
 pub mod trace;
+pub mod status;
+pub mod synchronization;
 pub mod util;
 
+pub use self::adapter::OverlordConsensusAdapter;
+pub use self::consensus::OverlordConsensus;
+pub use self::synchronization::Synchronization;
 pub use overlord::DurationConfig;
 
 use std::error::Error;
 
-use derive_more::{Display, From};
+use derive_more::Display;
 
 use common_crypto::CryptoError;
 
@@ -39,12 +44,40 @@ pub enum MsgType {
     RpcPullTxs,
 }
 
+#[derive(Clone, Debug, Display)]
+pub enum StatusCacheField {
+    #[display(fmt = "Previous Hash")]
+    PrevHash,
+
+    #[display(fmt = "State Root")]
+    StateRoot,
+
+    #[display(fmt = "Receipt Root")]
+    ReceiptRoot,
+
+    #[display(fmt = "Ordered Root")]
+    OrderedRoot,
+
+    #[display(fmt = "Confirm Root")]
+    ConfirmRoot,
+
+    #[display(fmt = "Cycles Used")]
+    CyclesUsed,
+
+    #[display(fmt = "Logs Bloom")]
+    LogsBloom,
+}
+
 /// Consensus errors defines here.
-#[derive(Debug, Display, From)]
+#[derive(Debug, Display)]
 pub enum ConsensusError {
     /// Send consensus message error.
     #[display(fmt = "Send {:?} message failed", _0)]
     SendMsgErr(MsgType),
+
+    /// Check epoch error.
+    #[display(fmt = "Check epoch {:?} error", _0)]
+    CheckEpochErr(StatusCacheField),
 
     /// Decode consensus message error.
     #[display(fmt = "Decode {:?} message failed", _0)]
@@ -78,6 +111,10 @@ pub enum ConsensusError {
     #[display(fmt = "Synchronization {} epoch error", _0)]
     SyncEpochHashErr(u64),
 
+    /// The synchronous epoch does not pass the checks.
+    #[display(fmt = "Synchronization {} epoch error", _0)]
+    SyncEpochStateRootErr(u64),
+
     /// The synchronous epoch proof does not pass the checks.
     #[display(fmt = "Synchronization {} proof error", _0)]
     SyncEpochProofErr(u64),
@@ -89,6 +126,14 @@ pub enum ConsensusError {
     ///
     #[display(fmt = "Get merkle root failed {:?}", _0)]
     MerkleErr(String),
+
+    ///
+    #[display(fmt = "Execute transactions error {:?}", _0)]
+    ExecuteErr(String),
+
+    ///
+    #[display(fmt = "Status cache error {:?}", _0)]
+    StatusErr(StatusCacheField),
 
     /// Other error used for very few errors.
     #[display(fmt = "{:?}", _0)]
