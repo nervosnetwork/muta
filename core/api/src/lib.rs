@@ -51,7 +51,7 @@ struct Query;
 // Switch to async/await fn https://github.com/graphql-rust/juniper/issues/2
 #[juniper::object(Context = State)]
 impl Query {
-    #[graphql(name = "getLatestEpoch", description = "get epoch")]
+    #[graphql(name = "getLatestEpoch", description = "Get the latest epoch")]
     fn get_latest_epoch(state_ctx: &State, epoch_id: Option<Uint64>) -> FieldResult<Epoch> {
         let epoch_id = opt_hex_to_u64(epoch_id.map(|id| id.as_hex()))?;
 
@@ -60,7 +60,13 @@ impl Query {
         Ok(Epoch::from(epoch))
     }
 
-    #[graphql(name = "getBalance", description = "get balance")]
+    #[graphql(
+        name = "getBalance",
+        description = "Get the asset balance of an account",
+        arguments(id(description = "The asset id. Asset is the first-class in Muta, \
+            this means that your assets can be more than one in Muta, \
+            and the UDT(User Defined Token) will be supported in the future"))
+    )]
     fn get_balance(
         state_ctx: &State,
         address: Address,
@@ -110,7 +116,7 @@ impl Mutation {
 
     #[graphql(
         name = "sendDeployTransaction",
-        description = "Send deployment contract transactions to the blockchain."
+        description = "Send deployment contract transaction to the blockchain."
     )]
     fn send_deploy_transaction(
         state_ctx: &State,
@@ -132,7 +138,7 @@ impl Mutation {
 
     #[graphql(
         name = "sendUnsafeTransferTransaction",
-        deprecated = "Don't use it! This is just for development testing."
+        deprecated = "DON'T use it in production! This is just for development."
     )]
     fn send_unsafe_transfer_transaction(
         state_ctx: &State,
@@ -159,7 +165,7 @@ impl Mutation {
 
     #[graphql(
         name = "sendUnsafeDeployTransaction",
-        deprecated = "Don't use it! This is just for development testing."
+        deprecated = "DON'T use it in production! This is just for development."
     )]
     fn send_unsafe_deploy_transaction(
         state_ctx: &State,
