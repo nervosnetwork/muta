@@ -41,7 +41,7 @@ async fn main() {
 
     let matches = clap::App::new("Muta")
         .version("v0.1.0")
-        .author("Cryptape Technologies <contact@cryptape.com>")
+        .author("Muta Dev <muta@nervos.org>")
         .arg(
             clap::Arg::from_usage("-c --config=[FILE] 'a required file for the configuration'")
                 .default_value("./devtools/chain/config.toml"),
