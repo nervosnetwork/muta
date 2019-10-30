@@ -86,14 +86,19 @@ impl Query {
         let address = protocol::types::Address::from_hex(&address.as_hex())?;
         let id = protocol::types::AssetID::from_hex(&id.as_hex())?;
 
-        let balance = block_on(state_ctx.adapter.get_balance(
+        let result = block_on(state_ctx.adapter.get_balance(
             Context::new(),
             &address,
             &id,
             epoch_id,
-        ))
-        .map_err(FieldError::from)?;
-        Ok(Balance::from(balance))
+        ));
+
+        match result {
+            Ok(balance) => Ok(Balance::from(balance)),
+            Err(_) => Ok(Balance::from(
+                protocol::types::Balance::from_bytes_be(b""),
+            )),
+        }
     }
 }
 
