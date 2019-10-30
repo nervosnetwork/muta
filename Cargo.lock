@@ -459,7 +459,7 @@ dependencies = [
  "futures-preview 0.3.0-alpha.19 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "num-traits 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "overlord 0.1.0 (git+https://github.com/cryptape/overlord.git?rev=10ce94a)",
+ "overlord 0.1.0 (git+https://github.com/cryptape/overlord.git?rev=ae6fe07)",
  "parking_lot 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "protocol 0.1.0",
  "rand 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1791,7 +1791,7 @@ dependencies = [
 [[package]]
 name = "overlord"
 version = "0.1.0"
-source = "git+https://github.com/cryptape/overlord.git?rev=10ce94a#10ce94a06211724febe35f5f500b051ea1ff03f7"
+source = "git+https://github.com/cryptape/overlord.git?rev=ae6fe07#ae6fe07deb7927db7db468c6dc3f3bed64f2b098"
 dependencies = [
  "async-trait 0.1.15 (registry+https://github.com/rust-lang/crates.io-index)",
  "bit-vec 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -3824,7 +3824,7 @@ dependencies = [
 "checksum ophelia-derive 0.1.0 (git+https://github.com/zeroqn/ophelia.git)" = "<none>"
 "checksum ophelia-hasher 0.1.0 (git+https://github.com/zeroqn/ophelia.git)" = "<none>"
 "checksum ophelia-secp256k1 0.1.0 (git+https://github.com/zeroqn/ophelia.git)" = "<none>"
-"checksum overlord 0.1.0 (git+https://github.com/cryptape/overlord.git?rev=10ce94a)" = "<none>"
+"checksum overlord 0.1.0 (git+https://github.com/cryptape/overlord.git?rev=ae6fe07)" = "<none>"
 "checksum owning_ref 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)" = "cdf84f41639e037b484f93433aa3897863b561ed65c6e59c7073d7c561710f37"
 "checksum pairing 0.14.2 (registry+https://github.com/rust-lang/crates.io-index)" = "ceda21136251c6d5a422d3d798d8ac22515a6e8d3521bb60c59a8349d36d0d57"
 "checksum parity-multiaddr 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)" = "b574ca9f0c0235c04de4c5110542959f64c9b8882f638b70f6c6be52c75bdc46"
