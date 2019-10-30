@@ -23,6 +23,8 @@ use crate::schema::{
     Address, AssetID, Balance, Bytes, ContractType, Epoch, Hash, InputDeployAction,
     InputRawTransaction, InputTransactionEncryption, InputTransferAction, Uint64,
 };
+use http::header::HeaderValue;
+use tide::middleware::{CorsMiddleware, CorsOrigin};
 
 pub async fn start_graphql<Adapter: APIAdapter + 'static>(cfg: GraphQLConfig, adapter: Adapter) {
     let state = State {
@@ -30,6 +32,13 @@ pub async fn start_graphql<Adapter: APIAdapter + 'static>(cfg: GraphQLConfig, ad
     };
 
     let mut app = App::with_state(Arc::new(state));
+    // allow CORS
+    app.middleware(
+        CorsMiddleware::new()
+            .allow_origin(CorsOrigin::from("*"))
+            .allow_methods(HeaderValue::from_static("GET, POST, OPTIONS")),
+    );
+
     app.at(&cfg.graphql_uri).post(handle_graphql);
     app.at(&cfg.graphiql_uri).get(handle_graphiql);
     app.serve(cfg.listening_address).await.unwrap();
