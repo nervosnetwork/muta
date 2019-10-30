@@ -95,9 +95,7 @@ impl Query {
 
         match result {
             Ok(balance) => Ok(Balance::from(balance)),
-            Err(_) => Ok(Balance::from(
-                protocol::types::Balance::from_bytes_be(b""),
-            )),
+            Err(_) => Ok(Balance::from(protocol::types::Balance::from_bytes_be(b""))),
         }
     }
 }
