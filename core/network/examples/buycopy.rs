@@ -98,7 +98,7 @@ pub async fn main() {
     let bt_seckey_bytes = "8".repeat(32);
     let bt_seckey = hex::encode(&bt_seckey_bytes);
     let bt_keypair = SecioKeyPair::secp256k1_raw_key(bt_seckey_bytes).expect("keypair");
-    let bt_pubkey = hex::encode(bt_keypair.to_public_key().inner());
+    let bt_pubkey = hex::encode(bt_keypair.public_key().inner());
     let bt_addr = SocketAddr::new(IP_ADDR, 1337);
 
     if std::env::args().nth(1) == Some("server".to_string()) {
