@@ -267,8 +267,8 @@ fn gen_input_tx_encryption(
     let signature = privkey.sign_message(&hash_value);
 
     let input_encryption = InputTransactionEncryption {
-        tx_hash:   tx_hash.clone(),
-        pubkey:    Bytes::from(pubkey.to_bytes()),
+        tx_hash,
+        pubkey: Bytes::from(pubkey.to_bytes()),
         signature: Bytes::from(signature.to_bytes()),
     };
     Ok(input_encryption)

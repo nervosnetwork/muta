@@ -30,7 +30,7 @@ fn contains() {
     let key = Bytes::from(b"test-key".to_vec());
     let value = Bytes::from(b"test-value".to_vec());
 
-    trie.insert(key.clone(), value.clone()).unwrap();
+    trie.insert(key.clone(), value).unwrap();
     assert_eq!(trie.contains(&key).unwrap(), true);
     let root = trie.commit().unwrap();
 
@@ -46,12 +46,12 @@ fn commit() {
     let key = Bytes::from(b"test-key".to_vec());
     let value = Bytes::from(b"test-value".to_vec());
 
-    trie.insert(key.clone(), value.clone()).unwrap();
+    trie.insert(key, value).unwrap();
     let root = trie.commit().unwrap();
 
     let mut new_trie = tests::create_trie_from_root(root.clone(), Arc::clone(&memdb));
     let root2 = new_trie.commit().unwrap();
-    assert_eq!(root.clone(), root2.clone());
+    assert_eq!(root, root2);
 
     let key2 = Bytes::from(b"test-key2".to_vec());
     let value2 = Bytes::from(b"test-value2".to_vec());

@@ -38,7 +38,7 @@ fn insert() {
         .get::<FixedBytesSchema>(&key)
         .unwrap()
         .unwrap();
-    assert_eq!(get_value, value.clone());
+    assert_eq!(get_value, value);
 }
 
 #[test]
@@ -57,7 +57,7 @@ fn revert() {
         .get::<FixedBytesSchema>(&key)
         .unwrap()
         .unwrap();
-    assert_eq!(get_value, value.clone());
+    assert_eq!(get_value, value);
 
     state_adapter.revert_cache().unwrap();
     let get_value = state_adapter.get::<FixedBytesSchema>(&key).unwrap();

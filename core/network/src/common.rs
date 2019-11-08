@@ -1,10 +1,11 @@
 use std::{
     future::Future,
     net::{IpAddr, SocketAddr},
+    ops::Add,
     pin::Pin,
     sync::Arc,
     task::{Context, Poll},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use futures::{pin_mut, task::AtomicWaker};
@@ -87,9 +88,10 @@ impl Future for HeartBeat {
             let delay = &mut ecg.delay;
             pin_mut!(delay);
 
-            crate::loop_ready!(delay.poll(ctx))?;
+            crate::loop_ready!(delay.poll(ctx));
 
-            ecg.delay.reset(interval);
+            let next_time = Instant::now().add(interval);
+            ecg.delay.reset(next_time);
             ecg.waker.wake();
         }
 

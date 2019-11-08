@@ -9,7 +9,6 @@ use std::{
 use async_trait::async_trait;
 use futures::{
     channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
-    future::TryFutureExt,
     pin_mut,
     stream::Stream,
     task::AtomicWaker,
@@ -165,16 +164,16 @@ impl NetworkService {
         let rpc_map = Arc::new(RpcMap::new());
         let gossip = NetworkGossip::new(conn_ctrl.clone(), Snappy);
         let rpc_map_clone = Arc::clone(&rpc_map);
-        let rpc = NetworkRpc::new(conn_ctrl.clone(), Snappy, rpc_map_clone);
-        let router = MessageRouter::new(raw_msg_rx, Snappy, sys_tx.clone());
+        let rpc = NetworkRpc::new(conn_ctrl, Snappy, rpc_map_clone);
+        let router = MessageRouter::new(raw_msg_rx, Snappy, sys_tx);
 
         NetworkService {
             sys_rx,
-
-            conn_tx: conn_tx.clone(),
-            mgr_tx: mgr_tx.clone(),
-            raw_msg_tx: raw_msg_tx.clone(),
+            conn_tx,
+            mgr_tx,
+            raw_msg_tx,
             hb_waker,
+
             heart_beat: Some(heart_beat),
 
             config,
@@ -323,10 +322,6 @@ impl Future for NetworkService {
 
         // Heart beats
         if let Some(heart_beat) = self.heart_beat.take() {
-            let heart_beat = heart_beat.map_err(|_| {
-                error!("network: fatal: asystole, no ecg now");
-            });
-
             runtime::spawn(heart_beat);
         }
 

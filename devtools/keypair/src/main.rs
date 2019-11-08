@@ -9,7 +9,7 @@ pub fn main() {
     let seckey = Hash::digest(seed.as_ref().into());
     let keypair = SecioKeyPair::secp256k1_raw_key(seckey.as_bytes()).expect("secp256k1 keypair");
     let pubkey = keypair.to_public_key().inner();
-    let user_addr = UserAddress::from_pubkey_bytes(pubkey.clone().into()).expect("user addr");
+    let user_addr = UserAddress::from_pubkey_bytes(pubkey.into()).expect("user addr");
 
     println!("seckey hex: {:?}", seckey.as_hex());
     println!(

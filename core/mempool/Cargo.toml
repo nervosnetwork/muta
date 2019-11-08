@@ -11,7 +11,7 @@ protocol = { path = "../../protocol" }
 common-crypto = { path = "../../common/crypto" }
 core-network = { path = "../network" }
 
-futures-preview = { version = "0.3.0-alpha.19", features = [ "async-await" ] }
+futures = { version = "0.3", features = [ "async-await" ] }
 runtime-tokio = "0.3.0-alpha.6"
 runtime = "0.3.0-alpha.7"
 crossbeam-queue = "0.1"

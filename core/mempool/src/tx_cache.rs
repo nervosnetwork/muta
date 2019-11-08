@@ -146,14 +146,14 @@ impl TxCache {
 
     pub fn insert_new_tx(&self, signed_tx: SignedTransaction) -> ProtocolResult<()> {
         let tx_hash = signed_tx.tx_hash.clone();
-        let tx_wrapper = TxWrapper::new(signed_tx.clone());
+        let tx_wrapper = TxWrapper::new(signed_tx);
         let shared_tx = Arc::new(tx_wrapper);
         self.insert(tx_hash, shared_tx)
     }
 
     pub fn insert_propose_tx(&self, signed_tx: SignedTransaction) -> ProtocolResult<()> {
         let tx_hash = signed_tx.tx_hash.clone();
-        let tx_wrapper = TxWrapper::propose(signed_tx.clone());
+        let tx_wrapper = TxWrapper::propose(signed_tx);
         let shared_tx = Arc::new(tx_wrapper);
         self.insert(tx_hash, shared_tx)
     }
@@ -393,7 +393,7 @@ mod tests {
         let chain_id = rand_hash.clone();
         let asset_id = rand_hash.clone();
         let nonce = rand_hash.clone();
-        let tx_hash = rand_hash.clone();
+        let tx_hash = rand_hash;
         let add_str = "10CAB8EEA4799C21379C20EF5BAA2CC8AF1BEC475B";
         let bytes = Bytes::from(hex::decode(add_str).unwrap());
         let address = UserAddress::from_bytes(bytes.clone()).unwrap();
@@ -402,7 +402,7 @@ mod tests {
             cycle:    TX_CYCLE,
         };
         let action = TransactionAction::Transfer {
-            receiver:       address.clone(),
+            receiver:       address,
             carrying_asset: CarryingAsset {
                 asset_id,
                 amount: FromPrimitive::from_i32(10_000).unwrap(),
@@ -431,7 +431,7 @@ mod tests {
 
     fn concurrent_flush(tx_cache: &Arc<TxCache>, tx_hashes: Vec<Hash>) -> JoinHandle<()> {
         let tx_cache_clone = Arc::<TxCache>::clone(tx_cache);
-        let tx_hashes = tx_hashes.clone();
+
         thread::spawn(move || {
             tx_cache_clone.flush(&tx_hashes);
         })
@@ -539,7 +539,7 @@ mod tests {
     fn bench_package(b: &mut Bencher) {
         let txs = gen_signed_txs(TX_NUM);
         let tx_cache = TxCache::new(POOL_SIZE);
-        concurrent_insert(txs.clone(), &tx_cache);
+        concurrent_insert(txs, &tx_cache);
         b.iter(|| {
             let mixed_tx_hashes = tx_cache.package(CYCLE_LIMIT, CURRENT_H, TIMEOUT).unwrap();
             assert_eq!(

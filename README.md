@@ -2,7 +2,7 @@
 
 [![Build Status](https://travis-ci.com/nervosnetwork/muta.svg?branch=master)](https://travis-ci.com/nervosnetwork/muta)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Minimum rustc version](https://img.shields.io/badge/rustc-nightly-informational.svg)](https://github.com/cryptape/overlord/blob/master/rust-toolchain)
+[![Minimum rustc version](https://img.shields.io/badge/rustc-nightly-informational.svg)](https://github.com/nervosnetwork/muta/blob/master/rust-toolchain)
 
 Muta is a high-performance blockchain framework.
 
@@ -38,7 +38,6 @@ If everything goes well, you’ll see this appear:
 Go to [http://127.0.0.1:8000/graphiql](http://127.0.0.1:8000/graphiql) to communicate with the chain and read the documentations after the chain is running.
 
 The develop chain is worked on **LOCAL** and **SINGLE NODE**.
-
 
 ## How to Contribute
 
