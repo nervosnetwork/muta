@@ -20,7 +20,7 @@ fn test_bank_contract() {
         AssetID::from_hex("0000000000000000000000000000000000000000000000000000000000000000")
             .unwrap();
 
-    let ctx = mock_invoke_context(caller, None, 0, 1_000_000, fee_asset.clone());
+    let ctx = mock_invoke_context(caller, None, 0, 1_000_000, fee_asset);
     let name = "Muta token".to_owned();
     let symbol = "MTT".to_owned();
     let supply = Balance::from(1e18 as u64);
@@ -42,9 +42,9 @@ fn test_bank_contract() {
     let asset2 = bank.register(
         Rc::<RefCell<InvokeContext>>::clone(&ctx),
         &address,
-        name.clone(),
-        symbol.clone(),
-        supply.clone(),
+        name,
+        symbol,
+        supply,
     );
     assert_eq!(asset2.is_err(), true);
 

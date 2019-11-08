@@ -153,7 +153,7 @@ impl<P: NetworkProtocol> ConnectionService<P> {
                 if !pending_addrs.is_empty() {
                     let pending_connect = ConnectionEvent::Connect {
                         addrs: pending_addrs,
-                        proto: target_protocol.clone(),
+                        proto: target_protocol,
                     };
 
                     self.pending_events.push_back(pending_connect);

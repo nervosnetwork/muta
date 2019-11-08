@@ -29,7 +29,6 @@ use futures::{
         mpsc::{UnboundedReceiver, UnboundedSender},
         oneshot,
     },
-    future::TryFutureExt,
     pin_mut,
     stream::Stream,
     task::AtomicWaker,
@@ -1017,10 +1016,6 @@ impl Future for PeerManager {
 
         // Spawn heart beat
         if let Some(heart_beat) = self.heart_beat.take() {
-            let heart_beat = heart_beat.map_err(|_| {
-                error!("network: fatal: asystole, fallback to passive mode");
-            });
-
             runtime::spawn(heart_beat);
         }
 

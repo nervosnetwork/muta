@@ -161,8 +161,8 @@ impl<DB: TrieDB> Executor for TransactionExecutor<DB> {
         Ok(ExecutorExecResp {
             receipts,
             all_cycles_used,
+            state_root,
             logs_bloom: Bloom::default(),
-            state_root: state_root.clone(),
         })
     }
 
@@ -223,7 +223,7 @@ impl<DB: TrieDB> TransactionExecutor<DB> {
 
         Ok(ReceiptResult::Transfer {
             receiver: UserAddress::from_bytes(to.as_bytes())?,
-            asset_id: carrying_asset.asset_id.clone(),
+            asset_id: carrying_asset.asset_id,
             before_amount,
             after_amount,
         })
@@ -298,7 +298,7 @@ impl<DB: 'static + TrieDB> ExecutorFactory<DB> for TransactionExecutorFactory {
             if state_root == Hash::from_empty() {
                 MPTTrie::new(Arc::clone(&db))
             } else {
-                MPTTrie::from(state_root.clone(), Arc::clone(&db))?
+                MPTTrie::from(state_root, Arc::clone(&db))?
             }
         };
 

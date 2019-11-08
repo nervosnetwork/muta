@@ -17,4 +17,4 @@ juniper_codegen = "0.13"
 async-trait = "0.1"
 hex = "0.3"
 bytes = "0.4"
-futures-preview = { version = "0.3.0-alpha.19" }
+futures = "0.3"

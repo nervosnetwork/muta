@@ -28,13 +28,7 @@ fn test_account_contract() {
         asset_id: asset.clone(),
         amount:   1000u64.into(),
     };
-    let ctx = mock_invoke_context(
-        user1.clone(),
-        Some(carrying_asset),
-        0,
-        1_000_000,
-        fee_asset.clone(),
-    );
+    let ctx = mock_invoke_context(user1.clone(), Some(carrying_asset), 0, 1_000_000, fee_asset);
     account.transfer(Rc::clone(&ctx), &user2).unwrap();
     let user1_balance = account.get_balance(&asset, &user1).unwrap();
     assert_eq!(user1_balance, Balance::from(9000u64));

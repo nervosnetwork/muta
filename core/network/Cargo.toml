@@ -13,8 +13,8 @@ async-trait = "0.1"
 bincode = "1.1"
 bytes = { version = "0.4", features = ["serde"] }
 derive_more = "0.15"
-futures-timer = "0.3"
-futures-preview = { version = "0.3.0-alpha.19", features = [ "compat" ] }
+futures-timer = "1.0"
+futures= { version = "0.3", features = [ "compat" ] }
 generic-channel = { version = "0.2", features = [ "all" ] }
 log = "0.4"
 parking_lot = "0.9"

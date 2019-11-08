@@ -175,7 +175,7 @@ fn test_sync_propose_txs() {
     concurrent_broadcast(need_sync_txs.to_vec(), Arc::clone(mempool));
 
     let tx_hashes: Vec<Hash> = txs.iter().map(|tx| tx.tx_hash.clone()).collect();
-    exec_sync_propose_txs(tx_hashes.clone(), Arc::clone(mempool));
+    exec_sync_propose_txs(tx_hashes, Arc::clone(mempool));
 
     assert_eq!(mempool.get_tx_cache().len(), 50);
 }
@@ -194,7 +194,7 @@ fn bench_insert(b: &mut Bencher) {
 fn bench_package(b: &mut Bencher) {
     let mempool = Arc::new(default_mempool());
     let txs = default_mock_txs(50_000);
-    concurrent_insert(txs.clone(), Arc::clone(&mempool));
+    concurrent_insert(txs, Arc::clone(&mempool));
     b.iter(|| {
         exec_package(Arc::clone(&mempool), CYCLE_LIMIT);
     });

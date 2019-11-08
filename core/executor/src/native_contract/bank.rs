@@ -79,7 +79,7 @@ impl<StateAdapter: ContractStateAdapter> BankContract<StateAdapter>
 
         self.state_adapter
             .borrow_mut()
-            .insert_cache::<FixedAssetSchema>(asset_id.clone(), asset.clone())?;
+            .insert_cache::<FixedAssetSchema>(asset_id, asset.clone())?;
 
         let cycles_used = consume_cycles(
             CyclesAction::BankRegister,

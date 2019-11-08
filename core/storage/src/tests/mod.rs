@@ -64,7 +64,7 @@ fn mock_receipt(tx_hash: Hash) -> Receipt {
     };
 
     Receipt {
-        state_root: nonce.clone(),
+        state_root: nonce,
         epoch_id: 10,
         tx_hash,
         cycles_used,
@@ -83,7 +83,7 @@ fn mock_epoch(epoch_id: u64, epoch_hash: Hash) -> Epoch {
         logs_bloom: Default::default(),
         order_root: nonce.clone(),
         confirm_root: Vec::new(),
-        state_root: nonce.clone(),
+        state_root: nonce,
         receipt_root: Vec::new(),
         cycles_used: 999_999,
         proposer: UserAddress::from_hex(addr_str).unwrap(),

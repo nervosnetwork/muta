@@ -168,7 +168,7 @@ mod test {
             logs_bloom: Default::default(),
             order_root: nonce.clone(),
             confirm_root: Vec::new(),
-            state_root: nonce.clone(),
+            state_root: nonce,
             receipt_root: Vec::new(),
             cycles_used: 999_999,
             proposer: UserAddress::from_hex(addr_str).unwrap(),
@@ -212,7 +212,7 @@ mod test {
             cycle:    random::<u64>(),
         };
         let action = TransactionAction::Transfer {
-            receiver:       address.clone(),
+            receiver:       address,
             carrying_asset: CarryingAsset {
                 asset_id: nonce.clone(),
                 amount:   FromPrimitive::from_i32(42).unwrap(),

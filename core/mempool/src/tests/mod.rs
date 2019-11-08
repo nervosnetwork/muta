@@ -132,7 +132,7 @@ async fn check_hash(tx: SignedTransaction) -> ProtocolResult<()> {
     if tx_hash != tx.tx_hash {
         return Err(MemPoolError::CheckHash {
             expect: tx.tx_hash.clone(),
-            actual: tx_hash.clone(),
+            actual: tx_hash,
         }
         .into());
     }
