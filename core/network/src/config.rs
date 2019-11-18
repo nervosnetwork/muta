@@ -199,8 +199,8 @@ impl From<&NetworkConfig> for ConnectionConfig {
 impl From<&NetworkConfig> for PeerManagerConfig {
     fn from(config: &NetworkConfig) -> PeerManagerConfig {
         PeerManagerConfig {
-            our_id:           config.secio_keypair.to_peer_id(),
-            pubkey:           config.secio_keypair.to_public_key(),
+            our_id:           config.secio_keypair.peer_id(),
+            pubkey:           config.secio_keypair.public_key(),
             bootstraps:       config.bootstraps.clone(),
             max_connections:  config.max_connections,
             routine_interval: config.peer_manager_heart_beat_interval,

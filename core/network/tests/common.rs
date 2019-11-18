@@ -13,7 +13,7 @@ lazy_static! {
     pub static ref BOOTSTRAP_PUBKEY: String = hex::encode(
         SecioKeyPair::secp256k1_raw_key("8".repeat(32))
             .expect("seckey")
-            .to_public_key()
+            .public_key()
             .inner()
     );
     pub static ref BOOTSTRAP_ADDR: SocketAddr = SocketAddr::new(IP_ADDR, BOOTSTRAP_PORT);
