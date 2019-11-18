@@ -22,5 +22,7 @@
 # dev
 devtools/chain/data
 
+tests/e2e/node_modules/
+
 # rocksdb
 **/rocksdb/

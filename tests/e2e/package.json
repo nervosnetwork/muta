@@ -1,0 +1,28 @@
+{
+  "name": "muta-e2e-tests",
+  "version": "1.0.0",
+  "description": "",
+  "author": "huwenchao",
+  "license": "MIT",
+  "scripts": {
+    "test": "jest --color",
+    "lint": "eslint --fix '{src,test}/**/*.{js,ts}'",
+    "prettier": "prettier --write **/*.{js,ts,graphql}"
+  },
+  "dependencies": {
+    "@types/node": "^12.12.8",
+    "apollo-boost": "^0.4.4",
+    "graphql": "^14.5.8",
+    "graphql-tag": "^2.10.1",
+    "node-fetch": "^2.6.0",
+    "toml": "^3.0.0",
+    "ts-node": "^8.3.0",
+    "typescript": "^3.5.3"
+  },
+  "devDependencies": {
+    "@types/jest": "^24.0.23",
+    "jest": "^24.9.0",
+    "prettier": "^1.19.1",
+    "ts-jest": "^24.1.0"
+  }
+}
