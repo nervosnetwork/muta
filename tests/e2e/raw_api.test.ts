@@ -1,5 +1,5 @@
 import gql from "graphql-tag";
-import { client, getNonce, delay, CHAIN_CONFIG } from "./utils";
+import { client, getNonce, delay, CHAIN_CONFIG, CHAIN_ID } from "./utils";
 
 describe("query API works", () => {
   test("getLatestEpoch works", async () => {
@@ -66,7 +66,7 @@ describe("transfer work", () => {
 mutation {
   sendUnsafeTransferTransaction(
     inputRaw: {
-      chainId: "0xb6a4d7da21443f5e816e8700eea87610e6d769657d6b8ec73028457bf2ca4036", 
+      chainId: "${CHAIN_ID}", 
       feeCycle: "0xff", 
       feeAssetId: "0x0000000000000000000000000000000000000000000000000000000000000000", 
       nonce: "${getNonce()}", 
