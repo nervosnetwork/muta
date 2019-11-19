@@ -8,10 +8,10 @@ describe("API test via muta-sdk-js", () => {
   });
 
   test("transfer work", async () => {
-    const from_addr = "0x10f8389d774afdad8755ef8e629e5a154fddc6325a";
+    const from_addr = "0x103e9b982b443592ffc3d4c2a484c220fb3e29e2e4";
     const from_pk =
-      "0x45c56be699dca666191ad3446897e0f480da234da896270202514a0e1a587c3f";
-    const to_addr = "0x100000000000000000000000000000000000000000";
+      "0x1ab5dfb50a38643ad8bbcbb27145825ddba65e67c72ec9bb643b72e190a27509";
+    const to_addr = "0x100000000000000000000000000000000000000001";
     const asset_id =
       "0xfee0decb4f6a76d402f200b5642a9236ba455c22aa80ef82d69fc70ea5ba20b5";
     const from_balance_before = await muta.client.getBalance(
