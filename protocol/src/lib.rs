@@ -1,5 +1,4 @@
 #![feature(test)]
-#![feature(trait_alias)]
 
 pub mod codec;
 pub mod fixed_codec;
@@ -19,6 +18,7 @@ pub enum ProtocolErrorKind {
     Mempool,
     Network,
     Storage,
+    Runtime,
 
     // codec
     Codec,
