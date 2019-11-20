@@ -14,12 +14,10 @@ pub use epoch::{Epoch, EpochHeader, EpochId, Pill, Proof, Validator};
 pub use ethbloom::{Bloom, BloomRef, Input as BloomInput};
 pub use genesis::{Genesis, GenesisStateAlloc, GenesisStateAsset};
 pub use primitive::{
-    Account, Address, ApprovedInfo, Asset, AssetID, AssetInfo, Balance, ContractAccount,
-    ContractAddress, ContractType, Fee, Hash, MerkleRoot, UserAccount, UserAddress,
-    GENESIS_EPOCH_ID,
+    Account, Address, Balance, Fee, Hash, JsonString, MerkleRoot, GENESIS_EPOCH_ID,
 };
-pub use receipt::{Receipt, ReceiptResult};
-pub use transaction::{CarryingAsset, RawTransaction, SignedTransaction, TransactionAction};
+pub use receipt::{Receipt, ReceiptResponse};
+pub use transaction::{RawTransaction, SignedTransaction, TransactionRequest};
 
 #[derive(Debug, Display, From)]
 pub enum TypesError {
