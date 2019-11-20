@@ -5,9 +5,7 @@ use bytes::Bytes;
 use derive_more::Display;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    traits::Context, types::UserAddress, ProtocolError, ProtocolErrorKind, ProtocolResult,
-};
+use crate::{traits::Context, types::Address, ProtocolError, ProtocolErrorKind, ProtocolResult};
 
 #[derive(Debug)]
 pub enum Priority {
@@ -60,7 +58,7 @@ pub trait Gossip: Send + Sync {
         &self,
         cx: Context,
         end: &str,
-        users: Vec<UserAddress>,
+        users: Vec<Address>,
         msg: M,
         p: Priority,
     ) -> ProtocolResult<()>

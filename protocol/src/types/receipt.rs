@@ -1,42 +1,25 @@
-use bytes::Bytes;
+use crate::types::{Hash, MerkleRoot};
 
-use crate::types::{
-    AssetID, Balance, Bloom, ContractAddress, ContractType, Fee, Hash, MerkleRoot, UserAddress,
-};
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Event {
+    pub service: String,
+    pub data:    String,
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Receipt {
     pub state_root:  MerkleRoot,
     pub epoch_id:    u64,
     pub tx_hash:     Hash,
-    pub cycles_used: Fee,
-    pub result:      ReceiptResult,
+    pub cycles_used: u64,
+    pub events:      Vec<Event>,
+    pub response:    ReceiptResponse,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum ReceiptResult {
-    Transfer {
-        receiver:      UserAddress,
-        asset_id:      AssetID,
-        before_amount: Balance,
-        after_amount:  Balance,
-    },
-    Approve {
-        spender:  ContractAddress,
-        asset_id: AssetID,
-        max:      Balance,
-    },
-    Deploy {
-        contract:      ContractAddress,
-        contract_type: ContractType,
-    },
-    Call {
-        contract:     ContractAddress,
-        return_value: Bytes,
-        logs_bloom:   Box<Bloom>,
-    },
-    Fail {
-        system: String,
-        user:   String,
-    },
+pub struct ReceiptResponse {
+    pub service_name: String,
+    pub method:       String,
+    pub ret:          String,
+    pub is_error:     bool,
 }
