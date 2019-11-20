@@ -4,3 +4,4 @@ devtools/chain/data
 devtools/dex
 .github
 docs
+tests/e2e/node_modules
