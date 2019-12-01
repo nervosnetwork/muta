@@ -59,6 +59,29 @@ pub struct ConfigExecutor {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct ConfigLogger {
+    pub filter:                     String,
+    pub log_to_console:             bool,
+    pub console_show_file_and_line: bool,
+    pub log_to_file:                bool,
+    pub metrics:                    bool,
+    pub log_path:                   PathBuf,
+}
+
+impl Default for ConfigLogger {
+    fn default() -> Self {
+        Self {
+            filter:                     "info".into(),
+            log_to_console:             true,
+            console_show_file_and_line: false,
+            log_to_file:                true,
+            metrics:                    true,
+            log_path:                   "logs/".into(),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
 pub struct Config {
     // chain id
     pub chain_id: String,
@@ -67,11 +90,13 @@ pub struct Config {
     // db config
     pub data_path: PathBuf,
 
-    pub graphql:   ConfigGraphQL,
-    pub network:   ConfigNetwork,
-    pub mempool:   ConfigMempool,
+    pub graphql: ConfigGraphQL,
+    pub network: ConfigNetwork,
+    pub mempool: ConfigMempool,
     pub consensus: ConfigConsensus,
-    pub executor:  ConfigExecutor,
+    pub executor: ConfigExecutor,
+    #[serde(default)]
+    pub logger: ConfigLogger,
 }
 
 impl Config {

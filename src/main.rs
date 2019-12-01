@@ -37,8 +37,6 @@ use crate::config::Config;
 
 #[runtime::main(runtime_tokio::Tokio)]
 async fn main() {
-    common_logger::init(common_logger::Flag::Main);
-
     let matches = clap::App::new("Muta")
         .version("v0.1.0")
         .author("Muta Dev <muta@nervos.org>")
@@ -53,6 +51,14 @@ async fn main() {
         .get_matches();
     let args_config = matches.value_of("config").unwrap();
     let cfg: Config = common_config_parser::parse(args_config).unwrap();
+    common_logger::init(
+        cfg.logger.filter.clone(),
+        cfg.logger.log_to_console,
+        cfg.logger.console_show_file_and_line,
+        cfg.logger.log_to_file,
+        cfg.logger.metrics,
+        cfg.logger.log_path.clone(),
+    );
     log::info!("Go with config: {:?}", cfg);
 
     // init genesis
