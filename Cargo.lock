@@ -462,7 +462,6 @@ dependencies = [
  "bincode 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "bytes 0.4.12 (registry+https://github.com/rust-lang/crates.io-index)",
  "common-crypto 0.1.0",
- "common-logger 0.1.0",
  "common-merkle 0.1.0",
  "core-mempool 0.1.0",
  "core-network 0.1.0",
