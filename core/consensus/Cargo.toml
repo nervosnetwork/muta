@@ -19,6 +19,7 @@ parking_lot = "0.9"
 rlp = "0.4"
 serde = {version = "1.0", features = ["derive"]}
 
+common-logger = { path = "../../common/logger"}
 common-crypto = { path = "../../common/crypto"}
 common-merkle = { path = "../../common/merkle"}
 core-mempool = { path = "../../core/mempool"}

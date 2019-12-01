@@ -363,6 +363,12 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
             .save_epoch(Context::new(), epoch.clone())
             .await?;
 
+        common_logger::metrics(common_logger::json!({
+            "name": "save_epoch",
+            "epoch_id": epoch_id,
+            "ordered_tx_num": epoch.ordered_tx_hashes.len()
+        }));
+
         let prev_hash = Hash::digest(epoch.encode_fixed()?);
         {
             let mut current_consensus_status = self.current_consensus_status.write();
