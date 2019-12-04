@@ -1,14 +1,15 @@
 use std::path::PathBuf;
 
+use json::JsonValue;
 use log::LevelFilter;
 use log4rs::append::console::ConsoleAppender;
 use log4rs::append::file::FileAppender;
 use log4rs::config::{Appender, Config, Logger, Root};
 use log4rs::encode::json::JsonEncoder;
 use log4rs::encode::pattern::PatternEncoder;
-use serde_json::value::Value;
 
-pub use serde_json::json;
+pub use json::array;
+pub use json::object;
 
 pub fn init(
     filter: String,
@@ -79,12 +80,9 @@ pub fn init(
     log4rs::init_config(config).unwrap();
 }
 
-pub fn metrics(content: Value) {
+pub fn metrics(name: &str, mut content: JsonValue) {
     log::trace!(target: "metrics", "{}", {
-        assert!(
-            content.get("name").is_some(),
-            "metrics content must have 'name' field"
-        );
+        content["name"] = name.into();
         content
     });
 }

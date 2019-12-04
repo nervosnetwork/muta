@@ -45,14 +45,19 @@ Metrics is an independent logger, it `metrics` is `true`, the metrics will be lo
 {"time":"2019-12-01T22:02:49.035084+08:00","message":"{\"epoch_id\":7943,\"name\":\"save_epoch\",\"ordered_tx_num\":0}","module_path":"common_logger","file":"common/logger/src/lib.rs","line":83,"level":"TRACE","target":"metrics","thread":"tokio-runtime-worker-3","thread_id":123145445486592,"mdc":{}}
 ```
 
-If you want to use log metrics in a module, you need to add this crate as dependency and use the code below to add a metric. The `name` field is necessary, or it will panic.
+If you want to use log metrics in a module, you need to add this crate as dependency and use the code below to add a metric. The `name` field is reserved, please avoid using this as a key in your metrics.
 
+```rust
+common_logger::metrics("save_epoch", common_logger::object! {
+    "epoch_id" => epoch.header.epoch_id,
+    "ordered_tx_num" => epoch.ordered_tx_hashes.len(),
+});
 ```
-common_logger::metrics(common_logger::json!({
-    "name": "save_epoch",
-    "epoch_id": 1,
-    "ordered_tx_num": 1000
-}));
+
+This signature of the function is showed below. The `JsonValue` is a `enum` from [`json crate`](https://docs.rs/json/0.12.0/json/enum.JsonValue.html).
+
+```rust
+pub fn metrics(name: &str, mut content: JsonValue)
 ```
 
 ## Yaml File
