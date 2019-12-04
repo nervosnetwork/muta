@@ -79,6 +79,7 @@ pub fn mock_raw_tx() -> RawTransaction {
         chain_id:     mock_hash(),
         nonce:        mock_hash(),
         timeout:      100,
+        cycles_price: 1,
         cycles_limit: 100,
         request:      mock_transaction_request(),
     }
