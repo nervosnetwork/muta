@@ -10,9 +10,10 @@ impl_default_fixed_codec_for!(transaction, [RawTransaction, SignedTransaction]);
 
 impl rlp::Encodable for RawTransaction {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
-        s.begin_list(7);
+        s.begin_list(8);
         s.append(&self.chain_id.as_bytes().to_vec());
         s.append(&self.cycles_limit);
+        s.append(&self.cycles_price);
         s.append(&self.nonce.as_bytes().to_vec());
         s.append(&self.request.method);
         s.append(&self.request.service_name);
@@ -27,19 +28,21 @@ impl rlp::Decodable for RawTransaction {
             .map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
 
         let cycles_limit: u64 = r.at(1)?.as_val()?;
+        let cycles_price: u64 = r.at(2)?.as_val()?;
 
-        let nonce = Hash::from_bytes(Bytes::from(r.at(2)?.data()?))
+        let nonce = Hash::from_bytes(Bytes::from(r.at(3)?.data()?))
             .map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
 
         let request = TransactionRequest {
-            method:       r.at(3)?.as_val()?,
-            service_name: r.at(4)?.as_val()?,
-            payload:      r.at(5)?.as_val()?,
+            method:       r.at(4)?.as_val()?,
+            service_name: r.at(5)?.as_val()?,
+            payload:      r.at(6)?.as_val()?,
         };
-        let timeout = r.at(6)?.as_val()?;
+        let timeout = r.at(7)?.as_val()?;
 
         Ok(Self {
             chain_id,
+            cycles_price,
             cycles_limit,
             nonce,
             request,
