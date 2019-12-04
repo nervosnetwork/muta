@@ -41,3 +41,11 @@ precommit_denominator = 30
 
 [executor]
 light = false
+
+[logger]
+filter = "info"
+log_to_console = true
+console_show_file_and_line = false
+log_path = "logs/"
+log_to_file = true
+metrics = true

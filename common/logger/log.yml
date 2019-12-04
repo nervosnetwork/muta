@@ -1,0 +1,36 @@
+# This file is yaml style config, can make testing the logger more easily.
+# When you need to do some test, Add the code below to the `init` function.
+# log4rs::init_file("common/logger/log.yml", Default::default()).unwrap();
+# reference: <https://docs.rs/log4rs/0.8.3/log4rs/>
+appenders:
+  console:
+    kind: console
+    encoder:
+      # this pattern below contains file name and line, usefule for debugging
+      # pattern: "[{d} {h({l})} {t} {f}:{L}] {m}{n}"
+      pattern: "[{d} {h({l})} {t}] {m}{n}"
+
+  file:
+    kind: file
+    path: logs/muta.log
+    encoder:
+      kind: json
+
+  metrics:
+    kind: file
+    path: logs/metrics.log
+    encoder:
+      kind: json
+
+root:
+  level: info
+  appenders:
+  - console
+  - file
+
+loggers:
+  metrics:
+    level: trace
+    appenders:
+    - metrics
+    additive: false
