@@ -7,6 +7,7 @@ pub struct RawTransaction {
     pub chain_id:     Hash,
     pub nonce:        Hash,
     pub timeout:      u64,
+    pub cycles_price: u64,
     pub cycles_limit: u64,
     pub request:      TransactionRequest,
 }
