@@ -34,9 +34,12 @@ pub struct RawTransaction {
     pub timeout: u64,
 
     #[prost(uint64, tag = "4")]
+    pub cycles_price: u64,
+
+    #[prost(uint64, tag = "5")]
     pub cycles_limit: u64,
 
-    #[prost(message, tag = "5")]
+    #[prost(message, tag = "6")]
     pub request: Option<TransactionRequest>,
 }
 
@@ -97,6 +100,7 @@ impl From<transaction::RawTransaction> for RawTransaction {
         RawTransaction {
             chain_id,
             nonce,
+            cycles_price: raw.cycles_price,
             timeout: raw.timeout,
             cycles_limit: raw.cycles_limit,
             request,
@@ -116,6 +120,7 @@ impl TryFrom<RawTransaction> for transaction::RawTransaction {
             chain_id:     protocol_primitive::Hash::try_from(chain_id)?,
             nonce:        protocol_primitive::Hash::try_from(nonce)?,
             timeout:      raw.timeout,
+            cycles_price: raw.cycles_price,
             cycles_limit: raw.cycles_limit,
             request:      transaction::TransactionRequest::try_from(request)?,
         };
