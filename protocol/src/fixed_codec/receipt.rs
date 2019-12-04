@@ -1,6 +1,6 @@
 use bytes::Bytes;
 
-use crate::fixed_codec::{FixedCodecError, ProtocolFixedCodec};
+use crate::fixed_codec::{FixedCodec, FixedCodecError};
 use crate::types::receipt::{Event, Receipt, ReceiptResponse};
 use crate::{impl_default_fixed_codec_for, ProtocolResult};
 

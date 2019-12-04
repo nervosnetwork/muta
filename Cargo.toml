@@ -15,6 +15,8 @@ core-mempool = { path = "./core/mempool" }
 core-network = { path = "./core/network" }
 core-consensus = { path = "./core/consensus" }
 core-executor = { path = "./core/executor" }
+core-binding = { path = "./core/binding" }
+core-binding-macro = { path = "./core/binding-macro" }
 
 parking_lot = "0.9"
 runtime = "0.3.0-alpha.7"
