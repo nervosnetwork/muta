@@ -4,9 +4,9 @@ macro_rules! impl_default_fixed_codec_for {
         use crate::types::$category;
 
         $(
-            impl ProtocolFixedCodec for $category::$type {
-                fn encode_fixed(&self) -> ProtocolResult<bytes::Bytes> {
-                    Ok(bytes::Bytes::from(rlp::encode(self)))
+            impl FixedCodec for $category::$type {
+                fn encode_fixed(&self) -> ProtocolResult<Bytes> {
+                    Ok(Bytes::from(rlp::encode(self)))
                 }
 
                 fn decode_fixed(bytes: bytes::Bytes) -> ProtocolResult<Self> {
