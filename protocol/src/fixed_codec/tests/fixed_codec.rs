@@ -2,7 +2,7 @@ extern crate test;
 
 use test::Bencher;
 
-use crate::fixed_codec::ProtocolFixedCodec;
+use crate::fixed_codec::FixedCodec;
 use crate::types;
 
 use super::*;

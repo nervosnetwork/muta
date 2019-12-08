@@ -16,7 +16,7 @@ use derive_more::{Display, From};
 use crate::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
 // Consistent serialization trait using rlp-algorithm
-pub trait ProtocolFixedCodec: Sized {
+pub trait FixedCodec: Sized {
     fn encode_fixed(&self) -> ProtocolResult<Bytes>;
 
     fn decode_fixed(bytes: Bytes) -> ProtocolResult<Self>;

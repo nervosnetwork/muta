@@ -444,6 +444,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "core-binding"
+version = "0.1.0"
+
+[[package]]
+name = "core-binding-macro"
+version = "0.1.0"
+
+[[package]]
 name = "core-consensus"
 version = "0.1.0"
 dependencies = [
@@ -1733,6 +1741,8 @@ dependencies = [
  "common-crypto 0.1.0",
  "common-logger 0.1.0",
  "core-api 0.1.0",
+ "core-binding 0.1.0",
+ "core-binding-macro 0.1.0",
  "core-consensus 0.1.0",
  "core-executor 0.1.0",
  "core-mempool 0.1.0",
