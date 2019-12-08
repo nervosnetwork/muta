@@ -1,6 +1,6 @@
 use bytes::BytesMut;
 
-use crate::fixed_codec::{FixedCodecError, ProtocolFixedCodec};
+use crate::fixed_codec::{FixedCodec, FixedCodecError};
 use crate::types::epoch::{Epoch, EpochHeader, EpochId, Pill, Proof, Validator};
 use crate::types::primitive::Hash;
 use crate::types::Bloom;
