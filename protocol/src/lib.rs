@@ -20,6 +20,7 @@ pub enum ProtocolErrorKind {
     Network,
     Storage,
     Runtime,
+    Binding,
 
     // codec
     Codec,
