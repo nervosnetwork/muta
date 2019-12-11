@@ -1,6 +1,6 @@
-use std::sync::Arc;
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::Arc;
 
 use cita_trie::MemoryDB;
 

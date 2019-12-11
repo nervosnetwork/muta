@@ -1,6 +1,6 @@
+use std::cell::RefCell;
 use std::io::Cursor;
 use std::mem;
-use std::cell::RefCell;
 use std::rc::Rc;
 
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
@@ -33,7 +33,11 @@ impl<DB: TrieDB> StoreBool for DefaultStoreBool<DB> {
         // let opt_bs: Option<Bytes> = self.state.borrow().get(&self.key)?;
         // let bs = opt_bs.ok_or(StoreError::GetNone)?;
 
-        let bs :Bytes = self.state.borrow().get(&self.key)?.ok_or(StoreError::GetNone)?;
+        let bs: Bytes = self
+            .state
+            .borrow()
+            .get(&self.key)?
+            .ok_or(StoreError::GetNone)?;
 
         let mut rdr = Cursor::new(bs.to_vec());
         let u = rdr.read_u8().expect("read u8 should not fail");
@@ -72,10 +76,16 @@ impl<DB: TrieDB> DefaultStoreUint64<DB> {
 
 impl<DB: TrieDB> StoreUint64 for DefaultStoreUint64<DB> {
     fn get(&self) -> ProtocolResult<u64> {
-        let bs :Bytes = self.state.borrow().get(&self.key)?.ok_or(StoreError::GetNone)?;
+        let bs: Bytes = self
+            .state
+            .borrow()
+            .get(&self.key)?
+            .ok_or(StoreError::GetNone)?;
         let mut rdr = Cursor::new(bs.to_vec());
 
-        Ok(rdr.read_u64::<BigEndian>().expect("read u64 should not fail"))
+        Ok(rdr
+            .read_u64::<BigEndian>()
+            .expect("read u64 should not fail"))
     }
 
     fn set(&mut self, val: u64) -> ProtocolResult<()> {
@@ -150,7 +160,7 @@ impl<DB: TrieDB> StoreUint64 for DefaultStoreUint64<DB> {
     fn rem(&mut self, val: u64) -> ProtocolResult<()> {
         let sv = self.get()?;
 
-        if(0 == val) {
+        if (0 == val) {
             Err(StoreError::Overflow.into())
         } else {
             self.set(sv % val)
@@ -181,7 +191,11 @@ impl<DB: TrieDB> StoreString for DefaultStoreString<DB> {
     }
 
     fn get(&self) -> ProtocolResult<String> {
-        let bs :Bytes = self.state.borrow().get(&self.key)?.ok_or(StoreError::GetNone)?;
+        let bs: Bytes = self
+            .state
+            .borrow()
+            .get(&self.key)?
+            .ok_or(StoreError::GetNone)?;
 
         Ok(String::from_utf8(bs.to_vec()).expect("get string should not fail"))
     }
