@@ -2,9 +2,6 @@ mod array;
 mod map;
 mod primitive;
 
-#[cfg(test)]
-mod tests;
-
 use derive_more::{Display, From};
 
 pub use primitive::{DefaultStoreBool, DefaultStoreString, DefaultStoreUint64};
