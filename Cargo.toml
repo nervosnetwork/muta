@@ -48,6 +48,8 @@ members = [
   "core/mempool",
   "core/network",
   "core/storage",
+  "core/binding",
+  "core/binding-macro",
 
   "protocol",
 ]
