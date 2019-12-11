@@ -3,24 +3,22 @@ use std::io::Cursor;
 use std::mem;
 use std::rc::Rc;
 
-use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use bytes::Bytes;
-use cita_trie::DB as TrieDB;
 
 use protocol::traits::{ServiceState, StoreBool, StoreString, StoreUint64};
 use protocol::types::Hash;
 use protocol::ProtocolResult;
 
-use crate::state::GeneralServiceState;
 use crate::store::StoreError;
 
-pub struct DefaultStoreBool<DB: TrieDB> {
-    state: Rc<RefCell<GeneralServiceState<DB>>>,
+pub struct DefaultStoreBool<S: ServiceState> {
+    state: Rc<RefCell<S>>,
     key:   Hash,
 }
 
-impl<DB: TrieDB> DefaultStoreBool<DB> {
-    pub fn new(state: Rc<RefCell<GeneralServiceState<DB>>>, var_name: &str) -> Self {
+impl<S: ServiceState> DefaultStoreBool<S> {
+    pub fn new(state: Rc<RefCell<S>>, var_name: &str) -> Self {
         Self {
             state,
             key: Hash::digest(Bytes::from(var_name.to_owned() + "bool")),
@@ -28,11 +26,8 @@ impl<DB: TrieDB> DefaultStoreBool<DB> {
     }
 }
 
-impl<DB: TrieDB> StoreBool for DefaultStoreBool<DB> {
+impl<S: ServiceState> StoreBool for DefaultStoreBool<S> {
     fn get(&self) -> ProtocolResult<bool> {
-        // let opt_bs: Option<Bytes> = self.state.borrow().get(&self.key)?;
-        // let bs = opt_bs.ok_or(StoreError::GetNone)?;
-
         let bs: Bytes = self
             .state
             .borrow()
@@ -60,13 +55,13 @@ impl<DB: TrieDB> StoreBool for DefaultStoreBool<DB> {
     }
 }
 
-pub struct DefaultStoreUint64<DB: TrieDB> {
-    state: Rc<RefCell<GeneralServiceState<DB>>>,
+pub struct DefaultStoreUint64<S: ServiceState> {
+    state: Rc<RefCell<S>>,
     key:   Hash,
 }
 
-impl<DB: TrieDB> DefaultStoreUint64<DB> {
-    pub fn new(state: Rc<RefCell<GeneralServiceState<DB>>>, var_name: &str) -> Self {
+impl<S: ServiceState> DefaultStoreUint64<S> {
+    pub fn new(state: Rc<RefCell<S>>, var_name: &str) -> Self {
         Self {
             state,
             key: Hash::digest(Bytes::from(var_name.to_owned() + "uint64")),
@@ -74,7 +69,7 @@ impl<DB: TrieDB> DefaultStoreUint64<DB> {
     }
 }
 
-impl<DB: TrieDB> StoreUint64 for DefaultStoreUint64<DB> {
+impl<S: ServiceState> StoreUint64 for DefaultStoreUint64<S> {
     fn get(&self) -> ProtocolResult<u64> {
         let bs: Bytes = self
             .state
@@ -84,14 +79,14 @@ impl<DB: TrieDB> StoreUint64 for DefaultStoreUint64<DB> {
         let mut rdr = Cursor::new(bs.to_vec());
 
         Ok(rdr
-            .read_u64::<BigEndian>()
+            .read_u64::<LittleEndian>()
             .expect("read u64 should not fail"))
     }
 
     fn set(&mut self, val: u64) -> ProtocolResult<()> {
         let mut bs = [0u8; mem::size_of::<u64>()];
         bs.as_mut()
-            .write_u64::<BigEndian>(val)
+            .write_u64::<LittleEndian>(val)
             .expect("write u64 should not fail");
         let val = Bytes::from(bs.as_ref());
 
@@ -168,13 +163,13 @@ impl<DB: TrieDB> StoreUint64 for DefaultStoreUint64<DB> {
     }
 }
 
-pub struct DefaultStoreString<DB: TrieDB> {
-    state: Rc<RefCell<GeneralServiceState<DB>>>,
+pub struct DefaultStoreString<S: ServiceState> {
+    state: Rc<RefCell<S>>,
     key:   Hash,
 }
 
-impl<DB: TrieDB> DefaultStoreString<DB> {
-    pub fn new(state: Rc<RefCell<GeneralServiceState<DB>>>, var_name: &str) -> Self {
+impl<S: ServiceState> DefaultStoreString<S> {
+    pub fn new(state: Rc<RefCell<S>>, var_name: &str) -> Self {
         Self {
             state,
             key: Hash::digest(Bytes::from(var_name.to_owned() + "string")),
@@ -182,7 +177,7 @@ impl<DB: TrieDB> DefaultStoreString<DB> {
     }
 }
 
-impl<DB: TrieDB> StoreString for DefaultStoreString<DB> {
+impl<S: ServiceState> StoreString for DefaultStoreString<S> {
     fn set(&mut self, val: &str) -> ProtocolResult<()> {
         let val = Bytes::from(val);
 
