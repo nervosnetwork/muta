@@ -2,8 +2,12 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::punctuated::Punctuated;
 use syn::{
-    parse_macro_input, FnArg, GenericArgument, GenericParam, Generics, ImplItemMethod, Path,
-    PathArguments, ReturnType, Token, Type, TypeParamBound, Visibility,
+    parse_macro_input, FnArg, GenericArgument, Generics, ImplItemMethod, Path, PathArguments,
+    ReturnType, Token, Type, Visibility,
+};
+
+use crate::common::{
+    arg_is_request_context, get_bounds_name_of_request_context, get_protocol_result_args,
 };
 
 pub fn verify_read_or_write(item: TokenStream, mutable: bool) -> TokenStream {
@@ -41,12 +45,14 @@ fn verify_inputs(inputs: &Punctuated<FnArg, Token![,]>, generics: &Generics, mut
         if !arg_is_mutable_receiver(&inputs[0]) {
             panic!("The receiver must be `&mut self`.")
         }
-    } else {
-        if !arg_is_inmutable_receiver(&inputs[0]) {
-            panic!("The receiver must be `&self`.")
-        }
+    } else if !arg_is_inmutable_receiver(&inputs[0]) {
+        panic!("The receiver must be `&self`.")
     }
-    arg_is_request_context(&inputs[1], generics);
+
+    let request_bound_name = get_bounds_name_of_request_context(generics).expect("");
+    if !arg_is_request_context(&inputs[1], &request_bound_name) {
+        panic!("The first parameter to read/write must be RequestContext")
+    }
 }
 
 fn verify_ret_type(ret_type: &ReturnType) {
@@ -74,20 +80,6 @@ fn verify_ret_type(ret_type: &ReturnType) {
     }
 }
 
-fn get_protocol_result_args(path: &Path) -> Option<&PathArguments> {
-    // ::<a>::<b>
-    if path.leading_colon.is_some() {
-        return None;
-    }
-
-    // ProtocolResult<T>
-    if path.segments.len() == 1 && path.segments[0].ident == "ProtocolResult" {
-        return Some(&path.segments[0].arguments);
-    }
-
-    return None;
-}
-
 fn path_is_jsonvalue(path: &Path) -> bool {
     // ::<a>::<b>
     if path.leading_colon.is_some() {
@@ -98,60 +90,12 @@ fn path_is_jsonvalue(path: &Path) -> bool {
     path.segments.len() == 1 && path.segments[0].ident == "JsonValue"
 }
 
-fn path_is_request_context(path: &Path, bound_name: &str) -> bool {
-    // ::<a>::<b>
-    if path.leading_colon.is_some() {
-        return false;
-    }
-
-    // RequestContext
-    path.segments.len() == 1 && path.segments[0].ident == bound_name
-}
-
 fn generic_type_is_jsonvalue(generic_type: &GenericArgument) -> bool {
     match generic_type {
         GenericArgument::Type(t) => match t {
             Type::Path(type_path) => path_is_jsonvalue(&type_path.path),
             _ => false,
         },
-        _ => false,
-    }
-}
-
-// expect fn foo<Context: RequestContext>
-fn get_bounds_name_of_request_context(generics: &Generics) -> Option<String> {
-    if generics.params.len() != 1 {
-        return None;
-    }
-
-    let generics_type = &generics.params[0];
-
-    if let GenericParam::Type(t) = generics_type {
-        let bound_name = t.ident.to_string();
-
-        if let TypeParamBound::Trait(bound_trait) = &t.bounds[0] {
-            let ident = &bound_trait.path.segments[0].ident;
-            if ident == "RequestContext" {
-                return Some(bound_name);
-            }
-        }
-    }
-
-    None
-}
-
-// expect fn foo<Context: RequestContext>(&self, ctx: Context)
-fn arg_is_request_context(fn_arg: &FnArg, generics: &Generics) -> bool {
-    let ty = match fn_arg {
-        FnArg::Typed(pat_type) => &*pat_type.ty,
-        _ => return false,
-    };
-
-    let bound_name = get_bounds_name_of_request_context(generics)
-        .expect("The `read/write` method must bound the trait `RequestContext`");
-
-    match ty {
-        Type::Path(type_path) => path_is_request_context(&type_path.path, &bound_name),
         _ => false,
     }
 }
