@@ -20,6 +20,7 @@ use core_consensus::message::{
     VoteMessageHandler, END_GOSSIP_AGGREGATED_VOTE, END_GOSSIP_RICH_EPOCH_ID,
     END_GOSSIP_SIGNED_PROPOSAL, END_GOSSIP_SIGNED_VOTE, RPC_RESP_SYNC_PULL, RPC_SYNC_PULL,
 };
+use core_consensus::trace::init_tracer;
 use core_executor::trie::RocksTrieDB;
 use core_executor::TransactionExecutorFactory;
 use core_mempool::{DefaultMemPoolAdapter, HashMemPool, NewTxsHandler, END_GOSSIP_NEW_TXS};
@@ -266,6 +267,7 @@ async fn start(cfg: &Config) -> ProtocolResult<()> {
         consensus_interval: cfg.consensus.interval,
     };
 
+    init_tracer(my_address.as_hex());
     let overlord_consensus = Arc::new(OverlordConsensus::new(
         current_consensus_status,
         node_info,
