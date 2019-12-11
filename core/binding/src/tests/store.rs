@@ -1,4 +1,6 @@
 use std::sync::Arc;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 use cita_trie::MemoryDB;
 
@@ -13,7 +15,7 @@ fn test_default_store_bool() {
     let memdb = Arc::new(MemoryDB::new(false));
     let mut state = new_state(Arc::clone(&memdb), None);
 
-    let mut sb = DefaultStoreBool::new(state, "test");
+    let mut sb = DefaultStoreBool::new(Rc::new(RefCell::new(state)), "test");
 
     sb.set(true).unwrap();
     assert_eq!(sb.get().unwrap(), true);
@@ -26,7 +28,7 @@ fn test_default_store_uint64() {
     let memdb = Arc::new(MemoryDB::new(false));
     let mut state = new_state(Arc::clone(&memdb), None);
 
-    let mut su = DefaultStoreUint64::new(state, "test");
+    let mut su = DefaultStoreUint64::new(Rc::new(RefCell::new(state)), "test");
 
     su.set(8u64).unwrap();
     assert_eq!(su.get().unwrap(), 8u64);
@@ -55,7 +57,7 @@ fn test_default_store_string() {
     let memdb = Arc::new(MemoryDB::new(false));
     let mut state = new_state(Arc::clone(&memdb), None);
 
-    let mut ss = DefaultStoreString::new(state, "test");
+    let mut ss = DefaultStoreString::new(Rc::new(RefCell::new(state)), "test");
 
     ss.set("").unwrap();
     assert_eq!(ss.get().unwrap(), "");
