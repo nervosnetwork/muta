@@ -1,9 +1,9 @@
-use common_logger::{metrics, object};
+use log::error;
 use moodyblues_sdk::time::now;
-use moodyblues_sdk::trace::{start_epoch, set_boxed_tracer, Metadata, Trace, TracePoint};
+use moodyblues_sdk::trace::{set_boxed_tracer, Metadata, Trace, TracePoint};
 use serde_json::to_string;
 
-pub struct MetricTracer {
+struct MetricTracer {
     address: String,
 }
 
@@ -15,7 +15,10 @@ impl MetricTracer {
 
 impl Trace for MetricTracer {
     fn report(&self, point: TracePoint) {
-        log::trace!(target: "metrics", "{}", to_string(&point).unwrap());
+        match to_string(&point) {
+            Ok(json) => log::trace!(target: "metrics", "{}", json),
+            Err(e) => error!("tracing: convert json error {:?}", e),
+        }
     }
 
     fn metadata(&self) -> Metadata {
@@ -30,6 +33,7 @@ impl Trace for MetricTracer {
 }
 
 pub fn init_tracer(address: String) {
-    set_boxed_tracer(Box::new(MetricTracer::new(address)));
-    start_epoch(1);
+    if let Err(_) = set_boxed_tracer(Box::new(MetricTracer::new(address))) {
+        error!("tracing: tracing init failed");
+    }
 }
