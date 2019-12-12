@@ -1,4 +1,5 @@
 <!--  Thanks for sending a pull request! -->
+<!--  Have I run `make ci`? -->
 
 **What type of PR is this?**
 
