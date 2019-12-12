@@ -14,12 +14,15 @@ creep = "0.1"
 derive_more = "0.15"
 futures = "0.3"
 log = "0.4"
+moodyblues-sdk = { git = "https://github.com/homura/moodyblues-client-rust" }
 overlord = "0.1"
 parking_lot = "0.9"
 rlp = "0.4"
 serde = {version = "1.0", features = ["derive"]}
+serde_json = "1.0"
 
 common-crypto = { path = "../../common/crypto"}
+common-logger = { path = "../../common/logger" }
 common-merkle = { path = "../../common/merkle"}
 core-mempool = { path = "../../core/mempool"}
 core-storage = { path = "../../core/storage"}
@@ -27,7 +30,6 @@ core-network = { path = "../../core/network"}
 protocol = { path = "../../protocol" }
 
 [dev-dependencies]
-serde_json = "1.0"
 num-traits = "0.2"
 rand = "0.7"
 runtime = "0.3.0-alpha.7"

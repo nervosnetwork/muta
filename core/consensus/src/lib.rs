@@ -4,6 +4,7 @@ pub mod adapter;
 pub mod consensus;
 pub mod fixed_types;
 pub mod message;
+pub mod trace;
 pub mod util;
 
 pub use overlord::DurationConfig;
