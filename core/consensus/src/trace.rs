@@ -1,6 +1,6 @@
 use log::error;
 use moodyblues_sdk::time::now;
-use moodyblues_sdk::trace::{set_boxed_tracer, Metadata, Trace, TracePoint, SetTraceError};
+use moodyblues_sdk::trace::{set_boxed_tracer, Metadata, SetTraceError, Trace, TracePoint};
 use serde_json::to_string;
 
 struct MetricTracer {
