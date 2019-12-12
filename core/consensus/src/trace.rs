@@ -33,7 +33,7 @@ impl Trace for MetricTracer {
 }
 
 pub fn init_tracer(address: String) {
-    if let Err(_) = set_boxed_tracer(Box::new(MetricTracer::new(address))) {
+    if set_boxed_tracer(Box::new(MetricTracer::new(address))).is_err() {
         error!("tracing: tracing init failed");
     }
 }
