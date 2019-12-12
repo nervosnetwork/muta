@@ -267,7 +267,7 @@ async fn start(cfg: &Config) -> ProtocolResult<()> {
         consensus_interval: cfg.consensus.interval,
     };
 
-    init_tracer(my_address.as_hex());
+    init_tracer(my_address.as_hex()).unwrap();
     let overlord_consensus = Arc::new(OverlordConsensus::new(
         current_consensus_status,
         node_info,

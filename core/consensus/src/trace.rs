@@ -1,6 +1,6 @@
 use log::error;
 use moodyblues_sdk::time::now;
-use moodyblues_sdk::trace::{set_boxed_tracer, Metadata, Trace, TracePoint};
+use moodyblues_sdk::trace::{set_boxed_tracer, Metadata, Trace, TracePoint, SetTraceError};
 use serde_json::to_string;
 
 struct MetricTracer {
@@ -32,8 +32,6 @@ impl Trace for MetricTracer {
     }
 }
 
-pub fn init_tracer(address: String) {
-    if set_boxed_tracer(Box::new(MetricTracer::new(address))).is_err() {
-        error!("tracing: tracing init failed");
-    }
+pub fn init_tracer(address: String) -> Result<(), SetTraceError> {
+    set_boxed_tracer(Box::new(MetricTracer::new(address)))
 }
