@@ -1757,7 +1757,7 @@ dependencies = [
 [[package]]
 name = "moodyblues-sdk"
 version = "0.1.0"
-source = "git+https://github.com/homura/moodyblues-client-rust#9b3922a2ef6640098d75193d7bbed5953c2294da"
+source = "git+https://github.com/homura/moodyblues-client-rust#9c6858b7f8c5caa397e9021a22db0abade327c72"
 dependencies = [
  "serde 1.0.102 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 1.0.42 (registry+https://github.com/rust-lang/crates.io-index)",

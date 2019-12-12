@@ -1,6 +1,7 @@
 use log::{error, trace};
+use moodyblues_sdk::point::{Metadata, TracePoint};
 use moodyblues_sdk::time::now;
-use moodyblues_sdk::trace::{set_boxed_tracer, Metadata, Trace, TracePoint};
+use moodyblues_sdk::trace::{set_boxed_tracer, Trace};
 use serde_json::to_string;
 
 use protocol::{ProtocolError, ProtocolResult};
