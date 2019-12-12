@@ -4,7 +4,7 @@ use moodyblues_sdk::time::now;
 use moodyblues_sdk::trace::{set_boxed_tracer, Trace};
 use serde_json::to_string;
 
-use protocol::{ProtocolError, ProtocolResult};
+use protocol::ProtocolResult;
 
 use crate::ConsensusError;
 
@@ -38,7 +38,6 @@ impl Trace for MetricTracer {
 }
 
 pub fn init_tracer(address: String) -> ProtocolResult<()> {
-    set_boxed_tracer(Box::new(MetricTracer::new(address))).map_err(|_| {
-        ProtocolError::from(ConsensusError::Other("failed to init tracer ".to_string()))
-    })
+    set_boxed_tracer(Box::new(MetricTracer::new(address)))
+        .map_err(|_| ConsensusError::Other("failed to init tracer ".to_string()).into())
 }
