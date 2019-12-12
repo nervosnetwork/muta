@@ -1,7 +1,11 @@
-use log::error;
+use log::{error, trace};
 use moodyblues_sdk::time::now;
-use moodyblues_sdk::trace::{set_boxed_tracer, Metadata, SetTraceError, Trace, TracePoint};
+use moodyblues_sdk::trace::{set_boxed_tracer, Metadata, Trace, TracePoint};
 use serde_json::to_string;
+
+use protocol::{ProtocolError, ProtocolResult};
+
+use crate::ConsensusError;
 
 struct MetricTracer {
     address: String,
@@ -16,7 +20,7 @@ impl MetricTracer {
 impl Trace for MetricTracer {
     fn report(&self, point: TracePoint) {
         match to_string(&point) {
-            Ok(json) => log::trace!(target: "metrics", "{}", json),
+            Ok(json) => trace!(target: "metrics", "{}", json),
             Err(e) => error!("tracing: convert json error {:?}", e),
         }
     }
@@ -32,6 +36,8 @@ impl Trace for MetricTracer {
     }
 }
 
-pub fn init_tracer(address: String) -> Result<(), SetTraceError> {
-    set_boxed_tracer(Box::new(MetricTracer::new(address)))
+pub fn init_tracer(address: String) -> ProtocolResult<()> {
+    set_boxed_tracer(Box::new(MetricTracer::new(address))).map_err(|_| {
+        ProtocolError::from(ConsensusError::Other("failed to init tracer ".to_string()))
+    })
 }
