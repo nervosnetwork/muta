@@ -228,12 +228,42 @@ pub trait StoreArray<Elm: FixedCodec> {
 
 pub trait StoreUint64 {
     fn get(&self) -> ProtocolResult<u64>;
+
+    fn set(&mut self, val: u64) -> ProtocolResult<()>;
+
+    // Add val with self
+    // And set the result back to self
+    fn add(&mut self, val: u64) -> ProtocolResult<()>;
+
+    // Self minus val
+    // And set the result back to self
+    fn sub(&mut self, val: u64) -> ProtocolResult<()>;
+
+    // Multiply val with self
+    // And set the result back to self
+    fn mul(&mut self, val: u64) -> ProtocolResult<()>;
+
+    // Power of self
+    // And set the result back to self
+    fn pow(&mut self, val: u32) -> ProtocolResult<()>;
+
+    // Self divided by val
+    // And set the result back to self
+    fn div(&mut self, val: u64) -> ProtocolResult<()>;
+
+    // Remainder of self
+    // And set the result back to self
+    fn rem(&mut self, val: u64) -> ProtocolResult<()>;
 }
 
 pub trait StoreString {
-    fn get(&self) -> ProtocolResult<&str>;
+    fn get(&self) -> ProtocolResult<String>;
 
     fn set(&mut self, val: &str) -> ProtocolResult<()>;
+
+    fn len(&self) -> ProtocolResult<usize>;
+
+    fn is_empty(&self) -> ProtocolResult<bool>;
 }
 
 pub trait StoreBool {
