@@ -4,9 +4,9 @@ pub mod adapter;
 pub mod consensus;
 pub mod fixed_types;
 pub mod message;
-pub mod trace;
 pub mod status;
 pub mod synchronization;
+pub mod trace;
 pub mod util;
 
 pub use self::adapter::OverlordConsensusAdapter;
