@@ -194,21 +194,21 @@ pub trait ServiceSDK {
     ) -> ProtocolResult<json::JsonValue>;
 }
 
-pub trait StoreMap<Key: FixedCodec, Value: FixedCodec> {
+pub trait StoreMap<Key: FixedCodec + PartialEq, Value: FixedCodec> {
     fn get(&self, key: &Key) -> ProtocolResult<Value>;
 
-    fn insert(&mut self, key: Key, value: Value) -> ProtocolResult<()>;
-
     fn contains(&self, key: &Key) -> ProtocolResult<bool>;
+
+    fn insert(&mut self, key: Key, value: Value) -> ProtocolResult<()>;
 
     fn remove(&mut self, key: &Key) -> ProtocolResult<()>;
 
     fn len(&self) -> ProtocolResult<usize>;
 
-    fn for_each<F>(&self, f: F)
+    fn for_each<F>(&mut self, mut f: F) -> ProtocolResult<()>
     where
         Self: Sized,
-        F: FnMut(Value) -> ProtocolResult<()>;
+        F: FnMut(&mut Value) -> ProtocolResult<()>;
 }
 
 pub trait StoreArray<Elm: FixedCodec> {

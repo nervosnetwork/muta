@@ -6,6 +6,7 @@ use derive_more::{Display, From};
 
 use protocol::{ProtocolError, ProtocolErrorKind};
 
+pub use map::DefaultStoreMap;
 pub use primitive::{DefaultStoreBool, DefaultStoreString, DefaultStoreUint64};
 
 #[derive(Debug, Display, From)]

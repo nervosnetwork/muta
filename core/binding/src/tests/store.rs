@@ -2,13 +2,14 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
 
+use bytes::Bytes;
 use cita_trie::MemoryDB;
 
-use protocol::traits::{StoreBool, StoreString, StoreUint64};
-use protocol::types::MerkleRoot;
+use protocol::traits::{ServiceState, StoreBool, StoreMap, StoreString, StoreUint64};
+use protocol::types::{Hash, MerkleRoot};
 
 use crate::state::{GeneralServiceState, MPTTrie};
-use crate::store::{DefaultStoreBool, DefaultStoreString, DefaultStoreUint64};
+use crate::store::{DefaultStoreBool, DefaultStoreMap, DefaultStoreString, DefaultStoreUint64};
 
 #[test]
 fn test_default_store_bool() {
@@ -57,7 +58,8 @@ fn test_default_store_string() {
     let memdb = Arc::new(MemoryDB::new(false));
     let mut state = new_state(Arc::clone(&memdb), None);
 
-    let mut ss = DefaultStoreString::new(Rc::new(RefCell::new(state)), "test");
+    let rs = Rc::new(RefCell::new(state));
+    let mut ss = DefaultStoreString::new(Rc::clone(&rs), "test");
 
     ss.set("").unwrap();
     assert_eq!(ss.get().unwrap(), "");
@@ -66,6 +68,48 @@ fn test_default_store_string() {
     ss.set("ok").unwrap();
     assert_eq!(ss.get().unwrap(), String::from("ok"));
     assert_eq!(ss.len().unwrap(), 2usize);
+}
+
+#[test]
+fn test_default_store_map() {
+    let memdb = Arc::new(MemoryDB::new(false));
+    let mut state = new_state(Arc::clone(&memdb), None);
+    let rs = Rc::new(RefCell::new(state));
+
+    let mut sm = DefaultStoreMap::<_, Hash, Bytes>::new(Rc::clone(&rs), "test");
+
+    sm.insert(Hash::digest(Bytes::from("key_1")), Bytes::from("val_1"))
+        .unwrap();
+    sm.insert(Hash::digest(Bytes::from("key_2")), Bytes::from("val_2"))
+        .unwrap();
+
+    assert_eq!(
+        sm.get(&Hash::digest(Bytes::from("key_1"))).unwrap(),
+        Bytes::from("val_1")
+    );
+    assert_eq!(
+        sm.get(&Hash::digest(Bytes::from("key_2"))).unwrap(),
+        Bytes::from("val_2")
+    );
+
+    sm.for_each(|v| Ok(v.truncate(3))).unwrap();
+
+    assert_eq!(
+        sm.get(&Hash::digest(Bytes::from("key_1"))).unwrap(),
+        Bytes::from("val")
+    );
+    assert_eq!(
+        sm.get(&Hash::digest(Bytes::from("key_2"))).unwrap(),
+        Bytes::from("val")
+    );
+
+    sm.remove(&Hash::digest(Bytes::from("key_1"))).unwrap();
+
+    assert_eq!(
+        sm.contains(&Hash::digest(Bytes::from("key_1"))).unwrap(),
+        false
+    );
+    assert_eq!(sm.len().unwrap(), 1usize)
 }
 
 fn new_state(memdb: Arc<MemoryDB>, root: Option<MerkleRoot>) -> GeneralServiceState<MemoryDB> {
