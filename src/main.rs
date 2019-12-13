@@ -21,8 +21,8 @@ use core_consensus::message::{
     END_GOSSIP_RICH_EPOCH_ID, END_GOSSIP_SIGNED_PROPOSAL, END_GOSSIP_SIGNED_VOTE,
     RPC_RESP_SYNC_PULL_EPOCH, RPC_RESP_SYNC_PULL_TXS, RPC_SYNC_PULL_EPOCH, RPC_SYNC_PULL_TXS,
 };
-use core_consensus::trace::init_tracer;
 use core_consensus::status::{CurrentConsensusStatus, StatusPivot};
+use core_consensus::trace::init_tracer;
 use core_consensus::{OverlordConsensus, OverlordConsensusAdapter};
 use core_executor::trie::RocksTrieDB;
 use core_executor::TransactionExecutorFactory;
