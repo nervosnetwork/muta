@@ -11,11 +11,11 @@ use protocol::ProtocolResult;
 
 use crate::store::StoreError;
 
-struct FixedKeys<K: FixedCodec + PartialEq> {
-    inner: Vec<K>,
+pub struct FixedKeys<K: FixedCodec> {
+    pub inner: Vec<K>,
 }
 
-impl<K: FixedCodec + PartialEq> rlp::Encodable for FixedKeys<K> {
+impl<K: FixedCodec> rlp::Encodable for FixedKeys<K> {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
         let inner: Vec<Vec<u8>> = self
             .inner
@@ -27,7 +27,7 @@ impl<K: FixedCodec + PartialEq> rlp::Encodable for FixedKeys<K> {
     }
 }
 
-impl<K: FixedCodec + PartialEq> rlp::Decodable for FixedKeys<K> {
+impl<K: FixedCodec> rlp::Decodable for FixedKeys<K> {
     fn decode(r: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
         let inner_u8: Vec<Vec<u8>> = rlp::decode_list(r.at(0)?.as_raw());
 
@@ -42,7 +42,7 @@ impl<K: FixedCodec + PartialEq> rlp::Decodable for FixedKeys<K> {
     }
 }
 
-impl<K: FixedCodec + PartialEq> FixedCodec for FixedKeys<K> {
+impl<K: FixedCodec> FixedCodec for FixedKeys<K> {
     fn encode_fixed(&self) -> ProtocolResult<Bytes> {
         Ok(Bytes::from(rlp::encode(self)))
     }
@@ -82,7 +82,7 @@ impl<S: ServiceState, K: FixedCodec + PartialEq, V: FixedCodec> DefaultStoreMap<
         }
     }
 
-    fn get_map_key<Key: FixedCodec>(&self, key: &Key) -> ProtocolResult<Hash> {
+    fn get_map_key(&self, key: &K) -> ProtocolResult<Hash> {
         let mut name_bytes = self.var_name.as_bytes().to_vec();
         name_bytes.extend_from_slice(key.encode_fixed()?.as_ref());
 
@@ -125,12 +125,14 @@ impl<S: ServiceState, K: FixedCodec + PartialEq, V: FixedCodec> StoreMap<K, V>
         }
     }
 
+    // TODO(@zhounan): Atomicity of insert(k, v) and insert self.keys to
+    // ServiceState is not guaranteed for now That must be settled soon after.
     fn remove(&mut self, key: &K) -> ProtocolResult<()> {
         if let true = self.contains(key)? {
             self.keys.inner.remove_item(key);
             self.state
                 .borrow_mut()
-                .insert(self.var_name.clone(), self.keys.encode_fixed()?);
+                .insert(self.var_name.clone(), self.keys.encode_fixed()?)?;
 
             self.state
                 .borrow_mut()

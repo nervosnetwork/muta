@@ -205,7 +205,7 @@ pub trait StoreMap<Key: FixedCodec + PartialEq, Value: FixedCodec> {
 
     fn len(&self) -> ProtocolResult<usize>;
 
-    fn for_each<F>(&mut self, mut f: F) -> ProtocolResult<()>
+    fn for_each<F>(&mut self, f: F) -> ProtocolResult<()>
     where
         Self: Sized,
         F: FnMut(&mut Value) -> ProtocolResult<()>;
@@ -220,10 +220,10 @@ pub trait StoreArray<Elm: FixedCodec> {
 
     fn len(&self) -> ProtocolResult<usize>;
 
-    fn for_each<F>(&self, f: F)
+    fn for_each<F>(&mut self, f: F) -> ProtocolResult<()>
     where
         Self: Sized,
-        F: FnMut(Elm) -> ProtocolResult<()>;
+        F: FnMut(&mut Elm) -> ProtocolResult<()>;
 }
 
 pub trait StoreUint64 {
