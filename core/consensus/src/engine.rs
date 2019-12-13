@@ -523,8 +523,8 @@ fn covert_to_overlord_authority(validators: &[Validator]) -> Vec<Node> {
 fn check_vec_roots<T: Eq>(cache_roots: &[T], epoch_roots: &[T]) -> bool {
     if epoch_roots.is_empty() {
         return true;
-    } 
-    
+    }
+
     if cache_roots.is_empty() {
         return true;
     } else if cache_roots.len() < epoch_roots.len() {
