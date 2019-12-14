@@ -41,13 +41,6 @@ impl<S: ServiceState, E: FixedCodec> DefaultStoreArray<S, E> {
             phantom: PhantomData,
         }
     }
-
-    // fn get_array_key<Key: FixedCodec>(&self, key: &Key) -> ProtocolResult<Hash> {
-    //     let mut name_bytes = self.var_name.as_bytes().to_vec();
-    //     name_bytes.extend_from_slice(key.encode_fixed()?.as_ref());
-
-    //     Ok(Hash::digest(Bytes::from(name_bytes)))
-    // }
 }
 
 impl<S: ServiceState, E: FixedCodec> StoreArray<E> for DefaultStoreArray<S, E> {
@@ -88,6 +81,14 @@ impl<S: ServiceState, E: FixedCodec> StoreArray<E> for DefaultStoreArray<S, E> {
 
     fn len(&self) -> ProtocolResult<usize> {
         Ok(self.keys.inner.len())
+    }
+
+    fn is_empty(&self) -> ProtocolResult<bool> {
+        if let 0 = self.len()? {
+            Ok(true)
+        } else {
+            Ok(false)
+        }
     }
 
     fn for_each<F>(&mut self, mut f: F) -> ProtocolResult<()>

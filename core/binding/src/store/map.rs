@@ -4,53 +4,12 @@ use std::rc::Rc;
 
 use bytes::Bytes;
 
-use protocol::fixed_codec::{FixedCodec, FixedCodecError};
+use protocol::fixed_codec::FixedCodec;
 use protocol::traits::{ServiceState, StoreMap};
 use protocol::types::Hash;
 use protocol::ProtocolResult;
 
-use crate::store::StoreError;
-
-pub struct FixedKeys<K: FixedCodec> {
-    pub inner: Vec<K>,
-}
-
-impl<K: FixedCodec> rlp::Encodable for FixedKeys<K> {
-    fn rlp_append(&self, s: &mut rlp::RlpStream) {
-        let inner: Vec<Vec<u8>> = self
-            .inner
-            .iter()
-            .map(|k| k.encode_fixed().expect("encode should not fail").to_vec())
-            .collect();
-
-        s.begin_list(1).append_list::<Vec<u8>, _>(&inner);
-    }
-}
-
-impl<K: FixedCodec> rlp::Decodable for FixedKeys<K> {
-    fn decode(r: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
-        let inner_u8: Vec<Vec<u8>> = rlp::decode_list(r.at(0)?.as_raw());
-
-        let inner_k: Result<Vec<K>, _> = inner_u8
-            .into_iter()
-            .map(|v| <_>::decode_fixed(Bytes::from(v)))
-            .collect();
-
-        let inner = inner_k.map_err(|_| rlp::DecoderError::Custom("decode K from bytes fail"))?;
-
-        Ok(FixedKeys { inner })
-    }
-}
-
-impl<K: FixedCodec> FixedCodec for FixedKeys<K> {
-    fn encode_fixed(&self) -> ProtocolResult<Bytes> {
-        Ok(Bytes::from(rlp::encode(self)))
-    }
-
-    fn decode_fixed(bytes: Bytes) -> ProtocolResult<Self> {
-        Ok(rlp::decode(bytes.as_ref()).map_err(FixedCodecError::from)?)
-    }
-}
+use crate::store::{FixedKeys, StoreError};
 
 pub struct DefaultStoreMap<S: ServiceState, K: FixedCodec + PartialEq, V: FixedCodec> {
     state:    Rc<RefCell<S>>,
@@ -113,16 +72,15 @@ impl<S: ServiceState, K: FixedCodec + PartialEq, V: FixedCodec> StoreMap<K, V>
     // ServiceState is not guaranteed for now That must be settled soon after.
     fn insert(&mut self, key: K, value: V) -> ProtocolResult<()> {
         let mk = self.get_map_key(&key)?;
-        self.state.borrow_mut().insert(mk, value)?;
 
-        if !self.contains(&key)? {
+        if let false = self.contains(&key)? {
             self.keys.inner.push(key);
             self.state
                 .borrow_mut()
-                .insert(self.var_name.clone(), self.keys.encode_fixed()?)
-        } else {
-            Ok(())
+                .insert(self.var_name.clone(), self.keys.encode_fixed()?)?;
         }
+
+        self.state.borrow_mut().insert(mk, value)
     }
 
     // TODO(@zhounan): Atomicity of insert(k, v) and insert self.keys to
@@ -144,6 +102,14 @@ impl<S: ServiceState, K: FixedCodec + PartialEq, V: FixedCodec> StoreMap<K, V>
 
     fn len(&self) -> ProtocolResult<usize> {
         Ok(self.keys.inner.len())
+    }
+
+    fn is_empty(&self) -> ProtocolResult<bool> {
+        if let 0 = self.len()? {
+            Ok(true)
+        } else {
+            Ok(false)
+        }
     }
 
     fn for_each<F>(&mut self, mut f: F) -> ProtocolResult<()>

@@ -205,6 +205,8 @@ pub trait StoreMap<Key: FixedCodec + PartialEq, Value: FixedCodec> {
 
     fn len(&self) -> ProtocolResult<usize>;
 
+    fn is_empty(&self) -> ProtocolResult<bool>;
+
     fn for_each<F>(&mut self, f: F) -> ProtocolResult<()>
     where
         Self: Sized,
@@ -219,6 +221,8 @@ pub trait StoreArray<Elm: FixedCodec> {
     fn remove(&mut self, index: usize) -> ProtocolResult<()>;
 
     fn len(&self) -> ProtocolResult<usize>;
+
+    fn is_empty(&self) -> ProtocolResult<bool>;
 
     fn for_each<F>(&mut self, f: F) -> ProtocolResult<()>
     where
