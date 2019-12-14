@@ -73,7 +73,7 @@ impl<S: ServiceState, K: FixedCodec + PartialEq, V: FixedCodec> StoreMap<K, V>
     fn insert(&mut self, key: K, value: V) -> ProtocolResult<()> {
         let mk = self.get_map_key(&key)?;
 
-        if let false = self.contains(&key)? {
+        if !self.contains(&key)? {
             self.keys.inner.push(key);
             self.state
                 .borrow_mut()
@@ -86,7 +86,7 @@ impl<S: ServiceState, K: FixedCodec + PartialEq, V: FixedCodec> StoreMap<K, V>
     // TODO(@zhounan): Atomicity of insert(k, v) and insert self.keys to
     // ServiceState is not guaranteed for now That must be settled soon after.
     fn remove(&mut self, key: &K) -> ProtocolResult<()> {
-        if let true = self.contains(key)? {
+        if self.contains(key)? {
             self.keys.inner.remove_item(key);
             self.state
                 .borrow_mut()
@@ -112,6 +112,8 @@ impl<S: ServiceState, K: FixedCodec + PartialEq, V: FixedCodec> StoreMap<K, V>
         }
     }
 
+    // TODO(@zhounan): If value was not changed by f, then it should not be inserted
+    // to ServiceState for performance reason
     fn for_each<F>(&mut self, mut f: F) -> ProtocolResult<()>
     where
         Self: Sized,

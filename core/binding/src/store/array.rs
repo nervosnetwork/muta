@@ -91,6 +91,8 @@ impl<S: ServiceState, E: FixedCodec> StoreArray<E> for DefaultStoreArray<S, E> {
         }
     }
 
+    // TODO(@zhounan): If element was not changed by f, then it should not be
+    // inserted to ServiceState for performance reason
     fn for_each<F>(&mut self, mut f: F) -> ProtocolResult<()>
     where
         Self: Sized,
