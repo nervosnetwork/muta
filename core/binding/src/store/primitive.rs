@@ -143,7 +143,7 @@ impl<S: ServiceState> StoreUint64 for DefaultStoreUint64<S> {
     fn div(&mut self, val: u64) -> ProtocolResult<()> {
         let sv = self.get()?;
 
-        if (0 == val) {
+        if let 0 = val {
             Err(StoreError::Overflow.into())
         } else {
             self.set(sv / val)
@@ -155,7 +155,7 @@ impl<S: ServiceState> StoreUint64 for DefaultStoreUint64<S> {
     fn rem(&mut self, val: u64) -> ProtocolResult<()> {
         let sv = self.get()?;
 
-        if (0 == val) {
+        if let 0 = val {
             Err(StoreError::Overflow.into())
         } else {
             self.set(sv % val)
