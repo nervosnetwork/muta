@@ -150,6 +150,11 @@ impl CurrentConsensusStatus {
     fn update_state_root(&mut self, state_root: &MerkleRoot) -> ProtocolResult<()> {
         if self.state_root.is_empty() {
             return Ok(());
+        } else if self.state_root.len() == 1 {
+            if state_root != self.state_root.get(0).unwrap() {
+                return Err(ConsensusError::StatusErr(StatusCacheField::StateRoot).into());
+            }
+            return Ok(());
         }
 
         let mut at = usize::max_value();
@@ -171,30 +176,6 @@ impl CurrentConsensusStatus {
         self.state_root = tmp;
         Ok(())
     }
-
-    // fn update_order_root(&mut self, order_root: &MerkleRoot) ->
-    // ProtocolResult<()> {     if self.order_root.is_empty() {
-    //         return Ok(());
-    //     }
-
-    //     let mut at = usize::max_value();
-    //     for (index, item) in self.order_root.iter().enumerate() {
-    //         if item == order_root {
-    //             at = index;
-    //             break;
-    //         }
-    //     }
-
-    //     if at == usize::max_value() {
-    //         warn!("order root: {:?}", order_root);
-    //         return
-    // Err(ConsensusError::StatusErr(StatusCacheField::OrderedRoot).into());
-    //     }
-
-    //     let tmp = self.order_root.split_off(at + 1);
-    //     self.order_root = tmp;
-    //     Ok(())
-    // }
 
     fn update_receipt_root(&mut self, receipt_root: &[MerkleRoot]) -> ProtocolResult<()> {
         if receipt_root.is_empty() {
