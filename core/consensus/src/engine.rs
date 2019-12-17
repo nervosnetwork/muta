@@ -1,7 +1,7 @@
-use std::cmp::Eq;
+use std::error::Error;
 use std::collections::HashSet;
 use std::time::{SystemTime, UNIX_EPOCH};
-use std::{error::Error, sync::Arc};
+use std::{cmp::Eq, sync::Arc};
 
 use async_trait::async_trait;
 use bincode::serialize;
