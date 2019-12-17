@@ -1,5 +1,5 @@
-use std::error::Error;
 use std::collections::HashSet;
+use std::error::Error;
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::{cmp::Eq, sync::Arc};
 
