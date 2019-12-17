@@ -474,7 +474,7 @@ dependencies = [
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "moodyblues-sdk 0.1.0 (git+https://github.com/homura/moodyblues-client-rust)",
  "num-traits 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "overlord 0.1.0 (git+https://github.com/nervosnetwork/overlord?branch=test)",
+ "overlord 0.1.0 (git+https://github.com/nervosnetwork/overlord?rev=33eb665)",
  "parking_lot 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "protocol 0.1.0",
  "rand 0.7.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1952,7 +1952,7 @@ dependencies = [
 [[package]]
 name = "overlord"
 version = "0.1.0"
-source = "git+https://github.com/nervosnetwork/overlord?branch=test#9150bc65837a2e7eb84a46e807f86d4ac6d8ec8d"
+source = "git+https://github.com/nervosnetwork/overlord?rev=33eb665#33eb665340d5629daa00c9c4184b8ee8fd4b01a8"
 dependencies = [
  "async-trait 0.1.17 (registry+https://github.com/rust-lang/crates.io-index)",
  "bit-vec 0.6.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1963,6 +1963,7 @@ dependencies = [
  "futures-timer 2.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "hex 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "moodyblues-sdk 0.1.0 (git+https://github.com/homura/moodyblues-client-rust)",
  "parking_lot 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand_core 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand_pcg 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -4131,7 +4132,7 @@ dependencies = [
 "checksum ophelia-hasher 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "b08ec8574c7c180763d5d3c26c31525db5981ceb2d4b62c47c4bc32555c776b9"
 "checksum ophelia-secp256k1 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "3d3a734015b125cef5a331105bd428be591d7874a362ed5d2c2252c046677386"
 "checksum ordered-float 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)" = "18869315e81473c951eb56ad5558bbc56978562d3ecfb87abb7a1e944cea4518"
-"checksum overlord 0.1.0 (git+https://github.com/nervosnetwork/overlord?branch=test)" = "<none>"
+"checksum overlord 0.1.0 (git+https://github.com/nervosnetwork/overlord?rev=33eb665)" = "<none>"
 "checksum owning_ref 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)" = "cdf84f41639e037b484f93433aa3897863b561ed65c6e59c7073d7c561710f37"
 "checksum pairing 0.14.2 (registry+https://github.com/rust-lang/crates.io-index)" = "ceda21136251c6d5a422d3d798d8ac22515a6e8d3521bb60c59a8349d36d0d57"
 "checksum parity-multiaddr 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)" = "b574ca9f0c0235c04de4c5110542959f64c9b8882f638b70f6c6be52c75bdc46"
