@@ -9,9 +9,9 @@ pub mod synchronization;
 pub mod trace;
 pub mod util;
 
-pub use self::adapter::OverlordConsensusAdapter;
-pub use self::consensus::OverlordConsensus;
-pub use self::synchronization::Synchronization;
+pub use crate::adapter::OverlordConsensusAdapter;
+pub use crate::consensus::OverlordConsensus;
+pub use crate::synchronization::Synchronization;
 pub use overlord::DurationConfig;
 
 use std::error::Error;

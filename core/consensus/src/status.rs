@@ -9,6 +9,7 @@ use parking_lot::RwLock;
 use protocol::types::{Bloom, Epoch, Hash, MerkleRoot, Proof, Validator};
 use protocol::{ProtocolError, ProtocolResult};
 
+use crate::engine::check_vec_roots;
 use crate::{ConsensusError, StatusCacheField};
 
 #[derive(Debug)]
@@ -123,7 +124,7 @@ impl CurrentConsensusStatus {
         }
 
         let len = cycles.len();
-        if self.cycles_used.len() < len || self.cycles_used[len - 1] != cycles[len - 1] {
+        if self.cycles_used.len() < len || check_vec_roots(&self.cycles_used, cycles) {
             return Err(ConsensusError::StatusErr(StatusCacheField::CyclesUsed).into());
         }
 
@@ -132,13 +133,13 @@ impl CurrentConsensusStatus {
         Ok(())
     }
 
-    fn update_logs_bloom(&mut self, log: &[Bloom]) -> ProtocolResult<()> {
-        if log.is_empty() {
+    fn update_logs_bloom(&mut self, logs: &[Bloom]) -> ProtocolResult<()> {
+        if logs.is_empty() {
             return Ok(());
         }
 
-        let len = log.len();
-        if self.logs_bloom.len() < len || self.logs_bloom[len - 1] != log[len - 1] {
+        let len = logs.len();
+        if self.logs_bloom.len() < len || check_vec_roots(&self.logs_bloom, logs) {
             return Err(ConsensusError::StatusErr(StatusCacheField::LogsBloom).into());
         }
 
@@ -177,14 +178,14 @@ impl CurrentConsensusStatus {
         Ok(())
     }
 
-    fn update_receipt_root(&mut self, receipt_root: &[MerkleRoot]) -> ProtocolResult<()> {
-        if receipt_root.is_empty() {
+    fn update_receipt_root(&mut self, receipt_roots: &[MerkleRoot]) -> ProtocolResult<()> {
+        if receipt_roots.is_empty() {
             return Ok(());
         }
 
-        let len = receipt_root.len();
-        if self.receipt_root.len() < len || self.receipt_root[len - 1] != receipt_root[len - 1] {
-            warn!("receipt root: {:?}", receipt_root);
+        let len = receipt_roots.len();
+        if self.receipt_root.len() < len || check_vec_roots(&self.receipt_root, receipt_roots) {
+            warn!("receipt root: {:?}", receipt_roots);
             return Err(ConsensusError::StatusErr(StatusCacheField::ReceiptRoot).into());
         }
 

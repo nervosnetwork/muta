@@ -520,17 +520,20 @@ fn covert_to_overlord_authority(validators: &[Validator]) -> Vec<Node> {
     authority
 }
 
-fn check_vec_roots<T: Eq>(cache_roots: &[T], epoch_roots: &[T]) -> bool {
+pub fn check_vec_roots<T: Eq>(cache_roots: &[T], epoch_roots: &[T]) -> bool {
     if epoch_roots.is_empty() {
         return true;
     }
 
-    if cache_roots.is_empty() {
-        return true;
-    } else if cache_roots.len() < epoch_roots.len() {
+    // If cache_roots is empty, however, epoch_roots is not empty, is an illegal
+    // situation. If the length of cache_roots is less than epoch_roots', is an
+    // illegal situation.
+    if cache_roots.is_empty() || cache_roots.len() < epoch_roots.len() {
         return false;
     }
 
+    // aabbcddeee
+    // aabbcd
     cache_roots
         .iter()
         .zip(epoch_roots.iter())
