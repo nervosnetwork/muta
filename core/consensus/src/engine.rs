@@ -560,7 +560,7 @@ mod test {
         let roots_5 = vec![3, 4, 5, 6, 8];
 
         assert!(check_vec_roots(&roots_1, &roots_2));
-        assert!(check_vec_roots(&roots_3, &roots_2));
+        assert!(!check_vec_roots(&roots_3, &roots_2));
         assert!(!check_vec_roots(&roots_4, &roots_2));
         assert!(!check_vec_roots(&roots_5, &roots_2));
     }
