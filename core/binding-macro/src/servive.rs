@@ -23,7 +23,7 @@ pub fn gen_service_code(_: TokenStream, item: TokenStream) -> TokenStream {
 
     let service_ident = get_service_ident(&impl_item);
     let items = &impl_item.items;
-    let generics = &impl_item.generics;
+    let (impl_generics, ty_generics, where_clause) = impl_item.generics.split_for_impl();
 
     let mut methods: Vec<ServiceMethod> = vec![];
 
@@ -55,7 +55,7 @@ pub fn gen_service_code(_: TokenStream, item: TokenStream) -> TokenStream {
         split_list_for_metadata(&list_method_meta, false);
 
     TokenStream::from(quote! {
-        impl#generics protocol::traits::Service for #service_ident#generics {
+        impl #impl_generics protocol::traits::Service for #service_ident #ty_generics #where_clause {
             fn hook_before_(&mut self) -> protocol::ProtocolResult<()> {
                 #hook_before_body
             }
@@ -141,19 +141,48 @@ fn find_service_method(method: &ImplItemMethod) -> Option<ServiceMethod> {
 }
 
 fn extract_hooks(items: &[ImplItem]) -> Hooks {
+    let methods: Vec<ImplItemMethod> = items
+        .iter()
+        .filter(|item| {
+            if let ImplItem::Method(_) = item {
+                true
+            } else {
+                false
+            }
+        })
+        .map(|item| {
+            if let ImplItem::Method(method) = item {
+                method.clone()
+            } else {
+                unreachable!()
+            }
+        })
+        .collect();
+
     let mut hooks = Hooks {
         before: None,
         after:  None,
     };
 
-    for item in items {
-        if let ImplItem::Method(method) = item {
-            for attr in &method.attrs {
-                for segment in &attr.path.segments {
-                    if segment.ident == "hook_before" {
-                        hooks.before = Some(method.sig.ident.clone())
-                    } else if segment.ident == "hook_after" {
-                        hooks.after = Some(method.sig.ident.clone())
+    let mut before_count = 0;
+    let mut after_count = 0;
+
+    for method in methods {
+        for attr in &method.attrs {
+            for segment in &attr.path.segments {
+                if segment.ident == "hook_before" {
+                    if before_count == 0 {
+                        hooks.before = Some(method.sig.ident.clone());
+                        before_count = 1;
+                    } else {
+                        panic!("The before hook can only have one")
+                    }
+                } else if segment.ident == "hook_after" {
+                    if after_count == 0 {
+                        hooks.after = Some(method.sig.ident.clone());
+                        after_count = 1;
+                    } else {
+                        panic!("The after hook can only have one")
                     }
                 }
             }
