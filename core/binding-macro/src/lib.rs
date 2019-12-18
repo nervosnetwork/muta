@@ -22,7 +22,7 @@ use crate::servive::gen_service_code;
 ///  2. Is visibility private?
 ///  3. Does function generics constrain `fn f<Context: RequestContext>`?
 ///  4. Parameter signature contains `&self and ctx:Context`?
-///  5. Is the return value `ProtocolResult <JsonValue>`?
+///  5. Is the return value `ProtocolResult <String>`?
 ///
 /// # Example:
 ///
@@ -34,8 +34,8 @@ use crate::servive::gen_service_code;
 ///     fn test_read_fn<Context: RequestContext>(
 ///         &self,
 ///         _ctx: Context,
-///     ) -> ProtocolResult<JsonValue> {
-///         Ok(JsonValue::Null)
+///     ) -> ProtocolResult<String> {
+///         Ok("test read".to_owend())
 ///     }
 /// }
 /// ```
@@ -56,7 +56,7 @@ pub fn read(_: TokenStream, item: TokenStream) -> TokenStream {
 ///  2. Is visibility private?
 ///  3. Does function generics constrain `fn f<Context: RequestContext>`?
 ///  4. Parameter signature contains `&mut self and ctx:Context`?
-///  5. Is the return value `ProtocolResult <JsonValue>`?
+///  5. Is the return value `ProtocolResult <String>`?
 ///
 /// # Example:
 ///
@@ -68,8 +68,8 @@ pub fn read(_: TokenStream, item: TokenStream) -> TokenStream {
 ///     fn test_write_fn<Context: RequestContext>(
 ///         &mut self,
 ///         _ctx: Context,
-///     ) -> ProtocolResult<JsonValue> {
-///         Ok(JsonValue::Null)
+///     ) -> ProtocolResult<String> {
+///         Ok("test write".to_owned())
 ///     }
 /// }
 /// ```
@@ -130,31 +130,31 @@ pub fn hook_before(_: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// ```rust
 /// // Source code
-/// 
+///
 /// // serde::Deserialize and serde::Serialize are required.
 /// #[derive(Serialize, Deserialize)]
 /// struct CreateKittyPayload {
 ///     // fields
 /// }
-/// 
+///
 /// // serde::Deserialize and serde::Serialize are required.
 /// #[derive(Serialize, Deserialize)]
 /// struct GetKittyPayload {
 ///     // fields
 /// }
-/// 
+///
 /// #[service]
 /// impl KittyService {
 ///     #[hook_before]
 ///     fn custom_hook_before(&mut self) -> ProtoResult<()> {
 ///         // Do something
 ///     }
-/// 
+///
 ///     #[hook_after]
 ///     fn custom_hook_after(&mut self) -> ProtoResult<()> {
 ///         // Do something
 ///     }
-/// 
+///
 ///     #[read]
 ///     fn get_kitty<Context: RequestContext>(
 ///         &self,
@@ -163,7 +163,7 @@ pub fn hook_before(_: TokenStream, item: TokenStream) -> TokenStream {
 ///     ) -> ProtoResult<&str> {
 ///         // Do something
 ///     }
-/// 
+///
 ///     #[write]
 ///     fn create_kitty<Context: RequestContext>(
 ///         &mut self,
@@ -173,20 +173,20 @@ pub fn hook_before(_: TokenStream, item: TokenStream) -> TokenStream {
 ///         // Do something
 ///     }
 /// }
-/// 
+///
 /// // Generated code.
 /// impl Service for KittyService {
 ///     fn hook_before_(&mut self) -> ProtocolResult<()> {
 ///         self.custom_hook_before()
 ///     }
-/// 
+///
 ///     fn hook_after(&mut self) -> ProtocolResult<()> {
 ///         self.custom_hook_after()
 ///     }
-/// 
+///
 ///     fn write<Context: RequestContext>(&mut self, ctx: Context) -> ProtocolResult<&str> {
 ///         let method = ctx.get_service_method();
-/// 
+///
 ///         match ctx.get_service_method() {
 ///             "create_kitty" => {
 ///                 let payload: CreateKittyPayload = serde_json::from_str(ctx.get_payload())
@@ -196,10 +196,10 @@ pub fn hook_before(_: TokenStream, item: TokenStream) -> TokenStream {
 ///             _ => Err(core_binding::ServiceError::NotFoundMethod(method.to_owned()).into()),
 ///         }
 ///     }
-/// 
+///
 ///     fn read<Context: RequestContext>(&self, ctx: Context) -> ProtocolResult<&str> {
 ///         let method = ctx.get_service_method();
-/// 
+///
 ///         match ctx.get_service_method() {
 ///             "get_kitty" => {
 ///                 let payload: GetKittyPayload = serde_json::from_str(ctx.get_payload())

@@ -5,7 +5,6 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use bytes::Bytes;
-use json::JsonValue;
 use serde::{Deserialize, Serialize};
 
 use core_binding_macro::{cycles, read, write};
@@ -19,27 +18,24 @@ fn test_read_and_write() {
 
     impl Tests {
         #[read]
-        fn test_read_fn<Context: RequestContext>(
-            &self,
-            _ctx: Context,
-        ) -> ProtocolResult<JsonValue> {
-            Ok(JsonValue::Null)
+        fn test_read_fn<Context: RequestContext>(&self, _ctx: Context) -> ProtocolResult<String> {
+            Ok("read".to_owned())
         }
 
         #[write]
         fn test_write_fn<Context: RequestContext>(
             &mut self,
             _ctx: Context,
-        ) -> ProtocolResult<JsonValue> {
-            Ok(JsonValue::Null)
+        ) -> ProtocolResult<String> {
+            Ok("write".to_owned())
         }
     }
 
     let context = MockRequestContext::new(1000);
 
     let mut t = Tests {};
-    assert_eq!(t.test_read_fn(context.clone()).unwrap(), JsonValue::Null);
-    assert_eq!(t.test_write_fn(context).unwrap(), JsonValue::Null);
+    assert_eq!(t.test_read_fn(context.clone()).unwrap(), "read".to_owned());
+    assert_eq!(t.test_write_fn(context).unwrap(), "write".to_owned());
 }
 
 #[test]

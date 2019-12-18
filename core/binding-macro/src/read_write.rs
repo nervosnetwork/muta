@@ -71,9 +71,11 @@ fn verify_ret_type(ret_type: &ReturnType) {
                 PathArguments::AngleBracketed(arg) => {
                     let generic_args = &arg.args;
                     let generic_type = &generic_args[0];
-                    generic_type_is_jsonvalue(generic_type);
+                    if !generic_type_is_string(generic_type) {
+                        panic!("The return value of read/write method must be String");
+                    }
                 }
-                _ => panic!("The return value of read/write method must be json::JsonValue"),
+                _ => panic!("The return value of read/write method must be String"),
             };
         }
         _ => panic!("The return type of read/write method must be protocol::ProtocolResult"),
@@ -87,10 +89,10 @@ fn path_is_jsonvalue(path: &Path) -> bool {
     }
 
     // JsonValue
-    path.segments.len() == 1 && path.segments[0].ident == "JsonValue"
+    path.segments.len() == 1 && path.segments[0].ident == "String"
 }
 
-fn generic_type_is_jsonvalue(generic_type: &GenericArgument) -> bool {
+fn generic_type_is_string(generic_type: &GenericArgument) -> bool {
     match generic_type {
         GenericArgument::Type(t) => match t {
             Type::Path(type_path) => path_is_jsonvalue(&type_path.path),
