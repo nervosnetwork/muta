@@ -1,4 +1,4 @@
-mod chain_querier;
+pub mod chain_querier;
 
 use std::cell::RefCell;
 use std::rc::Rc;

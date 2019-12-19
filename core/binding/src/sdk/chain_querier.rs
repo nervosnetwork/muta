@@ -7,7 +7,7 @@ use protocol::traits::{ChainQuerier, Storage};
 use protocol::types::{Epoch, Hash, Receipt, SignedTransaction};
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
-struct DefaultChainQuerier<S: Storage> {
+pub struct DefaultChainQuerier<S: Storage> {
     storage: Arc<S>,
 }
 
