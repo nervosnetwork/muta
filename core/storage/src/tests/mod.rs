@@ -9,7 +9,6 @@ macro_rules! exec {
 mod adapter;
 mod storage;
 
-use bytes::Bytes;
 use num_traits::FromPrimitive;
 use rand::random;
 
@@ -17,6 +16,7 @@ use protocol::types::{
     CarryingAsset, Epoch, EpochHeader, Fee, Hash, Proof, RawTransaction, Receipt, ReceiptResult,
     SignedTransaction, TransactionAction, UserAddress,
 };
+use protocol::Bytes;
 
 fn mock_signed_tx(tx_hash: Hash) -> SignedTransaction {
     let nonce = Hash::digest(Bytes::from("XXXX"));

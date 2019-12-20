@@ -1,7 +1,6 @@
-use bytes::Bytes;
 use static_merkle_tree::Tree;
 
-use protocol::types::Hash;
+use protocol::{types::Hash, Bytes};
 
 #[derive(Debug, Clone)]
 pub struct ProofNode {

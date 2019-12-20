@@ -4,7 +4,6 @@ use std::{error::Error, sync::Arc};
 
 use async_trait::async_trait;
 use bincode::serialize;
-use bytes::Bytes;
 use futures::lock::Mutex;
 use overlord::types::{Commit, Node, OverlordMsg, Status};
 use overlord::Consensus as Engine;
@@ -21,7 +20,7 @@ use protocol::types::{
     Address, Epoch, EpochHeader, Hash, MerkleRoot, Pill, Proof, SignedTransaction, UserAddress,
     Validator,
 };
-use protocol::{ProtocolError, ProtocolResult};
+use protocol::{Bytes, BytesMut, ProtocolError, ProtocolResult};
 
 use crate::fixed_types::{FixedEpochID, FixedPill, FixedSignedTxs};
 use crate::message::{
@@ -49,7 +48,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill, FixedSignedTxs>
         &self,
         ctx: Context,
         epoch_id: u64,
-    ) -> Result<(FixedPill, Bytes), Box<dyn Error + Send>> {
+    ) -> Result<(FixedPill, bytes::Bytes), Box<dyn Error + Send>> {
         let current_consensus_status = { self.current_consensus_status.read().clone() };
 
         let (ordered_tx_hashes, propose_hashes) = self
@@ -95,19 +94,20 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill, FixedSignedTxs>
         let mut set = self.exemption_hash.write();
         set.insert(hash.clone());
 
-        Ok((fixed_pill, hash))
+        Ok((fixed_pill, bytes::Bytes::from(hash.as_ref())))
     }
 
     async fn check_epoch(
         &self,
         ctx: Context,
         _epoch_id: u64,
-        hash: Bytes,
+        hash: bytes::Bytes,
         epoch: FixedPill,
     ) -> Result<FixedSignedTxs, Box<dyn Error + Send>> {
         let order_hashes = epoch.get_ordered_hashes();
         let exemption = {
             let set = self.exemption_hash.read();
+            let hash = BytesMut::from(hash.as_ref()).freeze();
             set.contains(&hash)
         };
         // If the epoch is proposed by self, it does not need to check. Get full signed
@@ -145,13 +145,17 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill, FixedSignedTxs>
 
         let pill = commit.content.inner;
 
+        let epoch_hash = BytesMut::from(commit.proof.epoch_hash.as_ref()).freeze();
+        let signature = BytesMut::from(commit.proof.signature.signature.as_ref()).freeze();
+        let bitmap = BytesMut::from(commit.proof.signature.address_bitmap.as_ref()).freeze();
+
         // Sorage save the lastest proof.
         let proof = Proof {
-            epoch_id:   commit.proof.epoch_id,
-            round:      commit.proof.round,
-            epoch_hash: Hash::from_bytes(commit.proof.epoch_hash)?,
-            signature:  commit.proof.signature.signature,
-            bitmap:     commit.proof.signature.address_bitmap,
+            epoch_id: commit.proof.epoch_id,
+            round: commit.proof.round,
+            epoch_hash: Hash::from_bytes(epoch_hash)?,
+            signature,
+            bitmap,
         };
 
         self.adapter.save_proof(ctx.clone(), proof.clone()).await?;
@@ -238,13 +242,14 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill, FixedSignedTxs>
     async fn transmit_to_relayer(
         &self,
         ctx: Context,
-        addr: Bytes,
+        addr: bytes::Bytes,
         msg: OverlordMsg<FixedPill>,
     ) -> Result<(), Box<dyn Error + Send>> {
         let msg = match msg {
             OverlordMsg::SignedVote(sv) => sv.rlp_bytes(),
             _ => unreachable!(),
         };
+        let addr = BytesMut::from(addr.as_ref()).freeze();
 
         self.adapter
             .transmit(
@@ -267,10 +272,14 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill, FixedSignedTxs>
         let validators = self.adapter.get_last_validators(ctx, epoch_id).await?;
         let mut res = validators
             .into_iter()
-            .map(|v| Node {
-                address:        v.address.as_bytes(),
-                propose_weight: v.propose_weight,
-                vote_weight:    v.vote_weight,
+            .map(|v| {
+                let address = bytes::Bytes::from(v.address.as_bytes().as_ref());
+
+                Node {
+                    address,
+                    propose_weight: v.propose_weight,
+                    vote_weight: v.vote_weight,
+                }
             })
             .collect::<Vec<_>>();
 
@@ -418,7 +427,7 @@ fn covert_to_overlord_authority(validators: &[Validator]) -> Vec<Node> {
     let mut authority = validators
         .iter()
         .map(|v| Node {
-            address:        v.address.as_bytes(),
+            address:        bytes::Bytes::from(v.address.as_bytes().as_ref()),
             propose_weight: v.propose_weight,
             vote_weight:    v.vote_weight,
         })

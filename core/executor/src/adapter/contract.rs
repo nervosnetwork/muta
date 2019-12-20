@@ -3,13 +3,13 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::rc::Rc;
 
-use bytes::Bytes;
 use derive_more::{Display, From};
 
 use protocol::fixed_codec::ProtocolFixedCodec;
 use protocol::traits::executor::contract::ContractStateAdapter;
 use protocol::traits::executor::{ContractSchema, TrieDB};
 use protocol::types::MerkleRoot;
+use protocol::Bytes;
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
 use crate::trie::MPTTrie;

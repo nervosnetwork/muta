@@ -1,7 +1,6 @@
-use bytes::Bytes;
-
 use protocol::traits::executor::ContractSchema;
 use protocol::types::{Account, Address, Asset, AssetID};
+use protocol::Bytes;
 
 #[allow(dead_code)]
 pub struct FixedBytesSchema;

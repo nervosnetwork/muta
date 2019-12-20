@@ -2,9 +2,9 @@ use async_trait::async_trait;
 use protocol::{
     traits::{Cloneable, Context, Priority},
     types::UserAddress,
+    Bytes,
 };
 use tentacle::{
-    bytes::Bytes,
     multiaddr::Multiaddr,
     secio::PeerId,
     service::TargetSession,

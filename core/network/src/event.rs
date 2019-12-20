@@ -2,9 +2,8 @@ use std::error::Error;
 
 use derive_more::{Display, From};
 use futures::channel::oneshot::Sender;
-use protocol::{traits::Priority, types::UserAddress};
+use protocol::{traits::Priority, types::UserAddress, Bytes};
 use tentacle::{
-    bytes::Bytes,
     multiaddr::Multiaddr,
     secio::{PeerId, PublicKey},
     service::{DialProtocol, SessionType, TargetSession},

@@ -3,12 +3,12 @@ use std::path::Path;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use bytes::Bytes;
 use derive_more::{Display, From};
 use rocksdb::{ColumnFamily, Options, WriteBatch, DB};
 
 use protocol::codec::ProtocolCodec;
 use protocol::traits::{StorageAdapter, StorageBatchModify, StorageCategory, StorageSchema};
+use protocol::Bytes;
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
 #[derive(Debug)]

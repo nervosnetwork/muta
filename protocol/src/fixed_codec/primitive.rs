@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
 
 use crate::fixed_codec::{FixedCodecError, ProtocolFixedCodec};
 use crate::types::{
@@ -39,7 +39,7 @@ impl rlp::Encodable for Hash {
 
 impl rlp::Decodable for Hash {
     fn decode(r: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
-        let hash = Hash::from_bytes(Bytes::from(r.at(0)?.data()?))
+        let hash = Hash::from_bytes(BytesMut::from(r.at(0)?.data()?).freeze())
             .map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
         Ok(hash)
     }
@@ -117,7 +117,7 @@ impl rlp::Encodable for Address {
 
 impl rlp::Decodable for Address {
     fn decode(r: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
-        let address = Address::from_bytes(Bytes::from(r.at(0)?.data()?))
+        let address = Address::from_bytes(BytesMut::from(r.at(0)?.data()?).freeze())
             .map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
 
         Ok(address)
@@ -132,7 +132,7 @@ impl rlp::Encodable for UserAddress {
 
 impl rlp::Decodable for UserAddress {
     fn decode(r: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
-        let address = UserAddress::from_bytes(Bytes::from(r.at(0)?.data()?))
+        let address = UserAddress::from_bytes(BytesMut::from(r.at(0)?.data()?).freeze())
             .map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
 
         Ok(address)
@@ -147,7 +147,7 @@ impl rlp::Encodable for ContractAddress {
 
 impl rlp::Decodable for ContractAddress {
     fn decode(r: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
-        let address = ContractAddress::from_bytes(Bytes::from(r.at(0)?.data()?))
+        let address = ContractAddress::from_bytes(BytesMut::from(r.at(0)?.data()?).freeze())
             .map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
 
         Ok(address)

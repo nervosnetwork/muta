@@ -2,7 +2,7 @@
 use std::collections::BTreeMap;
 use std::fmt;
 
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
 use hasher::{Hasher, HasherKeccak};
 use lazy_static::lazy_static;
 use num_bigint::BigUint;
@@ -67,7 +67,7 @@ impl Hash {
     }
 
     pub fn as_bytes(&self) -> Bytes {
-        Bytes::from(self.0.as_ref())
+        BytesMut::from(self.0.as_ref()).freeze()
     }
 
     pub fn as_hex(&self) -> String {
@@ -185,7 +185,7 @@ impl InnerAddress {
     }
 
     pub fn as_bytes(&self) -> Bytes {
-        Bytes::from(self.0.as_ref())
+        BytesMut::from(self.0.as_ref()).freeze()
     }
 
     pub fn as_hex(&self) -> String {

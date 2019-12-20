@@ -1,4 +1,4 @@
-use bytes::Bytes;
+use bytes::BytesMut;
 
 use crate::fixed_codec::{FixedCodecError, ProtocolFixedCodec};
 use crate::types::primitive::{Balance, ContractType, Fee};
@@ -136,7 +136,7 @@ impl rlp::Decodable for ReceiptResult {
                 let contract = rlp::decode(r.at(1)?.as_raw())?;
                 let bloom = rlp::decode(r.at(2)?.as_raw())?;
                 let logs_bloom = Box::new(bloom);
-                let return_value = Bytes::from(r.at(3)?.data()?);
+                let return_value = BytesMut::from(r.at(3)?.data()?).freeze();
 
                 Ok(ReceiptResult::Call {
                     contract,

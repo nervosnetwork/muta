@@ -15,7 +15,6 @@ lazy_static = "1.4"
 parking_lot = "0.9"
 async-trait = "0.1"
 rocksdb = "0.12"
-bytes = "0.4"
 
 [dev-dependencies]
 num-traits = "0.2"

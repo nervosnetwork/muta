@@ -2,12 +2,12 @@ use std::cell::RefCell;
 use std::error::Error;
 use std::rc::Rc;
 
-use bytes::Bytes;
 use derive_more::{Display, From};
 
 use protocol::traits::executor::contract::{BankContract, ContractStateAdapter};
 use protocol::traits::executor::RcInvokeContext;
 use protocol::types::{Asset, AssetID, Balance, ContractAddress, ContractType, Hash};
+use protocol::Bytes;
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
 use crate::cycles::{consume_cycles, CyclesAction};

@@ -1,8 +1,8 @@
 use futures::channel::mpsc::UnboundedSender;
 use log::error;
+use protocol::BytesMut;
 use tentacle::{
     builder::MetaBuilder,
-    bytes::Bytes,
     context::{ProtocolContext, ProtocolContextMutRef},
     service::{ProtocolHandle, ProtocolMeta},
     traits::ServiceProtocol,
@@ -38,7 +38,8 @@ impl ServiceProtocol for Transmitter {
         // Nothing to init
     }
 
-    fn received(&mut self, ctx: ProtocolContextMutRef, data: Bytes) {
+    fn received(&mut self, ctx: ProtocolContextMutRef, data: tentacle::bytes::Bytes) {
+        let data = BytesMut::from(data.as_ref()).freeze();
         let raw_msg = RawSessionMessage::new(ctx.session.id, data);
 
         if self.msg_deliver.unbounded_send(raw_msg).is_err() {
