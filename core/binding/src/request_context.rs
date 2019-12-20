@@ -44,7 +44,7 @@ impl DefaultRequestContext {
         }
     }
 
-    pub fn derive_context(
+    pub fn with_context(
         context: &DefaultRequestContext,
         service_name: String,
         service_method: String,
