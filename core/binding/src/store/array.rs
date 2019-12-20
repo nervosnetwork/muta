@@ -48,7 +48,7 @@ impl<S: ServiceState, E: FixedCodec> StoreArray<E> for DefaultStoreArray<S, E> {
         if let Some(k) = self.keys.inner.get(index) {
             self.state.borrow().get(k)?.map_or_else(
                 || <_>::decode_fixed(Bytes::new()).map_err(|_| StoreError::DecodeError.into()),
-                |e| Ok(e),
+                Ok,
             )
         } else {
             Err(StoreError::OutRange.into())
@@ -105,7 +105,7 @@ impl<S: ServiceState, E: FixedCodec> StoreArray<E> for DefaultStoreArray<S, E> {
                 .get(key)?
                 .map_or_else::<ProtocolResult<E>, _, _>(
                     || <_>::decode_fixed(Bytes::new()).map_err(|_| StoreError::DecodeError.into()),
-                    |e| Ok(e),
+                    Ok,
                 )?;
 
             f(&mut elm)?;

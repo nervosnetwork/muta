@@ -56,7 +56,7 @@ fn test_state_account() {
     assert_eq!(val, value);
 }
 
-fn new_state(memdb: Arc<MemoryDB>, root: Option<MerkleRoot>) -> GeneralServiceState<MemoryDB> {
+pub fn new_state(memdb: Arc<MemoryDB>, root: Option<MerkleRoot>) -> GeneralServiceState<MemoryDB> {
     let trie = match root {
         Some(root) => MPTTrie::from(root, memdb).unwrap(),
         None => MPTTrie::new(memdb),
