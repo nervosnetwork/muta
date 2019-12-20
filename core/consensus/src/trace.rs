@@ -19,12 +19,12 @@ impl MetricTracer {
 }
 
 fn err() -> ProtocolError {
-    ConsensusError::Other("failed to parse point ".to_string()).into()
+    ConsensusError::Other("tracing: failed when parse point".to_string()).into()
 }
 
 fn to_trace_str(point: TracePoint) -> ProtocolResult<String> {
     let mut json = to_value(point).map_err(|_| err())?;
-    let map = json.as_object_mut().ok_or(err())?;
+    let map = json.as_object_mut().ok_or_else(err)?;
     // metrics logger always takes a `name` to distinguish different metric log
     map.insert("name".to_string(), json!("moodyblues"));
     to_string(&map).map_err(|_| err())
