@@ -304,6 +304,6 @@ pub fn mock_request_context() -> DefaultRequestContext {
         1,
         "service_name".to_owned(),
         "service_method".to_owned(),
-        "service_playload".to_owned(),
+        "service_payload".to_owned(),
     )
 }
