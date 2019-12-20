@@ -4,9 +4,9 @@ use async_trait::async_trait;
 use futures::future::TryFutureExt;
 use protocol::{
     traits::{Context, MessageCodec, Priority, Rpc},
-    ProtocolResult,
+    Bytes, ProtocolResult,
 };
-use tentacle::{bytes::Bytes, service::TargetSession, SessionId};
+use tentacle::{service::TargetSession, SessionId};
 
 use crate::{
     endpoint::Endpoint,

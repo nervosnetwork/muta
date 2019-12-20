@@ -1,6 +1,6 @@
 use std::io;
 
-use tentacle::bytes::Bytes;
+use protocol::Bytes;
 
 use crate::{error::NetworkError, traits::Compression};
 

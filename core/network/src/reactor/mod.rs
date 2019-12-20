@@ -15,9 +15,8 @@ use futures::{channel::mpsc::UnboundedReceiver, future::TryFutureExt, pin_mut, s
 use log::warn;
 use protocol::{
     traits::{Context, MessageCodec, MessageHandler},
-    ProtocolError, ProtocolResult,
+    Bytes, ProtocolError, ProtocolResult,
 };
-use tentacle::bytes::Bytes;
 
 use crate::{
     endpoint::{Endpoint, EndpointScheme, RpcEndpoint},

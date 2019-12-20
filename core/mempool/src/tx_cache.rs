@@ -353,7 +353,6 @@ mod tests {
     use std::sync::Arc;
     use std::thread;
 
-    use bytes::Bytes;
     use num_traits::FromPrimitive;
     use rand::random;
     use rayon::iter::IntoParallelRefIterator;
@@ -363,6 +362,7 @@ mod tests {
     use protocol::types::{
         CarryingAsset, Fee, Hash, RawTransaction, SignedTransaction, TransactionAction, UserAddress,
     };
+    use protocol::Bytes;
 
     use crate::map::Map;
     use crate::tx_cache::{TxCache, TxWrapper};

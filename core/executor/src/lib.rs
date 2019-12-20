@@ -14,7 +14,6 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::u64;
 
-use bytes::Bytes;
 use derive_more::{Display, From};
 
 use protocol::traits::executor::contract::{AccountContract, BankContract, ContractStateAdapter};
@@ -25,6 +24,7 @@ use protocol::types::{
     Address, AssetID, Balance, Bloom, ContractAddress, ContractType, Fee, Genesis, Hash,
     MerkleRoot, Receipt, ReceiptResult, SignedTransaction, TransactionAction, UserAddress,
 };
+use protocol::Bytes;
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
 use crate::adapter::{GeneralContractStateAdapter, RcGeneralContractStateAdapter};

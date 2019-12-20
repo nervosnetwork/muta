@@ -3,7 +3,8 @@ pub mod serde_multi;
 
 use derive_more::Constructor;
 use prost::Message;
-use tentacle::{bytes::Bytes, SessionId};
+use protocol::Bytes;
+use tentacle::SessionId;
 
 use crate::{
     endpoint::Endpoint,
@@ -55,7 +56,7 @@ pub struct SessionMessage {
 
 #[cfg(test)]
 mod tests {
-    use protocol::types::Hash;
+    use protocol::{types::Hash, Bytes};
     use quickcheck_macros::quickcheck;
     use serde_derive::{Deserialize, Serialize};
 
@@ -73,8 +74,8 @@ mod tests {
 
     impl quickcheck::Arbitrary for QHash {
         fn arbitrary<G: quickcheck::Gen>(g: &mut G) -> QHash {
-            let msg = String::arbitrary(g);
-            let hash_val = Hash::digest(msg.as_bytes().into());
+            let msg = Bytes::from(String::arbitrary(g));
+            let hash_val = Hash::digest(msg);
 
             QHash { hash: hash_val }
         }

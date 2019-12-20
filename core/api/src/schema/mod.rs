@@ -99,8 +99,8 @@ impl From<protocol::types::Fee> for Fee {
     }
 }
 
-impl From<bytes::Bytes> for Bytes {
-    fn from(bytes: bytes::Bytes) -> Self {
+impl From<protocol::Bytes> for Bytes {
+    fn from(bytes: protocol::Bytes) -> Self {
         Bytes(hex::encode(bytes))
     }
 }

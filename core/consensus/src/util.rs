@@ -1,6 +1,5 @@
 use std::error::Error;
 
-use bytes::Bytes;
 use overlord::{types::AggregatedSignature, Crypto};
 
 use common_crypto::{
@@ -9,7 +8,7 @@ use common_crypto::{
 };
 
 use protocol::types::{Hash, UserAddress};
-use protocol::ProtocolError;
+use protocol::{BytesMut, ProtocolError};
 
 use crate::ConsensusError;
 
@@ -20,41 +19,46 @@ pub struct OverlordCrypto {
 }
 
 impl Crypto for OverlordCrypto {
-    fn hash(&self, msg: Bytes) -> Bytes {
-        Hash::digest(msg).as_bytes()
+    fn hash(&self, msg: bytes::Bytes) -> bytes::Bytes {
+        let msg = BytesMut::from(msg.as_ref()).freeze();
+        bytes::Bytes::from(Hash::digest(msg).as_bytes().as_ref())
     }
 
-    fn sign(&self, hash: Bytes) -> Result<Bytes, Box<dyn Error + Send>> {
+    fn sign(&self, hash: bytes::Bytes) -> Result<bytes::Bytes, Box<dyn Error + Send>> {
+        let hash = BytesMut::from(hash.as_ref()).freeze();
         let signature = Secp256k1::sign_message(&hash, &self.private_key.to_bytes())
             .map_err(|e| ProtocolError::from(ConsensusError::CryptoErr(Box::new(e))))?
             .to_bytes();
 
-        let mut res = self.public_key.to_bytes();
-        res.extend_from_slice(&signature);
+        let mut res = bytes::Bytes::from(self.public_key.to_bytes().as_ref());
+        res.extend_from_slice(&signature.as_ref());
         Ok(res)
     }
 
     fn verify_signature(
         &self,
-        mut signature: Bytes,
-        hash: Bytes,
-    ) -> Result<Bytes, Box<dyn Error + Send>> {
+        mut signature: bytes::Bytes,
+        hash: bytes::Bytes,
+    ) -> Result<bytes::Bytes, Box<dyn Error + Send>> {
         let tmp = signature.split_off(33);
         let pub_key = signature;
         let signature = tmp;
 
+        let hash = BytesMut::from(hash.as_ref()).freeze();
+        let pub_key = BytesMut::from(pub_key.as_ref()).freeze();
+
         Secp256k1::verify_signature(&hash, &signature, &pub_key)
             .map_err(|e| ProtocolError::from(ConsensusError::CryptoErr(Box::new(e))))?;
         let address = UserAddress::from_pubkey_bytes(pub_key)?;
-        Ok(address.as_bytes())
+        Ok(bytes::Bytes::from(address.as_bytes().as_ref()))
     }
 
     fn aggregate_signatures(
         &self,
-        _signatures: Vec<Bytes>,
-        _voters: Vec<Bytes>,
-    ) -> Result<Bytes, Box<dyn Error + Send>> {
-        Ok(Bytes::new())
+        _signatures: Vec<bytes::Bytes>,
+        _voters: Vec<bytes::Bytes>,
+    ) -> Result<bytes::Bytes, Box<dyn Error + Send>> {
+        Ok(bytes::Bytes::new())
     }
 
     fn verify_aggregated_signature(

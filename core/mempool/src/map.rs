@@ -139,13 +139,12 @@ mod tests {
     use std::collections::HashMap;
     use std::sync::{Arc, RwLock};
 
-    use bytes::Bytes;
     use chashmap::CHashMap;
     use rand::random;
     use rayon::prelude::*;
     use test::Bencher;
 
-    use protocol::types::Hash;
+    use protocol::{types::Hash, Bytes};
 
     use crate::map::Map;
 

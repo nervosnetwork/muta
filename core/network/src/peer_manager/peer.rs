@@ -7,10 +7,9 @@ use std::{
 };
 
 use derive_more::Display;
-use protocol::types::UserAddress;
+use protocol::{types::UserAddress, Bytes};
 use serde_derive::{Deserialize, Serialize};
 use tentacle::{
-    bytes::Bytes,
     multiaddr::Multiaddr,
     secio::{PeerId, PublicKey},
 };

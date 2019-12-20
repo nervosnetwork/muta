@@ -9,7 +9,6 @@ use std::error::Error;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use bytes::Bytes;
 use derive_more::{Display, From};
 use lazy_static::lazy_static;
 
@@ -18,6 +17,7 @@ use protocol::traits::{
     Storage, StorageAdapter, StorageBatchModify, StorageCategory, StorageSchema,
 };
 use protocol::types::{Epoch, EpochId, Hash, Proof, Receipt, SignedTransaction};
+use protocol::Bytes;
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
 lazy_static! {

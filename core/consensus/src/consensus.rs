@@ -9,7 +9,7 @@ use overlord::types::{AggregatedVote, Node, OverlordMsg, SignedProposal, SignedV
 use overlord::{DurationConfig, Overlord, OverlordHandler};
 use parking_lot::RwLock;
 
-use common_crypto::{PrivateKey, Secp256k1PrivateKey};
+use common_crypto::{Secp256k1PrivateKey, ToPublicKey};
 
 use protocol::traits::{Consensus, ConsensusAdapter, CurrentConsensusStatus, NodeInfo};
 use protocol::types::{Address, Hash, Proof, Validator};
@@ -204,7 +204,7 @@ impl<Adapter: ConsensusAdapter + 'static> OverlordConsensus<Adapter> {
 
         let crypto = OverlordCrypto::new(priv_key.pub_key(), priv_key);
         let overlord = Overlord::new(
-            node_info.self_address.as_bytes(),
+            bytes::Bytes::from(node_info.self_address.as_bytes().as_ref()),
             Arc::clone(&engine),
             crypto,
         );
@@ -251,7 +251,7 @@ fn gen_overlord_status(epoch_id: u64, interval: u64, validators: Vec<Validator>)
     let mut authority_list = validators
         .into_iter()
         .map(|v| Node {
-            address:        v.address.as_bytes(),
+            address:        bytes::Bytes::from(v.address.as_bytes().as_ref()),
             propose_weight: v.propose_weight,
             vote_weight:    v.vote_weight,
         })

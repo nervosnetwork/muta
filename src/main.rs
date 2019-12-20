@@ -7,9 +7,7 @@ use std::fs::File;
 use std::path::Path;
 use std::sync::Arc;
 
-use bytes::Bytes;
-
-use common_crypto::{PrivateKey, PublicKey, Secp256k1, Secp256k1PrivateKey};
+use common_crypto::{PublicKey, Secp256k1, Secp256k1PrivateKey, ToPublicKey};
 use core_api::adapter::DefaultAPIAdapter;
 use core_api::config::GraphQLConfig;
 use core_consensus::adapter::OverlordConsensusAdapter;
@@ -32,7 +30,7 @@ use protocol::traits::{CurrentConsensusStatus, NodeInfo, Storage};
 use protocol::types::{
     Address, Bloom, Epoch, EpochHeader, Genesis, Hash, MerkleRoot, Proof, UserAddress, Validator,
 };
-use protocol::{fixed_codec::ProtocolFixedCodec, ProtocolResult};
+use protocol::{fixed_codec::ProtocolFixedCodec, Bytes, ProtocolResult};
 
 use crate::config::Config;
 
