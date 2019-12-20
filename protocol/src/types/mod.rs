@@ -16,7 +16,7 @@ pub use genesis::{Genesis, GenesisStateAlloc, GenesisStateAsset};
 pub use primitive::{
     Account, Address, Balance, Fee, Hash, JsonString, MerkleRoot, GENESIS_EPOCH_ID,
 };
-pub use receipt::{Receipt, ReceiptResponse, Event};
+pub use receipt::{Event, Receipt, ReceiptResponse};
 pub use transaction::{RawTransaction, SignedTransaction, TransactionRequest};
 
 #[derive(Debug, Display, From)]

@@ -13,6 +13,7 @@ use protocol::types::{
 };
 use protocol::ProtocolResult;
 
+use crate::request_context::DefaultRequestContext;
 use crate::sdk::chain_querier::DefaultChainQuerier;
 use crate::sdk::DefalutServiceSDK;
 use crate::store::StoreError;
@@ -26,8 +27,9 @@ fn test_service_sdk() {
 
     let arcs = Arc::new(MockStorage {});
     let cq = DefaultChainQuerier::new(Arc::clone(&arcs));
+    let ctx = mock_request_context();
 
-    let mut sdk = DefalutServiceSDK::new(Rc::clone(&rs), Rc::new(cq));
+    let mut sdk = DefalutServiceSDK::new(Rc::clone(&rs), Rc::new(cq), ctx);
 
     // test sdk store bool
     let mut sdk_bool = sdk.alloc_or_recover_bool("test_bool").unwrap();
@@ -97,6 +99,10 @@ fn test_service_sdk() {
 
     let epoch_data = sdk.get_epoch_by_epoch_id(Some(1)).unwrap().unwrap();
     assert_eq!(mock_epoch(1), epoch_data);
+
+    // test get request context
+    let ctx_data = sdk.get_request_context().unwrap();
+    assert_eq!(mock_request_context(), ctx_data);
 }
 
 struct MockStorage;
@@ -283,4 +289,21 @@ pub fn mock_epoch(order_size: usize) -> Epoch {
         header:            mock_epoch_header(),
         ordered_tx_hashes: (0..order_size).map(|_| mock_hash()).collect(),
     }
+}
+
+// #####################
+// Mock RequestContext
+// #####################
+
+pub fn mock_request_context() -> DefaultRequestContext {
+    DefaultRequestContext::new(
+        100,
+        8,
+        10,
+        mock_address(),
+        1,
+        "service_name".to_owned(),
+        "service_method".to_owned(),
+        "service_playload".to_owned(),
+    )
 }

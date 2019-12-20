@@ -54,23 +54,27 @@ pub trait ChainQuerier {
 }
 
 pub trait RequestContext: Clone {
-    fn sub_cycles(&self, cycels: u64) -> ProtocolResult<()>;
+    fn sub_cycles(&mut self, cycles: u64) -> ProtocolResult<()>;
 
-    fn get_cycles_price(&self) -> ProtocolResult<u64>;
+    fn get_cycles_price(&self) -> u64;
 
-    fn get_cycles_limit(&self) -> ProtocolResult<u64>;
+    fn get_cycles_limit(&self) -> u64;
 
-    fn get_cycles_used(&self) -> ProtocolResult<u64>;
+    fn get_cycles_used(&self) -> u64;
 
-    fn get_caller(&self) -> ProtocolResult<Address>;
+    fn get_caller(&self) -> Address;
 
-    fn get_current_epoch_id(&self) -> ProtocolResult<u64>;
+    fn get_current_epoch_id(&self) -> u64;
 
-    fn get_service_name(&self) -> ProtocolResult<&str>;
+    fn get_service_name(&self) -> &str;
 
-    fn get_service_method(&self) -> ProtocolResult<&str>;
+    fn get_service_method(&self) -> &str;
 
-    fn get_payload(&self) -> ProtocolResult<&str>;
+    fn get_playload(&self) -> &str;
+
+    // Trigger an `event`, which can be any string
+    // NOTE: The string is recommended as json string
+    fn emit_event(&mut self, message: String) -> ProtocolResult<()>;
 }
 
 // Admission control will be called before entering service
@@ -122,6 +126,8 @@ pub trait Service {
 // - ChainDB
 // - ServiceState
 pub trait ServiceSDK {
+    type ContextItem: RequestContext;
+
     // Alloc or recover a `Map` by` var_name`
     fn alloc_or_recover_map<Key: 'static + FixedCodec + PartialEq, Val: 'static + FixedCodec>(
         &mut self,
@@ -182,24 +188,21 @@ pub trait ServiceSDK {
     // if not found on the chain, return None
     fn get_receipt_by_hash(&self, tx_hash: &Hash) -> ProtocolResult<Option<Receipt>>;
 
-    // // Trigger an `event`, which can be any string
-    // // NOTE: The string is recommended as json string
-    // fn emit_event(&mut self, message: json::JsonValue) -> ProtocolResult<()>;
+    fn get_request_context(&self) -> ProtocolResult<Self::ContextItem>;
 
-    // // Call other read-only methods of `service` and return the results
-    // // synchronously NOTE: You can use recursive calls, but the maximum call
-    // // stack is 1024
-    // fn read(&self, servide: &str, method: &str, payload: &str) ->
-    // ProtocolResult<json::JsonValue>;
+    // Call other read-only methods of `service` and return the results
+    // synchronously NOTE: You can use recursive calls, but the maximum call
+    // stack is 1024
+    fn read(&self, service: &str, method: &str, playload: &str) -> ProtocolResult<json::JsonValue>;
 
-    // // Call other writable methods of `service` and return the results
-    // synchronously // NOTE: You can use recursive calls, but the maximum call
-    // stack is 1024 fn write(
-    //     &mut self,
-    //     servide: &str,
-    //     method: &str,
-    //     payload: &str,
-    // ) -> ProtocolResult<json::JsonValue>;
+    // Call other writable methods of `service` and return the results synchronously
+    // NOTE: You can use recursive calls, but the maximum call stack is 1024
+    fn write(
+        &mut self,
+        service: &str,
+        method: &str,
+        playload: &str,
+    ) -> ProtocolResult<json::JsonValue>;
 }
 
 pub trait StoreMap<Key: FixedCodec + PartialEq, Value: FixedCodec> {

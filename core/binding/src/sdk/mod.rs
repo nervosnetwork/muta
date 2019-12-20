@@ -5,8 +5,8 @@ use std::rc::Rc;
 
 use protocol::fixed_codec::FixedCodec;
 use protocol::traits::{
-    ChainQuerier, ServiceSDK, ServiceState, StoreArray, StoreBool, StoreMap, StoreString,
-    StoreUint64,
+    ChainQuerier, RequestContext, ServiceSDK, ServiceState, StoreArray, StoreBool, StoreMap,
+    StoreString, StoreUint64,
 };
 use protocol::types::{Address, Epoch, Hash, Receipt, SignedTransaction};
 use protocol::ProtocolResult;
@@ -15,23 +15,27 @@ use crate::store::{
     DefaultStoreArray, DefaultStoreBool, DefaultStoreMap, DefaultStoreString, DefaultStoreUint64,
 };
 
-pub struct DefalutServiceSDK<S: ServiceState, C: ChainQuerier> {
-    state:         Rc<RefCell<S>>,
-    chain_querier: Rc<C>,
-    events:        Vec<String>,
+pub struct DefalutServiceSDK<S: ServiceState, C: ChainQuerier, R: RequestContext> {
+    state:           Rc<RefCell<S>>,
+    chain_querier:   Rc<C>,
+    request_context: R,
 }
 
-impl<S: ServiceState, C: ChainQuerier> DefalutServiceSDK<S, C> {
-    pub fn new(state: Rc<RefCell<S>>, chain_querier: Rc<C>) -> Self {
+impl<S: ServiceState, C: ChainQuerier, R: RequestContext> DefalutServiceSDK<S, C, R> {
+    pub fn new(state: Rc<RefCell<S>>, chain_querier: Rc<C>, request_context: R) -> Self {
         Self {
             state,
             chain_querier,
-            events: Vec::new(),
+            request_context,
         }
     }
 }
 
-impl<S: 'static + ServiceState, C: ChainQuerier> ServiceSDK for DefalutServiceSDK<S, C> {
+impl<S: 'static + ServiceState, C: ChainQuerier, R: RequestContext> ServiceSDK
+    for DefalutServiceSDK<S, C, R>
+{
+    type ContextItem = R;
+
     // Alloc or recover a `Map` by` var_name`
     fn alloc_or_recover_map<K: 'static + FixedCodec + PartialEq, V: 'static + FixedCodec>(
         &mut self,
@@ -133,22 +137,25 @@ impl<S: 'static + ServiceState, C: ChainQuerier> ServiceSDK for DefalutServiceSD
         self.chain_querier.get_receipt_by_hash(tx_hash)
     }
 
-    // // Trigger an `event`, which can be any string
-    // // NOTE: The string is recommended as json string
-    // fn emit_event(&mut self, message: json::JsonValue) -> ProtocolResult<()>;
+    fn get_request_context(&self) -> ProtocolResult<Self::ContextItem> {
+        Ok(self.request_context.clone())
+    }
 
-    // // Call other read-only methods of `service` and return the results
-    // // synchronously NOTE: You can use recursive calls, but the maximum call
-    // // stack is 1024
-    // fn read(&self, servide: &str, method: &str, payload: &str) ->
-    // ProtocolResult<json::JsonValue>;
+    // Call other read-only methods of `service` and return the results
+    // synchronously NOTE: You can use recursive calls, but the maximum call
+    // stack is 1024
+    fn read(&self, service: &str, method: &str, playload: &str) -> ProtocolResult<json::JsonValue> {
+        unimplemented!();
+    }
 
-    // // Call other writable methods of `service` and return the results
-    // synchronously // NOTE: You can use recursive calls, but the maximum call
-    // stack is 1024 fn write(
-    //     &mut self,
-    //     servide: &str,
-    //     method: &str,
-    //     payload: &str,
-    // ) -> ProtocolResult<json::JsonValue>;
+    // Call other writable methods of `service` and return the results synchronously
+    // NOTE: You can use recursive calls, but the maximum call stack is 1024
+    fn write(
+        &mut self,
+        service: &str,
+        method: &str,
+        playload: &str,
+    ) -> ProtocolResult<json::JsonValue> {
+        unimplemented!();
+    }
 }
