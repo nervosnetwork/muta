@@ -57,7 +57,7 @@ impl<S: ServiceState, K: FixedCodec + PartialEq, V: FixedCodec> StoreMap<K, V>
             let mk = self.get_map_key(key)?;
             self.state.borrow().get(&mk)?.map_or_else(
                 || <_>::decode_fixed(Bytes::new()).map_err(|_| StoreError::DecodeError.into()),
-                |v| Ok(v),
+                Ok,
             )
         } else {
             Err(StoreError::GetNone.into())

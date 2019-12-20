@@ -5,18 +5,18 @@ use std::sync::Arc;
 use bytes::Bytes;
 use cita_trie::MemoryDB;
 
-use protocol::traits::{ServiceState, StoreArray, StoreBool, StoreMap, StoreString, StoreUint64};
-use protocol::types::{Hash, MerkleRoot};
+use protocol::traits::{StoreArray, StoreBool, StoreMap, StoreString, StoreUint64};
+use protocol::types::Hash;
 
-use crate::state::{GeneralServiceState, MPTTrie};
 use crate::store::{
     DefaultStoreArray, DefaultStoreBool, DefaultStoreMap, DefaultStoreString, DefaultStoreUint64,
 };
+use crate::tests::state::new_state;
 
 #[test]
 fn test_default_store_bool() {
     let memdb = Arc::new(MemoryDB::new(false));
-    let mut state = new_state(Arc::clone(&memdb), None);
+    let state = new_state(Arc::clone(&memdb), None);
 
     let mut sb = DefaultStoreBool::new(Rc::new(RefCell::new(state)), "test");
 
@@ -29,7 +29,7 @@ fn test_default_store_bool() {
 #[test]
 fn test_default_store_uint64() {
     let memdb = Arc::new(MemoryDB::new(false));
-    let mut state = new_state(Arc::clone(&memdb), None);
+    let state = new_state(Arc::clone(&memdb), None);
 
     let mut su = DefaultStoreUint64::new(Rc::new(RefCell::new(state)), "test");
 
@@ -58,7 +58,7 @@ fn test_default_store_uint64() {
 #[test]
 fn test_default_store_string() {
     let memdb = Arc::new(MemoryDB::new(false));
-    let mut state = new_state(Arc::clone(&memdb), None);
+    let state = new_state(Arc::clone(&memdb), None);
 
     let rs = Rc::new(RefCell::new(state));
     let mut ss = DefaultStoreString::new(Rc::clone(&rs), "test");
@@ -75,7 +75,7 @@ fn test_default_store_string() {
 #[test]
 fn test_default_store_map() {
     let memdb = Arc::new(MemoryDB::new(false));
-    let mut state = new_state(Arc::clone(&memdb), None);
+    let state = new_state(Arc::clone(&memdb), None);
     let rs = Rc::new(RefCell::new(state));
 
     let mut sm = DefaultStoreMap::<_, Hash, Bytes>::new(Rc::clone(&rs), "test");
@@ -94,17 +94,6 @@ fn test_default_store_map() {
         Bytes::from("val_2")
     );
 
-    sm.for_each(|v| Ok(v.truncate(3))).unwrap();
-
-    assert_eq!(
-        sm.get(&Hash::digest(Bytes::from("key_1"))).unwrap(),
-        Bytes::from("val")
-    );
-    assert_eq!(
-        sm.get(&Hash::digest(Bytes::from("key_2"))).unwrap(),
-        Bytes::from("val")
-    );
-
     sm.remove(&Hash::digest(Bytes::from("key_1"))).unwrap();
 
     assert_eq!(
@@ -117,7 +106,7 @@ fn test_default_store_map() {
 #[test]
 fn test_default_store_array() {
     let memdb = Arc::new(MemoryDB::new(false));
-    let mut state = new_state(Arc::clone(&memdb), None);
+    let state = new_state(Arc::clone(&memdb), None);
     let rs = Rc::new(RefCell::new(state));
 
     let mut sa = DefaultStoreArray::<_, Bytes>::new(Rc::clone(&rs), "test");
@@ -130,22 +119,8 @@ fn test_default_store_array() {
     assert_eq!(sa.get(0usize).unwrap(), Bytes::from("111"));
     assert_eq!(sa.get(1usize).unwrap(), Bytes::from("222"));
 
-    sa.for_each(|e| Ok(e.truncate(2))).unwrap();
-
-    assert_eq!(sa.get(0usize).unwrap(), Bytes::from("11"));
-    assert_eq!(sa.get(1usize).unwrap(), Bytes::from("22"));
-
     sa.remove(0usize).unwrap();
 
     assert_eq!(sa.len().unwrap(), 1usize);
-    assert_eq!(sa.get(0usize).unwrap(), Bytes::from("22"));
-}
-
-fn new_state(memdb: Arc<MemoryDB>, root: Option<MerkleRoot>) -> GeneralServiceState<MemoryDB> {
-    let trie = match root {
-        Some(root) => MPTTrie::from(root, memdb).unwrap(),
-        None => MPTTrie::new(memdb),
-    };
-
-    GeneralServiceState::new(trie)
+    assert_eq!(sa.get(0usize).unwrap(), Bytes::from("222"));
 }

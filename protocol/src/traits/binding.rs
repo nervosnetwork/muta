@@ -44,32 +44,37 @@ pub trait ServiceState {
     fn commit(&mut self) -> ProtocolResult<MerkleRoot>;
 }
 
-pub trait ChainDB {
+pub trait ChainQuerier {
     fn get_transaction_by_hash(&self, tx_hash: &Hash) -> ProtocolResult<Option<SignedTransaction>>;
 
+    // To get the latest `Epoch` of finality, set `epoch_id` to `None`
     fn get_epoch_by_epoch_id(&self, epoch_id: Option<u64>) -> ProtocolResult<Option<Epoch>>;
 
     fn get_receipt_by_hash(&self, tx_hash: &Hash) -> ProtocolResult<Option<Receipt>>;
 }
 
 pub trait RequestContext: Clone {
-    fn sub_cycles(&self, cycels: u64) -> ProtocolResult<()>;
+    fn sub_cycles(&mut self, cycles: u64) -> ProtocolResult<()>;
 
-    fn get_cycles_price(&self) -> ProtocolResult<u64>;
+    fn get_cycles_price(&self) -> u64;
 
-    fn get_cycles_limit(&self) -> ProtocolResult<u64>;
+    fn get_cycles_limit(&self) -> u64;
 
-    fn get_cycles_used(&self) -> ProtocolResult<u64>;
+    fn get_cycles_used(&self) -> u64;
 
-    fn get_caller(&self) -> ProtocolResult<Address>;
+    fn get_caller(&self) -> Address;
 
-    fn get_current_epoch_id(&self) -> ProtocolResult<u64>;
+    fn get_current_epoch_id(&self) -> u64;
 
-    fn get_service_name(&self) -> ProtocolResult<&str>;
+    fn get_service_name(&self) -> &str;
 
-    fn get_service_method(&self) -> ProtocolResult<&str>;
+    fn get_service_method(&self) -> &str;
 
-    fn get_payload(&self) -> ProtocolResult<&str>;
+    fn get_playload(&self) -> &str;
+
+    // Trigger an `event`, which can be any string
+    // NOTE: The string is recommended as json string
+    fn emit_event(&mut self, message: String) -> ProtocolResult<()>;
 }
 
 // Admission control will be called before entering service
@@ -111,6 +116,7 @@ pub trait Service {
 // - Various data structures that store data to `world state`(call
 //   `alloc_or_recover_*`)
 // - Access and modify `account`
+// - Access service state
 // - Event triggered
 // - Access to data on the chain (epoch, transaction, receipt)
 // - Read / write other `service`
@@ -120,14 +126,16 @@ pub trait Service {
 // - ChainDB
 // - ServiceState
 pub trait ServiceSDK {
+    type ContextItem: RequestContext;
+
     // Alloc or recover a `Map` by` var_name`
-    fn alloc_or_recover_map<Key: FixedCodec, Value: FixedCodec>(
+    fn alloc_or_recover_map<Key: 'static + FixedCodec + PartialEq, Val: 'static + FixedCodec>(
         &mut self,
         var_name: &str,
-    ) -> ProtocolResult<Box<dyn StoreMap<Key, Value>>>;
+    ) -> ProtocolResult<Box<dyn StoreMap<Key, Val>>>;
 
     // Alloc or recover a `Array` by` var_name`
-    fn alloc_or_recover_array<Elm: FixedCodec>(
+    fn alloc_or_recover_array<Elm: 'static + FixedCodec>(
         &mut self,
         var_name: &str,
     ) -> ProtocolResult<Box<dyn StoreArray<Elm>>>;
@@ -141,11 +149,16 @@ pub trait ServiceSDK {
     // Alloc or recover a `Bool` by` var_name`
     fn alloc_or_recover_bool(&mut self, var_name: &str) -> ProtocolResult<Box<dyn StoreBool>>;
 
-    // Alloc or recover a `Object` by` var_name`
-    fn alloc_or_recover_object<Object: FixedCodec + Default>(
+    // Get a value from the service state by key
+    fn get_value<Key: FixedCodec, Ret: FixedCodec>(&self, key: &Key)
+        -> ProtocolResult<Option<Ret>>;
+
+    // Set a value to the service state by key
+    fn set_value<Key: FixedCodec, Val: FixedCodec>(
         &mut self,
-        var_name: &str,
-    ) -> ProtocolResult<Object>;
+        key: Key,
+        val: Val,
+    ) -> ProtocolResult<()>;
 
     // Get a value from the specified address by key
     fn get_account_value<Key: FixedCodec, Ret: FixedCodec>(
@@ -175,22 +188,20 @@ pub trait ServiceSDK {
     // if not found on the chain, return None
     fn get_receipt_by_hash(&self, tx_hash: &Hash) -> ProtocolResult<Option<Receipt>>;
 
-    // Trigger an `event`, which can be any string
-    // NOTE: The string is recommended as json string
-    fn emit_event(&mut self, message: json::JsonValue) -> ProtocolResult<()>;
+    fn get_request_context(&self) -> ProtocolResult<Self::ContextItem>;
 
     // Call other read-only methods of `service` and return the results
     // synchronously NOTE: You can use recursive calls, but the maximum call
     // stack is 1024
-    fn read(&self, servide: &str, method: &str, payload: &str) -> ProtocolResult<json::JsonValue>;
+    fn read(&self, service: &str, method: &str, playload: &str) -> ProtocolResult<json::JsonValue>;
 
     // Call other writable methods of `service` and return the results synchronously
     // NOTE: You can use recursive calls, but the maximum call stack is 1024
     fn write(
         &mut self,
-        servide: &str,
+        service: &str,
         method: &str,
-        payload: &str,
+        playload: &str,
     ) -> ProtocolResult<json::JsonValue>;
 }
 
