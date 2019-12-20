@@ -13,7 +13,7 @@ fn test_request_context() {
         1,
         "service_name".to_owned(),
         "service_method".to_owned(),
-        "service_playload".to_owned(),
+        "service_payload".to_owned(),
     );
 
     ctx.sub_cycles(8).unwrap();
@@ -25,5 +25,5 @@ fn test_request_context() {
     assert_eq!(ctx.get_current_epoch_id(), 1);
     assert_eq!(ctx.get_service_name(), "service_name");
     assert_eq!(ctx.get_service_method(), "service_method");
-    assert_eq!(ctx.get_playload(), "service_playload");
+    assert_eq!(ctx.get_payload(), "service_payload");
 }
