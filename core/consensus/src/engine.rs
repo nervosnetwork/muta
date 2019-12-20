@@ -249,6 +249,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill, FixedSignedTxs>
         addr: bytes::Bytes,
         msg: OverlordMsg<FixedPill>,
     ) -> Result<(), Box<dyn Error + Send>> {
+        let addr = BytesMut::from(addr.as_ref()).freeze();
         match msg {
             OverlordMsg::SignedVote(sv) => {
                 let msg = sv.rlp_bytes();
@@ -274,16 +275,6 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill, FixedSignedTxs>
             }
             _ => unreachable!(),
         };
-
-        let addr = BytesMut::from(addr.as_ref()).freeze();
-        self.adapter
-            .transmit(
-                ctx,
-                msg,
-                END_GOSSIP_SIGNED_VOTE,
-                MessageTarget::Specified(UserAddress::from_bytes(addr)?),
-            )
-            .await?;
         Ok(())
     }
 

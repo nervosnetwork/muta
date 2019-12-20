@@ -7,9 +7,6 @@ use std::fs::File;
 use std::path::Path;
 use std::sync::Arc;
 
-use bytes::Bytes;
-use futures::executor::block_on;
-use parking_lot::RwLock;
 use common_crypto::{PublicKey, Secp256k1, Secp256k1PrivateKey, ToPublicKey};
 use core_api::adapter::DefaultAPIAdapter;
 use core_api::config::GraphQLConfig;
@@ -31,6 +28,8 @@ use core_mempool::{
 };
 use core_network::{NetworkConfig, NetworkService};
 use core_storage::{adapter::rocks::RocksAdapter, ImplStorage};
+use futures::executor::block_on;
+use parking_lot::RwLock;
 
 use protocol::traits::executor::ExecutorFactory;
 use protocol::traits::{NodeInfo, Storage};

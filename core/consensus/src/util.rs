@@ -7,10 +7,8 @@ use common_crypto::{
     Secp256k1PublicKey, Signature,
 };
 
-
 use protocol::types::{Address, Hash, MerkleRoot, SignedTransaction, UserAddress};
 use protocol::{BytesMut, ProtocolError};
-
 
 use crate::ConsensusError;
 

@@ -7,8 +7,7 @@ use overlord::Codec;
 use protocol::codec::{Deserialize, ProtocolCodecSync, Serialize};
 use protocol::fixed_codec::ProtocolFixedCodec;
 use protocol::types::{Epoch, Hash, Pill, SignedTransaction};
-use protocol::{traits::MessageCodec, ProtocolResult};
-use protocol::{fixed_codec::ProtocolFixedCodec, Bytes, BytesMut, ProtocolResult};
+use protocol::{traits::MessageCodec, Bytes, BytesMut, ProtocolResult};
 
 use crate::{ConsensusError, MsgType};
 
