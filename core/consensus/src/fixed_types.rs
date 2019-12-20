@@ -182,7 +182,7 @@ mod test {
     };
     use protocol::Bytes;
 
-    use super::{Bytes, FixedEpoch, FixedSignedTxs};
+    use super::{FixedEpoch, FixedSignedTxs};
 
     fn gen_epoch(epoch_id: u64, epoch_hash: Hash) -> Epoch {
         let nonce = Hash::digest(Bytes::from("XXXX"));
