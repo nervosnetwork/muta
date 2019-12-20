@@ -44,9 +44,10 @@ impl<S: ServiceState> StoreBool for DefaultStoreBool<S> {
     }
 
     fn set(&mut self, b: bool) -> ProtocolResult<()> {
-        let bs = match b {
-            true => [1u8; mem::size_of::<u8>()],
-            false => [0u8; mem::size_of::<u8>()],
+        let bs = if b {
+            [1u8; mem::size_of::<u8>()]
+        } else {
+            [0u8; mem::size_of::<u8>()]
         };
 
         let val = Bytes::from(bs.as_ref());
@@ -110,9 +111,10 @@ impl<S: ServiceState> StoreUint64 for DefaultStoreUint64<S> {
     fn sub(&mut self, val: u64) -> ProtocolResult<()> {
         let sv = self.get()?;
 
-        match sv >= val {
-            true => self.set(sv - val),
-            false => Err(StoreError::Overflow.into()),
+        if sv >= val {
+            self.set(sv - val)
+        } else {
+            Err(StoreError::Overflow.into())
         }
     }
 
