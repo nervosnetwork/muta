@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use bytes::Bytes;
+use protocol::Bytes;
 
 use crate::tests;
 

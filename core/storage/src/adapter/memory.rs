@@ -3,12 +3,12 @@ use std::error::Error;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use bytes::Bytes;
 use derive_more::{Display, From};
 use parking_lot::RwLock;
 
 use protocol::codec::ProtocolCodec;
 use protocol::traits::{StorageAdapter, StorageBatchModify, StorageSchema};
+use protocol::Bytes;
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
 #[derive(Debug)]

@@ -2,13 +2,70 @@ use std::error::Error;
 
 use async_trait::async_trait;
 use bincode::{deserialize, serialize};
-use bytes::Bytes;
 use overlord::Codec;
 
 use protocol::codec::{Deserialize, ProtocolCodecSync, Serialize};
 use protocol::fixed_codec::ProtocolFixedCodec;
 use protocol::types::{Epoch, Hash, Pill, SignedTransaction};
 use protocol::{traits::MessageCodec, ProtocolResult};
+use protocol::{fixed_codec::ProtocolFixedCodec, Bytes, BytesMut, ProtocolResult};
+
+use crate::{ConsensusError, MsgType};
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub enum ConsensusRpcRequest {
+    PullEpochs(u64),
+    PullTxs(PullTxsRequest),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ConsensusRpcResponse {
+    PullEpochs(Box<Epoch>),
+    PullTxs(Box<FixedSignedTxs>),
+}
+
+#[async_trait]
+impl MessageCodec for ConsensusRpcResponse {
+    async fn encode(&mut self) -> ProtocolResult<Bytes> {
+        let bytes = match self {
+            ConsensusRpcResponse::PullEpochs(ep) => {
+                let mut tmp = BytesMut::from(ep.encode_fixed()?.as_ref());
+                tmp.extend_from_slice(b"a");
+                tmp
+            }
+
+            ConsensusRpcResponse::PullTxs(txs) => {
+                let mut tmp = BytesMut::from(
+                    serialize(&txs)
+                        .map_err(|_| ConsensusError::EncodeErr(MsgType::RpcPullTxs))?
+                        .as_slice(),
+                );
+                tmp.extend_from_slice(b"b");
+                tmp
+            }
+        };
+        Ok(bytes.freeze())
+    }
+
+    async fn decode(mut bytes: Bytes) -> ProtocolResult<Self> {
+        let len = bytes.len();
+        let flag = bytes.split_off(len - 1);
+
+        match flag.as_ref() {
+            b"a" => {
+                let res: Epoch = ProtocolFixedCodec::decode_fixed(bytes)?;
+                Ok(ConsensusRpcResponse::PullEpochs(Box::new(res)))
+            }
+
+            b"b" => {
+                let res: FixedSignedTxs = deserialize(&bytes)
+                    .map_err(|_| ConsensusError::DecodeErr(MsgType::RpcPullTxs))?;
+                Ok(ConsensusRpcResponse::PullTxs(Box::new(res)))
+            }
+            _ => unreachable!(),
+        }
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FixedPill {
@@ -16,12 +73,14 @@ pub struct FixedPill {
 }
 
 impl Codec for FixedPill {
-    fn encode(&self) -> Result<Bytes, Box<dyn Error + Send>> {
+    fn encode(&self) -> Result<bytes::Bytes, Box<dyn Error + Send>> {
         let bytes = self.inner.encode_fixed()?;
+        let bytes = bytes::Bytes::from(bytes.as_ref());
         Ok(bytes)
     }
 
-    fn decode(data: Bytes) -> Result<Self, Box<dyn Error + Send>> {
+    fn decode(data: bytes::Bytes) -> Result<Self, Box<dyn Error + Send>> {
+        let data = BytesMut::from(data.as_ref()).freeze();
         let inner: Pill = ProtocolFixedCodec::decode_fixed(data)?;
         Ok(FixedPill { inner })
     }
@@ -90,12 +149,14 @@ pub struct FixedSignedTxs {
 }
 
 impl Codec for FixedSignedTxs {
-    fn encode(&self) -> Result<Bytes, Box<dyn Error + Send>> {
+    fn encode(&self) -> Result<bytes::Bytes, Box<dyn Error + Send>> {
         let bytes = serialize(&self).map_err(|e| e as Box<dyn Error + Send>)?;
-        Ok(Bytes::from(bytes))
+        let bytes = bytes::Bytes::from(bytes.as_slice());
+        Ok(bytes)
     }
 
-    fn decode(data: Bytes) -> Result<Self, Box<dyn Error + Send>> {
+    fn decode(data: bytes::Bytes) -> Result<Self, Box<dyn Error + Send>> {
+        let data = BytesMut::from(data.as_ref()).freeze();
         let res: FixedSignedTxs =
             deserialize(data.as_ref()).map_err(|e| e as Box<dyn Error + Send>)?;
         Ok(res)
@@ -120,6 +181,7 @@ mod test {
         CarryingAsset, Epoch, EpochHeader, Fee, Hash, Proof, RawTransaction, SignedTransaction,
         TransactionAction, UserAddress,
     };
+    use protocol::Bytes;
 
     use super::{Bytes, FixedEpoch, FixedSignedTxs};
 

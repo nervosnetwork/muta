@@ -2,10 +2,10 @@ use std::error::Error;
 use std::path::Path;
 use std::sync::Arc;
 
-use bytes::Bytes;
 use derive_more::{Display, From};
 use rocksdb::{Options, WriteBatch, DB};
 
+use protocol::Bytes;
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
 pub struct RocksTrieDB {

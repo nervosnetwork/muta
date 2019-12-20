@@ -14,7 +14,9 @@ use juniper::graphiql::graphiql_source;
 use juniper::{FieldError, FieldResult};
 use tide::{error::ResultExt, response, App, EndpointResult};
 
-use common_crypto::{HashValue, PrivateKey, PublicKey, Secp256k1PrivateKey, Signature};
+use common_crypto::{
+    HashValue, PrivateKey, PublicKey, Secp256k1PrivateKey, Signature, ToPublicKey,
+};
 use protocol::fixed_codec::ProtocolFixedCodec;
 use protocol::traits::{APIAdapter, Context};
 
@@ -310,8 +312,8 @@ fn cover_to_signed_tx(
         raw,
         tx_hash: protocol::types::Hash::from_hex(&input_encryption.tx_hash.as_hex())
             .map_err(FieldError::from)?,
-        pubkey: bytes::Bytes::from(hex_to_vec_u8(&input_encryption.pubkey.as_hex())?),
-        signature: bytes::Bytes::from(hex_to_vec_u8(&input_encryption.signature.as_hex())?),
+        pubkey: protocol::Bytes::from(hex_to_vec_u8(&input_encryption.pubkey.as_hex())?),
+        signature: protocol::Bytes::from(hex_to_vec_u8(&input_encryption.signature.as_hex())?),
     };
 
     Ok(signed_tx)
@@ -345,7 +347,7 @@ fn cover_deploy_action(
     };
 
     let action = protocol::types::TransactionAction::Deploy {
-        code: bytes::Bytes::from(hex_to_vec_u8(&input_action.code.as_hex())?),
+        code: protocol::Bytes::from(hex_to_vec_u8(&input_action.code.as_hex())?),
         contract_type,
     };
 

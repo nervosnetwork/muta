@@ -10,8 +10,7 @@ use std::sync::Arc;
 use bytes::Bytes;
 use futures::executor::block_on;
 use parking_lot::RwLock;
-
-use common_crypto::{PrivateKey, PublicKey, Secp256k1, Secp256k1PrivateKey};
+use common_crypto::{PublicKey, Secp256k1, Secp256k1PrivateKey, ToPublicKey};
 use core_api::adapter::DefaultAPIAdapter;
 use core_api::config::GraphQLConfig;
 use core_consensus::fixed_types::{FixedEpoch, FixedSignedTxs};
@@ -38,7 +37,7 @@ use protocol::traits::{NodeInfo, Storage};
 use protocol::types::{
     Address, Bloom, Epoch, EpochHeader, Genesis, Hash, MerkleRoot, Proof, UserAddress, Validator,
 };
-use protocol::{fixed_codec::ProtocolFixedCodec, ProtocolResult};
+use protocol::{fixed_codec::ProtocolFixedCodec, Bytes, ProtocolResult};
 
 use crate::config::Config;
 

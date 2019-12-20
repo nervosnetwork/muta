@@ -1,8 +1,7 @@
 use std::sync::Arc;
 
-use bytes::Bytes;
-
 use protocol::traits::executor::contract::ContractStateAdapter;
+use protocol::Bytes;
 
 use crate::adapter::GeneralContractStateAdapter;
 use crate::fixed_types::FixedBytesSchema;

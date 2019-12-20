@@ -6,7 +6,6 @@ use std::convert::{From, TryFrom};
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use bytes::Bytes;
 use chashmap::CHashMap;
 use futures::executor;
 use num_traits::FromPrimitive;
@@ -17,7 +16,7 @@ use rayon::prelude::*;
 
 use common_crypto::{
     Crypto, PrivateKey, PublicKey, Secp256k1, Secp256k1PrivateKey, Secp256k1PublicKey,
-    Secp256k1Signature, Signature,
+    Secp256k1Signature, Signature, ToPublicKey,
 };
 use protocol::codec::ProtocolCodec;
 use protocol::traits::{Context, MemPool, MemPoolAdapter, MixedTxHashes};
@@ -25,7 +24,7 @@ use protocol::types::{
     CarryingAsset, Fee, Hash, RawTransaction, SignedTransaction, TransactionAction,
     UserAddress as Address,
 };
-use protocol::ProtocolResult;
+use protocol::{Bytes, ProtocolResult};
 
 use crate::{HashMemPool, MemPoolError};
 
@@ -94,8 +93,8 @@ pub fn default_mock_txs(size: usize) -> Vec<SignedTransaction> {
 
 fn mock_txs(valid_size: usize, invalid_size: usize, timeout: u64) -> Vec<SignedTransaction> {
     let mut vec = Vec::new();
-    let mut rng = OsRng::new().expect("OsRng");
-    let (priv_key, pub_key) = Secp256k1::generate_keypair(&mut rng);
+    let priv_key = Secp256k1PrivateKey::generate(&mut OsRng);
+    let pub_key = priv_key.pub_key();
     let address = pub_key_to_address(&pub_key).unwrap();
     for i in 0..valid_size + invalid_size {
         vec.push(mock_signed_tx(

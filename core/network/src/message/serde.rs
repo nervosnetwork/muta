@@ -1,7 +1,7 @@
 use std::fmt;
 
-use bytes::Bytes;
 use protocol::codec::ProtocolCodecSync;
+use protocol::Bytes;
 use serde::{de, ser, Deserializer, Serializer};
 
 pub fn serialize<T, S>(val: &T, s: S) -> Result<S::Ok, S::Error>

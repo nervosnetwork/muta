@@ -5,7 +5,6 @@ pub use trie_db::RocksTrieDB;
 use std::error::Error;
 use std::sync::Arc;
 
-use bytes::Bytes;
 use cita_trie::{PatriciaTrie, Trie, TrieError};
 use derive_more::{Display, From};
 use hasher::HasherKeccak;
@@ -13,6 +12,7 @@ use lazy_static::lazy_static;
 
 use protocol::traits::executor::TrieDB;
 use protocol::types::{Hash, MerkleRoot};
+use protocol::Bytes;
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
 lazy_static! {

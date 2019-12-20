@@ -337,11 +337,10 @@ mod tests {
     use protocol::{
         traits::{Context, Gossip, MessageCodec, Priority},
         types::UserAddress,
-        ProtocolResult,
+        Bytes, ProtocolResult,
     };
 
     use async_trait::async_trait;
-    use bytes::Bytes;
     use futures::{
         channel::mpsc::{channel, unbounded, UnboundedSender},
         stream::StreamExt,

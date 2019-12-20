@@ -1,4 +1,4 @@
-use bytes::Bytes;
+use bytes::BytesMut;
 
 use crate::fixed_codec::{FixedCodecError, ProtocolFixedCodec};
 use crate::types::epoch::{Epoch, EpochHeader, EpochId, Pill, Proof, Validator};
@@ -26,11 +26,11 @@ impl rlp::Decodable for Proof {
             return Err(rlp::DecoderError::RlpIncorrectListLen);
         }
 
-        let bitmap = Bytes::from(r.at(0)?.data()?);
+        let bitmap = BytesMut::from(r.at(0)?.data()?).freeze();
         let epoch_hash: Hash = rlp::decode(r.at(1)?.as_raw())?;
         let epoch_id = r.at(2)?.as_val()?;
         let round = r.at(3)?.as_val()?;
-        let signature = Bytes::from(r.at(4)?.data()?);
+        let signature = BytesMut::from(r.at(4)?.data()?).freeze();
 
         Ok(Proof {
             epoch_id,
