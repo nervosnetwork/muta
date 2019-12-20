@@ -9,15 +9,15 @@ use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct DefaultRequestContext {
-    cycles_limit:     u64,
-    cycles_price:     u64,
-    cycles_used:      Rc<RefCell<u64>>,
-    caller:           Address,
-    epoch_id:         u64,
-    service_name:     String,
-    service_method:   String,
-    service_playload: String,
-    events:           Rc<RefCell<Vec<Event>>>,
+    cycles_limit:    u64,
+    cycles_price:    u64,
+    cycles_used:     Rc<RefCell<u64>>,
+    caller:          Address,
+    epoch_id:        u64,
+    service_name:    String,
+    service_method:  String,
+    service_payload: String,
+    events:          Rc<RefCell<Vec<Event>>>,
 }
 
 impl DefaultRequestContext {
@@ -29,7 +29,7 @@ impl DefaultRequestContext {
         epoch_id: u64,
         service_name: String,
         service_method: String,
-        service_playload: String,
+        service_payload: String,
     ) -> Self {
         Self {
             cycles_limit,
@@ -39,7 +39,7 @@ impl DefaultRequestContext {
             epoch_id,
             service_name,
             service_method,
-            service_playload,
+            service_payload,
             events: Rc::new(RefCell::new(Vec::new())),
         }
     }
@@ -48,7 +48,7 @@ impl DefaultRequestContext {
         context: &DefaultRequestContext,
         service_name: String,
         service_method: String,
-        service_playload: String,
+        service_payload: String,
     ) -> Self {
         Self {
             cycles_limit: context.cycles_limit,
@@ -58,14 +58,14 @@ impl DefaultRequestContext {
             epoch_id: context.epoch_id,
             service_name,
             service_method,
-            service_playload,
+            service_payload,
             events: Rc::clone(&context.events),
         }
     }
 }
 
 impl RequestContext for DefaultRequestContext {
-    fn sub_cycles(&mut self, cycles: u64) -> ProtocolResult<()> {
+    fn sub_cycles(&self, cycles: u64) -> ProtocolResult<()> {
         if self.get_cycles_used() + cycles <= self.cycles_limit {
             *self.cycles_used.borrow_mut() = self.get_cycles_used() + cycles;
             Ok(())
@@ -102,8 +102,8 @@ impl RequestContext for DefaultRequestContext {
         &self.service_method
     }
 
-    fn get_playload(&self) -> &str {
-        &self.service_playload
+    fn get_payload(&self) -> &str {
+        &self.service_payload
     }
 
     fn emit_event(&mut self, message: String) -> ProtocolResult<()> {
