@@ -8,7 +8,7 @@ mod storage;
 
 pub use api::APIAdapter;
 pub use binding::{
-    AdmissionControl, ChainDB, RequestContext, Service, ServiceSDK, ServiceState, StoreArray,
+    AdmissionControl, ChainQuerier, RequestContext, Service, ServiceSDK, ServiceState, StoreArray,
     StoreBool, StoreMap, StoreString, StoreUint64,
 };
 pub use consensus::{Consensus, ConsensusAdapter, CurrentConsensusStatus, MessageTarget, NodeInfo};
