@@ -144,18 +144,13 @@ impl<S: 'static + ServiceState, C: ChainQuerier, R: RequestContext> ServiceSDK
     // Call other read-only methods of `service` and return the results
     // synchronously NOTE: You can use recursive calls, but the maximum call
     // stack is 1024
-    fn read(&self, service: &str, method: &str, playload: &str) -> ProtocolResult<json::JsonValue> {
+    fn read(&self, service: &str, method: &str, payload: &str) -> ProtocolResult<&str> {
         unimplemented!();
     }
 
     // Call other writable methods of `service` and return the results synchronously
     // NOTE: You can use recursive calls, but the maximum call stack is 1024
-    fn write(
-        &mut self,
-        service: &str,
-        method: &str,
-        playload: &str,
-    ) -> ProtocolResult<json::JsonValue> {
+    fn write(&mut self, service: &str, method: &str, payload: &str) -> ProtocolResult<&str> {
         unimplemented!();
     }
 }

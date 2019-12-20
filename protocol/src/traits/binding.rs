@@ -54,7 +54,7 @@ pub trait ChainQuerier {
 }
 
 pub trait RequestContext: Clone {
-    fn sub_cycles(&mut self, cycles: u64) -> ProtocolResult<()>;
+    fn sub_cycles(&self, cycles: u64) -> ProtocolResult<()>;
 
     fn get_cycles_price(&self) -> u64;
 
@@ -70,7 +70,7 @@ pub trait RequestContext: Clone {
 
     fn get_service_method(&self) -> &str;
 
-    fn get_playload(&self) -> &str;
+    fn get_payload(&self) -> &str;
 
     // Trigger an `event`, which can be any string
     // NOTE: The string is recommended as json string
@@ -95,18 +95,18 @@ pub trait AdmissionControl {
 // - write: provide some writable functions for users or other services to call
 pub trait Service {
     // Executed before the epoch is executed.
-    fn hook_before(&mut self) -> ProtocolResult<()> {
+    fn hook_before_(&mut self) -> ProtocolResult<()> {
         Ok(())
     }
 
     // Executed after epoch execution.
-    fn hook_after(&mut self) -> ProtocolResult<()> {
+    fn hook_after_(&mut self) -> ProtocolResult<()> {
         Ok(())
     }
 
-    fn write<Context: RequestContext>(&mut self, ctx: Context) -> ProtocolResult<json::JsonValue>;
+    fn write_<Context: RequestContext>(&mut self, ctx: Context) -> ProtocolResult<String>;
 
-    fn read<Context: RequestContext>(&self, ctx: Context) -> ProtocolResult<json::JsonValue>;
+    fn read_<Context: RequestContext>(&self, ctx: Context) -> ProtocolResult<String>;
 }
 
 // `ServiceSDK` provides multiple rich interfaces for `service` developers
@@ -193,16 +193,11 @@ pub trait ServiceSDK {
     // Call other read-only methods of `service` and return the results
     // synchronously NOTE: You can use recursive calls, but the maximum call
     // stack is 1024
-    fn read(&self, service: &str, method: &str, playload: &str) -> ProtocolResult<json::JsonValue>;
+    fn read(&self, servide: &str, method: &str, payload: &str) -> ProtocolResult<&str>;
 
     // Call other writable methods of `service` and return the results synchronously
     // NOTE: You can use recursive calls, but the maximum call stack is 1024
-    fn write(
-        &mut self,
-        service: &str,
-        method: &str,
-        playload: &str,
-    ) -> ProtocolResult<json::JsonValue>;
+    fn write(&mut self, servide: &str, method: &str, payload: &str) -> ProtocolResult<&str>;
 }
 
 pub trait StoreMap<Key: FixedCodec + PartialEq, Value: FixedCodec> {
