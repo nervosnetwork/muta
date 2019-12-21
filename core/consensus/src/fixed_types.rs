@@ -4,10 +4,10 @@ use async_trait::async_trait;
 use bincode::{deserialize, serialize};
 use overlord::Codec;
 
-use protocol::codec::{Deserialize, Serialize};
-use protocol::traits::MessageCodec;
+use protocol::codec::{Deserialize, ProtocolCodecSync, Serialize};
+use protocol::fixed_codec::ProtocolFixedCodec;
 use protocol::types::{Epoch, Hash, Pill, SignedTransaction};
-use protocol::{fixed_codec::ProtocolFixedCodec, Bytes, BytesMut, ProtocolResult};
+use protocol::{traits::MessageCodec, Bytes, BytesMut, ProtocolResult};
 
 use crate::{ConsensusError, MsgType};
 
@@ -95,6 +95,29 @@ impl FixedPill {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FixedEpoch {
+    pub inner: Epoch,
+}
+
+#[async_trait]
+impl MessageCodec for FixedEpoch {
+    async fn encode(&mut self) -> ProtocolResult<Bytes> {
+        self.inner.encode_sync()
+    }
+
+    async fn decode(bytes: Bytes) -> ProtocolResult<Self> {
+        let inner: Epoch = ProtocolCodecSync::decode_sync(bytes)?;
+        Ok(FixedEpoch::new(inner))
+    }
+}
+
+impl FixedEpoch {
+    pub fn new(inner: Epoch) -> Self {
+        FixedEpoch { inner }
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct FixedEpochID {
     pub inner: u64,
@@ -151,7 +174,6 @@ mod test {
 
     use futures::executor;
     use num_traits::FromPrimitive;
-    use overlord::Codec;
     use rand::random;
 
     use protocol::types::{
@@ -160,7 +182,7 @@ mod test {
     };
     use protocol::Bytes;
 
-    use super::{ConsensusRpcResponse, FixedSignedTxs};
+    use super::{FixedEpoch, FixedSignedTxs};
 
     fn gen_epoch(epoch_id: u64, epoch_hash: Hash) -> Epoch {
         let nonce = Hash::digest(Bytes::from("XXXX"));
@@ -175,7 +197,7 @@ mod test {
             confirm_root: Vec::new(),
             state_root: nonce,
             receipt_root: Vec::new(),
-            cycles_used: 999_999,
+            cycles_used: vec![999_999],
             proposer: UserAddress::from_hex(addr_str).unwrap(),
             proof: mock_proof(epoch_hash),
             validator_version: 1,
@@ -244,6 +266,7 @@ mod test {
 
     #[test]
     fn test_txs_codec() {
+        use super::Codec;
         for _ in 0..10 {
             let fixed_txs = FixedSignedTxs {
                 inner: (0..1000).map(|_| gen_signed_tx()).collect::<Vec<_>>(),
@@ -255,20 +278,13 @@ mod test {
     }
 
     #[runtime::test]
-    async fn test_rpc_codec() {
-        use protocol::traits::MessageCodec;
-
-        let mut origin = ConsensusRpcResponse::PullTxs(Box::new(FixedSignedTxs {
-            inner: (0..1000).map(|_| gen_signed_tx()).collect::<Vec<_>>(),
-        }));
-        let bytes = origin.encode().await.unwrap();
-        let res: ConsensusRpcResponse = MessageCodec::decode(bytes).await.unwrap();
-        assert_eq!(origin, res);
+    async fn test_epoch_codec() {
+        use super::MessageCodec;
 
         let epoch = gen_epoch(random::<u64>(), Hash::from_empty());
-        let mut origin = ConsensusRpcResponse::PullEpochs(Box::new(epoch));
+        let mut origin = FixedEpoch::new(epoch.clone());
         let bytes = origin.encode().await.unwrap();
-        let res: ConsensusRpcResponse = MessageCodec::decode(bytes).await.unwrap();
-        assert_eq!(origin, res);
+        let res: FixedEpoch = MessageCodec::decode(bytes).await.unwrap();
+        assert_eq!(res.inner, epoch);
     }
 }

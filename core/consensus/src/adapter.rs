@@ -1,10 +1,13 @@
-use std::borrow::Borrow;
+use std::boxed::Box;
 use std::marker::PhantomData;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use log::debug;
+use futures::channel::mpsc::{channel, Receiver, Sender};
+use futures::stream::StreamExt;
+use log::{debug, error};
 
+use common_merkle::Merkle;
 use protocol::traits::executor::{ExecutorExecResp, ExecutorFactory, TrieDB};
 use protocol::traits::{
     ConsensusAdapter, Context, Gossip, MemPool, MessageTarget, MixedTxHashes, NodeInfo, Priority,
@@ -13,10 +16,14 @@ use protocol::traits::{
 use protocol::types::{
     Address, Epoch, Hash, MerkleRoot, Proof, Receipt, SignedTransaction, Validator,
 };
-use protocol::ProtocolResult;
+use protocol::{fixed_codec::ProtocolFixedCodec, ProtocolResult};
 
-use crate::fixed_types::{ConsensusRpcRequest, ConsensusRpcResponse, PullTxsRequest};
-use crate::{ConsensusError, MsgType};
+use crate::fixed_types::{FixedEpoch, FixedEpochID, FixedSignedTxs, PullTxsRequest};
+use crate::status::{CurrentStatusAgent, UpdateInfo};
+use crate::util::ExecuteInfo;
+use crate::ConsensusError;
+
+const OVERLORD_GAP: usize = 10;
 
 pub struct OverlordConsensusAdapter<
     EF: ExecutorFactory<DB>,
@@ -30,9 +37,9 @@ pub struct OverlordConsensusAdapter<
     network: Arc<G>,
     mempool: Arc<M>,
     storage: Arc<S>,
-    trie_db: Arc<DB>,
 
-    pin_ef: PhantomData<EF>,
+    exec_queue:  Sender<ExecuteInfo>,
+    exec_demons: Option<ExecDemons<S, DB, EF>>,
 }
 
 #[async_trait]
@@ -95,21 +102,26 @@ where
     async fn execute(
         &self,
         node_info: NodeInfo,
-        state_root: MerkleRoot,
+        order_root: MerkleRoot,
         epoch_id: u64,
         cycles_price: u64,
         coinbase: Address,
         signed_txs: Vec<SignedTransaction>,
-    ) -> ProtocolResult<ExecutorExecResp> {
-        let mut executor = EF::from_root(
-            node_info.chain_id,
-            state_root,
-            Arc::clone(&self.trie_db),
+    ) -> ProtocolResult<()> {
+        let chain_id = node_info.chain_id;
+        let exec_info = ExecuteInfo {
             epoch_id,
+            chain_id,
             cycles_price,
+            signed_txs,
+            order_root,
             coinbase,
-        )?;
-        executor.exec(signed_txs)
+        };
+
+        let mut tx = self.exec_queue.clone();
+        tx.try_send(exec_info)
+            .map_err(|e| ConsensusError::ExecuteErr(e.to_string()))?;
+        Ok(())
     }
 
     async fn flush_mempool(&self, ctx: Context, txs: Vec<Hash>) -> ProtocolResult<()> {
@@ -118,10 +130,6 @@ where
 
     async fn save_epoch(&self, _ctx: Context, epoch: Epoch) -> ProtocolResult<()> {
         self.storage.insert_epoch(epoch).await
-    }
-
-    async fn save_receipts(&self, _ctx: Context, receipts: Vec<Receipt>) -> ProtocolResult<()> {
-        self.storage.insert_receipts(receipts).await
     }
 
     async fn save_proof(&self, _ctx: Context, proof: Proof) -> ProtocolResult<()> {
@@ -154,21 +162,9 @@ where
         debug!("consensus: send rpc pull epoch {}", epoch_id);
         let res = self
             .rpc
-            .call::<ConsensusRpcRequest, ConsensusRpcResponse>(
-                ctx,
-                end,
-                ConsensusRpcRequest::PullEpochs(epoch_id),
-                Priority::High,
-            )
+            .call::<FixedEpochID, FixedEpoch>(ctx, end, FixedEpochID::new(epoch_id), Priority::High)
             .await?;
-
-        match res {
-            ConsensusRpcResponse::PullEpochs(epoch) => {
-                let res: &Epoch = epoch.borrow();
-                Ok(res.to_owned())
-            }
-            _ => Err(ConsensusError::RpcErr(MsgType::RpcPullEpochs).into()),
-        }
+        Ok(res.inner)
     }
 
     async fn pull_txs(
@@ -177,21 +173,17 @@ where
         hashes: Vec<Hash>,
         end: &str,
     ) -> ProtocolResult<Vec<SignedTransaction>> {
-        let msg = PullTxsRequest::new(hashes);
+        debug!("consensus: send rpc pull txs");
         let res = self
             .rpc
-            .call::<ConsensusRpcRequest, ConsensusRpcResponse>(
+            .call::<PullTxsRequest, FixedSignedTxs>(
                 ctx,
                 end,
-                ConsensusRpcRequest::PullTxs(msg),
+                PullTxsRequest::new(hashes),
                 Priority::High,
             )
             .await?;
-
-        match res {
-            ConsensusRpcResponse::PullTxs(txs) => Ok(txs.inner),
-            _ => Err(ConsensusError::RpcErr(MsgType::RpcPullTxs).into()),
-        }
+        Ok(res.inner)
     }
 
     async fn get_epoch_by_id(&self, _ctx: Context, epoch_id: u64) -> ProtocolResult<Epoch> {
@@ -214,15 +206,130 @@ where
         mempool: Arc<M>,
         storage: Arc<S>,
         trie_db: Arc<DB>,
+        status_agent: CurrentStatusAgent,
+        state_root: MerkleRoot,
     ) -> Self {
+        let (exec_queue, rx) = channel(OVERLORD_GAP);
+        let exec_demons = Some(ExecDemons::new(
+            Arc::clone(&storage),
+            trie_db,
+            rx,
+            status_agent,
+            state_root,
+        ));
+
         OverlordConsensusAdapter {
             rpc,
             network,
             mempool,
             storage,
-            trie_db,
-
-            pin_ef: PhantomData,
+            exec_queue,
+            exec_demons,
         }
+    }
+
+    pub fn take_exec_demon(&mut self) -> ExecDemons<S, DB, EF> {
+        assert!(self.exec_demons.is_some());
+        self.exec_demons.take().unwrap()
+    }
+}
+
+#[derive(Debug)]
+pub struct ExecDemons<S, DB, EF> {
+    storage: Arc<S>,
+    trie_db: Arc<DB>,
+
+    pin_ef:     PhantomData<EF>,
+    queue:      Receiver<ExecuteInfo>,
+    state_root: MerkleRoot,
+    status:     CurrentStatusAgent,
+}
+
+impl<S, DB, EF> ExecDemons<S, DB, EF>
+where
+    S: Storage,
+    DB: TrieDB,
+    EF: ExecutorFactory<DB>,
+{
+    fn new(
+        storage: Arc<S>,
+        trie_db: Arc<DB>,
+        rx: Receiver<ExecuteInfo>,
+        status_agent: CurrentStatusAgent,
+        state_root: MerkleRoot,
+    ) -> Self {
+        ExecDemons {
+            storage,
+            trie_db,
+            state_root,
+            queue: rx,
+            pin_ef: PhantomData,
+            status: status_agent,
+        }
+    }
+
+    pub async fn run(mut self) {
+        loop {
+            if let Err(e) = self.process().await {
+                error!("muta-consensus: executor demons error {:?}", e);
+            }
+        }
+    }
+
+    async fn process(&mut self) -> ProtocolResult<()> {
+        if let Some(info) = self.queue.next().await {
+            let epoch_id = info.epoch_id;
+            let txs = info.signed_txs.clone();
+            let order_root = info.order_root.clone();
+
+            error!("muta-consensus: execute {} epoch", epoch_id);
+            let mut executor = EF::from_root(
+                info.chain_id.clone(),
+                self.state_root.clone(),
+                Arc::clone(&self.trie_db),
+                info.epoch_id,
+                info.cycles_price,
+                info.coinbase,
+            )?;
+
+            let resp = executor.exec(txs)?;
+            self.state_root = resp.state_root.clone();
+            self.save_receipts(resp.receipts.clone()).await?;
+            self.status
+                .send(gen_update_info(resp.clone(), epoch_id, order_root))?;
+        } else {
+            return Err(ConsensusError::Other("Queue disconnect".to_string()).into());
+        }
+        Ok(())
+    }
+
+    async fn save_receipts(&self, receipts: Vec<Receipt>) -> ProtocolResult<()> {
+        self.storage.insert_receipts(receipts).await
+    }
+}
+
+fn gen_update_info(
+    exec_resp: ExecutorExecResp,
+    epoch_id: u64,
+    order_root: MerkleRoot,
+) -> UpdateInfo {
+    let cycles = exec_resp.all_cycles_used.iter().map(|fee| fee.cycle).sum();
+    let receipt = Merkle::from_hashes(
+        exec_resp
+            .receipts
+            .iter()
+            .map(|r| Hash::digest(r.to_owned().encode_fixed().unwrap()))
+            .collect::<Vec<_>>(),
+    )
+    .get_root_hash()
+    .expect("Generate receipt root failed");
+
+    UpdateInfo {
+        exec_epoch_id: epoch_id,
+        cycles_used:   cycles,
+        receipt_root:  receipt,
+        confirm_root:  order_root,
+        state_root:    exec_resp.state_root.clone(),
+        logs_bloom:    exec_resp.logs_bloom,
     }
 }

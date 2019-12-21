@@ -30,7 +30,7 @@ use protocol::{
 };
 
 use crate::adapter::message::{
-    MsgNewTxs, MsgPullTxs, MsgPushTxs, END_GOSSIP_NEW_TXS, END_RPC_PULL_TXS,
+    MsgNewTxs, MsgPullTxs, MsgPushTxs, END_GOSSIP_NEW_TXS, RPC_PULL_TXS,
 };
 use crate::MemPoolError;
 
@@ -202,7 +202,7 @@ where
 
         let resp_msg = self
             .network
-            .call::<MsgPullTxs, MsgPushTxs>(ctx, END_RPC_PULL_TXS, pull_msg, Priority::High)
+            .call::<MsgPullTxs, MsgPushTxs>(ctx, RPC_PULL_TXS, pull_msg, Priority::High)
             .await?;
 
         Ok(resp_msg.sig_txs)
