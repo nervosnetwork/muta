@@ -35,21 +35,18 @@ impl Crypto for OverlordCrypto {
 
     fn verify_signature(
         &self,
-        mut signature: Bytes,
+        signature: Bytes,
         hash: Bytes,
-        _voter: Bytes,
+        voter: Bytes,
     ) -> Result<(), Box<dyn Error + Send>> {
-        let tmp = signature.split_off(33);
-        let pub_key = signature;
-        let signature = tmp;
-
         let hash = HashValue::try_from(hash.as_ref()).map_err(|_| {
             ProtocolError::from(ConsensusError::Other(
                 "failed to convert hash value".to_string(),
             ))
         })?;
-        let pub_key = BlsPublicKey::try_from(pub_key.as_ref())
-            .map_err(|e| ProtocolError::from(ConsensusError::CryptoErr(Box::new(e))))?;
+        let pub_key = self.addr_pubkey.get(&voter).ok_or_else(|| {
+            ProtocolError::from(ConsensusError::Other("lose public key".to_string()))
+        })?;
         let signature = BlsSignature::try_from(signature.as_ref())
             .map_err(|e| ProtocolError::from(ConsensusError::CryptoErr(Box::new(e))))?;
 
@@ -73,13 +70,14 @@ impl Crypto for OverlordCrypto {
 
         let mut sigs_pubkeys = Vec::with_capacity(signatures.len());
         for item in signatures.iter().zip(voters.iter()) {
-            let pubkey = self.addr_pubkey.get(item.1).ok_or_else(|| {
+            let pub_key = self.addr_pubkey.get(item.1).ok_or_else(|| {
                 ProtocolError::from(ConsensusError::Other("lose public key".to_string()))
             })?;
             let signature = BlsSignature::try_from(item.0.as_ref())
                 .map_err(|e| ProtocolError::from(ConsensusError::CryptoErr(Box::new(e))))?;
-            sigs_pubkeys.push((signature, pubkey.to_owned()));
+            sigs_pubkeys.push((signature, pub_key.to_owned()));
         }
+
         let sig = BlsSignature::combine(sigs_pubkeys);
         Ok(sig.to_bytes())
     }
@@ -90,15 +88,15 @@ impl Crypto for OverlordCrypto {
         hash: Bytes,
         voters: Vec<Bytes>,
     ) -> Result<(), Box<dyn Error + Send>> {
-        let mut pubkeys = Vec::new();
+        let mut pub_keys = Vec::new();
         for addr in voters.iter() {
-            let pubkey = self.addr_pubkey.get(addr).ok_or_else(|| {
+            let pub_key = self.addr_pubkey.get(addr).ok_or_else(|| {
                 ProtocolError::from(ConsensusError::Other("lose public key".to_string()))
             })?;
-            pubkeys.push(pubkey);
+            pub_keys.push(pub_key);
         }
 
-        let aggregate_key = BlsPublicKey::aggregate(pubkeys);
+        let aggregate_key = BlsPublicKey::aggregate(pub_keys);
         let aggregated_signature = BlsSignature::try_from(aggregated_signature.as_ref())
             .map_err(|e| ProtocolError::from(ConsensusError::CryptoErr(Box::new(e))))?;
         let hash = HashValue::try_from(hash.as_ref()).map_err(|_| {
@@ -106,6 +104,7 @@ impl Crypto for OverlordCrypto {
                 "failed to convert hash value".to_string(),
             ))
         })?;
+        
         aggregated_signature
             .verify(&hash, &aggregate_key, &self.common_ref)
             .map_err(|e| ProtocolError::from(ConsensusError::CryptoErr(Box::new(e))))?;
