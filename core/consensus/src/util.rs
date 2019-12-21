@@ -1,79 +1,134 @@
+use std::collections::HashMap;
+use std::convert::TryFrom;
 use std::error::Error;
 
-use overlord::{types::AggregatedSignature, Crypto};
-
-use common_crypto::{
-    Crypto as Secp256k1Crypto, PrivateKey, PublicKey, Secp256k1, Secp256k1PrivateKey,
-    Secp256k1PublicKey, Signature,
-};
-
-use protocol::types::{Address, Hash, MerkleRoot, SignedTransaction, UserAddress};
-use protocol::{BytesMut, ProtocolError};
+use overlord::Crypto;
 
 use crate::ConsensusError;
+use common_crypto::{
+    BlsCommonReference, BlsPrivateKey, BlsPublicKey, BlsSignature, BlsSignatureVerify, HashValue,
+    PrivateKey, Signature,
+};
+use protocol::types::{Address, Hash, MerkleRoot, SignedTransaction};
+use protocol::{Bytes, ProtocolError};
 
-#[derive(Clone, Debug)]
 pub struct OverlordCrypto {
-    public_key:  Secp256k1PublicKey,
-    private_key: Secp256k1PrivateKey,
+    private_key: BlsPrivateKey,
+    addr_pubkey: HashMap<Bytes, BlsPublicKey>,
+    common_ref:  BlsCommonReference,
 }
 
 impl Crypto for OverlordCrypto {
-    fn hash(&self, msg: bytes::Bytes) -> bytes::Bytes {
-        let msg = BytesMut::from(msg.as_ref()).freeze();
-        bytes::Bytes::from(Hash::digest(msg).as_bytes().as_ref())
+    fn hash(&self, msg: Bytes) -> Bytes {
+        Hash::digest(msg).as_bytes()
     }
 
-    fn sign(&self, hash: bytes::Bytes) -> Result<bytes::Bytes, Box<dyn Error + Send>> {
-        let hash = BytesMut::from(hash.as_ref()).freeze();
-        let signature = Secp256k1::sign_message(&hash, &self.private_key.to_bytes())
-            .map_err(|e| ProtocolError::from(ConsensusError::CryptoErr(Box::new(e))))?
-            .to_bytes();
-
-        let mut res = bytes::Bytes::from(self.public_key.to_bytes().as_ref());
-        res.extend_from_slice(&signature.as_ref());
-        Ok(res)
+    fn sign(&self, hash: Bytes) -> Result<Bytes, Box<dyn Error + Send>> {
+        let hash = HashValue::try_from(hash.as_ref()).map_err(|_| {
+            ProtocolError::from(ConsensusError::Other(
+                "failed to convert hash value".to_string(),
+            ))
+        })?;
+        let sig = self.private_key.sign_message(&hash);
+        Ok(sig.to_bytes())
     }
 
     fn verify_signature(
         &self,
-        mut signature: bytes::Bytes,
-        hash: bytes::Bytes,
-    ) -> Result<bytes::Bytes, Box<dyn Error + Send>> {
+        mut signature: Bytes,
+        hash: Bytes,
+        _voter: Bytes,
+    ) -> Result<(), Box<dyn Error + Send>> {
         let tmp = signature.split_off(33);
         let pub_key = signature;
         let signature = tmp;
 
-        let hash = BytesMut::from(hash.as_ref()).freeze();
-        let pub_key = BytesMut::from(pub_key.as_ref()).freeze();
-
-        Secp256k1::verify_signature(&hash, &signature, &pub_key)
+        let hash = HashValue::try_from(hash.as_ref()).map_err(|_| {
+            ProtocolError::from(ConsensusError::Other(
+                "failed to convert hash value".to_string(),
+            ))
+        })?;
+        let pub_key = BlsPublicKey::try_from(pub_key.as_ref())
             .map_err(|e| ProtocolError::from(ConsensusError::CryptoErr(Box::new(e))))?;
-        let address = UserAddress::from_pubkey_bytes(pub_key)?;
-        Ok(bytes::Bytes::from(address.as_bytes().as_ref()))
+        let signature = BlsSignature::try_from(signature.as_ref())
+            .map_err(|e| ProtocolError::from(ConsensusError::CryptoErr(Box::new(e))))?;
+
+        signature
+            .verify(&hash, &pub_key, &self.common_ref)
+            .map_err(|e| ProtocolError::from(ConsensusError::CryptoErr(Box::new(e))))?;
+        Ok(())
     }
 
     fn aggregate_signatures(
         &self,
-        _signatures: Vec<bytes::Bytes>,
-        _voters: Vec<bytes::Bytes>,
-    ) -> Result<bytes::Bytes, Box<dyn Error + Send>> {
-        Ok(bytes::Bytes::new())
+        signatures: Vec<Bytes>,
+        voters: Vec<Bytes>,
+    ) -> Result<Bytes, Box<dyn Error + Send>> {
+        if signatures.len() != voters.len() {
+            return Err(ProtocolError::from(ConsensusError::Other(
+                "signatures length does not match voters length".to_string(),
+            ))
+            .into());
+        }
+
+        let mut sigs_pubkeys = Vec::with_capacity(signatures.len());
+        for item in signatures.iter().zip(voters.iter()) {
+            let pubkey =
+                self.addr_pubkey
+                    .get(item.1)
+                    .ok_or(ProtocolError::from(ConsensusError::Other(
+                        "lose public key".to_string(),
+                    )))?;
+            let signature = BlsSignature::try_from(item.0.as_ref())
+                .map_err(|e| ProtocolError::from(ConsensusError::CryptoErr(Box::new(e))))?;
+            sigs_pubkeys.push((signature, pubkey.to_owned()));
+        }
+        let sig = BlsSignature::combine(sigs_pubkeys);
+        Ok(sig.to_bytes())
     }
 
     fn verify_aggregated_signature(
         &self,
-        _aggregated_signature: AggregatedSignature,
+        aggregated_signature: Bytes,
+        hash: Bytes,
+        voters: Vec<Bytes>,
     ) -> Result<(), Box<dyn Error + Send>> {
+        let mut pubkeys = Vec::new();
+        for addr in voters.iter() {
+            let pubkey =
+                self.addr_pubkey
+                    .get(addr)
+                    .ok_or(ProtocolError::from(ConsensusError::Other(
+                        "lose public key".to_string(),
+                    )))?;
+            pubkeys.push(pubkey);
+        }
+
+        let aggregate_key = BlsPublicKey::aggregate(pubkeys);
+        let aggregated_signature = BlsSignature::try_from(aggregated_signature.as_ref())
+            .map_err(|e| ProtocolError::from(ConsensusError::CryptoErr(Box::new(e))))?;
+        let hash = HashValue::try_from(hash.as_ref()).map_err(|_| {
+            ProtocolError::from(ConsensusError::Other(
+                "failed to convert hash value".to_string(),
+            ))
+        })?;
+        aggregated_signature
+            .verify(&hash, &aggregate_key, &self.common_ref)
+            .map_err(|e| ProtocolError::from(ConsensusError::CryptoErr(Box::new(e))))?;
         Ok(())
     }
 }
 
 impl OverlordCrypto {
-    pub fn new(public_key: Secp256k1PublicKey, private_key: Secp256k1PrivateKey) -> Self {
+    pub fn new(
+        private_key: BlsPrivateKey,
+        addr_pubkey: HashMap<Bytes, BlsPublicKey>,
+        common_ref: BlsCommonReference,
+    ) -> Self {
         OverlordCrypto {
-            public_key,
+            addr_pubkey,
             private_key,
+            common_ref,
         }
     }
 }
@@ -90,28 +145,22 @@ pub struct ExecuteInfo {
 
 #[cfg(test)]
 mod test {
-    use common_crypto::{
-        BlsPrivateKey, BlsPublicKey, BlsSignature, BlsSignatureVerify, HashValue, PrivateKey,
-        PublicKey, Signature,
-    };
-    use std::convert::TryFrom;
-
     use super::*;
 
     #[test]
     fn test_bls_amcl() {
         let private_keys = vec![
-            hex::decode("000000000000000000000000000000005300a6fe476044d019e41ea1e60a238bee604572399791d594025e139029eda1").unwrap(),
-            hex::decode("000000000000000000000000000000004a523df5ba1277c2aab8abcbd36992a185385471e64e1f2903eb5eebb6d0322b").unwrap(),
-            hex::decode("0000000000000000000000000000000059fddca68fba89f1bac6f657505e6de473fe64490740c557d2bd6a1ecfe1c297").unwrap(),
-            hex::decode("000000000000000000000000000000006cc70c90c27a4057aa6a93c5c05a04de601612d1b477e932ab9aba25c52a456b").unwrap(),
+            hex::decode("000000000000000000000000000000001abd6ffdb44427d9e1fcb6f84e7fe7d98f2b5b205b30a94992ec24d94bb0c970").unwrap(),
+            hex::decode("00000000000000000000000000000000320b11d7c1ae66fdad1b4a75221244ae2d84903d3548c581d7d30dc135aac817").unwrap(),
+            hex::decode("000000000000000000000000000000006a41e900d0426e615ca9d9393e6792baf9bda4398d5d407e59f77cb6c6f393cc").unwrap(),
+            hex::decode("00000000000000000000000000000000125d81e0eb0a9c3746d868bf3b4f07760fdd430daded41d92f53b4e484ef3415").unwrap(),
         ];
 
         let public_keys = vec![
-            hex::decode("0411ebec3718c83799b7dfc357463e191805d8dc4d1062ae1eeb9a1a6263e75023507a640e13e6ca91ce5a6c5dbf485fa708d56495a9d228824673dd51b2e699fb929a596b4ea73f9bf8b7c451768a0161f3bfe6573b2b127b754a903d74a3dd27").unwrap(),
-            hex::decode("0414ddfa41c71ce851fd2d999d104ddd1c27b41e7de7c463b8a39ea16e2b4ca5288e7584782ea61c5f07b66ef983aea4aa1637fa8b0e146d85272fed875d9ac0d717caaca8566e3e61c06184f342f6f1b253dfedf8a71bbc1297b9b471abba4963").unwrap(),
-            hex::decode("04045f930543a0b1adedf358c6cd70be3ac6deaad55c85c46cd466cac9750b3e19826b8cf3e12c06aa6cbe7d410398160e0059e9819f9484e7b1cedb9ff28ea077b62a8917ce4b627acc08839d021e4a286c8bfe1ad98a061c49cfa83be5610c3b").unwrap(),
-            hex::decode("040f25cefe64dfeca7e8a3683debe42b5f23ed5c7e6b95d1ef0c206a7407bbc494103df834f23d4d12d789b3926038141e087edfdf84d4ee9244a7ca92e1d4ead41ef4597d3598a3f3fbb3c73c327d4d33fb67f404ef7eeceb6238a66810b8cf5e").unwrap(),
+            hex::decode("041054fe9a65be0891094ed37fb3655e3ffb12353bc0a1b4f8673b52ad65d1ca481780cf7e988eb8dcdc05d8352f03605b0d11afb2525b3f1b55ec694509248bcfead39cbb292725d710e2a509c77ed051d1d49e15e429cf6d12b9be7c02179612").unwrap(),
+            hex::decode("040c15c82ed07dc866ab7c3af3a070eb4340ac0439bf12bb49cbed5797d52707e009f7c17414777b0213b9a55c8a5c08290ce40c366d59322db418b7ff41277090bd25614174763c9fd725ede1f65f3e61ca9acdb35f59e33d556e738add14d536").unwrap(),
+            hex::decode("040b3118acefdfbb11ded262a7f3c90dfca4fbc0200a92b4f6bb80210ab85e39f79458f7d47f7cb06864df0571e7591a4e0858df0b52a4c3ae19ae3adc32e1da0ec4cbdca108365ee433becdb1ccebb1b339647788dfad94ebae1cbd770fcfa4e5").unwrap(),
+            hex::decode("040709f204e3ec5b8bdd9f2bb6edc9cb1704fc1e4952661ba7532ea8e37f3b159b8d41987ee6707d32bdf494e2deb00b7f049a4670a5ce1ad8e429fcacc5bbc69cb03b71a7f1d831d0b47dda5e62642d420ff0a545950cb1db19d42fe04e2c91d2").unwrap(),
         ];
 
         let msg = Hash::digest(Bytes::from("muta-consensus"));
@@ -128,6 +177,11 @@ mod test {
         let signature = BlsSignature::combine(sigs_and_pub_keys.clone());
         let aggregate_key =
             BlsPublicKey::aggregate(sigs_and_pub_keys.iter().map(|s| &s.1).collect::<Vec<_>>());
-        assert!(signature.verify(&hash, &aggregate_key, &"muta".into()).is_ok());
+
+        let res = signature.verify(&hash, &aggregate_key, &"muta".into());
+        println!("{:?}", res);
+        assert!(signature
+            .verify(&hash, &aggregate_key, &"muta".into())
+            .is_ok());
     }
 }

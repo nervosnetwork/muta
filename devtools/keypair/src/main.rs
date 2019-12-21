@@ -1,12 +1,9 @@
-use protocol::{
-    types::{Hash, UserAddress},
-    BytesMut,
-};
-use rand::{rngs::OsRng, RngCore, thread_rng};
+use rand::{rngs::OsRng, thread_rng, RngCore};
 use tentacle_secio::SecioKeyPair;
 
 use common_crypto::{BlsPrivateKey, PrivateKey, PublicKey, ToBlsPublicKey};
 use protocol::types::{Hash, UserAddress};
+use protocol::BytesMut;
 
 pub fn main() {
     let mut seed = [0u8; 32];

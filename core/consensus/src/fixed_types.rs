@@ -72,14 +72,12 @@ pub struct FixedPill {
 }
 
 impl Codec for FixedPill {
-    fn encode(&self) -> Result<bytes::Bytes, Box<dyn Error + Send>> {
+    fn encode(&self) -> Result<Bytes, Box<dyn Error + Send>> {
         let bytes = self.inner.encode_fixed()?;
-        let bytes = bytes::Bytes::from(bytes.as_ref());
         Ok(bytes)
     }
 
-    fn decode(data: bytes::Bytes) -> Result<Self, Box<dyn Error + Send>> {
-        let data = BytesMut::from(data.as_ref()).freeze();
+    fn decode(data: Bytes) -> Result<Self, Box<dyn Error + Send>> {
         let inner: Pill = ProtocolFixedCodec::decode_fixed(data)?;
         Ok(FixedPill { inner })
     }
@@ -148,14 +146,12 @@ pub struct FixedSignedTxs {
 }
 
 impl Codec for FixedSignedTxs {
-    fn encode(&self) -> Result<bytes::Bytes, Box<dyn Error + Send>> {
+    fn encode(&self) -> Result<Bytes, Box<dyn Error + Send>> {
         let bytes = serialize(&self).map_err(|e| e as Box<dyn Error + Send>)?;
-        let bytes = bytes::Bytes::from(bytes.as_slice());
-        Ok(bytes)
+        Ok(Bytes::from(bytes))
     }
 
-    fn decode(data: bytes::Bytes) -> Result<Self, Box<dyn Error + Send>> {
-        let data = BytesMut::from(data.as_ref()).freeze();
+    fn decode(data: Bytes) -> Result<Self, Box<dyn Error + Send>> {
         let res: FixedSignedTxs =
             deserialize(data.as_ref()).map_err(|e| e as Box<dyn Error + Send>)?;
         Ok(res)
