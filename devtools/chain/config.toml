@@ -30,6 +30,9 @@ cycles_limit = 99999999
 cycles_price = 1
 interval = 3000
 verifier_list = [ "10f8389d774afdad8755ef8e629e5a154fddc6325a" ]
+private_key = "000000000000000000000000000000001abd6ffdb44427d9e1fcb6f84e7fe7d98f2b5b205b30a94992ec24d94bb0c970"
+public_keys = [ "041054fe9a65be0891094ed37fb3655e3ffb12353bc0a1b4f8673b52ad65d1ca481780cf7e988eb8dcdc05d8352f03605b0d11afb2525b3f1b55ec694509248bcfead39cbb292725d710e2a509c77ed051d1d49e15e429cf6d12b9be7c02179612" ]
+common_ref = "17eb09f7bf2d2021"
 
 [consensus.duration]
 propose_ratio = 10

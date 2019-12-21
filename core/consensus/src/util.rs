@@ -73,12 +73,9 @@ impl Crypto for OverlordCrypto {
 
         let mut sigs_pubkeys = Vec::with_capacity(signatures.len());
         for item in signatures.iter().zip(voters.iter()) {
-            let pubkey =
-                self.addr_pubkey
-                    .get(item.1)
-                    .ok_or(ProtocolError::from(ConsensusError::Other(
-                        "lose public key".to_string(),
-                    )))?;
+            let pubkey = self.addr_pubkey.get(item.1).ok_or_else(|| {
+                ProtocolError::from(ConsensusError::Other("lose public key".to_string()))
+            })?;
             let signature = BlsSignature::try_from(item.0.as_ref())
                 .map_err(|e| ProtocolError::from(ConsensusError::CryptoErr(Box::new(e))))?;
             sigs_pubkeys.push((signature, pubkey.to_owned()));
@@ -95,12 +92,9 @@ impl Crypto for OverlordCrypto {
     ) -> Result<(), Box<dyn Error + Send>> {
         let mut pubkeys = Vec::new();
         for addr in voters.iter() {
-            let pubkey =
-                self.addr_pubkey
-                    .get(addr)
-                    .ok_or(ProtocolError::from(ConsensusError::Other(
-                        "lose public key".to_string(),
-                    )))?;
+            let pubkey = self.addr_pubkey.get(addr).ok_or_else(|| {
+                ProtocolError::from(ConsensusError::Other("lose public key".to_string()))
+            })?;
             pubkeys.push(pubkey);
         }
 
