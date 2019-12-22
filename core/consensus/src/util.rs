@@ -104,7 +104,7 @@ impl Crypto for OverlordCrypto {
                 "failed to convert hash value".to_string(),
             ))
         })?;
-        
+
         aggregated_signature
             .verify(&hash, &aggregate_key, &self.common_ref)
             .map_err(|e| ProtocolError::from(ConsensusError::CryptoErr(Box::new(e))))?;
