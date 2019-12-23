@@ -8,8 +8,11 @@ use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 
 use core_binding_macro::{cycles, read, write};
-use protocol::traits::{RequestContext, Service};
-use protocol::types::{Address, Hash};
+use protocol::fixed_codec::FixedCodec;
+use protocol::traits::{
+    RequestContext, Service, ServiceSDK, StoreArray, StoreBool, StoreMap, StoreString, StoreUint64,
+};
+use protocol::types::{Address, Epoch, Hash, Receipt, SignedTransaction};
 use protocol::ProtocolResult;
 
 #[test]
@@ -87,13 +90,23 @@ fn test_impl_service() {
         age:  u64,
         sex:  bool,
     }
-    struct Tests {
+    struct Tests<SDK: ServiceSDK> {
+        sdk:         SDK,
         hook_before: bool,
         hook_after:  bool,
     }
 
     #[service]
-    impl Tests {
+    impl<SDK: ServiceSDK> Tests<SDK> {
+        #[init]
+        fn custom_init(sdk: SDK) -> ProtocolResult<Self> {
+            Ok(Self {
+                sdk,
+                hook_after: false,
+                hook_before: false,
+            })
+        }
+
         #[hook_before]
         fn custom_hook_before(&mut self) -> ProtocolResult<()> {
             self.hook_before = true;
@@ -132,10 +145,9 @@ fn test_impl_service() {
     };
     let payload_str = serde_json::to_string(&payload).unwrap();
 
-    let mut test_service = Tests {
-        hook_before: false,
-        hook_after:  false,
-    };
+    let sdk = MockServiceSDK {};
+    let mut test_service = Tests::init_(sdk).unwrap();
+
     let context = MockRequestContext::with_method(1024 * 1024, "test_write", &payload_str);
     let write_res = test_service.write_(context).unwrap();
     assert_eq!(write_res, "write ok");
@@ -221,6 +233,115 @@ impl RequestContext for MockRequestContext {
     }
 
     fn emit_event(&mut self, message: String) -> ProtocolResult<()> {
+        unimplemented!()
+    }
+}
+
+struct MockServiceSDK;
+
+impl ServiceSDK for MockServiceSDK {
+    type ContextItem = MockRequestContext;
+
+    // Alloc or recover a `Map` by` var_name`
+    fn alloc_or_recover_map<Key: 'static + FixedCodec + PartialEq, Val: 'static + FixedCodec>(
+        &mut self,
+        var_name: &str,
+    ) -> ProtocolResult<Box<dyn StoreMap<Key, Val>>> {
+        unimplemented!()
+    }
+
+    // Alloc or recover a `Array` by` var_name`
+    fn alloc_or_recover_array<Elm: 'static + FixedCodec>(
+        &mut self,
+        var_name: &str,
+    ) -> ProtocolResult<Box<dyn StoreArray<Elm>>> {
+        unimplemented!()
+    }
+
+    // Alloc or recover a `Uint64` by` var_name`
+    fn alloc_or_recover_uint64(&mut self, var_name: &str) -> ProtocolResult<Box<dyn StoreUint64>> {
+        unimplemented!()
+    }
+
+    // Alloc or recover a `String` by` var_name`
+    fn alloc_or_recover_string(&mut self, var_name: &str) -> ProtocolResult<Box<dyn StoreString>> {
+        unimplemented!()
+    }
+
+    // Alloc or recover a `Bool` by` var_name`
+    fn alloc_or_recover_bool(&mut self, var_name: &str) -> ProtocolResult<Box<dyn StoreBool>> {
+        unimplemented!()
+    }
+
+    // Get a value from the service state by key
+    fn get_value<Key: FixedCodec, Ret: FixedCodec>(
+        &self,
+        key: &Key,
+    ) -> ProtocolResult<Option<Ret>> {
+        unimplemented!()
+    }
+
+    // Set a value to the service state by key
+    fn set_value<Key: FixedCodec, Val: FixedCodec>(
+        &mut self,
+        key: Key,
+        val: Val,
+    ) -> ProtocolResult<()> {
+        unimplemented!()
+    }
+
+    // Get a value from the specified address by key
+    fn get_account_value<Key: FixedCodec, Ret: FixedCodec>(
+        &self,
+        address: &Address,
+        key: &Key,
+    ) -> ProtocolResult<Option<Ret>> {
+        unimplemented!()
+    }
+
+    // Insert a pair of key / value to the specified address
+    fn set_account_value<Key: FixedCodec, Val: FixedCodec>(
+        &mut self,
+        address: &Address,
+        key: Key,
+        val: Val,
+    ) -> ProtocolResult<()> {
+        unimplemented!()
+    }
+
+    // Get a signed transaction by `tx_hash`
+    // if not found on the chain, return None
+    fn get_transaction_by_hash(&self, tx_hash: &Hash) -> ProtocolResult<Option<SignedTransaction>> {
+        unimplemented!()
+    }
+
+    // Get a epoch by `epoch_id`
+    // if not found on the chain, return None
+    // When the parameter `epoch_id` is None, get the latest (executing)` epoch`
+    fn get_epoch_by_epoch_id(&self, epoch_id: Option<u64>) -> ProtocolResult<Option<Epoch>> {
+        unimplemented!()
+    }
+
+    // Get a receipt by `tx_hash`
+    // if not found on the chain, return None
+    fn get_receipt_by_hash(&self, tx_hash: &Hash) -> ProtocolResult<Option<Receipt>> {
+        unimplemented!()
+    }
+
+    fn get_request_context(&self) -> ProtocolResult<Self::ContextItem> {
+        unimplemented!()
+    }
+
+    // Call other read-only methods of `service` and return the results
+    // synchronously NOTE: You can use recursive calls, but the maximum call
+    // stack is 1024
+    fn read(&self, servide: &str, method: &str, payload: &str) -> ProtocolResult<&str> {
+        unimplemented!()
+    }
+
+    // Call other writable methods of `service` and return the results synchronously
+    // NOTE: You can use recursive calls, but the maximum call stack is 1024
+    fn write(&mut self, servide: &str, method: &str, payload: &str) -> ProtocolResult<&str> {
         unimplemented!()
     }
 }
