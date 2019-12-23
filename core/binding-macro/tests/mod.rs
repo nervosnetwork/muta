@@ -91,7 +91,7 @@ fn test_impl_service() {
         sex:  bool,
     }
     struct Tests<SDK: ServiceSDK> {
-        sdk:         SDK,
+        _sdk:        SDK,
         hook_before: bool,
         hook_after:  bool,
     }
@@ -99,9 +99,9 @@ fn test_impl_service() {
     #[service]
     impl<SDK: ServiceSDK> Tests<SDK> {
         #[init]
-        fn custom_init(sdk: SDK) -> ProtocolResult<Self> {
+        fn custom_init(_sdk: SDK) -> ProtocolResult<Self> {
             Ok(Self {
-                sdk,
+                _sdk,
                 hook_after: false,
                 hook_before: false,
             })
@@ -232,7 +232,7 @@ impl RequestContext for MockRequestContext {
         &self.payload
     }
 
-    fn emit_event(&mut self, message: String) -> ProtocolResult<()> {
+    fn emit_event(&mut self, _message: String) -> ProtocolResult<()> {
         unimplemented!()
     }
 }
@@ -245,7 +245,7 @@ impl ServiceSDK for MockServiceSDK {
     // Alloc or recover a `Map` by` var_name`
     fn alloc_or_recover_map<Key: 'static + FixedCodec + PartialEq, Val: 'static + FixedCodec>(
         &mut self,
-        var_name: &str,
+        _var_name: &str,
     ) -> ProtocolResult<Box<dyn StoreMap<Key, Val>>> {
         unimplemented!()
     }
@@ -253,30 +253,30 @@ impl ServiceSDK for MockServiceSDK {
     // Alloc or recover a `Array` by` var_name`
     fn alloc_or_recover_array<Elm: 'static + FixedCodec>(
         &mut self,
-        var_name: &str,
+        _var_name: &str,
     ) -> ProtocolResult<Box<dyn StoreArray<Elm>>> {
         unimplemented!()
     }
 
     // Alloc or recover a `Uint64` by` var_name`
-    fn alloc_or_recover_uint64(&mut self, var_name: &str) -> ProtocolResult<Box<dyn StoreUint64>> {
+    fn alloc_or_recover_uint64(&mut self, _var_name: &str) -> ProtocolResult<Box<dyn StoreUint64>> {
         unimplemented!()
     }
 
     // Alloc or recover a `String` by` var_name`
-    fn alloc_or_recover_string(&mut self, var_name: &str) -> ProtocolResult<Box<dyn StoreString>> {
+    fn alloc_or_recover_string(&mut self, _var_name: &str) -> ProtocolResult<Box<dyn StoreString>> {
         unimplemented!()
     }
 
     // Alloc or recover a `Bool` by` var_name`
-    fn alloc_or_recover_bool(&mut self, var_name: &str) -> ProtocolResult<Box<dyn StoreBool>> {
+    fn alloc_or_recover_bool(&mut self, _var_name: &str) -> ProtocolResult<Box<dyn StoreBool>> {
         unimplemented!()
     }
 
     // Get a value from the service state by key
     fn get_value<Key: FixedCodec, Ret: FixedCodec>(
         &self,
-        key: &Key,
+        _key: &Key,
     ) -> ProtocolResult<Option<Ret>> {
         unimplemented!()
     }
@@ -284,8 +284,8 @@ impl ServiceSDK for MockServiceSDK {
     // Set a value to the service state by key
     fn set_value<Key: FixedCodec, Val: FixedCodec>(
         &mut self,
-        key: Key,
-        val: Val,
+        _key: Key,
+        _val: Val,
     ) -> ProtocolResult<()> {
         unimplemented!()
     }
@@ -293,8 +293,8 @@ impl ServiceSDK for MockServiceSDK {
     // Get a value from the specified address by key
     fn get_account_value<Key: FixedCodec, Ret: FixedCodec>(
         &self,
-        address: &Address,
-        key: &Key,
+        _address: &Address,
+        _key: &Key,
     ) -> ProtocolResult<Option<Ret>> {
         unimplemented!()
     }
@@ -302,29 +302,32 @@ impl ServiceSDK for MockServiceSDK {
     // Insert a pair of key / value to the specified address
     fn set_account_value<Key: FixedCodec, Val: FixedCodec>(
         &mut self,
-        address: &Address,
-        key: Key,
-        val: Val,
+        _address: &Address,
+        _key: Key,
+        _val: Val,
     ) -> ProtocolResult<()> {
         unimplemented!()
     }
 
     // Get a signed transaction by `tx_hash`
     // if not found on the chain, return None
-    fn get_transaction_by_hash(&self, tx_hash: &Hash) -> ProtocolResult<Option<SignedTransaction>> {
+    fn get_transaction_by_hash(
+        &self,
+        _tx_hash: &Hash,
+    ) -> ProtocolResult<Option<SignedTransaction>> {
         unimplemented!()
     }
 
     // Get a epoch by `epoch_id`
     // if not found on the chain, return None
     // When the parameter `epoch_id` is None, get the latest (executing)` epoch`
-    fn get_epoch_by_epoch_id(&self, epoch_id: Option<u64>) -> ProtocolResult<Option<Epoch>> {
+    fn get_epoch_by_epoch_id(&self, _epoch_id: Option<u64>) -> ProtocolResult<Option<Epoch>> {
         unimplemented!()
     }
 
     // Get a receipt by `tx_hash`
     // if not found on the chain, return None
-    fn get_receipt_by_hash(&self, tx_hash: &Hash) -> ProtocolResult<Option<Receipt>> {
+    fn get_receipt_by_hash(&self, _tx_hash: &Hash) -> ProtocolResult<Option<Receipt>> {
         unimplemented!()
     }
 
@@ -335,13 +338,13 @@ impl ServiceSDK for MockServiceSDK {
     // Call other read-only methods of `service` and return the results
     // synchronously NOTE: You can use recursive calls, but the maximum call
     // stack is 1024
-    fn read(&self, servide: &str, method: &str, payload: &str) -> ProtocolResult<&str> {
+    fn read(&self, _service: &str, _method: &str, _payload: &str) -> ProtocolResult<&str> {
         unimplemented!()
     }
 
     // Call other writable methods of `service` and return the results synchronously
     // NOTE: You can use recursive calls, but the maximum call stack is 1024
-    fn write(&mut self, servide: &str, method: &str, payload: &str) -> ProtocolResult<&str> {
+    fn write(&mut self, _service: &str, _method: &str, _payload: &str) -> ProtocolResult<&str> {
         unimplemented!()
     }
 }

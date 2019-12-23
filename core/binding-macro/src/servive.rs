@@ -158,17 +158,12 @@ fn extract_init_metod(items: &[ImplItem]) -> InitMethod {
     let mut syn_init_method: Option<ImplItemMethod> = None;
 
     for method in methods {
-        let is_init_method = method
-            .attrs
-            .iter()
-            .find(|attr| {
-                attr.path
-                    .segments
-                    .iter()
-                    .find(|segment| segment.ident == INIT_ATTRIBUTE)
-                    .is_some()
-            })
-            .is_some();
+        let is_init_method = method.attrs.iter().any(|attr| {
+            attr.path
+                .segments
+                .iter()
+                .any(|segment| segment.ident == INIT_ATTRIBUTE)
+        });
         if is_init_method && syn_init_method.is_none() {
             syn_init_method = Some(method)
         } else if is_init_method & syn_init_method.is_some() {
@@ -179,7 +174,7 @@ fn extract_init_metod(items: &[ImplItem]) -> InitMethod {
     let init_method = syn_init_method.expect("The init attribute must be added to a method");
 
     InitMethod {
-        ident: init_method.sig.ident.clone(),
+        ident: init_method.sig.ident,
     }
 }
 
