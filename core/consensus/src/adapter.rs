@@ -322,7 +322,7 @@ fn gen_update_info(
             .collect::<Vec<_>>(),
     )
     .get_root_hash()
-    .expect("Generate receipt root failed");
+    .unwrap_or_else(Hash::from_empty);
 
     UpdateInfo {
         exec_epoch_id: epoch_id,

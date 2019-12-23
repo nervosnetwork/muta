@@ -8,12 +8,12 @@ privkey = "136dbd5402e4002d9efb3f67eb8250b719e54813a4369cf8ad26ef916d938850"
 data_path = "./devtools/chain/data"
 
 [graphql]
-listening_address = "0.0.0.0:8000"
+listening_address = "192.168.0.106:8000"
 graphql_uri = "/graphql"
 graphiql_uri = "/graphiql"
 
 [network]
-listening_address = "0.0.0.0:1337"
+listening_address = "192.168.0.106:1337"
 
 [[network.bootstraps]]
 pubkey = "03d158fb85df6201708f2cbde51e0b7c2d8835a28aaea7ed243e5db1aa442b18b1"

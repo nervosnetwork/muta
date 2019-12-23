@@ -124,7 +124,11 @@ impl CurrentConsensusStatus {
         }
 
         let len = cycles.len();
-        if self.cycles_used.len() < len || check_vec_roots(&self.cycles_used, cycles) {
+        if self.cycles_used.len() < len || !check_vec_roots(&self.cycles_used, cycles) {
+            warn!(
+                "cycles used {:?}, cache cycles used {:?}",
+                cycles, self.cycles_used
+            );
             return Err(ConsensusError::StatusErr(StatusCacheField::CyclesUsed).into());
         }
 
@@ -139,7 +143,7 @@ impl CurrentConsensusStatus {
         }
 
         let len = logs.len();
-        if self.logs_bloom.len() < len || check_vec_roots(&self.logs_bloom, logs) {
+        if self.logs_bloom.len() < len || !check_vec_roots(&self.logs_bloom, logs) {
             return Err(ConsensusError::StatusErr(StatusCacheField::LogsBloom).into());
         }
 
@@ -184,7 +188,7 @@ impl CurrentConsensusStatus {
         }
 
         let len = receipt_roots.len();
-        if self.receipt_root.len() < len || check_vec_roots(&self.receipt_root, receipt_roots) {
+        if self.receipt_root.len() < len || !check_vec_roots(&self.receipt_root, receipt_roots) {
             warn!("receipt root: {:?}", receipt_roots);
             return Err(ConsensusError::StatusErr(StatusCacheField::ReceiptRoot).into());
         }
