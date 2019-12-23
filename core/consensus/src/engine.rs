@@ -546,7 +546,7 @@ pub fn check_vec_roots<T: Eq>(cache_roots: &[T], epoch_roots: &[T]) -> bool {
     cache_roots
         .iter()
         .zip(epoch_roots.iter())
-        .any(|(c_root, e_root)| c_root == e_root)
+        .all(|(c_root, e_root)| c_root == e_root)
 }
 
 fn time_now() -> u64 {
