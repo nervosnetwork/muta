@@ -14,9 +14,9 @@ core-storage = { path = "./core/storage" }
 core-mempool = { path = "./core/mempool" }
 core-network = { path = "./core/network" }
 core-consensus = { path = "./core/consensus" }
-core-executor = { path = "./core/executor" }
-core-binding = { path = "./core/binding" }
-core-binding-macro = { path = "./core/binding-macro" }
+
+binding-macro = { path = "./binding-macro" }
+framework = { path = "./framework" }
 
 parking_lot = "0.9"
 runtime = "0.3.0-alpha.7"
@@ -44,12 +44,12 @@ members = [
 
   "core/api",
   "core/consensus",
-  "core/executor",
   "core/mempool",
   "core/network",
   "core/storage",
-  "core/binding",
-  "core/binding-macro",
+
+  "binding-macro",
+  "framework",
 
   "protocol",
 ]
