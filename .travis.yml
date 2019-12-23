@@ -35,5 +35,7 @@ env:
     - TEST: true
 
 before_cache:
+  # reduce cache size
+  - rm -rf "$TRAVIS_HOME"/.cargo/registry"
   - rm -rf ./target/debug/incremental/
   - cargo sweep -f
