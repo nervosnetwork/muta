@@ -2,7 +2,7 @@ use log::{error, trace};
 use moodyblues_sdk::point::{Metadata, TracePoint};
 use moodyblues_sdk::time::now;
 use moodyblues_sdk::trace::{set_boxed_tracer, Trace};
-use serde_json::to_string;
+use serde_json::{json, to_string, to_value};
 
 use protocol::ProtocolResult;
 
@@ -18,9 +18,21 @@ impl MetricTracer {
     }
 }
 
+// 1. TracePoint to json
+// 2. add `tag.name="moodyblues"` into json
+fn to_trace_str(point: TracePoint) -> ProtocolResult<String> {
+    let mut json = to_value(point).map_err(|e| ConsensusError::OverlordErr(Box::new(e)))?;
+    let map = json
+        .as_object_mut()
+        .ok_or_else(|| ConsensusError::Other("tracing: mutate json error".to_string()))?;
+    // metrics logger always takes a `name` to distinguish different metric log
+    map.insert("name".to_string(), json!("moodyblues"));
+    to_string(&map).map_err(|e| ConsensusError::OverlordErr(Box::new(e)).into())
+}
+
 impl Trace for MetricTracer {
     fn report(&self, point: TracePoint) {
-        match to_string(&point) {
+        match to_trace_str(point) {
             Ok(json) => trace!(target: "metrics", "{}", json),
             Err(e) => error!("tracing: convert json error {:?}", e),
         }
