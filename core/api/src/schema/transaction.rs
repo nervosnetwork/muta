@@ -29,33 +29,33 @@ pub enum ContractType {
                          InputRawTransaction describes information above")]
 pub struct InputRawTransaction {
     #[graphql(description = "Identifier of the chain.")]
-    pub chain_id: Hash,
+    pub chain_id:     Hash,
     #[graphql(
         description = "Mostly like the gas limit in Ethereum, describes the fee that \
                        you are willing to pay the highest price for the transaction"
     )]
-    pub fee_cycle: Uint64,
+    pub fee_cycle:    Uint64,
     #[graphql(description = "asset type")]
     pub fee_asset_id: AssetID,
     #[graphql(
         description = "Every transaction has its own id, unlike Ethereum's nonce,\
                        the nonce in Muta is an hash"
     )]
-    pub nonce: Hash,
+    pub nonce:        Hash,
     #[graphql(description = "For security and performance reasons, \
     Muta will only deal with trade request over a period of time,\
     the `timeout` should be `timeout > current_epoch_height` and `timeout < current_epoch_height + timeout_gap`,\
     the `timeout_gap` generally equal to 20.")]
-    pub timeout: Uint64,
+    pub timeout:      Uint64,
 }
 
 #[derive(GraphQLInputObject, Clone)]
 #[graphql(description = "Signature of the transaction")]
 pub struct InputTransactionEncryption {
     #[graphql(description = "The digest of the transaction")]
-    pub tx_hash: Hash,
+    pub tx_hash:   Hash,
     #[graphql(description = "The public key of transfer")]
-    pub pubkey: Bytes,
+    pub pubkey:    Bytes,
     #[graphql(description = "The signature of the transaction")]
     pub signature: Bytes,
 }
@@ -64,18 +64,18 @@ pub struct InputTransactionEncryption {
 #[graphql(description = "The action of transfer transaction")]
 pub struct InputTransferAction {
     #[graphql(description = "The amount of the transfer")]
-    pub carrying_amount: Balance,
+    pub carrying_amount:   Balance,
     #[graphql(description = "The asset of of the transfer")]
     pub carrying_asset_id: AssetID,
     #[graphql(description = "The receiver of the transfer")]
-    pub receiver: Address,
+    pub receiver:          Address,
 }
 
 #[derive(GraphQLInputObject, Clone)]
 #[graphql(description = "The deploy transfer transaction")]
 pub struct InputDeployAction {
     #[graphql(description = "Encoded contract code")]
-    pub code: Bytes,
+    pub code:          Bytes,
     #[graphql(description = "The type of contract")]
     pub contract_type: ContractType,
 }

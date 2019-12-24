@@ -9,7 +9,7 @@ use crate::schema::{Address, Hash, MerkleRoot, Uint64};
 )]
 pub struct Epoch {
     #[graphql(description = "The header section of an epoch")]
-    header: EpochHeader,
+    header:            EpochHeader,
     #[graphql(description = "The body section of an epoch")]
     ordered_tx_hashes: Vec<Hash>,
 }
@@ -20,25 +20,25 @@ pub struct EpochHeader {
     #[graphql(
         description = "Identifier of a chain in order to prevent replay attacks across channels "
     )]
-    pub chain_id: Hash,
+    pub chain_id:          Hash,
     #[graphql(description = "Known as the block height like other blockchain")]
-    pub epoch_id: Uint64,
+    pub epoch_id:          Uint64,
     #[graphql(description = "The hash of the serialized previous epoch")]
-    pub pre_hash: Hash,
+    pub pre_hash:          Hash,
     #[graphql(description = "A timestamp that records when the epoch was created")]
-    pub timestamp: Uint64,
+    pub timestamp:         Uint64,
     #[graphql(description = "The merkle root of ordered transactions")]
-    pub order_root: MerkleRoot,
+    pub order_root:        MerkleRoot,
     #[graphql(description = "The merkle roots of all the confirms")]
-    pub confirm_root: Vec<MerkleRoot>,
+    pub confirm_root:      Vec<MerkleRoot>,
     #[graphql(description = "The merkle root of state root")]
-    pub state_root: MerkleRoot,
+    pub state_root:        MerkleRoot,
     #[graphql(description = "The merkle roots of receipts")]
-    pub receipt_root: Vec<MerkleRoot>,
+    pub receipt_root:      Vec<MerkleRoot>,
     #[graphql(description = "The sum of all transactions costs")]
-    pub cycles_used: Vec<Uint64>,
+    pub cycles_used:       Vec<Uint64>,
     #[graphql(description = "The address descirbed who packed the epoch")]
-    pub proposer: Address,
+    pub proposer:          Address,
     // proof:             Proof,
     #[graphql(description = "The version of validator is designed for cross chain")]
     pub validator_version: Uint64,

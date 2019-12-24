@@ -43,7 +43,7 @@ pub struct ConnectionService<P: NetworkProtocol> {
     // TODO: Remove Compat01As03 after tentacle supports std Future
     inner: Compat01As03<Service<ConnectionServiceKeeper>>,
 
-    event_rx: UnboundedReceiver<ConnectionEvent>,
+    event_rx:       UnboundedReceiver<ConnectionEvent>,
     // Temporary store events for later processing under high load
     pending_events: VecDeque<ConnectionEvent>,
 
