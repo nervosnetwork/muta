@@ -7,6 +7,19 @@ use protocol::traits::RequestContext;
 use protocol::types::{Address, Event};
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
+#[derive(Debug)]
+pub struct ContextParams {
+    pub cycles_limit:    u64,
+    pub cycles_price:    u64,
+    pub cycles_used:     Rc<RefCell<u64>>,
+    pub caller:          Address,
+    pub epoch_id:        u64,
+    pub service_name:    String,
+    pub service_method:  String,
+    pub service_payload: String,
+    pub events:          Rc<RefCell<Vec<Event>>>,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct DefaultRequestContext {
     cycles_limit:    u64,
@@ -21,26 +34,17 @@ pub struct DefaultRequestContext {
 }
 
 impl DefaultRequestContext {
-    pub fn new(
-        cycles_limit: u64,
-        cycles_price: u64,
-        cycles_used: u64,
-        caller: Address,
-        epoch_id: u64,
-        service_name: String,
-        service_method: String,
-        service_payload: String,
-    ) -> Self {
+    pub fn new(params: ContextParams) -> Self {
         Self {
-            cycles_limit,
-            cycles_price,
-            cycles_used: Rc::new(RefCell::new(cycles_used)),
-            caller,
-            epoch_id,
-            service_name,
-            service_method,
-            service_payload,
-            events: Rc::new(RefCell::new(Vec::new())),
+            cycles_limit:    params.cycles_limit,
+            cycles_price:    params.cycles_price,
+            cycles_used:     params.cycles_used,
+            caller:          params.caller,
+            epoch_id:        params.epoch_id,
+            service_name:    params.service_name,
+            service_method:  params.service_method,
+            service_payload: params.service_payload,
+            events:          params.events,
         }
     }
 

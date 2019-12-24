@@ -1,4 +1,6 @@
-pub mod chain_querier;
+mod chain_querier;
+
+pub use chain_querier::{ChainQueryError, DefaultChainQuerier};
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -11,7 +13,7 @@ use protocol::traits::{
 use protocol::types::{Address, Epoch, Hash, Receipt, SignedTransaction};
 use protocol::ProtocolResult;
 
-use crate::store::{
+use crate::binding::store::{
     DefaultStoreArray, DefaultStoreBool, DefaultStoreMap, DefaultStoreString, DefaultStoreUint64,
 };
 

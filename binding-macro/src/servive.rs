@@ -86,10 +86,10 @@ pub fn gen_service_code(_: TokenStream, item: TokenStream) -> TokenStream {
                 match method {
                     #(#list_read_name => {
                         let payload: #list_read_payload = serde_json::from_str(ctx.get_payload())
-                                .map_err(|e| core_binding::ServiceError::JsonParse(e))?;
+                                .map_err(|e| framework::ServiceError::JsonParse(e))?;
                         self.#list_read_ident(ctx, payload)
                     },)*
-                    _ => Err(core_binding::ServiceError::NotFoundMethod(method.to_owned()).into())
+                    _ => Err(framework::ServiceError::NotFoundMethod(method.to_owned()).into())
                 }
             }
 
@@ -99,10 +99,10 @@ pub fn gen_service_code(_: TokenStream, item: TokenStream) -> TokenStream {
                 match method {
                     #(#list_write_name => {
                         let payload: #list_write_payload = serde_json::from_str(ctx.get_payload())
-                                .map_err(|e| core_binding::ServiceError::JsonParse(e))?;
+                                .map_err(|e| framework::ServiceError::JsonParse(e))?;
                         self.#list_write_ident(ctx, payload)
                     },)*
-                    _ => Err(core_binding::ServiceError::NotFoundMethod(method.to_owned()).into())
+                    _ => Err(framework::ServiceError::NotFoundMethod(method.to_owned()).into())
                 }
             }
         }
