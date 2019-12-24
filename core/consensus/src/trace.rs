@@ -18,6 +18,8 @@ impl MetricTracer {
     }
 }
 
+// 1. TracePoint to json
+// 2. add `tag.name="moodyblues"` into json
 fn to_trace_str(point: TracePoint) -> ProtocolResult<String> {
     let mut json = to_value(point).map_err(|e| ConsensusError::OverlordErr(Box::new(e)))?;
     let map = json
