@@ -119,12 +119,7 @@ impl CurrentConsensusStatus {
     }
 
     fn update_cycles(&mut self, cycles: &[u64]) -> ProtocolResult<()> {
-        if cycles.is_empty() {
-            return Ok(());
-        }
-
-        let len = cycles.len();
-        if self.cycles_used.len() < len || !check_vec_roots(&self.cycles_used, cycles) {
+        if !check_vec_roots(&self.cycles_used, cycles) {
             warn!(
                 "cycles used {:?}, cache cycles used {:?}",
                 cycles, self.cycles_used
@@ -132,23 +127,16 @@ impl CurrentConsensusStatus {
             return Err(ConsensusError::StatusErr(StatusCacheField::CyclesUsed).into());
         }
 
-        let tmp = self.cycles_used.split_off(len);
-        self.cycles_used = tmp;
+        self.cycles_used = self.cycles_used.split_off(cycles.len());
         Ok(())
     }
 
     fn update_logs_bloom(&mut self, logs: &[Bloom]) -> ProtocolResult<()> {
-        if logs.is_empty() {
-            return Ok(());
-        }
-
-        let len = logs.len();
-        if self.logs_bloom.len() < len || !check_vec_roots(&self.logs_bloom, logs) {
+        if !check_vec_roots(&self.logs_bloom, logs) {
             return Err(ConsensusError::StatusErr(StatusCacheField::LogsBloom).into());
         }
 
-        let tmp = self.logs_bloom.split_off(len);
-        self.logs_bloom = tmp;
+        self.logs_bloom = self.logs_bloom.split_off(logs.len());
         Ok(())
     }
 
@@ -183,18 +171,12 @@ impl CurrentConsensusStatus {
     }
 
     fn update_receipt_root(&mut self, receipt_roots: &[MerkleRoot]) -> ProtocolResult<()> {
-        if receipt_roots.is_empty() {
-            return Ok(());
-        }
-
-        let len = receipt_roots.len();
-        if self.receipt_root.len() < len || !check_vec_roots(&self.receipt_root, receipt_roots) {
+        if !check_vec_roots(&self.receipt_root, receipt_roots) {
             warn!("receipt root: {:?}", receipt_roots);
             return Err(ConsensusError::StatusErr(StatusCacheField::ReceiptRoot).into());
         }
 
-        let tmp = self.receipt_root.split_off(len);
-        self.receipt_root = tmp;
+        self.receipt_root = self.receipt_root.split_off(receipt_roots.len());
         Ok(())
     }
 

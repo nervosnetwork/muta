@@ -20,11 +20,11 @@ use crate::MemPoolError;
 /// transaction hashes for consensus.
 pub struct TxWrapper {
     /// Content.
-    tx: SignedTransaction,
+    tx:       SignedTransaction,
     /// While map removes a `shared_tx` during flush, it will mark `removed`
     /// true. Afterwards, queue removes the transaction which marks
     /// `removed` true during package.
-    removed: AtomicBool,
+    removed:  AtomicBool,
     /// The response transactions in propose-syncing will insert into `TxCache`
     /// marking `proposed` true.
     /// While collecting propose_tx_hashes during package,
@@ -114,14 +114,14 @@ struct QueueRole<'a> {
 /// out, `queue_1` switch to insertion queue.
 pub struct TxCache {
     /// One queue.
-    queue_0: ArrayQueue<SharedTx>,
+    queue_0:          ArrayQueue<SharedTx>,
     /// Another queue.
-    queue_1: ArrayQueue<SharedTx>,
+    queue_1:          ArrayQueue<SharedTx>,
     /// A map for randomly search and removal.
-    map: Map<SharedTx>,
+    map:              Map<SharedTx>,
     /// This is used to pick a queue for insertion,
     /// If true selects `queue_0`, else `queue_1`.
-    is_zero: AtomicBool,
+    is_zero:          AtomicBool,
     /// This is an atomic state to solve concurrent insertion problem during
     /// package. While switching insertion queues, some transactions may
     /// still insert into the old queue. We use this state to make sure

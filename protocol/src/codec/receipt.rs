@@ -53,29 +53,29 @@ pub enum ReceiptResult {
 #[derive(Clone, Message)]
 pub struct Transfer {
     #[prost(message, tag = "1")]
-    pub receiver: Option<UserAddress>,
+    pub receiver:      Option<UserAddress>,
     #[prost(message, tag = "2")]
-    pub asset_id: Option<AssetID>,
+    pub asset_id:      Option<AssetID>,
     #[prost(message, tag = "3")]
     pub before_amount: Option<Balance>,
     #[prost(message, tag = "4")]
-    pub after_amount: Option<Balance>,
+    pub after_amount:  Option<Balance>,
 }
 
 #[derive(Clone, Message)]
 pub struct Approve {
     #[prost(message, tag = "1")]
-    pub spender: Option<ContractAddress>,
+    pub spender:  Option<ContractAddress>,
     #[prost(message, tag = "2")]
     pub asset_id: Option<AssetID>,
     #[prost(message, tag = "3")]
-    pub max: Option<Balance>,
+    pub max:      Option<Balance>,
 }
 
 #[derive(Clone, Message)]
 pub struct Deploy {
     #[prost(message, tag = "1")]
-    pub contract: Option<ContractAddress>,
+    pub contract:      Option<ContractAddress>,
     #[prost(enumeration = "ContractType", tag = "2")]
     pub contract_type: i32,
 }
@@ -83,11 +83,11 @@ pub struct Deploy {
 #[derive(Clone, Message)]
 pub struct Call {
     #[prost(message, tag = "1")]
-    pub contract: Option<ContractAddress>,
+    pub contract:     Option<ContractAddress>,
     #[prost(bytes, tag = "2")]
     pub return_value: Vec<u8>,
     #[prost(bytes, tag = "3")]
-    pub logs_bloom: Vec<u8>,
+    pub logs_bloom:   Vec<u8>,
 }
 
 #[derive(Clone, Message)]
@@ -95,7 +95,7 @@ pub struct Fail {
     #[prost(string, tag = "1")]
     pub system: String,
     #[prost(string, tag = "2")]
-    pub user: String,
+    pub user:   String,
 }
 
 // #################
