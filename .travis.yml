@@ -33,7 +33,7 @@ script: ./devtools/ci/script.sh
 env:
   global:
     - RUST_BACKTRACE=full
-    - RUSTC_WRAPPER=sccache
+    # - RUSTC_WRAPPER=sccache
     - SCCACHE_CACHE_SIZE="2G"
     - USE_SYS_ROCKSDB: true
     - FMT: true
