@@ -1,8 +1,6 @@
 #!/bin/bash
 set -ev
 
-cargo sweep -s
-
 if [ "$FMT" = true ]; then
   make fmt
 fi

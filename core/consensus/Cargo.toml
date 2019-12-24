@@ -8,15 +8,16 @@ edition = "2018"
 
 [dependencies]
 async-trait = "0.1"
-bincode = "1.1"
+bincode = "1.2"
 bytes = "0.4"
 creep = "0.1"
-derive_more = "0.15"
-futures = "0.3"
+derive_more = "0.99"
+futures = { version = "0.3", features = ["async-await"] }
+futures-timer = "2.0"
 log = "0.4"
 moodyblues-sdk = "0.2"
-overlord = "0.1"
-parking_lot = "0.9"
+overlord = { git = "https://github.com/nervosnetwork/overlord", rev = "123294e" }
+parking_lot = "0.10"
 rlp = "0.4"
 serde = {version = "1.0", features = ["derive"]}
 serde_json = "1.0"

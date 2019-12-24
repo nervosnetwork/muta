@@ -11,14 +11,16 @@ use serde::{Deserialize, Serialize};
 use protocol::traits::{Consensus, Context, MessageHandler, Priority, Rpc, Storage};
 use protocol::ProtocolResult;
 
-use crate::fixed_types::{ConsensusRpcRequest, ConsensusRpcResponse, FixedEpochID, FixedSignedTxs};
+use crate::fixed_types::{FixedEpoch, FixedEpochID, FixedSignedTxs, PullTxsRequest};
 
 pub const END_GOSSIP_SIGNED_PROPOSAL: &str = "/gossip/consensus/signed_proposal";
 pub const END_GOSSIP_SIGNED_VOTE: &str = "/gossip/consensus/signed_vote";
 pub const END_GOSSIP_AGGREGATED_VOTE: &str = "/gossip/consensus/qc";
 pub const END_GOSSIP_RICH_EPOCH_ID: &str = "/gossip/consensus/rich_epoch_id";
-pub const RPC_SYNC_PULL: &str = "/rpc_call/consensus/sync_pull";
-pub const RPC_RESP_SYNC_PULL: &str = "/rpc_resp/consensus/sync_pull";
+pub const RPC_SYNC_PULL_EPOCH: &str = "/rpc_call/consensus/sync_pull_epoch";
+pub const RPC_RESP_SYNC_PULL_EPOCH: &str = "/rpc_resp/consensus/sync_pull_epoch";
+pub const RPC_SYNC_PULL_TXS: &str = "/rpc_call/consensus/sync_pull_txs";
+pub const RPC_RESP_SYNC_PULL_TXS: &str = "/rpc_resp/consensus/sync_pull_txs";
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Proposal(pub Vec<u8>);
@@ -133,56 +135,75 @@ impl<C: Consensus + 'static> MessageHandler for RichEpochIDMessageHandler<C> {
 }
 
 #[derive(Debug)]
-pub struct RpcHandler<R, S> {
+pub struct PullEpochRpcHandler<R, S> {
     rpc:     Arc<R>,
     storage: Arc<S>,
 }
 
-#[async_trait]
-impl<R: Rpc + 'static, S: Storage + 'static> MessageHandler for RpcHandler<R, S> {
-    type Message = ConsensusRpcRequest;
-
-    async fn process(&self, ctx: Context, msg: ConsensusRpcRequest) -> ProtocolResult<()> {
-        match msg {
-            ConsensusRpcRequest::PullEpochs(ep) => {
-                debug!("message: get rpc pull epoch {:?}, {:?}", ep, ctx);
-                let res = self.storage.get_epoch_by_epoch_id(ep).await?;
-
-                self.rpc
-                    .response(
-                        ctx,
-                        RPC_RESP_SYNC_PULL,
-                        ConsensusRpcResponse::PullEpochs(Box::new(res)),
-                        Priority::High,
-                    )
-                    .await
-            }
-
-            ConsensusRpcRequest::PullTxs(txs) => {
-                let mut res = Vec::new();
-                for tx in txs.inner.into_iter() {
-                    res.push(self.storage.get_transaction_by_hash(tx).await?);
-                }
-
-                self.rpc
-                    .response(
-                        ctx,
-                        RPC_RESP_SYNC_PULL,
-                        ConsensusRpcResponse::PullTxs(Box::new(FixedSignedTxs::new(res))),
-                        Priority::High,
-                    )
-                    .await
-            }
-        }
-    }
-}
-
-impl<R, S> RpcHandler<R, S>
+impl<R, S> PullEpochRpcHandler<R, S>
 where
     R: Rpc + 'static,
     S: Storage + 'static,
 {
     pub fn new(rpc: Arc<R>, storage: Arc<S>) -> Self {
-        RpcHandler { rpc, storage }
+        PullEpochRpcHandler { rpc, storage }
+    }
+}
+
+#[async_trait]
+impl<R: Rpc + 'static, S: Storage + 'static> MessageHandler for PullEpochRpcHandler<R, S> {
+    type Message = FixedEpochID;
+
+    async fn process(&self, ctx: Context, msg: FixedEpochID) -> ProtocolResult<()> {
+        debug!("message: get rpc pull epoch {:?}, {:?}", msg.inner, ctx);
+        let id = msg.inner;
+        let epoch = self.storage.get_epoch_by_epoch_id(id).await?;
+
+        self.rpc
+            .response(
+                ctx,
+                RPC_RESP_SYNC_PULL_EPOCH,
+                FixedEpoch::new(epoch),
+                Priority::High,
+            )
+            .await
+    }
+}
+
+#[derive(Debug)]
+pub struct PullTxsRpcHandler<R, S> {
+    rpc:     Arc<R>,
+    storage: Arc<S>,
+}
+
+impl<R, S> PullTxsRpcHandler<R, S>
+where
+    R: Rpc + 'static,
+    S: Storage + 'static,
+{
+    pub fn new(rpc: Arc<R>, storage: Arc<S>) -> Self {
+        PullTxsRpcHandler { rpc, storage }
+    }
+}
+
+#[async_trait]
+impl<R: Rpc + 'static, S: Storage + 'static> MessageHandler for PullTxsRpcHandler<R, S> {
+    type Message = PullTxsRequest;
+
+    async fn process(&self, ctx: Context, msg: PullTxsRequest) -> ProtocolResult<()> {
+        debug!("message: get rpc pull txs {:?}", msg.inner.len());
+        let mut res = Vec::new();
+        for tx in msg.inner.into_iter() {
+            res.push(self.storage.get_transaction_by_hash(tx).await?);
+        }
+
+        self.rpc
+            .response(
+                ctx,
+                RPC_RESP_SYNC_PULL_TXS,
+                FixedSignedTxs::new(res),
+                Priority::High,
+            )
+            .await
     }
 }
