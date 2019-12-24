@@ -89,11 +89,17 @@ pub trait AdmissionControl {
 // Developers can use service to customize blockchain business
 //
 // It contains:
+// - init: Initialize the service.
 // - hooks: A pair of hooks that allow inserting a piece of logic before and
 //   after the epoch is executed.
 // - read: Provide some read-only functions for users or other services to call
 // - write: provide some writable functions for users or other services to call
-pub trait Service {
+pub trait Service<SDK: ServiceSDK> {
+    // Initialize the service
+    fn init_(sdk: SDK) -> ProtocolResult<Self>
+    where
+        Self: Sized;
+
     // Executed before the epoch is executed.
     fn hook_before_(&mut self) -> ProtocolResult<()> {
         Ok(())
@@ -193,11 +199,11 @@ pub trait ServiceSDK {
     // Call other read-only methods of `service` and return the results
     // synchronously NOTE: You can use recursive calls, but the maximum call
     // stack is 1024
-    fn read(&self, servide: &str, method: &str, payload: &str) -> ProtocolResult<&str>;
+    fn read(&self, service: &str, method: &str, payload: &str) -> ProtocolResult<&str>;
 
     // Call other writable methods of `service` and return the results synchronously
     // NOTE: You can use recursive calls, but the maximum call stack is 1024
-    fn write(&mut self, servide: &str, method: &str, payload: &str) -> ProtocolResult<&str>;
+    fn write(&mut self, service: &str, method: &str, payload: &str) -> ProtocolResult<&str>;
 }
 
 pub trait StoreMap<Key: FixedCodec + PartialEq, Value: FixedCodec> {

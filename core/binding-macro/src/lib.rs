@@ -125,7 +125,7 @@ pub fn hook_before(_: TokenStream, item: TokenStream) -> TokenStream {
 /// # Example
 ///
 /// use serde::{Deserialize, Serialize};
-/// use protocol::traits::RequestContext;
+/// use protocol::traits::{RequestContext, ServiceSDK};
 /// use protocol::ProtocolResult;
 ///
 /// ```rust
@@ -139,12 +139,16 @@ pub fn hook_before(_: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// // serde::Deserialize and serde::Serialize are required.
 /// #[derive(Serialize, Deserialize)]
-/// struct GetKittyPayload {
+/// struct GetKittyPayload<SDK: ServiceSDK> {
 ///     // fields
 /// }
 ///
 /// #[service]
-/// impl KittyService {
+/// impl<SDK: ServiceSDK> KittyService<SDK> {
+///     #[init]
+///     fn custom_init(sdk: SDK) -> ProtoResult<Self> {
+///         Ok(Self {})
+///     }
 ///     #[hook_before]
 ///     fn custom_hook_before(&mut self) -> ProtoResult<()> {
 ///         // Do something
@@ -175,7 +179,10 @@ pub fn hook_before(_: TokenStream, item: TokenStream) -> TokenStream {
 /// }
 ///
 /// // Generated code.
-/// impl Service for KittyService {
+/// impl<SDK: ServiceSDK> Service<SDK> for KittyService<SDK> {
+///     fn init_(sdk: SDK) -> ProtocolResult<Self> {
+///         Self::custom_init(sdk)
+///     }
 ///     fn hook_before_(&mut self) -> ProtocolResult<()> {
 ///         self.custom_hook_before()
 ///     }
@@ -214,4 +221,11 @@ pub fn hook_before(_: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn service(attr: TokenStream, item: TokenStream) -> TokenStream {
     gen_service_code(attr, item)
+}
+
+/// Marks a method so that it called when the service is initialized.
+// TODO(@yejiayu): Verify the function signature.
+#[proc_macro_attribute]
+pub fn init(_: TokenStream, item: TokenStream) -> TokenStream {
+    item
 }
