@@ -4,7 +4,7 @@ use moodyblues_sdk::time::now;
 use moodyblues_sdk::trace::{set_boxed_tracer, Trace};
 use serde_json::{json, to_string, to_value};
 
-use protocol::{ProtocolError, ProtocolResult};
+use protocol::ProtocolResult;
 
 use crate::ConsensusError;
 
@@ -18,16 +18,14 @@ impl MetricTracer {
     }
 }
 
-fn err() -> ProtocolError {
-    ConsensusError::Other("tracing: failed when parse point".to_string()).into()
-}
-
 fn to_trace_str(point: TracePoint) -> ProtocolResult<String> {
-    let mut json = to_value(point).map_err(|_| err())?;
-    let map = json.as_object_mut().ok_or_else(err)?;
+    let mut json = to_value(point).map_err(|e| ConsensusError::OverlordErr(Box::new(e)))?;
+    let map = json
+        .as_object_mut()
+        .ok_or_else(|| ConsensusError::Other("tracing: mutate json error".to_string()))?;
     // metrics logger always takes a `name` to distinguish different metric log
     map.insert("name".to_string(), json!("moodyblues"));
-    to_string(&map).map_err(|_| err())
+    to_string(&map).map_err(|e| ConsensusError::OverlordErr(Box::new(e)).into())
 }
 
 impl Trace for MetricTracer {
