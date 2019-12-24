@@ -14,7 +14,7 @@ creep = "0.1"
 derive_more = "0.15"
 futures = "0.3"
 log = "0.4"
-moodyblues-sdk = { git = "https://github.com/homura/moodyblues-client-rust" }
+moodyblues-sdk = "0.2"
 overlord = "0.1"
 parking_lot = "0.9"
 rlp = "0.4"

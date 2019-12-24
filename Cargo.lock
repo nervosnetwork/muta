@@ -476,7 +476,7 @@ dependencies = [
  "derive_more 0.15.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "moodyblues-sdk 0.1.0 (git+https://github.com/homura/moodyblues-client-rust)",
+ "moodyblues-sdk 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "num-traits 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "overlord 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "parking_lot 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1714,8 +1714,8 @@ dependencies = [
 
 [[package]]
 name = "moodyblues-sdk"
-version = "0.1.0"
-source = "git+https://github.com/homura/moodyblues-client-rust#9c6858b7f8c5caa397e9021a22db0abade327c72"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "serde 1.0.102 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 1.0.42 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -4029,7 +4029,7 @@ dependencies = [
 "checksum mio 0.6.19 (registry+https://github.com/rust-lang/crates.io-index)" = "83f51996a3ed004ef184e16818edc51fadffe8e7ca68be67f9dee67d84d0ff23"
 "checksum mio-uds 0.6.7 (registry+https://github.com/rust-lang/crates.io-index)" = "966257a94e196b11bb43aca423754d87429960a768de9414f3691d6957abf125"
 "checksum miow 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "8c1f2f3b1cf331de6896aabf6e9d55dca90356cc9960cca7eaaf408a355ae919"
-"checksum moodyblues-sdk 0.1.0 (git+https://github.com/homura/moodyblues-client-rust)" = "<none>"
+"checksum moodyblues-sdk 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "9418b3be8493c7811d9c00540310068def32951bc1e8239f440d9b8e7d06808f"
 "checksum multipart 0.16.1 (registry+https://github.com/rust-lang/crates.io-index)" = "136eed74cadb9edd2651ffba732b19a450316b680e4f48d6c79e905799e19d01"
 "checksum native-tls 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)" = "4b2df1a4c22fd44a62147fd8f13dd0f95c9d8ca7b2610299b2a2f9cf8964274e"
 "checksum net2 0.2.33 (registry+https://github.com/rust-lang/crates.io-index)" = "42550d9fb7b6684a6d404d9fa7250c2eb2646df731d1c06afc06dcee9e1bcf88"
