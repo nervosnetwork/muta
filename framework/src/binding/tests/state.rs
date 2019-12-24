@@ -6,7 +6,7 @@ use cita_trie::MemoryDB;
 use protocol::traits::ServiceState;
 use protocol::types::{Address, Hash, MerkleRoot};
 
-use crate::state::{GeneralServiceState, MPTTrie};
+use crate::binding::state::{GeneralServiceState, MPTTrie};
 
 #[test]
 fn test_state_insert() {

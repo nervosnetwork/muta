@@ -13,11 +13,10 @@ use protocol::types::{
 };
 use protocol::ProtocolResult;
 
-use crate::request_context::DefaultRequestContext;
-use crate::sdk::chain_querier::DefaultChainQuerier;
-use crate::sdk::DefalutServiceSDK;
-use crate::store::StoreError;
-use crate::tests::state::new_state;
+use crate::binding::sdk::{DefalutServiceSDK, DefaultChainQuerier};
+use crate::binding::store::StoreError;
+use crate::binding::tests::state::new_state;
+use crate::{ContextParams, DefaultRequestContext};
 
 #[test]
 fn test_service_sdk() {
@@ -296,14 +295,16 @@ pub fn mock_epoch(order_size: usize) -> Epoch {
 // #####################
 
 pub fn mock_request_context() -> DefaultRequestContext {
-    DefaultRequestContext::new(
-        100,
-        8,
-        10,
-        mock_address(),
-        1,
-        "service_name".to_owned(),
-        "service_method".to_owned(),
-        "service_payload".to_owned(),
-    )
+    let parrams = ContextParams {
+        cycles_limit:    100,
+        cycles_price:    8,
+        cycles_used:     Rc::new(RefCell::new(10)),
+        caller:          Address::from_hash(Hash::from_empty()).unwrap(),
+        epoch_id:        1,
+        service_name:    "service_name".to_owned(),
+        service_method:  "service_method".to_owned(),
+        service_payload: "service_payload".to_owned(),
+        events:          Rc::new(RefCell::new(vec![])),
+    };
+    DefaultRequestContext::new(parrams)
 }

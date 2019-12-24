@@ -9,8 +9,7 @@ use protocol::traits::{ServiceState, StoreArray};
 use protocol::types::Hash;
 use protocol::ProtocolResult;
 
-use crate::store::FixedKeys;
-use crate::store::StoreError;
+use crate::binding::store::{FixedKeys, StoreError};
 
 pub struct DefaultStoreArray<S: ServiceState, E: FixedCodec> {
     state:    Rc<RefCell<S>>,

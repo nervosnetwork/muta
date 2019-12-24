@@ -1,5 +1,5 @@
 #[macro_use]
-extern crate core_binding_macro;
+extern crate binding_macro;
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -7,7 +7,6 @@ use std::rc::Rc;
 use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 
-use core_binding_macro::{cycles, read, write};
 use protocol::fixed_codec::FixedCodec;
 use protocol::traits::{
     RequestContext, Service, ServiceSDK, StoreArray, StoreBool, StoreMap, StoreString, StoreUint64,
