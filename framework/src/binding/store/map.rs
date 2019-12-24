@@ -9,7 +9,7 @@ use protocol::traits::{ServiceState, StoreMap};
 use protocol::types::Hash;
 use protocol::ProtocolResult;
 
-use crate::store::{FixedKeys, StoreError};
+use crate::binding::store::{FixedKeys, StoreError};
 
 pub struct DefaultStoreMap<S: ServiceState, K: FixedCodec + PartialEq, V: FixedCodec> {
     state:    Rc<RefCell<S>>,

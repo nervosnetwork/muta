@@ -1,5 +1,5 @@
 [package]
-name = "core-binding-macro"
+name = "binding-macro"
 version = "0.1.0"
 authors = ["Muta Dev <muta@nervos.org>"]
 edition = "2018"
@@ -11,14 +11,14 @@ proc-macro = true
 doctest = false
 
 [dependencies]
-core-binding = { path = "../binding" }
+framework = { path = "../framework" }
 
 syn = { version = "1.0", features = ["full"] }
 proc-macro2 = "1.0"
 quote = "1.0"
 
 [dev-dependencies]
-protocol = { path = "../../protocol" }
+protocol = { path = "../protocol" }
 
 serde_json = "1.0"
 bytes = "0.4"

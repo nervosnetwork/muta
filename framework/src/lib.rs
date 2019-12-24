@@ -1,12 +1,11 @@
 #![feature(vec_remove_item)]
 
-#[cfg(test)]
-mod tests;
+pub mod binding;
+pub mod executor;
 
-mod request_context;
-mod sdk;
-mod state;
-mod store;
+mod context;
+
+pub use context::{ContextError, ContextParams, DefaultRequestContext};
 
 use derive_more::{Display, From};
 

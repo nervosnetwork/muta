@@ -10,7 +10,7 @@ use protocol::traits::{ServiceState, StoreBool, StoreString, StoreUint64};
 use protocol::types::Hash;
 use protocol::ProtocolResult;
 
-use crate::store::StoreError;
+use crate::binding::store::StoreError;
 
 pub struct DefaultStoreBool<S: ServiceState> {
     state: Rc<RefCell<S>>,

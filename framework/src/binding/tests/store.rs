@@ -8,10 +8,10 @@ use cita_trie::MemoryDB;
 use protocol::traits::{StoreArray, StoreBool, StoreMap, StoreString, StoreUint64};
 use protocol::types::Hash;
 
-use crate::store::{
+use crate::binding::store::{
     DefaultStoreArray, DefaultStoreBool, DefaultStoreMap, DefaultStoreString, DefaultStoreUint64,
 };
-use crate::tests::state::new_state;
+use crate::binding::tests::state::new_state;
 
 #[test]
 fn test_default_store_bool() {
