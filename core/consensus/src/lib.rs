@@ -18,7 +18,7 @@ use std::error::Error;
 
 use derive_more::Display;
 
-use common_crypto::CryptoError;
+use common_crypto::Error as CryptoError;
 
 use protocol::types::Hash;
 use protocol::{ProtocolError, ProtocolErrorKind};

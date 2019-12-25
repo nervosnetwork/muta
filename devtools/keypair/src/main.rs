@@ -1,9 +1,9 @@
-use protocol::{
-    types::{Hash, UserAddress},
-    BytesMut,
-};
-use rand::{rngs::OsRng, RngCore};
+use rand::{rngs::OsRng, thread_rng, RngCore};
 use tentacle_secio::SecioKeyPair;
+
+use common_crypto::{BlsPrivateKey, PrivateKey, PublicKey, ToBlsPublicKey};
+use protocol::types::{Hash, UserAddress};
+use protocol::BytesMut;
 
 pub fn main() {
     let mut seed = [0u8; 32];
@@ -20,4 +20,28 @@ pub fn main() {
         hex::encode(keypair.to_public_key().inner())
     );
     println!("user addr hex: {}", user_addr.as_hex());
+    println!("================================================================");
+
+    let n: usize = ::std::env::args()
+        .last()
+        .unwrap()
+        .parse()
+        .expect("argument error");
+    let common_ref = "muta";
+    println!("common ref: {:?}", hex::encode(common_ref.as_bytes()));
+
+    for i in 0..n {
+        let priv_key = BlsPrivateKey::generate(&mut thread_rng());
+        let pub_key = priv_key.pub_key(&common_ref.into());
+        println!(
+            "bls private key {}: {:?}",
+            i + 1,
+            hex::encode(priv_key.to_bytes())
+        );
+        println!(
+            "bls public key {}: {:?}",
+            i + 1,
+            hex::encode(pub_key.to_bytes())
+        );
+    }
 }

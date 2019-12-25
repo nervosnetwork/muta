@@ -9,14 +9,14 @@ edition = "2018"
 [dependencies]
 async-trait = "0.1"
 bincode = "1.2"
-bytes = "0.4"
 creep = "0.1"
 derive_more = "0.99"
 futures = { version = "0.3", features = ["async-await"] }
 futures-timer = "2.0"
+hex = "0.4"
 log = "0.4"
 moodyblues-sdk = { git = "https://github.com/homura/moodyblues-client-rust" }
-overlord = { git = "https://github.com/nervosnetwork/overlord", rev = "33eb665" }
+overlord = { git = "https://github.com/nervosnetwork/overlord", rev = "4e2c0c6" }
 parking_lot = "0.10"
 rlp = "0.4"
 serde = {version = "1.0", features = ["derive"]}

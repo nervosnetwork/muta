@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -8,11 +9,11 @@ use overlord::types::{AggregatedVote, Node, OverlordMsg, SignedProposal, SignedV
 use overlord::{DurationConfig, Overlord, OverlordHandler};
 use parking_lot::RwLock;
 
-use common_crypto::{Secp256k1PrivateKey, ToPublicKey};
+use common_crypto::{BlsCommonReference, BlsPrivateKey, BlsPublicKey};
 
 use protocol::traits::{Consensus, ConsensusAdapter, NodeInfo};
 use protocol::types::Validator;
-use protocol::ProtocolResult;
+use protocol::{Bytes, ProtocolResult};
 
 use crate::engine::ConsensusEngine;
 use crate::fixed_types::{FixedEpochID, FixedPill, FixedSignedTxs};
@@ -74,7 +75,9 @@ impl<Adapter: ConsensusAdapter + 'static> OverlordConsensus<Adapter> {
     pub fn new(
         current_consensus_status: Arc<RwLock<CurrentConsensusStatus>>,
         node_info: NodeInfo,
-        priv_key: Secp256k1PrivateKey,
+        addr_pubkey: HashMap<Bytes, BlsPublicKey>,
+        priv_key: BlsPrivateKey,
+        common_ref: BlsCommonReference,
         adapter: Arc<Adapter>,
     ) -> (Self, Synchronization<Adapter>) {
         let engine = Arc::new(ConsensusEngine::new(
@@ -83,9 +86,9 @@ impl<Adapter: ConsensusAdapter + 'static> OverlordConsensus<Adapter> {
             Arc::clone(&adapter),
         ));
 
-        let crypto = OverlordCrypto::new(priv_key.pub_key(), priv_key);
+        let crypto = OverlordCrypto::new(priv_key, addr_pubkey, common_ref);
         let overlord = Overlord::new(
-            bytes::Bytes::from(node_info.self_address.as_bytes().as_ref()),
+            node_info.self_address.as_bytes(),
             Arc::clone(&engine),
             crypto,
         );
@@ -130,7 +133,7 @@ fn gen_overlord_status(epoch_id: u64, interval: u64, validators: Vec<Validator>)
     let mut authority_list = validators
         .into_iter()
         .map(|v| Node {
-            address:        bytes::Bytes::from(v.address.as_bytes().as_ref()),
+            address:        v.address.as_bytes(),
             propose_weight: v.propose_weight,
             vote_weight:    v.vote_weight,
         })

@@ -48,7 +48,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill, FixedSignedTxs>
         &self,
         ctx: Context,
         epoch_id: u64,
-    ) -> Result<(FixedPill, bytes::Bytes), Box<dyn Error + Send>> {
+    ) -> Result<(FixedPill, Bytes), Box<dyn Error + Send>> {
         let current_consensus_status = { self.current_consensus_status.read().clone() };
 
         let (ordered_tx_hashes, propose_hashes) = self
@@ -98,14 +98,14 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill, FixedSignedTxs>
         let mut set = self.exemption_hash.write();
         set.insert(hash.clone());
 
-        Ok((fixed_pill, bytes::Bytes::from(hash.as_ref())))
+        Ok((fixed_pill, hash))
     }
 
     async fn check_epoch(
         &self,
         ctx: Context,
         _epoch_id: u64,
-        hash: bytes::Bytes,
+        hash: Bytes,
         epoch: FixedPill,
     ) -> Result<FixedSignedTxs, Box<dyn Error + Send>> {
         let order_hashes = epoch.get_ordered_hashes();
@@ -246,10 +246,9 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill, FixedSignedTxs>
     async fn transmit_to_relayer(
         &self,
         ctx: Context,
-        addr: bytes::Bytes,
+        addr: Bytes,
         msg: OverlordMsg<FixedPill>,
     ) -> Result<(), Box<dyn Error + Send>> {
-        let addr = BytesMut::from(addr.as_ref()).freeze();
         match msg {
             OverlordMsg::SignedVote(sv) => {
                 let msg = sv.rlp_bytes();
@@ -288,14 +287,10 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill, FixedSignedTxs>
         let validators = self.adapter.get_last_validators(ctx, epoch_id).await?;
         let mut res = validators
             .into_iter()
-            .map(|v| {
-                let address = bytes::Bytes::from(v.address.as_bytes().as_ref());
-
-                Node {
-                    address,
-                    propose_weight: v.propose_weight,
-                    vote_weight: v.vote_weight,
-                }
+            .map(|v| Node {
+                address:        v.address.as_bytes(),
+                propose_weight: v.propose_weight,
+                vote_weight:    v.vote_weight,
             })
             .collect::<Vec<_>>();
 
@@ -520,7 +515,7 @@ fn covert_to_overlord_authority(validators: &[Validator]) -> Vec<Node> {
     let mut authority = validators
         .iter()
         .map(|v| Node {
-            address:        bytes::Bytes::from(v.address.as_bytes().as_ref()),
+            address:        v.address.as_bytes(),
             propose_weight: v.propose_weight,
             vote_weight:    v.vote_weight,
         })
