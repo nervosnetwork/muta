@@ -25,6 +25,11 @@ use crate::binding::sdk::{DefalutServiceSDK, DefaultChainQuerier};
 use crate::binding::state::{GeneralServiceState, MPTTrie};
 use crate::{ContextParams, DefaultRequestContext};
 
+enum HookType {
+    Before,
+    After,
+}
+
 pub struct ServiceExecutor<S: Storage, DB: TrieDB> {
     querier:    Rc<DefaultChainQuerier<S>>,
     states:     HashMap<String, Rc<RefCell<GeneralServiceState<DB>>>>,
@@ -70,8 +75,7 @@ impl<S: Storage, DB: 'static + TrieDB> ServiceExecutor<S, DB> {
                     .ok_or(ExecutorError::NotFoundService {
                         service: context.get_service_name().to_owned(),
                     })?;
-            let sdk =
-                DefalutServiceSDK::new(Rc::clone(state), Rc::clone(&querier), context.clone());
+            let sdk = DefalutServiceSDK::new(Rc::clone(state), Rc::clone(&querier));
 
             match context.get_service_name() {
                 "asset" => {
@@ -142,13 +146,34 @@ impl<S: Storage, DB: 'static + TrieDB> ServiceExecutor<S, DB> {
         Ok(())
     }
 
+    fn hook(&mut self, hook: HookType) -> ProtocolResult<()> {
+        for (name, state) in self.states.iter() {
+            let sdk = self.get_sdk(name)?;
+
+            let mut service = match name.as_ref() {
+                "asset" => AssetService::init_(sdk)?,
+                _ => {
+                    return Err(ExecutorError::NotFoundService {
+                        service: name.to_owned(),
+                    }
+                    .into())
+                }
+            };
+
+            match hook {
+                HookType::Before => service.hook_before_()?,
+                HookType::After => service.hook_after_()?,
+            };
+
+            state.borrow_mut().stash()?;
+        }
+        Ok(())
+    }
+
     fn get_sdk(
         &self,
-        context: DefaultRequestContext,
         service: &str,
-    ) -> ProtocolResult<
-        DefalutServiceSDK<GeneralServiceState<DB>, DefaultChainQuerier<S>, DefaultRequestContext>,
-    > {
+    ) -> ProtocolResult<DefalutServiceSDK<GeneralServiceState<DB>, DefaultChainQuerier<S>>> {
         let state = self
             .states
             .get(service)
@@ -159,7 +184,6 @@ impl<S: Storage, DB: 'static + TrieDB> ServiceExecutor<S, DB> {
         Ok(DefalutServiceSDK::new(
             Rc::clone(&state),
             Rc::clone(&self.querier),
-            context,
         ))
     }
 
@@ -191,7 +215,7 @@ impl<S: Storage, DB: 'static + TrieDB> ServiceExecutor<S, DB> {
         context: DefaultRequestContext,
         readonly: bool,
     ) -> ProtocolResult<ExecResp> {
-        let sdk = self.get_sdk(context.clone(), context.get_service_name())?;
+        let sdk = self.get_sdk(context.get_service_name())?;
 
         let mut service = match context.get_service_name() {
             "asset" => AssetService::init_(sdk)?,
@@ -239,6 +263,8 @@ impl<S: Storage, DB: 'static + TrieDB> Executor for ServiceExecutor<S, DB> {
         params: &ExecutorParams,
         txs: &[SignedTransaction],
     ) -> ProtocolResult<ExecutorResp> {
+        self.hook(HookType::Before)?;
+
         let mut receipts = txs
             .iter()
             .map(|stx| {
@@ -269,6 +295,8 @@ impl<S: Storage, DB: 'static + TrieDB> Executor for ServiceExecutor<S, DB> {
                 })
             })
             .collect::<Result<Vec<Receipt>, ProtocolError>>()?;
+
+        self.hook(HookType::After)?;
 
         let state_root = self.commit()?;
         let mut all_cycles_used = 0;

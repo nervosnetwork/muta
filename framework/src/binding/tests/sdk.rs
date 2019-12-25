@@ -26,9 +26,8 @@ fn test_service_sdk() {
 
     let arcs = Arc::new(MockStorage {});
     let cq = DefaultChainQuerier::new(Arc::clone(&arcs));
-    let ctx = mock_request_context();
 
-    let mut sdk = DefalutServiceSDK::new(Rc::clone(&rs), Rc::new(cq), ctx);
+    let mut sdk = DefalutServiceSDK::new(Rc::clone(&rs), Rc::new(cq));
 
     // test sdk store bool
     let mut sdk_bool = sdk.alloc_or_recover_bool("test_bool").unwrap();
