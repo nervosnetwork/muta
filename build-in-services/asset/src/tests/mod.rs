@@ -16,9 +16,6 @@ use crate::types::{CreateAssetPayload, GetAssetPayload, GetBalancePayload, Trans
 use crate::AssetService;
 
 #[test]
-fn get_asset() {}
-
-#[test]
 fn test_create_asset() {
     let cycles_limit = 1024 * 1024 * 1024; // 1073741824
     let caller = Address::from_hex("0x755cdba6ae4f479f7164792b318b2a06c759833b").unwrap();

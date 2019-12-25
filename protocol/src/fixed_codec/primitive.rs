@@ -10,6 +10,16 @@ use crate::{impl_default_fixed_codec_for, ProtocolResult};
 // Impl ProtocolFixedCodec trait for types
 impl_default_fixed_codec_for!(primitive, [Hash, Fee, Address, Account]);
 
+impl FixedCodec for String {
+    fn encode_fixed(&self) -> ProtocolResult<Bytes> {
+        Ok(Bytes::from(self.as_bytes()))
+    }
+
+    fn decode_fixed(bytes: Bytes) -> ProtocolResult<Self> {
+        String::from_utf8(bytes.to_vec()).map_err(|e| FixedCodecError::StringUTF8(e).into())
+    }
+}
+
 impl FixedCodec for Bytes {
     fn encode_fixed(&self) -> ProtocolResult<Bytes> {
         Ok(self.clone())

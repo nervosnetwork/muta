@@ -28,6 +28,14 @@ pub struct GenesisSystemToken {
     pub supply: u64,
 }
 
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+pub struct GenesisService {
+    pub caller:  String,
+    pub service: String,
+    pub method:  String,
+    pub payload: String,
+}
+
 #[cfg(test)]
 mod tests {
     use super::Genesis;
