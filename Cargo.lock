@@ -505,7 +505,7 @@ dependencies = [
  "futures-timer 2.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "hex 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "moodyblues-sdk 0.1.1 (git+https://github.com/homura/moodyblues-client-rust)",
+ "moodyblues-sdk 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "num-traits 0.2.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "overlord 0.1.0 (git+https://github.com/nervosnetwork/overlord?rev=4e2c0c6)",
  "parking_lot 0.10.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1717,15 +1717,6 @@ dependencies = [
 name = "miracl_amcl"
 version = "3.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-
-[[package]]
-name = "moodyblues-sdk"
-version = "0.1.1"
-source = "git+https://github.com/homura/moodyblues-client-rust#5991167cef3cfd065c1159e2811ded6a63c51b1f"
-dependencies = [
- "serde 1.0.104 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde_json 1.0.44 (registry+https://github.com/rust-lang/crates.io-index)",
-]
 
 [[package]]
 name = "moodyblues-sdk"
@@ -4132,7 +4123,6 @@ dependencies = [
 "checksum mio-uds 0.6.7 (registry+https://github.com/rust-lang/crates.io-index)" = "966257a94e196b11bb43aca423754d87429960a768de9414f3691d6957abf125"
 "checksum miow 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "8c1f2f3b1cf331de6896aabf6e9d55dca90356cc9960cca7eaaf408a355ae919"
 "checksum miracl_amcl 3.2.5 (registry+https://github.com/rust-lang/crates.io-index)" = "89d10a1ea3ffe41d318ccd9f21a1f2366c8103b95e1deaa9449793f4b10cefe8"
-"checksum moodyblues-sdk 0.1.1 (git+https://github.com/homura/moodyblues-client-rust)" = "<none>"
 "checksum moodyblues-sdk 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "f94a8f39dfdc0674efc42c7e8b118bcb4588ae62f69ecc0b80fff538f34c9a0b"
 "checksum multipart 0.16.1 (registry+https://github.com/rust-lang/crates.io-index)" = "136eed74cadb9edd2651ffba732b19a450316b680e4f48d6c79e905799e19d01"
 "checksum native-tls 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)" = "4b2df1a4c22fd44a62147fd8f13dd0f95c9d8ca7b2610299b2a2f9cf8964274e"
