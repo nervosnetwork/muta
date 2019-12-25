@@ -98,10 +98,6 @@ fn test_service_sdk() {
 
     let epoch_data = sdk.get_epoch_by_epoch_id(Some(1)).unwrap().unwrap();
     assert_eq!(mock_epoch(1), epoch_data);
-
-    // test get request context
-    let ctx_data = sdk.get_request_context().unwrap();
-    assert_eq!(mock_request_context(), ctx_data);
 }
 
 struct MockStorage;
@@ -301,6 +297,7 @@ pub fn mock_request_context() -> DefaultRequestContext {
         cycles_used:     Rc::new(RefCell::new(10)),
         caller:          Address::from_hash(Hash::from_empty()).unwrap(),
         epoch_id:        1,
+        timestamp:       0,
         service_name:    "service_name".to_owned(),
         service_method:  "service_method".to_owned(),
         service_payload: "service_payload".to_owned(),

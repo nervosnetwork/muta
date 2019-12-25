@@ -1,4 +1,3 @@
-use crate::traits::{Service, ServiceSDK};
 use crate::types::{Address, Bloom, MerkleRoot, Receipt, SignedTransaction, TransactionRequest};
 use crate::ProtocolResult;
 
@@ -12,9 +11,16 @@ pub struct ExecutorResp {
 
 #[derive(Debug, Clone)]
 pub struct ExecutorParams {
-    state_root:   MerkleRoot,
-    epoch_id:     u64,
-    cycels_limit: u64,
+    pub state_root:   MerkleRoot,
+    pub epoch_id:     u64,
+    pub timestamp:    u64,
+    pub cycels_limit: u64,
+}
+
+#[derive(Debug, Clone)]
+pub struct ExecResp {
+    pub ret:      String,
+    pub is_error: bool,
 }
 
 pub trait Executor {
@@ -28,19 +34,7 @@ pub trait Executor {
         &self,
         params: &ExecutorParams,
         caller: &Address,
+        cycles_price: u64,
         request: &TransactionRequest,
-    ) -> ProtocolResult<String>;
-}
-
-pub trait ExecutorAdapter {
-    fn get_service_inst<SDK: ServiceSDK, Inst: Service<SDK>>(
-        &self,
-        service_name: &str,
-    ) -> ProtocolResult<Inst>;
-
-    fn revert_state(&mut self) -> ProtocolResult<()>;
-
-    fn stash_state(&mut self) -> ProtocolResult<()>;
-
-    fn commit_state(&mut self) -> ProtocolResult<MerkleRoot>;
+    ) -> ProtocolResult<ExecResp>;
 }

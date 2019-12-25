@@ -7,7 +7,6 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-framework = { path = "../../framework" }
 binding-macro = { path = "../../binding-macro" }
 protocol = { path = "../../protocol" }
 
@@ -21,3 +20,4 @@ byteorder = "1.3"
 [dev-dependencies]
 cita_trie = "2.0"
 async-trait = "0.1"
+framework = { path = "../../framework" }

@@ -36,8 +36,6 @@ impl<S: ServiceState, C: ChainQuerier, R: RequestContext> DefalutServiceSDK<S, C
 impl<S: 'static + ServiceState, C: ChainQuerier, R: RequestContext> ServiceSDK
     for DefalutServiceSDK<S, C, R>
 {
-    type ContextItem = R;
-
     // Alloc or recover a `Map` by` var_name`
     fn alloc_or_recover_map<K: 'static + FixedCodec + PartialEq, V: 'static + FixedCodec>(
         &mut self,
@@ -137,10 +135,6 @@ impl<S: 'static + ServiceState, C: ChainQuerier, R: RequestContext> ServiceSDK
     // if not found on the chain, return None
     fn get_receipt_by_hash(&self, tx_hash: &Hash) -> ProtocolResult<Option<Receipt>> {
         self.chain_querier.get_receipt_by_hash(tx_hash)
-    }
-
-    fn get_request_context(&self) -> ProtocolResult<Self::ContextItem> {
-        Ok(self.request_context.clone())
     }
 
     // Call other read-only methods of `service` and return the results

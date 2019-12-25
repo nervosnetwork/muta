@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests;
-mod types;
+pub mod types;
 
 use bytes::Bytes;
 use derive_more::{Display, From};
@@ -33,7 +33,7 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
     #[read]
     fn get_asset<Context: RequestContext>(
         &self,
-        _ctx: Context,
+        ctx: Context,
         payload: GetAssetPayload,
     ) -> ProtocolResult<Asset> {
         let asset = self.assets.get(&payload.id)?;

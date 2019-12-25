@@ -17,6 +17,7 @@ pub struct ContextParams {
     pub service_name:    String,
     pub service_method:  String,
     pub service_payload: String,
+    pub timestamp:       u64,
     pub events:          Rc<RefCell<Vec<Event>>>,
 }
 
@@ -30,6 +31,7 @@ pub struct DefaultRequestContext {
     service_name:    String,
     service_method:  String,
     service_payload: String,
+    timestamp:       u64,
     events:          Rc<RefCell<Vec<Event>>>,
 }
 
@@ -44,6 +46,7 @@ impl DefaultRequestContext {
             service_name:    params.service_name,
             service_method:  params.service_method,
             service_payload: params.service_payload,
+            timestamp:       params.timestamp,
             events:          params.events,
         }
     }
@@ -63,8 +66,13 @@ impl DefaultRequestContext {
             service_name,
             service_method,
             service_payload,
+            timestamp: context.get_timestamp(),
             events: Rc::clone(&context.events),
         }
+    }
+
+    pub fn get_events(&self) -> Vec<Event> {
+        self.events.borrow().clone()
     }
 }
 
@@ -110,7 +118,11 @@ impl RequestContext for DefaultRequestContext {
         &self.service_payload
     }
 
-    fn emit_event(&mut self, message: String) -> ProtocolResult<()> {
+    fn get_timestamp(&self) -> u64 {
+        self.timestamp
+    }
+
+    fn emit_event(&self, message: String) -> ProtocolResult<()> {
         self.events.borrow_mut().push(Event {
             service: self.service_name.clone(),
             data:    message,
