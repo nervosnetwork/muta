@@ -15,7 +15,7 @@ derive_more = "0.99"
 futures = { version = "0.3", features = ["async-await"] }
 futures-timer = "2.0"
 log = "0.4"
-moodyblues-sdk = { git = "https://github.com/homura/moodyblues-client-rust" }
+moodyblues-sdk = "0.2"
 overlord = { git = "https://github.com/nervosnetwork/overlord", rev = "33eb665" }
 parking_lot = "0.10"
 rlp = "0.4"
