@@ -24,7 +24,7 @@ pub struct AssetService<SDK> {
 impl<SDK: ServiceSDK> AssetService<SDK> {
     #[init]
     fn init(mut sdk: SDK) -> ProtocolResult<Self> {
-        let assets: Box<dyn StoreMap<Hash, Asset>> = sdk.alloc_or_recover_map("assrts")?;
+        let assets: Box<dyn StoreMap<Hash, Asset>> = sdk.alloc_or_recover_map("assets")?;
 
         Ok(Self { assets, sdk })
     }
