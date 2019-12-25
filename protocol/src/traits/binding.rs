@@ -1,6 +1,15 @@
+use serde::{Deserialize, Serialize};
+
 use crate::fixed_codec::FixedCodec;
 use crate::types::{Address, Epoch, Hash, MerkleRoot, Receipt, SignedTransaction};
 use crate::ProtocolResult;
+
+#[derive(Deserialize, Serialize, Clone)]
+pub struct ReturnEmpty {
+    pub message: Option<()>,
+}
+
+pub const RETURN_EMPTY: ReturnEmpty = ReturnEmpty { message: None };
 
 // `ServiceState` provides access to` world state` and `account` for` service`.
 // The bottom layer is an MPT tree.
@@ -71,6 +80,8 @@ pub trait RequestContext: Clone {
     fn get_service_method(&self) -> &str;
 
     fn get_payload(&self) -> &str;
+
+    // fn get_timestamp(&self) -> u64;
 
     // Trigger an `event`, which can be any string
     // NOTE: The string is recommended as json string

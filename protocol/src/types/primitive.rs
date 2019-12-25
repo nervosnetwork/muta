@@ -4,6 +4,7 @@ use bytes::Bytes;
 use hasher::{Hasher, HasherKeccak};
 use lazy_static::lazy_static;
 use num_bigint::BigUint;
+use serde::{Deserialize, Serialize};
 
 use crate::types::TypesError;
 use crate::ProtocolResult;
@@ -18,7 +19,7 @@ pub const GENESIS_EPOCH_ID: u64 = 0;
 /// Hash length
 const HASH_LEN: usize = 32;
 
-#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Deserialize, Serialize)]
 pub struct Hash([u8; HASH_LEN]);
 /// Balance
 pub type Balance = BigUint;
@@ -88,7 +89,7 @@ impl fmt::Debug for Hash {
 /// Address length.
 const ADDRESS_LEN: usize = 20;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct Address([u8; ADDRESS_LEN]);
 
 impl Address {
