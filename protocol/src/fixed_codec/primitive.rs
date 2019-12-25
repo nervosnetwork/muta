@@ -1,3 +1,6 @@
+use std::mem;
+
+use byteorder::{ByteOrder, LittleEndian, WriteBytesExt};
 use bytes::Bytes;
 
 use crate::fixed_codec::{FixedCodec, FixedCodecError};
@@ -14,6 +17,21 @@ impl FixedCodec for Bytes {
 
     fn decode_fixed(bytes: Bytes) -> ProtocolResult<Self> {
         Ok(bytes)
+    }
+}
+
+impl FixedCodec for u64 {
+    fn encode_fixed(&self) -> ProtocolResult<Bytes> {
+        let mut bs = [0u8; mem::size_of::<u64>()];
+        bs.as_mut()
+            .write_u64::<LittleEndian>(*self)
+            .expect("write u64 should not fail");
+
+        Ok(Bytes::from(bs.as_ref()))
+    }
+
+    fn decode_fixed(bytes: Bytes) -> ProtocolResult<Self> {
+        Ok(LittleEndian::read_u64(bytes.as_ref()))
     }
 }
 
