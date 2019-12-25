@@ -2,8 +2,7 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::punctuated::Punctuated;
 use syn::{
-    parse_macro_input, FnArg, GenericArgument, Generics, ImplItemMethod, Path, PathArguments,
-    ReturnType, Token, Type, Visibility,
+    parse_macro_input, FnArg, Generics, ImplItemMethod, ReturnType, Token, Type, Visibility,
 };
 
 use crate::common::{
@@ -17,8 +16,6 @@ pub fn verify_read_or_write(item: TokenStream, mutable: bool) -> TokenStream {
     let inputs = &method_item.sig.inputs;
     let generics = &method_item.sig.generics;
     let ret_type = &method_item.sig.output;
-
-    // TODO(@yejiayu): verify #[service]
 
     verify_visibiity(visibility);
 
@@ -64,41 +61,10 @@ fn verify_ret_type(ret_type: &ReturnType) {
     match real_ret_type {
         Type::Path(type_path) => {
             let path = &type_path.path;
-            let args = get_protocol_result_args(&path)
+            get_protocol_result_args(&path)
                 .expect("The return type of read/write method must be protocol::ProtocolResult");
-
-            match args {
-                PathArguments::AngleBracketed(arg) => {
-                    let generic_args = &arg.args;
-                    let generic_type = &generic_args[0];
-                    if !generic_type_is_string(generic_type) {
-                        panic!("The return value of read/write method must be String");
-                    }
-                }
-                _ => panic!("The return value of read/write method must be String"),
-            };
         }
         _ => panic!("The return type of read/write method must be protocol::ProtocolResult"),
-    }
-}
-
-fn path_is_jsonvalue(path: &Path) -> bool {
-    // ::<a>::<b>
-    if path.leading_colon.is_some() {
-        return false;
-    }
-
-    // JsonValue
-    path.segments.len() == 1 && path.segments[0].ident == "String"
-}
-
-fn generic_type_is_string(generic_type: &GenericArgument) -> bool {
-    match generic_type {
-        GenericArgument::Type(t) => match t {
-            Type::Path(type_path) => path_is_jsonvalue(&type_path.path),
-            _ => false,
-        },
-        _ => false,
     }
 }
 

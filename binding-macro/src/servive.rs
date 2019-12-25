@@ -87,7 +87,8 @@ pub fn gen_service_code(_: TokenStream, item: TokenStream) -> TokenStream {
                     #(#list_read_name => {
                         let payload: #list_read_payload = serde_json::from_str(ctx.get_payload())
                                 .map_err(|e| framework::ServiceError::JsonParse(e))?;
-                        self.#list_read_ident(ctx, payload)
+                        let res = self.#list_read_ident(ctx, payload)?;
+                        serde_json::to_string(&res).map_err(|e| framework::ServiceError::JsonParse(e).into())
                     },)*
                     _ => Err(framework::ServiceError::NotFoundMethod(method.to_owned()).into())
                 }
@@ -100,7 +101,8 @@ pub fn gen_service_code(_: TokenStream, item: TokenStream) -> TokenStream {
                     #(#list_write_name => {
                         let payload: #list_write_payload = serde_json::from_str(ctx.get_payload())
                                 .map_err(|e| framework::ServiceError::JsonParse(e))?;
-                        self.#list_write_ident(ctx, payload)
+                        let res = self.#list_write_ident(ctx, payload)?;
+                        serde_json::to_string(&res).map_err(|e| framework::ServiceError::JsonParse(e).into())
                     },)*
                     _ => Err(framework::ServiceError::NotFoundMethod(method.to_owned()).into())
                 }
@@ -244,10 +246,7 @@ fn extract_method_meta(method: ServiceMethod) -> MethodMeta {
     // inputs[1] = RequestContext
     // inputs[2] = MethodPayload: FromStr
     if impl_method.sig.inputs.len() != 3 {
-        panic!(
-            "The correct signature of the service method is: fn
-(&self/&mut self, RequestContext, Payload)"
-        );
+        panic!("The correct signature of the service method is: fn(&self/&mut self, RequestContext, Payload)");
     }
 
     let payload_arg = &impl_method.sig.inputs[2];
@@ -257,9 +256,9 @@ fn extract_method_meta(method: ServiceMethod) -> MethodMeta {
     };
 
     let payload_ident = if let Type::Path(path) = &*pat_type.ty {
-        path.path.get_ident().expect("")
+        path.path.get_ident().expect("No payload type found.")
     } else {
-        panic!("")
+        panic!("No payload type found.")
     };
 
     MethodMeta {

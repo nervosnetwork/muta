@@ -22,7 +22,7 @@ use crate::servive::gen_service_code;
 ///  2. Is visibility private?
 ///  3. Does function generics constrain `fn f<Context: RequestContext>`?
 ///  4. Parameter signature contains `&self and ctx:Context`?
-///  5. Is the return value `ProtocolResult <String>`?
+///  5. Is the return value `ProtocolResult <T: Deserialize + Serialize>`?
 ///
 /// # Example:
 ///
@@ -198,7 +198,8 @@ pub fn hook_before(_: TokenStream, item: TokenStream) -> TokenStream {
 ///             "create_kitty" => {
 ///                 let payload: CreateKittyPayload = serde_json::from_str(ctx.get_payload())
 ///                     .map_err(|e| core_binding::ServiceError::JsonParse(e))?;
-///                 self.create_kitty(ctx, payload)
+///                 let res = self.create_kitty(ctx, payload)?;
+///                 serde_json::to_string(&res).map_err(|e| framework::ServiceError::JsonParse(e).into())
 ///             }
 ///             _ => Err(core_binding::ServiceError::NotFoundMethod(method.to_owned()).into()),
 ///         }
@@ -211,7 +212,8 @@ pub fn hook_before(_: TokenStream, item: TokenStream) -> TokenStream {
 ///             "get_kitty" => {
 ///                 let payload: GetKittyPayload = serde_json::from_str(ctx.get_payload())
 ///                     .map_err(|e| core_binding::ServiceError::JsonParse(e))?;
-///                 self.get_kitty(ctx, payload)
+///                 let res = self.get_kitty(ctx, payload)?;
+///                 serde_json::to_string(&res).map_err(|e| framework::ServiceError::JsonParse(e).into())
 ///             }
 ///             _ => Err(core_binding::ServiceError::NotFoundMethod(method.to_owned()).into()),
 ///         }
