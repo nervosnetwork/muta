@@ -275,9 +275,9 @@ impl<S: Storage, DB: 'static + TrieDB> Executor for ServiceExecutor<S, DB> {
                 let exec_resp = self.exec_service(context.clone(), false)?;
 
                 if exec_resp.is_error {
-                    self.stash()?;
-                } else {
                     self.revert_cache()?;
+                } else {
+                    self.stash()?;
                 };
 
                 Ok(Receipt {
