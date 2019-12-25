@@ -89,6 +89,11 @@ fn test_impl_service() {
         age:  u64,
         sex:  bool,
     }
+    #[derive(Serialize, Deserialize, Debug)]
+    struct TestServiceResponse {
+        pub message: String,
+    }
+
     struct Tests<SDK: ServiceSDK> {
         _sdk:        SDK,
         hook_before: bool,
@@ -123,8 +128,10 @@ fn test_impl_service() {
             &self,
             _ctx: Context,
             _payload: TestServicePayload,
-        ) -> ProtocolResult<String> {
-            Ok("read ok".to_owned())
+        ) -> ProtocolResult<TestServiceResponse> {
+            Ok(TestServiceResponse {
+                message: "read ok".to_owned(),
+            })
         }
 
         #[write]
@@ -132,8 +139,10 @@ fn test_impl_service() {
             &mut self,
             _ctx: Context,
             _payload: TestServicePayload,
-        ) -> ProtocolResult<String> {
-            Ok("write ok".to_owned())
+        ) -> ProtocolResult<TestServiceResponse> {
+            Ok(TestServiceResponse {
+                message: "write ok".to_owned(),
+            })
         }
     }
 
@@ -149,11 +158,11 @@ fn test_impl_service() {
 
     let context = MockRequestContext::with_method(1024 * 1024, "test_write", &payload_str);
     let write_res = test_service.write_(context).unwrap();
-    assert_eq!(write_res, "write ok");
+    assert_eq!(write_res, r#"{"message":"write ok"}"#);
 
     let context = MockRequestContext::with_method(1024 * 1024, "test_read", &payload_str);
     let read_res = test_service.read_(context).unwrap();
-    assert_eq!(read_res, "read ok");
+    assert_eq!(read_res, r#"{"message":"read ok"}"#);
 
     let context = MockRequestContext::with_method(1024 * 1024, "test_notfound", &payload_str);
     let read_res = test_service.read_(context.clone());
