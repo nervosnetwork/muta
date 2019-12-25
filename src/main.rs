@@ -6,10 +6,12 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::fs::File;
 use std::path::Path;
+use std::str::from_utf8;
 use std::sync::Arc;
 
 use common_crypto::{
-    BlsPrivateKey, BlsPublicKey, PublicKey, Secp256k1, Secp256k1PrivateKey, ToPublicKey,
+    BlsCommonReference, BlsPrivateKey, BlsPublicKey, PublicKey, Secp256k1, Secp256k1PrivateKey,
+    ToPublicKey,
 };
 use core_api::adapter::DefaultAPIAdapter;
 use core_api::config::GraphQLConfig;
@@ -275,14 +277,14 @@ async fn start(cfg: Config) -> ProtocolResult<()> {
 
     assert!(cfg.consensus.verifier_list.len() == cfg.consensus.public_keys.len());
     let mut bls_pub_keys = HashMap::new();
-    for item in cfg
+    for (addr, bls_pub_key) in cfg
         .consensus
         .verifier_list
         .iter()
         .zip(cfg.consensus.public_keys.iter())
     {
-        let address = UserAddress::from_hex(item.0).unwrap().as_bytes();
-        let pub_key = BlsPublicKey::try_from(hex::decode(item.1).unwrap().as_ref()).unwrap();
+        let address = UserAddress::from_hex(addr).unwrap().as_bytes();
+        let pub_key = BlsPublicKey::try_from(hex::decode(bls_pub_key).unwrap().as_ref()).unwrap();
         bls_pub_keys.insert(address, pub_key);
     }
 
@@ -292,7 +294,14 @@ async fn start(cfg: Config) -> ProtocolResult<()> {
             .as_ref(),
     )
     .unwrap();
-    let common_ref = cfg.consensus.common_ref.clone();
+
+    let common_ref: BlsCommonReference = from_utf8(
+        hex::decode(cfg.consensus.common_ref.as_str())
+            .unwrap()
+            .as_ref(),
+    )
+    .unwrap()
+    .into();
 
     init_tracer(my_address.as_hex()).unwrap();
     let (status_pivot, agent) = StatusPivot::new(Arc::clone(&current_consensus_status));
@@ -316,7 +325,7 @@ async fn start(cfg: Config) -> ProtocolResult<()> {
         node_info,
         bls_pub_keys,
         bls_priv_key,
-        common_ref.as_str().into(),
+        common_ref,
         consensus_adapter,
     );
 

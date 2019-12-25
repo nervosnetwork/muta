@@ -22,21 +22,26 @@ pub fn main() {
     println!("user addr hex: {}", user_addr.as_hex());
     println!("================================================================");
 
-    let priv_key_1 = BlsPrivateKey::generate(&mut thread_rng());
-    let pub_key_1 = priv_key_1.pub_key(&"muta".into());
-    let priv_key_2 = BlsPrivateKey::generate(&mut thread_rng());
-    let pub_key_2 = priv_key_2.pub_key(&"muta".into());
-    let priv_key_3 = BlsPrivateKey::generate(&mut thread_rng());
-    let pub_key_3 = priv_key_3.pub_key(&"muta".into());
-    let priv_key_4 = BlsPrivateKey::generate(&mut thread_rng());
-    let pub_key_4 = priv_key_4.pub_key(&"muta".into());
+    let n: usize = ::std::env::args()
+        .last()
+        .unwrap()
+        .parse()
+        .expect("argument error");
+    let common_ref = "muta";
+    println!("common ref: {:?}", hex::encode(common_ref.as_bytes()));
 
-    println!("private_key_1: {:?}", hex::encode(priv_key_1.to_bytes()));
-    println!("private_key_2: {:?}", hex::encode(priv_key_2.to_bytes()));
-    println!("private_key_3: {:?}", hex::encode(priv_key_3.to_bytes()));
-    println!("private_key_4: {:?}", hex::encode(priv_key_4.to_bytes()));
-    println!("public_key_1: {:?}", hex::encode(pub_key_1.to_bytes()));
-    println!("public_key_2: {:?}", hex::encode(pub_key_2.to_bytes()));
-    println!("public_key_3: {:?}", hex::encode(pub_key_3.to_bytes()));
-    println!("public_key_4: {:?}", hex::encode(pub_key_4.to_bytes()));
+    for i in 0..n {
+        let priv_key = BlsPrivateKey::generate(&mut thread_rng());
+        let pub_key = priv_key.pub_key(&common_ref.into());
+        println!(
+            "bls private key {}: {:?}",
+            i + 1,
+            hex::encode(priv_key.to_bytes())
+        );
+        println!(
+            "bls public key {}: {:?}",
+            i + 1,
+            hex::encode(pub_key.to_bytes())
+        );
+    }
 }
