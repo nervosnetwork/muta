@@ -1,7 +1,7 @@
 #!/bin/bash
 set -ev
 
-sccache --version || cargo install sccache
+sccache --version || env RUSTC_WRAPPER= cargo install sccache
 
 if [ "$FMT" = true ]; then
   cargo fmt --version || rustup component add rustfmt
