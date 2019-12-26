@@ -3,13 +3,13 @@ extern crate proc_macro;
 mod common;
 mod cycles;
 mod read_write;
-mod servive;
+mod service;
 
 use proc_macro::TokenStream;
 
 use crate::cycles::gen_cycles_code;
 use crate::read_write::verify_read_or_write;
-use crate::servive::gen_service_code;
+use crate::service::gen_service_code;
 
 #[rustfmt::skip]
 /// `#[read]` marks a service method as readable.
