@@ -11,15 +11,15 @@ proc-macro = true
 doctest = false
 
 [dependencies]
-framework = { path = "../framework" }
+protocol = { path = "../protocol" }
 
 syn = { version = "1.0", features = ["full"] }
 proc-macro2 = "1.0"
 quote = "1.0"
+derive_more = "0.15"
+serde_json = "1.0"
 
 [dev-dependencies]
-protocol = { path = "../protocol" }
-
-serde_json = "1.0"
+framework = { path = "../framework" }
 bytes = "0.4"
 serde = { version = "1.0", features = ["derive"] }

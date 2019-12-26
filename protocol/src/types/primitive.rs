@@ -4,6 +4,8 @@ use bytes::Bytes;
 use hasher::{Hasher, HasherKeccak};
 use lazy_static::lazy_static;
 use num_bigint::BigUint;
+use serde::de;
+use serde::{Deserialize, Serialize};
 
 use crate::types::TypesError;
 use crate::ProtocolResult;
@@ -26,6 +28,48 @@ pub type Balance = BigUint;
 pub type MerkleRoot = Hash;
 /// Json string
 pub type JsonString = String;
+
+impl Serialize for Hash {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        serializer.serialize_str(&self.as_hex())
+    }
+}
+
+struct HashVisitor;
+
+impl<'de> de::Visitor<'de> for HashVisitor {
+    type Value = Hash;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("Expect a hex string")
+    }
+
+    fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Hash::from_hex(&v).map_err(|e| de::Error::custom(e.to_string()))
+    }
+
+    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Hash::from_hex(&v).map_err(|e| de::Error::custom(e.to_string()))
+    }
+}
+
+impl<'de> Deserialize<'de> for Hash {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        deserializer.deserialize_string(HashVisitor)
+    }
+}
 
 impl Hash {
     /// Enter an array of bytes to get a 32-bit hash.
@@ -90,6 +134,48 @@ const ADDRESS_LEN: usize = 20;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Address([u8; ADDRESS_LEN]);
+
+impl Serialize for Address {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        serializer.serialize_str(&self.as_hex())
+    }
+}
+
+struct AddressVisitor;
+
+impl<'de> de::Visitor<'de> for AddressVisitor {
+    type Value = Address;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("Expect a hex string")
+    }
+
+    fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Address::from_hex(&v).map_err(|e| de::Error::custom(e.to_string()))
+    }
+
+    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Address::from_hex(&v).map_err(|e| de::Error::custom(e.to_string()))
+    }
+}
+
+impl<'de> Deserialize<'de> for Address {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        deserializer.deserialize_string(AddressVisitor)
+    }
+}
 
 impl Address {
     pub fn from_pubkey_bytes(bytes: Bytes) -> ProtocolResult<Self> {

@@ -1,6 +1,32 @@
+use derive_more::{Display, From};
+use serde::{Deserialize, Serialize};
+
 use crate::fixed_codec::FixedCodec;
 use crate::types::{Address, Epoch, Hash, MerkleRoot, Receipt, SignedTransaction};
-use crate::ProtocolResult;
+use crate::{ProtocolError, ProtocolErrorKind, ProtocolResult};
+
+#[derive(Debug, Display, From)]
+pub enum BindingMacroError {
+    #[display(fmt = "service {:?} method {:?} was not found", service, method)]
+    NotFoundMethod { service: String, method: String },
+
+    #[display(fmt = "Parsing payload to json failed {:?}", _0)]
+    JsonParse(serde_json::Error),
+}
+impl std::error::Error for BindingMacroError {}
+
+impl From<BindingMacroError> for ProtocolError {
+    fn from(err: BindingMacroError) -> ProtocolError {
+        ProtocolError::new(ProtocolErrorKind::Binding, Box::new(err))
+    }
+}
+
+#[derive(Deserialize, Serialize, Clone)]
+pub struct ReturnEmpty {
+    pub message: Option<()>,
+}
+
+pub const RETURN_EMPTY: ReturnEmpty = ReturnEmpty { message: None };
 
 // `ServiceState` provides access to` world state` and `account` for` service`.
 // The bottom layer is an MPT tree.
@@ -72,9 +98,11 @@ pub trait RequestContext: Clone {
 
     fn get_payload(&self) -> &str;
 
+    fn get_timestamp(&self) -> u64;
+
     // Trigger an `event`, which can be any string
     // NOTE: The string is recommended as json string
-    fn emit_event(&mut self, message: String) -> ProtocolResult<()>;
+    fn emit_event(&self, message: String) -> ProtocolResult<()>;
 }
 
 // Admission control will be called before entering service
@@ -132,8 +160,6 @@ pub trait Service<SDK: ServiceSDK> {
 // - ChainDB
 // - ServiceState
 pub trait ServiceSDK {
-    type ContextItem: RequestContext;
-
     // Alloc or recover a `Map` by` var_name`
     fn alloc_or_recover_map<Key: 'static + FixedCodec + PartialEq, Val: 'static + FixedCodec>(
         &mut self,
@@ -193,8 +219,6 @@ pub trait ServiceSDK {
     // Get a receipt by `tx_hash`
     // if not found on the chain, return None
     fn get_receipt_by_hash(&self, tx_hash: &Hash) -> ProtocolResult<Option<Receipt>>;
-
-    fn get_request_context(&self) -> ProtocolResult<Self::ContextItem>;
 
     // Call other read-only methods of `service` and return the results
     // synchronously NOTE: You can use recursive calls, but the maximum call

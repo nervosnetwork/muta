@@ -50,6 +50,7 @@ members = [
 
   "binding-macro",
   "framework",
+  "built-in-services/asset",
 
   "protocol",
 ]
