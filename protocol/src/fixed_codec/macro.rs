@@ -5,8 +5,8 @@ macro_rules! impl_default_fixed_codec_for {
 
         $(
             impl FixedCodec for $category::$type {
-                fn encode_fixed(&self) -> ProtocolResult<Bytes> {
-                    Ok(Bytes::from(rlp::encode(self)))
+                fn encode_fixed(&self) -> ProtocolResult<bytes::Bytes> {
+                    Ok(bytes::Bytes::from(rlp::encode(self)))
                 }
 
                 fn decode_fixed(bytes: bytes::Bytes) -> ProtocolResult<Self> {

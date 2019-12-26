@@ -12,10 +12,8 @@ use crate::{ProtocolError, ProtocolErrorKind};
 
 pub use epoch::{Epoch, EpochHeader, EpochId, Pill, Proof, Validator};
 pub use ethbloom::{Bloom, BloomRef, Input as BloomInput};
-pub use genesis::{Genesis, GenesisService, GenesisStateAlloc, GenesisStateAsset};
-pub use primitive::{
-    Account, Address, Balance, Fee, Hash, JsonString, MerkleRoot, GENESIS_EPOCH_ID,
-};
+pub use genesis::{Genesis, GenesisService};
+pub use primitive::{Account, Address, Balance, Hash, JsonString, MerkleRoot, GENESIS_EPOCH_ID};
 pub use receipt::{Event, Receipt, ReceiptResponse};
 pub use transaction::{RawTransaction, SignedTransaction, TransactionRequest};
 

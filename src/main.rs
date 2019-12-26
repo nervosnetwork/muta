@@ -4,17 +4,20 @@ mod config;
 
 use std::collections::HashMap;
 use std::convert::TryFrom;
-use std::fs::File;
+use std::fs;
 use std::path::Path;
 use std::str::from_utf8;
 use std::sync::Arc;
+
+use futures::executor::block_on;
+use parking_lot::RwLock;
 
 use common_crypto::{
     BlsCommonReference, BlsPrivateKey, BlsPublicKey, PublicKey, Secp256k1, Secp256k1PrivateKey,
     ToPublicKey,
 };
-use core_api::adapter::DefaultAPIAdapter;
-use core_api::config::GraphQLConfig;
+// use core_api::adapter::DefaultAPIAdapter;
+// use core_api::config::GraphQLConfig;
 use core_consensus::fixed_types::{FixedEpoch, FixedSignedTxs};
 use core_consensus::message::{
     ProposalMessageHandler, PullEpochRpcHandler, PullTxsRpcHandler, QCMessageHandler,
@@ -25,23 +28,17 @@ use core_consensus::message::{
 use core_consensus::status::{CurrentConsensusStatus, StatusPivot};
 use core_consensus::trace::init_tracer;
 use core_consensus::{OverlordConsensus, OverlordConsensusAdapter};
-use core_executor::trie::RocksTrieDB;
-use core_executor::TransactionExecutorFactory;
 use core_mempool::{
     DefaultMemPoolAdapter, HashMemPool, MsgPushTxs, NewTxsHandler, PullTxsHandler,
     END_GOSSIP_NEW_TXS, RPC_PULL_TXS, RPC_RESP_PULL_TXS,
 };
 use core_network::{NetworkConfig, NetworkService};
 use core_storage::{adapter::rocks::RocksAdapter, ImplStorage};
-use futures::executor::block_on;
-use parking_lot::RwLock;
-
-use protocol::traits::executor::ExecutorFactory;
+use framework::binding::state::RocksTrieDB;
+use framework::executor::{ServiceExecutor, ServiceExecutorFactory};
 use protocol::traits::{NodeInfo, Storage};
-use protocol::types::{
-    Address, Bloom, Epoch, EpochHeader, Genesis, Hash, MerkleRoot, Proof, UserAddress, Validator,
-};
-use protocol::{fixed_codec::ProtocolFixedCodec, Bytes, ProtocolResult};
+use protocol::types::{Address, Bloom, Epoch, EpochHeader, Genesis, Hash, Proof, Validator};
+use protocol::{fixed_codec::FixedCodec, Bytes, ProtocolResult};
 
 use crate::config::Config;
 
@@ -55,8 +52,8 @@ async fn main() {
                 .default_value("./devtools/chain/config.toml"),
         )
         .arg(
-            clap::Arg::from_usage("-g --genesis=[FILE] 'a required file for the genesis json'")
-                .default_value("./devtools/chain/genesis.json"),
+            clap::Arg::from_usage("-g --genesis=[FILE] 'a required file for the genesis toml'")
+                .default_value("./devtools/chain/genesis.toml"),
         )
         .get_matches();
     let args_config = matches.value_of("config").unwrap();
@@ -82,15 +79,9 @@ async fn main() {
 async fn handle_init(cfg: &Config, genesis_path: impl AsRef<Path>) -> ProtocolResult<()> {
     let chain_id = Hash::from_hex(&cfg.chain_id).unwrap();
 
-    // self private key
-    let my_privkey =
-        Secp256k1PrivateKey::try_from(hex::decode(cfg.privkey.clone()).unwrap().as_ref()).unwrap();
-    let my_pubkey = my_privkey.pub_key();
-    let my_address = UserAddress::from_pubkey_bytes(my_pubkey.to_bytes()).unwrap();
-
     // Read genesis.
-    let mut r = File::open(genesis_path).unwrap();
-    let genesis: Genesis = serde_json::from_reader(&mut r).unwrap();
+    let genesis_toml = fs::read_to_string(genesis_path).unwrap();
+    let genesis: Genesis = toml::from_str(&genesis_toml).unwrap();
     log::info!("Genesis data: {:?}", genesis);
 
     // Init Block db
@@ -116,18 +107,11 @@ async fn handle_init(cfg: &Config, genesis_path: impl AsRef<Path>) -> ProtocolRe
     let trie_db = Arc::new(RocksTrieDB::new(path_state, cfg.executor.light).unwrap());
 
     // Init genesis
-    let genesis_state_root = {
-        let mut executor = TransactionExecutorFactory::from_root(
-            chain_id.clone(),
-            MerkleRoot::from_empty(),
-            Arc::clone(&trie_db),
-            0,
-            cfg.consensus.cycles_price,
-            Address::User(my_address),
-        )?;
-
-        executor.create_genesis(&genesis)?
-    };
+    let genesis_state_root = ServiceExecutor::create_genesis(
+        genesis.services,
+        Arc::clone(&trie_db),
+        Arc::clone(&storage),
+    )?;
 
     // Build genesis block.
     let genesis_epoch_header = EpochHeader {
@@ -141,8 +125,7 @@ async fn handle_init(cfg: &Config, genesis_path: impl AsRef<Path>) -> ProtocolRe
         state_root:        genesis_state_root,
         receipt_root:      vec![Hash::from_empty()],
         cycles_used:       vec![0],
-        proposer:          UserAddress::from_hex("100000000000000000000000000000000000000000")
-            .unwrap(),
+        proposer:          Address::from_hex("0000000000000000000000000000000000000000").unwrap(),
         proof:             Proof {
             epoch_id:   0,
             round:      0,
@@ -172,7 +155,7 @@ async fn start(cfg: Config) -> ProtocolResult<()> {
     let my_privkey =
         Secp256k1PrivateKey::try_from(hex::decode(cfg.privkey.clone()).unwrap().as_ref()).unwrap();
     let my_pubkey = my_privkey.pub_key();
-    let my_address = UserAddress::from_pubkey_bytes(my_pubkey.to_bytes()).unwrap();
+    let my_address = Address::from_pubkey_bytes(my_pubkey.to_bytes()).unwrap();
 
     // Init Block db
     let path_block = cfg.data_path_for_block();
@@ -267,7 +250,7 @@ async fn start(cfg: Config) -> ProtocolResult<()> {
             .verifier_list
             .iter()
             .map(|v| Validator {
-                address:        UserAddress::from_hex(v).unwrap(),
+                address:        Address::from_hex(v).unwrap(),
                 propose_weight: 1,
                 vote_weight:    1,
             })
@@ -283,7 +266,7 @@ async fn start(cfg: Config) -> ProtocolResult<()> {
         .iter()
         .zip(cfg.consensus.public_keys.iter())
     {
-        let address = UserAddress::from_hex(addr).unwrap().as_bytes();
+        let address = Address::from_hex(addr).unwrap().as_bytes();
         let pub_key = BlsPublicKey::try_from(hex::decode(bls_pub_key).unwrap().as_ref()).unwrap();
         bls_pub_keys.insert(address, pub_key);
     }
@@ -307,7 +290,7 @@ async fn start(cfg: Config) -> ProtocolResult<()> {
     let (status_pivot, agent) = StatusPivot::new(Arc::clone(&current_consensus_status));
 
     let mut consensus_adapter =
-        OverlordConsensusAdapter::<TransactionExecutorFactory, _, _, _, _, _>::new(
+        OverlordConsensusAdapter::<ServiceExecutorFactory, _, _, _, _, _>::new(
             Arc::new(network_service.handle()),
             Arc::new(network_service.handle()),
             Arc::clone(&mempool),
@@ -387,18 +370,24 @@ async fn start(cfg: Config) -> ProtocolResult<()> {
     runtime::spawn(network_service);
 
     // Init graphql
-    let api_adapter = DefaultAPIAdapter::<TransactionExecutorFactory, _, _, _>::new(
-        Arc::clone(&mempool),
-        Arc::clone(&storage),
-        Arc::clone(&trie_db),
-    );
-    let mut graphql_config = GraphQLConfig::default();
-    graphql_config.listening_address = cfg.graphql.listening_address;
-    graphql_config.graphql_uri = cfg.graphql.graphql_uri.clone();
-    graphql_config.graphiql_uri = cfg.graphql.graphiql_uri.clone();
+    // let api_adapter = DefaultAPIAdapter::<TransactionExecutorFactory, _, _,
+    // _>::new(     Arc::clone(&mempool),
+    //     Arc::clone(&storage),
+    //     Arc::clone(&trie_db),
+    // );
+    // let mut graphql_config = GraphQLConfig::default();
+    // graphql_config.listening_address = cfg.graphql.listening_address;
+    // graphql_config.graphql_uri = cfg.graphql.graphql_uri.clone();
+    // graphql_config.graphiql_uri = cfg.graphql.graphiql_uri.clone();
+    //
+    // // Run GraphQL server
+    // runtime::spawn(core_api::start_graphql(graphql_config, api_adapter));
 
-    // Run GraphQL server
-    runtime::spawn(core_api::start_graphql(graphql_config, api_adapter));
+    // Run sychronization process
+    runtime::spawn(synchronization.run());
+
+    // Run status cache pivot
+    runtime::spawn(status_pivot.run());
 
     // Run sychronization process
     runtime::spawn(synchronization.run());

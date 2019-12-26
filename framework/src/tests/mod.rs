@@ -20,7 +20,7 @@ fn test_request_context() {
         service_payload: "service_payload".to_owned(),
         events:          Rc::new(RefCell::new(vec![])),
     };
-    let mut ctx = DefaultRequestContext::new(params);
+    let ctx = DefaultRequestContext::new(params);
 
     ctx.sub_cycles(8).unwrap();
     assert_eq!(ctx.get_cycles_used(), 18);
