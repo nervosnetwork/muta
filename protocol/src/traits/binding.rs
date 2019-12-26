@@ -1,3 +1,5 @@
+use std::iter::Iterator;
+
 use derive_more::{Display, From};
 use serde::{Deserialize, Serialize};
 
@@ -239,31 +241,25 @@ pub trait StoreMap<Key: FixedCodec + PartialEq, Value: FixedCodec> {
 
     fn remove(&mut self, key: &Key) -> ProtocolResult<()>;
 
-    fn len(&self) -> ProtocolResult<usize>;
+    fn len(&self) -> ProtocolResult<u32>;
 
     fn is_empty(&self) -> ProtocolResult<bool>;
 
-    fn for_each<F>(&mut self, f: F) -> ProtocolResult<()>
-    where
-        Self: Sized,
-        F: FnMut(&mut Value) -> ProtocolResult<()>;
+    fn iter<'a>(&'a self) -> Box<dyn Iterator<Item = (&Key, Value)> + 'a>;
 }
 
 pub trait StoreArray<Elm: FixedCodec> {
-    fn get(&self, index: usize) -> ProtocolResult<Elm>;
+    fn get(&self, index: u32) -> ProtocolResult<Elm>;
 
     fn push(&mut self, element: Elm) -> ProtocolResult<()>;
 
-    fn remove(&mut self, index: usize) -> ProtocolResult<()>;
+    fn remove(&mut self, index: u32) -> ProtocolResult<()>;
 
-    fn len(&self) -> ProtocolResult<usize>;
+    fn len(&self) -> ProtocolResult<u32>;
 
     fn is_empty(&self) -> ProtocolResult<bool>;
 
-    fn for_each<F>(&mut self, f: F) -> ProtocolResult<()>
-    where
-        Self: Sized,
-        F: FnMut(&mut Elm) -> ProtocolResult<()>;
+    fn iter<'a>(&'a self) -> Box<dyn Iterator<Item = (u32, Elm)> + 'a>;
 }
 
 pub trait StoreUint64 {
@@ -301,7 +297,7 @@ pub trait StoreString {
 
     fn set(&mut self, val: &str) -> ProtocolResult<()>;
 
-    fn len(&self) -> ProtocolResult<usize>;
+    fn len(&self) -> ProtocolResult<u32>;
 
     fn is_empty(&self) -> ProtocolResult<bool>;
 }
