@@ -1,4 +1,0 @@
-- caller: f8389d774afdad8755ef8e629e5a154fddc6325a # id f56924db538e77bb5951eb5ff0d02b88983c49c45eea30e8ae3e7234b311436c
-  service: asset
-  method: create_asset
-  payload: '{ "name": "MutaToken", "symbol": "MT", "supply": 320000011 }'

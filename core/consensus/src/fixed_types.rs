@@ -5,7 +5,7 @@ use bincode::{deserialize, serialize};
 use overlord::Codec;
 
 use protocol::codec::{Deserialize, ProtocolCodecSync, Serialize};
-use protocol::fixed_codec::ProtocolFixedCodec;
+use protocol::fixed_codec::FixedCodec;
 use protocol::types::{Epoch, Hash, Pill, SignedTransaction};
 use protocol::{traits::MessageCodec, Bytes, BytesMut, ProtocolResult};
 
@@ -52,7 +52,7 @@ impl MessageCodec for ConsensusRpcResponse {
 
         match flag.as_ref() {
             b"a" => {
-                let res: Epoch = ProtocolFixedCodec::decode_fixed(bytes)?;
+                let res: Epoch = FixedCodec::decode_fixed(bytes)?;
                 Ok(ConsensusRpcResponse::PullEpochs(Box::new(res)))
             }
 
@@ -78,7 +78,7 @@ impl Codec for FixedPill {
     }
 
     fn decode(data: Bytes) -> Result<Self, Box<dyn Error + Send>> {
-        let inner: Pill = ProtocolFixedCodec::decode_fixed(data)?;
+        let inner: Pill = FixedCodec::decode_fixed(data)?;
         Ok(FixedPill { inner })
     }
 }
@@ -169,12 +169,11 @@ mod test {
     use std::convert::From;
 
     use futures::executor;
-    use num_traits::FromPrimitive;
     use rand::random;
 
     use protocol::types::{
-        CarryingAsset, Epoch, EpochHeader, Fee, Hash, Proof, RawTransaction, SignedTransaction,
-        TransactionAction, UserAddress,
+        Address, Epoch, EpochHeader, Hash, Proof, RawTransaction, SignedTransaction,
+        TransactionRequest,
     };
     use protocol::Bytes;
 
@@ -182,7 +181,7 @@ mod test {
 
     fn gen_epoch(epoch_id: u64, epoch_hash: Hash) -> Epoch {
         let nonce = Hash::digest(Bytes::from("XXXX"));
-        let addr_str = "10CAB8EEA4799C21379C20EF5BAA2CC8AF1BEC475B";
+        let addr_str = "CAB8EEA4799C21379C20EF5BAA2CC8AF1BEC475B";
         let header = EpochHeader {
             chain_id: nonce.clone(),
             epoch_id,
@@ -194,7 +193,7 @@ mod test {
             state_root: nonce,
             receipt_root: Vec::new(),
             cycles_used: vec![999_999],
-            proposer: UserAddress::from_hex(addr_str).unwrap(),
+            proposer: Address::from_hex(addr_str).unwrap(),
             proof: mock_proof(epoch_hash),
             validator_version: 1,
             validators: Vec::new(),
@@ -220,33 +219,23 @@ mod test {
         (0..len).map(|_| random::<u8>()).collect::<Vec<_>>()
     }
 
-    fn gen_user_address() -> UserAddress {
-        let inner = "0x107899EE7319601cbC2684709e0eC3A4807bb0Fd74";
-        UserAddress::from_hex(inner).unwrap()
-    }
-
     fn gen_signed_tx() -> SignedTransaction {
         use protocol::codec::ProtocolCodec;
 
-        let address = gen_user_address();
         let nonce = Hash::digest(Bytes::from(gen_random_bytes(10)));
-        let fee = Fee {
-            asset_id: nonce.clone(),
-            cycle:    random::<u64>(),
-        };
-        let action = TransactionAction::Transfer {
-            receiver:       address,
-            carrying_asset: CarryingAsset {
-                asset_id: nonce.clone(),
-                amount:   FromPrimitive::from_i32(42).unwrap(),
-            },
+
+        let request = TransactionRequest {
+            service_name: "test".to_owned(),
+            method:       "test".to_owned(),
+            payload:      "test".to_owned(),
         };
         let mut raw = RawTransaction {
             chain_id: nonce.clone(),
             nonce,
             timeout: random::<u64>(),
-            fee,
-            action,
+            cycles_price: 1,
+            cycles_limit: random::<u64>(),
+            request,
         };
 
         let raw_bytes = executor::block_on(async { raw.encode().await.unwrap() });

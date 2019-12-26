@@ -40,15 +40,6 @@ pub struct Address {
     pub value: Vec<u8>,
 }
 
-#[derive(Clone, Message)]
-pub struct Fee {
-    #[prost(message, tag = "1")]
-    pub asset_id: Option<Hash>,
-
-    #[prost(uint64, tag = "2")]
-    pub cycle: u64,
-}
-
 // #####################
 // Conversion
 // #####################
@@ -131,40 +122,12 @@ impl TryFrom<MerkleRoot> for protocol_primitive::MerkleRoot {
     }
 }
 
-// Fee
-
-impl From<protocol_primitive::Fee> for Fee {
-    fn from(fee: protocol_primitive::Fee) -> Fee {
-        let asset_id = Hash::from(fee.asset_id);
-
-        Fee {
-            asset_id: Some(asset_id),
-            cycle:    fee.cycle,
-        }
-    }
-}
-
-impl TryFrom<Fee> for protocol_primitive::Fee {
-    type Error = ProtocolError;
-
-    fn try_from(fee: Fee) -> Result<protocol_primitive::Fee, Self::Error> {
-        let asset_id = field!(fee.asset_id, "Fee", "asset_id")?;
-
-        let fee = protocol_primitive::Fee {
-            asset_id: protocol_primitive::Hash::try_from(asset_id)?,
-            cycle:    fee.cycle,
-        };
-
-        Ok(fee)
-    }
-}
-
 // #####################
 // Codec
 // #####################
 
 // MerkleRoot and AssetID are just Hash aliases
-impl_default_bytes_codec_for!(primitive, [Balance, Hash, Fee]);
+impl_default_bytes_codec_for!(primitive, [Balance, Hash]);
 
 // #####################
 // Util

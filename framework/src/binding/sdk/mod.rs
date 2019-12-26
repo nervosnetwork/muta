@@ -7,8 +7,8 @@ use std::rc::Rc;
 
 use protocol::fixed_codec::FixedCodec;
 use protocol::traits::{
-    ChainQuerier, RequestContext, ServiceSDK, ServiceState, StoreArray, StoreBool, StoreMap,
-    StoreString, StoreUint64,
+    ChainQuerier, ServiceSDK, ServiceState, StoreArray, StoreBool, StoreMap, StoreString,
+    StoreUint64,
 };
 use protocol::types::{Address, Epoch, Hash, Receipt, SignedTransaction};
 use protocol::ProtocolResult;
@@ -136,13 +136,13 @@ impl<S: 'static + ServiceState, C: ChainQuerier> ServiceSDK for DefalutServiceSD
     // Call other read-only methods of `service` and return the results
     // synchronously NOTE: You can use recursive calls, but the maximum call
     // stack is 1024
-    fn read(&self, service: &str, method: &str, payload: &str) -> ProtocolResult<&str> {
+    fn read(&self, _service: &str, _method: &str, _payload: &str) -> ProtocolResult<&str> {
         unimplemented!();
     }
 
     // Call other writable methods of `service` and return the results synchronously
     // NOTE: You can use recursive calls, but the maximum call stack is 1024
-    fn write(&mut self, service: &str, method: &str, payload: &str) -> ProtocolResult<&str> {
+    fn write(&mut self, _service: &str, _method: &str, _payload: &str) -> ProtocolResult<&str> {
         unimplemented!();
     }
 }

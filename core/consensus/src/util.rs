@@ -134,6 +134,8 @@ pub struct ExecuteInfo {
     pub order_root:   MerkleRoot,
     pub cycles_price: u64,
     pub coinbase:     Address,
+    pub timestamp:    u64,
+    pub cycles_limit: u64,
 }
 
 #[cfg(test)]

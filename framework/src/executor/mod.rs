@@ -1,5 +1,8 @@
+mod factory;
 #[cfg(test)]
 mod tests;
+
+pub use factory::ServiceExecutorFactory;
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -10,7 +13,7 @@ use cita_trie::DB as TrieDB;
 use derive_more::{Display, From};
 
 use asset::AssetService;
-use bytes::Bytes;
+use bytes::BytesMut;
 use protocol::traits::{
     ExecResp, Executor, ExecutorParams, ExecutorResp, RequestContext, Service, ServiceState,
     Storage,
@@ -99,7 +102,7 @@ impl<S: Storage, DB: 'static + TrieDB> ServiceExecutor<S, DB> {
     }
 
     pub fn with_root(root: MerkleRoot, trie_db: Arc<DB>, storage: Arc<S>) -> ProtocolResult<Self> {
-        let trie = MPTTrie::from(root.clone(), Arc::clone(&trie_db))?;
+        let trie = MPTTrie::from(root, Arc::clone(&trie_db))?;
         let root_state = GeneralServiceState::new(trie);
 
         let asset_root =
@@ -228,9 +231,9 @@ impl<S: Storage, DB: 'static + TrieDB> ServiceExecutor<S, DB> {
         };
 
         let result = if readonly {
-            service.read_(context.clone())
+            service.read_(context)
         } else {
-            service.write_(context.clone())
+            service.write_(context)
         };
 
         let (ret, is_error) = match result {
@@ -245,7 +248,8 @@ impl<S: Storage, DB: 'static + TrieDB> ServiceExecutor<S, DB> {
         let mut bloom = Bloom::default();
         for receipt in receipts {
             for event in receipt.events.iter() {
-                let bytes = Bytes::from((event.service.clone() + &event.data).as_bytes());
+                let bytes =
+                    BytesMut::from((event.service.clone() + &event.data).as_bytes()).freeze();
                 let hash = Hash::digest(bytes).as_bytes();
 
                 let input = BloomInput::Raw(hash.as_ref());

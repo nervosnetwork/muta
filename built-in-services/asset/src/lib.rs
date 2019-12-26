@@ -5,7 +5,7 @@ pub mod types;
 use bytes::Bytes;
 use derive_more::{Display, From};
 
-use binding_macro::{cycles, init, read, service, write};
+use binding_macro::{cycles, init, service, write};
 use protocol::traits::{RequestContext, ReturnEmpty, ServiceSDK, StoreMap, RETURN_EMPTY};
 use protocol::types::Hash;
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
@@ -65,8 +65,7 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
         payload: CreateAssetPayload,
     ) -> ProtocolResult<Asset> {
         let caller = ctx.get_caller();
-        let payload_str =
-            serde_json::to_string(&payload).map_err(|e| ServiceError::JsonParse(e))?;
+        let payload_str = serde_json::to_string(&payload).map_err(ServiceError::JsonParse)?;
 
         let id = Hash::digest(Bytes::from(payload_str + &caller.as_hex()));
 
@@ -82,8 +81,7 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
         };
         self.assets.insert(id.clone(), asset.clone())?;
 
-        self.sdk
-            .set_account_value(&caller, id.clone(), payload.supply)?;
+        self.sdk.set_account_value(&caller, id, payload.supply)?;
 
         Ok(asset)
     }
@@ -98,7 +96,7 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
         let caller = ctx.get_caller();
         let asset_id = payload.asset_id.clone();
         let value = payload.value;
-        let to = payload.to.clone();
+        let to = payload.to;
 
         if !self.assets.contains(&asset_id)? {
             return Err(ServiceError::NotFoundAsset { id: asset_id }.into());
@@ -125,7 +123,7 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
         if overflow {
             return Err(ServiceError::U64Overflow.into());
         }
-        self.sdk.set_account_value(&caller, asset_id.clone(), v)?;
+        self.sdk.set_account_value(&caller, asset_id, v)?;
 
         Ok(RETURN_EMPTY)
     }

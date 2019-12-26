@@ -62,8 +62,6 @@ fn test_fixed_codec() {
     test_eq!(receipt, Receipt, mock_receipt);
     test_eq!(receipt, Receipt, mock_receipt);
     test_eq!(receipt, Receipt, mock_receipt);
-
-    test_eq!(genesis, Genesis, mock_genesis);
 }
 
 #[test]

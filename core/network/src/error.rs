@@ -3,7 +3,7 @@ use std::{error::Error, num::ParseIntError};
 use derive_more::{Display, From};
 use tentacle::{ProtocolId, SessionId};
 
-use protocol::{types::UserAddress, ProtocolError, ProtocolErrorKind};
+use protocol::{types::Address, ProtocolError, ProtocolErrorKind};
 
 #[derive(Debug, Display, From)]
 pub enum ErrorKind {
@@ -82,7 +82,7 @@ pub enum NetworkError {
     NotEndpoint,
 
     #[display(fmt = "{:?} account addrs aren't connecting, try connect them", miss)]
-    PartialRouteMessage { miss: Vec<UserAddress> },
+    PartialRouteMessage { miss: Vec<Address> },
 
     #[display(fmt = "internal error: {}", _0)]
     Internal(Box<dyn Error + Send>),

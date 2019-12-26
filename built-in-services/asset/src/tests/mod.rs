@@ -41,7 +41,7 @@ fn test_create_asset() {
     assert_eq!(asset, new_asset);
 
     let balance_res = service
-        .get_balance(context.clone(), GetBalancePayload {
+        .get_balance(context, GetBalancePayload {
             asset_id: asset.id.clone(),
         })
         .unwrap();
@@ -53,7 +53,7 @@ fn test_create_asset() {
 fn test_transfer() {
     let cycles_limit = 1024 * 1024 * 1024; // 1073741824
     let caller = Address::from_hex("0x755cdba6ae4f479f7164792b318b2a06c759833b").unwrap();
-    let context = mock_context(cycles_limit, caller.clone());
+    let context = mock_context(cycles_limit, caller);
 
     let mut service = new_asset_service();
 
@@ -85,9 +85,7 @@ fn test_transfer() {
 
     let context = mock_context(cycles_limit, to_address);
     let balance_res = service
-        .get_balance(context, GetBalancePayload {
-            asset_id: asset.id.clone(),
-        })
+        .get_balance(context, GetBalancePayload { asset_id: asset.id })
         .unwrap();
     assert_eq!(balance_res.balance, 1024);
 }

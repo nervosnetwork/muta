@@ -12,8 +12,8 @@ pub use binding::{
     ServiceSDK, ServiceState, StoreArray, StoreBool, StoreMap, StoreString, StoreUint64,
     RETURN_EMPTY,
 };
-pub use consensus::{Consensus, ConsensusAdapter, CurrentConsensusStatus, MessageTarget, NodeInfo};
-pub use executor::{ExecResp, Executor, ExecutorParams, ExecutorResp};
+pub use consensus::{Consensus, ConsensusAdapter, MessageTarget, NodeInfo};
+pub use executor::{ExecResp, Executor, ExecutorFactory, ExecutorParams, ExecutorResp};
 pub use mempool::{MemPool, MemPoolAdapter, MixedTxHashes};
 pub use network::{Gossip, MessageCodec, MessageHandler, Priority, Rpc};
 pub use storage::{Storage, StorageAdapter, StorageBatchModify, StorageCategory, StorageSchema};

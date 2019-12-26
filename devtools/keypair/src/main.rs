@@ -2,7 +2,7 @@ use rand::{rngs::OsRng, thread_rng, RngCore};
 use tentacle_secio::SecioKeyPair;
 
 use common_crypto::{BlsPrivateKey, PrivateKey, PublicKey, ToBlsPublicKey};
-use protocol::types::{Hash, UserAddress};
+use protocol::types::{Address, Hash};
 use protocol::BytesMut;
 
 pub fn main() {
@@ -12,7 +12,7 @@ pub fn main() {
     let seckey = Hash::digest(BytesMut::from(seed.as_ref()).freeze());
     let keypair = SecioKeyPair::secp256k1_raw_key(seckey.as_bytes()).expect("secp256k1 keypair");
     let pubkey = keypair.to_public_key().inner();
-    let user_addr = UserAddress::from_pubkey_bytes(pubkey.into()).expect("user addr");
+    let user_addr = Address::from_pubkey_bytes(pubkey.into()).expect("user addr");
 
     println!("seckey hex: {:?}", seckey.as_hex());
     println!(
