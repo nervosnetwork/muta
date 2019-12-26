@@ -1,13 +1,13 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
 use cita_trie::MemoryDB;
 
 use asset::types::{Asset, GetBalanceResponse};
 use protocol::traits::{Executor, ExecutorParams, Storage};
 use protocol::types::{
-    Address, Epoch, GenesisService, Hash, Proof, RawTransaction, Receipt, SignedTransaction,
+    Address, Epoch, Genesis, Hash, Proof, RawTransaction, Receipt, SignedTransaction,
     TransactionRequest,
 };
 use protocol::ProtocolResult;
@@ -17,11 +17,12 @@ use crate::executor::ServiceExecutor;
 #[test]
 fn test_create_genesis() {
     let toml_str = include_str!("./genesis_services.toml");
-    let genesis_services: Vec<GenesisService> = toml::from_str(toml_str).unwrap();
+    let genesis: Genesis = toml::from_str(toml_str).unwrap();
+
     let db = Arc::new(MemoryDB::new(false));
 
     let root = ServiceExecutor::create_genesis(
-        genesis_services,
+        genesis.services,
         Arc::clone(&db),
         Arc::new(MockStorage {}),
     )
@@ -31,7 +32,7 @@ fn test_create_genesis() {
         ServiceExecutor::with_root(root.clone(), Arc::clone(&db), Arc::new(MockStorage {}))
             .unwrap();
     let params = ExecutorParams {
-        state_root:   root.clone(),
+        state_root:   root,
         epoch_id:     1,
         timestamp:    0,
         cycels_limit: std::u64::MAX,
@@ -47,17 +48,18 @@ fn test_create_genesis() {
     let res = executor.read(&params, &caller, 1, &request).unwrap();
     let resp: GetBalanceResponse = serde_json::from_str(&res.ret).unwrap();
 
-    assert_eq!(resp.balance, 320000011);
+    assert_eq!(resp.balance, 320_000_011);
 }
 
 #[test]
 fn test_exec() {
-    let yaml = include_str!("./genesis_services.yaml");
-    let genesis_services: Vec<GenesisService> = serde_yaml::from_str(yaml).unwrap();
+    let toml_str = include_str!("./genesis_services.toml");
+    let genesis: Genesis = toml::from_str(toml_str).unwrap();
+
     let db = Arc::new(MemoryDB::new(false));
 
     let root = ServiceExecutor::create_genesis(
-        genesis_services,
+        genesis.services,
         Arc::clone(&db),
         Arc::new(MockStorage {}),
     )
@@ -68,7 +70,7 @@ fn test_exec() {
             .unwrap();
 
     let params = ExecutorParams {
-        state_root:   root.clone(),
+        state_root:   root,
         epoch_id:     1,
         timestamp:    0,
         cycels_limit: std::u64::MAX,
@@ -94,7 +96,7 @@ fn test_exec() {
             hex::decode("031288a6788678c25952eba8693b2f278f66e2187004b64ac09416d07f83f96d5b")
                 .unwrap(),
         ),
-        signature: Bytes::from("".as_bytes()),
+        signature: BytesMut::from("").freeze(),
     };
     let txs = vec![stx];
     let executor_resp = executor.exec(&params, &txs).unwrap();
@@ -104,7 +106,7 @@ fn test_exec() {
     let asset: Asset = serde_json::from_str(&receipt.response.ret).unwrap();
     assert_eq!(asset.name, "MutaToken2");
     assert_eq!(asset.symbol, "MT2");
-    assert_eq!(asset.supply, 320000011);
+    assert_eq!(asset.supply, 320_000_011);
 }
 
 struct MockStorage;

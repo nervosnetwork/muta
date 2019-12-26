@@ -102,7 +102,7 @@ impl<S: Storage, DB: 'static + TrieDB> ServiceExecutor<S, DB> {
     }
 
     pub fn with_root(root: MerkleRoot, trie_db: Arc<DB>, storage: Arc<S>) -> ProtocolResult<Self> {
-        let trie = MPTTrie::from(root.clone(), Arc::clone(&trie_db))?;
+        let trie = MPTTrie::from(root, Arc::clone(&trie_db))?;
         let root_state = GeneralServiceState::new(trie);
 
         let asset_root =
@@ -231,9 +231,9 @@ impl<S: Storage, DB: 'static + TrieDB> ServiceExecutor<S, DB> {
         };
 
         let result = if readonly {
-            service.read_(context.clone())
+            service.read_(context)
         } else {
-            service.write_(context.clone())
+            service.write_(context)
         };
 
         let (ret, is_error) = match result {

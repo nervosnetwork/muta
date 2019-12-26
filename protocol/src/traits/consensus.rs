@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use creep::Context;
 
 use crate::types::{Address, Epoch, Hash, MerkleRoot, Proof, SignedTransaction, Validator};
-use crate::{traits::mempool::MixedTxHashes, traits::ExecutorResp, ProtocolResult};
+use crate::{traits::mempool::MixedTxHashes, ProtocolResult};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum MessageTarget {

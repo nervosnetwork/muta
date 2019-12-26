@@ -4,11 +4,11 @@ use byteorder::{ByteOrder, LittleEndian, WriteBytesExt};
 use bytes::{Bytes, BytesMut};
 
 use crate::fixed_codec::{FixedCodec, FixedCodecError};
-use crate::types::{Account, Address, Fee, Hash};
+use crate::types::{Account, Address, Hash};
 use crate::{impl_default_fixed_codec_for, ProtocolResult};
 
 // Impl FixedCodec trait for types
-impl_default_fixed_codec_for!(primitive, [Hash, Fee, Address, Account]);
+impl_default_fixed_codec_for!(primitive, [Hash, Address, Account]);
 
 impl FixedCodec for String {
     fn encode_fixed(&self) -> ProtocolResult<Bytes> {
@@ -57,25 +57,6 @@ impl rlp::Decodable for Hash {
         let hash = Hash::from_bytes(BytesMut::from(r.at(0)?.data()?).freeze())
             .map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
         Ok(hash)
-    }
-}
-
-impl rlp::Encodable for Fee {
-    fn rlp_append(&self, s: &mut rlp::RlpStream) {
-        s.begin_list(2).append(&self.asset_id).append(&self.cycle);
-    }
-}
-
-impl rlp::Decodable for Fee {
-    fn decode(r: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
-        if !r.is_list() && r.size() != 2 {
-            return Err(rlp::DecoderError::RlpIncorrectListLen);
-        }
-
-        let asset_id: Hash = rlp::decode(r.at(0)?.as_raw())?;
-        let cycle = r.at(1)?.as_val()?;
-
-        Ok(Fee { asset_id, cycle })
     }
 }
 

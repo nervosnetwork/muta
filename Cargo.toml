@@ -18,9 +18,6 @@ core-consensus = { path = "./core/consensus" }
 binding-macro = { path = "./binding-macro" }
 framework = { path = "./framework" }
 
-binding-macro = { path = "./binding-macro" }
-framework = { path = "./framework" }
-
 futures = "0.3"
 parking_lot = "0.10"
 runtime = "0.3.0-alpha.7"

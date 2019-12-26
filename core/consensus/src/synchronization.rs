@@ -11,7 +11,7 @@ use overlord::OverlordHandler;
 
 use protocol::fixed_codec::FixedCodec;
 use protocol::traits::ConsensusAdapter;
-use protocol::types::{Address, Hash, Proof};
+use protocol::types::{Hash, Proof};
 use protocol::ProtocolResult;
 
 use crate::engine::ConsensusEngine;

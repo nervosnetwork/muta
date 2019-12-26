@@ -227,12 +227,6 @@ pub struct Account {
     pub storage_root: MerkleRoot,
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub struct Fee {
-    pub asset_id: Hash,
-    pub cycle:    u64,
-}
-
 fn clean_0x(s: &str) -> &str {
     if s.starts_with("0x") {
         &s[2..]

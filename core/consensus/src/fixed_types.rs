@@ -169,12 +169,11 @@ mod test {
     use std::convert::From;
 
     use futures::executor;
-    use num_traits::FromPrimitive;
     use rand::random;
 
     use protocol::types::{
-        Address, CarryingAsset, Epoch, EpochHeader, Fee, Hash, Proof, RawTransaction,
-        SignedTransaction, TransactionAction,
+        Address, Epoch, EpochHeader, Hash, Proof, RawTransaction, SignedTransaction,
+        TransactionRequest,
     };
     use protocol::Bytes;
 
@@ -182,7 +181,7 @@ mod test {
 
     fn gen_epoch(epoch_id: u64, epoch_hash: Hash) -> Epoch {
         let nonce = Hash::digest(Bytes::from("XXXX"));
-        let addr_str = "10CAB8EEA4799C21379C20EF5BAA2CC8AF1BEC475B";
+        let addr_str = "CAB8EEA4799C21379C20EF5BAA2CC8AF1BEC475B";
         let header = EpochHeader {
             chain_id: nonce.clone(),
             epoch_id,
@@ -220,33 +219,23 @@ mod test {
         (0..len).map(|_| random::<u8>()).collect::<Vec<_>>()
     }
 
-    fn gen_user_address() -> Address {
-        let inner = "0x107899EE7319601cbC2684709e0eC3A4807bb0Fd74";
-        Address::from_hex(inner).unwrap()
-    }
-
     fn gen_signed_tx() -> SignedTransaction {
         use protocol::codec::ProtocolCodec;
 
-        let address = gen_user_address();
         let nonce = Hash::digest(Bytes::from(gen_random_bytes(10)));
-        let fee = Fee {
-            asset_id: nonce.clone(),
-            cycle:    random::<u64>(),
-        };
-        let action = TransactionAction::Transfer {
-            receiver:       address,
-            carrying_asset: CarryingAsset {
-                asset_id: nonce.clone(),
-                amount:   FromPrimitive::from_i32(42).unwrap(),
-            },
+
+        let request = TransactionRequest {
+            service_name: "test".to_owned(),
+            method:       "test".to_owned(),
+            payload:      "test".to_owned(),
         };
         let mut raw = RawTransaction {
             chain_id: nonce.clone(),
             nonce,
             timeout: random::<u64>(),
-            fee,
-            action,
+            cycles_price: 1,
+            cycles_limit: random::<u64>(),
+            request,
         };
 
         let raw_bytes = executor::block_on(async { raw.encode().await.unwrap() });
