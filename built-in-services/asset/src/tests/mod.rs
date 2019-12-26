@@ -21,7 +21,7 @@ fn test_create_asset() {
     let caller = Address::from_hex("0x755cdba6ae4f479f7164792b318b2a06c759833b").unwrap();
     let context = mock_context(cycles_limit, caller);
 
-    let mut service = new_asset_service(context.clone());
+    let mut service = new_asset_service();
 
     let supply = 1024 * 1024;
     // test create_asset
@@ -55,7 +55,7 @@ fn test_transfer() {
     let caller = Address::from_hex("0x755cdba6ae4f479f7164792b318b2a06c759833b").unwrap();
     let context = mock_context(cycles_limit, caller.clone());
 
-    let mut service = new_asset_service(context.clone());
+    let mut service = new_asset_service();
 
     let supply = 1024 * 1024;
     // test create_asset
@@ -93,23 +93,13 @@ fn test_transfer() {
 }
 
 fn new_asset_service(
-    context: DefaultRequestContext,
-) -> AssetService<
-    DefalutServiceSDK<
-        GeneralServiceState<MemoryDB>,
-        DefaultChainQuerier<MockStorage>,
-        DefaultRequestContext,
-    >,
-> {
+) -> AssetService<DefalutServiceSDK<GeneralServiceState<MemoryDB>, DefaultChainQuerier<MockStorage>>>
+{
     let chain_db = DefaultChainQuerier::new(Arc::new(MockStorage {}));
     let trie = MPTTrie::new(Arc::new(MemoryDB::new(false)));
     let state = GeneralServiceState::new(trie);
 
-    let sdk = DefalutServiceSDK::new(
-        Rc::new(RefCell::new(state)),
-        Rc::new(chain_db),
-        context.clone(),
-    );
+    let sdk = DefalutServiceSDK::new(Rc::new(RefCell::new(state)), Rc::new(chain_db));
 
     AssetService::init(sdk).unwrap()
 }
@@ -121,6 +111,7 @@ fn mock_context(cycles_limit: u64, caller: Address) -> DefaultRequestContext {
         cycles_used: Rc::new(RefCell::new(0)),
         caller,
         epoch_id: 1,
+        timestamp: 0,
         service_name: "service_name".to_owned(),
         service_method: "service_method".to_owned(),
         service_payload: "service_payload".to_owned(),
