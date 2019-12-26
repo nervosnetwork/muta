@@ -19,7 +19,7 @@ hex = "0.3"
 prost = { git = "https://github.com/danburkert/prost", rev = "dfe51e9" }
 hasher = { version = "0.1", features = ['hash-keccak'] }
 creep = "0.1"
-bincode = "1.1"
+bincode = "1.2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 rlp = "0.4"
