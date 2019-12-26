@@ -16,8 +16,8 @@ use common_crypto::{
     BlsCommonReference, BlsPrivateKey, BlsPublicKey, PublicKey, Secp256k1, Secp256k1PrivateKey,
     ToPublicKey,
 };
-// use core_api::adapter::DefaultAPIAdapter;
-// use core_api::config::GraphQLConfig;
+use core_api::adapter::DefaultAPIAdapter;
+use core_api::config::GraphQLConfig;
 use core_consensus::fixed_types::{FixedEpoch, FixedSignedTxs};
 use core_consensus::message::{
     ProposalMessageHandler, PullEpochRpcHandler, PullTxsRpcHandler, QCMessageHandler,
@@ -370,18 +370,18 @@ async fn start(cfg: Config) -> ProtocolResult<()> {
     runtime::spawn(network_service);
 
     // Init graphql
-    // let api_adapter = DefaultAPIAdapter::<TransactionExecutorFactory, _, _,
-    // _>::new(     Arc::clone(&mempool),
-    //     Arc::clone(&storage),
-    //     Arc::clone(&trie_db),
-    // );
-    // let mut graphql_config = GraphQLConfig::default();
-    // graphql_config.listening_address = cfg.graphql.listening_address;
-    // graphql_config.graphql_uri = cfg.graphql.graphql_uri.clone();
-    // graphql_config.graphiql_uri = cfg.graphql.graphiql_uri.clone();
-    //
-    // // Run GraphQL server
-    // runtime::spawn(core_api::start_graphql(graphql_config, api_adapter));
+    let api_adapter = DefaultAPIAdapter::<ServiceExecutorFactory, _, _, _>::new(
+        Arc::clone(&mempool),
+        Arc::clone(&storage),
+        Arc::clone(&trie_db),
+    );
+    let mut graphql_config = GraphQLConfig::default();
+    graphql_config.listening_address = cfg.graphql.listening_address;
+    graphql_config.graphql_uri = cfg.graphql.graphql_uri.clone();
+    graphql_config.graphiql_uri = cfg.graphql.graphiql_uri.clone();
+
+    // Run GraphQL server
+    runtime::spawn(core_api::start_graphql(graphql_config, api_adapter));
 
     // Run sychronization process
     runtime::spawn(synchronization.run());

@@ -174,7 +174,7 @@ mod test {
             BlsPublicKey::aggregate(sigs_and_pub_keys.iter().map(|s| &s.1).collect::<Vec<_>>());
 
         let res = signature.verify(&hash, &aggregate_key, &"muta".into());
-        println!("{:?}", res);
+        assert_eq!(res.is_ok(), true);
         assert!(signature
             .verify(&hash, &aggregate_key, &"muta".into())
             .is_ok());

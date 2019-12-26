@@ -1,20 +1,43 @@
 mod epoch;
+mod receipt;
 mod transaction;
 
+use std::convert::From;
+
+use derive_more::{Display, From};
+use std::num::ParseIntError;
+
+use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
+
 pub use epoch::{Epoch, EpochHeader};
+pub use receipt::{Event, Receipt, ReceiptResponse};
 pub use transaction::{
-    ContractType, InputDeployAction, InputRawTransaction, InputTransactionEncryption,
-    InputTransferAction,
+    to_signed_transaction, to_transaction, InputRawTransaction, InputTransactionEncryption,
+    SignedTransaction,
 };
+
+#[derive(GraphQLObject, Clone)]
+pub struct ExecResp {
+    ret:      String,
+    is_error: bool,
+}
+
+impl From<protocol::traits::ExecResp> for ExecResp {
+    fn from(resp: protocol::traits::ExecResp) -> Self {
+        Self {
+            ret:      resp.ret,
+            is_error: resp.is_error,
+        }
+    }
+}
 
 #[derive(GraphQLScalarValue, Clone)]
 #[graphql(description = "The output digest of Keccak hash function")]
 pub struct Hash(String);
 pub type MerkleRoot = Hash;
-pub type AssetID = Hash;
 
 #[derive(GraphQLScalarValue, Clone)]
-#[graphql(description = "21 bytes of account address, the first bytes of which is the identifier.")]
+#[graphql(description = "20 bytes of account address")]
 pub struct Address(String);
 
 #[derive(GraphQLScalarValue, Clone)]
@@ -22,19 +45,8 @@ pub struct Address(String);
 pub struct Uint64(String);
 
 #[derive(GraphQLScalarValue, Clone)]
-#[graphql(description = "uint256")]
-pub struct Balance(String);
-
-#[derive(GraphQLScalarValue, Clone)]
 #[graphql(description = "Bytes corresponding hex string.")]
 pub struct Bytes(String);
-
-#[derive(GraphQLObject, Clone)]
-#[graphql(description = "Transaction fee")]
-pub struct Fee {
-    asset_id: AssetID,
-    cycle:    Uint64,
-}
 
 impl Hash {
     pub fn as_hex(&self) -> String {
@@ -52,17 +64,21 @@ impl Uint64 {
     pub fn as_hex(&self) -> String {
         clean_0x(&self.0).to_owned().to_uppercase()
     }
-}
 
-impl Balance {
-    pub fn as_hex(&self) -> String {
-        clean_0x(&self.0).to_owned().to_uppercase()
+    pub fn try_into_u64(self) -> ProtocolResult<u64> {
+        let n = u64::from_str_radix(&self.as_hex(), 16).map_err(SchemaError::IntoU64)?;
+        Ok(n)
     }
 }
 
 impl Bytes {
     pub fn as_hex(&self) -> String {
         clean_0x(&self.0).to_owned().to_uppercase()
+    }
+
+    pub fn to_vec(&self) -> ProtocolResult<Vec<u8>> {
+        let v = hex::decode(self.as_hex()).map_err(SchemaError::FromHex)?;
+        Ok(v)
     }
 }
 
@@ -84,21 +100,6 @@ impl From<u64> for Uint64 {
     }
 }
 
-impl From<protocol::types::Balance> for Balance {
-    fn from(balance: protocol::types::Balance) -> Self {
-        Balance(hex::encode(balance.to_bytes_be().to_vec()))
-    }
-}
-
-impl From<protocol::types::Fee> for Fee {
-    fn from(fee: protocol::types::Fee) -> Self {
-        Fee {
-            asset_id: AssetID::from(fee.asset_id),
-            cycle:    Uint64::from(fee.cycle),
-        }
-    }
-}
-
 impl From<protocol::Bytes> for Bytes {
     fn from(bytes: protocol::Bytes) -> Self {
         Bytes(hex::encode(bytes))
@@ -110,5 +111,22 @@ fn clean_0x(s: &str) -> &str {
         &s[2..]
     } else {
         s
+    }
+}
+
+#[derive(Debug, Display, From)]
+pub enum SchemaError {
+    #[display(fmt = "into u64 {:?}", _0)]
+    IntoU64(ParseIntError),
+
+    #[display(fmt = "from hex {:?}", _0)]
+    FromHex(hex::FromHexError),
+}
+
+impl std::error::Error for SchemaError {}
+
+impl From<SchemaError> for ProtocolError {
+    fn from(err: SchemaError) -> ProtocolError {
+        ProtocolError::new(ProtocolErrorKind::API, Box::new(err))
     }
 }

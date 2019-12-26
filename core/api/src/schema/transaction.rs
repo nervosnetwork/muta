@@ -1,21 +1,38 @@
-use crate::schema::{Address, AssetID, Balance, Bytes, Hash, Uint64};
+use protocol::ProtocolResult;
 
-#[derive(GraphQLEnum, Clone)]
-#[graphql(description = "According to different purposes, Muta has many contract type")]
-pub enum ContractType {
-    // Asset contract
-    #[graphql(
-        description = "Asset contract often use for creating User Define Asset(also known as UDT(User Define Token))"
-    )]
-    Asset,
-    // App contract, the code in the contract is allowed to change the state world.
-    #[graphql(
-        description = "App contract often use for creating DAPP(Decentralized APPlication) "
-    )]
-    App,
-    // Library contract, the code in the contract is not allowed to change the state world.
-    #[graphql(description = "Library contract often providing reusable and immutable function")]
-    Library,
+use crate::schema::{Bytes, Hash, Uint64};
+
+#[derive(GraphQLObject, Clone)]
+pub struct SignedTransaction {
+    pub chain_id:     Hash,
+    pub cycles_limit: Uint64,
+    pub cycles_price: Uint64,
+    pub nonce:        Hash,
+    pub timeout:      Uint64,
+    pub service_name: String,
+    pub method:       String,
+    pub payload:      String,
+    pub tx_hash:      Hash,
+    pub pubkey:       Bytes,
+    pub signature:    Bytes,
+}
+
+impl From<protocol::types::SignedTransaction> for SignedTransaction {
+    fn from(stx: protocol::types::SignedTransaction) -> Self {
+        Self {
+            chain_id:     Hash::from(stx.raw.chain_id),
+            cycles_limit: Uint64::from(stx.raw.cycles_limit),
+            cycles_price: Uint64::from(stx.raw.cycles_price),
+            nonce:        Hash::from(stx.raw.nonce),
+            timeout:      Uint64::from(stx.raw.timeout),
+            service_name: stx.raw.request.service_name,
+            method:       stx.raw.request.method,
+            payload:      stx.raw.request.payload,
+            tx_hash:      Hash::from(stx.tx_hash),
+            pubkey:       Bytes::from(stx.pubkey),
+            signature:    Bytes::from(stx.signature),
+        }
+    }
 }
 
 // #####################
@@ -34,9 +51,8 @@ pub struct InputRawTransaction {
         description = "Mostly like the gas limit in Ethereum, describes the fee that \
                        you are willing to pay the highest price for the transaction"
     )]
-    pub fee_cycle:    Uint64,
-    #[graphql(description = "asset type")]
-    pub fee_asset_id: AssetID,
+    pub cycles_limit: Uint64,
+    pub cycles_price: Uint64,
     #[graphql(
         description = "Every transaction has its own id, unlike Ethereum's nonce,\
                        the nonce in Muta is an hash"
@@ -47,6 +63,9 @@ pub struct InputRawTransaction {
     the `timeout` should be `timeout > current_epoch_height` and `timeout < current_epoch_height + timeout_gap`,\
     the `timeout_gap` generally equal to 20.")]
     pub timeout:      Uint64,
+    pub service_name: String,
+    pub method:       String,
+    pub payload:      String,
 }
 
 #[derive(GraphQLInputObject, Clone)]
@@ -60,22 +79,29 @@ pub struct InputTransactionEncryption {
     pub signature: Bytes,
 }
 
-#[derive(GraphQLInputObject, Clone)]
-#[graphql(description = "The action of transfer transaction")]
-pub struct InputTransferAction {
-    #[graphql(description = "The amount of the transfer")]
-    pub carrying_amount:   Balance,
-    #[graphql(description = "The asset of of the transfer")]
-    pub carrying_asset_id: AssetID,
-    #[graphql(description = "The receiver of the transfer")]
-    pub receiver:          Address,
+pub fn to_signed_transaction(
+    raw: InputRawTransaction,
+    encryption: InputTransactionEncryption,
+) -> ProtocolResult<protocol::types::SignedTransaction> {
+    Ok(protocol::types::SignedTransaction {
+        raw:       to_transaction(raw)?,
+        tx_hash:   protocol::types::Hash::from_hex(&encryption.tx_hash.as_hex())?,
+        pubkey:    bytes::BytesMut::from(encryption.pubkey.as_hex().as_bytes()).freeze(),
+        signature: bytes::BytesMut::from(encryption.signature.as_hex().as_bytes()).freeze(),
+    })
 }
 
-#[derive(GraphQLInputObject, Clone)]
-#[graphql(description = "The deploy transfer transaction")]
-pub struct InputDeployAction {
-    #[graphql(description = "Encoded contract code")]
-    pub code:          Bytes,
-    #[graphql(description = "The type of contract")]
-    pub contract_type: ContractType,
+pub fn to_transaction(raw: InputRawTransaction) -> ProtocolResult<protocol::types::RawTransaction> {
+    Ok(protocol::types::RawTransaction {
+        chain_id:     protocol::types::Hash::from_hex(&raw.chain_id.as_hex())?,
+        nonce:        protocol::types::Hash::from_hex(&raw.nonce.as_hex())?,
+        timeout:      raw.timeout.try_into_u64()?,
+        cycles_price: raw.cycles_price.try_into_u64()?,
+        cycles_limit: raw.cycles_limit.try_into_u64()?,
+        request:      protocol::types::TransactionRequest {
+            service_name: raw.service_name.to_owned(),
+            method:       raw.method.to_owned(),
+            payload:      raw.payload.to_owned(),
+        },
+    })
 }

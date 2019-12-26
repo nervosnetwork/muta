@@ -19,7 +19,7 @@ impl std::error::Error for BindingMacroError {}
 
 impl From<BindingMacroError> for ProtocolError {
     fn from(err: BindingMacroError) -> ProtocolError {
-        ProtocolError::new(ProtocolErrorKind::Binding, Box::new(err))
+        ProtocolError::new(ProtocolErrorKind::BindingMacro, Box::new(err))
     }
 }
 

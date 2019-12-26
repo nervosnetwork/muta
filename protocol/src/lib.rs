@@ -21,6 +21,7 @@ pub enum ProtocolErrorKind {
     Storage,
     Runtime,
     Binding,
+    BindingMacro,
     Service,
 
     // codec
