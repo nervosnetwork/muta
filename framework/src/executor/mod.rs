@@ -1,5 +1,8 @@
+mod factory;
 #[cfg(test)]
 mod tests;
+
+pub use factory::ServiceExecutorFactory;
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -10,7 +13,7 @@ use cita_trie::DB as TrieDB;
 use derive_more::{Display, From};
 
 use asset::AssetService;
-use bytes::Bytes;
+use bytes::BytesMut;
 use protocol::traits::{
     ExecResp, Executor, ExecutorParams, ExecutorResp, RequestContext, Service, ServiceState,
     Storage,
@@ -245,7 +248,8 @@ impl<S: Storage, DB: 'static + TrieDB> ServiceExecutor<S, DB> {
         let mut bloom = Bloom::default();
         for receipt in receipts {
             for event in receipt.events.iter() {
-                let bytes = Bytes::from((event.service.clone() + &event.data).as_bytes());
+                let bytes =
+                    BytesMut::from((event.service.clone() + &event.data).as_bytes()).freeze();
                 let hash = Hash::digest(bytes).as_bytes();
 
                 let input = BloomInput::Raw(hash.as_ref());

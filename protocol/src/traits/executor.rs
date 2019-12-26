@@ -1,3 +1,6 @@
+use std::sync::Arc;
+
+use crate::traits::Storage;
 use crate::types::{Address, Bloom, MerkleRoot, Receipt, SignedTransaction, TransactionRequest};
 use crate::ProtocolResult;
 
@@ -21,6 +24,14 @@ pub struct ExecutorParams {
 pub struct ExecResp {
     pub ret:      String,
     pub is_error: bool,
+}
+
+pub trait ExecutorFactory<DB: cita_trie::DB, S: Storage>: Send + Sync {
+    fn from_root(
+        root: MerkleRoot,
+        db: Arc<DB>,
+        storage: Arc<S>,
+    ) -> ProtocolResult<Box<dyn Executor>>;
 }
 
 pub trait Executor {

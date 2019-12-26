@@ -5,7 +5,7 @@ use bincode::{deserialize, serialize};
 use overlord::Codec;
 
 use protocol::codec::{Deserialize, ProtocolCodecSync, Serialize};
-use protocol::fixed_codec::ProtocolFixedCodec;
+use protocol::fixed_codec::FixedCodec;
 use protocol::types::{Epoch, Hash, Pill, SignedTransaction};
 use protocol::{traits::MessageCodec, Bytes, BytesMut, ProtocolResult};
 
@@ -52,7 +52,7 @@ impl MessageCodec for ConsensusRpcResponse {
 
         match flag.as_ref() {
             b"a" => {
-                let res: Epoch = ProtocolFixedCodec::decode_fixed(bytes)?;
+                let res: Epoch = FixedCodec::decode_fixed(bytes)?;
                 Ok(ConsensusRpcResponse::PullEpochs(Box::new(res)))
             }
 
@@ -78,7 +78,7 @@ impl Codec for FixedPill {
     }
 
     fn decode(data: Bytes) -> Result<Self, Box<dyn Error + Send>> {
-        let inner: Pill = ProtocolFixedCodec::decode_fixed(data)?;
+        let inner: Pill = FixedCodec::decode_fixed(data)?;
         Ok(FixedPill { inner })
     }
 }
@@ -173,8 +173,8 @@ mod test {
     use rand::random;
 
     use protocol::types::{
-        CarryingAsset, Epoch, EpochHeader, Fee, Hash, Proof, RawTransaction, SignedTransaction,
-        TransactionAction, UserAddress,
+        Address, CarryingAsset, Epoch, EpochHeader, Fee, Hash, Proof, RawTransaction,
+        SignedTransaction, TransactionAction,
     };
     use protocol::Bytes;
 
@@ -194,7 +194,7 @@ mod test {
             state_root: nonce,
             receipt_root: Vec::new(),
             cycles_used: vec![999_999],
-            proposer: UserAddress::from_hex(addr_str).unwrap(),
+            proposer: Address::from_hex(addr_str).unwrap(),
             proof: mock_proof(epoch_hash),
             validator_version: 1,
             validators: Vec::new(),
@@ -220,9 +220,9 @@ mod test {
         (0..len).map(|_| random::<u8>()).collect::<Vec<_>>()
     }
 
-    fn gen_user_address() -> UserAddress {
+    fn gen_user_address() -> Address {
         let inner = "0x107899EE7319601cbC2684709e0eC3A4807bb0Fd74";
-        UserAddress::from_hex(inner).unwrap()
+        Address::from_hex(inner).unwrap()
     }
 
     fn gen_signed_tx() -> SignedTransaction {

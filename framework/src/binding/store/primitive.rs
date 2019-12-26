@@ -4,7 +4,7 @@ use std::mem;
 use std::rc::Rc;
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
 
 use protocol::traits::{ServiceState, StoreBool, StoreString, StoreUint64};
 use protocol::types::Hash;
@@ -50,7 +50,7 @@ impl<S: ServiceState> StoreBool for DefaultStoreBool<S> {
             [0u8; mem::size_of::<u8>()]
         };
 
-        let val = Bytes::from(bs.as_ref());
+        let val = BytesMut::from(bs.as_ref()).freeze();
         self.state.borrow_mut().insert(self.key.clone(), val)?;
         Ok(())
     }
@@ -89,7 +89,7 @@ impl<S: ServiceState> StoreUint64 for DefaultStoreUint64<S> {
         bs.as_mut()
             .write_u64::<LittleEndian>(val)
             .expect("write u64 should not fail");
-        let val = Bytes::from(bs.as_ref());
+        let val = BytesMut::from(bs.as_ref()).freeze();
 
         self.state.borrow_mut().insert(self.key.clone(), val)?;
         Ok(())
@@ -181,7 +181,7 @@ impl<S: ServiceState> DefaultStoreString<S> {
 
 impl<S: ServiceState> StoreString for DefaultStoreString<S> {
     fn set(&mut self, val: &str) -> ProtocolResult<()> {
-        let val = Bytes::from(val);
+        let val = BytesMut::from(val).freeze();
 
         self.state.borrow_mut().insert(self.key.clone(), val)?;
         Ok(())

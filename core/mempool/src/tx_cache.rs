@@ -217,10 +217,10 @@ impl TxCache {
                 }
                 // Accumulate cycles. The order_tx_hashes and the propose_tx_hashes both collect
                 // transactions under cycle limit.
-                cycle_count += shared_tx.tx.raw.fee.cycle;
+                cycle_count += shared_tx.tx.raw.cycles_limit;
                 if cycle_count > cycle_limit {
                     stage = stage.next();
-                    cycle_count = shared_tx.tx.raw.fee.cycle;
+                    cycle_count = shared_tx.tx.raw.cycles_limit;
                 }
 
                 match stage {
@@ -360,7 +360,7 @@ mod tests {
     use test::Bencher;
 
     use protocol::types::{
-        CarryingAsset, Fee, Hash, RawTransaction, SignedTransaction, TransactionAction, UserAddress,
+        Address, CarryingAsset, Fee, Hash, RawTransaction, SignedTransaction, TransactionAction,
     };
     use protocol::Bytes;
 
@@ -396,7 +396,7 @@ mod tests {
         let tx_hash = rand_hash;
         let add_str = "10CAB8EEA4799C21379C20EF5BAA2CC8AF1BEC475B";
         let bytes = Bytes::from(hex::decode(add_str).unwrap());
-        let address = UserAddress::from_bytes(bytes.clone()).unwrap();
+        let address = Address::from_bytes(bytes.clone()).unwrap();
         let fee = Fee {
             asset_id: asset_id.clone(),
             cycle:    TX_CYCLE,

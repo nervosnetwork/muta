@@ -21,8 +21,7 @@ use common_crypto::{
 use protocol::codec::ProtocolCodec;
 use protocol::traits::{Context, MemPool, MemPoolAdapter, MixedTxHashes};
 use protocol::types::{
-    CarryingAsset, Fee, Hash, RawTransaction, SignedTransaction, TransactionAction,
-    UserAddress as Address,
+    Address, CarryingAsset, Fee, Hash, RawTransaction, SignedTransaction, TransactionAction,
 };
 use protocol::{Bytes, ProtocolResult};
 

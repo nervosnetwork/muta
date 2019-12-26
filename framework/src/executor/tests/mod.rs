@@ -16,8 +16,8 @@ use crate::executor::ServiceExecutor;
 
 #[test]
 fn test_create_genesis() {
-    let yaml = include_str!("./genesis_services.yaml");
-    let genesis_services: Vec<GenesisService> = serde_yaml::from_str(yaml).unwrap();
+    let toml_str = include_str!("./genesis_services.toml");
+    let genesis_services: Vec<GenesisService> = toml::from_str(toml_str).unwrap();
     let db = Arc::new(MemoryDB::new(false));
 
     let root = ServiceExecutor::create_genesis(

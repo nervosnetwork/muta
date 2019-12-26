@@ -1,10 +1,8 @@
-use bytes::BytesMut;
-
 use crate::fixed_codec::{FixedCodec, FixedCodecError};
 use crate::types::receipt::{Event, Receipt, ReceiptResponse};
 use crate::{impl_default_fixed_codec_for, ProtocolResult};
 
-// Impl ProtocolFixedCodec trait for types
+// Impl FixedCodec trait for types
 impl_default_fixed_codec_for!(receipt, [Receipt, ReceiptResponse]);
 
 impl rlp::Encodable for Receipt {

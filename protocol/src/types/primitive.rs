@@ -132,7 +132,7 @@ impl fmt::Debug for Hash {
 /// Address length.
 const ADDRESS_LEN: usize = 20;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Address([u8; ADDRESS_LEN]);
 
 impl Serialize for Address {
@@ -208,11 +208,17 @@ impl Address {
     }
 
     pub fn as_bytes(&self) -> Bytes {
-        Bytes::from(self.0.as_ref())
+        BytesMut::from(self.0.as_ref()).freeze()
     }
 
     pub fn as_hex(&self) -> String {
         hex::encode(self.0)
+    }
+}
+
+impl fmt::Debug for Address {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.as_hex())
     }
 }
 

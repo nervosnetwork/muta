@@ -8,15 +8,14 @@ use futures::stream::StreamExt;
 use log::{debug, error};
 
 use common_merkle::Merkle;
-use protocol::traits::executor::{ExecutorExecResp, ExecutorFactory, TrieDB};
 use protocol::traits::{
-    ConsensusAdapter, Context, Gossip, MemPool, MessageTarget, MixedTxHashes, NodeInfo, Priority,
-    Rpc, Storage,
+    ConsensusAdapter, Context, ExecutorFactory, ExecutorParams, ExecutorResp, Gossip, MemPool,
+    MessageTarget, MixedTxHashes, NodeInfo, Priority, Rpc, Storage,
 };
 use protocol::types::{
     Address, Epoch, Hash, MerkleRoot, Proof, Receipt, SignedTransaction, Validator,
 };
-use protocol::{fixed_codec::ProtocolFixedCodec, ProtocolResult};
+use protocol::{fixed_codec::FixedCodec, ProtocolResult};
 
 use crate::fixed_types::{FixedEpoch, FixedEpochID, FixedSignedTxs, PullTxsRequest};
 use crate::status::{CurrentStatusAgent, UpdateInfo};
@@ -26,12 +25,12 @@ use crate::ConsensusError;
 const OVERLORD_GAP: usize = 10;
 
 pub struct OverlordConsensusAdapter<
-    EF: ExecutorFactory<DB>,
+    EF: ExecutorFactory<DB, S>,
     G: Gossip,
     M: MemPool,
     R: Rpc,
     S: Storage,
-    DB: TrieDB,
+    DB: cita_trie::DB,
 > {
     rpc:     Arc<R>,
     network: Arc<G>,
@@ -45,12 +44,12 @@ pub struct OverlordConsensusAdapter<
 #[async_trait]
 impl<EF, G, M, R, S, DB> ConsensusAdapter for OverlordConsensusAdapter<EF, G, M, R, S, DB>
 where
-    EF: ExecutorFactory<DB>,
+    EF: ExecutorFactory<DB, S>,
     G: Gossip + Sync + Send,
     R: Rpc + Sync + Send,
     M: MemPool,
     S: Storage,
-    DB: TrieDB,
+    DB: cita_trie::DB,
 {
     async fn get_txs_from_mempool(
         &self,
@@ -107,6 +106,8 @@ where
         cycles_price: u64,
         coinbase: Address,
         signed_txs: Vec<SignedTransaction>,
+        cycles_limit: u64,
+        timestamp: u64,
     ) -> ProtocolResult<()> {
         let chain_id = node_info.chain_id;
         let exec_info = ExecuteInfo {
@@ -116,6 +117,8 @@ where
             signed_txs,
             order_root,
             coinbase,
+            cycles_limit,
+            timestamp,
         };
 
         let mut tx = self.exec_queue.clone();
@@ -193,12 +196,12 @@ where
 
 impl<EF, G, M, R, S, DB> OverlordConsensusAdapter<EF, G, M, R, S, DB>
 where
-    EF: ExecutorFactory<DB>,
+    EF: ExecutorFactory<DB, S>,
     G: Gossip + Sync + Send,
     R: Rpc + Sync + Send,
     M: MemPool,
     S: Storage,
-    DB: TrieDB,
+    DB: cita_trie::DB,
 {
     pub fn new(
         rpc: Arc<R>,
@@ -248,8 +251,8 @@ pub struct ExecDemons<S, DB, EF> {
 impl<S, DB, EF> ExecDemons<S, DB, EF>
 where
     S: Storage,
-    DB: TrieDB,
-    EF: ExecutorFactory<DB>,
+    DB: cita_trie::DB,
+    EF: ExecutorFactory<DB, S>,
 {
     fn new(
         storage: Arc<S>,
@@ -284,15 +287,17 @@ where
 
             error!("muta-consensus: execute {} epoch", epoch_id);
             let mut executor = EF::from_root(
-                info.chain_id.clone(),
                 self.state_root.clone(),
                 Arc::clone(&self.trie_db),
-                info.epoch_id,
-                info.cycles_price,
-                info.coinbase,
+                Arc::clone(&self.storage),
             )?;
-
-            let resp = executor.exec(txs)?;
+            let exec_params = ExecutorParams {
+                state_root: self.state_root.clone(),
+                epoch_id,
+                timestamp: info.timestamp,
+                cycels_limit: info.cycles_limit,
+            };
+            let resp = executor.exec(&exec_params, &txs)?;
             self.state_root = resp.state_root.clone();
             self.save_receipts(resp.receipts.clone()).await?;
             self.status
@@ -308,12 +313,9 @@ where
     }
 }
 
-fn gen_update_info(
-    exec_resp: ExecutorExecResp,
-    epoch_id: u64,
-    order_root: MerkleRoot,
-) -> UpdateInfo {
-    let cycles = exec_resp.all_cycles_used.iter().map(|fee| fee.cycle).sum();
+fn gen_update_info(exec_resp: ExecutorResp, epoch_id: u64, order_root: MerkleRoot) -> UpdateInfo {
+    let cycles = exec_resp.all_cycles_used;
+
     let receipt = Merkle::from_hashes(
         exec_resp
             .receipts

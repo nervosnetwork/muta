@@ -1,18 +1,18 @@
 use std::mem;
 
 use byteorder::{ByteOrder, LittleEndian, WriteBytesExt};
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
 
 use crate::fixed_codec::{FixedCodec, FixedCodecError};
 use crate::types::{Account, Address, Fee, Hash};
 use crate::{impl_default_fixed_codec_for, ProtocolResult};
 
-// Impl ProtocolFixedCodec trait for types
+// Impl FixedCodec trait for types
 impl_default_fixed_codec_for!(primitive, [Hash, Fee, Address, Account]);
 
 impl FixedCodec for String {
     fn encode_fixed(&self) -> ProtocolResult<Bytes> {
-        Ok(Bytes::from(self.as_bytes()))
+        Ok(Bytes::from(self.clone()))
     }
 
     fn decode_fixed(bytes: Bytes) -> ProtocolResult<Self> {
@@ -37,7 +37,7 @@ impl FixedCodec for u64 {
             .write_u64::<LittleEndian>(*self)
             .expect("write u64 should not fail");
 
-        Ok(Bytes::from(bs.as_ref()))
+        Ok(BytesMut::from(bs.as_ref()).freeze())
     }
 
     fn decode_fixed(bytes: Bytes) -> ProtocolResult<Self> {
