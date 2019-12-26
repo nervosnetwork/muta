@@ -229,9 +229,11 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         bls_pub_keys.insert(address, pub_key);
     }
 
-    let hex_privkey =
-        hex::decode(config.consensus.private_key.clone()).map_err(MainError::FromHex)?;
-    let bls_priv_key = BlsPrivateKey::try_from(hex_privkey.as_ref()).map_err(MainError::Crypto)?;
+    let mut priv_key = Vec::new();
+    priv_key.extend_from_slice(&[0u8; 16]);
+    let mut tmp = hex::decode(config.privkey.clone()).unwrap();
+    priv_key.append(&mut tmp);
+    let bls_priv_key = BlsPrivateKey::try_from(priv_key.as_ref()).map_err(MainError::Crypto)?;
 
     let hex_common_ref =
         hex::decode(config.consensus.common_ref.as_str()).map_err(MainError::FromHex)?;

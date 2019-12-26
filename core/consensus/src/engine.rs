@@ -7,10 +7,12 @@ use async_trait::async_trait;
 use bincode::serialize;
 use futures::lock::Mutex;
 use log::error;
+use moodyblues_sdk::trace;
 use overlord::types::{Commit, Node, OverlordMsg, Status};
 use overlord::Consensus as Engine;
 use parking_lot::RwLock;
 use rlp::Encodable;
+use serde_json::json;
 
 use common_merkle::Merkle;
 use protocol::fixed_codec::FixedCodec;
@@ -193,6 +195,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill, FixedSignedTxs>
             ))
         })?;
 
+        trace_epoch(&pill.epoch);
         self.update_status(epoch_id, pill.epoch, proof, full_txs)
             .await?;
 
@@ -371,6 +374,13 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
 
         // check previous hash
         if status.prev_hash != epoch.pre_hash {
+            trace::error(
+                "check_epoch_prev_hash_diff".to_string(),
+                Some(json!({
+                    "epoch_prev_hash": epoch.pre_hash.as_hex(),
+                    "cache_prev_hash": status.prev_hash.as_hex(),
+                })),
+            );
             error!(
                 "cache previous hash {:?}, epoch previous hash {:?}",
                 status.prev_hash, epoch.pre_hash
@@ -380,6 +390,13 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
 
         // check state root
         if !status.state_root.contains(&epoch.state_root) {
+            trace::error(
+                "check_epoch_state_root_diff".to_string(),
+                Some(json!({
+                    "epoch_state_root": epoch.state_root.as_hex(),
+                    "cache_state_roots": status.state_root.iter().map(|root| root.as_hex()).collect::<Vec<_>>(),
+                })),
+            );
             error!(
                 "cache state root {:?}, epoch state root {:?}",
                 status.state_root, epoch.state_root
@@ -389,6 +406,13 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
 
         // check confirm root
         if !check_vec_roots(&status.confirm_root, &epoch.confirm_root) {
+            trace::error(
+                "check_epoch_confirm_root_diff".to_string(),
+                Some(json!({
+                    "epoch_state_root": epoch.confirm_root.iter().map(|root| root.as_hex()).collect::<Vec<_>>(),
+                    "cache_state_roots": status.confirm_root.iter().map(|root| root.as_hex()).collect::<Vec<_>>(),
+                })),
+            );
             error!(
                 "cache confirm root {:?}, epoch confirm root {:?}",
                 status.confirm_root, epoch.confirm_root
@@ -398,6 +422,13 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
 
         // check receipt root
         if !check_vec_roots(&status.receipt_root, &epoch.receipt_root) {
+            trace::error(
+                "check_epoch_receipt_root_diff".to_string(),
+                Some(json!({
+                    "epoch_state_root": epoch.receipt_root.iter().map(|root| root.as_hex()).collect::<Vec<_>>(),
+                    "cache_state_roots": status.receipt_root.iter().map(|root| root.as_hex()).collect::<Vec<_>>(),
+                })),
+            );
             error!(
                 "cache receipt root {:?}, epoch receipt root {:?}",
                 status.receipt_root, epoch.receipt_root
@@ -407,6 +438,13 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
 
         // check cycles used
         if !check_vec_roots(&status.cycles_used, &epoch.cycles_used) {
+            trace::error(
+                "check_epoch_cycle_used_diff".to_string(),
+                Some(json!({
+                    "epoch_state_root": epoch.cycles_used,
+                    "cache_state_roots": status.cycles_used,
+                })),
+            );
             error!(
                 "cache cycles used {:?}, epoch cycles used {:?}",
                 status.cycles_used, epoch.cycles_used
@@ -444,36 +482,6 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
             let mut current_consensus_status = self.current_consensus_status.write();
             current_consensus_status.update_after_commit(epoch_id + 1, epoch, prev_hash, proof)?;
         }
-        //     current_consensus_status.epoch_id = epoch_id + 1;
-        //     current_consensus_status.prev_hash = prev_hash;
-        //     current_consensus_status.proof = proof;
-
-        //     // Update state root
-        //     current_consensus_status.state_root = exec_resp.state_root.clone();
-
-        //     // Update order root
-        //     let ordered_root = Merkle::from_hashes(epoch.ordered_tx_hashes.clone())
-        //         .get_root_hash()
-        //         .unwrap_or_else(Hash::from_empty);
-        //     current_consensus_status.order_root = ordered_root.clone();
-
-        //     // Update confirm root
-        //     current_consensus_status.confirm_root = vec![ordered_root];
-
-        //     // Update receipt root
-        //     current_consensus_status.receipt_root = {
-        //         let receipt_root = Merkle::from_hashes(
-        //             exec_resp
-        //                 .receipts
-        //                 .iter()
-        //                 .map(|receipt|
-        // Hash::digest(receipt.to_owned().encode_fixed().unwrap()))
-        // .collect::<Vec<_>>(),         )
-        //         .get_root_hash()
-        //         .unwrap_or_else(Hash::from_empty);
-        //         vec![receipt_root]
-        //     };
-        // }
         Ok(())
     }
 
@@ -533,6 +541,34 @@ pub fn check_vec_roots<T: Eq>(cache_roots: &[T], epoch_roots: &[T]) -> bool {
             .iter()
             .zip(epoch_roots.iter())
             .all(|(c_root, e_root)| c_root == e_root)
+}
+
+pub fn trace_epoch(epoch: &Epoch) {
+    let confirm_roots = epoch
+        .header
+        .confirm_root
+        .iter()
+        .map(|root| root.as_hex())
+        .collect::<Vec<_>>();
+    let receipt_roots = epoch
+        .header
+        .receipt_root
+        .iter()
+        .map(|root| root.as_hex())
+        .collect::<Vec<_>>();
+
+    trace::custom(
+        "commit_epoch".to_string(),
+        Some(json!({
+            "epoch_id": epoch.header.epoch_id,
+            "pre_hash": epoch.header.pre_hash.as_hex(),
+            "order_root": epoch.header.order_root.as_hex(),
+            "state_root": epoch.header.state_root.as_hex(),
+            "proposer": epoch.header.proposer.as_hex(),
+            "confirm_roots": confirm_roots,
+            "receipt_roots": receipt_roots,
+        })),
+    );
 }
 
 fn time_now() -> u64 {

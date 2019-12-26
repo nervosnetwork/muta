@@ -4,7 +4,9 @@ use derive_more::Display;
 use futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
 use futures::stream::StreamExt;
 use log::{error, warn};
+use moodyblues_sdk::trace;
 use parking_lot::RwLock;
+use serde_json::json;
 
 use protocol::types::{Bloom, Epoch, Hash, MerkleRoot, Proof, Validator};
 use protocol::{ProtocolError, ProtocolResult};
@@ -86,6 +88,7 @@ impl CurrentConsensusStatus {
     fn update_after_exec(&mut self, info: UpdateInfo) {
         warn!("Update {}", info);
         warn!("AE: {}", self);
+        trace_after_exec(&info);
 
         assert!(info.exec_epoch_id == self.exec_epoch_id + 1);
         self.exec_epoch_id += 1;
@@ -210,4 +213,16 @@ pub struct UpdateInfo {
     pub state_root:    MerkleRoot,
     pub receipt_root:  MerkleRoot,
     pub confirm_root:  MerkleRoot,
+}
+
+pub fn trace_after_exec(info: &UpdateInfo) {
+    trace::custom(
+        "update_exec_info".to_string(),
+        Some(json!({
+            "exec_epoch_id": info.exec_epoch_id,
+            "state_root": info.state_root.as_hex(),
+            "receipt_root": info.receipt_root.as_hex(),
+            "confirm_root": info.confirm_root.as_hex(),
+        })),
+    );
 }

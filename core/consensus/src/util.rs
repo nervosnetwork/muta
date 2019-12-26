@@ -61,6 +61,7 @@ impl Crypto for OverlordCrypto {
         signatures: Vec<Bytes>,
         voters: Vec<Bytes>,
     ) -> Result<Bytes, Box<dyn Error + Send>> {
+        // log::error!("{:?}", voters);
         if signatures.len() != voters.len() {
             return Err(ProtocolError::from(ConsensusError::Other(
                 "signatures length does not match voters length".to_string(),
@@ -69,12 +70,14 @@ impl Crypto for OverlordCrypto {
         }
 
         let mut sigs_pubkeys = Vec::with_capacity(signatures.len());
-        for item in signatures.iter().zip(voters.iter()) {
-            let pub_key = self.addr_pubkey.get(item.1).ok_or_else(|| {
+        for (sig, addr) in signatures.iter().zip(voters.iter()) {
+            let signature = BlsSignature::try_from(sig.as_ref())
+                .map_err(|e| ProtocolError::from(ConsensusError::CryptoErr(Box::new(e))))?;
+
+            let pub_key = self.addr_pubkey.get(addr).ok_or_else(|| {
                 ProtocolError::from(ConsensusError::Other("lose public key".to_string()))
             })?;
-            let signature = BlsSignature::try_from(item.0.as_ref())
-                .map_err(|e| ProtocolError::from(ConsensusError::CryptoErr(Box::new(e))))?;
+
             sigs_pubkeys.push((signature, pub_key.to_owned()));
         }
 
@@ -88,6 +91,7 @@ impl Crypto for OverlordCrypto {
         hash: Bytes,
         voters: Vec<Bytes>,
     ) -> Result<(), Box<dyn Error + Send>> {
+        // log::error!("{:?}", voters);
         let mut pub_keys = Vec::new();
         for addr in voters.iter() {
             let pub_key = self.addr_pubkey.get(addr).ok_or_else(|| {
@@ -161,7 +165,7 @@ mod test {
         let msg = Hash::digest(Bytes::from("muta-consensus"));
         let hash = HashValue::try_from(msg.as_bytes().as_ref()).unwrap();
         let mut sigs_and_pub_keys = Vec::new();
-        for i in 0..2 {
+        for i in 0..3 {
             let sig = BlsPrivateKey::try_from(private_keys[i].as_ref())
                 .unwrap()
                 .sign_message(&hash);
@@ -174,9 +178,7 @@ mod test {
             BlsPublicKey::aggregate(sigs_and_pub_keys.iter().map(|s| &s.1).collect::<Vec<_>>());
 
         let res = signature.verify(&hash, &aggregate_key, &"muta".into());
-        assert_eq!(res.is_ok(), true);
-        assert!(signature
-            .verify(&hash, &aggregate_key, &"muta".into())
-            .is_ok());
+        println!("{:?}", res);
+        assert!(res.is_ok());
     }
 }
