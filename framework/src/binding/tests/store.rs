@@ -69,7 +69,7 @@ fn test_default_store_string() {
 
     ss.set("ok").unwrap();
     assert_eq!(ss.get().unwrap(), String::from("ok"));
-    assert_eq!(ss.len().unwrap(), 2usize);
+    assert_eq!(ss.len().unwrap(), 2u32);
 }
 
 #[test]
@@ -84,6 +84,19 @@ fn test_default_store_map() {
         .unwrap();
     sm.insert(Hash::digest(Bytes::from("key_2")), Bytes::from("val_2"))
         .unwrap();
+
+    {
+        let mut it = sm.iter();
+        assert_eq!(
+            it.next().unwrap(),
+            (&Hash::digest(Bytes::from("key_1")), Bytes::from("val_1"))
+        );
+        assert_eq!(
+            it.next().unwrap(),
+            (&Hash::digest(Bytes::from("key_2")), Bytes::from("val_2"))
+        );
+        assert_eq!(it.next().is_none(), true);
+    }
 
     assert_eq!(
         sm.get(&Hash::digest(Bytes::from("key_1"))).unwrap(),
@@ -100,7 +113,7 @@ fn test_default_store_map() {
         sm.contains(&Hash::digest(Bytes::from("key_1"))).unwrap(),
         false
     );
-    assert_eq!(sm.len().unwrap(), 1usize)
+    assert_eq!(sm.len().unwrap(), 1u32)
 }
 
 #[test]
@@ -111,16 +124,23 @@ fn test_default_store_array() {
 
     let mut sa = DefaultStoreArray::<_, Bytes>::new(Rc::clone(&rs), "test");
 
-    assert_eq!(sa.len().unwrap(), 0usize);
+    assert_eq!(sa.len().unwrap(), 0u32);
 
     sa.push(Bytes::from("111")).unwrap();
     sa.push(Bytes::from("222")).unwrap();
 
-    assert_eq!(sa.get(0usize).unwrap(), Bytes::from("111"));
-    assert_eq!(sa.get(1usize).unwrap(), Bytes::from("222"));
+    {
+        let mut it = sa.iter();
+        assert_eq!(it.next().unwrap(), (0u32, Bytes::from("111")));
+        assert_eq!(it.next().unwrap(), (1u32, Bytes::from("222")));
+        assert_eq!(it.next().is_none(), true);
+    }
 
-    sa.remove(0usize).unwrap();
+    assert_eq!(sa.get(0u32).unwrap(), Bytes::from("111"));
+    assert_eq!(sa.get(1u32).unwrap(), Bytes::from("222"));
 
-    assert_eq!(sa.len().unwrap(), 1usize);
-    assert_eq!(sa.get(0usize).unwrap(), Bytes::from("222"));
+    sa.remove(0u32).unwrap();
+
+    assert_eq!(sa.len().unwrap(), 1u32);
+    assert_eq!(sa.get(0u32).unwrap(), Bytes::from("222"));
 }

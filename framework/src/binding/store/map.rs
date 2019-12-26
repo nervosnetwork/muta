@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::iter::Iterator;
 use std::marker::PhantomData;
 use std::rc::Rc;
 
@@ -49,8 +50,8 @@ impl<S: ServiceState, K: FixedCodec + PartialEq, V: FixedCodec> DefaultStoreMap<
     }
 }
 
-impl<S: ServiceState, K: FixedCodec + PartialEq, V: FixedCodec> StoreMap<K, V>
-    for DefaultStoreMap<S, K, V>
+impl<S: 'static + ServiceState, K: 'static + FixedCodec + PartialEq, V: 'static + FixedCodec>
+    StoreMap<K, V> for DefaultStoreMap<S, K, V>
 {
     fn get(&self, key: &K) -> ProtocolResult<V> {
         if self.keys.inner.contains(key) {
@@ -100,8 +101,8 @@ impl<S: ServiceState, K: FixedCodec + PartialEq, V: FixedCodec> StoreMap<K, V>
         }
     }
 
-    fn len(&self) -> ProtocolResult<usize> {
-        Ok(self.keys.inner.len())
+    fn len(&self) -> ProtocolResult<u32> {
+        Ok(self.keys.inner.len() as u32)
     }
 
     fn is_empty(&self) -> ProtocolResult<bool> {
@@ -112,20 +113,54 @@ impl<S: ServiceState, K: FixedCodec + PartialEq, V: FixedCodec> StoreMap<K, V>
         }
     }
 
-    // TODO(@zhounan): If value was not changed by f, then it should not be inserted
-    // to ServiceState for performance reason
-    fn for_each<F>(&mut self, mut f: F) -> ProtocolResult<()>
-    where
-        Self: Sized,
-        F: FnMut(&mut V) -> ProtocolResult<()>,
-    {
-        for k in &self.keys.inner {
-            let mut v = self.get(k)?;
-            f(&mut v)?;
-            let mk = self.get_map_key(k)?;
-            self.state.borrow_mut().insert(mk, v)?;
-        }
+    fn iter<'a>(&'a self) -> Box<dyn Iterator<Item = (&K, V)> + 'a> {
+        Box::new(MapIter::<S, K, V>::new(0, self))
+    }
+}
 
-        Ok(())
+pub struct MapIter<
+    'a,
+    S: 'static + ServiceState,
+    K: 'static + FixedCodec + PartialEq,
+    V: 'static + FixedCodec,
+> {
+    idx: u32,
+    map: &'a DefaultStoreMap<S, K, V>,
+}
+
+impl<
+        'a,
+        S: 'static + ServiceState,
+        K: 'static + FixedCodec + PartialEq,
+        V: 'static + FixedCodec,
+    > MapIter<'a, S, K, V>
+{
+    pub fn new(idx: u32, map: &'a DefaultStoreMap<S, K, V>) -> Self {
+        Self { idx, map }
+    }
+}
+
+impl<
+        'a,
+        S: 'static + ServiceState,
+        K: 'static + FixedCodec + PartialEq,
+        V: 'static + FixedCodec,
+    > Iterator for MapIter<'a, S, K, V>
+{
+    type Item = (&'a K, V);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.idx < self.map.len().expect("get len should not fail") {
+            let key = self
+                .map
+                .keys
+                .inner
+                .get(self.idx as usize)
+                .expect("get key should not fail");
+            self.idx += 1;
+            Some((key, self.map.get(key).expect("get value should not fail")))
+        } else {
+            None
+        }
     }
 }

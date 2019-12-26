@@ -24,7 +24,14 @@ pub trait FixedCodec: Sized {
 #[derive(Debug, Display, From)]
 pub enum FixedCodecError {
     Decoder(rlp::DecoderError),
+
     StringUTF8(std::string::FromUtf8Error),
+
+    #[display(fmt = "wrong bytes of bool")]
+    DecodeBool,
+
+    #[display(fmt = "wrong bytes of u8")]
+    DecodeUint8,
 }
 
 impl Error for FixedCodecError {}

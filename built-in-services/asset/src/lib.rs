@@ -111,7 +111,7 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
             .into());
         }
 
-        let to_balance = self.sdk.get_account_value(&to, &asset_id)?.unwrap_or(0);
+        let to_balance: u64 = self.sdk.get_account_value(&to, &asset_id)?.unwrap_or(0);
         let (v, overflow) = to_balance.overflowing_add(value);
         if overflow {
             return Err(ServiceError::U64Overflow.into());

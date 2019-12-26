@@ -56,6 +56,13 @@ fn test_service_sdk() {
         Bytes::from("val_1")
     );
 
+    let mut it = sdk_map.iter();
+    assert_eq!(
+        it.next().unwrap(),
+        (&Hash::digest(Bytes::from("key_1")), Bytes::from("val_1"))
+    );
+    assert_eq!(it.next().is_none(), true);
+
     // test sdk array
     let mut sdk_array = sdk.alloc_or_recover_array::<Hash>("test_array").unwrap();
     assert_eq!(sdk_array.is_empty().unwrap(), true);
@@ -63,9 +70,13 @@ fn test_service_sdk() {
     sdk_array.push(Hash::digest(Bytes::from("key_1"))).unwrap();
 
     assert_eq!(
-        sdk_array.get(0usize).unwrap(),
+        sdk_array.get(0).unwrap(),
         Hash::digest(Bytes::from("key_1"))
     );
+
+    let mut it = sdk_array.iter();
+    assert_eq!(it.next().unwrap(), (0, Hash::digest(Bytes::from("key_1"))));
+    assert_eq!(it.next().is_none(), true);
 
     // test get/set account value
     sdk.set_account_value(&mock_address(), Bytes::from("ak"), Bytes::from("av"))
