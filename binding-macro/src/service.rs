@@ -81,30 +81,32 @@ pub fn gen_service_code(_: TokenStream, item: TokenStream) -> TokenStream {
             }
 
             fn read_<Context: protocol::traits::RequestContext>(&self, ctx: Context) -> protocol::ProtocolResult<String> {
+                let service = ctx.get_service_name();
                 let method = ctx.get_service_method();
 
                 match method {
                     #(#list_read_name => {
                         let payload: #list_read_payload = serde_json::from_str(ctx.get_payload())
-                                .map_err(|e| framework::ServiceError::JsonParse(e))?;
+                                .map_err(|e| protocol::traits::BindingMacroError::JsonParse(e))?;
                         let res = self.#list_read_ident(ctx, payload)?;
-                        serde_json::to_string(&res).map_err(|e| framework::ServiceError::JsonParse(e).into())
+                        serde_json::to_string(&res).map_err(|e| protocol::traits::BindingMacroError::JsonParse(e).into())
                     },)*
-                    _ => Err(framework::ServiceError::NotFoundMethod(method.to_owned()).into())
+                    _ => Err(protocol::traits::BindingMacroError::NotFoundMethod{ service: service.to_owned(), method: method.to_owned() }.into())
                 }
             }
 
             fn write_<Context: protocol::traits::RequestContext>(&mut self, ctx: Context) -> protocol::ProtocolResult<String> {
+                let service = ctx.get_service_name();
                 let method = ctx.get_service_method();
 
                 match method {
                     #(#list_write_name => {
                         let payload: #list_write_payload = serde_json::from_str(ctx.get_payload())
-                                .map_err(|e| framework::ServiceError::JsonParse(e))?;
+                                .map_err(|e| protocol::traits::BindingMacroError::JsonParse(e))?;
                         let res = self.#list_write_ident(ctx, payload)?;
-                        serde_json::to_string(&res).map_err(|e| framework::ServiceError::JsonParse(e).into())
+                        serde_json::to_string(&res).map_err(|e| protocol::traits::BindingMacroError::JsonParse(e).into())
                     },)*
-                    _ => Err(framework::ServiceError::NotFoundMethod(method.to_owned()).into())
+                    _ => Err(protocol::traits::BindingMacroError::NotFoundMethod{ service: service.to_owned(), method: method.to_owned() }.into())
                 }
             }
         }

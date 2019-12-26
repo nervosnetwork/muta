@@ -1,4 +1,4 @@
-use serde_derive::Deserialize;
+use serde::Deserialize;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 pub struct Genesis {
@@ -26,6 +26,14 @@ pub struct GenesisSystemToken {
     pub name:   String,
     pub symbol: String,
     pub supply: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+pub struct GenesisService {
+    pub caller:  String,
+    pub service: String,
+    pub method:  String,
+    pub payload: String,
 }
 
 #[cfg(test)]
