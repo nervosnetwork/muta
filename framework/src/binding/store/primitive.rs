@@ -28,30 +28,13 @@ impl<S: ServiceState> DefaultStoreBool<S> {
 
 impl<S: ServiceState> StoreBool for DefaultStoreBool<S> {
     fn get(&self) -> ProtocolResult<bool> {
-        let bs: Bytes = self
-            .state
-            .borrow()
-            .get(&self.key)?
-            .ok_or(StoreError::GetNone)?;
+        let b: Option<bool> = self.state.borrow().get(&self.key)?;
 
-        let mut rdr = Cursor::new(bs.to_vec());
-        let u = rdr.read_u8().expect("read u8 should not fail");
-        match u {
-            0 => Ok(false),
-            1 => Ok(true),
-            _ => Err(StoreError::DecodeError.into()),
-        }
+        b.ok_or(StoreError::GetNone.into())
     }
 
     fn set(&mut self, b: bool) -> ProtocolResult<()> {
-        let bs = if b {
-            [1u8; mem::size_of::<u8>()]
-        } else {
-            [0u8; mem::size_of::<u8>()]
-        };
-
-        let val = Bytes::from(bs.as_ref());
-        self.state.borrow_mut().insert(self.key.clone(), val)?;
+        self.state.borrow_mut().insert(self.key.clone(), b)?;
         Ok(())
     }
 }
@@ -72,25 +55,12 @@ impl<S: ServiceState> DefaultStoreUint64<S> {
 
 impl<S: ServiceState> StoreUint64 for DefaultStoreUint64<S> {
     fn get(&self) -> ProtocolResult<u64> {
-        let bs: Bytes = self
-            .state
-            .borrow()
-            .get(&self.key)?
-            .ok_or(StoreError::GetNone)?;
-        let mut rdr = Cursor::new(bs.to_vec());
+        let u: Option<u64> = self.state.borrow().get(&self.key)?;
 
-        Ok(rdr
-            .read_u64::<LittleEndian>()
-            .expect("read u64 should not fail"))
+        u.ok_or(StoreError::GetNone.into())
     }
 
     fn set(&mut self, val: u64) -> ProtocolResult<()> {
-        let mut bs = [0u8; mem::size_of::<u64>()];
-        bs.as_mut()
-            .write_u64::<LittleEndian>(val)
-            .expect("write u64 should not fail");
-        let val = Bytes::from(bs.as_ref());
-
         self.state.borrow_mut().insert(self.key.clone(), val)?;
         Ok(())
     }
@@ -181,24 +151,20 @@ impl<S: ServiceState> DefaultStoreString<S> {
 
 impl<S: ServiceState> StoreString for DefaultStoreString<S> {
     fn set(&mut self, val: &str) -> ProtocolResult<()> {
-        let val = Bytes::from(val);
-
-        self.state.borrow_mut().insert(self.key.clone(), val)?;
+        self.state
+            .borrow_mut()
+            .insert(self.key.clone(), val.to_string())?;
         Ok(())
     }
 
     fn get(&self) -> ProtocolResult<String> {
-        let bs: Bytes = self
-            .state
-            .borrow()
-            .get(&self.key)?
-            .ok_or(StoreError::GetNone)?;
+        let s: Option<String> = self.state.borrow().get(&self.key)?;
 
-        Ok(String::from_utf8(bs.to_vec()).expect("get string should not fail"))
+        s.ok_or(StoreError::GetNone.into())
     }
 
-    fn len(&self) -> ProtocolResult<usize> {
-        self.get().map(|s| s.len())
+    fn len(&self) -> ProtocolResult<u32> {
+        self.get().map(|s| s.len() as u32)
     }
 
     fn is_empty(&self) -> ProtocolResult<bool> {

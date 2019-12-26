@@ -43,8 +43,8 @@ impl<S: ServiceState, E: FixedCodec> DefaultStoreArray<S, E> {
 }
 
 impl<S: ServiceState, E: FixedCodec> StoreArray<E> for DefaultStoreArray<S, E> {
-    fn get(&self, index: usize) -> ProtocolResult<E> {
-        if let Some(k) = self.keys.inner.get(index) {
+    fn get(&self, index: u32) -> ProtocolResult<E> {
+        if let Some(k) = self.keys.inner.get(index as usize) {
             self.state.borrow().get(k)?.map_or_else(
                 || <_>::decode_fixed(Bytes::new()).map_err(|_| StoreError::DecodeError.into()),
                 Ok,
@@ -69,8 +69,8 @@ impl<S: ServiceState, E: FixedCodec> StoreArray<E> for DefaultStoreArray<S, E> {
 
     // TODO(@zhounan): Atomicity of insert(k, v) and insert self.keys to
     // ServiceState is not guaranteed for now That must be settled soon after.
-    fn remove(&mut self, index: usize) -> ProtocolResult<()> {
-        let key = self.keys.inner.remove(index);
+    fn remove(&mut self, index: u32) -> ProtocolResult<()> {
+        let key = self.keys.inner.remove(index as usize);
         self.state
             .borrow_mut()
             .insert(self.var_name.clone(), self.keys.encode_fixed()?)?;
@@ -78,8 +78,8 @@ impl<S: ServiceState, E: FixedCodec> StoreArray<E> for DefaultStoreArray<S, E> {
         self.state.borrow_mut().insert(key, Bytes::new())
     }
 
-    fn len(&self) -> ProtocolResult<usize> {
-        Ok(self.keys.inner.len())
+    fn len(&self) -> ProtocolResult<u32> {
+        Ok(self.keys.inner.len() as u32)
     }
 
     fn is_empty(&self) -> ProtocolResult<bool> {
@@ -90,28 +90,40 @@ impl<S: ServiceState, E: FixedCodec> StoreArray<E> for DefaultStoreArray<S, E> {
         }
     }
 
-    // TODO(@zhounan): If element was not changed by f, then it should not be
-    // inserted to ServiceState for performance reason
-    fn for_each<F>(&mut self, mut f: F) -> ProtocolResult<()>
-    where
-        Self: Sized,
-        F: FnMut(&mut E) -> ProtocolResult<()>,
-    {
-        for key in &self.keys.inner {
-            let mut elm: E = self
-                .state
-                .borrow()
-                .get(key)?
-                .map_or_else::<ProtocolResult<E>, _, _>(
-                    || <_>::decode_fixed(Bytes::new()).map_err(|_| StoreError::DecodeError.into()),
-                    Ok,
-                )?;
+    fn iter<'a>(&'a self) -> Box<dyn Iterator<Item = (u32, E)> + 'a> {
+        Box::new(ArrayIter::<E, Self>::new(0, self))
+    }
+}
 
-            f(&mut elm)?;
+struct ArrayIter<'a, E: FixedCodec, A: StoreArray<E>> {
+    idx:     u32,
+    array:   &'a A,
+    phantom: PhantomData<E>,
+}
 
-            self.state.borrow_mut().insert(key.clone(), elm)?;
+impl<'a, E: FixedCodec, A: StoreArray<E>> ArrayIter<'a, E, A> {
+    pub fn new(idx: u32, array: &'a A) -> Self {
+        ArrayIter {
+            idx,
+            array,
+            phantom: PhantomData,
         }
+    }
+}
 
-        Ok(())
+impl<'a, E: FixedCodec, A: StoreArray<E>> Iterator for ArrayIter<'a, E, A> {
+    type Item = (u32, E);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.idx < self.array.len().expect("get len should not fail") {
+            let ele = self
+                .array
+                .get(self.idx)
+                .expect("iter get element should not fail");
+            self.idx += 1;
+            Some((self.idx - 1, ele))
+        } else {
+            None
+        }
     }
 }
