@@ -1,14 +1,14 @@
 use std::mem;
 
 use byteorder::{ByteOrder, LittleEndian};
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
 
 use crate::fixed_codec::{FixedCodec, FixedCodecError};
-use crate::types::{Account, Address, Fee, Hash};
+use crate::types::{Account, Address, Hash};
 use crate::{impl_default_fixed_codec_for, ProtocolResult};
 
-// Impl ProtocolFixedCodec trait for types
-impl_default_fixed_codec_for!(primitive, [Hash, Fee, Address, Account]);
+// Impl FixedCodec trait for types
+impl_default_fixed_codec_for!(primitive, [Hash, Address, Account]);
 
 impl FixedCodec for bool {
     fn encode_fixed(&self) -> ProtocolResult<Bytes> {
@@ -18,7 +18,7 @@ impl FixedCodec for bool {
             [0u8; mem::size_of::<u8>()]
         };
 
-        Ok(Bytes::from(bs.as_ref()))
+        Ok(BytesMut::from(bs.as_ref()).freeze())
     }
 
     fn decode_fixed(bytes: Bytes) -> ProtocolResult<Self> {
@@ -34,7 +34,7 @@ impl FixedCodec for bool {
 
 impl FixedCodec for u8 {
     fn encode_fixed(&self) -> ProtocolResult<Bytes> {
-        Ok(Bytes::from([*self].as_ref()))
+        Ok(BytesMut::from([*self].as_ref()).freeze())
     }
 
     fn decode_fixed(bytes: Bytes) -> ProtocolResult<Self> {
@@ -49,7 +49,7 @@ impl FixedCodec for u32 {
         let mut buf = [0u8; mem::size_of::<u32>()];
         LittleEndian::write_u32(&mut buf, *self);
 
-        Ok(Bytes::from(buf.as_ref()))
+        Ok(BytesMut::from(buf.as_ref()).freeze())
     }
 
     fn decode_fixed(bytes: Bytes) -> ProtocolResult<Self> {
@@ -62,7 +62,7 @@ impl FixedCodec for u64 {
         let mut buf = [0u8; mem::size_of::<u64>()];
         LittleEndian::write_u64(&mut buf, *self);
 
-        Ok(Bytes::from(buf.as_ref()))
+        Ok(BytesMut::from(buf.as_ref()).freeze())
     }
 
     fn decode_fixed(bytes: Bytes) -> ProtocolResult<Self> {
@@ -99,28 +99,9 @@ impl rlp::Encodable for Hash {
 
 impl rlp::Decodable for Hash {
     fn decode(r: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
-        let hash = Hash::from_bytes(Bytes::from(r.at(0)?.data()?))
+        let hash = Hash::from_bytes(BytesMut::from(r.at(0)?.data()?).freeze())
             .map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
         Ok(hash)
-    }
-}
-
-impl rlp::Encodable for Fee {
-    fn rlp_append(&self, s: &mut rlp::RlpStream) {
-        s.begin_list(2).append(&self.asset_id).append(&self.cycle);
-    }
-}
-
-impl rlp::Decodable for Fee {
-    fn decode(r: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
-        if !r.is_list() && r.size() != 2 {
-            return Err(rlp::DecoderError::RlpIncorrectListLen);
-        }
-
-        let asset_id: Hash = rlp::decode(r.at(0)?.as_raw())?;
-        let cycle = r.at(1)?.as_val()?;
-
-        Ok(Fee { asset_id, cycle })
     }
 }
 
@@ -132,7 +113,7 @@ impl rlp::Encodable for Address {
 
 impl rlp::Decodable for Address {
     fn decode(r: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
-        let address = Address::from_bytes(Bytes::from(r.at(0)?.data()?))
+        let address = Address::from_bytes(BytesMut::from(r.at(0)?.data()?).freeze())
             .map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
 
         Ok(address)

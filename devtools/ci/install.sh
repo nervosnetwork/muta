@@ -1,7 +1,7 @@
 #!/bin/bash
 set -ev
 
-cargo sweep --version || cargo install --git https://github.com/holmgr/cargo-sweep --rev 3e98dbf7e4ddf1e07dd2526a803c501fd549da75
+sccache --version || env RUSTC_WRAPPER= cargo install sccache
 
 if [ "$FMT" = true ]; then
   cargo fmt --version || rustup component add rustfmt

@@ -7,6 +7,7 @@ pub mod types;
 
 use std::error::Error;
 
+pub use bytes::{Buf, BufMut, Bytes, BytesMut};
 use derive_more::{Constructor, Display};
 
 #[derive(Debug, Clone)]

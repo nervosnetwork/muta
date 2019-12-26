@@ -12,8 +12,8 @@ use serde_derive::{Deserialize, Serialize};
 use crate::context::TxContext;
 
 pub const END_GOSSIP_NEW_TXS: &str = "/gossip/mempool/new_txs";
-pub const END_RPC_PULL_TXS: &str = "/rpc_call/mempool/pull_txs";
-pub const END_RESP_PULL_TXS: &str = "/rpc_resp/mempool/pull_txs";
+pub const RPC_PULL_TXS: &str = "/rpc_call/mempool/pull_txs";
+pub const RPC_RESP_PULL_TXS: &str = "/rpc_resp/mempool/pull_txs";
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct MsgNewTxs {
@@ -76,7 +76,7 @@ pub struct MsgPushTxs {
 }
 
 pub struct PullTxsHandler<N, M> {
-    network:  N,
+    network:  Arc<N>,
     mem_pool: Arc<M>,
 }
 
@@ -85,7 +85,7 @@ where
     N: Rpc + 'static,
     M: MemPool + 'static,
 {
-    pub fn new(network: N, mem_pool: Arc<M>) -> Self {
+    pub fn new(network: Arc<N>, mem_pool: Arc<M>) -> Self {
         PullTxsHandler { network, mem_pool }
     }
 }
@@ -103,7 +103,7 @@ where
         let resp_msg = MsgPushTxs { sig_txs };
 
         self.network
-            .response::<MsgPushTxs>(ctx, END_RESP_PULL_TXS, resp_msg, Priority::High)
+            .response::<MsgPushTxs>(ctx, RPC_RESP_PULL_TXS, resp_msg, Priority::High)
             .await
     }
 }

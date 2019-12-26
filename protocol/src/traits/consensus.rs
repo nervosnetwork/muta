@@ -1,10 +1,8 @@
 use async_trait::async_trait;
 use creep::Context;
 
-use crate::types::{
-    Address, Bloom, Epoch, Hash, MerkleRoot, Proof, Receipt, SignedTransaction, Validator,
-};
-use crate::{traits::mempool::MixedTxHashes, traits::ExecutorResp, ProtocolResult};
+use crate::types::{Address, Epoch, Hash, MerkleRoot, Proof, SignedTransaction, Validator};
+use crate::{traits::mempool::MixedTxHashes, ProtocolResult};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum MessageTarget {
@@ -16,23 +14,6 @@ pub enum MessageTarget {
 pub struct NodeInfo {
     pub chain_id:     Hash,
     pub self_address: Address,
-}
-
-#[derive(Clone, Debug)]
-pub struct CurrentConsensusStatus {
-    pub cycles_price:       u64,
-    pub cycles_limit:       u64,
-    pub epoch_id:           u64,
-    pub prev_hash:          Hash,
-    pub logs_bloom:         Bloom,
-    pub order_root:         MerkleRoot,
-    pub confirm_root:       Vec<MerkleRoot>,
-    pub state_root:         MerkleRoot,
-    pub receipt_root:       Vec<MerkleRoot>,
-    pub cycles_used:        u64,
-    pub proof:              Proof,
-    pub validators:         Vec<Validator>,
-    pub consensus_interval: u64,
 }
 
 #[async_trait]
@@ -89,21 +70,20 @@ pub trait ConsensusAdapter: Send + Sync {
     async fn execute(
         &self,
         node_info: NodeInfo,
-        state_root: MerkleRoot,
+        order_root: MerkleRoot,
         epoch_id: u64,
         cycles_price: u64,
         coinbase: Address,
         signed_txs: Vec<SignedTransaction>,
-    ) -> ProtocolResult<ExecutorResp>;
+        cycles_limit: u64,
+        timestamp: u64,
+    ) -> ProtocolResult<()>;
 
     /// Flush the given transactions in the mempool.
     async fn flush_mempool(&self, ctx: Context, txs: Vec<Hash>) -> ProtocolResult<()>;
 
     /// Save an epoch to the database.
     async fn save_epoch(&self, ctx: Context, epoch: Epoch) -> ProtocolResult<()>;
-
-    /// Save some receipts to the database.
-    async fn save_receipts(&self, ctx: Context, receipts: Vec<Receipt>) -> ProtocolResult<()>;
 
     ///
     async fn save_proof(&self, ctx: Context, proof: Proof) -> ProtocolResult<()>;

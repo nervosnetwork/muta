@@ -6,10 +6,8 @@ use std::convert::{From, TryFrom};
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use bytes::Bytes;
 use chashmap::CHashMap;
 use futures::executor;
-use num_traits::FromPrimitive;
 use rand::random;
 use rand::rngs::OsRng;
 use rayon::iter::IntoParallelRefIterator;
@@ -17,19 +15,15 @@ use rayon::prelude::*;
 
 use common_crypto::{
     Crypto, PrivateKey, PublicKey, Secp256k1, Secp256k1PrivateKey, Secp256k1PublicKey,
-    Secp256k1Signature, Signature,
+    Secp256k1Signature, Signature, ToPublicKey,
 };
 use protocol::codec::ProtocolCodec;
 use protocol::traits::{Context, MemPool, MemPoolAdapter, MixedTxHashes};
-use protocol::types::{
-    CarryingAsset, Fee, Hash, RawTransaction, SignedTransaction, TransactionAction,
-    UserAddress as Address,
-};
-use protocol::ProtocolResult;
+use protocol::types::{Hash, RawTransaction, SignedTransaction, TransactionRequest};
+use protocol::{Bytes, ProtocolResult};
 
 use crate::{HashMemPool, MemPoolError};
 
-const AMOUNT: i32 = 42;
 const CYCLE_LIMIT: u64 = 10_000;
 const CURRENT_EPOCH_ID: u64 = 999;
 const POOL_SIZE: usize = 100_000;
@@ -94,17 +88,10 @@ pub fn default_mock_txs(size: usize) -> Vec<SignedTransaction> {
 
 fn mock_txs(valid_size: usize, invalid_size: usize, timeout: u64) -> Vec<SignedTransaction> {
     let mut vec = Vec::new();
-    let mut rng = OsRng::new().expect("OsRng");
-    let (priv_key, pub_key) = Secp256k1::generate_keypair(&mut rng);
-    let address = pub_key_to_address(&pub_key).unwrap();
+    let priv_key = Secp256k1PrivateKey::generate(&mut OsRng);
+    let pub_key = priv_key.pub_key();
     for i in 0..valid_size + invalid_size {
-        vec.push(mock_signed_tx(
-            &priv_key,
-            &pub_key,
-            &address,
-            timeout,
-            i < valid_size,
-        ));
+        vec.push(mock_signed_tx(&priv_key, &pub_key, timeout, i < valid_size));
     }
     vec
 }
@@ -116,13 +103,6 @@ fn default_mempool() -> HashMemPool<HashMemPoolAdapter> {
 fn new_mempool(pool_size: usize, timeout_gap: u64) -> HashMemPool<HashMemPoolAdapter> {
     let adapter = HashMemPoolAdapter::new();
     HashMemPool::new(pool_size, timeout_gap, adapter)
-}
-
-fn pub_key_to_address(pub_key: &Secp256k1PublicKey) -> ProtocolResult<Address> {
-    let mut pub_key_str = Hash::digest(pub_key.to_bytes()).as_hex();
-    pub_key_str.truncate(40);
-    pub_key_str.insert_str(0, "10");
-    Address::from_bytes(Bytes::from(hex::decode(pub_key_str).unwrap()))
 }
 
 async fn check_hash(tx: SignedTransaction) -> ProtocolResult<()> {
@@ -224,28 +204,23 @@ fn exec_get_full_txs(
 fn mock_signed_tx(
     priv_key: &Secp256k1PrivateKey,
     pub_key: &Secp256k1PublicKey,
-    address: &Address,
     timeout: u64,
     valid: bool,
 ) -> SignedTransaction {
     let nonce = Hash::digest(Bytes::from(get_random_bytes(10)));
-    let fee = Fee {
-        asset_id: nonce.clone(),
-        cycle:    TX_CYCLE,
-    };
-    let action = TransactionAction::Transfer {
-        receiver:       address.clone(),
-        carrying_asset: CarryingAsset {
-            asset_id: nonce.clone(),
-            amount:   FromPrimitive::from_i32(AMOUNT).unwrap(),
-        },
+
+    let request = TransactionRequest {
+        service_name: "test".to_owned(),
+        method:       "test".to_owned(),
+        payload:      "test".to_owned(),
     };
     let mut raw = RawTransaction {
         chain_id: nonce.clone(),
         nonce,
         timeout,
-        fee,
-        action,
+        cycles_limit: TX_CYCLE,
+        cycles_price: 1,
+        request,
     };
 
     let raw_bytes = executor::block_on(async { raw.encode().await.unwrap() });

@@ -39,7 +39,7 @@ pub struct ConfigMempool {
     pub pool_size:   u64,
 
     #[serde(default = "default_broadcast_txs_size")]
-    pub broadcast_txs_size: usize,
+    pub broadcast_txs_size:     usize,
     #[serde(default = "default_broadcast_txs_interval")]
     pub broadcast_txs_interval: u64,
 }
@@ -51,6 +51,9 @@ pub struct ConfigConsensus {
     pub interval:      u64,
     pub duration:      DurationConfig,
     pub verifier_list: Vec<String>,
+    pub private_key:   String,
+    pub public_keys:   Vec<String>,
+    pub common_ref:    String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -59,11 +62,34 @@ pub struct ConfigExecutor {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct ConfigLogger {
+    pub filter:                     String,
+    pub log_to_console:             bool,
+    pub console_show_file_and_line: bool,
+    pub log_to_file:                bool,
+    pub metrics:                    bool,
+    pub log_path:                   PathBuf,
+}
+
+impl Default for ConfigLogger {
+    fn default() -> Self {
+        Self {
+            filter:                     "info".into(),
+            log_to_console:             true,
+            console_show_file_and_line: false,
+            log_to_file:                true,
+            metrics:                    true,
+            log_path:                   "logs/".into(),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
 pub struct Config {
     // chain id
-    pub chain_id: String,
+    pub chain_id:  String,
     // crypto
-    pub privkey: String,
+    pub privkey:   String,
     // db config
     pub data_path: PathBuf,
 
@@ -72,6 +98,8 @@ pub struct Config {
     pub mempool:   ConfigMempool,
     pub consensus: ConfigConsensus,
     pub executor:  ConfigExecutor,
+    #[serde(default)]
+    pub logger:    ConfigLogger,
 }
 
 impl Config {

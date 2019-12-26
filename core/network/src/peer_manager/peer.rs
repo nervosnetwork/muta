@@ -7,10 +7,9 @@ use std::{
 };
 
 use derive_more::Display;
-use protocol::types::UserAddress;
+use protocol::{types::Address, Bytes};
 use serde_derive::{Deserialize, Serialize};
 use tentacle::{
-    bytes::Bytes,
     multiaddr::Multiaddr,
     secio::{PeerId, PublicKey},
 };
@@ -63,7 +62,7 @@ pub(super) struct PeerState {
 )]
 pub struct Peer {
     id:        Arc<PeerId>,
-    user_addr: Arc<UserAddress>,
+    user_addr: Arc<Address>,
     pubkey:    Arc<PublicKey>,
     state:     PeerState,
 }
@@ -130,7 +129,7 @@ impl Peer {
         self.state.connection_ip
     }
 
-    pub fn user_addr(&self) -> &UserAddress {
+    pub fn user_addr(&self) -> &Address {
         &self.user_addr
     }
 
@@ -213,10 +212,10 @@ impl Peer {
     }
 
     // # Panic
-    pub(super) fn pubkey_to_addr(pubkey: &PublicKey) -> UserAddress {
+    pub(super) fn pubkey_to_addr(pubkey: &PublicKey) -> Address {
         let pubkey_bytes = Bytes::from(pubkey.inner_ref().clone());
 
-        UserAddress::from_pubkey_bytes(pubkey_bytes)
+        Address::from_pubkey_bytes(pubkey_bytes)
             .expect("convert from secp256k1 public key should always success")
     }
 }

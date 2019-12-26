@@ -43,7 +43,7 @@ pub struct ConnectionService<P: NetworkProtocol> {
     // TODO: Remove Compat01As03 after tentacle supports std Future
     inner: Compat01As03<Service<ConnectionServiceKeeper>>,
 
-    event_rx: UnboundedReceiver<ConnectionEvent>,
+    event_rx:       UnboundedReceiver<ConnectionEvent>,
     // Temporary store events for later processing under high load
     pending_events: VecDeque<ConnectionEvent>,
 
@@ -171,7 +171,7 @@ impl<P: NetworkProtocol> ConnectionService<P> {
             ConnectionEvent::SendMsg { tar, msg, pri } => {
                 let proto_id = P::message_proto_id();
                 let tar2 = tar.clone();
-                let msg2 = msg.clone();
+                let msg2 = tentacle::bytes::Bytes::from(msg.as_ref());
 
                 if let Err(()) = match pri {
                     Priority::High => try_do!(control.quick_filter_broadcast(tar2, proto_id, msg2)),

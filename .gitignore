@@ -26,3 +26,4 @@ tests/e2e/node_modules/
 
 # rocksdb
 **/rocksdb/
+logs/

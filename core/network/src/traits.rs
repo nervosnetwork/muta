@@ -1,10 +1,10 @@
 use async_trait::async_trait;
 use protocol::{
     traits::{Cloneable, Context, Priority},
-    types::UserAddress,
+    types::Address,
+    Bytes,
 };
 use tentacle::{
-    bytes::Bytes,
     multiaddr::Multiaddr,
     secio::PeerId,
     service::TargetSession,
@@ -27,7 +27,7 @@ pub trait NetworkProtocol {
 #[async_trait]
 pub trait MessageSender {
     fn send(&self, tar: TargetSession, msg: Bytes, pri: Priority) -> Result<(), NetworkError>;
-    async fn users_send(&self, users: Vec<UserAddress>, msg: Bytes, pri: Priority) -> Result<(), NetworkError>;
+    async fn users_send(&self, users: Vec<Address>, msg: Bytes, pri: Priority) -> Result<(), NetworkError>;
 }
 
 pub trait Compression {

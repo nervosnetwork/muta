@@ -3,9 +3,8 @@ use std::{io, marker::PhantomData};
 use async_trait::async_trait;
 use futures::channel::{mpsc::UnboundedSender, oneshot};
 use log::debug;
-use protocol::{traits::Priority, types::UserAddress};
+use protocol::{traits::Priority, types::Address, Bytes};
 use tentacle::{
-    bytes::Bytes,
     error::Error as TentacleError,
     service::{ServiceControl, TargetSession},
 };
@@ -50,6 +49,7 @@ impl<P: NetworkProtocol> Clone for ConnectionServiceControl<P> {
 impl<P: NetworkProtocol> MessageSender for ConnectionServiceControl<P> {
     fn send(&self, tar: TargetSession, msg: Bytes, pri: Priority) -> Result<(), NetworkError> {
         let proto_id = P::message_proto_id();
+        let msg = tentacle::bytes::Bytes::from(msg.as_ref());
 
         let ret = match pri {
             Priority::High => self.inner.quick_filter_broadcast(tar, proto_id, msg),
@@ -70,7 +70,7 @@ impl<P: NetworkProtocol> MessageSender for ConnectionServiceControl<P> {
 
     async fn users_send(
         &self,
-        user_addrs: Vec<UserAddress>,
+        user_addrs: Vec<Address>,
         msg: Bytes,
         pri: Priority,
     ) -> Result<(), NetworkError> {

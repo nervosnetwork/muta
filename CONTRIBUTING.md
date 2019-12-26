@@ -24,9 +24,10 @@ When contributing to this repository, please first discuss the change you wish t
 1. Fork the `muta` repo and create your branch from master.
 2. If you have added code that should be tested, add unit tests.
 3. Verify and ensure that the test suite passes.
-4. Make sure your code passes CI.
-5. Ensure the PR description clearly describes the problem and solution. Include the relevant issue number if applicable.
-6. Submit your pull request.
+4. Run `make ci` to lint and test the code before commit.
+5. Make sure your code passes CI.
+6. Ensure the PR description clearly describes the problem and solution. Include the relevant issue number if applicable.
+7. Submit your pull request.
 
 
 ## Code of Conduct

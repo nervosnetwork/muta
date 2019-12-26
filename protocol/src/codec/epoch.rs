@@ -41,8 +41,8 @@ pub struct EpochHeader {
     #[prost(uint64, tag = "4")]
     pub timestamp: u64,
 
-    #[prost(bytes, tag = "5")]
-    pub logs_bloom: Vec<u8>,
+    #[prost(message, repeated, tag = "5")]
+    pub logs_bloom: Vec<Vec<u8>>,
 
     #[prost(message, tag = "6")]
     pub order_root: Option<Hash>,
@@ -56,8 +56,8 @@ pub struct EpochHeader {
     #[prost(message, repeated, tag = "9")]
     pub receipt_root: Vec<Hash>,
 
-    #[prost(uint64, tag = "10")]
-    pub cycles_used: u64,
+    #[prost(message, repeated, tag = "10")]
+    pub cycles_used: Vec<u64>,
 
     #[prost(message, tag = "11")]
     pub proposer: Option<Address>,
@@ -170,6 +170,11 @@ impl From<epoch::EpochHeader> for EpochHeader {
         let proposer = Some(Address::from(epoch_header.proposer));
         let proof = Some(Proof::from(epoch_header.proof));
 
+        let logs_bloom = epoch_header
+            .logs_bloom
+            .into_iter()
+            .map(|bloom| bloom.as_bytes().to_vec())
+            .collect::<Vec<_>>();
         let confirm_root = epoch_header
             .confirm_root
             .into_iter()
@@ -191,7 +196,7 @@ impl From<epoch::EpochHeader> for EpochHeader {
             epoch_id: epoch_header.epoch_id,
             pre_hash,
             timestamp: epoch_header.timestamp,
-            logs_bloom: epoch_header.logs_bloom.as_bytes().to_vec(),
+            logs_bloom,
             order_root,
             confirm_root,
             state_root,
@@ -216,6 +221,11 @@ impl TryFrom<EpochHeader> for epoch::EpochHeader {
         let proposer = field!(epoch_header.proposer, "EpochHeader", "proposer")?;
         let proof = field!(epoch_header.proof, "EpochHeader", "proof")?;
 
+        let mut logs_bloom = Vec::new();
+        for bloom in epoch_header.logs_bloom {
+            logs_bloom.push(Bloom::from_slice(&bloom));
+        }
+
         let mut confirm_root = Vec::new();
         for root in epoch_header.confirm_root {
             confirm_root.push(protocol_primitive::Hash::try_from(root)?);
@@ -236,7 +246,7 @@ impl TryFrom<EpochHeader> for epoch::EpochHeader {
             epoch_id: epoch_header.epoch_id,
             pre_hash: protocol_primitive::Hash::try_from(pre_hash)?,
             timestamp: epoch_header.timestamp,
-            logs_bloom: Bloom::from_slice(&epoch_header.logs_bloom),
+            logs_bloom,
             order_root: protocol_primitive::Hash::try_from(order_root)?,
             confirm_root,
             state_root: protocol_primitive::Hash::try_from(state_root)?,

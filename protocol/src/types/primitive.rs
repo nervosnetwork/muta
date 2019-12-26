@@ -1,6 +1,6 @@
 use std::fmt;
 
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
 use hasher::{Hasher, HasherKeccak};
 use lazy_static::lazy_static;
 use num_bigint::BigUint;
@@ -109,7 +109,7 @@ impl Hash {
     }
 
     pub fn as_bytes(&self) -> Bytes {
-        Bytes::from(self.0.as_ref())
+        BytesMut::from(self.0.as_ref()).freeze()
     }
 
     pub fn as_hex(&self) -> String {
@@ -132,7 +132,7 @@ impl fmt::Debug for Hash {
 /// Address length.
 const ADDRESS_LEN: usize = 20;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Address([u8; ADDRESS_LEN]);
 
 impl Serialize for Address {
@@ -208,7 +208,7 @@ impl Address {
     }
 
     pub fn as_bytes(&self) -> Bytes {
-        Bytes::from(self.0.as_ref())
+        BytesMut::from(self.0.as_ref()).freeze()
     }
 
     pub fn as_hex(&self) -> String {
@@ -216,15 +216,15 @@ impl Address {
     }
 }
 
+impl fmt::Debug for Address {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.as_hex())
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Account {
     pub storage_root: MerkleRoot,
-}
-
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub struct Fee {
-    pub asset_id: Hash,
-    pub cycle:    u64,
 }
 
 fn clean_0x(s: &str) -> &str {

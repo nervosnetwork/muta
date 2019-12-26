@@ -1,10 +1,10 @@
 use async_trait::async_trait;
 use protocol::{
     traits::{Context, Gossip, MessageCodec, Priority},
-    types::UserAddress,
-    ProtocolResult,
+    types::Address,
+    Bytes, ProtocolResult,
 };
-use tentacle::{bytes::Bytes, service::TargetSession};
+use tentacle::service::TargetSession;
 
 use crate::{
     endpoint::Endpoint,
@@ -61,7 +61,7 @@ where
     async fn users_send(
         &self,
         _ctx: Context,
-        users: Vec<UserAddress>,
+        users: Vec<Address>,
         msg: Bytes,
         pri: Priority,
     ) -> Result<(), NetworkError> {
@@ -89,7 +89,7 @@ where
         &self,
         cx: Context,
         end: &str,
-        users: Vec<UserAddress>,
+        users: Vec<Address>,
         msg: M,
         p: Priority,
     ) -> ProtocolResult<()>

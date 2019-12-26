@@ -1,4 +1,4 @@
-use bytes::Bytes;
+use bytes::BytesMut;
 
 use crate::fixed_codec::{FixedCodec, FixedCodecError};
 use crate::types::epoch::{Epoch, EpochHeader, EpochId, Pill, Proof, Validator};
@@ -6,7 +6,7 @@ use crate::types::primitive::Hash;
 use crate::types::Bloom;
 use crate::{impl_default_fixed_codec_for, ProtocolResult};
 
-// Impl ProtocolFixedCodec trait for types
+// Impl FixedCodec trait for types
 impl_default_fixed_codec_for!(epoch, [Proof, Validator, Epoch, EpochHeader, Pill, EpochId]);
 
 impl rlp::Encodable for Proof {
@@ -26,11 +26,11 @@ impl rlp::Decodable for Proof {
             return Err(rlp::DecoderError::RlpIncorrectListLen);
         }
 
-        let bitmap = Bytes::from(r.at(0)?.data()?);
+        let bitmap = BytesMut::from(r.at(0)?.data()?).freeze();
         let epoch_hash: Hash = rlp::decode(r.at(1)?.as_raw())?;
         let epoch_id = r.at(2)?.as_val()?;
         let round = r.at(3)?.as_val()?;
-        let signature = Bytes::from(r.at(4)?.data()?);
+        let signature = BytesMut::from(r.at(4)?.data()?).freeze();
 
         Ok(Proof {
             epoch_id,
@@ -74,9 +74,9 @@ impl rlp::Encodable for EpochHeader {
         s.begin_list(14)
             .append(&self.chain_id)
             .append_list(&self.confirm_root)
-            .append(&self.cycles_used)
+            .append_list(&self.cycles_used)
             .append(&self.epoch_id)
-            .append(&self.logs_bloom)
+            .append_list(&self.logs_bloom)
             .append(&self.order_root)
             .append(&self.pre_hash)
             .append(&self.proof)
@@ -97,9 +97,9 @@ impl rlp::Decodable for EpochHeader {
 
         let chain_id: Hash = rlp::decode(r.at(0)?.as_raw())?;
         let confirm_root: Vec<Hash> = rlp::decode_list(r.at(1)?.as_raw());
-        let cycles_used: u64 = r.at(2)?.as_val()?;
+        let cycles_used: Vec<u64> = rlp::decode_list(r.at(2)?.as_raw());
         let epoch_id: u64 = r.at(3)?.as_val()?;
-        let logs_bloom: Bloom = rlp::decode(r.at(4)?.as_raw())?;
+        let logs_bloom: Vec<Bloom> = rlp::decode_list(r.at(4)?.as_raw());
         let order_root = rlp::decode(r.at(5)?.as_raw())?;
         let pre_hash = rlp::decode(r.at(6)?.as_raw())?;
         let proof: Proof = rlp::decode(r.at(7)?.as_raw())?;

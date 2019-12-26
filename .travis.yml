@@ -2,9 +2,12 @@ language: rust
 dist: bionic
 sudo: false
 
+# cache sccache and its cache
 cache:
-  cargo: true
   apt: true
+  directories:
+    - $TRAVIS_HOME/.cargo/
+    - $TRAVIS_HOME/.cache/sccache
 
 git:
   depth: 1
@@ -26,14 +29,16 @@ matrix:
 install: ./devtools/ci/install.sh
 script: ./devtools/ci/script.sh
 
+# use sccache and limit cache size to 2G, so travis cache command dont timeout
 env:
   global:
     - RUST_BACKTRACE=full
+    - RUSTC_WRAPPER=sccache
+    - SCCACHE_CACHE_SIZE="2G"
     - USE_SYS_ROCKSDB: true
     - FMT: true
     - CHECK: true
     - TEST: true
 
 before_cache:
-  - rm -rf ./target/debug/incremental/
-  - cargo sweep -f
+  - rm -rf "$TRAVIS_HOME"/.cargo/registry"

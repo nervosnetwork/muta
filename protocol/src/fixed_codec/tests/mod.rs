@@ -5,7 +5,6 @@ use num_traits::FromPrimitive;
 use rand::random;
 
 use crate::types::epoch::{Epoch, EpochHeader, EpochId, Pill, Proof, Validator};
-use crate::types::genesis::{Genesis, GenesisStateAlloc, GenesisStateAsset, GenesisSystemToken};
 use crate::types::primitive::{Address, Balance, Hash, MerkleRoot};
 use crate::types::receipt::{Event, Receipt, ReceiptResponse};
 use crate::types::transaction::{RawTransaction, SignedTransaction, TransactionRequest};
@@ -131,7 +130,7 @@ pub fn mock_epoch_header() -> EpochHeader {
         confirm_root:      vec![mock_hash(), mock_hash()],
         state_root:        mock_merkle_root(),
         receipt_root:      vec![mock_hash(), mock_hash()],
-        cycles_used:       999_999,
+        cycles_used:       vec![999_999],
         proposer:          mock_address(),
         proof:             mock_proof(),
         validator_version: 1,
@@ -155,51 +154,6 @@ pub fn mock_pill(order_size: usize, propose_size: usize) -> Pill {
     Pill {
         epoch:          mock_epoch(order_size),
         propose_hashes: (0..propose_size).map(|_| mock_hash()).collect(),
-    }
-}
-
-// #####################
-// Mock Genesis
-// #####################
-
-pub fn mock_genesis() -> Genesis {
-    Genesis {
-        timestamp:    99,
-        prevhash:     "prevhashtest".to_string(),
-        system_token: GenesisSystemToken {
-            code:   "codetest".to_string(),
-            name:   "nametest".to_string(),
-            symbol: "symbol".to_string(),
-            supply: 7,
-        },
-        state_alloc:  vec![
-            GenesisStateAlloc {
-                address: "test".to_string(),
-                assets:  vec![
-                    GenesisStateAsset {
-                        asset_id: "test".to_string(),
-                        balance:  "test".to_string(),
-                    },
-                    GenesisStateAsset {
-                        asset_id: "test".to_string(),
-                        balance:  "test".to_string(),
-                    },
-                ],
-            },
-            GenesisStateAlloc {
-                address: "test".to_string(),
-                assets:  vec![
-                    GenesisStateAsset {
-                        asset_id: "test".to_string(),
-                        balance:  "test".to_string(),
-                    },
-                    GenesisStateAsset {
-                        asset_id: "test".to_string(),
-                        balance:  "test".to_string(),
-                    },
-                ],
-            },
-        ],
     }
 }
 

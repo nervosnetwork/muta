@@ -23,14 +23,14 @@ use log::{debug, error};
 
 use common_crypto::Crypto;
 use protocol::{
-    fixed_codec::ProtocolFixedCodec,
+    fixed_codec::FixedCodec,
     traits::{Context, Gossip, MemPoolAdapter, Priority, Rpc, Storage},
     types::{Hash, SignedTransaction},
     ProtocolError, ProtocolErrorKind, ProtocolResult,
 };
 
 use crate::adapter::message::{
-    MsgNewTxs, MsgPullTxs, MsgPushTxs, END_GOSSIP_NEW_TXS, END_RPC_PULL_TXS,
+    MsgNewTxs, MsgPullTxs, MsgPushTxs, END_GOSSIP_NEW_TXS, RPC_PULL_TXS,
 };
 use crate::MemPoolError;
 
@@ -202,7 +202,7 @@ where
 
         let resp_msg = self
             .network
-            .call::<MsgPullTxs, MsgPushTxs>(ctx, END_RPC_PULL_TXS, pull_msg, Priority::High)
+            .call::<MsgPullTxs, MsgPushTxs>(ctx, RPC_PULL_TXS, pull_msg, Priority::High)
             .await?;
 
         Ok(resp_msg.sig_txs)
@@ -336,12 +336,11 @@ mod tests {
 
     use protocol::{
         traits::{Context, Gossip, MessageCodec, Priority},
-        types::UserAddress,
-        ProtocolResult,
+        types::Address,
+        Bytes, ProtocolResult,
     };
 
     use async_trait::async_trait;
-    use bytes::Bytes;
     use futures::{
         channel::mpsc::{channel, unbounded, UnboundedSender},
         stream::StreamExt,
@@ -395,7 +394,7 @@ mod tests {
             &self,
             _: Context,
             _: &str,
-            _: Vec<UserAddress>,
+            _: Vec<Address>,
             _: M,
             _: Priority,
         ) -> ProtocolResult<()>

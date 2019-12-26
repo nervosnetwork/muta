@@ -236,11 +236,15 @@ impl RequestContext for MockRequestContext {
         &self.method
     }
 
+    fn get_timestamp(&self) -> u64 {
+        0
+    }
+
     fn get_payload(&self) -> &str {
         &self.payload
     }
 
-    fn emit_event(&mut self, _message: String) -> ProtocolResult<()> {
+    fn emit_event(&self, _message: String) -> ProtocolResult<()> {
         unimplemented!()
     }
 }
@@ -248,8 +252,6 @@ impl RequestContext for MockRequestContext {
 struct MockServiceSDK;
 
 impl ServiceSDK for MockServiceSDK {
-    type ContextItem = MockRequestContext;
-
     // Alloc or recover a `Map` by` var_name`
     fn alloc_or_recover_map<Key: 'static + FixedCodec + PartialEq, Val: 'static + FixedCodec>(
         &mut self,
@@ -336,10 +338,6 @@ impl ServiceSDK for MockServiceSDK {
     // Get a receipt by `tx_hash`
     // if not found on the chain, return None
     fn get_receipt_by_hash(&self, _tx_hash: &Hash) -> ProtocolResult<Option<Receipt>> {
-        unimplemented!()
-    }
-
-    fn get_request_context(&self) -> ProtocolResult<Self::ContextItem> {
         unimplemented!()
     }
 
