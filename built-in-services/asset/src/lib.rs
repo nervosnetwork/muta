@@ -114,10 +114,18 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
         }
 
         let to_balance = self.sdk.get_account_value(&to, &asset_id)?.unwrap_or(0);
-        self.sdk
-            .set_account_value(&to, asset_id.clone(), to_balance + value)?;
-        self.sdk
-            .set_account_value(&caller, asset_id.clone(), caller_balance - value)?;
+        let (v, overflow) = to_balance.overflowing_add(value);
+        if overflow {
+            return Err(ServiceError::U64Overflow.into());
+        }
+
+        self.sdk.set_account_value(&to, asset_id.clone(), v)?;
+
+        let (v, overflow) = caller_balance.overflowing_sub(value);
+        if overflow {
+            return Err(ServiceError::U64Overflow.into());
+        }
+        self.sdk.set_account_value(&caller, asset_id.clone(), v)?;
 
         Ok(RETURN_EMPTY)
     }
@@ -129,13 +137,22 @@ pub enum ServiceError {
     JsonParse(serde_json::Error),
 
     #[display(fmt = "Asset {:?} already exists", id)]
-    Exists { id: Hash },
+    Exists {
+        id: Hash,
+    },
 
     #[display(fmt = "Not found asset, id {:?}", id)]
-    NotFoundAsset { id: Hash },
+    NotFoundAsset {
+        id: Hash,
+    },
 
     #[display(fmt = "Not found asset, expect {:?} real {:?}", expect, real)]
-    LackOfBalance { expect: u64, real: u64 },
+    LackOfBalance {
+        expect: u64,
+        real:   u64,
+    },
+
+    U64Overflow,
 }
 
 impl std::error::Error for ServiceError {}

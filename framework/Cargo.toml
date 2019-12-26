@@ -8,7 +8,7 @@ edition = "2018"
 
 [dependencies]
 protocol = { path = "../protocol" }
-asset = { path = "../build-in-services/asset"}
+asset = { path = "../built-in-services/asset"}
 
 hasher = { version = "0.1", features = ['hash-keccak'] }
 cita_trie = "2.0"
