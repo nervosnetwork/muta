@@ -17,6 +17,33 @@ macro_rules! test_eq {
 }
 
 #[test]
+fn test_fixed_codec_primitive() {
+    let bs = true.encode_fixed().unwrap();
+    assert_eq!(<bool as FixedCodec>::decode_fixed(bs).unwrap(), true);
+
+    let bs = false.encode_fixed().unwrap();
+    assert_eq!(<bool as FixedCodec>::decode_fixed(bs).unwrap(), false);
+
+    let bs = 0u8.encode_fixed().unwrap();
+    assert_eq!(<u8 as FixedCodec>::decode_fixed(bs).unwrap(), 0u8);
+
+    let bs = 8u8.encode_fixed().unwrap();
+    assert_eq!(<u8 as FixedCodec>::decode_fixed(bs).unwrap(), 8u8);
+
+    let bs = 8u32.encode_fixed().unwrap();
+    assert_eq!(<u32 as FixedCodec>::decode_fixed(bs).unwrap(), 8u32);
+
+    let bs = 8u64.encode_fixed().unwrap();
+    assert_eq!(<u64 as FixedCodec>::decode_fixed(bs).unwrap(), 8u64);
+
+    let bs = "test".to_owned().encode_fixed().unwrap();
+    assert_eq!(
+        <String as FixedCodec>::decode_fixed(bs).unwrap(),
+        "test".to_owned()
+    );
+}
+
+#[test]
 fn test_fixed_codec() {
     test_eq!(primitive, Hash, mock_hash);
 

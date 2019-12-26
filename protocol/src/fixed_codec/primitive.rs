@@ -1,6 +1,6 @@
 use std::mem;
 
-use byteorder::{ByteOrder, LittleEndian, WriteBytesExt};
+use byteorder::{ByteOrder, LittleEndian};
 use bytes::Bytes;
 
 use crate::fixed_codec::{FixedCodec, FixedCodecError};
@@ -10,9 +10,69 @@ use crate::{impl_default_fixed_codec_for, ProtocolResult};
 // Impl ProtocolFixedCodec trait for types
 impl_default_fixed_codec_for!(primitive, [Hash, Fee, Address, Account]);
 
+impl FixedCodec for bool {
+    fn encode_fixed(&self) -> ProtocolResult<Bytes> {
+        let bs = if *self {
+            [1u8; mem::size_of::<u8>()]
+        } else {
+            [0u8; mem::size_of::<u8>()]
+        };
+
+        Ok(Bytes::from(bs.as_ref()))
+    }
+
+    fn decode_fixed(bytes: Bytes) -> ProtocolResult<Self> {
+        let u = *bytes.to_vec().get(0).ok_or(FixedCodecError::DecodeBool)?;
+
+        match u {
+            0 => Ok(false),
+            1 => Ok(true),
+            _ => Err(FixedCodecError::DecodeBool.into()),
+        }
+    }
+}
+
+impl FixedCodec for u8 {
+    fn encode_fixed(&self) -> ProtocolResult<Bytes> {
+        Ok(Bytes::from([*self].as_ref()))
+    }
+
+    fn decode_fixed(bytes: Bytes) -> ProtocolResult<Self> {
+        let u = *bytes.to_vec().get(0).ok_or(FixedCodecError::DecodeUint8)?;
+
+        Ok(u)
+    }
+}
+
+impl FixedCodec for u32 {
+    fn encode_fixed(&self) -> ProtocolResult<Bytes> {
+        let mut buf = [0u8; mem::size_of::<u32>()];
+        LittleEndian::write_u32(&mut buf, *self);
+
+        Ok(Bytes::from(buf.as_ref()))
+    }
+
+    fn decode_fixed(bytes: Bytes) -> ProtocolResult<Self> {
+        Ok(LittleEndian::read_u32(bytes.as_ref()))
+    }
+}
+
+impl FixedCodec for u64 {
+    fn encode_fixed(&self) -> ProtocolResult<Bytes> {
+        let mut buf = [0u8; mem::size_of::<u64>()];
+        LittleEndian::write_u64(&mut buf, *self);
+
+        Ok(Bytes::from(buf.as_ref()))
+    }
+
+    fn decode_fixed(bytes: Bytes) -> ProtocolResult<Self> {
+        Ok(LittleEndian::read_u64(bytes.as_ref()))
+    }
+}
+
 impl FixedCodec for String {
     fn encode_fixed(&self) -> ProtocolResult<Bytes> {
-        Ok(Bytes::from(self.as_bytes()))
+        Ok(Bytes::from(self.clone()))
     }
 
     fn decode_fixed(bytes: Bytes) -> ProtocolResult<Self> {
@@ -27,21 +87,6 @@ impl FixedCodec for Bytes {
 
     fn decode_fixed(bytes: Bytes) -> ProtocolResult<Self> {
         Ok(bytes)
-    }
-}
-
-impl FixedCodec for u64 {
-    fn encode_fixed(&self) -> ProtocolResult<Bytes> {
-        let mut bs = [0u8; mem::size_of::<u64>()];
-        bs.as_mut()
-            .write_u64::<LittleEndian>(*self)
-            .expect("write u64 should not fail");
-
-        Ok(Bytes::from(bs.as_ref()))
-    }
-
-    fn decode_fixed(bytes: Bytes) -> ProtocolResult<Self> {
-        Ok(LittleEndian::read_u64(bytes.as_ref()))
     }
 }
 
