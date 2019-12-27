@@ -5,7 +5,8 @@ use bytes::{Bytes, BytesMut};
 use cita_trie::MemoryDB;
 
 use asset::types::{Asset, GetBalanceResponse};
-use protocol::traits::{Executor, ExecutorParams, Storage};
+use asset::AssetService;
+use protocol::traits::{Executor, ExecutorParams, Service, ServiceMapping, ServiceSDK, Storage};
 use protocol::types::{
     Address, Epoch, Genesis, Hash, Proof, RawTransaction, Receipt, SignedTransaction,
     TransactionRequest,
@@ -25,12 +26,17 @@ fn test_create_genesis() {
         genesis.services,
         Arc::clone(&db),
         Arc::new(MockStorage {}),
+        Arc::new(MockServiceMapping {}),
     )
     .unwrap();
 
-    let executor =
-        ServiceExecutor::with_root(root.clone(), Arc::clone(&db), Arc::new(MockStorage {}))
-            .unwrap();
+    let executor = ServiceExecutor::with_root(
+        root.clone(),
+        Arc::clone(&db),
+        Arc::new(MockStorage {}),
+        Arc::new(MockServiceMapping {}),
+    )
+    .unwrap();
     let params = ExecutorParams {
         state_root:   root,
         epoch_id:     1,
@@ -62,12 +68,17 @@ fn test_exec() {
         genesis.services,
         Arc::clone(&db),
         Arc::new(MockStorage {}),
+        Arc::new(MockServiceMapping {}),
     )
     .unwrap();
 
-    let mut executor =
-        ServiceExecutor::with_root(root.clone(), Arc::clone(&db), Arc::new(MockStorage {}))
-            .unwrap();
+    let mut executor = ServiceExecutor::with_root(
+        root.clone(),
+        Arc::clone(&db),
+        Arc::new(MockStorage {}),
+        Arc::new(MockServiceMapping {}),
+    )
+    .unwrap();
 
     let params = ExecutorParams {
         state_root:   root,
@@ -107,6 +118,27 @@ fn test_exec() {
     assert_eq!(asset.name, "MutaToken2");
     assert_eq!(asset.symbol, "MT2");
     assert_eq!(asset.supply, 320_000_011);
+}
+
+struct MockServiceMapping;
+
+impl ServiceMapping for MockServiceMapping {
+    fn get_service<SDK: 'static + ServiceSDK>(
+        &self,
+        name: &str,
+        sdk: SDK,
+    ) -> ProtocolResult<Box<dyn Service>> {
+        let service = match name {
+            "asset" => AssetService::init(sdk)?,
+            _ => panic!("not found service"),
+        };
+
+        Ok(Box::new(service))
+    }
+
+    fn list_service_name(&self) -> Vec<String> {
+        vec!["asset".to_owned()]
+    }
 }
 
 struct MockStorage;

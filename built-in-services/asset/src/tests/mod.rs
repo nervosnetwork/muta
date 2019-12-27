@@ -7,9 +7,10 @@ use cita_trie::MemoryDB;
 
 use framework::binding::sdk::{DefalutServiceSDK, DefaultChainQuerier};
 use framework::binding::state::{GeneralServiceState, MPTTrie};
-use framework::{ContextParams, DefaultRequestContext};
 use protocol::traits::Storage;
-use protocol::types::{Address, Epoch, Hash, Proof, Receipt, SignedTransaction};
+use protocol::types::{
+    Address, Epoch, Hash, Proof, Receipt, ServiceContext, ServiceContextParams, SignedTransaction,
+};
 use protocol::ProtocolResult;
 
 use crate::types::{CreateAssetPayload, GetAssetPayload, GetBalancePayload, TransferPayload};
@@ -102,8 +103,8 @@ fn new_asset_service(
     AssetService::init(sdk).unwrap()
 }
 
-fn mock_context(cycles_limit: u64, caller: Address) -> DefaultRequestContext {
-    let params = ContextParams {
+fn mock_context(cycles_limit: u64, caller: Address) -> ServiceContext {
+    let params = ServiceContextParams {
         cycles_limit,
         cycles_price: 1,
         cycles_used: Rc::new(RefCell::new(0)),
@@ -116,7 +117,7 @@ fn mock_context(cycles_limit: u64, caller: Address) -> DefaultRequestContext {
         events: Rc::new(RefCell::new(vec![])),
     };
 
-    DefaultRequestContext::new(params)
+    ServiceContext::new(params)
 }
 
 struct MockStorage;

@@ -1,10 +1,9 @@
 use std::iter::Iterator;
 
 use derive_more::{Display, From};
-use serde::{Deserialize, Serialize};
 
 use crate::fixed_codec::FixedCodec;
-use crate::types::{Address, Epoch, Hash, MerkleRoot, Receipt, SignedTransaction};
+use crate::types::{Address, Epoch, Hash, MerkleRoot, Receipt, ServiceContext, SignedTransaction};
 use crate::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
 #[derive(Debug, Display, From)]
@@ -23,12 +22,15 @@ impl From<BindingMacroError> for ProtocolError {
     }
 }
 
-#[derive(Deserialize, Serialize, Clone)]
-pub struct ReturnEmpty {
-    pub message: Option<()>,
-}
+pub trait ServiceMapping: Send + Sync {
+    fn get_service<SDK: 'static + ServiceSDK>(
+        &self,
+        name: &str,
+        sdk: SDK,
+    ) -> ProtocolResult<Box<dyn Service>>;
 
-pub const RETURN_EMPTY: ReturnEmpty = ReturnEmpty { message: None };
+    fn list_service_name(&self) -> Vec<String>;
+}
 
 // `ServiceState` provides access to` world state` and `account` for` service`.
 // The bottom layer is an MPT tree.
@@ -81,39 +83,9 @@ pub trait ChainQuerier {
     fn get_receipt_by_hash(&self, tx_hash: &Hash) -> ProtocolResult<Option<Receipt>>;
 }
 
-pub trait RequestContext: Clone {
-    fn sub_cycles(&self, cycles: u64) -> ProtocolResult<()>;
-
-    fn get_cycles_price(&self) -> u64;
-
-    fn get_cycles_limit(&self) -> u64;
-
-    fn get_cycles_used(&self) -> u64;
-
-    fn get_caller(&self) -> Address;
-
-    fn get_current_epoch_id(&self) -> u64;
-
-    fn get_service_name(&self) -> &str;
-
-    fn get_service_method(&self) -> &str;
-
-    fn get_payload(&self) -> &str;
-
-    fn get_timestamp(&self) -> u64;
-
-    // Trigger an `event`, which can be any string
-    // NOTE: The string is recommended as json string
-    fn emit_event(&self, message: String) -> ProtocolResult<()>;
-}
-
 // Admission control will be called before entering service
 pub trait AdmissionControl {
-    fn next<SDK: ServiceSDK, Context: RequestContext>(
-        &self,
-        ctx: Context,
-        sdk: SDK,
-    ) -> ProtocolResult<()>;
+    fn next<SDK: ServiceSDK>(&self, ctx: ServiceContext, sdk: SDK) -> ProtocolResult<()>;
 }
 
 // Developers can use service to customize blockchain business
@@ -124,12 +96,7 @@ pub trait AdmissionControl {
 //   after the epoch is executed.
 // - read: Provide some read-only functions for users or other services to call
 // - write: provide some writable functions for users or other services to call
-pub trait Service<SDK: ServiceSDK> {
-    // Initialize the service
-    fn init_(sdk: SDK) -> ProtocolResult<Self>
-    where
-        Self: Sized;
-
+pub trait Service {
     // Executed before the epoch is executed.
     fn hook_before_(&mut self) -> ProtocolResult<()> {
         Ok(())
@@ -140,9 +107,9 @@ pub trait Service<SDK: ServiceSDK> {
         Ok(())
     }
 
-    fn write_<Context: RequestContext>(&mut self, ctx: Context) -> ProtocolResult<String>;
+    fn write_(&mut self, ctx: ServiceContext) -> ProtocolResult<String>;
 
-    fn read_<Context: RequestContext>(&self, ctx: Context) -> ProtocolResult<String>;
+    fn read_(&self, ctx: ServiceContext) -> ProtocolResult<String>;
 }
 
 // `ServiceSDK` provides multiple rich interfaces for `service` developers

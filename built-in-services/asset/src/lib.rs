@@ -5,9 +5,9 @@ pub mod types;
 use bytes::Bytes;
 use derive_more::{Display, From};
 
-use binding_macro::{cycles, init, service, write};
-use protocol::traits::{RequestContext, ReturnEmpty, ServiceSDK, StoreMap, RETURN_EMPTY};
-use protocol::types::Hash;
+use binding_macro::{cycles, service, write};
+use protocol::traits::{ServiceSDK, StoreMap};
+use protocol::types::{Hash, ServiceContext};
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
 use crate::types::{
@@ -22,29 +22,24 @@ pub struct AssetService<SDK> {
 
 #[service]
 impl<SDK: ServiceSDK> AssetService<SDK> {
-    #[init]
-    fn init(mut sdk: SDK) -> ProtocolResult<Self> {
+    pub fn init(mut sdk: SDK) -> ProtocolResult<Self> {
         let assets: Box<dyn StoreMap<Hash, Asset>> = sdk.alloc_or_recover_map("assets")?;
 
-        Ok(Self { assets, sdk })
+        Ok(Self { sdk, assets })
     }
 
     #[cycles(100_00)]
     #[read]
-    fn get_asset<Context: RequestContext>(
-        &self,
-        ctx: Context,
-        payload: GetAssetPayload,
-    ) -> ProtocolResult<Asset> {
+    fn get_asset(&self, ctx: ServiceContext, payload: GetAssetPayload) -> ProtocolResult<Asset> {
         let asset = self.assets.get(&payload.id)?;
         Ok(asset)
     }
 
     #[cycles(100_00)]
     #[read]
-    fn get_balance<Context: RequestContext>(
+    fn get_balance(
         &self,
-        ctx: Context,
+        ctx: ServiceContext,
         payload: GetBalancePayload,
     ) -> ProtocolResult<GetBalanceResponse> {
         let balance = self
@@ -59,9 +54,9 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
 
     #[cycles(210_00)]
     #[write]
-    fn create_asset<Context: RequestContext>(
+    fn create_asset(
         &mut self,
-        ctx: Context,
+        ctx: ServiceContext,
         payload: CreateAssetPayload,
     ) -> ProtocolResult<Asset> {
         let caller = ctx.get_caller();
@@ -88,11 +83,11 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
 
     #[cycles(210_00)]
     #[write]
-    fn transfer<Context: RequestContext>(
+    fn transfer(
         &mut self,
-        ctx: Context,
+        ctx: ServiceContext,
         payload: TransferPayload,
-    ) -> ProtocolResult<ReturnEmpty> {
+    ) -> ProtocolResult<serde_json::Value> {
         let caller = ctx.get_caller();
         let asset_id = payload.asset_id.clone();
         let value = payload.value;
@@ -125,7 +120,7 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
         }
         self.sdk.set_account_value(&caller, asset_id, v)?;
 
-        Ok(RETURN_EMPTY)
+        Ok(serde_json::Value::Null)
     }
 }
 

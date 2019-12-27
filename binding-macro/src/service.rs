@@ -2,7 +2,6 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, FnArg, Ident, ImplItem, ImplItemMethod, ItemImpl, Type};
 
-const INIT_ATTRIBUTE: &str = "init";
 const READ_ATTRIBUTE: &str = "read";
 const WRITE_ATTRIBUTE: &str = "write";
 const HOOK_BEFORE_ATTRIBUTE: &str = "hook_before";
@@ -22,10 +21,6 @@ struct MethodMeta {
     method_ident:  Ident,
     payload_ident: Ident,
     readonly:      bool,
-}
-
-struct InitMethod {
-    ident: Ident,
 }
 
 pub fn gen_service_code(_: TokenStream, item: TokenStream) -> TokenStream {
@@ -57,8 +52,6 @@ pub fn gen_service_code(_: TokenStream, item: TokenStream) -> TokenStream {
         None => quote! {Ok(())},
     };
 
-    let init_method_ident = extract_init_metod(items).ident;
-
     let list_method_meta: Vec<MethodMeta> = methods.into_iter().map(extract_method_meta).collect();
 
     let (list_read_name, list_read_ident, list_read_payload) =
@@ -67,11 +60,7 @@ pub fn gen_service_code(_: TokenStream, item: TokenStream) -> TokenStream {
         split_list_for_metadata(&list_method_meta, false);
 
     TokenStream::from(quote! {
-        impl #impl_generics protocol::traits::Service#ty_generics for #service_ident #ty_generics #where_clause {
-            fn init_(sdk: SDK) -> protocol::ProtocolResult<Self> {
-                Self::#init_method_ident(sdk)
-            }
-
+        impl #impl_generics protocol::traits::Service for #service_ident #ty_generics #where_clause {
             fn hook_before_(&mut self) -> protocol::ProtocolResult<()> {
                 #hook_before_body
             }
@@ -80,7 +69,7 @@ pub fn gen_service_code(_: TokenStream, item: TokenStream) -> TokenStream {
                 #hook_after_body
             }
 
-            fn read_<Context: protocol::traits::RequestContext>(&self, ctx: Context) -> protocol::ProtocolResult<String> {
+            fn read_(&self, ctx: protocol::types::ServiceContext) -> protocol::ProtocolResult<String> {
                 let service = ctx.get_service_name();
                 let method = ctx.get_service_method();
 
@@ -95,7 +84,7 @@ pub fn gen_service_code(_: TokenStream, item: TokenStream) -> TokenStream {
                 }
             }
 
-            fn write_<Context: protocol::traits::RequestContext>(&mut self, ctx: Context) -> protocol::ProtocolResult<String> {
+            fn write_(&mut self, ctx: protocol::types::ServiceContext) -> protocol::ProtocolResult<String> {
                 let service = ctx.get_service_name();
                 let method = ctx.get_service_method();
 
@@ -154,32 +143,6 @@ fn find_service_method(method: &ImplItemMethod) -> Option<ServiceMethod> {
     }
 
     None
-}
-
-fn extract_init_metod(items: &[ImplItem]) -> InitMethod {
-    let methods: Vec<ImplItemMethod> = find_list_for_item_method(items);
-
-    let mut syn_init_method: Option<ImplItemMethod> = None;
-
-    for method in methods {
-        let is_init_method = method.attrs.iter().any(|attr| {
-            attr.path
-                .segments
-                .iter()
-                .any(|segment| segment.ident == INIT_ATTRIBUTE)
-        });
-        if is_init_method && syn_init_method.is_none() {
-            syn_init_method = Some(method)
-        } else if is_init_method & syn_init_method.is_some() {
-            panic!("The init attribute can onlu have one")
-        }
-    }
-
-    let init_method = syn_init_method.expect("The init attribute must be added to a method");
-
-    InitMethod {
-        ident: init_method.sig.ident,
-    }
 }
 
 fn extract_hooks(items: &[ImplItem]) -> Hooks {

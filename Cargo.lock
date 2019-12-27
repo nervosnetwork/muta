@@ -1896,9 +1896,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "muta-chain"
+name = "muta"
 version = "0.1.0"
 dependencies = [
+<<<<<<< HEAD
 <<<<<<< HEAD
  "binding-macro 0.1.0",
  "bytes 0.5.3 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1923,6 +1924,9 @@ dependencies = [
  "serde_derive 1.0.104 (registry+https://github.com/rust-lang/crates.io-index)",
  "toml 0.5.5 (registry+https://github.com/rust-lang/crates.io-index)",
 =======
+=======
+ "asset",
+>>>>>>> feat: Extract muta as crate.
  "binding-macro",
  "bytes 0.5.3",
  "clap",
@@ -1934,6 +1938,7 @@ dependencies = [
  "core-mempool",
  "core-network",
  "core-storage",
+ "derive_more 0.15.0",
  "framework",
  "futures 0.3.1",
  "hex 0.4.0",
