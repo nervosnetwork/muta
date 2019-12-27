@@ -4,11 +4,11 @@ use byteorder::{ByteOrder, LittleEndian};
 use bytes::{Bytes, BytesMut};
 
 use crate::fixed_codec::{FixedCodec, FixedCodecError};
-use crate::types::{Account, Address, Hash};
+use crate::types::{Address, Hash, Metadata};
 use crate::{impl_default_fixed_codec_for, ProtocolResult};
 
 // Impl FixedCodec trait for types
-impl_default_fixed_codec_for!(primitive, [Hash, Address, Account]);
+impl_default_fixed_codec_for!(primitive, [Hash, Address, Metadata]);
 
 impl FixedCodec for bool {
     fn encode_fixed(&self) -> ProtocolResult<Bytes> {
@@ -120,16 +120,31 @@ impl rlp::Decodable for Address {
     }
 }
 
-impl rlp::Encodable for Account {
+impl rlp::Encodable for Metadata {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
-        s.begin_list(1);
-        s.append(&self.storage_root);
+        s.begin_list(5)
+            .append(&self.chain_id)
+            .append_list(&self.verifier_list)
+            .append(&self.consensus_interval)
+            .append(&self.cycles_limit)
+            .append(&self.cycles_price);
     }
 }
 
-impl rlp::Decodable for Account {
+impl rlp::Decodable for Metadata {
     fn decode(r: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
-        let storage_root: Hash = r.at(0)?.as_val()?;
-        Ok(Self { storage_root })
+        let chain_id: Hash = r.at(0)?.as_val()?;
+        let verifier_list: Vec<Address> = r.at(1)?.as_list()?;
+        let consensus_interval = r.at(2)?.as_val()?;
+        let cycles_limit = r.at(3)?.as_val()?;
+        let cycles_price = r.at(4)?.as_val()?;
+
+        Ok(Self {
+            chain_id,
+            verifier_list,
+            consensus_interval,
+            cycles_limit,
+            cycles_price,
+        })
     }
 }

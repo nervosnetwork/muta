@@ -224,10 +224,3 @@ pub fn hook_before(_: TokenStream, item: TokenStream) -> TokenStream {
 pub fn service(attr: TokenStream, item: TokenStream) -> TokenStream {
     gen_service_code(attr, item)
 }
-
-/// Marks a method so that it called when the service is initialized.
-// TODO(@yejiayu): Verify the function signature.
-#[proc_macro_attribute]
-pub fn init(_: TokenStream, item: TokenStream) -> TokenStream {
-    item
-}

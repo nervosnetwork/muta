@@ -10,7 +10,7 @@ use log::{debug, error};
 use common_merkle::Merkle;
 use protocol::traits::{
     ConsensusAdapter, Context, ExecutorFactory, ExecutorParams, ExecutorResp, Gossip, MemPool,
-    MessageTarget, MixedTxHashes, NodeInfo, Priority, Rpc, Storage,
+    MessageTarget, MixedTxHashes, NodeInfo, Priority, Rpc, ServiceMapping, Storage,
 };
 use protocol::types::{
     Address, Epoch, Hash, MerkleRoot, Proof, Receipt, SignedTransaction, Validator,
@@ -25,12 +25,13 @@ use crate::ConsensusError;
 const OVERLORD_GAP: usize = 10;
 
 pub struct OverlordConsensusAdapter<
-    EF: ExecutorFactory<DB, S>,
+    EF: ExecutorFactory<DB, S, Mapping>,
     G: Gossip,
     M: MemPool,
     R: Rpc,
     S: Storage,
     DB: cita_trie::DB,
+    Mapping: ServiceMapping,
 > {
     rpc:     Arc<R>,
     network: Arc<G>,
@@ -38,18 +39,20 @@ pub struct OverlordConsensusAdapter<
     storage: Arc<S>,
 
     exec_queue:  Sender<ExecuteInfo>,
-    exec_demons: Option<ExecDemons<S, DB, EF>>,
+    exec_demons: Option<ExecDemons<S, DB, EF, Mapping>>,
 }
 
 #[async_trait]
-impl<EF, G, M, R, S, DB> ConsensusAdapter for OverlordConsensusAdapter<EF, G, M, R, S, DB>
+impl<EF, G, M, R, S, DB, Mapping> ConsensusAdapter
+    for OverlordConsensusAdapter<EF, G, M, R, S, DB, Mapping>
 where
-    EF: ExecutorFactory<DB, S>,
+    EF: ExecutorFactory<DB, S, Mapping>,
     G: Gossip + Sync + Send,
     R: Rpc + Sync + Send,
     M: MemPool,
     S: Storage,
     DB: cita_trie::DB,
+    Mapping: ServiceMapping,
 {
     async fn get_txs_from_mempool(
         &self,
@@ -194,14 +197,15 @@ where
     }
 }
 
-impl<EF, G, M, R, S, DB> OverlordConsensusAdapter<EF, G, M, R, S, DB>
+impl<EF, G, M, R, S, DB, Mapping> OverlordConsensusAdapter<EF, G, M, R, S, DB, Mapping>
 where
-    EF: ExecutorFactory<DB, S>,
+    EF: ExecutorFactory<DB, S, Mapping>,
     G: Gossip + Sync + Send,
     R: Rpc + Sync + Send,
     M: MemPool,
     S: Storage,
     DB: cita_trie::DB,
+    Mapping: ServiceMapping,
 {
     pub fn new(
         rpc: Arc<R>,
@@ -209,6 +213,7 @@ where
         mempool: Arc<M>,
         storage: Arc<S>,
         trie_db: Arc<DB>,
+        service_mapping: Arc<Mapping>,
         status_agent: CurrentStatusAgent,
         state_root: MerkleRoot,
     ) -> Self {
@@ -216,6 +221,7 @@ where
         let exec_demons = Some(ExecDemons::new(
             Arc::clone(&storage),
             trie_db,
+            service_mapping,
             rx,
             status_agent,
             state_root,
@@ -231,16 +237,17 @@ where
         }
     }
 
-    pub fn take_exec_demon(&mut self) -> ExecDemons<S, DB, EF> {
+    pub fn take_exec_demon(&mut self) -> ExecDemons<S, DB, EF, Mapping> {
         assert!(self.exec_demons.is_some());
         self.exec_demons.take().unwrap()
     }
 }
 
 #[derive(Debug)]
-pub struct ExecDemons<S, DB, EF> {
-    storage: Arc<S>,
-    trie_db: Arc<DB>,
+pub struct ExecDemons<S, DB, EF, Mapping> {
+    storage:         Arc<S>,
+    trie_db:         Arc<DB>,
+    service_mapping: Arc<Mapping>,
 
     pin_ef:     PhantomData<EF>,
     queue:      Receiver<ExecuteInfo>,
@@ -248,15 +255,17 @@ pub struct ExecDemons<S, DB, EF> {
     status:     CurrentStatusAgent,
 }
 
-impl<S, DB, EF> ExecDemons<S, DB, EF>
+impl<S, DB, EF, Mapping> ExecDemons<S, DB, EF, Mapping>
 where
     S: Storage,
     DB: cita_trie::DB,
-    EF: ExecutorFactory<DB, S>,
+    EF: ExecutorFactory<DB, S, Mapping>,
+    Mapping: ServiceMapping,
 {
     fn new(
         storage: Arc<S>,
         trie_db: Arc<DB>,
+        service_mapping: Arc<Mapping>,
         rx: Receiver<ExecuteInfo>,
         status_agent: CurrentStatusAgent,
         state_root: MerkleRoot,
@@ -264,42 +273,12 @@ where
         ExecDemons {
             storage,
             trie_db,
+            service_mapping,
             state_root,
             queue: rx,
             pin_ef: PhantomData,
             status: status_agent,
         }
-        Ok(())
-    }
-
-    async fn save_receipts(&self, receipts: Vec<Receipt>) -> ProtocolResult<()> {
-        self.storage.insert_receipts(receipts).await
-    }
-}
-
-fn gen_update_info(
-    exec_resp: ExecutorExecResp,
-    epoch_id: u64,
-    order_root: MerkleRoot,
-) -> UpdateInfo {
-    let cycles = exec_resp.all_cycles_used.iter().map(|fee| fee.cycle).sum();
-    let receipt = Merkle::from_hashes(
-        exec_resp
-            .receipts
-            .iter()
-            .map(|r| Hash::digest(r.to_owned().encode_fixed().unwrap()))
-            .collect::<Vec<_>>(),
-    )
-    .get_root_hash()
-    .unwrap_or_else(Hash::from_empty);
-
-    UpdateInfo {
-        exec_epoch_id: epoch_id,
-        cycles_used:   cycles,
-        receipt_root:  receipt,
-        confirm_root:  order_root,
-        state_root:    exec_resp.state_root.clone(),
-        logs_bloom:    exec_resp.logs_bloom,
     }
 
     pub async fn run(mut self) {
@@ -321,6 +300,7 @@ fn gen_update_info(
                 self.state_root.clone(),
                 Arc::clone(&self.trie_db),
                 Arc::clone(&self.storage),
+                Arc::clone(&self.service_mapping),
             )?;
             let exec_params = ExecutorParams {
                 state_root: self.state_root.clone(),

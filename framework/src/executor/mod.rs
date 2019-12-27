@@ -6,59 +6,58 @@ pub use factory::ServiceExecutorFactory;
 
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 use std::sync::Arc;
 
 use cita_trie::DB as TrieDB;
 use derive_more::{Display, From};
 
-use asset::AssetService;
 use bytes::BytesMut;
 use protocol::traits::{
-    ExecResp, Executor, ExecutorParams, ExecutorResp, RequestContext, Service, ServiceState,
-    Storage,
+    ExecResp, Executor, ExecutorParams, ExecutorResp, ServiceMapping, ServiceState, Storage,
 };
 use protocol::types::{
     Address, Bloom, BloomInput, GenesisService, Hash, MerkleRoot, Receipt, ReceiptResponse,
-    SignedTransaction, TransactionRequest,
+    ServiceContext, ServiceContextParams, SignedTransaction, TransactionRequest,
 };
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
 use crate::binding::sdk::{DefalutServiceSDK, DefaultChainQuerier};
 use crate::binding::state::{GeneralServiceState, MPTTrie};
-use crate::{ContextParams, DefaultRequestContext};
 
 enum HookType {
     Before,
     After,
 }
 
-pub struct ServiceExecutor<S: Storage, DB: TrieDB> {
-    querier:    Rc<DefaultChainQuerier<S>>,
-    states:     HashMap<String, Rc<RefCell<GeneralServiceState<DB>>>>,
-    root_state: GeneralServiceState<DB>,
+pub struct ServiceExecutor<S: Storage, DB: TrieDB, Mapping: ServiceMapping> {
+    service_mapping: Arc<Mapping>,
+    querier:         Rc<DefaultChainQuerier<S>>,
+    states:          HashMap<String, Rc<RefCell<GeneralServiceState<DB>>>>,
+    root_state:      GeneralServiceState<DB>,
 }
 
-impl<S: Storage, DB: 'static + TrieDB> ServiceExecutor<S, DB> {
+impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: ServiceMapping>
+    ServiceExecutor<S, DB, Mapping>
+{
     pub fn create_genesis(
         genesis_services: Vec<GenesisService>,
         trie_db: Arc<DB>,
         storage: Arc<S>,
+        mapping: Arc<Mapping>,
     ) -> ProtocolResult<MerkleRoot> {
         let querier = Rc::new(DefaultChainQuerier::new(Arc::clone(&storage)));
 
         let mut states = HashMap::new();
-        for service_alloc in genesis_services.iter() {
+        for name in mapping.list_service_name().into_iter() {
             let trie = MPTTrie::new(Arc::clone(&trie_db));
 
-            states.insert(
-                service_alloc.service.to_owned(),
-                Rc::new(RefCell::new(GeneralServiceState::new(trie))),
-            );
+            states.insert(name, Rc::new(RefCell::new(GeneralServiceState::new(trie))));
         }
 
         for service_alloc in genesis_services.into_iter() {
-            let ctx_params = ContextParams {
+            let ctx_params = ServiceContextParams {
                 cycles_limit:    std::u64::MAX,
                 cycles_price:    1,
                 cycles_used:     Rc::new(RefCell::new(0)),
@@ -71,7 +70,7 @@ impl<S: Storage, DB: 'static + TrieDB> ServiceExecutor<S, DB> {
                 events:          Rc::new(RefCell::new(vec![])),
             };
 
-            let context = DefaultRequestContext::new(ctx_params);
+            let context = ServiceContext::new(ctx_params);
             let state =
                 states
                     .get(context.get_service_name())
@@ -80,13 +79,8 @@ impl<S: Storage, DB: 'static + TrieDB> ServiceExecutor<S, DB> {
                     })?;
             let sdk = DefalutServiceSDK::new(Rc::clone(state), Rc::clone(&querier));
 
-            match context.get_service_name() {
-                "asset" => {
-                    let mut service = AssetService::init_(sdk)?;
-                    service.write_(context.clone())?;
-                }
-                _ => unreachable!(),
-            };
+            let mut service = mapping.get_service(context.get_service_name(), sdk)?;
+            service.write_(context.clone())?;
 
             state.borrow_mut().stash()?;
         }
@@ -101,23 +95,28 @@ impl<S: Storage, DB: 'static + TrieDB> ServiceExecutor<S, DB> {
         root_state.commit()
     }
 
-    pub fn with_root(root: MerkleRoot, trie_db: Arc<DB>, storage: Arc<S>) -> ProtocolResult<Self> {
+    pub fn with_root(
+        root: MerkleRoot,
+        trie_db: Arc<DB>,
+        storage: Arc<S>,
+        service_mapping: Arc<Mapping>,
+    ) -> ProtocolResult<Self> {
         let trie = MPTTrie::from(root, Arc::clone(&trie_db))?;
         let root_state = GeneralServiceState::new(trie);
 
-        let asset_root =
-            root_state
-                .get(&"asset".to_owned())?
-                .ok_or(ExecutorError::NotFoundService {
-                    service: "asset".to_owned(),
-                })?;
-        let trie = MPTTrie::from(asset_root, Arc::clone(&trie_db))?;
-        let asset_state = GeneralServiceState::new(trie);
-
         let mut states = HashMap::new();
-        states.insert("asset".to_owned(), Rc::new(RefCell::new(asset_state)));
+        for name in service_mapping.list_service_name().into_iter() {
+            let trie = match root_state.get(&name)? {
+                Some(service_root) => MPTTrie::from(service_root, Arc::clone(&trie_db))?,
+                None => MPTTrie::new(Arc::clone(&trie_db)),
+            };
+
+            let service_state = GeneralServiceState::new(trie);
+            states.insert(name.to_owned(), Rc::new(RefCell::new(service_state)));
+        }
 
         Ok(Self {
+            service_mapping,
             querier: Rc::new(DefaultChainQuerier::new(storage)),
             states,
             root_state,
@@ -150,18 +149,16 @@ impl<S: Storage, DB: 'static + TrieDB> ServiceExecutor<S, DB> {
     }
 
     fn hook(&mut self, hook: HookType) -> ProtocolResult<()> {
-        for (name, state) in self.states.iter() {
-            let sdk = self.get_sdk(name)?;
+        for name in self.service_mapping.list_service_name().into_iter() {
+            let state = self
+                .states
+                .get(&name)
+                .ok_or(ExecutorError::NotFoundService {
+                    service: name.to_owned(),
+                })?;
 
-            let mut service = match name.as_ref() {
-                "asset" => AssetService::init_(sdk)?,
-                _ => {
-                    return Err(ExecutorError::NotFoundService {
-                        service: name.to_owned(),
-                    }
-                    .into())
-                }
-            };
+            let sdk = self.get_sdk(&name)?;
+            let mut service = self.service_mapping.get_service(name.as_str(), sdk)?;
 
             match hook {
                 HookType::Before => service.hook_before_()?,
@@ -196,8 +193,8 @@ impl<S: Storage, DB: 'static + TrieDB> ServiceExecutor<S, DB> {
         caller: &Address,
         cycles_price: u64,
         request: &TransactionRequest,
-    ) -> ProtocolResult<DefaultRequestContext> {
-        let ctx_params = ContextParams {
+    ) -> ProtocolResult<ServiceContext> {
+        let ctx_params = ServiceContextParams {
             cycles_limit: params.cycels_limit,
             cycles_price,
             cycles_used: Rc::new(RefCell::new(0)),
@@ -210,30 +207,20 @@ impl<S: Storage, DB: 'static + TrieDB> ServiceExecutor<S, DB> {
             events: Rc::new(RefCell::new(vec![])),
         };
 
-        Ok(DefaultRequestContext::new(ctx_params))
+        Ok(ServiceContext::new(ctx_params))
     }
 
-    fn exec_service(
-        &self,
-        context: DefaultRequestContext,
-        readonly: bool,
-    ) -> ProtocolResult<ExecResp> {
+    fn exec_service(&self, context: ServiceContext, readonly: bool) -> ProtocolResult<ExecResp> {
         let sdk = self.get_sdk(context.get_service_name())?;
 
-        let mut service = match context.get_service_name() {
-            "asset" => AssetService::init_(sdk)?,
-            _ => {
-                return Err(ExecutorError::NotFoundService {
-                    service: context.get_service_name().to_owned(),
-                }
-                .into())
-            }
-        };
+        let mut service = self
+            .service_mapping
+            .get_service(context.get_service_name(), sdk)?;
 
         let result = if readonly {
-            service.read_(context)
+            service.deref().read_(context)
         } else {
-            service.write_(context)
+            service.deref_mut().write_(context)
         };
 
         let (ret, is_error) = match result {
@@ -261,7 +248,9 @@ impl<S: Storage, DB: 'static + TrieDB> ServiceExecutor<S, DB> {
     }
 }
 
-impl<S: Storage, DB: 'static + TrieDB> Executor for ServiceExecutor<S, DB> {
+impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: ServiceMapping> Executor
+    for ServiceExecutor<S, DB, Mapping>
+{
     fn exec(
         &mut self,
         params: &ExecutorParams,

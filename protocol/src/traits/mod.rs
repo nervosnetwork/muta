@@ -8,9 +8,8 @@ mod storage;
 
 pub use api::APIAdapter;
 pub use binding::{
-    AdmissionControl, BindingMacroError, ChainQuerier, RequestContext, ReturnEmpty, Service,
-    ServiceSDK, ServiceState, StoreArray, StoreBool, StoreMap, StoreString, StoreUint64,
-    RETURN_EMPTY,
+    AdmissionControl, BindingMacroError, ChainQuerier, Service, ServiceMapping, ServiceSDK,
+    ServiceState, StoreArray, StoreBool, StoreMap, StoreString, StoreUint64,
 };
 pub use consensus::{Consensus, ConsensusAdapter, MessageTarget, NodeInfo};
 pub use executor::{ExecResp, Executor, ExecutorFactory, ExecutorParams, ExecutorResp};

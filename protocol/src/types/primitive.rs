@@ -10,6 +10,8 @@ use serde::{Deserialize, Serialize};
 use crate::types::TypesError;
 use crate::ProtocolResult;
 
+pub const METADATA_KEY: &str = "metadata";
+
 lazy_static! {
     static ref HASHER_INST: HasherKeccak = HasherKeccak::new();
 }
@@ -222,9 +224,13 @@ impl fmt::Debug for Address {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Account {
-    pub storage_root: MerkleRoot,
+#[derive(Deserialize, Serialize, Clone, Debug)]
+pub struct Metadata {
+    pub chain_id:           Hash,
+    pub verifier_list:      Vec<Address>,
+    pub consensus_interval: u64,
+    pub cycles_limit:       u64,
+    pub cycles_price:       u64,
 }
 
 fn clean_0x(s: &str) -> &str {

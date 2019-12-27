@@ -4,35 +4,53 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use protocol::traits::ExecutorFactory;
-use protocol::traits::{APIAdapter, Context, ExecResp, ExecutorParams, MemPool, Storage};
+use protocol::traits::{
+    APIAdapter, Context, ExecResp, ExecutorParams, MemPool, ServiceMapping, Storage,
+};
 use protocol::types::{Address, Epoch, Hash, Receipt, SignedTransaction, TransactionRequest};
 use protocol::ProtocolResult;
 
-pub struct DefaultAPIAdapter<EF, M, S, DB> {
-    mempool: Arc<M>,
-    storage: Arc<S>,
-    trie_db: Arc<DB>,
+pub struct DefaultAPIAdapter<EF, M, S, DB, Mapping> {
+    mempool:         Arc<M>,
+    storage:         Arc<S>,
+    trie_db:         Arc<DB>,
+    service_mapping: Arc<Mapping>,
 
     pin_ef: PhantomData<EF>,
 }
 
-impl<EF: ExecutorFactory<DB, S>, M: MemPool, S: Storage, DB: cita_trie::DB>
-    DefaultAPIAdapter<EF, M, S, DB>
+impl<
+        EF: ExecutorFactory<DB, S, Mapping>,
+        M: MemPool,
+        S: Storage,
+        DB: cita_trie::DB,
+        Mapping: ServiceMapping,
+    > DefaultAPIAdapter<EF, M, S, DB, Mapping>
 {
-    pub fn new(mempool: Arc<M>, storage: Arc<S>, trie_db: Arc<DB>) -> Self {
+    pub fn new(
+        mempool: Arc<M>,
+        storage: Arc<S>,
+        trie_db: Arc<DB>,
+        service_mapping: Arc<Mapping>,
+    ) -> Self {
         Self {
             mempool,
             storage,
             trie_db,
-
+            service_mapping,
             pin_ef: PhantomData,
         }
     }
 }
 
 #[async_trait]
-impl<EF: ExecutorFactory<DB, S>, M: MemPool, S: Storage, DB: cita_trie::DB> APIAdapter
-    for DefaultAPIAdapter<EF, M, S, DB>
+impl<
+        EF: ExecutorFactory<DB, S, Mapping>,
+        M: MemPool,
+        S: Storage,
+        DB: cita_trie::DB,
+        Mapping: ServiceMapping,
+    > APIAdapter for DefaultAPIAdapter<EF, M, S, DB, Mapping>
 {
     async fn insert_signed_txs(
         &self,
@@ -84,6 +102,7 @@ impl<EF: ExecutorFactory<DB, S>, M: MemPool, S: Storage, DB: cita_trie::DB> APIA
             epoch.header.state_root.clone(),
             Arc::clone(&self.trie_db),
             Arc::clone(&self.storage),
+            Arc::clone(&self.service_mapping),
         )?;
 
         let params = ExecutorParams {
