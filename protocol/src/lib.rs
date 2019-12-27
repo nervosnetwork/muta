@@ -23,6 +23,7 @@ pub enum ProtocolErrorKind {
     Binding,
     BindingMacro,
     Service,
+    Main,
 
     // codec
     Codec,

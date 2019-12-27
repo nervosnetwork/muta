@@ -4,14 +4,15 @@ extern crate binding_macro;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 
 use protocol::fixed_codec::FixedCodec;
 use protocol::traits::{
-    RequestContext, Service, ServiceSDK, StoreArray, StoreBool, StoreMap, StoreString, StoreUint64,
+    Service, ServiceSDK, StoreArray, StoreBool, StoreMap, StoreString, StoreUint64,
 };
-use protocol::types::{Address, Epoch, Hash, Receipt, SignedTransaction};
+use protocol::types::{
+    Address, Epoch, Hash, Receipt, ServiceContext, ServiceContextParams, SignedTransaction,
+};
 use protocol::ProtocolResult;
 
 #[test]
@@ -20,20 +21,17 @@ fn test_read_and_write() {
 
     impl Tests {
         #[read]
-        fn test_read_fn<Context: RequestContext>(&self, _ctx: Context) -> ProtocolResult<String> {
+        fn test_read_fn(&self, _ctx: ServiceContext) -> ProtocolResult<String> {
             Ok("read".to_owned())
         }
 
         #[write]
-        fn test_write_fn<Context: RequestContext>(
-            &mut self,
-            _ctx: Context,
-        ) -> ProtocolResult<String> {
+        fn test_write_fn(&mut self, _ctx: ServiceContext) -> ProtocolResult<String> {
             Ok("write".to_owned())
         }
     }
 
-    let context = MockRequestContext::new(1000);
+    let context = get_context(1000, "", "", "");
 
     let mut t = Tests {};
     assert_eq!(t.test_read_fn(context.clone()).unwrap(), "read".to_owned());
@@ -46,39 +44,39 @@ fn test_cycles() {
 
     impl Tests {
         #[cycles(100)]
-        fn test_cycles<Context: RequestContext>(&self, ctx: Context) -> ProtocolResult<()> {
+        fn test_cycles(&self, ctx: ServiceContext) -> ProtocolResult<()> {
             Ok(())
         }
 
         #[cycles(500)]
-        fn test_cycles2<Context: RequestContext>(&self, ctx: Context) -> ProtocolResult<()> {
+        fn test_cycles2(&self, ctx: ServiceContext) -> ProtocolResult<()> {
             Ok(())
         }
     }
 
     #[cycles(200)]
-    fn test_sub_cycles_fn1<Context: RequestContext>(ctx: Context) -> ProtocolResult<()> {
+    fn test_sub_cycles_fn1(ctx: ServiceContext) -> ProtocolResult<()> {
         Ok(())
     }
 
     #[cycles(200)]
-    fn test_sub_cycles_fn2<Context: RequestContext>(_foo: u64, ctx: Context) -> ProtocolResult<()> {
+    fn test_sub_cycles_fn2(_foo: u64, ctx: ServiceContext) -> ProtocolResult<()> {
         Ok(())
     }
 
     let t = Tests {};
-    let context = MockRequestContext::new(1000);
+    let context = get_context(1000, "", "", "");
     t.test_cycles(context.clone()).unwrap();
-    assert_eq!(context.get_cycles_limit(), 900);
+    assert_eq!(context.get_cycles_used(), 100);
 
     t.test_cycles2(context.clone()).unwrap();
-    assert_eq!(context.get_cycles_limit(), 400);
+    assert_eq!(context.get_cycles_used(), 600);
 
     test_sub_cycles_fn1(context.clone()).unwrap();
-    assert_eq!(context.get_cycles_limit(), 200);
+    assert_eq!(context.get_cycles_used(), 800);
 
     test_sub_cycles_fn2(1, context.clone()).unwrap();
-    assert_eq!(context.get_cycles_limit(), 0);
+    assert_eq!(context.get_cycles_used(), 1000);
 }
 
 #[test]
@@ -102,15 +100,6 @@ fn test_impl_service() {
 
     #[service]
     impl<SDK: ServiceSDK> Tests<SDK> {
-        #[init]
-        fn custom_init(_sdk: SDK) -> ProtocolResult<Self> {
-            Ok(Self {
-                _sdk,
-                hook_after: false,
-                hook_before: false,
-            })
-        }
-
         #[hook_before]
         fn custom_hook_before(&mut self) -> ProtocolResult<()> {
             self.hook_before = true;
@@ -124,9 +113,9 @@ fn test_impl_service() {
         }
 
         #[read]
-        fn test_read<Context: RequestContext>(
+        fn test_read(
             &self,
-            _ctx: Context,
+            _ctx: ServiceContext,
             _payload: TestServicePayload,
         ) -> ProtocolResult<TestServiceResponse> {
             Ok(TestServiceResponse {
@@ -135,9 +124,9 @@ fn test_impl_service() {
         }
 
         #[write]
-        fn test_write<Context: RequestContext>(
+        fn test_write(
             &mut self,
-            _ctx: Context,
+            _ctx: ServiceContext,
             _payload: TestServicePayload,
         ) -> ProtocolResult<TestServiceResponse> {
             Ok(TestServiceResponse {
@@ -154,17 +143,21 @@ fn test_impl_service() {
     let payload_str = serde_json::to_string(&payload).unwrap();
 
     let sdk = MockServiceSDK {};
-    let mut test_service = Tests::init_(sdk).unwrap();
+    let mut test_service = Tests {
+        _sdk:        sdk,
+        hook_after:  false,
+        hook_before: false,
+    };
 
-    let context = MockRequestContext::with_method(1024 * 1024, "test_write", &payload_str);
+    let context = get_context(1024 * 1024, "", "test_write", &payload_str);
     let write_res = test_service.write_(context).unwrap();
     assert_eq!(write_res, r#"{"message":"write ok"}"#);
 
-    let context = MockRequestContext::with_method(1024 * 1024, "test_read", &payload_str);
+    let context = get_context(1024 * 1024, "", "test_read", &payload_str);
     let read_res = test_service.read_(context).unwrap();
     assert_eq!(read_res, r#"{"message":"read ok"}"#);
 
-    let context = MockRequestContext::with_method(1024 * 1024, "test_notfound", &payload_str);
+    let context = get_context(1024 * 1024, "", "test_notfound", &payload_str);
     let read_res = test_service.read_(context.clone());
     assert_eq!(read_res.is_err(), true);
     let write_res = test_service.write_(context);
@@ -177,76 +170,21 @@ fn test_impl_service() {
     assert_eq!(test_service.hook_after, true);
 }
 
-#[derive(Clone)]
-struct MockRequestContext {
-    cycles_limit: Rc<RefCell<u64>>,
-    method:       String,
-    payload:      String,
-}
+fn get_context(cycles_limit: u64, service: &str, method: &str, payload: &str) -> ServiceContext {
+    let params = ServiceContextParams {
+        cycles_limit,
+        cycles_price: 1,
+        cycles_used: Rc::new(RefCell::new(0)),
+        caller: Address::from_hash(Hash::from_empty()).unwrap(),
+        epoch_id: 1,
+        timestamp: 0,
+        service_name: service.to_owned(),
+        service_method: method.to_owned(),
+        service_payload: payload.to_owned(),
+        events: Rc::new(RefCell::new(vec![])),
+    };
 
-impl MockRequestContext {
-    pub fn new(cycles_limit: u64) -> Self {
-        Self {
-            cycles_limit: Rc::new(RefCell::new(cycles_limit)),
-            method:       "method".to_owned(),
-            payload:      "payload".to_owned(),
-        }
-    }
-
-    pub fn with_method(cycles_limit: u64, method: &str, payload: &str) -> Self {
-        Self {
-            cycles_limit: Rc::new(RefCell::new(cycles_limit)),
-            method:       method.to_owned(),
-            payload:      payload.to_owned(),
-        }
-    }
-}
-
-impl RequestContext for MockRequestContext {
-    fn sub_cycles(&self, cycles: u64) -> ProtocolResult<()> {
-        self.cycles_limit.replace_with(|&mut old| old - cycles);
-        Ok(())
-    }
-
-    fn get_cycles_price(&self) -> u64 {
-        0
-    }
-
-    fn get_cycles_limit(&self) -> u64 {
-        *self.cycles_limit.borrow()
-    }
-
-    fn get_cycles_used(&self) -> u64 {
-        0
-    }
-
-    fn get_caller(&self) -> Address {
-        Address::from_hash(Hash::digest(Bytes::from("test"))).unwrap()
-    }
-
-    fn get_current_epoch_id(&self) -> u64 {
-        0
-    }
-
-    fn get_service_name(&self) -> &str {
-        "service"
-    }
-
-    fn get_service_method(&self) -> &str {
-        &self.method
-    }
-
-    fn get_timestamp(&self) -> u64 {
-        0
-    }
-
-    fn get_payload(&self) -> &str {
-        &self.payload
-    }
-
-    fn emit_event(&self, _message: String) -> ProtocolResult<()> {
-        unimplemented!()
-    }
+    ServiceContext::new(params)
 }
 
 struct MockServiceSDK;

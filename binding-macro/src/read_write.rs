@@ -5,9 +5,7 @@ use syn::{
     parse_macro_input, FnArg, Generics, ImplItemMethod, ReturnType, Token, Type, Visibility,
 };
 
-use crate::common::{
-    arg_is_request_context, get_bounds_name_of_request_context, get_protocol_result_args,
-};
+use crate::common::get_protocol_result_args;
 
 pub fn verify_read_or_write(item: TokenStream, mutable: bool) -> TokenStream {
     let method_item = parse_macro_input!(item as ImplItemMethod);
@@ -33,9 +31,9 @@ fn verify_visibiity(visibility: &Visibility) {
     };
 }
 
-fn verify_inputs(inputs: &Punctuated<FnArg, Token![,]>, generics: &Generics, mutable: bool) {
+fn verify_inputs(inputs: &Punctuated<FnArg, Token![,]>, _generics: &Generics, mutable: bool) {
     if inputs.len() < 2 {
-        panic!("The two required parameters are missing: `&self/&mut self` and `RequestContext`.")
+        panic!("The two required parameters are missing: `&self/&mut self` and `ServiceContext`.")
     }
 
     if mutable {
@@ -44,11 +42,6 @@ fn verify_inputs(inputs: &Punctuated<FnArg, Token![,]>, generics: &Generics, mut
         }
     } else if !arg_is_inmutable_receiver(&inputs[0]) {
         panic!("The receiver must be `&self`.")
-    }
-
-    let request_bound_name = get_bounds_name_of_request_context(generics).expect("");
-    if !arg_is_request_context(&inputs[1], &request_bound_name) {
-        panic!("The first parameter to read/write must be RequestContext")
     }
 }
 

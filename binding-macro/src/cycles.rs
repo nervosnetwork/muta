@@ -7,7 +7,7 @@ use syn::{
     ReturnType, Token, Visibility,
 };
 
-use crate::common::{get_bounds_name_of_request_context, get_request_context_pat};
+use crate::common::get_request_context_pat;
 
 #[derive(Debug)]
 struct Cycles {
@@ -68,18 +68,13 @@ pub fn gen_cycles_code(attr: TokenStream, item: TokenStream) -> TokenStream {
     let body = &fn_item.body;
     let generics = &fn_item.generics;
 
-    // Extract the name of the trait bound.
-    // eg. fn <Context: RequestContext> The bound name is Context.
-    let request_bound_name = get_bounds_name_of_request_context(generics)
-        .expect("The bound for RequestContext could not be found");
-
-    let request_pat = find_request_ident(&request_bound_name, inputs)
-        .expect("The first parameter to read/write must be RequestContext");
+    let request_pat = find_request_ident("ServiceContext", inputs)
+        .expect("The first parameter to read/write must be ServiceContext");
 
     // Extract the variable name of the RequestContext.
     let request_ident = match request_pat {
         Pat::Ident(pat_ident) => pat_ident.ident,
-        _ => panic!("Make sure the RequestContext declaration is ctx: RequestContext."),
+        _ => panic!("Make sure the RequestContext declaration is ctx: ServiceContext."),
     };
 
     let cycles_value = cycles.value;
