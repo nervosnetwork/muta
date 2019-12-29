@@ -279,37 +279,6 @@ where
             pin_ef: PhantomData,
             status: status_agent,
         }
-        Ok(())
-    }
-
-    async fn save_receipts(&self, receipts: Vec<Receipt>) -> ProtocolResult<()> {
-        self.storage.insert_receipts(receipts).await
-    }
-}
-
-fn gen_update_info(
-    exec_resp: ExecutorExecResp,
-    epoch_id: u64,
-    order_root: MerkleRoot,
-) -> UpdateInfo {
-    let cycles = exec_resp.all_cycles_used.iter().map(|fee| fee.cycle).sum();
-    let receipt = Merkle::from_hashes(
-        exec_resp
-            .receipts
-            .iter()
-            .map(|r| Hash::digest(r.to_owned().encode_fixed().unwrap()))
-            .collect::<Vec<_>>(),
-    )
-    .get_root_hash()
-    .unwrap_or_else(Hash::from_empty);
-
-    UpdateInfo {
-        exec_epoch_id: epoch_id,
-        cycles_used:   cycles,
-        receipt_root:  receipt,
-        confirm_root:  order_root,
-        state_root:    exec_resp.state_root.clone(),
-        logs_bloom:    exec_resp.logs_bloom,
     }
 
     pub async fn run(mut self) {
