@@ -2,7 +2,7 @@ use std::error::Error;
 
 use derive_more::{Display, From};
 use futures::channel::oneshot::Sender;
-use protocol::{traits::Priority, types::Address, Bytes};
+use protocol::{traits::Priority, types::UserAddress, Bytes};
 use tentacle::{
     multiaddr::Multiaddr,
     secio::{PeerId, PublicKey},
@@ -79,7 +79,7 @@ pub enum RemoveKind {
 #[derive(Debug, Display)]
 #[display(fmt = "multi users message, addrs: {:?}", user_addrs)]
 pub struct MultiUsersMessage {
-    pub user_addrs: Vec<Address>,
+    pub user_addrs: Vec<UserAddress>,
     pub msg:        Bytes,
     pub pri:        Priority,
 }
@@ -165,6 +165,6 @@ pub enum PeerManagerEvent {
     #[display(fmt = "try route multi accounts message: {}", users_msg)]
     RouteMultiUsersMessage {
         users_msg: MultiUsersMessage,
-        miss_tx:   Sender<Vec<Address>>,
+        miss_tx:   Sender<Vec<UserAddress>>,
     },
 }

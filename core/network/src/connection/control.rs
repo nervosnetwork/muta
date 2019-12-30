@@ -3,7 +3,7 @@ use std::{io, marker::PhantomData};
 use async_trait::async_trait;
 use futures::channel::{mpsc::UnboundedSender, oneshot};
 use log::debug;
-use protocol::{traits::Priority, types::Address, Bytes};
+use protocol::{traits::Priority, types::UserAddress, Bytes};
 use tentacle::{
     error::Error as TentacleError,
     service::{ServiceControl, TargetSession},
@@ -70,7 +70,7 @@ impl<P: NetworkProtocol> MessageSender for ConnectionServiceControl<P> {
 
     async fn users_send(
         &self,
-        user_addrs: Vec<Address>,
+        user_addrs: Vec<UserAddress>,
         msg: Bytes,
         pri: Priority,
     ) -> Result<(), NetworkError> {

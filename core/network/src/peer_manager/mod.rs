@@ -35,7 +35,7 @@ use futures::{
 };
 use log::{debug, error, info, warn};
 use parking_lot::RwLock;
-use protocol::types::Address;
+use protocol::types::UserAddress;
 use rand::seq::IteratorRandom;
 use tentacle::{
     multiaddr::{Multiaddr, Protocol},
@@ -121,7 +121,7 @@ struct Inner {
     connected:  RwLock<HashSet<PeerId>>,
 
     addr_pid: RwLock<HashMap<Multiaddr, PeerId>>,
-    user_pid: RwLock<HashMap<Address, PeerId>>,
+    user_pid: RwLock<HashMap<UserAddress, PeerId>>,
     pool:     RwLock<HashMap<PeerId, Peer>>,
 
     // Self PeerId
@@ -169,14 +169,14 @@ impl Inner {
         self.listen.read().clone()
     }
 
-    pub fn user_peer(&self, user: &Address) -> Option<Peer> {
+    pub fn user_peer(&self, user: &UserAddress) -> Option<Peer> {
         let user_pid = self.user_pid.read();
         let pool = self.pool.read();
 
         user_pid.get(user).and_then(|pid| pool.get(pid).cloned())
     }
 
-    pub fn pid_user_addr(&self, pid: &PeerId) -> Option<Address> {
+    pub fn pid_user_addr(&self, pid: &PeerId) -> Option<UserAddress> {
         let pool = self.pool.read();
 
         pool.get(pid).map(|peer| peer.user_addr().clone())
@@ -802,7 +802,7 @@ impl PeerManager {
     fn route_multi_users_message(
         &mut self,
         users_msg: MultiUsersMessage,
-        miss_tx: oneshot::Sender<Vec<Address>>,
+        miss_tx: oneshot::Sender<Vec<UserAddress>>,
     ) {
         let mut no_peers = vec![];
         let mut connected = vec![];

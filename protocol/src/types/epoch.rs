@@ -1,6 +1,6 @@
 use bytes::Bytes;
 
-use crate::types::{Address, Bloom, Hash, MerkleRoot};
+use crate::types::{Bloom, Hash, MerkleRoot, UserAddress};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Epoch {
@@ -20,7 +20,7 @@ pub struct EpochHeader {
     pub state_root:        MerkleRoot,
     pub receipt_root:      Vec<MerkleRoot>,
     pub cycles_used:       Vec<u64>,
-    pub proposer:          Address,
+    pub proposer:          UserAddress,
     pub proof:             Proof,
     pub validator_version: u64,
     pub validators:        Vec<Validator>,
@@ -37,7 +37,7 @@ pub struct Proof {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Validator {
-    pub address:        Address,
+    pub address:        UserAddress,
     pub propose_weight: u8,
     pub vote_weight:    u8,
 }

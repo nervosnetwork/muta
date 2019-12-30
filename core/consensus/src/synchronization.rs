@@ -9,9 +9,9 @@ use log::{error, warn};
 use overlord::types::{OverlordMsg, Status};
 use overlord::OverlordHandler;
 
-use protocol::fixed_codec::FixedCodec;
+use protocol::fixed_codec::ProtocolFixedCodec;
 use protocol::traits::ConsensusAdapter;
-use protocol::types::{Hash, Proof};
+use protocol::types::{Address, Hash, Proof};
 use protocol::ProtocolResult;
 
 use crate::engine::ConsensusEngine;
@@ -103,8 +103,7 @@ where
                 .exec(
                     epoch.header.order_root.clone(),
                     epoch.header.epoch_id,
-                    epoch.header.proposer.clone(),
-                    epoch.header.timestamp,
+                    Address::User(epoch.header.proposer.clone()),
                     txs.clone(),
                 )
                 .await?;

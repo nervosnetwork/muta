@@ -1,4 +1,4 @@
-use crate::schema::{Address, Bytes, Hash, MerkleRoot, Uint64};
+use crate::schema::{Address, Hash, MerkleRoot, Uint64};
 
 #[derive(GraphQLObject, Clone)]
 #[graphql(
@@ -39,28 +39,10 @@ pub struct EpochHeader {
     pub cycles_used:       Vec<Uint64>,
     #[graphql(description = "The address descirbed who packed the epoch")]
     pub proposer:          Address,
-    pub proof:             Proof,
+    // proof:             Proof,
     #[graphql(description = "The version of validator is designed for cross chain")]
     pub validator_version: Uint64,
-    pub validators:        Vec<Validator>,
-}
-
-#[derive(GraphQLObject, Clone)]
-#[graphql(description = "The verifier of the epoch header proved")]
-pub struct Proof {
-    pub epoch_id:   Uint64,
-    pub round:      Uint64,
-    pub epoch_hash: Hash,
-    pub signature:  Bytes,
-    pub bitmap:     Bytes,
-}
-
-#[derive(GraphQLObject, Clone)]
-#[graphql(description = "Validator address set")]
-pub struct Validator {
-    pub address:        Address,
-    pub propose_weight: i32,
-    pub vote_weight:    i32,
+    // validators:        Vec<Validator>,
 }
 
 impl From<protocol::types::EpochHeader> for EpochHeader {
@@ -87,14 +69,8 @@ impl From<protocol::types::EpochHeader> for EpochHeader {
                 .into_iter()
                 .map(Uint64::from)
                 .collect(),
-            proposer:          Address::from(epoch_header.proposer),
-            proof:             Proof::from(epoch_header.proof),
+            proposer:          Address::from(protocol::types::Address::User(epoch_header.proposer)),
             validator_version: Uint64::from(epoch_header.validator_version),
-            validators:        epoch_header
-                .validators
-                .into_iter()
-                .map(Validator::from)
-                .collect(),
         }
     }
 }
@@ -108,28 +84,6 @@ impl From<protocol::types::Epoch> for Epoch {
                 .into_iter()
                 .map(MerkleRoot::from)
                 .collect(),
-        }
-    }
-}
-
-impl From<protocol::types::Proof> for Proof {
-    fn from(proof: protocol::types::Proof) -> Self {
-        Proof {
-            epoch_id:   Uint64::from(proof.epoch_id),
-            round:      Uint64::from(proof.round),
-            epoch_hash: Hash::from(proof.epoch_hash),
-            signature:  Bytes::from(proof.signature),
-            bitmap:     Bytes::from(proof.bitmap),
-        }
-    }
-}
-
-impl From<protocol::types::Validator> for Validator {
-    fn from(validator: protocol::types::Validator) -> Self {
-        Validator {
-            address:        Address::from(validator.address),
-            propose_weight: validator.vote_weight as i32,
-            vote_weight:    validator.vote_weight as i32,
         }
     }
 }

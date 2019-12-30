@@ -134,8 +134,6 @@ pub struct ExecuteInfo {
     pub order_root:   MerkleRoot,
     pub cycles_price: u64,
     pub coinbase:     Address,
-    pub timestamp:    u64,
-    pub cycles_limit: u64,
 }
 
 #[cfg(test)]
@@ -174,7 +172,7 @@ mod test {
             BlsPublicKey::aggregate(sigs_and_pub_keys.iter().map(|s| &s.1).collect::<Vec<_>>());
 
         let res = signature.verify(&hash, &aggregate_key, &"muta".into());
-        assert_eq!(res.is_ok(), true);
+        println!("{:?}", res);
         assert!(signature
             .verify(&hash, &aggregate_key, &"muta".into())
             .is_ok());

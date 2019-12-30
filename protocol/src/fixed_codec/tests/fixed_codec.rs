@@ -2,7 +2,7 @@ extern crate test;
 
 use test::Bencher;
 
-use crate::fixed_codec::FixedCodec;
+use crate::fixed_codec::ProtocolFixedCodec;
 use crate::types;
 
 use super::*;
@@ -17,39 +17,27 @@ macro_rules! test_eq {
 }
 
 #[test]
-fn test_fixed_codec_primitive() {
-    let bs = true.encode_fixed().unwrap();
-    assert_eq!(<bool as FixedCodec>::decode_fixed(bs).unwrap(), true);
-
-    let bs = false.encode_fixed().unwrap();
-    assert_eq!(<bool as FixedCodec>::decode_fixed(bs).unwrap(), false);
-
-    let bs = 0u8.encode_fixed().unwrap();
-    assert_eq!(<u8 as FixedCodec>::decode_fixed(bs).unwrap(), 0u8);
-
-    let bs = 8u8.encode_fixed().unwrap();
-    assert_eq!(<u8 as FixedCodec>::decode_fixed(bs).unwrap(), 8u8);
-
-    let bs = 8u32.encode_fixed().unwrap();
-    assert_eq!(<u32 as FixedCodec>::decode_fixed(bs).unwrap(), 8u32);
-
-    let bs = 8u64.encode_fixed().unwrap();
-    assert_eq!(<u64 as FixedCodec>::decode_fixed(bs).unwrap(), 8u64);
-
-    let bs = "test".to_owned().encode_fixed().unwrap();
-    assert_eq!(
-        <String as FixedCodec>::decode_fixed(bs).unwrap(),
-        "test".to_owned()
-    );
-}
-
-#[test]
 fn test_fixed_codec() {
+    test_eq!(primitive, Fee, mock_fee);
     test_eq!(primitive, Hash, mock_hash);
+    test_eq!(primitive, Asset, mock_asset);
+    test_eq!(primitive, UserAddress, mock_account_address);
+    test_eq!(primitive, ContractAddress, mock_contract_address);
+    test_eq!(primitive, Account, mock_account_user);
+    test_eq!(primitive, Account, mock_account_contract);
 
-    test_eq!(transaction, RawTransaction, mock_raw_tx);
+    test_eq!(transaction, RawTransaction, mock_raw_tx, AType::Transfer);
+    test_eq!(transaction, RawTransaction, mock_raw_tx, AType::Deploy);
+    test_eq!(transaction, RawTransaction, mock_raw_tx, AType::Call);
 
-    test_eq!(transaction, SignedTransaction, mock_sign_tx);
+    test_eq!(
+        transaction,
+        SignedTransaction,
+        mock_sign_tx,
+        AType::Transfer
+    );
+    test_eq!(transaction, SignedTransaction, mock_sign_tx, AType::Deploy);
+    test_eq!(transaction, SignedTransaction, mock_sign_tx, AType::Call);
 
     test_eq!(epoch, Proof, mock_proof);
     test_eq!(epoch, EpochHeader, mock_epoch_header);
@@ -58,16 +46,18 @@ fn test_fixed_codec() {
     test_eq!(epoch, Validator, mock_validator);
     test_eq!(epoch, EpochId, mock_epoch_id);
 
-    test_eq!(receipt, Receipt, mock_receipt);
-    test_eq!(receipt, Receipt, mock_receipt);
-    test_eq!(receipt, Receipt, mock_receipt);
-    test_eq!(receipt, Receipt, mock_receipt);
+    test_eq!(receipt, Receipt, mock_receipt, ReceiptType::Transfer);
+    test_eq!(receipt, Receipt, mock_receipt, ReceiptType::Deploy);
+    test_eq!(receipt, Receipt, mock_receipt, ReceiptType::Call);
+    test_eq!(receipt, Receipt, mock_receipt, ReceiptType::Fail);
+
+    test_eq!(genesis, Genesis, mock_genesis);
 }
 
 #[test]
 fn test_signed_tx_serialize_size() {
     let txs: Vec<Bytes> = (0..50_000)
-        .map(|_| mock_sign_tx().encode_fixed().unwrap())
+        .map(|_| mock_sign_tx(AType::Transfer).encode_fixed().unwrap())
         .collect();
     let size = &txs.iter().fold(0, |acc, x| acc + x.len());
     println!("1 tx size {:?}", txs[1].len());
@@ -76,7 +66,7 @@ fn test_signed_tx_serialize_size() {
 
 #[bench]
 fn bench_signed_tx_serialize(b: &mut Bencher) {
-    let txs: Vec<SignedTransaction> = (0..50_000).map(|_| mock_sign_tx()).collect();
+    let txs: Vec<SignedTransaction> = (0..50_000).map(|_| mock_sign_tx(AType::Transfer)).collect();
     b.iter(|| {
         txs.iter().for_each(|signed_tx| {
             signed_tx.encode_fixed().unwrap();
@@ -87,7 +77,7 @@ fn bench_signed_tx_serialize(b: &mut Bencher) {
 #[bench]
 fn bench_signed_tx_deserialize(b: &mut Bencher) {
     let txs: Vec<Bytes> = (0..50_000)
-        .map(|_| mock_sign_tx().encode_fixed().unwrap())
+        .map(|_| mock_sign_tx(AType::Transfer).encode_fixed().unwrap())
         .collect();
 
     b.iter(|| {

@@ -23,7 +23,7 @@ use log::{debug, error};
 
 use common_crypto::Crypto;
 use protocol::{
-    fixed_codec::FixedCodec,
+    fixed_codec::ProtocolFixedCodec,
     traits::{Context, Gossip, MemPoolAdapter, Priority, Rpc, Storage},
     types::{Hash, SignedTransaction},
     ProtocolError, ProtocolErrorKind, ProtocolResult,
@@ -336,7 +336,7 @@ mod tests {
 
     use protocol::{
         traits::{Context, Gossip, MessageCodec, Priority},
-        types::Address,
+        types::UserAddress,
         Bytes, ProtocolResult,
     };
 
@@ -394,7 +394,7 @@ mod tests {
             &self,
             _: Context,
             _: &str,
-            _: Vec<Address>,
+            _: Vec<UserAddress>,
             _: M,
             _: Priority,
         ) -> ProtocolResult<()>

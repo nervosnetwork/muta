@@ -28,12 +28,25 @@ fn test_codec() {
     test!(primitive, Balance, mock_balance);
     test!(primitive, Hash, mock_hash);
     test!(primitive, MerkleRoot, mock_merkle_root);
+    test!(primitive, AssetID, mock_asset_id);
+    test!(primitive, UserAddress, mock_account_address);
+    test!(primitive, ContractAddress, mock_contract_address);
+    test!(primitive, Asset, mock_asset);
+    test!(primitive, Fee, mock_fee);
 
-    test!(receipt, Receipt, mock_receipt);
+    test!(receipt, ReceiptResult, mock_result, ReceiptType::Transfer);
+    test!(receipt, ReceiptResult, mock_result, ReceiptType::Approve);
+    test!(receipt, ReceiptResult, mock_result, ReceiptType::Deploy);
+    test!(receipt, ReceiptResult, mock_result, ReceiptType::Call);
+    test!(receipt, ReceiptResult, mock_result, ReceiptType::Fail);
+    test!(receipt, Receipt, mock_receipt, ReceiptType::Transfer);
 
-    test!(transaction, TransactionRequest, mock_transaction_request);
-    test!(transaction, RawTransaction, mock_raw_tx);
-    test!(transaction, SignedTransaction, mock_sign_tx);
+    test!(transaction, TransactionAction, mock_action, AType::Transfer);
+    test!(transaction, TransactionAction, mock_action, AType::Approve);
+    test!(transaction, TransactionAction, mock_action, AType::Deploy);
+    test!(transaction, TransactionAction, mock_action, AType::Call);
+    test!(transaction, RawTransaction, mock_raw_tx, AType::Approve);
+    test!(transaction, SignedTransaction, mock_sign_tx, AType::Deploy);
 
     test!(epoch, Validator, mock_validator);
     test!(epoch, Proof, mock_proof);
@@ -46,7 +59,7 @@ fn test_codec() {
 #[test]
 fn test_signed_tx_serialize_size() {
     let txs: Vec<Bytes> = (0..50_000)
-        .map(|_| mock_sign_tx().encode_sync().unwrap())
+        .map(|_| mock_sign_tx(AType::Transfer).encode_sync().unwrap())
         .collect();
     let size = &txs.iter().fold(0, |acc, x| acc + x.len());
     println!("1 tx size {:?}", txs[1].len());
@@ -55,7 +68,7 @@ fn test_signed_tx_serialize_size() {
 
 #[bench]
 fn bench_signed_tx_serialize(b: &mut Bencher) {
-    let txs: Vec<SignedTransaction> = (0..50_000).map(|_| mock_sign_tx()).collect();
+    let txs: Vec<SignedTransaction> = (0..50_000).map(|_| mock_sign_tx(AType::Transfer)).collect();
     b.iter(|| {
         txs.iter().for_each(|signed_tx| {
             signed_tx.encode_sync().unwrap();
@@ -66,7 +79,7 @@ fn bench_signed_tx_serialize(b: &mut Bencher) {
 #[bench]
 fn bench_signed_tx_deserialize(b: &mut Bencher) {
     let txs: Vec<Bytes> = (0..50_000)
-        .map(|_| mock_sign_tx().encode_sync().unwrap())
+        .map(|_| mock_sign_tx(AType::Transfer).encode_sync().unwrap())
         .collect();
 
     b.iter(|| {
