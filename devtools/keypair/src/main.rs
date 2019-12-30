@@ -10,7 +10,7 @@ use serde::Serialize;
 use tentacle_secio::SecioKeyPair;
 
 use common_crypto::{BlsPrivateKey, PublicKey, ToBlsPublicKey};
-use protocol::types::{Hash, Address};
+use protocol::types::{Address, Hash};
 use protocol::BytesMut;
 
 #[derive(Default, Serialize, Debug)]
