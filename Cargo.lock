@@ -503,6 +503,7 @@ dependencies = [
  "textwrap",
  "unicode-width",
  "vec_map",
+ "yaml-rust 0.3.5",
 ]
 
 [[package]]
@@ -1754,10 +1755,13 @@ dependencies = [
 name = "keypair"
 version = "0.1.0"
 dependencies = [
+ "clap",
  "common-crypto",
  "hex 0.4.0",
  "protocol",
  "rand 0.7.2",
+ "serde",
+ "serde_json",
  "tentacle-secio 0.1.11",
 ]
 
@@ -3176,7 +3180,7 @@ dependencies = [
  "dtoa",
  "linked-hash-map",
  "serde",
- "yaml-rust",
+ "yaml-rust 0.4.3",
 ]
 
 [[package]]
@@ -4220,6 +4224,12 @@ checksum = "ff8eaee9d17062850f1e6163b509947969242990ee59a35801af437abe041e70"
 dependencies = [
  "xml-rs",
 ]
+
+[[package]]
+name = "yaml-rust"
+version = "0.3.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e66366e18dc58b46801afbf2ca7661a9f59cc8c5962c29892b6039b4f86fa992"
 
 [[package]]
 name = "yaml-rust"

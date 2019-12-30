@@ -13,3 +13,6 @@ protocol = { path = "../../protocol" }
 hex = "0.4"
 rand = "0.7"
 tentacle-secio = { version = "0.1", features = [ "flatc" ] }
+clap = { version = "2.33", features = ["yaml"] }
+serde = {version = "1.0", features = ["derive"]}
+serde_json = "1.0"
