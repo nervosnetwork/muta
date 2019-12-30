@@ -10,14 +10,10 @@ edition = "2018"
 protocol = { path = "../../protocol" }
 common-crypto = { path = "../../common/crypto"}
 
-http-service = "0.4"
-http = "0.2"
-tide = "0.5"
-juniper = "0.14"
-juniper_codegen = "0.14"
+http = "0.1"
+tide = { git = "https://github.com/rustasync/tide", rev = "af0b900" }
+juniper = "0.13"
+juniper_codegen = "0.13"
 async-trait = "0.1"
 hex = "0.3"
 futures = "0.3"
-derive_more = "0.15"
-cita_trie = "2.0"
-bytes = "0.5"

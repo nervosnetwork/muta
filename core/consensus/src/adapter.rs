@@ -8,14 +8,15 @@ use futures::stream::StreamExt;
 use log::{debug, error};
 
 use common_merkle::Merkle;
+use protocol::traits::executor::{ExecutorExecResp, ExecutorFactory, TrieDB};
 use protocol::traits::{
-    ConsensusAdapter, Context, ExecutorFactory, ExecutorParams, ExecutorResp, Gossip, MemPool,
-    MessageTarget, MixedTxHashes, NodeInfo, Priority, Rpc, ServiceMapping, Storage,
+    ConsensusAdapter, Context, Gossip, MemPool, MessageTarget, MixedTxHashes, NodeInfo, Priority,
+    Rpc, Storage,
 };
 use protocol::types::{
     Address, Epoch, Hash, MerkleRoot, Proof, Receipt, SignedTransaction, Validator,
 };
-use protocol::{fixed_codec::FixedCodec, ProtocolResult};
+use protocol::{fixed_codec::ProtocolFixedCodec, ProtocolResult};
 
 use crate::fixed_types::{FixedEpoch, FixedEpochID, FixedSignedTxs, PullTxsRequest};
 use crate::status::{CurrentStatusAgent, UpdateInfo};
@@ -25,13 +26,12 @@ use crate::ConsensusError;
 const OVERLORD_GAP: usize = 10;
 
 pub struct OverlordConsensusAdapter<
-    EF: ExecutorFactory<DB, S, Mapping>,
+    EF: ExecutorFactory<DB>,
     G: Gossip,
     M: MemPool,
     R: Rpc,
     S: Storage,
-    DB: cita_trie::DB,
-    Mapping: ServiceMapping,
+    DB: TrieDB,
 > {
     rpc:     Arc<R>,
     network: Arc<G>,
@@ -39,20 +39,18 @@ pub struct OverlordConsensusAdapter<
     storage: Arc<S>,
 
     exec_queue:  Sender<ExecuteInfo>,
-    exec_demons: Option<ExecDemons<S, DB, EF, Mapping>>,
+    exec_demons: Option<ExecDemons<S, DB, EF>>,
 }
 
 #[async_trait]
-impl<EF, G, M, R, S, DB, Mapping> ConsensusAdapter
-    for OverlordConsensusAdapter<EF, G, M, R, S, DB, Mapping>
+impl<EF, G, M, R, S, DB> ConsensusAdapter for OverlordConsensusAdapter<EF, G, M, R, S, DB>
 where
-    EF: ExecutorFactory<DB, S, Mapping>,
+    EF: ExecutorFactory<DB>,
     G: Gossip + Sync + Send,
     R: Rpc + Sync + Send,
     M: MemPool,
     S: Storage,
-    DB: cita_trie::DB,
-    Mapping: ServiceMapping,
+    DB: TrieDB,
 {
     async fn get_txs_from_mempool(
         &self,
@@ -109,8 +107,6 @@ where
         cycles_price: u64,
         coinbase: Address,
         signed_txs: Vec<SignedTransaction>,
-        cycles_limit: u64,
-        timestamp: u64,
     ) -> ProtocolResult<()> {
         let chain_id = node_info.chain_id;
         let exec_info = ExecuteInfo {
@@ -120,8 +116,6 @@ where
             signed_txs,
             order_root,
             coinbase,
-            cycles_limit,
-            timestamp,
         };
 
         let mut tx = self.exec_queue.clone();
@@ -197,15 +191,14 @@ where
     }
 }
 
-impl<EF, G, M, R, S, DB, Mapping> OverlordConsensusAdapter<EF, G, M, R, S, DB, Mapping>
+impl<EF, G, M, R, S, DB> OverlordConsensusAdapter<EF, G, M, R, S, DB>
 where
-    EF: ExecutorFactory<DB, S, Mapping>,
+    EF: ExecutorFactory<DB>,
     G: Gossip + Sync + Send,
     R: Rpc + Sync + Send,
     M: MemPool,
     S: Storage,
-    DB: cita_trie::DB,
-    Mapping: ServiceMapping,
+    DB: TrieDB,
 {
     pub fn new(
         rpc: Arc<R>,
@@ -213,7 +206,6 @@ where
         mempool: Arc<M>,
         storage: Arc<S>,
         trie_db: Arc<DB>,
-        service_mapping: Arc<Mapping>,
         status_agent: CurrentStatusAgent,
         state_root: MerkleRoot,
     ) -> Self {
@@ -221,7 +213,6 @@ where
         let exec_demons = Some(ExecDemons::new(
             Arc::clone(&storage),
             trie_db,
-            service_mapping,
             rx,
             status_agent,
             state_root,
@@ -237,17 +228,16 @@ where
         }
     }
 
-    pub fn take_exec_demon(&mut self) -> ExecDemons<S, DB, EF, Mapping> {
+    pub fn take_exec_demon(&mut self) -> ExecDemons<S, DB, EF> {
         assert!(self.exec_demons.is_some());
         self.exec_demons.take().unwrap()
     }
 }
 
 #[derive(Debug)]
-pub struct ExecDemons<S, DB, EF, Mapping> {
-    storage:         Arc<S>,
-    trie_db:         Arc<DB>,
-    service_mapping: Arc<Mapping>,
+pub struct ExecDemons<S, DB, EF> {
+    storage: Arc<S>,
+    trie_db: Arc<DB>,
 
     pin_ef:     PhantomData<EF>,
     queue:      Receiver<ExecuteInfo>,
@@ -255,17 +245,15 @@ pub struct ExecDemons<S, DB, EF, Mapping> {
     status:     CurrentStatusAgent,
 }
 
-impl<S, DB, EF, Mapping> ExecDemons<S, DB, EF, Mapping>
+impl<S, DB, EF> ExecDemons<S, DB, EF>
 where
     S: Storage,
-    DB: cita_trie::DB,
-    EF: ExecutorFactory<DB, S, Mapping>,
-    Mapping: ServiceMapping,
+    DB: TrieDB,
+    EF: ExecutorFactory<DB>,
 {
     fn new(
         storage: Arc<S>,
         trie_db: Arc<DB>,
-        service_mapping: Arc<Mapping>,
         rx: Receiver<ExecuteInfo>,
         status_agent: CurrentStatusAgent,
         state_root: MerkleRoot,
@@ -273,7 +261,6 @@ where
         ExecDemons {
             storage,
             trie_db,
-            service_mapping,
             state_root,
             queue: rx,
             pin_ef: PhantomData,
@@ -297,18 +284,15 @@ where
 
             error!("muta-consensus: execute {} epoch", epoch_id);
             let mut executor = EF::from_root(
+                info.chain_id.clone(),
                 self.state_root.clone(),
                 Arc::clone(&self.trie_db),
-                Arc::clone(&self.storage),
-                Arc::clone(&self.service_mapping),
+                info.epoch_id,
+                info.cycles_price,
+                info.coinbase,
             )?;
-            let exec_params = ExecutorParams {
-                state_root: self.state_root.clone(),
-                epoch_id,
-                timestamp: info.timestamp,
-                cycels_limit: info.cycles_limit,
-            };
-            let resp = executor.exec(&exec_params, &txs)?;
+
+            let resp = executor.exec(txs)?;
             self.state_root = resp.state_root.clone();
             self.save_receipts(resp.receipts.clone()).await?;
             self.status
@@ -324,9 +308,12 @@ where
     }
 }
 
-fn gen_update_info(exec_resp: ExecutorResp, epoch_id: u64, order_root: MerkleRoot) -> UpdateInfo {
-    let cycles = exec_resp.all_cycles_used;
-
+fn gen_update_info(
+    exec_resp: ExecutorExecResp,
+    epoch_id: u64,
+    order_root: MerkleRoot,
+) -> UpdateInfo {
+    let cycles = exec_resp.all_cycles_used.iter().map(|fee| fee.cycle).sum();
     let receipt = Merkle::from_hashes(
         exec_resp
             .receipts

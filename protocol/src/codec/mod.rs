@@ -70,9 +70,6 @@ pub enum CodecError {
 
     #[display(fmt = "wrong bytes length: {{ expect: {}, got: {} }}", expect, real)]
     WrongBytesLength { expect: usize, real: usize },
-
-    #[display(fmt = "from string {}", _0)]
-    FromStringUtf8(std::string::FromUtf8Error),
 }
 
 impl Error for CodecError {}

@@ -1,25 +1,85 @@
 use std::convert::TryFrom;
 
 use bytes::Bytes;
-use prost::Message;
+use prost::{Message, Oneof};
 
 use crate::{
-    codec::{primitive::Hash, CodecError, ProtocolCodecSync},
+    codec::{
+        primitive::{AssetID, Balance, ContractAddress, ContractType, Fee, Hash, UserAddress},
+        CodecError, ProtocolCodecSync,
+    },
     field, impl_default_bytes_codec_for,
     types::primitive as protocol_primitive,
     ProtocolError, ProtocolResult,
 };
 
 #[derive(Clone, Message)]
-pub struct TransactionRequest {
+pub struct CarryingAsset {
+    #[prost(message, tag = "1")]
+    pub asset_id: Option<AssetID>,
+
+    #[prost(message, tag = "2")]
+    pub amount: Option<Balance>,
+}
+
+#[derive(Clone, Message)]
+pub struct Transfer {
+    #[prost(message, tag = "1")]
+    pub receiver: Option<UserAddress>,
+
+    #[prost(message, tag = "2")]
+    pub carrying_asset: Option<CarryingAsset>,
+}
+
+#[derive(Clone, Message)]
+pub struct Approve {
+    #[prost(message, tag = "1")]
+    pub spender: Option<ContractAddress>,
+
+    #[prost(message, tag = "2")]
+    pub asset_id: Option<AssetID>,
+
+    #[prost(message, tag = "3")]
+    pub max: Option<Balance>,
+}
+
+#[derive(Clone, Message)]
+pub struct Deploy {
     #[prost(bytes, tag = "1")]
-    pub service_name: Vec<u8>,
+    pub code: Vec<u8>,
 
-    #[prost(bytes, tag = "2")]
-    pub method: Vec<u8>,
+    #[prost(enumeration = "ContractType", tag = "2")]
+    pub contract_type: i32,
+}
 
-    #[prost(bytes, tag = "3")]
-    pub payload: Vec<u8>,
+#[derive(Clone, Message)]
+pub struct Call {
+    #[prost(message, tag = "1")]
+    pub contract: Option<ContractAddress>,
+
+    #[prost(string, tag = "2")]
+    pub method: String,
+
+    #[prost(bytes, repeated, tag = "3")]
+    pub args: Vec<Vec<u8>>,
+
+    #[prost(message, tag = "4")]
+    pub carrying_asset: Option<CarryingAsset>,
+}
+
+#[derive(Clone, Oneof)]
+pub enum TransactionAction {
+    #[prost(message, tag = "5")]
+    Transfer(Transfer),
+
+    #[prost(message, tag = "6")]
+    Approve(Approve),
+
+    #[prost(message, tag = "7")]
+    Deploy(Deploy),
+
+    #[prost(message, tag = "8")]
+    Call(Call),
 }
 
 #[derive(Clone, Message)]
@@ -33,14 +93,11 @@ pub struct RawTransaction {
     #[prost(uint64, tag = "3")]
     pub timeout: u64,
 
-    #[prost(uint64, tag = "4")]
-    pub cycles_price: u64,
+    #[prost(message, tag = "4")]
+    pub fee: Option<Fee>,
 
-    #[prost(uint64, tag = "5")]
-    pub cycles_limit: u64,
-
-    #[prost(message, tag = "6")]
-    pub request: Option<TransactionRequest>,
+    #[prost(oneof = "TransactionAction", tags = "5, 6, 7, 8")]
+    pub action: Option<TransactionAction>,
 }
 
 #[derive(Clone, Message)]
@@ -62,30 +119,173 @@ pub struct SignedTransaction {
 // Conversion
 // #################
 
+// CarryingAsset
+impl From<transaction::CarryingAsset> for CarryingAsset {
+    fn from(ca: transaction::CarryingAsset) -> CarryingAsset {
+        let asset_id = Some(AssetID::from(ca.asset_id));
+        let amount = Some(Balance::from(ca.amount));
+
+        CarryingAsset { asset_id, amount }
+    }
+}
+
+impl TryFrom<CarryingAsset> for transaction::CarryingAsset {
+    type Error = ProtocolError;
+
+    fn try_from(ca: CarryingAsset) -> Result<transaction::CarryingAsset, Self::Error> {
+        let asset_id = field!(ca.asset_id, "CarryingAsset", "asset_id")?;
+        let amount = field!(ca.amount, "CarryingAsset", "amount")?;
+
+        Ok(transaction::CarryingAsset {
+            asset_id: protocol_primitive::AssetID::try_from(asset_id)?,
+            amount:   protocol_primitive::Balance::try_from(amount)?,
+        })
+    }
+}
+
 // TransactionAction
 
-impl From<transaction::TransactionRequest> for TransactionRequest {
-    fn from(request: transaction::TransactionRequest) -> TransactionRequest {
-        TransactionRequest {
-            service_name: request.service_name.as_bytes().to_vec(),
-            method:       request.method.as_bytes().to_vec(),
-            payload:      request.payload.as_bytes().to_vec(),
+impl From<transaction::TransactionAction> for TransactionAction {
+    fn from(action: transaction::TransactionAction) -> TransactionAction {
+        match action {
+            transaction::TransactionAction::Transfer {
+                receiver,
+                carrying_asset,
+            } => {
+                let transfer = Transfer {
+                    receiver:       Some(UserAddress::from(receiver)),
+                    carrying_asset: Some(CarryingAsset {
+                        asset_id: Some(AssetID::from(carrying_asset.asset_id)),
+                        amount:   Some(Balance::from(carrying_asset.amount)),
+                    }),
+                };
+
+                TransactionAction::Transfer(transfer)
+            }
+            transaction::TransactionAction::Approve {
+                spender,
+                asset_id,
+                max,
+            } => {
+                let approve = Approve {
+                    spender:  Some(ContractAddress::from(spender)),
+                    asset_id: Some(AssetID::from(asset_id)),
+                    max:      Some(Balance::from(max)),
+                };
+
+                TransactionAction::Approve(approve)
+            }
+            transaction::TransactionAction::Deploy {
+                code,
+                contract_type,
+            } => {
+                let deploy = Deploy {
+                    code:          code.to_vec(),
+                    contract_type: contract_type as i32,
+                };
+
+                TransactionAction::Deploy(deploy)
+            }
+            transaction::TransactionAction::Call {
+                contract,
+                method,
+                args,
+                carrying_asset,
+            } => {
+                let args = args.into_iter().map(|arg| arg.to_vec()).collect::<Vec<_>>();
+
+                let call = Call {
+                    contract: Some(ContractAddress::from(contract)),
+                    method,
+                    args,
+                    carrying_asset: {
+                        if let Some(ca) = carrying_asset {
+                            Some(CarryingAsset {
+                                asset_id: Some(AssetID::from(ca.asset_id)),
+                                amount:   Some(Balance::from(ca.amount)),
+                            })
+                        } else {
+                            None
+                        }
+                    },
+                };
+
+                TransactionAction::Call(call)
+            }
         }
     }
 }
 
-impl TryFrom<TransactionRequest> for transaction::TransactionRequest {
+impl TryFrom<TransactionAction> for transaction::TransactionAction {
     type Error = ProtocolError;
 
-    fn try_from(
-        request: TransactionRequest,
-    ) -> Result<transaction::TransactionRequest, Self::Error> {
-        Ok(transaction::TransactionRequest {
-            service_name: String::from_utf8(request.service_name)
-                .map_err(CodecError::FromStringUtf8)?,
-            method:       String::from_utf8(request.method).map_err(CodecError::FromStringUtf8)?,
-            payload:      String::from_utf8(request.payload).map_err(CodecError::FromStringUtf8)?,
-        })
+    fn try_from(action: TransactionAction) -> Result<transaction::TransactionAction, Self::Error> {
+        match action {
+            TransactionAction::Transfer(transfer) => {
+                let receiver =
+                    field!(transfer.receiver, "TransactionAction::Transfer", "receiver")?;
+                let carrying_asset = field!(
+                    transfer.carrying_asset,
+                    "TransactionAction::Transfer",
+                    "carrying_asset"
+                )?;
+
+                let action = transaction::TransactionAction::Transfer {
+                    receiver:       protocol_primitive::UserAddress::try_from(receiver)?,
+                    carrying_asset: transaction::CarryingAsset::try_from(carrying_asset)?,
+                };
+
+                Ok(action)
+            }
+            TransactionAction::Approve(approve) => {
+                let spender = field!(approve.spender, "TransactionAction::Approve", "spender")?;
+                let asset_id = field!(approve.asset_id, "TransactionAction::Approve", "asset_id")?;
+                let max = field!(approve.max, "TransactionAction::Approve", "max")?;
+
+                let action = transaction::TransactionAction::Approve {
+                    spender:  protocol_primitive::ContractAddress::try_from(spender)?,
+                    asset_id: protocol_primitive::AssetID::try_from(asset_id)?,
+                    max:      protocol_primitive::Balance::try_from(max)?,
+                };
+
+                Ok(action)
+            }
+            TransactionAction::Deploy(deploy) => {
+                let contract_type = match deploy.contract_type {
+                    0 => protocol_primitive::ContractType::Asset,
+                    1 => protocol_primitive::ContractType::Library,
+                    2 => protocol_primitive::ContractType::App,
+                    _ => return Err(CodecError::InvalidContractType(deploy.contract_type).into()),
+                };
+
+                let action = transaction::TransactionAction::Deploy {
+                    code: Bytes::from(deploy.code),
+                    contract_type,
+                };
+
+                Ok(action)
+            }
+            TransactionAction::Call(call) => {
+                let contract = field!(call.contract, "TransactionAction::Call", "contract")?;
+                let args = call.args.into_iter();
+                let opt_carrying_asset = call.carrying_asset;
+
+                let action = transaction::TransactionAction::Call {
+                    contract:       protocol_primitive::ContractAddress::try_from(contract)?,
+                    method:         call.method,
+                    args:           args.map(Bytes::from).collect::<Vec<_>>(),
+                    carrying_asset: {
+                        if let Some(carrying_asset) = opt_carrying_asset {
+                            Some(transaction::CarryingAsset::try_from(carrying_asset)?)
+                        } else {
+                            None
+                        }
+                    },
+                };
+
+                Ok(action)
+            }
+        }
     }
 }
 
@@ -95,15 +295,15 @@ impl From<transaction::RawTransaction> for RawTransaction {
     fn from(raw: transaction::RawTransaction) -> RawTransaction {
         let chain_id = Some(Hash::from(raw.chain_id));
         let nonce = Some(Hash::from(raw.nonce));
-        let request = Some(TransactionRequest::from(raw.request));
+        let fee = Some(Fee::from(raw.fee));
+        let action = Some(TransactionAction::from(raw.action));
 
         RawTransaction {
             chain_id,
             nonce,
-            cycles_price: raw.cycles_price,
             timeout: raw.timeout,
-            cycles_limit: raw.cycles_limit,
-            request,
+            fee,
+            action,
         }
     }
 }
@@ -114,15 +314,15 @@ impl TryFrom<RawTransaction> for transaction::RawTransaction {
     fn try_from(raw: RawTransaction) -> Result<transaction::RawTransaction, Self::Error> {
         let chain_id = field!(raw.chain_id, "RawTransaction", "chain_id")?;
         let nonce = field!(raw.nonce, "RawTransaction", "nonce")?;
-        let request = field!(raw.request, "RawTransaction", "request")?;
+        let fee = field!(raw.fee, "RawTransaction", "fee")?;
+        let action = field!(raw.action, "RawTransaction", "action")?;
 
         let raw_tx = transaction::RawTransaction {
-            chain_id:     protocol_primitive::Hash::try_from(chain_id)?,
-            nonce:        protocol_primitive::Hash::try_from(nonce)?,
-            timeout:      raw.timeout,
-            cycles_price: raw.cycles_price,
-            cycles_limit: raw.cycles_limit,
-            request:      transaction::TransactionRequest::try_from(request)?,
+            chain_id: protocol_primitive::Hash::try_from(chain_id)?,
+            nonce:    protocol_primitive::Hash::try_from(nonce)?,
+            timeout:  raw.timeout,
+            fee:      protocol_primitive::Fee::try_from(fee)?,
+            action:   transaction::TransactionAction::try_from(action)?,
         };
 
         Ok(raw_tx)

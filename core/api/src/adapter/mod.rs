@@ -3,54 +3,34 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use protocol::traits::ExecutorFactory;
-use protocol::traits::{
-    APIAdapter, Context, ExecResp, ExecutorParams, MemPool, ServiceMapping, Storage,
-};
-use protocol::types::{Address, Epoch, Hash, Receipt, SignedTransaction, TransactionRequest};
+use protocol::traits::executor::{ExecutorFactory, TrieDB};
+use protocol::traits::{APIAdapter, Context, MemPool, Storage};
+use protocol::types::{Address, AssetID, Balance, Epoch, Hash, Receipt, SignedTransaction};
 use protocol::ProtocolResult;
 
-pub struct DefaultAPIAdapter<EF, M, S, DB, Mapping> {
-    mempool:         Arc<M>,
-    storage:         Arc<S>,
-    trie_db:         Arc<DB>,
-    service_mapping: Arc<Mapping>,
+pub struct DefaultAPIAdapter<EF, M, S, DB> {
+    mempool: Arc<M>,
+    storage: Arc<S>,
+    trie_db: Arc<DB>,
 
     pin_ef: PhantomData<EF>,
 }
 
-impl<
-        EF: ExecutorFactory<DB, S, Mapping>,
-        M: MemPool,
-        S: Storage,
-        DB: cita_trie::DB,
-        Mapping: ServiceMapping,
-    > DefaultAPIAdapter<EF, M, S, DB, Mapping>
-{
-    pub fn new(
-        mempool: Arc<M>,
-        storage: Arc<S>,
-        trie_db: Arc<DB>,
-        service_mapping: Arc<Mapping>,
-    ) -> Self {
+impl<EF: ExecutorFactory<DB>, M: MemPool, S: Storage, DB: TrieDB> DefaultAPIAdapter<EF, M, S, DB> {
+    pub fn new(mempool: Arc<M>, storage: Arc<S>, trie_db: Arc<DB>) -> Self {
         Self {
             mempool,
             storage,
             trie_db,
-            service_mapping,
+
             pin_ef: PhantomData,
         }
     }
 }
 
 #[async_trait]
-impl<
-        EF: ExecutorFactory<DB, S, Mapping>,
-        M: MemPool,
-        S: Storage,
-        DB: cita_trie::DB,
-        Mapping: ServiceMapping,
-    > APIAdapter for DefaultAPIAdapter<EF, M, S, DB, Mapping>
+impl<EF: ExecutorFactory<DB>, M: MemPool, S: Storage, DB: TrieDB> APIAdapter
+    for DefaultAPIAdapter<EF, M, S, DB>
 {
     async fn insert_signed_txs(
         &self,
@@ -77,44 +57,24 @@ impl<
         self.storage.get_receipt(tx_hash).await
     }
 
-    async fn get_transaction_by_hash(
-        &self,
-        _: Context,
-        tx_hash: Hash,
-    ) -> ProtocolResult<SignedTransaction> {
-        self.storage.get_transaction_by_hash(tx_hash).await
-    }
-
-    async fn query_service(
+    async fn get_balance(
         &self,
         ctx: Context,
-        epoch_id: u64,
-        cycels_limit: u64,
-        cycles_price: u64,
-        caller: Address,
-        service_name: String,
-        method: String,
-        payload: String,
-    ) -> ProtocolResult<ExecResp> {
-        let epoch = self.get_epoch_by_id(ctx.clone(), Some(epoch_id)).await?;
+        address: &Address,
+        id: &AssetID,
+        epoch_id: Option<u64>,
+    ) -> ProtocolResult<Balance> {
+        let epoch: Epoch = self.get_epoch_by_id(ctx.clone(), epoch_id).await?;
 
         let executor = EF::from_root(
+            epoch.header.chain_id,
             epoch.header.state_root.clone(),
             Arc::clone(&self.trie_db),
-            Arc::clone(&self.storage),
-            Arc::clone(&self.service_mapping),
+            epoch.header.epoch_id,
+            0,
+            Address::User(epoch.header.proposer.clone()),
         )?;
 
-        let params = ExecutorParams {
-            state_root: epoch.header.state_root,
-            epoch_id,
-            timestamp: epoch.header.timestamp,
-            cycels_limit,
-        };
-        executor.read(&params, &caller, cycles_price, &TransactionRequest {
-            service_name,
-            method,
-            payload,
-        })
+        executor.get_balance(address, id)
     }
 }

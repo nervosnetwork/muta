@@ -13,10 +13,11 @@ use parking_lot::RwLock;
 use rlp::Encodable;
 
 use common_merkle::Merkle;
-use protocol::fixed_codec::FixedCodec;
+use protocol::fixed_codec::ProtocolFixedCodec;
 use protocol::traits::{ConsensusAdapter, Context, MessageTarget, NodeInfo};
 use protocol::types::{
-    Address, Epoch, EpochHeader, Hash, MerkleRoot, Pill, Proof, SignedTransaction, Validator,
+    Address, Epoch, EpochHeader, Hash, MerkleRoot, Pill, Proof, SignedTransaction, UserAddress,
+    Validator,
 };
 use protocol::{Bytes, BytesMut, ProtocolError, ProtocolResult};
 
@@ -180,8 +181,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill, FixedSignedTxs>
         self.exec(
             pill.epoch.header.order_root.clone(),
             epoch_id,
-            pill.epoch.header.proposer.clone(),
-            pill.epoch.header.timestamp,
+            Address::User(pill.epoch.header.proposer.clone()),
             full_txs.clone(),
         )
         .await?;
@@ -257,7 +257,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill, FixedSignedTxs>
                         ctx,
                         msg,
                         END_GOSSIP_SIGNED_VOTE,
-                        MessageTarget::Specified(Address::from_bytes(addr)?),
+                        MessageTarget::Specified(UserAddress::from_bytes(addr)?),
                     )
                     .await?;
             }
@@ -268,7 +268,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill, FixedSignedTxs>
                         ctx,
                         msg,
                         END_GOSSIP_AGGREGATED_VOTE,
-                        MessageTarget::Specified(Address::from_bytes(addr)?),
+                        MessageTarget::Specified(UserAddress::from_bytes(addr)?),
                     )
                     .await?;
             }
@@ -342,7 +342,6 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
         order_root: MerkleRoot,
         epoch_id: u64,
         address: Address,
-        timestamp: u64,
         txs: Vec<SignedTransaction>,
     ) -> ProtocolResult<()> {
         let status = { self.current_consensus_status.read().clone() };
@@ -355,8 +354,6 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
                 status.cycles_price,
                 address,
                 txs,
-                status.cycles_limit,
-                timestamp,
             )
             .await
     }
