@@ -1,12 +1,12 @@
 use bytes::BytesMut;
 
-use crate::fixed_codec::{FixedCodecError, ProtocolFixedCodec};
+use crate::fixed_codec::{FixedCodec, FixedCodecError};
 use crate::types::epoch::{Epoch, EpochHeader, EpochId, Pill, Proof, Validator};
 use crate::types::primitive::Hash;
 use crate::types::Bloom;
 use crate::{impl_default_fixed_codec_for, ProtocolResult};
 
-// Impl ProtocolFixedCodec trait for types
+// Impl FixedCodec trait for types
 impl_default_fixed_codec_for!(epoch, [Proof, Validator, Epoch, EpochHeader, Pill, EpochId]);
 
 impl rlp::Encodable for Proof {

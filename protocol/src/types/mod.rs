@@ -2,6 +2,7 @@ pub(crate) mod epoch;
 pub(crate) mod genesis;
 pub(crate) mod primitive;
 pub(crate) mod receipt;
+pub(crate) mod service_context;
 pub(crate) mod transaction;
 
 use std::error::Error;
@@ -10,16 +11,16 @@ use derive_more::{Display, From};
 
 use crate::{ProtocolError, ProtocolErrorKind};
 
+pub use bytes::{Bytes, BytesMut};
 pub use epoch::{Epoch, EpochHeader, EpochId, Pill, Proof, Validator};
 pub use ethbloom::{Bloom, BloomRef, Input as BloomInput};
-pub use genesis::{Genesis, GenesisStateAlloc, GenesisStateAsset};
+pub use genesis::{Genesis, GenesisService};
 pub use primitive::{
-    Account, Address, ApprovedInfo, Asset, AssetID, AssetInfo, Balance, ContractAccount,
-    ContractAddress, ContractType, Fee, Hash, MerkleRoot, UserAccount, UserAddress,
-    GENESIS_EPOCH_ID,
+    Address, Balance, Hash, JsonString, MerkleRoot, Metadata, GENESIS_EPOCH_ID, METADATA_KEY,
 };
-pub use receipt::{Receipt, ReceiptResult};
-pub use transaction::{CarryingAsset, RawTransaction, SignedTransaction, TransactionAction};
+pub use receipt::{Event, Receipt, ReceiptResponse};
+pub use service_context::{ServiceContext, ServiceContextError, ServiceContextParams};
+pub use transaction::{RawTransaction, SignedTransaction, TransactionRequest};
 
 #[derive(Debug, Display, From)]
 pub enum TypesError {

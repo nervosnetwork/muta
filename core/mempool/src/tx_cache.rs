@@ -217,10 +217,10 @@ impl TxCache {
                 }
                 // Accumulate cycles. The order_tx_hashes and the propose_tx_hashes both collect
                 // transactions under cycle limit.
-                cycle_count += shared_tx.tx.raw.fee.cycle;
+                cycle_count += shared_tx.tx.raw.cycles_limit;
                 if cycle_count > cycle_limit {
                     stage = stage.next();
-                    cycle_count = shared_tx.tx.raw.fee.cycle;
+                    cycle_count = shared_tx.tx.raw.cycles_limit;
                 }
 
                 match stage {
@@ -353,15 +353,12 @@ mod tests {
     use std::sync::Arc;
     use std::thread;
 
-    use num_traits::FromPrimitive;
     use rand::random;
     use rayon::iter::IntoParallelRefIterator;
     use rayon::prelude::*;
     use test::Bencher;
 
-    use protocol::types::{
-        CarryingAsset, Fee, Hash, RawTransaction, SignedTransaction, TransactionAction, UserAddress,
-    };
+    use protocol::types::{Hash, RawTransaction, SignedTransaction, TransactionRequest};
     use protocol::Bytes;
 
     use crate::map::Map;
@@ -391,29 +388,24 @@ mod tests {
     fn mock_signed_tx(bytes: Vec<u8>) -> SignedTransaction {
         let rand_hash = Hash::digest(Bytes::from(bytes));
         let chain_id = rand_hash.clone();
-        let asset_id = rand_hash.clone();
         let nonce = rand_hash.clone();
         let tx_hash = rand_hash;
         let add_str = "10CAB8EEA4799C21379C20EF5BAA2CC8AF1BEC475B";
         let bytes = Bytes::from(hex::decode(add_str).unwrap());
-        let address = UserAddress::from_bytes(bytes.clone()).unwrap();
-        let fee = Fee {
-            asset_id: asset_id.clone(),
-            cycle:    TX_CYCLE,
+
+        let request = TransactionRequest {
+            service_name: "test".to_owned(),
+            method:       "test".to_owned(),
+            payload:      "test".to_owned(),
         };
-        let action = TransactionAction::Transfer {
-            receiver:       address,
-            carrying_asset: CarryingAsset {
-                asset_id,
-                amount: FromPrimitive::from_i32(10_000).unwrap(),
-            },
-        };
+
         let raw = RawTransaction {
             chain_id,
             nonce,
             timeout: TIMEOUT,
-            fee,
-            action,
+            cycles_limit: TX_CYCLE,
+            cycles_price: 1,
+            request,
         };
         SignedTransaction {
             raw,

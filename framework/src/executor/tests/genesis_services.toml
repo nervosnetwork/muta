@@ -1,0 +1,9 @@
+timestamp = 0
+prevhash = "44915be5b6c20b0678cf05fcddbbaa832e25d7e6ac538784cd5c24de00d47472"
+
+[[services]]
+# asset id f56924db538e77bb5951eb5ff0d02b88983c49c45eea30e8ae3e7234b311436c
+caller = "f8389d774afdad8755ef8e629e5a154fddc6325a"
+service = "asset"
+method = "create_asset"
+payload = '{ "name": "MutaToken", "symbol": "MT", "supply": 320000011 }'

@@ -7,52 +7,30 @@ mod schema;
 
 use std::convert::TryFrom;
 use std::sync::Arc;
-use std::u64;
 
 use futures::executor::block_on;
+use http::status::StatusCode;
 use juniper::graphiql::graphiql_source;
 use juniper::{FieldError, FieldResult};
-use tide::{error::ResultExt, response, App, EndpointResult};
+use tide::{Request, Response, ResultExt, Server};
 
 use common_crypto::{
     HashValue, PrivateKey, PublicKey, Secp256k1PrivateKey, Signature, ToPublicKey,
 };
-use protocol::fixed_codec::ProtocolFixedCodec;
+use protocol::fixed_codec::FixedCodec;
 use protocol::traits::{APIAdapter, Context};
 
 use crate::config::GraphQLConfig;
 use crate::schema::{
-    Address, AssetID, Balance, Bytes, ContractType, Epoch, Hash, InputDeployAction,
-    InputRawTransaction, InputTransactionEncryption, InputTransferAction, Uint64,
+    to_signed_transaction, to_transaction, Address, Bytes, Epoch, ExecResp, Hash,
+    InputRawTransaction, InputTransactionEncryption, Receipt, SignedTransaction, Uint64,
 };
-use http::header::HeaderValue;
-use tide::middleware::{CorsMiddleware, CorsOrigin};
-
-pub async fn start_graphql<Adapter: APIAdapter + 'static>(cfg: GraphQLConfig, adapter: Adapter) {
-    let state = State {
-        adapter: Arc::new(Box::new(adapter)),
-    };
-
-    let mut app = App::with_state(Arc::new(state));
-    // allow CORS
-    app.middleware(
-        CorsMiddleware::new()
-            .allow_origin(CorsOrigin::from("*"))
-            .allow_methods(HeaderValue::from_static("GET, POST, OPTIONS")),
-    );
-
-    app.at(&cfg.graphql_uri).post(handle_graphql);
-    app.at(&cfg.graphiql_uri).get(handle_graphiql);
-    app.serve(cfg.listening_address).await.unwrap();
-}
 
 // This is accessible as state in Tide, and as executor context in Juniper.
 #[derive(Clone)]
 struct State {
     adapter: Arc<Box<dyn APIAdapter>>,
 }
-
-impl juniper::Context for State {}
 
 // We define `Query` unit struct here. GraphQL queries will refer to this
 // struct. The struct itself doesn't have any associated state (and there's no
@@ -62,43 +40,85 @@ struct Query;
 // Switch to async/await fn https://github.com/graphql-rust/juniper/issues/2
 #[juniper::object(Context = State)]
 impl Query {
-    #[graphql(name = "getLatestEpoch", description = "Get the latest epoch")]
+    #[graphql(name = "getEpoch", description = "Get the epoch")]
     fn get_latest_epoch(state_ctx: &State, epoch_id: Option<Uint64>) -> FieldResult<Epoch> {
-        let epoch_id = opt_hex_to_u64(epoch_id.map(|id| id.as_hex()))?;
+        let epoch_id = match epoch_id {
+            Some(id) => Some(id.try_into_u64()?),
+            None => None,
+        };
 
-        let epoch = block_on(state_ctx.adapter.get_epoch_by_id(Context::new(), epoch_id))
-            .map_err(FieldError::from)?;
+        let epoch = block_on(state_ctx.adapter.get_epoch_by_id(Context::new(), epoch_id))?;
         Ok(Epoch::from(epoch))
     }
 
+    #[graphql(name = "getTransaction", description = "Get the transaction by hash")]
+    fn get_transaction(state_ctx: &State, tx_hash: Hash) -> FieldResult<SignedTransaction> {
+        let hash = protocol::types::Hash::from_hex(&tx_hash.as_hex())?;
+        let stx = block_on(
+            state_ctx
+                .adapter
+                .get_transaction_by_hash(Context::new(), hash),
+        )?;
+        Ok(SignedTransaction::from(stx))
+    }
+
     #[graphql(
-        name = "getBalance",
-        description = "Get the asset balance of an account",
-        arguments(id(description = "The asset id. Asset is the first-class in Muta, \
-            this means that your assets can be more than one in Muta, \
-            and the UDT(User Defined Token) will be supported in the future"))
+        name = "getReceipt",
+        description = "Get the receipt by transaction hash"
     )]
-    fn get_balance(
+    fn get_receipt(state_ctx: &State, tx_hash: Hash) -> FieldResult<Receipt> {
+        let hash = protocol::types::Hash::from_hex(&tx_hash.as_hex())?;
+        let receipt = block_on(
+            state_ctx
+                .adapter
+                .get_receipt_by_tx_hash(Context::new(), hash),
+        )?;
+
+        Ok(Receipt::from(receipt))
+    }
+
+    #[graphql(name = "queryService", description = "query service")]
+    fn query_service(
         state_ctx: &State,
-        address: Address,
-        id: AssetID,
         epoch_id: Option<Uint64>,
-    ) -> FieldResult<Balance> {
-        let epoch_id = opt_hex_to_u64(epoch_id.map(|id| id.as_hex()))?;
-        let address = protocol::types::Address::from_hex(&address.as_hex())?;
-        let id = protocol::types::AssetID::from_hex(&id.as_hex())?;
+        cycels_limit: Option<Uint64>,
+        cycles_price: Option<Uint64>,
+        caller: Address,
+        service_name: String,
+        method: String,
+        payload: String,
+    ) -> FieldResult<ExecResp> {
+        let epoch_id = match epoch_id {
+            Some(id) => id.try_into_u64()?,
+            None => {
+                block_on(state_ctx.adapter.get_epoch_by_id(Context::new(), None))?
+                    .header
+                    .epoch_id
+            }
+        };
+        let cycels_limit = match cycels_limit {
+            Some(cycels_limit) => cycels_limit.try_into_u64()?,
+            None => std::u64::MAX,
+        };
 
-        let result = block_on(state_ctx.adapter.get_balance(
+        let cycles_price = match cycles_price {
+            Some(cycles_price) => cycles_price.try_into_u64()?,
+            None => 1,
+        };
+
+        let address = protocol::types::Address::from_hex(&caller.as_hex())?;
+
+        let exec_resp = block_on(state_ctx.adapter.query_service(
             Context::new(),
-            &address,
-            &id,
             epoch_id,
-        ));
-
-        match result {
-            Ok(balance) => Ok(Balance::from(balance)),
-            Err(_) => Ok(Balance::from(protocol::types::Balance::from_bytes_be(b""))),
-        }
+            cycels_limit,
+            cycles_price,
+            address,
+            service_name,
+            method,
+            payload,
+        ))?;
+        Ok(ExecResp::from(exec_resp))
     }
 }
 
@@ -106,102 +126,48 @@ struct Mutation;
 // Switch to async/await fn https://github.com/graphql-rust/juniper/issues/2
 #[juniper::object(Context = State)]
 impl Mutation {
-    #[graphql(
-        name = "sendTransferTransaction",
-        description = "Send a transfer transaction to the blockchain."
-    )]
-    fn send_transfer_transaction(
+    #[graphql(name = "sendTransaction", description = "send transaction")]
+    fn send_transaction(
         state_ctx: &State,
         input_raw: InputRawTransaction,
-        input_action: InputTransferAction,
         input_encryption: InputTransactionEncryption,
     ) -> FieldResult<Hash> {
-        let action = cover_transfer_action(&input_action)?;
-        let signed_tx = cover_to_signed_tx(&action, &input_raw, &input_encryption)?;
-        block_on(
-            state_ctx
-                .adapter
-                .insert_signed_txs(Context::new(), signed_tx),
-        )
-        .map_err(FieldError::from)?;
+        let stx = to_signed_transaction(input_raw, input_encryption)?;
+        let tx_hash = stx.tx_hash.clone();
 
-        Ok(input_encryption.tx_hash)
+        block_on(state_ctx.adapter.insert_signed_txs(Context::new(), stx))
+            .map_err(FieldError::from)?;
+
+        Ok(Hash::from(tx_hash))
     }
 
     #[graphql(
-        name = "sendDeployTransaction",
-        description = "Send deployment contract transaction to the blockchain."
-    )]
-    fn send_deploy_transaction(
-        state_ctx: &State,
-        input_raw: InputRawTransaction,
-        input_action: InputDeployAction,
-        input_encryption: InputTransactionEncryption,
-    ) -> FieldResult<Hash> {
-        let action = cover_deploy_action(&input_action)?;
-        let signed_tx = cover_to_signed_tx(&action, &input_raw, &input_encryption)?;
-        block_on(
-            state_ctx
-                .adapter
-                .insert_signed_txs(Context::new(), signed_tx),
-        )
-        .map_err(FieldError::from)?;
-
-        Ok(input_encryption.tx_hash)
-    }
-
-    #[graphql(
-        name = "sendUnsafeTransferTransaction",
+        name = "unsafeSendTransaction",
         deprecated = "DON'T use it in production! This is just for development."
     )]
-    fn send_unsafe_transfer_transaction(
+    fn unsafe_send_transaction(
         state_ctx: &State,
         input_raw: InputRawTransaction,
-        input_action: InputTransferAction,
         input_privkey: Bytes,
     ) -> FieldResult<Hash> {
-        let action = cover_transfer_action(&input_action)?;
-        let raw_tx = cover_to_raw_tx(&action, &input_raw)?;
+        let raw_tx = to_transaction(input_raw)?;
         let tx_hash = protocol::types::Hash::digest(raw_tx.encode_fixed()?);
-        let tx_hash = Hash::from(tx_hash);
 
-        let input_encryption = gen_input_tx_encryption(input_privkey, tx_hash.clone())?;
-        let signed_tx = cover_to_signed_tx(&action, &input_raw, &input_encryption)?;
-        block_on(
-            state_ctx
-                .adapter
-                .insert_signed_txs(Context::new(), signed_tx),
-        )
-        .map_err(FieldError::from)?;
+        let privkey = Secp256k1PrivateKey::try_from(input_privkey.to_vec()?.as_ref())?;
+        let pubkey = privkey.pub_key();
+        let hash_value = HashValue::try_from(tx_hash.as_bytes().as_ref())?;
+        let signature = privkey.sign_message(&hash_value);
 
-        Ok(tx_hash)
-    }
+        let stx = protocol::types::SignedTransaction {
+            raw:       raw_tx,
+            tx_hash:   tx_hash.clone(),
+            signature: signature.to_bytes(),
+            pubkey:    pubkey.to_bytes(),
+        };
+        block_on(state_ctx.adapter.insert_signed_txs(Context::new(), stx))
+            .map_err(FieldError::from)?;
 
-    #[graphql(
-        name = "sendUnsafeDeployTransaction",
-        deprecated = "DON'T use it in production! This is just for development."
-    )]
-    fn send_unsafe_deploy_transaction(
-        state_ctx: &State,
-        input_raw: InputRawTransaction,
-        input_action: InputDeployAction,
-        input_privkey: Bytes,
-    ) -> FieldResult<Hash> {
-        let action = cover_deploy_action(&input_action)?;
-        let raw_tx = cover_to_raw_tx(&action, &input_raw)?;
-        let tx_hash = protocol::types::Hash::digest(raw_tx.encode_fixed()?);
-        let tx_hash = Hash::from(tx_hash);
-
-        let input_encryption = gen_input_tx_encryption(input_privkey, tx_hash.clone())?;
-        let signed_tx = cover_to_signed_tx(&action, &input_raw, &input_encryption)?;
-        block_on(
-            state_ctx
-                .adapter
-                .insert_signed_txs(Context::new(), signed_tx),
-        )
-        .map_err(FieldError::from)?;
-
-        Ok(tx_hash)
+        Ok(Hash::from(tx_hash))
     }
 }
 
@@ -212,144 +178,43 @@ type Schema = juniper::RootNode<'static, Query, Mutation>;
 // Finally, we'll bridge between Tide and Juniper. `GraphQLRequest` from Juniper
 // implements `Deserialize`, so we use `Json` extractor to deserialize the
 // request body.
-async fn handle_graphql(mut ctx: tide::Context<Arc<State>>) -> EndpointResult {
-    let query: juniper::http::GraphQLRequest = ctx.body_json().await.client_err()?;
-    let schema = Schema::new(Query, Mutation);
-    let response = query.execute(&schema, ctx.state());
-    let status = if response.is_ok() {
-        http::status::StatusCode::OK
-    } else {
-        http::status::StatusCode::BAD_REQUEST
+async fn handle_graphql(mut req: Request<State>) -> Response {
+    let query: juniper::http::GraphQLRequest = match req.body_json().await.client_err() {
+        Ok(query) => query,
+        Err(e) => {
+            return Response::new(StatusCode::BAD_REQUEST.into()).body_string(format!("{:?}", e))
+        }
     };
-    let mut resp = response::json(response);
-    *resp.status_mut() = status;
-    Ok(resp)
+
+    let schema = Schema::new(Query, Mutation);
+    let response = query.execute(&schema, req.state());
+    let status = if response.is_ok() {
+        StatusCode::OK
+    } else {
+        StatusCode::BAD_REQUEST
+    };
+
+    Response::new(status.into())
+        .body_json(&response)
+        .expect("Json parsing errors on return should never occur.")
 }
 
-async fn handle_graphiql(
-    _ctx: tide::Context<Arc<State>>,
-) -> EndpointResult<tide::http::Response<String>> {
+async fn handle_graphiql(_: Request<State>) -> Response {
     let html = graphiql_source("/graphql");
 
-    Ok(tide::http::Response::builder()
-        .status(http::status::StatusCode::OK)
-        .header("Content-Type", "text/html")
-        .body(html)
-        .unwrap())
+    Response::new(StatusCode::OK.into())
+        .body_string(html)
+        .set_header("Content-Type", "text/html")
 }
 
-fn hex_to_vec_u8(s: &str) -> FieldResult<Vec<u8>> {
-    hex::decode(s).map_err(FieldError::from)
-}
-
-fn hex_to_u64(s: &str) -> FieldResult<u64> {
-    let n = u64::from_str_radix(s, 16).map_err(FieldError::from)?;
-    Ok(n)
-}
-
-fn opt_hex_to_u64(s: Option<String>) -> FieldResult<Option<u64>> {
-    match s {
-        Some(s) => match hex_to_u64(&s) {
-            Ok(num) => Ok(Some(num)),
-            Err(e) => Err(e),
-        },
-        None => Ok(None),
-    }
-}
-
-fn gen_input_tx_encryption(
-    input_privkey: Bytes,
-    tx_hash: Hash,
-) -> FieldResult<InputTransactionEncryption> {
-    let privkey = Secp256k1PrivateKey::try_from(hex_to_vec_u8(&input_privkey.as_hex())?.as_ref())
-        .map_err(FieldError::from)?;
-    let pubkey = privkey.pub_key();
-    let hash_value = HashValue::try_from(hex_to_vec_u8(&tx_hash.as_hex())?.as_ref())
-        .map_err(FieldError::from)?;
-    let signature = privkey.sign_message(&hash_value);
-
-    let input_encryption = InputTransactionEncryption {
-        tx_hash,
-        pubkey: Bytes::from(pubkey.to_bytes()),
-        signature: Bytes::from(signature.to_bytes()),
-    };
-    Ok(input_encryption)
-}
-
-// #####################
-// Convert from graphql type to protocol type
-// #####################
-
-fn cover_to_raw_tx(
-    action: &protocol::types::TransactionAction,
-    input_raw: &InputRawTransaction,
-) -> FieldResult<protocol::types::RawTransaction> {
-    let raw = protocol::types::RawTransaction {
-        chain_id: protocol::types::Hash::from_hex(&input_raw.chain_id.as_hex())
-            .map_err(FieldError::from)?,
-        nonce:    protocol::types::Hash::from_hex(&input_raw.nonce.as_hex())
-            .map_err(FieldError::from)?,
-        timeout:  hex_to_u64(&input_raw.timeout.as_hex())?,
-        fee:      protocol::types::Fee {
-            asset_id: protocol::types::AssetID::from_hex(&input_raw.fee_asset_id.as_hex())
-                .map_err(FieldError::from)?,
-            cycle:    hex_to_u64(&input_raw.fee_cycle.as_hex())?,
-        },
-        action:   action.clone(),
+pub async fn start_graphql<Adapter: APIAdapter + 'static>(cfg: GraphQLConfig, adapter: Adapter) {
+    let state = State {
+        adapter: Arc::new(Box::new(adapter)),
     };
 
-    Ok(raw)
-}
+    let mut server = Server::with_state(state);
 
-fn cover_to_signed_tx(
-    action: &protocol::types::TransactionAction,
-    input_raw: &InputRawTransaction,
-    input_encryption: &InputTransactionEncryption,
-) -> FieldResult<protocol::types::SignedTransaction> {
-    let raw = cover_to_raw_tx(action, input_raw)?;
-
-    let signed_tx = protocol::types::SignedTransaction {
-        raw,
-        tx_hash: protocol::types::Hash::from_hex(&input_encryption.tx_hash.as_hex())
-            .map_err(FieldError::from)?,
-        pubkey: protocol::Bytes::from(hex_to_vec_u8(&input_encryption.pubkey.as_hex())?),
-        signature: protocol::Bytes::from(hex_to_vec_u8(&input_encryption.signature.as_hex())?),
-    };
-
-    Ok(signed_tx)
-}
-
-fn cover_transfer_action(
-    input_action: &InputTransferAction,
-) -> FieldResult<protocol::types::TransactionAction> {
-    let action = protocol::types::TransactionAction::Transfer {
-        receiver:       protocol::types::UserAddress::from_hex(&input_action.receiver.as_hex())
-            .map_err(FieldError::from)?,
-        carrying_asset: protocol::types::CarryingAsset {
-            asset_id: protocol::types::AssetID::from_hex(&input_action.carrying_asset_id.as_hex())
-                .map_err(FieldError::from)?,
-            amount:   protocol::types::Balance::from_bytes_be(
-                hex_to_vec_u8(&input_action.carrying_amount.as_hex())?.as_ref(),
-            ),
-        },
-    };
-
-    Ok(action)
-}
-
-fn cover_deploy_action(
-    input_action: &InputDeployAction,
-) -> FieldResult<protocol::types::TransactionAction> {
-    let contract_type = match input_action.contract_type {
-        ContractType::Asset => protocol::types::ContractType::Asset,
-        ContractType::App => protocol::types::ContractType::App,
-        ContractType::Library => protocol::types::ContractType::Library,
-    };
-
-    let action = protocol::types::TransactionAction::Deploy {
-        code: protocol::Bytes::from(hex_to_vec_u8(&input_action.code.as_hex())?),
-        contract_type,
-    };
-
-    Ok(action)
+    server.at(&cfg.graphiql_uri).get(handle_graphiql);
+    server.at(&cfg.graphql_uri).post(handle_graphql);
+    server.listen(cfg.listening_address).await.unwrap();
 }

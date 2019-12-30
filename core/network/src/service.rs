@@ -16,7 +16,7 @@ use futures::{
 use log::{debug, error, info};
 use protocol::{
     traits::{Context, Gossip, MessageCodec, MessageHandler, Priority, Rpc},
-    types::UserAddress,
+    types::Address,
     ProtocolResult,
 };
 
@@ -57,7 +57,7 @@ impl Gossip for NetworkServiceHandle {
         &self,
         cx: Context,
         end: &str,
-        users: Vec<UserAddress>,
+        users: Vec<Address>,
         msg: M,
         p: Priority,
     ) -> ProtocolResult<()>
