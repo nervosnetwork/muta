@@ -40,7 +40,7 @@ pub fn main() {
         .collect::<String>();
 
     let mut output = Output {
-        common_ref: common_ref.clone(),
+        common_ref: hex::encode(common_ref.clone()),
         keypairs:   vec![],
     };
 
