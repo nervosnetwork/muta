@@ -1,0 +1,11 @@
+name: muta_keypair
+version: "0.1"
+about: a tool to generate keypairs for muta
+author: Muta Dev <muta@nervos.org>
+
+args:
+    - number:
+        help: Number of keypairs to generate
+        short: n
+        long: number
+        default_value: "4"
