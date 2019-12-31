@@ -1,7 +1,7 @@
 use std::convert::TryFrom;
 
 use bytes::Bytes;
-use prost::Message;
+use muta_vendor_prost::Message;
 
 use crate::{
     codec::{primitive::Hash, CodecError, ProtocolCodecSync},

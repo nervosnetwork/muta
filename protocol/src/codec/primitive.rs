@@ -2,7 +2,7 @@ use std::{convert::TryFrom, default::Default};
 
 use bytes::Bytes;
 use derive_more::From;
-use prost::Message;
+use muta_vendor_prost::Message;
 
 use crate::{
     codec::{CodecError, ProtocolCodecSync},
