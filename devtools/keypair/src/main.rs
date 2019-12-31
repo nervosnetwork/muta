@@ -5,6 +5,8 @@ use std::convert::TryFrom;
 use std::default::Default;
 
 use clap::App;
+use rand::distributions::Alphanumeric;
+use rand::Rng;
 use rand::{rngs::OsRng, RngCore};
 use serde::Serialize;
 use tentacle_secio::SecioKeyPair;
@@ -32,10 +34,13 @@ pub fn main() {
     let yml = load_yaml!("keypair.yml");
     let m = App::from(yml).get_matches();
     let number = value_t!(m, "number", u32).unwrap();
-    let common_ref = m.value_of("common_ref").unwrap();
+    let common_ref = rand::thread_rng()
+        .sample_iter(&Alphanumeric)
+        .take(10)
+        .collect::<String>();
 
     let mut output = Output {
-        common_ref: common_ref.to_string(),
+        common_ref: common_ref.clone(),
         keypairs:   vec![],
     };
 
@@ -58,7 +63,7 @@ pub fn main() {
         let priv_key =
             BlsPrivateKey::try_from([&[0u8; 16], seckey.as_bytes().as_ref()].concat().as_ref())
                 .unwrap();
-        let pub_key = priv_key.pub_key(&common_ref.into());
+        let pub_key = priv_key.pub_key(&common_ref.as_str().into());
         k.bls_public_key = hex::encode(pub_key.to_bytes());
         k.index = i + 1;
         output.keypairs.push(k);
