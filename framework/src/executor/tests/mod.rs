@@ -1,3 +1,5 @@
+mod service_call_service;
+
 use std::sync::Arc;
 
 use async_trait::async_trait;

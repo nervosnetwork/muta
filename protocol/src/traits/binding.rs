@@ -192,11 +192,23 @@ pub trait ServiceSDK {
     // Call other read-only methods of `service` and return the results
     // synchronously NOTE: You can use recursive calls, but the maximum call
     // stack is 1024
-    fn read(&self, service: &str, method: &str, payload: &str) -> ProtocolResult<&str>;
+    fn read(
+        &self,
+        ctx: &ServiceContext,
+        service: &str,
+        method: &str,
+        payload: &str,
+    ) -> ProtocolResult<String>;
 
     // Call other writable methods of `service` and return the results synchronously
     // NOTE: You can use recursive calls, but the maximum call stack is 1024
-    fn write(&mut self, service: &str, method: &str, payload: &str) -> ProtocolResult<&str>;
+    fn write(
+        &mut self,
+        ctx: &ServiceContext,
+        service: &str,
+        method: &str,
+        payload: &str,
+    ) -> ProtocolResult<String>;
 }
 
 pub trait StoreMap<Key: FixedCodec + PartialEq, Value: FixedCodec> {

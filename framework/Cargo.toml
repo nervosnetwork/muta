@@ -26,3 +26,4 @@ serde_json = "1.0"
 [dev-dependencies]
 async-trait = "0.1"
 toml = "0.5"
+binding-macro = { path = "../binding-macro" }

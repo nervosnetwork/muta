@@ -282,13 +282,25 @@ impl ServiceSDK for MockServiceSDK {
     // Call other read-only methods of `service` and return the results
     // synchronously NOTE: You can use recursive calls, but the maximum call
     // stack is 1024
-    fn read(&self, _service: &str, _method: &str, _payload: &str) -> ProtocolResult<&str> {
+    fn read(
+        &self,
+        _ctx: &ServiceContext,
+        _service: &str,
+        _method: &str,
+        _payload: &str,
+    ) -> ProtocolResult<String> {
         unimplemented!()
     }
 
     // Call other writable methods of `service` and return the results synchronously
     // NOTE: You can use recursive calls, but the maximum call stack is 1024
-    fn write(&mut self, _service: &str, _method: &str, _payload: &str) -> ProtocolResult<&str> {
+    fn write(
+        &mut self,
+        _ctx: &ServiceContext,
+        _service: &str,
+        _method: &str,
+        _payload: &str,
+    ) -> ProtocolResult<String> {
         unimplemented!()
     }
 }

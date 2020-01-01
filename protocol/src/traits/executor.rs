@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
 use crate::traits::{ServiceMapping, Storage};
-use crate::types::{Address, Bloom, MerkleRoot, Receipt, SignedTransaction, TransactionRequest};
+use crate::types::{
+    Address, Bloom, MerkleRoot, Receipt, ServiceContext, SignedTransaction, TransactionRequest,
+};
 use crate::ProtocolResult;
 
 #[derive(Debug, Clone)]
@@ -51,4 +53,16 @@ pub trait Executor {
         cycles_price: u64,
         request: &TransactionRequest,
     ) -> ProtocolResult<ExecResp>;
+}
+
+pub trait Dispatcher {
+    fn call(&self, context: ServiceContext, readonly: bool) -> ProtocolResult<ExecResp>;
+}
+
+pub struct DispatcherHolder;
+
+impl Dispatcher for DispatcherHolder {
+    fn call(&self, _context: ServiceContext, _readonly: bool) -> ProtocolResult<ExecResp> {
+        unimplemented!()
+    }
 }

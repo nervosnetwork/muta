@@ -15,7 +15,8 @@ use derive_more::{Display, From};
 
 use bytes::BytesMut;
 use protocol::traits::{
-    ExecResp, Executor, ExecutorParams, ExecutorResp, ServiceMapping, ServiceState, Storage,
+    Dispatcher, DispatcherHolder, ExecResp, Executor, ExecutorParams, ExecutorResp, ServiceMapping,
+    ServiceState, Storage,
 };
 use protocol::types::{
     Address, Bloom, BloomInput, GenesisService, Hash, MerkleRoot, Receipt, ReceiptResponse,
@@ -34,11 +35,22 @@ enum HookType {
 pub struct ServiceExecutor<S: Storage, DB: TrieDB, Mapping: ServiceMapping> {
     service_mapping: Arc<Mapping>,
     querier:         Rc<DefaultChainQuerier<S>>,
-    states:          HashMap<String, Rc<RefCell<GeneralServiceState<DB>>>>,
-    root_state:      GeneralServiceState<DB>,
+    states:          Rc<HashMap<String, Rc<RefCell<GeneralServiceState<DB>>>>>,
+    root_state:      Rc<RefCell<GeneralServiceState<DB>>>,
 }
 
-impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: ServiceMapping>
+impl<S: Storage, DB: TrieDB, Mapping: ServiceMapping> Clone for ServiceExecutor<S, DB, Mapping> {
+    fn clone(&self) -> Self {
+        Self {
+            service_mapping: Arc::clone(&self.service_mapping),
+            querier:         Rc::clone(&self.querier),
+            states:          Rc::clone(&self.states),
+            root_state:      Rc::clone(&self.root_state),
+        }
+    }
+}
+
+impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMapping>
     ServiceExecutor<S, DB, Mapping>
 {
     pub fn create_genesis(
@@ -77,7 +89,8 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: ServiceMapping>
                     .ok_or(ExecutorError::NotFoundService {
                         service: context.get_service_name().to_owned(),
                     })?;
-            let sdk = DefalutServiceSDK::new(Rc::clone(state), Rc::clone(&querier));
+            let sdk =
+                DefalutServiceSDK::new(Rc::clone(state), Rc::clone(&querier), DispatcherHolder {});
 
             let mut service = mapping.get_service(context.get_service_name(), sdk)?;
             service.write_(context.clone())?;
@@ -118,18 +131,18 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: ServiceMapping>
         Ok(Self {
             service_mapping,
             querier: Rc::new(DefaultChainQuerier::new(storage)),
-            states,
-            root_state,
+            states: Rc::new(states),
+            root_state: Rc::new(RefCell::new(root_state)),
         })
     }
 
     fn commit(&mut self) -> ProtocolResult<MerkleRoot> {
         for (name, state) in self.states.iter() {
             let root = state.borrow_mut().commit()?;
-            self.root_state.insert(name.to_owned(), root)?;
+            self.root_state.borrow_mut().insert(name.to_owned(), root)?;
         }
-        self.root_state.stash()?;
-        self.root_state.commit()
+        self.root_state.borrow_mut().stash()?;
+        self.root_state.borrow_mut().commit()
     }
 
     fn stash(&mut self) -> ProtocolResult<()> {
@@ -173,7 +186,8 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: ServiceMapping>
     fn get_sdk(
         &self,
         service: &str,
-    ) -> ProtocolResult<DefalutServiceSDK<GeneralServiceState<DB>, DefaultChainQuerier<S>>> {
+    ) -> ProtocolResult<DefalutServiceSDK<GeneralServiceState<DB>, DefaultChainQuerier<S>, Self>>
+    {
         let state = self
             .states
             .get(service)
@@ -184,6 +198,7 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: ServiceMapping>
         Ok(DefalutServiceSDK::new(
             Rc::clone(&state),
             Rc::clone(&self.querier),
+            (*self).clone(),
         ))
     }
 
@@ -248,7 +263,7 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: ServiceMapping>
     }
 }
 
-impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: ServiceMapping> Executor
+impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMapping> Executor
     for ServiceExecutor<S, DB, Mapping>
 {
     fn exec(
@@ -317,6 +332,14 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: ServiceMapping> Execut
     ) -> ProtocolResult<ExecResp> {
         let context = self.get_context(params, caller, cycles_price, request)?;
         self.exec_service(context, true)
+    }
+}
+
+impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMapping> Dispatcher
+    for ServiceExecutor<S, DB, Mapping>
+{
+    fn call(&self, context: ServiceContext, readonly: bool) -> ProtocolResult<ExecResp> {
+        self.exec_service(context, readonly)
     }
 }
 

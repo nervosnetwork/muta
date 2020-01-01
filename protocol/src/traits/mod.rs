@@ -12,7 +12,9 @@ pub use binding::{
     ServiceState, StoreArray, StoreBool, StoreMap, StoreString, StoreUint64,
 };
 pub use consensus::{Consensus, ConsensusAdapter, MessageTarget, NodeInfo};
-pub use executor::{ExecResp, Executor, ExecutorFactory, ExecutorParams, ExecutorResp};
+pub use executor::{
+    Dispatcher, DispatcherHolder, ExecResp, Executor, ExecutorFactory, ExecutorParams, ExecutorResp,
+};
 pub use mempool::{MemPool, MemPoolAdapter, MixedTxHashes};
 pub use network::{Gossip, MessageCodec, MessageHandler, Priority, Rpc};
 pub use storage::{Storage, StorageAdapter, StorageBatchModify, StorageCategory, StorageSchema};
