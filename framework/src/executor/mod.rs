@@ -360,6 +360,14 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
     }
 }
 
+impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMapping> Dispatcher
+    for ServiceExecutor<S, DB, Mapping>
+{
+    fn call(&self, context: ServiceContext, readonly: bool) -> ProtocolResult<ExecResp> {
+        self.exec_service(context, readonly)
+    }
+}
+
 #[derive(Debug, Display, From)]
 pub enum ExecutorError {
     #[display(fmt = "service {:?} was not found", service)]
