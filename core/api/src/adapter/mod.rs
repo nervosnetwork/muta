@@ -89,7 +89,7 @@ impl<
         &self,
         ctx: Context,
         epoch_id: u64,
-        cycels_limit: u64,
+        cycles_limit: u64,
         cycles_price: u64,
         caller: Address,
         service_name: String,
@@ -109,7 +109,7 @@ impl<
             state_root: epoch.header.state_root,
             epoch_id,
             timestamp: epoch.header.timestamp,
-            cycels_limit,
+            cycles_limit,
         };
         executor.read(&params, &caller, cycles_price, &TransactionRequest {
             service_name,

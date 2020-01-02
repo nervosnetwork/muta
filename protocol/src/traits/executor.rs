@@ -19,7 +19,7 @@ pub struct ExecutorParams {
     pub state_root:   MerkleRoot,
     pub epoch_id:     u64,
     pub timestamp:    u64,
-    pub cycels_limit: u64,
+    pub cycles_limit: u64,
 }
 
 #[derive(Debug, Clone)]

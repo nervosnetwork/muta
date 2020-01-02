@@ -44,7 +44,7 @@ fn test_service_call_service() {
         state_root:   root,
         epoch_id:     1,
         timestamp:    0,
-        cycels_limit: std::u64::MAX,
+        cycles_limit: std::u64::MAX,
     };
 
     let raw = RawTransaction {
