@@ -5,8 +5,9 @@ use std::convert::TryFrom;
 use std::default::Default;
 
 use clap::App;
-use ophelia::{PublicKey, ToBlsPublicKey};
+use ophelia::{PrivateKey, PublicKey, ToBlsPublicKey, ToPublicKey};
 use ophelia_bls_amcl::BlsPrivateKey;
+use ophelia_secp256k1::Secp256k1PrivateKey;
 use protocol::types::{Address, Hash};
 use protocol::BytesMut;
 use rand::distributions::Alphanumeric;

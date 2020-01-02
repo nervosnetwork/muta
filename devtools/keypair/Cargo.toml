@@ -1,7 +1,7 @@
 [package]
 name = "muta-keypair"
 version = "0.1.0-alpha.0"
-authors = ["Eason Gao <kaoimin@qq.com>"]
+authors = ["Muta Dev <muta@nervos.org>"]
 edition = "2018"
 include = ["Cargo.toml", "src/*"]
 repository = "https://github.com/nervosnetwork/muta/tree/master/devtools/keypair"
