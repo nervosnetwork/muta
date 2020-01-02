@@ -1,14 +1,15 @@
 [package]
 name = "asset"
-version = "0.1.0"
+version = "0.1.0-alpha.0"
 authors = ["Muta Dev <muta@nervos.org>"]
 edition = "2018"
+repository = "https://github.com/nervosnetwork/muta"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 binding-macro = { path = "../../binding-macro" }
-protocol = { path = "../../protocol" }
+protocol = { path = "../../protocol", package = "muta-protocol" }
 
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

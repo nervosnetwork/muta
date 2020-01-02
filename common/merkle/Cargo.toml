@@ -1,12 +1,13 @@
 [package]
 name = "common-merkle"
-version = "0.1.0"
+version = "0.1.0-alpha.0"
 authors = ["Muta Dev <muta@nervos.org>"]
 edition = "2018"
+repository = "https://github.com/nervosnetwork/muta"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-protocol = { path = "../../protocol" }
+protocol = { path = "../../protocol", package = "muta-protocol" }
 rayon = "1.0"
 static_merkle_tree = "1.1.0"
