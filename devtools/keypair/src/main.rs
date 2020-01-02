@@ -5,19 +5,19 @@ use std::convert::TryFrom;
 use std::default::Default;
 
 use clap::App;
+use ophelia::{PublicKey, ToBlsPublicKey};
+use ophelia_bls_amcl::BlsPrivateKey;
+use protocol::types::{Address, Hash};
+use protocol::{Bytes, BytesMut};
 use rand::distributions::Alphanumeric;
 use rand::Rng;
 use rand::{rngs::OsRng, RngCore};
 use serde::Serialize;
 use tentacle_secio::SecioKeyPair;
 
-use common_crypto::{BlsPrivateKey, PublicKey, ToBlsPublicKey};
-use protocol::types::{Address, Hash};
-use protocol::BytesMut;
-
 #[derive(Default, Serialize, Debug)]
 struct Keypair {
-    pub index:          u32,
+    pub index:          usize,
     pub private_key:    String,
     pub public_key:     String,
     pub address:        String,
@@ -30,10 +30,17 @@ struct Output {
     pub keypairs:   Vec<Keypair>,
 }
 
+#[allow(clippy::needless_range_loop)]
 pub fn main() {
     let yml = load_yaml!("keypair.yml");
     let m = App::from(yml).get_matches();
-    let number = value_t!(m, "number", u32).unwrap();
+    let number = value_t!(m, "number", usize).unwrap();
+    let priv_keys = values_t!(m.values_of("private_keys"), String).unwrap_or_default();
+    let len = priv_keys.len();
+    if len > number {
+        panic!("private keys length can not be larger than number");
+    }
+
     let common_ref = rand::thread_rng()
         .sample_iter(&Alphanumeric)
         .take(10)
@@ -46,23 +53,23 @@ pub fn main() {
 
     for i in 0..number {
         let mut k = Keypair::default();
-
-        let mut seed = [0u8; 32];
-        OsRng.fill_bytes(&mut seed);
-
-        let seckey = Hash::digest(BytesMut::from(seed.as_ref()).freeze());
-        let keypair =
-            SecioKeyPair::secp256k1_raw_key(seckey.as_bytes()).expect("secp256k1 keypair");
+        let seckey = if i < len {
+            Bytes::from(hex::decode(&priv_keys[i]).expect("decode hex private key"))
+        } else {
+            let mut seed = [0u8; 32];
+            OsRng.fill_bytes(&mut seed);
+            Hash::digest(BytesMut::from(seed.as_ref()).freeze()).as_bytes()
+        };
+        let keypair = SecioKeyPair::secp256k1_raw_key(seckey.as_ref()).expect("secp256k1 keypair");
         let pubkey = keypair.to_public_key().inner();
         let user_addr = Address::from_pubkey_bytes(pubkey.into()).expect("user addr");
 
-        k.private_key = seckey.as_hex();
+        k.private_key = hex::encode(seckey.as_ref());
         k.public_key = hex::encode(keypair.to_public_key().inner());
         k.address = user_addr.as_hex();
 
         let priv_key =
-            BlsPrivateKey::try_from([&[0u8; 16], seckey.as_bytes().as_ref()].concat().as_ref())
-                .unwrap();
+            BlsPrivateKey::try_from([&[0u8; 16], seckey.as_ref()].concat().as_ref()).unwrap();
         let pub_key = priv_key.pub_key(&common_ref.as_str().into());
         k.bls_public_key = hex::encode(pub_key.to_bytes());
         k.index = i + 1;

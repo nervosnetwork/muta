@@ -1,19 +1,23 @@
 [package]
-name = "keypair"
+name = "muta-keypair"
 version = "0.1.0-alpha.0"
-authors = ["zero.qn <zero.qn@outlook.com>"]
+authors = ["Muta Dev <muta@nervos.org>"]
 edition = "2018"
-repository = "https://github.com/nervosnetwork/muta"
+include = ["Cargo.toml", "src/*"]
+repository = "https://github.com/nervosnetwork/muta/tree/master/devtools/keypair"
+license = "MIT"
+description = "A tool to generate keypairs for muta framework"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-common-crypto = { path = "../../common/crypto" }
-protocol = { path = "../../protocol", package = "muta-protocol" }
-
-hex = "0.4"
-rand = "0.7"
-tentacle-secio = { version = "0.1", features = [ "flatc" ] }
 clap = { version = "2.33", features = ["yaml"] }
+hex = "0.4"
+ophelia-bls-amcl = "0.1"
+ophelia-secp256k1 = "0.2"
+ophelia = "0.2"
+protocol = { version = "0.1.0-alpha.0", package = "muta-protocol" }
+rand = "0.7"
 serde = {version = "1.0", features = ["derive"]}
 serde_json = "1.0"
+tentacle-secio = { version = "0.1", features = [ "flatc" ] }

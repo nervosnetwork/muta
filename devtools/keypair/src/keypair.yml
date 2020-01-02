@@ -9,3 +9,10 @@ args:
         short: n
         long: number
         default_value: "4"
+
+    - private_keys:
+        help: Generate keypairs from a given private key vector
+        short: p
+        long: private_keys
+        multiple: true
+        takes_value: true
