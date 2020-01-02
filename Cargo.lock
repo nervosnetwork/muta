@@ -700,8 +700,8 @@ dependencies = [
  "hex 0.4.0",
  "lazy_static",
  "log",
+ "muta-vendor-prost",
  "parking_lot 0.9.0",
- "prost",
  "protocol",
  "quickcheck",
  "quickcheck_macros",
@@ -2024,6 +2024,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "muta-vendor-prost"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "61546345d842bc7dc7c0560d71b9774c01bd77b9e92754d6eacfd70b0453f4a3"
+dependencies = [
+ "bytes 0.5.3",
+ "muta-vendor-prost-derive",
+]
+
+[[package]]
+name = "muta-vendor-prost-derive"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7bbc59e525251e7d1b6da1a75f3ad546fb7aa23159b2c49b7b965c8f557d0e9f"
+dependencies = [
+ "failure",
+ "itertools",
+ "proc-macro2 0.4.30",
+ "quote 0.6.13",
+ "syn 0.15.44",
+]
+
+[[package]]
 name = "native-tls"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2474,27 +2497,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "prost"
-version = "0.5.0"
-source = "git+https://github.com/danburkert/prost?rev=dfe51e9#dfe51e94e96be5b31077e29927392b63178fee59"
-dependencies = [
- "bytes 0.5.3",
- "prost-derive",
-]
-
-[[package]]
-name = "prost-derive"
-version = "0.5.0"
-source = "git+https://github.com/danburkert/prost?rev=dfe51e9#dfe51e94e96be5b31077e29927392b63178fee59"
-dependencies = [
- "failure",
- "itertools",
- "proc-macro2 0.4.30",
- "quote 0.6.13",
- "syn 0.15.44",
-]
-
-[[package]]
 name = "protocol"
 version = "0.1.0"
 dependencies = [
@@ -2511,9 +2513,9 @@ dependencies = [
  "hex 0.3.2",
  "json",
  "lazy_static",
+ "muta-vendor-prost",
  "num-bigint",
  "num-traits",
- "prost",
  "rand 0.6.5",
  "rayon",
  "rlp 0.4.4",

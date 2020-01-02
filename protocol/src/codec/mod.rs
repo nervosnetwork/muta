@@ -54,10 +54,10 @@ impl<T: ProtocolCodecSync + 'static> ProtocolCodec for T {
 #[derive(Debug, From, Display)]
 pub enum CodecError {
     #[display(fmt = "prost encode: {}", _0)]
-    ProtobufEncode(prost::EncodeError),
+    ProtobufEncode(muta_vendor_prost::EncodeError),
 
     #[display(fmt = "prost decode: {}", _0)]
-    ProtobufDecode(prost::DecodeError),
+    ProtobufDecode(muta_vendor_prost::DecodeError),
 
     #[display(fmt = "{} missing field {}", r#type, field)]
     MissingField {
