@@ -225,17 +225,20 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
         Ok(ServiceContext::new(ctx_params))
     }
 
-    fn exec_service(&self, context: ServiceContext, readonly: bool) -> ProtocolResult<ExecResp> {
+    fn exec_service(
+        &self,
+        context: ServiceContext,
+        exec_type: ExecType,
+    ) -> ProtocolResult<ExecResp> {
         let sdk = self.get_sdk(context.get_service_name())?;
 
         let mut service = self
             .service_mapping
             .get_service(context.get_service_name(), sdk)?;
 
-        let result = if readonly {
-            service.deref().read_(context)
-        } else {
-            service.deref_mut().write_(context)
+        let result = match exec_type {
+            ExecType::Read => service.deref().read_(context),
+            ExecType::Write => service.deref_mut().write_(context),
         };
 
         let (ret, is_error) = match result {
@@ -280,7 +283,7 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
                 let context =
                     self.get_context(params, &caller, stx.raw.cycles_price, &stx.raw.request)?;
 
-                let exec_resp = self.exec_service(context.clone(), false)?;
+                let exec_resp = self.exec_service(context.clone(), ExecType::Write)?;
 
                 if exec_resp.is_error {
                     self.revert_cache()?;
@@ -331,16 +334,25 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
         request: &TransactionRequest,
     ) -> ProtocolResult<ExecResp> {
         let context = self.get_context(params, caller, cycles_price, request)?;
-        self.exec_service(context, true)
+        self.exec_service(context, ExecType::Read)
     }
 }
 
 impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMapping> Dispatcher
     for ServiceExecutor<S, DB, Mapping>
 {
-    fn call(&self, context: ServiceContext, readonly: bool) -> ProtocolResult<ExecResp> {
-        self.exec_service(context, readonly)
+    fn read(&self, context: ServiceContext) -> ProtocolResult<ExecResp> {
+        self.exec_service(context, ExecType::Read)
     }
+
+    fn write(&self, context: ServiceContext) -> ProtocolResult<ExecResp> {
+        self.exec_service(context, ExecType::Write)
+    }
+}
+
+enum ExecType {
+    Read,
+    Write,
 }
 
 #[derive(Debug, Display, From)]

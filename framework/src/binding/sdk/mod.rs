@@ -156,7 +156,7 @@ impl<S: 'static + ServiceState, C: ChainQuerier, D: Dispatcher> ServiceSDK
             payload.to_string(),
         );
 
-        let result = self.dispatcher.call(ctx, true)?;
+        let result = self.dispatcher.read(ctx)?;
         if result.is_error {
             Err(SDKError::DispatchFailed { error: result.ret }.into())
         } else {
@@ -180,7 +180,7 @@ impl<S: 'static + ServiceState, C: ChainQuerier, D: Dispatcher> ServiceSDK
             payload.to_string(),
         );
 
-        let result = self.dispatcher.call(ctx, false)?;
+        let result = self.dispatcher.write(ctx)?;
         if result.is_error {
             Err(SDKError::DispatchFailed { error: result.ret }.into())
         } else {
