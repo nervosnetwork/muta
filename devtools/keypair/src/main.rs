@@ -36,11 +36,7 @@ pub fn main() {
     let yml = load_yaml!("keypair.yml");
     let m = App::from(yml).get_matches();
     let number = value_t!(m, "number", usize).unwrap();
-    let priv_keys = if let Ok(tmp) = values_t!(m.values_of("private_keys"), String) {
-        tmp
-    } else {
-        vec![]
-    };
+    let priv_keys = values_t!(m.values_of("private_keys"), String).unwrap_or_default();
     let len = priv_keys.len();
     if len > number {
         panic!("private keys length can not be larger than number");
