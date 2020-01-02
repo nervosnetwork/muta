@@ -43,7 +43,7 @@ fn test_create_genesis() {
         state_root:   root,
         epoch_id:     1,
         timestamp:    0,
-        cycels_limit: std::u64::MAX,
+        cycles_limit: std::u64::MAX,
     };
     let caller = Address::from_hex("f8389d774afdad8755ef8e629e5a154fddc6325a").unwrap();
     let request = TransactionRequest {
@@ -86,7 +86,7 @@ fn test_exec() {
         state_root:   root,
         epoch_id:     1,
         timestamp:    0,
-        cycels_limit: std::u64::MAX,
+        cycles_limit: std::u64::MAX,
     };
 
     let raw = RawTransaction {

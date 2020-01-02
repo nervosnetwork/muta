@@ -81,7 +81,7 @@ impl Query {
     fn query_service(
         state_ctx: &State,
         epoch_id: Option<Uint64>,
-        cycels_limit: Option<Uint64>,
+        cycles_limit: Option<Uint64>,
         cycles_price: Option<Uint64>,
         caller: Address,
         service_name: String,
@@ -96,8 +96,8 @@ impl Query {
                     .epoch_id
             }
         };
-        let cycels_limit = match cycels_limit {
-            Some(cycels_limit) => cycels_limit.try_into_u64()?,
+        let cycles_limit = match cycles_limit {
+            Some(cycles_limit) => cycles_limit.try_into_u64()?,
             None => std::u64::MAX,
         };
 
@@ -111,7 +111,7 @@ impl Query {
         let exec_resp = block_on(state_ctx.adapter.query_service(
             Context::new(),
             epoch_id,
-            cycels_limit,
+            cycles_limit,
             cycles_price,
             address,
             service_name,

@@ -306,7 +306,7 @@ where
                 state_root: self.state_root.clone(),
                 epoch_id,
                 timestamp: info.timestamp,
-                cycels_limit: info.cycles_limit,
+                cycles_limit: info.cycles_limit,
             };
             let resp = executor.exec(&exec_params, &txs)?;
             self.state_root = resp.state_root.clone();
