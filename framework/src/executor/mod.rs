@@ -363,9 +363,18 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
 impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMapping> Dispatcher
     for ServiceExecutor<S, DB, Mapping>
 {
-    fn call(&self, context: ServiceContext, readonly: bool) -> ProtocolResult<ExecResp> {
-        self.exec_service(context, readonly)
+    fn read(&self, context: ServiceContext) -> ProtocolResult<ExecResp> {
+        self.exec_service(context, ExecType::Read)
     }
+
+    fn write(&self, context: ServiceContext) -> ProtocolResult<ExecResp> {
+        self.exec_service(context, ExecType::Write)
+    }
+}
+
+enum ExecType {
+    Read,
+    Write,
 }
 
 #[derive(Debug, Display, From)]
