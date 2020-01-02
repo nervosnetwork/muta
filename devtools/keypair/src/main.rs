@@ -11,13 +11,15 @@ use rand::{rngs::OsRng, RngCore};
 use serde::Serialize;
 use tentacle_secio::SecioKeyPair;
 
-use common_crypto::{BlsPrivateKey, PublicKey, ToBlsPublicKey};
+use common_crypto::{
+    BlsPrivateKey, PrivateKey, PublicKey, Secp256k1PrivateKey, ToBlsPublicKey, ToPublicKey,
+};
 use protocol::types::{Address, Hash};
 use protocol::BytesMut;
 
 #[derive(Default, Serialize, Debug)]
 struct Keypair {
-    pub index:          u32,
+    pub index:          usize,
     pub private_key:    String,
     pub public_key:     String,
     pub address:        String,
@@ -33,7 +35,17 @@ struct Output {
 pub fn main() {
     let yml = load_yaml!("keypair.yml");
     let m = App::from(yml).get_matches();
-    let number = value_t!(m, "number", u32).unwrap();
+    let number = value_t!(m, "number", usize).unwrap();
+    let priv_keys = if let Ok(tmp) = values_t!(m.values_of("private_keys"), String) {
+        tmp
+    } else {
+        vec![]
+    };
+    let len = priv_keys.len();
+    if len > number {
+        panic!("private keys length can not be larger than number");
+    }
+
     let common_ref = rand::thread_rng()
         .sample_iter(&Alphanumeric)
         .take(10)
@@ -44,7 +56,27 @@ pub fn main() {
         keypairs:   vec![],
     };
 
-    for i in 0..number {
+    for (i, prikey) in priv_keys.iter().enumerate() {
+        let mut k = Keypair::default();
+        let mut prikey = hex::decode(prikey).expect("decode hex private key");
+        let seckey = Secp256k1PrivateKey::try_from(prikey.as_ref()).expect("secp private key");
+        let pubkey = seckey.pub_key();
+        let user_addr = Address::from_pubkey_bytes(pubkey.to_bytes()).expect("user addr");
+        k.private_key = hex::encode(seckey.to_bytes());
+        k.public_key = hex::encode(pubkey.to_bytes());
+        k.address = user_addr.as_hex();
+
+        let mut tmp = Vec::new();
+        tmp.extend_from_slice(&[0u8; 16]);
+        tmp.append(&mut prikey);
+        let priv_key = BlsPrivateKey::try_from(tmp.as_ref()).unwrap();
+        let pub_key = priv_key.pub_key(&common_ref.as_str().into());
+        k.bls_public_key = hex::encode(pub_key.to_bytes());
+        k.index = i + 1;
+        output.keypairs.push(k);
+    }
+
+    for i in len..number {
         let mut k = Keypair::default();
 
         let mut seed = [0u8; 32];
