@@ -35,7 +35,7 @@ use protocol::{fixed_codec::FixedCodec, ProtocolError, ProtocolResult};
 use crate::config::Config;
 use crate::MainError;
 
-pub async fn create_genesis<Mapping: ServiceMapping>(
+pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
     config: &Config,
     genesis: &Genesis,
     servive_mapping: Arc<Mapping>,

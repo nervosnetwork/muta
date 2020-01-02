@@ -5,33 +5,39 @@ pub use chain_querier::{ChainQueryError, DefaultChainQuerier};
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use derive_more::{Display, From};
+
 use protocol::fixed_codec::FixedCodec;
 use protocol::traits::{
-    ChainQuerier, ServiceSDK, ServiceState, StoreArray, StoreBool, StoreMap, StoreString,
-    StoreUint64,
+    ChainQuerier, Dispatcher, ServiceSDK, ServiceState, StoreArray, StoreBool, StoreMap,
+    StoreString, StoreUint64,
 };
-use protocol::types::{Address, Epoch, Hash, Receipt, SignedTransaction};
-use protocol::ProtocolResult;
+use protocol::types::{Address, Epoch, Hash, Receipt, ServiceContext, SignedTransaction};
+use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
 use crate::binding::store::{
     DefaultStoreArray, DefaultStoreBool, DefaultStoreMap, DefaultStoreString, DefaultStoreUint64,
 };
 
-pub struct DefalutServiceSDK<S: ServiceState, C: ChainQuerier> {
+pub struct DefalutServiceSDK<S: ServiceState, C: ChainQuerier, D: Dispatcher> {
     state:         Rc<RefCell<S>>,
     chain_querier: Rc<C>,
+    dispatcher:    D,
 }
 
-impl<S: ServiceState, C: ChainQuerier> DefalutServiceSDK<S, C> {
-    pub fn new(state: Rc<RefCell<S>>, chain_querier: Rc<C>) -> Self {
+impl<S: ServiceState, C: ChainQuerier, D: Dispatcher> DefalutServiceSDK<S, C, D> {
+    pub fn new(state: Rc<RefCell<S>>, chain_querier: Rc<C>, dispatcher: D) -> Self {
         Self {
             state,
             chain_querier,
+            dispatcher,
         }
     }
 }
 
-impl<S: 'static + ServiceState, C: ChainQuerier> ServiceSDK for DefalutServiceSDK<S, C> {
+impl<S: 'static + ServiceState, C: ChainQuerier, D: Dispatcher> ServiceSDK
+    for DefalutServiceSDK<S, C, D>
+{
     // Alloc or recover a `Map` by` var_name`
     fn alloc_or_recover_map<K: 'static + FixedCodec + PartialEq, V: 'static + FixedCodec>(
         &mut self,
@@ -136,13 +142,62 @@ impl<S: 'static + ServiceState, C: ChainQuerier> ServiceSDK for DefalutServiceSD
     // Call other read-only methods of `service` and return the results
     // synchronously NOTE: You can use recursive calls, but the maximum call
     // stack is 1024
-    fn read(&self, _service: &str, _method: &str, _payload: &str) -> ProtocolResult<&str> {
-        unimplemented!();
+    fn read(
+        &self,
+        ctx: &ServiceContext,
+        service: &str,
+        method: &str,
+        payload: &str,
+    ) -> ProtocolResult<String> {
+        let ctx = ServiceContext::with_context(
+            ctx,
+            service.to_string(),
+            method.to_string(),
+            payload.to_string(),
+        );
+
+        let result = self.dispatcher.read(ctx)?;
+        if result.is_error {
+            Err(SDKError::DispatchFailed { error: result.ret }.into())
+        } else {
+            Ok(result.ret)
+        }
     }
 
     // Call other writable methods of `service` and return the results synchronously
     // NOTE: You can use recursive calls, but the maximum call stack is 1024
-    fn write(&mut self, _service: &str, _method: &str, _payload: &str) -> ProtocolResult<&str> {
-        unimplemented!();
+    fn write(
+        &mut self,
+        ctx: &ServiceContext,
+        service: &str,
+        method: &str,
+        payload: &str,
+    ) -> ProtocolResult<String> {
+        let ctx = ServiceContext::with_context(
+            ctx,
+            service.to_string(),
+            method.to_string(),
+            payload.to_string(),
+        );
+
+        let result = self.dispatcher.write(ctx)?;
+        if result.is_error {
+            Err(SDKError::DispatchFailed { error: result.ret }.into())
+        } else {
+            Ok(result.ret)
+        }
+    }
+}
+
+#[derive(Debug, Display, From)]
+pub enum SDKError {
+    #[display(fmt = "dispatch failed: {:?}", error)]
+    DispatchFailed { error: String },
+}
+impl std::error::Error for SDKError {}
+
+impl From<SDKError> for ProtocolError {
+    fn from(err: SDKError) -> ProtocolError {
+        ProtocolError::new(ProtocolErrorKind::Binding, Box::new(err))
     }
 }

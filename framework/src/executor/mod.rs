@@ -6,7 +6,6 @@ pub use factory::ServiceExecutorFactory;
 
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -15,7 +14,8 @@ use derive_more::{Display, From};
 
 use bytes::BytesMut;
 use protocol::traits::{
-    ExecResp, Executor, ExecutorParams, ExecutorResp, ServiceMapping, ServiceState, Storage,
+    Dispatcher, ExecResp, Executor, ExecutorParams, ExecutorResp, NoopDispatcher, ServiceMapping,
+    ServiceState, Storage,
 };
 use protocol::types::{
     Address, Bloom, BloomInput, GenesisService, Hash, MerkleRoot, Receipt, ReceiptResponse,
@@ -34,11 +34,22 @@ enum HookType {
 pub struct ServiceExecutor<S: Storage, DB: TrieDB, Mapping: ServiceMapping> {
     service_mapping: Arc<Mapping>,
     querier:         Rc<DefaultChainQuerier<S>>,
-    states:          HashMap<String, Rc<RefCell<GeneralServiceState<DB>>>>,
-    root_state:      GeneralServiceState<DB>,
+    states:          Rc<HashMap<String, Rc<RefCell<GeneralServiceState<DB>>>>>,
+    root_state:      Rc<RefCell<GeneralServiceState<DB>>>,
 }
 
-impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: ServiceMapping>
+impl<S: Storage, DB: TrieDB, Mapping: ServiceMapping> Clone for ServiceExecutor<S, DB, Mapping> {
+    fn clone(&self) -> Self {
+        Self {
+            service_mapping: Arc::clone(&self.service_mapping),
+            querier:         Rc::clone(&self.querier),
+            states:          Rc::clone(&self.states),
+            root_state:      Rc::clone(&self.root_state),
+        }
+    }
+}
+
+impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMapping>
     ServiceExecutor<S, DB, Mapping>
 {
     pub fn create_genesis(
@@ -77,7 +88,8 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: ServiceMapping>
                     .ok_or(ExecutorError::NotFoundService {
                         service: context.get_service_name().to_owned(),
                     })?;
-            let sdk = DefalutServiceSDK::new(Rc::clone(state), Rc::clone(&querier));
+            let sdk =
+                DefalutServiceSDK::new(Rc::clone(state), Rc::clone(&querier), NoopDispatcher {});
 
             let mut service = mapping.get_service(context.get_service_name(), sdk)?;
             service.write_(context.clone())?;
@@ -118,18 +130,18 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: ServiceMapping>
         Ok(Self {
             service_mapping,
             querier: Rc::new(DefaultChainQuerier::new(storage)),
-            states,
-            root_state,
+            states: Rc::new(states),
+            root_state: Rc::new(RefCell::new(root_state)),
         })
     }
 
     fn commit(&mut self) -> ProtocolResult<MerkleRoot> {
         for (name, state) in self.states.iter() {
             let root = state.borrow_mut().commit()?;
-            self.root_state.insert(name.to_owned(), root)?;
+            self.root_state.borrow_mut().insert(name.to_owned(), root)?;
         }
-        self.root_state.stash()?;
-        self.root_state.commit()
+        self.root_state.borrow_mut().stash()?;
+        self.root_state.borrow_mut().commit()
     }
 
     fn stash(&mut self) -> ProtocolResult<()> {
@@ -173,7 +185,8 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: ServiceMapping>
     fn get_sdk(
         &self,
         service: &str,
-    ) -> ProtocolResult<DefalutServiceSDK<GeneralServiceState<DB>, DefaultChainQuerier<S>>> {
+    ) -> ProtocolResult<DefalutServiceSDK<GeneralServiceState<DB>, DefaultChainQuerier<S>, Self>>
+    {
         let state = self
             .states
             .get(service)
@@ -184,6 +197,7 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: ServiceMapping>
         Ok(DefalutServiceSDK::new(
             Rc::clone(&state),
             Rc::clone(&self.querier),
+            (*self).clone(),
         ))
     }
 
@@ -210,17 +224,20 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: ServiceMapping>
         Ok(ServiceContext::new(ctx_params))
     }
 
-    fn exec_service(&self, context: ServiceContext, readonly: bool) -> ProtocolResult<ExecResp> {
+    fn exec_service(
+        &self,
+        context: ServiceContext,
+        exec_type: ExecType,
+    ) -> ProtocolResult<ExecResp> {
         let sdk = self.get_sdk(context.get_service_name())?;
 
         let mut service = self
             .service_mapping
             .get_service(context.get_service_name(), sdk)?;
 
-        let result = if readonly {
-            service.deref().read_(context)
-        } else {
-            service.deref_mut().write_(context)
+        let result = match exec_type {
+            ExecType::Read => service.read_(context),
+            ExecType::Write => service.write_(context),
         };
 
         let (ret, is_error) = match result {
@@ -248,7 +265,7 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: ServiceMapping>
     }
 }
 
-impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: ServiceMapping> Executor
+impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMapping> Executor
     for ServiceExecutor<S, DB, Mapping>
 {
     fn exec(
@@ -265,7 +282,7 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: ServiceMapping> Execut
                 let context =
                     self.get_context(params, &caller, stx.raw.cycles_price, &stx.raw.request)?;
 
-                let exec_resp = self.exec_service(context.clone(), false)?;
+                let exec_resp = self.exec_service(context.clone(), ExecType::Write)?;
 
                 if exec_resp.is_error {
                     self.revert_cache()?;
@@ -316,8 +333,25 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: ServiceMapping> Execut
         request: &TransactionRequest,
     ) -> ProtocolResult<ExecResp> {
         let context = self.get_context(params, caller, cycles_price, request)?;
-        self.exec_service(context, true)
+        self.exec_service(context, ExecType::Read)
     }
+}
+
+impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMapping> Dispatcher
+    for ServiceExecutor<S, DB, Mapping>
+{
+    fn read(&self, context: ServiceContext) -> ProtocolResult<ExecResp> {
+        self.exec_service(context, ExecType::Read)
+    }
+
+    fn write(&self, context: ServiceContext) -> ProtocolResult<ExecResp> {
+        self.exec_service(context, ExecType::Write)
+    }
+}
+
+enum ExecType {
+    Read,
+    Write,
 }
 
 #[derive(Debug, Display, From)]

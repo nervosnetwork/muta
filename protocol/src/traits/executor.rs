@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
 use crate::traits::{ServiceMapping, Storage};
-use crate::types::{Address, Bloom, MerkleRoot, Receipt, SignedTransaction, TransactionRequest};
+use crate::types::{
+    Address, Bloom, MerkleRoot, Receipt, ServiceContext, SignedTransaction, TransactionRequest,
+};
 use crate::ProtocolResult;
 
 #[derive(Debug, Clone)]
@@ -51,4 +53,23 @@ pub trait Executor {
         cycles_price: u64,
         request: &TransactionRequest,
     ) -> ProtocolResult<ExecResp>;
+}
+
+// `Dispatcher` provides ability to send a call message to other services
+pub trait Dispatcher {
+    fn read(&self, context: ServiceContext) -> ProtocolResult<ExecResp>;
+
+    fn write(&self, context: ServiceContext) -> ProtocolResult<ExecResp>;
+}
+
+pub struct NoopDispatcher;
+
+impl Dispatcher for NoopDispatcher {
+    fn read(&self, _context: ServiceContext) -> ProtocolResult<ExecResp> {
+        unimplemented!()
+    }
+
+    fn write(&self, _context: ServiceContext) -> ProtocolResult<ExecResp> {
+        unimplemented!()
+    }
 }
