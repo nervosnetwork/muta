@@ -4,6 +4,8 @@ version = "0.1.0-alpha.0"
 authors = ["Muta Dev <muta@nervos.org>"]
 edition = "2018"
 repository = "https://github.com/nervosnetwork/muta"
+license = "MIT"
+description = "Contains all the core data types and traits of the muta framework"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
