@@ -6,7 +6,6 @@ pub use factory::ServiceExecutorFactory;
 
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -237,8 +236,8 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
             .get_service(context.get_service_name(), sdk)?;
 
         let result = match exec_type {
-            ExecType::Read => service.deref().read_(context),
-            ExecType::Write => service.deref_mut().write_(context),
+            ExecType::Read => service.read_(context),
+            ExecType::Write => service.write_(context),
         };
 
         let (ret, is_error) = match result {
