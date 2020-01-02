@@ -1,6 +1,6 @@
 use protocol::ProtocolResult;
 
-use crate::schema::{Bytes, Hash, Uint64};
+use crate::schema::{Bytes, Hash, SchemaError, Uint64};
 
 #[derive(GraphQLObject, Clone)]
 pub struct SignedTransaction {
@@ -83,11 +83,15 @@ pub fn to_signed_transaction(
     raw: InputRawTransaction,
     encryption: InputTransactionEncryption,
 ) -> ProtocolResult<protocol::types::SignedTransaction> {
+    let pubkey: &[u8] = &hex::decode(encryption.pubkey.as_hex()).map_err(SchemaError::from)?;
+    let signature: &[u8] =
+        &hex::decode(encryption.signature.as_hex()).map_err(SchemaError::from)?;
+
     Ok(protocol::types::SignedTransaction {
         raw:       to_transaction(raw)?,
         tx_hash:   protocol::types::Hash::from_hex(&encryption.tx_hash.as_hex())?,
-        pubkey:    bytes::BytesMut::from(encryption.pubkey.as_hex().as_bytes()).freeze(),
-        signature: bytes::BytesMut::from(encryption.signature.as_hex().as_bytes()).freeze(),
+        pubkey:    bytes::BytesMut::from(pubkey).freeze(),
+        signature: bytes::BytesMut::from(signature).freeze(),
     })
 }
 
