@@ -13,7 +13,7 @@ pub use binding::{
 };
 pub use consensus::{Consensus, ConsensusAdapter, MessageTarget, NodeInfo};
 pub use executor::{
-    Dispatcher, DispatcherHolder, ExecResp, Executor, ExecutorFactory, ExecutorParams, ExecutorResp,
+    Dispatcher, ExecResp, Executor, ExecutorFactory, ExecutorParams, ExecutorResp, NoopDispatcher,
 };
 pub use mempool::{MemPool, MemPoolAdapter, MixedTxHashes};
 pub use network::{Gossip, MessageCodec, MessageHandler, Priority, Rpc};

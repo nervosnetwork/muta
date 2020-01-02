@@ -55,13 +55,16 @@ pub trait Executor {
     ) -> ProtocolResult<ExecResp>;
 }
 
+// `Dispatcher` provides ability to send a call message to other services
 pub trait Dispatcher {
+    // Send a call message to mutate destination service, set `readonly` to `false`
+    // Otherwise, set `true`
     fn call(&self, context: ServiceContext, readonly: bool) -> ProtocolResult<ExecResp>;
 }
 
-pub struct DispatcherHolder;
+pub struct NoopDispatcher;
 
-impl Dispatcher for DispatcherHolder {
+impl Dispatcher for NoopDispatcher {
     fn call(&self, _context: ServiceContext, _readonly: bool) -> ProtocolResult<ExecResp> {
         unimplemented!()
     }

@@ -7,7 +7,7 @@ use cita_trie::MemoryDB;
 
 use framework::binding::sdk::{DefalutServiceSDK, DefaultChainQuerier};
 use framework::binding::state::{GeneralServiceState, MPTTrie};
-use protocol::traits::{DispatcherHolder, Storage};
+use protocol::traits::{NoopDispatcher, Storage};
 use protocol::types::{
     Address, Epoch, Hash, Proof, Receipt, ServiceContext, ServiceContextParams, SignedTransaction,
 };
@@ -95,7 +95,7 @@ fn new_asset_service() -> AssetService<
     DefalutServiceSDK<
         GeneralServiceState<MemoryDB>,
         DefaultChainQuerier<MockStorage>,
-        DispatcherHolder,
+        NoopDispatcher,
     >,
 > {
     let chain_db = DefaultChainQuerier::new(Arc::new(MockStorage {}));
@@ -105,7 +105,7 @@ fn new_asset_service() -> AssetService<
     let sdk = DefalutServiceSDK::new(
         Rc::new(RefCell::new(state)),
         Rc::new(chain_db),
-        DispatcherHolder {},
+        NoopDispatcher {},
     );
 
     AssetService::init(sdk).unwrap()

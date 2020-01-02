@@ -15,7 +15,7 @@ use derive_more::{Display, From};
 
 use bytes::BytesMut;
 use protocol::traits::{
-    Dispatcher, DispatcherHolder, ExecResp, Executor, ExecutorParams, ExecutorResp, ServiceMapping,
+    Dispatcher, ExecResp, Executor, ExecutorParams, ExecutorResp, NoopDispatcher, ServiceMapping,
     ServiceState, Storage,
 };
 use protocol::types::{
@@ -90,7 +90,7 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
                         service: context.get_service_name().to_owned(),
                     })?;
             let sdk =
-                DefalutServiceSDK::new(Rc::clone(state), Rc::clone(&querier), DispatcherHolder {});
+                DefalutServiceSDK::new(Rc::clone(state), Rc::clone(&querier), NoopDispatcher {});
 
             let mut service = mapping.get_service(context.get_service_name(), sdk)?;
             service.write_(context.clone())?;
