@@ -209,7 +209,7 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
         request: &TransactionRequest,
     ) -> ProtocolResult<ServiceContext> {
         let ctx_params = ServiceContextParams {
-            cycles_limit: params.cycels_limit,
+            cycles_limit: params.cycles_limit,
             cycles_price,
             cycles_used: Rc::new(RefCell::new(0)),
             caller: caller.clone(),
