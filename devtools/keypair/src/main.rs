@@ -10,10 +10,8 @@ use rand::Rng;
 use rand::{rngs::OsRng, RngCore};
 use serde::Serialize;
 use tentacle_secio::SecioKeyPair;
-
-use common_crypto::{
-    BlsPrivateKey, PrivateKey, PublicKey, Secp256k1PrivateKey, ToBlsPublicKey, ToPublicKey,
-};
+use ophelia::{PublicKey, ToBlsPublicKey};
+use ophelia_bls_amcl::{BlsPrivateKey};
 use protocol::types::{Address, Hash};
 use protocol::BytesMut;
 
