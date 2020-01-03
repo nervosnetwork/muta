@@ -51,7 +51,6 @@ pub struct ConfigConsensus {
     pub interval:      u64,
     pub duration:      DurationConfig,
     pub verifier_list: Vec<String>,
-    pub private_key:   String,
     pub public_keys:   Vec<String>,
     pub common_ref:    String,
 }

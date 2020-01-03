@@ -6,8 +6,10 @@ use futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
 use futures::stream::StreamExt;
 use futures_timer::Delay;
 use log::{error, warn};
+use moodyblues_sdk::trace;
 use overlord::types::{OverlordMsg, Status};
 use overlord::OverlordHandler;
+use serde_json::json;
 
 use protocol::fixed_codec::FixedCodec;
 use protocol::traits::ConsensusAdapter;
@@ -69,8 +71,21 @@ where
         error!("consensus: start synchronization");
 
         let mut current_hash = self.get_prev_hash().await?;
+        trace::custom(
+            "current_prev_hash".to_string(),
+            Some(json!({
+                "epoch_id": current_epoch_id + 1,
+                "current_prev_hash": current_hash.as_hex(),
+            })),
+        );
 
         for id in (current_epoch_id + 1)..=rich_epoch_id {
+            trace::custom(
+                "sync_epoch".to_string(),
+                Some(json!({
+                    "epoch_id": id,
+                })),
+            );
             error!("consensus: start synchronization epoch {}", id);
 
             // First pull a new block.
@@ -82,9 +97,25 @@ where
             self.check_proof(id, proof.clone())?;
 
             if id != 1 && current_hash != epoch.header.pre_hash {
+                trace::error(
+                    "diff_prev_hash".to_string(),
+                    Some(json!({
+                        "epoch_id": id,
+                        "current_prev_hash":current_hash.as_hex(),
+                        "epoch_prev_hash": epoch.header.pre_hash.as_hex(),
+                    })),
+                );
                 return Err(ConsensusError::SyncEpochHashErr(id).into());
             }
+
             if !self.engine.check_state_root(&epoch.header.state_root) {
+                trace::error(
+                    "diff_state_root".to_string(),
+                    Some(json!({
+                        "epoch_id": id,
+                        "epoch_state_root": epoch.header.state_root.as_hex(),
+                    })),
+                );
                 return Err(ConsensusError::SyncEpochStateRootErr(id).into());
             }
 
