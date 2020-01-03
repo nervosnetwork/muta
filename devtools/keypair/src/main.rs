@@ -15,13 +15,18 @@ use rand::{rngs::OsRng, RngCore};
 use serde::Serialize;
 use tentacle_secio::SecioKeyPair;
 
+use common_crypto::{BlsPrivateKey, PrivateKey, PublicKey, ToBlsPublicKey};
+use protocol::types::{Address, Hash};
+use protocol::BytesMut;
+
 #[derive(Default, Serialize, Debug)]
 struct Keypair {
-    pub index:          usize,
-    pub private_key:    String,
-    pub public_key:     String,
-    pub address:        String,
-    pub bls_public_key: String,
+    pub index:           u32,
+    pub private_key:     String,
+    pub public_key:      String,
+    pub address:         String,
+    pub bls_private_key: String,
+    pub bls_public_key:  String,
 }
 
 #[derive(Default, Serialize, Debug)]
@@ -71,6 +76,7 @@ pub fn main() {
         let priv_key =
             BlsPrivateKey::try_from([&[0u8; 16], seckey.as_ref()].concat().as_ref()).unwrap();
         let pub_key = priv_key.pub_key(&common_ref.as_str().into());
+        k.bls_private_key = hex::encode(priv_key.to_bytes());
         k.bls_public_key = hex::encode(pub_key.to_bytes());
         k.index = i + 1;
         output.keypairs.push(k);
