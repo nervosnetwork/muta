@@ -98,10 +98,10 @@ where
 
             if id != 1 && current_hash != epoch.header.pre_hash {
                 trace::error(
-                    "prev_hash_diff".to_string(),
+                    "diff_prev_hash".to_string(),
                     Some(json!({
                         "epoch_id": id,
-                        "current_prev_hash": epoch.header.pre_hash.as_hex(),
+                        "current_prev_hash":current_hash.as_hex(),
                         "epoch_prev_hash": epoch.header.pre_hash.as_hex(),
                     })),
                 );
@@ -110,7 +110,7 @@ where
 
             if !self.engine.check_state_root(&epoch.header.state_root) {
                 trace::error(
-                    "state_root_diff".to_string(),
+                    "diff_state_root".to_string(),
                     Some(json!({
                         "epoch_id": id,
                         "epoch_state_root": epoch.header.state_root.as_hex(),
