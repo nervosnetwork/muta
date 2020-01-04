@@ -12,7 +12,7 @@ use async_trait::async_trait;
 use derive_more::{Display, From};
 use lazy_static::lazy_static;
 
-use protocol::codec::ProtocolCodec;
+use protocol::fixed_codec::FixedCodec;
 use protocol::traits::{
     Storage, StorageAdapter, StorageBatchModify, StorageCategory, StorageSchema,
 };
@@ -109,10 +109,8 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
         let epoch_id = EpochId {
             id: epoch.header.epoch_id,
         };
-        let mut header = epoch.header.clone();
 
-        // TODO(@yejiayu): rlp.
-        let epoch_hash = Hash::digest(header.encode().await?);
+        let epoch_hash = Hash::digest(epoch.encode_fixed()?);
 
         self.adapter
             .insert::<EpochSchema>(epoch_id.clone(), epoch.clone())

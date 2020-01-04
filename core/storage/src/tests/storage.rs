@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use protocol::codec::ProtocolCodec;
+use protocol::fixed_codec::FixedCodec;
 use protocol::traits::Storage;
 use protocol::types::Hash;
 
@@ -13,8 +13,8 @@ fn test_storage_epoch_insert() {
     let storage = ImplStorage::new(Arc::new(MemoryAdapter::new()));
 
     let epoch_id = 100;
-    let mut epoch = mock_epoch(epoch_id, Hash::digest(get_random_bytes(10)));
-    let epoch_hash = Hash::digest(exec!(epoch.header.encode()));
+    let epoch = mock_epoch(epoch_id, Hash::digest(get_random_bytes(10)));
+    let epoch_hash = Hash::digest(epoch.encode_fixed().unwrap());
 
     exec!(storage.insert_epoch(epoch));
 
