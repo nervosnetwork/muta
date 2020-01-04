@@ -56,7 +56,6 @@ fn test_fixed_codec() {
     test_eq!(epoch, Epoch, mock_epoch, 33);
     test_eq!(epoch, Pill, mock_pill, 22, 33);
     test_eq!(epoch, Validator, mock_validator);
-    test_eq!(epoch, EpochId, mock_epoch_id);
 
     test_eq!(receipt, Receipt, mock_receipt);
     test_eq!(receipt, Receipt, mock_receipt);

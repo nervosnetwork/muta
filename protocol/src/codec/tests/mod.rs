@@ -37,7 +37,6 @@ fn test_codec() {
 
     test!(epoch, Validator, mock_validator);
     test!(epoch, Proof, mock_proof);
-    test!(epoch, EpochId, mock_epoch_id);
     test!(epoch, EpochHeader, mock_epoch_header);
     test!(epoch, Epoch, mock_epoch, 100);
     test!(epoch, Pill, mock_pill, 100, 200);
