@@ -31,6 +31,11 @@ enum HookType {
     After,
 }
 
+enum ExecType {
+    Read,
+    Write,
+}
+
 pub struct ServiceExecutor<S: Storage, DB: TrieDB, Mapping: ServiceMapping> {
     service_mapping: Arc<Mapping>,
     querier:         Rc<DefaultChainQuerier<S>>,
@@ -224,11 +229,17 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
         Ok(ServiceContext::new(ctx_params))
     }
 
-    fn exec_service(
-        &self,
-        context: ServiceContext,
-        exec_type: ExecType,
-    ) -> ProtocolResult<ExecResp> {
+    fn catch_call(&self, context: ServiceContext, exec_type: ExecType) -> ExecResp {
+        match self.call(context, exec_type) {
+            Ok(resp) => resp,
+            Err(e) => ExecResp {
+                ret:      e.to_string(),
+                is_error: true,
+            },
+        }
+    }
+
+    fn call(&self, context: ServiceContext, exec_type: ExecType) -> ProtocolResult<ExecResp> {
         let sdk = self.get_sdk(context.get_service_name())?;
 
         let mut service = self
@@ -282,7 +293,7 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
                 let context =
                     self.get_context(params, &caller, stx.raw.cycles_price, &stx.raw.request)?;
 
-                let exec_resp = self.exec_service(context.clone(), ExecType::Write)?;
+                let exec_resp = self.catch_call(context.clone(), ExecType::Write);
 
                 if exec_resp.is_error {
                     self.revert_cache()?;
@@ -333,7 +344,7 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
         request: &TransactionRequest,
     ) -> ProtocolResult<ExecResp> {
         let context = self.get_context(params, caller, cycles_price, request)?;
-        self.exec_service(context, ExecType::Read)
+        self.call(context, ExecType::Read)
     }
 }
 
@@ -341,17 +352,12 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
     for ServiceExecutor<S, DB, Mapping>
 {
     fn read(&self, context: ServiceContext) -> ProtocolResult<ExecResp> {
-        self.exec_service(context, ExecType::Read)
+        self.call(context, ExecType::Read)
     }
 
     fn write(&self, context: ServiceContext) -> ProtocolResult<ExecResp> {
-        self.exec_service(context, ExecType::Write)
+        self.call(context, ExecType::Write)
     }
-}
-
-enum ExecType {
-    Read,
-    Write,
 }
 
 #[derive(Debug, Display, From)]
