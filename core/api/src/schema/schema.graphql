@@ -1,0 +1,184 @@
+"""20 bytes of account address"""
+scalar Address
+
+"""Bytes corresponding hex string."""
+scalar Bytes
+
+"""
+Epoch is a single digital record created within a blockchain. Each epoch
+contains a record of the previous Epoch, and when linked together these become
+the “chain”.An epoch is always composed of header and body.
+"""
+type Epoch {
+  """The header section of an epoch"""
+  header: EpochHeader!
+
+  """The body section of an epoch"""
+  orderedTxHashes: [Hash!]!
+}
+
+"""An epoch header is like the metadata of an epoch."""
+type EpochHeader {
+  """
+  Identifier of a chain in order to prevent replay attacks across channels 
+  """
+  chainId: Hash!
+
+  """Known as the block height like other blockchain"""
+  epochId: Uint64!
+
+  """The hash of the serialized previous epoch"""
+  preHash: Hash!
+
+  """A timestamp that records when the epoch was created"""
+  timestamp: Uint64!
+
+  """The merkle root of ordered transactions"""
+  orderRoot: Hash!
+
+  """The merkle roots of all the confirms"""
+  confirmRoot: [Hash!]!
+
+  """The merkle root of state root"""
+  stateRoot: Hash!
+
+  """The merkle roots of receipts"""
+  receiptRoot: [Hash!]!
+
+  """The sum of all transactions costs"""
+  cyclesUsed: [Uint64!]!
+
+  """The address descirbed who packed the epoch"""
+  proposer: Address!
+  proof: Proof!
+
+  """The version of validator is designed for cross chain"""
+  validatorVersion: Uint64!
+  validators: [Validator!]!
+}
+
+type Event {
+  service: String!
+  data: String!
+}
+
+type ExecResp {
+  ret: String!
+  isError: Boolean!
+}
+
+"""The output digest of Keccak hash function"""
+scalar Hash
+
+"""
+There was many types of transaction in Muta, A transaction often require
+computing resources or write data to chain,these resources are valuable so we
+need to pay some token for them.InputRawTransaction describes information above
+"""
+input InputRawTransaction {
+  """Identifier of the chain."""
+  chainId: Hash!
+
+  """
+  Mostly like the gas limit in Ethereum, describes the fee that you are willing to pay the highest price for the transaction
+  """
+  cyclesLimit: Uint64!
+  cyclesPrice: Uint64!
+
+  """
+  Every transaction has its own id, unlike Ethereum's nonce,the nonce in Muta is an hash
+  """
+  nonce: Hash!
+
+  """
+  For security and performance reasons, Muta will only deal with trade request
+  over a period of time,the `timeout` should be `timeout > current_epoch_height`
+  and `timeout < current_epoch_height + timeout_gap`,the `timeout_gap` generally equal to 20.
+  """
+  timeout: Uint64!
+  serviceName: String!
+  method: String!
+  payload: String!
+}
+
+"""Signature of the transaction"""
+input InputTransactionEncryption {
+  """The digest of the transaction"""
+  txHash: Hash!
+
+  """The public key of transfer"""
+  pubkey: Bytes!
+
+  """The signature of the transaction"""
+  signature: Bytes!
+}
+
+type Mutation {
+  """send transaction"""
+  sendTransaction(inputRaw: InputRawTransaction!, inputEncryption: InputTransactionEncryption!): Hash!
+  unsafeSendTransaction(inputRaw: InputRawTransaction!, inputPrivkey: Bytes!): Hash! @deprecated(reason: "DON'T use it in production! This is just for development.")
+}
+
+"""The verifier of the epoch header proved"""
+type Proof {
+  epochId: Uint64!
+  round: Uint64!
+  epochHash: Hash!
+  signature: Bytes!
+  bitmap: Bytes!
+}
+
+type Query {
+  """Get the epoch"""
+  getEpoch(epochId: Uint64): Epoch!
+
+  """Get the transaction by hash"""
+  getTransaction(txHash: Hash!): SignedTransaction!
+
+  """Get the receipt by transaction hash"""
+  getReceipt(txHash: Hash!): Receipt!
+
+  """query service"""
+  queryService(epochId: Uint64, cyclesLimit: Uint64, cyclesPrice: Uint64, caller: Address!, serviceName: String!, method: String!, payload: String!): ExecResp!
+}
+
+type Receipt {
+  stateRoot: Hash!
+  epochId: Uint64!
+  txHash: Hash!
+  cyclesUsed: Uint64!
+  events: [Event!]!
+  response: ReceiptResponse!
+}
+
+type ReceiptResponse {
+  serviceName: String!
+  method: String!
+  ret: String!
+  isError: Boolean!
+}
+
+type SignedTransaction {
+  chainId: Hash!
+  cyclesLimit: Uint64!
+  cyclesPrice: Uint64!
+  nonce: Hash!
+  timeout: Uint64!
+  serviceName: String!
+  method: String!
+  payload: String!
+  txHash: Hash!
+  pubkey: Bytes!
+  signature: Bytes!
+}
+
+"""Uint64"""
+scalar Uint64
+
+"""Validator address set"""
+type Validator {
+  address: Address!
+  proposeWeight: Int!
+  voteWeight: Int!
+}
+
