@@ -12,11 +12,11 @@ use async_trait::async_trait;
 use derive_more::{Display, From};
 use lazy_static::lazy_static;
 
-use protocol::codec::ProtocolCodec;
+use protocol::fixed_codec::FixedCodec;
 use protocol::traits::{
     Storage, StorageAdapter, StorageBatchModify, StorageCategory, StorageSchema,
 };
-use protocol::types::{Epoch, EpochId, Hash, Proof, Receipt, SignedTransaction};
+use protocol::types::{Epoch, Hash, Proof, Receipt, SignedTransaction};
 use protocol::Bytes;
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
@@ -58,8 +58,8 @@ impl_storage_schema_for!(
     SignedTransaction
 );
 impl_storage_schema_for!(ReceiptSchema, Hash, Receipt, Receipt);
-impl_storage_schema_for!(EpochSchema, EpochId, Epoch, Epoch);
-impl_storage_schema_for!(HashEpochSchema, Hash, EpochId, Epoch);
+impl_storage_schema_for!(EpochSchema, u64, Epoch, Epoch);
+impl_storage_schema_for!(HashEpochSchema, Hash, u64, Epoch);
 impl_storage_schema_for!(LatestEpochSchema, Hash, Epoch, Epoch);
 impl_storage_schema_for!(LatestProofSchema, Hash, Proof, Epoch);
 
@@ -106,13 +106,9 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
     }
 
     async fn insert_epoch(&self, epoch: Epoch) -> ProtocolResult<()> {
-        let epoch_id = EpochId {
-            id: epoch.header.epoch_id,
-        };
-        let mut header = epoch.header.clone();
+        let epoch_id = epoch.header.epoch_id;
 
-        // TODO(@yejiayu): rlp.
-        let epoch_hash = Hash::digest(header.encode().await?);
+        let epoch_hash = Hash::digest(epoch.encode_fixed()?);
 
         self.adapter
             .insert::<EpochSchema>(epoch_id.clone(), epoch.clone())
@@ -160,7 +156,6 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
     }
 
     async fn get_epoch_by_epoch_id(&self, epoch_id: u64) -> ProtocolResult<Epoch> {
-        let epoch_id = EpochId { id: epoch_id };
         let epoch = get!(self, epoch_id, EpochSchema);
 
         Ok(epoch)

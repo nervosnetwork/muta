@@ -4,7 +4,7 @@ use bytes::Bytes;
 use num_traits::FromPrimitive;
 use rand::random;
 
-use crate::types::epoch::{Epoch, EpochHeader, EpochId, Pill, Proof, Validator};
+use crate::types::epoch::{Epoch, EpochHeader, Pill, Proof, Validator};
 use crate::types::primitive::{Address, Balance, Hash, MerkleRoot};
 use crate::types::receipt::{Event, Receipt, ReceiptResponse};
 use crate::types::transaction::{RawTransaction, SignedTransaction, TransactionRequest};
@@ -113,10 +113,6 @@ pub fn mock_proof() -> Proof {
         signature:  Default::default(),
         bitmap:     Default::default(),
     }
-}
-
-pub fn mock_epoch_id() -> EpochId {
-    EpochId { id: 10 }
 }
 
 pub fn mock_epoch_header() -> EpochHeader {

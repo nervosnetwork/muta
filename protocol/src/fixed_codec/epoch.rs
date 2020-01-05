@@ -1,13 +1,13 @@
 use bytes::BytesMut;
 
 use crate::fixed_codec::{FixedCodec, FixedCodecError};
-use crate::types::epoch::{Epoch, EpochHeader, EpochId, Pill, Proof, Validator};
+use crate::types::epoch::{Epoch, EpochHeader, Pill, Proof, Validator};
 use crate::types::primitive::Hash;
 use crate::types::Bloom;
 use crate::{impl_default_fixed_codec_for, ProtocolResult};
 
 // Impl FixedCodec trait for types
-impl_default_fixed_codec_for!(epoch, [Proof, Validator, Epoch, EpochHeader, Pill, EpochId]);
+impl_default_fixed_codec_for!(epoch, [Proof, Validator, Epoch, EpochHeader, Pill]);
 
 impl rlp::Encodable for Proof {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
@@ -174,19 +174,5 @@ impl rlp::Decodable for Pill {
             epoch,
             propose_hashes,
         })
-    }
-}
-
-impl rlp::Encodable for EpochId {
-    fn rlp_append(&self, s: &mut rlp::RlpStream) {
-        s.begin_list(1).append(&self.id);
-    }
-}
-
-impl rlp::Decodable for EpochId {
-    fn decode(r: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
-        let id = r.at(0)?.as_val()?;
-
-        Ok(EpochId { id })
     }
 }

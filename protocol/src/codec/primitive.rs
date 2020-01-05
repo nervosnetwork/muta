@@ -1,6 +1,7 @@
-use std::{convert::TryFrom, default::Default};
+use std::{convert::TryFrom, default::Default, mem};
 
-use bytes::Bytes;
+use byteorder::{ByteOrder, LittleEndian};
+use bytes::{Bytes, BytesMut};
 use derive_more::From;
 use muta_vendor_prost::Message;
 
@@ -128,6 +129,19 @@ impl TryFrom<MerkleRoot> for protocol_primitive::MerkleRoot {
 
 // MerkleRoot and AssetID are just Hash aliases
 impl_default_bytes_codec_for!(primitive, [Balance, Hash]);
+
+impl ProtocolCodecSync for u64 {
+    fn encode_sync(&self) -> ProtocolResult<Bytes> {
+        let mut buf = [0u8; mem::size_of::<u64>()];
+        LittleEndian::write_u64(&mut buf, *self);
+
+        Ok(BytesMut::from(buf.as_ref()).freeze())
+    }
+
+    fn decode_sync(bytes: Bytes) -> ProtocolResult<Self> {
+        Ok(LittleEndian::read_u64(bytes.as_ref()))
+    }
+}
 
 // #####################
 // Util

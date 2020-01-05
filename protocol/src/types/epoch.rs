@@ -47,8 +47,3 @@ pub struct Pill {
     pub epoch:          Epoch,
     pub propose_hashes: Vec<Hash>,
 }
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct EpochId {
-    pub id: u64,
-}

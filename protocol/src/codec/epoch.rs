@@ -111,12 +111,6 @@ pub struct Pill {
     pub propose_hashes: Vec<Hash>,
 }
 
-#[derive(Clone, Message)]
-pub struct EpochId {
-    #[prost(uint64, tag = "1")]
-    pub id: u64,
-}
-
 // #################
 // Conversion
 // #################
@@ -364,28 +358,11 @@ impl TryFrom<Pill> for epoch::Pill {
     }
 }
 
-// EpochId
-
-impl From<epoch::EpochId> for EpochId {
-    fn from(epoch_id: epoch::EpochId) -> EpochId {
-        EpochId { id: epoch_id.id }
-    }
-}
-
-impl TryFrom<EpochId> for epoch::EpochId {
-    type Error = ProtocolError;
-
-    fn try_from(epoch_id: EpochId) -> Result<epoch::EpochId, Self::Error> {
-        let epoch_id = epoch::EpochId { id: epoch_id.id };
-        Ok(epoch_id)
-    }
-}
-
 // #################
 // Codec
 // #################
 
-impl_default_bytes_codec_for!(epoch, [Epoch, EpochHeader, Proof, Validator, Pill, EpochId]);
+impl_default_bytes_codec_for!(epoch, [Epoch, EpochHeader, Proof, Validator, Pill]);
 
 #[cfg(test)]
 mod test {
