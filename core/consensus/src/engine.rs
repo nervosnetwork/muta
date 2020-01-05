@@ -27,15 +27,15 @@ use crate::message::{
     END_GOSSIP_AGGREGATED_VOTE, END_GOSSIP_RICH_EPOCH_ID, END_GOSSIP_SIGNED_PROPOSAL,
     END_GOSSIP_SIGNED_VOTE, RPC_SYNC_PULL_EPOCH, RPC_SYNC_PULL_TXS,
 };
-use crate::status::CurrentConsensusStatus;
+use crate::status::StatusAgent;
 use crate::{ConsensusError, StatusCacheField};
 
 /// validator is for create new epoch, and authority is for build overlord
 /// status.
 pub struct ConsensusEngine<Adapter> {
-    current_consensus_status: Arc<RwLock<CurrentConsensusStatus>>,
-    node_info:                NodeInfo,
-    exemption_hash:           RwLock<HashSet<Bytes>>,
+    status_agent:   StatusAgent,
+    node_info:      NodeInfo,
+    exemption_hash: RwLock<HashSet<Bytes>>,
 
     adapter:  Arc<Adapter>,
     pub lock: Mutex<()>,
@@ -50,7 +50,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill, FixedSignedTxs>
         ctx: Context,
         epoch_id: u64,
     ) -> Result<(FixedPill, Bytes), Box<dyn Error + Send>> {
-        let current_consensus_status = { self.current_consensus_status.read().clone() };
+        let current_consensus_status = self.status_agent.to_inner();
 
         let (ordered_tx_hashes, propose_hashes) = self
             .adapter
@@ -210,7 +210,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill, FixedSignedTxs>
 
         let mut set = self.exemption_hash.write();
         set.clear();
-        let current_consensus_status = self.current_consensus_status.read();
+        let current_consensus_status = self.status_agent.to_inner();
         let status = Status {
             epoch_id:       epoch_id + 1,
             interval:       Some(current_consensus_status.consensus_interval),
@@ -304,13 +304,9 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill, FixedSignedTxs>
 }
 
 impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
-    pub fn new(
-        current_consensus_status: Arc<RwLock<CurrentConsensusStatus>>,
-        node_info: NodeInfo,
-        adapter: Arc<Adapter>,
-    ) -> Self {
+    pub fn new(status_agent: StatusAgent, node_info: NodeInfo, adapter: Arc<Adapter>) -> Self {
         Self {
-            current_consensus_status,
+            status_agent,
             node_info,
             exemption_hash: RwLock::new(HashSet::new()),
             adapter,
@@ -348,7 +344,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
         timestamp: u64,
         txs: Vec<SignedTransaction>,
     ) -> ProtocolResult<()> {
-        let status = { self.current_consensus_status.read().clone() };
+        let status = self.status_agent.to_inner();
 
         self.adapter
             .execute(
@@ -365,12 +361,12 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
     }
 
     pub fn get_exec_epoch_id(&self) -> u64 {
-        let status = self.current_consensus_status.read();
+        let status = self.status_agent.to_inner();
         status.exec_epoch_id
     }
 
     fn check_epoch_roots(&self, epoch: &EpochHeader) -> ProtocolResult<()> {
-        let status = self.current_consensus_status.read().clone();
+        let status = self.status_agent.to_inner();
 
         // check previous hash
         if status.prev_hash != epoch.pre_hash {
@@ -478,11 +474,8 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
             .await?;
 
         let prev_hash = Hash::digest(epoch.encode_fixed()?);
-        {
-            let mut current_consensus_status = self.current_consensus_status.write();
-            current_consensus_status.update_after_commit(epoch_id + 1, epoch, prev_hash, proof)?;
-        }
-        Ok(())
+        self.status_agent
+            .update_after_commit(epoch_id + 1, epoch, prev_hash, proof)
     }
 
     pub async fn save_proof(&self, ctx: Context, proof: Proof) -> ProtocolResult<()> {
@@ -490,17 +483,17 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
     }
 
     pub fn get_current_interval(&self) -> u64 {
-        let current_consensus_status = self.current_consensus_status.read();
+        let current_consensus_status = self.status_agent.to_inner();
         current_consensus_status.consensus_interval
     }
 
     pub fn get_current_authority_list(&self) -> Vec<Node> {
-        let current_consensus_status = self.current_consensus_status.read();
+        let current_consensus_status = self.status_agent.to_inner();
         covert_to_overlord_authority(&current_consensus_status.validators)
     }
 
     pub fn get_current_state_root(&self, epoch_id: u64) -> ProtocolResult<Option<MerkleRoot>> {
-        let current_consensus_status = self.current_consensus_status.read();
+        let current_consensus_status = self.status_agent.to_inner();
         if epoch_id == current_consensus_status.exec_epoch_id {
             let state_root = current_consensus_status
                 .state_root
@@ -512,13 +505,13 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
     }
 
     pub fn check_state_root(&self, state_root: &MerkleRoot) -> bool {
-        let current_consensus_status = self.current_consensus_status.read();
+        let current_consensus_status = self.status_agent.to_inner();
         current_consensus_status.state_root.contains(state_root)
     }
 
     pub fn get_current_prev_hash(&self) -> Hash {
-        let current_consensus_status = self.current_consensus_status.read();
-        current_consensus_status.prev_hash.clone()
+        let current_consensus_status = self.status_agent.to_inner();
+        current_consensus_status.prev_hash
     }
 }
 
