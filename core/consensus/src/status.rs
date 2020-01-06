@@ -1,64 +1,46 @@
 use std::sync::Arc;
 
 use derive_more::Display;
-use futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
-use futures::stream::StreamExt;
-use log::{error, warn};
 use moodyblues_sdk::trace;
 use parking_lot::RwLock;
 use serde_json::json;
 
 use protocol::types::{Bloom, Epoch, Hash, MerkleRoot, Proof, Validator};
-use protocol::{ProtocolError, ProtocolResult};
+use protocol::ProtocolResult;
 
 use crate::engine::check_vec_roots;
 use crate::{ConsensusError, StatusCacheField};
 
-#[derive(Debug)]
-pub struct StatusPivot {
+#[derive(Clone, Debug)]
+pub struct StatusAgent {
     status: Arc<RwLock<CurrentConsensusStatus>>,
-    msg_rx: UnboundedReceiver<UpdateInfo>,
 }
 
-impl StatusPivot {
-    pub fn new(status: Arc<RwLock<CurrentConsensusStatus>>) -> (Self, CurrentStatusAgent) {
-        let (tx, msg_rx) = unbounded();
-        let pivot = StatusPivot { status, msg_rx };
-        let agent = CurrentStatusAgent::new(tx);
-        (pivot, agent)
-    }
-
-    pub async fn run(mut self) {
-        loop {
-            if let Some(msg) = self.msg_rx.next().await {
-                self.update(msg);
-            } else {
-                error!("muta-consensus: Status agent disconnected");
-            }
+impl StatusAgent {
+    pub fn new(status: CurrentConsensusStatus) -> Self {
+        Self {
+            status: Arc::new(RwLock::new(status)),
         }
     }
 
-    fn update(&self, info: UpdateInfo) {
-        let mut status = self.status.write();
-        status.update_after_exec(info);
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct CurrentStatusAgent {
-    tx: UnboundedSender<UpdateInfo>,
-}
-
-impl CurrentStatusAgent {
-    pub fn new(tx: UnboundedSender<UpdateInfo>) -> Self {
-        CurrentStatusAgent { tx }
+    pub fn update_after_exec(&self, info: UpdateInfo) {
+        self.status.write().update_after_exec(info);
     }
 
-    pub fn send(&mut self, info: UpdateInfo) -> ProtocolResult<()> {
-        self.tx.unbounded_send(info).map_err(|e| {
-            ProtocolError::from(ConsensusError::Other(format!("Status agent error {:?}", e)))
-        })?;
-        Ok(())
+    pub fn update_after_commit(
+        &self,
+        epoch_id: u64,
+        epoch: Epoch,
+        prev_hash: Hash,
+        proof: Proof,
+    ) -> ProtocolResult<()> {
+        self.status
+            .write()
+            .update_after_commit(epoch_id, epoch, prev_hash, proof)
+    }
+
+    pub fn to_inner(&self) -> CurrentConsensusStatus {
+        self.status.read().clone()
     }
 }
 
@@ -86,8 +68,8 @@ pub struct CurrentConsensusStatus {
 
 impl CurrentConsensusStatus {
     fn update_after_exec(&mut self, info: UpdateInfo) {
-        warn!("Update {}", info);
-        warn!("AE: {}", self);
+        log::info!("update info{}", info);
+        log::info!("update after exec: {}", self);
         trace_after_exec(&info);
 
         assert!(info.exec_epoch_id == self.exec_epoch_id + 1);
@@ -106,8 +88,8 @@ impl CurrentConsensusStatus {
         prev_hash: Hash,
         proof: Proof,
     ) -> ProtocolResult<()> {
-        warn!("update {:?}, {:?}", epoch_id, prev_hash);
-        warn!("AC: {}", self);
+        log::info!("update info {:?}, {:?}", epoch_id, prev_hash);
+        log::info!("update after commit: {}", self);
 
         self.epoch_id = epoch_id;
         self.prev_hash = prev_hash;
@@ -123,9 +105,10 @@ impl CurrentConsensusStatus {
 
     fn update_cycles(&mut self, cycles: &[u64]) -> ProtocolResult<()> {
         if !check_vec_roots(&self.cycles_used, cycles) {
-            warn!(
+            log::error!(
                 "cycles used {:?}, cache cycles used {:?}",
-                cycles, self.cycles_used
+                cycles,
+                self.cycles_used
             );
             return Err(ConsensusError::StatusErr(StatusCacheField::CyclesUsed).into());
         }
@@ -162,7 +145,7 @@ impl CurrentConsensusStatus {
         }
 
         if at == usize::max_value() {
-            warn!("state root: {:?}", state_root);
+            log::error!("state root: {:?}", state_root);
             return Err(ConsensusError::StatusErr(StatusCacheField::StateRoot).into());
         } else if at == self.state_root.len() - 1 {
             at -= 1;
@@ -175,7 +158,7 @@ impl CurrentConsensusStatus {
 
     fn update_receipt_root(&mut self, receipt_roots: &[MerkleRoot]) -> ProtocolResult<()> {
         if !check_vec_roots(&self.receipt_root, receipt_roots) {
-            warn!("receipt root: {:?}", receipt_roots);
+            log::error!("receipt root: {:?}", receipt_roots);
             return Err(ConsensusError::StatusErr(StatusCacheField::ReceiptRoot).into());
         }
 
@@ -190,7 +173,7 @@ impl CurrentConsensusStatus {
 
         let len = confirm_root.len();
         if self.confirm_root.len() < len || self.confirm_root[len - 1] != confirm_root[len - 1] {
-            warn!("confirm root: {:?}", confirm_root);
+            log::error!("confirm root: {:?}", confirm_root);
             return Err(ConsensusError::StatusErr(StatusCacheField::ConfirmRoot).into());
         }
 

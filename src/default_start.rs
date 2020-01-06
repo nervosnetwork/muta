@@ -3,7 +3,6 @@ use std::convert::TryFrom;
 use std::sync::Arc;
 
 use bytes::Bytes;
-use parking_lot::RwLock;
 
 use common_crypto::{
     BlsCommonReference, BlsPrivateKey, BlsPublicKey, PublicKey, Secp256k1, Secp256k1PrivateKey,
@@ -18,7 +17,7 @@ use core_consensus::message::{
     END_GOSSIP_RICH_EPOCH_ID, END_GOSSIP_SIGNED_PROPOSAL, END_GOSSIP_SIGNED_VOTE,
     RPC_RESP_SYNC_PULL_EPOCH, RPC_RESP_SYNC_PULL_TXS, RPC_SYNC_PULL_EPOCH, RPC_SYNC_PULL_TXS,
 };
-use core_consensus::status::{CurrentConsensusStatus, StatusPivot};
+use core_consensus::status::{CurrentConsensusStatus, StatusAgent};
 use core_consensus::{OverlordConsensus, OverlordConsensusAdapter};
 use core_mempool::{
     DefaultMemPoolAdapter, HashMemPool, MsgPushTxs, NewTxsHandler, PullTxsHandler,
@@ -188,7 +187,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     let current_header = &current_epoch.header;
     let prevhash = Hash::digest(current_epoch.encode_fixed()?);
 
-    let current_consensus_status = Arc::new(RwLock::new(CurrentConsensusStatus {
+    let current_consensus_status = CurrentConsensusStatus {
         cycles_price:       config.consensus.cycles_price,
         cycles_limit:       config.consensus.cycles_limit,
         epoch_id:           current_epoch.header.epoch_id + 1,
@@ -213,7 +212,9 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
             })
             .collect::<Result<Vec<Validator>, ProtocolError>>()?,
         consensus_interval: config.consensus.interval,
-    }));
+    };
+
+    let status_agent = StatusAgent::new(current_consensus_status);
 
     assert!(config.consensus.verifier_list.len() == config.consensus.public_keys.len());
     let mut bls_pub_keys = HashMap::new();
@@ -243,8 +244,6 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
 
     core_consensus::trace::init_tracer(my_address.as_hex())?;
 
-    let (status_pivot, agent) = StatusPivot::new(Arc::clone(&current_consensus_status));
-
     let mut consensus_adapter =
         OverlordConsensusAdapter::<ServiceExecutorFactory, _, _, _, _, _, _>::new(
             Arc::new(network_service.handle()),
@@ -253,7 +252,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
             Arc::clone(&storage),
             Arc::clone(&trie_db),
             Arc::clone(&service_mapping),
-            agent,
+            status_agent.clone(),
             current_header.state_root.clone(),
         );
 
@@ -261,7 +260,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     let consensus_adapter = Arc::new(consensus_adapter);
 
     let (tmp, synchronization) = OverlordConsensus::new(
-        current_consensus_status,
+        status_agent,
         node_info,
         bls_pub_keys,
         bls_priv_key,
@@ -327,9 +326,6 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
 
     // Run sychronization process
     runtime::spawn(synchronization.run());
-
-    // Run status cache pivot
-    runtime::spawn(status_pivot.run());
 
     // Run consensus
     runtime::spawn(async move {

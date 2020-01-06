@@ -7,7 +7,6 @@ use creep::Context;
 use futures::channel::mpsc::UnboundedSender;
 use overlord::types::{AggregatedVote, Node, OverlordMsg, SignedProposal, SignedVote, Status};
 use overlord::{DurationConfig, Overlord, OverlordHandler};
-use parking_lot::RwLock;
 
 use common_crypto::{BlsCommonReference, BlsPrivateKey, BlsPublicKey};
 
@@ -17,7 +16,7 @@ use protocol::{Bytes, ProtocolResult};
 
 use crate::engine::ConsensusEngine;
 use crate::fixed_types::{FixedEpochID, FixedPill, FixedSignedTxs};
-use crate::status::CurrentConsensusStatus;
+use crate::status::StatusAgent;
 use crate::synchronization::Synchronization;
 use crate::util::OverlordCrypto;
 use crate::{ConsensusError, MsgType};
@@ -73,7 +72,7 @@ impl<Adapter: ConsensusAdapter + 'static> Consensus for OverlordConsensus<Adapte
 
 impl<Adapter: ConsensusAdapter + 'static> OverlordConsensus<Adapter> {
     pub fn new(
-        current_consensus_status: Arc<RwLock<CurrentConsensusStatus>>,
+        status_agent: StatusAgent,
         node_info: NodeInfo,
         addr_pubkey: HashMap<Bytes, BlsPublicKey>,
         priv_key: BlsPrivateKey,
@@ -81,7 +80,7 @@ impl<Adapter: ConsensusAdapter + 'static> OverlordConsensus<Adapter> {
         adapter: Arc<Adapter>,
     ) -> (Self, Synchronization<Adapter>) {
         let engine = Arc::new(ConsensusEngine::new(
-            Arc::clone(&current_consensus_status),
+            status_agent.clone(),
             node_info.clone(),
             Arc::clone(&adapter),
         ));
@@ -94,13 +93,14 @@ impl<Adapter: ConsensusAdapter + 'static> OverlordConsensus<Adapter> {
         );
         let overlord_handler = overlord.get_handler();
 
+        let status = status_agent.to_inner();
         overlord_handler
             .send_msg(
                 Context::new(),
                 OverlordMsg::RichStatus(gen_overlord_status(
-                    current_consensus_status.read().epoch_id,
-                    current_consensus_status.read().consensus_interval,
-                    current_consensus_status.read().validators.clone(),
+                    status.epoch_id,
+                    status.consensus_interval,
+                    status.validators,
                 )),
             )
             .unwrap();

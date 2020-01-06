@@ -18,7 +18,7 @@ use protocol::types::{
 use protocol::{fixed_codec::FixedCodec, ProtocolResult};
 
 use crate::fixed_types::{FixedEpoch, FixedEpochID, FixedSignedTxs, PullTxsRequest};
-use crate::status::{CurrentStatusAgent, UpdateInfo};
+use crate::status::{StatusAgent, UpdateInfo};
 use crate::util::ExecuteInfo;
 use crate::ConsensusError;
 
@@ -214,7 +214,7 @@ where
         storage: Arc<S>,
         trie_db: Arc<DB>,
         service_mapping: Arc<Mapping>,
-        status_agent: CurrentStatusAgent,
+        status_agent: StatusAgent,
         state_root: MerkleRoot,
     ) -> Self {
         let (exec_queue, rx) = channel(OVERLORD_GAP);
@@ -252,7 +252,7 @@ pub struct ExecDemons<S, DB, EF, Mapping> {
     pin_ef:     PhantomData<EF>,
     queue:      Receiver<ExecuteInfo>,
     state_root: MerkleRoot,
-    status:     CurrentStatusAgent,
+    status:     StatusAgent,
 }
 
 impl<S, DB, EF, Mapping> ExecDemons<S, DB, EF, Mapping>
@@ -267,7 +267,7 @@ where
         trie_db: Arc<DB>,
         service_mapping: Arc<Mapping>,
         rx: Receiver<ExecuteInfo>,
-        status_agent: CurrentStatusAgent,
+        status_agent: StatusAgent,
         state_root: MerkleRoot,
     ) -> Self {
         ExecDemons {
@@ -312,7 +312,7 @@ where
             self.state_root = resp.state_root.clone();
             self.save_receipts(resp.receipts.clone()).await?;
             self.status
-                .send(gen_update_info(resp.clone(), epoch_id, order_root))?;
+                .update_after_exec(gen_update_info(resp.clone(), epoch_id, order_root));
         } else {
             return Err(ConsensusError::Other("Queue disconnect".to_string()).into());
         }
