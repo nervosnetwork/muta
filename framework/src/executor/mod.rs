@@ -360,23 +360,6 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
     }
 }
 
-impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMapping> Dispatcher
-    for ServiceExecutor<S, DB, Mapping>
-{
-    fn read(&self, context: ServiceContext) -> ProtocolResult<ExecResp> {
-        self.exec_service(context, ExecType::Read)
-    }
-
-    fn write(&self, context: ServiceContext) -> ProtocolResult<ExecResp> {
-        self.exec_service(context, ExecType::Write)
-    }
-}
-
-enum ExecType {
-    Read,
-    Write,
-}
-
 #[derive(Debug, Display, From)]
 pub enum ExecutorError {
     #[display(fmt = "service {:?} was not found", service)]
