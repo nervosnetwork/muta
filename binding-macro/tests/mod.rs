@@ -21,12 +21,12 @@ fn test_read_and_write() {
 
     impl Tests {
         #[read]
-        fn test_read_fn(&self, _ctx: ServiceContext) -> ProtocolResult<String> {
+        fn test_read_fn(&self, _ctx: ServiceContext, _s: &str) -> ProtocolResult<String> {
             Ok("read".to_owned())
         }
 
         #[write]
-        fn test_write_fn(&mut self, _ctx: ServiceContext) -> ProtocolResult<String> {
+        fn test_write_fn(&mut self, _ctx: ServiceContext, _s: &str) -> ProtocolResult<String> {
             Ok("write".to_owned())
         }
     }
@@ -34,8 +34,31 @@ fn test_read_and_write() {
     let context = get_context(1000, "", "", "");
 
     let mut t = Tests {};
-    assert_eq!(t.test_read_fn(context.clone()).unwrap(), "read".to_owned());
-    assert_eq!(t.test_write_fn(context).unwrap(), "write".to_owned());
+    assert_eq!(t.test_read_fn(context.clone(), "read").unwrap(), "read".to_owned());
+    assert_eq!(t.test_write_fn(context, "write").unwrap(), "write".to_owned());
+}
+
+#[test]
+fn test_read_and_write_with_noparams() {
+    struct Tests;
+
+    impl Tests {
+        #[read]
+        fn test_read_fn(&self, _ctx: ServiceContext) -> ProtocolResult<()> {
+            Ok(())
+        }
+
+        #[write]
+        fn test_write_fn(&mut self, _ctx: ServiceContext) -> ProtocolResult<()> {
+            Ok(())
+        }
+    }
+
+    let context = get_context(1000, "", "", "");
+
+    let mut t = Tests {};
+    assert_eq!(t.test_read_fn(context.clone()).unwrap(), ());
+    assert_eq!(t.test_write_fn(context).unwrap(), ());
 }
 
 #[test]

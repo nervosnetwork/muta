@@ -1,5 +1,8 @@
 extern crate proc_macro;
 
+#[macro_use]
+extern crate static_assertions;
+
 mod common;
 mod cycles;
 mod read_write;
@@ -20,9 +23,8 @@ use crate::service::gen_service_code;
 /// - Verification
 ///  1. Is it a struct method marked with #[service]?
 ///  2. Is visibility private?
-///  3. Does function generics constrain `fn f<Context: RequestContext>`?
-///  4. Parameter signature contains `&self and ctx:Context`?
-///  5. Is the return value `ProtocolResult <T: Deserialize + Serialize>`?
+///  3. Parameter signature contains `&self and ctx:ServiceContext`?
+///  4. Is the return value `ProtocolResult <T: Deserialize + Serialize>` or `ProtocolResult <()>`?
 ///
 /// # Example:
 ///
@@ -31,7 +33,7 @@ use crate::service::gen_service_code;
 /// #[service]
 /// impl Service {
 ///     #[read]
-///     fn test_read_fn<Context: RequestContext>(
+///     fn test_read_fn(
 ///         &self,
 ///         _ctx: Context,
 ///     ) -> ProtocolResult<String> {
@@ -54,9 +56,8 @@ pub fn read(_: TokenStream, item: TokenStream) -> TokenStream {
 /// - Verification
 ///  1. Is it a struct method marked with #[service]?
 ///  2. Is visibility private?
-///  3. Does function generics constrain `fn f<Context: RequestContext>`?
-///  4. Parameter signature contains `&mut self and ctx:Context`?
-///  5. Is the return value `ProtocolResult <String>`?
+///  3. Parameter signature contains `&self and ctx:ServiceContext`?
+///  4. Is the return value `ProtocolResult <T: Deserialize + Serialize>` or `ProtocolResult <()>`?
 ///
 /// # Example:
 ///
@@ -104,14 +105,14 @@ pub fn cycles(attr: TokenStream, item: TokenStream) -> TokenStream {
     gen_cycles_code(attr, item)
 }
 
-/// Marks a method so that it executes before the entire block executes.
+/// Marks a method so that it executes after the entire block executes.
 // TODO(@yejiayu): Verify the function signature.
 #[proc_macro_attribute]
 pub fn hook_after(_: TokenStream, item: TokenStream) -> TokenStream {
     item
 }
 
-/// Marks a method so that it executes after the entire block executes.
+/// Marks a method so that it executes before the entire block executes.
 // TODO(@yejiayu): Verify the function signature.
 #[proc_macro_attribute]
 pub fn hook_before(_: TokenStream, item: TokenStream) -> TokenStream {
@@ -145,10 +146,6 @@ pub fn hook_before(_: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// #[service]
 /// impl<SDK: ServiceSDK> KittyService<SDK> {
-///     #[init]
-///     fn custom_init(sdk: SDK) -> ProtoResult<Self> {
-///         Ok(Self {})
-///     }
 ///     #[hook_before]
 ///     fn custom_hook_before(&mut self) -> ProtoResult<()> {
 ///         // Do something
@@ -180,9 +177,6 @@ pub fn hook_before(_: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// // Generated code.
 /// impl<SDK: ServiceSDK> Service<SDK> for KittyService<SDK> {
-///     fn init_(sdk: SDK) -> ProtocolResult<Self> {
-///         Self::custom_init(sdk)
-///     }
 ///     fn hook_before_(&mut self) -> ProtocolResult<()> {
 ///         self.custom_hook_before()
 ///     }
