@@ -19,7 +19,6 @@ proc-macro2 = "1.0"
 quote = "1.0"
 derive_more = "0.15"
 serde_json = "1.0"
-static_assertions = "1.1.0"
 
 [dev-dependencies]
 framework = { path = "../framework" }

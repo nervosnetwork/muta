@@ -1,8 +1,5 @@
 extern crate proc_macro;
 
-#[macro_use]
-extern crate static_assertions;
-
 mod common;
 mod cycles;
 mod read_write;
@@ -35,7 +32,7 @@ use crate::service::gen_service_code;
 ///     #[read]
 ///     fn test_read_fn(
 ///         &self,
-///         _ctx: Context,
+///         _ctx: ServiceContext,
 ///     ) -> ProtocolResult<String> {
 ///         Ok("test read".to_owend())
 ///     }
@@ -66,9 +63,9 @@ pub fn read(_: TokenStream, item: TokenStream) -> TokenStream {
 /// #[service]
 /// impl Service {
 ///     #[write]
-///     fn test_write_fn<Context: RequestContext>(
+///     fn test_write_fn(
 ///         &mut self,
-///         _ctx: Context,
+///         _ctx: ServiceContext,
 ///     ) -> ProtocolResult<String> {
 ///         Ok("test write".to_owned())
 ///     }
@@ -87,7 +84,7 @@ pub fn write(_: TokenStream, item: TokenStream) -> TokenStream {
 /// // Source Code
 /// impl Tests {
 ///     #[cycles(100)]
-///     fn test_cycles<Context: RequestContext>(&self, ctx: Context) -> ProtocolResult<()> {
+///     fn test_cycles(&self, ctx: ServiceContext) -> ProtocolResult<()> {
 ///         Ok(())
 ///     }
 /// }
@@ -126,7 +123,8 @@ pub fn hook_before(_: TokenStream, item: TokenStream) -> TokenStream {
 /// # Example
 ///
 /// use serde::{Deserialize, Serialize};
-/// use protocol::traits::{RequestContext, ServiceSDK};
+/// use protocol::traits::ServiceSDK;
+/// use protocol::types::ServiceContext;
 /// use protocol::ProtocolResult;
 ///
 /// ```rust
@@ -157,18 +155,18 @@ pub fn hook_before(_: TokenStream, item: TokenStream) -> TokenStream {
 ///     }
 ///
 ///     #[read]
-///     fn get_kitty<Context: RequestContext>(
+///     fn get_kitty(
 ///         &self,
-///         ctx: Context,
+///         ctx: ServiceContext,
 ///         payload: GetKittyPayload,
 ///     ) -> ProtoResult<&str> {
 ///         // Do something
 ///     }
 ///
 ///     #[write]
-///     fn create_kitty<Context: RequestContext>(
+///     fn create_kitty(
 ///         &mut self,
-///         ctx: Context,
+///         ctx: ServiceContext,
 ///         payload: CreateKittyPayload,
 ///     ) -> ProtoResult<&str> {
 ///         // Do something
@@ -185,7 +183,7 @@ pub fn hook_before(_: TokenStream, item: TokenStream) -> TokenStream {
 ///         self.custom_hook_after()
 ///     }
 ///
-///     fn write<Context: RequestContext>(&mut self, ctx: Context) -> ProtocolResult<&str> {
+///     fn write(&mut self, ctx: ServiceContext) -> ProtocolResult<&str> {
 ///         let method = ctx.get_service_method();
 ///
 ///         match ctx.get_service_method() {

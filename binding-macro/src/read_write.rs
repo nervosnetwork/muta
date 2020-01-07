@@ -2,10 +2,10 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::punctuated::Punctuated;
 use syn::{
-    parse_macro_input, FnArg, ImplItemMethod, ReturnType, Token, Type, Visibility, PathArguments, GenericArgument
+    parse_macro_input, FnArg, ImplItemMethod, ReturnType, Token, Type, Visibility,
 };
 
-use crate::common::get_protocol_result_args;
+use crate::common::{get_protocol_result_args, assert_ty_servicecontext};
 
 pub fn verify_read_or_write(item: TokenStream, mutable: bool) -> TokenStream {
     let method_item = parse_macro_input!(item as ImplItemMethod);
@@ -52,18 +52,6 @@ fn verify_inputs(inputs: &Punctuated<FnArg, Token![,]>, mutable: bool) {
     }
 }
 
-fn assert_ty_servicecontext(ty: &Type) {
-    match ty {
-        Type::Path(ty_path) => {
-            let path = &ty_path.path;
-            assert_eq!(path.leading_colon.is_none(), true);
-            assert_eq!(path.segments.len(), 1);
-            assert_eq!(path.segments[0].ident, "ServiceContext")
-        },
-        _ => panic!("The type should be `ServiceContext")
-    }
-}
-
 fn verify_ret_type(ret_type: &ReturnType) {
     let real_ret_type = match ret_type {
         ReturnType::Type(_, t) => t.as_ref(),
@@ -73,38 +61,10 @@ fn verify_ret_type(ret_type: &ReturnType) {
     match real_ret_type {
         Type::Path(type_path) => {
             let path = &type_path.path;
-            let result_args = get_protocol_result_args(&path)
+            get_protocol_result_args(&path)
                 .expect("The return type of read/write method must be protocol::ProtocolResult");
-
-            match result_args {
-                PathArguments::AngleBracketed(angle_args) => {
-                    let generic_args = &angle_args.args[0];
-                    match generic_args {
-                        GenericArgument::Type(generic_type) => {
-                            assert_type_impl_codec(&generic_type)
-                        },
-                        _ => panic!("ProtocolResult should contain a Type")
-                    }
-                },
-                _ => panic!("The return type of read/write method must be protocol::ProtocolResult<T> or protocol::ProtocolResult<()>")
-            }
         }
         _ => panic!("The return type of read/write method must be protocol::ProtocolResult"),
-    }
-}
-
-fn assert_type_impl_codec(ty: &Type) {
-    match ty {
-        Type::Tuple(t) => {
-
-        },
-        Type::Path(p) => {
-            let path = &p.path;
-            assert_eq!(path.leading_colon.is_none(), true);
-            // println!("debug: T is {:?}", path.segments[0].ident)
-            assert_impl_all!(path.segments[0].ident.span(): Send);
-        },
-        _ => panic!("The Type in ProtocolResult should be () or Generic Type")
     }
 }
 
