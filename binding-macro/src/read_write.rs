@@ -1,11 +1,9 @@
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::punctuated::Punctuated;
-use syn::{
-    parse_macro_input, FnArg, ImplItemMethod, ReturnType, Token, Type, Visibility,
-};
+use syn::{parse_macro_input, FnArg, ImplItemMethod, ReturnType, Token, Type, Visibility};
 
-use crate::common::{get_protocol_result_args, assert_ty_servicecontext};
+use crate::common::{assert_ty_servicecontext, get_protocol_result_args};
 
 pub fn verify_read_or_write(item: TokenStream, mutable: bool) -> TokenStream {
     let method_item = parse_macro_input!(item as ImplItemMethod);
@@ -47,8 +45,8 @@ fn verify_inputs(inputs: &Punctuated<FnArg, Token![,]>, mutable: bool) {
         FnArg::Typed(pt) => {
             let ty = pt.ty.as_ref();
             assert_ty_servicecontext(ty)
-        },
-        _ => panic!("The second parameter should be `ServiceContext`.")
+        }
+        _ => panic!("The second parameter should be `ServiceContext`."),
     }
 }
 

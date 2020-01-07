@@ -1,3 +1,4 @@
+#![allow(clippy::unit_cmp)]
 #[macro_use]
 extern crate binding_macro;
 
@@ -34,8 +35,14 @@ fn test_read_and_write() {
     let context = get_context(1000, "", "", "");
 
     let mut t = Tests {};
-    assert_eq!(t.test_read_fn(context.clone(), "read").unwrap(), "read".to_owned());
-    assert_eq!(t.test_write_fn(context, "write").unwrap(), "write".to_owned());
+    assert_eq!(
+        t.test_read_fn(context.clone(), "read").unwrap(),
+        "read".to_owned()
+    );
+    assert_eq!(
+        t.test_write_fn(context, "write").unwrap(),
+        "write".to_owned()
+    );
 }
 
 #[test]
