@@ -71,6 +71,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill, FixedSignedTxs>
             chain_id:          self.node_info.chain_id.clone(),
             pre_hash:          current_consensus_status.prev_hash,
             epoch_id:          tmp_epoch_id,
+            exec_epoch_id:     current_consensus_status.exec_epoch_id,
             timestamp:         time_now(),
             logs_bloom:        current_consensus_status.logs_bloom,
             order_root:        order_root.unwrap_or_else(Hash::from_empty),

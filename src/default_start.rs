@@ -77,6 +77,7 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
     let genesis_epoch_header = EpochHeader {
         chain_id:          chain_id.clone(),
         epoch_id:          0,
+        exec_epoch_id:     0,
         pre_hash:          Hash::from_empty(),
         timestamp:         genesis.timestamp,
         logs_bloom:        vec![Bloom::default()],

@@ -1,31 +1,40 @@
 use std::marker::PhantomData;
 use std::sync::Arc;
 
-use async_trait::async_trait;
+use derive_more::{Display, From};
 
-use protocol::traits::ExecutorFactory;
+use async_trait::async_trait;
+use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 use protocol::traits::{
     APIAdapter, Context, ExecResp, ExecutorParams, MemPool, ServiceMapping, Storage,
 };
+use protocol::traits::ExecutorFactory;
 use protocol::types::{Address, Epoch, Hash, Receipt, SignedTransaction, TransactionRequest};
-use protocol::ProtocolResult;
+
+#[derive(Debug, Display)]
+pub enum APIError {
+    #[display(fmt = "Unexecuted epoch,try to {:?}, but now only reached {:?}", real, expect)]
+    UnExecedError { expect: u64, real: u64 },
+}
+
+impl std::error::Error for APIError {}
 
 pub struct DefaultAPIAdapter<EF, M, S, DB, Mapping> {
-    mempool:         Arc<M>,
-    storage:         Arc<S>,
-    trie_db:         Arc<DB>,
+    mempool: Arc<M>,
+    storage: Arc<S>,
+    trie_db: Arc<DB>,
     service_mapping: Arc<Mapping>,
 
     pin_ef: PhantomData<EF>,
 }
 
 impl<
-        EF: ExecutorFactory<DB, S, Mapping>,
-        M: MemPool,
-        S: Storage,
-        DB: cita_trie::DB,
-        Mapping: ServiceMapping,
-    > DefaultAPIAdapter<EF, M, S, DB, Mapping>
+    EF: ExecutorFactory<DB, S, Mapping>,
+    M: MemPool,
+    S: Storage,
+    DB: cita_trie::DB,
+    Mapping: ServiceMapping,
+> DefaultAPIAdapter<EF, M, S, DB, Mapping>
 {
     pub fn new(
         mempool: Arc<M>,
@@ -45,12 +54,12 @@ impl<
 
 #[async_trait]
 impl<
-        EF: ExecutorFactory<DB, S, Mapping>,
-        M: MemPool,
-        S: Storage,
-        DB: cita_trie::DB,
-        Mapping: ServiceMapping,
-    > APIAdapter for DefaultAPIAdapter<EF, M, S, DB, Mapping>
+    EF: ExecutorFactory<DB, S, Mapping>,
+    M: MemPool,
+    S: Storage,
+    DB: cita_trie::DB,
+    Mapping: ServiceMapping,
+> APIAdapter for DefaultAPIAdapter<EF, M, S, DB, Mapping>
 {
     async fn insert_signed_txs(
         &self,
@@ -74,7 +83,19 @@ impl<
         _ctx: Context,
         tx_hash: Hash,
     ) -> ProtocolResult<Receipt> {
-        self.storage.get_receipt(tx_hash).await
+        let receipt = self.storage.get_receipt(tx_hash).await?;
+        let exec_epoch_id = self.storage.get_latest_epoch().await?.header.exec_epoch_id;
+        let epoch_id = receipt.epoch_id;
+        if exec_epoch_id >= epoch_id {
+            return Ok(receipt);
+        }
+        Err(ProtocolError::new(
+            ProtocolErrorKind::API,
+            Box::new(APIError::UnExecedError {
+                real: exec_epoch_id,
+                expect: epoch_id,
+            }),
+        ))
     }
 
     async fn get_transaction_by_hash(
