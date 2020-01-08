@@ -5,7 +5,7 @@ use creep::Context;
 use futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
 use futures::stream::StreamExt;
 use futures_timer::Delay;
-use log::{error, warn};
+use log::{debug, info};
 use moodyblues_sdk::trace;
 use overlord::types::{OverlordMsg, Status};
 use overlord::OverlordHandler;
@@ -49,7 +49,7 @@ where
         loop {
             if let Some((id, ctx)) = self.rich_id_rx.next().await {
                 if let Err(e) = self.process(id - 1, ctx).await {
-                    error!("synchronization error {:?}", e);
+                    log::error!("synchronization error {:?}", e);
                 }
             }
         }
@@ -67,8 +67,8 @@ where
             return Ok(());
         }
 
-        error!("self {}, chain {}", current_epoch_id, rich_epoch_id);
-        error!("consensus: start synchronization");
+        info!("self {}, chain {}", current_epoch_id, rich_epoch_id);
+        info!("consensus: start synchronization");
 
         let mut current_hash = self.get_prev_hash().await?;
         trace::custom(
@@ -86,13 +86,13 @@ where
                     "epoch_id": id,
                 })),
             );
-            error!("consensus: start synchronization epoch {}", id);
+            info!("consensus: start synchronization epoch {}", id);
 
             // First pull a new block.
-            warn!("consensus: synchronization pull epoch {}", id);
+            debug!("consensus: synchronization pull epoch {}", id);
             let epoch = self.engine.pull_epoch(ctx.clone(), id).await?;
             // Check proof and previous hash.
-            warn!("consensus: synchronization check proof and previous hash");
+            debug!("consensus: synchronization check proof and previous hash");
             let proof = epoch.header.proof.clone();
             self.check_proof(id, proof.clone())?;
 
@@ -122,14 +122,14 @@ where
             self.engine.save_proof(ctx.clone(), proof.clone()).await?;
 
             // Then pull signed transactions.
-            warn!("consensus: synchronization pull signed transactions");
+            debug!("consensus: synchronization pull signed transactions");
             let ordered_tx_hashes = epoch.ordered_tx_hashes.clone();
             let txs = self
                 .engine
                 .pull_txs(ctx.clone(), ordered_tx_hashes.clone())
                 .await?;
 
-            warn!("consensus: synchronization executor the epoch");
+            debug!("consensus: synchronization executor the epoch");
             self.engine
                 .exec(
                     epoch.header.order_root.clone(),
@@ -152,7 +152,7 @@ where
     }
 
     async fn transmit_rich_status(&self, ctx: Context, epoch_id: u64) -> ProtocolResult<()> {
-        warn!(
+        debug!(
             "consensus: synchronization send overlord rich status {}",
             epoch_id
         );

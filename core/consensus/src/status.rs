@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use derive_more::Display;
+use log::{error, info};
 use moodyblues_sdk::trace;
 use parking_lot::RwLock;
 use serde_json::json;
@@ -68,8 +69,8 @@ pub struct CurrentConsensusStatus {
 
 impl CurrentConsensusStatus {
     fn update_after_exec(&mut self, info: UpdateInfo) {
-        log::info!("update info{}", info);
-        log::info!("update after exec: {}", self);
+        info!("update info {}", info);
+        info!("update after exec cache: {}", self);
         trace_after_exec(&info);
 
         assert!(info.exec_epoch_id == self.exec_epoch_id + 1);
@@ -88,8 +89,8 @@ impl CurrentConsensusStatus {
         prev_hash: Hash,
         proof: Proof,
     ) -> ProtocolResult<()> {
-        log::info!("update info {:?}, {:?}", epoch_id, prev_hash);
-        log::info!("update after commit: {}", self);
+        info!("update info {}, {:?}", epoch_id, prev_hash);
+        info!("update after commit cache: {}", self);
 
         self.epoch_id = epoch_id;
         self.prev_hash = prev_hash;
@@ -105,10 +106,9 @@ impl CurrentConsensusStatus {
 
     fn update_cycles(&mut self, cycles: &[u64]) -> ProtocolResult<()> {
         if !check_vec_roots(&self.cycles_used, cycles) {
-            log::error!(
+            error!(
                 "cycles used {:?}, cache cycles used {:?}",
-                cycles,
-                self.cycles_used
+                cycles, self.cycles_used
             );
             return Err(ConsensusError::StatusErr(StatusCacheField::CyclesUsed).into());
         }
@@ -145,7 +145,7 @@ impl CurrentConsensusStatus {
         }
 
         if at == usize::max_value() {
-            log::error!("state root: {:?}", state_root);
+            error!("state root: {:?}", state_root);
             return Err(ConsensusError::StatusErr(StatusCacheField::StateRoot).into());
         } else if at == self.state_root.len() - 1 {
             at -= 1;
@@ -158,7 +158,7 @@ impl CurrentConsensusStatus {
 
     fn update_receipt_root(&mut self, receipt_roots: &[MerkleRoot]) -> ProtocolResult<()> {
         if !check_vec_roots(&self.receipt_root, receipt_roots) {
-            log::error!("receipt root: {:?}", receipt_roots);
+            error!("receipt root: {:?}", receipt_roots);
             return Err(ConsensusError::StatusErr(StatusCacheField::ReceiptRoot).into());
         }
 
@@ -173,7 +173,7 @@ impl CurrentConsensusStatus {
 
         let len = confirm_root.len();
         if self.confirm_root.len() < len || self.confirm_root[len - 1] != confirm_root[len - 1] {
-            log::error!("confirm root: {:?}", confirm_root);
+            error!("confirm root: {:?}", confirm_root);
             return Err(ConsensusError::StatusErr(StatusCacheField::ConfirmRoot).into());
         }
 

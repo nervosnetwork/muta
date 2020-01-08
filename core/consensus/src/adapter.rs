@@ -5,7 +5,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use futures::channel::mpsc::{channel, Receiver, Sender};
 use futures::stream::StreamExt;
-use log::{debug, error};
+use log::{debug, info};
 
 use common_merkle::Merkle;
 use protocol::traits::{
@@ -284,7 +284,7 @@ where
     pub async fn run(mut self) {
         loop {
             if let Err(e) = self.process().await {
-                error!("muta-consensus: executor demons error {:?}", e);
+                log::error!("muta-consensus: executor demons error {:?}", e);
             }
         }
     }
@@ -295,7 +295,7 @@ where
             let txs = info.signed_txs.clone();
             let order_root = info.order_root.clone();
 
-            error!("muta-consensus: execute {} epoch", epoch_id);
+            info!("muta-consensus: execute {} epoch", epoch_id);
             let mut executor = EF::from_root(
                 self.state_root.clone(),
                 Arc::clone(&self.trie_db),
