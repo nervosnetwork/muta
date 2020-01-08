@@ -79,9 +79,11 @@ impl<Adapter: ConsensusAdapter + 'static> OverlordConsensus<Adapter> {
         common_ref: BlsCommonReference,
         adapter: Arc<Adapter>,
     ) -> (Self, Synchronization<Adapter>) {
+        let status = status_agent.to_inner();
         let engine = Arc::new(ConsensusEngine::new(
-            status_agent.clone(),
+            status_agent,
             node_info.clone(),
+            status.consensus_interval,
             Arc::clone(&adapter),
         ));
 
@@ -91,9 +93,8 @@ impl<Adapter: ConsensusAdapter + 'static> OverlordConsensus<Adapter> {
             Arc::clone(&engine),
             crypto,
         );
-        let overlord_handler = overlord.get_handler();
 
-        let status = status_agent.to_inner();
+        let overlord_handler = overlord.get_handler();
         overlord_handler
             .send_msg(
                 Context::new(),

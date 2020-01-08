@@ -1,11 +1,13 @@
 use std::collections::HashSet;
 use std::error::Error;
+use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::{cmp::Eq, sync::Arc};
 
 use async_trait::async_trait;
 use bincode::serialize;
 use futures::lock::Mutex;
+use futures_timer::Delay;
 use log::error;
 use moodyblues_sdk::trace;
 use overlord::types::{Commit, Node, OverlordMsg, Status};
@@ -30,12 +32,15 @@ use crate::message::{
 use crate::status::StatusAgent;
 use crate::{ConsensusError, StatusCacheField};
 
+const RECHECK_EPOCH_RATIO: u64 = 5;
+
 /// validator is for create new epoch, and authority is for build overlord
 /// status.
 pub struct ConsensusEngine<Adapter> {
     status_agent:   StatusAgent,
     node_info:      NodeInfo,
     exemption_hash: RwLock<HashSet<Bytes>>,
+    interval:       u64,
 
     adapter:  Arc<Adapter>,
     pub lock: Mutex<()>,
@@ -109,7 +114,6 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill, FixedSignedTxs>
         hash: Bytes,
         epoch: FixedPill,
     ) -> Result<FixedSignedTxs, Box<dyn Error + Send>> {
-        let order_hashes = epoch.get_ordered_hashes();
         let exemption = {
             let set = self.exemption_hash.read();
             let hash = BytesMut::from(hash.as_ref()).freeze();
@@ -117,18 +121,16 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill, FixedSignedTxs>
         };
         // If the epoch is proposed by self, it does not need to check. Get full signed
         // transactions directly.
-        if !exemption {
-            self.check_epoch_roots(&epoch.inner.epoch.header)?;
-
-            self.adapter
-                .sync_txs(ctx.clone(), epoch.get_propose_hashes())
-                .await?;
-            self.adapter
-                .check_txs(ctx.clone(), order_hashes.clone())
-                .await?;
+        if !exemption && self.check_epoch_header(ctx.clone(), &epoch).await.is_err() {
+            // Wait for a moment and try again.
+            Delay::new(Duration::from_millis(self.interval / RECHECK_EPOCH_RATIO)).await;
+            self.check_epoch_header(ctx.clone(), &epoch).await?;
         }
 
-        let inner = self.adapter.get_full_txs(ctx, order_hashes).await?;
+        let inner = self
+            .adapter
+            .get_full_txs(ctx, epoch.get_ordered_hashes())
+            .await?;
         Ok(FixedSignedTxs { inner })
     }
 
@@ -211,12 +213,16 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill, FixedSignedTxs>
         let mut set = self.exemption_hash.write();
         set.clear();
         let current_consensus_status = self.status_agent.to_inner();
+        // TODO: change self.interval after update overlord
+        // if self.interval != current_consensus_status.consensus_interval {
+        //     self.interval = current_consensus_status.consensus_interval;
+        // }
+
         let status = Status {
             epoch_id:       epoch_id + 1,
             interval:       Some(current_consensus_status.consensus_interval),
             authority_list: covert_to_overlord_authority(&current_consensus_status.validators),
         };
-
         Ok(status)
     }
 
@@ -304,12 +310,18 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill, FixedSignedTxs>
 }
 
 impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
-    pub fn new(status_agent: StatusAgent, node_info: NodeInfo, adapter: Arc<Adapter>) -> Self {
+    pub fn new(
+        status_agent: StatusAgent,
+        node_info: NodeInfo,
+        interval: u64,
+        adapter: Arc<Adapter>,
+    ) -> Self {
         Self {
             status_agent,
             node_info,
             exemption_hash: RwLock::new(HashSet::new()),
             adapter,
+            interval,
             lock: Mutex::new(()),
         }
     }
@@ -512,6 +524,17 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
     pub fn get_current_prev_hash(&self) -> Hash {
         let current_consensus_status = self.status_agent.to_inner();
         current_consensus_status.prev_hash
+    }
+
+    async fn check_epoch_header(&self, ctx: Context, epoch: &FixedPill) -> ProtocolResult<()> {
+        self.check_epoch_roots(&epoch.inner.epoch.header)?;
+        self.adapter
+            .sync_txs(ctx.clone(), epoch.get_propose_hashes())
+            .await?;
+        self.adapter
+            .check_txs(ctx.clone(), epoch.get_propose_hashes())
+            .await?;
+        Ok(())
     }
 }
 
