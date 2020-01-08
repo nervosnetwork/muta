@@ -71,11 +71,12 @@ impl rlp::Decodable for Validator {
 
 impl rlp::Encodable for EpochHeader {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
-        s.begin_list(14)
+        s.begin_list(15)
             .append(&self.chain_id)
             .append_list(&self.confirm_root)
             .append_list(&self.cycles_used)
             .append(&self.epoch_id)
+            .append(&self.exec_epoch_id)
             .append_list(&self.logs_bloom)
             .append(&self.order_root)
             .append(&self.pre_hash)
@@ -91,7 +92,7 @@ impl rlp::Encodable for EpochHeader {
 
 impl rlp::Decodable for EpochHeader {
     fn decode(r: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
-        if !r.is_list() && r.size() != 14 {
+        if !r.is_list() && r.size() != 15 {
             return Err(rlp::DecoderError::RlpIncorrectListLen);
         }
 
@@ -99,20 +100,22 @@ impl rlp::Decodable for EpochHeader {
         let confirm_root: Vec<Hash> = rlp::decode_list(r.at(1)?.as_raw());
         let cycles_used: Vec<u64> = rlp::decode_list(r.at(2)?.as_raw());
         let epoch_id: u64 = r.at(3)?.as_val()?;
-        let logs_bloom: Vec<Bloom> = rlp::decode_list(r.at(4)?.as_raw());
-        let order_root = rlp::decode(r.at(5)?.as_raw())?;
-        let pre_hash = rlp::decode(r.at(6)?.as_raw())?;
-        let proof: Proof = rlp::decode(r.at(7)?.as_raw())?;
-        let proposer = rlp::decode(r.at(8)?.as_raw())?;
-        let receipt_root: Vec<Hash> = rlp::decode_list(r.at(9)?.as_raw());
-        let state_root = rlp::decode(r.at(10)?.as_raw())?;
-        let timestamp: u64 = r.at(11)?.as_val()?;
-        let validator_version: u64 = r.at(12)?.as_val()?;
-        let validators: Vec<Validator> = rlp::decode_list(r.at(13)?.as_raw());
+        let exec_epoch_id: u64 = r.at(4)?.as_val()?;
+        let logs_bloom: Vec<Bloom> = rlp::decode_list(r.at(5)?.as_raw());
+        let order_root = rlp::decode(r.at(6)?.as_raw())?;
+        let pre_hash = rlp::decode(r.at(7)?.as_raw())?;
+        let proof: Proof = rlp::decode(r.at(8)?.as_raw())?;
+        let proposer = rlp::decode(r.at(9)?.as_raw())?;
+        let receipt_root: Vec<Hash> = rlp::decode_list(r.at(10)?.as_raw());
+        let state_root = rlp::decode(r.at(11)?.as_raw())?;
+        let timestamp: u64 = r.at(12)?.as_val()?;
+        let validator_version: u64 = r.at(13)?.as_val()?;
+        let validators: Vec<Validator> = rlp::decode_list(r.at(14)?.as_raw());
 
         Ok(EpochHeader {
             chain_id,
             epoch_id,
+            exec_epoch_id,
             pre_hash,
             timestamp,
             logs_bloom,

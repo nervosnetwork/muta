@@ -1,14 +1,27 @@
 use std::marker::PhantomData;
 use std::sync::Arc;
 
-use async_trait::async_trait;
+use derive_more::Display;
 
+use async_trait::async_trait;
 use protocol::traits::ExecutorFactory;
 use protocol::traits::{
     APIAdapter, Context, ExecResp, ExecutorParams, MemPool, ServiceMapping, Storage,
 };
 use protocol::types::{Address, Epoch, Hash, Receipt, SignedTransaction, TransactionRequest};
-use protocol::ProtocolResult;
+use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
+
+#[derive(Debug, Display)]
+pub enum APIError {
+    #[display(
+        fmt = "Unexecuted epoch,try to {:?}, but now only reached {:?}",
+        real,
+        expect
+    )]
+    UnExecedError { expect: u64, real: u64 },
+}
+
+impl std::error::Error for APIError {}
 
 pub struct DefaultAPIAdapter<EF, M, S, DB, Mapping> {
     mempool:         Arc<M>,
@@ -74,7 +87,19 @@ impl<
         _ctx: Context,
         tx_hash: Hash,
     ) -> ProtocolResult<Receipt> {
-        self.storage.get_receipt(tx_hash).await
+        let receipt = self.storage.get_receipt(tx_hash).await?;
+        let exec_epoch_id = self.storage.get_latest_epoch().await?.header.exec_epoch_id;
+        let epoch_id = receipt.epoch_id;
+        if exec_epoch_id >= epoch_id {
+            return Ok(receipt);
+        }
+        Err(ProtocolError::new(
+            ProtocolErrorKind::API,
+            Box::new(APIError::UnExecedError {
+                real:   exec_epoch_id,
+                expect: epoch_id,
+            }),
+        ))
     }
 
     async fn get_transaction_by_hash(

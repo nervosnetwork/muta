@@ -119,6 +119,7 @@ pub fn mock_epoch_header() -> EpochHeader {
     EpochHeader {
         chain_id:          mock_hash(),
         epoch_id:          42,
+        exec_epoch_id:     41,
         pre_hash:          mock_hash(),
         timestamp:         420_000_000,
         logs_bloom:        Default::default(),

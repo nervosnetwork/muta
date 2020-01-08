@@ -12,6 +12,7 @@ pub struct Epoch {
 pub struct EpochHeader {
     pub chain_id:          Hash,
     pub epoch_id:          u64,
+    pub exec_epoch_id:     u64,
     pub pre_hash:          Hash,
     pub timestamp:         u64,
     pub logs_bloom:        Vec<Bloom>,

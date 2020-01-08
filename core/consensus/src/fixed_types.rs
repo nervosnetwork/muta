@@ -185,6 +185,7 @@ mod test {
         let header = EpochHeader {
             chain_id: nonce.clone(),
             epoch_id,
+            exec_epoch_id: epoch_id - 1,
             pre_hash: nonce.clone(),
             timestamp: 1000,
             logs_bloom: Default::default(),

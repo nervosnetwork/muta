@@ -70,6 +70,9 @@ pub struct EpochHeader {
 
     #[prost(message, repeated, tag = "14")]
     pub validators: Vec<Validator>,
+
+    #[prost(uint64, tag = "15")]
+    pub exec_epoch_id: u64,
 }
 
 #[derive(Clone, Message)]
@@ -188,6 +191,7 @@ impl From<epoch::EpochHeader> for EpochHeader {
         EpochHeader {
             chain_id,
             epoch_id: epoch_header.epoch_id,
+            exec_epoch_id: epoch_header.exec_epoch_id,
             pre_hash,
             timestamp: epoch_header.timestamp,
             logs_bloom,
@@ -238,6 +242,7 @@ impl TryFrom<EpochHeader> for epoch::EpochHeader {
         let proof = epoch::EpochHeader {
             chain_id: protocol_primitive::Hash::try_from(chain_id)?,
             epoch_id: epoch_header.epoch_id,
+            exec_epoch_id: epoch_header.exec_epoch_id,
             pre_hash: protocol_primitive::Hash::try_from(pre_hash)?,
             timestamp: epoch_header.timestamp,
             logs_bloom,
