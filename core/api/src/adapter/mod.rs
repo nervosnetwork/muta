@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 use std::sync::Arc;
 
-use derive_more::{Display, From};
+use derive_more::Display;
 
 use async_trait::async_trait;
 use protocol::traits::ExecutorFactory;
