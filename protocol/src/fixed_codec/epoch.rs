@@ -71,7 +71,7 @@ impl rlp::Decodable for Validator {
 
 impl rlp::Encodable for EpochHeader {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
-        s.begin_list(14)
+        s.begin_list(15)
             .append(&self.chain_id)
             .append_list(&self.confirm_root)
             .append_list(&self.cycles_used)
@@ -92,7 +92,7 @@ impl rlp::Encodable for EpochHeader {
 
 impl rlp::Decodable for EpochHeader {
     fn decode(r: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
-        if !r.is_list() && r.size() != 14 {
+        if !r.is_list() && r.size() != 15 {
             return Err(rlp::DecoderError::RlpIncorrectListLen);
         }
 
@@ -110,7 +110,7 @@ impl rlp::Decodable for EpochHeader {
         let state_root = rlp::decode(r.at(11)?.as_raw())?;
         let timestamp: u64 = r.at(12)?.as_val()?;
         let validator_version: u64 = r.at(13)?.as_val()?;
-        let validators: Vec<Validator> = rlp::decode_list(r.at(13)?.as_raw());
+        let validators: Vec<Validator> = rlp::decode_list(r.at(14)?.as_raw());
 
         Ok(EpochHeader {
             chain_id,
