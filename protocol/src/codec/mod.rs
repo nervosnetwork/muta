@@ -51,6 +51,16 @@ impl<T: ProtocolCodecSync + 'static> ProtocolCodec for T {
     }
 }
 
+impl ProtocolCodecSync for Bytes {
+    fn encode_sync(&self) -> ProtocolResult<Bytes> {
+        Ok(self.clone())
+    }
+
+    fn decode_sync(bytes: Bytes) -> ProtocolResult<Self> {
+        Ok(bytes)
+    }
+}
+
 #[derive(Debug, From, Display)]
 pub enum CodecError {
     #[display(fmt = "prost encode: {}", _0)]
