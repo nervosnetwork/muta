@@ -3,7 +3,7 @@ use quote::quote;
 use syn::punctuated::Punctuated;
 use syn::{parse_macro_input, FnArg, ImplItemMethod, ReturnType, Token, Type, Visibility};
 
-use crate::common::{assert_ty_servicecontext, get_protocol_result_args};
+use crate::common::{assert_type_servicecontext, get_protocol_result_args};
 
 pub fn verify_read_or_write(item: TokenStream, mutable: bool) -> TokenStream {
     let method_item = parse_macro_input!(item as ImplItemMethod);
@@ -29,8 +29,8 @@ fn verify_visibiity(visibility: &Visibility) {
 }
 
 fn verify_inputs(inputs: &Punctuated<FnArg, Token![,]>, mutable: bool) {
-    if inputs.len() < 2 {
-        panic!("The two required parameters are missing: `&self/&mut self` and `ServiceContext`.")
+    if inputs.len() < 2 || inputs.len() > 3 {
+        panic!("The input parameters should be `(&self/&mut self, ctx: ServiceContext)` or `(&self/&mut self, ctx: ServiceContext, payload: PayloadType)`")
     }
 
     if mutable {
@@ -44,9 +44,9 @@ fn verify_inputs(inputs: &Punctuated<FnArg, Token![,]>, mutable: bool) {
     match &inputs[1] {
         FnArg::Typed(pt) => {
             let ty = pt.ty.as_ref();
-            assert_ty_servicecontext(ty)
+            assert_type_servicecontext(ty)
         }
-        _ => panic!("The second parameter should be `ServiceContext`."),
+        _ => panic!("The second parameter type should be `ServiceContext`."),
     }
 }
 

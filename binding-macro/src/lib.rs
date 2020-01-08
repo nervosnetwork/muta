@@ -91,7 +91,7 @@ pub fn write(_: TokenStream, item: TokenStream) -> TokenStream {
 ///
 /// // Generated code.
 /// impl Tests {
-///     fn test_cycles<Context: RequestContext>(&self, ctx: Context) -> ProtocolResult<()> {
+///     fn test_cycles(&self, ctx: ServiceContext) -> ProtocolResult<()> {
 ///         ctx.sub_cycles(100)?;
 ///         Ok(())
 ///     }
@@ -197,7 +197,7 @@ pub fn hook_before(_: TokenStream, item: TokenStream) -> TokenStream {
 ///         }
 ///     }
 ///
-///     fn read<Context: RequestContext>(&self, ctx: Context) -> ProtocolResult<&str> {
+///     fn read(&self, ctx: ServiceContext) -> ProtocolResult<&str> {
 ///         let method = ctx.get_service_method();
 ///
 ///         match ctx.get_service_method() {

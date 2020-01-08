@@ -37,7 +37,7 @@ fn path_is_request_context(path: &Path, bound_name: &str) -> bool {
     path.segments.len() == 1 && path.segments[0].ident == bound_name
 }
 
-pub fn assert_ty_servicecontext(ty: &Type) {
+pub fn assert_type_servicecontext(ty: &Type) {
     match ty {
         Type::Path(ty_path) => {
             let path = &ty_path.path;
