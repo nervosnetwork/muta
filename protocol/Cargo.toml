@@ -11,16 +11,16 @@ description = "Contains all the core data types and traits of the muta framework
 
 [dependencies]
 futures = "0.3"
-derive_more = "0.15"
+derive_more = "0.99"
 async-trait = "0.1"
 lazy_static = "1.4"
 num-bigint = "0.2"
 ethbloom = "0.8"
-bytes = "0.5"
-hex = "0.3"
+hex = "0.4"
 prost = "0.6"
+bytes = { version = "0.5", features = ["serde"] }
 hasher = { version = "0.1", features = ['hash-keccak'] }
-creep = "0.1"
+creep = "0.2"
 bincode = "1.2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

@@ -1,10 +1,7 @@
 use async_trait::async_trait;
 use creep::Context;
 
-use crate::traits::{ExecutorParams, ExecutorResp};
-use crate::types::{
-    Address, Epoch, Hash, MerkleRoot, Proof, Receipt, SignedTransaction, Validator,
-};
+use crate::types::{Address, Bytes, Epoch, Hash, MerkleRoot, Proof, SignedTransaction, Validator};
 use crate::{traits::mempool::MixedTxHashes, ProtocolResult};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -136,11 +133,12 @@ pub trait ConsensusAdapter: CommonConsensusAdapter + Send + Sync {
     /// Execute some transactions.
     async fn execute(
         &self,
-        node_info: NodeInfo,
+        chain_id: Hash,
         order_root: MerkleRoot,
         epoch_id: u64,
         cycles_price: u64,
         coinbase: Address,
+        epoch_hash: Hash,
         signed_txs: Vec<SignedTransaction>,
         cycles_limit: u64,
         timestamp: u64,
@@ -152,4 +150,49 @@ pub trait ConsensusAdapter: CommonConsensusAdapter + Send + Sync {
         ctx: Context,
         epoch_id: u64,
     ) -> ProtocolResult<Vec<Validator>>;
+
+    /// Get the current epoch ID from storage.
+    async fn get_current_epoch_id(&self, ctx: Context) -> ProtocolResult<u64>;
+
+    /// Pull some epochs from other nodes from `begin` to `end`.
+    async fn pull_epoch(&self, ctx: Context, epoch_id: u64, end: &str) -> ProtocolResult<Epoch>;
+
+    /// Pull signed transactions corresponding to the given hashes from other
+    /// nodes.
+    async fn pull_txs(
+        &self,
+        ctx: Context,
+        hashes: Vec<Hash>,
+        end: &str,
+    ) -> ProtocolResult<Vec<SignedTransaction>>;
+
+    /// Get an epoch corresponding to the given epoch ID.
+    async fn get_epoch_by_id(&self, ctx: Context, epoch_id: u64) -> ProtocolResult<Epoch>;
+
+    /// Save overlord wal info.
+    async fn save_overlord_wal(&self, ctx: Context, info: Bytes) -> ProtocolResult<()>;
+
+    /// Load latest overlord wal info.
+    async fn load_overlord_wal(&self, ctx: Context) -> ProtocolResult<Bytes>;
+
+    /// Save muta wal info.
+    async fn save_muta_wal(&self, ctx: Context, info: Bytes) -> ProtocolResult<()>;
+
+    /// Load lastest muta wal info.
+    async fn load_muta_wal(&self, ctx: Context) -> ProtocolResult<Bytes>;
+
+    /// Save full transcations with the epoch hash when check epoch.
+    async fn save_wal_transactions(
+        &self,
+        ctx: Context,
+        epoch_hash: Hash,
+        txs: Vec<SignedTransaction>,
+    ) -> ProtocolResult<()>;
+
+    /// Load full transactions by the given epoch hash.
+    async fn load_wal_transactions(
+        &self,
+        ctx: Context,
+        epoch_hash: Hash,
+    ) -> ProtocolResult<Vec<SignedTransaction>>;
 }

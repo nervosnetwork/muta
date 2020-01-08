@@ -1,8 +1,9 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::convert::TryFrom;
 use std::error::Error;
 
 use overlord::Crypto;
+use rlp::{Decodable, DecoderError, Encodable, Prototype, Rlp, RlpStream};
 
 use crate::ConsensusError;
 use common_crypto::{
@@ -10,7 +11,7 @@ use common_crypto::{
     PrivateKey, Signature,
 };
 use protocol::types::{Address, Hash, MerkleRoot, SignedTransaction};
-use protocol::{Bytes, ProtocolError};
+use protocol::{Bytes, ProtocolError, ProtocolResult};
 
 pub struct OverlordCrypto {
     private_key: BlsPrivateKey,
@@ -134,12 +135,159 @@ impl OverlordCrypto {
 pub struct ExecuteInfo {
     pub epoch_id:     u64,
     pub chain_id:     Hash,
+    pub epoch_hash:   Hash,
     pub signed_txs:   Vec<SignedTransaction>,
     pub order_root:   MerkleRoot,
     pub cycles_price: u64,
     pub coinbase:     Address,
     pub timestamp:    u64,
     pub cycles_limit: u64,
+}
+
+impl Into<ExecWalInfo> for ExecuteInfo {
+    fn into(self) -> ExecWalInfo {
+        ExecWalInfo {
+            epoch_id:     self.epoch_id,
+            chain_id:     self.chain_id,
+            epoch_hash:   self.epoch_hash,
+            order_root:   self.order_root,
+            cycles_price: self.cycles_price,
+            coinbase:     self.coinbase,
+            timestamp:    self.timestamp,
+            cycles_limit: self.cycles_limit,
+        }
+    }
+}
+
+impl ExecuteInfo {
+    pub fn from_wal_info(wal_info: ExecWalInfo, txs: Vec<SignedTransaction>) -> Self {
+        ExecuteInfo {
+            epoch_id:     wal_info.epoch_id,
+            chain_id:     wal_info.chain_id,
+            epoch_hash:   wal_info.epoch_hash,
+            signed_txs:   txs,
+            order_root:   wal_info.order_root,
+            cycles_price: wal_info.cycles_price,
+            coinbase:     wal_info.coinbase,
+            timestamp:    wal_info.timestamp,
+            cycles_limit: wal_info.cycles_limit,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ExecWalInfo {
+    pub epoch_id:     u64,
+    pub chain_id:     Hash,
+    pub epoch_hash:   Hash,
+    pub order_root:   MerkleRoot,
+    pub cycles_price: u64,
+    pub coinbase:     Address,
+    pub timestamp:    u64,
+    pub cycles_limit: u64,
+}
+
+impl Encodable for ExecWalInfo {
+    fn rlp_append(&self, s: &mut RlpStream) {
+        s.begin_list(8)
+            .append(&self.epoch_id)
+            .append(&self.chain_id)
+            .append(&self.epoch_hash)
+            .append(&self.order_root)
+            .append(&self.cycles_price)
+            .append(&self.coinbase)
+            .append(&self.timestamp)
+            .append(&self.cycles_limit);
+    }
+}
+
+impl Decodable for ExecWalInfo {
+    fn decode(r: &Rlp) -> Result<Self, DecoderError> {
+        match r.prototype()? {
+            Prototype::List(8) => {
+                let epoch_id: u64 = r.val_at(0)?;
+                let chain_id: Hash = r.val_at(1)?;
+                let epoch_hash: Hash = r.val_at(2)?;
+                let order_root: Hash = r.val_at(3)?;
+                let cycles_price: u64 = r.val_at(4)?;
+                let coinbase: Address = r.val_at(5)?;
+                let timestamp: u64 = r.val_at(6)?;
+                let cycles_limit: u64 = r.val_at(7)?;
+                Ok(ExecWalInfo {
+                    epoch_id,
+                    chain_id,
+                    epoch_hash,
+                    order_root,
+                    cycles_price,
+                    coinbase,
+                    timestamp,
+                    cycles_limit,
+                })
+            }
+            _ => Err(DecoderError::RlpInconsistentLengthAndData),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct WalInfoQueue {
+    pub inner: BTreeMap<u64, ExecWalInfo>,
+}
+
+impl Encodable for WalInfoQueue {
+    fn rlp_append(&self, s: &mut RlpStream) {
+        s.begin_list(1).append_list(
+            &self
+                .inner
+                .iter()
+                .map(|(_id, info)| info.clone())
+                .collect::<Vec<ExecWalInfo>>(),
+        );
+    }
+}
+
+impl Decodable for WalInfoQueue {
+    fn decode(r: &Rlp) -> Result<Self, DecoderError> {
+        match r.prototype()? {
+            Prototype::List(1) => {
+                let tmp: Vec<ExecWalInfo> = r.list_at(0)?;
+                let inner = tmp
+                    .into_iter()
+                    .map(|info| (info.epoch_id, info))
+                    .collect::<BTreeMap<_, _>>();
+                Ok(WalInfoQueue { inner })
+            }
+            _ => Err(DecoderError::RlpInconsistentLengthAndData),
+        }
+    }
+}
+
+#[allow(clippy::new_without_default)]
+impl WalInfoQueue {
+    pub fn new() -> Self {
+        WalInfoQueue {
+            inner: BTreeMap::new(),
+        }
+    }
+
+    pub fn insert(&mut self, info: ExecWalInfo) {
+        self.inner.insert(info.epoch_id, info);
+    }
+
+    pub fn remove_by_epoch_id(&mut self, epoch_id: u64) -> ProtocolResult<()> {
+        match self.inner.remove(&epoch_id) {
+            Some(_) => Ok(()),
+            None => Err(ConsensusError::ExecuteErr(format!(
+                "wal info queue does not contain epoch ID {}",
+                epoch_id
+            ))
+            .into()),
+        }
+    }
+
+    pub fn clear(&mut self) {
+        self.inner.clear();
+    }
 }
 
 #[cfg(test)]

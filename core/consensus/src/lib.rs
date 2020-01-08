@@ -14,6 +14,8 @@ pub use crate::adapter::OverlordConsensusAdapter;
 pub use crate::consensus::OverlordConsensus;
 pub use crate::synchronization_v2::OverlordSynchronization;
 pub use overlord::DurationConfig;
+pub use crate::util::WalInfoQueue;
+pub use overlord::{types::Node, DurationConfig};
 
 use std::error::Error;
 
@@ -135,6 +137,9 @@ pub enum ConsensusError {
     ///
     #[display(fmt = "Status cache error {:?}", _0)]
     StatusErr(StatusCacheField),
+
+    ///
+    WalErr(String),
 
     /// Other error used for very few errors.
     #[display(fmt = "{:?}", _0)]

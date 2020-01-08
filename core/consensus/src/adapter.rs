@@ -4,9 +4,11 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use futures::channel::mpsc::{channel, Receiver, Sender};
+use futures::executor::block_on;
 use futures::stream::StreamExt;
 use overlord::types::OverlordMsg;
 use overlord::OverlordHandler;
+use log::{debug, info};
 use parking_lot::RwLock;
 
 use protocol::traits::{
@@ -15,7 +17,7 @@ use protocol::traits::{
     ServiceMapping, Storage, SynchronizationAdapter,
 };
 use protocol::types::{
-    Address, Epoch, Hash, MerkleRoot, Proof, Receipt, SignedTransaction, Validator,
+    Address, Bytes, Epoch, Hash, MerkleRoot, Proof, Receipt, SignedTransaction, Validator,
 };
 use protocol::ProtocolResult;
 
@@ -23,7 +25,7 @@ use crate::consensus::gen_overlord_status;
 use crate::fixed_types::{FixedEpoch, FixedEpochID, FixedPill, FixedSignedTxs, PullTxsRequest};
 use crate::message::{BROADCAST_EPOCH_ID, RPC_SYNC_PULL_EPOCH, RPC_SYNC_PULL_TXS};
 use crate::status::{StatusAgent, UpdateInfo};
-use crate::util::ExecuteInfo;
+use crate::util::{ExecuteInfo, WalInfoQueue};
 use crate::ConsensusError;
 
 const OVERLORD_GAP: usize = 10;
@@ -45,8 +47,9 @@ pub struct OverlordConsensusAdapter<
     service_mapping:  Arc<Mapping>,
     overlord_handler: RwLock<Option<OverlordHandler<FixedPill>>>,
 
-    exec_queue:  Sender<ExecuteInfo>,
-    exec_demons: Option<ExecDemons<S, DB, EF, Mapping>>,
+    exec_queue:     Sender<ExecuteInfo>,
+    exec_queue_wal: Arc<RwLock<WalInfoQueue>>,
+    exec_demons:    Option<ExecDemons<S, DB, EF, Mapping>>,
 }
 
 #[async_trait]
@@ -110,20 +113,21 @@ where
 
     async fn execute(
         &self,
-        node_info: NodeInfo,
+        chain_id: Hash,
         order_root: MerkleRoot,
         epoch_id: u64,
         cycles_price: u64,
         coinbase: Address,
+        epoch_hash: Hash,
         signed_txs: Vec<SignedTransaction>,
         cycles_limit: u64,
         timestamp: u64,
     ) -> ProtocolResult<()> {
-        let chain_id = node_info.chain_id;
         let exec_info = ExecuteInfo {
             epoch_id,
             chain_id,
             cycles_price,
+            epoch_hash,
             signed_txs,
             order_root,
             coinbase,
@@ -132,9 +136,9 @@ where
         };
 
         let mut tx = self.exec_queue.clone();
-        tx.try_send(exec_info)
+        tx.try_send(exec_info.clone())
             .map_err(|e| ConsensusError::ExecuteErr(e.to_string()))?;
-        Ok(())
+        self.save_queue_wal(exec_info).await
     }
 
     async fn get_last_validators(
@@ -295,6 +299,37 @@ where
         self.network
             .broadcast(ctx.clone(), BROADCAST_EPOCH_ID, epoch_id, Priority::High)
             .await
+    async fn save_overlord_wal(&self, _ctx: Context, info: Bytes) -> ProtocolResult<()> {
+        self.storage.update_overlord_wal(info).await
+    }
+
+    async fn load_overlord_wal(&self, _ctx: Context) -> ProtocolResult<Bytes> {
+        self.storage.load_overlord_wal().await
+    }
+
+    async fn save_muta_wal(&self, _ctx: Context, info: Bytes) -> ProtocolResult<()> {
+        self.storage.update_muta_wal(info).await
+    }
+
+    async fn load_muta_wal(&self, _ctx: Context) -> ProtocolResult<Bytes> {
+        self.storage.load_muta_wal().await
+    }
+
+    async fn save_wal_transactions(
+        &self,
+        _ctx: Context,
+        epoch_hash: Hash,
+        txs: Vec<SignedTransaction>,
+    ) -> ProtocolResult<()> {
+        self.storage.insert_wal_transactions(epoch_hash, txs).await
+    }
+
+    async fn load_wal_transactions(
+        &self,
+        _ctx: Context,
+        epoch_hash: Hash,
+    ) -> ProtocolResult<Vec<SignedTransaction>> {
+        self.storage.get_wal_transactions(epoch_hash).await
     }
 }
 
@@ -316,17 +351,21 @@ where
         trie_db: Arc<DB>,
         service_mapping: Arc<Mapping>,
         status_agent: StatusAgent,
-    ) -> Self {
+        state_root: MerkleRoot,
+        queue_wal: WalInfoQueue,
+    ) -> ProtocolResult<Self> {
         let (exec_queue, rx) = channel(OVERLORD_GAP);
+        let exec_queue_wal = Arc::new(RwLock::new(WalInfoQueue::new()));
         let exec_demons = Some(ExecDemons::new(
             Arc::clone(&storage),
             Arc::clone(&trie_db),
             Arc::clone(&service_mapping),
             rx,
+            Arc::clone(&exec_queue_wal),
             status_agent,
         ));
 
-        OverlordConsensusAdapter {
+        let adapter = OverlordConsensusAdapter {
             rpc,
             network,
             mempool,
@@ -335,8 +374,12 @@ where
             service_mapping,
             overlord_handler: RwLock::new(None),
             exec_queue,
+            exec_queue_wal,
             exec_demons,
-        }
+        };
+
+        block_on(adapter.init_exec_queue(queue_wal))?;
+        Ok(adapter)
     }
 
     pub fn take_exec_demon(&mut self) -> ExecDemons<S, DB, EF, Mapping> {
@@ -346,6 +389,38 @@ where
 
     pub fn set_overlord_handler(&self, handler: OverlordHandler<FixedPill>) {
         *self.overlord_handler.write() = Some(handler)
+    async fn save_queue_wal(&self, exec_info: ExecuteInfo) -> ProtocolResult<()> {
+        let wal_info = {
+            let mut map = self.exec_queue_wal.write();
+            map.insert(exec_info.into());
+            map.clone()
+        };
+
+        self.storage
+            .update_exec_queue_wal(Bytes::from(rlp::encode(&wal_info)))
+            .await?;
+        Ok(())
+    }
+
+    async fn init_exec_queue(&self, queue: WalInfoQueue) -> ProtocolResult<()> {
+        for (_id, info) in queue.inner.into_iter() {
+            let txs = self
+                .load_wal_transactions(Context::new(), info.epoch_hash.clone())
+                .await?;
+            self.execute(
+                info.chain_id,
+                info.order_root,
+                info.epoch_id,
+                info.cycles_price,
+                info.coinbase,
+                info.epoch_hash,
+                txs,
+                info.cycles_limit,
+                info.timestamp,
+            )
+            .await?;
+        }
+        Ok(())
     }
 }
 
@@ -355,9 +430,11 @@ pub struct ExecDemons<S, DB, EF, Mapping> {
     trie_db:         Arc<DB>,
     service_mapping: Arc<Mapping>,
 
-    pin_ef: PhantomData<EF>,
-    queue:  Receiver<ExecuteInfo>,
-    status: StatusAgent,
+    pin_ef:     PhantomData<EF>,
+    queue:      Receiver<ExecuteInfo>,
+    queue_wal:  Arc<RwLock<WalInfoQueue>>,
+    state_root: MerkleRoot,
+    status:     StatusAgent,
 }
 
 impl<S, DB, EF, Mapping> ExecDemons<S, DB, EF, Mapping>
@@ -372,6 +449,7 @@ where
         trie_db: Arc<DB>,
         service_mapping: Arc<Mapping>,
         rx: Receiver<ExecuteInfo>,
+        wal: Arc<RwLock<WalInfoQueue>>,
         status_agent: StatusAgent,
     ) -> Self {
         ExecDemons {
@@ -379,6 +457,7 @@ where
             trie_db,
             service_mapping,
             queue: rx,
+            queue_wal: wal,
             pin_ef: PhantomData,
             status: status_agent,
         }
@@ -414,7 +493,8 @@ where
             let resp = executor.exec(&exec_params, &txs)?;
             self.save_receipts(resp.receipts.clone()).await?;
             self.status
-                .update_after_exec(UpdateInfo::with_after_exec(epoch_id, order_root, resp));
+                .update_after_exec(gen_update_info(resp.clone(), epoch_id, order_root));
+            self.save_wal(epoch_id).await?;
         } else {
             return Err(ConsensusError::Other("Queue disconnect".to_string()).into());
         }
@@ -423,5 +503,19 @@ where
 
     async fn save_receipts(&self, receipts: Vec<Receipt>) -> ProtocolResult<()> {
         self.storage.insert_receipts(receipts).await
+    }
+
+    async fn save_wal(&self, epoch_id: u64) -> ProtocolResult<()> {
+        let info = {
+            let mut map = self.queue_wal.write();
+            map.remove_by_epoch_id(epoch_id)?;
+            map.clone()
+        };
+        let queue_info = Bytes::from(rlp::encode(&info));
+        let mut info = self.status.to_inner();
+        let wal_info = MessageCodec::encode(&mut info).await?;
+
+        self.storage.update_exec_queue_wal(queue_info).await?;
+        self.storage.update_muta_wal(wal_info).await
     }
 }

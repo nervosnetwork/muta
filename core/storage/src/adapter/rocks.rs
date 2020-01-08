@@ -26,6 +26,7 @@ impl RocksAdapter {
             map_category(StorageCategory::Epoch),
             map_category(StorageCategory::Receipt),
             map_category(StorageCategory::SignedTransaction),
+            map_category(StorageCategory::Wal),
         ];
 
         let db = DB::open_cf(&opts, path, categories.iter()).map_err(RocksAdapterError::from)?;
@@ -164,12 +165,14 @@ impl From<RocksAdapterError> for ProtocolError {
 const C_EPOCHS: &str = "c1";
 const C_SIGNED_TRANSACTIONS: &str = "c2";
 const C_RECEIPTS: &str = "c3";
+const C_WALS: &str = "c4";
 
 fn map_category(c: StorageCategory) -> &'static str {
     match c {
         StorageCategory::Epoch => C_EPOCHS,
         StorageCategory::Receipt => C_RECEIPTS,
         StorageCategory::SignedTransaction => C_SIGNED_TRANSACTIONS,
+        StorageCategory::Wal => C_WALS,
     }
 }
 
