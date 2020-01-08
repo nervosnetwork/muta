@@ -26,12 +26,18 @@ And the next step, also the only step:
 ```shell
 $ git clone https://github.com/nervosnetwork/muta.git
 $ cd muta
-$ cargo run
+$ cargo run --release --example muta-chain
+```
+
+You can also run muta chain with your custom config and gensis epoch:
+
+```shell
+$ CONFIG=$confit_path GENSIS=$gensis_path cargo run --release --example muta-chain
 ```
 
 If everything goes well, you’ll see this appear:
 
-```
+```log
 [2019-09-25T15:26:14Z INFO  muta] Go with config: Config { .. }
 ```
 
