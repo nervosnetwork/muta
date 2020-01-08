@@ -16,8 +16,12 @@ use crate::common::{get_protocol_result_args, assert_ty_servicecontext};
 =======
 use syn::{parse_macro_input, FnArg, ImplItemMethod, ReturnType, Token, Type, Visibility};
 
+<<<<<<< HEAD
 use crate::common::{assert_ty_servicecontext, get_protocol_result_args};
 >>>>>>> pass ci
+=======
+use crate::common::{assert_type_servicecontext, get_protocol_result_args};
+>>>>>>> feat(binding-macro): service method supports none payload and none response
 
 pub fn verify_read_or_write(item: TokenStream, mutable: bool) -> TokenStream {
     let method_item = parse_macro_input!(item as ImplItemMethod);
@@ -58,9 +62,9 @@ fn verify_inputs(inputs: &Punctuated<FnArg, Token![,]>, mutable: bool) {
     match &inputs[1] {
         FnArg::Typed(pt) => {
             let ty = pt.ty.as_ref();
-            assert_ty_servicecontext(ty)
+            assert_type_servicecontext(ty)
         }
-        _ => panic!("The second parameter should be `ServiceContext`."),
+        _ => panic!("The second parameter type should be `ServiceContext`."),
     }
 }
 
