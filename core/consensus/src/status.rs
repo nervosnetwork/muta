@@ -68,8 +68,8 @@ pub struct CurrentConsensusStatus {
 
 impl CurrentConsensusStatus {
     fn update_after_exec(&mut self, info: UpdateInfo) {
-        log::info!("update info{}", info);
-        log::info!("update after exec: {}", self);
+        log::info!("update info {}", info);
+        log::info!("update after exec cache: {}", self);
         trace_after_exec(&info);
 
         assert!(info.exec_epoch_id == self.exec_epoch_id + 1);
@@ -88,8 +88,8 @@ impl CurrentConsensusStatus {
         prev_hash: Hash,
         proof: Proof,
     ) -> ProtocolResult<()> {
-        log::info!("update info {:?}, {:?}", epoch_id, prev_hash);
-        log::info!("update after commit: {}", self);
+        log::info!("update info {}, {:?}", epoch_id, prev_hash);
+        log::info!("update after commit cache: {}", self);
 
         self.epoch_id = epoch_id;
         self.prev_hash = prev_hash;
