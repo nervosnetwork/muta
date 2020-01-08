@@ -83,11 +83,21 @@ pub fn gen_service_code(_: TokenStream, item: TokenStream) -> TokenStream {
                         let payload: #list_read_payload = serde_json::from_str(ctx.get_payload())
                                 .map_err(|e| protocol::traits::BindingMacroError::JsonParse(e))?;
                         let res = self.#list_read_ident(ctx, payload)?;
-                        serde_json::to_string(&res).map_err(|e| protocol::traits::BindingMacroError::JsonParse(e).into())
+                        let res_str = serde_json::to_string(&res).map_err(|e| protocol::traits::BindingMacroError::JsonParse(e))?;
+                        if res_str.as_str() == "null" {
+                            Ok("".to_owned())
+                        } else {
+                            Ok(res_str)
+                        }
                     },)*
                     #(#list_read_name_nonepayload => {
                         let res = self.#list_read_ident_nonepayload(ctx)?;
-                        serde_json::to_string(&res).map_err(|e| protocol::traits::BindingMacroError::JsonParse(e).into())
+                        let res_str = serde_json::to_string(&res).map_err(|e| protocol::traits::BindingMacroError::JsonParse(e))?;
+                        if res_str.as_str() == "null" {
+                            Ok("".to_owned())
+                        } else {
+                            Ok(res_str)
+                        }
                     },)*
                     _ => Err(protocol::traits::BindingMacroError::NotFoundMethod{ service: service.to_owned(), method: method.to_owned() }.into())
                 }
@@ -102,11 +112,21 @@ pub fn gen_service_code(_: TokenStream, item: TokenStream) -> TokenStream {
                         let payload: #list_write_payload = serde_json::from_str(ctx.get_payload())
                                 .map_err(|e| protocol::traits::BindingMacroError::JsonParse(e))?;
                         let res = self.#list_write_ident(ctx, payload)?;
-                        serde_json::to_string(&res).map_err(|e| protocol::traits::BindingMacroError::JsonParse(e).into())
+                        let res_str = serde_json::to_string(&res).map_err(|e| protocol::traits::BindingMacroError::JsonParse(e))?;
+                        if res_str.as_str() == "null" {
+                            Ok("".to_owned())
+                        } else {
+                            Ok(res_str)
+                        }
                     },)*
                     #(#list_write_name_nonepayload => {
                         let res = self.#list_write_ident_nonepayload(ctx)?;
-                        serde_json::to_string(&res).map_err(|e| protocol::traits::BindingMacroError::JsonParse(e).into())
+                        let res_str = serde_json::to_string(&res).map_err(|e| protocol::traits::BindingMacroError::JsonParse(e))?;
+                        if res_str.as_str() == "null" {
+                            Ok("".to_owned())
+                        } else {
+                            Ok(res_str)
+                        }
                     },)*
                     _ => Err(protocol::traits::BindingMacroError::NotFoundMethod{ service: service.to_owned(), method: method.to_owned() }.into())
                 }

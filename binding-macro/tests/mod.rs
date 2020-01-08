@@ -312,11 +312,11 @@ fn test_service_none_response() {
 
     let context = get_context(1024 * 1024, "", "test_write", "");
     let write_res = test_service.write_(context).unwrap();
-    assert_eq!(write_res, "null");
+    assert_eq!(write_res, "");
 
     let context = get_context(1024 * 1024, "", "test_read", "");
     let read_res = test_service.read_(context).unwrap();
-    assert_eq!(read_res, "null");
+    assert_eq!(read_res, "");
 
     let context = get_context(1024 * 1024, "", "test_notfound", "");
     let read_res = test_service.read_(context.clone());

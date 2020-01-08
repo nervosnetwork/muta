@@ -20,7 +20,7 @@ use crate::service::gen_service_code;
 /// - Verification
 ///  1. Is it a struct method marked with #[service]?
 ///  2. Is visibility private?
-///  3. Parameter signature contains `&self and ctx:ServiceContext`?
+///  3. Parameter signature contains `&self and ctx: ServiceContext`?
 ///  4. Is the return value `ProtocolResult <T: Deserialize + Serialize>` or `ProtocolResult <()>`?
 ///
 /// # Example:
@@ -53,7 +53,7 @@ pub fn read(_: TokenStream, item: TokenStream) -> TokenStream {
 /// - Verification
 ///  1. Is it a struct method marked with #[service]?
 ///  2. Is visibility private?
-///  3. Parameter signature contains `&self and ctx:ServiceContext`?
+///  3. Parameter signature contains `&self and ctx: ServiceContext`?
 ///  4. Is the return value `ProtocolResult <T: Deserialize + Serialize>` or `ProtocolResult <()>`?
 ///
 /// # Example:
