@@ -1,8 +1,9 @@
-use crate::common::{assert_type_servicecontext, get_protocol_result_args};
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::punctuated::Punctuated;
 use syn::{parse_macro_input, FnArg, ImplItemMethod, ReturnType, Token, Type, Visibility};
+
+use crate::common::{assert_type_servicecontext, get_protocol_result_args};
 
 pub fn verify_read_or_write(item: TokenStream, mutable: bool) -> TokenStream {
     let method_item = parse_macro_input!(item as ImplItemMethod);
