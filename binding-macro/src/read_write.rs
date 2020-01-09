@@ -1,27 +1,8 @@
+use crate::common::{assert_type_servicecontext, get_protocol_result_args};
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::punctuated::Punctuated;
-<<<<<<< HEAD
-<<<<<<< HEAD
 use syn::{parse_macro_input, FnArg, ImplItemMethod, ReturnType, Token, Type, Visibility};
-
-use crate::common::{assert_type_servicecontext, get_protocol_result_args};
-=======
-use syn::{
-    parse_macro_input, FnArg, ImplItemMethod, ReturnType, Token, Type, Visibility,
-};
-
-use crate::common::{get_protocol_result_args, assert_ty_servicecontext};
->>>>>>> fix(binding-macro): service method signatures supports no extra params
-=======
-use syn::{parse_macro_input, FnArg, ImplItemMethod, ReturnType, Token, Type, Visibility};
-
-<<<<<<< HEAD
-use crate::common::{assert_ty_servicecontext, get_protocol_result_args};
->>>>>>> pass ci
-=======
-use crate::common::{assert_type_servicecontext, get_protocol_result_args};
->>>>>>> feat(binding-macro): service method supports none payload and none response
 
 pub fn verify_read_or_write(item: TokenStream, mutable: bool) -> TokenStream {
     let method_item = parse_macro_input!(item as ImplItemMethod);

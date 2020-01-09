@@ -44,7 +44,7 @@ pub fn assert_type_servicecontext(ty: &Type) {
             assert_eq!(path.leading_colon.is_none(), true);
             assert_eq!(path.segments.len(), 1);
             assert_eq!(path.segments[0].ident, "ServiceContext")
-        },
+        }
         _ => panic!("The type should be `ServiceContext"),
     }
 }
