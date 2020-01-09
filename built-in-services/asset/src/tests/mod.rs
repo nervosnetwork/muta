@@ -108,7 +108,7 @@ fn new_asset_service() -> AssetService<
         NoopDispatcher {},
     );
 
-    AssetService::init(sdk).unwrap()
+    AssetService::new(sdk).unwrap()
 }
 
 fn mock_context(cycles_limit: u64, caller: Address) -> ServiceContext {

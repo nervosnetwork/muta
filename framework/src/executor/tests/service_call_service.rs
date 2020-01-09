@@ -94,7 +94,7 @@ pub struct MockService<SDK> {
 
 #[service]
 impl<SDK: ServiceSDK> MockService<SDK> {
-    pub fn init(sdk: SDK) -> ProtocolResult<Self> {
+    pub fn new(sdk: SDK) -> ProtocolResult<Self> {
         Ok(Self { sdk })
     }
 
@@ -128,8 +128,8 @@ impl ServiceMapping for MockServiceMapping {
         sdk: SDK,
     ) -> ProtocolResult<Box<dyn Service>> {
         let service = match name {
-            "mock" => Box::new(MockService::init(sdk)?) as Box<dyn Service>,
-            "asset" => Box::new(AssetService::init(sdk)?) as Box<dyn Service>,
+            "mock" => Box::new(MockService::new(sdk)?) as Box<dyn Service>,
+            "asset" => Box::new(AssetService::new(sdk)?) as Box<dyn Service>,
             _ => panic!("not found service"),
         };
 

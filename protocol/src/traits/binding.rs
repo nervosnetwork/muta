@@ -97,6 +97,11 @@ pub trait AdmissionControl {
 // - read: Provide some read-only functions for users or other services to call
 // - write: provide some writable functions for users or other services to call
 pub trait Service {
+    // Executed to create genesis states when starting chain
+    fn genesis_(&mut self, _payload: String) -> ProtocolResult<()> {
+        Ok(())
+    }
+
     // Executed before the epoch is executed.
     fn hook_before_(&mut self) -> ProtocolResult<()> {
         Ok(())
