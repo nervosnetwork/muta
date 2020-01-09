@@ -1,23 +1,20 @@
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::punctuated::Punctuated;
-use syn::{
-    parse_macro_input, FnArg, Generics, ImplItemMethod, ReturnType, Token, Type, Visibility,
-};
+use syn::{parse_macro_input, FnArg, ImplItemMethod, ReturnType, Token, Type, Visibility};
 
-use crate::common::get_protocol_result_args;
+use crate::common::{assert_type_servicecontext, get_protocol_result_args};
 
 pub fn verify_read_or_write(item: TokenStream, mutable: bool) -> TokenStream {
     let method_item = parse_macro_input!(item as ImplItemMethod);
 
     let visibility = &method_item.vis;
     let inputs = &method_item.sig.inputs;
-    let generics = &method_item.sig.generics;
     let ret_type = &method_item.sig.output;
 
     verify_visibiity(visibility);
 
-    verify_inputs(inputs, generics, mutable);
+    verify_inputs(inputs, mutable);
 
     verify_ret_type(ret_type);
 
@@ -31,9 +28,9 @@ fn verify_visibiity(visibility: &Visibility) {
     };
 }
 
-fn verify_inputs(inputs: &Punctuated<FnArg, Token![,]>, _generics: &Generics, mutable: bool) {
-    if inputs.len() < 2 {
-        panic!("The two required parameters are missing: `&self/&mut self` and `ServiceContext`.")
+fn verify_inputs(inputs: &Punctuated<FnArg, Token![,]>, mutable: bool) {
+    if inputs.len() < 2 || inputs.len() > 3 {
+        panic!("The input parameters should be `(&self/&mut self, ctx: ServiceContext)` or `(&self/&mut self, ctx: ServiceContext, payload: PayloadType)`")
     }
 
     if mutable {
@@ -42,6 +39,14 @@ fn verify_inputs(inputs: &Punctuated<FnArg, Token![,]>, _generics: &Generics, mu
         }
     } else if !arg_is_inmutable_receiver(&inputs[0]) {
         panic!("The receiver must be `&self`.")
+    }
+
+    match &inputs[1] {
+        FnArg::Typed(pt) => {
+            let ty = pt.ty.as_ref();
+            assert_type_servicecontext(ty)
+        }
+        _ => panic!("The second parameter type should be `ServiceContext`."),
     }
 }
 

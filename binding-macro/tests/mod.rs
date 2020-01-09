@@ -1,3 +1,4 @@
+#![allow(clippy::unit_cmp)]
 #[macro_use]
 extern crate binding_macro;
 
@@ -21,12 +22,12 @@ fn test_read_and_write() {
 
     impl Tests {
         #[read]
-        fn test_read_fn(&self, _ctx: ServiceContext) -> ProtocolResult<String> {
+        fn test_read_fn(&self, _ctx: ServiceContext, _s: &str) -> ProtocolResult<String> {
             Ok("read".to_owned())
         }
 
         #[write]
-        fn test_write_fn(&mut self, _ctx: ServiceContext) -> ProtocolResult<String> {
+        fn test_write_fn(&mut self, _ctx: ServiceContext, _s: &str) -> ProtocolResult<String> {
             Ok("write".to_owned())
         }
     }
@@ -34,8 +35,37 @@ fn test_read_and_write() {
     let context = get_context(1000, "", "", "");
 
     let mut t = Tests {};
-    assert_eq!(t.test_read_fn(context.clone()).unwrap(), "read".to_owned());
-    assert_eq!(t.test_write_fn(context).unwrap(), "write".to_owned());
+    assert_eq!(
+        t.test_read_fn(context.clone(), "read").unwrap(),
+        "read".to_owned()
+    );
+    assert_eq!(
+        t.test_write_fn(context, "write").unwrap(),
+        "write".to_owned()
+    );
+}
+
+#[test]
+fn test_read_and_write_with_noneparams() {
+    struct Tests;
+
+    impl Tests {
+        #[read]
+        fn test_read_fn(&self, _ctx: ServiceContext) -> ProtocolResult<()> {
+            Ok(())
+        }
+
+        #[write]
+        fn test_write_fn(&mut self, _ctx: ServiceContext) -> ProtocolResult<()> {
+            Ok(())
+        }
+    }
+
+    let context = get_context(1000, "", "", "");
+
+    let mut t = Tests {};
+    assert_eq!(t.test_read_fn(context.clone()).unwrap(), ());
+    assert_eq!(t.test_write_fn(context).unwrap(), ());
 }
 
 #[test]
@@ -80,7 +110,7 @@ fn test_cycles() {
 }
 
 #[test]
-fn test_impl_service() {
+fn test_service() {
     #[derive(Serialize, Deserialize, Debug)]
     struct TestServicePayload {
         name: String,
@@ -158,6 +188,137 @@ fn test_impl_service() {
     assert_eq!(read_res, r#"{"message":"read ok"}"#);
 
     let context = get_context(1024 * 1024, "", "test_notfound", &payload_str);
+    let read_res = test_service.read_(context.clone());
+    assert_eq!(read_res.is_err(), true);
+    let write_res = test_service.write_(context);
+    assert_eq!(write_res.is_err(), true);
+
+    test_service.hook_before_().unwrap();
+    assert_eq!(test_service.hook_before, true);
+
+    test_service.hook_after_().unwrap();
+    assert_eq!(test_service.hook_after, true);
+}
+
+#[test]
+fn test_service_none_payload() {
+    #[derive(Serialize, Deserialize, Debug)]
+    struct TestServiceResponse {
+        pub message: String,
+    }
+
+    struct Tests<SDK: ServiceSDK> {
+        _sdk:        SDK,
+        hook_before: bool,
+        hook_after:  bool,
+    }
+
+    #[service]
+    impl<SDK: ServiceSDK> Tests<SDK> {
+        #[hook_before]
+        fn custom_hook_before(&mut self) -> ProtocolResult<()> {
+            self.hook_before = true;
+            Ok(())
+        }
+
+        #[hook_after]
+        fn custom_hook_after(&mut self) -> ProtocolResult<()> {
+            self.hook_after = true;
+            Ok(())
+        }
+
+        #[read]
+        fn test_read(&self, _ctx: ServiceContext) -> ProtocolResult<TestServiceResponse> {
+            Ok(TestServiceResponse {
+                message: "read ok".to_owned(),
+            })
+        }
+
+        #[write]
+        fn test_write(&mut self, _ctx: ServiceContext) -> ProtocolResult<TestServiceResponse> {
+            Ok(TestServiceResponse {
+                message: "write ok".to_owned(),
+            })
+        }
+    }
+
+    let sdk = MockServiceSDK {};
+    let mut test_service = Tests {
+        _sdk:        sdk,
+        hook_after:  false,
+        hook_before: false,
+    };
+
+    let context = get_context(1024 * 1024, "", "test_write", "");
+    let write_res = test_service.write_(context).unwrap();
+    assert_eq!(write_res, r#"{"message":"write ok"}"#);
+
+    let context = get_context(1024 * 1024, "", "test_read", "");
+    let read_res = test_service.read_(context).unwrap();
+    assert_eq!(read_res, r#"{"message":"read ok"}"#);
+
+    let context = get_context(1024 * 1024, "", "test_notfound", "");
+    let read_res = test_service.read_(context.clone());
+    assert_eq!(read_res.is_err(), true);
+    let write_res = test_service.write_(context);
+    assert_eq!(write_res.is_err(), true);
+
+    test_service.hook_before_().unwrap();
+    assert_eq!(test_service.hook_before, true);
+
+    test_service.hook_after_().unwrap();
+    assert_eq!(test_service.hook_after, true);
+}
+
+#[test]
+fn test_service_none_response() {
+    struct Tests<SDK: ServiceSDK> {
+        _sdk:        SDK,
+        hook_before: bool,
+        hook_after:  bool,
+    }
+
+    #[service]
+    impl<SDK: ServiceSDK> Tests<SDK> {
+        #[hook_before]
+        fn custom_hook_before(&mut self) -> ProtocolResult<()> {
+            self.hook_before = true;
+            Ok(())
+        }
+
+        #[hook_after]
+        fn custom_hook_after(&mut self) -> ProtocolResult<()> {
+            self.hook_after = true;
+            Ok(())
+        }
+
+        #[read]
+        fn test_read(&self, _ctx: ServiceContext) -> ProtocolResult<()> {
+            Ok(())
+        }
+
+        #[write]
+        fn test_write(&mut self, _ctx: ServiceContext) -> ProtocolResult<()> {
+            Ok(())
+        }
+    }
+
+    let sdk = MockServiceSDK {};
+    let mut test_service = Tests {
+        _sdk:        sdk,
+        hook_after:  false,
+        hook_before: false,
+    };
+
+    let context = get_context(1024 * 1024, "", "test_write", "");
+    let write_res = test_service.write_(context).unwrap();
+    assert_eq!(write_res, "");
+
+    let context = get_context(1024 * 1024, "", "test_read", "");
+    let read_res = test_service.read_(context).unwrap();
+    assert_eq!(read_res, "");
+
+    let context = get_context(1024 * 1024, "", "test_notfound", "");
     let read_res = test_service.read_(context.clone());
     assert_eq!(read_res.is_err(), true);
     let write_res = test_service.write_(context);
