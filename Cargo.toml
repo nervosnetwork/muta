@@ -59,6 +59,7 @@ members = [
   "framework",
   "built-in-services/asset",
   "built-in-services/metadata",
+  "built-in-services/riscv",
 
   "protocol",
 ]
