@@ -147,11 +147,9 @@ impl CurrentConsensusStatus {
         if at == usize::max_value() {
             error!("state root: {:?}", state_root);
             return Err(ConsensusError::StatusErr(StatusCacheField::StateRoot).into());
-        } else if at == self.state_root.len() - 1 {
-            at -= 1;
         }
 
-        let tmp = self.state_root.split_off(at + 1);
+        let tmp = self.state_root.split_off(at);
         self.state_root = tmp;
         Ok(())
     }
