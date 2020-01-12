@@ -8,7 +8,9 @@ use overlord::Codec;
 use rlp::Encodable;
 use serde::{Deserialize, Serialize};
 
-use protocol::traits::{Consensus, Context, MessageHandler, Priority, Rpc, Storage};
+use protocol::traits::{
+    Consensus, Context, MessageHandler, Priority, Rpc, Storage, Synchronization,
+};
 use protocol::ProtocolResult;
 
 use crate::fixed_types::{FixedEpoch, FixedEpochID, FixedSignedTxs, PullTxsRequest};
@@ -16,11 +18,11 @@ use crate::fixed_types::{FixedEpoch, FixedEpochID, FixedSignedTxs, PullTxsReques
 pub const END_GOSSIP_SIGNED_PROPOSAL: &str = "/gossip/consensus/signed_proposal";
 pub const END_GOSSIP_SIGNED_VOTE: &str = "/gossip/consensus/signed_vote";
 pub const END_GOSSIP_AGGREGATED_VOTE: &str = "/gossip/consensus/qc";
-pub const END_GOSSIP_RICH_EPOCH_ID: &str = "/gossip/consensus/rich_epoch_id";
 pub const RPC_SYNC_PULL_EPOCH: &str = "/rpc_call/consensus/sync_pull_epoch";
 pub const RPC_RESP_SYNC_PULL_EPOCH: &str = "/rpc_resp/consensus/sync_pull_epoch";
 pub const RPC_SYNC_PULL_TXS: &str = "/rpc_call/consensus/sync_pull_txs";
 pub const RPC_RESP_SYNC_PULL_TXS: &str = "/rpc_resp/consensus/sync_pull_txs";
+pub const BROADCAST_EPOCH_ID: &str = "/gossip/consensus/broadcast_epoch_id";
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Proposal(pub Vec<u8>);
@@ -115,22 +117,22 @@ impl<C: Consensus + 'static> MessageHandler for QCMessageHandler<C> {
     }
 }
 
-pub struct RichEpochIDMessageHandler<C> {
-    consensus: Arc<C>,
+pub struct RemoteEpochIDMessageHandler<Sy> {
+    synchronization: Arc<Sy>,
 }
 
-impl<C: Consensus + 'static> RichEpochIDMessageHandler<C> {
-    pub fn new(consensus: Arc<C>) -> Self {
-        Self { consensus }
+impl<Sy: Synchronization + 'static> RemoteEpochIDMessageHandler<Sy> {
+    pub fn new(synchronization: Arc<Sy>) -> Self {
+        Self { synchronization }
     }
 }
 
 #[async_trait]
-impl<C: Consensus + 'static> MessageHandler for RichEpochIDMessageHandler<C> {
-    type Message = RichEpochID;
+impl<Sy: Synchronization + 'static> MessageHandler for RemoteEpochIDMessageHandler<Sy> {
+    type Message = u64;
 
     async fn process(&self, ctx: Context, msg: Self::Message) -> ProtocolResult<()> {
-        self.consensus.update_epoch(ctx, msg.0).await
+        self.synchronization.receive_remote_epoch(ctx, msg).await
     }
 }
 
