@@ -2,7 +2,7 @@ pub mod serde;
 pub mod serde_multi;
 
 use derive_more::Constructor;
-use muta_vendor_prost::Message;
+use prost::Message;
 use protocol::Bytes;
 use tentacle::SessionId;
 

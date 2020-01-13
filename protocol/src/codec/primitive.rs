@@ -3,7 +3,7 @@ use std::{convert::TryFrom, default::Default, mem};
 use byteorder::{ByteOrder, LittleEndian};
 use bytes::{Bytes, BytesMut};
 use derive_more::From;
-use muta_vendor_prost::Message;
+use prost::Message;
 
 use crate::{
     codec::{CodecError, ProtocolCodecSync},
