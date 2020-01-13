@@ -1,8 +1,11 @@
 #[cfg(test)]
 mod tests;
 pub mod types;
+pub mod vm;
 
+use std::cell::RefCell;
 use std::io::Read;
+use std::rc::Rc;
 
 use bytes::Bytes;
 use derive_more::{Display, From};
@@ -13,10 +16,10 @@ use protocol::types::{Address, Hash, ServiceContext};
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
 use crate::types::{Contract, DeployPayload, ExecPayload, ExecResp};
+use crate::vm::{ChainInterface, Interpreter, InterpreterConf, InterpreterParams};
 
 pub struct RiscvService<SDK> {
     sdk: SDK,
-    // assets: Box<dyn StoreMap<Hash, Asset>>,
 }
 
 #[service]
@@ -28,42 +31,38 @@ impl<SDK: ServiceSDK> RiscvService<SDK> {
     #[cycles(200_00)]
     #[write]
     fn exec(&mut self, ctx: ServiceContext, payload: ExecPayload) -> ProtocolResult<ExecResp> {
-        // let mut file =
-        // std::fs::File::open("built-in-services/riscv/src/tests/is13").unwrap();
-        // let mut buffer = Vec::new();
-        // file.read_to_end(&mut buffer).unwrap();
-        // let buffer = Bytes::from(buffer);
-        // let contract_code =
-        // self.sdk
-        //     .get_value<Bytes>(Bytes::from(code_hash.as_hex() + ":code"))?;
         let mut exec_resp = ExecResp::default();
         let contract = self
             .sdk
             .get_value::<Address, Contract>(&payload.address)?
             .unwrap();
-        // .ok_or(Err(ServiceError::ContractNotExists).into())?;
-        // if contract.is_none() {
-        //     return Err(ServiceError::ContractNotExist).into();
-        // };
-        // let contract = contract.unwrap();
         let code: Bytes = self
             .sdk
             .get_value::<Hash, Bytes>(&contract.code_hash)?
             .unwrap();
-        let args: Vec<Bytes> = vec!["a.out".into(), payload.args];
-        let r = ckb_vm::run::<u64, ckb_vm::SparseMemory<u64>>(&code, &args[..]);
+        let interpreter_params = InterpreterParams {
+            code,
+            args: payload.args.clone(),
+        };
+        let mut interpreter = Interpreter::new(
+            ctx.clone(),
+            InterpreterConf::default(),
+            interpreter_params,
+            Rc::new(RefCell::new(ChainInterfaceImpl::default())),
+        );
+        let r = interpreter.run().map_err(|e| ServiceError::CkbVm(e))?;
         dbg!(&r);
-        match r {
-            Err(e) => exec_resp.error = Some(format!("{}", e)),
-            Ok(ret_code) => exec_resp.ret_code = ret_code,
+        if r.ret_code != 0 {
+            exec_resp.is_error = true;
         }
+        exec_resp.ret = String::from_utf8_lossy(r.ret.as_ref()).to_string();
         Ok(exec_resp)
     }
 
     #[cycles(210_00)]
     #[write]
     fn deploy(&mut self, ctx: ServiceContext, payload: DeployPayload) -> ProtocolResult<String> {
-        dbg!(&payload);
+        // dbg!(&payload);
         let code_hash = Hash::digest(payload.code.clone());
         self.sdk.set_value(code_hash.clone(), payload.code)?;
         let contract_address = Address::from_bytes(
@@ -77,10 +76,28 @@ impl<SDK: ServiceSDK> RiscvService<SDK> {
     }
 }
 
+#[derive(Default)]
+struct ChainInterfaceImpl {
+    store: ::std::collections::HashMap<Bytes, Bytes>,
+}
+impl ChainInterface for ChainInterfaceImpl {
+    fn get_storage(&self, key: Bytes) -> ProtocolResult<Bytes> {
+        Ok(self.store.get(&key).cloned().unwrap_or_default())
+    }
+
+    fn set_storage(&mut self, key: Bytes, val: Bytes) -> ProtocolResult<()> {
+        self.store.insert(key, val);
+        Ok(())
+    }
+}
+
 #[derive(Debug, Display, From)]
 pub enum ServiceError {
     #[display(fmt = "Contract not exists")]
     ContractNotExists,
+
+    #[display(fmt = "ckb vm error: {:?}", _0)]
+    CkbVm(ckb_vm::Error),
 }
 
 impl std::error::Error for ServiceError {}

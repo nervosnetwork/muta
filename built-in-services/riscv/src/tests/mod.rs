@@ -18,7 +18,7 @@ use crate::types::{DeployPayload, ExecPayload};
 use crate::RiscvService;
 
 #[test]
-fn test_deploy() {
+fn test_deploy_and_run() {
     let cycles_limit = 1024 * 1024 * 1024; // 1073741824
     let caller = Address::from_hex("0x755cdba6ae4f479f7164792b318b2a06c759833b").unwrap();
     let context = mock_context(cycles_limit, caller);
@@ -27,7 +27,7 @@ fn test_deploy() {
 
     let supply = 1024 * 1024;
 
-    let mut file = std::fs::File::open("src/tests/is13").unwrap();
+    let mut file = std::fs::File::open("src/tests/sys_call").unwrap();
     let mut buffer = Vec::new();
     file.read_to_end(&mut buffer).unwrap();
     let buffer = bytes::Bytes::from(buffer);
@@ -42,13 +42,13 @@ fn test_deploy() {
         args:    "13".into(),
     });
     dbg!(&exec_result);
-    assert_eq!(exec_result.unwrap().ret_code, 0);
+    assert!(!exec_result.unwrap().is_error);
     let exec_result = service.exec(context.clone(), ExecPayload {
         address: Address::from_hex(&address).unwrap(),
         args:    "not 13".into(),
     });
     dbg!(&exec_result);
-    assert_eq!(exec_result.unwrap().ret_code, 1);
+    assert!(!exec_result.unwrap().is_error);
 }
 
 fn new_riscv_service() -> RiscvService<
