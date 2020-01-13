@@ -35,13 +35,13 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
             name:   payload.name,
             symbol: payload.symbol,
             supply: payload.supply,
-            owner:  payload.issuer.clone(),
+            issuer: payload.issuer.clone(),
         };
 
         self.assets.insert(asset.id.clone(), asset.clone())?;
 
         self.sdk
-            .set_account_value(&asset.owner, asset.id, payload.supply)
+            .set_account_value(&asset.issuer, asset.id, payload.supply)
     }
 
     #[cycles(100_00)]
@@ -88,7 +88,7 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
             name:   payload.name,
             symbol: payload.symbol,
             supply: payload.supply,
-            owner:  caller.clone(),
+            issuer: caller.clone(),
         };
         self.assets.insert(id.clone(), asset.clone())?;
 
