@@ -18,8 +18,7 @@ num-bigint = "0.2"
 ethbloom = "0.8"
 bytes = "0.5"
 hex = "0.3"
-# For bytes 0.5
-muta-vendor-prost = "0.5"
+prost = "0.6"
 hasher = { version = "0.1", features = ['hash-keccak'] }
 creep = "0.1"
 bincode = "1.2"
