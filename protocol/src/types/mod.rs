@@ -14,7 +14,7 @@ use crate::{ProtocolError, ProtocolErrorKind};
 pub use bytes::{Bytes, BytesMut};
 pub use epoch::{Epoch, EpochHeader, Pill, Proof, Validator};
 pub use ethbloom::{Bloom, BloomRef, Input as BloomInput};
-pub use genesis::{Genesis, GenesisService};
+pub use genesis::{Genesis, ServiceParam};
 pub use primitive::{
     Address, Balance, Hash, JsonString, MerkleRoot, Metadata, GENESIS_EPOCH_ID, METADATA_KEY,
 };

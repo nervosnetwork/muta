@@ -18,8 +18,8 @@ use protocol::traits::{
     ServiceState, Storage,
 };
 use protocol::types::{
-    Address, Bloom, BloomInput, GenesisService, Hash, MerkleRoot, Receipt, ReceiptResponse,
-    ServiceContext, ServiceContextParams, SignedTransaction, TransactionRequest,
+    Address, Bloom, BloomInput, Hash, MerkleRoot, Receipt, ReceiptResponse, ServiceContext,
+    ServiceContextParams, ServiceParam, SignedTransaction, TransactionRequest,
 };
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
@@ -58,7 +58,7 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
     ServiceExecutor<S, DB, Mapping>
 {
     pub fn create_genesis(
-        genesis_services: Vec<GenesisService>,
+        services: Vec<ServiceParam>,
         trie_db: Arc<DB>,
         storage: Arc<S>,
         mapping: Arc<Mapping>,
@@ -72,32 +72,17 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
             states.insert(name, Rc::new(RefCell::new(GeneralServiceState::new(trie))));
         }
 
-        for service_alloc in genesis_services.into_iter() {
-            let ctx_params = ServiceContextParams {
-                cycles_limit:    std::u64::MAX,
-                cycles_price:    1,
-                cycles_used:     Rc::new(RefCell::new(0)),
-                caller:          Address::from_hex(&service_alloc.caller)?,
-                epoch_id:        0,
-                timestamp:       0,
-                service_name:    service_alloc.service.to_owned(),
-                service_method:  service_alloc.method.to_owned(),
-                service_payload: service_alloc.payload.to_owned(),
-                events:          Rc::new(RefCell::new(vec![])),
-            };
-
-            let context = ServiceContext::new(ctx_params);
-            let state =
-                states
-                    .get(context.get_service_name())
-                    .ok_or(ExecutorError::NotFoundService {
-                        service: context.get_service_name().to_owned(),
-                    })?;
+        for params in services.into_iter() {
+            let state = states
+                .get(&params.name)
+                .ok_or(ExecutorError::NotFoundService {
+                    service: params.name.to_owned(),
+                })?;
             let sdk =
                 DefalutServiceSDK::new(Rc::clone(state), Rc::clone(&querier), NoopDispatcher {});
 
-            let mut service = mapping.get_service(context.get_service_name(), sdk)?;
-            service.write_(context.clone())?;
+            let mut service = mapping.get_service(&params.name, sdk)?;
+            service.genesis_(params.payload.clone())?;
 
             state.borrow_mut().stash()?;
         }

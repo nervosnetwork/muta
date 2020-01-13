@@ -4,6 +4,7 @@ use syn::{parse_macro_input, FnArg, Ident, ImplItem, ImplItemMethod, ItemImpl, T
 
 const READ_ATTRIBUTE: &str = "read";
 const WRITE_ATTRIBUTE: &str = "write";
+const GENESIS_ATTRIBUTE: &str = "genesis";
 const HOOK_BEFORE_ATTRIBUTE: &str = "hook_before";
 const HOOK_AFTER_ATTRIBUTE: &str = "hook_after";
 
@@ -40,6 +41,12 @@ pub fn gen_service_code(_: TokenStream, item: TokenStream) -> TokenStream {
         }
     }
 
+    let genesis_method = find_genesis(items);
+    let genesis_body = match genesis_method {
+        Some(genesis_method) => get_genesis_body(&genesis_method),
+        None => quote! {Ok(())},
+    };
+
     let hooks = extract_hooks(items);
     let hook_before = &hooks.before;
     let hook_before_body = match hook_before {
@@ -66,6 +73,10 @@ pub fn gen_service_code(_: TokenStream, item: TokenStream) -> TokenStream {
 
     TokenStream::from(quote! {
         impl #impl_generics protocol::traits::Service for #service_ident #ty_generics #where_clause {
+            fn genesis_(&mut self, _payload: String) -> protocol::ProtocolResult<()> {
+                #genesis_body
+            }
+
             fn hook_before_(&mut self) -> protocol::ProtocolResult<()> {
                 #hook_before_body
             }
@@ -197,6 +208,57 @@ fn find_service_method(method: &ImplItemMethod) -> Option<ServiceMethod> {
     }
 
     None
+}
+
+fn find_genesis(items: &[ImplItem]) -> Option<ImplItemMethod> {
+    let methods: Vec<ImplItemMethod> = find_list_for_item_method(items);
+
+    let mut count = 0;
+    let mut genesis: Option<ImplItemMethod> = None;
+
+    for method in methods {
+        for attr in &method.attrs {
+            for segment in &attr.path.segments {
+                if segment.ident == GENESIS_ATTRIBUTE {
+                    if count == 0 {
+                        genesis = Some(method.clone());
+                        count = 1;
+                    } else {
+                        panic!("The genesis method can only have one")
+                    }
+                }
+            }
+        }
+    }
+
+    genesis
+}
+
+fn get_genesis_body(item: &ImplItemMethod) -> proc_macro2::TokenStream {
+    let method_name = item.sig.ident.clone();
+    match item.sig.inputs.len() {
+        1 => quote!{ self.#method_name()},
+        2 => {
+                let payload_arg = &item.sig.inputs[1];
+                let pat_type = match payload_arg {
+                    FnArg::Typed(pat_type) => pat_type,
+                    _ => unreachable!(),
+                };
+
+                let payload_ident = if let Type::Path(path) = &*pat_type.ty {
+                    Some(path.path.get_ident().expect("No payload type found.").clone())
+                } else {
+                    panic!("No payload type found.")
+                };
+
+                quote!{
+                    let payload: #payload_ident = serde_json::from_str(&_payload)
+                                    .map_err(|e| protocol::traits::BindingMacroError::JsonParse(e))?;
+                    self.#method_name(payload)
+                }
+        },
+        _ => panic!("genesis method input params should be `(&mut self)` or `(&mut self, payload: PayloadType)`")
+    }
 }
 
 fn extract_hooks(items: &[ImplItem]) -> Hooks {
