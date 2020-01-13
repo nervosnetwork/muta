@@ -53,7 +53,7 @@ pub struct Asset {
     pub name:   String,
     pub symbol: String,
     pub supply: u64,
-    pub owner:  Address,
+    pub issuer: Address,
 }
 
 impl rlp::Decodable for Asset {
@@ -63,7 +63,7 @@ impl rlp::Decodable for Asset {
             name:   rlp.at(1)?.as_val()?,
             symbol: rlp.at(2)?.as_val()?,
             supply: rlp.at(3)?.as_val()?,
-            owner:  rlp.at(4)?.as_val()?,
+            issuer: rlp.at(4)?.as_val()?,
         })
     }
 }
@@ -75,7 +75,7 @@ impl rlp::Encodable for Asset {
             .append(&self.name)
             .append(&self.symbol)
             .append(&self.supply)
-            .append(&self.owner);
+            .append(&self.issuer);
     }
 }
 
