@@ -20,9 +20,15 @@ pub struct ExecPayload {
 
 #[derive(Deserialize, Serialize, Clone, Debug, Default)]
 pub struct ExecResp {
-    pub error:    Option<String>,
-    pub ret_code: i8,
-    pub result:   String,
+    pub ret:      String,
+    pub is_error: bool,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, Default)]
+pub struct InterpreterResult {
+    pub cycles_used: u64,
+    pub ret:         Bytes,
+    pub ret_code:    i8,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
