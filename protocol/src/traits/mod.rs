@@ -11,7 +11,10 @@ pub use binding::{
     AdmissionControl, BindingMacroError, ChainQuerier, Service, ServiceMapping, ServiceSDK,
     ServiceState, StoreArray, StoreBool, StoreMap, StoreString, StoreUint64,
 };
-pub use consensus::{Consensus, ConsensusAdapter, MessageTarget, NodeInfo};
+pub use consensus::{
+    CommonConsensusAdapter, Consensus, ConsensusAdapter, MessageTarget, NodeInfo, Synchronization,
+    SynchronizationAdapter,
+};
 pub use executor::{
     Dispatcher, ExecResp, Executor, ExecutorFactory, ExecutorParams, ExecutorResp, NoopDispatcher,
 };

@@ -6,6 +6,9 @@ use moodyblues_sdk::trace;
 use parking_lot::RwLock;
 use serde_json::json;
 
+use common_merkle::Merkle;
+use protocol::fixed_codec::FixedCodec;
+use protocol::traits::ExecutorResp;
 use protocol::types::{Bloom, Epoch, Hash, MerkleRoot, Proof, Validator};
 use protocol::ProtocolResult;
 
@@ -40,6 +43,37 @@ impl StatusAgent {
             .update_after_commit(epoch_id, epoch, prev_hash, proof)
     }
 
+    pub fn update_after_sync_commit(
+        &self,
+        epoch_id: u64,
+        epoch: Epoch,
+        prev_hash: Hash,
+        proof: Proof,
+    ) {
+        self.status
+            .write()
+            .update_after_sync_commit(epoch_id, epoch, prev_hash, proof)
+    }
+
+    // TODO(yejiayu): Is there a better way to write it?
+    pub fn replace(&self, new_status: CurrentConsensusStatus) {
+        let mut status = self.status.write();
+        status.cycles_price = new_status.cycles_price;
+        status.cycles_limit = new_status.cycles_limit;
+        status.epoch_id = new_status.epoch_id;
+        status.exec_epoch_id = new_status.exec_epoch_id;
+        status.prev_hash = new_status.prev_hash;
+        status.logs_bloom = new_status.logs_bloom;
+        status.confirm_root = new_status.confirm_root;
+        status.latest_state_root = new_status.latest_state_root;
+        status.state_root = new_status.state_root;
+        status.receipt_root = new_status.receipt_root;
+        status.cycles_used = new_status.cycles_used;
+        status.proof = new_status.proof;
+        status.validators = new_status.validators;
+        status.consensus_interval = new_status.consensus_interval;
+    }
+
     pub fn to_inner(&self) -> CurrentConsensusStatus {
         self.status.read().clone()
     }
@@ -48,8 +82,8 @@ impl StatusAgent {
 #[derive(Clone, Debug, Display)]
 #[rustfmt::skip]
 #[display(
-    fmt = "epoch ID {}, exec epoch ID {}, prev_hash {:?}, state root {:?}, receipt root {:?}, confirm root {:?}, cycle used {:?}",
-    epoch_id, exec_epoch_id, prev_hash, state_root, receipt_root, confirm_root, cycles_used
+    fmt = "epoch ID {}, exec epoch ID {}, prev_hash {:?},latest_state_root {:?} state root {:?}, receipt root {:?}, confirm root {:?}, cycle used {:?}",
+    epoch_id, exec_epoch_id, prev_hash, latest_state_root, state_root, receipt_root, confirm_root, cycles_used
 )]
 pub struct CurrentConsensusStatus {
     pub cycles_price:       u64,
@@ -57,6 +91,7 @@ pub struct CurrentConsensusStatus {
     pub epoch_id:           u64,
     pub exec_epoch_id:      u64,
     pub prev_hash:          Hash,
+    pub latest_state_root: MerkleRoot,
     pub logs_bloom:         Vec<Bloom>,
     pub confirm_root:       Vec<MerkleRoot>,
     pub state_root:         Vec<MerkleRoot>,
@@ -68,13 +103,14 @@ pub struct CurrentConsensusStatus {
 }
 
 impl CurrentConsensusStatus {
-    fn update_after_exec(&mut self, info: UpdateInfo) {
-        info!("update info {}", info);
-        info!("update after exec cache: {}", self);
+    pub fn update_after_exec(&mut self, info: UpdateInfo) {
+        info!("update_after_exec info {}", info);
+        info!("update_after_exec cache: {}", self);
         trace_after_exec(&info);
 
         assert!(info.exec_epoch_id == self.exec_epoch_id + 1);
         self.exec_epoch_id += 1;
+        self.latest_state_root = info.state_root.clone();
         self.cycles_used.push(info.cycles_used);
         self.confirm_root.push(info.confirm_root.clone());
         self.logs_bloom.push(info.logs_bloom.clone());
@@ -95,13 +131,30 @@ impl CurrentConsensusStatus {
         self.epoch_id = epoch_id;
         self.prev_hash = prev_hash;
         self.proof = proof;
-
         self.update_cycles(&epoch.header.cycles_used)?;
         self.update_logs_bloom(&epoch.header.logs_bloom)?;
         self.update_state_root(&epoch.header.state_root)?;
         self.update_confirm_root(&epoch.header.confirm_root)?;
         self.update_receipt_root(&epoch.header.receipt_root)?;
         Ok(())
+    }
+
+    pub fn update_after_sync_commit(
+        &mut self,
+        epoch_id: u64,
+        epoch: Epoch,
+        prev_hash: Hash,
+        proof: Proof,
+    ) {
+        self.epoch_id = epoch_id;
+        self.prev_hash = prev_hash;
+        self.proof = proof;
+
+        self.cycles_used = self.cycles_used.split_off(epoch.header.cycles_used.len());
+        self.logs_bloom = self.logs_bloom.split_off(epoch.header.logs_bloom.len());
+        self.state_root = self.state_root.split_off(epoch.header.cycles_used.len());
+        self.confirm_root = self.confirm_root.split_off(epoch.header.confirm_root.len());
+        self.receipt_root = self.receipt_root.split_off(epoch.header.receipt_root.len());
     }
 
     fn update_cycles(&mut self, cycles: &[u64]) -> ProtocolResult<()> {
@@ -194,6 +247,30 @@ pub struct UpdateInfo {
     pub state_root:    MerkleRoot,
     pub receipt_root:  MerkleRoot,
     pub confirm_root:  MerkleRoot,
+}
+
+impl UpdateInfo {
+    pub fn with_after_exec(epoch_id: u64, order_root: MerkleRoot, resp: ExecutorResp) -> Self {
+        let cycles = resp.all_cycles_used;
+
+        let receipt = Merkle::from_hashes(
+            resp.receipts
+                .iter()
+                .map(|r| Hash::digest(r.to_owned().encode_fixed().unwrap()))
+                .collect::<Vec<_>>(),
+        )
+        .get_root_hash()
+        .unwrap_or_else(Hash::from_empty);
+
+        Self {
+            exec_epoch_id: epoch_id,
+            cycles_used:   cycles,
+            receipt_root:  receipt,
+            confirm_root:  order_root,
+            state_root:    resp.state_root.clone(),
+            logs_bloom:    resp.logs_bloom,
+        }
+    }
 }
 
 pub fn trace_after_exec(info: &UpdateInfo) {

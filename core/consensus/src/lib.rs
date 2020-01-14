@@ -1,17 +1,18 @@
-mod engine;
-
 pub mod adapter;
 pub mod consensus;
+mod engine;
 pub mod fixed_types;
 pub mod message;
 pub mod status;
-pub mod synchronization;
+pub mod synchronization_v2;
+#[cfg(test)]
+mod tests;
 pub mod trace;
 pub mod util;
 
 pub use crate::adapter::OverlordConsensusAdapter;
 pub use crate::consensus::OverlordConsensus;
-pub use crate::synchronization::Synchronization;
+pub use crate::synchronization_v2::OverlordSynchronization;
 pub use overlord::DurationConfig;
 
 use std::error::Error;

@@ -4,7 +4,6 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use std::{cmp::Eq, sync::Arc};
 
 use async_trait::async_trait;
-use bincode::serialize;
 use futures::lock::Mutex;
 use log::error;
 use moodyblues_sdk::trace;
@@ -22,10 +21,9 @@ use protocol::types::{
 };
 use protocol::{Bytes, BytesMut, ProtocolError, ProtocolResult};
 
-use crate::fixed_types::{FixedEpochID, FixedPill, FixedSignedTxs};
+use crate::fixed_types::{FixedPill, FixedSignedTxs};
 use crate::message::{
-    END_GOSSIP_AGGREGATED_VOTE, END_GOSSIP_RICH_EPOCH_ID, END_GOSSIP_SIGNED_PROPOSAL,
-    END_GOSSIP_SIGNED_VOTE, RPC_SYNC_PULL_EPOCH, RPC_SYNC_PULL_TXS,
+    END_GOSSIP_AGGREGATED_VOTE, END_GOSSIP_SIGNED_PROPOSAL, END_GOSSIP_SIGNED_VOTE,
 };
 use crate::status::StatusAgent;
 use crate::{ConsensusError, StatusCacheField};
@@ -37,8 +35,8 @@ pub struct ConsensusEngine<Adapter> {
     node_info:      NodeInfo,
     exemption_hash: RwLock<HashSet<Bytes>>,
 
-    adapter:  Arc<Adapter>,
-    pub lock: Mutex<()>,
+    adapter: Arc<Adapter>,
+    lock:    Arc<Mutex<()>>,
 }
 
 #[async_trait]
@@ -63,9 +61,6 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill, FixedSignedTxs>
         }
         let tmp_epoch_id = epoch_id;
         let order_root = Merkle::from_hashes(ordered_tx_hashes.clone()).get_root_hash();
-        let state_root = current_consensus_status.state_root.last().ok_or_else(|| {
-            ProtocolError::from(ConsensusError::StatusErr(StatusCacheField::StateRoot))
-        })?;
 
         let header = EpochHeader {
             chain_id:          self.node_info.chain_id.clone(),
@@ -76,7 +71,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill, FixedSignedTxs>
             logs_bloom:        current_consensus_status.logs_bloom,
             order_root:        order_root.unwrap_or_else(Hash::from_empty),
             confirm_root:      current_consensus_status.confirm_root,
-            state_root:        state_root.to_owned(),
+            state_root:        current_consensus_status.latest_state_root.clone(),
             receipt_root:      current_consensus_status.receipt_root.clone(),
             cycles_used:       current_consensus_status.cycles_used,
             proposer:          self.node_info.self_address.clone(),
@@ -176,7 +171,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill, FixedSignedTxs>
             .await?;
 
         self.adapter
-            .flush_mempool(ctx.clone(), ordered_tx_hashes.clone())
+            .flush_mempool(ctx.clone(), &ordered_tx_hashes)
             .await?;
 
         // Execute transactions
@@ -189,24 +184,12 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill, FixedSignedTxs>
         )
         .await?;
 
-        // Broadcast rich epoch ID
-        let msg = serialize(&FixedEpochID::new(epoch_id + 1)).map_err(|_| {
-            ProtocolError::from(ConsensusError::Other(
-                "Encode rich epoch ID error".to_string(),
-            ))
-        })?;
-
         trace_epoch(&pill.epoch);
         self.update_status(epoch_id, pill.epoch, proof, full_txs)
             .await?;
 
         self.adapter
-            .transmit(
-                ctx.clone(),
-                msg,
-                END_GOSSIP_RICH_EPOCH_ID,
-                MessageTarget::Broadcast,
-            )
+            .broadcast_epoch_id(ctx.clone(), epoch_id)
             .await?;
 
         let mut set = self.exemption_hash.write();
@@ -305,36 +288,19 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill, FixedSignedTxs>
 }
 
 impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
-    pub fn new(status_agent: StatusAgent, node_info: NodeInfo, adapter: Arc<Adapter>) -> Self {
+    pub fn new(
+        status_agent: StatusAgent,
+        node_info: NodeInfo,
+        adapter: Arc<Adapter>,
+        lock: Arc<Mutex<()>>,
+    ) -> Self {
         Self {
             status_agent,
             node_info,
             exemption_hash: RwLock::new(HashSet::new()),
             adapter,
-            lock: Mutex::new(()),
+            lock,
         }
-    }
-
-    pub async fn get_current_epoch_id(&self, ctx: Context) -> ProtocolResult<u64> {
-        self.adapter.get_current_epoch_id(ctx).await
-    }
-
-    pub async fn pull_epoch(&self, ctx: Context, epoch_id: u64) -> ProtocolResult<Epoch> {
-        self.adapter
-            .pull_epoch(ctx, epoch_id, RPC_SYNC_PULL_EPOCH)
-            .await
-    }
-
-    pub async fn pull_txs(
-        &self,
-        ctx: Context,
-        hashes: Vec<Hash>,
-    ) -> ProtocolResult<Vec<SignedTransaction>> {
-        self.adapter.pull_txs(ctx, hashes, RPC_SYNC_PULL_TXS).await
-    }
-
-    pub async fn get_epoch_by_id(&self, ctx: Context, epoch_id: u64) -> ProtocolResult<Epoch> {
-        self.adapter.get_epoch_by_id(ctx, epoch_id).await
     }
 
     pub async fn exec(
@@ -359,11 +325,6 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
                 timestamp,
             )
             .await
-    }
-
-    pub fn get_exec_epoch_id(&self) -> u64 {
-        let status = self.status_agent.to_inner();
-        status.exec_epoch_id
     }
 
     fn check_epoch_roots(&self, epoch: &EpochHeader) -> ProtocolResult<()> {
@@ -477,42 +438,6 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
         let prev_hash = Hash::digest(epoch.encode_fixed()?);
         self.status_agent
             .update_after_commit(epoch_id + 1, epoch, prev_hash, proof)
-    }
-
-    pub async fn save_proof(&self, ctx: Context, proof: Proof) -> ProtocolResult<()> {
-        self.adapter.save_proof(ctx, proof).await
-    }
-
-    pub fn get_current_interval(&self) -> u64 {
-        let current_consensus_status = self.status_agent.to_inner();
-        current_consensus_status.consensus_interval
-    }
-
-    pub fn get_current_authority_list(&self) -> Vec<Node> {
-        let current_consensus_status = self.status_agent.to_inner();
-        covert_to_overlord_authority(&current_consensus_status.validators)
-    }
-
-    pub fn get_current_state_root(&self, epoch_id: u64) -> ProtocolResult<Option<MerkleRoot>> {
-        let current_consensus_status = self.status_agent.to_inner();
-        if epoch_id == current_consensus_status.exec_epoch_id {
-            let state_root = current_consensus_status
-                .state_root
-                .last()
-                .ok_or_else(|| ConsensusError::StatusErr(StatusCacheField::StateRoot))?;
-            return Ok(Some(state_root.clone()));
-        }
-        Ok(None)
-    }
-
-    pub fn check_state_root(&self, state_root: &MerkleRoot) -> bool {
-        let current_consensus_status = self.status_agent.to_inner();
-        current_consensus_status.state_root.contains(state_root)
-    }
-
-    pub fn get_current_prev_hash(&self) -> Hash {
-        let current_consensus_status = self.status_agent.to_inner();
-        current_consensus_status.prev_hash
     }
 }
 
