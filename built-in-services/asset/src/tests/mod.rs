@@ -113,6 +113,8 @@ fn new_asset_service() -> AssetService<
 
 fn mock_context(cycles_limit: u64, caller: Address) -> ServiceContext {
     let params = ServiceContextParams {
+        tx_hash: None,
+        nonce: None,
         cycles_limit,
         cycles_price: 1,
         cycles_used: Rc::new(RefCell::new(0)),
