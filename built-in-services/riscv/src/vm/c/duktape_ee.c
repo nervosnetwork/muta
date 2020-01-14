@@ -68,7 +68,7 @@ int main(int argc, char *argv[]) {
 
     // Compile code
     char *code = argv[1];
-    duk_push_string(ctx, "function");
+    duk_push_string(ctx, "main");
     if (0 != duk_pcompile_string(ctx, DUK_COMPILE_FUNCTION, code)) {
         pvm_debug(duk_get_string(ctx, -1));
         return EE_ERR_COMPILE_CODE;
