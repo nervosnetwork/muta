@@ -1,3 +1,5 @@
+pub mod duktape;
+
 use std::cell::RefCell;
 use std::io::Read;
 use std::rc::Rc;
@@ -15,7 +17,7 @@ use protocol::types::{
 };
 use protocol::ProtocolResult;
 
-use crate::types::{DeployPayload, ExecPayload};
+use crate::types::{DeployPayload, ExecPayload, InterpreterType};
 use crate::RiscvService;
 
 #[test]
@@ -35,6 +37,7 @@ fn test_deploy_and_run() {
     let address = service
         .deploy(context.clone(), DeployPayload {
             code:      buffer,
+            intp_type: InterpreterType::Binary,
             init_args: "args".into(),
         })
         .unwrap();
