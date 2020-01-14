@@ -3,6 +3,7 @@ use std::convert::TryFrom;
 use std::sync::Arc;
 
 use bytes::Bytes;
+use futures::lock::Mutex;
 
 use common_crypto::{
     BlsCommonReference, BlsPrivateKey, BlsPublicKey, PublicKey, Secp256k1, Secp256k1PrivateKey,
@@ -13,12 +14,12 @@ use core_api::config::GraphQLConfig;
 use core_consensus::fixed_types::{FixedEpoch, FixedSignedTxs};
 use core_consensus::message::{
     ProposalMessageHandler, PullEpochRpcHandler, PullTxsRpcHandler, QCMessageHandler,
-    RichEpochIDMessageHandler, VoteMessageHandler, END_GOSSIP_AGGREGATED_VOTE,
-    END_GOSSIP_RICH_EPOCH_ID, END_GOSSIP_SIGNED_PROPOSAL, END_GOSSIP_SIGNED_VOTE,
+    RemoteEpochIDMessageHandler, VoteMessageHandler, BROADCAST_EPOCH_ID,
+    END_GOSSIP_AGGREGATED_VOTE, END_GOSSIP_SIGNED_PROPOSAL, END_GOSSIP_SIGNED_VOTE,
     RPC_RESP_SYNC_PULL_EPOCH, RPC_RESP_SYNC_PULL_TXS, RPC_SYNC_PULL_EPOCH, RPC_SYNC_PULL_TXS,
 };
 use core_consensus::status::{CurrentConsensusStatus, StatusAgent};
-use core_consensus::{OverlordConsensus, OverlordConsensusAdapter};
+use core_consensus::{OverlordConsensus, OverlordConsensusAdapter, OverlordSynchronization};
 use core_mempool::{
     DefaultMemPoolAdapter, HashMemPool, MsgPushTxs, NewTxsHandler, PullTxsHandler,
     END_GOSSIP_NEW_TXS, RPC_PULL_TXS, RPC_RESP_PULL_TXS,
@@ -194,6 +195,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         epoch_id:           current_epoch.header.epoch_id + 1,
         exec_epoch_id:      current_epoch.header.epoch_id,
         prev_hash:          prevhash,
+        latest_state_root:  current_header.state_root.clone(),
         logs_bloom:         current_header.logs_bloom.clone(),
         confirm_root:       vec![],
         state_root:         vec![current_header.state_root.clone()],
@@ -254,22 +256,29 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
             Arc::clone(&trie_db),
             Arc::clone(&service_mapping),
             status_agent.clone(),
-            current_header.state_root.clone(),
         );
 
     let exec_demon = consensus_adapter.take_exec_demon();
     let consensus_adapter = Arc::new(consensus_adapter);
 
-    let (tmp, synchronization) = OverlordConsensus::new(
-        status_agent,
+    let lock = Arc::new(Mutex::new(()));
+    let overlord_consensus = Arc::new(OverlordConsensus::new(
+        status_agent.clone(),
         node_info,
         bls_pub_keys,
         bls_priv_key,
         common_ref,
-        consensus_adapter,
-    );
+        Arc::clone(&consensus_adapter),
+        Arc::clone(&lock),
+    ));
 
-    let overlord_consensus = Arc::new(tmp);
+    consensus_adapter.set_overlord_handler(overlord_consensus.get_overlord_handler());
+
+    let synchronization = Arc::new(OverlordSynchronization::new(
+        consensus_adapter,
+        status_agent,
+        lock,
+    ));
 
     // register consensus
     network_service.register_endpoint_handler(
@@ -285,9 +294,9 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         Box::new(VoteMessageHandler::new(Arc::clone(&overlord_consensus))),
     )?;
     network_service.register_endpoint_handler(
-        END_GOSSIP_RICH_EPOCH_ID,
-        Box::new(RichEpochIDMessageHandler::new(Arc::clone(
-            &overlord_consensus,
+        BROADCAST_EPOCH_ID,
+        Box::new(RemoteEpochIDMessageHandler::new(Arc::clone(
+            &synchronization,
         ))),
     )?;
     network_service.register_endpoint_handler(
@@ -325,8 +334,12 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     // Run GraphQL server
     runtime::spawn(core_api::start_graphql(graphql_config, api_adapter));
 
-    // Run sychronization process
-    runtime::spawn(synchronization.run());
+    // Run sync
+    runtime::spawn(async move {
+        if let Err(e) = synchronization.polling_broadcast().await {
+            log::error!("synchronization: {:?}", e);
+        }
+    });
 
     // Run consensus
     runtime::spawn(async move {

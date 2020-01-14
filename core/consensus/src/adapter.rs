@@ -5,19 +5,23 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use futures::channel::mpsc::{channel, Receiver, Sender};
 use futures::stream::StreamExt;
-use log::{debug, info};
+use overlord::types::OverlordMsg;
+use overlord::OverlordHandler;
+use parking_lot::RwLock;
 
-use common_merkle::Merkle;
 use protocol::traits::{
-    ConsensusAdapter, Context, ExecutorFactory, ExecutorParams, ExecutorResp, Gossip, MemPool,
-    MessageTarget, MixedTxHashes, NodeInfo, Priority, Rpc, ServiceMapping, Storage,
+    CommonConsensusAdapter, ConsensusAdapter, Context, ExecutorFactory, ExecutorParams,
+    ExecutorResp, Gossip, MemPool, MessageTarget, MixedTxHashes, NodeInfo, Priority, Rpc,
+    ServiceMapping, Storage, SynchronizationAdapter,
 };
 use protocol::types::{
     Address, Epoch, Hash, MerkleRoot, Proof, Receipt, SignedTransaction, Validator,
 };
-use protocol::{fixed_codec::FixedCodec, ProtocolResult};
+use protocol::ProtocolResult;
 
-use crate::fixed_types::{FixedEpoch, FixedEpochID, FixedSignedTxs, PullTxsRequest};
+use crate::consensus::gen_overlord_status;
+use crate::fixed_types::{FixedEpoch, FixedEpochID, FixedPill, FixedSignedTxs, PullTxsRequest};
+use crate::message::{BROADCAST_EPOCH_ID, RPC_SYNC_PULL_EPOCH, RPC_SYNC_PULL_TXS};
 use crate::status::{StatusAgent, UpdateInfo};
 use crate::util::ExecuteInfo;
 use crate::ConsensusError;
@@ -33,10 +37,13 @@ pub struct OverlordConsensusAdapter<
     DB: cita_trie::DB,
     Mapping: ServiceMapping,
 > {
-    rpc:     Arc<R>,
-    network: Arc<G>,
-    mempool: Arc<M>,
-    storage: Arc<S>,
+    rpc:              Arc<R>,
+    network:          Arc<G>,
+    mempool:          Arc<M>,
+    storage:          Arc<S>,
+    trie_db:          Arc<DB>,
+    service_mapping:  Arc<Mapping>,
+    overlord_handler: RwLock<Option<OverlordHandler<FixedPill>>>,
 
     exec_queue:  Sender<ExecuteInfo>,
     exec_demons: Option<ExecDemons<S, DB, EF, Mapping>>,
@@ -130,26 +137,6 @@ where
         Ok(())
     }
 
-    async fn flush_mempool(&self, ctx: Context, txs: Vec<Hash>) -> ProtocolResult<()> {
-        self.mempool.flush(ctx, txs).await
-    }
-
-    async fn save_epoch(&self, _ctx: Context, epoch: Epoch) -> ProtocolResult<()> {
-        self.storage.insert_epoch(epoch).await
-    }
-
-    async fn save_proof(&self, _ctx: Context, proof: Proof) -> ProtocolResult<()> {
-        self.storage.update_latest_proof(proof).await
-    }
-
-    async fn save_signed_txs(
-        &self,
-        _ctx: Context,
-        signed_txs: Vec<SignedTransaction>,
-    ) -> ProtocolResult<()> {
-        self.storage.insert_transactions(signed_txs).await
-    }
-
     async fn get_last_validators(
         &self,
         _ctx: Context,
@@ -158,42 +145,156 @@ where
         let epoch = self.storage.get_epoch_by_epoch_id(epoch_id).await?;
         Ok(epoch.header.validators)
     }
+}
 
-    async fn get_current_epoch_id(&self, _ctx: Context) -> ProtocolResult<u64> {
-        let res = self.storage.get_latest_epoch().await?;
-        Ok(res.header.epoch_id)
-    }
-
-    async fn pull_epoch(&self, ctx: Context, epoch_id: u64, end: &str) -> ProtocolResult<Epoch> {
-        debug!("consensus: send rpc pull epoch {}", epoch_id);
-        let res = self
-            .rpc
-            .call::<FixedEpochID, FixedEpoch>(ctx, end, FixedEpochID::new(epoch_id), Priority::High)
-            .await?;
-        Ok(res.inner)
-    }
-
-    async fn pull_txs(
+#[async_trait]
+impl<EF, G, M, R, S, DB, Mapping> SynchronizationAdapter
+    for OverlordConsensusAdapter<EF, G, M, R, S, DB, Mapping>
+where
+    EF: ExecutorFactory<DB, S, Mapping>,
+    G: Gossip + Sync + Send,
+    R: Rpc + Sync + Send,
+    M: MemPool,
+    S: Storage,
+    DB: cita_trie::DB,
+    Mapping: ServiceMapping,
+{
+    fn update_status(
         &self,
         ctx: Context,
-        hashes: Vec<Hash>,
-        end: &str,
-    ) -> ProtocolResult<Vec<SignedTransaction>> {
-        debug!("consensus: send rpc pull txs");
+        epoch_id: u64,
+        consensus_interval: u64,
+        validators: Vec<Validator>,
+    ) -> ProtocolResult<()> {
+        self.overlord_handler
+            .read()
+            .as_ref()
+            .expect("Please set the overlord handle first")
+            .send_msg(
+                ctx,
+                OverlordMsg::RichStatus(gen_overlord_status(
+                    epoch_id,
+                    consensus_interval,
+                    validators,
+                )),
+            )
+            .map_err(|e| ConsensusError::OverlordErr(Box::new(e)))?;
+        Ok(())
+    }
+
+    fn sync_exec(
+        &self,
+        _: Context,
+        params: &ExecutorParams,
+        txs: &[SignedTransaction],
+    ) -> ProtocolResult<ExecutorResp> {
+        let mut executor = EF::from_root(
+            params.state_root.clone(),
+            Arc::clone(&self.trie_db),
+            Arc::clone(&self.storage),
+            Arc::clone(&self.service_mapping),
+        )?;
+
+        let resp = executor.exec(params, txs)?;
+        Ok(resp)
+    }
+
+    /// Pull some epochs from other nodes from `begin` to `end`.
+    async fn get_epoch_from_remote(&self, ctx: Context, epoch_id: u64) -> ProtocolResult<Epoch> {
         let res = self
             .rpc
-            .call::<PullTxsRequest, FixedSignedTxs>(
+            .call::<FixedEpochID, FixedEpoch>(
                 ctx,
-                end,
-                PullTxsRequest::new(hashes),
+                RPC_SYNC_PULL_EPOCH,
+                FixedEpochID::new(epoch_id),
                 Priority::High,
             )
             .await?;
         Ok(res.inner)
     }
 
-    async fn get_epoch_by_id(&self, _ctx: Context, epoch_id: u64) -> ProtocolResult<Epoch> {
+    /// Pull signed transactions corresponding to the given hashes from other
+    /// nodes.
+    async fn get_txs_from_remote(
+        &self,
+        ctx: Context,
+        hashes: &[Hash],
+    ) -> ProtocolResult<Vec<SignedTransaction>> {
+        let res = self
+            .rpc
+            .call::<PullTxsRequest, FixedSignedTxs>(
+                ctx,
+                RPC_SYNC_PULL_TXS,
+                PullTxsRequest::new(hashes.to_vec()),
+                Priority::High,
+            )
+            .await?;
+        Ok(res.inner)
+    }
+}
+
+#[async_trait]
+impl<EF, G, M, R, S, DB, Mapping> CommonConsensusAdapter
+    for OverlordConsensusAdapter<EF, G, M, R, S, DB, Mapping>
+where
+    EF: ExecutorFactory<DB, S, Mapping>,
+    G: Gossip + Sync + Send,
+    R: Rpc + Sync + Send,
+    M: MemPool,
+    S: Storage,
+    DB: cita_trie::DB,
+    Mapping: ServiceMapping,
+{
+    /// Save an epoch to the database.
+    async fn save_epoch(&self, _: Context, epoch: Epoch) -> ProtocolResult<()> {
+        self.storage.insert_epoch(epoch).await
+    }
+
+    async fn save_proof(&self, _: Context, proof: Proof) -> ProtocolResult<()> {
+        self.storage.update_latest_proof(proof).await
+    }
+
+    /// Save some signed transactions to the database.
+    async fn save_signed_txs(
+        &self,
+        _: Context,
+        signed_txs: Vec<SignedTransaction>,
+    ) -> ProtocolResult<()> {
+        self.storage.insert_transactions(signed_txs).await
+    }
+
+    async fn save_receipts(&self, _: Context, receipts: Vec<Receipt>) -> ProtocolResult<()> {
+        self.storage.insert_receipts(receipts).await
+    }
+
+    /// Flush the given transactions in the mempool.
+    async fn flush_mempool(&self, ctx: Context, ordered_tx_hashes: &[Hash]) -> ProtocolResult<()> {
+        self.mempool.flush(ctx, ordered_tx_hashes.to_vec()).await
+    }
+
+    /// Get an epoch corresponding to the given epoch ID.
+    async fn get_epoch_by_id(&self, _: Context, epoch_id: u64) -> ProtocolResult<Epoch> {
         self.storage.get_epoch_by_epoch_id(epoch_id).await
+    }
+
+    /// Get the current epoch ID from storage.
+    async fn get_current_epoch_id(&self, _: Context) -> ProtocolResult<u64> {
+        let res = self.storage.get_latest_epoch().await?;
+        Ok(res.header.epoch_id)
+    }
+
+    async fn get_txs_from_storage(
+        &self,
+        _: Context,
+        tx_hashes: &[Hash],
+    ) -> ProtocolResult<Vec<SignedTransaction>> {
+        self.storage.get_transactions(tx_hashes.to_vec()).await
+    }
+
+    async fn broadcast_epoch_id(&self, ctx: Context, epoch_id: u64) -> ProtocolResult<()> {
+        self.network
+            .broadcast(ctx.clone(), BROADCAST_EPOCH_ID, epoch_id, Priority::High)
+            .await
     }
 }
 
@@ -215,16 +316,14 @@ where
         trie_db: Arc<DB>,
         service_mapping: Arc<Mapping>,
         status_agent: StatusAgent,
-        state_root: MerkleRoot,
     ) -> Self {
         let (exec_queue, rx) = channel(OVERLORD_GAP);
         let exec_demons = Some(ExecDemons::new(
             Arc::clone(&storage),
-            trie_db,
-            service_mapping,
+            Arc::clone(&trie_db),
+            Arc::clone(&service_mapping),
             rx,
             status_agent,
-            state_root,
         ));
 
         OverlordConsensusAdapter {
@@ -232,6 +331,9 @@ where
             network,
             mempool,
             storage,
+            trie_db,
+            service_mapping,
+            overlord_handler: RwLock::new(None),
             exec_queue,
             exec_demons,
         }
@@ -241,6 +343,10 @@ where
         assert!(self.exec_demons.is_some());
         self.exec_demons.take().unwrap()
     }
+
+    pub fn set_overlord_handler(&self, handler: OverlordHandler<FixedPill>) {
+        *self.overlord_handler.write() = Some(handler)
+    }
 }
 
 #[derive(Debug)]
@@ -249,10 +355,9 @@ pub struct ExecDemons<S, DB, EF, Mapping> {
     trie_db:         Arc<DB>,
     service_mapping: Arc<Mapping>,
 
-    pin_ef:     PhantomData<EF>,
-    queue:      Receiver<ExecuteInfo>,
-    state_root: MerkleRoot,
-    status:     StatusAgent,
+    pin_ef: PhantomData<EF>,
+    queue:  Receiver<ExecuteInfo>,
+    status: StatusAgent,
 }
 
 impl<S, DB, EF, Mapping> ExecDemons<S, DB, EF, Mapping>
@@ -268,13 +373,11 @@ where
         service_mapping: Arc<Mapping>,
         rx: Receiver<ExecuteInfo>,
         status_agent: StatusAgent,
-        state_root: MerkleRoot,
     ) -> Self {
         ExecDemons {
             storage,
             trie_db,
             service_mapping,
-            state_root,
             queue: rx,
             pin_ef: PhantomData,
             status: status_agent,
@@ -294,25 +397,24 @@ where
             let epoch_id = info.epoch_id;
             let txs = info.signed_txs.clone();
             let order_root = info.order_root.clone();
+            let state_root = self.status.to_inner().latest_state_root;
 
-            info!("muta-consensus: execute {} epoch", epoch_id);
             let mut executor = EF::from_root(
-                self.state_root.clone(),
+                state_root.clone(),
                 Arc::clone(&self.trie_db),
                 Arc::clone(&self.storage),
                 Arc::clone(&self.service_mapping),
             )?;
             let exec_params = ExecutorParams {
-                state_root: self.state_root.clone(),
+                state_root: state_root.clone(),
                 epoch_id,
                 timestamp: info.timestamp,
                 cycles_limit: info.cycles_limit,
             };
             let resp = executor.exec(&exec_params, &txs)?;
-            self.state_root = resp.state_root.clone();
             self.save_receipts(resp.receipts.clone()).await?;
             self.status
-                .update_after_exec(gen_update_info(resp.clone(), epoch_id, order_root));
+                .update_after_exec(UpdateInfo::with_after_exec(epoch_id, order_root, resp));
         } else {
             return Err(ConsensusError::Other("Queue disconnect".to_string()).into());
         }
@@ -321,28 +423,5 @@ where
 
     async fn save_receipts(&self, receipts: Vec<Receipt>) -> ProtocolResult<()> {
         self.storage.insert_receipts(receipts).await
-    }
-}
-
-fn gen_update_info(exec_resp: ExecutorResp, epoch_id: u64, order_root: MerkleRoot) -> UpdateInfo {
-    let cycles = exec_resp.all_cycles_used;
-
-    let receipt = Merkle::from_hashes(
-        exec_resp
-            .receipts
-            .iter()
-            .map(|r| Hash::digest(r.to_owned().encode_fixed().unwrap()))
-            .collect::<Vec<_>>(),
-    )
-    .get_root_hash()
-    .unwrap_or_else(Hash::from_empty);
-
-    UpdateInfo {
-        exec_epoch_id: epoch_id,
-        cycles_used:   cycles,
-        receipt_root:  receipt,
-        confirm_root:  order_root,
-        state_root:    exec_resp.state_root.clone(),
-        logs_bloom:    exec_resp.logs_bloom,
     }
 }
