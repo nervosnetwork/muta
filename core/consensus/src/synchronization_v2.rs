@@ -83,7 +83,7 @@ impl<Adapter: SynchronizationAdapter> Synchronization for OverlordSynchronizatio
                     ctx.clone(),
                     sync_status.epoch_id,
                     sync_status.consensus_interval,
-                    sync_status.validators.clone(),
+                    sync_status.validators,
                 )?;
                 break;
             }

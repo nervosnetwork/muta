@@ -67,12 +67,12 @@ fn sync_gap_test() {
         block_on(sync.receive_remote_epoch(Context::new(), max_epoch_id / 2)).unwrap();
 
         let status = status_agent.to_inner();
-        let epoch = block_on(adapter.get_epoch_by_id(Context::new(), status.epoch_id)).unwrap();
+        let epoch = block_on(adapter.get_epoch_by_id(Context::new(), status.epoch_id - 1)).unwrap();
         assert_sync(status, epoch);
 
         block_on(sync.receive_remote_epoch(Context::new(), max_epoch_id)).unwrap();
         let status = status_agent.to_inner();
-        let epoch = block_on(adapter.get_epoch_by_id(Context::new(), status.epoch_id)).unwrap();
+        let epoch = block_on(adapter.get_epoch_by_id(Context::new(), status.epoch_id - 1)).unwrap();
         assert_sync(status, epoch);
     }
 }
@@ -443,7 +443,7 @@ fn exec_txs(epoch_id: u64, txs: &[SignedTransaction]) -> (ExecutorResp, MerkleRo
 fn assert_sync(status: CurrentConsensusStatus, latest_epoch: Epoch) {
     let exec_gap = latest_epoch.header.epoch_id - latest_epoch.header.exec_epoch_id;
 
-    assert_eq!(status.epoch_id, latest_epoch.header.epoch_id);
+    assert_eq!(status.epoch_id - 1, latest_epoch.header.epoch_id);
     assert_eq!(status.exec_epoch_id, latest_epoch.header.epoch_id);
     assert_eq!(status.confirm_root.len(), exec_gap as usize);
     assert_eq!(status.cycles_used.len(), exec_gap as usize);
