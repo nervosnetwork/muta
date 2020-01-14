@@ -4,6 +4,7 @@ use derive_more::Display;
 use log::{error, info};
 use moodyblues_sdk::trace;
 use parking_lot::RwLock;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use common_merkle::Merkle;
@@ -79,7 +80,7 @@ impl StatusAgent {
     }
 }
 
-#[derive(Clone, Debug, Display)]
+#[derive(Serialize, Deserialize, Clone, Debug, Display)]
 #[rustfmt::skip]
 #[display(
     fmt = "epoch ID {}, exec epoch ID {}, prev_hash {:?},latest_state_root {:?} state root {:?}, receipt root {:?}, confirm root {:?}, cycle used {:?}",

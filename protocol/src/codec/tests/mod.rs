@@ -34,6 +34,7 @@ fn test_codec() {
     test!(transaction, TransactionRequest, mock_transaction_request);
     test!(transaction, RawTransaction, mock_raw_tx);
     test!(transaction, SignedTransaction, mock_sign_tx);
+    test!(transaction, WalSaveTxs, mock_wal_txs, 100);
 
     test!(epoch, Validator, mock_validator);
     test!(epoch, Proof, mock_proof);

@@ -5,13 +5,14 @@ use crate::codec::ProtocolCodec;
 use crate::types::epoch::{Epoch, Proof};
 use crate::types::receipt::Receipt;
 use crate::types::{Hash, SignedTransaction};
-use crate::ProtocolResult;
+use crate::{Bytes, ProtocolResult};
 
 #[derive(Debug, Copy, Clone, Display)]
 pub enum StorageCategory {
     Epoch,
     Receipt,
     SignedTransaction,
+    Wal,
 }
 
 pub trait StorageSchema {
@@ -46,6 +47,29 @@ pub trait Storage: Send + Sync {
     async fn get_receipts(&self, hash: Vec<Hash>) -> ProtocolResult<Vec<Receipt>>;
 
     async fn get_latest_proof(&self) -> ProtocolResult<Proof>;
+
+    async fn update_overlord_wal(&self, info: Bytes) -> ProtocolResult<()>;
+
+    async fn update_muta_wal(&self, info: Bytes) -> ProtocolResult<()>;
+
+    async fn load_overlord_wal(&self) -> ProtocolResult<Bytes>;
+
+    async fn load_muta_wal(&self) -> ProtocolResult<Bytes>;
+
+    async fn update_exec_queue_wal(&self, info: Bytes) -> ProtocolResult<()>;
+
+    async fn load_exec_queue_wal(&self) -> ProtocolResult<Bytes>;
+
+    async fn insert_wal_transactions(
+        &self,
+        epoch_hash: Hash,
+        signed_txs: Vec<SignedTransaction>,
+    ) -> ProtocolResult<()>;
+
+    async fn get_wal_transactions(
+        &self,
+        epoch_hash: Hash,
+    ) -> ProtocolResult<Vec<SignedTransaction>>;
 }
 
 pub enum StorageBatchModify<S: StorageSchema> {
