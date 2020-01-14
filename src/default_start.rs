@@ -256,7 +256,6 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
             Arc::clone(&trie_db),
             Arc::clone(&service_mapping),
             status_agent.clone(),
-            current_header.state_root.clone(),
         );
 
     let exec_demon = consensus_adapter.take_exec_demon();
@@ -272,6 +271,8 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         Arc::clone(&consensus_adapter),
         Arc::clone(&lock),
     ));
+
+    consensus_adapter.set_overlord_handler(overlord_consensus.get_overlord_handler());
 
     let synchronization = Arc::new(OverlordSynchronization::new(
         consensus_adapter,
@@ -332,6 +333,13 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
 
     // Run GraphQL server
     runtime::spawn(core_api::start_graphql(graphql_config, api_adapter));
+
+    // Run sync
+    runtime::spawn(async move {
+        if let Err(e) = synchronization.polling_broadcast().await {
+            log::error!("synchronization: {:?}", e);
+        }
+    });
 
     // Run consensus
     runtime::spawn(async move {

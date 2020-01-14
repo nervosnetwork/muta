@@ -38,6 +38,14 @@ pub trait Synchronization: Send + Sync {
 
 #[async_trait]
 pub trait SynchronizationAdapter: CommonConsensusAdapter + Send + Sync {
+    fn update_status(
+        &self,
+        ctx: Context,
+        epoch_id: u64,
+        consensus_interval: u64,
+        validators: Vec<Validator>,
+    ) -> ProtocolResult<()>;
+
     fn sync_exec(
         &self,
         ctx: Context,

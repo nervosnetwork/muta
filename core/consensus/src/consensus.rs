@@ -22,7 +22,7 @@ use crate::{ConsensusError, MsgType};
 /// Provide consensus
 pub struct OverlordConsensus<Adapter: ConsensusAdapter + 'static> {
     /// Overlord consensus protocol instance.
-    inner:   Arc<Overlord<FixedPill, FixedSignedTxs, ConsensusEngine<Adapter>, OverlordCrypto>>,
+    inner: Arc<Overlord<FixedPill, FixedSignedTxs, ConsensusEngine<Adapter>, OverlordCrypto>>,
     /// An overlord consensus protocol handler.
     handler: OverlordHandler<FixedPill>,
 }
@@ -55,15 +55,6 @@ impl<Adapter: ConsensusAdapter + 'static> Consensus for OverlordConsensus<Adapte
             .map_err(|e| ConsensusError::OverlordErr(Box::new(e)))?;
         Ok(())
     }
-
-    // async fn update_epoch(&self, ctx: Context, msg: Vec<u8>) ->
-    // ProtocolResult<()> {     let epoch_id: FixedEpochID =
-    //         deserialize(&msg).map_err(|_|
-    // ConsensusError::DecodeErr(MsgType::RichEpochID))?;     self.sync
-    //         .unbounded_send((epoch_id.inner, ctx))
-    //         .map_err(|_| ConsensusError::Other("Send sync msg
-    // error".to_string()))?;     Ok(())
-    // }
 }
 
 impl<Adapter: ConsensusAdapter + 'static> OverlordConsensus<Adapter> {
@@ -109,6 +100,10 @@ impl<Adapter: ConsensusAdapter + 'static> OverlordConsensus<Adapter> {
         }
     }
 
+    pub fn get_overlord_handler(&self) -> OverlordHandler<FixedPill> {
+        self.handler.clone()
+    }
+
     pub async fn run(
         &self,
         interval: u64,
@@ -123,7 +118,7 @@ impl<Adapter: ConsensusAdapter + 'static> OverlordConsensus<Adapter> {
     }
 }
 
-fn gen_overlord_status(epoch_id: u64, interval: u64, validators: Vec<Validator>) -> Status {
+pub fn gen_overlord_status(epoch_id: u64, interval: u64, validators: Vec<Validator>) -> Status {
     let mut authority_list = validators
         .into_iter()
         .map(|v| Node {

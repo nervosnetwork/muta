@@ -82,8 +82,8 @@ impl StatusAgent {
 #[derive(Clone, Debug, Display)]
 #[rustfmt::skip]
 #[display(
-    fmt = "epoch ID {}, exec epoch ID {}, prev_hash {:?}, state root {:?}, receipt root {:?}, confirm root {:?}, cycle used {:?}",
-    epoch_id, exec_epoch_id, prev_hash, state_root, receipt_root, confirm_root, cycles_used
+    fmt = "epoch ID {}, exec epoch ID {}, prev_hash {:?},latest_state_root {:?} state root {:?}, receipt root {:?}, confirm root {:?}, cycle used {:?}",
+    epoch_id, exec_epoch_id, prev_hash, latest_state_root, state_root, receipt_root, confirm_root, cycles_used
 )]
 pub struct CurrentConsensusStatus {
     pub cycles_price:       u64,
@@ -104,15 +104,10 @@ pub struct CurrentConsensusStatus {
 
 impl CurrentConsensusStatus {
     pub fn update_after_exec(&mut self, info: UpdateInfo) {
-        info!("update info {}", info);
-        info!("update after exec cache: {}", self);
+        info!("update_after_exec info {}", info);
+        info!("update_after_exec cache: {}", self);
         trace_after_exec(&info);
 
-        println!(
-            "info.exec_epoch_id {:?} self.exec_epoch_id {:?}",
-            info.exec_epoch_id,
-            self.exec_epoch_id + 1
-        );
         assert!(info.exec_epoch_id == self.exec_epoch_id + 1);
         self.exec_epoch_id += 1;
         self.latest_state_root = info.state_root.clone();

@@ -1,7 +1,9 @@
 use std::sync::Arc;
+use std::time::Duration;
 
 use async_trait::async_trait;
 use futures::lock::Mutex;
+use futures_timer::Delay;
 
 use protocol::fixed_codec::FixedCodec;
 use protocol::traits::{
@@ -12,6 +14,8 @@ use protocol::ProtocolResult;
 
 use crate::status::{CurrentConsensusStatus, StatusAgent, UpdateInfo};
 use crate::ConsensusError;
+
+const POLLING_BROADCAST: u64 = 2000;
 
 #[derive(Clone, Debug)]
 pub struct RichEpoch {
@@ -28,16 +32,21 @@ pub struct OverlordSynchronization<Adapter: SynchronizationAdapter> {
 #[async_trait]
 impl<Adapter: SynchronizationAdapter> Synchronization for OverlordSynchronization<Adapter> {
     async fn receive_remote_epoch(&self, ctx: Context, remote_epoch_id: u64) -> ProtocolResult<()> {
-        let mut current_epoch_id = self.adapter.get_current_epoch_id(ctx.clone()).await?;
-        if current_epoch_id >= remote_epoch_id - 1 {
+        let mut current_epoch_id = self.adapter.get_current_epoch_id(Context::new()).await?;
+        if remote_epoch_id == 0 || current_epoch_id >= remote_epoch_id - 1 {
             return Ok(());
         }
-
         // Lock the consensus engine, block commit process.
         let commit_lock = self.lock.try_lock();
         if commit_lock.is_none() {
             return Ok(());
         }
+
+        log::info!(
+            "[synchronization]: start, remote epoch id {:?} current epoch id {:?}",
+            remote_epoch_id,
+            current_epoch_id,
+        );
 
         let sync_status_agent = self
             .init_status_agent(ctx.clone(), current_epoch_id)
@@ -50,25 +59,41 @@ impl<Adapter: SynchronizationAdapter> Synchronization for OverlordSynchronizatio
                 .await?;
 
             let next_epoch_id = current_epoch_id + 1;
+
             let next_rich_epoch = self
                 .get_rich_epoch_from_remote(ctx.clone(), next_epoch_id)
                 .await?;
 
             self.verify_epoch(&current_epoch, &next_rich_epoch.epoch)?;
+
             self.commit_epoch(ctx.clone(), next_rich_epoch, sync_status_agent.clone())
                 .await?;
 
             self.adapter
                 .broadcast_epoch_id(ctx.clone(), current_epoch_id)
                 .await?;
+
             current_epoch_id = next_epoch_id;
 
             if current_epoch_id >= remote_epoch_id {
-                self.status.replace(sync_status_agent.to_inner());
+                let mut sync_status = sync_status_agent.to_inner();
+                sync_status.epoch_id += 1;
+                self.status.replace(sync_status.clone());
+                self.adapter.update_status(
+                    ctx.clone(),
+                    sync_status.epoch_id,
+                    sync_status.consensus_interval,
+                    sync_status.validators.clone(),
+                )?;
                 break;
             }
         }
 
+        log::info!(
+            "[synchronization] end, remote epoch id {:?} current epoch id {:?}",
+            remote_epoch_id,
+            current_epoch_id,
+        );
         Ok(())
     }
 }
@@ -79,6 +104,18 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
             adapter,
             status,
             lock,
+        }
+    }
+
+    pub async fn polling_broadcast(&self) -> ProtocolResult<()> {
+        loop {
+            let current_epoch_id = self.adapter.get_current_epoch_id(Context::new()).await?;
+            if current_epoch_id != 0 {
+                self.adapter
+                    .broadcast_epoch_id(Context::new(), current_epoch_id)
+                    .await?;
+            }
+            Delay::new(Duration::from_millis(POLLING_BROADCAST)).await;
         }
     }
 
@@ -163,7 +200,7 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
         rich_epoch: RichEpoch,
         status_agent: StatusAgent,
     ) -> ProtocolResult<ExecutorResp> {
-        let current_status = self.status.to_inner();
+        let current_status = status_agent.to_inner();
         let cycles_limit = current_status.cycles_limit;
 
         let exec_params = ExecutorParams {

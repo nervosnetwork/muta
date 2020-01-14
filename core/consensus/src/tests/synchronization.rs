@@ -107,6 +107,10 @@ impl MockCommonConsensusAdapter {
 
 #[async_trait]
 impl SynchronizationAdapter for MockCommonConsensusAdapter {
+    fn update_status(&self, _: Context, _: u64, _: u64, _: Vec<Validator>) -> ProtocolResult<()> {
+        Ok(())
+    }
+
     fn sync_exec(
         &self,
         _: Context,

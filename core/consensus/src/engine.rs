@@ -61,9 +61,6 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill, FixedSignedTxs>
         }
         let tmp_epoch_id = epoch_id;
         let order_root = Merkle::from_hashes(ordered_tx_hashes.clone()).get_root_hash();
-        let state_root = current_consensus_status.state_root.last().ok_or_else(|| {
-            ProtocolError::from(ConsensusError::StatusErr(StatusCacheField::StateRoot))
-        })?;
 
         let header = EpochHeader {
             chain_id:          self.node_info.chain_id.clone(),
@@ -74,7 +71,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill, FixedSignedTxs>
             logs_bloom:        current_consensus_status.logs_bloom,
             order_root:        order_root.unwrap_or_else(Hash::from_empty),
             confirm_root:      current_consensus_status.confirm_root,
-            state_root:        state_root.to_owned(),
+            state_root:        current_consensus_status.latest_state_root.clone(),
             receipt_root:      current_consensus_status.receipt_root.clone(),
             cycles_used:       current_consensus_status.cycles_used,
             proposer:          self.node_info.self_address.clone(),

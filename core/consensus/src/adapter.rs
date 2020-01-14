@@ -5,6 +5,9 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use futures::channel::mpsc::{channel, Receiver, Sender};
 use futures::stream::StreamExt;
+use overlord::types::OverlordMsg;
+use overlord::OverlordHandler;
+use parking_lot::RwLock;
 
 use protocol::traits::{
     CommonConsensusAdapter, ConsensusAdapter, Context, ExecutorFactory, ExecutorParams,
@@ -16,7 +19,8 @@ use protocol::types::{
 };
 use protocol::ProtocolResult;
 
-use crate::fixed_types::{FixedEpoch, FixedEpochID, FixedSignedTxs, PullTxsRequest};
+use crate::consensus::gen_overlord_status;
+use crate::fixed_types::{FixedEpoch, FixedEpochID, FixedPill, FixedSignedTxs, PullTxsRequest};
 use crate::message::{BROADCAST_EPOCH_ID, RPC_SYNC_PULL_EPOCH, RPC_SYNC_PULL_TXS};
 use crate::status::{StatusAgent, UpdateInfo};
 use crate::util::ExecuteInfo;
@@ -33,12 +37,13 @@ pub struct OverlordConsensusAdapter<
     DB: cita_trie::DB,
     Mapping: ServiceMapping,
 > {
-    rpc:             Arc<R>,
-    network:         Arc<G>,
-    mempool:         Arc<M>,
-    storage:         Arc<S>,
-    trie_db:         Arc<DB>,
-    service_mapping: Arc<Mapping>,
+    rpc:              Arc<R>,
+    network:          Arc<G>,
+    mempool:          Arc<M>,
+    storage:          Arc<S>,
+    trie_db:          Arc<DB>,
+    service_mapping:  Arc<Mapping>,
+    overlord_handler: RwLock<Option<OverlordHandler<FixedPill>>>,
 
     exec_queue:  Sender<ExecuteInfo>,
     exec_demons: Option<ExecDemons<S, DB, EF, Mapping>>,
@@ -154,6 +159,29 @@ where
     DB: cita_trie::DB,
     Mapping: ServiceMapping,
 {
+    fn update_status(
+        &self,
+        ctx: Context,
+        epoch_id: u64,
+        consensus_interval: u64,
+        validators: Vec<Validator>,
+    ) -> ProtocolResult<()> {
+        self.overlord_handler
+            .read()
+            .as_ref()
+            .expect("Please set the overlord handle first")
+            .send_msg(
+                ctx,
+                OverlordMsg::RichStatus(gen_overlord_status(
+                    epoch_id,
+                    consensus_interval,
+                    validators,
+                )),
+            )
+            .map_err(|e| ConsensusError::OverlordErr(Box::new(e)))?;
+        Ok(())
+    }
+
     fn sync_exec(
         &self,
         _: Context,
@@ -257,10 +285,10 @@ where
 
     async fn get_txs_from_storage(
         &self,
-        ctx: Context,
+        _: Context,
         tx_hashes: &[Hash],
     ) -> ProtocolResult<Vec<SignedTransaction>> {
-        self.mempool.get_full_txs(ctx, tx_hashes.to_vec()).await
+        self.storage.get_transactions(tx_hashes.to_vec()).await
     }
 
     async fn broadcast_epoch_id(&self, ctx: Context, epoch_id: u64) -> ProtocolResult<()> {
@@ -288,7 +316,6 @@ where
         trie_db: Arc<DB>,
         service_mapping: Arc<Mapping>,
         status_agent: StatusAgent,
-        state_root: MerkleRoot,
     ) -> Self {
         let (exec_queue, rx) = channel(OVERLORD_GAP);
         let exec_demons = Some(ExecDemons::new(
@@ -297,7 +324,6 @@ where
             Arc::clone(&service_mapping),
             rx,
             status_agent,
-            state_root,
         ));
 
         OverlordConsensusAdapter {
@@ -307,6 +333,7 @@ where
             storage,
             trie_db,
             service_mapping,
+            overlord_handler: RwLock::new(None),
             exec_queue,
             exec_demons,
         }
@@ -316,6 +343,10 @@ where
         assert!(self.exec_demons.is_some());
         self.exec_demons.take().unwrap()
     }
+
+    pub fn set_overlord_handler(&self, handler: OverlordHandler<FixedPill>) {
+        *self.overlord_handler.write() = Some(handler)
+    }
 }
 
 #[derive(Debug)]
@@ -324,10 +355,9 @@ pub struct ExecDemons<S, DB, EF, Mapping> {
     trie_db:         Arc<DB>,
     service_mapping: Arc<Mapping>,
 
-    pin_ef:     PhantomData<EF>,
-    queue:      Receiver<ExecuteInfo>,
-    state_root: MerkleRoot,
-    status:     StatusAgent,
+    pin_ef: PhantomData<EF>,
+    queue:  Receiver<ExecuteInfo>,
+    status: StatusAgent,
 }
 
 impl<S, DB, EF, Mapping> ExecDemons<S, DB, EF, Mapping>
@@ -343,13 +373,11 @@ where
         service_mapping: Arc<Mapping>,
         rx: Receiver<ExecuteInfo>,
         status_agent: StatusAgent,
-        state_root: MerkleRoot,
     ) -> Self {
         ExecDemons {
             storage,
             trie_db,
             service_mapping,
-            state_root,
             queue: rx,
             pin_ef: PhantomData,
             status: status_agent,
@@ -369,21 +397,21 @@ where
             let epoch_id = info.epoch_id;
             let txs = info.signed_txs.clone();
             let order_root = info.order_root.clone();
+            let state_root = self.status.to_inner().latest_state_root;
 
             let mut executor = EF::from_root(
-                self.state_root.clone(),
+                state_root.clone(),
                 Arc::clone(&self.trie_db),
                 Arc::clone(&self.storage),
                 Arc::clone(&self.service_mapping),
             )?;
             let exec_params = ExecutorParams {
-                state_root: self.state_root.clone(),
+                state_root: state_root.clone(),
                 epoch_id,
                 timestamp: info.timestamp,
                 cycles_limit: info.cycles_limit,
             };
             let resp = executor.exec(&exec_params, &txs)?;
-            self.state_root = resp.state_root.clone();
             self.save_receipts(resp.receipts.clone()).await?;
             self.status
                 .update_after_exec(UpdateInfo::with_after_exec(epoch_id, order_root, resp));
