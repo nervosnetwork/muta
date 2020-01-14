@@ -27,7 +27,7 @@ impl<Mac: ckb_vm::SupportMachine> ckb_vm::Syscalls<Mac> for SyscallIO {
 
     fn ecall(&mut self, machine: &mut Mac) -> Result<bool, ckb_vm::Error> {
         let code = &machine.registers()[ckb_vm::registers::A7];
-        if code.to_i32() == SYSCODE_RET {
+        if code.to_u64() == SYSCODE_RET {
             let addr = machine.registers()[ckb_vm::registers::A0].to_u64();
             let size = machine.registers()[ckb_vm::registers::A1].to_u64();
             let buffer = get_arr(machine, addr, size)?;
@@ -36,7 +36,7 @@ impl<Mac: ckb_vm::SupportMachine> ckb_vm::Syscalls<Mac> for SyscallIO {
             machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(0));
             return Ok(true);
         }
-        if code.to_i32() == SYSCODE_LOAD_ARGS {
+        if code.to_u64() == SYSCODE_LOAD_ARGS {
             let addr = machine.registers()[ckb_vm::registers::A0].to_u64();
             machine.memory_mut().store_bytes(addr, &self.input)?;
             let len = machine.registers()[ckb_vm::registers::A1].to_u64();

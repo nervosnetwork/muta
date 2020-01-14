@@ -1,8 +1,9 @@
-pub const SYSCODE_DEBUG: i32 = 2000;
-pub const SYSCODE_LOAD_ARGS: i32 = 2001;
-pub const SYSCODE_RET: i32 = 2002;
+pub const SYSCODE_DEBUG: u64 = 2000;
+pub const SYSCODE_LOAD_ARGS: u64 = 2001;
+pub const SYSCODE_RET: u64 = 2002;
 
-pub const SYSCODE_CYCLE_LIMIT: i32 = 3000;
+pub const SYSCODE_CYCLE_LIMIT: u64 = 3000;
 
 pub const SYSCODE_GET_STORAGE: u64 = 4000;
 pub const SYSCODE_SET_STORAGE: u64 = 4001;
+pub const SYSCODE_CONTRACT_CALL: u64 = 4002;

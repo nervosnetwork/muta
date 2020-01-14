@@ -25,7 +25,7 @@ impl<Mac: ckb_vm::SupportMachine, T: Write> ckb_vm::Syscalls<Mac> for SyscallDeb
 
     fn ecall(&mut self, machine: &mut Mac) -> Result<bool, ckb_vm::Error> {
         let code = &machine.registers()[ckb_vm::registers::A7];
-        if code.to_i32() != SYSCODE_DEBUG {
+        if code.to_u64() != SYSCODE_DEBUG {
             return Ok(false);
         }
         let addr = machine.registers()[ckb_vm::registers::A0].to_u64();

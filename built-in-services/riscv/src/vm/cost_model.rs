@@ -3,6 +3,8 @@ use ckb_vm::{
     Instruction,
 };
 
+pub const CONTRACT_CALL_FIXED_CYCLE: u64 = 1000;
+
 pub fn instruction_cycles(i: Instruction) -> u64 {
     match extract_opcode(i) {
         insts::OP_JALR => 3,
