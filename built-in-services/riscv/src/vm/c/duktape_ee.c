@@ -75,13 +75,17 @@ int main(int argc, char *argv[]) {
     }
 
     // Call our funtion
-    duk_call(ctx, 1);
-
-    const char *ret = duk_get_string(ctx, -1);
-    pvm_ret((uint8_t *)ret, strlen(ret));
+    duk_int_t ret = duk_pcall(ctx, 0);
+    if (DUK_EXEC_SUCCESS == ret) {
+        const char *ret = duk_get_string(ctx, -1);
+        pvm_ret((uint8_t *)ret, strlen(ret));
+    } else {
+        const char *err_msg = duk_safe_to_string(ctx, -1);
+        pvm_ret((uint8_t *)err_msg, strlen(err_msg));
+    }
 
     duk_pop(ctx);
     duk_destroy_heap(ctx);
 
-    return 0;
+    return ret;
 }
