@@ -13,7 +13,6 @@ use crate::ChainInterface;
 use crate::InterpreterParams;
 
 pub struct SyscallChainInterface {
-    // iparams: InterpreterParams,
     chain: Rc<RefCell<dyn ChainInterface>>,
 }
 
@@ -54,7 +53,7 @@ impl<Mac: ckb_vm::SupportMachine> ckb_vm::Syscalls<Mac> for SyscallChainInterfac
                 let val = self
                     .chain
                     .borrow()
-                    .get_storage(Bytes::from(k))
+                    .get_storage(&Bytes::from(k))
                     .map_err(|e| ckb_vm::Error::InvalidEcall(code))?
                     .clone();
                 machine.memory_mut().store_bytes(v_addr, &val)?;

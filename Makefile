@@ -90,3 +90,10 @@ security-audit:
 .PHONY: build prod prod-test
 .PHONY: fmt test clippy doc doc-deps doc-api check stats
 .PHONY: ci info security-audit
+
+.PHONY: test_riscv
+
+test_riscv:
+	docker run --rm -it -v `pwd`:/code nervos/ckb-riscv-gnu-toolchain:xenial bash -c 'cd /code && riscv64-unknown-elf-gcc -I/code/built-in-services/riscv/src/vm/c built-in-services/riscv/src/tests/sys_call.c -o built-in-services/riscv/src/tests/sys_call'
+	cargo fmt
+	RUST_BACKTRACE=full cargo test -p riscv --lib -- test_deploy --nocapture
