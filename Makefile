@@ -46,7 +46,6 @@ clippy:
 	${CARGO} clippy ${VERBOSE} --all --all-targets --all-features -- \
 		-D warnings -D clippy::clone_on_ref_ptr -D clippy::enum_glob_use
 
-
 ci: fmt clippy test
 	git diff --exit-code Cargo.lock
 
@@ -90,10 +89,28 @@ security-audit:
 .PHONY: build prod prod-test
 .PHONY: fmt test clippy doc doc-deps doc-api check stats
 .PHONY: ci info security-audit
-
 .PHONY: test_riscv
+.PHONY: duktape
 
 test_riscv:
 	docker run --rm -it -v `pwd`:/code nervos/ckb-riscv-gnu-toolchain:xenial bash -c 'cd /code && riscv64-unknown-elf-gcc -I/code/built-in-services/riscv/src/vm/c built-in-services/riscv/src/tests/sys_call.c -o built-in-services/riscv/src/tests/sys_call'
 	cargo fmt
 	RUST_BACKTRACE=full cargo test -p riscv --lib -- test_deploy --nocapture
+
+# For duktape
+TARGET := riscv64-unknown-elf
+CC := $(TARGET)-gcc
+LD := $(TARGET)-gcc
+CFLAGS := -Os -DCKB_NO_MMU -D__riscv_soft_float -D__riscv_float_abi_soft
+LDFLAGS := -lm -Wl,-static -fdata-sections -ffunction-sections -Wl,--gc-sections -Wl,-s
+CURRENT_DIR := $(shell pwd)
+DOCKER_BUILD := docker run -v $(CURRENT_DIR):/src nervos/ckb-riscv-gnu-toolchain:xenial bash -c
+RISCV_SRC := $(CURRENT_DIR)/built-in-services/riscv/src/vm/c
+DUKTAPE_SRC := $(RISCV_SRC)/duktape
+
+duktape:
+	$(CC) -I$(DUKTAPE_SRC) $(DUKTAPE_SRC)/duktape.c $(RISCV_SRC)/duktape_ee.c $(LDFLAGS) -o $(RISCV_SRC)/duktape_ee
+
+duktape_docker:
+	$(DOCKER_BUILD) "cd /src && make duktape"
+

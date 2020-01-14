@@ -50,6 +50,7 @@ impl<SDK: ServiceSDK + 'static> RiscvService<SDK> {
         let mut interpreter = Interpreter::new(
             ctx.clone(),
             InterpreterConf::default(),
+            contract.intp_type,
             interpreter_params,
             Rc::new(RefCell::new(ChainInterfaceImpl::new(
                 ctx.clone(),
@@ -84,10 +85,15 @@ impl<SDK: ServiceSDK + 'static> RiscvService<SDK> {
                 .as_bytes()
                 .slice(0..20),
         )?;
+
+        let intp_type = payload.intp_type;
+        let contract = Contract::new(code_hash, intp_type);
+
         self.sdk
             .borrow_mut()
-            .set_value(contract_address.clone(), Contract { code_hash })?;
+            .set_value(contract_address.clone(), contract)?;
         ctx.sub_cycles(code_len)?;
+
         Ok(contract_address.as_hex())
     }
 }
