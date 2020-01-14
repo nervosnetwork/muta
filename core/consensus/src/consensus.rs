@@ -2,9 +2,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use bincode::deserialize;
 use creep::Context;
-use futures::channel::mpsc::UnboundedSender;
+use futures::lock::Mutex;
 use overlord::types::{AggregatedVote, Node, OverlordMsg, SignedProposal, SignedVote, Status};
 use overlord::{DurationConfig, Overlord, OverlordHandler};
 
@@ -15,9 +14,8 @@ use protocol::types::Validator;
 use protocol::{Bytes, ProtocolResult};
 
 use crate::engine::ConsensusEngine;
-use crate::fixed_types::{FixedEpochID, FixedPill, FixedSignedTxs};
+use crate::fixed_types::{FixedPill, FixedSignedTxs};
 use crate::status::StatusAgent;
-use crate::synchronization::Synchronization;
 use crate::util::OverlordCrypto;
 use crate::{ConsensusError, MsgType};
 
@@ -27,8 +25,6 @@ pub struct OverlordConsensus<Adapter: ConsensusAdapter + 'static> {
     inner:   Arc<Overlord<FixedPill, FixedSignedTxs, ConsensusEngine<Adapter>, OverlordCrypto>>,
     /// An overlord consensus protocol handler.
     handler: OverlordHandler<FixedPill>,
-    /// A synchronization module.
-    sync:    UnboundedSender<(u64, Context)>,
 }
 
 #[async_trait]
@@ -59,15 +55,6 @@ impl<Adapter: ConsensusAdapter + 'static> Consensus for OverlordConsensus<Adapte
             .map_err(|e| ConsensusError::OverlordErr(Box::new(e)))?;
         Ok(())
     }
-
-    async fn update_epoch(&self, ctx: Context, msg: Vec<u8>) -> ProtocolResult<()> {
-        let epoch_id: FixedEpochID =
-            deserialize(&msg).map_err(|_| ConsensusError::DecodeErr(MsgType::RichEpochID))?;
-        self.sync
-            .unbounded_send((epoch_id.inner, ctx))
-            .map_err(|_| ConsensusError::Other("Send sync msg error".to_string()))?;
-        Ok(())
-    }
 }
 
 impl<Adapter: ConsensusAdapter + 'static> OverlordConsensus<Adapter> {
@@ -78,11 +65,13 @@ impl<Adapter: ConsensusAdapter + 'static> OverlordConsensus<Adapter> {
         priv_key: BlsPrivateKey,
         common_ref: BlsCommonReference,
         adapter: Arc<Adapter>,
-    ) -> (Self, Synchronization<Adapter>) {
+        lock: Arc<Mutex<()>>,
+    ) -> Self {
         let engine = Arc::new(ConsensusEngine::new(
             status_agent.clone(),
             node_info.clone(),
             Arc::clone(&adapter),
+            lock,
         ));
 
         let crypto = OverlordCrypto::new(priv_key, addr_pubkey, common_ref);
@@ -105,14 +94,14 @@ impl<Adapter: ConsensusAdapter + 'static> OverlordConsensus<Adapter> {
             )
             .unwrap();
 
-        let (sync, rx) = Synchronization::new(overlord_handler.clone(), Arc::clone(&engine));
-        let consensus = OverlordConsensus {
+        Self {
             inner:   Arc::new(overlord),
             handler: overlord_handler,
-            sync:    rx,
-        };
+        }
+    }
 
-        (consensus, sync)
+    pub fn get_overlord_handler(&self) -> OverlordHandler<FixedPill> {
+        self.handler.clone()
     }
 
     pub async fn run(
@@ -129,7 +118,7 @@ impl<Adapter: ConsensusAdapter + 'static> OverlordConsensus<Adapter> {
     }
 }
 
-fn gen_overlord_status(epoch_id: u64, interval: u64, validators: Vec<Validator>) -> Status {
+pub fn gen_overlord_status(epoch_id: u64, interval: u64, validators: Vec<Validator>) -> Status {
     let mut authority_list = validators
         .into_iter()
         .map(|v| Node {
