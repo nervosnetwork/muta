@@ -6,6 +6,7 @@ use bytes::Bytes;
 use ckb_vm::{DefaultMachineBuilder, SupportMachine};
 
 // use protocol::traits::ServiceSDK;
+use protocol::traits::{ServiceSDK, StoreMap};
 use protocol::types::{Address, Hash, ServiceContext};
 
 use crate::types::{ExecPayload, InterpreterResult};
@@ -25,8 +26,9 @@ impl Default for InterpreterConf {
 
 #[derive(Clone, Debug)]
 pub struct InterpreterParams {
-    pub code: Bytes,
-    pub args: Bytes,
+    pub address: Address,
+    pub code:    Bytes,
+    pub args:    Bytes,
 }
 
 pub struct Interpreter {
