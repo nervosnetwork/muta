@@ -21,7 +21,7 @@ use protocol::types::{
 };
 use protocol::{Bytes, BytesMut, ProtocolError, ProtocolResult};
 
-use crate::fixed_types::{FixedEpochID, FixedPill};
+use crate::fixed_types::FixedPill;
 use crate::message::{
     END_GOSSIP_AGGREGATED_VOTE, END_GOSSIP_SIGNED_PROPOSAL, END_GOSSIP_SIGNED_VOTE,
 };
@@ -475,41 +475,41 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
         self.save_wal().await
     }
 
-    pub async fn save_proof(&self, ctx: Context, proof: Proof) -> ProtocolResult<()> {
-        self.adapter.save_proof(ctx, proof).await
-    }
+    // pub async fn save_proof(&self, ctx: Context, proof: Proof) ->
+    // ProtocolResult<()> {     self.adapter.save_proof(ctx, proof).await
+    // }
 
-    pub fn get_current_interval(&self) -> u64 {
-        let current_consensus_status = self.status_agent.to_inner();
-        current_consensus_status.consensus_interval
-    }
+    // pub fn get_current_interval(&self) -> u64 {
+    //     let current_consensus_status = self.status_agent.to_inner();
+    //     current_consensus_status.consensus_interval
+    // }
 
-    pub fn get_current_authority_list(&self) -> Vec<Node> {
-        let current_consensus_status = self.status_agent.to_inner();
-        covert_to_overlord_authority(&current_consensus_status.validators)
-    }
+    // pub fn get_current_authority_list(&self) -> Vec<Node> {
+    //     let current_consensus_status = self.status_agent.to_inner();
+    //     covert_to_overlord_authority(&current_consensus_status.validators)
+    // }
 
-    pub fn get_current_state_root(&self, epoch_id: u64) -> ProtocolResult<Option<MerkleRoot>> {
-        let current_consensus_status = self.status_agent.to_inner();
-        if epoch_id == current_consensus_status.exec_epoch_id {
-            let state_root = current_consensus_status
-                .state_root
-                .last()
-                .ok_or_else(|| ConsensusError::StatusErr(StatusCacheField::StateRoot))?;
-            return Ok(Some(state_root.clone()));
-        }
-        Ok(None)
-    }
+    // pub fn get_current_state_root(&self, epoch_id: u64) ->
+    // ProtocolResult<Option<MerkleRoot>> {     let current_consensus_status =
+    // self.status_agent.to_inner();     if epoch_id ==
+    // current_consensus_status.exec_epoch_id {         let state_root =
+    // current_consensus_status             .state_root
+    //             .last()
+    //             .ok_or_else(||
+    // ConsensusError::StatusErr(StatusCacheField::StateRoot))?;         return
+    // Ok(Some(state_root.clone()));     }
+    //     Ok(None)
+    // }
 
-    pub fn check_state_root(&self, state_root: &MerkleRoot) -> bool {
-        let current_consensus_status = self.status_agent.to_inner();
-        current_consensus_status.state_root.contains(state_root)
-    }
+    // pub fn check_state_root(&self, state_root: &MerkleRoot) -> bool {
+    //     let current_consensus_status = self.status_agent.to_inner();
+    //     current_consensus_status.state_root.contains(state_root)
+    // }
 
-    pub fn get_current_prev_hash(&self) -> Hash {
-        let current_consensus_status = self.status_agent.to_inner();
-        current_consensus_status.prev_hash
-    }
+    // pub fn get_current_prev_hash(&self) -> Hash {
+    //     let current_consensus_status = self.status_agent.to_inner();
+    //     current_consensus_status.prev_hash
+    // }
 
     async fn save_wal(&self) -> ProtocolResult<()> {
         let mut info = self.status_agent.to_inner();

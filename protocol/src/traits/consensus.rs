@@ -1,7 +1,10 @@
 use async_trait::async_trait;
 use creep::Context;
 
-use crate::types::{Address, Bytes, Epoch, Hash, MerkleRoot, Proof, SignedTransaction, Validator};
+use crate::traits::{ExecutorParams, ExecutorResp};
+use crate::types::{
+    Address, Bytes, Epoch, Hash, MerkleRoot, Proof, Receipt, SignedTransaction, Validator,
+};
 use crate::{traits::mempool::MixedTxHashes, ProtocolResult};
 
 #[derive(Clone, Debug, PartialEq, Eq)]

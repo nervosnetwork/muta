@@ -14,7 +14,7 @@ use protocol::types::Validator;
 use protocol::{Bytes, ProtocolResult};
 
 use crate::engine::ConsensusEngine;
-use crate::fixed_types::{FixedEpochID, FixedPill};
+use crate::fixed_types::FixedPill;
 use crate::status::StatusAgent;
 use crate::util::OverlordCrypto;
 use crate::{ConsensusError, MsgType};

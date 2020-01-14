@@ -19,7 +19,9 @@ use core_consensus::message::{
     RPC_RESP_SYNC_PULL_EPOCH, RPC_RESP_SYNC_PULL_TXS, RPC_SYNC_PULL_EPOCH, RPC_SYNC_PULL_TXS,
 };
 use core_consensus::status::{CurrentConsensusStatus, StatusAgent};
-use core_consensus::{Node, OverlordConsensus, OverlordConsensusAdapter, WalInfoQueue};
+use core_consensus::{
+    Node, OverlordConsensus, OverlordConsensusAdapter, OverlordSynchronization, WalInfoQueue,
+};
 use core_mempool::{
     DefaultMemPoolAdapter, HashMemPool, MsgPushTxs, NewTxsHandler, PullTxsHandler,
     END_GOSSIP_NEW_TXS, RPC_PULL_TXS, RPC_RESP_PULL_TXS,
@@ -198,6 +200,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
             epoch_id:           current_epoch.header.epoch_id + 1,
             exec_epoch_id:      current_epoch.header.epoch_id,
             prev_hash:          prevhash,
+            latest_state_root:  current_header.state_root.clone(),
             logs_bloom:         current_header.logs_bloom.clone(),
             confirm_root:       vec![],
             state_root:         vec![current_header.state_root.clone()],
@@ -271,7 +274,6 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
             Arc::clone(&trie_db),
             Arc::clone(&service_mapping),
             status_agent.clone(),
-            current_header.state_root.clone(),
             exec_wal,
         )?;
 

@@ -8,18 +8,18 @@ use futures::executor::block_on;
 use futures::stream::StreamExt;
 use overlord::types::OverlordMsg;
 use overlord::OverlordHandler;
-use log::{debug, info};
 use parking_lot::RwLock;
 
+use common_merkle::Merkle;
 use protocol::traits::{
     CommonConsensusAdapter, ConsensusAdapter, Context, ExecutorFactory, ExecutorParams,
-    ExecutorResp, Gossip, MemPool, MessageTarget, MixedTxHashes, NodeInfo, Priority, Rpc,
+    ExecutorResp, Gossip, MemPool, MessageCodec, MessageTarget, MixedTxHashes, Priority, Rpc,
     ServiceMapping, Storage, SynchronizationAdapter,
 };
 use protocol::types::{
     Address, Bytes, Epoch, Hash, MerkleRoot, Proof, Receipt, SignedTransaction, Validator,
 };
-use protocol::ProtocolResult;
+use protocol::{fixed_codec::FixedCodec, ProtocolResult};
 
 use crate::consensus::gen_overlord_status;
 use crate::fixed_types::{FixedEpoch, FixedEpochID, FixedPill, FixedSignedTxs, PullTxsRequest};
@@ -148,6 +148,78 @@ where
     ) -> ProtocolResult<Vec<Validator>> {
         let epoch = self.storage.get_epoch_by_epoch_id(epoch_id).await?;
         Ok(epoch.header.validators)
+    }
+
+    async fn save_overlord_wal(&self, _ctx: Context, info: Bytes) -> ProtocolResult<()> {
+        self.storage.update_overlord_wal(info).await
+    }
+
+    async fn load_overlord_wal(&self, _ctx: Context) -> ProtocolResult<Bytes> {
+        self.storage.load_overlord_wal().await
+    }
+
+    async fn save_muta_wal(&self, _ctx: Context, info: Bytes) -> ProtocolResult<()> {
+        self.storage.update_muta_wal(info).await
+    }
+
+    async fn load_muta_wal(&self, _ctx: Context) -> ProtocolResult<Bytes> {
+        self.storage.load_muta_wal().await
+    }
+
+    async fn save_wal_transactions(
+        &self,
+        _ctx: Context,
+        epoch_hash: Hash,
+        txs: Vec<SignedTransaction>,
+    ) -> ProtocolResult<()> {
+        self.storage.insert_wal_transactions(epoch_hash, txs).await
+    }
+
+    async fn load_wal_transactions(
+        &self,
+        _ctx: Context,
+        epoch_hash: Hash,
+    ) -> ProtocolResult<Vec<SignedTransaction>> {
+        self.storage.get_wal_transactions(epoch_hash).await
+    }
+
+    async fn pull_epoch(&self, ctx: Context, epoch_id: u64, end: &str) -> ProtocolResult<Epoch> {
+        log::debug!("consensus: send rpc pull epoch {}", epoch_id);
+        let res = self
+            .rpc
+            .call::<FixedEpochID, FixedEpoch>(ctx, end, FixedEpochID::new(epoch_id), Priority::High)
+            .await?;
+        Ok(res.inner)
+    }
+
+    async fn pull_txs(
+        &self,
+        ctx: Context,
+        hashes: Vec<Hash>,
+        end: &str,
+    ) -> ProtocolResult<Vec<SignedTransaction>> {
+        log::debug!("consensus: send rpc pull txs");
+        let res = self
+            .rpc
+            .call::<PullTxsRequest, FixedSignedTxs>(
+                ctx,
+                end,
+                PullTxsRequest::new(hashes),
+                Priority::High,
+            )
+            .await?;
+        Ok(res.inner)
+    }
+
+    /// Get an epoch corresponding to the given epoch ID.
+    async fn get_epoch_by_id(&self, _: Context, epoch_id: u64) -> ProtocolResult<Epoch> {
+        self.storage.get_epoch_by_epoch_id(epoch_id).await
+    }
+
+    /// Get the current epoch ID from storage.
+    async fn get_current_epoch_id(&self, _: Context) -> ProtocolResult<u64> {
+        let res = self.storage.get_latest_epoch().await?;
+        Ok(res.header.epoch_id)
     }
 }
 
@@ -299,37 +371,6 @@ where
         self.network
             .broadcast(ctx.clone(), BROADCAST_EPOCH_ID, epoch_id, Priority::High)
             .await
-    async fn save_overlord_wal(&self, _ctx: Context, info: Bytes) -> ProtocolResult<()> {
-        self.storage.update_overlord_wal(info).await
-    }
-
-    async fn load_overlord_wal(&self, _ctx: Context) -> ProtocolResult<Bytes> {
-        self.storage.load_overlord_wal().await
-    }
-
-    async fn save_muta_wal(&self, _ctx: Context, info: Bytes) -> ProtocolResult<()> {
-        self.storage.update_muta_wal(info).await
-    }
-
-    async fn load_muta_wal(&self, _ctx: Context) -> ProtocolResult<Bytes> {
-        self.storage.load_muta_wal().await
-    }
-
-    async fn save_wal_transactions(
-        &self,
-        _ctx: Context,
-        epoch_hash: Hash,
-        txs: Vec<SignedTransaction>,
-    ) -> ProtocolResult<()> {
-        self.storage.insert_wal_transactions(epoch_hash, txs).await
-    }
-
-    async fn load_wal_transactions(
-        &self,
-        _ctx: Context,
-        epoch_hash: Hash,
-    ) -> ProtocolResult<Vec<SignedTransaction>> {
-        self.storage.get_wal_transactions(epoch_hash).await
     }
 }
 
@@ -351,7 +392,6 @@ where
         trie_db: Arc<DB>,
         service_mapping: Arc<Mapping>,
         status_agent: StatusAgent,
-        state_root: MerkleRoot,
         queue_wal: WalInfoQueue,
     ) -> ProtocolResult<Self> {
         let (exec_queue, rx) = channel(OVERLORD_GAP);
@@ -389,6 +429,8 @@ where
 
     pub fn set_overlord_handler(&self, handler: OverlordHandler<FixedPill>) {
         *self.overlord_handler.write() = Some(handler)
+    }
+
     async fn save_queue_wal(&self, exec_info: ExecuteInfo) -> ProtocolResult<()> {
         let wal_info = {
             let mut map = self.exec_queue_wal.write();
@@ -430,11 +472,10 @@ pub struct ExecDemons<S, DB, EF, Mapping> {
     trie_db:         Arc<DB>,
     service_mapping: Arc<Mapping>,
 
-    pin_ef:     PhantomData<EF>,
-    queue:      Receiver<ExecuteInfo>,
-    queue_wal:  Arc<RwLock<WalInfoQueue>>,
-    state_root: MerkleRoot,
-    status:     StatusAgent,
+    pin_ef:    PhantomData<EF>,
+    queue:     Receiver<ExecuteInfo>,
+    queue_wal: Arc<RwLock<WalInfoQueue>>,
+    status:    StatusAgent,
 }
 
 impl<S, DB, EF, Mapping> ExecDemons<S, DB, EF, Mapping>
@@ -517,5 +558,28 @@ where
 
         self.storage.update_exec_queue_wal(queue_info).await?;
         self.storage.update_muta_wal(wal_info).await
+    }
+}
+
+fn gen_update_info(exec_resp: ExecutorResp, epoch_id: u64, order_root: MerkleRoot) -> UpdateInfo {
+    let cycles = exec_resp.all_cycles_used;
+
+    let receipt = Merkle::from_hashes(
+        exec_resp
+            .receipts
+            .iter()
+            .map(|r| Hash::digest(r.to_owned().encode_fixed().unwrap()))
+            .collect::<Vec<_>>(),
+    )
+    .get_root_hash()
+    .unwrap_or_else(Hash::from_empty);
+
+    UpdateInfo {
+        exec_epoch_id: epoch_id,
+        cycles_used:   cycles,
+        receipt_root:  receipt,
+        confirm_root:  order_root,
+        state_root:    exec_resp.state_root.clone(),
+        logs_bloom:    exec_resp.logs_bloom,
     }
 }
