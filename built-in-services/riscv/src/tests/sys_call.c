@@ -21,6 +21,23 @@ int is13(char* data) {
     return 1;
 }
 
+// pvm contract call, call self
+int contract_call() {
+    pvm_debug("------ start contract call -------------");
+    // char addr[40] = "not-exist-address";
+    char addr[40] = "cea3d2319b3caa8643942fda60da00f49a693f5e";
+    char call_args[] = "1133";
+    char contract_call_ret[1000] = {0};
+    uint64_t ret_size = 0;
+    int call_result = pvm_contract_call(addr, call_args, strlen(call_args), contract_call_ret, &ret_size);
+    if (call_result != 0) {
+        pvm_debug("call failed:");
+        pvm_debug(contract_call_ret);
+    }
+    pvm_debug("------  end contract call -------------");
+    return call_result;
+}
+
 int main() {
     char debug[1000] = {0};
 
@@ -52,6 +69,7 @@ int main() {
     char ret[100] = {0};
     if (is13(args) == 0) {
         sprintf(ret, "'%s' is 13", args);
+        contract_call();
     } else {
         sprintf(ret, "'%s' is not 13", args);
     }

@@ -1,5 +1,5 @@
 mod cost_model;
-pub use cost_model::instruction_cycles;
+pub use cost_model::{instruction_cycles, CONTRACT_CALL_FIXED_CYCLE};
 
 mod err;
 pub use err::Error;

@@ -30,10 +30,8 @@ impl<SDK: ServiceSDK + 'static> RiscvService<SDK> {
         })
     }
 
-    #[cycles(200_00)]
     #[write]
-    fn exec(&mut self, ctx: ServiceContext, payload: ExecPayload) -> ProtocolResult<ExecResp> {
-        let mut exec_resp = ExecResp::default();
+    fn exec(&mut self, ctx: ServiceContext, payload: ExecPayload) -> ProtocolResult<String> {
         let contract = self
             .sdk
             .borrow()
@@ -61,18 +59,23 @@ impl<SDK: ServiceSDK + 'static> RiscvService<SDK> {
         );
         let r = interpreter.run().map_err(|e| ServiceError::CkbVm(e))?;
         dbg!(&r);
+        let ret = String::from_utf8_lossy(r.ret.as_ref()).to_string();
         if r.ret_code != 0 {
-            exec_resp.is_error = true;
+            return Err(ServiceError::NonZeroExitCode {
+                exitcode: r.ret_code,
+                ret,
+            }
+            .into());
         }
-        exec_resp.ret = String::from_utf8_lossy(r.ret.as_ref()).to_string();
-        Ok(exec_resp)
+        ctx.sub_cycles(r.cycles_used)?;
+        Ok(ret)
     }
 
-    #[cycles(210_00)]
     #[write]
     fn deploy(&mut self, ctx: ServiceContext, payload: DeployPayload) -> ProtocolResult<String> {
         // dbg!(&payload);
         let code_hash = Hash::digest(payload.code.clone());
+        let code_len = payload.code.len() as u64;
         self.sdk
             .borrow_mut()
             .set_value(code_hash.clone(), payload.code)?;
@@ -84,19 +87,26 @@ impl<SDK: ServiceSDK + 'static> RiscvService<SDK> {
         self.sdk
             .borrow_mut()
             .set_value(contract_address.clone(), Contract { code_hash })?;
+        ctx.sub_cycles(code_len)?;
         Ok(contract_address.as_hex())
     }
 }
 
 struct ChainInterfaceImpl<SDK> {
-    ctx:     ServiceContext,
-    payload: ExecPayload,
-    sdk:     Rc<RefCell<SDK>>,
+    ctx:             ServiceContext,
+    payload:         ExecPayload,
+    sdk:             Rc<RefCell<SDK>>,
+    all_cycles_used: u64,
 }
 
 impl<SDK: ServiceSDK + 'static> ChainInterfaceImpl<SDK> {
     fn new(ctx: ServiceContext, payload: ExecPayload, sdk: Rc<RefCell<SDK>>) -> Self {
-        Self { ctx, payload, sdk }
+        Self {
+            ctx,
+            payload,
+            sdk,
+            all_cycles_used: 0,
+        }
     }
 
     fn contract_key(&self, key: &Bytes) -> Hash {
@@ -122,6 +132,24 @@ where
         let contract_key = self.contract_key(&key);
         self.sdk.borrow_mut().set_value(contract_key, val)
     }
+
+    fn contract_call(
+        &mut self,
+        address: Address,
+        args: Bytes,
+        current_cycle: u64,
+    ) -> ProtocolResult<(String, u64)> {
+        let vm_cycle = current_cycle - self.all_cycles_used;
+        self.ctx.sub_cycles(vm_cycle)?;
+        let payload = ExecPayload { address, args };
+        let payload_str = serde_json::to_string(&payload).map_err(|e| ServiceError::Serde(e))?;
+        let call_ret = self
+            .sdk
+            .borrow_mut()
+            .write(&self.ctx, "riscv", "exec", &payload_str)?;
+        self.all_cycles_used = self.ctx.get_cycles_used();
+        Ok((call_ret, self.all_cycles_used))
+    }
 }
 
 #[derive(Debug, Display, From)]
@@ -129,8 +157,14 @@ pub enum ServiceError {
     #[display(fmt = "Contract not exists")]
     ContractNotExists,
 
+    #[display(fmt = "CKB VM return non zero, exitcode: {}, ret: {}", exitcode, ret)]
+    NonZeroExitCode { exitcode: i8, ret: String },
+
     #[display(fmt = "ckb vm error: {:?}", _0)]
     CkbVm(ckb_vm::Error),
+
+    #[display(fmt = "json serde error: {:?}", _0)]
+    Serde(serde_json::error::Error),
 }
 
 impl std::error::Error for ServiceError {}

@@ -8,6 +8,7 @@ use cita_trie::MemoryDB;
 
 use framework::binding::sdk::{DefalutServiceSDK, DefaultChainQuerier};
 use framework::binding::state::{GeneralServiceState, MPTTrie};
+use protocol::traits::{Dispatcher, ExecResp};
 use protocol::traits::{NoopDispatcher, Storage};
 use protocol::types::{
     Address, Epoch, Hash, Proof, Receipt, ServiceContext, ServiceContextParams, SignedTransaction,
@@ -37,25 +38,42 @@ fn test_deploy_and_run() {
             init_args: "args".into(),
         })
         .unwrap();
+    dbg!(&address);
     let exec_result = service.exec(context.clone(), ExecPayload {
         address: Address::from_hex(&address).unwrap(),
         args:    "13".into(),
     });
     dbg!(&exec_result);
-    assert!(!exec_result.unwrap().is_error);
+    assert!(!exec_result.is_err());
     let exec_result = service.exec(context.clone(), ExecPayload {
         address: Address::from_hex(&address).unwrap(),
         args:    "not 13".into(),
     });
     dbg!(&exec_result);
-    assert!(!exec_result.unwrap().is_error);
+    assert!(!exec_result.is_err());
+}
+
+struct MockDispatcher;
+
+impl Dispatcher for MockDispatcher {
+    fn read(&self, _context: ServiceContext) -> ProtocolResult<ExecResp> {
+        unimplemented!()
+    }
+
+    fn write(&self, context: ServiceContext) -> ProtocolResult<ExecResp> {
+        dbg!(context);
+        Ok(ExecResp {
+            ret:      "".to_owned(),
+            is_error: false,
+        })
+    }
 }
 
 fn new_riscv_service() -> RiscvService<
     DefalutServiceSDK<
         GeneralServiceState<MemoryDB>,
         DefaultChainQuerier<MockStorage>,
-        NoopDispatcher,
+        MockDispatcher,
     >,
 > {
     let chain_db = DefaultChainQuerier::new(Arc::new(MockStorage {}));
@@ -65,7 +83,7 @@ fn new_riscv_service() -> RiscvService<
     let sdk = DefalutServiceSDK::new(
         Rc::new(RefCell::new(state)),
         Rc::new(chain_db),
-        NoopDispatcher {},
+        MockDispatcher {},
     );
 
     RiscvService::init(sdk).unwrap()

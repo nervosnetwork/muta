@@ -28,7 +28,7 @@ impl<Mac: ckb_vm::SupportMachine> ckb_vm::Syscalls<Mac> for SyscallEnvironment {
 
     fn ecall(&mut self, machine: &mut Mac) -> Result<bool, ckb_vm::Error> {
         let code = &machine.registers()[ckb_vm::registers::A7];
-        match code.to_i32() {
+        match code.to_u64() {
             SYSCODE_CYCLE_LIMIT => {
                 let addr = machine.registers()[ckb_vm::registers::A0].to_u64();
                 let gaslimit_byte = self.context.get_cycles_limit().to_le_bytes();
