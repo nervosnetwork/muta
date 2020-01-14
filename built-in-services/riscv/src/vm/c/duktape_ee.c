@@ -75,8 +75,8 @@ int main(int argc, char *argv[]) {
     }
 
     // Call our funtion
-    duk_int_t ret = duk_pcall(ctx, 0);
-    if (DUK_EXEC_SUCCESS == ret) {
+    duk_int_t rc = duk_pcall(ctx, 0);
+    if (DUK_EXEC_SUCCESS == rc) {
         const char *ret = duk_get_string(ctx, -1);
         pvm_ret((uint8_t *)ret, strlen(ret));
     } else {
@@ -87,5 +87,5 @@ int main(int argc, char *argv[]) {
     duk_pop(ctx);
     duk_destroy_heap(ctx);
 
-    return ret;
+    return rc;
 }
