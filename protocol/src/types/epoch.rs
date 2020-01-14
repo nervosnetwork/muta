@@ -1,4 +1,5 @@
 use bytes::Bytes;
+use serde::{Deserialize, Serialize};
 
 use crate::types::{Address, Bloom, Hash, MerkleRoot};
 
@@ -27,7 +28,7 @@ pub struct EpochHeader {
     pub validators:        Vec<Validator>,
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, Hash, PartialEq, Eq)]
 pub struct Proof {
     pub epoch_id:   u64,
     pub round:      u64,
@@ -36,7 +37,7 @@ pub struct Proof {
     pub bitmap:     Bytes,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Validator {
     pub address:        Address,
     pub propose_weight: u8,

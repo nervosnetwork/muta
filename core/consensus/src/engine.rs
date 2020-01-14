@@ -8,20 +8,20 @@ use futures::lock::Mutex;
 use log::error;
 use moodyblues_sdk::trace;
 use overlord::types::{Commit, Node, OverlordMsg, Status};
-use overlord::Consensus as Engine;
+use overlord::{Consensus as Engine, Wal};
 use parking_lot::RwLock;
 use rlp::Encodable;
 use serde_json::json;
 
 use common_merkle::Merkle;
 use protocol::fixed_codec::FixedCodec;
-use protocol::traits::{ConsensusAdapter, Context, MessageTarget, NodeInfo};
+use protocol::traits::{ConsensusAdapter, Context, MessageCodec, MessageTarget, NodeInfo};
 use protocol::types::{
     Address, Epoch, EpochHeader, Hash, MerkleRoot, Pill, Proof, SignedTransaction, Validator,
 };
 use protocol::{Bytes, BytesMut, ProtocolError, ProtocolResult};
 
-use crate::fixed_types::{FixedPill, FixedSignedTxs};
+use crate::fixed_types::FixedPill;
 use crate::message::{
     END_GOSSIP_AGGREGATED_VOTE, END_GOSSIP_SIGNED_PROPOSAL, END_GOSSIP_SIGNED_VOTE,
 };
@@ -40,9 +40,7 @@ pub struct ConsensusEngine<Adapter> {
 }
 
 #[async_trait]
-impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill, FixedSignedTxs>
-    for ConsensusEngine<Adapter>
-{
+impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<Adapter> {
     async fn get_epoch(
         &self,
         ctx: Context,
@@ -91,7 +89,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill, FixedSignedTxs>
         let fixed_pill = FixedPill {
             inner: pill.clone(),
         };
-        let hash = Hash::digest(pill.encode_fixed()?).as_bytes();
+        let hash = Hash::digest(pill.epoch.encode_fixed()?).as_bytes();
         let mut set = self.exemption_hash.write();
         set.insert(hash.clone());
 
@@ -104,13 +102,10 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill, FixedSignedTxs>
         _epoch_id: u64,
         hash: Bytes,
         epoch: FixedPill,
-    ) -> Result<FixedSignedTxs, Box<dyn Error + Send>> {
+    ) -> Result<(), Box<dyn Error + Send>> {
         let order_hashes = epoch.get_ordered_hashes();
-        let exemption = {
-            let set = self.exemption_hash.read();
-            let hash = BytesMut::from(hash.as_ref()).freeze();
-            set.contains(&hash)
-        };
+        let exemption = { self.exemption_hash.read().contains(&hash) };
+
         // If the epoch is proposed by self, it does not need to check. Get full signed
         // transactions directly.
         if !exemption {
@@ -124,8 +119,11 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill, FixedSignedTxs>
                 .await?;
         }
 
-        let inner = self.adapter.get_full_txs(ctx, order_hashes).await?;
-        Ok(FixedSignedTxs { inner })
+        let inner = self.adapter.get_full_txs(ctx.clone(), order_hashes).await?;
+        self.adapter
+            .save_wal_transactions(ctx, Hash::digest(hash.clone()), inner)
+            .await?;
+        Ok(())
     }
 
     /// **TODO:** the overlord interface and process needs to be changed.
@@ -145,6 +143,16 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill, FixedSignedTxs>
             );
         }
 
+        let current_consensus_status = self.status_agent.to_inner();
+        if current_consensus_status.exec_epoch_id == epoch_id {
+            let status = Status {
+                epoch_id:       epoch_id + 1,
+                interval:       Some(current_consensus_status.consensus_interval),
+                authority_list: covert_to_overlord_authority(&current_consensus_status.validators),
+            };
+            return Ok(status);
+        }
+
         let pill = commit.content.inner;
 
         let epoch_hash = BytesMut::from(commit.proof.epoch_hash.as_ref()).freeze();
@@ -155,20 +163,27 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill, FixedSignedTxs>
         let proof = Proof {
             epoch_id: commit.proof.epoch_id,
             round: commit.proof.round,
-            epoch_hash: Hash::from_bytes(epoch_hash)?,
+            epoch_hash: Hash::from_bytes(epoch_hash.clone())?,
             signature,
             bitmap,
         };
 
         self.adapter.save_proof(ctx.clone(), proof.clone()).await?;
 
-        // Get full transactions from mempool temporarily.
-        // Storage save the signed transactions.
+        // Get full transactions from mempool. If is error, try get from wal.
         let ordered_tx_hashes = pill.epoch.ordered_tx_hashes.clone();
-        let full_txs = self
+        let full_txs = match self
             .adapter
             .get_full_txs(ctx.clone(), ordered_tx_hashes.clone())
-            .await?;
+            .await
+        {
+            Ok(txs) => txs,
+            Err(_) => {
+                self.adapter
+                    .load_wal_transactions(ctx.clone(), Hash::digest(epoch_hash))
+                    .await?
+            }
+        };
 
         self.adapter
             .flush_mempool(ctx.clone(), &ordered_tx_hashes)
@@ -180,6 +195,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill, FixedSignedTxs>
             epoch_id,
             pill.epoch.header.proposer.clone(),
             pill.epoch.header.timestamp,
+            Hash::digest(pill.epoch.encode_fixed()?),
             full_txs.clone(),
         )
         .await?;
@@ -287,6 +303,22 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill, FixedSignedTxs>
     }
 }
 
+#[async_trait]
+impl<Adapter: ConsensusAdapter + 'static> Wal for ConsensusEngine<Adapter> {
+    async fn save(&self, info: Bytes) -> Result<(), Box<dyn Error + Send>> {
+        self.adapter
+            .save_overlord_wal(Context::new(), info)
+            .await
+            .map_err(|e| ProtocolError::from(ConsensusError::WalErr(e.to_string())))?;
+        Ok(())
+    }
+
+    async fn load(&self) -> Result<Option<Bytes>, Box<dyn Error + Send>> {
+        let res = self.adapter.load_overlord_wal(Context::new()).await.ok();
+        Ok(res)
+    }
+}
+
 impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
     pub fn new(
         status_agent: StatusAgent,
@@ -309,17 +341,19 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
         epoch_id: u64,
         address: Address,
         timestamp: u64,
+        epoch_hash: Hash,
         txs: Vec<SignedTransaction>,
     ) -> ProtocolResult<()> {
         let status = self.status_agent.to_inner();
 
         self.adapter
             .execute(
-                self.node_info.clone(),
+                self.node_info.chain_id.clone(),
                 order_root,
                 epoch_id,
                 status.cycles_price,
                 address,
+                epoch_hash,
                 txs,
                 status.cycles_limit,
                 timestamp,
@@ -437,7 +471,50 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
 
         let prev_hash = Hash::digest(epoch.encode_fixed()?);
         self.status_agent
-            .update_after_commit(epoch_id + 1, epoch, prev_hash, proof)
+            .update_after_commit(epoch_id + 1, epoch, prev_hash, proof)?;
+        self.save_wal().await
+    }
+
+    // pub async fn save_proof(&self, ctx: Context, proof: Proof) ->
+    // ProtocolResult<()> {     self.adapter.save_proof(ctx, proof).await
+    // }
+
+    // pub fn get_current_interval(&self) -> u64 {
+    //     let current_consensus_status = self.status_agent.to_inner();
+    //     current_consensus_status.consensus_interval
+    // }
+
+    // pub fn get_current_authority_list(&self) -> Vec<Node> {
+    //     let current_consensus_status = self.status_agent.to_inner();
+    //     covert_to_overlord_authority(&current_consensus_status.validators)
+    // }
+
+    // pub fn get_current_state_root(&self, epoch_id: u64) ->
+    // ProtocolResult<Option<MerkleRoot>> {     let current_consensus_status =
+    // self.status_agent.to_inner();     if epoch_id ==
+    // current_consensus_status.exec_epoch_id {         let state_root =
+    // current_consensus_status             .state_root
+    //             .last()
+    //             .ok_or_else(||
+    // ConsensusError::StatusErr(StatusCacheField::StateRoot))?;         return
+    // Ok(Some(state_root.clone()));     }
+    //     Ok(None)
+    // }
+
+    // pub fn check_state_root(&self, state_root: &MerkleRoot) -> bool {
+    //     let current_consensus_status = self.status_agent.to_inner();
+    //     current_consensus_status.state_root.contains(state_root)
+    // }
+
+    // pub fn get_current_prev_hash(&self) -> Hash {
+    //     let current_consensus_status = self.status_agent.to_inner();
+    //     current_consensus_status.prev_hash
+    // }
+
+    async fn save_wal(&self) -> ProtocolResult<()> {
+        let mut info = self.status_agent.to_inner();
+        let wal_info = MessageCodec::encode(&mut info).await?;
+        self.adapter.save_muta_wal(Context::new(), wal_info).await
     }
 }
 

@@ -14,7 +14,7 @@ use protocol::types::Validator;
 use protocol::{Bytes, ProtocolResult};
 
 use crate::engine::ConsensusEngine;
-use crate::fixed_types::{FixedPill, FixedSignedTxs};
+use crate::fixed_types::FixedPill;
 use crate::status::StatusAgent;
 use crate::util::OverlordCrypto;
 use crate::{ConsensusError, MsgType};
@@ -22,7 +22,9 @@ use crate::{ConsensusError, MsgType};
 /// Provide consensus
 pub struct OverlordConsensus<Adapter: ConsensusAdapter + 'static> {
     /// Overlord consensus protocol instance.
-    inner:   Arc<Overlord<FixedPill, FixedSignedTxs, ConsensusEngine<Adapter>, OverlordCrypto>>,
+    inner: Arc<
+        Overlord<FixedPill, ConsensusEngine<Adapter>, OverlordCrypto, ConsensusEngine<Adapter>>,
+    >,
     /// An overlord consensus protocol handler.
     handler: OverlordHandler<FixedPill>,
 }
@@ -79,20 +81,23 @@ impl<Adapter: ConsensusAdapter + 'static> OverlordConsensus<Adapter> {
             node_info.self_address.as_bytes(),
             Arc::clone(&engine),
             crypto,
+            Arc::clone(&engine),
         );
         let overlord_handler = overlord.get_handler();
 
         let status = status_agent.to_inner();
-        overlord_handler
-            .send_msg(
-                Context::new(),
-                OverlordMsg::RichStatus(gen_overlord_status(
-                    status.epoch_id,
-                    status.consensus_interval,
-                    status.validators,
-                )),
-            )
-            .unwrap();
+        if status.epoch_id == 1 {
+            overlord_handler
+                .send_msg(
+                    Context::new(),
+                    OverlordMsg::RichStatus(gen_overlord_status(
+                        status.epoch_id,
+                        status.consensus_interval,
+                        status.validators,
+                    )),
+                )
+                .unwrap();
+        }
 
         Self {
             inner:   Arc::new(overlord),
@@ -107,10 +112,11 @@ impl<Adapter: ConsensusAdapter + 'static> OverlordConsensus<Adapter> {
     pub async fn run(
         &self,
         interval: u64,
+        authority_list: Vec<Node>,
         timer_config: Option<DurationConfig>,
     ) -> ProtocolResult<()> {
         self.inner
-            .run(interval, timer_config)
+            .run(interval, authority_list, timer_config)
             .await
             .map_err(|e| ConsensusError::OverlordErr(Box::new(e)))?;
 

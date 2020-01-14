@@ -7,7 +7,9 @@ use rand::random;
 use crate::types::epoch::{Epoch, EpochHeader, Pill, Proof, Validator};
 use crate::types::primitive::{Address, Balance, Hash, MerkleRoot};
 use crate::types::receipt::{Event, Receipt, ReceiptResponse};
-use crate::types::transaction::{RawTransaction, SignedTransaction, TransactionRequest};
+use crate::types::transaction::{
+    RawTransaction, SignedTransaction, TransactionRequest, WalSaveTxs,
+};
 
 // #####################
 // Mock Primitive
@@ -91,6 +93,11 @@ pub fn mock_sign_tx() -> SignedTransaction {
         pubkey:    Default::default(),
         signature: Default::default(),
     }
+}
+
+pub fn mock_wal_txs(tx_size: usize) -> WalSaveTxs {
+    let inner = (0..tx_size).map(|_| mock_sign_tx()).collect::<Vec<_>>();
+    WalSaveTxs { inner }
 }
 
 // #####################

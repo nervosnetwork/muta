@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use protocol::{
-    traits::{Cloneable, Context, Priority},
+    traits::{Context, Priority},
     types::Address,
     Bytes,
 };
@@ -51,12 +51,8 @@ pub trait ListenExchangeManager {
 #[derive(Debug, Clone)]
 struct CtxSessionId(SessionId);
 
-impl Cloneable for CtxSessionId {}
-
 #[derive(Debug, Clone)]
 struct CtxRpcId(u64);
-
-impl Cloneable for CtxRpcId {}
 
 impl NetworkContext for Context {
     fn session_id(&self) -> Result<SessionId, NetworkError> {
