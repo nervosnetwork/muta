@@ -106,6 +106,28 @@ static duk_ret_t duk_pvm_set_storage(duk_context *ctx) {
     return 0;
 }
 
+static duk_ret_t duk_pvm_contract_call(duk_context *ctx) {
+    if (!duk_is_string(ctx, -1) || !duk_is_string(ctx, -2)) {
+        duk_push_error_object(ctx, DUK_ERR_EVAL_ERROR, "Invalid arguments, should be string");
+        return duk_throw(ctx);
+    }
+
+    const char *addr = duk_get_string(ctx, -2);
+    const char *call_args = duk_get_string(ctx, -1);
+    duk_pop_n(ctx, 2);
+
+    duk_push_dynamic_buffer(ctx, 1024);
+    void *ret = duk_get_buffer(ctx, -1, NULL);
+
+    int ret_code = 0;
+    if (ret_code != pvm_contract_call((uint8_t *)addr, (uint8_t *)call_args, strlen(call_args), ret, NULL)) {
+        return ret_code;
+    }
+
+    duk_buffer_to_string(ctx, -1);
+    return 1;
+}
+
 void pvm_init(duk_context *ctx) {
   duk_push_object(ctx);
 
@@ -123,6 +145,9 @@ void pvm_init(duk_context *ctx) {
 
   duk_push_c_function(ctx, duk_pvm_set_storage, 2);
   duk_put_prop_string(ctx, -2, "set_storage");
+
+  duk_push_c_function(ctx, duk_pvm_contract_call, 2);
+  duk_put_prop_string(ctx, -2, "contract_call");
 
   duk_put_global_string(ctx, "PVM");
 }

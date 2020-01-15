@@ -23,16 +23,24 @@ fn should_able_deploy_js_contract_and_run() {
         init_args: "args".into(),
     };
 
+    let bin_test_code = include_bytes!("./sys_call");
+    let bin_dep_payload = DeployPayload {
+        code:      Bytes::from(bin_test_code.as_ref()),
+        intp_type: InterpreterType::Binary,
+        init_args: "args".into(),
+    };
+
     let args = serde_json::json!({
         "x": 5,
         "y": 6
     })
     .to_string();
 
-    let address = service
-        .deploy(context.clone(), dep_payoad)
-        .expect("deploy")
-        .address;
+    service
+        .deploy(context.clone(), bin_dep_payload)
+        .expect("deplay binary");
+
+    let address = service.deploy(context.clone(), dep_payoad).expect("deploy");
     let exec_ret = service.exec(context.clone(), ExecPayload {
         address,
         args: args.into(),
