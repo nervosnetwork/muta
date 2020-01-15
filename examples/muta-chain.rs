@@ -4,6 +4,7 @@ use asset::AssetService;
 use muta::MutaBuilder;
 use protocol::traits::{Service, ServiceMapping, ServiceSDK};
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
+use riscv::RiscvService;
 
 struct DefaultServiceMapping;
 
@@ -15,6 +16,7 @@ impl ServiceMapping for DefaultServiceMapping {
     ) -> ProtocolResult<Box<dyn Service>> {
         let service = match name {
             "asset" => Box::new(AssetService::init(sdk)?) as Box<dyn Service>,
+            "riscv" => Box::new(RiscvService::init(sdk)?) as Box<dyn Service>,
             _ => {
                 return Err(MappingError::NotFoundService {
                     service: name.to_owned(),
@@ -27,7 +29,7 @@ impl ServiceMapping for DefaultServiceMapping {
     }
 
     fn list_service_name(&self) -> Vec<String> {
-        vec!["asset".to_owned()]
+        vec!["asset".to_owned(), "riscv".to_owned()]
     }
 }
 

@@ -30,9 +30,11 @@ int contract_call() {
     char contract_call_ret[1000] = {0};
     uint64_t ret_size = 0;
     int call_result = pvm_contract_call(addr, call_args, strlen(call_args), contract_call_ret, &ret_size);
+    pvm_debug(contract_call_ret);
     if (call_result != 0) {
         pvm_debug("call failed:");
-        pvm_debug(contract_call_ret);
+    } else {
+        pvm_debug("call success:");
     }
     pvm_debug("------  end contract call -------------");
     return call_result;

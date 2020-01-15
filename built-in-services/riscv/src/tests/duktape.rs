@@ -14,7 +14,7 @@ fn should_able_deploy_js_contract_and_run() {
 
     let test_code = include_str!("./test_code.js");
     let dep_payoad = DeployPayload {
-        code:      Bytes::from(test_code),
+        code:      hex::encode(Bytes::from(test_code)),
         intp_type: InterpreterType::Duktape,
         init_args: "args".into(),
     };

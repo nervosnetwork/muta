@@ -31,15 +31,15 @@ impl TryFrom<u8> for InterpreterType {
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct DeployPayload {
-    pub code:      Bytes,
+    pub code:      String,
     pub intp_type: InterpreterType,
-    pub init_args: Bytes,
+    pub init_args: String,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct ExecPayload {
     pub address: Address,
-    pub args:    Bytes,
+    pub args:    String,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, Default)]

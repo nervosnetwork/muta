@@ -35,6 +35,7 @@ toml = "0.5"
 
 [dev-dependencies]
 asset = { path = "built-in-services/asset"}
+riscv = { path = "built-in-services/riscv"}
 
 [workspace]
 members = [
