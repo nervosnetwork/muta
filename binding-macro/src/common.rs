@@ -37,14 +37,40 @@ fn path_is_request_context(path: &Path, bound_name: &str) -> bool {
     path.segments.len() == 1 && path.segments[0].ident == bound_name
 }
 
-pub fn assert_type_servicecontext(ty: &Type) {
+pub fn assert_type(ty: &Type, ty_str: &str) {
     match ty {
         Type::Path(ty_path) => {
             let path = &ty_path.path;
             assert_eq!(path.leading_colon.is_none(), true);
             assert_eq!(path.segments.len(), 1);
-            assert_eq!(path.segments[0].ident, "ServiceContext")
+            assert_eq!(path.segments[0].ident, ty_str)
         }
-        _ => panic!("The type should be `ServiceContext"),
+        _ => panic!("asset type failed"),
+    }
+}
+
+pub fn assert_reference_type(ty: &Type, ty_str: &str) {
+    match ty {
+        Type::Reference(ref_ty) => {
+            let ty_ref = &ref_ty.elem.as_ref();
+            assert_type(ty_ref, ty_str)
+        }
+        _ => panic!("asset reference type failed"),
+    }
+}
+
+// expect &mut self
+pub fn arg_is_mutable_receiver(fn_arg: &FnArg) -> bool {
+    match fn_arg {
+        FnArg::Receiver(receiver) => receiver.reference.is_some() && receiver.mutability.is_some(),
+        _ => false,
+    }
+}
+
+// expect &self
+pub fn arg_is_immutable_receiver(fn_arg: &FnArg) -> bool {
+    match fn_arg {
+        FnArg::Receiver(receiver) => receiver.reference.is_some() && receiver.mutability.is_none(),
+        _ => false,
     }
 }

@@ -50,12 +50,12 @@ pub fn gen_service_code(_: TokenStream, item: TokenStream) -> TokenStream {
     let hooks = extract_hooks(items);
     let hook_before = &hooks.before;
     let hook_before_body = match hook_before {
-        Some(hook_before) => quote! { self.#hook_before() },
+        Some(hook_before) => quote! { self.#hook_before(_params) },
         None => quote! {Ok(())},
     };
     let hook_after = &hooks.after;
     let hook_after_body = match hook_after {
-        Some(hook_after) => quote! { self.#hook_after() },
+        Some(hook_after) => quote! { self.#hook_after(_params) },
         None => quote! {Ok(())},
     };
 
@@ -77,11 +77,11 @@ pub fn gen_service_code(_: TokenStream, item: TokenStream) -> TokenStream {
                 #genesis_body
             }
 
-            fn hook_before_(&mut self) -> protocol::ProtocolResult<()> {
+            fn hook_before_(&mut self, _params: &ExecutorParams) -> protocol::ProtocolResult<()> {
                 #hook_before_body
             }
 
-            fn hook_after_(&mut self) -> protocol::ProtocolResult<()> {
+            fn hook_after_(&mut self, _params: &ExecutorParams) -> protocol::ProtocolResult<()> {
                 #hook_after_body
             }
 
