@@ -38,6 +38,16 @@ static duk_ret_t duk_pvm_debug(duk_context *ctx) {
   return 0;
 }
 
+static duk_ret_t duk_pvm_load_args(duk_context *ctx) {
+  duk_push_dynamic_buffer(ctx, 1024);
+
+  void *args = duk_get_buffer(ctx, -1, NULL);
+  pvm_load_args(args, NULL);
+
+  duk_buffer_to_string(ctx, -1);
+  return 1;
+}
+
 static duk_ret_t duk_pvm_load_json_args(duk_context *ctx) {
   duk_push_dynamic_buffer(ctx, 1024);
 
@@ -141,6 +151,9 @@ void pvm_init(duk_context *ctx) {
 
   duk_push_c_function(ctx, duk_pvm_debug, DUK_VARARGS);
   duk_put_prop_string(ctx, -2, "debug");
+  
+  duk_push_c_function(ctx, duk_pvm_load_args, 0);
+  duk_put_prop_string(ctx, -2, "load_args");
 
   duk_push_c_function(ctx, duk_pvm_load_json_args, 0);
   duk_put_prop_string(ctx, -2, "load_json_args");

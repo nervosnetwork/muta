@@ -4,6 +4,9 @@ function main() {
   PVM.debug(PVM.is_init());
 
   PVM.debug("hello! it's me, mario");
+  const raw_args = PVM.load_args();
+  PVM.debug(raw_args);
+
   const args = PVM.load_json_args();
 
   PVM.set_storage('carmen', 'red');
