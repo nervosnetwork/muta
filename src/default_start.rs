@@ -21,6 +21,7 @@ use core_consensus::message::{
 use core_consensus::status::{CurrentConsensusStatus, StatusAgent};
 use core_consensus::{
     Node, OverlordConsensus, OverlordConsensusAdapter, OverlordSynchronization, WalInfoQueue,
+    EXEC_QUEUE_WAL_KEY, MUTA_WAL_KEY,
 };
 use core_mempool::{
     DefaultMemPoolAdapter, HashMemPool, MsgPushTxs, NewTxsHandler, PullTxsHandler,
@@ -191,37 +192,38 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     let current_header = &current_epoch.header;
     let prevhash = Hash::digest(current_epoch.encode_fixed()?);
 
-    let current_consensus_status = if let Ok(wal_info) = storage.load_muta_wal().await {
-        MessageCodec::decode(wal_info).await?
-    } else {
-        CurrentConsensusStatus {
-            cycles_price:       config.consensus.cycles_price,
-            cycles_limit:       config.consensus.cycles_limit,
-            epoch_id:           current_epoch.header.epoch_id + 1,
-            exec_epoch_id:      current_epoch.header.epoch_id,
-            prev_hash:          prevhash,
-            latest_state_root:  current_header.state_root.clone(),
-            logs_bloom:         current_header.logs_bloom.clone(),
-            confirm_root:       vec![],
-            state_root:         vec![current_header.state_root.clone()],
-            receipt_root:       vec![],
-            cycles_used:        current_header.cycles_used.clone(),
-            proof:              current_header.proof.clone(),
-            validators:         config
-                .consensus
-                .verifier_list
-                .iter()
-                .map(|v| {
-                    Ok(Validator {
-                        address:        Address::from_hex(v)?,
-                        propose_weight: 1,
-                        vote_weight:    1,
+    let current_consensus_status =
+        if let Ok(wal_info) = storage.load_wal(MUTA_WAL_KEY.clone()).await {
+            MessageCodec::decode(wal_info).await?
+        } else {
+            CurrentConsensusStatus {
+                cycles_price:       config.consensus.cycles_price,
+                cycles_limit:       config.consensus.cycles_limit,
+                epoch_id:           current_epoch.header.epoch_id + 1,
+                exec_epoch_id:      current_epoch.header.epoch_id,
+                prev_hash:          prevhash,
+                latest_state_root:  current_header.state_root.clone(),
+                logs_bloom:         current_header.logs_bloom.clone(),
+                confirm_root:       vec![],
+                state_root:         vec![current_header.state_root.clone()],
+                receipt_root:       vec![],
+                cycles_used:        current_header.cycles_used.clone(),
+                proof:              current_header.proof.clone(),
+                validators:         config
+                    .consensus
+                    .verifier_list
+                    .iter()
+                    .map(|v| {
+                        Ok(Validator {
+                            address:        Address::from_hex(v)?,
+                            propose_weight: 1,
+                            vote_weight:    1,
+                        })
                     })
-                })
-                .collect::<Result<Vec<Validator>, ProtocolError>>()?,
-            consensus_interval: config.consensus.interval,
-        }
-    };
+                    .collect::<Result<Vec<Validator>, ProtocolError>>()?,
+                consensus_interval: config.consensus.interval,
+            }
+        };
 
     let authority_list = config
         .consensus
@@ -260,7 +262,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
 
     core_consensus::trace::init_tracer(my_address.as_hex())?;
 
-    let exec_wal = match storage.load_exec_queue_wal().await {
+    let exec_wal = match storage.load_wal(EXEC_QUEUE_WAL_KEY.clone()).await {
         Ok(bytes) => rlp::decode(bytes.as_ref()).unwrap(),
         Err(_) => WalInfoQueue::new(),
     };

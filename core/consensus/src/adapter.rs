@@ -18,6 +18,7 @@ use protocol::traits::{
 };
 use protocol::types::{
     Address, Bytes, Epoch, Hash, MerkleRoot, Proof, Receipt, SignedTransaction, Validator,
+    WalSaveTxs,
 };
 use protocol::{fixed_codec::FixedCodec, ProtocolResult};
 
@@ -26,7 +27,7 @@ use crate::fixed_types::{FixedEpoch, FixedEpochID, FixedPill, FixedSignedTxs, Pu
 use crate::message::{BROADCAST_EPOCH_ID, RPC_SYNC_PULL_EPOCH, RPC_SYNC_PULL_TXS};
 use crate::status::{StatusAgent, UpdateInfo};
 use crate::util::{ExecuteInfo, WalInfoQueue};
-use crate::ConsensusError;
+use crate::{ConsensusError, EXEC_QUEUE_WAL_KEY, MUTA_WAL_KEY};
 
 const OVERLORD_GAP: usize = 10;
 
@@ -151,37 +152,12 @@ where
         Ok(epoch.header.validators)
     }
 
-    async fn save_overlord_wal(&self, _ctx: Context, info: Bytes) -> ProtocolResult<()> {
-        self.storage.update_overlord_wal(info).await
+    async fn save_wal(&self, _ctx: Context, key: Hash, info: Bytes) -> ProtocolResult<()> {
+        self.storage.update_wal(key, info).await
     }
 
-    async fn load_overlord_wal(&self, _ctx: Context) -> ProtocolResult<Bytes> {
-        self.storage.load_overlord_wal().await
-    }
-
-    async fn save_muta_wal(&self, _ctx: Context, info: Bytes) -> ProtocolResult<()> {
-        self.storage.update_muta_wal(info).await
-    }
-
-    async fn load_muta_wal(&self, _ctx: Context) -> ProtocolResult<Bytes> {
-        self.storage.load_muta_wal().await
-    }
-
-    async fn save_wal_transactions(
-        &self,
-        _ctx: Context,
-        epoch_hash: Hash,
-        txs: Vec<SignedTransaction>,
-    ) -> ProtocolResult<()> {
-        self.storage.insert_wal_transactions(epoch_hash, txs).await
-    }
-
-    async fn load_wal_transactions(
-        &self,
-        _ctx: Context,
-        epoch_hash: Hash,
-    ) -> ProtocolResult<Vec<SignedTransaction>> {
-        self.storage.get_wal_transactions(epoch_hash).await
+    async fn load_wal(&self, _ctx: Context, key: Hash) -> ProtocolResult<Bytes> {
+        self.storage.load_wal(key).await
     }
 
     async fn pull_epoch(&self, ctx: Context, epoch_id: u64, end: &str) -> ProtocolResult<Epoch> {
@@ -440,16 +416,24 @@ where
         };
 
         self.storage
-            .update_exec_queue_wal(Bytes::from(rlp::encode(&wal_info)))
+            .update_wal(
+                EXEC_QUEUE_WAL_KEY.clone(),
+                Bytes::from(rlp::encode(&wal_info)),
+            )
             .await?;
         Ok(())
     }
 
     async fn init_exec_queue(&self, queue: WalInfoQueue) -> ProtocolResult<()> {
         for (_id, info) in queue.inner.into_iter() {
-            let txs = self
-                .load_wal_transactions(Context::new(), info.epoch_hash.clone())
-                .await?;
+            let txs = {
+                let bytes = self
+                    .load_wal(Context::new(), info.epoch_hash.clone())
+                    .await?;
+                let res: WalSaveTxs = FixedCodec::decode_fixed(bytes)?;
+                res.inner
+            };
+
             self.execute(
                 info.chain_id,
                 info.order_root,
@@ -557,8 +541,12 @@ where
         let mut info = self.status.to_inner();
         let wal_info = MessageCodec::encode(&mut info).await?;
 
-        self.storage.update_exec_queue_wal(queue_info).await?;
-        self.storage.update_muta_wal(wal_info).await
+        self.storage
+            .update_wal(EXEC_QUEUE_WAL_KEY.clone(), queue_info)
+            .await?;
+        self.storage
+            .update_wal(MUTA_WAL_KEY.clone(), wal_info)
+            .await
     }
 }
 

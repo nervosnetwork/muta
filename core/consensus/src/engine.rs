@@ -18,6 +18,7 @@ use protocol::fixed_codec::FixedCodec;
 use protocol::traits::{ConsensusAdapter, Context, MessageCodec, MessageTarget, NodeInfo};
 use protocol::types::{
     Address, Epoch, EpochHeader, Hash, MerkleRoot, Pill, Proof, SignedTransaction, Validator,
+    WalSaveTxs,
 };
 use protocol::{Bytes, ProtocolError, ProtocolResult};
 
@@ -26,7 +27,7 @@ use crate::message::{
     END_GOSSIP_AGGREGATED_VOTE, END_GOSSIP_SIGNED_PROPOSAL, END_GOSSIP_SIGNED_VOTE,
 };
 use crate::status::StatusAgent;
-use crate::{ConsensusError, StatusCacheField};
+use crate::{ConsensusError, StatusCacheField, MUTA_WAL_KEY, OVERLORD_WAL_KEY};
 
 /// validator is for create new epoch, and authority is for build overlord
 /// status.
@@ -124,13 +125,13 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
                 error!("Consensus sync epoch error {}", e);
             }
         });
+        let wal_txs = WalSaveTxs { inner };
         self.adapter
-            .save_wal_transactions(Context::new(), Hash::digest(hash.clone()), inner)
+            .save_wal(ctx, Hash::digest(hash.clone()), wal_txs.encode_fixed()?)
             .await?;
         Ok(())
     }
 
-    /// **TODO:** the overlord interface and process needs to be changed.
     /// Get the `FixedSignedTxs` from the argument rather than get it from
     /// mempool.
     async fn commit(
@@ -183,9 +184,12 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         {
             Ok(txs) => txs,
             Err(_) => {
-                self.adapter
-                    .load_wal_transactions(ctx.clone(), Hash::digest(epoch_hash))
-                    .await?
+                let bytes = self
+                    .adapter
+                    .load_wal(ctx.clone(), Hash::digest(epoch_hash))
+                    .await?;
+                let res: WalSaveTxs = FixedCodec::decode_fixed(bytes)?;
+                res.inner
             }
         };
 
@@ -311,14 +315,18 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
 impl<Adapter: ConsensusAdapter + 'static> Wal for ConsensusEngine<Adapter> {
     async fn save(&self, info: Bytes) -> Result<(), Box<dyn Error + Send>> {
         self.adapter
-            .save_overlord_wal(Context::new(), info)
+            .save_wal(Context::new(), OVERLORD_WAL_KEY.clone(), info)
             .await
             .map_err(|e| ProtocolError::from(ConsensusError::WalErr(e.to_string())))?;
         Ok(())
     }
 
     async fn load(&self) -> Result<Option<Bytes>, Box<dyn Error + Send>> {
-        let res = self.adapter.load_overlord_wal(Context::new()).await.ok();
+        let res = self
+            .adapter
+            .load_wal(Context::new(), OVERLORD_WAL_KEY.clone())
+            .await
+            .ok();
         Ok(res)
     }
 }
@@ -481,7 +489,9 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
     async fn save_wal(&self) -> ProtocolResult<()> {
         let mut info = self.status_agent.to_inner();
         let wal_info = MessageCodec::encode(&mut info).await?;
-        self.adapter.save_muta_wal(Context::new(), wal_info).await
+        self.adapter
+            .save_wal(Context::new(), MUTA_WAL_KEY.clone(), wal_info)
+            .await
     }
 }
 

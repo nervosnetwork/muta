@@ -19,11 +19,18 @@ pub use overlord::{types::Node, DurationConfig};
 use std::error::Error;
 
 use derive_more::Display;
+use lazy_static::lazy_static;
 
 use common_crypto::Error as CryptoError;
 
-use protocol::types::Hash;
+use protocol::types::{Bytes, Hash};
 use protocol::{ProtocolError, ProtocolErrorKind};
+
+lazy_static! {
+    pub static ref OVERLORD_WAL_KEY: Hash = Hash::digest(Bytes::from("overlord_wal"));
+    pub static ref MUTA_WAL_KEY: Hash = Hash::digest(Bytes::from("muta_wal"));
+    pub static ref EXEC_QUEUE_WAL_KEY: Hash = Hash::digest(Bytes::from("exec_quequ_wal"));
+}
 
 #[derive(Clone, Debug, Display, PartialEq, Eq)]
 pub enum MsgType {

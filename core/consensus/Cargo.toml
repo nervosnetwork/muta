@@ -10,11 +10,11 @@ repository = "https://github.com/nervosnetwork/muta"
 [dependencies]
 async-trait = "0.1"
 bincode = "1.2"
-creep = "0.2"
 derive_more = "0.99"
 futures = { version = "0.3", features = ["async-await"] }
 futures-timer = "2.0"
 hex = "0.4"
+lazy_static = "1.4"
 log = "0.4"
 moodyblues-sdk = "0.2"
 overlord = { git = "https://github.com/nervosnetwork/overlord", rev = "91f3cb4" }

@@ -16,16 +16,13 @@ use protocol::fixed_codec::FixedCodec;
 use protocol::traits::{
     Storage, StorageAdapter, StorageBatchModify, StorageCategory, StorageSchema,
 };
-use protocol::types::{Epoch, Hash, Proof, Receipt, SignedTransaction, WalSaveTxs};
+use protocol::types::{Epoch, Hash, Proof, Receipt, SignedTransaction};
 use protocol::Bytes;
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
 lazy_static! {
     pub static ref LATEST_EPOCH_KEY: Hash = Hash::digest(Bytes::from("latest_hash"));
     pub static ref LATEST_PROOF_KEY: Hash = Hash::digest(Bytes::from("latest_proof"));
-    pub static ref OVERLORD_WAL_KEY: Hash = Hash::digest(Bytes::from("overlord_wal"));
-    pub static ref MUTA_WAL_KEY: Hash = Hash::digest(Bytes::from("muta_wal"));
-    pub static ref EXEC_QUEUE_WAL_KEY: Hash = Hash::digest(Bytes::from("exec_quequ_wal"));
 }
 
 #[derive(Debug)]
@@ -65,10 +62,10 @@ impl_storage_schema_for!(EpochSchema, u64, Epoch, Epoch);
 impl_storage_schema_for!(HashEpochSchema, Hash, u64, Epoch);
 impl_storage_schema_for!(LatestEpochSchema, Hash, Epoch, Epoch);
 impl_storage_schema_for!(LatestProofSchema, Hash, Proof, Epoch);
-impl_storage_schema_for!(OverlordWalSchema, Hash, Bytes, Wal);
-impl_storage_schema_for!(MutaWalSchema, Hash, Bytes, Wal);
-impl_storage_schema_for!(ExecQueueWalSchema, Hash, Bytes, Wal);
-impl_storage_schema_for!(WalTransactionSchema, Hash, WalSaveTxs, Wal);
+impl_storage_schema_for!(WalSchema, Hash, Bytes, Wal);
+// impl_storage_schema_for!(MutaWalSchema, Hash, Bytes, Wal);
+// impl_storage_schema_for!(ExecQueueWalSchema, Hash, Bytes, Wal);
+// impl_storage_schema_for!(WalTransactionSchema, Hash, WalSaveTxs, Wal);
 
 macro_rules! batch_insert {
     ($self_: ident,$vec: expr, $schema: ident) => {
@@ -180,60 +177,14 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
         Ok(proof)
     }
 
-    async fn update_overlord_wal(&self, info: Bytes) -> ProtocolResult<()> {
-        self.adapter
-            .insert::<OverlordWalSchema>(OVERLORD_WAL_KEY.clone(), info)
-            .await?;
+    async fn update_wal(&self, key: Hash, info: Bytes) -> ProtocolResult<()> {
+        self.adapter.insert::<WalSchema>(key, info).await?;
         Ok(())
     }
 
-    async fn update_muta_wal(&self, info: Bytes) -> ProtocolResult<()> {
-        self.adapter
-            .insert::<MutaWalSchema>(MUTA_WAL_KEY.clone(), info)
-            .await?;
-        Ok(())
-    }
-
-    async fn load_overlord_wal(&self) -> ProtocolResult<Bytes> {
-        let wal_info = get!(self, OVERLORD_WAL_KEY.clone(), OverlordWalSchema);
+    async fn load_wal(&self, key: Hash) -> ProtocolResult<Bytes> {
+        let wal_info = get!(self, key, WalSchema);
         Ok(wal_info)
-    }
-
-    async fn load_muta_wal(&self) -> ProtocolResult<Bytes> {
-        let wal_info = get!(self, MUTA_WAL_KEY.clone(), MutaWalSchema);
-        Ok(wal_info)
-    }
-
-    async fn update_exec_queue_wal(&self, info: Bytes) -> ProtocolResult<()> {
-        self.adapter
-            .insert::<ExecQueueWalSchema>(EXEC_QUEUE_WAL_KEY.clone(), info)
-            .await?;
-        Ok(())
-    }
-
-    async fn load_exec_queue_wal(&self) -> ProtocolResult<Bytes> {
-        let wal_info = get!(self, EXEC_QUEUE_WAL_KEY.clone(), ExecQueueWalSchema);
-        Ok(wal_info)
-    }
-
-    async fn insert_wal_transactions(
-        &self,
-        epoch_hash: Hash,
-        signed_txs: Vec<SignedTransaction>,
-    ) -> ProtocolResult<()> {
-        let wal_txs_info = WalSaveTxs { inner: signed_txs };
-        self.adapter
-            .insert::<WalTransactionSchema>(epoch_hash, wal_txs_info)
-            .await?;
-        Ok(())
-    }
-
-    async fn get_wal_transactions(
-        &self,
-        epoch_hash: Hash,
-    ) -> ProtocolResult<Vec<SignedTransaction>> {
-        let stxs = get!(self, epoch_hash, WalTransactionSchema);
-        Ok(stxs.inner)
     }
 }
 

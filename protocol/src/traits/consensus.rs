@@ -172,30 +172,9 @@ pub trait ConsensusAdapter: CommonConsensusAdapter + Send + Sync {
     /// Get an epoch corresponding to the given epoch ID.
     async fn get_epoch_by_id(&self, ctx: Context, epoch_id: u64) -> ProtocolResult<Epoch>;
 
-    /// Save overlord wal info.
-    async fn save_overlord_wal(&self, ctx: Context, info: Bytes) -> ProtocolResult<()>;
+    /// Save wal info.
+    async fn save_wal(&self, ctx: Context, key: Hash, info: Bytes) -> ProtocolResult<()>;
 
-    /// Load latest overlord wal info.
-    async fn load_overlord_wal(&self, ctx: Context) -> ProtocolResult<Bytes>;
-
-    /// Save muta wal info.
-    async fn save_muta_wal(&self, ctx: Context, info: Bytes) -> ProtocolResult<()>;
-
-    /// Load lastest muta wal info.
-    async fn load_muta_wal(&self, ctx: Context) -> ProtocolResult<Bytes>;
-
-    /// Save full transcations with the epoch hash when check epoch.
-    async fn save_wal_transactions(
-        &self,
-        ctx: Context,
-        epoch_hash: Hash,
-        txs: Vec<SignedTransaction>,
-    ) -> ProtocolResult<()>;
-
-    /// Load full transactions by the given epoch hash.
-    async fn load_wal_transactions(
-        &self,
-        ctx: Context,
-        epoch_hash: Hash,
-    ) -> ProtocolResult<Vec<SignedTransaction>>;
+    /// Load wal info.
+    async fn load_wal(&self, ctx: Context, key: Hash) -> ProtocolResult<Bytes>;
 }

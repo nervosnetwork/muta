@@ -2,11 +2,13 @@ use bytes::BytesMut;
 
 use crate::fixed_codec::{FixedCodec, FixedCodecError};
 use crate::types::primitive::Hash;
-use crate::types::transaction::{RawTransaction, SignedTransaction, TransactionRequest};
+use crate::types::transaction::{
+    RawTransaction, SignedTransaction, TransactionRequest, WalSaveTxs,
+};
 use crate::{impl_default_fixed_codec_for, ProtocolResult};
 
 // Impl FixedCodec trait for types
-impl_default_fixed_codec_for!(transaction, [RawTransaction, SignedTransaction]);
+impl_default_fixed_codec_for!(transaction, [RawTransaction, SignedTransaction, WalSaveTxs]);
 
 impl rlp::Encodable for RawTransaction {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
@@ -78,5 +80,22 @@ impl rlp::Decodable for SignedTransaction {
             pubkey,
             signature,
         })
+    }
+}
+
+impl rlp::Encodable for WalSaveTxs {
+    fn rlp_append(&self, s: &mut rlp::RlpStream) {
+        s.begin_list(1).append_list(&self.inner);
+    }
+}
+
+impl rlp::Decodable for WalSaveTxs {
+    fn decode(r: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
+        if !r.is_list() && r.size() != 1 {
+            return Err(rlp::DecoderError::RlpIncorrectListLen);
+        }
+
+        let inner: Vec<SignedTransaction> = r.list_at(0)?;
+        Ok(WalSaveTxs { inner })
     }
 }

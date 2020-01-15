@@ -2,14 +2,13 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use creep::Context;
 use futures::lock::Mutex;
 use overlord::types::{AggregatedVote, Node, OverlordMsg, SignedProposal, SignedVote, Status};
 use overlord::{DurationConfig, Overlord, OverlordHandler};
 
 use common_crypto::{BlsCommonReference, BlsPrivateKey, BlsPublicKey};
 
-use protocol::traits::{Consensus, ConsensusAdapter, NodeInfo};
+use protocol::traits::{Consensus, ConsensusAdapter, Context, NodeInfo};
 use protocol::types::Validator;
 use protocol::{Bytes, ProtocolResult};
 

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use protocol::fixed_codec::FixedCodec;
 use protocol::traits::Storage;
-use protocol::types::Hash;
+use protocol::types::{Bytes, Hash};
 
 use crate::adapter::memory::MemoryAdapter;
 use crate::tests::{get_random_bytes, mock_epoch, mock_proof, mock_receipt, mock_signed_tx};
@@ -96,12 +96,12 @@ fn test_storage_wal_insert() {
     let storage = ImplStorage::new(Arc::new(MemoryAdapter::new()));
 
     let info = get_random_bytes(64);
-    exec!(storage.update_overlord_wal(info.clone()));
-    let info_2 = exec!(storage.load_overlord_wal());
+    exec!(storage.update_wal(Hash::digest(Bytes::from("overlord_wal")), info.clone()));
+    let info_2 = exec!(storage.load_wal(Hash::digest(Bytes::from("overlord_wal"))));
     assert_eq!(info, info_2);
 
     let info = get_random_bytes(64);
-    exec!(storage.update_muta_wal(info.clone()));
-    let info_2 = exec!(storage.load_muta_wal());
+    exec!(storage.update_wal(Hash::digest(Bytes::from("muta_wal")), info.clone()));
+    let info_2 = exec!(storage.load_wal(Hash::digest(Bytes::from("muta_wal"))));
     assert_eq!(info, info_2);
 }

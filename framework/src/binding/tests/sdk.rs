@@ -161,42 +161,11 @@ impl Storage for MockStorage {
         Err(StoreError::GetNone.into())
     }
 
-    async fn update_overlord_wal(&self, _info: Bytes) -> ProtocolResult<()> {
+    async fn update_wal(&self, _key: Hash, _info: Bytes) -> ProtocolResult<()> {
         Ok(())
     }
 
-    async fn update_muta_wal(&self, _info: Bytes) -> ProtocolResult<()> {
-        Ok(())
-    }
-
-    async fn load_overlord_wal(&self) -> ProtocolResult<Bytes> {
-        Err(StoreError::GetNone.into())
-    }
-
-    async fn load_muta_wal(&self) -> ProtocolResult<Bytes> {
-        Err(StoreError::GetNone.into())
-    }
-
-    async fn update_exec_queue_wal(&self, _info: Bytes) -> ProtocolResult<()> {
-        Ok(())
-    }
-
-    async fn load_exec_queue_wal(&self) -> ProtocolResult<Bytes> {
-        Err(StoreError::GetNone.into())
-    }
-
-    async fn insert_wal_transactions(
-        &self,
-        _epoch_hash: Hash,
-        _signed_txs: Vec<SignedTransaction>,
-    ) -> ProtocolResult<()> {
-        Ok(())
-    }
-
-    async fn get_wal_transactions(
-        &self,
-        _epoch_hash: Hash,
-    ) -> ProtocolResult<Vec<SignedTransaction>> {
+    async fn load_wal(&self, _key: Hash) -> ProtocolResult<Bytes> {
         Err(StoreError::GetNone.into())
     }
 }
