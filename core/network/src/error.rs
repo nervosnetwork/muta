@@ -46,6 +46,9 @@ pub enum ErrorKind {
     #[display(fmt = "kind: rpc future dropped")]
     RpcDropped,
 
+    #[display(fmt = "kind: rpc timeout")]
+    RpcTimeout,
+
     #[display(fmt = "kind: not reactor register for {}", _0)]
     NoReactor(String),
 }
