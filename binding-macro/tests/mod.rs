@@ -408,7 +408,7 @@ fn get_context(cycles_limit: u64, service: &str, method: &str, payload: &str) ->
         service_name: service.to_owned(),
         service_method: method.to_owned(),
         service_payload: payload.to_owned(),
-        extra: Bytes::default(),
+        extra: None,
         events: Rc::new(RefCell::new(vec![])),
     };
 
@@ -522,6 +522,7 @@ impl ServiceSDK for MockServiceSDK {
     fn read(
         &self,
         _ctx: &ServiceContext,
+        _extra: Option<Bytes>,
         _service: &str,
         _method: &str,
         _payload: &str,
@@ -534,6 +535,7 @@ impl ServiceSDK for MockServiceSDK {
     fn write(
         &mut self,
         _ctx: &ServiceContext,
+        _extra: Option<Bytes>,
         _service: &str,
         _method: &str,
         _payload: &str,

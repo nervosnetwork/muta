@@ -5,6 +5,7 @@ pub use chain_querier::{ChainQueryError, DefaultChainQuerier};
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use bytes::Bytes;
 use derive_more::{Display, From};
 
 use protocol::fixed_codec::FixedCodec;
@@ -145,12 +146,14 @@ impl<S: 'static + ServiceState, C: ChainQuerier, D: Dispatcher> ServiceSDK
     fn read(
         &self,
         ctx: &ServiceContext,
+        extra: Option<Bytes>,
         service: &str,
         method: &str,
         payload: &str,
     ) -> ProtocolResult<String> {
         let ctx = ServiceContext::with_context(
             ctx,
+            extra,
             service.to_string(),
             method.to_string(),
             payload.to_string(),
@@ -169,12 +172,14 @@ impl<S: 'static + ServiceState, C: ChainQuerier, D: Dispatcher> ServiceSDK
     fn write(
         &mut self,
         ctx: &ServiceContext,
+        extra: Option<Bytes>,
         service: &str,
         method: &str,
         payload: &str,
     ) -> ProtocolResult<String> {
         let ctx = ServiceContext::with_context(
             ctx,
+            extra,
             service.to_string(),
             method.to_string(),
             payload.to_string(),

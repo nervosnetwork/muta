@@ -109,7 +109,7 @@ impl<SDK: ServiceSDK> MockService<SDK> {
 
         let ret = self
             .sdk
-            .write(&ctx, "asset", "create_asset", &payload_str)?;
+            .write(&ctx, None, "asset", "create_asset", &payload_str)?;
 
         let asset: Asset = serde_json::from_str(&ret).unwrap();
 

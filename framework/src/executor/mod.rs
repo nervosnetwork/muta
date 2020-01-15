@@ -12,7 +12,7 @@ use std::sync::Arc;
 use cita_trie::DB as TrieDB;
 use derive_more::{Display, From};
 
-use bytes::{Bytes, BytesMut};
+use bytes::BytesMut;
 use protocol::traits::{
     Dispatcher, ExecResp, Executor, ExecutorParams, ExecutorResp, NoopDispatcher, ServiceMapping,
     ServiceState, Storage,
@@ -213,7 +213,7 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
             service_name: request.service_name.to_owned(),
             service_method: request.method.to_owned(),
             service_payload: request.payload.to_owned(),
-            extra: Bytes::default(),
+            extra: None,
             events: Rc::new(RefCell::new(vec![])),
         };
 

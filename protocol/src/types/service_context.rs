@@ -19,7 +19,7 @@ pub struct ServiceContextParams {
     pub service_name:    String,
     pub service_method:  String,
     pub service_payload: String,
-    pub extra:           Bytes,
+    pub extra:           Option<Bytes>,
     pub timestamp:       u64,
     pub events:          Rc<RefCell<Vec<Event>>>,
 }
@@ -36,7 +36,7 @@ pub struct ServiceContext {
     service_name:    String,
     service_method:  String,
     service_payload: String,
-    extra:           Bytes,
+    extra:           Option<Bytes>,
     timestamp:       u64,
     events:          Rc<RefCell<Vec<Event>>>,
 }
@@ -62,6 +62,7 @@ impl ServiceContext {
 
     pub fn with_context(
         context: &ServiceContext,
+        extra: Option<Bytes>,
         service_name: String,
         service_method: String,
         service_payload: String,
@@ -77,7 +78,7 @@ impl ServiceContext {
             service_name,
             service_method,
             service_payload,
-            extra: context.extra.clone(),
+            extra,
             timestamp: context.get_timestamp(),
             events: Rc::clone(&context.events),
         }
@@ -136,12 +137,8 @@ impl ServiceContext {
         &self.service_payload
     }
 
-    pub fn get_extra(&self) -> Bytes {
+    pub fn get_extra(&self) -> Option<Bytes> {
         self.extra.clone()
-    }
-
-    pub fn set_extra(&mut self, extra: Bytes) {
-        self.extra = extra
     }
 
     pub fn get_timestamp(&self) -> u64 {
@@ -194,7 +191,7 @@ mod tests {
             service_name:    "service_name".to_owned(),
             service_method:  "service_method".to_owned(),
             service_payload: "service_payload".to_owned(),
-            extra:           bytes::Bytes::default(),
+            extra:           None,
             events:          Rc::new(RefCell::new(vec![])),
         };
         let ctx = ServiceContext::new(params);
