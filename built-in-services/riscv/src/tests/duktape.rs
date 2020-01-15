@@ -20,14 +20,14 @@ fn should_able_deploy_js_contract_and_run() {
     let dep_payoad = DeployPayload {
         code:      hex::encode(Bytes::from(test_code)),
         intp_type: InterpreterType::Duktape,
-        init_args: "args".into(),
+        init_args: "{}".into(),
     };
 
     let bin_test_code = include_bytes!("./sys_call");
     let bin_dep_payload = DeployPayload {
         code:      hex::encode(Bytes::from(bin_test_code.as_ref())),
         intp_type: InterpreterType::Binary,
-        init_args: "args".into(),
+        init_args: "set k init".into(),
     };
 
     let args = serde_json::json!({
