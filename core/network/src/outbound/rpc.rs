@@ -1,7 +1,8 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use async_trait::async_trait;
-use futures::future::TryFutureExt;
+use futures::future::{self, Either};
+use futures_timer::Delay;
 use protocol::{
     traits::{Context, MessageCodec, Priority, Rpc},
     Bytes, ProtocolResult,
@@ -15,6 +16,8 @@ use crate::{
     rpc_map::RpcMap,
     traits::{Compression, MessageSender, NetworkContext},
 };
+
+const RPC_TIMEOUT: u64 = 4;
 
 #[derive(Clone)]
 pub struct NetworkRpc<S, C> {
@@ -66,10 +69,16 @@ where
 
         self.send(cx, sid, net_msg, p)?;
 
-        let ret = done_rx
-            .map_err(|_| ErrorKind::RpcDropped)
-            .err_into::<NetworkError>()
-            .await?;
+        // FIXME: timeout from context
+        let timeout = Delay::new(Duration::from_secs(RPC_TIMEOUT));
+        let ret = match future::select(done_rx, timeout).await {
+            Either::Left((ret, _timeout)) => {
+                ret.map_err(|_| NetworkError::from(ErrorKind::RpcDropped))?
+            }
+            Either::Right((_unresolved, _timeout)) => {
+                return Err(NetworkError::from(ErrorKind::RpcTimeout).into());
+            }
+        };
 
         Ok(ret)
     }
