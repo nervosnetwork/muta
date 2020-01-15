@@ -15,7 +15,7 @@ use protocol::traits::{ServiceSDK, StoreMap};
 use protocol::types::{Address, Hash, ServiceContext};
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
-use crate::types::{Contract, DeployPayload, ExecPayload, ExecResp};
+use crate::types::{Contract, DeployPayload, DeployResp, ExecPayload, ExecResp};
 use crate::vm::{ChainInterface, Interpreter, InterpreterConf, InterpreterParams};
 
 pub struct RiscvService<SDK> {
@@ -40,7 +40,7 @@ impl<SDK: ServiceSDK + 'static> RiscvService<SDK> {
             .sdk
             .borrow()
             .get_value::<Address, Contract>(&payload.address)?
-            .ok_or(ServiceError::ContractNotExists)?;
+            .ok_or(ServiceError::ContractNotExists(payload.address.as_hex()))?;
         let code: Bytes = self
             .sdk
             .borrow()
@@ -88,12 +88,16 @@ impl<SDK: ServiceSDK + 'static> RiscvService<SDK> {
     }
 
     #[write]
-    fn deploy(&mut self, ctx: ServiceContext, payload: DeployPayload) -> ProtocolResult<String> {
+    fn deploy(
+        &mut self,
+        ctx: ServiceContext,
+        payload: DeployPayload,
+    ) -> ProtocolResult<DeployResp> {
         // dbg!(&payload);
-        let code = Bytes::from(hex::decode(payload.code).map_err(|e| ServiceError::HexDecode(e))?);
+        let code = Bytes::from(hex::decode(&payload.code).map_err(|e| ServiceError::HexDecode(e))?);
         let code_hash = Hash::digest(code.clone());
         let code_len = code.len() as u64;
-        ctx.sub_cycles(code_len)?;
+        // ctx.sub_cycles(code_len)?;
         self.sdk.borrow_mut().set_value(code_hash.clone(), code)?;
         let tx_hash = ctx
             .get_tx_hash()
@@ -109,8 +113,9 @@ impl<SDK: ServiceSDK + 'static> RiscvService<SDK> {
             .set_value(contract_address.clone(), contract)?;
 
         // run init
+        let mut ret = String::new();
         if payload.init_args.len() != 0 {
-            self.run(
+            ret = self.run(
                 ctx,
                 ExecPayload {
                     address: contract_address.clone(),
@@ -119,7 +124,10 @@ impl<SDK: ServiceSDK + 'static> RiscvService<SDK> {
                 true,
             )?;
         }
-        Ok(contract_address.as_hex())
+        Ok(DeployResp {
+            address:  contract_address,
+            init_ret: ret,
+        })
     }
 }
 
@@ -191,8 +199,8 @@ pub enum ServiceError {
     #[display(fmt = "method {} can not be invoke with call", _0)]
     NotInExecContext(String),
 
-    #[display(fmt = "Contract not exists")]
-    ContractNotExists,
+    #[display(fmt = "Contract {} not exists", _0)]
+    ContractNotExists(String),
 
     #[display(fmt = "CKB VM return non zero, exitcode: {}, ret: {}", exitcode, ret)]
     NonZeroExitCode { exitcode: i8, ret: String },

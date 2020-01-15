@@ -22,7 +22,7 @@ use crate::RiscvService;
 
 #[test]
 fn test_deploy_and_run() {
-    let cycles_limit = 1024 * 1024 * 1024; // 1073741824
+    let cycles_limit = 0x999999; // 1024 * 1024 * 1024; // 1073741824
     let caller = Address::from_hex("0x755cdba6ae4f479f7164792b318b2a06c759833b").unwrap();
     let tx_hash =
         Hash::from_hex("412a6c54cf3d3dbb16b49c34e6cd93d08a245298032eb975ee51105b4c296828").unwrap();
@@ -32,34 +32,48 @@ fn test_deploy_and_run() {
 
     let mut service = new_riscv_service();
 
-    let supply = 1024 * 1024;
-
-    let mut file = std::fs::File::open("src/tests/sys_call").unwrap();
+    let mut file = std::fs::File::open("src/tests/simple_storage").unwrap();
     let mut buffer = Vec::new();
     file.read_to_end(&mut buffer).unwrap();
     let buffer = bytes::Bytes::from(buffer);
     let deploy_payload = DeployPayload {
         code:      hex::encode(buffer.as_ref()),
         intp_type: InterpreterType::Binary,
-        init_args: "args".into(),
+        init_args: "set k init".into(),
     };
-    // println!("{}", serde_json::to_string(&deploy_payload).unwrap());
-    let address = service.deploy(context.clone(), deploy_payload).unwrap();
-    dbg!(&address);
-    let exec_payload = ExecPayload {
-        address: Address::from_hex(&address).unwrap(),
-        args:    "13".into(),
-    };
-    println!("{}", serde_json::to_string(&exec_payload).unwrap());
-    let exec_result = service.exec(context.clone(), exec_payload);
-    dbg!(&exec_result);
-    assert!(!exec_result.is_err());
-    let exec_result = service.exec(context.clone(), ExecPayload {
-        address: Address::from_hex(&address).unwrap(),
-        args:    "not 13".into(),
+    let deploy_result = service.deploy(context.clone(), deploy_payload).unwrap();
+    assert_eq!(&deploy_result.init_ret, "");
+    let address = deploy_result.address.clone();
+    let exec_result = service.call(context.clone(), ExecPayload {
+        address: address.clone(),
+        args:    "get k".into(),
     });
-    dbg!(&exec_result);
-    assert!(!exec_result.is_err());
+    assert_eq!(&exec_result.unwrap(), "init");
+    let exec_payload = ExecPayload {
+        address: address.clone(),
+        args:    "set k v".into(),
+    };
+    let exec_result = service.exec(context.clone(), exec_payload);
+    assert_eq!(&exec_result.unwrap(), "");
+    let exec_result = service.call(context.clone(), ExecPayload {
+        address: address.clone(),
+        args:    "get k".into(),
+    });
+    assert_eq!(&exec_result.unwrap(), "v");
+
+    // wrong command
+    let exec_result = service.exec(context.clone(), ExecPayload {
+        address: address.clone(),
+        args:    "clear k v".into(),
+    });
+    assert!(exec_result.is_err());
+
+    // wrong command 2
+    let exec_result = service.exec(context.clone(), ExecPayload {
+        address: address.clone(),
+        args:    "set k".into(),
+    });
+    assert!(exec_result.is_err());
 }
 
 struct MockDispatcher;

@@ -87,7 +87,8 @@ security-audit:
 .PHONY: duktape
 
 test_riscv:
-	docker run --rm -it -v `pwd`:/code nervos/ckb-riscv-gnu-toolchain:xenial bash -c 'cd /code && riscv64-unknown-elf-gcc -I/code/built-in-services/riscv/src/vm/c built-in-services/riscv/src/tests/sys_call.c -o built-in-services/riscv/src/tests/sys_call'
+	docker run --rm -it -v `pwd`:/code nervos/ckb-riscv-gnu-toolchain:xenial bash -c 'cd /code && riscv64-unknown-elf-gcc -I/code/built-in-services/riscv/src/vm/c built-in-services/riscv/src/tests/simple_storage.c -o built-in-services/riscv/src/tests/simple_storage'
+	# docker run --rm -it -v `pwd`:/code nervos/ckb-riscv-gnu-toolchain:xenial bash -c 'cd /code && riscv64-unknown-elf-gcc -I/code/built-in-services/riscv/src/vm/c built-in-services/riscv/src/tests/sys_call.c -o built-in-services/riscv/src/tests/sys_call'
 	cargo fmt
 	RUST_BACKTRACE=full cargo test -p riscv --lib -- test_deploy --nocapture
 
@@ -107,4 +108,3 @@ duktape:
 
 duktape_docker:
 	$(DOCKER_BUILD) "cd /src && make duktape"
-

@@ -29,10 +29,13 @@ fn should_able_deploy_js_contract_and_run() {
     })
     .to_string();
 
-    let address = service.deploy(context.clone(), dep_payoad).expect("deploy");
+    let address = service
+        .deploy(context.clone(), dep_payoad)
+        .expect("deploy")
+        .address;
     let exec_ret = service.exec(context.clone(), ExecPayload {
-        address: Address::from_hex(&address).unwrap(),
-        args:    args.into(),
+        address,
+        args: args.into(),
     });
 
     dbg!(&exec_ret);
