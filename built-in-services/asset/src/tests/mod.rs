@@ -3,6 +3,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use bytes::Bytes;
 use cita_trie::MemoryDB;
 
 use framework::binding::sdk::{DefalutServiceSDK, DefaultChainQuerier};
@@ -124,6 +125,7 @@ fn mock_context(cycles_limit: u64, caller: Address) -> ServiceContext {
         service_name: "service_name".to_owned(),
         service_method: "service_method".to_owned(),
         service_payload: "service_payload".to_owned(),
+        extra: Bytes::default(),
         events: Rc::new(RefCell::new(vec![])),
     };
 

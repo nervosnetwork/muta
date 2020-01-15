@@ -5,6 +5,7 @@ extern crate binding_macro;
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 
 use protocol::fixed_codec::FixedCodec;
@@ -407,6 +408,7 @@ fn get_context(cycles_limit: u64, service: &str, method: &str, payload: &str) ->
         service_name: service.to_owned(),
         service_method: method.to_owned(),
         service_payload: payload.to_owned(),
+        extra: Bytes::default(),
         events: Rc::new(RefCell::new(vec![])),
     };
 
