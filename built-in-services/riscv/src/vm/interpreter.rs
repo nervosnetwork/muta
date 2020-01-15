@@ -32,6 +32,7 @@ pub struct InterpreterParams {
     pub address: Address,
     pub code:    Bytes,
     pub args:    Bytes,
+    pub is_init: bool,
 }
 
 pub struct Interpreter {

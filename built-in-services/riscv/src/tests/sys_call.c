@@ -43,6 +43,13 @@ int contract_call() {
 int main() {
     char debug[1000] = {0};
 
+    // get is init
+    uint64_t is_init = 0;
+    pvm_is_init(&is_init);
+    memset(debug, 0, sizeof debug);
+    sprintf(debug, "is_init is %d", is_init);
+    pvm_debug(debug);
+
     // get cycle_limit
     uint64_t cycle_limit = 0;
     pvm_cycle_limit(&cycle_limit);

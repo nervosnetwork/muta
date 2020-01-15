@@ -1,6 +1,6 @@
 use super::{mock_context, new_riscv_service};
 
-use protocol::{types::Address, Bytes};
+use protocol::{types::Address, types::Hash, Bytes};
 
 use crate::types::{DeployPayload, ExecPayload, InterpreterType};
 
@@ -8,7 +8,11 @@ use crate::types::{DeployPayload, ExecPayload, InterpreterType};
 fn should_able_deploy_js_contract_and_run() {
     let cycles_limit = 1024 * 1024 * 1024; // 1073741824
     let caller = Address::from_hex("0x755cdba6ae4f479f7164792b318b2a06c759833b").unwrap();
-    let context = mock_context(cycles_limit, caller);
+    let tx_hash =
+        Hash::from_hex("412a6c54cf3d3dbb16b49c34e6cd93d08a245298032eb975ee51105b4c296828").unwrap();
+    let nonce =
+        Hash::from_hex("0000000000000000000000000000000000000000000000000000000000000000").unwrap();
+    let context = mock_context(cycles_limit, caller, tx_hash, nonce);
 
     let mut service = new_riscv_service();
 
