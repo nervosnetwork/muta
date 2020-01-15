@@ -64,10 +64,10 @@ impl ProtocolCodecSync for Bytes {
 #[derive(Debug, From, Display)]
 pub enum CodecError {
     #[display(fmt = "prost encode: {}", _0)]
-    ProtobufEncode(muta_vendor_prost::EncodeError),
+    ProtobufEncode(prost::EncodeError),
 
     #[display(fmt = "prost decode: {}", _0)]
-    ProtobufDecode(muta_vendor_prost::DecodeError),
+    ProtobufDecode(prost::DecodeError),
 
     #[display(fmt = "{} missing field {}", r#type, field)]
     MissingField {

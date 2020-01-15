@@ -131,7 +131,7 @@ impl ServiceMapping for MockServiceMapping {
         sdk: SDK,
     ) -> ProtocolResult<Box<dyn Service>> {
         let service = match name {
-            "asset" => AssetService::init(sdk)?,
+            "asset" => AssetService::new(sdk)?,
             _ => panic!("not found service"),
         };
 

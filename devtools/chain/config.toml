@@ -48,3 +48,5 @@ console_show_file_and_line = false
 log_path = "logs/"
 log_to_file = true
 metrics = true
+# you can specify log level for modules with config below
+# modules_level = { "overlord::state::process" = "debug", core_consensus = "error" }

@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 
@@ -68,6 +69,8 @@ pub struct ConfigLogger {
     pub log_to_file:                bool,
     pub metrics:                    bool,
     pub log_path:                   PathBuf,
+    #[serde(default)]
+    pub modules_level:              HashMap<String, String>,
 }
 
 impl Default for ConfigLogger {
@@ -79,6 +82,7 @@ impl Default for ConfigLogger {
             log_to_file:                true,
             metrics:                    true,
             log_path:                   "logs/".into(),
+            modules_level:              HashMap::new(),
         }
     }
 }

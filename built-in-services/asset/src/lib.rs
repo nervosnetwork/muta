@@ -5,14 +5,14 @@ pub mod types;
 use bytes::Bytes;
 use derive_more::{Display, From};
 
-use binding_macro::{cycles, service, write};
+use binding_macro::{cycles, genesis, service, write};
 use protocol::traits::{ServiceSDK, StoreMap};
 use protocol::types::{Hash, ServiceContext};
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
 use crate::types::{
     Asset, CreateAssetPayload, GetAssetPayload, GetBalancePayload, GetBalanceResponse,
-    TransferPayload,
+    InitGenesisPayload, TransferPayload,
 };
 
 pub struct AssetService<SDK> {
@@ -22,10 +22,26 @@ pub struct AssetService<SDK> {
 
 #[service]
 impl<SDK: ServiceSDK> AssetService<SDK> {
-    pub fn init(mut sdk: SDK) -> ProtocolResult<Self> {
+    pub fn new(mut sdk: SDK) -> ProtocolResult<Self> {
         let assets: Box<dyn StoreMap<Hash, Asset>> = sdk.alloc_or_recover_map("assets")?;
 
         Ok(Self { sdk, assets })
+    }
+
+    #[genesis]
+    fn init_genesis(&mut self, payload: InitGenesisPayload) -> ProtocolResult<()> {
+        let asset = Asset {
+            id:     payload.id,
+            name:   payload.name,
+            symbol: payload.symbol,
+            supply: payload.supply,
+            issuer: payload.issuer.clone(),
+        };
+
+        self.assets.insert(asset.id.clone(), asset.clone())?;
+
+        self.sdk
+            .set_account_value(&asset.issuer, asset.id, payload.supply)
     }
 
     #[cycles(100_00)]
@@ -72,7 +88,7 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
             name:   payload.name,
             symbol: payload.symbol,
             supply: payload.supply,
-            owner:  caller.clone(),
+            issuer: caller.clone(),
         };
         self.assets.insert(id.clone(), asset.clone())?;
 

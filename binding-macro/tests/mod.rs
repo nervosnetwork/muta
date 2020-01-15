@@ -123,13 +123,21 @@ fn test_service() {
     }
 
     struct Tests<SDK: ServiceSDK> {
-        _sdk:        SDK,
-        hook_before: bool,
-        hook_after:  bool,
+        _sdk:         SDK,
+        genesis_data: String,
+        hook_before:  bool,
+        hook_after:   bool,
     }
 
     #[service]
     impl<SDK: ServiceSDK> Tests<SDK> {
+        #[genesis]
+        fn init_genesis(&mut self) -> ProtocolResult<()> {
+            self.genesis_data = "genesis".to_owned();
+
+            Ok(())
+        }
+
         #[hook_before]
         fn custom_hook_before(&mut self) -> ProtocolResult<()> {
             self.hook_before = true;
@@ -174,10 +182,14 @@ fn test_service() {
 
     let sdk = MockServiceSDK {};
     let mut test_service = Tests {
-        _sdk:        sdk,
-        hook_after:  false,
-        hook_before: false,
+        _sdk:         sdk,
+        genesis_data: "".to_owned(),
+        hook_after:   false,
+        hook_before:  false,
     };
+
+    test_service.genesis_("".to_owned()).unwrap();
+    assert_eq!(test_service.genesis_data, "genesis");
 
     let context = get_context(1024 * 1024, "", "test_write", &payload_str);
     let write_res = test_service.write_(context).unwrap();
@@ -208,13 +220,21 @@ fn test_service_none_payload() {
     }
 
     struct Tests<SDK: ServiceSDK> {
-        _sdk:        SDK,
-        hook_before: bool,
-        hook_after:  bool,
+        _sdk:         SDK,
+        genesis_data: String,
+        hook_before:  bool,
+        hook_after:   bool,
     }
 
     #[service]
     impl<SDK: ServiceSDK> Tests<SDK> {
+        #[genesis]
+        fn init_genesis(&mut self) -> ProtocolResult<()> {
+            self.genesis_data = "genesis".to_owned();
+
+            Ok(())
+        }
+
         #[hook_before]
         fn custom_hook_before(&mut self) -> ProtocolResult<()> {
             self.hook_before = true;
@@ -244,10 +264,14 @@ fn test_service_none_payload() {
 
     let sdk = MockServiceSDK {};
     let mut test_service = Tests {
-        _sdk:        sdk,
-        hook_after:  false,
-        hook_before: false,
+        _sdk:         sdk,
+        genesis_data: "".to_owned(),
+        hook_after:   false,
+        hook_before:  false,
     };
+
+    test_service.genesis_("".to_owned()).unwrap();
+    assert_eq!(test_service.genesis_data, "genesis");
 
     let context = get_context(1024 * 1024, "", "test_write", "");
     let write_res = test_service.write_(context).unwrap();
@@ -273,13 +297,21 @@ fn test_service_none_payload() {
 #[test]
 fn test_service_none_response() {
     struct Tests<SDK: ServiceSDK> {
-        _sdk:        SDK,
-        hook_before: bool,
-        hook_after:  bool,
+        _sdk:         SDK,
+        genesis_data: String,
+        hook_before:  bool,
+        hook_after:   bool,
     }
 
     #[service]
     impl<SDK: ServiceSDK> Tests<SDK> {
+        #[genesis]
+        fn init_genesis(&mut self) -> ProtocolResult<()> {
+            self.genesis_data = "genesis".to_owned();
+
+            Ok(())
+        }
+
         #[hook_before]
         fn custom_hook_before(&mut self) -> ProtocolResult<()> {
             self.hook_before = true;
@@ -305,10 +337,14 @@ fn test_service_none_response() {
 
     let sdk = MockServiceSDK {};
     let mut test_service = Tests {
-        _sdk:        sdk,
-        hook_after:  false,
-        hook_before: false,
+        _sdk:         sdk,
+        genesis_data: "".to_owned(),
+        hook_after:   false,
+        hook_before:  false,
     };
+
+    test_service.genesis_("".to_owned()).unwrap();
+    assert_eq!(test_service.genesis_data, "genesis");
 
     let context = get_context(1024 * 1024, "", "test_write", "");
     let write_res = test_service.write_(context).unwrap();
@@ -333,6 +369,8 @@ fn test_service_none_response() {
 
 fn get_context(cycles_limit: u64, service: &str, method: &str, payload: &str) -> ServiceContext {
     let params = ServiceContextParams {
+        tx_hash: None,
+        nonce: None,
         cycles_limit,
         cycles_price: 1,
         cycles_used: Rc::new(RefCell::new(0)),

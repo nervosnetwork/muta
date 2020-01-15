@@ -87,6 +87,7 @@ impl<Mapping: 'static + ServiceMapping> Muta<Mapping> {
             self.config.logger.log_to_file,
             self.config.logger.metrics,
             self.config.logger.log_path.clone(),
+            self.config.logger.modules_level.clone(),
         );
 
         self.create_genesis().await?;

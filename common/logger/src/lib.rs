@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 use json::JsonValue;
@@ -11,13 +12,14 @@ use log4rs::encode::pattern::PatternEncoder;
 pub use json::array;
 pub use json::object;
 
-pub fn init(
+pub fn init<S: ::std::hash::BuildHasher>(
     filter: String,
     log_to_console: bool,
     console_show_file_and_line: bool,
     log_to_file: bool,
     metrics: bool,
     log_path: PathBuf,
+    modules_level: HashMap<String, String, S>,
 ) {
     let console = ConsoleAppender::builder()
         .encoder(Box::new(PatternEncoder::new(
@@ -46,18 +48,7 @@ pub fn init(
     if log_to_file {
         root_builder = root_builder.appender("file");
     }
-    let level_filter = match filter.as_ref() {
-        "off" => LevelFilter::Off,
-        "error" => LevelFilter::Error,
-        "info" => LevelFilter::Info,
-        "warn" => LevelFilter::Warn,
-        "debug" => LevelFilter::Debug,
-        "trace" => LevelFilter::Trace,
-        f => {
-            println!("invalid logger.filter {}, use info", f);
-            LevelFilter::Info
-        }
-    };
+    let level_filter = convert_level(filter.as_ref());
     let root = root_builder.build(level_filter);
 
     let metrics_logger = Logger::builder().additive(false).appender("metrics").build(
@@ -68,16 +59,37 @@ pub fn init(
             LevelFilter::Off
         },
     );
-
-    let config = Config::builder()
+    let mut config_builder = Config::builder()
         .appender(Appender::builder().build("console", Box::new(console)))
         .appender(Appender::builder().build("file", Box::new(file)))
         .appender(Appender::builder().build("metrics", Box::new(metrics_appender)))
-        .logger(metrics_logger)
-        .build(root)
-        .unwrap();
+        .logger(metrics_logger);
+    for (module, level) in &modules_level {
+        let module_logger = Logger::builder()
+            .additive(false)
+            .appender("console")
+            .appender("file")
+            .build(module, convert_level(&level));
+        config_builder = config_builder.logger(module_logger);
+    }
+    let config = config_builder.build(root).unwrap();
 
     log4rs::init_config(config).unwrap();
+}
+
+fn convert_level(level: &str) -> LevelFilter {
+    match level {
+        "off" => LevelFilter::Off,
+        "error" => LevelFilter::Error,
+        "info" => LevelFilter::Info,
+        "warn" => LevelFilter::Warn,
+        "debug" => LevelFilter::Debug,
+        "trace" => LevelFilter::Trace,
+        f => {
+            println!("invalid logger.filter {}, use info", f);
+            LevelFilter::Info
+        }
+    }
 }
 
 pub fn metrics(name: &str, mut content: JsonValue) {
