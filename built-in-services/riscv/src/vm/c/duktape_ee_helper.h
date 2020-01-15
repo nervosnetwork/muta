@@ -101,6 +101,20 @@ static duk_ret_t duk_pvm_set_storage(duk_context *ctx) {
   return 0;
 }
 
+static duk_ret_t duk_pvm_is_init(duk_context *ctx) {
+  uint64_t is_init;
+  pvm_is_init(&is_init);
+  
+  if (0 == is_init) {
+      // Push true
+      duk_push_true(ctx);
+  } else {
+      duk_push_false(ctx);
+  }
+
+  return 1;
+}
+
 static duk_ret_t duk_pvm_contract_call(duk_context *ctx) {
   if (!duk_is_string(ctx, -1) || !duk_is_string(ctx, -2)) {
     duk_push_error_object(ctx, DUK_ERR_EVAL_ERROR,
@@ -145,6 +159,9 @@ void pvm_init(duk_context *ctx) {
 
   duk_push_c_function(ctx, duk_pvm_contract_call, 2);
   duk_put_prop_string(ctx, -2, "contract_call");
+
+  duk_push_c_function(ctx, duk_pvm_is_init, 0);
+  duk_put_prop_string(ctx, -2, "is_init");
 
   duk_put_global_string(ctx, "PVM");
 }

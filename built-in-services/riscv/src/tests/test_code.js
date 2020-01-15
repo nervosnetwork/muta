@@ -1,6 +1,8 @@
 function main() {
   'use strict';
 
+  PVM.debug(PVM.is_init());
+
   PVM.debug("hello! it's me, mario");
   PVM.load_json_args();
 
