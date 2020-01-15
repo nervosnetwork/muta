@@ -369,6 +369,8 @@ fn test_service_none_response() {
 
 fn get_context(cycles_limit: u64, service: &str, method: &str, payload: &str) -> ServiceContext {
     let params = ServiceContextParams {
+        tx_hash: None,
+        nonce: None,
         cycles_limit,
         cycles_price: 1,
         cycles_used: Rc::new(RefCell::new(0)),

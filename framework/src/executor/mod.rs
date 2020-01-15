@@ -193,13 +193,18 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
 
     fn get_context(
         &self,
-        params: &ExecutorParams,
+        tx_hash: Option<Hash>,
+        nonce: Option<Hash>,
         caller: &Address,
         cycles_price: u64,
+        cycles_limit: u64,
+        params: &ExecutorParams,
         request: &TransactionRequest,
     ) -> ProtocolResult<ServiceContext> {
         let ctx_params = ServiceContextParams {
-            cycles_limit: params.cycles_limit,
+            tx_hash,
+            nonce,
+            cycles_limit,
             cycles_price,
             cycles_used: Rc::new(RefCell::new(0)),
             caller: caller.clone(),
@@ -275,8 +280,15 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
             .iter()
             .map(|stx| {
                 let caller = Address::from_pubkey_bytes(stx.pubkey.clone())?;
-                let context =
-                    self.get_context(params, &caller, stx.raw.cycles_price, &stx.raw.request)?;
+                let context = self.get_context(
+                    Some(stx.tx_hash.clone()),
+                    Some(stx.raw.nonce.clone()),
+                    &caller,
+                    stx.raw.cycles_price,
+                    stx.raw.cycles_limit,
+                    params,
+                    &stx.raw.request,
+                )?;
 
                 let exec_resp = self.catch_call(context.clone(), ExecType::Write);
 
@@ -328,7 +340,15 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
         cycles_price: u64,
         request: &TransactionRequest,
     ) -> ProtocolResult<ExecResp> {
-        let context = self.get_context(params, caller, cycles_price, request)?;
+        let context = self.get_context(
+            None,
+            None,
+            caller,
+            cycles_price,
+            std::u64::MAX,
+            params,
+            request,
+        )?;
         self.call(context, ExecType::Read)
     }
 }

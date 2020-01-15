@@ -3,11 +3,13 @@ use std::rc::Rc;
 
 use derive_more::{Display, From};
 
-use crate::types::{Address, Event};
+use crate::types::{Address, Event, Hash};
 use crate::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
 #[derive(Debug, Clone)]
 pub struct ServiceContextParams {
+    pub tx_hash:         Option<Hash>,
+    pub nonce:           Option<Hash>,
     pub cycles_limit:    u64,
     pub cycles_price:    u64,
     pub cycles_used:     Rc<RefCell<u64>>,
@@ -22,6 +24,8 @@ pub struct ServiceContextParams {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ServiceContext {
+    tx_hash:         Option<Hash>,
+    nonce:           Option<Hash>,
     cycles_limit:    u64,
     cycles_price:    u64,
     cycles_used:     Rc<RefCell<u64>>,
@@ -37,6 +41,8 @@ pub struct ServiceContext {
 impl ServiceContext {
     pub fn new(params: ServiceContextParams) -> Self {
         Self {
+            tx_hash:         params.tx_hash,
+            nonce:           params.nonce,
             cycles_limit:    params.cycles_limit,
             cycles_price:    params.cycles_price,
             cycles_used:     params.cycles_used,
@@ -57,6 +63,8 @@ impl ServiceContext {
         service_payload: String,
     ) -> Self {
         Self {
+            tx_hash: context.tx_hash.clone(),
+            nonce: context.nonce.clone(),
             cycles_limit: context.cycles_limit,
             cycles_price: context.cycles_price,
             cycles_used: Rc::clone(&context.cycles_used),
@@ -68,6 +76,14 @@ impl ServiceContext {
             timestamp: context.get_timestamp(),
             events: Rc::clone(&context.events),
         }
+    }
+
+    pub fn get_tx_hash(&self) -> Option<Hash> {
+        self.tx_hash.clone()
+    }
+
+    pub fn get_nonce(&self) -> Option<Hash> {
+        self.nonce.clone()
     }
 
     pub fn get_events(&self) -> Vec<Event> {
@@ -154,6 +170,8 @@ mod tests {
     #[test]
     fn test_request_context() {
         let params = ServiceContextParams {
+            tx_hash:         None,
+            nonce:           None,
             cycles_limit:    100,
             cycles_price:    8,
             cycles_used:     Rc::new(RefCell::new(10)),
