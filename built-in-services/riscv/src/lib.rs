@@ -183,7 +183,7 @@ where
         self.ctx.sub_cycles(vm_cycle)?;
         let payload = ExecPayload {
             address,
-            args: hex::encode(args.as_ref()),
+            args: String::from_utf8_lossy(args.as_ref()).to_string(),
         };
         let payload_str = serde_json::to_string(&payload).map_err(|e| ServiceError::Serde(e))?;
         let call_ret = self
