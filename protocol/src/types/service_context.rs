@@ -78,18 +78,12 @@ impl ServiceContext {
         }
     }
 
-    pub fn get_tx_hash(&self) -> Hash {
-        self.tx_hash
-            .as_ref()
-            .expect("should not get tx hash in query request")
-            .clone()
+    pub fn get_tx_hash(&self) -> Option<Hash> {
+        self.tx_hash.clone()
     }
 
-    pub fn get_nonce(&self) -> Hash {
-        self.nonce
-            .as_ref()
-            .expect("should not get nonce in query request")
-            .clone()
+    pub fn get_nonce(&self) -> Option<Hash> {
+        self.nonce.clone()
     }
 
     pub fn get_events(&self) -> Vec<Event> {
