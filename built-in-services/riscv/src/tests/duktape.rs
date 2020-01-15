@@ -25,7 +25,7 @@ fn should_able_deploy_js_contract_and_run() {
 
     let bin_test_code = include_bytes!("./sys_call");
     let bin_dep_payload = DeployPayload {
-        code:      Bytes::from(bin_test_code.as_ref()),
+        code:      hex::encode(Bytes::from(bin_test_code.as_ref())),
         intp_type: InterpreterType::Binary,
         init_args: "args".into(),
     };
@@ -40,7 +40,11 @@ fn should_able_deploy_js_contract_and_run() {
         .deploy(context.clone(), bin_dep_payload)
         .expect("deplay binary");
 
-    let address = service.deploy(context.clone(), dep_payoad).expect("deploy");
+    let address = service
+        .deploy(context.clone(), dep_payoad)
+        .expect("deploy")
+        .address;
+
     let exec_ret = service.exec(context.clone(), ExecPayload {
         address,
         args: args.into(),
