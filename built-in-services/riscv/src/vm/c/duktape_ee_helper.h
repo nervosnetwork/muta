@@ -40,14 +40,17 @@ static duk_ret_t duk_pvm_debug(duk_context *ctx) {
 }
 
 static duk_ret_t duk_pvm_load_json_args(duk_context *ctx) {
-    // FIXME: overflow?
-    char json_args[2048];
-    duk_size_t len = 0;
-    pvm_load_args((uint8_t *)json_args, &len);
+    duk_push_dynamic_buffer(ctx, 1024);
+
+    void *args = duk_get_buffer(ctx, -1, NULL);
+    pvm_load_args(args, NULL);
+
+    duk_buffer_to_string(ctx, -1);
+    const char *json = duk_get_string(ctx, -1);
+    duk_pop(ctx);
 
     duk_push_object(ctx);
-
-    duk_push_string(ctx, json_args);
+    duk_push_string(ctx, json);
     duk_json_decode(ctx, -1);
 
     duk_put_global_string(ctx, "ARGS");
