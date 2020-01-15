@@ -79,12 +79,14 @@ impl<SDK: ServiceSDK + 'static> RiscvService<SDK> {
 
     #[write]
     fn deploy(&mut self, ctx: ServiceContext, payload: DeployPayload) -> ProtocolResult<String> {
+        dbg!(&payload);
         let code = Bytes::from(hex::decode(payload.code).map_err(|e| ServiceError::HexDecode(e))?);
         let code_hash = Hash::digest(code.clone());
         let code_len = code.len() as u64;
         self.sdk.borrow_mut().set_value(code_hash.clone(), code)?;
+        let tx_hash = ctx.get_tx_hash().ok_or(ServiceError::NotInExecContext("riscv deploy".to_owned()))?;
         let contract_address = Address::from_bytes(
-            Hash::digest(Bytes::from(ctx.get_caller().as_hex() + "nonce"))
+            Hash::digest(tx_hash.as_bytes())
                 .as_bytes()
                 .slice(0..20),
         )?;
@@ -165,6 +167,9 @@ where
 
 #[derive(Debug, Display, From)]
 pub enum ServiceError {
+    #[display(fmt = "method {} can not be invoke with call", _0)]
+    NotInExecContext(String),
+
     #[display(fmt = "Contract not exists")]
     ContractNotExists,
 
