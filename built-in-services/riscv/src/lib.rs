@@ -30,8 +30,12 @@ impl<SDK: ServiceSDK + 'static> RiscvService<SDK> {
         })
     }
 
-    #[read]
-    fn call(&self, ctx: ServiceContext, payload: ExecPayload) -> ProtocolResult<String> {
+    fn run(
+        &self,
+        ctx: ServiceContext,
+        payload: ExecPayload,
+        is_init: bool,
+    ) -> ProtocolResult<String> {
         let contract = self
             .sdk
             .borrow()
@@ -46,6 +50,7 @@ impl<SDK: ServiceSDK + 'static> RiscvService<SDK> {
             address: payload.address.clone(),
             code,
             args: payload.args.clone().into(),
+            is_init,
         };
         let mut interpreter = Interpreter::new(
             ctx.clone(),
@@ -72,24 +77,29 @@ impl<SDK: ServiceSDK + 'static> RiscvService<SDK> {
         Ok(ret)
     }
 
+    #[read]
+    fn call(&self, ctx: ServiceContext, payload: ExecPayload) -> ProtocolResult<String> {
+        self.run(ctx, payload, false)
+    }
+
     #[write]
     fn exec(&mut self, ctx: ServiceContext, payload: ExecPayload) -> ProtocolResult<String> {
-        self.call(ctx, payload)
+        self.run(ctx, payload, false)
     }
 
     #[write]
     fn deploy(&mut self, ctx: ServiceContext, payload: DeployPayload) -> ProtocolResult<String> {
-        dbg!(&payload);
+        // dbg!(&payload);
         let code = Bytes::from(hex::decode(payload.code).map_err(|e| ServiceError::HexDecode(e))?);
         let code_hash = Hash::digest(code.clone());
         let code_len = code.len() as u64;
+        ctx.sub_cycles(code_len)?;
         self.sdk.borrow_mut().set_value(code_hash.clone(), code)?;
-        let tx_hash = ctx.get_tx_hash().ok_or(ServiceError::NotInExecContext("riscv deploy".to_owned()))?;
-        let contract_address = Address::from_bytes(
-            Hash::digest(tx_hash.as_bytes())
-                .as_bytes()
-                .slice(0..20),
-        )?;
+        let tx_hash = ctx
+            .get_tx_hash()
+            .ok_or(ServiceError::NotInExecContext("riscv deploy".to_owned()))?;
+        let contract_address =
+            Address::from_bytes(Hash::digest(tx_hash.as_bytes()).as_bytes().slice(0..20))?;
 
         let intp_type = payload.intp_type;
         let contract = Contract::new(code_hash, intp_type);
@@ -97,7 +107,18 @@ impl<SDK: ServiceSDK + 'static> RiscvService<SDK> {
         self.sdk
             .borrow_mut()
             .set_value(contract_address.clone(), contract)?;
-        ctx.sub_cycles(code_len)?;
+
+        // run init
+        if payload.init_args.len() != 0 {
+            self.run(
+                ctx,
+                ExecPayload {
+                    address: contract_address.clone(),
+                    args:    payload.init_args,
+                },
+                true,
+            )?;
+        }
         Ok(contract_address.as_hex())
     }
 }

@@ -29,6 +29,7 @@ __internal_syscall(long n, long _a0, long _a1, long _a2, long _a3, long _a4, lon
 #define SYSCODE_RET 2002
 
 #define SYSCODE_CYCLE_LIMIT 3000
+#define SYSCODE_IS_INIT 3001
 
 #define SYSCODE_GET_STORAGE 4000
 #define SYSCODE_SET_STORAGE 4001
@@ -73,6 +74,11 @@ int pvm_ret(uint8_t *data, size_t size)
 int pvm_cycle_limit(uint64_t *cycle_limit)
 {
     return syscall(SYSCODE_CYCLE_LIMIT, cycle_limit, 0, 0, 0, 0, 0);
+}
+
+int pvm_is_init(uint64_t *is_init)
+{
+    return syscall(SYSCODE_IS_INIT, is_init, 0, 0, 0, 0, 0);
 }
 
 int pvm_get_storage(uint8_t *k, uint64_t k_size, uint8_t *v, uint64_t *v_size)

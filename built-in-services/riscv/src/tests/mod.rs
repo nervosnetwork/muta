@@ -24,7 +24,11 @@ use crate::RiscvService;
 fn test_deploy_and_run() {
     let cycles_limit = 1024 * 1024 * 1024; // 1073741824
     let caller = Address::from_hex("0x755cdba6ae4f479f7164792b318b2a06c759833b").unwrap();
-    let context = mock_context(cycles_limit, caller);
+    let tx_hash =
+        Hash::from_hex("412a6c54cf3d3dbb16b49c34e6cd93d08a245298032eb975ee51105b4c296828").unwrap();
+    let nonce =
+        Hash::from_hex("0000000000000000000000000000000000000000000000000000000000000000").unwrap();
+    let context = mock_context(cycles_limit, caller, tx_hash, nonce);
 
     let mut service = new_riscv_service();
 
@@ -94,8 +98,10 @@ fn new_riscv_service() -> RiscvService<
     RiscvService::init(sdk).unwrap()
 }
 
-fn mock_context(cycles_limit: u64, caller: Address) -> ServiceContext {
+fn mock_context(cycles_limit: u64, caller: Address, tx_hash: Hash, nonce: Hash) -> ServiceContext {
     let params = ServiceContextParams {
+        tx_hash: Some(tx_hash),
+        nonce: Some(nonce),
         cycles_limit,
         cycles_price: 1,
         cycles_used: Rc::new(RefCell::new(0)),
