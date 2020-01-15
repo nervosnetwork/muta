@@ -6,7 +6,7 @@ use bytes::Bytes;
 use derive_more::{Display, From};
 
 use binding_macro::{cycles, genesis, service, write};
-use protocol::traits::{ServiceSDK, StoreMap};
+use protocol::traits::{ExecutorParams, ServiceSDK, StoreMap};
 use protocol::types::{Hash, ServiceContext};
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 

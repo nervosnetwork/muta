@@ -3,6 +3,7 @@ use std::iter::Iterator;
 use derive_more::{Display, From};
 
 use crate::fixed_codec::FixedCodec;
+use crate::traits::ExecutorParams;
 use crate::types::{Address, Epoch, Hash, MerkleRoot, Receipt, ServiceContext, SignedTransaction};
 use crate::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
@@ -103,12 +104,12 @@ pub trait Service {
     }
 
     // Executed before the epoch is executed.
-    fn hook_before_(&mut self) -> ProtocolResult<()> {
+    fn hook_before_(&mut self, _params: &ExecutorParams) -> ProtocolResult<()> {
         Ok(())
     }
 
     // Executed after epoch execution.
-    fn hook_after_(&mut self) -> ProtocolResult<()> {
+    fn hook_after_(&mut self, _params: &ExecutorParams) -> ProtocolResult<()> {
         Ok(())
     }
 

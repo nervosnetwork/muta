@@ -3,7 +3,9 @@ use quote::quote;
 use syn::punctuated::Punctuated;
 use syn::{parse_macro_input, FnArg, ImplItemMethod, ReturnType, Token, Type, Visibility};
 
-use crate::common::{assert_type_servicecontext, get_protocol_result_args};
+use crate::common::{
+    arg_is_immutable_receiver, arg_is_mutable_receiver, assert_type, get_protocol_result_args,
+};
 
 pub fn verify_read_or_write(item: TokenStream, mutable: bool) -> TokenStream {
     let method_item = parse_macro_input!(item as ImplItemMethod);
@@ -37,14 +39,14 @@ fn verify_inputs(inputs: &Punctuated<FnArg, Token![,]>, mutable: bool) {
         if !arg_is_mutable_receiver(&inputs[0]) {
             panic!("The receiver must be `&mut self`.")
         }
-    } else if !arg_is_inmutable_receiver(&inputs[0]) {
+    } else if !arg_is_immutable_receiver(&inputs[0]) {
         panic!("The receiver must be `&self`.")
     }
 
     match &inputs[1] {
         FnArg::Typed(pt) => {
             let ty = pt.ty.as_ref();
-            assert_type_servicecontext(ty)
+            assert_type(ty, "ServiceContext")
         }
         _ => panic!("The second parameter type should be `ServiceContext`."),
     }
@@ -63,21 +65,5 @@ fn verify_ret_type(ret_type: &ReturnType) {
                 .expect("The return type of read/write method must be protocol::ProtocolResult");
         }
         _ => panic!("The return type of read/write method must be protocol::ProtocolResult"),
-    }
-}
-
-// expect &mut self
-fn arg_is_mutable_receiver(fn_arg: &FnArg) -> bool {
-    match fn_arg {
-        FnArg::Receiver(receiver) => receiver.reference.is_some() && receiver.mutability.is_some(),
-        _ => false,
-    }
-}
-
-// expect &self
-fn arg_is_inmutable_receiver(fn_arg: &FnArg) -> bool {
-    match fn_arg {
-        FnArg::Receiver(receiver) => receiver.reference.is_some() && receiver.mutability.is_none(),
-        _ => false,
     }
 }

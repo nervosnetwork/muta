@@ -2,12 +2,14 @@ extern crate proc_macro;
 
 mod common;
 mod cycles;
+mod hooks;
 mod read_write;
 mod service;
 
 use proc_macro::TokenStream;
 
 use crate::cycles::gen_cycles_code;
+use crate::hooks::verify_hook;
 use crate::read_write::verify_read_or_write;
 use crate::service::gen_service_code;
 
@@ -150,14 +152,14 @@ pub fn cycles(attr: TokenStream, item: TokenStream) -> TokenStream {
 // TODO(@yejiayu): Verify the function signature.
 #[proc_macro_attribute]
 pub fn hook_after(_: TokenStream, item: TokenStream) -> TokenStream {
-    item
+    verify_hook(item)
 }
 
 /// Marks a method so that it executes before the entire block executes.
 // TODO(@yejiayu): Verify the function signature.
 #[proc_macro_attribute]
 pub fn hook_before(_: TokenStream, item: TokenStream) -> TokenStream {
-    item
+    verify_hook(item)
 }
 
 #[rustfmt::skip]
