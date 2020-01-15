@@ -13,6 +13,21 @@ duk_double_t dummy_get_now(void) {
   return -11504520000.0;
 }
 
+/*
+ * Check if v can fit in duk_int_t, if so, push it to duktape stack, otherwise
+ * throw an error.
+ */
+static void push_checked_integer(duk_context *ctx, uint64_t v) {
+  if (v == ((uint64_t)((duk_int_t)v))) {
+    duk_push_int(ctx, (duk_int_t)v);
+  } else {
+    duk_push_error_object(ctx, DUK_ERR_EVAL_ERROR, "Integer %lu is overflowed!",
+                          v);
+    (void)duk_throw(ctx);
+  }
+}
+
+
 static duk_ret_t duk_pvm_debug(duk_context *ctx) {
     duk_push_string(ctx, " ");
     duk_insert(ctx, 0);
@@ -38,6 +53,15 @@ static duk_ret_t duk_pvm_load_json_args(duk_context *ctx) {
     return 0;
 }
 
+static duk_ret_t duk_pvm_cycle_limit(duk_context* ctx) {
+    uint64_t cycle_limit;
+
+    pvm_cycle_limit(&cycle_limit);
+    push_checked_integer(ctx, cycle_limit);
+
+    return 1;
+}
+
 void pvm_init(duk_context *ctx) {
   duk_push_object(ctx);
 
@@ -46,6 +70,9 @@ void pvm_init(duk_context *ctx) {
 
   duk_push_c_function(ctx, duk_pvm_load_json_args, 0);
   duk_put_prop_string(ctx, -2, "load_json_args");
+
+  duk_push_c_function(ctx, duk_pvm_cycle_limit, 0);
+  duk_put_prop_string(ctx, -2, "cycle_limit");
 
   duk_put_global_string(ctx, "PVM");
 }
