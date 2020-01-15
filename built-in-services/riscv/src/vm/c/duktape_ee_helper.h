@@ -28,6 +28,8 @@ static void push_checked_integer(duk_context *ctx, uint64_t v) {
 }
 
 
+// ####### PVM #######
+
 static duk_ret_t duk_pvm_debug(duk_context *ctx) {
     duk_push_string(ctx, " ");
     duk_insert(ctx, 0);
@@ -62,6 +64,27 @@ static duk_ret_t duk_pvm_cycle_limit(duk_context* ctx) {
     return 1;
 }
 
+static duk_ret_t duk_pvm_get_storage(duk_context *ctx) {
+    const char *key;
+    void *val;
+
+    key = duk_get_string(ctx, -1);
+    val = duk_push_fixed_buffer(ctx, 4096);
+
+    int rc = pvm_get_storage((uint8_t *)key, strlen(key), val, (uint64_t *)1024);
+    if (0 != rc) {
+        return rc;
+    }
+
+    return 1;
+}
+
+static duk_ret_t duk_pvm_set_storage(duk_context *ctx) {
+    const char *key;
+
+    key = duk_get_string(ctx, -1);
+}
+
 void pvm_init(duk_context *ctx) {
   duk_push_object(ctx);
 
@@ -73,6 +96,12 @@ void pvm_init(duk_context *ctx) {
 
   duk_push_c_function(ctx, duk_pvm_cycle_limit, 0);
   duk_put_prop_string(ctx, -2, "cycle_limit");
+
+  duk_push_c_function(ctx, duk_pvm_get_storage, 1);
+  duk_put_prop_string(ctx, -2, "get_storage");
+
+  duk_push_c_function(ctx, duk_pvm_set_storage, 2);
+  duk_put_prop_string(ctx, -2, "set_storage");
 
   duk_put_global_string(ctx, "PVM");
 }
