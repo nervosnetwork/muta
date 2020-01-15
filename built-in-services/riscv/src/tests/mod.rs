@@ -34,18 +34,20 @@ fn test_deploy_and_run() {
     let mut buffer = Vec::new();
     file.read_to_end(&mut buffer).unwrap();
     let buffer = bytes::Bytes::from(buffer);
-    let address = service
-        .deploy(context.clone(), DeployPayload {
-            code:      buffer,
-            intp_type: InterpreterType::Binary,
-            init_args: "args".into(),
-        })
-        .unwrap();
+    let deploy_payload = DeployPayload {
+        code:      hex::encode(buffer.as_ref()),
+        intp_type: InterpreterType::Binary,
+        init_args: "args".into(),
+    };
+    // println!("{}", serde_json::to_string(&deploy_payload).unwrap());
+    let address = service.deploy(context.clone(), deploy_payload).unwrap();
     dbg!(&address);
-    let exec_result = service.exec(context.clone(), ExecPayload {
+    let exec_payload = ExecPayload {
         address: Address::from_hex(&address).unwrap(),
         args:    "13".into(),
-    });
+    };
+    println!("{}", serde_json::to_string(&exec_payload).unwrap());
+    let exec_result = service.exec(context.clone(), exec_payload);
     dbg!(&exec_result);
     assert!(!exec_result.is_err());
     let exec_result = service.exec(context.clone(), ExecPayload {

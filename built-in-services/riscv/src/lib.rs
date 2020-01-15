@@ -10,7 +10,7 @@ use std::rc::Rc;
 use bytes::Bytes;
 use derive_more::{Display, From};
 
-use binding_macro::{cycles, service, write};
+use binding_macro::{cycles, read, service, write};
 use protocol::traits::{ServiceSDK, StoreMap};
 use protocol::types::{Address, Hash, ServiceContext};
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
@@ -24,19 +24,19 @@ pub struct RiscvService<SDK> {
 
 #[service]
 impl<SDK: ServiceSDK + 'static> RiscvService<SDK> {
-    pub fn init(mut sdk: SDK) -> ProtocolResult<Self> {
+    pub fn init(sdk: SDK) -> ProtocolResult<Self> {
         Ok(Self {
             sdk: Rc::new(RefCell::new(sdk)),
         })
     }
 
-    #[write]
-    fn exec(&mut self, ctx: ServiceContext, payload: ExecPayload) -> ProtocolResult<String> {
+    #[read]
+    fn call(&self, ctx: ServiceContext, payload: ExecPayload) -> ProtocolResult<String> {
         let contract = self
             .sdk
             .borrow()
             .get_value::<Address, Contract>(&payload.address)?
-            .unwrap();
+            .ok_or(ServiceError::ContractNotExists)?;
         let code: Bytes = self
             .sdk
             .borrow()
@@ -45,7 +45,7 @@ impl<SDK: ServiceSDK + 'static> RiscvService<SDK> {
         let interpreter_params = InterpreterParams {
             address: payload.address.clone(),
             code,
-            args: payload.args.clone(),
+            args: payload.args.clone().into(),
         };
         let mut interpreter = Interpreter::new(
             ctx.clone(),
@@ -73,13 +73,16 @@ impl<SDK: ServiceSDK + 'static> RiscvService<SDK> {
     }
 
     #[write]
+    fn exec(&mut self, ctx: ServiceContext, payload: ExecPayload) -> ProtocolResult<String> {
+        self.call(ctx, payload)
+    }
+
+    #[write]
     fn deploy(&mut self, ctx: ServiceContext, payload: DeployPayload) -> ProtocolResult<String> {
-        // dbg!(&payload);
-        let code_hash = Hash::digest(payload.code.clone());
-        let code_len = payload.code.len() as u64;
-        self.sdk
-            .borrow_mut()
-            .set_value(code_hash.clone(), payload.code)?;
+        let code = Bytes::from(hex::decode(payload.code).map_err(|e| ServiceError::HexDecode(e))?);
+        let code_hash = Hash::digest(code.clone());
+        let code_len = code.len() as u64;
+        self.sdk.borrow_mut().set_value(code_hash.clone(), code)?;
         let contract_address = Address::from_bytes(
             Hash::digest(Bytes::from(ctx.get_caller().as_hex() + "nonce"))
                 .as_bytes()
@@ -147,7 +150,10 @@ where
     ) -> ProtocolResult<(String, u64)> {
         let vm_cycle = current_cycle - self.all_cycles_used;
         self.ctx.sub_cycles(vm_cycle)?;
-        let payload = ExecPayload { address, args };
+        let payload = ExecPayload {
+            address,
+            args: hex::encode(args.as_ref()),
+        };
         let payload_str = serde_json::to_string(&payload).map_err(|e| ServiceError::Serde(e))?;
         let call_ret = self
             .sdk
@@ -171,6 +177,9 @@ pub enum ServiceError {
 
     #[display(fmt = "json serde error: {:?}", _0)]
     Serde(serde_json::error::Error),
+
+    #[display(fmt = "hex decode error: {:?}", _0)]
+    HexDecode(hex::FromHexError),
 }
 
 impl std::error::Error for ServiceError {}
