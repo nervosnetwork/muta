@@ -48,13 +48,10 @@ static duk_ret_t duk_pvm_load_json_args(duk_context *ctx) {
   const char *json = duk_get_string(ctx, -1);
   duk_pop(ctx);
 
-  duk_push_object(ctx);
   duk_push_string(ctx, json);
   duk_json_decode(ctx, -1);
 
-  duk_put_global_string(ctx, "ARGS");
-
-  return 0;
+  return 1;
 }
 
 static duk_ret_t duk_pvm_cycle_limit(duk_context *ctx) {
