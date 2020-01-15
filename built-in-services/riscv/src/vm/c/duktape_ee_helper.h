@@ -65,43 +65,34 @@ static duk_ret_t duk_pvm_cycle_limit(duk_context* ctx) {
 }
 
 static duk_ret_t duk_pvm_get_storage(duk_context *ctx) {
-    if (!duk_is_buffer_data(ctx, -1)) {
-        duk_push_error_object(ctx, DUK_ERR_EVAL_ERROR, "Invalid arguments");
+    if (!duk_is_string(ctx, -1)) {
+        duk_push_error_object(ctx, DUK_ERR_EVAL_ERROR, "Invalid arguments, key should be string");
         return duk_throw(ctx);
     }
 
-    duk_size_t key_size = 0;
-    void *key = duk_get_buffer_data(ctx, -1, &key_size);
+    const char *key = duk_get_string(ctx, -1);
     duk_pop(ctx);
 
-    duk_size_t val_size = 0;
     duk_push_dynamic_buffer(ctx, 1024);
+    void *val = duk_get_buffer(ctx, -1, NULL);
 
-    void *val = duk_get_buffer(ctx, 0, NULL);
-    pvm_get_storage(key, key_size, val, &val_size);
+    pvm_get_storage((uint8_t *)key, strlen(key), val, NULL);
 
-    // Change to ArrayBuffer
-    duk_push_buffer_object(ctx, 0, 0, val_size, DUK_BUFOBJ_ARRAYBUFFER);
-    duk_swap(ctx, 0, 1);
-    duk_pop(ctx);
-
+    duk_buffer_to_string(ctx, -1);
     return 1;
 }
 
 static duk_ret_t duk_pvm_set_storage(duk_context *ctx) {
-    if (!duk_is_buffer_data(ctx, -1) || !duk_is_buffer_data(ctx, -2)) {
-        duk_push_error_object(ctx, DUK_ERR_EVAL_ERROR, "Invalid arguments");
+    if (!duk_is_string(ctx, -1) || !duk_is_string(ctx, -2)) {
+        duk_push_error_object(ctx, DUK_ERR_EVAL_ERROR, "Invalid arguments, should be string");
         return duk_throw(ctx);
     }
 
-    duk_size_t key_size = 0;
-    duk_size_t val_size = 0;
-
-    void *key = duk_get_buffer_data(ctx, -2, &key_size);
-    void *val = duk_get_buffer_data(ctx, -1, &val_size);
+    const char *key = duk_get_string(ctx, -2);
+    const char *val = duk_get_string(ctx, -1);
     duk_pop_n(ctx, 2);
 
-    pvm_set_storage(key, key_size, val, val_size);
+    pvm_set_storage((uint8_t *)key, strlen(key), (uint8_t *)val, strlen(val));
 
     return 0;
 }
