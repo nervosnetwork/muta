@@ -25,30 +25,49 @@ int main(int argc, char *argv[]) {
   // Compile code
   char *code = argv[1];
 
-  // Insert Main() invoke
-  duk_push_string(ctx, "\n");
-  duk_push_string(ctx, code);
-  duk_push_string(ctx, "main();");
-  duk_join(ctx, 2);
+  // // Insert Main() invoke
+  // duk_push_string(ctx, "\n");
+  // duk_push_string(ctx, code);
+  // duk_push_string(ctx, "main();");
+  // duk_join(ctx, 2);
 
-  const char *main_code = duk_get_string(ctx, -1);
+  // const char *main_code = duk_get_string(ctx, -1);
 
-  if (0 != duk_pcompile_string(ctx, DUK_COMPILE_EVAL, main_code)) {
-    const char *err_msg = duk_get_string(ctx, -1);
-    pvm_ret((uint8_t *)err_msg, strlen(err_msg));
+  // if (0 != duk_pcompile_string(ctx, DUK_COMPILE_EVAL, main_code)) {
+  //   const char *err_msg = duk_get_string(ctx, -1);
+  //   pvm_ret((uint8_t *)err_msg, strlen(err_msg));
+  // }
 
-    return EE_ERR_COMPILE_CODE;
-  }
+  // char* hook_in_the_end = "main();";
 
-  // Call our funtion
-  duk_int_t rc = duk_pcall(ctx, 0);
-  if (DUK_EXEC_SUCCESS == rc) {
-    const char *ret = duk_get_string(ctx, -1);
-    pvm_ret((uint8_t *)ret, strlen(ret));
-  } else {
-    const char *err_msg = duk_safe_to_string(ctx, -1);
-    pvm_ret((uint8_t *)err_msg, strlen(err_msg));
-  }
+	// duk_eval_string(ctx, code);
+  duk_int_t rc = duk_peval_lstring(ctx, code, strlen(code));
+  const char *err_msg = duk_safe_to_string(ctx, -1);
+  pvm_ret((uint8_t *)err_msg, strlen(err_msg));
+  // if(duk_peval_lstring(ctx, hook_in_the_end, strlen(hook_in_the_end)) != 0) {
+  //   const char *err_msg = duk_safe_to_string(ctx, -1);
+  //   pvm_ret((uint8_t *)err_msg, strlen(err_msg));
+  //   return 1;
+  // }
+	// duk_eval_string(ctx, "PVM.ret()");
+
+  // duk_push_string(ctx, "main");
+  // if (0 != duk_pcompile_string(ctx, DUK_COMPILE_FUNCTION, code)) {
+  //   const char *err_msg = duk_get_string(ctx, -1);
+  //   pvm_ret((uint8_t *)err_msg, strlen(err_msg));
+
+  //   return EE_ERR_COMPILE_CODE;
+  // }
+
+  // // Call our funtion
+  // duk_int_t rc = duk_pcall(ctx, 0);
+  // if (DUK_EXEC_SUCCESS == rc) {
+  //   const char *ret = duk_get_string(ctx, -1);
+  //   pvm_ret((uint8_t *)ret, strlen(ret));
+  // } else {
+  //   const char *err_msg = duk_safe_to_string(ctx, -1);
+  //   pvm_ret((uint8_t *)err_msg, strlen(err_msg));
+  // }
 
   duk_pop(ctx);
   duk_destroy_heap(ctx);

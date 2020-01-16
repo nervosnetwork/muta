@@ -1,6 +1,6 @@
 function assert(condition, msg) {
     if (!condition) {
-        throw msg;
+        throw new Error(msg);
     }
 }
 
@@ -89,79 +89,81 @@ function _main(args) {
     }
 }
 
-// function main() {
-//     const args = JSON.parse(PVM.load_args());
-//     return _main(args);
-// }
+function main() {
+    const args = JSON.parse(PVM.load_args());
+    PVM.debug(JSON.stringify(args));
+    return _main(args);
+}
+main();
 // PVM.ret(main() || '');
 
 // -------- test ----------------
 // run with below code via duktape on local machine
 
-PVM = {
-    storage: {},
-    ret: "",
-    caller: "",
-    debug: function(msg) {
-        console.log('[ckb-vm]', msg);
-    },
-    set_storage: function(key, value) {
-        this.storage[key] = value;
-    },
-    get_storage: function(key) {
-        return this.storage[key];
-    },
-    is_init: function() {
-        return true;
-    },
-    ret: function(msg) {
-        this.ret = msg;
-    },
-    _clear_ret: function() {
-        this.ret = "";
-    },
-    get_caller: function() {
-        return this.caller;
-    },
-    _set_caller: function(caller) {
-        this.caller = caller;
-    }
-}
+// PVM = {
+//     storage: {},
+//     ret: "",
+//     caller: "",
+//     debug: function(msg) {
+//         console.log('[ckb-vm]', msg);
+//     },
+//     set_storage: function(key, value) {
+//         this.storage[key] = value;
+//     },
+//     get_storage: function(key) {
+//         return this.storage[key];
+//     },
+//     is_init: function() {
+//         return true;
+//     },
+//     ret: function(msg) {
+//         this.ret = msg;
+//     },
+//     _clear_ret: function() {
+//         this.ret = "";
+//     },
+//     get_caller: function() {
+//         return this.caller;
+//     },
+//     _set_caller: function(caller) {
+//         this.caller = caller;
+//     }
+// }
 
-function call_and_print(args, caller) {
-    PVM._clear_ret();
-    caller = caller || '755cdba6ae4f479f7164792b318b2a06c759833b';
-    PVM._set_caller(caller);
-    PVM.debug('[' + args.method + ']: ' + _main(args) || '');
-}
+// function call_and_print(args, caller) {
+//     PVM._clear_ret();
+//     caller = caller || '755cdba6ae4f479f7164792b318b2a06c759833b';
+//     PVM._set_caller(caller);
+//     PVM.debug('[' + args.method + ']: ' + _main(args) || '');
+// }
 
-function test() {
-    PVM.debug('-------- start  erc20 test --------');
-    // init
-    call_and_print({method: 'init', name: 'bitcoin', symbol: 'BTC', supply: 10000000000});
-    call_and_print({method: 'total_supply'});
-    call_and_print({method: 'balance_of', account: '755cdba6ae4f479f7164792b318b2a06c759833b'});
-    call_and_print({method: 'balance_of', account: '0000000000000000000000000000000000000000'});
-    call_and_print({method: 'transfer', recipient: '0000000000000000000000000000000000000000', amount: 1000});
-    call_and_print({method: 'balance_of', account: '755cdba6ae4f479f7164792b318b2a06c759833b'});
-    call_and_print({method: 'balance_of', account: '0000000000000000000000000000000000000000'});
+// function test() {
+//     PVM.debug('-------- start  erc20 test --------');
+//     // init
+//     call_and_print({method: 'init', name: 'bitcoin', symbol: 'BTC', supply: 10000000000});
+//     call_and_print({method: 'total_supply'});
+//     call_and_print({method: 'balance_of', account: '755cdba6ae4f479f7164792b318b2a06c759833b'});
+//     call_and_print({method: 'balance_of', account: '0000000000000000000000000000000000000000'});
+//     call_and_print({method: 'transfer', recipient: '0000000000000000000000000000000000000000', amount: 1000});
+//     call_and_print({method: 'balance_of', account: '755cdba6ae4f479f7164792b318b2a06c759833b'});
+//     call_and_print({method: 'balance_of', account: '0000000000000000000000000000000000000000'});
 
-    call_and_print({method: 'allowances', owner: '755cdba6ae4f479f7164792b318b2a06c759833b', spender: '0000000000000000000000000000000000000000'});
-    call_and_print({method: 'approve', spender: '0000000000000000000000000000000000000000', amount: 600});
-    call_and_print({method: 'allowances', owner: '755cdba6ae4f479f7164792b318b2a06c759833b', spender: '0000000000000000000000000000000000000000'});
-    // allowances not enough
-    // call_and_print({method: 'transfer_from', sender: '755cdba6ae4f479f7164792b318b2a06c759833b', recipient: '0000000000000000000000000000000000000001', amount: 601}, '0000000000000000000000000000000000000000');
-    call_and_print({method: 'transfer_from', sender: '755cdba6ae4f479f7164792b318b2a06c759833b', recipient: '0000000000000000000000000000000000000001', amount: 500}, '0000000000000000000000000000000000000000');
-    call_and_print({method: 'allowances', owner: '755cdba6ae4f479f7164792b318b2a06c759833b', spender: '0000000000000000000000000000000000000000'});
-    call_and_print({method: 'balance_of', account: '755cdba6ae4f479f7164792b318b2a06c759833b'});
-    call_and_print({method: 'balance_of', account: '0000000000000000000000000000000000000000'});
-    call_and_print({method: 'balance_of', account: '0000000000000000000000000000000000000001'});
+//     call_and_print({method: 'allowances', owner: '755cdba6ae4f479f7164792b318b2a06c759833b', spender: '0000000000000000000000000000000000000000'});
+//     call_and_print({method: 'approve', spender: '0000000000000000000000000000000000000000', amount: 600});
+//     call_and_print({method: 'allowances', owner: '755cdba6ae4f479f7164792b318b2a06c759833b', spender: '0000000000000000000000000000000000000000'});
+//     // allowances not enough
+//     // call_and_print({method: 'transfer_from', sender: '755cdba6ae4f479f7164792b318b2a06c759833b', recipient: '0000000000000000000000000000000000000001', amount: 601}, '0000000000000000000000000000000000000000');
+//     call_and_print({method: 'transfer_from', sender: '755cdba6ae4f479f7164792b318b2a06c759833b', recipient: '0000000000000000000000000000000000000001', amount: 500}, '0000000000000000000000000000000000000000');
+//     call_and_print({method: 'allowances', owner: '755cdba6ae4f479f7164792b318b2a06c759833b', spender: '0000000000000000000000000000000000000000'});
+//     call_and_print({method: 'balance_of', account: '755cdba6ae4f479f7164792b318b2a06c759833b'});
+//     call_and_print({method: 'balance_of', account: '0000000000000000000000000000000000000000'});
+//     call_and_print({method: 'balance_of', account: '0000000000000000000000000000000000000001'});
 
-    // balance not enough
-    // call_and_print({method: 'transfer', recipient: '0000000000000000000000000000000000000000', amount: 1000}, '0000000000000000000000000000000000000001');
-    // console.log(PVM.storage);
+//     // balance not enough
+//     // call_and_print({method: 'transfer', recipient: '0000000000000000000000000000000000000000', amount: 1000}, '0000000000000000000000000000000000000001');
+//     // console.log(PVM.storage);
 
-    PVM.debug('-------- finish erc20 test --------');
-}
+//     PVM.debug('-------- finish erc20 test --------');
+// }
 
-test();
+// test();

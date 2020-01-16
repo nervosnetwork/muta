@@ -70,10 +70,18 @@ fn test_js_erc20() {
     let mut buffer = Vec::new();
     file.read_to_end(&mut buffer).unwrap();
     let buffer = bytes::Bytes::from(buffer);
+    let init_args = serde_json::json!({
+        "method": "init",
+        "name": "bitcoin",
+        "symbol": "BTC",
+        "supply": 1000000000,
+    })
+    .to_string();
+    dbg!(&init_args);
     let dep_payoad = DeployPayload {
-        code:      hex::encode(buffer),
+        code: hex::encode(buffer),
         intp_type: InterpreterType::Duktape,
-        init_args: "".into(),
+        init_args,
     };
 
     let address = service
