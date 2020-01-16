@@ -45,6 +45,11 @@ static duk_ret_t duk_pvm_load_args(duk_context *ctx) {
   pvm_load_args(args, NULL);
 
   duk_buffer_to_string(ctx, -1);
+  const char *args_str = duk_get_string(ctx, -1);
+  duk_pop(ctx);
+
+  duk_push_string(ctx, args_str);
+
   return 1;
 }
 
