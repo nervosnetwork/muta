@@ -49,9 +49,8 @@ static duk_ret_t duk_pvm_load_args(duk_context *ctx) {
   pvm_load_args(args, NULL);
 
   duk_buffer_to_string(ctx, -1);
-  const char *args_str = duk_get_string(ctx, -1);
-  duk_pop(ctx);
-  duk_push_string(ctx, args_str);
+  duk_push_string(ctx, duk_get_string(ctx, -1));
+
   return 1;
 }
 
@@ -63,9 +62,8 @@ static duk_ret_t duk_pvm_origin(duk_context *ctx) {
   pvm_origin(args);
 
   duk_buffer_to_string(ctx, -1);
-  const char *args_str = duk_get_string(ctx, -1);
-  duk_pop(ctx);
-  duk_push_string(ctx, args_str);
+  duk_push_string(ctx, duk_get_string(ctx, -1));
+
   return 1;
 }
 
@@ -89,9 +87,8 @@ static duk_ret_t duk_pvm_caller(duk_context *ctx) {
   pvm_caller(args);
 
   duk_buffer_to_string(ctx, -1);
-  const char *args_str = duk_get_string(ctx, -1);
-  duk_pop(ctx);
-  duk_push_string(ctx, args_str);
+  duk_push_string(ctx, duk_get_string(ctx, -1));
+
   return 1;
 }
 
@@ -102,10 +99,7 @@ static duk_ret_t duk_pvm_load_json_args(duk_context *ctx) {
   pvm_load_args(args, NULL);
 
   duk_buffer_to_string(ctx, -1);
-  const char *json = duk_get_string(ctx, -1);
-  duk_pop(ctx);
-
-  duk_push_string(ctx, json);
+  duk_push_string(ctx, duk_get_string(ctx, -1));
   duk_json_decode(ctx, -1);
 
   return 1;
@@ -137,9 +131,8 @@ static duk_ret_t duk_pvm_get_storage(duk_context *ctx) {
   pvm_get_storage((uint8_t *)key, strlen(key), val, &val_size);
 
   duk_buffer_to_string(ctx, -1);
-  const char *args_str = duk_get_string(ctx, -1);
-  duk_pop(ctx);
-  duk_push_string(ctx, args_str);
+  duk_push_string(ctx, duk_get_string(ctx, -1));
+
   return 1;
 }
 
@@ -164,9 +157,9 @@ static duk_ret_t duk_pvm_is_init(duk_context *ctx) {
   pvm_is_init(&is_init);
 
   if (0 == is_init) {
-      duk_push_false(ctx);
-  } else {
       duk_push_true(ctx);
+  } else {
+      duk_push_false(ctx);
   }
 
   return 1;
@@ -191,11 +184,10 @@ static duk_ret_t duk_pvm_contract_call(duk_context *ctx) {
                                     strlen(call_args), ret, NULL)) {
     return ret_code;
   }
-
+  
   duk_buffer_to_string(ctx, -1);
-  const char *args_str = duk_get_string(ctx, -1);
-  duk_pop(ctx);
-  duk_push_string(ctx, args_str);
+  duk_push_string(ctx, duk_get_string(ctx, -1));
+
   return 1;
 }
 
