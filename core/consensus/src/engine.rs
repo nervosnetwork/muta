@@ -107,6 +107,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         let order_hashes_len = order_hashes.len();
         log::info!("check_epoch order_hashes {:?}", order_hashes_len);
         let exemption = { self.exemption_hash.read().contains(&hash) };
+        let sync_tx_hashes = epoch.get_propose_hashes();
 
         // If the epoch is proposed by self, it does not need to check. Get full signed
         // transactions directly.
@@ -114,11 +115,9 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             log::info!("check_epoch_roots order_hashes {:?}", order_hashes_len);
             self.check_epoch_roots(&epoch.inner.epoch.header)?;
 
-            log::info!("sync_txs order_hashes {:?}", order_hashes_len);
-            self.adapter
-                .sync_txs(ctx.clone(), epoch.get_propose_hashes())
-                .await?;
-            log::info!("check_txs order_hashes {:?}", order_hashes_len);
+            // self.adapter
+            //     .sync_txs(ctx.clone(), epoch.get_propose_hashes())
+            //     .await?;
             self.adapter
                 .check_txs(ctx.clone(), order_hashes.clone())
                 .await?;
@@ -128,8 +127,15 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         let inner = self.adapter.get_full_txs(ctx.clone(), order_hashes).await?;
 
         log::info!("save_wal_transactions order_hashes {:?}", order_hashes_len);
+        let adapter = Arc::clone(&self.adapter);
+
+        runtime::spawn(async move {
+            if let Err(e) = sync_txs(ctx, adapter, sync_tx_hashes).await {
+                error!("Consensus sync epoch error {}", e);
+            }
+        });
         self.adapter
-            .save_wal_transactions(ctx, Hash::digest(hash.clone()), inner)
+            .save_wal_transactions(Context::new(), Hash::digest(hash.clone()), inner)
             .await?;
         log::info!("check_epoch done order_hashes {:?}", order_hashes_len);
         Ok(())
@@ -581,6 +587,14 @@ fn time_now() -> u64 {
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_secs()
+}
+
+async fn sync_txs<CA: ConsensusAdapter>(
+    ctx: Context,
+    adapter: Arc<CA>,
+    propose_hashes: Vec<Hash>,
+) -> ProtocolResult<()> {
+    adapter.sync_txs(ctx, propose_hashes).await
 }
 
 #[cfg(test)]
