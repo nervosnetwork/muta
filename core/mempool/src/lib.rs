@@ -29,16 +29,16 @@ use crate::tx_cache::TxCache;
 /// Memory pool for caching transactions.
 pub struct HashMemPool<Adapter: MemPoolAdapter> {
     /// Pool size limit.
-    pool_size: usize,
+    pool_size:      usize,
     /// A system param limits the life time of an off-chain transaction.
-    timeout_gap: u64,
+    timeout_gap:    u64,
     /// A structure for caching new transactions and responsible transactions of
     /// propose-sync.
-    tx_cache: TxCache,
+    tx_cache:       TxCache,
     /// A structure for caching fresh transactions in order transaction hashes.
     callback_cache: Map<SignedTransaction>,
     /// Supply necessary functions from outer modules.
-    adapter: Adapter,
+    adapter:        Adapter,
 }
 
 impl<Adapter> HashMemPool<Adapter>

@@ -19,7 +19,7 @@ use protocol::traits::{ConsensusAdapter, Context, MessageCodec, MessageTarget, N
 use protocol::types::{
     Address, Epoch, EpochHeader, Hash, MerkleRoot, Pill, Proof, SignedTransaction, Validator,
 };
-use protocol::{Bytes, BytesMut, ProtocolError, ProtocolResult};
+use protocol::{Bytes, ProtocolError, ProtocolResult};
 
 use crate::fixed_types::FixedPill;
 use crate::message::{
@@ -173,9 +173,9 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
 
         let pill = commit.content.inner;
 
-        let epoch_hash = BytesMut::from(commit.proof.epoch_hash.as_ref()).freeze();
-        let signature = BytesMut::from(commit.proof.signature.signature.as_ref()).freeze();
-        let bitmap = BytesMut::from(commit.proof.signature.address_bitmap.as_ref()).freeze();
+        let epoch_hash = commit.proof.epoch_hash.clone();
+        let signature = commit.proof.signature.signature.clone();
+        let bitmap = commit.proof.signature.address_bitmap.clone();
 
         // Sorage save the lastest proof.
         let proof = Proof {
