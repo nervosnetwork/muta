@@ -1,7 +1,14 @@
+function init() {
+  PVM.debug(PVM.is_init());
+  return 'hello world';
+}
+
 function main() {
   'use strict';
 
-  PVM.debug(PVM.is_init());
+  if (!PVM.is_init()) {
+    return init();
+  }
 
   PVM.debug("hello! it's me, mario");
   const raw_args = PVM.load_args();
