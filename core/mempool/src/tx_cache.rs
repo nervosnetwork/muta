@@ -54,17 +54,17 @@ impl TxWrapper {
         self.removed.store(true, Ordering::SeqCst);
     }
 
-    #[inline]
+    #[inline(always)]
     pub(crate) fn is_removed(&self) -> bool {
         self.removed.load(Ordering::SeqCst)
     }
 
-    #[inline]
+    #[inline(always)]
     fn is_proposed(&self) -> bool {
         self.proposed.load(Ordering::SeqCst)
     }
 
-    #[inline]
+    #[inline(always)]
     fn is_timeout(&self, current_epoch_id: u64, timeout: u64) -> bool {
         let tx_timeout = self.tx.raw.timeout;
         tx_timeout <= current_epoch_id || tx_timeout > timeout
@@ -176,6 +176,7 @@ impl TxCache {
         self.map.deletes(tx_hashes);
     }
 
+    #[inline(always)]
     pub fn package(
         &self,
         cycle_limit: u64,
@@ -245,7 +246,7 @@ impl TxCache {
         })
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn check_exist(&self, tx_hash: &Hash) -> ProtocolResult<()> {
         if self.contain(tx_hash) {
             return Err(MemPoolError::Dup {
@@ -256,7 +257,7 @@ impl TxCache {
         Ok(())
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn check_reach_limit(&self, pool_size: usize) -> ProtocolResult<()> {
         if self.len() >= pool_size {
             return Err(MemPoolError::ReachLimit { pool_size }.into());
@@ -264,12 +265,12 @@ impl TxCache {
         Ok(())
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn contain(&self, tx_hash: &Hash) -> bool {
         self.map.contains_key(tx_hash)
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn get(&self, tx_hash: &Hash) -> Option<SignedTransaction> {
         self.map.get(tx_hash).map(|shared_tx| shared_tx.tx.clone())
     }
@@ -332,7 +333,7 @@ impl TxCache {
         self.get_queue_role()
     }
 
-    #[inline]
+    #[inline(always)]
     fn get_queue_role(&self) -> QueueRole {
         let (incumbent, candidate) = if self.is_zero.load(Ordering::SeqCst) {
             (&self.queue_0, &self.queue_1)
