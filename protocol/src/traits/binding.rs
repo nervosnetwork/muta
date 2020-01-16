@@ -1,5 +1,6 @@
 use std::iter::Iterator;
 
+use bytes::Bytes;
 use derive_more::{Display, From};
 
 use crate::fixed_codec::FixedCodec;
@@ -201,6 +202,7 @@ pub trait ServiceSDK {
     fn read(
         &self,
         ctx: &ServiceContext,
+        extra: Option<Bytes>,
         service: &str,
         method: &str,
         payload: &str,
@@ -211,6 +213,7 @@ pub trait ServiceSDK {
     fn write(
         &mut self,
         ctx: &ServiceContext,
+        extra: Option<Bytes>,
         service: &str,
         method: &str,
         payload: &str,
