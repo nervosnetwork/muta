@@ -25,8 +25,13 @@ function total_supply() {
     return PVM.get_storage('supply');
 }
 
+function _balance_key(account) {
+    return 'balance:' + account;
+}
+
 function _set_balance(account, amount) {
-    PVM.set_storage('balance:' + account, amount.toString());
+    const key = _balance_key(account);
+    PVM.set_storage(key, amount.toString());
 }
 
 function _transfer(sender, recipient, amount) {
@@ -51,7 +56,7 @@ function transfer(recipient, amount) {
 
 function balance_of(account) {
     account = account || PVM.caller();
-    const key = 'balance:' + account;
+    const key = _balance_key(account);
     const ret = PVM.get_storage(key);
     return ret || '0';
 }
@@ -104,12 +109,12 @@ function main() {
     // const key = 'k';
     // PVM.set_storage(key, '1000');
     // print({ret: PVM.get_storage(key)});
-    const args = JSON.parse(PVM.load_args());
-    PVM.debug(JSON.stringify(args));
+    const args = PVM.load_args();
+    PVM.debug(args);
+    const args = JSON.parse(args);
     // PVM.debug(PVM.is_init());
     return _main(args) || '';
 }
-main();
 // PVM.ret(main() || '');
 
 // -------- test ----------------

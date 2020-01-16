@@ -4,7 +4,7 @@
 #include "./duktape/duktape.h"
 #include "pvm.h"
 
-#define ADDRESS_LEN 41
+#define ADDRESS_LEN 50
 // load at most 1KB data
 #define MAX_LOAD_SIZE 1024
 
@@ -157,9 +157,9 @@ static duk_ret_t duk_pvm_is_init(duk_context *ctx) {
   pvm_is_init(&is_init);
 
   if (0 == is_init) {
-      duk_push_true(ctx);
-  } else {
       duk_push_false(ctx);
+  } else {
+      duk_push_true(ctx);
   }
 
   return 1;

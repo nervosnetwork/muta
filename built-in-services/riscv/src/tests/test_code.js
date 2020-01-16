@@ -21,7 +21,9 @@ function _test_cycle_limit() {
 function _test_storage() {
   const args = PVM.load_json_args();
   PVM.set_storage(args.key, args.val);
-  return JSON.stringify(JSON.parse(PVM.get_storage(args.key)));
+  const out = PVM.get_storage(args.key);
+  PVM.debug(out);
+  return JSON.stringify(JSON.parse(out));
 }
 
 function _test_contract_call() {
@@ -34,7 +36,7 @@ function _test_contract_call() {
 function main() {
   'use strict';
 
-  if (!PVM.is_init()) {
+  if (PVM.is_init()) {
     return _test_init();
   }
 

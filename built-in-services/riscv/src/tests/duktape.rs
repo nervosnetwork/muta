@@ -67,7 +67,7 @@ macro_rules! deploy_test_code {
         };
 
         let ret = service.deploy(context.make(), payload).expect("deploy");
-        assert_eq!(ret.init_ret, "not init");
+        assert_eq!(ret.init_ret, "init");
 
         (service, context, ret.address)
     }};
@@ -82,7 +82,7 @@ fn should_support_pvm_init() {
 
     let ret = service.exec(context.make(), payload).expect("init");
 
-    assert_eq!("init", ret);
+    assert_eq!("not init", ret);
 }
 
 #[test]
