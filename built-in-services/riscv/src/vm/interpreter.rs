@@ -3,6 +3,7 @@ use std::io;
 use std::rc::Rc;
 
 use bytes::Bytes;
+use ckb_vm::machine::asm::{AsmCoreMachine, AsmMachine};
 use ckb_vm::{DefaultMachineBuilder, SupportMachine};
 
 // use protocol::traits::ServiceSDK;
@@ -17,13 +18,23 @@ use crate::vm::ChainInterface;
 const DUKTAPE_EE: &[u8] = std::include_bytes!("c/duktape_ee");
 
 #[derive(Clone, Debug)]
+pub enum MachineType {
+    NativeRust,
+    Asm,
+}
+
+#[derive(Clone, Debug)]
 pub struct InterpreterConf {
-    pub print_debug: bool,
+    pub print_debug:  bool,
+    pub machine_type: MachineType,
 }
 
 impl Default for InterpreterConf {
     fn default() -> Self {
-        InterpreterConf { print_debug: true }
+        InterpreterConf {
+            print_debug:  true,
+            machine_type: MachineType::Asm,
+        }
     }
 }
 
@@ -81,28 +92,55 @@ impl Interpreter {
         }
 
         let ret_data = Rc::new(RefCell::new(Vec::new()));
-        let core_machine =
-            ckb_vm::DefaultCoreMachine::<u64, ckb_vm::SparseMemory<u64>>::new_with_max_cycles(
-                self.context.get_cycles_limit(),
-            );
-        let mut machine = ckb_vm::DefaultMachineBuilder::<
-            ckb_vm::DefaultCoreMachine<u64, ckb_vm::SparseMemory<u64>>,
-        >::new(core_machine)
-        .instruction_cycle_func(Box::new(vm::cost_model::instruction_cycles))
-        .syscall(Box::new(vm::SyscallDebug::new("[ckb-vm debug]", output)))
-        .syscall(Box::new(vm::SyscallEnvironment::new(
-            self.context.clone(),
-            self.iparams.clone(),
-        )))
-        .syscall(Box::new(vm::SyscallIO::new(
-            self.iparams.args.to_vec(),
-            ret_data.clone(),
-        )))
-        .syscall(Box::new(vm::SyscallChainInterface::new(self.chain.clone())))
-        .build();
-        machine.load_program(&code, &args[..]).unwrap();
-        let exitcode = machine.run()?;
-        let cycles = machine.cycles();
+        let cycles_lmit = self.context.get_cycles_limit();
+        let (exitcode, cycles) = match self.cfg.machine_type {
+            MachineType::NativeRust => {
+                let core_machine =
+                    ckb_vm::DefaultCoreMachine::<u64, ckb_vm::SparseMemory<u64>>::new_with_max_cycles(
+                        cycles_lmit
+                    );
+                let mut machine = ckb_vm::DefaultMachineBuilder::<
+                    ckb_vm::DefaultCoreMachine<u64, ckb_vm::SparseMemory<u64>>,
+                >::new(core_machine)
+                .instruction_cycle_func(Box::new(vm::cost_model::instruction_cycles))
+                .syscall(Box::new(vm::SyscallDebug::new("[ckb-vm debug]", output)))
+                .syscall(Box::new(vm::SyscallEnvironment::new(
+                    self.context.clone(),
+                    self.iparams.clone(),
+                )))
+                .syscall(Box::new(vm::SyscallIO::new(
+                    self.iparams.args.to_vec(),
+                    ret_data.clone(),
+                )))
+                .syscall(Box::new(vm::SyscallChainInterface::new(self.chain.clone())))
+                .build();
+                machine.load_program(&code, &args[..]).unwrap();
+                let exitcode = machine.run()?;
+                let cycles = machine.cycles();
+                (exitcode, cycles)
+            }
+            MachineType::Asm => {
+                let core_machine = AsmCoreMachine::new_with_max_cycles(cycles_lmit);
+                let machine = DefaultMachineBuilder::<Box<AsmCoreMachine>>::new(core_machine)
+                    .instruction_cycle_func(Box::new(vm::cost_model::instruction_cycles))
+                    .syscall(Box::new(vm::SyscallDebug::new("[ckb-vm debug]", output)))
+                    .syscall(Box::new(vm::SyscallEnvironment::new(
+                        self.context.clone(),
+                        self.iparams.clone(),
+                    )))
+                    .syscall(Box::new(vm::SyscallIO::new(
+                        self.iparams.args.to_vec(),
+                        ret_data.clone(),
+                    )))
+                    .syscall(Box::new(vm::SyscallChainInterface::new(self.chain.clone())))
+                    .build();
+                let mut machine = AsmMachine::new(machine, None);
+                machine.load_program(&code, &args[..]).unwrap();
+                let exitcode = machine.run()?;
+                let cycles = machine.machine.cycles();
+                (exitcode, cycles)
+            }
+        };
         let ret = ret_data.borrow();
         let result = InterpreterResult {
             ret_code:    exitcode,
