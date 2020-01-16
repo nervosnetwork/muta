@@ -62,7 +62,7 @@ fn test_js_erc20() {
         Hash::from_hex("412a6c54cf3d3dbb16b49c34e6cd93d08a245298032eb975ee51105b4c296828").unwrap();
     let nonce =
         Hash::from_hex("0000000000000000000000000000000000000000000000000000000000000000").unwrap();
-    let context = mock_context(cycles_limit, caller, tx_hash, nonce);
+    let context = mock_context(cycles_limit, caller.clone(), tx_hash, nonce);
 
     let mut service = new_riscv_service();
 
@@ -89,17 +89,28 @@ fn test_js_erc20() {
         .expect("deploy")
         .address;
 
-    // total supply
-    let address_hex = &address.as_hex();
-    let args = serde_json::json!({
-        "method": "total_supply",
-    })
-    .to_string();
-    let exec_ret = service.call(context.clone(), ExecPayload {
-        address: address.clone(),
-        args,
-    });
-    dbg!(&exec_ret);
+    // // total supply
+    // let address_hex = &address.as_hex();
+    // let args = serde_json::json!({
+    //     "method": "total_supply",
+    // })
+    // .to_string();
+    // let exec_ret = service.call(context.clone(), ExecPayload {
+    //     address: address.clone(),
+    //     args,
+    // });
+    // dbg!(&exec_ret);
+
+    // let args = serde_json::json!({
+    //     "method": "balance_of",
+    //     "account": caller.clone(),
+    // })
+    // .to_string();
+    // let exec_ret = service.call(context.clone(), ExecPayload {
+    //     address: address.clone(),
+    //     args,
+    // });
+    // dbg!(&exec_ret);
 
     let address_hex = &address.as_hex();
     let to_address = "0000000000000000000000000000000000000000";
