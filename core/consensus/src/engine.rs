@@ -104,25 +104,34 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         epoch: FixedPill,
     ) -> Result<(), Box<dyn Error + Send>> {
         let order_hashes = epoch.get_ordered_hashes();
+        let order_hashes_len = order_hashes.len();
+        log::info!("check_epoch order_hashes {:?}", order_hashes_len);
         let exemption = { self.exemption_hash.read().contains(&hash) };
 
         // If the epoch is proposed by self, it does not need to check. Get full signed
         // transactions directly.
         if !exemption {
+            log::info!("check_epoch_roots order_hashes {:?}", order_hashes_len);
             self.check_epoch_roots(&epoch.inner.epoch.header)?;
 
+            log::info!("sync_txs order_hashes {:?}", order_hashes_len);
             self.adapter
                 .sync_txs(ctx.clone(), epoch.get_propose_hashes())
                 .await?;
+            log::info!("check_txs order_hashes {:?}", order_hashes_len);
             self.adapter
                 .check_txs(ctx.clone(), order_hashes.clone())
                 .await?;
         }
 
+        log::info!("get_full_txs order_hashes {:?}", order_hashes_len);
         let inner = self.adapter.get_full_txs(ctx.clone(), order_hashes).await?;
+
+        log::info!("save_wal_transactions order_hashes {:?}", order_hashes_len);
         self.adapter
             .save_wal_transactions(ctx, Hash::digest(hash.clone()), inner)
             .await?;
+        log::info!("check_epoch done order_hashes {:?}", order_hashes_len);
         Ok(())
     }
 
