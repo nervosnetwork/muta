@@ -48,11 +48,17 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
     ) -> Result<(FixedPill, Bytes), Box<dyn Error + Send>> {
         let current_consensus_status = self.status_agent.to_inner();
 
+        log::info!("get_epoch start {:?}", epoch_id);
         let (ordered_tx_hashes, propose_hashes) = self
             .adapter
             .get_txs_from_mempool(ctx, epoch_id, current_consensus_status.cycles_limit)
             .await?
             .clap();
+        log::info!(
+            "get_epoch get_txs_from_mempool {:?} {:?}",
+            ordered_tx_hashes.len(),
+            propose_hashes.len()
+        );
 
         if current_consensus_status.epoch_id != epoch_id {
             return Err(ProtocolError::from(ConsensusError::MissingEpochHeader(epoch_id)).into());
@@ -93,6 +99,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         let mut set = self.exemption_hash.write();
         set.insert(hash.clone());
 
+        log::info!("get_epoch end {:?}", epoch_id);
         Ok((fixed_pill, hash))
     }
 
@@ -104,22 +111,24 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         epoch: FixedPill,
     ) -> Result<(), Box<dyn Error + Send>> {
         let order_hashes = epoch.get_ordered_hashes();
+        let order_hashes_len = order_hashes.len();
+        log::info!("check_epoch order_hashes {:?}", order_hashes_len);
         let exemption = { self.exemption_hash.read().contains(&hash) };
         let sync_tx_hashes = epoch.get_propose_hashes();
 
         // If the epoch is proposed by self, it does not need to check. Get full signed
         // transactions directly.
         if !exemption {
+            log::info!("check_epoch_roots order_hashes {:?}", order_hashes_len);
             self.check_epoch_roots(&epoch.inner.epoch.header)?;
 
-            // self.adapter
-            //     .sync_txs(ctx.clone(), epoch.get_propose_hashes())
-            //     .await?;
+
             self.adapter
                 .check_txs(ctx.clone(), order_hashes.clone())
                 .await?;
         }
 
+        log::info!("get_full_txs order_hashes {:?}", order_hashes_len);
         let inner = self.adapter.get_full_txs(ctx.clone(), order_hashes).await?;
 
         log::info!("save_wal_transactions order_hashes {:?}", order_hashes_len);
@@ -130,9 +139,11 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
                 error!("Consensus sync epoch error {}", e);
             }
         });
+
         self.adapter
             .save_wal_transactions(Context::new(), Hash::digest(hash.clone()), inner)
             .await?;
+        log::info!("check_epoch done order_hashes {:?}", order_hashes_len);
         Ok(())
     }
 
@@ -152,6 +163,8 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
                 ProtocolError::from(ConsensusError::Other("lock in sync".to_string())).into(),
             );
         }
+
+        log::info!("commit start {:?}", epoch_id);
 
         let current_consensus_status = self.status_agent.to_inner();
         if current_consensus_status.exec_epoch_id == epoch_id {
@@ -182,6 +195,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
 
         // Get full transactions from mempool. If is error, try get from wal.
         let ordered_tx_hashes = pill.epoch.ordered_tx_hashes.clone();
+        log::info!("commit get_full_txs {:?}", ordered_tx_hashes.len());
         let full_txs = match self
             .adapter
             .get_full_txs(ctx.clone(), ordered_tx_hashes.clone())
@@ -195,6 +209,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             }
         };
 
+        log::info!("commit flush_mempool {:?}", ordered_tx_hashes.len());
         self.adapter
             .flush_mempool(ctx.clone(), &ordered_tx_hashes)
             .await?;
@@ -227,6 +242,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             authority_list: covert_to_overlord_authority(&current_consensus_status.validators),
         };
 
+        log::info!("commit end {:?}", epoch_id);
         Ok(status)
     }
 
@@ -470,17 +486,21 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
         proof: Proof,
         txs: Vec<SignedTransaction>,
     ) -> ProtocolResult<()> {
+        let len = txs.len();
+        log::info!("update_status save_signed_txs {:?}", len);
         // Save signed transactions
         self.adapter.save_signed_txs(Context::new(), txs).await?;
-
+        log::info!("update_status save_signed_txs end {:?}", len);
         // Save the epoch.
         self.adapter
             .save_epoch(Context::new(), epoch.clone())
             .await?;
 
+        log::info!("update_status update_after_commit {:?}", len);
         let prev_hash = Hash::digest(epoch.encode_fixed()?);
         self.status_agent
             .update_after_commit(epoch_id + 1, epoch, prev_hash, proof)?;
+        log::info!("update_status update_after_commit end {:?}", len);
         self.save_wal().await
     }
 
