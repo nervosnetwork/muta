@@ -66,4 +66,3 @@ function main() {
     PVM.debug(JSON.stringify(args));
     return _main(args) || '';
 }
-main();
