@@ -26,7 +26,6 @@ function total_supply() {
 }
 
 function _set_balance(account, amount) {
-    const key = 'balance:' + account;
     PVM.set_storage('balance:' + account, amount.toString());
 }
 
@@ -45,19 +44,20 @@ function _transfer(sender, recipient, amount) {
 }
 
 function transfer(recipient, amount) {
-    print({recipient, amount}, 'transfer');
-    _transfer(PVM.caller(), recipient, amount);
+    const caller = PVM.caller();
+    print({caller, recipient, amount}, 'transfer');
+    _transfer(caller, recipient, amount);
 }
 
 function balance_of(account) {
+    account = account || PVM.caller();
     const key = 'balance:' + account;
     const ret = PVM.get_storage(key);
-    print({key, ret}, 'balance_of');
     return ret || '0';
 }
 
 function _approve(owner, spender, amount) {
-    PVM.set_storage('allowances:' + owner + spender, amount.toString());
+    PVM.set_storage('allowances:' + owner + ':' + spender, amount.toString());
 }
 
 function approve(spender, amount) {
@@ -65,7 +65,7 @@ function approve(spender, amount) {
 }
 
 function allowances(owner, spender) {
-    return PVM.get_storage('allowances:' + owner + spender) || '0';
+    return PVM.get_storage('allowances:' + owner + ':' + spender) || '0';
 }
 
 function transfer_from(sender, recipient, amount) {
@@ -101,9 +101,9 @@ function _main(args) {
 
 function main() {
     // const key = 'balance:755cdba6ae4f479f7164792b318b2a06c759833b';
-    const key = 'k';
-    PVM.set_storage(key, '1000');
-    print({ret: PVM.get_storage(key)});
+    // const key = 'k';
+    // PVM.set_storage(key, '1000');
+    // print({ret: PVM.get_storage(key)});
     const args = JSON.parse(PVM.load_args());
     PVM.debug(JSON.stringify(args));
     // PVM.debug(PVM.is_init());

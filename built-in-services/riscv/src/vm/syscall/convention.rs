@@ -6,6 +6,7 @@ pub const SYSCODE_CYCLE_LIMIT: u64 = 3000;
 pub const SYSCODE_IS_INIT: u64 = 3001;
 pub const SYSCODE_ORIGIN: u64 = 3002;
 pub const SYSCODE_CALLER: u64 = 3003;
+pub const SYSCODE_ADDRESS: u64 = 3004;
 
 pub const SYSCODE_GET_STORAGE: u64 = 4000;
 pub const SYSCODE_SET_STORAGE: u64 = 4001;

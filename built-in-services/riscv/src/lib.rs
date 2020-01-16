@@ -60,12 +60,12 @@ impl<SDK: ServiceSDK + 'static> RiscvService<SDK> {
             interpreter_params,
             Rc::new(RefCell::new(ChainInterfaceImpl::new(
                 ctx.clone(),
-                payload,
+                payload.clone(),
                 self.sdk.clone(),
             ))),
         );
         let r = interpreter.run().map_err(|e| ServiceError::CkbVm(e))?;
-        dbg!(&r);
+        dbg!(&payload, &r);
         let ret = String::from_utf8_lossy(r.ret.as_ref()).to_string();
         if r.ret_code != 0 {
             return Err(ServiceError::NonZeroExitCode {
@@ -94,7 +94,7 @@ impl<SDK: ServiceSDK + 'static> RiscvService<SDK> {
         ctx: ServiceContext,
         payload: DeployPayload,
     ) -> ProtocolResult<DeployResp> {
-        // dbg!(&payload);
+        dbg!(&payload);
         let code = Bytes::from(hex::decode(&payload.code).map_err(|e| ServiceError::HexDecode(e))?);
         let code_hash = Hash::digest(code.clone());
         let code_len = code.len() as u64;

@@ -54,6 +54,11 @@ impl<Mac: ckb_vm::SupportMachine> ckb_vm::Syscalls<Mac> for SyscallChainInterfac
                 let v_size = machine.registers()[ckb_vm::registers::A3].to_u64();
                 let k = get_arr(machine, k_addr, k_size)?;
                 let v = get_arr(machine, v_addr, v_size)?;
+                // dbg!(
+                //     "set",
+                //     String::from_utf8_lossy(&k).to_string(),
+                //     String::from_utf8_lossy(&v).to_string(),
+                // );
                 self.chain
                     .borrow_mut()
                     .set_storage(Bytes::from(k), Bytes::from(v))
@@ -70,9 +75,14 @@ impl<Mac: ckb_vm::SupportMachine> ckb_vm::Syscalls<Mac> for SyscallChainInterfac
                 let val = self
                     .chain
                     .borrow()
-                    .get_storage(&Bytes::from(k))
+                    .get_storage(&Bytes::from(k.clone()))
                     .map_err(|e| ckb_vm::Error::InvalidEcall(code))?
                     .clone();
+                // dbg!(
+                //     "get",
+                //     String::from_utf8_lossy(&k).to_string(),
+                //     &String::from_utf8_lossy(&val).to_string()
+                // );
                 machine.memory_mut().store_bytes(v_addr, &val)?;
                 machine
                     .memory_mut()

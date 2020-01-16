@@ -62,12 +62,12 @@ fn test_js_erc20() {
         Hash::from_hex("412a6c54cf3d3dbb16b49c34e6cd93d08a245298032eb975ee51105b4c296828").unwrap();
     let nonce =
         Hash::from_hex("0000000000000000000000000000000000000000000000000000000000000000").unwrap();
-    let context = mock_context(cycles_limit, caller.clone(), tx_hash, nonce);
+    let context = mock_context(cycles_limit, caller.clone(), tx_hash.clone(), nonce.clone());
 
     let mut service = new_riscv_service();
 
     // deploy
-    let mut file = std::fs::File::open("src/tests/erc20.js").unwrap();
+    let mut file = std::fs::File::open("examples/dex/erc20.js").unwrap();
     let mut buffer = Vec::new();
     file.read_to_end(&mut buffer).unwrap();
     let buffer = bytes::Bytes::from(buffer);
@@ -89,28 +89,28 @@ fn test_js_erc20() {
         .expect("deploy")
         .address;
 
-    // // total supply
-    // let address_hex = &address.as_hex();
-    // let args = serde_json::json!({
-    //     "method": "total_supply",
-    // })
-    // .to_string();
-    // let exec_ret = service.call(context.clone(), ExecPayload {
-    //     address: address.clone(),
-    //     args,
-    // });
-    // dbg!(&exec_ret);
+    // total supply
+    let address_hex = &address.as_hex();
+    let args = serde_json::json!({
+        "method": "total_supply",
+    })
+    .to_string();
+    let exec_ret = service.exec(context.clone(), ExecPayload {
+        address: address.clone(),
+        args,
+    });
+    assert_eq!(exec_ret.unwrap(), "1000000000".to_owned());
 
-    // let args = serde_json::json!({
-    //     "method": "balance_of",
-    //     "account": caller.clone(),
-    // })
-    // .to_string();
-    // let exec_ret = service.call(context.clone(), ExecPayload {
-    //     address: address.clone(),
-    //     args,
-    // });
-    // dbg!(&exec_ret);
+    let args = serde_json::json!({
+        "method": "balance_of",
+        "account": caller.clone(),
+    })
+    .to_string();
+    let exec_ret = service.exec(context.clone(), ExecPayload {
+        address: address.clone(),
+        args,
+    });
+    assert_eq!(exec_ret.unwrap(), "1000000000".to_owned());
 
     let address_hex = &address.as_hex();
     let to_address = "0000000000000000000000000000000000000000";
@@ -120,20 +120,120 @@ fn test_js_erc20() {
         "amount": 100,
     })
     .to_string();
-    let exec_ret = service.call(context.clone(), ExecPayload {
+    let exec_ret = service.exec(context.clone(), ExecPayload {
         address: address.clone(),
         args,
     });
-    dbg!(&exec_ret);
+    assert_eq!(exec_ret.unwrap(), "".to_owned());
+
+    let args = serde_json::json!({
+        "method": "balance_of",
+        "account": caller.clone(),
+    })
+    .to_string();
+    let exec_ret = service.exec(context.clone(), ExecPayload {
+        address: address.clone(),
+        args,
+    });
+    assert_eq!(exec_ret.unwrap(), "999999900".to_owned());
 
     let args = serde_json::json!({
         "method": "balance_of",
         "account": to_address,
     })
     .to_string();
-    let exec_ret = service.call(context.clone(), ExecPayload {
+    let exec_ret = service.exec(context.clone(), ExecPayload {
         address: address.clone(),
         args,
     });
-    dbg!(&exec_ret);
+    assert_eq!(exec_ret.unwrap(), "100".to_owned());
+
+    let args = serde_json::json!({
+        "method": "approve",
+        "spender": to_address,
+        "amount": 1000,
+    })
+    .to_string();
+    let exec_ret = service.exec(context.clone(), ExecPayload {
+        address: address.clone(),
+        args,
+    });
+    assert_eq!(exec_ret.unwrap(), "".to_owned());
+
+    let args = serde_json::json!({
+        "method": "allowances",
+        "owner": caller.clone(),
+        "spender": to_address,
+    })
+    .to_string();
+    let exec_ret = service.exec(context.clone(), ExecPayload {
+        address: address.clone(),
+        args,
+    });
+    assert_eq!(exec_ret.unwrap(), "1000".to_owned());
+
+    let to_addr2 = "0000000000000000000000000000000000000001";
+    let args = serde_json::json!({
+        "method": "transfer_from",
+        "sender": caller.clone(),
+        "amount": 200,
+        "recipient": to_addr2,
+    })
+    .to_string();
+    let context2 = mock_context(
+        cycles_limit,
+        Address::from_hex(to_address).unwrap(),
+        tx_hash,
+        nonce,
+    );
+    let exec_ret = service.exec(context2, ExecPayload {
+        address: address.clone(),
+        args,
+    });
+    assert_eq!(exec_ret.unwrap(), "".to_owned());
+
+    let args = serde_json::json!({
+        "method": "allowances",
+        "owner": caller.clone(),
+        "spender": to_address,
+    })
+    .to_string();
+    let exec_ret = service.exec(context.clone(), ExecPayload {
+        address: address.clone(),
+        args,
+    });
+    assert_eq!(exec_ret.unwrap(), "800".to_owned());
+
+    let args = serde_json::json!({
+        "method": "balance_of",
+        "account": caller.clone(),
+    })
+    .to_string();
+    let exec_ret = service.exec(context.clone(), ExecPayload {
+        address: address.clone(),
+        args,
+    });
+    assert_eq!(exec_ret.unwrap(), "999999700".to_owned());
+
+    let args = serde_json::json!({
+        "method": "balance_of",
+        "account": to_address.clone(),
+    })
+    .to_string();
+    let exec_ret = service.exec(context.clone(), ExecPayload {
+        address: address.clone(),
+        args,
+    });
+    assert_eq!(exec_ret.unwrap(), "100".to_owned());
+
+    let args = serde_json::json!({
+        "method": "balance_of",
+        "account": to_addr2,
+    })
+    .to_string();
+    let exec_ret = service.exec(context.clone(), ExecPayload {
+        address: address.clone(),
+        args,
+    });
+    assert_eq!(exec_ret.unwrap(), "200".to_owned());
 }

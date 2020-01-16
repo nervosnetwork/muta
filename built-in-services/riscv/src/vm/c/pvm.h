@@ -32,6 +32,7 @@ __internal_syscall(long n, long _a0, long _a1, long _a2, long _a3, long _a4, lon
 #define SYSCODE_IS_INIT 3001
 #define SYSCODE_ORIGIN 3002
 #define SYSCODE_CALLER 3003
+#define SYSCODE_ADDRESS 3004
 
 #define SYSCODE_GET_STORAGE 4000
 #define SYSCODE_SET_STORAGE 4001
@@ -96,6 +97,11 @@ int pvm_origin(uint8_t *addr)
 int pvm_caller(uint8_t *addr)
 {
     return syscall(SYSCODE_CALLER, addr, 0, 0, 0, 0, 0);
+}
+
+int pvm_address(uint8_t *addr)
+{
+    return syscall(SYSCODE_ADDRESS, addr, 0, 0, 0, 0, 0);
 }
 
 int pvm_is_init(uint64_t *is_init)
