@@ -29,16 +29,16 @@ use crate::tx_cache::TxCache;
 /// Memory pool for caching transactions.
 pub struct HashMemPool<Adapter: MemPoolAdapter> {
     /// Pool size limit.
-    pool_size:      usize,
+    pool_size: usize,
     /// A system param limits the life time of an off-chain transaction.
-    timeout_gap:    u64,
+    timeout_gap: u64,
     /// A structure for caching new transactions and responsible transactions of
     /// propose-sync.
-    tx_cache:       TxCache,
+    tx_cache: TxCache,
     /// A structure for caching fresh transactions in order transaction hashes.
     callback_cache: Map<SignedTransaction>,
     /// Supply necessary functions from outer modules.
-    adapter:        Adapter,
+    adapter: Adapter,
 }
 
 impl<Adapter> HashMemPool<Adapter>
@@ -147,6 +147,10 @@ where
         let unknown_hashes = self.tx_cache.show_unknown(order_tx_hashes);
         if !unknown_hashes.is_empty() {
             let unknown_len = unknown_hashes.len();
+            log::info!(
+                "[mempool] ensure_order_txs unknown_hashes {:?}",
+                unknown_hashes.len()
+            );
             let txs = self.adapter.pull_txs(ctx.clone(), unknown_hashes).await?;
             // Make sure response signed_txs is the same size of request hashes.
             if txs.len() != unknown_len {
