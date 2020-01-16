@@ -31,7 +31,7 @@ impl<Mac: ckb_vm::SupportMachine, T: Write> ckb_vm::Syscalls<Mac> for SyscallDeb
         let addr = machine.registers()[ckb_vm::registers::A0].to_u64();
         let s = get_str(machine, addr)?;
         self.output
-            .write_fmt(format_args!("{} {}\n", self.prefix, s))?;
+            .write_fmt(format_args!("{} [{}]\n", self.prefix, s))?;
         machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(0));
         Ok(true)
     }

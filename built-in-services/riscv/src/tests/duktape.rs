@@ -66,6 +66,7 @@ fn test_js_erc20() {
 
     let mut service = new_riscv_service();
 
+    // deploy
     let mut file = std::fs::File::open("src/tests/erc20.js").unwrap();
     let mut buffer = Vec::new();
     file.read_to_end(&mut buffer).unwrap();
@@ -83,16 +84,45 @@ fn test_js_erc20() {
         intp_type: InterpreterType::Duktape,
         init_args,
     };
-
     let address = service
         .deploy(context.clone(), dep_payoad)
         .expect("deploy")
         .address;
 
-    let exec_ret = service.exec(context.clone(), ExecPayload {
-        address,
-        args: "".into(),
+    // total supply
+    let address_hex = &address.as_hex();
+    let args = serde_json::json!({
+        "method": "total_supply",
+    })
+    .to_string();
+    let exec_ret = service.call(context.clone(), ExecPayload {
+        address: address.clone(),
+        args,
     });
+    dbg!(&exec_ret);
 
+    let address_hex = &address.as_hex();
+    let to_address = "0000000000000000000000000000000000000000";
+    let args = serde_json::json!({
+        "method": "transfer",
+        "recipient": to_address,
+        "amount": 100,
+    })
+    .to_string();
+    let exec_ret = service.call(context.clone(), ExecPayload {
+        address: address.clone(),
+        args,
+    });
+    dbg!(&exec_ret);
+
+    let args = serde_json::json!({
+        "method": "balance_of",
+        "account": to_address,
+    })
+    .to_string();
+    let exec_ret = service.call(context.clone(), ExecPayload {
+        address: address.clone(),
+        args,
+    });
     dbg!(&exec_ret);
 }

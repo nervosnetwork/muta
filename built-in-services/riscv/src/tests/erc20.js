@@ -12,7 +12,7 @@ function init(name, symbol, supply) {
     PVM.set_storage('symbol', symbol);
     PVM.set_storage('supply', supply.toString());
     // set caller balance to supply
-    const caller = PVM.get_caller();
+    const caller = PVM.caller();
     _set_balance(caller, supply);
 }
 
@@ -39,7 +39,7 @@ function _transfer(sender, recipient, amount) {
 }
 
 function transfer(recipient, amount) {
-    _transfer(PVM.get_caller(), recipient, amount);
+    _transfer(PVM.caller(), recipient, amount);
 }
 
 function balance_of(account) {
@@ -51,7 +51,7 @@ function _approve(owner, spender, amount) {
 }
 
 function approve(spender, amount) {
-    _approve(PVM.get_caller(), spender, amount);
+    _approve(PVM.caller(), spender, amount);
 }
 
 function allowances(owner, spender) {
@@ -59,7 +59,7 @@ function allowances(owner, spender) {
 }
 
 function transfer_from(sender, recipient, amount) {
-    const caller = PVM.get_caller();
+    const caller = PVM.caller();
     const before_allowance = parseInt(allowances(sender, caller));
     const after_allowance = before_allowance - amount;
     if (after_allowance < 0) {
@@ -92,7 +92,8 @@ function _main(args) {
 function main() {
     const args = JSON.parse(PVM.load_args());
     PVM.debug(JSON.stringify(args));
-    return _main(args);
+    PVM.debug(PVM.is_init());
+    return _main(args) || '';
 }
 main();
 // PVM.ret(main() || '');
@@ -122,7 +123,7 @@ main();
 //     _clear_ret: function() {
 //         this.ret = "";
 //     },
-//     get_caller: function() {
+//     caller: function() {
 //         return this.caller;
 //     },
 //     _set_caller: function(caller) {

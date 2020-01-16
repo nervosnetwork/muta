@@ -11,6 +11,7 @@ use bytes::Bytes;
 use derive_more::{Display, From};
 
 use binding_macro::{cycles, read, service, write};
+use protocol::traits::ExecutorParams;
 use protocol::traits::{ServiceSDK, StoreMap};
 use protocol::types::{Address, Hash, ServiceContext};
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
@@ -186,10 +187,15 @@ where
             args: String::from_utf8_lossy(args.as_ref()).to_string(),
         };
         let payload_str = serde_json::to_string(&payload).map_err(|e| ServiceError::Serde(e))?;
-        let call_ret = self
-            .sdk
-            .borrow_mut()
-            .write(&self.ctx, "riscv", "exec", &payload_str)?;
+        // put caller into extra
+        let extra = self.payload.address.as_hex();
+        let call_ret = self.sdk.borrow_mut().write(
+            &self.ctx,
+            Some(Bytes::from(extra)),
+            "riscv",
+            "exec",
+            &payload_str,
+        )?;
         self.all_cycles_used = self.ctx.get_cycles_used();
         Ok((call_ret, self.all_cycles_used))
     }

@@ -7,7 +7,9 @@ use ckb_vm::memory::Memory;
 use protocol::types::{Address, Hash, ServiceContext};
 
 use crate::vm::syscall::common::get_arr;
-use crate::vm::syscall::convention::{SYSCODE_CYCLE_LIMIT, SYSCODE_IS_INIT};
+use crate::vm::syscall::convention::{
+    SYSCODE_CALLER, SYSCODE_CYCLE_LIMIT, SYSCODE_IS_INIT, SYSCODE_ORIGIN,
+};
 use crate::InterpreterParams;
 
 pub struct SyscallEnvironment {
@@ -42,6 +44,24 @@ impl<Mac: ckb_vm::SupportMachine> ckb_vm::Syscalls<Mac> for SyscallEnvironment {
                 machine
                     .memory_mut()
                     .store_bytes(addr, &is_init.to_le_bytes())?;
+                machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(0));
+                Ok(true)
+            }
+            SYSCODE_ORIGIN => {
+                let addr = machine.registers()[ckb_vm::registers::A0].to_u64();
+                machine
+                    .memory_mut()
+                    .store_bytes(addr, self.context.get_caller().as_hex().as_ref())?;
+                machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(0));
+                Ok(true)
+            }
+            SYSCODE_CALLER => {
+                let addr = machine.registers()[ckb_vm::registers::A0].to_u64();
+                let caller = self
+                    .context
+                    .get_extra()
+                    .unwrap_or(bytes::Bytes::from(self.context.get_caller().as_hex()));
+                machine.memory_mut().store_bytes(addr, &caller)?;
                 machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(0));
                 Ok(true)
             }

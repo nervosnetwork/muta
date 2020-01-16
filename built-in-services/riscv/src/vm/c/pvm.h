@@ -30,6 +30,8 @@ __internal_syscall(long n, long _a0, long _a1, long _a2, long _a3, long _a4, lon
 
 #define SYSCODE_CYCLE_LIMIT 3000
 #define SYSCODE_IS_INIT 3001
+#define SYSCODE_ORIGIN 3002
+#define SYSCODE_CALLER 3003
 
 #define SYSCODE_GET_STORAGE 4000
 #define SYSCODE_SET_STORAGE 4001
@@ -74,6 +76,26 @@ int pvm_ret(uint8_t *data, size_t size)
 int pvm_cycle_limit(uint64_t *cycle_limit)
 {
     return syscall(SYSCODE_CYCLE_LIMIT, cycle_limit, 0, 0, 0, 0, 0);
+}
+
+// Function pvm_origin loads current origin.
+// Params:
+//   addr: a pointer to a buffer in VM memory space denoting where the address located at.
+// Return:
+//   code: 0(success)
+int pvm_origin(uint8_t *addr)
+{
+    return syscall(SYSCODE_ORIGIN, addr, 0, 0, 0, 0, 0);
+}
+
+// Function pvm_caller loads current caller.
+// Params:
+//   addr: a pointer to a buffer in VM memory space denoting where the address located at.
+// Return:
+//   code: 0(success)
+int pvm_caller(uint8_t *addr)
+{
+    return syscall(SYSCODE_CALLER, addr, 0, 0, 0, 0, 0);
 }
 
 int pvm_is_init(uint64_t *is_init)
