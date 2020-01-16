@@ -136,9 +136,10 @@ where
         };
 
         let mut tx = self.exec_queue.clone();
-        tx.try_send(exec_info.clone())
+        self.save_queue_wal(exec_info.clone()).await?;
+        tx.try_send(exec_info)
             .map_err(|e| ConsensusError::ExecuteErr(e.to_string()))?;
-        self.save_queue_wal(exec_info).await
+        Ok(())
     }
 
     async fn get_last_validators(
