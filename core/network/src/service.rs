@@ -209,7 +209,7 @@ impl NetworkService {
             router.register_reactor(endpoint, msg_tx);
 
             let reactor = Reactor::new(msg_rx, handler, Arc::clone(&self.rpc_map));
-            runtime::spawn(reactor);
+            tokio::spawn(reactor);
         }
 
         Ok(())
@@ -232,7 +232,7 @@ impl NetworkService {
             router.register_reactor(endpoint, msg_tx);
 
             let reactor = Reactor::<M>::rpc_resp(msg_rx, Arc::clone(&self.rpc_map));
-            runtime::spawn(reactor);
+            tokio::spawn(reactor);
         }
 
         Ok(())
@@ -305,7 +305,7 @@ impl Future for NetworkService {
                 NetworkConnectionService::Ready(conn_srv) => conn_srv,
             };
 
-            runtime::spawn(conn_srv);
+            tokio::spawn(conn_srv);
         }
 
         if let Some(peer_mgr) = self.peer_mgr.take() {
@@ -313,16 +313,16 @@ impl Future for NetworkService {
                 peer_mgr.set_listen(self.config.default_listen.clone());
             }
 
-            runtime::spawn(peer_mgr);
+            tokio::spawn(peer_mgr);
         }
 
         if let Some(router) = self.router.take() {
-            runtime::spawn(router);
+            tokio::spawn(router);
         }
 
         // Heart beats
         if let Some(heart_beat) = self.heart_beat.take() {
-            runtime::spawn(heart_beat);
+            tokio::spawn(heart_beat);
         }
 
         // TODO: Reboot ceased service? Right now we just assume that it's

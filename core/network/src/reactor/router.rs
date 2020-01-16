@@ -111,7 +111,7 @@ where
             // service ready in common
             let raw_msg = crate::service_ready!("router service", raw_msg_rx.poll_next(ctx));
 
-            runtime::spawn(self.route_raw_message(raw_msg));
+            tokio::spawn(self.route_raw_message(raw_msg));
         }
 
         Poll::Pending

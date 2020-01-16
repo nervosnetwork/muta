@@ -91,7 +91,7 @@ impl<N: Rpc + Send + Sync + 'static> MessageHandler for Checkout<N> {
     }
 }
 
-#[runtime::main(runtime_tokio::Tokio)]
+#[tokio::main]
 pub async fn main() {
     env_logger::init();
 
@@ -119,7 +119,7 @@ pub async fn main() {
             .register_endpoint_handler(SHOP_CASH_CHANNEL, Box::new(check_out))
             .unwrap();
 
-        runtime::spawn(bootstrap);
+        tokio::spawn(bootstrap);
         thread::sleep(Duration::from_secs(10));
 
         let released = Cyber7702Released {

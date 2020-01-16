@@ -109,7 +109,7 @@ where
             let reactor_name = concat!("reactor service", stringify!(M));
             let smsg = crate::service_ready!(reactor_name, smsg_rx.poll_next(ctx));
 
-            runtime::spawn(self.react(smsg));
+            tokio::spawn(self.react(smsg));
         }
 
         Poll::Pending

@@ -1016,7 +1016,7 @@ impl Future for PeerManager {
 
         // Spawn heart beat
         if let Some(heart_beat) = self.heart_beat.take() {
-            runtime::spawn(heart_beat);
+            tokio::spawn(heart_beat);
         }
 
         // Process manager events

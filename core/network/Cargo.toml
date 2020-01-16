@@ -16,8 +16,9 @@ derive_more = "0.15"
 futures-timer = "2.0"
 futures= { version = "0.3", features = [ "compat" ] }
 generic-channel = { version = "0.2", features = [ "all" ] }
+hex = "0.4"
 log = "0.4"
-parking_lot = "0.9"
+parking_lot = "0.10"
 prost = "0.6"
 bytes = "0.5"
 rand = "0.7"
@@ -29,7 +30,7 @@ tentacle = { version = "0.2", features = [ "flatc" ] }
 tentacle-ping = { version = "0.3", features = [ "flatc" ] }
 tentacle-discovery = { version = "0.2", features = [ "flatc" ] }
 tentacle-identify =  { version = "0.2", features = [ "flatc" ] }
-hex = "0.4"
+tokio = { version = "0.2", features = ["macros", "rt-core"]}
 
 [dev-dependencies]
 env_logger = "0.6"

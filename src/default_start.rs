@@ -336,7 +336,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     network_service.register_rpc_response::<FixedSignedTxs>(RPC_RESP_SYNC_PULL_TXS)?;
 
     // Run network
-    runtime::spawn(network_service);
+    tokio::spawn(network_service);
 
     // Init graphql
     let api_adapter = DefaultAPIAdapter::<ServiceExecutorFactory, _, _, _, _>::new(
@@ -351,17 +351,17 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     graphql_config.graphiql_uri = config.graphql.graphiql_uri.clone();
 
     // Run GraphQL server
-    runtime::spawn(core_api::start_graphql(graphql_config, api_adapter));
+    tokio::spawn(core_api::start_graphql(graphql_config, api_adapter));
 
     // Run sync
-    runtime::spawn(async move {
+    tokio::spawn(async move {
         if let Err(e) = synchronization.polling_broadcast().await {
             log::error!("synchronization: {:?}", e);
         }
     });
 
     // Run consensus
-    runtime::spawn(async move {
+    tokio::spawn(async move {
         if let Err(e) = overlord_consensus
             .run(
                 consensus_interval,
