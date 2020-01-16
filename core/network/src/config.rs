@@ -39,6 +39,8 @@ pub const DEFAULT_DISCOVERY_SYNC_INTERVAL: u64 = 60 * 60; // 1 hour
 pub const DEFAULT_PEER_MANAGER_HEART_BEAT_INTERVAL: u64 = 30;
 pub const DEFAULT_SELF_HEART_BEAT_INTERVAL: u64 = 35;
 
+pub const DEFAULT_RPC_TIMEOUT: u64 = 10;
+
 pub type PublicKeyHexStr = String;
 pub type PrivateKeyHexStr = String;
 
@@ -65,6 +67,9 @@ pub struct NetworkConfig {
     // routine
     pub peer_manager_heart_beat_interval: Duration,
     pub heart_beat_interval:              Duration,
+
+    // rpc
+    pub rpc_timeout: Duration,
 }
 
 impl NetworkConfig {
@@ -92,6 +97,8 @@ impl NetworkConfig {
 
             peer_manager_heart_beat_interval: peer_manager_hb_interval,
             heart_beat_interval:              Duration::from_secs(DEFAULT_SELF_HEART_BEAT_INTERVAL),
+
+            rpc_timeout: Duration::from_secs(DEFAULT_RPC_TIMEOUT),
         }
     }
 
@@ -179,6 +186,14 @@ impl NetworkConfig {
 
         self
     }
+
+    pub fn rpc_timeout(mut self, timeout: Option<u64>) -> Self {
+        if let Some(timeout) = timeout {
+            self.rpc_timeout = Duration::from_secs(timeout);
+        }
+
+        self
+    }
 }
 
 impl Default for NetworkConfig {
@@ -205,6 +220,19 @@ impl From<&NetworkConfig> for PeerManagerConfig {
             max_connections:  config.max_connections,
             routine_interval: config.peer_manager_heart_beat_interval,
             persistence_path: config.persistence_path.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct TimeoutConfig {
+    pub rpc: Duration,
+}
+
+impl From<&NetworkConfig> for TimeoutConfig {
+    fn from(config: &NetworkConfig) -> TimeoutConfig {
+        TimeoutConfig {
+            rpc: config.rpc_timeout,
         }
     }
 }

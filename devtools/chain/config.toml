@@ -14,6 +14,7 @@ graphiql_uri = "/graphiql"
 
 [network]
 listening_address = "0.0.0.0:1337"
+rpc_timeout = 10
 
 [[network.bootstraps]]
 pubkey = "031288a6788678c25952eba8693b2f278f66e2187004b64ac09416d07f83f96d5b"

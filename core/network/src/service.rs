@@ -164,7 +164,7 @@ impl NetworkService {
         let rpc_map = Arc::new(RpcMap::new());
         let gossip = NetworkGossip::new(conn_ctrl.clone(), Snappy);
         let rpc_map_clone = Arc::clone(&rpc_map);
-        let rpc = NetworkRpc::new(conn_ctrl, Snappy, rpc_map_clone);
+        let rpc = NetworkRpc::new(conn_ctrl, Snappy, rpc_map_clone, (&config).into());
         let router = MessageRouter::new(raw_msg_rx, Snappy, sys_tx);
 
         NetworkService {
