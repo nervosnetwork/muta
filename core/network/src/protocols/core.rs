@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use futures::channel::mpsc::UnboundedSender;
 use tentacle::{
-    service::{DialProtocol, ProtocolMeta},
+    service::{TargetProtocol, ProtocolMeta},
     ProtocolId,
 };
 use tentacle_discovery::AddressManager;
@@ -43,8 +43,8 @@ impl CoreProtocol {
 }
 
 impl NetworkProtocol for CoreProtocol {
-    fn target() -> DialProtocol {
-        DialProtocol::Multi(vec![
+    fn target() -> TargetProtocol {
+        TargetProtocol::Multi(vec![
             ProtocolId::new(PING_PROTOCOL_ID),
             ProtocolId::new(IDENTIFY_PROTOCOL_ID),
             ProtocolId::new(DISCOVERY_PROTOCOL_ID),
