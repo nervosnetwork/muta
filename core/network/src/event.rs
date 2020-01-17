@@ -52,7 +52,7 @@ pub enum RetryKind {
     Other(&'static str),
 }
 
-#[derive(Debug, Display, From)]
+#[derive(Debug, Display)]
 pub enum RemoveKind {
     #[display(fmt = "unable to connect peer address {}: {}", addr, err)]
     UnableToConnect {

@@ -1,11 +1,11 @@
 use std::{error::Error, num::ParseIntError};
 
-use derive_more::{Display, From};
+use derive_more::Display;
 use tentacle::{ProtocolId, SessionId};
 
 use protocol::{types::Address, ProtocolError, ProtocolErrorKind};
 
-#[derive(Debug, Display, From)]
+#[derive(Debug, Display)]
 pub enum ErrorKind {
     #[display(fmt = "{} offline", _0)]
     Offline(&'static str),
@@ -55,7 +55,7 @@ pub enum ErrorKind {
 
 impl Error for ErrorKind {}
 
-#[derive(Debug, Display, From)]
+#[derive(Debug, Display)]
 pub enum NetworkError {
     #[display(fmt = "io error: {}", _0)]
     IoError(std::io::Error),
@@ -108,5 +108,11 @@ impl From<Box<bincode::ErrorKind>> for NetworkError {
 impl From<NetworkError> for ProtocolError {
     fn from(err: NetworkError) -> ProtocolError {
         ProtocolError::new(ProtocolErrorKind::Network, Box::new(err))
+    }
+}
+
+impl From<std::io::Error> for NetworkError {
+    fn from(err: std::io::Error) -> NetworkError {
+        NetworkError::IoError(err)
     }
 }
