@@ -20,22 +20,25 @@ use crate::types::{DeployPayload, ExecPayload, InterpreterType};
 use crate::RiscvService;
 
 type TestRiscvService = RiscvService<
-        DefalutServiceSDK<
+    DefalutServiceSDK<
         GeneralServiceState<MemoryDB>,
         DefaultChainQuerier<MockStorage>,
         MockDispatcher,
-        >>;
+    >,
+>;
 
 thread_local! {
     static RISCV_SERVICE: RefCell<TestRiscvService> = RefCell::new(new_riscv_service());
 }
 
-fn with_dispatcher_service<R: for<'a> serde::Deserialize<'a>>(f: impl FnOnce(&mut TestRiscvService) -> ProtocolResult<R>) -> ProtocolResult<R> {
-        RISCV_SERVICE.with(|cell| {
-            let mut service = cell.borrow_mut();
+fn with_dispatcher_service<R: for<'a> serde::Deserialize<'a>>(
+    f: impl FnOnce(&mut TestRiscvService) -> ProtocolResult<R>,
+) -> ProtocolResult<R> {
+    RISCV_SERVICE.with(|cell| {
+        let mut service = cell.borrow_mut();
 
-            f(&mut service)
-        })
+        f(&mut service)
+    })
 }
 
 #[test]
@@ -102,13 +105,14 @@ impl Dispatcher for MockDispatcher {
     }
 
     fn write(&self, context: ServiceContext) -> ProtocolResult<ExecResp> {
-        let payload: ExecPayload = serde_json::from_str(context.get_payload()).expect("dispatcher payload");
+        let payload: ExecPayload =
+            serde_json::from_str(context.get_payload()).expect("dispatcher payload");
 
         RISCV_SERVICE.with(|cell| {
             let mut service = cell.borrow_mut();
 
             Ok(ExecResp {
-                ret: service.exec(context.clone(), payload)?,
+                ret:      service.exec(context.clone(), payload)?,
                 is_error: false,
             })
         })
