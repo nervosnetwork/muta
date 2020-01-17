@@ -40,7 +40,11 @@ struct EventTranslator {
 impl Future for EventTranslator {
     type Output = ();
 
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        if self.reporter.is_mgr_shutdown() {
+            return Poll::Ready(());
+        }
+
         let event = match Stream::poll_next(Pin::new(&mut self.as_mut().rx), cx) {
             Poll::Pending => return Poll::Pending,
             Poll::Ready(None) => return Poll::Ready(()),
@@ -69,7 +73,7 @@ impl Future for EventTranslator {
             }
         };
 
-        if let Err(err) = self.reporter.inner.unbounded_send(mgr_event) {
+        if let Err(_) = self.reporter.inner.unbounded_send(mgr_event) {
             self.reporter.mgr_shutdown();
             return Poll::Ready(());
         }

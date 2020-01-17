@@ -8,7 +8,7 @@ use tentacle::{
     multiaddr::Multiaddr,
     secio::PeerId,
     service::TargetSession,
-    service::{TargetProtocol, ProtocolMeta},
+    service::{ProtocolMeta, TargetProtocol},
     ProtocolId, SessionId,
 };
 

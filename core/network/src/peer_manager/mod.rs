@@ -40,7 +40,7 @@ use rand::seq::IteratorRandom;
 use tentacle::{
     multiaddr::{Multiaddr, Protocol},
     secio::{PeerId, PublicKey},
-    service::{TargetProtocol, SessionType, TargetSession},
+    service::{SessionType, TargetProtocol, TargetSession},
     SessionId,
 };
 

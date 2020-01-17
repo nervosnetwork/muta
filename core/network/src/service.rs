@@ -245,13 +245,13 @@ impl NetworkService {
         }
     }
 
-    pub fn listen(&mut self, socket_addr: SocketAddr) -> ProtocolResult<()> {
+    pub async fn listen(&mut self, socket_addr: SocketAddr) -> ProtocolResult<()> {
         if let Some(NetworkConnectionService::NoListen(conn_srv)) = &mut self.net_conn_srv {
             debug!("network: listen to {}", socket_addr);
 
             let addr = socket_to_multi_addr(socket_addr);
 
-            conn_srv.listen(addr.clone())?;
+            conn_srv.listen(addr.clone()).await?;
 
             // Update peer manager listen
             if let Some(peer_mgr) = self.peer_mgr.take() {
@@ -294,18 +294,23 @@ impl Future for NetworkService {
 
         // Preflight
         if let Some(conn_srv) = self.net_conn_srv.take() {
-            let conn_srv = match conn_srv {
-                NetworkConnectionService::NoListen(mut conn_srv) => {
-                    conn_srv
-                        .listen(self.config.default_listen.clone())
-                        .expect("fail to listen default address");
+            let default_listen = self.config.default_listen.clone();
 
-                    conn_srv
-                }
-                NetworkConnectionService::Ready(conn_srv) => conn_srv,
-            };
+            tokio::spawn(async move {
+                let conn_srv = match conn_srv {
+                    NetworkConnectionService::NoListen(mut conn_srv) => {
+                        conn_srv
+                            .listen(default_listen)
+                            .await
+                            .expect("fail to listen default address");
 
-            tokio::spawn(conn_srv);
+                        conn_srv
+                    }
+                    NetworkConnectionService::Ready(conn_srv) => conn_srv,
+                };
+
+                conn_srv.await
+            });
         }
 
         if let Some(peer_mgr) = self.peer_mgr.take() {

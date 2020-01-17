@@ -146,7 +146,9 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         .bootstraps(bootstrap_pairs)?
         .secio_keypair(network_privkey)?;
     let mut network_service = NetworkService::new(network_config);
-    network_service.listen(config.network.listening_address)?;
+    network_service
+        .listen(config.network.listening_address)
+        .await?;
 
     // Init mempool
     let current_epoch = storage.get_latest_epoch().await?;
