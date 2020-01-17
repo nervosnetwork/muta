@@ -6,6 +6,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use bytes::Bytes;
 use cita_trie::MemoryDB;
 
 use framework::binding::sdk::{DefalutServiceSDK, DefaultChainQuerier};
@@ -208,6 +209,45 @@ impl Storage for MockStorage {
     }
 
     async fn get_latest_proof(&self) -> ProtocolResult<Proof> {
+        unimplemented!()
+    }
+
+    async fn update_overlord_wal(&self, info: Bytes) -> ProtocolResult<()> {
+        unimplemented!()
+    }
+
+    async fn update_muta_wal(&self, info: Bytes) -> ProtocolResult<()> {
+        unimplemented!()
+    }
+
+    async fn load_overlord_wal(&self) -> ProtocolResult<Bytes> {
+        unimplemented!()
+    }
+
+    async fn load_muta_wal(&self) -> ProtocolResult<Bytes> {
+        unimplemented!()
+    }
+
+    async fn update_exec_queue_wal(&self, info: Bytes) -> ProtocolResult<()> {
+        unimplemented!()
+    }
+
+    async fn load_exec_queue_wal(&self) -> ProtocolResult<Bytes> {
+        unimplemented!()
+    }
+
+    async fn insert_wal_transactions(
+        &self,
+        epoch_hash: Hash,
+        signed_txs: Vec<SignedTransaction>,
+    ) -> ProtocolResult<()> {
+        unimplemented!()
+    }
+
+    async fn get_wal_transactions(
+        &self,
+        epoch_hash: Hash,
+    ) -> ProtocolResult<Vec<SignedTransaction>> {
         unimplemented!()
     }
 }
