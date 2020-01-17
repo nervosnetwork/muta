@@ -127,7 +127,11 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         });
         let wal_txs = WalSaveTxs { inner };
         self.adapter
-            .save_wal(ctx, Hash::digest(hash.clone()), wal_txs.encode_fixed()?)
+            .save_wal(
+                Context::new(),
+                Hash::digest(hash.clone()),
+                wal_txs.encode_fixed()?,
+            )
             .await?;
         Ok(())
     }
