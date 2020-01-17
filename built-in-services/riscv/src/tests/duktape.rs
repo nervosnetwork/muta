@@ -11,6 +11,7 @@ use super::{mock_context, new_riscv_service, with_dispatcher_service};
 use crate::types::{DeployPayload, ExecPayload, InterpreterType};
 
 const CYCLE_LIMIT: u64 = 1024 * 1024 * 1024;
+const CALLER: &str = "0x0000000000000000000000000000000000000001";
 
 struct TestContext {
     count: usize,
@@ -26,7 +27,6 @@ impl TestContext {
     fn make(&mut self) -> ServiceContext {
         self.count += 1;
 
-        let caller = "0x0000000000000000000000000000000000000001";
         let tx_hash = Hash::digest(Bytes::from(format!("{}", self.count)));
 
         let params = ServiceContextParams {
@@ -35,7 +35,7 @@ impl TestContext {
             cycles_limit:    CYCLE_LIMIT,
             cycles_price:    1,
             cycles_used:     Rc::new(RefCell::new(0)),
-            caller:          Address::from_hex(caller).expect("ctx caller"),
+            caller:          Address::from_hex(CALLER).expect("ctx caller"),
             epoch_id:        1,
             timestamp:       0,
             extra:           None,
@@ -122,6 +122,69 @@ fn should_support_pvm_cycle_limit() {
         .expect("load cycle limit");
 
     assert_eq!(ret.parse::<u64>().expect("cycle limit"), CYCLE_LIMIT);
+}
+
+#[test]
+fn should_support_pvm_caller() {
+    let (mut service, mut context, address) = deploy_test_code!();
+
+    let args = json!({"method": "test_caller"}).to_string();
+    let payload = ExecPayload::new(address, args.clone().into());
+
+    let ret = service.exec(context.make(), payload).expect("load caller");
+
+    assert_eq!(format!("0x{}", ret), CALLER);
+}
+
+#[test]
+fn should_support_pvm_origin() {
+    let (mut service, mut context, address) = deploy_test_code!();
+
+    // Deploy another test code
+    let code = include_bytes!("./test_code.js");
+    let payload = DeployPayload {
+        code:      hex::encode(Bytes::from(code.as_ref())),
+        intp_type: InterpreterType::Duktape,
+        init_args: "".into(),
+    };
+
+    let tc_ctx = context.make();
+    let tc_ret = with_dispatcher_service(move |dispatcher_service| {
+        dispatcher_service.deploy(tc_ctx, payload)
+    })
+    .expect("deploy another test code");
+
+    let args =
+        json!({"method": "test_origin", "address": tc_ret.address.as_hex(), "call_args": json!({"method": "_ret_caller_and_origin"}).to_string()})
+            .to_string();
+
+    let payload = ExecPayload::new(address.clone(), args.into());
+
+    let ret = service
+        .exec(context.make(), payload)
+        .expect("call contract _ret_caller_and_origin");
+
+    #[derive(Debug, Deserialize)]
+    struct ExpectRet {
+        caller: String,
+        origin: String,
+    }
+
+    let ret: ExpectRet = serde_json::from_str(&ret).expect("decode test origin ret");
+    assert_eq!(ret.caller, address.as_hex());
+    assert_eq!(format!("0x{}", ret.origin), CALLER);
+}
+
+#[test]
+fn should_support_pvm_address() {
+    let (mut service, mut context, address) = deploy_test_code!();
+
+    let args = json!({"method": "test_address"}).to_string();
+    let payload = ExecPayload::new(address.clone(), args.clone().into());
+
+    let ret = service.exec(context.make(), payload).expect("load address");
+
+    assert_eq!(ret, address.as_hex());
 }
 
 #[test]
