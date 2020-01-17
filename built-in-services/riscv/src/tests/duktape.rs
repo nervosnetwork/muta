@@ -1,9 +1,4 @@
-use std::{
-    cell::RefCell,
-    io::Read,
-    rc::Rc,
-    sync::atomic::{AtomicUsize, Ordering},
-};
+use std::{cell::RefCell, io::Read, rc::Rc};
 
 use protocol::{
     types::{Address, Hash, ServiceContext, ServiceContextParams},
@@ -12,7 +7,7 @@ use protocol::{
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-use super::{mock_context, new_riscv_service};
+use super::{mock_context, new_riscv_service, with_dispatcher_service};
 use crate::types::{DeployPayload, ExecPayload, InterpreterType};
 
 const CYCLE_LIMIT: u64 = 1024 * 1024 * 1024;
@@ -156,9 +151,12 @@ fn should_support_pvm_contract_call() {
         intp_type: InterpreterType::Binary,
         init_args: "set k carmen".into(),
     };
-    let ss_ret = service
-        .deploy(context.make(), payload)
-        .expect("deploy simple storage");
+
+    let dp_ctx = context.make();
+    let ss_ret = with_dispatcher_service(move |dispatcher_service| {
+        dispatcher_service.deploy(dp_ctx, payload)
+    })
+    .expect("deploy simple storage");
 
     let args =
         json!({"method": "test_contract_call", "address": ss_ret.address.as_hex(), "call_args": "get k"})

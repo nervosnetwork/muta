@@ -10,8 +10,7 @@ use cita_trie::MemoryDB;
 
 use framework::binding::sdk::{DefalutServiceSDK, DefaultChainQuerier};
 use framework::binding::state::{GeneralServiceState, MPTTrie};
-use protocol::traits::{Dispatcher, ExecResp};
-use protocol::traits::{NoopDispatcher, Storage};
+use protocol::traits::{Dispatcher, ExecResp, Storage};
 use protocol::types::{
     Address, Epoch, Hash, Proof, Receipt, ServiceContext, ServiceContextParams, SignedTransaction,
 };
@@ -19,6 +18,25 @@ use protocol::ProtocolResult;
 
 use crate::types::{DeployPayload, ExecPayload, InterpreterType};
 use crate::RiscvService;
+
+type TestRiscvService = RiscvService<
+        DefalutServiceSDK<
+        GeneralServiceState<MemoryDB>,
+        DefaultChainQuerier<MockStorage>,
+        MockDispatcher,
+        >>;
+
+thread_local! {
+    static RISCV_SERVICE: RefCell<TestRiscvService> = RefCell::new(new_riscv_service());
+}
+
+fn with_dispatcher_service<R: for<'a> serde::Deserialize<'a>>(f: impl FnOnce(&mut TestRiscvService) -> ProtocolResult<R>) -> ProtocolResult<R> {
+        RISCV_SERVICE.with(|cell| {
+            let mut service = cell.borrow_mut();
+
+            f(&mut service)
+        })
+}
 
 #[test]
 fn test_deploy_and_run() {
@@ -84,10 +102,15 @@ impl Dispatcher for MockDispatcher {
     }
 
     fn write(&self, context: ServiceContext) -> ProtocolResult<ExecResp> {
-        dbg!(context);
-        Ok(ExecResp {
-            ret:      "".to_owned(),
-            is_error: false,
+        let payload: ExecPayload = serde_json::from_str(context.get_payload()).expect("dispatcher payload");
+
+        RISCV_SERVICE.with(|cell| {
+            let mut service = cell.borrow_mut();
+
+            Ok(ExecResp {
+                ret: service.exec(context.clone(), payload)?,
+                is_error: false,
+            })
         })
     }
 }
