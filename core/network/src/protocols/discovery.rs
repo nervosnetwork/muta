@@ -14,7 +14,7 @@ pub struct Discovery<M> {
     inner: tentacle_discovery::DiscoveryProtocol<M>,
 }
 
-impl<M: AddressManager + Send + 'static> Discovery<M> {
+impl<M: AddressManager + Send + 'static + Unpin> Discovery<M> {
     pub fn new(addr_mgr: M, sync_interval: Duration) -> Self {
         let inner_discovery = tentacle_discovery::Discovery::new(addr_mgr, Some(sync_interval));
 

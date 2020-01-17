@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use futures::channel::mpsc::UnboundedSender;
 use tentacle::{
-    service::{TargetProtocol, ProtocolMeta},
+    service::{ProtocolMeta, TargetProtocol},
     ProtocolId,
 };
 use tentacle_discovery::AddressManager;
@@ -35,8 +35,8 @@ pub struct CoreProtocol {
 impl CoreProtocol {
     pub fn build<M, C>() -> CoreProtocolBuilder<M, C>
     where
-        M: AddressManager + Send + 'static,
-        C: Callback + Send + 'static,
+        M: AddressManager + Send + 'static + Unpin,
+        C: Callback + Send + 'static + Unpin,
     {
         CoreProtocolBuilder::new()
     }
@@ -63,8 +63,8 @@ impl NetworkProtocol for CoreProtocol {
 
 impl<M, C> CoreProtocolBuilder<M, C>
 where
-    M: AddressManager + Send + 'static,
-    C: Callback + Send + 'static,
+    M: AddressManager + Send + 'static + Unpin,
+    C: Callback + Send + 'static + Unpin,
 {
     pub fn new() -> Self {
         CoreProtocolBuilder {
