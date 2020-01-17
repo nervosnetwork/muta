@@ -54,15 +54,16 @@ macro_rules! deploy_test_code {
         let mut context = TestContext::default();
         let mut service = new_riscv_service();
 
+        // No init
         let code = include_str!("./test_code.js");
         let payload = DeployPayload {
             code:      hex::encode(Bytes::from(code)),
             intp_type: InterpreterType::Duktape,
-            init_args: "{}".into(),
+            init_args: "".into(),
         };
 
         let ret = service.deploy(context.make(), payload).expect("deploy");
-        assert_eq!(ret.init_ret, "init");
+        assert_eq!(ret.init_ret, "");
 
         (service, context, ret.address)
     }};
@@ -70,14 +71,17 @@ macro_rules! deploy_test_code {
 
 #[test]
 fn should_support_pvm_init() {
-    let (mut service, mut context, address) = deploy_test_code!();
+    let (mut service, mut context, ..) = deploy_test_code!();
 
-    let args = json!({"method": "test_init"}).to_string();
-    let payload = ExecPayload::new(address, args.into());
+    let code = include_str!("./test_code.js");
+    let payload = DeployPayload {
+        code:      hex::encode(Bytes::from(code)),
+        intp_type: InterpreterType::Duktape,
+        init_args: "do init".into(),
+    };
 
-    let ret = service.exec(context.make(), payload).expect("init");
-
-    assert_eq!("not init", ret);
+    let ret = service.deploy(context.make(), payload).expect("deploy");
+    assert_eq!(ret.init_ret, "do init");
 }
 
 #[test]
