@@ -5,7 +5,7 @@ use futures::future::try_join_all;
 use protocol::{
     traits::{Context, MemPool, MessageHandler, Priority, Rpc},
     types::{Hash, SignedTransaction},
-    ProtocolResult, ProtocolError
+    ProtocolError, ProtocolResult,
 };
 use serde_derive::{Deserialize, Serialize};
 
