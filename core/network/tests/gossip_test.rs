@@ -72,7 +72,7 @@ async fn broadcast() {
     let (test_tx, mut test_rx) = unbounded();
 
     // Init bootstrap node
-    let mut bootstrap = common::setup_bootstrap();
+    let mut bootstrap = common::setup_bootstrap().await;
     let (done_tx, mut bootstrap_done) = unbounded();
 
     bootstrap
@@ -82,7 +82,7 @@ async fn broadcast() {
     tokio::spawn(bootstrap);
 
     // Init peer alpha
-    let mut alpha = common::setup_peer(common::BOOTSTRAP_PORT + 1);
+    let mut alpha = common::setup_peer(common::BOOTSTRAP_PORT + 1).await;
     let (done_tx, mut alpha_done) = unbounded();
 
     alpha
@@ -92,7 +92,7 @@ async fn broadcast() {
     tokio::spawn(alpha);
 
     // Init peer brova
-    let mut brova = common::setup_peer(common::BOOTSTRAP_PORT + 2);
+    let mut brova = common::setup_peer(common::BOOTSTRAP_PORT + 2).await;
     let (done_tx, mut brova_done) = unbounded();
 
     brova
@@ -102,7 +102,7 @@ async fn broadcast() {
     tokio::spawn(brova);
 
     // Init peer charlie
-    let charlie = common::setup_peer(common::BOOTSTRAP_PORT + 3);
+    let charlie = common::setup_peer(common::BOOTSTRAP_PORT + 3).await;
     let broadcaster = charlie.handle();
 
     tokio::spawn(charlie);

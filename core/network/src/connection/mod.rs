@@ -214,7 +214,7 @@ impl<P: NetworkProtocol + Unpin> Future for ConnectionService<P> {
             let inner = &mut serv_mut.inner;
             pin_mut!(inner);
 
-            let _ = crate::service_ready!("connection service", inner.poll_next(ctx));
+            crate::service_ready!("connection service", inner.poll_next(ctx));
         }
 
         Poll::Pending

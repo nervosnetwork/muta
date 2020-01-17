@@ -110,7 +110,7 @@ pub async fn main() {
 
         let mut bootstrap = NetworkService::new(bt_conf);
         let handle = bootstrap.handle();
-        bootstrap.listen(bt_addr).unwrap();
+        bootstrap.listen(bt_addr).await.unwrap();
 
         let check_out = Checkout {
             dealer: handle.clone(),
@@ -145,7 +145,7 @@ pub async fn main() {
 
         let mut peer = NetworkService::new(peer_conf);
         let handle = peer.handle();
-        peer.listen(peer_addr).unwrap();
+        peer.listen(peer_addr).await.unwrap();
 
         let take_my_money = TakeMyMoney {
             shop: handle.clone(),

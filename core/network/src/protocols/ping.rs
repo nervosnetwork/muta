@@ -73,7 +73,7 @@ impl Future for EventTranslator {
             }
         };
 
-        if let Err(_) = self.reporter.inner.unbounded_send(mgr_event) {
+        if self.reporter.inner.unbounded_send(mgr_event).is_err() {
             self.reporter.mgr_shutdown();
             return Poll::Ready(());
         }
