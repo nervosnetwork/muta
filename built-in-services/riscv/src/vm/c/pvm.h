@@ -37,6 +37,7 @@ __internal_syscall(long n, long _a0, long _a1, long _a2, long _a3, long _a4, lon
 #define SYSCODE_GET_STORAGE 4000
 #define SYSCODE_SET_STORAGE 4001
 #define SYSCODE_CONTRACT_CALL 4002
+#define SYSCODE_SERVICE_CALL 4003
 
 // Function pvm_debug accepts a string that contains the text to be written to stdout(It depends on the VM).
 // Params:
@@ -122,6 +123,11 @@ int pvm_set_storage(uint8_t *k, uint64_t k_size, uint8_t *v, uint64_t v_size)
 int pvm_contract_call(uint8_t *addr, uint8_t *args, uint64_t args_size, uint8_t *ret, uint64_t *ret_size)
 {
     return syscall(SYSCODE_CONTRACT_CALL, addr, args, args_size, ret, ret_size, 0);
+}
+
+int pvm_service_call(const char* service, const char* method, uint8_t *payload, uint64_t payload_size, uint8_t *ret, uint64_t *ret_size)
+{
+    return syscall(SYSCODE_SERVICE_CALL, service, method, payload, payload_size, ret, ret_size);
 }
 
 #endif

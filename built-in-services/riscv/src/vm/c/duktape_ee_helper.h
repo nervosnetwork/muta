@@ -164,6 +164,33 @@ static duk_ret_t duk_pvm_is_init(duk_context *ctx) {
   return 1;
 }
 
+static duk_ret_t duk_pvm_service_call(duk_context *ctx) {
+  if (!duk_is_string(ctx, 0) || !duk_is_string(ctx, 1) || !duk_is_string(ctx, 2)) {
+    duk_push_error_object(ctx, DUK_ERR_EVAL_ERROR,
+                          "Invalid service_call arguments, should be string");
+    return duk_throw(ctx);
+  }
+
+  const char *service = duk_safe_to_string(ctx, 0);
+  const char *method = duk_safe_to_string(ctx, 1);
+  const char *payload = duk_safe_to_string(ctx, 2);
+  duk_pop_n(ctx, 3);
+
+  duk_push_fixed_buffer(ctx, MAX_LOAD_SIZE);
+  void *ret = duk_get_buffer(ctx, 0, NULL);
+
+  int ret_code = 0;
+  if (ret_code != pvm_service_call(service, method, (uint8_t*)payload,
+                                    strlen(payload), ret, NULL)) {
+    return ret_code;
+  }
+
+  duk_buffer_to_string(ctx, -1);
+  duk_push_string(ctx, duk_safe_to_string(ctx, -1));
+
+  return 1;
+}
+
 static duk_ret_t duk_pvm_contract_call(duk_context *ctx) {
   if (!duk_is_string(ctx, -1) || !duk_is_string(ctx, -2)) {
     duk_push_error_object(ctx, DUK_ERR_EVAL_ERROR,
@@ -222,6 +249,9 @@ void pvm_init(duk_context *ctx) {
 
   duk_push_c_function(ctx, duk_pvm_contract_call, 2);
   duk_put_prop_string(ctx, -2, "contract_call");
+
+  duk_push_c_function(ctx, duk_pvm_service_call, 3);
+  duk_put_prop_string(ctx, -2, "service_call");
 
   duk_push_c_function(ctx, duk_pvm_is_init, 0);
   duk_put_prop_string(ctx, -2, "is_init");

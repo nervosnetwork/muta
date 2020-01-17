@@ -51,6 +51,11 @@ function _test_contract_call() {
   return PVM.contract_call(args.address, args.call_args);
 }
 
+function _test_service_call() {
+  const args = PVM.load_json_args();
+  return PVM.service_call(args.call_service, args.call_method, args.call_payload);
+}
+
 function main() {
   'use strict';
 
@@ -76,6 +81,8 @@ function main() {
     return _test_storage();
   } else if (args.method == 'test_contract_call') {
     return _test_contract_call();
+  } else if (args.method == 'test_service_call') {
+    return _test_service_call();
   } else if (args.method == '_ret_caller_and_origin') {
     return _ret_caller_and_origin();
   } else if (args.method == '_ret_self') {

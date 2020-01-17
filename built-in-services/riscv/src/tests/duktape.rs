@@ -239,6 +239,46 @@ fn should_support_pvm_contract_call() {
 }
 
 #[test]
+fn should_support_pvm_service_call() {
+    let (mut service, mut context, address) = deploy_test_code!();
+
+    // Deploy another test code
+    let code = include_bytes!("./test_code.js");
+    let payload = DeployPayload {
+        code:      hex::encode(Bytes::from(code.as_ref())),
+        intp_type: InterpreterType::Duktape,
+        init_args: "".into(),
+    };
+
+    let tc_ctx = context.make();
+    let tc_ret = with_dispatcher_service(move |dispatcher_service| {
+        dispatcher_service.deploy(tc_ctx, payload)
+    })
+    .expect("deploy another test code");
+
+    let args = json!({
+        "method": "test_service_call",
+        "call_service": "riscv",
+        "call_method": "exec",
+        "call_payload": json!({
+            "address": tc_ret.address.as_hex(),
+            "args": json!({
+                "method": "_ret_self",
+            }).to_string(),
+        }).to_string(),
+    })
+    .to_string();
+
+    let payload = ExecPayload::new(address.clone(), args.into());
+
+    let ret = service
+        .exec(context.make(), payload)
+        .expect("exec service call");
+
+    assert_eq!(ret, "self");
+}
+
+#[test]
 fn test_js_erc20() {
     let cycles_limit = 1024 * 1024 * 1024; // 1073741824
     let caller = Address::from_hex("0x755cdba6ae4f479f7164792b318b2a06c759833b").unwrap();

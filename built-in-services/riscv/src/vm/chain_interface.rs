@@ -7,6 +7,14 @@ pub trait ChainInterface {
 
     fn set_storage(&mut self, key: Bytes, val: Bytes) -> ProtocolResult<()>;
 
+    fn service_call(
+        &mut self,
+        service: &str,
+        method: &str,
+        payload: &str,
+        current_cycle: u64,
+    ) -> ProtocolResult<(String, u64)>;
+
     fn contract_call(
         &mut self,
         address: Address,

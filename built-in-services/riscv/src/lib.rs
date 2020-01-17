@@ -180,21 +180,30 @@ where
         args: Bytes,
         current_cycle: u64,
     ) -> ProtocolResult<(String, u64)> {
-        let vm_cycle = current_cycle - self.all_cycles_used;
-        self.ctx.sub_cycles(vm_cycle)?;
         let payload = ExecPayload {
             address,
             args: String::from_utf8_lossy(args.as_ref()).to_string(),
         };
         let payload_str = serde_json::to_string(&payload).map_err(|e| ServiceError::Serde(e))?;
-        // put caller into extra
+        self.service_call("riscv", "exec", &payload_str, current_cycle)
+    }
+
+    fn service_call(
+        &mut self,
+        service: &str,
+        method: &str,
+        payload: &str,
+        current_cycle: u64,
+    ) -> ProtocolResult<(String, u64)> {
+        let vm_cycle = current_cycle - self.all_cycles_used;
+        self.ctx.sub_cycles(vm_cycle)?;
         let extra = self.payload.address.as_hex();
         let call_ret = self.sdk.borrow_mut().write(
             &self.ctx,
             Some(Bytes::from(extra)),
-            "riscv",
-            "exec",
-            &payload_str,
+            service,
+            method,
+            payload,
         )?;
         self.all_cycles_used = self.ctx.get_cycles_used();
         Ok((call_ret, self.all_cycles_used))
