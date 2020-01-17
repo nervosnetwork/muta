@@ -42,6 +42,10 @@ function _test_storage() {
   return JSON.stringify(JSON.parse(PVM.get_storage(args.key)));
 }
 
+function _ret_self() {
+  return 'self';
+}
+
 function _test_contract_call() {
   const args = PVM.load_json_args();
   return PVM.contract_call(args.address, args.call_args);
@@ -74,6 +78,8 @@ function main() {
     return _test_contract_call();
   } else if (args.method == '_ret_caller_and_origin') {
     return _ret_caller_and_origin();
+  } else if (args.method == '_ret_self') {
+    return _ret_self();
   }
 
   return '';

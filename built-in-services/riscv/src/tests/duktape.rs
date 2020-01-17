@@ -211,31 +211,31 @@ fn should_support_pvm_storage() {
 fn should_support_pvm_contract_call() {
     let (mut service, mut context, address) = deploy_test_code!();
 
-    // Deploy another contract
-    let simple_storage = include_bytes!("./simple_storage");
+    // Deploy another test code
+    let code = include_bytes!("./test_code.js");
     let payload = DeployPayload {
-        code:      hex::encode(Bytes::from(simple_storage.as_ref())),
-        intp_type: InterpreterType::Binary,
-        init_args: "set k carmen".into(),
+        code:      hex::encode(Bytes::from(code.as_ref())),
+        intp_type: InterpreterType::Duktape,
+        init_args: "".into(),
     };
 
-    let dp_ctx = context.make();
-    let ss_ret = with_dispatcher_service(move |dispatcher_service| {
-        dispatcher_service.deploy(dp_ctx, payload)
+    let tc_ctx = context.make();
+    let tc_ret = with_dispatcher_service(move |dispatcher_service| {
+        dispatcher_service.deploy(tc_ctx, payload)
     })
-    .expect("deploy simple storage");
+    .expect("deploy another test code");
 
     let args =
-        json!({"method": "test_contract_call", "address": ss_ret.address.as_hex(), "call_args": "get k"})
+        json!({"method": "test_contract_call", "address": tc_ret.address.as_hex(), "call_args": json!({"method": "_ret_self"}).to_string()})
             .to_string();
 
     let payload = ExecPayload::new(address.clone(), args.into());
 
     let ret = service
         .exec(context.make(), payload)
-        .expect("call contract get k");
+        .expect("exec contract call");
 
-    assert_eq!(ret, "carmen");
+    assert_eq!(ret, "self");
 }
 
 #[test]
