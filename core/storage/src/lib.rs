@@ -10,6 +10,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use derive_more::{Display, From};
+use futures::lock::Mutex;
 use lazy_static::lazy_static;
 
 use protocol::fixed_codec::FixedCodec;
@@ -31,11 +32,16 @@ lazy_static! {
 #[derive(Debug)]
 pub struct ImplStorage<Adapter> {
     adapter: Arc<Adapter>,
+
+    latest_epoch: Mutex<Option<Epoch>>,
 }
 
 impl<Adapter: StorageAdapter> ImplStorage<Adapter> {
     pub fn new(adapter: Arc<Adapter>) -> Self {
-        Self { adapter }
+        Self {
+            adapter,
+            latest_epoch: Mutex::new(None),
+        }
     }
 }
 
@@ -122,8 +128,11 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
             .insert::<HashEpochSchema>(epoch_hash, epoch_id)
             .await?;
         self.adapter
-            .insert::<LatestEpochSchema>(LATEST_EPOCH_KEY.clone(), epoch)
+            .insert::<LatestEpochSchema>(LATEST_EPOCH_KEY.clone(), epoch.clone())
             .await?;
+
+        self.latest_epoch.lock().await.replace(epoch);
+
         Ok(())
     }
 
@@ -150,8 +159,13 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
     }
 
     async fn get_latest_epoch(&self) -> ProtocolResult<Epoch> {
-        let epoch = get!(self, LATEST_EPOCH_KEY.clone(), LatestEpochSchema);
-        Ok(epoch)
+        let opt_epoch = { self.latest_epoch.lock().await.clone() };
+
+        if let Some(epoch) = opt_epoch {
+            Ok(epoch)
+        } else {
+            Ok(get!(self, LATEST_EPOCH_KEY.clone(), LatestEpochSchema))
+        }
     }
 
     async fn get_epoch_by_epoch_id(&self, epoch_id: u64) -> ProtocolResult<Epoch> {
