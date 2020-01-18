@@ -152,22 +152,19 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
 
     fn hook(&mut self, hook: HookType, exec_params: &ExecutorParams) -> ProtocolResult<()> {
         for name in self.service_mapping.list_service_name().into_iter() {
-            let state = self
-                .states
-                .get(&name)
-                .ok_or(ExecutorError::NotFoundService {
-                    service: name.to_owned(),
-                })?;
-
             let sdk = self.get_sdk(&name)?;
             let mut service = self.service_mapping.get_service(name.as_str(), sdk)?;
 
-            match hook {
-                HookType::Before => service.hook_before_(exec_params)?,
-                HookType::After => service.hook_after_(exec_params)?,
+            let hook_ret = match hook {
+                HookType::Before => service.hook_before_(exec_params),
+                HookType::After => service.hook_after_(exec_params),
             };
 
-            state.borrow_mut().stash()?;
+            if hook_ret.is_err() {
+                self.revert_cache()?;
+            } else {
+                self.stash()?;
+            }
         }
         Ok(())
     }
