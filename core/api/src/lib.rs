@@ -10,7 +10,6 @@ use std::sync::Arc;
 
 use futures::executor::block_on;
 use http::status::StatusCode;
-use juniper::graphiql::graphiql_source;
 use juniper::{FieldError, FieldResult};
 use tide::{Request, Response, ResultExt, Server};
 
@@ -29,7 +28,8 @@ use crate::schema::{
 // This is accessible as state in Tide, and as executor context in Juniper.
 #[derive(Clone)]
 struct State {
-    adapter: Arc<Box<dyn APIAdapter>>,
+    graphiql_html: String,
+    adapter:       Arc<Box<dyn APIAdapter>>,
 }
 
 // We define `Query` unit struct here. GraphQL queries will refer to this
@@ -199,8 +199,8 @@ async fn handle_graphql(mut req: Request<State>) -> Response {
         .expect("Json parsing errors on return should never occur.")
 }
 
-async fn handle_graphiql(_: Request<State>) -> Response {
-    let html = graphiql_source("/graphql");
+async fn handle_graphiql(req: Request<State>) -> Response {
+    let html = req.state().graphiql_html.to_owned();
 
     Response::new(StatusCode::OK.into())
         .body_string(html)
@@ -208,8 +208,11 @@ async fn handle_graphiql(_: Request<State>) -> Response {
 }
 
 pub async fn start_graphql<Adapter: APIAdapter + 'static>(cfg: GraphQLConfig, adapter: Adapter) {
+    let graphiql_html = include_str!("../source/graphiql.html");
+
     let state = State {
-        adapter: Arc::new(Box::new(adapter)),
+        graphiql_html: graphiql_html.to_owned(),
+        adapter:       Arc::new(Box::new(adapter)),
     };
 
     let mut server = Server::with_state(state);
