@@ -18,6 +18,7 @@ pub struct ConfigGraphQL {
 pub struct ConfigNetwork {
     pub bootstraps:        Option<Vec<ConfigNetworkBootstrap>>,
     pub listening_address: SocketAddr,
+    pub rpc_timeout:       Option<u64>,
 }
 
 #[derive(Debug, Deserialize)]

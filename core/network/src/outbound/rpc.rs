@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use futures::future::{self, Either};
@@ -10,6 +10,7 @@ use protocol::{
 use tentacle::{service::TargetSession, SessionId};
 
 use crate::{
+    config::TimeoutConfig,
     endpoint::Endpoint,
     error::{ErrorKind, NetworkError},
     message::NetworkMessage,
@@ -17,13 +18,13 @@ use crate::{
     traits::{Compression, MessageSender, NetworkContext},
 };
 
-const RPC_TIMEOUT: u64 = 4;
-
 #[derive(Clone)]
 pub struct NetworkRpc<S, C> {
     sender:      S,
     compression: C,
     map:         Arc<RpcMap>,
+
+    timeout: TimeoutConfig,
 }
 
 impl<S, C> NetworkRpc<S, C>
@@ -31,11 +32,13 @@ where
     S: MessageSender + Sync + Clone,
     C: Compression + Sync + Clone,
 {
-    pub fn new(sender: S, compression: C, map: Arc<RpcMap>) -> Self {
+    pub fn new(sender: S, compression: C, map: Arc<RpcMap>, timeout: TimeoutConfig) -> Self {
         NetworkRpc {
             sender,
             compression,
             map,
+
+            timeout,
         }
     }
 
@@ -69,8 +72,7 @@ where
 
         self.send(cx, sid, net_msg, p)?;
 
-        // FIXME: timeout from context
-        let timeout = Delay::new(Duration::from_secs(RPC_TIMEOUT));
+        let timeout = Delay::new(self.timeout.rpc);
         let ret = match future::select(done_rx, timeout).await {
             Either::Left((ret, _timeout)) => {
                 ret.map_err(|_| NetworkError::from(ErrorKind::RpcDropped))?
