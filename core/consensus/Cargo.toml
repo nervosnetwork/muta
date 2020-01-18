@@ -36,3 +36,7 @@ protocol = { path = "../../protocol", package = "muta-protocol" }
 [dev-dependencies]
 num-traits = "0.2"
 rand = "0.7"
+
+[features]
+default = []
+random_leader = ["overlord/random_leader"]
