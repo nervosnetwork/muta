@@ -45,37 +45,39 @@ impl Future for EventTranslator {
             return Poll::Ready(());
         }
 
-        let event = match Stream::poll_next(Pin::new(&mut self.as_mut().rx), cx) {
-            Poll::Pending => return Poll::Pending,
-            Poll::Ready(None) => return Poll::Ready(()),
-            Poll::Ready(Some(event)) => event,
-        };
+        loop {
+            let event = match Stream::poll_next(Pin::new(&mut self.as_mut().rx), cx) {
+                Poll::Pending => break,
+                Poll::Ready(None) => return Poll::Ready(()),
+                Poll::Ready(Some(event)) => event,
+            };
 
-        let mgr_event = match event {
-            PingEvent::Ping(ref pid) | PingEvent::Pong(ref pid, _) => {
-                PeerManagerEvent::PeerAlive { pid: pid.clone() }
-            }
-            PingEvent::Timeout(ref pid) => {
-                let kind = RetryKind::TimedOut;
-
-                PeerManagerEvent::RetryPeerLater {
-                    pid: pid.clone(),
-                    kind,
+            let mgr_event = match event {
+                PingEvent::Ping(ref pid) | PingEvent::Pong(ref pid, _) => {
+                    PeerManagerEvent::PeerAlive { pid: pid.clone() }
                 }
-            }
-            PingEvent::UnexpectedError(ref pid) => {
-                let kind = RetryKind::Other("ping unexpected error, maybe unstable network");
+                PingEvent::Timeout(ref pid) => {
+                    let kind = RetryKind::TimedOut;
 
-                PeerManagerEvent::RetryPeerLater {
-                    pid: pid.clone(),
-                    kind,
+                    PeerManagerEvent::RetryPeerLater {
+                        pid: pid.clone(),
+                        kind,
+                    }
                 }
-            }
-        };
+                PingEvent::UnexpectedError(ref pid) => {
+                    let kind = RetryKind::Other("ping unexpected error, maybe unstable network");
 
-        if self.reporter.inner.unbounded_send(mgr_event).is_err() {
-            self.reporter.mgr_shutdown();
-            return Poll::Ready(());
+                    PeerManagerEvent::RetryPeerLater {
+                        pid: pid.clone(),
+                        kind,
+                    }
+                }
+            };
+
+            if self.reporter.inner.unbounded_send(mgr_event).is_err() {
+                self.reporter.mgr_shutdown();
+                return Poll::Ready(());
+            }
         }
 
         Poll::Pending
