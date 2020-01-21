@@ -5,11 +5,12 @@ use futures::future::try_join_all;
 use protocol::{
     traits::{Context, MemPool, MessageHandler, Priority, Rpc},
     types::{Hash, SignedTransaction},
-    ProtocolResult,
+    ProtocolError, ProtocolResult,
 };
 use serde_derive::{Deserialize, Serialize};
 
 use crate::context::TxContext;
+use crate::MemPoolError;
 
 pub const END_GOSSIP_NEW_TXS: &str = "/gossip/mempool/new_txs";
 pub const RPC_PULL_TXS: &str = "/rpc_call/mempool/pull_txs";
@@ -48,7 +49,7 @@ where
             let mem_pool = Arc::clone(&self.mem_pool);
             let ctx = ctx.clone();
 
-            runtime::spawn(async move { mem_pool.insert(ctx, stx).await })
+            tokio::spawn(async move { mem_pool.insert(ctx, stx).await })
         };
 
         // Concurrently insert them
@@ -60,6 +61,7 @@ where
         )
         .await
         .map(|_| ())
+        .map_err(|_e| ProtocolError::from(MemPoolError::BatchInsertErr))
     }
 }
 

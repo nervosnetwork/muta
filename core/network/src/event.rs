@@ -6,7 +6,7 @@ use protocol::{traits::Priority, types::Address, Bytes};
 use tentacle::{
     multiaddr::Multiaddr,
     secio::{PeerId, PublicKey},
-    service::{DialProtocol, SessionType, TargetSession},
+    service::{SessionType, TargetProtocol, TargetSession},
     ProtocolId, SessionId,
 };
 
@@ -15,7 +15,7 @@ pub enum ConnectionEvent {
     #[display(fmt = "connect addrs {:?}, proto: {:?}", addrs, proto)]
     Connect {
         addrs: Vec<Multiaddr>,
-        proto: DialProtocol,
+        proto: TargetProtocol,
     },
 
     #[display(fmt = "disconnect session {}", _0)]
@@ -52,7 +52,7 @@ pub enum RetryKind {
     Other(&'static str),
 }
 
-#[derive(Debug, Display, From)]
+#[derive(Debug, Display)]
 pub enum RemoveKind {
     #[display(fmt = "unable to connect peer address {}: {}", addr, err)]
     UnableToConnect {

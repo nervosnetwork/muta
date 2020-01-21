@@ -119,7 +119,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         let inner = self.adapter.get_full_txs(ctx.clone(), order_hashes).await?;
         let adapter = Arc::clone(&self.adapter);
 
-        runtime::spawn(async move {
+        tokio::spawn(async move {
             if let Err(e) = sync_txs(ctx, adapter, sync_tx_hashes).await {
                 error!("Consensus sync epoch error {}", e);
             }

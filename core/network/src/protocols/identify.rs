@@ -13,7 +13,7 @@ pub struct Identify<C> {
     inner: IdentifyProtocol<C>,
 }
 
-impl<C: Callback + Send + 'static> Identify<C> {
+impl<C: Callback + Send + 'static + Unpin> Identify<C> {
     pub fn new(callback: C) -> Self {
         let inner = IdentifyProtocol::new(callback);
 

@@ -8,7 +8,7 @@ use tentacle::{
     multiaddr::Multiaddr,
     secio::PeerId,
     service::TargetSession,
-    service::{DialProtocol, ProtocolMeta},
+    service::{ProtocolMeta, TargetProtocol},
     ProtocolId, SessionId,
 };
 
@@ -16,7 +16,7 @@ use crate::error::{ErrorKind, NetworkError};
 
 pub trait NetworkProtocol {
     // TODO: change to TargetProtocol after tentacle 0.3
-    fn target() -> DialProtocol;
+    fn target() -> TargetProtocol;
 
     fn metas(self) -> Vec<ProtocolMeta>;
 

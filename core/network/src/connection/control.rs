@@ -49,7 +49,6 @@ impl<P: NetworkProtocol> Clone for ConnectionServiceControl<P> {
 impl<P: NetworkProtocol> MessageSender for ConnectionServiceControl<P> {
     fn send(&self, tar: TargetSession, msg: Bytes, pri: Priority) -> Result<(), NetworkError> {
         let proto_id = P::message_proto_id();
-        let msg = tentacle::bytes::Bytes::from(msg.as_ref());
 
         let ret = match pri {
             Priority::High => self.inner.quick_filter_broadcast(tar, proto_id, msg),

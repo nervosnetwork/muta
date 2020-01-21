@@ -263,7 +263,7 @@ mod test {
         }
     }
 
-    #[runtime::test]
+    #[tokio::test]
     async fn test_epoch_codec() {
         use super::MessageCodec;
 

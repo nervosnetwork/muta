@@ -30,7 +30,7 @@ impl ServiceMapping for DefaultServiceMapping {
     }
 }
 
-#[runtime::main(runtime_tokio::Tokio)]
+#[tokio::main]
 async fn main() {
     let config_path =
         std::env::var("CONFIG").unwrap_or_else(|_| "devtools/chain/config.toml".to_owned());

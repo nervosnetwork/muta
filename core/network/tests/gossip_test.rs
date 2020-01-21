@@ -64,7 +64,7 @@ impl MessageHandler for NewsReader {
 }
 
 // FIXME: sometimes timeout
-#[runtime::test(runtime_tokio::Tokio)]
+#[tokio::test]
 #[ignore]
 async fn broadcast() {
     env_logger::init();
@@ -72,47 +72,47 @@ async fn broadcast() {
     let (test_tx, mut test_rx) = unbounded();
 
     // Init bootstrap node
-    let mut bootstrap = common::setup_bootstrap();
+    let mut bootstrap = common::setup_bootstrap().await;
     let (done_tx, mut bootstrap_done) = unbounded();
 
     bootstrap
         .register_endpoint_handler(END_TEST_BROADCAST, Box::new(NewsReader::new(done_tx)))
         .expect("bootstrap register news reader");
 
-    runtime::spawn(bootstrap);
+    tokio::spawn(bootstrap);
 
     // Init peer alpha
-    let mut alpha = common::setup_peer(common::BOOTSTRAP_PORT + 1);
+    let mut alpha = common::setup_peer(common::BOOTSTRAP_PORT + 1).await;
     let (done_tx, mut alpha_done) = unbounded();
 
     alpha
         .register_endpoint_handler(END_TEST_BROADCAST, Box::new(NewsReader::new(done_tx)))
         .expect("alpha register news reader");
 
-    runtime::spawn(alpha);
+    tokio::spawn(alpha);
 
     // Init peer brova
-    let mut brova = common::setup_peer(common::BOOTSTRAP_PORT + 2);
+    let mut brova = common::setup_peer(common::BOOTSTRAP_PORT + 2).await;
     let (done_tx, mut brova_done) = unbounded();
 
     brova
         .register_endpoint_handler(END_TEST_BROADCAST, Box::new(NewsReader::new(done_tx)))
         .expect("brova register news reader");
 
-    runtime::spawn(brova);
+    tokio::spawn(brova);
 
     // Init peer charlie
-    let charlie = common::setup_peer(common::BOOTSTRAP_PORT + 3);
+    let charlie = common::setup_peer(common::BOOTSTRAP_PORT + 3).await;
     let broadcaster = charlie.handle();
 
-    runtime::spawn(charlie);
+    tokio::spawn(charlie);
 
     // Sleep a while for bootstrap phrase, so peers can connect to each other
     thread::sleep(Duration::from_secs(3));
 
     // Loop broadcast test message until all peers receive test message
     let test_tx_clone = test_tx.clone();
-    runtime::spawn(async move {
+    tokio::spawn(async move {
         let ctx = Context::new();
         let end = END_TEST_BROADCAST;
         let msg = TEST_MESSAGE.to_owned();
@@ -139,7 +139,7 @@ async fn broadcast() {
         }
     });
 
-    runtime::spawn(async move {
+    tokio::spawn(async move {
         bootstrap_done.next().await.expect("bootstrap done");
         alpha_done.next().await.expect("alpha done");
         brova_done.next().await.expect("brova done");

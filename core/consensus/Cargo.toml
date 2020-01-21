@@ -10,6 +10,7 @@ repository = "https://github.com/nervosnetwork/muta"
 [dependencies]
 async-trait = "0.1"
 bincode = "1.2"
+cita_trie = "2.0"
 creep = "0.2"
 derive_more = "0.99"
 futures = { version = "0.3", features = ["async-await"] }
@@ -17,13 +18,12 @@ futures-timer = "2.0"
 hex = "0.4"
 log = "0.4"
 moodyblues-sdk = "0.2"
-overlord = { git = "https://github.com/nervosnetwork/overlord", rev = "91f3cb4" }
+overlord = "0.2.0-alpha.1"
 parking_lot = "0.10"
 rlp = "0.4"
-runtime = "0.3.0-alpha.7"
 serde = {version = "1.0", features = ["derive"]}
 serde_json = "1.0"
-cita_trie = "2.0"
+tokio = { version = "0.2", features = ["macros", "rt-core"]}
 
 common-crypto = { path = "../../common/crypto"}
 common-logger = { path = "../../common/logger" }
@@ -36,3 +36,7 @@ protocol = { path = "../../protocol", package = "muta-protocol" }
 [dev-dependencies]
 num-traits = "0.2"
 rand = "0.7"
+
+[features]
+default = []
+random_leader = ["overlord/random_leader"]

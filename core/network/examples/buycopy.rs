@@ -91,7 +91,7 @@ impl<N: Rpc + Send + Sync + 'static> MessageHandler for Checkout<N> {
     }
 }
 
-#[runtime::main(runtime_tokio::Tokio)]
+#[tokio::main]
 pub async fn main() {
     env_logger::init();
 
@@ -110,7 +110,7 @@ pub async fn main() {
 
         let mut bootstrap = NetworkService::new(bt_conf);
         let handle = bootstrap.handle();
-        bootstrap.listen(bt_addr).unwrap();
+        bootstrap.listen(bt_addr).await.unwrap();
 
         let check_out = Checkout {
             dealer: handle.clone(),
@@ -119,7 +119,7 @@ pub async fn main() {
             .register_endpoint_handler(SHOP_CASH_CHANNEL, Box::new(check_out))
             .unwrap();
 
-        runtime::spawn(bootstrap);
+        tokio::spawn(bootstrap);
         thread::sleep(Duration::from_secs(10));
 
         let released = Cyber7702Released {
@@ -145,7 +145,7 @@ pub async fn main() {
 
         let mut peer = NetworkService::new(peer_conf);
         let handle = peer.handle();
-        peer.listen(peer_addr).unwrap();
+        peer.listen(peer_addr).await.unwrap();
 
         let take_my_money = TakeMyMoney {
             shop: handle.clone(),

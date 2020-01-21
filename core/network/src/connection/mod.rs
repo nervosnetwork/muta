@@ -12,11 +12,7 @@ use std::{
 };
 
 use futures::{
-    channel::mpsc::UnboundedReceiver,
-    channel::mpsc::UnboundedSender,
-    compat::{Compat01As03, Stream01CompatExt},
-    pin_mut,
-    stream::Stream,
+    channel::mpsc::UnboundedReceiver, channel::mpsc::UnboundedSender, pin_mut, stream::Stream,
 };
 use log::{debug, error};
 use protocol::traits::Priority;
@@ -40,8 +36,7 @@ pub struct ConnectionConfig {
 }
 
 pub struct ConnectionService<P: NetworkProtocol> {
-    // TODO: Remove Compat01As03 after tentacle supports std Future
-    inner: Compat01As03<Service<ConnectionServiceKeeper>>,
+    inner: Service<ConnectionServiceKeeper>,
 
     event_rx:       UnboundedReceiver<ConnectionEvent>,
     // Temporary store events for later processing under high load
@@ -72,7 +67,7 @@ impl<P: NetworkProtocol> ConnectionService<P> {
         }
 
         ConnectionService {
-            inner: builder.build(keeper).compat(),
+            inner: builder.build(keeper),
 
             event_rx,
             pending_events: Default::default(),
@@ -81,8 +76,8 @@ impl<P: NetworkProtocol> ConnectionService<P> {
         }
     }
 
-    pub fn listen(&mut self, address: Multiaddr) -> Result<(), NetworkError> {
-        self.inner.get_mut().listen(address)?;
+    pub async fn listen(&mut self, address: Multiaddr) -> Result<(), NetworkError> {
+        self.inner.listen(address).await?;
 
         Ok(())
     }
@@ -91,7 +86,7 @@ impl<P: NetworkProtocol> ConnectionService<P> {
         &self,
         mgr_tx: UnboundedSender<PeerManagerEvent>,
     ) -> ConnectionServiceControl<P> {
-        let control_ref = self.inner.get_ref().control();
+        let control_ref = self.inner.control();
 
         ConnectionServiceControl::new(control_ref.clone(), mgr_tx)
     }
@@ -137,7 +132,7 @@ impl<P: NetworkProtocol> ConnectionService<P> {
             }};
         }
 
-        let control = self.inner.get_ref().control();
+        let control = self.inner.control();
 
         match event {
             ConnectionEvent::Connect { addrs, .. } => {
@@ -171,7 +166,7 @@ impl<P: NetworkProtocol> ConnectionService<P> {
             ConnectionEvent::SendMsg { tar, msg, pri } => {
                 let proto_id = P::message_proto_id();
                 let tar2 = tar.clone();
-                let msg2 = tentacle::bytes::Bytes::from(msg.as_ref());
+                let msg2 = msg.clone();
 
                 if let Err(()) = match pri {
                     Priority::High => try_do!(control.quick_filter_broadcast(tar2, proto_id, msg2)),
@@ -219,7 +214,7 @@ impl<P: NetworkProtocol + Unpin> Future for ConnectionService<P> {
             let inner = &mut serv_mut.inner;
             pin_mut!(inner);
 
-            let _ = crate::service_ready!("connection service", inner.poll_next(ctx));
+            crate::service_ready!("connection service", inner.poll_next(ctx));
         }
 
         Poll::Pending

@@ -19,11 +19,9 @@ core-consensus = { path = "./core/consensus" }
 binding-macro = { path = "./binding-macro" }
 framework = { path = "./framework" }
 
-derive_more = "0.15"
+derive_more = "0.99"
 futures = "0.3"
 parking_lot = "0.10"
-runtime = "0.3.0-alpha.7"
-runtime-tokio = "0.3.0-alpha.6"
 serde = "1.0"
 serde_derive = "1.0"
 log = "0.4"
@@ -32,6 +30,7 @@ bytes = "0.5"
 hex = "0.4"
 rlp = "0.4"
 toml = "0.5"
+tokio = { version = "0.2", features = ["macros", "rt-core"]}
 
 [dev-dependencies]
 asset = { path = "built-in-services/asset"}

@@ -40,7 +40,7 @@ use rand::seq::IteratorRandom;
 use tentacle::{
     multiaddr::{Multiaddr, Protocol},
     secio::{PeerId, PublicKey},
-    service::{DialProtocol, SessionType, TargetSession},
+    service::{SessionType, TargetProtocol, TargetSession},
     SessionId,
 };
 
@@ -592,7 +592,7 @@ impl PeerManager {
 
         let connect = ConnectionEvent::Connect {
             addrs,
-            proto: DialProtocol::All,
+            proto: TargetProtocol::All,
         };
 
         if self.conn_tx.unbounded_send(connect).is_err() {
@@ -1016,7 +1016,7 @@ impl Future for PeerManager {
 
         // Spawn heart beat
         if let Some(heart_beat) = self.heart_beat.take() {
-            runtime::spawn(heart_beat);
+            tokio::spawn(heart_beat);
         }
 
         // Process manager events

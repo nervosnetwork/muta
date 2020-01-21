@@ -16,7 +16,7 @@ pub use adapter::{DEFAULT_BROADCAST_TXS_INTERVAL, DEFAULT_BROADCAST_TXS_SIZE};
 use std::error::Error;
 
 use async_trait::async_trait;
-use derive_more::{Display, From};
+use derive_more::Display;
 
 use protocol::traits::{Context, MemPool, MemPoolAdapter, MixedTxHashes};
 use protocol::types::{Hash, SignedTransaction};
@@ -182,7 +182,7 @@ where
     }
 }
 
-#[derive(Debug, Display, From)]
+#[derive(Debug, Display)]
 pub enum MemPoolError {
     #[display(fmt = "Tx: {:?} inserts failed", tx_hash)]
     Insert { tx_hash: Hash },
@@ -219,6 +219,9 @@ pub enum MemPoolError {
 
     #[display(fmt = "Tx: {:?} invalid timeout", tx_hash)]
     InvalidTimeout { tx_hash: Hash },
+
+    #[display(fmt = "Batch insert error")]
+    BatchInsertErr,
 }
 
 impl Error for MemPoolError {}

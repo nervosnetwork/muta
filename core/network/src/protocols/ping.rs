@@ -1,10 +1,14 @@
 use std::{
+    pin::Pin,
     sync::atomic::{AtomicBool, Ordering},
+    task::{Context, Poll},
     time::Duration,
 };
 
-use futures::channel::mpsc::UnboundedSender;
-use generic_channel::{Sender, TrySendError};
+use futures::{
+    channel::mpsc::{self, Receiver, UnboundedSender},
+    Future, Stream,
+};
 use log::debug;
 use tentacle::{
     builder::MetaBuilder,
@@ -22,13 +26,66 @@ pub const NAME: &str = "chain_ping";
 pub const SUPPORT_VERSIONS: [&str; 1] = ["0.1"];
 
 struct PingEventReporter {
-    reporter: UnboundedSender<PeerManagerEvent>,
+    inner: UnboundedSender<PeerManagerEvent>,
 
     mgr_shutdown: AtomicBool,
 }
 
+#[derive(derive_more::Constructor)]
+struct EventTranslator {
+    rx:       Receiver<PingEvent>,
+    reporter: PingEventReporter,
+}
+
+impl Future for EventTranslator {
+    type Output = ();
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        if self.reporter.is_mgr_shutdown() {
+            return Poll::Ready(());
+        }
+
+        loop {
+            let event = match Stream::poll_next(Pin::new(&mut self.as_mut().rx), cx) {
+                Poll::Pending => break,
+                Poll::Ready(None) => return Poll::Ready(()),
+                Poll::Ready(Some(event)) => event,
+            };
+
+            let mgr_event = match event {
+                PingEvent::Ping(ref pid) | PingEvent::Pong(ref pid, _) => {
+                    PeerManagerEvent::PeerAlive { pid: pid.clone() }
+                }
+                PingEvent::Timeout(ref pid) => {
+                    let kind = RetryKind::TimedOut;
+
+                    PeerManagerEvent::RetryPeerLater {
+                        pid: pid.clone(),
+                        kind,
+                    }
+                }
+                PingEvent::UnexpectedError(ref pid) => {
+                    let kind = RetryKind::Other("ping unexpected error, maybe unstable network");
+
+                    PeerManagerEvent::RetryPeerLater {
+                        pid: pid.clone(),
+                        kind,
+                    }
+                }
+            };
+
+            if self.reporter.inner.unbounded_send(mgr_event).is_err() {
+                self.reporter.mgr_shutdown();
+                return Poll::Ready(());
+            }
+        }
+
+        Poll::Pending
+    }
+}
+
 pub struct Ping {
-    handler: PingHandler<PingEventReporter>,
+    handler: PingHandler,
 }
 
 impl Ping {
@@ -38,7 +95,11 @@ impl Ping {
         sender: UnboundedSender<PeerManagerEvent>,
     ) -> Self {
         let reporter = PingEventReporter::new(sender);
-        let handler = PingHandler::new(interval, timeout, reporter);
+        let (tx, rx) = mpsc::channel(1000);
+        let handler = PingHandler::new(interval, timeout, tx);
+        let translator = EventTranslator::new(rx, reporter);
+
+        tokio::spawn(translator);
 
         Ping { handler }
     }
@@ -76,9 +137,9 @@ impl ServiceProtocol for Ping {
 }
 
 impl PingEventReporter {
-    fn new(reporter: UnboundedSender<PeerManagerEvent>) -> Self {
+    fn new(inner: UnboundedSender<PeerManagerEvent>) -> Self {
         PingEventReporter {
-            reporter,
+            inner,
 
             mgr_shutdown: AtomicBool::new(false),
         }
@@ -92,45 +153,5 @@ impl PingEventReporter {
         debug!("network: ping: peer manager shutdown");
 
         self.mgr_shutdown.store(true, Ordering::SeqCst);
-    }
-}
-
-impl Sender<PingEvent> for PingEventReporter {
-    fn try_send(&mut self, event: PingEvent) -> Result<(), TrySendError<PingEvent>> {
-        if self.is_mgr_shutdown() {
-            return Err(TrySendError::Disconnected(event));
-        }
-
-        let mgr_event = match event {
-            PingEvent::Ping(ref pid) | PingEvent::Pong(ref pid, _) => {
-                PeerManagerEvent::PeerAlive { pid: pid.clone() }
-            }
-            PingEvent::Timeout(ref pid) => {
-                let kind = RetryKind::TimedOut;
-
-                PeerManagerEvent::RetryPeerLater {
-                    pid: pid.clone(),
-                    kind,
-                }
-            }
-            PingEvent::UnexpectedError(ref pid) => {
-                let kind = RetryKind::Other("ping unexpected error, maybe unstable network");
-
-                PeerManagerEvent::RetryPeerLater {
-                    pid: pid.clone(),
-                    kind,
-                }
-            }
-        };
-
-        self.reporter.unbounded_send(mgr_event).map_err(|err| {
-            if err.is_full() {
-                TrySendError::Full(event)
-            } else {
-                self.mgr_shutdown();
-
-                TrySendError::Disconnected(event)
-            }
-        })
     }
 }
