@@ -57,13 +57,13 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         if current_consensus_status.height != height {
             return Err(ProtocolError::from(ConsensusError::MissingBlockHeader(height)).into());
         }
-        let emp_height = height;
+        let tmp_height = height;
         let order_root = Merkle::from_hashes(ordered_tx_hashes.clone()).get_root_hash();
 
         let header = BlockHeader {
             chain_id:          self.node_info.chain_id.clone(),
             pre_hash:          current_consensus_status.prev_hash,
-            height:            emp_height,
+            height:            tmp_height,
             exec_height:       current_consensus_status.exec_height,
             timestamp:         time_now(),
             logs_bloom:        current_consensus_status.logs_bloom,
