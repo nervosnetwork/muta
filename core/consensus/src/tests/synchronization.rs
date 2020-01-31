@@ -17,7 +17,7 @@ use protocol::types::{
 use protocol::ProtocolResult;
 
 use crate::status::{CurrentConsensusStatus, StatusAgent};
-use crate::synchronization_v2::{OverlordSynchronization, RichBlock};
+use crate::synchronization::{OverlordSynchronization, RichBlock};
 
 // Test the blocks gap from 1 to 10.
 #[test]
