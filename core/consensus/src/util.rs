@@ -133,7 +133,7 @@ impl OverlordCrypto {
 
 #[derive(Clone, Debug)]
 pub struct ExecuteInfo {
-    pub epoch_id:     u64,
+    pub height:     u64,
     pub chain_id:     Hash,
     pub epoch_hash:   Hash,
     pub signed_txs:   Vec<SignedTransaction>,
@@ -147,7 +147,7 @@ pub struct ExecuteInfo {
 impl Into<ExecWalInfo> for ExecuteInfo {
     fn into(self) -> ExecWalInfo {
         ExecWalInfo {
-            epoch_id:     self.epoch_id,
+            height:     self.height,
             chain_id:     self.chain_id,
             epoch_hash:   self.epoch_hash,
             order_root:   self.order_root,
@@ -162,7 +162,7 @@ impl Into<ExecWalInfo> for ExecuteInfo {
 impl ExecuteInfo {
     pub fn from_wal_info(wal_info: ExecWalInfo, txs: Vec<SignedTransaction>) -> Self {
         ExecuteInfo {
-            epoch_id:     wal_info.epoch_id,
+            height:     wal_info.height,
             chain_id:     wal_info.chain_id,
             epoch_hash:   wal_info.epoch_hash,
             signed_txs:   txs,
@@ -177,7 +177,7 @@ impl ExecuteInfo {
 
 #[derive(Clone, Debug)]
 pub struct ExecWalInfo {
-    pub epoch_id:     u64,
+    pub height:     u64,
     pub chain_id:     Hash,
     pub epoch_hash:   Hash,
     pub order_root:   MerkleRoot,
@@ -190,7 +190,7 @@ pub struct ExecWalInfo {
 impl Encodable for ExecWalInfo {
     fn rlp_append(&self, s: &mut RlpStream) {
         s.begin_list(8)
-            .append(&self.epoch_id)
+            .append(&self.height)
             .append(&self.chain_id)
             .append(&self.epoch_hash)
             .append(&self.order_root)
@@ -205,7 +205,7 @@ impl Decodable for ExecWalInfo {
     fn decode(r: &Rlp) -> Result<Self, DecoderError> {
         match r.prototype()? {
             Prototype::List(8) => {
-                let epoch_id: u64 = r.val_at(0)?;
+                let height: u64 = r.val_at(0)?;
                 let chain_id: Hash = r.val_at(1)?;
                 let epoch_hash: Hash = r.val_at(2)?;
                 let order_root: Hash = r.val_at(3)?;
@@ -214,7 +214,7 @@ impl Decodable for ExecWalInfo {
                 let timestamp: u64 = r.val_at(6)?;
                 let cycles_limit: u64 = r.val_at(7)?;
                 Ok(ExecWalInfo {
-                    epoch_id,
+                    height,
                     chain_id,
                     epoch_hash,
                     order_root,
@@ -253,7 +253,7 @@ impl Decodable for WalInfoQueue {
                 let tmp: Vec<ExecWalInfo> = r.list_at(0)?;
                 let inner = tmp
                     .into_iter()
-                    .map(|info| (info.epoch_id, info))
+                    .map(|info| (info.height, info))
                     .collect::<BTreeMap<_, _>>();
                 Ok(WalInfoQueue { inner })
             }
@@ -271,15 +271,15 @@ impl WalInfoQueue {
     }
 
     pub fn insert(&mut self, info: ExecWalInfo) {
-        self.inner.insert(info.epoch_id, info);
+        self.inner.insert(info.height, info);
     }
 
-    pub fn remove_by_epoch_id(&mut self, epoch_id: u64) -> ProtocolResult<()> {
-        match self.inner.remove(&epoch_id) {
+    pub fn remove_by_epoch_id(&mut self, height: u64) -> ProtocolResult<()> {
+        match self.inner.remove(&height) {
             Some(_) => Ok(()),
             None => Err(ConsensusError::ExecuteErr(format!(
-                "wal info queue does not contain epoch ID {}",
-                epoch_id
+                "wal info queue does not contain height {}",
+                height
             ))
             .into()),
         }

@@ -11,7 +11,7 @@ use protocol::fixed_codec::FixedCodec;
 use protocol::traits::{CommonConsensusAdapter, Synchronization, SynchronizationAdapter};
 use protocol::traits::{Context, ExecutorParams, ExecutorResp};
 use protocol::types::{
-    Address, Bytes, Epoch, EpochHeader, Hash, MerkleRoot, Proof, RawTransaction, Receipt,
+    Address, Bytes, Block, BlockHeader, Hash, MerkleRoot, Proof, RawTransaction, Receipt,
     ReceiptResponse, SignedTransaction, TransactionRequest, Validator,
 };
 use protocol::ProtocolResult;
@@ -33,7 +33,7 @@ fn sync_gap_test() {
         let local_epochs = Arc::new(RwLock::new(HashMap::new()));
         local_epochs
             .write()
-            .insert(genesis_epoch.header.epoch_id, genesis_epoch.clone());
+            .insert(genesis_epoch.header.height, genesis_epoch.clone());
 
         let local_transactions = Arc::new(RwLock::new(HashMap::new()));
         let remote_transactions = gen_remote_tx_hashmap(list_rich_epoch);
@@ -48,8 +48,8 @@ fn sync_gap_test() {
         let status = CurrentConsensusStatus {
             cycles_price:       1,
             cycles_limit:       300_000_000,
-            epoch_id:           genesis_epoch.header.epoch_id,
-            exec_epoch_id:      genesis_epoch.header.exec_epoch_id,
+            height:           genesis_epoch.header.height,
+            exec_height:      genesis_epoch.header.exec_height,
             prev_hash:          genesis_epoch.header.pre_hash,
             logs_bloom:         vec![],
             confirm_root:       vec![],
@@ -67,13 +67,13 @@ fn sync_gap_test() {
         block_on(sync.receive_remote_epoch(Context::new(), max_epoch_id / 2)).unwrap();
 
         let status = status_agent.to_inner();
-        let epoch = block_on(adapter.get_epoch_by_id(Context::new(), status.epoch_id - 1)).unwrap();
-        assert_sync(status, epoch);
+        let block = block_on(adapter.get_epoch_by_id(Context::new(), status.height - 1)).unwrap();
+        assert_sync(status, block);
 
         block_on(sync.receive_remote_epoch(Context::new(), max_epoch_id)).unwrap();
         let status = status_agent.to_inner();
-        let epoch = block_on(adapter.get_epoch_by_id(Context::new(), status.epoch_id - 1)).unwrap();
-        assert_sync(status, epoch);
+        let block = block_on(adapter.get_epoch_by_id(Context::new(), status.height - 1)).unwrap();
+        assert_sync(status, block);
     }
 }
 
@@ -81,8 +81,8 @@ pub type SafeHashMap<K, V> = Arc<RwLock<HashMap<K, V>>>;
 
 pub struct MockCommonConsensusAdapter {
     latest_epoch_id:     RwLock<u64>,
-    local_epochs:        SafeHashMap<u64, Epoch>,
-    remote_epochs:       SafeHashMap<u64, Epoch>,
+    local_epochs:        SafeHashMap<u64, Block>,
+    remote_epochs:       SafeHashMap<u64, Block>,
     local_transactions:  SafeHashMap<Hash, SignedTransaction>,
     remote_transactions: SafeHashMap<Hash, SignedTransaction>,
 }
@@ -90,8 +90,8 @@ pub struct MockCommonConsensusAdapter {
 impl MockCommonConsensusAdapter {
     pub fn new(
         latest_epoch_id: u64,
-        local_epochs: SafeHashMap<u64, Epoch>,
-        remote_epochs: SafeHashMap<u64, Epoch>,
+        local_epochs: SafeHashMap<u64, Block>,
+        remote_epochs: SafeHashMap<u64, Block>,
         local_transactions: SafeHashMap<Hash, SignedTransaction>,
         remote_transactions: SafeHashMap<Hash, SignedTransaction>,
     ) -> Self {
@@ -117,12 +117,12 @@ impl SynchronizationAdapter for MockCommonConsensusAdapter {
         params: &ExecutorParams,
         txs: &[SignedTransaction],
     ) -> ProtocolResult<ExecutorResp> {
-        Ok(exec_txs(params.epoch_id, txs).0)
+        Ok(exec_txs(params.height, txs).0)
     }
 
     /// Pull some epochs from other nodes from `begin` to `end`.
-    async fn get_epoch_from_remote(&self, _: Context, epoch_id: u64) -> ProtocolResult<Epoch> {
-        Ok(self.remote_epochs.read().get(&epoch_id).unwrap().clone())
+    async fn get_epoch_from_remote(&self, _: Context, height: u64) -> ProtocolResult<Block> {
+        Ok(self.remote_epochs.read().get(&height).unwrap().clone())
     }
 
     /// Pull signed transactions corresponding to the given hashes from other
@@ -146,13 +146,13 @@ impl SynchronizationAdapter for MockCommonConsensusAdapter {
 
 #[async_trait]
 impl CommonConsensusAdapter for MockCommonConsensusAdapter {
-    /// Save an epoch to the database.
-    async fn save_epoch(&self, _: Context, epoch: Epoch) -> ProtocolResult<()> {
+    /// Save a block to the database.
+    async fn save_epoch(&self, _: Context, block: Block) -> ProtocolResult<()> {
         self.local_epochs
             .write()
-            .insert(epoch.header.epoch_id, epoch);
-        let mut epoch_id = self.latest_epoch_id.write();
-        *epoch_id += 1;
+            .insert(block.header.height, block);
+        let mut height = self.latest_epoch_id.write();
+        *height += 1;
         Ok(())
     }
 
@@ -182,12 +182,12 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
         Ok(())
     }
 
-    /// Get an epoch corresponding to the given epoch ID.
-    async fn get_epoch_by_id(&self, _: Context, epoch_id: u64) -> ProtocolResult<Epoch> {
-        Ok(self.local_epochs.read().get(&epoch_id).unwrap().clone())
+    /// Get a block corresponding to the given height.
+    async fn get_epoch_by_id(&self, _: Context, height: u64) -> ProtocolResult<Block> {
+        Ok(self.local_epochs.read().get(&height).unwrap().clone())
     }
 
-    /// Get the current epoch ID from storage.
+    /// Get the current height from storage.
     async fn get_current_epoch_id(&self, _: Context) -> ProtocolResult<u64> {
         Ok(*self.latest_epoch_id.read())
     }
@@ -225,10 +225,10 @@ fn gen_remote_tx_hashmap(list: Vec<RichEpoch>) -> SafeHashMap<Hash, SignedTransa
     Arc::new(RwLock::new(remote_txs))
 }
 
-fn gen_remote_epoch_hashmap(list: Vec<RichEpoch>) -> SafeHashMap<u64, Epoch> {
+fn gen_remote_epoch_hashmap(list: Vec<RichEpoch>) -> SafeHashMap<u64, Block> {
     let mut remote_epochs = HashMap::new();
     for rich_epoch in list.into_iter() {
-        remote_epochs.insert(rich_epoch.epoch.header.epoch_id, rich_epoch.epoch.clone());
+        remote_epochs.insert(rich_epoch.block.header.height, rich_epoch.block.clone());
     }
 
     Arc::new(RwLock::new(remote_epochs))
@@ -246,8 +246,8 @@ fn mock_chained_rich_epoch(len: u64, gap: u64) -> Vec<RichEpoch> {
 
     let mut temp_rich_epoch: Vec<RichEpoch> = vec![];
     loop {
-        let last_epoch_hash = Hash::digest(last_rich_epoch.epoch.encode_fixed().unwrap());
-        let last_header = &last_rich_epoch.epoch.header;
+        let last_epoch_hash = Hash::digest(last_rich_epoch.block.encode_fixed().unwrap());
+        let last_header = &last_rich_epoch.block.header;
 
         let txs = mock_tx_list(10, current_epoch_id);
         let tx_hashes: Vec<Hash> = txs.iter().map(|tx| tx.tx_hash.clone()).collect();
@@ -255,10 +255,10 @@ fn mock_chained_rich_epoch(len: u64, gap: u64) -> Vec<RichEpoch> {
             .get_root_hash()
             .unwrap();
 
-        let mut header = EpochHeader {
+        let mut header = BlockHeader {
             chain_id: last_header.chain_id.clone(),
-            epoch_id: current_epoch_id,
-            exec_epoch_id: current_epoch_id,
+            height: current_epoch_id,
+            exec_height: current_epoch_id,
             pre_hash: last_epoch_hash,
             timestamp: 0,
             order_root,
@@ -269,7 +269,7 @@ fn mock_chained_rich_epoch(len: u64, gap: u64) -> Vec<RichEpoch> {
             cycles_used: vec![],
             proposer: Address::from_hex("1c9776983b2f251fa5c9cc562c1b667d1f05ff83").unwrap(),
             proof: Proof {
-                epoch_id:   current_epoch_id,
+                height:   current_epoch_id,
                 round:      0,
                 epoch_hash: Hash::from_empty(),
                 signature:  Bytes::new(),
@@ -284,13 +284,13 @@ fn mock_chained_rich_epoch(len: u64, gap: u64) -> Vec<RichEpoch> {
             }],
         };
 
-        if last_header.epoch_id != 0 && current_epoch_id % gap == 0 {
+        if last_header.height != 0 && current_epoch_id % gap == 0 {
             temp_rich_epoch.iter().for_each(|rich_epoch| {
-                let epoch_id = rich_epoch.epoch.header.epoch_id;
-                let confirm_root = rich_epoch.epoch.header.order_root.clone();
-                let (exec_resp, receipt_root) = exec_txs(epoch_id, &rich_epoch.txs);
+                let height = rich_epoch.block.header.height;
+                let confirm_root = rich_epoch.block.header.order_root.clone();
+                let (exec_resp, receipt_root) = exec_txs(height, &rich_epoch.txs);
 
-                header.exec_epoch_id = epoch_id;
+                header.exec_height = height;
                 header.logs_bloom.push(exec_resp.logs_bloom);
                 header.confirm_root.push(confirm_root);
                 header.state_root = exec_resp.state_root;
@@ -299,18 +299,18 @@ fn mock_chained_rich_epoch(len: u64, gap: u64) -> Vec<RichEpoch> {
             });
 
             temp_rich_epoch.clear();
-        } else if last_header.epoch_id != 0 && header.epoch_id != 1 {
-            header.exec_epoch_id -= temp_rich_epoch.len() as u64 + 1;
-        } else if header.epoch_id == 1 {
-            header.exec_epoch_id -= 1;
+        } else if last_header.height != 0 && header.height != 1 {
+            header.exec_height -= temp_rich_epoch.len() as u64 + 1;
+        } else if header.height == 1 {
+            header.exec_height -= 1;
         }
 
-        let epoch = Epoch {
+        let block = Block {
             header,
             ordered_tx_hashes: tx_hashes,
         };
 
-        let rich_epoch = RichEpoch { epoch, txs };
+        let rich_epoch = RichEpoch { block, txs };
 
         list.push(rich_epoch.clone());
         temp_rich_epoch.push(rich_epoch.clone());
@@ -326,10 +326,10 @@ fn mock_chained_rich_epoch(len: u64, gap: u64) -> Vec<RichEpoch> {
 }
 
 fn mock_genesis_rich_epoch() -> RichEpoch {
-    let header = EpochHeader {
+    let header = BlockHeader {
         chain_id:          Hash::from_empty(),
-        epoch_id:          0,
-        exec_epoch_id:     0,
+        height:          0,
+        exec_height:     0,
         pre_hash:          Hash::from_empty(),
         timestamp:         0,
         logs_bloom:        vec![],
@@ -340,7 +340,7 @@ fn mock_genesis_rich_epoch() -> RichEpoch {
         cycles_used:       vec![],
         proposer:          Address::from_hex("1c9776983b2f251fa5c9cc562c1b667d1f05ff83").unwrap(),
         proof:             Proof {
-            epoch_id:   0,
+            height:   0,
             round:      0,
             epoch_hash: Hash::from_empty(),
             signature:  Bytes::new(),
@@ -353,21 +353,21 @@ fn mock_genesis_rich_epoch() -> RichEpoch {
             vote_weight:    0,
         }],
     };
-    let genesis_epoch = Epoch {
+    let genesis_epoch = Block {
         header,
         ordered_tx_hashes: vec![],
     };
 
     RichEpoch {
-        epoch: genesis_epoch,
+        block: genesis_epoch,
         txs:   vec![],
     }
 }
 
-fn get_receipt(tx: &SignedTransaction, epoch_id: u64) -> Receipt {
+fn get_receipt(tx: &SignedTransaction, height: u64) -> Receipt {
     Receipt {
         state_root: MerkleRoot::from_empty(),
-        epoch_id,
+        height,
         tx_hash: tx.tx_hash.clone(),
         cycles_used: tx.raw.cycles_limit,
         events: vec![],
@@ -380,14 +380,14 @@ fn get_receipt(tx: &SignedTransaction, epoch_id: u64) -> Receipt {
     }
 }
 
-fn mock_tx_list(num: usize, epoch_id: u64) -> Vec<SignedTransaction> {
+fn mock_tx_list(num: usize, height: u64) -> Vec<SignedTransaction> {
     let mut txs = vec![];
 
     for i in 0..num {
         let raw = RawTransaction {
             chain_id:     Hash::from_empty(),
             nonce:        Hash::digest(Bytes::from(format!("{}", i))),
-            timeout:      epoch_id,
+            timeout:      height,
             cycles_price: 1,
             cycles_limit: 1,
             request:      TransactionRequest {
@@ -411,12 +411,12 @@ fn mock_tx_list(num: usize, epoch_id: u64) -> Vec<SignedTransaction> {
     txs
 }
 
-fn exec_txs(epoch_id: u64, txs: &[SignedTransaction]) -> (ExecutorResp, MerkleRoot) {
+fn exec_txs(height: u64, txs: &[SignedTransaction]) -> (ExecutorResp, MerkleRoot) {
     let mut receipts = vec![];
     let mut all_cycles_used = 0;
 
     for tx in txs.iter() {
-        let receipt = get_receipt(tx, epoch_id);
+        let receipt = get_receipt(tx, height);
         all_cycles_used += receipt.cycles_used;
         receipts.push(receipt);
     }
@@ -440,11 +440,11 @@ fn exec_txs(epoch_id: u64, txs: &[SignedTransaction]) -> (ExecutorResp, MerkleRo
     )
 }
 
-fn assert_sync(status: CurrentConsensusStatus, latest_epoch: Epoch) {
-    let exec_gap = latest_epoch.header.epoch_id - latest_epoch.header.exec_epoch_id;
+fn assert_sync(status: CurrentConsensusStatus, latest_epoch: Block) {
+    let exec_gap = latest_epoch.header.height - latest_epoch.header.exec_height;
 
-    assert_eq!(status.epoch_id - 1, latest_epoch.header.epoch_id);
-    assert_eq!(status.exec_epoch_id, latest_epoch.header.epoch_id);
+    assert_eq!(status.height - 1, latest_epoch.header.height);
+    assert_eq!(status.exec_height, latest_epoch.header.height);
     assert_eq!(status.confirm_root.len(), exec_gap as usize);
     assert_eq!(status.cycles_used.len(), exec_gap as usize);
     assert_eq!(status.logs_bloom.len(), exec_gap as usize);

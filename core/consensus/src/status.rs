@@ -10,7 +10,7 @@ use serde_json::json;
 use common_merkle::Merkle;
 use protocol::fixed_codec::FixedCodec;
 use protocol::traits::ExecutorResp;
-use protocol::types::{Bloom, Epoch, Hash, MerkleRoot, Proof, Validator};
+use protocol::types::{Bloom, Block, Hash, MerkleRoot, Proof, Validator};
 use protocol::ProtocolResult;
 
 use crate::engine::check_vec_roots;
@@ -34,26 +34,26 @@ impl StatusAgent {
 
     pub fn update_after_commit(
         &self,
-        epoch_id: u64,
-        epoch: Epoch,
+        height: u64,
+        block: Block,
         prev_hash: Hash,
         proof: Proof,
     ) -> ProtocolResult<()> {
         self.status
             .write()
-            .update_after_commit(epoch_id, epoch, prev_hash, proof)
+            .update_after_commit(height, block, prev_hash, proof)
     }
 
     pub fn update_after_sync_commit(
         &self,
-        epoch_id: u64,
-        epoch: Epoch,
+        height: u64,
+        block: Block,
         prev_hash: Hash,
         proof: Proof,
     ) {
         self.status
             .write()
-            .update_after_sync_commit(epoch_id, epoch, prev_hash, proof)
+            .update_after_sync_commit(height, block, prev_hash, proof)
     }
 
     // TODO(yejiayu): Is there a better way to write it?
@@ -61,8 +61,8 @@ impl StatusAgent {
         let mut status = self.status.write();
         status.cycles_price = new_status.cycles_price;
         status.cycles_limit = new_status.cycles_limit;
-        status.epoch_id = new_status.epoch_id;
-        status.exec_epoch_id = new_status.exec_epoch_id;
+        status.height = new_status.height;
+        status.exec_height = new_status.exec_height;
         status.prev_hash = new_status.prev_hash;
         status.logs_bloom = new_status.logs_bloom;
         status.confirm_root = new_status.confirm_root;
@@ -83,14 +83,14 @@ impl StatusAgent {
 #[derive(Serialize, Deserialize, Clone, Debug, Display)]
 #[rustfmt::skip]
 #[display(
-    fmt = "epoch ID {}, exec epoch ID {}, prev_hash {:?},latest_state_root {:?} state root {:?}, receipt root {:?}, confirm root {:?}, cycle used {:?}",
-    epoch_id, exec_epoch_id, prev_hash, latest_state_root, state_root, receipt_root, confirm_root, cycles_used
+    fmt = "height {}, exec height {}, prev_hash {:?},latest_state_root {:?} state root {:?}, receipt root {:?}, confirm root {:?}, cycle used {:?}",
+    height, exec_height, prev_hash, latest_state_root, state_root, receipt_root, confirm_root, cycles_used
 )]
 pub struct CurrentConsensusStatus {
     pub cycles_price:       u64,
     pub cycles_limit:       u64,
-    pub epoch_id:           u64,
-    pub exec_epoch_id:      u64,
+    pub height:           u64,
+    pub exec_height:      u64,
     pub prev_hash:          Hash,
     pub latest_state_root: MerkleRoot,
     pub logs_bloom:         Vec<Bloom>,
@@ -109,8 +109,8 @@ impl CurrentConsensusStatus {
         info!("update_after_exec cache: {}", self);
         trace_after_exec(&info);
 
-        assert!(info.exec_epoch_id == self.exec_epoch_id + 1);
-        self.exec_epoch_id += 1;
+        assert!(info.exec_height == self.exec_height + 1);
+        self.exec_height += 1;
         self.latest_state_root = info.state_root.clone();
         self.cycles_used.push(info.cycles_used);
         self.confirm_root.push(info.confirm_root.clone());
@@ -121,41 +121,41 @@ impl CurrentConsensusStatus {
 
     pub fn update_after_commit(
         &mut self,
-        epoch_id: u64,
-        epoch: Epoch,
+        height: u64,
+        block: Block,
         prev_hash: Hash,
         proof: Proof,
     ) -> ProtocolResult<()> {
-        info!("update info {}, {:?}", epoch_id, prev_hash);
+        info!("update info {}, {:?}", height, prev_hash);
         info!("update after commit cache: {}", self);
 
-        self.epoch_id = epoch_id;
+        self.height = height;
         self.prev_hash = prev_hash;
         self.proof = proof;
-        self.update_cycles(&epoch.header.cycles_used)?;
-        self.update_logs_bloom(&epoch.header.logs_bloom)?;
-        self.update_state_root(&epoch.header.state_root)?;
-        self.update_confirm_root(&epoch.header.confirm_root)?;
-        self.update_receipt_root(&epoch.header.receipt_root)?;
+        self.update_cycles(&block.header.cycles_used)?;
+        self.update_logs_bloom(&block.header.logs_bloom)?;
+        self.update_state_root(&block.header.state_root)?;
+        self.update_confirm_root(&block.header.confirm_root)?;
+        self.update_receipt_root(&block.header.receipt_root)?;
         Ok(())
     }
 
     pub fn update_after_sync_commit(
         &mut self,
-        epoch_id: u64,
-        epoch: Epoch,
+        height: u64,
+        block: Block,
         prev_hash: Hash,
         proof: Proof,
     ) {
-        self.epoch_id = epoch_id;
+        self.height = height;
         self.prev_hash = prev_hash;
         self.proof = proof;
 
-        self.cycles_used = self.cycles_used.split_off(epoch.header.cycles_used.len());
-        self.logs_bloom = self.logs_bloom.split_off(epoch.header.logs_bloom.len());
-        self.state_root = self.state_root.split_off(epoch.header.cycles_used.len());
-        self.confirm_root = self.confirm_root.split_off(epoch.header.confirm_root.len());
-        self.receipt_root = self.receipt_root.split_off(epoch.header.receipt_root.len());
+        self.cycles_used = self.cycles_used.split_off(block.header.cycles_used.len());
+        self.logs_bloom = self.logs_bloom.split_off(block.header.logs_bloom.len());
+        self.state_root = self.state_root.split_off(block.header.cycles_used.len());
+        self.confirm_root = self.confirm_root.split_off(block.header.confirm_root.len());
+        self.receipt_root = self.receipt_root.split_off(block.header.receipt_root.len());
     }
 
     fn update_cycles(&mut self, cycles: &[u64]) -> ProtocolResult<()> {
@@ -238,11 +238,11 @@ impl CurrentConsensusStatus {
 #[derive(Clone, Debug, Display)]
 #[rustfmt::skip]
 #[display(
-    fmt = "exec epoch ID {}, cycles used {}, state root {:?}, receipt root {:?}, confirm root {:?}",
-    exec_epoch_id, cycles_used, state_root, receipt_root, confirm_root
+    fmt = "exec height {}, cycles used {}, state root {:?}, receipt root {:?}, confirm root {:?}",
+    exec_height, cycles_used, state_root, receipt_root, confirm_root
 )]
 pub struct UpdateInfo {
-    pub exec_epoch_id: u64,
+    pub exec_height: u64,
     pub cycles_used:   u64,
     pub logs_bloom:    Bloom,
     pub state_root:    MerkleRoot,
@@ -251,7 +251,7 @@ pub struct UpdateInfo {
 }
 
 impl UpdateInfo {
-    pub fn with_after_exec(epoch_id: u64, order_root: MerkleRoot, resp: ExecutorResp) -> Self {
+    pub fn with_after_exec(height: u64, order_root: MerkleRoot, resp: ExecutorResp) -> Self {
         let cycles = resp.all_cycles_used;
 
         let receipt = Merkle::from_hashes(
@@ -264,7 +264,7 @@ impl UpdateInfo {
         .unwrap_or_else(Hash::from_empty);
 
         Self {
-            exec_epoch_id: epoch_id,
+            exec_height: height,
             cycles_used:   cycles,
             receipt_root:  receipt,
             confirm_root:  order_root,
@@ -278,7 +278,7 @@ pub fn trace_after_exec(info: &UpdateInfo) {
     trace::custom(
         "update_exec_info".to_string(),
         Some(json!({
-            "exec_epoch_id": info.exec_epoch_id,
+            "exec_height": info.exec_height,
             "state_root": info.state_root.as_hex(),
             "receipt_root": info.receipt_root.as_hex(),
             "confirm_root": info.confirm_root.as_hex(),

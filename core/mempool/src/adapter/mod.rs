@@ -265,7 +265,7 @@ where
         }
 
         // Verify timeout
-        let latest_epoch_id = latest_epoch.header.epoch_id;
+        let latest_epoch_id = latest_epoch.header.height;
         let timeout_gap = self.timeout_gap.load(Ordering::SeqCst);
 
         if stx.raw.timeout > latest_epoch_id + timeout_gap {
@@ -303,8 +303,8 @@ where
     }
 
     async fn get_latest_epoch_id(&self, _ctx: Context) -> ProtocolResult<u64> {
-        let epoch_id = self.storage.get_latest_epoch().await?.header.epoch_id;
-        Ok(epoch_id)
+        let height = self.storage.get_latest_epoch().await?.header.height;
+        Ok(height)
     }
 }
 

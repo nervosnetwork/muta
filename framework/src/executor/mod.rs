@@ -205,7 +205,7 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
             cycles_price,
             cycles_used: Rc::new(RefCell::new(0)),
             caller: caller.clone(),
-            epoch_id: params.epoch_id,
+            height: params.height,
             timestamp: params.timestamp,
             service_name: request.service_name.to_owned(),
             service_method: request.method.to_owned(),
@@ -298,7 +298,7 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
 
                 Ok(Receipt {
                     state_root:  MerkleRoot::from_empty(),
-                    epoch_id:    context.get_current_epoch_id(),
+                    height:    context.get_current_epoch_id(),
                     tx_hash:     stx.tx_hash.clone(),
                     cycles_used: context.get_cycles_used(),
                     events:      context.get_events(),

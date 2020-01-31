@@ -13,7 +13,7 @@ use protocol::traits::{
     ChainQuerier, Dispatcher, ServiceSDK, ServiceState, StoreArray, StoreBool, StoreMap,
     StoreString, StoreUint64,
 };
-use protocol::types::{Address, Epoch, Hash, Receipt, ServiceContext, SignedTransaction};
+use protocol::types::{Address, Block, Hash, Receipt, ServiceContext, SignedTransaction};
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
 use crate::binding::store::{
@@ -127,11 +127,11 @@ impl<S: 'static + ServiceState, C: ChainQuerier, D: Dispatcher> ServiceSDK
         self.chain_querier.get_transaction_by_hash(tx_hash)
     }
 
-    // Get a epoch by `epoch_id`
+    // Get a block by `height`
     // if not found on the chain, return None
-    // When the parameter `epoch_id` is None, get the latest (executing)` epoch`
-    fn get_epoch_by_epoch_id(&self, epoch_id: Option<u64>) -> ProtocolResult<Option<Epoch>> {
-        self.chain_querier.get_epoch_by_epoch_id(epoch_id)
+    // When the parameter `height` is None, get the latest (executing)` block`
+    fn get_epoch_by_epoch_id(&self, height: Option<u64>) -> ProtocolResult<Option<Block>> {
+        self.chain_querier.get_epoch_by_epoch_id(height)
     }
 
     // Get a receipt by `tx_hash`

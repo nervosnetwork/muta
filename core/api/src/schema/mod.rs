@@ -1,4 +1,4 @@
-mod epoch;
+mod block;
 mod receipt;
 mod transaction;
 
@@ -9,7 +9,7 @@ use std::num::ParseIntError;
 
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
-pub use epoch::{Epoch, EpochHeader};
+pub use block::{Block, BlockHeader};
 pub use receipt::{Event, Receipt, ReceiptResponse};
 pub use transaction::{
     to_signed_transaction, to_transaction, InputRawTransaction, InputTransactionEncryption,

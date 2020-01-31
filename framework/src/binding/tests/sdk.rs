@@ -8,7 +8,7 @@ use cita_trie::MemoryDB;
 
 use protocol::traits::{NoopDispatcher, ServiceSDK, Storage};
 use protocol::types::{
-    Address, Epoch, EpochHeader, Event, Hash, MerkleRoot, Proof, RawTransaction, Receipt,
+    Address, Block, BlockHeader, Event, Hash, MerkleRoot, Proof, RawTransaction, Receipt,
     ReceiptResponse, SignedTransaction, TransactionRequest, Validator,
 };
 use protocol::ProtocolResult;
@@ -117,7 +117,7 @@ impl Storage for MockStorage {
         Ok(())
     }
 
-    async fn insert_epoch(&self, _epoch: Epoch) -> ProtocolResult<()> {
+    async fn insert_epoch(&self, _epoch: Block) -> ProtocolResult<()> {
         Ok(())
     }
 
@@ -137,15 +137,15 @@ impl Storage for MockStorage {
         Err(StoreError::GetNone.into())
     }
 
-    async fn get_latest_epoch(&self) -> ProtocolResult<Epoch> {
+    async fn get_latest_epoch(&self) -> ProtocolResult<Block> {
         Ok(mock_epoch(1))
     }
 
-    async fn get_epoch_by_epoch_id(&self, _epoch_id: u64) -> ProtocolResult<Epoch> {
+    async fn get_epoch_by_epoch_id(&self, _epoch_id: u64) -> ProtocolResult<Block> {
         Ok(mock_epoch(1))
     }
 
-    async fn get_epoch_by_hash(&self, _epoch_hash: Hash) -> ProtocolResult<Epoch> {
+    async fn get_epoch_by_hash(&self, _epoch_hash: Hash) -> ProtocolResult<Block> {
         Err(StoreError::GetNone.into())
     }
 
@@ -257,7 +257,7 @@ pub fn mock_signed_tx() -> SignedTransaction {
 pub fn mock_receipt() -> Receipt {
     Receipt {
         state_root:  mock_merkle_root(),
-        epoch_id:    13,
+        height:    13,
         tx_hash:     mock_hash(),
         cycles_used: 100,
         events:      vec![mock_event()],
@@ -282,7 +282,7 @@ pub fn mock_event() -> Event {
 }
 
 // #####################
-// Mock Epoch
+// Mock Block
 // #####################
 
 pub fn mock_validator() -> Validator {
@@ -295,7 +295,7 @@ pub fn mock_validator() -> Validator {
 
 pub fn mock_proof() -> Proof {
     Proof {
-        epoch_id:   4,
+        height:   4,
         round:      99,
         epoch_hash: mock_hash(),
         signature:  Default::default(),
@@ -303,11 +303,11 @@ pub fn mock_proof() -> Proof {
     }
 }
 
-pub fn mock_epoch_header() -> EpochHeader {
-    EpochHeader {
+pub fn mock_epoch_header() -> BlockHeader {
+    BlockHeader {
         chain_id:          mock_hash(),
-        epoch_id:          42,
-        exec_epoch_id:     41,
+        height:          42,
+        exec_height:     41,
         pre_hash:          mock_hash(),
         timestamp:         420_000_000,
         logs_bloom:        Default::default(),
@@ -328,8 +328,8 @@ pub fn mock_epoch_header() -> EpochHeader {
     }
 }
 
-pub fn mock_epoch(order_size: usize) -> Epoch {
-    Epoch {
+pub fn mock_epoch(order_size: usize) -> Block {
+    Block {
         header:            mock_epoch_header(),
         ordered_tx_hashes: (0..order_size).map(|_| mock_hash()).collect(),
     }

@@ -12,7 +12,7 @@ mod storage;
 use rand::random;
 
 use protocol::types::{
-    Address, Epoch, EpochHeader, Hash, Proof, RawTransaction, Receipt, ReceiptResponse,
+    Address, Block, BlockHeader, Hash, Proof, RawTransaction, Receipt, ReceiptResponse,
     SignedTransaction, TransactionRequest,
 };
 use protocol::Bytes;
@@ -54,7 +54,7 @@ fn mock_receipt(tx_hash: Hash) -> Receipt {
     };
     Receipt {
         state_root: nonce,
-        epoch_id: 10,
+        height: 10,
         tx_hash,
         cycles_used: 10,
         events: vec![],
@@ -62,13 +62,13 @@ fn mock_receipt(tx_hash: Hash) -> Receipt {
     }
 }
 
-fn mock_epoch(epoch_id: u64, epoch_hash: Hash) -> Epoch {
+fn mock_epoch(height: u64, epoch_hash: Hash) -> Block {
     let nonce = Hash::digest(Bytes::from("XXXX"));
     let addr_str = "CAB8EEA4799C21379C20EF5BAA2CC8AF1BEC475B";
-    let header = EpochHeader {
+    let header = BlockHeader {
         chain_id: nonce.clone(),
-        epoch_id,
-        exec_epoch_id: epoch_id - 1,
+        height,
+        exec_height: height - 1,
         pre_hash: nonce.clone(),
         timestamp: 1000,
         logs_bloom: Default::default(),
@@ -83,7 +83,7 @@ fn mock_epoch(epoch_id: u64, epoch_hash: Hash) -> Epoch {
         validators: Vec::new(),
     };
 
-    Epoch {
+    Block {
         header,
         ordered_tx_hashes: Vec::new(),
     }
@@ -91,7 +91,7 @@ fn mock_epoch(epoch_id: u64, epoch_hash: Hash) -> Epoch {
 
 fn mock_proof(epoch_hash: Hash) -> Proof {
     Proof {
-        epoch_id: 0,
+        height: 0,
         round: 0,
         epoch_hash,
         signature: Default::default(),

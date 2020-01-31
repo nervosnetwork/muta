@@ -16,8 +16,8 @@ node, and then try open http://127.0.0.1:8000/graphiql in the browser.
   * [Query](#query)
   * [Mutation](#mutation)
   * [Objects](#objects)
-    * [Epoch](#epoch)
-    * [EpochHeader](#epochheader)
+    * [Block](#block)
+    * [BlockHeader](#epochheader)
   * [Inputs](#inputs)
     * [InputDeployAction](#inputdeployaction)
     * [InputRawTransaction](#inputrawtransaction)
@@ -49,10 +49,10 @@ node, and then try open http://127.0.0.1:8000/graphiql in the browser.
 <tbody>
 <tr>
 <td colspan="2" valign="top"><strong>getLatestEpoch</strong></td>
-<td valign="top"><a href="#epoch">Epoch</a>!</td>
+<td valign="top"><a href="#block">Block</a>!</td>
 <td>
 
-Get the latest epoch
+Get the latest block
 
 </td>
 </tr>
@@ -210,9 +210,9 @@ DON'T use it in production! This is just for development.
 
 ## Objects
 
-### Epoch
+### Block
 
-Epoch is a single digital record created within a blockchain. Each epoch contains a record of the previous Epoch, and when linked together these become the “chain”.An epoch is always composed of header and body.
+Block is a single digital record created within a blockchain. Each block contains a record of the previous Block, and when linked together these become the “chain”.A block is always composed of header and body.
 
 <table>
 <thead>
@@ -226,10 +226,10 @@ Epoch is a single digital record created within a blockchain. Each epoch contain
 <tbody>
 <tr>
 <td colspan="2" valign="top"><strong>header</strong></td>
-<td valign="top"><a href="#epochheader">EpochHeader</a>!</td>
+<td valign="top"><a href="#epochheader">BlockHeader</a>!</td>
 <td>
 
-The header section of an epoch
+The header section of a block
 
 </td>
 </tr>
@@ -238,16 +238,16 @@ The header section of an epoch
 <td valign="top">[<a href="#hash">Hash</a>!]!</td>
 <td>
 
-The body section of an epoch
+The body section of a block
 
 </td>
 </tr>
 </tbody>
 </table>
 
-### EpochHeader
+### BlockHeader
 
-An epoch header is like the metadata of an epoch.
+A block header is like the metadata of a block.
 
 <table>
 <thead>
@@ -282,7 +282,7 @@ Known as the block height like other blockchain
 <td valign="top"><a href="#hash">Hash</a>!</td>
 <td>
 
-The merkle proof of the previous epoch
+The merkle proof of the previous block
 
 </td>
 </tr>
@@ -291,7 +291,7 @@ The merkle proof of the previous epoch
 <td valign="top"><a href="#uint64">Uint64</a>!</td>
 <td>
 
-A timestamp that records when the epoch was created
+A timestamp that records when the block was created
 
 </td>
 </tr>
@@ -345,7 +345,7 @@ The sum of all transactions costs
 <td valign="top"><a href="#address">Address</a>!</td>
 <td>
 
-The address descirbed who packed the epoch
+The address descirbed who packed the block
 
 </td>
 </tr>

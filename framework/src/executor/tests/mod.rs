@@ -10,7 +10,7 @@ use asset::types::{Asset, GetBalanceResponse};
 use asset::AssetService;
 use protocol::traits::{Executor, ExecutorParams, Service, ServiceMapping, ServiceSDK, Storage};
 use protocol::types::{
-    Address, Epoch, Genesis, Hash, Proof, RawTransaction, Receipt, SignedTransaction,
+    Address, Block, Genesis, Hash, Proof, RawTransaction, Receipt, SignedTransaction,
     TransactionRequest,
 };
 use protocol::ProtocolResult;
@@ -41,7 +41,7 @@ fn test_create_genesis() {
     .unwrap();
     let params = ExecutorParams {
         state_root:   root,
-        epoch_id:     1,
+        height:     1,
         timestamp:    0,
         cycles_limit: std::u64::MAX,
     };
@@ -84,7 +84,7 @@ fn test_exec() {
 
     let params = ExecutorParams {
         state_root:   root,
-        epoch_id:     1,
+        height:     1,
         timestamp:    0,
         cycles_limit: std::u64::MAX,
     };
@@ -151,7 +151,7 @@ impl Storage for MockStorage {
         unimplemented!()
     }
 
-    async fn insert_epoch(&self, _: Epoch) -> ProtocolResult<()> {
+    async fn insert_epoch(&self, _: Block) -> ProtocolResult<()> {
         unimplemented!()
     }
 
@@ -171,15 +171,15 @@ impl Storage for MockStorage {
         unimplemented!()
     }
 
-    async fn get_latest_epoch(&self) -> ProtocolResult<Epoch> {
+    async fn get_latest_epoch(&self) -> ProtocolResult<Block> {
         unimplemented!()
     }
 
-    async fn get_epoch_by_epoch_id(&self, _: u64) -> ProtocolResult<Epoch> {
+    async fn get_epoch_by_epoch_id(&self, _: u64) -> ProtocolResult<Block> {
         unimplemented!()
     }
 
-    async fn get_epoch_by_hash(&self, _: Hash) -> ProtocolResult<Epoch> {
+    async fn get_epoch_by_hash(&self, _: Hash) -> ProtocolResult<Block> {
         unimplemented!()
     }
 

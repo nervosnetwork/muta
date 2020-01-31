@@ -1,20 +1,20 @@
 use bytes::BytesMut;
 
 use crate::fixed_codec::{FixedCodec, FixedCodecError};
-use crate::types::epoch::{Epoch, EpochHeader, Pill, Proof, Validator};
+use crate::types::block::{Block, BlockHeader, Pill, Proof, Validator};
 use crate::types::primitive::Hash;
 use crate::types::Bloom;
 use crate::{impl_default_fixed_codec_for, ProtocolResult};
 
 // Impl FixedCodec trait for types
-impl_default_fixed_codec_for!(epoch, [Proof, Validator, Epoch, EpochHeader, Pill]);
+impl_default_fixed_codec_for!(block, [Proof, Validator, Block, BlockHeader, Pill]);
 
 impl rlp::Encodable for Proof {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
         s.begin_list(5)
             .append(&self.bitmap.to_vec())
             .append(&self.epoch_hash)
-            .append(&self.epoch_id)
+            .append(&self.height)
             .append(&self.round)
             .append(&self.signature.to_vec());
     }
@@ -28,12 +28,12 @@ impl rlp::Decodable for Proof {
 
         let bitmap = BytesMut::from(r.at(0)?.data()?).freeze();
         let epoch_hash: Hash = rlp::decode(r.at(1)?.as_raw())?;
-        let epoch_id = r.at(2)?.as_val()?;
+        let height = r.at(2)?.as_val()?;
         let round = r.at(3)?.as_val()?;
         let signature = BytesMut::from(r.at(4)?.data()?).freeze();
 
         Ok(Proof {
-            epoch_id,
+            height,
             round,
             epoch_hash,
             signature,
@@ -69,14 +69,14 @@ impl rlp::Decodable for Validator {
     }
 }
 
-impl rlp::Encodable for EpochHeader {
+impl rlp::Encodable for BlockHeader {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
         s.begin_list(15)
             .append(&self.chain_id)
             .append_list(&self.confirm_root)
             .append_list(&self.cycles_used)
-            .append(&self.epoch_id)
-            .append(&self.exec_epoch_id)
+            .append(&self.height)
+            .append(&self.exec_height)
             .append_list(&self.logs_bloom)
             .append(&self.order_root)
             .append(&self.pre_hash)
@@ -90,7 +90,7 @@ impl rlp::Encodable for EpochHeader {
     }
 }
 
-impl rlp::Decodable for EpochHeader {
+impl rlp::Decodable for BlockHeader {
     fn decode(r: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
         if !r.is_list() && r.size() != 15 {
             return Err(rlp::DecoderError::RlpIncorrectListLen);
@@ -99,8 +99,8 @@ impl rlp::Decodable for EpochHeader {
         let chain_id: Hash = rlp::decode(r.at(0)?.as_raw())?;
         let confirm_root: Vec<Hash> = rlp::decode_list(r.at(1)?.as_raw());
         let cycles_used: Vec<u64> = rlp::decode_list(r.at(2)?.as_raw());
-        let epoch_id: u64 = r.at(3)?.as_val()?;
-        let exec_epoch_id: u64 = r.at(4)?.as_val()?;
+        let height: u64 = r.at(3)?.as_val()?;
+        let exec_height: u64 = r.at(4)?.as_val()?;
         let logs_bloom: Vec<Bloom> = rlp::decode_list(r.at(5)?.as_raw());
         let order_root = rlp::decode(r.at(6)?.as_raw())?;
         let pre_hash = rlp::decode(r.at(7)?.as_raw())?;
@@ -112,10 +112,10 @@ impl rlp::Decodable for EpochHeader {
         let validator_version: u64 = r.at(13)?.as_val()?;
         let validators: Vec<Validator> = rlp::decode_list(r.at(14)?.as_raw());
 
-        Ok(EpochHeader {
+        Ok(BlockHeader {
             chain_id,
-            epoch_id,
-            exec_epoch_id,
+            height,
+            exec_height,
             pre_hash,
             timestamp,
             logs_bloom,
@@ -132,7 +132,7 @@ impl rlp::Decodable for EpochHeader {
     }
 }
 
-impl rlp::Encodable for Epoch {
+impl rlp::Encodable for Block {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
         s.begin_list(2)
             .append(&self.header)
@@ -140,16 +140,16 @@ impl rlp::Encodable for Epoch {
     }
 }
 
-impl rlp::Decodable for Epoch {
+impl rlp::Decodable for Block {
     fn decode(r: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
         if !r.is_list() && r.size() != 2 {
             return Err(rlp::DecoderError::RlpIncorrectListLen);
         }
 
-        let header: EpochHeader = rlp::decode(r.at(0)?.as_raw())?;
+        let header: BlockHeader = rlp::decode(r.at(0)?.as_raw())?;
         let ordered_tx_hashes: Vec<Hash> = rlp::decode_list(r.at(1)?.as_raw());
 
-        Ok(Epoch {
+        Ok(Block {
             header,
             ordered_tx_hashes,
         })
@@ -159,7 +159,7 @@ impl rlp::Decodable for Epoch {
 impl rlp::Encodable for Pill {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
         s.begin_list(2)
-            .append(&self.epoch)
+            .append(&self.block)
             .append_list(&self.propose_hashes);
     }
 }
@@ -170,11 +170,11 @@ impl rlp::Decodable for Pill {
             return Err(rlp::DecoderError::RlpIncorrectListLen);
         }
 
-        let epoch: Epoch = rlp::decode(r.at(0)?.as_raw())?;
+        let block: Block = rlp::decode(r.at(0)?.as_raw())?;
         let propose_hashes: Vec<Hash> = rlp::decode_list(r.at(1)?.as_raw());
 
         Ok(Pill {
-            epoch,
+            block,
             propose_hashes,
         })
     }

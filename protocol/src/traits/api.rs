@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 
 use crate::traits::{Context, ExecResp};
-use crate::types::{Address, Epoch, Hash, Receipt, SignedTransaction};
+use crate::types::{Address, Block, Hash, Receipt, SignedTransaction};
 use crate::ProtocolResult;
 
 #[async_trait]
@@ -12,7 +12,7 @@ pub trait APIAdapter: Send + Sync {
         signed_tx: SignedTransaction,
     ) -> ProtocolResult<()>;
 
-    async fn get_epoch_by_id(&self, ctx: Context, epoch_id: Option<u64>) -> ProtocolResult<Epoch>;
+    async fn get_epoch_by_id(&self, ctx: Context, height: Option<u64>) -> ProtocolResult<Block>;
 
     async fn get_receipt_by_tx_hash(&self, ctx: Context, tx_hash: Hash) -> ProtocolResult<Receipt>;
 
@@ -25,7 +25,7 @@ pub trait APIAdapter: Send + Sync {
     async fn query_service(
         &self,
         ctx: Context,
-        epoch_id: u64,
+        height: u64,
         cycles_limit: u64,
         cycles_price: u64,
         caller: Address,

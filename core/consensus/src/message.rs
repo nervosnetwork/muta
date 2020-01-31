@@ -157,15 +157,15 @@ impl<R: Rpc + 'static, S: Storage + 'static> MessageHandler for PullEpochRpcHand
     type Message = FixedEpochID;
 
     async fn process(&self, ctx: Context, msg: FixedEpochID) -> ProtocolResult<()> {
-        debug!("message: get rpc pull epoch {:?}, {:?}", msg.inner, ctx);
+        debug!("message: get rpc pull block {:?}, {:?}", msg.inner, ctx);
         let id = msg.inner;
-        let epoch = self.storage.get_epoch_by_epoch_id(id).await?;
+        let block = self.storage.get_epoch_by_epoch_id(id).await?;
 
         self.rpc
             .response(
                 ctx,
                 RPC_RESP_SYNC_PULL_EPOCH,
-                FixedEpoch::new(epoch),
+                FixedEpoch::new(block),
                 Priority::High,
             )
             .await

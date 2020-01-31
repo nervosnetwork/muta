@@ -51,11 +51,11 @@ fn test_fixed_codec() {
 
     test_eq!(transaction, SignedTransaction, mock_sign_tx);
 
-    test_eq!(epoch, Proof, mock_proof);
-    test_eq!(epoch, EpochHeader, mock_epoch_header);
-    test_eq!(epoch, Epoch, mock_epoch, 33);
-    test_eq!(epoch, Pill, mock_pill, 22, 33);
-    test_eq!(epoch, Validator, mock_validator);
+    test_eq!(block, Proof, mock_proof);
+    test_eq!(block, BlockHeader, mock_epoch_header);
+    test_eq!(block, Block, mock_epoch, 33);
+    test_eq!(block, Pill, mock_pill, 22, 33);
+    test_eq!(block, Validator, mock_validator);
 
     test_eq!(receipt, Receipt, mock_receipt);
     test_eq!(receipt, Receipt, mock_receipt);
@@ -98,18 +98,18 @@ fn bench_signed_tx_deserialize(b: &mut Bencher) {
 
 #[bench]
 fn bench_epoch_serialize(b: &mut Bencher) {
-    let epoch = mock_epoch(50_000);
+    let block = mock_epoch(50_000);
 
     b.iter(|| {
-        epoch.encode_fixed().unwrap();
+        block.encode_fixed().unwrap();
     });
 }
 
 #[bench]
 fn bench_epoch_deserialize(b: &mut Bencher) {
-    let epoch = mock_epoch(50_000).encode_fixed().unwrap();
+    let block = mock_epoch(50_000).encode_fixed().unwrap();
 
     b.iter(|| {
-        Epoch::decode_fixed(epoch.clone()).unwrap();
+        Block::decode_fixed(block.clone()).unwrap();
     });
 }

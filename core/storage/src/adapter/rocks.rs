@@ -23,7 +23,7 @@ impl RocksAdapter {
         opts.create_missing_column_families(true);
 
         let categories = [
-            map_category(StorageCategory::Epoch),
+            map_category(StorageCategory::Block),
             map_category(StorageCategory::Receipt),
             map_category(StorageCategory::SignedTransaction),
             map_category(StorageCategory::Wal),
@@ -169,7 +169,7 @@ const C_WALS: &str = "c4";
 
 fn map_category(c: StorageCategory) -> &'static str {
     match c {
-        StorageCategory::Epoch => C_EPOCHS,
+        StorageCategory::Block => C_EPOCHS,
         StorageCategory::Receipt => C_RECEIPTS,
         StorageCategory::SignedTransaction => C_SIGNED_TRANSACTIONS,
         StorageCategory::Wal => C_WALS,

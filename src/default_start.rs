@@ -31,7 +31,7 @@ use core_storage::{adapter::rocks::RocksAdapter, ImplStorage};
 use framework::binding::state::RocksTrieDB;
 use framework::executor::{ServiceExecutor, ServiceExecutorFactory};
 use protocol::traits::{MessageCodec, NodeInfo, ServiceMapping, Storage};
-use protocol::types::{Address, Bloom, Epoch, EpochHeader, Genesis, Hash, Proof, Validator};
+use protocol::types::{Address, Bloom, Block, BlockHeader, Genesis, Hash, Proof, Validator};
 use protocol::{fixed_codec::FixedCodec, ProtocolError, ProtocolResult};
 
 use crate::config::Config;
@@ -41,7 +41,7 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
     config: &Config,
     genesis: &Genesis,
     servive_mapping: Arc<Mapping>,
-) -> ProtocolResult<Epoch> {
+) -> ProtocolResult<Block> {
     let chain_id = Hash::from_hex(&config.chain_id)?;
 
     // Read genesis.
@@ -77,10 +77,10 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
     )?;
 
     // Build genesis block.
-    let genesis_epoch_header = EpochHeader {
+    let genesis_epoch_header = BlockHeader {
         chain_id:          chain_id.clone(),
-        epoch_id:          0,
-        exec_epoch_id:     0,
+        height:          0,
+        exec_height:     0,
         pre_hash:          Hash::from_empty(),
         timestamp:         genesis.timestamp,
         logs_bloom:        vec![Bloom::default()],
@@ -91,7 +91,7 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
         cycles_used:       vec![0],
         proposer:          Address::from_hex("0000000000000000000000000000000000000000")?,
         proof:             Proof {
-            epoch_id:   0,
+            height:   0,
             round:      0,
             epoch_hash: Hash::from_empty(),
             signature:  Bytes::new(),
@@ -101,7 +101,7 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
         validators:        vec![],
     };
     let latest_proof = genesis_epoch_header.proof.clone();
-    let genesis_epoch = Epoch {
+    let genesis_epoch = Block {
         header:            genesis_epoch_header,
         ordered_tx_hashes: vec![],
     };
@@ -199,8 +199,8 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         CurrentConsensusStatus {
             cycles_price:       config.consensus.cycles_price,
             cycles_limit:       config.consensus.cycles_limit,
-            epoch_id:           current_epoch.header.epoch_id + 1,
-            exec_epoch_id:      current_epoch.header.epoch_id,
+            height:           current_epoch.header.height + 1,
+            exec_height:      current_epoch.header.height,
             prev_hash:          prevhash,
             latest_state_root:  current_header.state_root.clone(),
             logs_bloom:         current_header.logs_bloom.clone(),

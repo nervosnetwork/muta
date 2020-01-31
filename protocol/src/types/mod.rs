@@ -1,4 +1,4 @@
-pub(crate) mod epoch;
+pub(crate) mod block;
 pub(crate) mod genesis;
 pub(crate) mod primitive;
 pub(crate) mod receipt;
@@ -12,7 +12,7 @@ use derive_more::{Display, From};
 use crate::{ProtocolError, ProtocolErrorKind};
 
 pub use bytes::{Bytes, BytesMut};
-pub use epoch::{Epoch, EpochHeader, Pill, Proof, Validator};
+pub use block::{Block, BlockHeader, Pill, Proof, Validator};
 pub use ethbloom::{Bloom, BloomRef, Input as BloomInput};
 pub use genesis::{Genesis, ServiceParam};
 pub use primitive::{

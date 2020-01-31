@@ -8,13 +8,13 @@ use protocol::traits::ExecutorFactory;
 use protocol::traits::{
     APIAdapter, Context, ExecResp, ExecutorParams, MemPool, ServiceMapping, Storage,
 };
-use protocol::types::{Address, Epoch, Hash, Receipt, SignedTransaction, TransactionRequest};
+use protocol::types::{Address, Block, Hash, Receipt, SignedTransaction, TransactionRequest};
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
 #[derive(Debug, Display)]
 pub enum APIError {
     #[display(
-        fmt = "Unexecuted epoch,try to {:?}, but now only reached {:?}",
+        fmt = "Unexecuted block,try to {:?}, but now only reached {:?}",
         real,
         expect
     )]
@@ -73,13 +73,13 @@ impl<
         self.mempool.insert(ctx, signed_tx).await
     }
 
-    async fn get_epoch_by_id(&self, _ctx: Context, epoch_id: Option<u64>) -> ProtocolResult<Epoch> {
-        let epoch = match epoch_id {
+    async fn get_epoch_by_id(&self, _ctx: Context, height: Option<u64>) -> ProtocolResult<Block> {
+        let block = match height {
             Some(id) => self.storage.get_epoch_by_epoch_id(id).await?,
             None => self.storage.get_latest_epoch().await?,
         };
 
-        Ok(epoch)
+        Ok(block)
     }
 
     async fn get_receipt_by_tx_hash(
@@ -88,16 +88,16 @@ impl<
         tx_hash: Hash,
     ) -> ProtocolResult<Receipt> {
         let receipt = self.storage.get_receipt(tx_hash).await?;
-        let exec_epoch_id = self.storage.get_latest_epoch().await?.header.exec_epoch_id;
-        let epoch_id = receipt.epoch_id;
-        if exec_epoch_id >= epoch_id {
+        let exec_height = self.storage.get_latest_epoch().await?.header.exec_height;
+        let height = receipt.height;
+        if exec_height >= height {
             return Ok(receipt);
         }
         Err(ProtocolError::new(
             ProtocolErrorKind::API,
             Box::new(APIError::UnExecedError {
-                real:   exec_epoch_id,
-                expect: epoch_id,
+                real:   exec_height,
+                expect: height,
             }),
         ))
     }
@@ -113,7 +113,7 @@ impl<
     async fn query_service(
         &self,
         ctx: Context,
-        epoch_id: u64,
+        height: u64,
         cycles_limit: u64,
         cycles_price: u64,
         caller: Address,
@@ -121,19 +121,19 @@ impl<
         method: String,
         payload: String,
     ) -> ProtocolResult<ExecResp> {
-        let epoch = self.get_epoch_by_id(ctx.clone(), Some(epoch_id)).await?;
+        let block = self.get_epoch_by_id(ctx.clone(), Some(height)).await?;
 
         let executor = EF::from_root(
-            epoch.header.state_root.clone(),
+            block.header.state_root.clone(),
             Arc::clone(&self.trie_db),
             Arc::clone(&self.storage),
             Arc::clone(&self.service_mapping),
         )?;
 
         let params = ExecutorParams {
-            state_root: epoch.header.state_root,
-            epoch_id,
-            timestamp: epoch.header.timestamp,
+            state_root: block.header.state_root,
+            height,
+            timestamp: block.header.timestamp,
             cycles_limit,
         };
         executor.read(&params, &caller, cycles_price, &TransactionRequest {

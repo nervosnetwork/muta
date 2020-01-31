@@ -12,20 +12,20 @@ use crate::ImplStorage;
 fn test_storage_epoch_insert() {
     let storage = ImplStorage::new(Arc::new(MemoryAdapter::new()));
 
-    let epoch_id = 100;
-    let epoch = mock_epoch(epoch_id, Hash::digest(get_random_bytes(10)));
-    let epoch_hash = Hash::digest(epoch.encode_fixed().unwrap());
+    let height = 100;
+    let block = mock_epoch(height, Hash::digest(get_random_bytes(10)));
+    let epoch_hash = Hash::digest(block.encode_fixed().unwrap());
 
-    exec!(storage.insert_epoch(epoch));
+    exec!(storage.insert_epoch(block));
 
-    let epoch = exec!(storage.get_latest_epoch());
-    assert_eq!(epoch_id, epoch.header.epoch_id);
+    let block = exec!(storage.get_latest_epoch());
+    assert_eq!(height, block.header.height);
 
-    let epoch = exec!(storage.get_epoch_by_epoch_id(epoch_id));
-    assert_eq!(epoch_id, epoch.header.epoch_id);
+    let block = exec!(storage.get_epoch_by_epoch_id(height));
+    assert_eq!(height, block.header.height);
 
-    let epoch = exec!(storage.get_epoch_by_hash(epoch_hash));
-    assert_eq!(epoch_id, epoch.header.epoch_id);
+    let block = exec!(storage.get_epoch_by_hash(epoch_hash));
+    assert_eq!(height, block.header.height);
 }
 
 #[test]

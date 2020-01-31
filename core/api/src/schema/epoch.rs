@@ -2,30 +2,30 @@ use crate::schema::{Address, Bytes, Hash, MerkleRoot, Uint64};
 
 #[derive(GraphQLObject, Clone)]
 #[graphql(
-    description = "Epoch is a single digital record created within a blockchain. \
-                   Each epoch contains a record of the previous Epoch, \
+    description = "Block is a single digital record created within a blockchain. \
+                   Each block contains a record of the previous Block, \
                    and when linked together these become the “chain”.\
-                   An epoch is always composed of header and body."
+                   A block is always composed of header and body."
 )]
-pub struct Epoch {
-    #[graphql(description = "The header section of an epoch")]
-    header:            EpochHeader,
-    #[graphql(description = "The body section of an epoch")]
+pub struct Block {
+    #[graphql(description = "The header section of a block")]
+    header:            BlockHeader,
+    #[graphql(description = "The body section of a block")]
     ordered_tx_hashes: Vec<Hash>,
 }
 
 #[derive(GraphQLObject, Clone)]
-#[graphql(description = "An epoch header is like the metadata of an epoch.")]
-pub struct EpochHeader {
+#[graphql(description = "A block header is like the metadata of a block.")]
+pub struct BlockHeader {
     #[graphql(
         description = "Identifier of a chain in order to prevent replay attacks across channels "
     )]
     pub chain_id:          Hash,
     #[graphql(description = "Known as the block height like other blockchain")]
-    pub epoch_id:          Uint64,
-    #[graphql(description = "The hash of the serialized previous epoch")]
+    pub height:          Uint64,
+    #[graphql(description = "The hash of the serialized previous block")]
     pub pre_hash:          Hash,
-    #[graphql(description = "A timestamp that records when the epoch was created")]
+    #[graphql(description = "A timestamp that records when the block was created")]
     pub timestamp:         Uint64,
     #[graphql(description = "The merkle root of ordered transactions")]
     pub order_root:        MerkleRoot,
@@ -37,7 +37,7 @@ pub struct EpochHeader {
     pub receipt_root:      Vec<MerkleRoot>,
     #[graphql(description = "The sum of all transactions costs")]
     pub cycles_used:       Vec<Uint64>,
-    #[graphql(description = "The address descirbed who packed the epoch")]
+    #[graphql(description = "The address descirbed who packed the block")]
     pub proposer:          Address,
     pub proof:             Proof,
     #[graphql(description = "The version of validator is designed for cross chain")]
@@ -46,9 +46,9 @@ pub struct EpochHeader {
 }
 
 #[derive(GraphQLObject, Clone)]
-#[graphql(description = "The verifier of the epoch header proved")]
+#[graphql(description = "The verifier of the block header proved")]
 pub struct Proof {
-    pub epoch_id:   Uint64,
+    pub height:   Uint64,
     pub round:      Uint64,
     pub epoch_hash: Hash,
     pub signature:  Bytes,
@@ -63,11 +63,11 @@ pub struct Validator {
     pub vote_weight:    i32,
 }
 
-impl From<protocol::types::EpochHeader> for EpochHeader {
-    fn from(epoch_header: protocol::types::EpochHeader) -> Self {
-        EpochHeader {
+impl From<protocol::types::BlockHeader> for BlockHeader {
+    fn from(epoch_header: protocol::types::BlockHeader) -> Self {
+        BlockHeader {
             chain_id:          Hash::from(epoch_header.chain_id),
-            epoch_id:          Uint64::from(epoch_header.epoch_id),
+            height:          Uint64::from(epoch_header.height),
             pre_hash:          Hash::from(epoch_header.pre_hash),
             timestamp:         Uint64::from(epoch_header.timestamp),
             order_root:        MerkleRoot::from(epoch_header.order_root),
@@ -99,11 +99,11 @@ impl From<protocol::types::EpochHeader> for EpochHeader {
     }
 }
 
-impl From<protocol::types::Epoch> for Epoch {
-    fn from(epoch: protocol::types::Epoch) -> Self {
-        Epoch {
-            header:            EpochHeader::from(epoch.header),
-            ordered_tx_hashes: epoch
+impl From<protocol::types::Block> for Block {
+    fn from(block: protocol::types::Block) -> Self {
+        Block {
+            header:            BlockHeader::from(block.header),
+            ordered_tx_hashes: block
                 .ordered_tx_hashes
                 .into_iter()
                 .map(MerkleRoot::from)
@@ -115,7 +115,7 @@ impl From<protocol::types::Epoch> for Epoch {
 impl From<protocol::types::Proof> for Proof {
     fn from(proof: protocol::types::Proof) -> Self {
         Proof {
-            epoch_id:   Uint64::from(proof.epoch_id),
+            height:   Uint64::from(proof.height),
             round:      Uint64::from(proof.round),
             epoch_hash: Hash::from(proof.epoch_hash),
             signature:  Bytes::from(proof.signature),

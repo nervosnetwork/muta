@@ -36,7 +36,7 @@ pub enum MsgType {
     #[display(fmt = "Aggregated Vote")]
     AggregateVote,
 
-    #[display(fmt = "Rich Epoch ID")]
+    #[display(fmt = "Rich Block ID")]
     RichEpochID,
 
     #[display(fmt = "Rpc Pull Epochs")]
@@ -77,8 +77,8 @@ pub enum ConsensusError {
     #[display(fmt = "Send {:?} message failed", _0)]
     SendMsgErr(MsgType),
 
-    /// Check epoch error.
-    #[display(fmt = "Check epoch {:?} error", _0)]
+    /// Check block error.
+    #[display(fmt = "Check block {:?} error", _0)]
     CheckEpochErr(StatusCacheField),
 
     /// Decode consensus message error.
@@ -93,31 +93,31 @@ pub enum ConsensusError {
     #[display(fmt = "Overlord error {:?}", _0)]
     OverlordErr(Box<dyn Error + Send>),
 
-    /// Consensus missed last epoch proof.
-    #[display(fmt = "Consensus missed proof of {} epoch", _0)]
+    /// Consensus missed last block proof.
+    #[display(fmt = "Consensus missed proof of {} block", _0)]
     MissingProof(u64),
 
     /// Consensus missed the pill.
     #[display(fmt = "Consensus missed pill cooresponding {:?}", _0)]
     MissingPill(Hash),
 
-    /// Consensus missed the epoch header.
-    #[display(fmt = "Consensus missed epoch header of {} epoch", _0)]
+    /// Consensus missed the block header.
+    #[display(fmt = "Consensus missed block header of {} block", _0)]
     MissingEpochHeader(u64),
 
     /// This boxed error should be a `CryptoError`.
     #[display(fmt = "Crypto error {:?}", _0)]
     CryptoErr(Box<CryptoError>),
 
-    /// The synchronous epoch does not pass the checks.
-    #[display(fmt = "Synchronization {} epoch error", _0)]
+    /// The synchronous block does not pass the checks.
+    #[display(fmt = "Synchronization {} block error", _0)]
     SyncEpochHashErr(u64),
 
-    /// The synchronous epoch does not pass the checks.
-    #[display(fmt = "Synchronization {} epoch error", _0)]
+    /// The synchronous block does not pass the checks.
+    #[display(fmt = "Synchronization {} block error", _0)]
     SyncEpochStateRootErr(u64),
 
-    /// The synchronous epoch proof does not pass the checks.
+    /// The synchronous block proof does not pass the checks.
     #[display(fmt = "Synchronization {} proof error", _0)]
     SyncEpochProofErr(u64),
 
