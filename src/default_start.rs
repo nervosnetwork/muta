@@ -14,9 +14,9 @@ use core_api::config::GraphQLConfig;
 use core_consensus::fixed_types::{FixedBlock, FixedSignedTxs};
 use core_consensus::message::{
     ProposalMessageHandler, PullBlockRpcHandler, PullTxsRpcHandler, QCMessageHandler,
-    RemoteHeightMessageHandler, VoteMessageHandler, BROADCAST_HEIGHT,
-    END_GOSSIP_AGGREGATED_VOTE, END_GOSSIP_SIGNED_PROPOSAL, END_GOSSIP_SIGNED_VOTE,
-    RPC_RESP_SYNC_PULL_BLOCK, RPC_RESP_SYNC_PULL_TXS, RPC_SYNC_PULL_BLOCK, RPC_SYNC_PULL_TXS,
+    RemoteHeightMessageHandler, VoteMessageHandler, BROADCAST_HEIGHT, END_GOSSIP_AGGREGATED_VOTE,
+    END_GOSSIP_SIGNED_PROPOSAL, END_GOSSIP_SIGNED_VOTE, RPC_RESP_SYNC_PULL_BLOCK,
+    RPC_RESP_SYNC_PULL_TXS, RPC_SYNC_PULL_BLOCK, RPC_SYNC_PULL_TXS,
 };
 use core_consensus::status::{CurrentConsensusStatus, StatusAgent};
 use core_consensus::{
