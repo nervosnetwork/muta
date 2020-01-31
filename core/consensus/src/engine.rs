@@ -150,7 +150,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         let current_consensus_status = self.status_agent.to_inner();
         if current_consensus_status.exec_height == height {
             let status = Status {
-                height:       height + 1,
+                height:         height + 1,
                 interval:       Some(current_consensus_status.consensus_interval),
                 authority_list: covert_to_overlord_authority(&current_consensus_status.validators),
             };
@@ -214,7 +214,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         set.clear();
         let current_consensus_status = self.status_agent.to_inner();
         let status = Status {
-            height:       height + 1,
+            height:         height + 1,
             interval:       Some(current_consensus_status.consensus_interval),
             authority_list: covert_to_overlord_authority(&current_consensus_status.validators),
         };
