@@ -13,13 +13,13 @@ use crate::{ConsensusError, MsgType};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum ConsensusRpcRequest {
-    PullEpochs(u64),
+    PullBlocks(u64),
     PullTxs(PullTxsRequest),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ConsensusRpcResponse {
-    PullEpochs(Box<Block>),
+    PullBlocks(Box<Block>),
     PullTxs(Box<FixedSignedTxs>),
 }
 
@@ -27,7 +27,7 @@ pub enum ConsensusRpcResponse {
 impl MessageCodec for ConsensusRpcResponse {
     async fn encode(&mut self) -> ProtocolResult<Bytes> {
         let bytes = match self {
-            ConsensusRpcResponse::PullEpochs(ep) => {
+            ConsensusRpcResponse::PullBlocks(ep) => {
                 let mut tmp = BytesMut::from(ep.encode_fixed()?.as_ref());
                 tmp.extend_from_slice(b"a");
                 tmp
@@ -53,7 +53,7 @@ impl MessageCodec for ConsensusRpcResponse {
         match flag.as_ref() {
             b"a" => {
                 let res: Block = FixedCodec::decode_fixed(bytes)?;
-                Ok(ConsensusRpcResponse::PullEpochs(Box::new(res)))
+                Ok(ConsensusRpcResponse::PullBlocks(Box::new(res)))
             }
 
             b"b" => {

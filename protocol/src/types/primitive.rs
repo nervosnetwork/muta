@@ -17,7 +17,7 @@ lazy_static! {
 }
 
 /// The height of the genesis block.
-pub const GENESIS_EPOCH_ID: u64 = 0;
+pub const GENESIS_HEIGHT: u64 = 0;
 
 /// Hash length
 const HASH_LEN: usize = 32;

@@ -379,7 +379,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
                 "cache previous hash {:?}, block previous hash {:?}",
                 status.prev_hash, block.pre_hash
             );
-            return Err(ConsensusError::CheckEpochErr(StatusCacheField::PrevHash).into());
+            return Err(ConsensusError::CheckBlockErr(StatusCacheField::PrevHash).into());
         }
 
         // check state root
@@ -395,7 +395,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
                 "cache state root {:?}, block state root {:?}",
                 status.state_root, block.state_root
             );
-            return Err(ConsensusError::CheckEpochErr(StatusCacheField::StateRoot).into());
+            return Err(ConsensusError::CheckBlockErr(StatusCacheField::StateRoot).into());
         }
 
         // check confirm root
@@ -411,7 +411,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
                 "cache confirm root {:?}, block confirm root {:?}",
                 status.confirm_root, block.confirm_root
             );
-            return Err(ConsensusError::CheckEpochErr(StatusCacheField::ConfirmRoot).into());
+            return Err(ConsensusError::CheckBlockErr(StatusCacheField::ConfirmRoot).into());
         }
 
         // check receipt root
@@ -427,7 +427,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
                 "cache receipt root {:?}, block receipt root {:?}",
                 status.receipt_root, block.receipt_root
             );
-            return Err(ConsensusError::CheckEpochErr(StatusCacheField::ReceiptRoot).into());
+            return Err(ConsensusError::CheckBlockErr(StatusCacheField::ReceiptRoot).into());
         }
 
         // check cycles used
@@ -443,7 +443,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
                 "cache cycles used {:?}, block cycles used {:?}",
                 status.cycles_used, block.cycles_used
             );
-            return Err(ConsensusError::CheckEpochErr(StatusCacheField::CyclesUsed).into());
+            return Err(ConsensusError::CheckBlockErr(StatusCacheField::CyclesUsed).into());
         }
 
         Ok(())

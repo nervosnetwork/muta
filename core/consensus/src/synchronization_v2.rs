@@ -43,7 +43,7 @@ impl<Adapter: SynchronizationAdapter> Synchronization for OverlordSynchronizatio
         }
 
         log::info!(
-            "[synchronization]: start, remote block id {:?} current block id {:?}",
+            "[synchronization]: start, remote block height {:?} current block height {:?}",
             remote_height,
             current_height,
         );
@@ -88,7 +88,7 @@ impl<Adapter: SynchronizationAdapter> Synchronization for OverlordSynchronizatio
         }
 
         log::info!(
-            "[synchronization] end, remote block id {:?} current block id {:?}",
+            "[synchronization] end, remote block height {:?} current block height {:?}",
             remote_height,
             current_height,
         );

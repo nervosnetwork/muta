@@ -13,10 +13,10 @@ use core_api::adapter::DefaultAPIAdapter;
 use core_api::config::GraphQLConfig;
 use core_consensus::fixed_types::{FixedBlock, FixedSignedTxs};
 use core_consensus::message::{
-    ProposalMessageHandler, PullEpochRpcHandler, PullTxsRpcHandler, QCMessageHandler,
-    RemoteEpochIDMessageHandler, VoteMessageHandler, BROADCAST_EPOCH_ID,
+    ProposalMessageHandler, PullBlockRpcHandler, PullTxsRpcHandler, QCMessageHandler,
+    RemoteHeightMessageHandler, VoteMessageHandler, BROADCAST_HEIGHT,
     END_GOSSIP_AGGREGATED_VOTE, END_GOSSIP_SIGNED_PROPOSAL, END_GOSSIP_SIGNED_VOTE,
-    RPC_RESP_SYNC_PULL_EPOCH, RPC_RESP_SYNC_PULL_TXS, RPC_SYNC_PULL_EPOCH, RPC_SYNC_PULL_TXS,
+    RPC_RESP_SYNC_PULL_BLOCK, RPC_RESP_SYNC_PULL_TXS, RPC_SYNC_PULL_BLOCK, RPC_SYNC_PULL_TXS,
 };
 use core_consensus::status::{CurrentConsensusStatus, StatusAgent};
 use core_consensus::{
@@ -315,14 +315,14 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         Box::new(VoteMessageHandler::new(Arc::clone(&overlord_consensus))),
     )?;
     network_service.register_endpoint_handler(
-        BROADCAST_EPOCH_ID,
-        Box::new(RemoteEpochIDMessageHandler::new(Arc::clone(
+        BROADCAST_HEIGHT,
+        Box::new(RemoteHeightMessageHandler::new(Arc::clone(
             &synchronization,
         ))),
     )?;
     network_service.register_endpoint_handler(
-        RPC_SYNC_PULL_EPOCH,
-        Box::new(PullEpochRpcHandler::new(
+        RPC_SYNC_PULL_BLOCK,
+        Box::new(PullBlockRpcHandler::new(
             Arc::new(network_service.handle()),
             Arc::clone(&storage),
         )),
@@ -334,7 +334,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
             Arc::clone(&storage),
         )),
     )?;
-    network_service.register_rpc_response::<FixedBlock>(RPC_RESP_SYNC_PULL_EPOCH)?;
+    network_service.register_rpc_response::<FixedBlock>(RPC_RESP_SYNC_PULL_BLOCK)?;
     network_service.register_rpc_response::<FixedSignedTxs>(RPC_RESP_SYNC_PULL_TXS)?;
 
     // Run network

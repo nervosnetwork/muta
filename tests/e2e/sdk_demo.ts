@@ -4,7 +4,7 @@ import { muta, CHAIN_CONFIG, delay, client } from "./utils";
 async function main() {
   let q = `
         query {
-            getLatestEpoch {
+            getLatestBlock {
                 header {
                     height
                 }
@@ -15,12 +15,12 @@ async function main() {
   for (let i = 0; i < 10; i++) {
     await delay(100);
     const res = await client.query({ query: gql(q) });
-    console.log(res.data.getLatestEpoch.header);
+    console.log(res.data.getLatestBlock.header);
 
-    const height = await muta_client.getEpochHeight();
+    const height = await muta_client.getBlockHeight();
     console.log(height);
 
-    const height2 = await muta.client.getEpochHeight();
+    const height2 = await muta.client.getBlockHeight();
     console.log(height2);
   }
 }

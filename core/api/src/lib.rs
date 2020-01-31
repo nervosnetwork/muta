@@ -40,7 +40,7 @@ struct Query;
 // Switch to async/await fn https://github.com/graphql-rust/juniper/issues/2
 #[juniper::object(Context = State)]
 impl Query {
-    #[graphql(name = "getEpoch", description = "Get the block")]
+    #[graphql(name = "getBlock", description = "Get the block")]
     fn get_latest_block(state_ctx: &State, height: Option<Uint64>) -> FieldResult<Block> {
         let height = match height {
             Some(id) => Some(id.try_into_u64()?),

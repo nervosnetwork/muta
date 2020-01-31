@@ -162,14 +162,14 @@ impl From<RocksAdapterError> for ProtocolError {
     }
 }
 
-const C_EPOCHS: &str = "c1";
+const C_BLOCKS: &str = "c1";
 const C_SIGNED_TRANSACTIONS: &str = "c2";
 const C_RECEIPTS: &str = "c3";
 const C_WALS: &str = "c4";
 
 fn map_category(c: StorageCategory) -> &'static str {
     match c {
-        StorageCategory::Block => C_EPOCHS,
+        StorageCategory::Block => C_BLOCKS,
         StorageCategory::Receipt => C_RECEIPTS,
         StorageCategory::SignedTransaction => C_SIGNED_TRANSACTIONS,
         StorageCategory::Wal => C_WALS,

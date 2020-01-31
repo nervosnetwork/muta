@@ -48,7 +48,7 @@ node, and then try open http://127.0.0.1:8000/graphiql in the browser.
 </thead>
 <tbody>
 <tr>
-<td colspan="2" valign="top"><strong>getLatestEpoch</strong></td>
+<td colspan="2" valign="top"><strong>getLatestBlock</strong></td>
 <td valign="top"><a href="#block">Block</a>!</td>
 <td>
 

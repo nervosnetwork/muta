@@ -1,8 +1,8 @@
 import { muta, CHAIN_CONFIG, delay } from "./utils";
 
 describe("API test via muta-sdk-js", () => {
-  test("getLatestEpoch", async () => {
-    let current_height = await muta.client.getEpochHeight();
+  test("getLatestBlock", async () => {
+    let current_height = await muta.client.getBlockHeight();
     // console.log(current_height);
     expect(current_height).toBeGreaterThan(0);
   });
@@ -19,7 +19,7 @@ describe("API test via muta-sdk-js", () => {
       asset_id
     );
     const to_balance_before = await muta.client.getBalance(to_addr, asset_id);
-    const height_before = await muta.client.getEpochHeight();
+    const height_before = await muta.client.getBlockHeight();
 
     // transfer
     const account = muta.accountFromPrivateKey(from_pk);
@@ -39,7 +39,7 @@ describe("API test via muta-sdk-js", () => {
     for (i = 0; i < retry_times; i++) {
       // wait at least 2 blocks. Change to confirm after impl
       await delay(CHAIN_CONFIG.consensus.interval * 2 + 100);
-      let height_after = await muta.client.getEpochHeight();
+      let height_after = await muta.client.getBlockHeight();
       if (height_after <= height_before) {
         continue;
       }

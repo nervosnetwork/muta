@@ -36,11 +36,11 @@ pub enum MsgType {
     #[display(fmt = "Aggregated Vote")]
     AggregateVote,
 
-    #[display(fmt = "Rich Block ID")]
-    RichEpochID,
+    #[display(fmt = "Rich Height")]
+    RichHeight,
 
-    #[display(fmt = "Rpc Pull Epochs")]
-    RpcPullEpochs,
+    #[display(fmt = "Rpc Pull Blocks")]
+    RpcPullBlocks,
 
     #[display(fmt = "Rpc Pull Transactions")]
     RpcPullTxs,
@@ -79,7 +79,7 @@ pub enum ConsensusError {
 
     /// Check block error.
     #[display(fmt = "Check block {:?} error", _0)]
-    CheckEpochErr(StatusCacheField),
+    CheckBlockErr(StatusCacheField),
 
     /// Decode consensus message error.
     #[display(fmt = "Decode {:?} message failed", _0)]

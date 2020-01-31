@@ -18,11 +18,11 @@ use crate::fixed_types::{FixedBlock, FixedHeight, FixedSignedTxs, PullTxsRequest
 pub const END_GOSSIP_SIGNED_PROPOSAL: &str = "/gossip/consensus/signed_proposal";
 pub const END_GOSSIP_SIGNED_VOTE: &str = "/gossip/consensus/signed_vote";
 pub const END_GOSSIP_AGGREGATED_VOTE: &str = "/gossip/consensus/qc";
-pub const RPC_SYNC_PULL_EPOCH: &str = "/rpc_call/consensus/sync_pull_block";
-pub const RPC_RESP_SYNC_PULL_EPOCH: &str = "/rpc_resp/consensus/sync_pull_block";
+pub const RPC_SYNC_PULL_BLOCK: &str = "/rpc_call/consensus/sync_pull_block";
+pub const RPC_RESP_SYNC_PULL_BLOCK: &str = "/rpc_resp/consensus/sync_pull_block";
 pub const RPC_SYNC_PULL_TXS: &str = "/rpc_call/consensus/sync_pull_txs";
 pub const RPC_RESP_SYNC_PULL_TXS: &str = "/rpc_resp/consensus/sync_pull_txs";
-pub const BROADCAST_EPOCH_ID: &str = "/gossip/consensus/broadcast_height";
+pub const BROADCAST_HEIGHT: &str = "/gossip/consensus/broadcast_height";
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Proposal(pub Vec<u8>);
@@ -52,11 +52,11 @@ impl From<AggregatedVote> for QC {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-pub struct RichEpochID(pub Vec<u8>);
+pub struct RichHeight(pub Vec<u8>);
 
-impl From<FixedHeight> for RichEpochID {
+impl From<FixedHeight> for RichHeight {
     fn from(id: FixedHeight) -> Self {
-        RichEpochID(serialize(&id).unwrap())
+        RichHeight(serialize(&id).unwrap())
     }
 }
 
@@ -117,18 +117,18 @@ impl<C: Consensus + 'static> MessageHandler for QCMessageHandler<C> {
     }
 }
 
-pub struct RemoteEpochIDMessageHandler<Sy> {
+pub struct RemoteHeightMessageHandler<Sy> {
     synchronization: Arc<Sy>,
 }
 
-impl<Sy: Synchronization + 'static> RemoteEpochIDMessageHandler<Sy> {
+impl<Sy: Synchronization + 'static> RemoteHeightMessageHandler<Sy> {
     pub fn new(synchronization: Arc<Sy>) -> Self {
         Self { synchronization }
     }
 }
 
 #[async_trait]
-impl<Sy: Synchronization + 'static> MessageHandler for RemoteEpochIDMessageHandler<Sy> {
+impl<Sy: Synchronization + 'static> MessageHandler for RemoteHeightMessageHandler<Sy> {
     type Message = u64;
 
     async fn process(&self, ctx: Context, msg: Self::Message) -> ProtocolResult<()> {
@@ -137,23 +137,23 @@ impl<Sy: Synchronization + 'static> MessageHandler for RemoteEpochIDMessageHandl
 }
 
 #[derive(Debug)]
-pub struct PullEpochRpcHandler<R, S> {
+pub struct PullBlockRpcHandler<R, S> {
     rpc:     Arc<R>,
     storage: Arc<S>,
 }
 
-impl<R, S> PullEpochRpcHandler<R, S>
+impl<R, S> PullBlockRpcHandler<R, S>
 where
     R: Rpc + 'static,
     S: Storage + 'static,
 {
     pub fn new(rpc: Arc<R>, storage: Arc<S>) -> Self {
-        PullEpochRpcHandler { rpc, storage }
+        PullBlockRpcHandler { rpc, storage }
     }
 }
 
 #[async_trait]
-impl<R: Rpc + 'static, S: Storage + 'static> MessageHandler for PullEpochRpcHandler<R, S> {
+impl<R: Rpc + 'static, S: Storage + 'static> MessageHandler for PullBlockRpcHandler<R, S> {
     type Message = FixedHeight;
 
     async fn process(&self, ctx: Context, msg: FixedHeight) -> ProtocolResult<()> {
@@ -164,7 +164,7 @@ impl<R: Rpc + 'static, S: Storage + 'static> MessageHandler for PullEpochRpcHand
         self.rpc
             .response(
                 ctx,
-                RPC_RESP_SYNC_PULL_EPOCH,
+                RPC_RESP_SYNC_PULL_BLOCK,
                 FixedBlock::new(block),
                 Priority::High,
             )

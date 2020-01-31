@@ -2,10 +2,10 @@ import gql from "graphql-tag";
 import { client, getNonce, delay, CHAIN_CONFIG, CHAIN_ID } from "./utils";
 
 describe("query API works", () => {
-  test("getLatestEpoch works", async () => {
+  test("getLatestBlock works", async () => {
     let q = `
         query {
-            getLatestEpoch {
+            getLatestBlock {
                 header {
                     height
                 }
@@ -13,13 +13,13 @@ describe("query API works", () => {
         }
         `;
     let res = await client.query({ query: gql(q) });
-    expect(typeof res.data.getLatestEpoch.header.height).toBe("string");
+    expect(typeof res.data.getLatestBlock.header.height).toBe("string");
   });
 
-  test("getLatestEpoch with height works", async () => {
+  test("getLatestBlock with height works", async () => {
     let q = `
         query {
-            getLatestEpoch(height: "0x0") {
+            getLatestBlock(height: "0x0") {
                 header {
                     height
                 }
@@ -27,7 +27,7 @@ describe("query API works", () => {
         }
         `;
     let res = await client.query({ query: gql(q) });
-    expect(res.data.getLatestEpoch.header.height).toBe("0000000000000000");
+    expect(res.data.getLatestBlock.header.height).toBe("0000000000000000");
   });
 });
 
@@ -41,7 +41,7 @@ describe("transfer work", () => {
       "fee0decb4f6a76d402f200b5642a9236ba455c22aa80ef82d69fc70ea5ba20b5";
     const q_balance = `
           query {
-            height: getLatestEpoch {
+            height: getLatestBlock {
                 header {
                   height
                 }

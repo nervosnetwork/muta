@@ -23,7 +23,7 @@ use protocol::{fixed_codec::FixedCodec, ProtocolResult};
 
 use crate::consensus::gen_overlord_status;
 use crate::fixed_types::{FixedBlock, FixedHeight, FixedPill, FixedSignedTxs, PullTxsRequest};
-use crate::message::{BROADCAST_EPOCH_ID, RPC_SYNC_PULL_EPOCH, RPC_SYNC_PULL_TXS};
+use crate::message::{BROADCAST_HEIGHT, RPC_SYNC_PULL_BLOCK, RPC_SYNC_PULL_TXS};
 use crate::status::{StatusAgent, UpdateInfo};
 use crate::util::{ExecuteInfo, WalInfoQueue};
 use crate::ConsensusError;
@@ -282,7 +282,7 @@ where
             .rpc
             .call::<FixedHeight, FixedBlock>(
                 ctx,
-                RPC_SYNC_PULL_EPOCH,
+                RPC_SYNC_PULL_BLOCK,
                 FixedHeight::new(height),
                 Priority::High,
             )
@@ -370,7 +370,7 @@ where
 
     async fn broadcast_height(&self, ctx: Context, height: u64) -> ProtocolResult<()> {
         self.network
-            .broadcast(ctx.clone(), BROADCAST_EPOCH_ID, height, Priority::High)
+            .broadcast(ctx.clone(), BROADCAST_HEIGHT, height, Priority::High)
             .await
     }
 }

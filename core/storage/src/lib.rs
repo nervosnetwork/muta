@@ -22,7 +22,7 @@ use protocol::Bytes;
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
 lazy_static! {
-    pub static ref LATEST_EPOCH_KEY: Hash = Hash::digest(Bytes::from("latest_hash"));
+    pub static ref LATEST_BLOCK_KEY: Hash = Hash::digest(Bytes::from("latest_hash"));
     pub static ref LATEST_PROOF_KEY: Hash = Hash::digest(Bytes::from("latest_proof"));
     pub static ref OVERLORD_WAL_KEY: Hash = Hash::digest(Bytes::from("overlord_wal"));
     pub static ref MUTA_WAL_KEY: Hash = Hash::digest(Bytes::from("muta_wal"));
@@ -67,9 +67,9 @@ impl_storage_schema_for!(
     SignedTransaction
 );
 impl_storage_schema_for!(ReceiptSchema, Hash, Receipt, Receipt);
-impl_storage_schema_for!(EpochSchema, u64, Block, Block);
-impl_storage_schema_for!(HashEpochSchema, Hash, u64, Block);
-impl_storage_schema_for!(LatestEpochSchema, Hash, Block, Block);
+impl_storage_schema_for!(BlockSchema, u64, Block, Block);
+impl_storage_schema_for!(HashBlockSchema, Hash, u64, Block);
+impl_storage_schema_for!(LatestBlockSchema, Hash, Block, Block);
 impl_storage_schema_for!(LatestProofSchema, Hash, Proof, Block);
 impl_storage_schema_for!(OverlordWalSchema, Hash, Bytes, Wal);
 impl_storage_schema_for!(MutaWalSchema, Hash, Bytes, Wal);
@@ -122,13 +122,13 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
         let block_hash = Hash::digest(block.encode_fixed()?);
 
         self.adapter
-            .insert::<EpochSchema>(height.clone(), block.clone())
+            .insert::<BlockSchema>(height.clone(), block.clone())
             .await?;
         self.adapter
-            .insert::<HashEpochSchema>(block_hash, height)
+            .insert::<HashBlockSchema>(block_hash, height)
             .await?;
         self.adapter
-            .insert::<LatestEpochSchema>(LATEST_EPOCH_KEY.clone(), block.clone())
+            .insert::<LatestBlockSchema>(LATEST_BLOCK_KEY.clone(), block.clone())
             .await?;
 
         self.latest_block.write().await.replace(block);
@@ -164,18 +164,18 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
         if let Some(block) = opt_block {
             Ok(block)
         } else {
-            Ok(get!(self, LATEST_EPOCH_KEY.clone(), LatestEpochSchema))
+            Ok(get!(self, LATEST_BLOCK_KEY.clone(), LatestBlockSchema))
         }
     }
 
     async fn get_block_by_height(&self, height: u64) -> ProtocolResult<Block> {
-        let block = get!(self, height, EpochSchema);
+        let block = get!(self, height, BlockSchema);
         Ok(block)
     }
 
     async fn get_block_by_hash(&self, block_hash: Hash) -> ProtocolResult<Block> {
-        let height = get!(self, block_hash, HashEpochSchema);
-        let block = get!(self, height, EpochSchema);
+        let height = get!(self, block_hash, HashBlockSchema);
+        let block = get!(self, height, BlockSchema);
         Ok(block)
     }
 
