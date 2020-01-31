@@ -2,32 +2,32 @@ import gql from "graphql-tag";
 import { client, getNonce, delay, CHAIN_CONFIG, CHAIN_ID } from "./utils";
 
 describe("query API works", () => {
-  test("getLatestEpoch works", async () => {
+  test("getLatestBlock works", async () => {
     let q = `
         query {
-            getLatestEpoch {
+            getLatestBlock {
                 header {
-                    epochId
+                    height
                 }
             }
         }
         `;
     let res = await client.query({ query: gql(q) });
-    expect(typeof res.data.getLatestEpoch.header.epochId).toBe("string");
+    expect(typeof res.data.getLatestBlock.header.height).toBe("string");
   });
 
-  test("getLatestEpoch with epochId works", async () => {
+  test("getLatestBlock with height works", async () => {
     let q = `
         query {
-            getLatestEpoch(epochId: "0x0") {
+            getLatestBlock(height: "0x0") {
                 header {
-                    epochId
+                    height
                 }
             }
         }
         `;
     let res = await client.query({ query: gql(q) });
-    expect(res.data.getLatestEpoch.header.epochId).toBe("0000000000000000");
+    expect(res.data.getLatestBlock.header.height).toBe("0000000000000000");
   });
 });
 
@@ -41,9 +41,9 @@ describe("transfer work", () => {
       "fee0decb4f6a76d402f200b5642a9236ba455c22aa80ef82d69fc70ea5ba20b5";
     const q_balance = `
           query {
-            height: getLatestEpoch {
+            height: getLatestBlock {
                 header {
-                  epochId
+                  height
                 }
               }
             from: getBalance(
@@ -59,7 +59,7 @@ describe("transfer work", () => {
     let res = await client.query({ query: gql(q_balance) });
     const from_balance_before = parseInt(res.data.from, 16);
     const to_balance_before = parseInt(res.data.to, 16);
-    const current_height_before = parseInt(res.data.height.header.epochId, 16);
+    const current_height_before = parseInt(res.data.height.header.height, 16);
 
     // transfer
     let q_transfer = `
@@ -90,7 +90,7 @@ mutation {
       await delay(CHAIN_CONFIG.consensus.interval * 2 + 100);
       res = await client.query({ query: gql(q_balance) });
       // console.log(Date.now(), res, res.data.height);
-      const current_height_after = parseInt(res.data.height.header.epochId, 16);
+      const current_height_after = parseInt(res.data.height.header.height, 16);
       const from_balance_after = parseInt(res.data.from, 16);
       const to_balance_after = parseInt(res.data.to, 16);
       if (current_height_after <= current_height_before) {

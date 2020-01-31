@@ -13,7 +13,7 @@ use protocol::traits::{
     ExecutorParams, Service, ServiceSDK, StoreArray, StoreBool, StoreMap, StoreString, StoreUint64,
 };
 use protocol::types::{
-    Address, Epoch, Hash, Receipt, ServiceContext, ServiceContextParams, SignedTransaction,
+    Address, Block, Hash, Receipt, ServiceContext, ServiceContextParams, SignedTransaction,
 };
 use protocol::ProtocolResult;
 
@@ -49,28 +49,28 @@ fn test_read_and_write() {
 #[test]
 fn test_hooks() {
     struct Tests {
-        pub epoch_id: u64,
+        pub height: u64,
     };
 
     impl Tests {
         #[hook_after]
         fn hook_after(&mut self, params: &ExecutorParams) -> ProtocolResult<()> {
-            self.epoch_id = params.epoch_id;
+            self.height = params.height;
             Ok(())
         }
 
         #[hook_before]
         fn hook_before(&mut self, params: &ExecutorParams) -> ProtocolResult<()> {
-            self.epoch_id = params.epoch_id;
+            self.height = params.height;
             Ok(())
         }
     }
 
-    let mut t = Tests { epoch_id: 0 };
+    let mut t = Tests { height: 0 };
     t.hook_after(&mock_executor_params()).unwrap();
-    assert_eq!(t.epoch_id, 9);
+    assert_eq!(t.height, 9);
     t.hook_before(&mock_executor_params()).unwrap();
-    assert_eq!(t.epoch_id, 9);
+    assert_eq!(t.height, 9);
 }
 
 #[test]
@@ -403,7 +403,7 @@ fn get_context(cycles_limit: u64, service: &str, method: &str, payload: &str) ->
         cycles_price: 1,
         cycles_used: Rc::new(RefCell::new(0)),
         caller: Address::from_hash(Hash::from_empty()).unwrap(),
-        epoch_id: 1,
+        height: 1,
         timestamp: 0,
         service_name: service.to_owned(),
         service_method: method.to_owned(),
@@ -418,7 +418,7 @@ fn get_context(cycles_limit: u64, service: &str, method: &str, payload: &str) ->
 fn mock_executor_params() -> ExecutorParams {
     ExecutorParams {
         state_root:   Hash::default(),
-        epoch_id:     9,
+        height:       9,
         timestamp:    99,
         cycles_limit: 99999,
     }
@@ -503,10 +503,10 @@ impl ServiceSDK for MockServiceSDK {
         unimplemented!()
     }
 
-    // Get a epoch by `epoch_id`
+    // Get a block by `height`
     // if not found on the chain, return None
-    // When the parameter `epoch_id` is None, get the latest (executing)` epoch`
-    fn get_epoch_by_epoch_id(&self, _epoch_id: Option<u64>) -> ProtocolResult<Option<Epoch>> {
+    // When the parameter `height` is None, get the latest (executing)` block`
+    fn get_block_by_height(&self, _height: Option<u64>) -> ProtocolResult<Option<Block>> {
         unimplemented!()
     }
 

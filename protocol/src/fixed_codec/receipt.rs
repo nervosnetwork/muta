@@ -9,7 +9,7 @@ impl rlp::Encodable for Receipt {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
         s.begin_list(6);
         s.append(&self.cycles_used);
-        s.append(&self.epoch_id);
+        s.append(&self.height);
         s.begin_list(self.events.len());
         for e in &self.events {
             s.append(e);
@@ -27,7 +27,7 @@ impl rlp::Decodable for Receipt {
         }
 
         let cycles_used: u64 = r.at(0)?.as_val()?;
-        let epoch_id = r.at(1)?.as_val()?;
+        let height = r.at(1)?.as_val()?;
         let events: Vec<Event> = r.at(2)?.as_list()?;
         let response: ReceiptResponse = rlp::decode(r.at(3)?.as_raw())?;
         let state_root = rlp::decode(r.at(4)?.as_raw())?;
@@ -35,7 +35,7 @@ impl rlp::Decodable for Receipt {
 
         Ok(Receipt {
             state_root,
-            epoch_id,
+            height,
             events,
             tx_hash,
             cycles_used,

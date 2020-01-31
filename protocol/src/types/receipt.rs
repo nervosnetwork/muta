@@ -9,7 +9,7 @@ pub struct Event {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Receipt {
     pub state_root:  MerkleRoot,
-    pub epoch_id:    u64,
+    pub height:      u64,
     pub tx_hash:     Hash,
     pub cycles_used: u64,
     pub events:      Vec<Event>,

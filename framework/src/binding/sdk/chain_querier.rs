@@ -4,7 +4,7 @@ use derive_more::{Display, From};
 use futures::executor::block_on;
 
 use protocol::traits::{ChainQuerier, Storage};
-use protocol::types::{Epoch, Hash, Receipt, SignedTransaction};
+use protocol::types::{Block, Hash, Receipt, SignedTransaction};
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
 pub struct DefaultChainQuerier<S: Storage> {
@@ -25,14 +25,14 @@ impl<S: Storage> ChainQuerier for DefaultChainQuerier<S> {
         Ok(Some(ret))
     }
 
-    fn get_epoch_by_epoch_id(&self, epoch_id: Option<u64>) -> ProtocolResult<Option<Epoch>> {
-        if let Some(u) = epoch_id {
-            let ret = block_on(self.storage.get_epoch_by_epoch_id(u))
+    fn get_block_by_height(&self, height: Option<u64>) -> ProtocolResult<Option<Block>> {
+        if let Some(u) = height {
+            let ret = block_on(self.storage.get_block_by_height(u))
                 .map_err(|_| ChainQueryError::AsyncStorage)?;
 
             Ok(Some(ret))
         } else {
-            let ret = block_on(self.storage.get_latest_epoch())
+            let ret = block_on(self.storage.get_latest_block())
                 .map_err(|_| ChainQueryError::AsyncStorage)?;
 
             Ok(Some(ret))

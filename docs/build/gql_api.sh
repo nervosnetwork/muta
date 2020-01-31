@@ -19,7 +19,7 @@ if [ ! -z "$1" ]; then
 fi
 
 res_code=$(curl --write-out %{http_code} --silent --output /dev/null \
-            -X POST -d '{"query":"query { getLatestEpoch { header { epochId }}}"}' \
+            -X POST -d '{"query":"query { getLatestBlock { header { height }}}"}' \
             $endpoint)
 
 if [ $res_code -ne 200 ]; then

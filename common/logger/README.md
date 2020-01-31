@@ -19,7 +19,7 @@ metrics = true
 If `log_to_console` is `true`, logs like below will be logged to console.
 
 ```
-[2019-12-02T10:02:45.779337+08:00 INFO overlord::state::process] Overlord: state receive commit event epoch ID 11220, round 0
+[2019-12-02T10:02:45.779337+08:00 INFO overlord::state::process] Overlord: state receive commit event height 11220, round 0
 ```
 
 If `console_show_file_and_line` is `true`, log file and line number will also be logged to console, pretty useful for debugging.
@@ -42,15 +42,15 @@ This crate uses `log4rs` to init the logger, but you don't need to add dependenc
 Metrics is an independent logger, it `metrics` is `true`, the metrics will be logged to `{log_path}/metrics.log`.
 
 ```
-{"time":"2019-12-01T22:02:49.035084+08:00","message":"{\"epoch_id\":7943,\"name\":\"save_epoch\",\"ordered_tx_num\":0}","module_path":"common_logger","file":"common/logger/src/lib.rs","line":83,"level":"TRACE","target":"metrics","thread":"tokio-runtime-worker-3","thread_id":123145445486592,"mdc":{}}
+{"time":"2019-12-01T22:02:49.035084+08:00","message":"{\"height\":7943,\"name\":\"save_block\",\"ordered_tx_num\":0}","module_path":"common_logger","file":"common/logger/src/lib.rs","line":83,"level":"TRACE","target":"metrics","thread":"tokio-runtime-worker-3","thread_id":123145445486592,"mdc":{}}
 ```
 
 If you want to use log metrics in a module, you need to add this crate as dependency and use the code below to add a metric. The `name` field is reserved, please avoid using this as a key in your metrics.
 
 ```rust
-common_logger::metrics("save_epoch", common_logger::object! {
-    "epoch_id" => epoch.header.epoch_id,
-    "ordered_tx_num" => epoch.ordered_tx_hashes.len(),
+common_logger::metrics("save_block", common_logger::object! {
+    "height" => block.header.height,
+    "ordered_tx_num" => block.ordered_tx_hashes.len(),
 });
 ```
 

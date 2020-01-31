@@ -21,7 +21,7 @@ pub struct Receipt {
     pub state_root: Option<Hash>,
 
     #[prost(uint64, tag = "2")]
-    pub epoch_id: u64,
+    pub height: u64,
 
     #[prost(message, tag = "3")]
     pub tx_hash: Option<Hash>,
@@ -102,7 +102,7 @@ impl From<receipt::Receipt> for Receipt {
 
         Receipt {
             state_root,
-            epoch_id: receipt.epoch_id,
+            height: receipt.height,
             tx_hash,
             cycles_used: receipt.cycles_used,
             events,
@@ -126,7 +126,7 @@ impl TryFrom<Receipt> for receipt::Receipt {
 
         let receipt = receipt::Receipt {
             state_root: protocol_primitive::Hash::try_from(state_root)?,
-            epoch_id: receipt.epoch_id,
+            height: receipt.height,
             tx_hash: protocol_primitive::Hash::try_from(tx_hash)?,
             cycles_used: receipt.cycles_used,
             events,

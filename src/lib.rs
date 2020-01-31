@@ -9,7 +9,7 @@ use std::sync::Arc;
 use derive_more::{Display, From};
 
 use protocol::traits::ServiceMapping;
-use protocol::types::{Epoch, Genesis};
+use protocol::types::{Block, Genesis};
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
 use crate::config::Config;
@@ -97,7 +97,7 @@ impl<Mapping: 'static + ServiceMapping> Muta<Mapping> {
         Ok(())
     }
 
-    async fn create_genesis(&self) -> ProtocolResult<Epoch> {
+    async fn create_genesis(&self) -> ProtocolResult<Block> {
         create_genesis(
             &self.config,
             &self.genesis,

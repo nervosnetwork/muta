@@ -6,7 +6,7 @@ use bytes::Bytes;
 use test::Bencher;
 
 use crate::codec::ProtocolCodecSync;
-use crate::types::epoch::Epoch;
+use crate::types::block::Block;
 use crate::types::transaction::SignedTransaction;
 use crate::{codec, types};
 
@@ -36,11 +36,11 @@ fn test_codec() {
     test!(transaction, SignedTransaction, mock_sign_tx);
     test!(transaction, WalSaveTxs, mock_wal_txs, 100);
 
-    test!(epoch, Validator, mock_validator);
-    test!(epoch, Proof, mock_proof);
-    test!(epoch, EpochHeader, mock_epoch_header);
-    test!(epoch, Epoch, mock_epoch, 100);
-    test!(epoch, Pill, mock_pill, 100, 200);
+    test!(block, Validator, mock_validator);
+    test!(block, Proof, mock_proof);
+    test!(block, BlockHeader, mock_block_header);
+    test!(block, Block, mock_block, 100);
+    test!(block, Pill, mock_pill, 100, 200);
 }
 
 #[test]
@@ -77,19 +77,19 @@ fn bench_signed_tx_deserialize(b: &mut Bencher) {
 }
 
 #[bench]
-fn bench_epoch_serialize(b: &mut Bencher) {
-    let epoch = mock_epoch(50_000);
+fn bench_block_serialize(b: &mut Bencher) {
+    let block = mock_block(50_000);
 
     b.iter(|| {
-        epoch.encode_sync().unwrap();
+        block.encode_sync().unwrap();
     });
 }
 
 #[bench]
-fn bench_epoch_try_into(b: &mut Bencher) {
-    let epoch = mock_epoch(50_000).encode_sync().unwrap();
+fn bench_block_try_into(b: &mut Bencher) {
+    let block = mock_block(50_000).encode_sync().unwrap();
 
     b.iter(|| {
-        Epoch::decode_sync(epoch.clone()).unwrap();
+        Block::decode_sync(block.clone()).unwrap();
     });
 }

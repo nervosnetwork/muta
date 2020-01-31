@@ -29,7 +29,7 @@ $ cd muta
 $ cargo run --release --example muta-chain
 ```
 
-You can also run muta chain with your custom config and gensis epoch:
+You can also run muta chain with your custom config and gensis block:
 
 ```shell
 $ CONFIG=$confit_path GENESIS=$genesis_path cargo run --release --example muta-chain

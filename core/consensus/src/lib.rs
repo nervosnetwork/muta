@@ -4,7 +4,7 @@ mod engine;
 pub mod fixed_types;
 pub mod message;
 pub mod status;
-pub mod synchronization_v2;
+pub mod synchronization;
 #[cfg(test)]
 mod tests;
 pub mod trace;
@@ -12,7 +12,7 @@ pub mod util;
 
 pub use crate::adapter::OverlordConsensusAdapter;
 pub use crate::consensus::OverlordConsensus;
-pub use crate::synchronization_v2::OverlordSynchronization;
+pub use crate::synchronization::OverlordSynchronization;
 pub use crate::util::WalInfoQueue;
 pub use overlord::{types::Node, DurationConfig};
 
@@ -36,11 +36,11 @@ pub enum MsgType {
     #[display(fmt = "Aggregated Vote")]
     AggregateVote,
 
-    #[display(fmt = "Rich Epoch ID")]
-    RichEpochID,
+    #[display(fmt = "Rich Height")]
+    RichHeight,
 
-    #[display(fmt = "Rpc Pull Epochs")]
-    RpcPullEpochs,
+    #[display(fmt = "Rpc Pull Blocks")]
+    RpcPullBlocks,
 
     #[display(fmt = "Rpc Pull Transactions")]
     RpcPullTxs,
@@ -77,9 +77,9 @@ pub enum ConsensusError {
     #[display(fmt = "Send {:?} message failed", _0)]
     SendMsgErr(MsgType),
 
-    /// Check epoch error.
-    #[display(fmt = "Check epoch {:?} error", _0)]
-    CheckEpochErr(StatusCacheField),
+    /// Check block error.
+    #[display(fmt = "Check block {:?} error", _0)]
+    CheckBlockErr(StatusCacheField),
 
     /// Decode consensus message error.
     #[display(fmt = "Decode {:?} message failed", _0)]
@@ -93,33 +93,25 @@ pub enum ConsensusError {
     #[display(fmt = "Overlord error {:?}", _0)]
     OverlordErr(Box<dyn Error + Send>),
 
-    /// Consensus missed last epoch proof.
-    #[display(fmt = "Consensus missed proof of {} epoch", _0)]
+    /// Consensus missed last block proof.
+    #[display(fmt = "Consensus missed proof of {} block", _0)]
     MissingProof(u64),
 
     /// Consensus missed the pill.
     #[display(fmt = "Consensus missed pill cooresponding {:?}", _0)]
     MissingPill(Hash),
 
-    /// Consensus missed the epoch header.
-    #[display(fmt = "Consensus missed epoch header of {} epoch", _0)]
-    MissingEpochHeader(u64),
+    /// Consensus missed the block header.
+    #[display(fmt = "Consensus missed block header of {} block", _0)]
+    MissingBlockHeader(u64),
 
     /// This boxed error should be a `CryptoError`.
     #[display(fmt = "Crypto error {:?}", _0)]
     CryptoErr(Box<CryptoError>),
 
-    /// The synchronous epoch does not pass the checks.
-    #[display(fmt = "Synchronization {} epoch error", _0)]
-    SyncEpochHashErr(u64),
-
-    /// The synchronous epoch does not pass the checks.
-    #[display(fmt = "Synchronization {} epoch error", _0)]
-    SyncEpochStateRootErr(u64),
-
-    /// The synchronous epoch proof does not pass the checks.
-    #[display(fmt = "Synchronization {} proof error", _0)]
-    SyncEpochProofErr(u64),
+    /// The synchronous block does not pass the checks.
+    #[display(fmt = "Synchronization {} block error", _0)]
+    SyncBlockHashErr(u64),
 
     /// The Rpc response mismatch the request.
     #[display(fmt = "Synchronization Rpc {:?} message mismatch", _0)]

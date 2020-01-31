@@ -9,7 +9,7 @@ use protocol::fixed_codec::FixedCodec;
 use protocol::traits::{
     Context, ExecutorParams, ExecutorResp, Synchronization, SynchronizationAdapter,
 };
-use protocol::types::{Epoch, Hash, Receipt, SignedTransaction};
+use protocol::types::{Block, Hash, Receipt, SignedTransaction};
 use protocol::ProtocolResult;
 
 use crate::status::{CurrentConsensusStatus, StatusAgent, UpdateInfo};
@@ -18,8 +18,8 @@ use crate::ConsensusError;
 const POLLING_BROADCAST: u64 = 2000;
 
 #[derive(Clone, Debug)]
-pub struct RichEpoch {
-    pub epoch: Epoch,
+pub struct RichBlock {
+    pub block: Block,
     pub txs:   Vec<SignedTransaction>,
 }
 
@@ -31,9 +31,9 @@ pub struct OverlordSynchronization<Adapter: SynchronizationAdapter> {
 
 #[async_trait]
 impl<Adapter: SynchronizationAdapter> Synchronization for OverlordSynchronization<Adapter> {
-    async fn receive_remote_epoch(&self, ctx: Context, remote_epoch_id: u64) -> ProtocolResult<()> {
-        let mut current_epoch_id = self.adapter.get_current_epoch_id(Context::new()).await?;
-        if remote_epoch_id == 0 || current_epoch_id >= remote_epoch_id - 1 {
+    async fn receive_remote_block(&self, ctx: Context, remote_height: u64) -> ProtocolResult<()> {
+        let mut current_height = self.adapter.get_current_height(Context::new()).await?;
+        if remote_height == 0 || current_height >= remote_height - 1 {
             return Ok(());
         }
         // Lock the consensus engine, block commit process.
@@ -43,45 +43,43 @@ impl<Adapter: SynchronizationAdapter> Synchronization for OverlordSynchronizatio
         }
 
         log::info!(
-            "[synchronization]: start, remote epoch id {:?} current epoch id {:?}",
-            remote_epoch_id,
-            current_epoch_id,
+            "[synchronization]: start, remote block height {:?} current block height {:?}",
+            remote_height,
+            current_height,
         );
 
-        let sync_status_agent = self
-            .init_status_agent(ctx.clone(), current_epoch_id)
-            .await?;
+        let sync_status_agent = self.init_status_agent(ctx.clone(), current_height).await?;
 
         loop {
-            let current_epoch = self
+            let current_block = self
                 .adapter
-                .get_epoch_by_id(ctx.clone(), current_epoch_id)
+                .get_block_by_height(ctx.clone(), current_height)
                 .await?;
 
-            let next_epoch_id = current_epoch_id + 1;
+            let next_height = current_height + 1;
 
-            let next_rich_epoch = self
-                .get_rich_epoch_from_remote(ctx.clone(), next_epoch_id)
+            let next_rich_block = self
+                .get_rich_block_from_remote(ctx.clone(), next_height)
                 .await?;
 
-            self.verify_epoch(&current_epoch, &next_rich_epoch.epoch)?;
+            self.verify_block(&current_block, &next_rich_block.block)?;
 
-            self.commit_epoch(ctx.clone(), next_rich_epoch, sync_status_agent.clone())
+            self.commit_block(ctx.clone(), next_rich_block, sync_status_agent.clone())
                 .await?;
 
             self.adapter
-                .broadcast_epoch_id(ctx.clone(), current_epoch_id)
+                .broadcast_height(ctx.clone(), current_height)
                 .await?;
 
-            current_epoch_id = next_epoch_id;
+            current_height = next_height;
 
-            if current_epoch_id >= remote_epoch_id {
+            if current_height >= remote_height {
                 let mut sync_status = sync_status_agent.to_inner();
-                sync_status.epoch_id += 1;
+                sync_status.height += 1;
                 self.status.replace(sync_status.clone());
                 self.adapter.update_status(
                     ctx.clone(),
-                    sync_status.epoch_id,
+                    sync_status.height,
                     sync_status.consensus_interval,
                     sync_status.validators,
                 )?;
@@ -90,9 +88,9 @@ impl<Adapter: SynchronizationAdapter> Synchronization for OverlordSynchronizatio
         }
 
         log::info!(
-            "[synchronization] end, remote epoch id {:?} current epoch id {:?}",
-            remote_epoch_id,
-            current_epoch_id,
+            "[synchronization] end, remote block height {:?} current block height {:?}",
+            remote_height,
+            current_height,
         );
         Ok(())
     }
@@ -109,10 +107,10 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
 
     pub async fn polling_broadcast(&self) -> ProtocolResult<()> {
         loop {
-            let current_epoch_id = self.adapter.get_current_epoch_id(Context::new()).await?;
-            if current_epoch_id != 0 {
+            let current_height = self.adapter.get_current_height(Context::new()).await?;
+            if current_height != 0 {
                 self.adapter
-                    .broadcast_epoch_id(Context::new(), current_epoch_id)
+                    .broadcast_height(Context::new(), current_height)
                     .await?;
             }
             Delay::new(Duration::from_millis(POLLING_BROADCAST)).await;
@@ -121,61 +119,61 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
 
     // TODO(yejiayu):
     // - Verify the proof
-    // - Verify the epoch header
+    // - Verify the block header
     // - Verify the transaction list
-    fn verify_epoch(&self, current_epoch: &Epoch, next_epoch: &Epoch) -> ProtocolResult<()> {
-        let epoch_hash = Hash::digest(current_epoch.encode_fixed()?);
+    fn verify_block(&self, current_block: &Block, next_block: &Block) -> ProtocolResult<()> {
+        let block_hash = Hash::digest(current_block.encode_fixed()?);
 
-        if epoch_hash != next_epoch.header.pre_hash {
-            return Err(ConsensusError::SyncEpochHashErr(next_epoch.header.epoch_id).into());
+        if block_hash != next_block.header.pre_hash {
+            return Err(ConsensusError::SyncBlockHashErr(next_block.header.height).into());
         }
         Ok(())
     }
 
-    async fn commit_epoch(
+    async fn commit_block(
         &self,
         ctx: Context,
-        rich_epoch: RichEpoch,
+        rich_block: RichBlock,
         status_agent: StatusAgent,
     ) -> ProtocolResult<()> {
         let executor_resp = self
-            .exec_epoch(ctx.clone(), rich_epoch.clone(), status_agent.clone())
+            .exec_block(ctx.clone(), rich_block.clone(), status_agent.clone())
             .await?;
 
-        let epoch = &rich_epoch.epoch;
-        let epoch_hash = Hash::digest(epoch.encode_fixed()?);
+        let block = &rich_block.block;
+        let block_hash = Hash::digest(block.encode_fixed()?);
         status_agent.update_after_sync_commit(
-            epoch.header.epoch_id,
-            epoch.clone(),
-            epoch_hash,
-            epoch.header.proof.clone(),
+            block.header.height,
+            block.clone(),
+            block_hash,
+            block.header.proof.clone(),
         );
 
         self.save_chain_data(
             ctx.clone(),
-            rich_epoch.txs.clone(),
+            rich_block.txs.clone(),
             executor_resp.receipts.clone(),
-            rich_epoch.epoch.clone(),
+            rich_block.block.clone(),
         )
         .await?;
         Ok(())
     }
 
-    async fn get_rich_epoch_from_remote(
+    async fn get_rich_block_from_remote(
         &self,
         ctx: Context,
-        epoch_id: u64,
-    ) -> ProtocolResult<RichEpoch> {
-        let epoch = self
+        height: u64,
+    ) -> ProtocolResult<RichBlock> {
+        let block = self
             .adapter
-            .get_epoch_from_remote(ctx.clone(), epoch_id)
+            .get_block_from_remote(ctx.clone(), height)
             .await?;
         let txs = self
             .adapter
-            .get_txs_from_remote(ctx, &epoch.ordered_tx_hashes)
+            .get_txs_from_remote(ctx, &block.ordered_tx_hashes)
             .await?;
 
-        Ok(RichEpoch { epoch, txs })
+        Ok(RichBlock { block, txs })
     }
 
     async fn save_chain_data(
@@ -183,21 +181,21 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
         ctx: Context,
         txs: Vec<SignedTransaction>,
         receipts: Vec<Receipt>,
-        epoch: Epoch,
+        block: Block,
     ) -> ProtocolResult<()> {
         self.adapter.save_signed_txs(ctx.clone(), txs).await?;
         self.adapter.save_receipts(ctx.clone(), receipts).await?;
         self.adapter
-            .save_proof(ctx.clone(), epoch.header.proof.clone())
+            .save_proof(ctx.clone(), block.header.proof.clone())
             .await?;
-        self.adapter.save_epoch(ctx.clone(), epoch).await?;
+        self.adapter.save_block(ctx.clone(), block).await?;
         Ok(())
     }
 
-    async fn exec_epoch(
+    async fn exec_block(
         &self,
         ctx: Context,
-        rich_epoch: RichEpoch,
+        rich_block: RichBlock,
         status_agent: StatusAgent,
     ) -> ProtocolResult<ExecutorResp> {
         let current_status = status_agent.to_inner();
@@ -205,44 +203,50 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
 
         let exec_params = ExecutorParams {
             state_root: current_status.latest_state_root.clone(),
-            epoch_id: rich_epoch.epoch.header.epoch_id,
-            timestamp: rich_epoch.epoch.header.timestamp,
+            height: rich_block.block.header.height,
+            timestamp: rich_block.block.header.timestamp,
             cycles_limit,
         };
         let resp = self
             .adapter
-            .sync_exec(ctx.clone(), &exec_params, &rich_epoch.txs)?;
+            .sync_exec(ctx.clone(), &exec_params, &rich_block.txs)?;
 
         status_agent.update_after_exec(UpdateInfo::with_after_exec(
-            rich_epoch.epoch.header.epoch_id,
-            rich_epoch.epoch.header.order_root.clone(),
+            rich_block.block.header.height,
+            rich_block.block.header.order_root.clone(),
             resp.clone(),
         ));
 
         // If there are transactions in the trasnaction pool that have been on chain
         // after this execution, make sure they are cleaned up.
         self.adapter
-            .flush_mempool(ctx.clone(), &rich_epoch.epoch.ordered_tx_hashes)
+            .flush_mempool(ctx.clone(), &rich_block.block.ordered_tx_hashes)
             .await?;
         Ok(resp)
     }
 
-    async fn get_rich_epoch_from_local(
+    async fn get_rich_block_from_local(
         &self,
         ctx: Context,
-        epoch_id: u64,
-    ) -> ProtocolResult<RichEpoch> {
-        let epoch = self.adapter.get_epoch_by_id(ctx.clone(), epoch_id).await?;
+        height: u64,
+    ) -> ProtocolResult<RichBlock> {
+        let block = self
+            .adapter
+            .get_block_by_height(ctx.clone(), height)
+            .await?;
         let txs = self
             .adapter
-            .get_txs_from_storage(ctx.clone(), &epoch.ordered_tx_hashes)
+            .get_txs_from_storage(ctx.clone(), &block.ordered_tx_hashes)
             .await?;
 
-        Ok(RichEpoch { epoch, txs })
+        Ok(RichBlock { block, txs })
     }
 
-    async fn init_status_agent(&self, ctx: Context, epoch_id: u64) -> ProtocolResult<StatusAgent> {
-        let epoch = self.adapter.get_epoch_by_id(ctx.clone(), epoch_id).await?;
+    async fn init_status_agent(&self, ctx: Context, height: u64) -> ProtocolResult<StatusAgent> {
+        let block = self
+            .adapter
+            .get_block_by_height(ctx.clone(), height)
+            .await?;
         let current_status = self.status.to_inner();
 
         let status = CurrentConsensusStatus {
@@ -250,30 +254,30 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
             cycles_limit:       current_status.cycles_limit,
             validators:         current_status.validators.clone(),
             consensus_interval: current_status.consensus_interval,
-            prev_hash:          epoch.header.pre_hash.clone(),
-            epoch_id:           epoch.header.epoch_id,
-            exec_epoch_id:      epoch.header.exec_epoch_id,
-            latest_state_root:  epoch.header.state_root.clone(),
+            prev_hash:          block.header.pre_hash.clone(),
+            height:             block.header.height,
+            exec_height:        block.header.exec_height,
+            latest_state_root:  block.header.state_root.clone(),
             logs_bloom:         vec![],
             confirm_root:       vec![],
             receipt_root:       vec![],
             cycles_used:        vec![],
             state_root:         vec![],
-            proof:              epoch.header.proof,
+            proof:              block.header.proof,
         };
 
         let status_agent = StatusAgent::new(status);
-        let exec_epoch_id = epoch.header.exec_epoch_id;
+        let exec_height = block.header.exec_height;
 
         // Discard previous execution results and re-execute.
-        if epoch_id != 0 {
-            let exec_gap = epoch_id - exec_epoch_id;
+        if height != 0 {
+            let exec_gap = height - exec_height;
 
             for gap in 1..=exec_gap {
-                let rich_epoch = self
-                    .get_rich_epoch_from_local(ctx.clone(), exec_epoch_id + gap)
+                let rich_block = self
+                    .get_rich_block_from_local(ctx.clone(), exec_height + gap)
                     .await?;
-                self.exec_epoch(ctx.clone(), rich_epoch, status_agent.clone())
+                self.exec_block(ctx.clone(), rich_block, status_agent.clone())
                     .await?;
             }
         }

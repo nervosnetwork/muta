@@ -5,7 +5,7 @@ use derive_more::{Display, From};
 
 use crate::fixed_codec::FixedCodec;
 use crate::traits::ExecutorParams;
-use crate::types::{Address, Epoch, Hash, MerkleRoot, Receipt, ServiceContext, SignedTransaction};
+use crate::types::{Address, Block, Hash, MerkleRoot, Receipt, ServiceContext, SignedTransaction};
 use crate::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
 #[derive(Debug, Display, From)]
@@ -79,8 +79,8 @@ pub trait ServiceState {
 pub trait ChainQuerier {
     fn get_transaction_by_hash(&self, tx_hash: &Hash) -> ProtocolResult<Option<SignedTransaction>>;
 
-    // To get the latest `Epoch` of finality, set `epoch_id` to `None`
-    fn get_epoch_by_epoch_id(&self, epoch_id: Option<u64>) -> ProtocolResult<Option<Epoch>>;
+    // To get the latest `Block` of finality, set `height` to `None`
+    fn get_block_by_height(&self, height: Option<u64>) -> ProtocolResult<Option<Block>>;
 
     fn get_receipt_by_hash(&self, tx_hash: &Hash) -> ProtocolResult<Option<Receipt>>;
 }
@@ -95,7 +95,7 @@ pub trait AdmissionControl {
 // It contains:
 // - init: Initialize the service.
 // - hooks: A pair of hooks that allow inserting a piece of logic before and
-//   after the epoch is executed.
+//   after the block is executed.
 // - read: Provide some read-only functions for users or other services to call
 // - write: provide some writable functions for users or other services to call
 pub trait Service {
@@ -104,12 +104,12 @@ pub trait Service {
         Ok(())
     }
 
-    // Executed before the epoch is executed.
+    // Executed before the block is executed.
     fn hook_before_(&mut self, _params: &ExecutorParams) -> ProtocolResult<()> {
         Ok(())
     }
 
-    // Executed after epoch execution.
+    // Executed after block execution.
     fn hook_after_(&mut self, _params: &ExecutorParams) -> ProtocolResult<()> {
         Ok(())
     }
@@ -128,7 +128,7 @@ pub trait Service {
 // - Access and modify `account`
 // - Access service state
 // - Event triggered
-// - Access to data on the chain (epoch, transaction, receipt)
+// - Access to data on the chain (block, transaction, receipt)
 // - Read / write other `service`
 //
 // In fact, these functions depend on:
@@ -187,10 +187,10 @@ pub trait ServiceSDK {
     // if not found on the chain, return None
     fn get_transaction_by_hash(&self, tx_hash: &Hash) -> ProtocolResult<Option<SignedTransaction>>;
 
-    // Get a epoch by `epoch_id`
+    // Get a block by `height`
     // if not found on the chain, return None
-    // When the parameter `epoch_id` is None, get the latest (executing)` epoch`
-    fn get_epoch_by_epoch_id(&self, epoch_id: Option<u64>) -> ProtocolResult<Option<Epoch>>;
+    // When the parameter `height` is None, get the latest (executing)` block`
+    fn get_block_by_height(&self, height: Option<u64>) -> ProtocolResult<Option<Block>>;
 
     // Get a receipt by `tx_hash`
     // if not found on the chain, return None

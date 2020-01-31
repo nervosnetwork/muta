@@ -15,7 +15,7 @@ pub struct ServiceContextParams {
     pub cycles_price:    u64,
     pub cycles_used:     Rc<RefCell<u64>>,
     pub caller:          Address,
-    pub epoch_id:        u64,
+    pub height:          u64,
     pub service_name:    String,
     pub service_method:  String,
     pub service_payload: String,
@@ -32,7 +32,7 @@ pub struct ServiceContext {
     cycles_price:    u64,
     cycles_used:     Rc<RefCell<u64>>,
     caller:          Address,
-    epoch_id:        u64,
+    height:          u64,
     service_name:    String,
     service_method:  String,
     service_payload: String,
@@ -50,7 +50,7 @@ impl ServiceContext {
             cycles_price:    params.cycles_price,
             cycles_used:     params.cycles_used,
             caller:          params.caller,
-            epoch_id:        params.epoch_id,
+            height:          params.height,
             service_name:    params.service_name,
             service_method:  params.service_method,
             service_payload: params.service_payload,
@@ -74,7 +74,7 @@ impl ServiceContext {
             cycles_price: context.cycles_price,
             cycles_used: Rc::clone(&context.cycles_used),
             caller: context.caller.clone(),
-            epoch_id: context.epoch_id,
+            height: context.height,
             service_name,
             service_method,
             service_payload,
@@ -121,8 +121,8 @@ impl ServiceContext {
         self.caller.clone()
     }
 
-    pub fn get_current_epoch_id(&self) -> u64 {
-        self.epoch_id
+    pub fn get_current_height(&self) -> u64 {
+        self.height
     }
 
     pub fn get_service_name(&self) -> &str {
@@ -186,7 +186,7 @@ mod tests {
             cycles_price:    8,
             cycles_used:     Rc::new(RefCell::new(10)),
             caller:          Address::from_hash(Hash::from_empty()).unwrap(),
-            epoch_id:        1,
+            height:          1,
             timestamp:       0,
             service_name:    "service_name".to_owned(),
             service_method:  "service_method".to_owned(),
@@ -205,7 +205,7 @@ mod tests {
             ctx.get_caller(),
             Address::from_hash(Hash::from_empty()).unwrap()
         );
-        assert_eq!(ctx.get_current_epoch_id(), 1);
+        assert_eq!(ctx.get_current_height(), 1);
         assert_eq!(ctx.get_timestamp(), 0);
         assert_eq!(ctx.get_service_name(), "service_name");
         assert_eq!(ctx.get_service_method(), "service_method");

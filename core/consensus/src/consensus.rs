@@ -86,12 +86,12 @@ impl<Adapter: ConsensusAdapter + 'static> OverlordConsensus<Adapter> {
         let overlord_handler = overlord.get_handler();
 
         let status = status_agent.to_inner();
-        if status.epoch_id == 1 {
+        if status.height == 1 {
             overlord_handler
                 .send_msg(
                     Context::new(),
                     OverlordMsg::RichStatus(gen_overlord_status(
-                        status.epoch_id,
+                        status.height,
                         status.consensus_interval,
                         status.validators,
                     )),
@@ -124,7 +124,7 @@ impl<Adapter: ConsensusAdapter + 'static> OverlordConsensus<Adapter> {
     }
 }
 
-pub fn gen_overlord_status(epoch_id: u64, interval: u64, validators: Vec<Validator>) -> Status {
+pub fn gen_overlord_status(height: u64, interval: u64, validators: Vec<Validator>) -> Status {
     let mut authority_list = validators
         .into_iter()
         .map(|v| Node {
@@ -136,7 +136,7 @@ pub fn gen_overlord_status(epoch_id: u64, interval: u64, validators: Vec<Validat
 
     authority_list.sort();
     Status {
-        epoch_id,
+        height,
         interval: Some(interval),
         authority_list,
     }

@@ -17,13 +17,13 @@ use protocol::traits::{
     ServiceMapping, Storage, SynchronizationAdapter,
 };
 use protocol::types::{
-    Address, Bytes, Epoch, Hash, MerkleRoot, Proof, Receipt, SignedTransaction, Validator,
+    Address, Block, Bytes, Hash, MerkleRoot, Proof, Receipt, SignedTransaction, Validator,
 };
 use protocol::{fixed_codec::FixedCodec, ProtocolResult};
 
 use crate::consensus::gen_overlord_status;
-use crate::fixed_types::{FixedEpoch, FixedEpochID, FixedPill, FixedSignedTxs, PullTxsRequest};
-use crate::message::{BROADCAST_EPOCH_ID, RPC_SYNC_PULL_EPOCH, RPC_SYNC_PULL_TXS};
+use crate::fixed_types::{FixedBlock, FixedHeight, FixedPill, FixedSignedTxs, PullTxsRequest};
+use crate::message::{BROADCAST_HEIGHT, RPC_SYNC_PULL_BLOCK, RPC_SYNC_PULL_TXS};
 use crate::status::{StatusAgent, UpdateInfo};
 use crate::util::{ExecuteInfo, WalInfoQueue};
 use crate::ConsensusError;
@@ -67,7 +67,7 @@ where
     async fn get_txs_from_mempool(
         &self,
         ctx: Context,
-        _epoch_id: u64,
+        _height: u64,
         cycle_limit: u64,
     ) -> ProtocolResult<MixedTxHashes> {
         self.mempool.package(ctx, cycle_limit).await
@@ -115,19 +115,19 @@ where
         &self,
         chain_id: Hash,
         order_root: MerkleRoot,
-        epoch_id: u64,
+        height: u64,
         cycles_price: u64,
         coinbase: Address,
-        epoch_hash: Hash,
+        block_hash: Hash,
         signed_txs: Vec<SignedTransaction>,
         cycles_limit: u64,
         timestamp: u64,
     ) -> ProtocolResult<()> {
         let exec_info = ExecuteInfo {
-            epoch_id,
+            height,
             chain_id,
             cycles_price,
-            epoch_hash,
+            block_hash,
             signed_txs,
             order_root,
             coinbase,
@@ -145,10 +145,10 @@ where
     async fn get_last_validators(
         &self,
         _ctx: Context,
-        epoch_id: u64,
+        height: u64,
     ) -> ProtocolResult<Vec<Validator>> {
-        let epoch = self.storage.get_epoch_by_epoch_id(epoch_id).await?;
-        Ok(epoch.header.validators)
+        let block = self.storage.get_block_by_height(height).await?;
+        Ok(block.header.validators)
     }
 
     async fn save_overlord_wal(&self, _ctx: Context, info: Bytes) -> ProtocolResult<()> {
@@ -170,25 +170,25 @@ where
     async fn save_wal_transactions(
         &self,
         _ctx: Context,
-        epoch_hash: Hash,
+        block_hash: Hash,
         txs: Vec<SignedTransaction>,
     ) -> ProtocolResult<()> {
-        self.storage.insert_wal_transactions(epoch_hash, txs).await
+        self.storage.insert_wal_transactions(block_hash, txs).await
     }
 
     async fn load_wal_transactions(
         &self,
         _ctx: Context,
-        epoch_hash: Hash,
+        block_hash: Hash,
     ) -> ProtocolResult<Vec<SignedTransaction>> {
-        self.storage.get_wal_transactions(epoch_hash).await
+        self.storage.get_wal_transactions(block_hash).await
     }
 
-    async fn pull_epoch(&self, ctx: Context, epoch_id: u64, end: &str) -> ProtocolResult<Epoch> {
-        log::debug!("consensus: send rpc pull epoch {}", epoch_id);
+    async fn pull_block(&self, ctx: Context, height: u64, end: &str) -> ProtocolResult<Block> {
+        log::debug!("consensus: send rpc pull block {}", height);
         let res = self
             .rpc
-            .call::<FixedEpochID, FixedEpoch>(ctx, end, FixedEpochID::new(epoch_id), Priority::High)
+            .call::<FixedHeight, FixedBlock>(ctx, end, FixedHeight::new(height), Priority::High)
             .await?;
         Ok(res.inner)
     }
@@ -212,15 +212,15 @@ where
         Ok(res.inner)
     }
 
-    /// Get an epoch corresponding to the given epoch ID.
-    async fn get_epoch_by_id(&self, _: Context, epoch_id: u64) -> ProtocolResult<Epoch> {
-        self.storage.get_epoch_by_epoch_id(epoch_id).await
+    /// Get a block corresponding to the given height.
+    async fn get_block_by_height(&self, _: Context, height: u64) -> ProtocolResult<Block> {
+        self.storage.get_block_by_height(height).await
     }
 
-    /// Get the current epoch ID from storage.
-    async fn get_current_epoch_id(&self, _: Context) -> ProtocolResult<u64> {
-        let res = self.storage.get_latest_epoch().await?;
-        Ok(res.header.epoch_id)
+    /// Get the current height from storage.
+    async fn get_current_height(&self, _: Context) -> ProtocolResult<u64> {
+        let res = self.storage.get_latest_block().await?;
+        Ok(res.header.height)
     }
 }
 
@@ -239,7 +239,7 @@ where
     fn update_status(
         &self,
         ctx: Context,
-        epoch_id: u64,
+        height: u64,
         consensus_interval: u64,
         validators: Vec<Validator>,
     ) -> ProtocolResult<()> {
@@ -250,7 +250,7 @@ where
             .send_msg(
                 ctx,
                 OverlordMsg::RichStatus(gen_overlord_status(
-                    epoch_id,
+                    height,
                     consensus_interval,
                     validators,
                 )),
@@ -276,14 +276,14 @@ where
         Ok(resp)
     }
 
-    /// Pull some epochs from other nodes from `begin` to `end`.
-    async fn get_epoch_from_remote(&self, ctx: Context, epoch_id: u64) -> ProtocolResult<Epoch> {
+    /// Pull some blocks from other nodes from `begin` to `end`.
+    async fn get_block_from_remote(&self, ctx: Context, height: u64) -> ProtocolResult<Block> {
         let res = self
             .rpc
-            .call::<FixedEpochID, FixedEpoch>(
+            .call::<FixedHeight, FixedBlock>(
                 ctx,
-                RPC_SYNC_PULL_EPOCH,
-                FixedEpochID::new(epoch_id),
+                RPC_SYNC_PULL_BLOCK,
+                FixedHeight::new(height),
                 Priority::High,
             )
             .await?;
@@ -322,9 +322,9 @@ where
     DB: cita_trie::DB,
     Mapping: ServiceMapping,
 {
-    /// Save an epoch to the database.
-    async fn save_epoch(&self, _: Context, epoch: Epoch) -> ProtocolResult<()> {
-        self.storage.insert_epoch(epoch).await
+    /// Save a block to the database.
+    async fn save_block(&self, _: Context, block: Block) -> ProtocolResult<()> {
+        self.storage.insert_block(block).await
     }
 
     async fn save_proof(&self, _: Context, proof: Proof) -> ProtocolResult<()> {
@@ -349,15 +349,15 @@ where
         self.mempool.flush(ctx, ordered_tx_hashes.to_vec()).await
     }
 
-    /// Get an epoch corresponding to the given epoch ID.
-    async fn get_epoch_by_id(&self, _: Context, epoch_id: u64) -> ProtocolResult<Epoch> {
-        self.storage.get_epoch_by_epoch_id(epoch_id).await
+    /// Get a block corresponding to the given height.
+    async fn get_block_by_height(&self, _: Context, height: u64) -> ProtocolResult<Block> {
+        self.storage.get_block_by_height(height).await
     }
 
-    /// Get the current epoch ID from storage.
-    async fn get_current_epoch_id(&self, _: Context) -> ProtocolResult<u64> {
-        let res = self.storage.get_latest_epoch().await?;
-        Ok(res.header.epoch_id)
+    /// Get the current height from storage.
+    async fn get_current_height(&self, _: Context) -> ProtocolResult<u64> {
+        let res = self.storage.get_latest_block().await?;
+        Ok(res.header.height)
     }
 
     async fn get_txs_from_storage(
@@ -368,9 +368,9 @@ where
         self.storage.get_transactions(tx_hashes.to_vec()).await
     }
 
-    async fn broadcast_epoch_id(&self, ctx: Context, epoch_id: u64) -> ProtocolResult<()> {
+    async fn broadcast_height(&self, ctx: Context, height: u64) -> ProtocolResult<()> {
         self.network
-            .broadcast(ctx.clone(), BROADCAST_EPOCH_ID, epoch_id, Priority::High)
+            .broadcast(ctx.clone(), BROADCAST_HEIGHT, height, Priority::High)
             .await
     }
 }
@@ -448,15 +448,15 @@ where
     async fn init_exec_queue(&self, queue: WalInfoQueue) -> ProtocolResult<()> {
         for (_id, info) in queue.inner.into_iter() {
             let txs = self
-                .load_wal_transactions(Context::new(), info.epoch_hash.clone())
+                .load_wal_transactions(Context::new(), info.block_hash.clone())
                 .await?;
             self.execute(
                 info.chain_id,
                 info.order_root,
-                info.epoch_id,
+                info.height,
                 info.cycles_price,
                 info.coinbase,
-                info.epoch_hash,
+                info.block_hash,
                 txs,
                 info.cycles_limit,
                 info.timestamp,
@@ -515,7 +515,7 @@ where
 
     async fn process(&mut self) -> ProtocolResult<()> {
         if let Some(info) = self.queue.next().await {
-            let epoch_id = info.epoch_id;
+            let height = info.height;
             let txs = info.signed_txs.clone();
             let order_root = info.order_root.clone();
             let state_root = self.status.to_inner().latest_state_root;
@@ -528,15 +528,15 @@ where
             )?;
             let exec_params = ExecutorParams {
                 state_root: state_root.clone(),
-                epoch_id,
+                height,
                 timestamp: info.timestamp,
                 cycles_limit: info.cycles_limit,
             };
             let resp = executor.exec(&exec_params, &txs)?;
             self.save_receipts(resp.receipts.clone()).await?;
             self.status
-                .update_after_exec(gen_update_info(resp.clone(), epoch_id, order_root));
-            self.save_wal(epoch_id).await?;
+                .update_after_exec(gen_update_info(resp.clone(), height, order_root));
+            self.save_wal(height).await?;
         } else {
             return Err(ConsensusError::Other("Queue disconnect".to_string()).into());
         }
@@ -547,10 +547,10 @@ where
         self.storage.insert_receipts(receipts).await
     }
 
-    async fn save_wal(&self, epoch_id: u64) -> ProtocolResult<()> {
+    async fn save_wal(&self, height: u64) -> ProtocolResult<()> {
         let info = {
             let mut map = self.queue_wal.write();
-            map.remove_by_epoch_id(epoch_id)?;
+            map.remove_by_height(height)?;
             map.clone()
         };
         let queue_info = Bytes::from(rlp::encode(&info));
@@ -562,7 +562,7 @@ where
     }
 }
 
-fn gen_update_info(exec_resp: ExecutorResp, epoch_id: u64, order_root: MerkleRoot) -> UpdateInfo {
+fn gen_update_info(exec_resp: ExecutorResp, height: u64, order_root: MerkleRoot) -> UpdateInfo {
     let cycles = exec_resp.all_cycles_used;
 
     let receipt = Merkle::from_hashes(
@@ -576,11 +576,11 @@ fn gen_update_info(exec_resp: ExecutorResp, epoch_id: u64, order_root: MerkleRoo
     .unwrap_or_else(Hash::from_empty);
 
     UpdateInfo {
-        exec_epoch_id: epoch_id,
-        cycles_used:   cycles,
-        receipt_root:  receipt,
-        confirm_root:  order_root,
-        state_root:    exec_resp.state_root.clone(),
-        logs_bloom:    exec_resp.logs_bloom,
+        exec_height:  height,
+        cycles_used:  cycles,
+        receipt_root: receipt,
+        confirm_root: order_root,
+        state_root:   exec_resp.state_root.clone(),
+        logs_bloom:   exec_resp.logs_bloom,
     }
 }

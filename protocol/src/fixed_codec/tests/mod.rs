@@ -4,7 +4,7 @@ use bytes::Bytes;
 use num_traits::FromPrimitive;
 use rand::random;
 
-use crate::types::epoch::{Epoch, EpochHeader, Pill, Proof, Validator};
+use crate::types::block::{Block, BlockHeader, Pill, Proof, Validator};
 use crate::types::primitive::{Address, Balance, Hash, MerkleRoot};
 use crate::types::receipt::{Event, Receipt, ReceiptResponse};
 use crate::types::transaction::{
@@ -48,7 +48,7 @@ pub fn mock_receipt_response() -> ReceiptResponse {
 pub fn mock_receipt() -> Receipt {
     Receipt {
         state_root:  mock_merkle_root(),
-        epoch_id:    13,
+        height:      13,
         tx_hash:     mock_hash(),
         cycles_used: 100,
         events:      vec![mock_event()],
@@ -101,7 +101,7 @@ pub fn mock_wal_txs(tx_size: usize) -> WalSaveTxs {
 }
 
 // #####################
-// Mock Epoch
+// Mock Block
 // #####################
 
 pub fn mock_validator() -> Validator {
@@ -114,19 +114,19 @@ pub fn mock_validator() -> Validator {
 
 pub fn mock_proof() -> Proof {
     Proof {
-        epoch_id:   4,
+        height:     4,
         round:      99,
-        epoch_hash: mock_hash(),
+        block_hash: mock_hash(),
         signature:  Default::default(),
         bitmap:     Default::default(),
     }
 }
 
-pub fn mock_epoch_header() -> EpochHeader {
-    EpochHeader {
+pub fn mock_block_header() -> BlockHeader {
+    BlockHeader {
         chain_id:          mock_hash(),
-        epoch_id:          42,
-        exec_epoch_id:     41,
+        height:            42,
+        exec_height:       41,
         pre_hash:          mock_hash(),
         timestamp:         420_000_000,
         logs_bloom:        Default::default(),
@@ -147,16 +147,16 @@ pub fn mock_epoch_header() -> EpochHeader {
     }
 }
 
-pub fn mock_epoch(order_size: usize) -> Epoch {
-    Epoch {
-        header:            mock_epoch_header(),
+pub fn mock_block(order_size: usize) -> Block {
+    Block {
+        header:            mock_block_header(),
         ordered_tx_hashes: (0..order_size).map(|_| mock_hash()).collect(),
     }
 }
 
 pub fn mock_pill(order_size: usize, propose_size: usize) -> Pill {
     Pill {
-        epoch:          mock_epoch(order_size),
+        block:          mock_block(order_size),
         propose_hashes: (0..propose_size).map(|_| mock_hash()).collect(),
     }
 }

@@ -17,7 +17,7 @@ use common_merkle::Merkle;
 use protocol::fixed_codec::FixedCodec;
 use protocol::traits::{ConsensusAdapter, Context, MessageCodec, MessageTarget, NodeInfo};
 use protocol::types::{
-    Address, Epoch, EpochHeader, Hash, MerkleRoot, Pill, Proof, SignedTransaction, Validator,
+    Address, Block, BlockHeader, Hash, MerkleRoot, Pill, Proof, SignedTransaction, Validator,
 };
 use protocol::{Bytes, ProtocolError, ProtocolResult};
 
@@ -28,7 +28,7 @@ use crate::message::{
 use crate::status::StatusAgent;
 use crate::{ConsensusError, StatusCacheField};
 
-/// validator is for create new epoch, and authority is for build overlord
+/// validator is for create new block, and authority is for build overlord
 /// status.
 pub struct ConsensusEngine<Adapter> {
     status_agent:   StatusAgent,
@@ -41,30 +41,30 @@ pub struct ConsensusEngine<Adapter> {
 
 #[async_trait]
 impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<Adapter> {
-    async fn get_epoch(
+    async fn get_block(
         &self,
         ctx: Context,
-        epoch_id: u64,
+        height: u64,
     ) -> Result<(FixedPill, Bytes), Box<dyn Error + Send>> {
         let current_consensus_status = self.status_agent.to_inner();
 
         let (ordered_tx_hashes, propose_hashes) = self
             .adapter
-            .get_txs_from_mempool(ctx, epoch_id, current_consensus_status.cycles_limit)
+            .get_txs_from_mempool(ctx, height, current_consensus_status.cycles_limit)
             .await?
             .clap();
 
-        if current_consensus_status.epoch_id != epoch_id {
-            return Err(ProtocolError::from(ConsensusError::MissingEpochHeader(epoch_id)).into());
+        if current_consensus_status.height != height {
+            return Err(ProtocolError::from(ConsensusError::MissingBlockHeader(height)).into());
         }
-        let tmp_epoch_id = epoch_id;
+        let tmp_height = height;
         let order_root = Merkle::from_hashes(ordered_tx_hashes.clone()).get_root_hash();
 
-        let header = EpochHeader {
+        let header = BlockHeader {
             chain_id:          self.node_info.chain_id.clone(),
             pre_hash:          current_consensus_status.prev_hash,
-            epoch_id:          tmp_epoch_id,
-            exec_epoch_id:     current_consensus_status.exec_epoch_id,
+            height:            tmp_height,
+            exec_height:       current_consensus_status.exec_height,
             timestamp:         time_now(),
             logs_bloom:        current_consensus_status.logs_bloom,
             order_root:        order_root.unwrap_or_else(Hash::from_empty),
@@ -77,40 +77,40 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             validator_version: 0u64,
             validators:        current_consensus_status.validators.clone(),
         };
-        let epoch = Epoch {
+        let block = Block {
             header,
             ordered_tx_hashes,
         };
 
         let pill = Pill {
-            epoch,
+            block,
             propose_hashes,
         };
         let fixed_pill = FixedPill {
             inner: pill.clone(),
         };
-        let hash = Hash::digest(pill.epoch.encode_fixed()?).as_bytes();
+        let hash = Hash::digest(pill.block.encode_fixed()?).as_bytes();
         let mut set = self.exemption_hash.write();
         set.insert(hash.clone());
 
         Ok((fixed_pill, hash))
     }
 
-    async fn check_epoch(
+    async fn check_block(
         &self,
         ctx: Context,
-        _epoch_id: u64,
+        _height: u64,
         hash: Bytes,
-        epoch: FixedPill,
+        block: FixedPill,
     ) -> Result<(), Box<dyn Error + Send>> {
-        let order_hashes = epoch.get_ordered_hashes();
+        let order_hashes = block.get_ordered_hashes();
         let exemption = { self.exemption_hash.read().contains(&hash) };
-        let sync_tx_hashes = epoch.get_propose_hashes();
+        let sync_tx_hashes = block.get_propose_hashes();
 
-        // If the epoch is proposed by self, it does not need to check. Get full signed
+        // If the block is proposed by self, it does not need to check. Get full signed
         // transactions directly.
         if !exemption {
-            self.check_epoch_roots(&epoch.inner.epoch.header)?;
+            self.check_block_roots(&block.inner.block.header)?;
             self.adapter
                 .check_txs(ctx.clone(), order_hashes.clone())
                 .await?;
@@ -121,7 +121,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
 
         tokio::spawn(async move {
             if let Err(e) = sync_txs(ctx, adapter, sync_tx_hashes).await {
-                error!("Consensus sync epoch error {}", e);
+                error!("Consensus sync block error {}", e);
             }
         });
         self.adapter
@@ -136,7 +136,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
     async fn commit(
         &self,
         ctx: Context,
-        epoch_id: u64,
+        height: u64,
         commit: Commit<FixedPill>,
     ) -> Result<Status, Box<dyn Error + Send>> {
         let lock = self.lock.try_lock();
@@ -148,9 +148,9 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         }
 
         let current_consensus_status = self.status_agent.to_inner();
-        if current_consensus_status.exec_epoch_id == epoch_id {
+        if current_consensus_status.exec_height == height {
             let status = Status {
-                epoch_id:       epoch_id + 1,
+                height:         height + 1,
                 interval:       Some(current_consensus_status.consensus_interval),
                 authority_list: covert_to_overlord_authority(&current_consensus_status.validators),
             };
@@ -159,15 +159,15 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
 
         let pill = commit.content.inner;
 
-        let epoch_hash = commit.proof.epoch_hash.clone();
+        let block_hash = commit.proof.block_hash.clone();
         let signature = commit.proof.signature.signature.clone();
         let bitmap = commit.proof.signature.address_bitmap.clone();
 
         // Sorage save the lastest proof.
         let proof = Proof {
-            epoch_id: commit.proof.epoch_id,
+            height: commit.proof.height,
             round: commit.proof.round,
-            epoch_hash: Hash::from_bytes(epoch_hash.clone())?,
+            block_hash: Hash::from_bytes(block_hash.clone())?,
             signature,
             bitmap,
         };
@@ -175,7 +175,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         self.adapter.save_proof(ctx.clone(), proof.clone()).await?;
 
         // Get full transactions from mempool. If is error, try get from wal.
-        let ordered_tx_hashes = pill.epoch.ordered_tx_hashes.clone();
+        let ordered_tx_hashes = pill.block.ordered_tx_hashes.clone();
         let full_txs = match self
             .adapter
             .get_full_txs(ctx.clone(), ordered_tx_hashes.clone())
@@ -184,7 +184,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             Ok(txs) => txs,
             Err(_) => {
                 self.adapter
-                    .load_wal_transactions(ctx.clone(), Hash::digest(epoch_hash))
+                    .load_wal_transactions(ctx.clone(), Hash::digest(block_hash))
                     .await?
             }
         };
@@ -195,28 +195,26 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
 
         // Execute transactions
         self.exec(
-            pill.epoch.header.order_root.clone(),
-            epoch_id,
-            pill.epoch.header.proposer.clone(),
-            pill.epoch.header.timestamp,
-            Hash::digest(pill.epoch.encode_fixed()?),
+            pill.block.header.order_root.clone(),
+            height,
+            pill.block.header.proposer.clone(),
+            pill.block.header.timestamp,
+            Hash::digest(pill.block.encode_fixed()?),
             full_txs.clone(),
         )
         .await?;
 
-        trace_epoch(&pill.epoch);
-        self.update_status(epoch_id, pill.epoch, proof, full_txs)
+        trace_block(&pill.block);
+        self.update_status(height, pill.block, proof, full_txs)
             .await?;
 
-        self.adapter
-            .broadcast_epoch_id(ctx.clone(), epoch_id)
-            .await?;
+        self.adapter.broadcast_height(ctx.clone(), height).await?;
 
         let mut set = self.exemption_hash.write();
         set.clear();
         let current_consensus_status = self.status_agent.to_inner();
         let status = Status {
-            epoch_id:       epoch_id + 1,
+            height:         height + 1,
             interval:       Some(current_consensus_status.consensus_interval),
             authority_list: covert_to_overlord_authority(&current_consensus_status.validators),
         };
@@ -289,9 +287,9 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
     async fn get_authority_list(
         &self,
         ctx: Context,
-        epoch_id: u64,
+        height: u64,
     ) -> Result<Vec<Node>, Box<dyn Error + Send>> {
-        let validators = self.adapter.get_last_validators(ctx, epoch_id).await?;
+        let validators = self.adapter.get_last_validators(ctx, height).await?;
         let mut res = validators
             .into_iter()
             .map(|v| Node {
@@ -342,10 +340,10 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
     pub async fn exec(
         &self,
         order_root: MerkleRoot,
-        epoch_id: u64,
+        height: u64,
         address: Address,
         timestamp: u64,
-        epoch_hash: Hash,
+        block_hash: Hash,
         txs: Vec<SignedTransaction>,
     ) -> ProtocolResult<()> {
         let status = self.status_agent.to_inner();
@@ -354,10 +352,10 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
             .execute(
                 self.node_info.chain_id.clone(),
                 order_root,
-                epoch_id,
+                height,
                 status.cycles_price,
                 address,
-                epoch_hash,
+                block_hash,
                 txs,
                 status.cycles_limit,
                 timestamp,
@@ -365,87 +363,87 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
             .await
     }
 
-    fn check_epoch_roots(&self, epoch: &EpochHeader) -> ProtocolResult<()> {
+    fn check_block_roots(&self, block: &BlockHeader) -> ProtocolResult<()> {
         let status = self.status_agent.to_inner();
 
         // check previous hash
-        if status.prev_hash != epoch.pre_hash {
+        if status.prev_hash != block.pre_hash {
             trace::error(
-                "check_epoch_prev_hash_diff".to_string(),
+                "check_block_prev_hash_diff".to_string(),
                 Some(json!({
-                    "epoch_prev_hash": epoch.pre_hash.as_hex(),
+                    "block_prev_hash": block.pre_hash.as_hex(),
                     "cache_prev_hash": status.prev_hash.as_hex(),
                 })),
             );
             error!(
-                "cache previous hash {:?}, epoch previous hash {:?}",
-                status.prev_hash, epoch.pre_hash
+                "cache previous hash {:?}, block previous hash {:?}",
+                status.prev_hash, block.pre_hash
             );
-            return Err(ConsensusError::CheckEpochErr(StatusCacheField::PrevHash).into());
+            return Err(ConsensusError::CheckBlockErr(StatusCacheField::PrevHash).into());
         }
 
         // check state root
-        if !status.state_root.contains(&epoch.state_root) {
+        if !status.state_root.contains(&block.state_root) {
             trace::error(
-                "check_epoch_state_root_diff".to_string(),
+                "check_block_state_root_diff".to_string(),
                 Some(json!({
-                    "epoch_state_root": epoch.state_root.as_hex(),
+                    "block_state_root": block.state_root.as_hex(),
                     "cache_state_roots": status.state_root.iter().map(|root| root.as_hex()).collect::<Vec<_>>(),
                 })),
             );
             error!(
-                "cache state root {:?}, epoch state root {:?}",
-                status.state_root, epoch.state_root
+                "cache state root {:?}, block state root {:?}",
+                status.state_root, block.state_root
             );
-            return Err(ConsensusError::CheckEpochErr(StatusCacheField::StateRoot).into());
+            return Err(ConsensusError::CheckBlockErr(StatusCacheField::StateRoot).into());
         }
 
         // check confirm root
-        if !check_vec_roots(&status.confirm_root, &epoch.confirm_root) {
+        if !check_vec_roots(&status.confirm_root, &block.confirm_root) {
             trace::error(
-                "check_epoch_confirm_root_diff".to_string(),
+                "check_block_confirm_root_diff".to_string(),
                 Some(json!({
-                    "epoch_state_root": epoch.confirm_root.iter().map(|root| root.as_hex()).collect::<Vec<_>>(),
+                    "block_state_root": block.confirm_root.iter().map(|root| root.as_hex()).collect::<Vec<_>>(),
                     "cache_state_roots": status.confirm_root.iter().map(|root| root.as_hex()).collect::<Vec<_>>(),
                 })),
             );
             error!(
-                "cache confirm root {:?}, epoch confirm root {:?}",
-                status.confirm_root, epoch.confirm_root
+                "cache confirm root {:?}, block confirm root {:?}",
+                status.confirm_root, block.confirm_root
             );
-            return Err(ConsensusError::CheckEpochErr(StatusCacheField::ConfirmRoot).into());
+            return Err(ConsensusError::CheckBlockErr(StatusCacheField::ConfirmRoot).into());
         }
 
         // check receipt root
-        if !check_vec_roots(&status.receipt_root, &epoch.receipt_root) {
+        if !check_vec_roots(&status.receipt_root, &block.receipt_root) {
             trace::error(
-                "check_epoch_receipt_root_diff".to_string(),
+                "check_block_receipt_root_diff".to_string(),
                 Some(json!({
-                    "epoch_state_root": epoch.receipt_root.iter().map(|root| root.as_hex()).collect::<Vec<_>>(),
+                    "block_state_root": block.receipt_root.iter().map(|root| root.as_hex()).collect::<Vec<_>>(),
                     "cache_state_roots": status.receipt_root.iter().map(|root| root.as_hex()).collect::<Vec<_>>(),
                 })),
             );
             error!(
-                "cache receipt root {:?}, epoch receipt root {:?}",
-                status.receipt_root, epoch.receipt_root
+                "cache receipt root {:?}, block receipt root {:?}",
+                status.receipt_root, block.receipt_root
             );
-            return Err(ConsensusError::CheckEpochErr(StatusCacheField::ReceiptRoot).into());
+            return Err(ConsensusError::CheckBlockErr(StatusCacheField::ReceiptRoot).into());
         }
 
         // check cycles used
-        if !check_vec_roots(&status.cycles_used, &epoch.cycles_used) {
+        if !check_vec_roots(&status.cycles_used, &block.cycles_used) {
             trace::error(
-                "check_epoch_cycle_used_diff".to_string(),
+                "check_block_cycle_used_diff".to_string(),
                 Some(json!({
-                    "epoch_state_root": epoch.cycles_used,
+                    "block_state_root": block.cycles_used,
                     "cache_state_roots": status.cycles_used,
                 })),
             );
             error!(
-                "cache cycles used {:?}, epoch cycles used {:?}",
-                status.cycles_used, epoch.cycles_used
+                "cache cycles used {:?}, block cycles used {:?}",
+                status.cycles_used, block.cycles_used
             );
-            return Err(ConsensusError::CheckEpochErr(StatusCacheField::CyclesUsed).into());
+            return Err(ConsensusError::CheckBlockErr(StatusCacheField::CyclesUsed).into());
         }
 
         Ok(())
@@ -455,26 +453,26 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
     /// 1. Execute the signed transactions.
     /// 2. Save the signed transactions.
     /// 3. Save the latest proof.
-    /// 4. Save the new epoch.
+    /// 4. Save the new block.
     /// 5. Save the receipt.
     pub async fn update_status(
         &self,
-        epoch_id: u64,
-        epoch: Epoch,
+        height: u64,
+        block: Block,
         proof: Proof,
         txs: Vec<SignedTransaction>,
     ) -> ProtocolResult<()> {
         // Save signed transactions
         self.adapter.save_signed_txs(Context::new(), txs).await?;
 
-        // Save the epoch.
+        // Save the block.
         self.adapter
-            .save_epoch(Context::new(), epoch.clone())
+            .save_block(Context::new(), block.clone())
             .await?;
 
-        let prev_hash = Hash::digest(epoch.encode_fixed()?);
+        let prev_hash = Hash::digest(block.encode_fixed()?);
         self.status_agent
-            .update_after_commit(epoch_id + 1, epoch, prev_hash, proof)?;
+            .update_after_commit(height + 1, block, prev_hash, proof)?;
         self.save_wal().await
     }
 
@@ -498,22 +496,22 @@ fn covert_to_overlord_authority(validators: &[Validator]) -> Vec<Node> {
     authority
 }
 
-pub fn check_vec_roots<T: Eq>(cache_roots: &[T], epoch_roots: &[T]) -> bool {
-    epoch_roots.len() <= cache_roots.len()
+pub fn check_vec_roots<T: Eq>(cache_roots: &[T], block_roots: &[T]) -> bool {
+    block_roots.len() <= cache_roots.len()
         && cache_roots
             .iter()
-            .zip(epoch_roots.iter())
+            .zip(block_roots.iter())
             .all(|(c_root, e_root)| c_root == e_root)
 }
 
-pub fn trace_epoch(epoch: &Epoch) {
-    let confirm_roots = epoch
+pub fn trace_block(block: &Block) {
+    let confirm_roots = block
         .header
         .confirm_root
         .iter()
         .map(|root| root.as_hex())
         .collect::<Vec<_>>();
-    let receipt_roots = epoch
+    let receipt_roots = block
         .header
         .receipt_root
         .iter()
@@ -521,13 +519,13 @@ pub fn trace_epoch(epoch: &Epoch) {
         .collect::<Vec<_>>();
 
     trace::custom(
-        "commit_epoch".to_string(),
+        "commit_block".to_string(),
         Some(json!({
-            "epoch_id": epoch.header.epoch_id,
-            "pre_hash": epoch.header.pre_hash.as_hex(),
-            "order_root": epoch.header.order_root.as_hex(),
-            "state_root": epoch.header.state_root.as_hex(),
-            "proposer": epoch.header.proposer.as_hex(),
+            "height": block.header.height,
+            "pre_hash": block.header.pre_hash.as_hex(),
+            "order_root": block.header.order_root.as_hex(),
+            "state_root": block.header.state_root.as_hex(),
+            "proposer": block.header.proposer.as_hex(),
             "confirm_roots": confirm_roots,
             "receipt_roots": receipt_roots,
         })),

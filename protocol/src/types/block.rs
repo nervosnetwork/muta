@@ -4,16 +4,16 @@ use serde::{Deserialize, Serialize};
 use crate::types::{Address, Bloom, Hash, MerkleRoot};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Epoch {
-    pub header:            EpochHeader,
+pub struct Block {
+    pub header:            BlockHeader,
     pub ordered_tx_hashes: Vec<Hash>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct EpochHeader {
+pub struct BlockHeader {
     pub chain_id:          Hash,
-    pub epoch_id:          u64,
-    pub exec_epoch_id:     u64,
+    pub height:            u64,
+    pub exec_height:       u64,
     pub pre_hash:          Hash,
     pub timestamp:         u64,
     pub logs_bloom:        Vec<Bloom>,
@@ -30,9 +30,9 @@ pub struct EpochHeader {
 
 #[derive(Serialize, Deserialize, Clone, Debug, Hash, PartialEq, Eq)]
 pub struct Proof {
-    pub epoch_id:   u64,
+    pub height:     u64,
     pub round:      u64,
-    pub epoch_hash: Hash,
+    pub block_hash: Hash,
     pub signature:  Bytes,
     pub bitmap:     Bytes,
 }
@@ -46,6 +46,6 @@ pub struct Validator {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Pill {
-    pub epoch:          Epoch,
+    pub block:          Block,
     pub propose_hashes: Vec<Hash>,
 }

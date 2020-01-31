@@ -6,20 +6,20 @@ use overlord::Codec;
 
 use protocol::codec::{Deserialize, ProtocolCodecSync, Serialize};
 use protocol::fixed_codec::FixedCodec;
-use protocol::types::{Epoch, Hash, Pill, SignedTransaction};
+use protocol::types::{Block, Hash, Pill, SignedTransaction};
 use protocol::{traits::MessageCodec, Bytes, BytesMut, ProtocolResult};
 
 use crate::{ConsensusError, MsgType};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum ConsensusRpcRequest {
-    PullEpochs(u64),
+    PullBlocks(u64),
     PullTxs(PullTxsRequest),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ConsensusRpcResponse {
-    PullEpochs(Box<Epoch>),
+    PullBlocks(Box<Block>),
     PullTxs(Box<FixedSignedTxs>),
 }
 
@@ -27,7 +27,7 @@ pub enum ConsensusRpcResponse {
 impl MessageCodec for ConsensusRpcResponse {
     async fn encode(&mut self) -> ProtocolResult<Bytes> {
         let bytes = match self {
-            ConsensusRpcResponse::PullEpochs(ep) => {
+            ConsensusRpcResponse::PullBlocks(ep) => {
                 let mut tmp = BytesMut::from(ep.encode_fixed()?.as_ref());
                 tmp.extend_from_slice(b"a");
                 tmp
@@ -52,8 +52,8 @@ impl MessageCodec for ConsensusRpcResponse {
 
         match flag.as_ref() {
             b"a" => {
-                let res: Epoch = FixedCodec::decode_fixed(bytes)?;
-                Ok(ConsensusRpcResponse::PullEpochs(Box::new(res)))
+                let res: Block = FixedCodec::decode_fixed(bytes)?;
+                Ok(ConsensusRpcResponse::PullBlocks(Box::new(res)))
             }
 
             b"b" => {
@@ -85,7 +85,7 @@ impl Codec for FixedPill {
 
 impl FixedPill {
     pub fn get_ordered_hashes(&self) -> Vec<Hash> {
-        self.inner.epoch.ordered_tx_hashes.clone()
+        self.inner.block.ordered_tx_hashes.clone()
     }
 
     pub fn get_propose_hashes(&self) -> Vec<Hash> {
@@ -94,36 +94,36 @@ impl FixedPill {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct FixedEpoch {
-    pub inner: Epoch,
+pub struct FixedBlock {
+    pub inner: Block,
 }
 
 #[async_trait]
-impl MessageCodec for FixedEpoch {
+impl MessageCodec for FixedBlock {
     async fn encode(&mut self) -> ProtocolResult<Bytes> {
         self.inner.encode_sync()
     }
 
     async fn decode(bytes: Bytes) -> ProtocolResult<Self> {
-        let inner: Epoch = ProtocolCodecSync::decode_sync(bytes)?;
-        Ok(FixedEpoch::new(inner))
+        let inner: Block = ProtocolCodecSync::decode_sync(bytes)?;
+        Ok(FixedBlock::new(inner))
     }
 }
 
-impl FixedEpoch {
-    pub fn new(inner: Epoch) -> Self {
-        FixedEpoch { inner }
+impl FixedBlock {
+    pub fn new(inner: Block) -> Self {
+        FixedBlock { inner }
     }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct FixedEpochID {
+pub struct FixedHeight {
     pub inner: u64,
 }
 
-impl FixedEpochID {
+impl FixedHeight {
     pub fn new(inner: u64) -> Self {
-        FixedEpochID { inner }
+        FixedHeight { inner }
     }
 }
 
@@ -172,20 +172,20 @@ mod test {
     use rand::random;
 
     use protocol::types::{
-        Address, Epoch, EpochHeader, Hash, Proof, RawTransaction, SignedTransaction,
+        Address, Block, BlockHeader, Hash, Proof, RawTransaction, SignedTransaction,
         TransactionRequest,
     };
     use protocol::Bytes;
 
-    use super::{FixedEpoch, FixedSignedTxs};
+    use super::{FixedBlock, FixedSignedTxs};
 
-    fn gen_epoch(epoch_id: u64, epoch_hash: Hash) -> Epoch {
+    fn gen_block(height: u64, block_hash: Hash) -> Block {
         let nonce = Hash::digest(Bytes::from("XXXX"));
         let addr_str = "CAB8EEA4799C21379C20EF5BAA2CC8AF1BEC475B";
-        let header = EpochHeader {
+        let header = BlockHeader {
             chain_id: nonce.clone(),
-            epoch_id,
-            exec_epoch_id: epoch_id - 1,
+            height,
+            exec_height: height - 1,
             pre_hash: nonce.clone(),
             timestamp: 1000,
             logs_bloom: Default::default(),
@@ -195,22 +195,22 @@ mod test {
             receipt_root: Vec::new(),
             cycles_used: vec![999_999],
             proposer: Address::from_hex(addr_str).unwrap(),
-            proof: mock_proof(epoch_hash),
+            proof: mock_proof(block_hash),
             validator_version: 1,
             validators: Vec::new(),
         };
 
-        Epoch {
+        Block {
             header,
             ordered_tx_hashes: Vec::new(),
         }
     }
 
-    fn mock_proof(epoch_hash: Hash) -> Proof {
+    fn mock_proof(block_hash: Hash) -> Proof {
         Proof {
-            epoch_id: 0,
+            height: 0,
             round: 0,
-            epoch_hash,
+            block_hash,
             signature: Default::default(),
             bitmap: Default::default(),
         }
@@ -264,13 +264,13 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_epoch_codec() {
+    async fn test_block_codec() {
         use super::MessageCodec;
 
-        let epoch = gen_epoch(random::<u64>(), Hash::from_empty());
-        let mut origin = FixedEpoch::new(epoch.clone());
+        let block = gen_block(random::<u64>(), Hash::from_empty());
+        let mut origin = FixedBlock::new(block.clone());
         let bytes = origin.encode().await.unwrap();
-        let res: FixedEpoch = MessageCodec::decode(bytes).await.unwrap();
-        assert_eq!(res.inner, epoch);
+        let res: FixedBlock = MessageCodec::decode(bytes).await.unwrap();
+        assert_eq!(res.inner, block);
     }
 }

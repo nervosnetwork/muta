@@ -42,7 +42,7 @@ fn test_service_call_service() {
 
     let params = ExecutorParams {
         state_root:   root,
-        epoch_id:     1,
+        height:       1,
         timestamp:    0,
         cycles_limit: std::u64::MAX,
     };

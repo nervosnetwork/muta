@@ -11,12 +11,12 @@ use common_crypto::{
 };
 use core_api::adapter::DefaultAPIAdapter;
 use core_api::config::GraphQLConfig;
-use core_consensus::fixed_types::{FixedEpoch, FixedSignedTxs};
+use core_consensus::fixed_types::{FixedBlock, FixedSignedTxs};
 use core_consensus::message::{
-    ProposalMessageHandler, PullEpochRpcHandler, PullTxsRpcHandler, QCMessageHandler,
-    RemoteEpochIDMessageHandler, VoteMessageHandler, BROADCAST_EPOCH_ID,
-    END_GOSSIP_AGGREGATED_VOTE, END_GOSSIP_SIGNED_PROPOSAL, END_GOSSIP_SIGNED_VOTE,
-    RPC_RESP_SYNC_PULL_EPOCH, RPC_RESP_SYNC_PULL_TXS, RPC_SYNC_PULL_EPOCH, RPC_SYNC_PULL_TXS,
+    ProposalMessageHandler, PullBlockRpcHandler, PullTxsRpcHandler, QCMessageHandler,
+    RemoteHeightMessageHandler, VoteMessageHandler, BROADCAST_HEIGHT, END_GOSSIP_AGGREGATED_VOTE,
+    END_GOSSIP_SIGNED_PROPOSAL, END_GOSSIP_SIGNED_VOTE, RPC_RESP_SYNC_PULL_BLOCK,
+    RPC_RESP_SYNC_PULL_TXS, RPC_SYNC_PULL_BLOCK, RPC_SYNC_PULL_TXS,
 };
 use core_consensus::status::{CurrentConsensusStatus, StatusAgent};
 use core_consensus::{
@@ -31,7 +31,7 @@ use core_storage::{adapter::rocks::RocksAdapter, ImplStorage};
 use framework::binding::state::RocksTrieDB;
 use framework::executor::{ServiceExecutor, ServiceExecutorFactory};
 use protocol::traits::{MessageCodec, NodeInfo, ServiceMapping, Storage};
-use protocol::types::{Address, Bloom, Epoch, EpochHeader, Genesis, Hash, Proof, Validator};
+use protocol::types::{Address, Block, BlockHeader, Bloom, Genesis, Hash, Proof, Validator};
 use protocol::{fixed_codec::FixedCodec, ProtocolError, ProtocolResult};
 
 use crate::config::Config;
@@ -41,7 +41,7 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
     config: &Config,
     genesis: &Genesis,
     servive_mapping: Arc<Mapping>,
-) -> ProtocolResult<Epoch> {
+) -> ProtocolResult<Block> {
     let chain_id = Hash::from_hex(&config.chain_id)?;
 
     // Read genesis.
@@ -52,10 +52,10 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
     let rocks_adapter = Arc::new(RocksAdapter::new(path_block)?);
     let storage = Arc::new(ImplStorage::new(Arc::clone(&rocks_adapter)));
 
-    match storage.get_latest_epoch().await {
-        Ok(genesis_epoch) => {
+    match storage.get_latest_block().await {
+        Ok(genesis_block) => {
             log::info!("The Genesis block has been initialized.");
-            return Ok(genesis_epoch);
+            return Ok(genesis_block);
         }
         Err(e) => {
             if !e.to_string().contains("GetNone") {
@@ -77,10 +77,10 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
     )?;
 
     // Build genesis block.
-    let genesis_epoch_header = EpochHeader {
+    let genesis_block_header = BlockHeader {
         chain_id:          chain_id.clone(),
-        epoch_id:          0,
-        exec_epoch_id:     0,
+        height:            0,
+        exec_height:       0,
         pre_hash:          Hash::from_empty(),
         timestamp:         genesis.timestamp,
         logs_bloom:        vec![Bloom::default()],
@@ -91,25 +91,25 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
         cycles_used:       vec![0],
         proposer:          Address::from_hex("0000000000000000000000000000000000000000")?,
         proof:             Proof {
-            epoch_id:   0,
+            height:     0,
             round:      0,
-            epoch_hash: Hash::from_empty(),
+            block_hash: Hash::from_empty(),
             signature:  Bytes::new(),
             bitmap:     Bytes::new(),
         },
         validator_version: 0,
         validators:        vec![],
     };
-    let latest_proof = genesis_epoch_header.proof.clone();
-    let genesis_epoch = Epoch {
-        header:            genesis_epoch_header,
+    let latest_proof = genesis_block_header.proof.clone();
+    let genesis_block = Block {
+        header:            genesis_block_header,
         ordered_tx_hashes: vec![],
     };
-    storage.insert_epoch(genesis_epoch.clone()).await?;
+    storage.insert_block(genesis_block.clone()).await?;
     storage.update_latest_proof(latest_proof).await?;
 
-    log::info!("The genesis block is created {:?}", genesis_epoch);
-    Ok(genesis_epoch)
+    log::info!("The genesis block is created {:?}", genesis_block);
+    Ok(genesis_block)
 }
 
 pub async fn start<Mapping: 'static + ServiceMapping>(
@@ -151,7 +151,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         .await?;
 
     // Init mempool
-    let current_epoch = storage.get_latest_epoch().await?;
+    let current_block = storage.get_latest_block().await?;
     let mempool_adapter = DefaultMemPoolAdapter::<Secp256k1, _, _>::new(
         network_service.handle(),
         Arc::clone(&storage),
@@ -190,8 +190,8 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         chain_id:     chain_id.clone(),
         self_address: my_address.clone(),
     };
-    let current_header = &current_epoch.header;
-    let prevhash = Hash::digest(current_epoch.encode_fixed()?);
+    let current_header = &current_block.header;
+    let prevhash = Hash::digest(current_block.encode_fixed()?);
 
     let current_consensus_status = if let Ok(wal_info) = storage.load_muta_wal().await {
         MessageCodec::decode(wal_info).await?
@@ -199,8 +199,8 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         CurrentConsensusStatus {
             cycles_price:       config.consensus.cycles_price,
             cycles_limit:       config.consensus.cycles_limit,
-            epoch_id:           current_epoch.header.epoch_id + 1,
-            exec_epoch_id:      current_epoch.header.epoch_id,
+            height:             current_block.header.height + 1,
+            exec_height:        current_block.header.height,
             prev_hash:          prevhash,
             latest_state_root:  current_header.state_root.clone(),
             logs_bloom:         current_header.logs_bloom.clone(),
@@ -315,14 +315,14 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         Box::new(VoteMessageHandler::new(Arc::clone(&overlord_consensus))),
     )?;
     network_service.register_endpoint_handler(
-        BROADCAST_EPOCH_ID,
-        Box::new(RemoteEpochIDMessageHandler::new(Arc::clone(
+        BROADCAST_HEIGHT,
+        Box::new(RemoteHeightMessageHandler::new(Arc::clone(
             &synchronization,
         ))),
     )?;
     network_service.register_endpoint_handler(
-        RPC_SYNC_PULL_EPOCH,
-        Box::new(PullEpochRpcHandler::new(
+        RPC_SYNC_PULL_BLOCK,
+        Box::new(PullBlockRpcHandler::new(
             Arc::new(network_service.handle()),
             Arc::clone(&storage),
         )),
@@ -334,7 +334,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
             Arc::clone(&storage),
         )),
     )?;
-    network_service.register_rpc_response::<FixedEpoch>(RPC_RESP_SYNC_PULL_EPOCH)?;
+    network_service.register_rpc_response::<FixedBlock>(RPC_RESP_SYNC_PULL_BLOCK)?;
     network_service.register_rpc_response::<FixedSignedTxs>(RPC_RESP_SYNC_PULL_TXS)?;
 
     // Run network

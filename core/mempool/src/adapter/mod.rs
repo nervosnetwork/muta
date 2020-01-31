@@ -255,8 +255,8 @@ where
         }
 
         // Verify chain id
-        let latest_epoch = self.storage.get_latest_epoch().await?;
-        if latest_epoch.header.chain_id != stx.raw.chain_id {
+        let latest_block = self.storage.get_latest_block().await?;
+        if latest_block.header.chain_id != stx.raw.chain_id {
             let wrong_chain_id = MemPoolError::WrongChain {
                 tx_hash: stx.tx_hash,
             };
@@ -265,10 +265,10 @@ where
         }
 
         // Verify timeout
-        let latest_epoch_id = latest_epoch.header.epoch_id;
+        let latest_height = latest_block.header.height;
         let timeout_gap = self.timeout_gap.load(Ordering::SeqCst);
 
-        if stx.raw.timeout > latest_epoch_id + timeout_gap {
+        if stx.raw.timeout > latest_height + timeout_gap {
             let invalid_timeout = MemPoolError::InvalidTimeout {
                 tx_hash: stx.tx_hash,
             };
@@ -276,7 +276,7 @@ where
             return Err(invalid_timeout.into());
         }
 
-        if stx.raw.timeout < latest_epoch_id {
+        if stx.raw.timeout < latest_height {
             let timeout = MemPoolError::Timeout {
                 tx_hash: stx.tx_hash,
                 timeout: stx.raw.timeout,
@@ -302,9 +302,9 @@ where
         }
     }
 
-    async fn get_latest_epoch_id(&self, _ctx: Context) -> ProtocolResult<u64> {
-        let epoch_id = self.storage.get_latest_epoch().await?.header.epoch_id;
-        Ok(epoch_id)
+    async fn get_latest_height(&self, _ctx: Context) -> ProtocolResult<u64> {
+        let height = self.storage.get_latest_block().await?.header.height;
+        Ok(height)
     }
 }
 

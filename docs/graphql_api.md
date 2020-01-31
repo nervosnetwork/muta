@@ -16,8 +16,8 @@ node, and then try open http://127.0.0.1:8000/graphiql in the browser.
   * [Query](#query)
   * [Mutation](#mutation)
   * [Objects](#objects)
-    * [Epoch](#epoch)
-    * [EpochHeader](#epochheader)
+    * [Block](#block)
+    * [BlockHeader](#blockheader)
   * [Inputs](#inputs)
     * [InputDeployAction](#inputdeployaction)
     * [InputRawTransaction](#inputrawtransaction)
@@ -48,16 +48,16 @@ node, and then try open http://127.0.0.1:8000/graphiql in the browser.
 </thead>
 <tbody>
 <tr>
-<td colspan="2" valign="top"><strong>getLatestEpoch</strong></td>
-<td valign="top"><a href="#epoch">Epoch</a>!</td>
+<td colspan="2" valign="top"><strong>getLatestBlock</strong></td>
+<td valign="top"><a href="#block">Block</a>!</td>
 <td>
 
-Get the latest epoch
+Get the latest block
 
 </td>
 </tr>
 <tr>
-<td colspan="2" align="right" valign="top">epochId</td>
+<td colspan="2" align="right" valign="top">height</td>
 <td valign="top"><a href="#uint64">Uint64</a></td>
 <td></td>
 </tr>
@@ -85,7 +85,7 @@ The asset id. Asset is the first-class in Muta, and the UDT(User Defined Token) 
 </td>
 </tr>
 <tr>
-<td colspan="2" align="right" valign="top">epochId</td>
+<td colspan="2" align="right" valign="top">height</td>
 <td valign="top"><a href="#uint64">Uint64</a></td>
 <td></td>
 </tr>
@@ -210,9 +210,9 @@ DON'T use it in production! This is just for development.
 
 ## Objects
 
-### Epoch
+### Block
 
-Epoch is a single digital record created within a blockchain. Each epoch contains a record of the previous Epoch, and when linked together these become the “chain”.An epoch is always composed of header and body.
+Block is a single digital record created within a blockchain. Each block contains a record of the previous Block, and when linked together these become the “chain”.A block is always composed of header and body.
 
 <table>
 <thead>
@@ -226,10 +226,10 @@ Epoch is a single digital record created within a blockchain. Each epoch contain
 <tbody>
 <tr>
 <td colspan="2" valign="top"><strong>header</strong></td>
-<td valign="top"><a href="#epochheader">EpochHeader</a>!</td>
+<td valign="top"><a href="#blockheader">BlockHeader</a>!</td>
 <td>
 
-The header section of an epoch
+The header section of a block
 
 </td>
 </tr>
@@ -238,16 +238,16 @@ The header section of an epoch
 <td valign="top">[<a href="#hash">Hash</a>!]!</td>
 <td>
 
-The body section of an epoch
+The body section of a block
 
 </td>
 </tr>
 </tbody>
 </table>
 
-### EpochHeader
+### BlockHeader
 
-An epoch header is like the metadata of an epoch.
+A block header is like the metadata of a block.
 
 <table>
 <thead>
@@ -269,7 +269,7 @@ Identifier of a chain in order to prevent replay attacks across channels
 </td>
 </tr>
 <tr>
-<td colspan="2" valign="top"><strong>epochId</strong></td>
+<td colspan="2" valign="top"><strong>height</strong></td>
 <td valign="top"><a href="#uint64">Uint64</a>!</td>
 <td>
 
@@ -282,7 +282,7 @@ Known as the block height like other blockchain
 <td valign="top"><a href="#hash">Hash</a>!</td>
 <td>
 
-The merkle proof of the previous epoch
+The merkle proof of the previous block
 
 </td>
 </tr>
@@ -291,7 +291,7 @@ The merkle proof of the previous epoch
 <td valign="top"><a href="#uint64">Uint64</a>!</td>
 <td>
 
-A timestamp that records when the epoch was created
+A timestamp that records when the block was created
 
 </td>
 </tr>
@@ -345,7 +345,7 @@ The sum of all transactions costs
 <td valign="top"><a href="#address">Address</a>!</td>
 <td>
 
-The address descirbed who packed the epoch
+The address descirbed who packed the block
 
 </td>
 </tr>
@@ -451,7 +451,7 @@ Every transaction has its own id, unlike Ethereum's nonce,the nonce in Muta is a
 <td valign="top"><a href="#uint64">Uint64</a>!</td>
 <td>
 
-For security and performance reasons, Muta will only deal with trade request over a period of time,the `timeout` should be `timeout > current_epoch_height` and `timeout < current_epoch_height + timeout_gap`,the `timeout_gap` generally equal to 20.
+For security and performance reasons, Muta will only deal with trade request over a period of time,the `timeout` should be `timeout > current_block_height` and `timeout < current_block_height + timeout_gap`,the `timeout_gap` generally equal to 20.
 
 </td>
 </tr>

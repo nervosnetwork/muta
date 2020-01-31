@@ -25,7 +25,7 @@ use protocol::{Bytes, ProtocolResult};
 use crate::{HashMemPool, MemPoolError};
 
 const CYCLE_LIMIT: u64 = 10_000;
-const CURRENT_EPOCH_ID: u64 = 999;
+const CURRENT_HEIGHT: u64 = 999;
 const POOL_SIZE: usize = 100_000;
 const TIMEOUT: u64 = 1000;
 const TIMEOUT_GAP: u64 = 100;
@@ -77,8 +77,8 @@ impl MemPoolAdapter for HashMemPoolAdapter {
         Ok(())
     }
 
-    async fn get_latest_epoch_id(&self, _ctx: Context) -> ProtocolResult<u64> {
-        Ok(CURRENT_EPOCH_ID)
+    async fn get_latest_height(&self, _ctx: Context) -> ProtocolResult<u64> {
+        Ok(CURRENT_HEIGHT)
     }
 }
 

@@ -17,12 +17,12 @@ use protocol::fixed_codec::FixedCodec;
 use protocol::traits::{
     Storage, StorageAdapter, StorageBatchModify, StorageCategory, StorageSchema,
 };
-use protocol::types::{Epoch, Hash, Proof, Receipt, SignedTransaction, WalSaveTxs};
+use protocol::types::{Block, Hash, Proof, Receipt, SignedTransaction, WalSaveTxs};
 use protocol::Bytes;
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
 lazy_static! {
-    pub static ref LATEST_EPOCH_KEY: Hash = Hash::digest(Bytes::from("latest_hash"));
+    pub static ref LATEST_BLOCK_KEY: Hash = Hash::digest(Bytes::from("latest_hash"));
     pub static ref LATEST_PROOF_KEY: Hash = Hash::digest(Bytes::from("latest_proof"));
     pub static ref OVERLORD_WAL_KEY: Hash = Hash::digest(Bytes::from("overlord_wal"));
     pub static ref MUTA_WAL_KEY: Hash = Hash::digest(Bytes::from("muta_wal"));
@@ -33,14 +33,14 @@ lazy_static! {
 pub struct ImplStorage<Adapter> {
     adapter: Arc<Adapter>,
 
-    latest_epoch: RwLock<Option<Epoch>>,
+    latest_block: RwLock<Option<Block>>,
 }
 
 impl<Adapter: StorageAdapter> ImplStorage<Adapter> {
     pub fn new(adapter: Arc<Adapter>) -> Self {
         Self {
             adapter,
-            latest_epoch: RwLock::new(None),
+            latest_block: RwLock::new(None),
         }
     }
 }
@@ -67,10 +67,10 @@ impl_storage_schema_for!(
     SignedTransaction
 );
 impl_storage_schema_for!(ReceiptSchema, Hash, Receipt, Receipt);
-impl_storage_schema_for!(EpochSchema, u64, Epoch, Epoch);
-impl_storage_schema_for!(HashEpochSchema, Hash, u64, Epoch);
-impl_storage_schema_for!(LatestEpochSchema, Hash, Epoch, Epoch);
-impl_storage_schema_for!(LatestProofSchema, Hash, Proof, Epoch);
+impl_storage_schema_for!(BlockSchema, u64, Block, Block);
+impl_storage_schema_for!(HashBlockSchema, Hash, u64, Block);
+impl_storage_schema_for!(LatestBlockSchema, Hash, Block, Block);
+impl_storage_schema_for!(LatestProofSchema, Hash, Proof, Block);
 impl_storage_schema_for!(OverlordWalSchema, Hash, Bytes, Wal);
 impl_storage_schema_for!(MutaWalSchema, Hash, Bytes, Wal);
 impl_storage_schema_for!(ExecQueueWalSchema, Hash, Bytes, Wal);
@@ -117,21 +117,21 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
         Ok(())
     }
 
-    async fn insert_epoch(&self, epoch: Epoch) -> ProtocolResult<()> {
-        let epoch_id = epoch.header.epoch_id;
-        let epoch_hash = Hash::digest(epoch.encode_fixed()?);
+    async fn insert_block(&self, block: Block) -> ProtocolResult<()> {
+        let height = block.header.height;
+        let block_hash = Hash::digest(block.encode_fixed()?);
 
         self.adapter
-            .insert::<EpochSchema>(epoch_id.clone(), epoch.clone())
+            .insert::<BlockSchema>(height.clone(), block.clone())
             .await?;
         self.adapter
-            .insert::<HashEpochSchema>(epoch_hash, epoch_id)
+            .insert::<HashBlockSchema>(block_hash, height)
             .await?;
         self.adapter
-            .insert::<LatestEpochSchema>(LATEST_EPOCH_KEY.clone(), epoch.clone())
+            .insert::<LatestBlockSchema>(LATEST_BLOCK_KEY.clone(), block.clone())
             .await?;
 
-        self.latest_epoch.write().await.replace(epoch);
+        self.latest_block.write().await.replace(block);
 
         Ok(())
     }
@@ -158,25 +158,25 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
         Ok(stxs)
     }
 
-    async fn get_latest_epoch(&self) -> ProtocolResult<Epoch> {
-        let opt_epoch = { self.latest_epoch.read().await.clone() };
+    async fn get_latest_block(&self) -> ProtocolResult<Block> {
+        let opt_block = { self.latest_block.read().await.clone() };
 
-        if let Some(epoch) = opt_epoch {
-            Ok(epoch)
+        if let Some(block) = opt_block {
+            Ok(block)
         } else {
-            Ok(get!(self, LATEST_EPOCH_KEY.clone(), LatestEpochSchema))
+            Ok(get!(self, LATEST_BLOCK_KEY.clone(), LatestBlockSchema))
         }
     }
 
-    async fn get_epoch_by_epoch_id(&self, epoch_id: u64) -> ProtocolResult<Epoch> {
-        let epoch = get!(self, epoch_id, EpochSchema);
-        Ok(epoch)
+    async fn get_block_by_height(&self, height: u64) -> ProtocolResult<Block> {
+        let block = get!(self, height, BlockSchema);
+        Ok(block)
     }
 
-    async fn get_epoch_by_hash(&self, epoch_hash: Hash) -> ProtocolResult<Epoch> {
-        let epoch_id = get!(self, epoch_hash, HashEpochSchema);
-        let epoch = get!(self, epoch_id, EpochSchema);
-        Ok(epoch)
+    async fn get_block_by_hash(&self, block_hash: Hash) -> ProtocolResult<Block> {
+        let height = get!(self, block_hash, HashBlockSchema);
+        let block = get!(self, height, BlockSchema);
+        Ok(block)
     }
 
     async fn get_receipt(&self, hash: Hash) -> ProtocolResult<Receipt> {
@@ -232,21 +232,21 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
 
     async fn insert_wal_transactions(
         &self,
-        epoch_hash: Hash,
+        block_hash: Hash,
         signed_txs: Vec<SignedTransaction>,
     ) -> ProtocolResult<()> {
         let wal_txs_info = WalSaveTxs { inner: signed_txs };
         self.adapter
-            .insert::<WalTransactionSchema>(epoch_hash, wal_txs_info)
+            .insert::<WalTransactionSchema>(block_hash, wal_txs_info)
             .await?;
         Ok(())
     }
 
     async fn get_wal_transactions(
         &self,
-        epoch_hash: Hash,
+        block_hash: Hash,
     ) -> ProtocolResult<Vec<SignedTransaction>> {
-        let stxs = get!(self, epoch_hash, WalTransactionSchema);
+        let stxs = get!(self, block_hash, WalTransactionSchema);
         Ok(stxs.inner)
     }
 }
