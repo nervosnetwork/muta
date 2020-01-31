@@ -41,7 +41,7 @@ pub struct ConsensusEngine<Adapter> {
 
 #[async_trait]
 impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<Adapter> {
-    async fn get_epoch(
+    async fn get_block(
         &self,
         ctx: Context,
         height: u64,
@@ -96,7 +96,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         Ok((fixed_pill, hash))
     }
 
-    async fn check_epoch(
+    async fn check_block(
         &self,
         ctx: Context,
         _height: u64,
@@ -150,7 +150,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         let current_consensus_status = self.status_agent.to_inner();
         if current_consensus_status.exec_height == height {
             let status = Status {
-                epoch_id:       height + 1,
+                height:       height + 1,
                 interval:       Some(current_consensus_status.consensus_interval),
                 authority_list: covert_to_overlord_authority(&current_consensus_status.validators),
             };
@@ -159,13 +159,13 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
 
         let pill = commit.content.inner;
 
-        let block_hash = commit.proof.epoch_hash.clone();
+        let block_hash = commit.proof.block_hash.clone();
         let signature = commit.proof.signature.signature.clone();
         let bitmap = commit.proof.signature.address_bitmap.clone();
 
         // Sorage save the lastest proof.
         let proof = Proof {
-            height: commit.proof.epoch_id,
+            height: commit.proof.height,
             round: commit.proof.round,
             block_hash: Hash::from_bytes(block_hash.clone())?,
             signature,
@@ -214,7 +214,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         set.clear();
         let current_consensus_status = self.status_agent.to_inner();
         let status = Status {
-            epoch_id:       height + 1,
+            height:       height + 1,
             interval:       Some(current_consensus_status.consensus_interval),
             authority_list: covert_to_overlord_authority(&current_consensus_status.validators),
         };
@@ -371,7 +371,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
             trace::error(
                 "check_block_prev_hash_diff".to_string(),
                 Some(json!({
-                    "epoch_prev_hash": block.pre_hash.as_hex(),
+                    "block_prev_hash": block.pre_hash.as_hex(),
                     "cache_prev_hash": status.prev_hash.as_hex(),
                 })),
             );
@@ -387,7 +387,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
             trace::error(
                 "check_block_state_root_diff".to_string(),
                 Some(json!({
-                    "epoch_state_root": block.state_root.as_hex(),
+                    "block_state_root": block.state_root.as_hex(),
                     "cache_state_roots": status.state_root.iter().map(|root| root.as_hex()).collect::<Vec<_>>(),
                 })),
             );
@@ -403,7 +403,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
             trace::error(
                 "check_block_confirm_root_diff".to_string(),
                 Some(json!({
-                    "epoch_state_root": block.confirm_root.iter().map(|root| root.as_hex()).collect::<Vec<_>>(),
+                    "block_state_root": block.confirm_root.iter().map(|root| root.as_hex()).collect::<Vec<_>>(),
                     "cache_state_roots": status.confirm_root.iter().map(|root| root.as_hex()).collect::<Vec<_>>(),
                 })),
             );
@@ -419,7 +419,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
             trace::error(
                 "check_block_receipt_root_diff".to_string(),
                 Some(json!({
-                    "epoch_state_root": block.receipt_root.iter().map(|root| root.as_hex()).collect::<Vec<_>>(),
+                    "block_state_root": block.receipt_root.iter().map(|root| root.as_hex()).collect::<Vec<_>>(),
                     "cache_state_roots": status.receipt_root.iter().map(|root| root.as_hex()).collect::<Vec<_>>(),
                 })),
             );
@@ -435,7 +435,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
             trace::error(
                 "check_block_cycle_used_diff".to_string(),
                 Some(json!({
-                    "epoch_state_root": block.cycles_used,
+                    "block_state_root": block.cycles_used,
                     "cache_state_roots": status.cycles_used,
                 })),
             );
@@ -519,7 +519,7 @@ pub fn trace_block(block: &Block) {
         .collect::<Vec<_>>();
 
     trace::custom(
-        "commit_epoch".to_string(),
+        "commit_block".to_string(),
         Some(json!({
             "height": block.header.height,
             "pre_hash": block.header.pre_hash.as_hex(),

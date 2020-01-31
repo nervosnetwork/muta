@@ -4,7 +4,7 @@ mod engine;
 pub mod fixed_types;
 pub mod message;
 pub mod status;
-pub mod synchronization_v2;
+pub mod synchronization;
 #[cfg(test)]
 mod tests;
 pub mod trace;
@@ -12,7 +12,7 @@ pub mod util;
 
 pub use crate::adapter::OverlordConsensusAdapter;
 pub use crate::consensus::OverlordConsensus;
-pub use crate::synchronization_v2::OverlordSynchronization;
+pub use crate::synchronization::OverlordSynchronization;
 pub use crate::util::WalInfoQueue;
 pub use overlord::{types::Node, DurationConfig};
 
