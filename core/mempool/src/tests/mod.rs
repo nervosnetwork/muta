@@ -77,7 +77,7 @@ impl MemPoolAdapter for HashMemPoolAdapter {
         Ok(())
     }
 
-    async fn get_latest_epoch_id(&self, _ctx: Context) -> ProtocolResult<u64> {
+    async fn get_latest_height(&self, _ctx: Context) -> ProtocolResult<u64> {
         Ok(CURRENT_EPOCH_ID)
     }
 }

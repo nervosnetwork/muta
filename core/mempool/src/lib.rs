@@ -97,12 +97,12 @@ where
     }
 
     async fn package(&self, ctx: Context, cycle_limit: u64) -> ProtocolResult<MixedTxHashes> {
-        let current_epoch_id = self.adapter.get_latest_epoch_id(ctx.clone()).await?;
+        let current_height = self.adapter.get_latest_height(ctx.clone()).await?;
 
         self.tx_cache.package(
             cycle_limit,
-            current_epoch_id,
-            current_epoch_id + self.timeout_gap,
+            current_height,
+            current_height + self.timeout_gap,
         )
     }
 

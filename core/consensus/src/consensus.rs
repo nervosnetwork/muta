@@ -136,7 +136,7 @@ pub fn gen_overlord_status(height: u64, interval: u64, validators: Vec<Validator
 
     authority_list.sort();
     Status {
-        height,
+        epoch_id: height,
         interval: Some(interval),
         authority_list,
     }

@@ -17,7 +17,7 @@ pub struct ExecutorResp {
 #[derive(Debug, Clone)]
 pub struct ExecutorParams {
     pub state_root:   MerkleRoot,
-    pub height:     u64,
+    pub height:       u64,
     pub timestamp:    u64,
     pub cycles_limit: u64,
 }

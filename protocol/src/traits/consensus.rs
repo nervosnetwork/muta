@@ -3,7 +3,7 @@ use creep::Context;
 
 use crate::traits::{ExecutorParams, ExecutorResp};
 use crate::types::{
-    Address, Bytes, Block, Hash, MerkleRoot, Proof, Receipt, SignedTransaction, Validator,
+    Address, Block, Bytes, Hash, MerkleRoot, Proof, Receipt, SignedTransaction, Validator,
 };
 use crate::{traits::mempool::MixedTxHashes, ProtocolResult};
 
@@ -33,7 +33,7 @@ pub trait Consensus: Send + Sync {
 
 #[async_trait]
 pub trait Synchronization: Send + Sync {
-    async fn receive_remote_epoch(&self, ctx: Context, remote_epoch_id: u64) -> ProtocolResult<()>;
+    async fn receive_remote_block(&self, ctx: Context, remote_height: u64) -> ProtocolResult<()>;
 }
 
 #[async_trait]
@@ -53,8 +53,8 @@ pub trait SynchronizationAdapter: CommonConsensusAdapter + Send + Sync {
         txs: &[SignedTransaction],
     ) -> ProtocolResult<ExecutorResp>;
 
-    /// Pull some epochs from other nodes from `begin` to `end`.
-    async fn get_epoch_from_remote(&self, ctx: Context, height: u64) -> ProtocolResult<Block>;
+    /// Pull some blocks from other nodes from `begin` to `end`.
+    async fn get_block_from_remote(&self, ctx: Context, height: u64) -> ProtocolResult<Block>;
 
     /// Pull signed transactions corresponding to the given hashes from other
     /// nodes.
@@ -68,7 +68,7 @@ pub trait SynchronizationAdapter: CommonConsensusAdapter + Send + Sync {
 #[async_trait]
 pub trait CommonConsensusAdapter: Send + Sync {
     /// Save a block to the database.
-    async fn save_epoch(&self, ctx: Context, block: Block) -> ProtocolResult<()>;
+    async fn save_block(&self, ctx: Context, block: Block) -> ProtocolResult<()>;
 
     async fn save_proof(&self, ctx: Context, proof: Proof) -> ProtocolResult<()>;
 
@@ -85,10 +85,10 @@ pub trait CommonConsensusAdapter: Send + Sync {
     async fn flush_mempool(&self, ctx: Context, ordered_tx_hashes: &[Hash]) -> ProtocolResult<()>;
 
     /// Get a block corresponding to the given height.
-    async fn get_epoch_by_id(&self, ctx: Context, height: u64) -> ProtocolResult<Block>;
+    async fn get_block_by_height(&self, ctx: Context, height: u64) -> ProtocolResult<Block>;
 
     /// Get the current height from storage.
-    async fn get_current_epoch_id(&self, ctx: Context) -> ProtocolResult<u64>;
+    async fn get_current_height(&self, ctx: Context) -> ProtocolResult<u64>;
 
     async fn get_txs_from_storage(
         &self,
@@ -96,7 +96,7 @@ pub trait CommonConsensusAdapter: Send + Sync {
         tx_hashes: &[Hash],
     ) -> ProtocolResult<Vec<SignedTransaction>>;
 
-    async fn broadcast_epoch_id(&self, ctx: Context, height: u64) -> ProtocolResult<()>;
+    async fn broadcast_height(&self, ctx: Context, height: u64) -> ProtocolResult<()>;
 }
 
 #[async_trait]
@@ -141,7 +141,7 @@ pub trait ConsensusAdapter: CommonConsensusAdapter + Send + Sync {
         height: u64,
         cycles_price: u64,
         coinbase: Address,
-        epoch_hash: Hash,
+        block_hash: Hash,
         signed_txs: Vec<SignedTransaction>,
         cycles_limit: u64,
         timestamp: u64,
@@ -155,10 +155,10 @@ pub trait ConsensusAdapter: CommonConsensusAdapter + Send + Sync {
     ) -> ProtocolResult<Vec<Validator>>;
 
     /// Get the current height from storage.
-    async fn get_current_epoch_id(&self, ctx: Context) -> ProtocolResult<u64>;
+    async fn get_current_height(&self, ctx: Context) -> ProtocolResult<u64>;
 
-    /// Pull some epochs from other nodes from `begin` to `end`.
-    async fn pull_epoch(&self, ctx: Context, height: u64, end: &str) -> ProtocolResult<Block>;
+    /// Pull some blocks from other nodes from `begin` to `end`.
+    async fn pull_block(&self, ctx: Context, height: u64, end: &str) -> ProtocolResult<Block>;
 
     /// Pull signed transactions corresponding to the given hashes from other
     /// nodes.
@@ -170,7 +170,7 @@ pub trait ConsensusAdapter: CommonConsensusAdapter + Send + Sync {
     ) -> ProtocolResult<Vec<SignedTransaction>>;
 
     /// Get a block corresponding to the given height.
-    async fn get_epoch_by_id(&self, ctx: Context, height: u64) -> ProtocolResult<Block>;
+    async fn get_block_by_height(&self, ctx: Context, height: u64) -> ProtocolResult<Block>;
 
     /// Save overlord wal info.
     async fn save_overlord_wal(&self, ctx: Context, info: Bytes) -> ProtocolResult<()>;
@@ -188,7 +188,7 @@ pub trait ConsensusAdapter: CommonConsensusAdapter + Send + Sync {
     async fn save_wal_transactions(
         &self,
         ctx: Context,
-        epoch_hash: Hash,
+        block_hash: Hash,
         txs: Vec<SignedTransaction>,
     ) -> ProtocolResult<()>;
 
@@ -196,6 +196,6 @@ pub trait ConsensusAdapter: CommonConsensusAdapter + Send + Sync {
     async fn load_wal_transactions(
         &self,
         ctx: Context,
-        epoch_hash: Hash,
+        block_hash: Hash,
     ) -> ProtocolResult<Vec<SignedTransaction>>;
 }

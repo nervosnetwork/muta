@@ -5,26 +5,26 @@ use protocol::traits::Storage;
 use protocol::types::Hash;
 
 use crate::adapter::memory::MemoryAdapter;
-use crate::tests::{get_random_bytes, mock_epoch, mock_proof, mock_receipt, mock_signed_tx};
+use crate::tests::{get_random_bytes, mock_block, mock_proof, mock_receipt, mock_signed_tx};
 use crate::ImplStorage;
 
 #[test]
-fn test_storage_epoch_insert() {
+fn test_storage_block_insert() {
     let storage = ImplStorage::new(Arc::new(MemoryAdapter::new()));
 
     let height = 100;
-    let block = mock_epoch(height, Hash::digest(get_random_bytes(10)));
-    let epoch_hash = Hash::digest(block.encode_fixed().unwrap());
+    let block = mock_block(height, Hash::digest(get_random_bytes(10)));
+    let block_hash = Hash::digest(block.encode_fixed().unwrap());
 
-    exec!(storage.insert_epoch(block));
+    exec!(storage.insert_block(block));
 
-    let block = exec!(storage.get_latest_epoch());
+    let block = exec!(storage.get_latest_block());
     assert_eq!(height, block.header.height);
 
-    let block = exec!(storage.get_epoch_by_epoch_id(height));
+    let block = exec!(storage.get_block_by_height(height));
     assert_eq!(height, block.header.height);
 
-    let block = exec!(storage.get_epoch_by_hash(epoch_hash));
+    let block = exec!(storage.get_block_by_hash(block_hash));
     assert_eq!(height, block.header.height);
 }
 
@@ -82,13 +82,13 @@ fn test_storage_transactions_insert() {
 fn test_storage_latest_proof_insert() {
     let storage = ImplStorage::new(Arc::new(MemoryAdapter::new()));
 
-    let epoch_hash = Hash::digest(get_random_bytes(10));
-    let proof = mock_proof(epoch_hash);
+    let block_hash = Hash::digest(get_random_bytes(10));
+    let proof = mock_proof(block_hash);
 
     exec!(storage.update_latest_proof(proof.clone()));
     let proof_2 = exec!(storage.get_latest_proof());
 
-    assert_eq!(proof.epoch_hash, proof_2.epoch_hash);
+    assert_eq!(proof.block_hash, proof_2.block_hash);
 }
 
 #[test]

@@ -298,7 +298,7 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
 
                 Ok(Receipt {
                     state_root:  MerkleRoot::from_empty(),
-                    height:    context.get_current_epoch_id(),
+                    height:      context.get_current_height(),
                     tx_hash:     stx.tx_hash.clone(),
                     cycles_used: context.get_cycles_used(),
                     events:      context.get_events(),

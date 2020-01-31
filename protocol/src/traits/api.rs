@@ -12,7 +12,8 @@ pub trait APIAdapter: Send + Sync {
         signed_tx: SignedTransaction,
     ) -> ProtocolResult<()>;
 
-    async fn get_epoch_by_id(&self, ctx: Context, height: Option<u64>) -> ProtocolResult<Block>;
+    async fn get_block_by_height(&self, ctx: Context, height: Option<u64>)
+        -> ProtocolResult<Block>;
 
     async fn get_receipt_by_tx_hash(&self, ctx: Context, tx_hash: Hash) -> ProtocolResult<Receipt>;
 

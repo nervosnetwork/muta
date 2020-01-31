@@ -22,7 +22,7 @@ pub struct BlockHeader {
     )]
     pub chain_id:          Hash,
     #[graphql(description = "Known as the block height like other blockchain")]
-    pub height:          Uint64,
+    pub height:            Uint64,
     #[graphql(description = "The hash of the serialized previous block")]
     pub pre_hash:          Hash,
     #[graphql(description = "A timestamp that records when the block was created")]
@@ -48,9 +48,9 @@ pub struct BlockHeader {
 #[derive(GraphQLObject, Clone)]
 #[graphql(description = "The verifier of the block header proved")]
 pub struct Proof {
-    pub height:   Uint64,
+    pub height:     Uint64,
     pub round:      Uint64,
-    pub epoch_hash: Hash,
+    pub block_hash: Hash,
     pub signature:  Bytes,
     pub bitmap:     Bytes,
 }
@@ -64,33 +64,33 @@ pub struct Validator {
 }
 
 impl From<protocol::types::BlockHeader> for BlockHeader {
-    fn from(epoch_header: protocol::types::BlockHeader) -> Self {
+    fn from(block_header: protocol::types::BlockHeader) -> Self {
         BlockHeader {
-            chain_id:          Hash::from(epoch_header.chain_id),
-            height:          Uint64::from(epoch_header.height),
-            pre_hash:          Hash::from(epoch_header.pre_hash),
-            timestamp:         Uint64::from(epoch_header.timestamp),
-            order_root:        MerkleRoot::from(epoch_header.order_root),
-            state_root:        MerkleRoot::from(epoch_header.state_root),
-            confirm_root:      epoch_header
+            chain_id:          Hash::from(block_header.chain_id),
+            height:            Uint64::from(block_header.height),
+            pre_hash:          Hash::from(block_header.pre_hash),
+            timestamp:         Uint64::from(block_header.timestamp),
+            order_root:        MerkleRoot::from(block_header.order_root),
+            state_root:        MerkleRoot::from(block_header.state_root),
+            confirm_root:      block_header
                 .confirm_root
                 .into_iter()
                 .map(MerkleRoot::from)
                 .collect(),
-            receipt_root:      epoch_header
+            receipt_root:      block_header
                 .receipt_root
                 .into_iter()
                 .map(MerkleRoot::from)
                 .collect(),
-            cycles_used:       epoch_header
+            cycles_used:       block_header
                 .cycles_used
                 .into_iter()
                 .map(Uint64::from)
                 .collect(),
-            proposer:          Address::from(epoch_header.proposer),
-            proof:             Proof::from(epoch_header.proof),
-            validator_version: Uint64::from(epoch_header.validator_version),
-            validators:        epoch_header
+            proposer:          Address::from(block_header.proposer),
+            proof:             Proof::from(block_header.proof),
+            validator_version: Uint64::from(block_header.validator_version),
+            validators:        block_header
                 .validators
                 .into_iter()
                 .map(Validator::from)
@@ -115,9 +115,9 @@ impl From<protocol::types::Block> for Block {
 impl From<protocol::types::Proof> for Proof {
     fn from(proof: protocol::types::Proof) -> Self {
         Proof {
-            height:   Uint64::from(proof.height),
+            height:     Uint64::from(proof.height),
             round:      Uint64::from(proof.round),
-            epoch_hash: Hash::from(proof.epoch_hash),
+            block_hash: Hash::from(proof.block_hash),
             signature:  Bytes::from(proof.signature),
             bitmap:     Bytes::from(proof.bitmap),
         }

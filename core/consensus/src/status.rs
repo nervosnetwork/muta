@@ -10,7 +10,7 @@ use serde_json::json;
 use common_merkle::Merkle;
 use protocol::fixed_codec::FixedCodec;
 use protocol::traits::ExecutorResp;
-use protocol::types::{Bloom, Block, Hash, MerkleRoot, Proof, Validator};
+use protocol::types::{Block, Bloom, Hash, MerkleRoot, Proof, Validator};
 use protocol::ProtocolResult;
 
 use crate::engine::check_vec_roots;
@@ -264,12 +264,12 @@ impl UpdateInfo {
         .unwrap_or_else(Hash::from_empty);
 
         Self {
-            exec_height: height,
-            cycles_used:   cycles,
-            receipt_root:  receipt,
-            confirm_root:  order_root,
-            state_root:    resp.state_root.clone(),
-            logs_bloom:    resp.logs_bloom,
+            exec_height:  height,
+            cycles_used:  cycles,
+            receipt_root: receipt,
+            confirm_root: order_root,
+            state_root:   resp.state_root.clone(),
+            logs_bloom:   resp.logs_bloom,
         }
     }
 }

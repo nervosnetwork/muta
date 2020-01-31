@@ -21,7 +21,7 @@ use protocol::traits::{APIAdapter, Context};
 
 use crate::config::GraphQLConfig;
 use crate::schema::{
-    to_signed_transaction, to_transaction, Address, Bytes, Block, ExecResp, Hash,
+    to_signed_transaction, to_transaction, Address, Block, Bytes, ExecResp, Hash,
     InputRawTransaction, InputTransactionEncryption, Receipt, SignedTransaction, Uint64,
 };
 
@@ -41,13 +41,17 @@ struct Query;
 #[juniper::object(Context = State)]
 impl Query {
     #[graphql(name = "getEpoch", description = "Get the block")]
-    fn get_latest_epoch(state_ctx: &State, height: Option<Uint64>) -> FieldResult<Block> {
+    fn get_latest_block(state_ctx: &State, height: Option<Uint64>) -> FieldResult<Block> {
         let height = match height {
             Some(id) => Some(id.try_into_u64()?),
             None => None,
         };
 
-        let block = block_on(state_ctx.adapter.get_epoch_by_id(Context::new(), height))?;
+        let block = block_on(
+            state_ctx
+                .adapter
+                .get_block_by_height(Context::new(), height),
+        )?;
         Ok(Block::from(block))
     }
 
@@ -91,7 +95,7 @@ impl Query {
         let height = match height {
             Some(id) => id.try_into_u64()?,
             None => {
-                block_on(state_ctx.adapter.get_epoch_by_id(Context::new(), None))?
+                block_on(state_ctx.adapter.get_block_by_height(Context::new(), None))?
                     .header
                     .height
             }

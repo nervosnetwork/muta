@@ -52,8 +52,8 @@ fn test_fixed_codec() {
     test_eq!(transaction, SignedTransaction, mock_sign_tx);
 
     test_eq!(block, Proof, mock_proof);
-    test_eq!(block, BlockHeader, mock_epoch_header);
-    test_eq!(block, Block, mock_epoch, 33);
+    test_eq!(block, BlockHeader, mock_block_header);
+    test_eq!(block, Block, mock_block, 33);
     test_eq!(block, Pill, mock_pill, 22, 33);
     test_eq!(block, Validator, mock_validator);
 
@@ -97,8 +97,8 @@ fn bench_signed_tx_deserialize(b: &mut Bencher) {
 }
 
 #[bench]
-fn bench_epoch_serialize(b: &mut Bencher) {
-    let block = mock_epoch(50_000);
+fn bench_block_serialize(b: &mut Bencher) {
+    let block = mock_block(50_000);
 
     b.iter(|| {
         block.encode_fixed().unwrap();
@@ -106,8 +106,8 @@ fn bench_epoch_serialize(b: &mut Bencher) {
 }
 
 #[bench]
-fn bench_epoch_deserialize(b: &mut Bencher) {
-    let block = mock_epoch(50_000).encode_fixed().unwrap();
+fn bench_block_deserialize(b: &mut Bencher) {
+    let block = mock_block(50_000).encode_fixed().unwrap();
 
     b.iter(|| {
         Block::decode_fixed(block.clone()).unwrap();

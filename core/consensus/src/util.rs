@@ -133,9 +133,9 @@ impl OverlordCrypto {
 
 #[derive(Clone, Debug)]
 pub struct ExecuteInfo {
-    pub height:     u64,
+    pub height:       u64,
     pub chain_id:     Hash,
-    pub epoch_hash:   Hash,
+    pub block_hash:   Hash,
     pub signed_txs:   Vec<SignedTransaction>,
     pub order_root:   MerkleRoot,
     pub cycles_price: u64,
@@ -147,9 +147,9 @@ pub struct ExecuteInfo {
 impl Into<ExecWalInfo> for ExecuteInfo {
     fn into(self) -> ExecWalInfo {
         ExecWalInfo {
-            height:     self.height,
+            height:       self.height,
             chain_id:     self.chain_id,
-            epoch_hash:   self.epoch_hash,
+            block_hash:   self.block_hash,
             order_root:   self.order_root,
             cycles_price: self.cycles_price,
             coinbase:     self.coinbase,
@@ -162,9 +162,9 @@ impl Into<ExecWalInfo> for ExecuteInfo {
 impl ExecuteInfo {
     pub fn from_wal_info(wal_info: ExecWalInfo, txs: Vec<SignedTransaction>) -> Self {
         ExecuteInfo {
-            height:     wal_info.height,
+            height:       wal_info.height,
             chain_id:     wal_info.chain_id,
-            epoch_hash:   wal_info.epoch_hash,
+            block_hash:   wal_info.block_hash,
             signed_txs:   txs,
             order_root:   wal_info.order_root,
             cycles_price: wal_info.cycles_price,
@@ -177,9 +177,9 @@ impl ExecuteInfo {
 
 #[derive(Clone, Debug)]
 pub struct ExecWalInfo {
-    pub height:     u64,
+    pub height:       u64,
     pub chain_id:     Hash,
-    pub epoch_hash:   Hash,
+    pub block_hash:   Hash,
     pub order_root:   MerkleRoot,
     pub cycles_price: u64,
     pub coinbase:     Address,
@@ -192,7 +192,7 @@ impl Encodable for ExecWalInfo {
         s.begin_list(8)
             .append(&self.height)
             .append(&self.chain_id)
-            .append(&self.epoch_hash)
+            .append(&self.block_hash)
             .append(&self.order_root)
             .append(&self.cycles_price)
             .append(&self.coinbase)
@@ -207,7 +207,7 @@ impl Decodable for ExecWalInfo {
             Prototype::List(8) => {
                 let height: u64 = r.val_at(0)?;
                 let chain_id: Hash = r.val_at(1)?;
-                let epoch_hash: Hash = r.val_at(2)?;
+                let block_hash: Hash = r.val_at(2)?;
                 let order_root: Hash = r.val_at(3)?;
                 let cycles_price: u64 = r.val_at(4)?;
                 let coinbase: Address = r.val_at(5)?;
@@ -216,7 +216,7 @@ impl Decodable for ExecWalInfo {
                 Ok(ExecWalInfo {
                     height,
                     chain_id,
-                    epoch_hash,
+                    block_hash,
                     order_root,
                     cycles_price,
                     coinbase,
@@ -274,7 +274,7 @@ impl WalInfoQueue {
         self.inner.insert(info.height, info);
     }
 
-    pub fn remove_by_epoch_id(&mut self, height: u64) -> ProtocolResult<()> {
+    pub fn remove_by_height(&mut self, height: u64) -> ProtocolResult<()> {
         match self.inner.remove(&height) {
             Some(_) => Ok(()),
             None => Err(ConsensusError::ExecuteErr(format!(

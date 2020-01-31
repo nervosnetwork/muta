@@ -62,7 +62,7 @@ fn mock_receipt(tx_hash: Hash) -> Receipt {
     }
 }
 
-fn mock_epoch(height: u64, epoch_hash: Hash) -> Block {
+fn mock_block(height: u64, block_hash: Hash) -> Block {
     let nonce = Hash::digest(Bytes::from("XXXX"));
     let addr_str = "CAB8EEA4799C21379C20EF5BAA2CC8AF1BEC475B";
     let header = BlockHeader {
@@ -78,7 +78,7 @@ fn mock_epoch(height: u64, epoch_hash: Hash) -> Block {
         receipt_root: Vec::new(),
         cycles_used: vec![999_999],
         proposer: Address::from_hex(addr_str).unwrap(),
-        proof: mock_proof(epoch_hash),
+        proof: mock_proof(block_hash),
         validator_version: 1,
         validators: Vec::new(),
     };
@@ -89,11 +89,11 @@ fn mock_epoch(height: u64, epoch_hash: Hash) -> Block {
     }
 }
 
-fn mock_proof(epoch_hash: Hash) -> Proof {
+fn mock_proof(block_hash: Hash) -> Proof {
     Proof {
         height: 0,
         round: 0,
-        epoch_hash,
+        block_hash,
         signature: Default::default(),
         bitmap: Default::default(),
     }

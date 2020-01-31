@@ -3,7 +3,7 @@ use crate::schema::{Hash, MerkleRoot, Uint64};
 #[derive(GraphQLObject, Clone)]
 pub struct Receipt {
     pub state_root:  MerkleRoot,
-    pub height:    Uint64,
+    pub height:      Uint64,
     pub tx_hash:     Hash,
     pub cycles_used: Uint64,
     pub events:      Vec<Event>,
@@ -28,7 +28,7 @@ impl From<protocol::types::Receipt> for Receipt {
     fn from(receipt: protocol::types::Receipt) -> Self {
         Self {
             state_root:  MerkleRoot::from(receipt.state_root),
-            height:    Uint64::from(receipt.height),
+            height:      Uint64::from(receipt.height),
             tx_hash:     Hash::from(receipt.tx_hash),
             cycles_used: Uint64::from(receipt.cycles_used),
             events:      receipt.events.into_iter().map(Event::from).collect(),

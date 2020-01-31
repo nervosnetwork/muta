@@ -139,7 +139,7 @@ impl Storage for MockStorage {
         unimplemented!()
     }
 
-    async fn insert_epoch(&self, _: Block) -> ProtocolResult<()> {
+    async fn insert_block(&self, _: Block) -> ProtocolResult<()> {
         unimplemented!()
     }
 
@@ -159,15 +159,15 @@ impl Storage for MockStorage {
         unimplemented!()
     }
 
-    async fn get_latest_epoch(&self) -> ProtocolResult<Block> {
+    async fn get_latest_block(&self) -> ProtocolResult<Block> {
         unimplemented!()
     }
 
-    async fn get_epoch_by_epoch_id(&self, _: u64) -> ProtocolResult<Block> {
+    async fn get_block_by_height(&self, _: u64) -> ProtocolResult<Block> {
         unimplemented!()
     }
 
-    async fn get_epoch_by_hash(&self, _: Hash) -> ProtocolResult<Block> {
+    async fn get_block_by_hash(&self, _: Hash) -> ProtocolResult<Block> {
         unimplemented!()
     }
 
@@ -209,7 +209,7 @@ impl Storage for MockStorage {
 
     async fn insert_wal_transactions(
         &self,
-        _epoch_hash: Hash,
+        _block_hash: Hash,
         _signed_txs: Vec<SignedTransaction>,
     ) -> ProtocolResult<()> {
         unimplemented!()
@@ -217,7 +217,7 @@ impl Storage for MockStorage {
 
     async fn get_wal_transactions(
         &self,
-        _epoch_hash: Hash,
+        _block_hash: Hash,
     ) -> ProtocolResult<Vec<SignedTransaction>> {
         unimplemented!()
     }

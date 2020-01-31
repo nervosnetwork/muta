@@ -11,8 +11,8 @@ use derive_more::{Display, From};
 
 use crate::{ProtocolError, ProtocolErrorKind};
 
-pub use bytes::{Bytes, BytesMut};
 pub use block::{Block, BlockHeader, Pill, Proof, Validator};
+pub use bytes::{Bytes, BytesMut};
 pub use ethbloom::{Bloom, BloomRef, Input as BloomInput};
 pub use genesis::{Genesis, ServiceParam};
 pub use primitive::{

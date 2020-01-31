@@ -6,7 +6,7 @@ async function main() {
         query {
             getLatestEpoch {
                 header {
-                    epochId
+                    height
                 }
             }
         }

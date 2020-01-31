@@ -73,10 +73,14 @@ impl<
         self.mempool.insert(ctx, signed_tx).await
     }
 
-    async fn get_epoch_by_id(&self, _ctx: Context, height: Option<u64>) -> ProtocolResult<Block> {
+    async fn get_block_by_height(
+        &self,
+        _ctx: Context,
+        height: Option<u64>,
+    ) -> ProtocolResult<Block> {
         let block = match height {
-            Some(id) => self.storage.get_epoch_by_epoch_id(id).await?,
-            None => self.storage.get_latest_epoch().await?,
+            Some(id) => self.storage.get_block_by_height(id).await?,
+            None => self.storage.get_latest_block().await?,
         };
 
         Ok(block)
@@ -88,7 +92,7 @@ impl<
         tx_hash: Hash,
     ) -> ProtocolResult<Receipt> {
         let receipt = self.storage.get_receipt(tx_hash).await?;
-        let exec_height = self.storage.get_latest_epoch().await?.header.exec_height;
+        let exec_height = self.storage.get_latest_block().await?.header.exec_height;
         let height = receipt.height;
         if exec_height >= height {
             return Ok(receipt);
@@ -121,7 +125,7 @@ impl<
         method: String,
         payload: String,
     ) -> ProtocolResult<ExecResp> {
-        let block = self.get_epoch_by_id(ctx.clone(), Some(height)).await?;
+        let block = self.get_block_by_height(ctx.clone(), Some(height)).await?;
 
         let executor = EF::from_root(
             block.header.state_root.clone(),

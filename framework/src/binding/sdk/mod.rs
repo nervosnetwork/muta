@@ -130,8 +130,8 @@ impl<S: 'static + ServiceState, C: ChainQuerier, D: Dispatcher> ServiceSDK
     // Get a block by `height`
     // if not found on the chain, return None
     // When the parameter `height` is None, get the latest (executing)` block`
-    fn get_epoch_by_epoch_id(&self, height: Option<u64>) -> ProtocolResult<Option<Block>> {
-        self.chain_querier.get_epoch_by_epoch_id(height)
+    fn get_block_by_height(&self, height: Option<u64>) -> ProtocolResult<Option<Block>> {
+        self.chain_querier.get_block_by_height(height)
     }
 
     // Get a receipt by `tx_hash`

@@ -80,7 +80,7 @@ pub trait ChainQuerier {
     fn get_transaction_by_hash(&self, tx_hash: &Hash) -> ProtocolResult<Option<SignedTransaction>>;
 
     // To get the latest `Block` of finality, set `height` to `None`
-    fn get_epoch_by_epoch_id(&self, height: Option<u64>) -> ProtocolResult<Option<Block>>;
+    fn get_block_by_height(&self, height: Option<u64>) -> ProtocolResult<Option<Block>>;
 
     fn get_receipt_by_hash(&self, tx_hash: &Hash) -> ProtocolResult<Option<Receipt>>;
 }
@@ -190,7 +190,7 @@ pub trait ServiceSDK {
     // Get a block by `height`
     // if not found on the chain, return None
     // When the parameter `height` is None, get the latest (executing)` block`
-    fn get_epoch_by_epoch_id(&self, height: Option<u64>) -> ProtocolResult<Option<Block>>;
+    fn get_block_by_height(&self, height: Option<u64>) -> ProtocolResult<Option<Block>>;
 
     // Get a receipt by `tx_hash`
     // if not found on the chain, return None

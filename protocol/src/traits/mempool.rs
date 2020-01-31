@@ -59,5 +59,5 @@ pub trait MemPoolAdapter: Send + Sync {
 
     async fn check_storage_exist(&self, ctx: Context, tx_hash: Hash) -> ProtocolResult<()>;
 
-    async fn get_latest_epoch_id(&self, ctx: Context) -> ProtocolResult<u64>;
+    async fn get_latest_height(&self, ctx: Context) -> ProtocolResult<u64>;
 }

@@ -65,9 +65,9 @@ impl TxWrapper {
     }
 
     #[inline]
-    fn is_timeout(&self, current_epoch_id: u64, timeout: u64) -> bool {
+    fn is_timeout(&self, current_height: u64, timeout: u64) -> bool {
         let tx_timeout = self.tx.raw.timeout;
-        tx_timeout <= current_epoch_id || tx_timeout > timeout
+        tx_timeout <= current_height || tx_timeout > timeout
     }
 }
 
@@ -179,7 +179,7 @@ impl TxCache {
     pub fn package(
         &self,
         cycle_limit: u64,
-        current_epoch_id: u64,
+        current_height: u64,
         timeout: u64,
     ) -> ProtocolResult<MixedTxHashes> {
         let queue_role = self.get_queue_role();
@@ -198,7 +198,7 @@ impl TxCache {
                 if shared_tx.is_removed() {
                     continue;
                 }
-                if shared_tx.is_timeout(current_epoch_id, timeout) {
+                if shared_tx.is_timeout(current_height, timeout) {
                     timeout_tx_hashes.push(tx_hash.clone());
                     continue;
                 }

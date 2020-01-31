@@ -60,7 +60,7 @@ pub struct InputRawTransaction {
     pub nonce:        Hash,
     #[graphql(description = "For security and performance reasons, \
     Muta will only deal with trade request over a period of time,\
-    the `timeout` should be `timeout > current_epoch_height` and `timeout < current_epoch_height + timeout_gap`,\
+    the `timeout` should be `timeout > current_block_height` and `timeout < current_block_height + timeout_gap`,\
     the `timeout_gap` generally equal to 20.")]
     pub timeout:      Uint64,
     pub service_name: String,

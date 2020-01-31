@@ -72,15 +72,15 @@ fn test_package() {
     // 3. 2 * cycle_limit < pool_size
     package!(normal(100, 201, 100, 100));
 
-    // 4. current_epoch_id >= tx.timeout
+    // 4. current_height >= tx.timeout
     package!(timeout(50, CURRENT_EPOCH_ID, 10, 0));
     package!(timeout(50, CURRENT_EPOCH_ID - 10, 10, 0));
 
-    // 5. current_epoch_id + timeout_gap < tx.timeout
+    // 5. current_height + timeout_gap < tx.timeout
     package!(timeout(50, CURRENT_EPOCH_ID + 51, 10, 0));
     package!(timeout(50, CURRENT_EPOCH_ID + 60, 10, 0));
 
-    // 6. tx.timeout - timeout_gap =< current_epoch_id < tx.timeout
+    // 6. tx.timeout - timeout_gap =< current_height < tx.timeout
     package!(timeout(50, CURRENT_EPOCH_ID + 50, 10, 10));
     package!(timeout(50, CURRENT_EPOCH_ID + 1, 10, 10));
 }

@@ -7,27 +7,27 @@ describe("query API works", () => {
         query {
             getLatestEpoch {
                 header {
-                    epochId
+                    height
                 }
             }
         }
         `;
     let res = await client.query({ query: gql(q) });
-    expect(typeof res.data.getLatestEpoch.header.epochId).toBe("string");
+    expect(typeof res.data.getLatestEpoch.header.height).toBe("string");
   });
 
-  test("getLatestEpoch with epochId works", async () => {
+  test("getLatestEpoch with height works", async () => {
     let q = `
         query {
-            getLatestEpoch(epochId: "0x0") {
+            getLatestEpoch(height: "0x0") {
                 header {
-                    epochId
+                    height
                 }
             }
         }
         `;
     let res = await client.query({ query: gql(q) });
-    expect(res.data.getLatestEpoch.header.epochId).toBe("0000000000000000");
+    expect(res.data.getLatestEpoch.header.height).toBe("0000000000000000");
   });
 });
 
@@ -43,7 +43,7 @@ describe("transfer work", () => {
           query {
             height: getLatestEpoch {
                 header {
-                  epochId
+                  height
                 }
               }
             from: getBalance(
@@ -59,7 +59,7 @@ describe("transfer work", () => {
     let res = await client.query({ query: gql(q_balance) });
     const from_balance_before = parseInt(res.data.from, 16);
     const to_balance_before = parseInt(res.data.to, 16);
-    const current_height_before = parseInt(res.data.height.header.epochId, 16);
+    const current_height_before = parseInt(res.data.height.header.height, 16);
 
     // transfer
     let q_transfer = `
@@ -90,7 +90,7 @@ mutation {
       await delay(CHAIN_CONFIG.consensus.interval * 2 + 100);
       res = await client.query({ query: gql(q_balance) });
       // console.log(Date.now(), res, res.data.height);
-      const current_height_after = parseInt(res.data.height.header.epochId, 16);
+      const current_height_after = parseInt(res.data.height.header.height, 16);
       const from_balance_after = parseInt(res.data.from, 16);
       const to_balance_after = parseInt(res.data.to, 16);
       if (current_height_after <= current_height_before) {

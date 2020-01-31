@@ -13,7 +13,7 @@ impl rlp::Encodable for Proof {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
         s.begin_list(5)
             .append(&self.bitmap.to_vec())
-            .append(&self.epoch_hash)
+            .append(&self.block_hash)
             .append(&self.height)
             .append(&self.round)
             .append(&self.signature.to_vec());
@@ -27,7 +27,7 @@ impl rlp::Decodable for Proof {
         }
 
         let bitmap = BytesMut::from(r.at(0)?.data()?).freeze();
-        let epoch_hash: Hash = rlp::decode(r.at(1)?.as_raw())?;
+        let block_hash: Hash = rlp::decode(r.at(1)?.as_raw())?;
         let height = r.at(2)?.as_val()?;
         let round = r.at(3)?.as_val()?;
         let signature = BytesMut::from(r.at(4)?.data()?).freeze();
@@ -35,7 +35,7 @@ impl rlp::Decodable for Proof {
         Ok(Proof {
             height,
             round,
-            epoch_hash,
+            block_hash,
             signature,
             bitmap,
         })

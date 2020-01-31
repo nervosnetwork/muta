@@ -12,8 +12,8 @@ pub struct Block {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BlockHeader {
     pub chain_id:          Hash,
-    pub height:          u64,
-    pub exec_height:     u64,
+    pub height:            u64,
+    pub exec_height:       u64,
     pub pre_hash:          Hash,
     pub timestamp:         u64,
     pub logs_bloom:        Vec<Bloom>,
@@ -30,9 +30,9 @@ pub struct BlockHeader {
 
 #[derive(Serialize, Deserialize, Clone, Debug, Hash, PartialEq, Eq)]
 pub struct Proof {
-    pub height:   u64,
+    pub height:     u64,
     pub round:      u64,
-    pub epoch_hash: Hash,
+    pub block_hash: Hash,
     pub signature:  Bytes,
     pub bitmap:     Bytes,
 }

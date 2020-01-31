@@ -105,8 +105,8 @@ fn test_service_sdk() {
         .unwrap();
     assert_eq!(mock_receipt(), receipt_data);
 
-    let epoch_data = sdk.get_epoch_by_epoch_id(Some(1)).unwrap().unwrap();
-    assert_eq!(mock_epoch(1), epoch_data);
+    let block_data = sdk.get_block_by_height(Some(1)).unwrap().unwrap();
+    assert_eq!(mock_block(1), block_data);
 }
 
 struct MockStorage;
@@ -117,7 +117,7 @@ impl Storage for MockStorage {
         Ok(())
     }
 
-    async fn insert_epoch(&self, _epoch: Block) -> ProtocolResult<()> {
+    async fn insert_block(&self, _block: Block) -> ProtocolResult<()> {
         Ok(())
     }
 
@@ -137,15 +137,15 @@ impl Storage for MockStorage {
         Err(StoreError::GetNone.into())
     }
 
-    async fn get_latest_epoch(&self) -> ProtocolResult<Block> {
-        Ok(mock_epoch(1))
+    async fn get_latest_block(&self) -> ProtocolResult<Block> {
+        Ok(mock_block(1))
     }
 
-    async fn get_epoch_by_epoch_id(&self, _epoch_id: u64) -> ProtocolResult<Block> {
-        Ok(mock_epoch(1))
+    async fn get_block_by_height(&self, _height: u64) -> ProtocolResult<Block> {
+        Ok(mock_block(1))
     }
 
-    async fn get_epoch_by_hash(&self, _epoch_hash: Hash) -> ProtocolResult<Block> {
+    async fn get_block_by_hash(&self, _block_hash: Hash) -> ProtocolResult<Block> {
         Err(StoreError::GetNone.into())
     }
 
@@ -187,7 +187,7 @@ impl Storage for MockStorage {
 
     async fn insert_wal_transactions(
         &self,
-        _epoch_hash: Hash,
+        _block_hash: Hash,
         _signed_txs: Vec<SignedTransaction>,
     ) -> ProtocolResult<()> {
         Ok(())
@@ -195,7 +195,7 @@ impl Storage for MockStorage {
 
     async fn get_wal_transactions(
         &self,
-        _epoch_hash: Hash,
+        _block_hash: Hash,
     ) -> ProtocolResult<Vec<SignedTransaction>> {
         Err(StoreError::GetNone.into())
     }
@@ -257,7 +257,7 @@ pub fn mock_signed_tx() -> SignedTransaction {
 pub fn mock_receipt() -> Receipt {
     Receipt {
         state_root:  mock_merkle_root(),
-        height:    13,
+        height:      13,
         tx_hash:     mock_hash(),
         cycles_used: 100,
         events:      vec![mock_event()],
@@ -295,19 +295,19 @@ pub fn mock_validator() -> Validator {
 
 pub fn mock_proof() -> Proof {
     Proof {
-        height:   4,
+        height:     4,
         round:      99,
-        epoch_hash: mock_hash(),
+        block_hash: mock_hash(),
         signature:  Default::default(),
         bitmap:     Default::default(),
     }
 }
 
-pub fn mock_epoch_header() -> BlockHeader {
+pub fn mock_block_header() -> BlockHeader {
     BlockHeader {
         chain_id:          mock_hash(),
-        height:          42,
-        exec_height:     41,
+        height:            42,
+        exec_height:       41,
         pre_hash:          mock_hash(),
         timestamp:         420_000_000,
         logs_bloom:        Default::default(),
@@ -328,9 +328,9 @@ pub fn mock_epoch_header() -> BlockHeader {
     }
 }
 
-pub fn mock_epoch(order_size: usize) -> Block {
+pub fn mock_block(order_size: usize) -> Block {
     Block {
-        header:            mock_epoch_header(),
+        header:            mock_block_header(),
         ordered_tx_hashes: (0..order_size).map(|_| mock_hash()).collect(),
     }
 }

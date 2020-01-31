@@ -42,13 +42,13 @@ This crate uses `log4rs` to init the logger, but you don't need to add dependenc
 Metrics is an independent logger, it `metrics` is `true`, the metrics will be logged to `{log_path}/metrics.log`.
 
 ```
-{"time":"2019-12-01T22:02:49.035084+08:00","message":"{\"height\":7943,\"name\":\"save_epoch\",\"ordered_tx_num\":0}","module_path":"common_logger","file":"common/logger/src/lib.rs","line":83,"level":"TRACE","target":"metrics","thread":"tokio-runtime-worker-3","thread_id":123145445486592,"mdc":{}}
+{"time":"2019-12-01T22:02:49.035084+08:00","message":"{\"height\":7943,\"name\":\"save_block\",\"ordered_tx_num\":0}","module_path":"common_logger","file":"common/logger/src/lib.rs","line":83,"level":"TRACE","target":"metrics","thread":"tokio-runtime-worker-3","thread_id":123145445486592,"mdc":{}}
 ```
 
 If you want to use log metrics in a module, you need to add this crate as dependency and use the code below to add a metric. The `name` field is reserved, please avoid using this as a key in your metrics.
 
 ```rust
-common_logger::metrics("save_epoch", common_logger::object! {
+common_logger::metrics("save_block", common_logger::object! {
     "height" => block.header.height,
     "ordered_tx_num" => block.ordered_tx_hashes.len(),
 });

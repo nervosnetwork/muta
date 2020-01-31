@@ -103,7 +103,7 @@ pub enum ConsensusError {
 
     /// Consensus missed the block header.
     #[display(fmt = "Consensus missed block header of {} block", _0)]
-    MissingEpochHeader(u64),
+    MissingBlockHeader(u64),
 
     /// This boxed error should be a `CryptoError`.
     #[display(fmt = "Crypto error {:?}", _0)]
@@ -111,15 +111,7 @@ pub enum ConsensusError {
 
     /// The synchronous block does not pass the checks.
     #[display(fmt = "Synchronization {} block error", _0)]
-    SyncEpochHashErr(u64),
-
-    /// The synchronous block does not pass the checks.
-    #[display(fmt = "Synchronization {} block error", _0)]
-    SyncEpochStateRootErr(u64),
-
-    /// The synchronous block proof does not pass the checks.
-    #[display(fmt = "Synchronization {} proof error", _0)]
-    SyncEpochProofErr(u64),
+    SyncBlockHashErr(u64),
 
     /// The Rpc response mismatch the request.
     #[display(fmt = "Synchronization Rpc {:?} message mismatch", _0)]

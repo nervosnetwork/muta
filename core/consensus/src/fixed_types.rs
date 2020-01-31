@@ -94,36 +94,36 @@ impl FixedPill {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct FixedEpoch {
+pub struct FixedBlock {
     pub inner: Block,
 }
 
 #[async_trait]
-impl MessageCodec for FixedEpoch {
+impl MessageCodec for FixedBlock {
     async fn encode(&mut self) -> ProtocolResult<Bytes> {
         self.inner.encode_sync()
     }
 
     async fn decode(bytes: Bytes) -> ProtocolResult<Self> {
         let inner: Block = ProtocolCodecSync::decode_sync(bytes)?;
-        Ok(FixedEpoch::new(inner))
+        Ok(FixedBlock::new(inner))
     }
 }
 
-impl FixedEpoch {
+impl FixedBlock {
     pub fn new(inner: Block) -> Self {
-        FixedEpoch { inner }
+        FixedBlock { inner }
     }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct FixedEpochID {
+pub struct FixedHeight {
     pub inner: u64,
 }
 
-impl FixedEpochID {
+impl FixedHeight {
     pub fn new(inner: u64) -> Self {
-        FixedEpochID { inner }
+        FixedHeight { inner }
     }
 }
 
@@ -177,9 +177,9 @@ mod test {
     };
     use protocol::Bytes;
 
-    use super::{FixedEpoch, FixedSignedTxs};
+    use super::{FixedBlock, FixedSignedTxs};
 
-    fn gen_epoch(height: u64, epoch_hash: Hash) -> Block {
+    fn gen_block(height: u64, block_hash: Hash) -> Block {
         let nonce = Hash::digest(Bytes::from("XXXX"));
         let addr_str = "CAB8EEA4799C21379C20EF5BAA2CC8AF1BEC475B";
         let header = BlockHeader {
@@ -195,7 +195,7 @@ mod test {
             receipt_root: Vec::new(),
             cycles_used: vec![999_999],
             proposer: Address::from_hex(addr_str).unwrap(),
-            proof: mock_proof(epoch_hash),
+            proof: mock_proof(block_hash),
             validator_version: 1,
             validators: Vec::new(),
         };
@@ -206,11 +206,11 @@ mod test {
         }
     }
 
-    fn mock_proof(epoch_hash: Hash) -> Proof {
+    fn mock_proof(block_hash: Hash) -> Proof {
         Proof {
             height: 0,
             round: 0,
-            epoch_hash,
+            block_hash,
             signature: Default::default(),
             bitmap: Default::default(),
         }
@@ -264,13 +264,13 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_epoch_codec() {
+    async fn test_block_codec() {
         use super::MessageCodec;
 
-        let block = gen_epoch(random::<u64>(), Hash::from_empty());
-        let mut origin = FixedEpoch::new(block.clone());
+        let block = gen_block(random::<u64>(), Hash::from_empty());
+        let mut origin = FixedBlock::new(block.clone());
         let bytes = origin.encode().await.unwrap();
-        let res: FixedEpoch = MessageCodec::decode(bytes).await.unwrap();
+        let res: FixedBlock = MessageCodec::decode(bytes).await.unwrap();
         assert_eq!(res.inner, block);
     }
 }

@@ -38,8 +38,8 @@ fn test_codec() {
 
     test!(block, Validator, mock_validator);
     test!(block, Proof, mock_proof);
-    test!(block, BlockHeader, mock_epoch_header);
-    test!(block, Block, mock_epoch, 100);
+    test!(block, BlockHeader, mock_block_header);
+    test!(block, Block, mock_block, 100);
     test!(block, Pill, mock_pill, 100, 200);
 }
 
@@ -77,8 +77,8 @@ fn bench_signed_tx_deserialize(b: &mut Bencher) {
 }
 
 #[bench]
-fn bench_epoch_serialize(b: &mut Bencher) {
-    let block = mock_epoch(50_000);
+fn bench_block_serialize(b: &mut Bencher) {
+    let block = mock_block(50_000);
 
     b.iter(|| {
         block.encode_sync().unwrap();
@@ -86,8 +86,8 @@ fn bench_epoch_serialize(b: &mut Bencher) {
 }
 
 #[bench]
-fn bench_epoch_try_into(b: &mut Bencher) {
-    let block = mock_epoch(50_000).encode_sync().unwrap();
+fn bench_block_try_into(b: &mut Bencher) {
+    let block = mock_block(50_000).encode_sync().unwrap();
 
     b.iter(|| {
         Block::decode_sync(block.clone()).unwrap();

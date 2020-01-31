@@ -17,7 +17,7 @@ node, and then try open http://127.0.0.1:8000/graphiql in the browser.
   * [Mutation](#mutation)
   * [Objects](#objects)
     * [Block](#block)
-    * [BlockHeader](#epochheader)
+    * [BlockHeader](#blockheader)
   * [Inputs](#inputs)
     * [InputDeployAction](#inputdeployaction)
     * [InputRawTransaction](#inputrawtransaction)
@@ -57,7 +57,7 @@ Get the latest block
 </td>
 </tr>
 <tr>
-<td colspan="2" align="right" valign="top">epochId</td>
+<td colspan="2" align="right" valign="top">height</td>
 <td valign="top"><a href="#uint64">Uint64</a></td>
 <td></td>
 </tr>
@@ -85,7 +85,7 @@ The asset id. Asset is the first-class in Muta, and the UDT(User Defined Token) 
 </td>
 </tr>
 <tr>
-<td colspan="2" align="right" valign="top">epochId</td>
+<td colspan="2" align="right" valign="top">height</td>
 <td valign="top"><a href="#uint64">Uint64</a></td>
 <td></td>
 </tr>
@@ -226,7 +226,7 @@ Block is a single digital record created within a blockchain. Each block contain
 <tbody>
 <tr>
 <td colspan="2" valign="top"><strong>header</strong></td>
-<td valign="top"><a href="#epochheader">BlockHeader</a>!</td>
+<td valign="top"><a href="#blockheader">BlockHeader</a>!</td>
 <td>
 
 The header section of a block
@@ -269,7 +269,7 @@ Identifier of a chain in order to prevent replay attacks across channels
 </td>
 </tr>
 <tr>
-<td colspan="2" valign="top"><strong>epochId</strong></td>
+<td colspan="2" valign="top"><strong>height</strong></td>
 <td valign="top"><a href="#uint64">Uint64</a>!</td>
 <td>
 
@@ -451,7 +451,7 @@ Every transaction has its own id, unlike Ethereum's nonce,the nonce in Muta is a
 <td valign="top"><a href="#uint64">Uint64</a>!</td>
 <td>
 
-For security and performance reasons, Muta will only deal with trade request over a period of time,the `timeout` should be `timeout > current_epoch_height` and `timeout < current_epoch_height + timeout_gap`,the `timeout_gap` generally equal to 20.
+For security and performance reasons, Muta will only deal with trade request over a period of time,the `timeout` should be `timeout > current_block_height` and `timeout < current_block_height + timeout_gap`,the `timeout_gap` generally equal to 20.
 
 </td>
 </tr>

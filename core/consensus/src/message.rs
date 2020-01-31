@@ -13,16 +13,16 @@ use protocol::traits::{
 };
 use protocol::ProtocolResult;
 
-use crate::fixed_types::{FixedEpoch, FixedEpochID, FixedSignedTxs, PullTxsRequest};
+use crate::fixed_types::{FixedBlock, FixedHeight, FixedSignedTxs, PullTxsRequest};
 
 pub const END_GOSSIP_SIGNED_PROPOSAL: &str = "/gossip/consensus/signed_proposal";
 pub const END_GOSSIP_SIGNED_VOTE: &str = "/gossip/consensus/signed_vote";
 pub const END_GOSSIP_AGGREGATED_VOTE: &str = "/gossip/consensus/qc";
-pub const RPC_SYNC_PULL_EPOCH: &str = "/rpc_call/consensus/sync_pull_epoch";
-pub const RPC_RESP_SYNC_PULL_EPOCH: &str = "/rpc_resp/consensus/sync_pull_epoch";
+pub const RPC_SYNC_PULL_EPOCH: &str = "/rpc_call/consensus/sync_pull_block";
+pub const RPC_RESP_SYNC_PULL_EPOCH: &str = "/rpc_resp/consensus/sync_pull_block";
 pub const RPC_SYNC_PULL_TXS: &str = "/rpc_call/consensus/sync_pull_txs";
 pub const RPC_RESP_SYNC_PULL_TXS: &str = "/rpc_resp/consensus/sync_pull_txs";
-pub const BROADCAST_EPOCH_ID: &str = "/gossip/consensus/broadcast_epoch_id";
+pub const BROADCAST_EPOCH_ID: &str = "/gossip/consensus/broadcast_height";
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Proposal(pub Vec<u8>);
@@ -54,8 +54,8 @@ impl From<AggregatedVote> for QC {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct RichEpochID(pub Vec<u8>);
 
-impl From<FixedEpochID> for RichEpochID {
-    fn from(id: FixedEpochID) -> Self {
+impl From<FixedHeight> for RichEpochID {
+    fn from(id: FixedHeight) -> Self {
         RichEpochID(serialize(&id).unwrap())
     }
 }
@@ -132,7 +132,7 @@ impl<Sy: Synchronization + 'static> MessageHandler for RemoteEpochIDMessageHandl
     type Message = u64;
 
     async fn process(&self, ctx: Context, msg: Self::Message) -> ProtocolResult<()> {
-        self.synchronization.receive_remote_epoch(ctx, msg).await
+        self.synchronization.receive_remote_block(ctx, msg).await
     }
 }
 
@@ -154,18 +154,18 @@ where
 
 #[async_trait]
 impl<R: Rpc + 'static, S: Storage + 'static> MessageHandler for PullEpochRpcHandler<R, S> {
-    type Message = FixedEpochID;
+    type Message = FixedHeight;
 
-    async fn process(&self, ctx: Context, msg: FixedEpochID) -> ProtocolResult<()> {
+    async fn process(&self, ctx: Context, msg: FixedHeight) -> ProtocolResult<()> {
         debug!("message: get rpc pull block {:?}, {:?}", msg.inner, ctx);
         let id = msg.inner;
-        let block = self.storage.get_epoch_by_epoch_id(id).await?;
+        let block = self.storage.get_block_by_height(id).await?;
 
         self.rpc
             .response(
                 ctx,
                 RPC_RESP_SYNC_PULL_EPOCH,
-                FixedEpoch::new(block),
+                FixedBlock::new(block),
                 Priority::High,
             )
             .await

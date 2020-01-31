@@ -26,7 +26,7 @@ pub trait StorageSchema {
 pub trait Storage: Send + Sync {
     async fn insert_transactions(&self, signed_txs: Vec<SignedTransaction>) -> ProtocolResult<()>;
 
-    async fn insert_epoch(&self, block: Block) -> ProtocolResult<()>;
+    async fn insert_block(&self, block: Block) -> ProtocolResult<()>;
 
     async fn insert_receipts(&self, receipts: Vec<Receipt>) -> ProtocolResult<()>;
 
@@ -36,11 +36,11 @@ pub trait Storage: Send + Sync {
 
     async fn get_transactions(&self, hashes: Vec<Hash>) -> ProtocolResult<Vec<SignedTransaction>>;
 
-    async fn get_latest_epoch(&self) -> ProtocolResult<Block>;
+    async fn get_latest_block(&self) -> ProtocolResult<Block>;
 
-    async fn get_epoch_by_epoch_id(&self, height: u64) -> ProtocolResult<Block>;
+    async fn get_block_by_height(&self, height: u64) -> ProtocolResult<Block>;
 
-    async fn get_epoch_by_hash(&self, epoch_hash: Hash) -> ProtocolResult<Block>;
+    async fn get_block_by_hash(&self, block_hash: Hash) -> ProtocolResult<Block>;
 
     async fn get_receipt(&self, hash: Hash) -> ProtocolResult<Receipt>;
 
@@ -62,13 +62,13 @@ pub trait Storage: Send + Sync {
 
     async fn insert_wal_transactions(
         &self,
-        epoch_hash: Hash,
+        block_hash: Hash,
         signed_txs: Vec<SignedTransaction>,
     ) -> ProtocolResult<()>;
 
     async fn get_wal_transactions(
         &self,
-        epoch_hash: Hash,
+        block_hash: Hash,
     ) -> ProtocolResult<Vec<SignedTransaction>>;
 }
 

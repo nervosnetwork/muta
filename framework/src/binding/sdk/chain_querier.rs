@@ -25,14 +25,14 @@ impl<S: Storage> ChainQuerier for DefaultChainQuerier<S> {
         Ok(Some(ret))
     }
 
-    fn get_epoch_by_epoch_id(&self, height: Option<u64>) -> ProtocolResult<Option<Block>> {
+    fn get_block_by_height(&self, height: Option<u64>) -> ProtocolResult<Option<Block>> {
         if let Some(u) = height {
-            let ret = block_on(self.storage.get_epoch_by_epoch_id(u))
+            let ret = block_on(self.storage.get_block_by_height(u))
                 .map_err(|_| ChainQueryError::AsyncStorage)?;
 
             Ok(Some(ret))
         } else {
-            let ret = block_on(self.storage.get_latest_epoch())
+            let ret = block_on(self.storage.get_latest_block())
                 .map_err(|_| ChainQueryError::AsyncStorage)?;
 
             Ok(Some(ret))
