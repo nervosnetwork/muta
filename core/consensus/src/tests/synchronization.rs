@@ -48,7 +48,7 @@ fn sync_gap_test() {
         let status = CurrentConsensusStatus {
             cycles_price:       1,
             cycles_limit:       300_000_000,
-            height:             genesis_block.header.height,
+            height:             genesis_block.header.height + 1,
             exec_height:        genesis_block.header.exec_height,
             prev_hash:          genesis_block.header.pre_hash,
             logs_bloom:         vec![],
