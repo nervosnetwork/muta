@@ -9,7 +9,7 @@ use framework::binding::sdk::{DefalutServiceSDK, DefaultChainQuerier};
 use framework::binding::state::{GeneralServiceState, MPTTrie};
 use protocol::traits::{NoopDispatcher, ServiceSDK, Storage};
 use protocol::types::{
-    Address, Block, Hash, Metadata, Proof, Receipt, ServiceContext, ServiceContextParams,
+    Address, Block, Hash, Metadata, Node, Proof, Receipt, ServiceContext, ServiceContextParams,
     SignedTransaction, METADATA_KEY,
 };
 use protocol::{types::Bytes, ProtocolResult};
@@ -62,8 +62,12 @@ fn mock_metadata() -> Metadata {
         cycles_limit:    99_999_999,
         cycles_price:    1,
         interval:        3000,
-        verifier_list:   [Address::from_hex("CAB8EEA4799C21379C20EF5BAA2CC8AF1BEC475B").unwrap()]
-            .to_vec(),
+        verifier_list:   [Node {
+            address:        Address::from_hex("CAB8EEA4799C21379C20EF5BAA2CC8AF1BEC475B").unwrap(),
+            propose_weight: 1,
+            vote_weight:    1,
+        }]
+        .to_vec(),
         propose_ratio:   10,
         prevote_ratio:   10,
         precommit_ratio: 10,

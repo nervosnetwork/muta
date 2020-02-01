@@ -225,6 +225,13 @@ impl fmt::Debug for Address {
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
+pub struct Node {
+    pub address:        Address,
+    pub propose_weight: u8,
+    pub vote_weight:    u8,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub struct Metadata {
     pub chain_id:        Hash,
     pub common_ref:      String,
@@ -232,7 +239,7 @@ pub struct Metadata {
     pub cycles_limit:    u64,
     pub cycles_price:    u64,
     pub interval:        u64,
-    pub verifier_list:   Vec<Address>,
+    pub verifier_list:   Vec<Node>,
     pub propose_ratio:   u64,
     pub prevote_ratio:   u64,
     pub precommit_ratio: u64,
