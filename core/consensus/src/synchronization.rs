@@ -16,6 +16,7 @@ use crate::status::{CurrentConsensusStatus, StatusAgent, UpdateInfo};
 use crate::ConsensusError;
 
 const POLLING_BROADCAST: u64 = 2000;
+const WAIT_EXECUTION: u64 = 1000;
 
 #[derive(Clone, Debug)]
 pub struct RichBlock {
@@ -247,7 +248,7 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
             let current_status = self.status.to_inner();
 
             if current_status.exec_height != current_status.height - 1 {
-                Delay::new(Duration::from_millis(1000)).await;
+                Delay::new(Duration::from_millis(WAIT_EXECUTION)).await;
             } else {
                 break;
             }
