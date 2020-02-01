@@ -243,6 +243,16 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
     }
 
     async fn init_status_agent(&self, ctx: Context, height: u64) -> ProtocolResult<StatusAgent> {
+        loop {
+            let current_status = self.status.to_inner();
+
+            if current_status.exec_height != current_status.height - 1 {
+                Delay::new(Duration::from_millis(1000)).await;
+            } else {
+                break;
+            }
+        }
+
         let block = self
             .adapter
             .get_block_by_height(ctx.clone(), height)
