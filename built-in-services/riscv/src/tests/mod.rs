@@ -13,7 +13,7 @@ use framework::binding::sdk::{DefalutServiceSDK, DefaultChainQuerier};
 use framework::binding::state::{GeneralServiceState, MPTTrie};
 use protocol::traits::{Dispatcher, ExecResp, Storage};
 use protocol::types::{
-    Address, Epoch, Hash, Proof, Receipt, ServiceContext, ServiceContextParams, SignedTransaction,
+    Address, Block, Hash, Proof, Receipt, ServiceContext, ServiceContextParams, SignedTransaction,
 };
 use protocol::ProtocolResult;
 
@@ -148,7 +148,7 @@ fn mock_context(cycles_limit: u64, caller: Address, tx_hash: Hash, nonce: Hash) 
         cycles_price: 1,
         cycles_used: Rc::new(RefCell::new(0)),
         caller,
-        epoch_id: 1,
+        height: 1,
         timestamp: 0,
         extra: None,
         service_name: "service_name".to_owned(),
@@ -168,7 +168,7 @@ impl Storage for MockStorage {
         unimplemented!()
     }
 
-    async fn insert_epoch(&self, _: Epoch) -> ProtocolResult<()> {
+    async fn insert_block(&self, _: Block) -> ProtocolResult<()> {
         unimplemented!()
     }
 
@@ -188,15 +188,15 @@ impl Storage for MockStorage {
         unimplemented!()
     }
 
-    async fn get_latest_epoch(&self) -> ProtocolResult<Epoch> {
+    async fn get_latest_block(&self) -> ProtocolResult<Block> {
         unimplemented!()
     }
 
-    async fn get_epoch_by_epoch_id(&self, _: u64) -> ProtocolResult<Epoch> {
+    async fn get_block_by_height(&self, _: u64) -> ProtocolResult<Block> {
         unimplemented!()
     }
 
-    async fn get_epoch_by_hash(&self, _: Hash) -> ProtocolResult<Epoch> {
+    async fn get_block_by_hash(&self, _: Hash) -> ProtocolResult<Block> {
         unimplemented!()
     }
 
@@ -238,7 +238,7 @@ impl Storage for MockStorage {
 
     async fn insert_wal_transactions(
         &self,
-        epoch_hash: Hash,
+        block_hash: Hash,
         signed_txs: Vec<SignedTransaction>,
     ) -> ProtocolResult<()> {
         unimplemented!()
@@ -246,7 +246,7 @@ impl Storage for MockStorage {
 
     async fn get_wal_transactions(
         &self,
-        epoch_hash: Hash,
+        block_hash: Hash,
     ) -> ProtocolResult<Vec<SignedTransaction>> {
         unimplemented!()
     }

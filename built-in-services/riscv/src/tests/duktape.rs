@@ -36,7 +36,7 @@ impl TestContext {
             cycles_price:    1,
             cycles_used:     Rc::new(RefCell::new(0)),
             caller:          Address::from_hex(CALLER).expect("ctx caller"),
-            epoch_id:        1,
+            height:          1,
             timestamp:       0,
             extra:           None,
             service_name:    "service_name".to_owned(),
