@@ -224,7 +224,7 @@ impl fmt::Debug for Address {
     }
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub struct Metadata {
     pub chain_id:        Hash,
     pub common_ref:      String,

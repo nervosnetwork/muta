@@ -34,6 +34,7 @@ tokio = { version = "0.2", features = ["macros", "rt-core"]}
 
 [dev-dependencies]
 asset = { path = "built-in-services/asset"}
+metadata = { path = "built-in-services/metadata"}
 
 [workspace]
 members = [
@@ -56,6 +57,7 @@ members = [
   "binding-macro",
   "framework",
   "built-in-services/asset",
+  "built-in-services/metadata",
 
   "protocol",
 ]
