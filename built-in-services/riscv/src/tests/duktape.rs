@@ -89,7 +89,7 @@ fn should_support_pvm_load_args() {
     let (mut service, mut context, address) = deploy_test_code!();
 
     let args = json!({"method": "test_load_args"}).to_string();
-    let payload = ExecPayload::new(address, args.clone().into());
+    let payload = ExecPayload::new(address, args.clone());
 
     let ret = service.exec(context.make(), payload).expect("load args");
 
@@ -101,7 +101,7 @@ fn should_support_pvm_load_json_args() {
     let (mut service, mut context, address) = deploy_test_code!();
 
     let args = json!({"method": "test_load_json_args"}).to_string();
-    let payload = ExecPayload::new(address, args.clone().into());
+    let payload = ExecPayload::new(address, args.clone());
 
     let ret = service
         .exec(context.make(), payload)
@@ -115,7 +115,7 @@ fn should_support_pvm_cycle_limit() {
     let (mut service, mut context, address) = deploy_test_code!();
 
     let args = json!({"method": "test_cycle_limit"}).to_string();
-    let payload = ExecPayload::new(address, args.clone().into());
+    let payload = ExecPayload::new(address, args);
 
     let ret = service
         .exec(context.make(), payload)
@@ -129,7 +129,7 @@ fn should_support_pvm_caller() {
     let (mut service, mut context, address) = deploy_test_code!();
 
     let args = json!({"method": "test_caller"}).to_string();
-    let payload = ExecPayload::new(address, args.clone().into());
+    let payload = ExecPayload::new(address, args);
 
     let ret = service.exec(context.make(), payload).expect("load caller");
 
@@ -158,7 +158,7 @@ fn should_support_pvm_origin() {
         json!({"method": "test_origin", "address": tc_ret.address.as_hex(), "call_args": json!({"method": "_ret_caller_and_origin"}).to_string()})
             .to_string();
 
-    let payload = ExecPayload::new(address.clone(), args.into());
+    let payload = ExecPayload::new(address.clone(), args);
 
     let ret = service
         .exec(context.make(), payload)
@@ -180,7 +180,7 @@ fn should_support_pvm_address() {
     let (mut service, mut context, address) = deploy_test_code!();
 
     let args = json!({"method": "test_address"}).to_string();
-    let payload = ExecPayload::new(address.clone(), args.clone().into());
+    let payload = ExecPayload::new(address.clone(), args);
 
     let ret = service.exec(context.make(), payload).expect("load address");
 
@@ -198,7 +198,7 @@ fn should_support_pvm_storage() {
 
     let carmen = json!({"color": "red"}).to_string();
     let args = json!({"method": "test_storage", "key": "carmen", "val": carmen}).to_string();
-    let payload = ExecPayload::new(address, args.clone().into());
+    let payload = ExecPayload::new(address, args);
 
     let ret = service.exec(context.make(), payload).expect("load storage");
 
@@ -229,7 +229,7 @@ fn should_support_pvm_contract_call() {
         json!({"method": "test_contract_call", "address": tc_ret.address.as_hex(), "call_args": json!({"method": "_ret_self"}).to_string()})
             .to_string();
 
-    let payload = ExecPayload::new(address.clone(), args.into());
+    let payload = ExecPayload::new(address, args);
 
     let ret = service
         .exec(context.make(), payload)
@@ -269,7 +269,7 @@ fn should_support_pvm_service_call() {
     })
     .to_string();
 
-    let payload = ExecPayload::new(address.clone(), args.into());
+    let payload = ExecPayload::new(address, args);
 
     let ret = service
         .exec(context.make(), payload)
@@ -299,7 +299,7 @@ fn test_js_erc20() {
         "method": "init",
         "name": "bitcoin",
         "symbol": "BTC",
-        "supply": 1000000000,
+        "supply": 1_000_000_000,
     })
     .to_string();
     dbg!(&init_args);
@@ -428,7 +428,7 @@ fn test_js_erc20() {
 
     let args = serde_json::json!({
         "method": "balance_of",
-        "account": caller.clone(),
+        "account": caller,
     })
     .to_string();
     let exec_ret = service.exec(context.clone(), ExecPayload {
@@ -439,7 +439,7 @@ fn test_js_erc20() {
 
     let args = serde_json::json!({
         "method": "balance_of",
-        "account": to_address.clone(),
+        "account": to_address,
     })
     .to_string();
     let exec_ret = service.exec(context.clone(), ExecPayload {
@@ -453,9 +453,6 @@ fn test_js_erc20() {
         "account": to_addr2,
     })
     .to_string();
-    let exec_ret = service.exec(context.clone(), ExecPayload {
-        address: address.clone(),
-        args,
-    });
+    let exec_ret = service.exec(context, ExecPayload { address, args });
     assert_eq!(exec_ret.unwrap(), "200".to_owned());
 }

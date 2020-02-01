@@ -73,9 +73,8 @@ impl<Mac: ckb_vm::SupportMachine> ckb_vm::Syscalls<Mac> for SyscallChainInterfac
                 let val = self
                     .chain
                     .borrow()
-                    .get_storage(&Bytes::from(k.clone()))
-                    .map_err(|_e| ckb_vm::Error::InvalidEcall(code))?
-                    .clone();
+                    .get_storage(&Bytes::from(k))
+                    .map_err(|_e| ckb_vm::Error::InvalidEcall(code))?;
                 // dbg!(
                 //     "get",
                 //     String::from_utf8_lossy(&k).to_string(),

@@ -80,10 +80,7 @@ impl Interpreter {
 
         let (code, init_payload) = match self.r#type {
             InterpreterType::Binary => (self.iparams.code.clone(), None),
-            InterpreterType::Duktape => (
-                Bytes::from(DUKTAPE_EE.as_ref()),
-                Some(self.iparams.code.clone()),
-            ),
+            InterpreterType::Duktape => (Bytes::from(DUKTAPE_EE), Some(self.iparams.code.clone())),
         };
 
         let mut args: Vec<Bytes> = vec!["main".into()];

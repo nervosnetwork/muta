@@ -39,7 +39,7 @@ impl<SDK: ServiceSDK + 'static> RiscvService<SDK> {
             .sdk
             .borrow()
             .get_value::<Address, Contract>(&payload.address)?
-            .ok_or(ServiceError::ContractNotExists(payload.address.as_hex()))?;
+            .ok_or_else(|| ServiceError::ContractNotExists(payload.address.as_hex()))?;
         let code: Bytes = self
             .sdk
             .borrow()
@@ -62,7 +62,7 @@ impl<SDK: ServiceSDK + 'static> RiscvService<SDK> {
                 self.sdk.clone(),
             ))),
         );
-        let r = interpreter.run().map_err(|e| ServiceError::CkbVm(e))?;
+        let r = interpreter.run().map_err(ServiceError::CkbVm)?;
         dbg!(&payload, &r);
         let ret = String::from_utf8_lossy(r.ret.as_ref()).to_string();
         if r.ret_code != 0 {
@@ -93,7 +93,7 @@ impl<SDK: ServiceSDK + 'static> RiscvService<SDK> {
         payload: DeployPayload,
     ) -> ProtocolResult<DeployResp> {
         dbg!(&payload);
-        let code = Bytes::from(hex::decode(&payload.code).map_err(|e| ServiceError::HexDecode(e))?);
+        let code = Bytes::from(hex::decode(&payload.code).map_err(ServiceError::HexDecode)?);
         let code_hash = Hash::digest(code.clone());
         // FIXME:
         // let code_len = code.len() as u64;
@@ -101,7 +101,7 @@ impl<SDK: ServiceSDK + 'static> RiscvService<SDK> {
         self.sdk.borrow_mut().set_value(code_hash.clone(), code)?;
         let tx_hash = ctx
             .get_tx_hash()
-            .ok_or(ServiceError::NotInExecContext("riscv deploy".to_owned()))?;
+            .ok_or_else(|| ServiceError::NotInExecContext("riscv deploy".to_owned()))?;
         let contract_address =
             Address::from_bytes(Hash::digest(tx_hash.as_bytes()).as_bytes().slice(0..20))?;
 
@@ -113,21 +113,20 @@ impl<SDK: ServiceSDK + 'static> RiscvService<SDK> {
             .set_value(contract_address.clone(), contract)?;
 
         // run init
-        let mut ret = String::new();
-        if payload.init_args.len() != 0 {
-            ret = self.run(
-                ctx,
-                ExecPayload {
-                    address: contract_address.clone(),
-                    args:    payload.init_args,
-                },
-                true,
-            )?;
-        }
+        let init_ret = if !payload.init_args.is_empty() {
+            let init_payload = ExecPayload {
+                address: contract_address.clone(),
+                args:    payload.init_args,
+            };
+
+            self.run(ctx, init_payload, true)?
+        } else {
+            String::new()
+        };
 
         Ok(DeployResp {
-            address:  contract_address,
-            init_ret: ret,
+            address: contract_address,
+            init_ret,
         })
     }
 }
@@ -183,7 +182,7 @@ where
             address,
             args: String::from_utf8_lossy(args.as_ref()).to_string(),
         };
-        let payload_str = serde_json::to_string(&payload).map_err(|e| ServiceError::Serde(e))?;
+        let payload_str = serde_json::to_string(&payload).map_err(ServiceError::Serde)?;
         self.service_call("riscv", "exec", &payload_str, current_cycle)
     }
 

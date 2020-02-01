@@ -43,7 +43,7 @@ fn with_dispatcher_service<R: for<'a> serde::Deserialize<'a>>(
 
 #[test]
 fn test_deploy_and_run() {
-    let cycles_limit = 0x999999; // 1024 * 1024 * 1024; // 1073741824
+    let cycles_limit = 0x99_9999; // 1024 * 1024 * 1024; // 1073741824
     let caller = Address::from_hex("0x755cdba6ae4f479f7164792b318b2a06c759833b").unwrap();
     let tx_hash =
         Hash::from_hex("412a6c54cf3d3dbb16b49c34e6cd93d08a245298032eb975ee51105b4c296828").unwrap();
@@ -64,7 +64,8 @@ fn test_deploy_and_run() {
     };
     let deploy_result = service.deploy(context.clone(), deploy_payload).unwrap();
     assert_eq!(&deploy_result.init_ret, "");
-    let address = deploy_result.address.clone();
+
+    let address = deploy_result.address;
     let exec_result = service.call(context.clone(), ExecPayload {
         address: address.clone(),
         args:    "get k".into(),
@@ -90,9 +91,9 @@ fn test_deploy_and_run() {
     assert!(exec_result.is_err());
 
     // wrong command 2
-    let exec_result = service.exec(context.clone(), ExecPayload {
-        address: address.clone(),
-        args:    "set k".into(),
+    let exec_result = service.exec(context, ExecPayload {
+        address,
+        args: "set k".into(),
     });
     assert!(exec_result.is_err());
 }
