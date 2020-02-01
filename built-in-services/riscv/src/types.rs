@@ -1,12 +1,11 @@
 use serde::{Deserialize, Serialize};
 
-use bytes::Bytes;
 use derive_more::Constructor;
 use rlp;
 
 use protocol::fixed_codec::{FixedCodec, FixedCodecError};
 use protocol::types::{Address, Hash};
-use protocol::ProtocolResult;
+use protocol::{Bytes, ProtocolResult};
 
 use std::convert::TryFrom;
 

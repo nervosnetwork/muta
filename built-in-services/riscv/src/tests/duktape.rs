@@ -294,7 +294,7 @@ fn test_js_erc20() {
     let mut file = std::fs::File::open("examples/dex/erc20.js").unwrap();
     let mut buffer = Vec::new();
     file.read_to_end(&mut buffer).unwrap();
-    let buffer = bytes::Bytes::from(buffer);
+    let buffer = Bytes::from(buffer);
     let init_args = serde_json::json!({
         "method": "init",
         "name": "bitcoin",
@@ -314,7 +314,6 @@ fn test_js_erc20() {
         .address;
 
     // total supply
-    let address_hex = &address.as_hex();
     let args = serde_json::json!({
         "method": "total_supply",
     })
@@ -336,7 +335,6 @@ fn test_js_erc20() {
     });
     assert_eq!(exec_ret.unwrap(), "1000000000".to_owned());
 
-    let address_hex = &address.as_hex();
     let to_address = "0000000000000000000000000000000000000000";
     let args = serde_json::json!({
         "method": "transfer",

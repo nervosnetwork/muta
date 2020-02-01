@@ -2,15 +2,15 @@ use std::cell::RefCell;
 use std::io;
 use std::rc::Rc;
 
-use bytes::Bytes;
 use ckb_vm::machine::asm::{AsmCoreMachine, AsmMachine};
 use ckb_vm::{DefaultMachineBuilder, SupportMachine};
 
-// use protocol::traits::ServiceSDK;
-use protocol::traits::{ServiceSDK, StoreMap};
-use protocol::types::{Address, Hash, ServiceContext};
+use protocol::{
+    types::{Address, ServiceContext},
+    Bytes,
+};
 
-use crate::types::{ExecPayload, InterpreterResult, InterpreterType};
+use crate::types::{InterpreterResult, InterpreterType};
 use crate::vm;
 use crate::vm::ChainInterface;
 

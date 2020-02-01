@@ -1,12 +1,8 @@
 //! Environmental Information
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use ckb_vm::instructions::Register;
 use ckb_vm::memory::Memory;
-use protocol::types::{Address, Hash, ServiceContext};
+use protocol::{types::ServiceContext, Bytes};
 
-use crate::vm::syscall::common::get_arr;
 use crate::vm::syscall::convention::{
     SYSCODE_ADDRESS, SYSCODE_CALLER, SYSCODE_CYCLE_LIMIT, SYSCODE_IS_INIT, SYSCODE_ORIGIN,
 };
@@ -69,7 +65,7 @@ impl<Mac: ckb_vm::SupportMachine> ckb_vm::Syscalls<Mac> for SyscallEnvironment {
                 let caller = self
                     .context
                     .get_extra()
-                    .unwrap_or(bytes::Bytes::from(self.context.get_caller().as_hex()));
+                    .unwrap_or(Bytes::from(self.context.get_caller().as_hex()));
                 machine.memory_mut().store_bytes(addr, &caller)?;
                 machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(0));
                 Ok(true)

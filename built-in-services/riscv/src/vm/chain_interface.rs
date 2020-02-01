@@ -1,6 +1,4 @@
-use bytes::Bytes;
-use protocol::types::{Address, Hash, ServiceContext};
-use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
+use protocol::{types::Address, Bytes, ProtocolResult};
 
 pub trait ChainInterface {
     fn get_storage(&self, key: &Bytes) -> ProtocolResult<Bytes>;

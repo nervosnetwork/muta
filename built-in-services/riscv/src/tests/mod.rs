@@ -6,7 +6,6 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use bytes::Bytes;
 use cita_trie::MemoryDB;
 
 use framework::binding::sdk::{DefalutServiceSDK, DefaultChainQuerier};
@@ -15,7 +14,7 @@ use protocol::traits::{Dispatcher, ExecResp, Storage};
 use protocol::types::{
     Address, Block, Hash, Proof, Receipt, ServiceContext, ServiceContextParams, SignedTransaction,
 };
-use protocol::ProtocolResult;
+use protocol::{Bytes, ProtocolResult};
 
 use crate::types::{DeployPayload, ExecPayload, InterpreterType};
 use crate::RiscvService;
@@ -57,7 +56,7 @@ fn test_deploy_and_run() {
     let mut file = std::fs::File::open("src/tests/simple_storage").unwrap();
     let mut buffer = Vec::new();
     file.read_to_end(&mut buffer).unwrap();
-    let buffer = bytes::Bytes::from(buffer);
+    let buffer = Bytes::from(buffer);
     let deploy_payload = DeployPayload {
         code:      hex::encode(buffer.as_ref()),
         intp_type: InterpreterType::Binary,
@@ -212,11 +211,11 @@ impl Storage for MockStorage {
         unimplemented!()
     }
 
-    async fn update_overlord_wal(&self, info: Bytes) -> ProtocolResult<()> {
+    async fn update_overlord_wal(&self, _info: Bytes) -> ProtocolResult<()> {
         unimplemented!()
     }
 
-    async fn update_muta_wal(&self, info: Bytes) -> ProtocolResult<()> {
+    async fn update_muta_wal(&self, _info: Bytes) -> ProtocolResult<()> {
         unimplemented!()
     }
 
@@ -228,7 +227,7 @@ impl Storage for MockStorage {
         unimplemented!()
     }
 
-    async fn update_exec_queue_wal(&self, info: Bytes) -> ProtocolResult<()> {
+    async fn update_exec_queue_wal(&self, _info: Bytes) -> ProtocolResult<()> {
         unimplemented!()
     }
 
@@ -238,15 +237,15 @@ impl Storage for MockStorage {
 
     async fn insert_wal_transactions(
         &self,
-        block_hash: Hash,
-        signed_txs: Vec<SignedTransaction>,
+        _block_hash: Hash,
+        _signed_txs: Vec<SignedTransaction>,
     ) -> ProtocolResult<()> {
         unimplemented!()
     }
 
     async fn get_wal_transactions(
         &self,
-        block_hash: Hash,
+        _block_hash: Hash,
     ) -> ProtocolResult<Vec<SignedTransaction>> {
         unimplemented!()
     }

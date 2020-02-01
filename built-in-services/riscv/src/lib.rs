@@ -4,19 +4,17 @@ pub mod types;
 pub mod vm;
 
 use std::cell::RefCell;
-use std::io::Read;
 use std::rc::Rc;
 
-use bytes::Bytes;
 use derive_more::{Display, From};
 
-use binding_macro::{cycles, read, service, write};
+use binding_macro::{read, service, write};
 use protocol::traits::ExecutorParams;
-use protocol::traits::{ServiceSDK, StoreMap};
+use protocol::traits::ServiceSDK;
 use protocol::types::{Address, Hash, ServiceContext};
-use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
+use protocol::{Bytes, BytesMut, ProtocolError, ProtocolErrorKind, ProtocolResult};
 
-use crate::types::{Contract, DeployPayload, DeployResp, ExecPayload, ExecResp};
+use crate::types::{Contract, DeployPayload, DeployResp, ExecPayload};
 use crate::vm::{ChainInterface, Interpreter, InterpreterConf, InterpreterParams};
 
 pub struct RiscvService<SDK> {
@@ -97,7 +95,8 @@ impl<SDK: ServiceSDK + 'static> RiscvService<SDK> {
         dbg!(&payload);
         let code = Bytes::from(hex::decode(&payload.code).map_err(|e| ServiceError::HexDecode(e))?);
         let code_hash = Hash::digest(code.clone());
-        let code_len = code.len() as u64;
+        // FIXME:
+        // let code_len = code.len() as u64;
         // ctx.sub_cycles(code_len)?;
         self.sdk.borrow_mut().set_value(code_hash.clone(), code)?;
         let tx_hash = ctx
@@ -151,7 +150,7 @@ impl<SDK: ServiceSDK + 'static> ChainInterfaceImpl<SDK> {
     }
 
     fn contract_key(&self, key: &Bytes) -> Hash {
-        let mut contract_key = bytes::BytesMut::from(self.payload.address.as_bytes().as_ref());
+        let mut contract_key = BytesMut::from(self.payload.address.as_bytes().as_ref());
         contract_key.extend(key);
         Hash::digest(contract_key.freeze())
     }

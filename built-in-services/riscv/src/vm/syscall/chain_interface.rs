@@ -2,10 +2,9 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use bytes::Bytes;
 use ckb_vm::instructions::Register;
 use ckb_vm::memory::Memory;
-use protocol::types::{Address, Hash, ServiceContext};
+use protocol::{types::Address, Bytes};
 
 use crate::vm::cost_model::CONTRACT_CALL_FIXED_CYCLE;
 use crate::vm::syscall::common::{get_arr, get_str};
@@ -13,7 +12,6 @@ use crate::vm::syscall::convention::{
     SYSCODE_CONTRACT_CALL, SYSCODE_GET_STORAGE, SYSCODE_SERVICE_CALL, SYSCODE_SET_STORAGE,
 };
 use crate::ChainInterface;
-use crate::InterpreterParams;
 
 pub struct SyscallChainInterface {
     chain: Rc<RefCell<dyn ChainInterface>>,
@@ -62,7 +60,7 @@ impl<Mac: ckb_vm::SupportMachine> ckb_vm::Syscalls<Mac> for SyscallChainInterfac
                 self.chain
                     .borrow_mut()
                     .set_storage(Bytes::from(k), Bytes::from(v))
-                    .map_err(|e| ckb_vm::Error::InvalidEcall(code))?;
+                    .map_err(|_e| ckb_vm::Error::InvalidEcall(code))?;
                 machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(0));
                 Ok(true)
             }
@@ -76,7 +74,7 @@ impl<Mac: ckb_vm::SupportMachine> ckb_vm::Syscalls<Mac> for SyscallChainInterfac
                     .chain
                     .borrow()
                     .get_storage(&Bytes::from(k.clone()))
-                    .map_err(|e| ckb_vm::Error::InvalidEcall(code))?
+                    .map_err(|_e| ckb_vm::Error::InvalidEcall(code))?
                     .clone();
                 // dbg!(
                 //     "get",
@@ -100,7 +98,7 @@ impl<Mac: ckb_vm::SupportMachine> ckb_vm::Syscalls<Mac> for SyscallChainInterfac
                 let args = get_arr(machine, args_addr, args_size)?;
                 let address_bytes = get_arr(machine, addr, 40)?;
                 let address_hex = String::from_utf8_lossy(&address_bytes);
-                let address = Address::from_hex(&address_hex).map_err(|e| {
+                let address = Address::from_hex(&address_hex).map_err(|_e| {
                     ckb_vm::Error::EcallError(
                         SYSCODE_CONTRACT_CALL,
                         format!("invalid address: {}", address_hex),
