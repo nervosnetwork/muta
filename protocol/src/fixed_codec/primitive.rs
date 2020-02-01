@@ -122,29 +122,44 @@ impl rlp::Decodable for Address {
 
 impl rlp::Encodable for Metadata {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
-        s.begin_list(5)
+        s.begin_list(10)
             .append(&self.chain_id)
-            .append_list(&self.verifier_list)
-            .append(&self.consensus_interval)
+            .append(&self.common_ref)
+            .append(&self.timeout_gap)
             .append(&self.cycles_limit)
-            .append(&self.cycles_price);
+            .append(&self.cycles_price)
+            .append(&self.interval)
+            .append_list(&self.verifier_list)
+            .append(&self.propose_ratio)
+            .append(&self.prevote_ratio)
+            .append(&self.precommit_ratio);
     }
 }
 
 impl rlp::Decodable for Metadata {
     fn decode(r: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
         let chain_id: Hash = r.at(0)?.as_val()?;
-        let verifier_list: Vec<Address> = r.at(1)?.as_list()?;
-        let consensus_interval = r.at(2)?.as_val()?;
-        let cycles_limit = r.at(3)?.as_val()?;
-        let cycles_price = r.at(4)?.as_val()?;
+        let common_ref: String = r.at(1)?.as_val()?;
+        let timeout_gap: u64 = r.at(2)?.as_val()?;
+        let cycles_limit: u64 = r.at(3)?.as_val()?;
+        let cycles_price: u64 = r.at(4)?.as_val()?;
+        let interval: u64 = r.at(5)?.as_val()?;
+        let verifier_list: Vec<Address> = r.at(6)?.as_list()?;
+        let propose_ratio: u64 = r.at(7)?.as_val()?;
+        let prevote_ratio: u64 = r.at(8)?.as_val()?;
+        let precommit_ratio: u64 = r.at(9)?.as_val()?;
 
         Ok(Self {
             chain_id,
-            verifier_list,
-            consensus_interval,
+            common_ref,
+            timeout_gap,
             cycles_limit,
             cycles_price,
+            interval,
+            verifier_list,
+            propose_ratio,
+            prevote_ratio,
+            precommit_ratio,
         })
     }
 }
