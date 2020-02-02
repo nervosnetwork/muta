@@ -1,12 +1,14 @@
 //! Environmental Information
 use ckb_vm::instructions::Register;
 use ckb_vm::memory::Memory;
+use log::error;
 use protocol::{types::ServiceContext, Bytes};
 
+use crate::vm::syscall::common::get_arr;
 use crate::vm::syscall::convention::{
     SYSCODE_ADDRESS, SYSCODE_BLOCK_HEIGHT, SYSCODE_CALLER, SYSCODE_CYCLE_LIMIT,
-    SYSCODE_CYCLE_PRICE, SYSCODE_CYCLE_USED, SYSCODE_EXTRA, SYSCODE_IS_INIT, SYSCODE_ORIGIN,
-    SYSCODE_TIMESTAMP,
+    SYSCODE_CYCLE_PRICE, SYSCODE_CYCLE_USED, SYSCODE_EMIT_EVENT, SYSCODE_EXTRA, SYSCODE_IS_INIT,
+    SYSCODE_ORIGIN, SYSCODE_TIMESTAMP,
 };
 use crate::InterpreterParams;
 
@@ -104,17 +106,33 @@ impl<Mac: ckb_vm::SupportMachine> ckb_vm::Syscalls<Mac> for SyscallEnvironment {
                         .store_bytes(extra_size, &(extra.len() as u64).to_le_bytes())?;
 
                     machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(0));
-                    Ok(true)
                 } else {
                     machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(1));
-                    Ok(true)
                 }
+                Ok(true)
             }
             SYSCODE_TIMESTAMP => {
                 let ts_addr = machine.registers()[ckb_vm::registers::A0].to_u64();
                 let timestamp = self.context.get_timestamp().to_le_bytes();
                 machine.memory_mut().store_bytes(ts_addr, &timestamp)?;
                 machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(0));
+                Ok(true)
+            }
+            SYSCODE_EMIT_EVENT => {
+                let msg_addr = machine.registers()[ckb_vm::registers::A0].to_u64();
+                let msg_size = machine.registers()[ckb_vm::registers::A1].to_u64();
+                let msg_bytes = get_arr(machine, msg_addr, msg_size)?;
+
+                if let Ok(msg) = String::from_utf8(msg_bytes.into()) {
+                    // Note: Right now, emit event is infallible
+                    if let Err(e) = self.context.emit_event(msg) {
+                        error!("impossible emit event failed {}", e);
+                    }
+                    machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(0));
+                } else {
+                    machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(1));
+                }
+
                 Ok(true)
             }
             // TODO: add system call to get other fields in context

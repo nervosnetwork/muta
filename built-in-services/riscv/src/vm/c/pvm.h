@@ -38,6 +38,7 @@ __internal_syscall(long n, long _a0, long _a1, long _a2, long _a3, long _a4, lon
 #define SYSCODE_CYCLE_PRICE 3007
 #define SYSCODE_EXTRA 3008
 #define SYSCODE_TIMESTAMP 3009
+#define SYSCODE_EMIT_EVENT 3010
 
 #define SYSCODE_GET_STORAGE 4000
 #define SYSCODE_SET_STORAGE 4001
@@ -162,7 +163,7 @@ int pvm_extra(uint8_t *extra, uint64_t *extra_sz)
 
 // Function pvm_timestamp loads execution's timestamp. It's seconds since
 // 1970-01-01 00:00:00 UTC.
-// 
+//
 // Params:
 //   timestamp: a pointer to a uint64_t in VM memory space denoting where the
 //              timestamp located at.
@@ -171,6 +172,20 @@ int pvm_extra(uint8_t *extra, uint64_t *extra_sz)
 int pvm_timestamp(uint64_t *timestamp)
 {
     return syscall(SYSCODE_TIMESTAMP, timestamp, 0, 0, 0, 0, 0);
+}
+
+// Function pvm_emit_event emit event message string. Message is UTF-8 encoded.
+//
+// Params:
+//   msg: a pointer to a buffer in VM memory space denting where the event
+//        message located at.
+//  msg_sz: size of message buffer
+//
+// Return:
+//   code: 0(success), 1(invalid utf8)
+int pvm_emit_event(uint8_t *msg, uint64_t msg_sz)
+{
+    return syscall(SYSCODE_EMIT_EVENT, msg, msg_sz, 0, 0, 0, 0);
 }
 
 int pvm_get_storage(uint8_t *k, uint64_t k_size, uint8_t *v, uint64_t *v_size)

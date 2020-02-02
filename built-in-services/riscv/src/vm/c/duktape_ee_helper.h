@@ -142,7 +142,7 @@ static duk_ret_t duk_pvm_block_height(duk_context *ctx) {
 
 // Function duk_pvm_extra inject extra data. If no extra, null
 // is returned.
-// 
+//
 // Note: it assumes that injected extra data can be converted
 // to String type. Same as pvm_load_args function.
 static duk_ret_t duk_pvm_extra(duk_context *ctx) {
@@ -169,6 +169,23 @@ static duk_ret_t duk_pvm_timestamp(duk_context *ctx) {
   push_checked_integer(ctx, timestamp);
 
   return 1;
+}
+
+static duk_ret_t duk_pvm_emit_event(duk_context *ctx) {
+    if (!duk_is_string(ctx, -1)) {
+        duk_push_error_object(ctx, DUK_ERR_EVAL_ERROR, "Invalid argument, event message should be string");
+        return duk_throw(ctx);
+    }
+
+    const char *msg = duk_safe_to_string(ctx, -1);
+    duk_pop(ctx);
+
+    if (pvm_emit_event((uint8_t *)msg, strlen(msg))) {
+        duk_push_error_object(ctx, DUK_ERR_EVAL_ERROR, "Invalid UTF-8 string");
+        return duk_throw(ctx);
+    }
+
+    return 0;
 }
 
 static duk_ret_t duk_pvm_get_storage(duk_context *ctx) {
@@ -310,9 +327,12 @@ void pvm_init(duk_context *ctx) {
 
   duk_push_c_function(ctx, duk_pvm_extra, 0);
   duk_put_prop_string(ctx, -2, "extra");
-  
+
   duk_push_c_function(ctx, duk_pvm_timestamp, 0);
   duk_put_prop_string(ctx, -2, "timestamp");
+
+  duk_push_c_function(ctx, duk_pvm_emit_event, 1);
+  duk_put_prop_string(ctx, -2, "emit_event");
 
   duk_push_c_function(ctx, duk_pvm_get_storage, 1);
   duk_put_prop_string(ctx, -2, "get_storage");

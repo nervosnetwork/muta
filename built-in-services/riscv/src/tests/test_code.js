@@ -62,6 +62,12 @@ function _test_timestamp() {
   return PVM.timestamp().toString();
 }
 
+function _test_emit_event() {
+  const args = PVM.load_json_args();
+  PVM.emit_event(args.msg);
+  return 'emit success';
+}
+
 function _test_storage() {
   const args = PVM.load_json_args();
   PVM.set_storage(args.key, args.val);
@@ -119,6 +125,8 @@ function main() {
     return _test_no_extra();
   } else if (args.method == 'test_timestamp') {
     return _test_timestamp();
+  } else if (args.method == 'test_emit_event') {
+    return _test_emit_event();
   } else if (args.method == 'test_storage') {
     return _test_storage();
   } else if (args.method == 'test_contract_call') {

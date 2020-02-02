@@ -293,6 +293,22 @@ fn should_support_pvm_timestamp() {
 }
 
 #[test]
+fn should_support_pvm_emit_event() {
+    let (mut service, mut context, address) = deploy_test_code!();
+
+    let msg = "emit test event";
+    let args = json!({"method": "test_emit_event", "msg": msg}).to_string();
+    let payload = ExecPayload::new(address, args);
+
+    let ctx = context.make();
+    let ret = service.exec(ctx.clone(), payload).expect("emit event");
+    assert_eq!(ret, "emit success");
+
+    let events = ctx.get_events();
+    assert!(events.iter().find(|ev| ev.data == msg).is_some());
+}
+
+#[test]
 fn should_support_pvm_storage() {
     let (mut service, mut context, address) = deploy_test_code!();
 
