@@ -33,6 +33,7 @@ __internal_syscall(long n, long _a0, long _a1, long _a2, long _a3, long _a4, lon
 #define SYSCODE_ORIGIN 3002
 #define SYSCODE_CALLER 3003
 #define SYSCODE_ADDRESS 3004
+#define SYSCODE_BLOCK_HEIGHT 3005
 
 #define SYSCODE_GET_STORAGE 4000
 #define SYSCODE_SET_STORAGE 4001
@@ -108,6 +109,17 @@ int pvm_address(uint8_t *addr)
 int pvm_is_init(uint64_t *is_init)
 {
     return syscall(SYSCODE_IS_INIT, is_init, 0, 0, 0, 0, 0);
+}
+
+// Function pvm_block_height loads current block height.
+// Params:
+//   block_height: a pointer to a uint64_t in VM memory space denoting where the
+//                 block_height located at.
+// Return:
+//   code: 0(success)
+int pvm_block_height(uint64_t *block_height)
+{
+    return syscall(SYSCODE_BLOCK_HEIGHT, block_height, 0, 0, 0, 0, 0);
 }
 
 int pvm_get_storage(uint8_t *k, uint64_t k_size, uint8_t *v, uint64_t *v_size)

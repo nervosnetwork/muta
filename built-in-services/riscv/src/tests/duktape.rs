@@ -14,18 +14,23 @@ const CYCLE_LIMIT: u64 = 1024 * 1024 * 1024;
 const CALLER: &str = "0x0000000000000000000000000000000000000001";
 
 struct TestContext {
-    count: usize,
+    count:  usize,
+    height: u64,
 }
 
 impl Default for TestContext {
     fn default() -> Self {
-        TestContext { count: 1 }
+        TestContext {
+            count:  1,
+            height: 1,
+        }
     }
 }
 
 impl TestContext {
     fn make(&mut self) -> ServiceContext {
         self.count += 1;
+        self.height += 1;
 
         let tx_hash = Hash::digest(Bytes::from(format!("{}", self.count)));
 
@@ -36,7 +41,7 @@ impl TestContext {
             cycles_price:    1,
             cycles_used:     Rc::new(RefCell::new(0)),
             caller:          Address::from_hex(CALLER).expect("ctx caller"),
-            height:          1,
+            height:          self.height,
             timestamp:       0,
             extra:           None,
             service_name:    "service_name".to_owned(),
@@ -185,6 +190,24 @@ fn should_support_pvm_address() {
     let ret = service.exec(context.make(), payload).expect("load address");
 
     assert_eq!(ret, address.as_hex());
+}
+
+#[test]
+fn should_support_pvm_block_height() {
+    let (mut service, mut context, address) = deploy_test_code!();
+
+    let args = json!({"method": "test_block_height"}).to_string();
+    let payload = ExecPayload::new(address, args);
+
+    let ctx = context.make();
+    let ret = service
+        .exec(ctx.clone(), payload)
+        .expect("load block height");
+
+    assert_eq!(
+        ret.parse::<u64>().expect("block height"),
+        ctx.get_current_height()
+    );
 }
 
 #[test]

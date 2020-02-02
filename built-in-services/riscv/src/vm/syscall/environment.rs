@@ -4,7 +4,8 @@ use ckb_vm::memory::Memory;
 use protocol::{types::ServiceContext, Bytes};
 
 use crate::vm::syscall::convention::{
-    SYSCODE_ADDRESS, SYSCODE_CALLER, SYSCODE_CYCLE_LIMIT, SYSCODE_IS_INIT, SYSCODE_ORIGIN,
+    SYSCODE_ADDRESS, SYSCODE_BLOCK_HEIGHT, SYSCODE_CALLER, SYSCODE_CYCLE_LIMIT, SYSCODE_IS_INIT,
+    SYSCODE_ORIGIN,
 };
 use crate::InterpreterParams;
 
@@ -67,6 +68,13 @@ impl<Mac: ckb_vm::SupportMachine> ckb_vm::Syscalls<Mac> for SyscallEnvironment {
                     .get_extra()
                     .unwrap_or_else(|| Bytes::from(self.context.get_caller().as_hex()));
                 machine.memory_mut().store_bytes(addr, &caller)?;
+                machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(0));
+                Ok(true)
+            }
+            SYSCODE_BLOCK_HEIGHT => {
+                let addr = machine.registers()[ckb_vm::registers::A0].to_u64();
+                let block_height = self.context.get_current_height().to_le_bytes();
+                machine.memory_mut().store_bytes(addr, &block_height)?;
                 machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(0));
                 Ok(true)
             }

@@ -113,6 +113,15 @@ static duk_ret_t duk_pvm_cycle_limit(duk_context *ctx) {
   return 1;
 }
 
+static duk_ret_t duk_pvm_block_height(duk_context *ctx) {
+  uint64_t block_height;
+
+  pvm_block_height(&block_height);
+  push_checked_integer(ctx, block_height);
+
+  return 1;
+}
+
 static duk_ret_t duk_pvm_get_storage(duk_context *ctx) {
   if (!duk_is_string(ctx, -1)) {
     duk_push_error_object(ctx, DUK_ERR_EVAL_ERROR,
@@ -240,6 +249,9 @@ void pvm_init(duk_context *ctx) {
 
   duk_push_c_function(ctx, duk_pvm_address, 0);
   duk_put_prop_string(ctx, -2, "address");
+
+  duk_push_c_function(ctx, duk_pvm_block_height, 0);
+  duk_put_prop_string(ctx, -2, "block_height");
 
   duk_push_c_function(ctx, duk_pvm_get_storage, 1);
   duk_put_prop_string(ctx, -2, "get_storage");

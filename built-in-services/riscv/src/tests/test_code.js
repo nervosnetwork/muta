@@ -36,6 +36,10 @@ function _test_cycle_limit() {
   return PVM.cycle_limit().toString();
 }
 
+function _test_block_height() {
+  return PVM.block_height().toString();
+}
+
 function _test_storage() {
   const args = PVM.load_json_args();
   PVM.set_storage(args.key, args.val);
@@ -53,7 +57,11 @@ function _test_contract_call() {
 
 function _test_service_call() {
   const args = PVM.load_json_args();
-  return PVM.service_call(args.call_service, args.call_method, args.call_payload);
+  return PVM.service_call(
+    args.call_service,
+    args.call_method,
+    args.call_payload
+  );
 }
 
 function main() {
@@ -77,6 +85,8 @@ function main() {
     return _test_address();
   } else if (args.method == 'test_cycle_limit') {
     return _test_cycle_limit();
+  } else if (args.method == 'test_block_height') {
+    return _test_block_height();
   } else if (args.method == 'test_storage') {
     return _test_storage();
   } else if (args.method == 'test_contract_call') {
