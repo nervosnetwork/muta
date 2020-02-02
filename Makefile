@@ -1,5 +1,7 @@
 ERBOSE := $(if ${CI},--verbose,)
 
+COMMIT := $(shell git rev-parse --short HEAD)
+
 ifneq ("$(wildcard /usr/lib/librocksdb.so)","")
 	SYS_LIB_DIR := /usr/lib
 else ifneq ("$(wildcard /usr/lib64/librocksdb.so)","")
@@ -54,9 +56,13 @@ info:
 	env
 
 docker-build:
-	docker build -t nervos/muta:build -f devtools/docker/dockerfiles/Dockerfile.muta_build .
-	docker build -t nervos/muta:run -f devtools/docker/dockerfiles/Dockerfile.muta_run .
-	docker build -t nervos/muta:latest .
+	docker build -t mutadev/muta:build -f devtools/docker/dockerfiles/Dockerfile.muta_build .
+	docker build -t mutadev/muta:run -f devtools/docker/dockerfiles/Dockerfile.muta_run .
+	docker build -t mutadev/muta:${COMMIT} .
+
+docker-push:
+	docker tag nervos/muta:${COMMIT}  mutadev/muta:${COMMIT}
+	docker push mutadev/muta:${COMMIT}
 
 e2e-test:
 	@echo "-----------------------------------------------------------------"
