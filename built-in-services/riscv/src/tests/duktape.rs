@@ -309,6 +309,31 @@ fn should_support_pvm_emit_event() {
 }
 
 #[test]
+fn should_support_pvm_tx_hash() {
+    let (mut service, mut context, address) = deploy_test_code!();
+
+    let args = json!({"method": "test_tx_hash"}).to_string();
+    let payload = ExecPayload::new(address.clone(), args);
+
+    let ctx = context.make();
+    let ret = service.exec(ctx.clone(), payload).expect("test tx hash");
+
+    assert_eq!(Some(ret), ctx.get_tx_hash().map(|h| h.as_hex()));
+
+    // Should return extra data
+    let mut ctx_params = context.new_params();
+    ctx_params.tx_hash = None;
+    let ctx = ServiceContext::new(ctx_params);
+
+    let args = json!({"method": "test_no_tx_hash"}).to_string();
+    let payload = ExecPayload::new(address, args);
+
+    let ret = service.exec(ctx, payload).expect("test no tx hash");
+
+    assert_eq!(ret, "no tx hash");
+}
+
+#[test]
 fn should_support_pvm_storage() {
     let (mut service, mut context, address) = deploy_test_code!();
 

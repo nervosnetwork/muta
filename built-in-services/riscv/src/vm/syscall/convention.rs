@@ -13,6 +13,7 @@ pub const SYSCODE_CYCLE_PRICE: u64 = 3007;
 pub const SYSCODE_EXTRA: u64 = 3008;
 pub const SYSCODE_TIMESTAMP: u64 = 3009;
 pub const SYSCODE_EMIT_EVENT: u64 = 3010;
+pub const SYSCODE_TX_HASH: u64 = 3011;
 
 pub const SYSCODE_GET_STORAGE: u64 = 4000;
 pub const SYSCODE_SET_STORAGE: u64 = 4001;
