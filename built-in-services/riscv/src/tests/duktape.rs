@@ -1,4 +1,9 @@
-use std::{cell::RefCell, io::Read, rc::Rc};
+use std::{
+    cell::RefCell,
+    io::Read,
+    rc::Rc,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 use protocol::{
     types::{Address, Hash, ServiceContext, ServiceContextParams},
@@ -265,6 +270,26 @@ fn should_support_pvm_extra() {
     let ret = service.exec(ctx, payload).expect("test extra");
 
     assert_eq!(ret, extra);
+}
+
+#[test]
+fn should_support_pvm_timestamp() {
+    let (mut service, mut context, address) = deploy_test_code!();
+
+    let args = json!({"method": "test_timestamp"}).to_string();
+    let payload = ExecPayload::new(address, args);
+
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("timestamp")
+        .as_secs();
+
+    let mut ctx_params = context.new_params();
+    ctx_params.timestamp = now;
+    let ctx = ServiceContext::new(ctx_params);
+
+    let ret = service.exec(ctx.clone(), payload).expect("load timestamp");
+    assert_eq!(ret.parse::<u64>().expect("timestamp"), ctx.get_timestamp());
 }
 
 #[test]

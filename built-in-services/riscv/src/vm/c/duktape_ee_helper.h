@@ -162,6 +162,15 @@ static duk_ret_t duk_pvm_extra(duk_context *ctx) {
   return 1;
 }
 
+static duk_ret_t duk_pvm_timestamp(duk_context *ctx) {
+  uint64_t timestamp;
+
+  pvm_timestamp(&timestamp);
+  push_checked_integer(ctx, timestamp);
+
+  return 1;
+}
+
 static duk_ret_t duk_pvm_get_storage(duk_context *ctx) {
   if (!duk_is_string(ctx, -1)) {
     duk_push_error_object(ctx, DUK_ERR_EVAL_ERROR,
@@ -301,6 +310,9 @@ void pvm_init(duk_context *ctx) {
 
   duk_push_c_function(ctx, duk_pvm_extra, 0);
   duk_put_prop_string(ctx, -2, "extra");
+  
+  duk_push_c_function(ctx, duk_pvm_timestamp, 0);
+  duk_put_prop_string(ctx, -2, "timestamp");
 
   duk_push_c_function(ctx, duk_pvm_get_storage, 1);
   duk_put_prop_string(ctx, -2, "get_storage");

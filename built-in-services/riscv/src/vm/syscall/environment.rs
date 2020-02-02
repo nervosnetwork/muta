@@ -6,6 +6,7 @@ use protocol::{types::ServiceContext, Bytes};
 use crate::vm::syscall::convention::{
     SYSCODE_ADDRESS, SYSCODE_BLOCK_HEIGHT, SYSCODE_CALLER, SYSCODE_CYCLE_LIMIT,
     SYSCODE_CYCLE_PRICE, SYSCODE_CYCLE_USED, SYSCODE_EXTRA, SYSCODE_IS_INIT, SYSCODE_ORIGIN,
+    SYSCODE_TIMESTAMP,
 };
 use crate::InterpreterParams;
 
@@ -108,6 +109,13 @@ impl<Mac: ckb_vm::SupportMachine> ckb_vm::Syscalls<Mac> for SyscallEnvironment {
                     machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(1));
                     Ok(true)
                 }
+            }
+            SYSCODE_TIMESTAMP => {
+                let ts_addr = machine.registers()[ckb_vm::registers::A0].to_u64();
+                let timestamp = self.context.get_timestamp().to_le_bytes();
+                machine.memory_mut().store_bytes(ts_addr, &timestamp)?;
+                machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(0));
+                Ok(true)
             }
             // TODO: add system call to get other fields in context
             _ => Ok(false),
