@@ -80,6 +80,8 @@ impl MemPoolAdapter for HashMemPoolAdapter {
     async fn get_latest_height(&self, _ctx: Context) -> ProtocolResult<u64> {
         Ok(CURRENT_HEIGHT)
     }
+
+    fn set_timeout_gap(&self, _timeout_gap: u64) {}
 }
 
 pub fn default_mock_txs(size: usize) -> Vec<SignedTransaction> {
@@ -102,7 +104,9 @@ fn default_mempool() -> HashMemPool<HashMemPoolAdapter> {
 
 fn new_mempool(pool_size: usize, timeout_gap: u64) -> HashMemPool<HashMemPoolAdapter> {
     let adapter = HashMemPoolAdapter::new();
-    HashMemPool::new(pool_size, timeout_gap, adapter)
+    let mempool = HashMemPool::new(pool_size, adapter);
+    mempool.set_timeout_gap(timeout_gap);
+    mempool
 }
 
 async fn check_hash(tx: SignedTransaction) -> ProtocolResult<()> {

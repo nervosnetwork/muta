@@ -14,6 +14,7 @@ pub use adapter::DefaultMemPoolAdapter;
 pub use adapter::{DEFAULT_BROADCAST_TXS_INTERVAL, DEFAULT_BROADCAST_TXS_SIZE};
 
 use std::error::Error;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use async_trait::async_trait;
 use derive_more::Display;
@@ -31,7 +32,7 @@ pub struct HashMemPool<Adapter: MemPoolAdapter> {
     /// Pool size limit.
     pool_size:      usize,
     /// A system param limits the life time of an off-chain transaction.
-    timeout_gap:    u64,
+    timeout_gap:    AtomicU64,
     /// A structure for caching new transactions and responsible transactions of
     /// propose-sync.
     tx_cache:       TxCache,
@@ -45,10 +46,10 @@ impl<Adapter> HashMemPool<Adapter>
 where
     Adapter: MemPoolAdapter,
 {
-    pub fn new(pool_size: usize, timeout_gap: u64, adapter: Adapter) -> Self {
+    pub fn new(pool_size: usize, adapter: Adapter) -> Self {
         HashMemPool {
             pool_size,
-            timeout_gap,
+            timeout_gap: AtomicU64::new(0),
             tx_cache: TxCache::new(pool_size * 2),
             callback_cache: Map::new(pool_size),
             adapter,
@@ -65,6 +66,11 @@ where
 
     pub fn get_adapter(&self) -> &Adapter {
         &self.adapter
+    }
+
+    pub fn set_timeout_gap(&self, timeout_gap: u64) {
+        self.adapter.set_timeout_gap(timeout_gap);
+        self.timeout_gap.store(timeout_gap, Ordering::Relaxed);
     }
 }
 
@@ -102,7 +108,7 @@ where
         self.tx_cache.package(
             cycle_limit,
             current_height,
-            current_height + self.timeout_gap,
+            current_height + self.timeout_gap.load(Ordering::Relaxed),
         )
     }
 

@@ -28,7 +28,7 @@ impl ServiceMapping for DefaultServiceMapping {
     }
 
     fn list_service_name(&self) -> Vec<String> {
-        vec!["asset".to_owned()]
+        vec!["asset".to_owned(), "metadata".to_owned()]
     }
 }
 
