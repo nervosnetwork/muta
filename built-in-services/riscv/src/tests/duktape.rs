@@ -318,9 +318,13 @@ fn should_support_pvm_tx_hash() {
     let ctx = context.make();
     let ret = service.exec(ctx.clone(), payload).expect("test tx hash");
 
-    assert_eq!(Some(ret), ctx.get_tx_hash().map(|h| h.as_hex()));
+    assert_eq!(
+        Some(ret),
+        ctx.get_tx_hash().map(|h| h.as_hex()),
+        "should return tx hash"
+    );
 
-    // Should return extra data
+    // No tx hash
     let mut ctx_params = context.new_params();
     ctx_params.tx_hash = None;
     let ctx = ServiceContext::new(ctx_params);
@@ -331,6 +335,31 @@ fn should_support_pvm_tx_hash() {
     let ret = service.exec(ctx, payload).expect("test no tx hash");
 
     assert_eq!(ret, "no tx hash");
+}
+
+#[test]
+fn should_support_pvm_tx_nonce() {
+    let (mut service, mut context, address) = deploy_test_code!();
+
+    let args = json!({"method": "test_no_tx_nonce"}).to_string();
+    let payload = ExecPayload::new(address.clone(), args);
+
+    let ctx = context.make();
+    let ret = service.exec(ctx.clone(), payload).expect("tx no nonce");
+
+    assert_eq!(ret, "no tx nonce");
+
+    // Should return tx nonce
+    let mut ctx_params = context.new_params();
+    ctx_params.nonce = Some(Hash::digest(Bytes::from(format!("{}", "test nonce"))));
+    let ctx = ServiceContext::new(ctx_params);
+
+    let args = json!({"method": "test_tx_nonce"}).to_string();
+    let payload = ExecPayload::new(address, args);
+
+    let ret = service.exec(ctx.clone(), payload).expect("test tx nonce");
+
+    assert_eq!(Some(ret), ctx.get_nonce().map(|n| n.as_hex()));
 }
 
 #[test]

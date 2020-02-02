@@ -40,6 +40,7 @@ __internal_syscall(long n, long _a0, long _a1, long _a2, long _a3, long _a4, lon
 #define SYSCODE_TIMESTAMP 3009
 #define SYSCODE_EMIT_EVENT 3010
 #define SYSCODE_TX_HASH 3011
+#define SYSCODE_TX_NONCE 3012
 
 #define SYSCODE_GET_STORAGE 4000
 #define SYSCODE_SET_STORAGE 4001
@@ -198,6 +199,17 @@ int pvm_emit_event(uint8_t *msg, uint64_t msg_sz)
 int pvm_tx_hash(uint8_t *addr)
 {
     return syscall(SYSCODE_TX_HASH, addr, 0, 0, 0, 0, 0);
+}
+
+// Function pvm_nonce loads transaction nonce hash.
+//
+// Params:
+//   addr: a pointer to a buffer in VM memory space denoting where the address located at.
+// Return:
+//   code: 0(success) 1(no nonce)
+int pvm_tx_nonce(uint8_t *addr)
+{
+    return syscall(SYSCODE_TX_NONCE, addr, 0, 0, 0, 0, 0);
 }
 
 int pvm_get_storage(uint8_t *k, uint64_t k_size, uint8_t *v, uint64_t *v_size)

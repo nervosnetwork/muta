@@ -192,8 +192,25 @@ static duk_ret_t duk_pvm_emit_event(duk_context *ctx) {
 static duk_ret_t duk_pvm_tx_hash(duk_context *ctx) {
   duk_push_fixed_buffer(ctx, MAX_HASH_LEN);
 
-  void *args = duk_get_buffer(ctx, 0, NULL);
-  if (pvm_tx_hash(args)) {
+  void *hash= duk_get_buffer(ctx, 0, NULL);
+  if (pvm_tx_hash(hash)) {
+      duk_pop(ctx);
+      duk_push_null(ctx);
+  } else {
+      duk_buffer_to_string(ctx, -1);
+      duk_push_string(ctx, duk_safe_to_string(ctx, -1));
+  }
+
+  return 1;
+}
+
+// Function duk_pvm_tx_nonce inject extra data. If no nonce, null
+// is returned.
+static duk_ret_t duk_pvm_tx_nonce(duk_context *ctx) {
+  duk_push_fixed_buffer(ctx, MAX_HASH_LEN);
+
+  void *nonce = duk_get_buffer(ctx, 0, NULL);
+  if (pvm_tx_nonce(nonce)) {
       duk_pop(ctx);
       duk_push_null(ctx);
   } else {
@@ -352,6 +369,9 @@ void pvm_init(duk_context *ctx) {
 
   duk_push_c_function(ctx, duk_pvm_tx_hash, 0);
   duk_put_prop_string(ctx, -2, "tx_hash");
+
+  duk_push_c_function(ctx, duk_pvm_tx_nonce, 0);
+  duk_put_prop_string(ctx, -2, "tx_nonce");
 
   duk_push_c_function(ctx, duk_pvm_get_storage, 1);
   duk_put_prop_string(ctx, -2, "get_storage");

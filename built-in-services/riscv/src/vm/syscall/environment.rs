@@ -8,7 +8,7 @@ use crate::vm::syscall::common::get_arr;
 use crate::vm::syscall::convention::{
     SYSCODE_ADDRESS, SYSCODE_BLOCK_HEIGHT, SYSCODE_CALLER, SYSCODE_CYCLE_LIMIT,
     SYSCODE_CYCLE_PRICE, SYSCODE_CYCLE_USED, SYSCODE_EMIT_EVENT, SYSCODE_EXTRA, SYSCODE_IS_INIT,
-    SYSCODE_ORIGIN, SYSCODE_TIMESTAMP, SYSCODE_TX_HASH,
+    SYSCODE_ORIGIN, SYSCODE_TIMESTAMP, SYSCODE_TX_HASH, SYSCODE_TX_NONCE,
 };
 use crate::InterpreterParams;
 
@@ -140,6 +140,18 @@ impl<Mac: ckb_vm::SupportMachine> ckb_vm::Syscalls<Mac> for SyscallEnvironment {
                     let addr = machine.registers()[ckb_vm::registers::A0].to_u64();
 
                     machine.memory_mut().store_bytes(addr, tx_hash.as_ref())?;
+                    machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(0));
+                } else {
+                    machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(1));
+                }
+
+                Ok(true)
+            }
+            SYSCODE_TX_NONCE => {
+                if let Some(nonce) = self.context.get_nonce().map(|n| n.as_hex()) {
+                    let addr = machine.registers()[ckb_vm::registers::A0].to_u64();
+
+                    machine.memory_mut().store_bytes(addr, nonce.as_ref())?;
                     machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(0));
                 } else {
                     machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(1));

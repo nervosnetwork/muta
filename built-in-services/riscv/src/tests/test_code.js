@@ -78,6 +78,16 @@ function _test_no_tx_hash() {
   }
 }
 
+function _test_tx_nonce() {
+  return PVM.tx_nonce();
+}
+
+function _test_no_tx_nonce() {
+  if (PVM.tx_nonce() == null) {
+    return 'no tx nonce';
+  }
+}
+
 function _test_storage() {
   const args = PVM.load_json_args();
   PVM.set_storage(args.key, args.val);
@@ -141,6 +151,10 @@ function main() {
     return _test_tx_hash();
   } else if (args.method == 'test_no_tx_hash') {
     return _test_no_tx_hash();
+  } else if (args.method == 'test_tx_nonce') {
+    return _test_tx_nonce();
+  } else if (args.method == 'test_no_tx_nonce') {
+    return _test_no_tx_nonce();
   } else if (args.method == 'test_storage') {
     return _test_storage();
   } else if (args.method == 'test_contract_call') {
