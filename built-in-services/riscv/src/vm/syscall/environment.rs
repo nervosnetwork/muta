@@ -5,7 +5,7 @@ use protocol::{types::ServiceContext, Bytes};
 
 use crate::vm::syscall::convention::{
     SYSCODE_ADDRESS, SYSCODE_BLOCK_HEIGHT, SYSCODE_CALLER, SYSCODE_CYCLE_LIMIT,
-    SYSCODE_CYCLE_PRICE, SYSCODE_CYCLE_USED, SYSCODE_IS_INIT, SYSCODE_ORIGIN,
+    SYSCODE_CYCLE_PRICE, SYSCODE_CYCLE_USED, SYSCODE_EXTRA, SYSCODE_IS_INIT, SYSCODE_ORIGIN,
 };
 use crate::InterpreterParams;
 
@@ -91,6 +91,23 @@ impl<Mac: ckb_vm::SupportMachine> ckb_vm::Syscalls<Mac> for SyscallEnvironment {
                 machine.memory_mut().store_bytes(addr, &block_height)?;
                 machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(0));
                 Ok(true)
+            }
+            SYSCODE_EXTRA => {
+                if let Some(extra) = self.context.get_extra() {
+                    let extra_addr = machine.registers()[ckb_vm::registers::A0].to_u64();
+                    let extra_size = machine.registers()[ckb_vm::registers::A1].to_u64();
+
+                    machine.memory_mut().store_bytes(extra_addr, &extra)?;
+                    machine
+                        .memory_mut()
+                        .store_bytes(extra_size, &(extra.len() as u64).to_le_bytes())?;
+
+                    machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(0));
+                    Ok(true)
+                } else {
+                    machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(1));
+                    Ok(true)
+                }
             }
             // TODO: add system call to get other fields in context
             _ => Ok(false),

@@ -36,6 +36,7 @@ __internal_syscall(long n, long _a0, long _a1, long _a2, long _a3, long _a4, lon
 #define SYSCODE_BLOCK_HEIGHT 3005
 #define SYSCODE_CYCLE_USED 3006
 #define SYSCODE_CYCLE_PRICE 3007
+#define SYSCODE_EXTRA 3008
 
 #define SYSCODE_GET_STORAGE 4000
 #define SYSCODE_SET_STORAGE 4001
@@ -144,6 +145,18 @@ int pvm_is_init(uint64_t *is_init)
 int pvm_block_height(uint64_t *block_height)
 {
     return syscall(SYSCODE_BLOCK_HEIGHT, block_height, 0, 0, 0, 0, 0);
+}
+
+// Function pvm_extra loads extra data.
+// Params:
+//   extra: a pointer to a buffer in VM memory space denoting where the extra
+//          data located at.
+//   extra_sz: size of extra data if there is one
+// Return:
+//   code: 0(success), 1(no extra data)
+int pvm_extra(uint8_t *extra, uint64_t *extra_sz)
+{
+    return syscall(SYSCODE_EXTRA, extra, extra_sz, 0, 0, 0, 0);
 }
 
 int pvm_get_storage(uint8_t *k, uint64_t k_size, uint8_t *v, uint64_t *v_size)

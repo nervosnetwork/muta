@@ -48,6 +48,16 @@ function _test_block_height() {
   return PVM.block_height().toString();
 }
 
+function _test_extra() {
+  return PVM.extra();
+}
+
+function _test_no_extra() {
+  if (PVM.extra() == null) {
+    return 'no extra';
+  }
+}
+
 function _test_storage() {
   const args = PVM.load_json_args();
   PVM.set_storage(args.key, args.val);
@@ -99,6 +109,10 @@ function main() {
     return _test_cycle_price();
   } else if (args.method == 'test_block_height') {
     return _test_block_height();
+  } else if (args.method == 'test_extra') {
+    return _test_extra();
+  } else if (args.method == 'test_no_extra') {
+    return _test_no_extra();
   } else if (args.method == 'test_storage') {
     return _test_storage();
   } else if (args.method == 'test_contract_call') {

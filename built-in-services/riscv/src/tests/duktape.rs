@@ -29,12 +29,16 @@ impl Default for TestContext {
 
 impl TestContext {
     fn make(&mut self) -> ServiceContext {
+        ServiceContext::new(self.new_params())
+    }
+
+    fn new_params(&mut self) -> ServiceContextParams {
         self.count += 1;
         self.height += 1;
 
         let tx_hash = Hash::digest(Bytes::from(format!("{}", self.count)));
 
-        let params = ServiceContextParams {
+        ServiceContextParams {
             tx_hash:         Some(tx_hash),
             nonce:           None,
             cycles_limit:    CYCLE_LIMIT,
@@ -48,9 +52,7 @@ impl TestContext {
             service_method:  "service_method".to_owned(),
             service_payload: "service_payload".to_owned(),
             events:          Rc::new(RefCell::new(vec![])),
-        };
-
-        ServiceContext::new(params)
+        }
     }
 }
 
@@ -236,6 +238,33 @@ fn should_support_pvm_block_height() {
         ret.parse::<u64>().expect("block height"),
         ctx.get_current_height()
     );
+}
+
+#[test]
+fn should_support_pvm_extra() {
+    let (mut service, mut context, address) = deploy_test_code!();
+
+    let args = json!({"method": "test_no_extra"}).to_string();
+    let payload = ExecPayload::new(address.clone(), args);
+
+    let ret = service
+        .exec(context.make(), payload)
+        .expect("test no extra");
+
+    assert_eq!(ret, "no extra");
+
+    // Should return extra data
+    let extra = "final mixed ??? no !!!";
+    let mut ctx_params = context.new_params();
+    ctx_params.extra = Some(Bytes::from(extra));
+    let ctx = ServiceContext::new(ctx_params);
+
+    let args = json!({"method": "test_extra"}).to_string();
+    let payload = ExecPayload::new(address, args);
+
+    let ret = service.exec(ctx, payload).expect("test extra");
+
+    assert_eq!(ret, extra);
 }
 
 #[test]

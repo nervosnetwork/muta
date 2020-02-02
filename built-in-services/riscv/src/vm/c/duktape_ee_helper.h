@@ -140,6 +140,28 @@ static duk_ret_t duk_pvm_block_height(duk_context *ctx) {
   return 1;
 }
 
+// Function duk_pvm_extra inject extra data. If no extra, null
+// is returned.
+// 
+// Note: it assumes that injected extra data can be converted
+// to String type. Same as pvm_load_args function.
+static duk_ret_t duk_pvm_extra(duk_context *ctx) {
+  duk_push_fixed_buffer(ctx, MAX_LOAD_SIZE);
+
+  uint64_t extra_sz = 0;
+  void *extra = duk_get_buffer(ctx, -1, NULL);
+  int no_extra = pvm_extra(extra, &extra_sz);
+  if (no_extra) {
+      duk_pop(ctx); // Pop previous pushed fixed buffer
+      duk_push_null(ctx);
+  } else {
+      duk_buffer_to_string(ctx, -1);
+      duk_push_string(ctx, duk_safe_to_string(ctx, -1));
+  }
+
+  return 1;
+}
+
 static duk_ret_t duk_pvm_get_storage(duk_context *ctx) {
   if (!duk_is_string(ctx, -1)) {
     duk_push_error_object(ctx, DUK_ERR_EVAL_ERROR,
@@ -276,6 +298,9 @@ void pvm_init(duk_context *ctx) {
 
   duk_push_c_function(ctx, duk_pvm_block_height, 0);
   duk_put_prop_string(ctx, -2, "block_height");
+
+  duk_push_c_function(ctx, duk_pvm_extra, 0);
+  duk_put_prop_string(ctx, -2, "extra");
 
   duk_push_c_function(ctx, duk_pvm_get_storage, 1);
   duk_put_prop_string(ctx, -2, "get_storage");
