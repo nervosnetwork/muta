@@ -55,7 +55,6 @@ static duk_ret_t duk_pvm_load_args(duk_context *ctx) {
   return 1;
 }
 
-
 static duk_ret_t duk_pvm_origin(duk_context *ctx) {
   duk_push_fixed_buffer(ctx, ADDRESS_LEN);
 
@@ -153,11 +152,11 @@ static duk_ret_t duk_pvm_extra(duk_context *ctx) {
   void *extra = duk_get_buffer(ctx, -1, NULL);
   int no_extra = pvm_extra(extra, &extra_sz);
   if (no_extra) {
-      duk_pop(ctx); // Pop previous pushed fixed buffer
-      duk_push_null(ctx);
+    duk_pop(ctx); // Pop previous pushed fixed buffer
+    duk_push_null(ctx);
   } else {
-      duk_buffer_to_string(ctx, -1);
-      duk_push_string(ctx, duk_safe_to_string(ctx, -1));
+    duk_buffer_to_string(ctx, -1);
+    duk_push_string(ctx, duk_safe_to_string(ctx, -1));
   }
 
   return 1;
@@ -173,32 +172,33 @@ static duk_ret_t duk_pvm_timestamp(duk_context *ctx) {
 }
 
 static duk_ret_t duk_pvm_emit_event(duk_context *ctx) {
-    if (!duk_is_string(ctx, -1)) {
-        duk_push_error_object(ctx, DUK_ERR_EVAL_ERROR, "Invalid argument, event message should be string");
-        return duk_throw(ctx);
-    }
+  if (!duk_is_string(ctx, -1)) {
+    duk_push_error_object(ctx, DUK_ERR_EVAL_ERROR,
+                          "Invalid argument, event message should be string");
+    return duk_throw(ctx);
+  }
 
-    const char *msg = duk_safe_to_string(ctx, -1);
-    duk_pop(ctx);
+  const char *msg = duk_safe_to_string(ctx, -1);
+  duk_pop(ctx);
 
-    if (pvm_emit_event((uint8_t *)msg, strlen(msg))) {
-        duk_push_error_object(ctx, DUK_ERR_EVAL_ERROR, "Invalid UTF-8 string");
-        return duk_throw(ctx);
-    }
+  if (pvm_emit_event((uint8_t *)msg, strlen(msg))) {
+    duk_push_error_object(ctx, DUK_ERR_EVAL_ERROR, "Invalid UTF-8 string");
+    return duk_throw(ctx);
+  }
 
-    return 0;
+  return 0;
 }
 
 static duk_ret_t duk_pvm_tx_hash(duk_context *ctx) {
   duk_push_fixed_buffer(ctx, MAX_HASH_LEN);
 
-  void *hash= duk_get_buffer(ctx, 0, NULL);
+  void *hash = duk_get_buffer(ctx, 0, NULL);
   if (pvm_tx_hash(hash)) {
-      duk_pop(ctx);
-      duk_push_null(ctx);
+    duk_pop(ctx);
+    duk_push_null(ctx);
   } else {
-      duk_buffer_to_string(ctx, -1);
-      duk_push_string(ctx, duk_safe_to_string(ctx, -1));
+    duk_buffer_to_string(ctx, -1);
+    duk_push_string(ctx, duk_safe_to_string(ctx, -1));
   }
 
   return 1;
@@ -211,11 +211,11 @@ static duk_ret_t duk_pvm_tx_nonce(duk_context *ctx) {
 
   void *nonce = duk_get_buffer(ctx, 0, NULL);
   if (pvm_tx_nonce(nonce)) {
-      duk_pop(ctx);
-      duk_push_null(ctx);
+    duk_pop(ctx);
+    duk_push_null(ctx);
   } else {
-      duk_buffer_to_string(ctx, -1);
-      duk_push_string(ctx, duk_safe_to_string(ctx, -1));
+    duk_buffer_to_string(ctx, -1);
+    duk_push_string(ctx, duk_safe_to_string(ctx, -1));
   }
 
   return 1;
@@ -264,16 +264,17 @@ static duk_ret_t duk_pvm_is_init(duk_context *ctx) {
   pvm_is_init(&is_init);
 
   if (0 == is_init) {
-      duk_push_false(ctx);
+    duk_push_false(ctx);
   } else {
-      duk_push_true(ctx);
+    duk_push_true(ctx);
   }
 
   return 1;
 }
 
 static duk_ret_t duk_pvm_service_call(duk_context *ctx) {
-  if (!duk_is_string(ctx, 0) || !duk_is_string(ctx, 1) || !duk_is_string(ctx, 2)) {
+  if (!duk_is_string(ctx, 0) || !duk_is_string(ctx, 1) ||
+      !duk_is_string(ctx, 2)) {
     duk_push_error_object(ctx, DUK_ERR_EVAL_ERROR,
                           "Invalid service_call arguments, should be string");
     return duk_throw(ctx);
@@ -288,8 +289,8 @@ static duk_ret_t duk_pvm_service_call(duk_context *ctx) {
   void *ret = duk_get_buffer(ctx, 0, NULL);
 
   int ret_code = 0;
-  if (ret_code != pvm_service_call(service, method, (uint8_t*)payload,
-                                    strlen(payload), ret, NULL)) {
+  if (ret_code != pvm_service_call(service, method, (uint8_t *)payload,
+                                   strlen(payload), ret, NULL)) {
     return ret_code;
   }
 
