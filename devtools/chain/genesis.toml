@@ -4,3 +4,7 @@ prevhash = "44915be5b6c20b0678cf05fcddbbaa832e25d7e6ac538784cd5c24de00d47472"
 [[services]]
 name = "asset"
 payload = '{ "id": "f56924db538e77bb5951eb5ff0d02b88983c49c45eea30e8ae3e7234b311436c", "name": "MutaToken", "symbol": "MT", "supply": 320000011, "issuer": "f8389d774afdad8755ef8e629e5a154fddc6325a" }'
+
+[[services]]
+name = "metadata"
+payload = '{ "chain_id": "b6a4d7da21443f5e816e8700eea87610e6d769657d6b8ec73028457bf2ca4036", "common_ref": "703873635a6b51513451", "timeout_gap": "20", "cycles_limit": "99999999", "cycles_price": "1", "interval": "3000", "verifier_list": [{"address": "f8389d774afdad8755ef8e629e5a154fddc6325a", "propose_weight": "1", "vote_weight": "1"}], "propose_ratio": "15", "prevote_ratio": "10", "precommit_ratio": "10"}'
