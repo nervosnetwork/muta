@@ -34,6 +34,7 @@ __internal_syscall(long n, long _a0, long _a1, long _a2, long _a3, long _a4, lon
 #define SYSCODE_CALLER 3003
 #define SYSCODE_ADDRESS 3004
 #define SYSCODE_BLOCK_HEIGHT 3005
+#define SYSCODE_CYCLE_USED 3006
 
 #define SYSCODE_GET_STORAGE 4000
 #define SYSCODE_SET_STORAGE 4001
@@ -79,6 +80,17 @@ int pvm_ret(uint8_t *data, size_t size)
 int pvm_cycle_limit(uint64_t *cycle_limit)
 {
     return syscall(SYSCODE_CYCLE_LIMIT, cycle_limit, 0, 0, 0, 0, 0);
+}
+
+// Function pvm_cycle_used loads current block cycle_used.
+// Params:
+//   cycle_used: a pointer to a uint64_t in VM memory space denoting where the
+//               cycle_used located at.
+// Return:
+//   code: 0(success)
+int pvm_cycle_used(uint64_t *cycle_used)
+{
+    return syscall(SYSCODE_CYCLE_USED, cycle_used, 0, 0, 0, 0, 0);
 }
 
 // Function pvm_origin loads current origin.

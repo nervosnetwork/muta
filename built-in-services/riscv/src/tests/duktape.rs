@@ -39,7 +39,7 @@ impl TestContext {
             nonce:           None,
             cycles_limit:    CYCLE_LIMIT,
             cycles_price:    1,
-            cycles_used:     Rc::new(RefCell::new(0)),
+            cycles_used:     Rc::new(RefCell::new(3)),
             caller:          Address::from_hex(CALLER).expect("ctx caller"),
             height:          self.height,
             timestamp:       0,
@@ -127,6 +127,20 @@ fn should_support_pvm_cycle_limit() {
         .expect("load cycle limit");
 
     assert_eq!(ret.parse::<u64>().expect("cycle limit"), CYCLE_LIMIT);
+}
+
+#[test]
+fn should_support_pvm_cycle_used() {
+    let (mut service, mut context, address) = deploy_test_code!();
+
+    let args = json!({"method": "test_cycle_used"}).to_string();
+    let payload = ExecPayload::new(address, args);
+
+    let ctx = context.make();
+    let ret = service.exec(ctx, payload).expect("load cycle used");
+
+    // Hardcode in context make
+    assert_eq!(ret.parse::<u64>().expect("cycle used"), 3);
 }
 
 #[test]
