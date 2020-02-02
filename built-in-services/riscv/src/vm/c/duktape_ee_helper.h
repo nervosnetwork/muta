@@ -122,6 +122,15 @@ static duk_ret_t duk_pvm_cycle_used(duk_context *ctx) {
   return 1;
 }
 
+static duk_ret_t duk_pvm_cycle_price(duk_context *ctx) {
+  uint64_t cycle_price;
+
+  pvm_cycle_price(&cycle_price);
+  push_checked_integer(ctx, cycle_price);
+
+  return 1;
+}
+
 static duk_ret_t duk_pvm_block_height(duk_context *ctx) {
   uint64_t block_height;
 
@@ -252,6 +261,9 @@ void pvm_init(duk_context *ctx) {
 
   duk_push_c_function(ctx, duk_pvm_cycle_used, 0);
   duk_put_prop_string(ctx, -2, "cycle_used");
+
+  duk_push_c_function(ctx, duk_pvm_cycle_price, 0);
+  duk_put_prop_string(ctx, -2, "cycle_price");
 
   duk_push_c_function(ctx, duk_pvm_origin, 0);
   duk_put_prop_string(ctx, -2, "origin");

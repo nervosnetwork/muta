@@ -40,6 +40,10 @@ function _test_cycle_used() {
   return PVM.cycle_used().toString();
 }
 
+function _test_cycle_price() {
+  return PVM.cycle_price().toString();
+}
+
 function _test_block_height() {
   return PVM.block_height().toString();
 }
@@ -91,6 +95,8 @@ function main() {
     return _test_cycle_limit();
   } else if (args.method == 'test_cycle_used') {
     return _test_cycle_used();
+  } else if (args.method == 'test_cycle_price') {
+    return _test_cycle_price();
   } else if (args.method == 'test_block_height') {
     return _test_block_height();
   } else if (args.method == 'test_storage') {

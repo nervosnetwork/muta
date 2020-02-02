@@ -144,6 +144,20 @@ fn should_support_pvm_cycle_used() {
 }
 
 #[test]
+fn should_support_pvm_cycle_price() {
+    let (mut service, mut context, address) = deploy_test_code!();
+
+    let args = json!({"method": "test_cycle_price"}).to_string();
+    let payload = ExecPayload::new(address, args);
+
+    let ctx = context.make();
+    let ret = service.exec(ctx, payload).expect("load cycle price");
+
+    // Hardcode in context make
+    assert_eq!(ret.parse::<u64>().expect("cycle price"), 1);
+}
+
+#[test]
 fn should_support_pvm_caller() {
     let (mut service, mut context, address) = deploy_test_code!();
 
