@@ -159,7 +159,6 @@ impl<Mac: ckb_vm::SupportMachine> ckb_vm::Syscalls<Mac> for SyscallEnvironment {
 
                 Ok(true)
             }
-            // TODO: add system call to get other fields in context
             _ => Ok(false),
         }
     }
