@@ -31,7 +31,9 @@ use core_storage::{adapter::rocks::RocksAdapter, ImplStorage};
 use framework::binding::state::RocksTrieDB;
 use framework::executor::{ServiceExecutor, ServiceExecutorFactory};
 use protocol::traits::{MessageCodec, NodeInfo, ServiceMapping, Storage};
-use protocol::types::{Address, Block, BlockHeader, Bloom, Genesis, Hash, Proof, Validator};
+use protocol::types::{
+    Address, Block, BlockHeader, Bloom, Genesis, Hash, Metadata, Proof, Validator,
+};
 use protocol::{fixed_codec::FixedCodec, ProtocolError, ProtocolResult};
 
 use crate::config::Config;
@@ -42,7 +44,7 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
     genesis: &Genesis,
     servive_mapping: Arc<Mapping>,
 ) -> ProtocolResult<Block> {
-    let chain_id = Hash::from_hex(&config.chain_id)?;
+    let metadata: Metadata = serde_json::from_str(genesis.get_payload("metadata")).unwrap();
 
     // Read genesis.
     log::info!("Genesis data: {:?}", genesis);
@@ -78,7 +80,7 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
 
     // Build genesis block.
     let genesis_block_header = BlockHeader {
-        chain_id:          chain_id.clone(),
+        chain_id:          metadata.chain_id.clone(),
         height:            0,
         exec_height:       0,
         pre_hash:          Hash::from_empty(),
