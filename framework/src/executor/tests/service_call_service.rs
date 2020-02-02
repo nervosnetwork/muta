@@ -6,6 +6,7 @@ use cita_trie::MemoryDB;
 use asset::types::{Asset, CreateAssetPayload};
 use asset::{AssetService, ServiceError};
 use binding_macro::{cycles, service};
+use metadata::MetadataService;
 
 use protocol::traits::{Executor, ExecutorParams, Service, ServiceMapping, ServiceSDK};
 use protocol::types::{
@@ -130,6 +131,7 @@ impl ServiceMapping for MockServiceMapping {
         let service = match name {
             "mock" => Box::new(MockService::new(sdk)?) as Box<dyn Service>,
             "asset" => Box::new(AssetService::new(sdk)?) as Box<dyn Service>,
+            "metadata" => Box::new(MetadataService::new(sdk)?) as Box<dyn Service>,
             _ => panic!("not found service"),
         };
 

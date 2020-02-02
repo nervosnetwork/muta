@@ -1,5 +1,6 @@
 use asset::AssetService;
 use derive_more::{Display, From};
+use metadata::MetadataService;
 use muta::MutaBuilder;
 use protocol::traits::{Service, ServiceMapping, ServiceSDK};
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
@@ -14,6 +15,7 @@ impl ServiceMapping for DefaultServiceMapping {
     ) -> ProtocolResult<Box<dyn Service>> {
         let service = match name {
             "asset" => Box::new(AssetService::new(sdk)?) as Box<dyn Service>,
+            "metadata" => Box::new(MetadataService::new(sdk)?) as Box<dyn Service>,
             _ => {
                 return Err(MappingError::NotFoundService {
                     service: name.to_owned(),
