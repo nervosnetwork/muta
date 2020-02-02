@@ -2,6 +2,8 @@
 mod tests;
 pub mod types;
 
+use std::collections::BTreeMap;
+
 use bytes::Bytes;
 use derive_more::{Display, From};
 
@@ -11,8 +13,8 @@ use protocol::types::{Hash, ServiceContext};
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
 use crate::types::{
-    Asset, CreateAssetPayload, GetAssetPayload, GetBalancePayload, GetBalanceResponse,
-    InitGenesisPayload, TransferPayload,
+    Approval, Asset, AssetBalance, CreateAssetPayload, GetAllowancePayload, GetAllowanceResponse,
+    GetAssetPayload, GetBalancePayload, GetBalanceResponse, InitGenesisPayload, TransferPayload,
 };
 
 pub struct AssetService<SDK> {
@@ -40,8 +42,13 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
 
         self.assets.insert(asset.id.clone(), asset.clone())?;
 
+        let asset_balance = AssetBalance {
+            value:     payload.supply,
+            allowance: BTreeMap::new(),
+        };
+
         self.sdk
-            .set_account_value(&asset.issuer, asset.id, payload.supply)
+            .set_account_value(&asset.issuer, asset.id, asset_balance)
     }
 
     #[cycles(100_00)]
@@ -58,14 +65,58 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
         ctx: ServiceContext,
         payload: GetBalancePayload,
     ) -> ProtocolResult<GetBalanceResponse> {
-        let balance = self
+        if !self.assets.contains(&payload.asset_id)? {
+            return Err(ServiceError::NotFoundAsset { id: payload.asset_id }.into());
+        }
+
+        let asset_balance = self
             .sdk
             .get_account_value(&ctx.get_caller(), &payload.asset_id)?
-            .unwrap_or(0);
+            .unwrap_or(AssetBalance {
+                value:     0,
+                allowance: BTreeMap::new(),
+            });
         Ok(GetBalanceResponse {
             asset_id: payload.asset_id,
-            balance,
+            balance:  asset_balance.value,
         })
+    }
+
+    #[cycles(100_00)]
+    #[read]
+    fn get_allowance(
+        &self,
+        ctx: ServiceContext,
+        payload: GetAllowancePayload,
+    ) -> ProtocolResult<GetAllowanceResponse> {
+        if !self.assets.contains(&payload.asset_id)? {
+            return Err(ServiceError::NotFoundAsset { id: payload.asset_id }.into());
+        }
+
+        let opt_asset_balance: Option<AssetBalance> = self
+            .sdk
+            .get_account_value(&ctx.get_caller(), &payload.asset_id)?;
+
+        if let Some(v) = opt_asset_balance {
+            let allowance = v
+                .allowance
+                .get(&payload.grantee)
+                .unwrap_or(&Approval { total: 0, used: 0 });
+
+            Ok(GetAllowanceResponse {
+                asset_id: payload.asset_id,
+                grantee:  payload.grantee.clone(),
+                total:    allowance.total,
+                used:     allowance.used,
+            })
+        } else {
+            Ok(GetAllowanceResponse {
+                asset_id: payload.asset_id,
+                grantee:  payload.grantee.clone(),
+                total:    0,
+                used:     0,
+            })
+        }
     }
 
     #[cycles(210_00)]
@@ -92,18 +143,20 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
         };
         self.assets.insert(id.clone(), asset.clone())?;
 
-        self.sdk.set_account_value(&caller, id, payload.supply)?;
+        let asset_balance = AssetBalance {
+            value:     payload.supply,
+            allowance: BTreeMap::new(),
+        };
+
+        self.sdk
+            .set_account_value(&asset.issuer, asset.id.clone(), asset_balance)?;
 
         Ok(asset)
     }
 
     #[cycles(210_00)]
     #[write]
-    fn transfer(
-        &mut self,
-        ctx: ServiceContext,
-        payload: TransferPayload,
-    ) -> ProtocolResult<serde_json::Value> {
+    fn transfer(&mut self, ctx: ServiceContext, payload: TransferPayload) -> ProtocolResult<()> {
         let caller = ctx.get_caller();
         let asset_id = payload.asset_id.clone();
         let value = payload.value;
@@ -113,7 +166,15 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
             return Err(ServiceError::NotFoundAsset { id: asset_id }.into());
         }
 
-        let caller_balance: u64 = self.sdk.get_account_value(&caller, &asset_id)?.unwrap_or(0);
+        let mut caller_asset_balance: AssetBalance = self
+            .sdk
+            .get_account_value(&caller, &asset_id)?
+            .unwrap_or(AssetBalance {
+                value:     0,
+                allowance: BTreeMap::new(),
+            });
+        let caller_balance = caller_asset_balance.value;
+
         if caller_balance < value {
             return Err(ServiceError::LackOfBalance {
                 expect: value,
@@ -122,21 +183,38 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
             .into());
         }
 
-        let to_balance: u64 = self.sdk.get_account_value(&to, &asset_id)?.unwrap_or(0);
-        let (v, overflow) = to_balance.overflowing_add(value);
+        let mut to_asset_balance: AssetBalance = self
+            .sdk
+            .get_account_value(&to, &asset_id)?
+            .unwrap_or(AssetBalance {
+                value:     0,
+                allowance: BTreeMap::new(),
+            });
+
+        let (v, overflow) = to_asset_balance.value.overflowing_add(value);
         if overflow {
             return Err(ServiceError::U64Overflow.into());
         }
+        to_asset_balance.value = v;
 
-        self.sdk.set_account_value(&to, asset_id.clone(), v)?;
+        self.sdk
+            .set_account_value(&to, asset_id.clone(), to_asset_balance)?;
 
         let (v, overflow) = caller_balance.overflowing_sub(value);
         if overflow {
             return Err(ServiceError::U64Overflow.into());
         }
-        self.sdk.set_account_value(&caller, asset_id, v)?;
+        caller_asset_balance.value = v;
+        self.sdk
+            .set_account_value(&caller, asset_id, caller_asset_balance)?;
 
-        Ok(serde_json::Value::Null)
+        Ok(())
+    }
+
+    #[cycles(210_00)]
+    #[write]
+    fn approve(&mut self, ctx: ServiceContext, payload: ApprovePayload) -> ProtocolResult<()> {
+        
     }
 }
 
