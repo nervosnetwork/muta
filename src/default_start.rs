@@ -31,7 +31,9 @@ use core_network::{NetworkConfig, NetworkService};
 use core_storage::{adapter::rocks::RocksAdapter, ImplStorage};
 use framework::binding::state::RocksTrieDB;
 use framework::executor::{ServiceExecutor, ServiceExecutorFactory};
-use protocol::traits::{APIAdapter, Context, MessageCodec, NodeInfo, ServiceMapping, Storage};
+use protocol::traits::{
+    APIAdapter, Context, MemPool, MessageCodec, NodeInfo, ServiceMapping, Storage,
+};
 use protocol::types::{Address, Block, BlockHeader, Bloom, Genesis, Hash, Metadata, Proof};
 use protocol::{fixed_codec::FixedCodec, ProtocolResult};
 

@@ -101,11 +101,14 @@ pub trait CommonConsensusAdapter: Send + Sync {
     /// Get metadata by the giving state_root.
     fn get_metadata(
         &self,
-        _: Context,
+        context: Context,
         state_root: MerkleRoot,
         height: u64,
         timestamp: u64,
     ) -> ProtocolResult<Metadata>;
+
+    /// Set timeout_gap in mempool.
+    fn set_timeout_gap(&self, context: Context, timeout_gap: u64);
 }
 
 #[async_trait]

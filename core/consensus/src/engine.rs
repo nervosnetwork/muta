@@ -478,6 +478,10 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
             .save_block(Context::new(), block.clone())
             .await?;
 
+        // update timeout_gap of mempool
+        self.adapter
+            .set_timeout_gap(Context::new(), metadata.timeout_gap);
+
         let prev_hash = Hash::digest(block.encode_fixed()?);
         self.status_agent
             .update_after_commit(height + 1, metadata, block, prev_hash, proof)?;
