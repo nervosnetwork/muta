@@ -301,8 +301,8 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             .into_iter()
             .map(|v| Node {
                 address:        v.address.as_bytes(),
-                propose_weight: v.propose_weight,
-                vote_weight:    v.vote_weight,
+                propose_weight: v.propose_weight as u8,
+                vote_weight:    v.vote_weight as u8,
             })
             .collect::<Vec<_>>();
 
@@ -500,8 +500,8 @@ fn covert_to_overlord_authority(validators: &[Validator]) -> Vec<Node> {
         .iter()
         .map(|v| Node {
             address:        v.address.as_bytes(),
-            propose_weight: v.propose_weight,
-            vote_weight:    v.vote_weight,
+            propose_weight: v.propose_weight as u8,
+            vote_weight:    v.vote_weight as u8,
         })
         .collect::<Vec<_>>();
     authority.sort();

@@ -367,8 +367,8 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         .iter()
         .map(|v| Node {
             address:        v.address.as_bytes(),
-            propose_weight: v.propose_weight,
-            vote_weight:    v.vote_weight,
+            propose_weight: v.propose_weight as u8,
+            vote_weight:    v.vote_weight as u8,
         })
         .collect::<Vec<_>>();
 

@@ -40,8 +40,8 @@ pub struct Proof {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Validator {
     pub address:        Address,
-    pub propose_weight: u8,
-    pub vote_weight:    u8,
+    pub propose_weight: u32,
+    pub vote_weight:    u32,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
