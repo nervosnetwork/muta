@@ -223,38 +223,6 @@ where
         let res = self.storage.get_latest_block().await?;
         Ok(res.header.height)
     }
-
-    /// Get metadata by the giving height.
-    fn get_metadata(
-        &self,
-        _: Context,
-        state_root: MerkleRoot,
-        height: u64,
-        timestamp: u64,
-    ) -> ProtocolResult<Metadata> {
-        let executor = EF::from_root(
-            state_root.clone(),
-            Arc::clone(&self.trie_db),
-            Arc::clone(&self.storage),
-            Arc::clone(&self.service_mapping),
-        )?;
-
-        let caller = Address::from_hex("0000000000000000000000000000000000000000")?;
-
-        let params = ExecutorParams {
-            state_root,
-            height,
-            timestamp,
-            cycles_limit: u64::max_value(),
-        };
-        let exec_resp = executor.read(&params, &caller, 1, &TransactionRequest {
-            service_name: "metadata".to_string(),
-            method:       "get_metadata".to_string(),
-            payload:      "".to_string(),
-        })?;
-
-        Ok(serde_json::from_str(&exec_resp.ret).expect("Decode metadata failed!"))
-    }
 }
 
 #[async_trait]
@@ -405,6 +373,38 @@ where
         self.network
             .broadcast(ctx.clone(), BROADCAST_HEIGHT, height, Priority::High)
             .await
+    }
+
+    /// Get metadata by the giving height.
+    fn get_metadata(
+        &self,
+        _: Context,
+        state_root: MerkleRoot,
+        height: u64,
+        timestamp: u64,
+    ) -> ProtocolResult<Metadata> {
+        let executor = EF::from_root(
+            state_root.clone(),
+            Arc::clone(&self.trie_db),
+            Arc::clone(&self.storage),
+            Arc::clone(&self.service_mapping),
+        )?;
+
+        let caller = Address::from_hex("0000000000000000000000000000000000000000")?;
+
+        let params = ExecutorParams {
+            state_root,
+            height,
+            timestamp,
+            cycles_limit: u64::max_value(),
+        };
+        let exec_resp = executor.read(&params, &caller, 1, &TransactionRequest {
+            service_name: "metadata".to_string(),
+            method:       "get_metadata".to_string(),
+            payload:      "".to_string(),
+        })?;
+
+        Ok(serde_json::from_str(&exec_resp.ret).expect("Decode metadata failed!"))
     }
 }
 

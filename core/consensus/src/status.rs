@@ -48,13 +48,14 @@ impl StatusAgent {
     pub fn update_after_sync_commit(
         &self,
         height: u64,
+        metadata: Metadata,
         block: Block,
         prev_hash: Hash,
         proof: Proof,
     ) {
         self.status
             .write()
-            .update_after_sync_commit(height, block, prev_hash, proof)
+            .update_after_sync_commit(height, metadata, block, prev_hash, proof)
     }
 
     // TODO(yejiayu): Is there a better way to write it?
@@ -139,6 +140,7 @@ impl CurrentConsensusStatus {
         self.height = height;
         self.prev_hash = prev_hash;
         self.proof = proof;
+
         self.update_cycles(&block.header.cycles_used)?;
         self.update_logs_bloom(&block.header.logs_bloom)?;
         self.update_state_root(&block.header.state_root)?;
@@ -150,10 +152,16 @@ impl CurrentConsensusStatus {
     pub fn update_after_sync_commit(
         &mut self,
         height: u64,
+        metadata: Metadata,
         block: Block,
         prev_hash: Hash,
         proof: Proof,
     ) {
+        self.cycles_limit = metadata.cycles_limit;
+        self.cycles_price = metadata.cycles_price;
+        self.consensus_interval = metadata.interval;
+        self.validators = metadata.verifier_list;
+
         self.height = height;
         self.prev_hash = prev_hash;
         self.proof = proof;

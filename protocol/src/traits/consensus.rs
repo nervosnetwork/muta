@@ -97,6 +97,15 @@ pub trait CommonConsensusAdapter: Send + Sync {
     ) -> ProtocolResult<Vec<SignedTransaction>>;
 
     async fn broadcast_height(&self, ctx: Context, height: u64) -> ProtocolResult<()>;
+
+    /// Get metadata by the giving state_root.
+    fn get_metadata(
+        &self,
+        _: Context,
+        state_root: MerkleRoot,
+        height: u64,
+        timestamp: u64,
+    ) -> ProtocolResult<Metadata>;
 }
 
 #[async_trait]
@@ -198,13 +207,4 @@ pub trait ConsensusAdapter: CommonConsensusAdapter + Send + Sync {
         ctx: Context,
         block_hash: Hash,
     ) -> ProtocolResult<Vec<SignedTransaction>>;
-
-    /// Get metadata by the giving height.
-    fn get_metadata(
-        &self,
-        ctx: Context,
-        state_root: MerkleRoot,
-        height: u64,
-        timestamp: u64,
-    ) -> ProtocolResult<Metadata>;
 }
