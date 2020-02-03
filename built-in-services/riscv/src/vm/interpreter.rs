@@ -15,6 +15,7 @@ use crate::vm;
 use crate::vm::ChainInterface;
 
 // Duktape execution environment
+#[cfg(debug_assertions)]
 const DUKTAPE_EE: &[u8] = std::include_bytes!("c/duktape_ee");
 
 #[derive(Clone, Debug)]
@@ -80,6 +81,7 @@ impl Interpreter {
 
         let (code, init_payload) = match self.r#type {
             InterpreterType::Binary => (self.iparams.code.clone(), None),
+            #[cfg(debug_assertions)]
             InterpreterType::Duktape => (Bytes::from(DUKTAPE_EE), Some(self.iparams.code.clone())),
         };
 

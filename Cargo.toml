@@ -68,3 +68,14 @@ members = [
 [[example]]
 name = "muta-chain"
 crate-type = ["bin"]
+
+# Make sure cfg(debug-assertions) is properly enabled for development
+# and disable for release.
+[profile.dev]
+debug-assertions = true
+
+[profile.test]
+debug-assertions = true
+
+[profile.release]
+debug-assertions = false

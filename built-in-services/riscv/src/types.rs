@@ -13,6 +13,7 @@ use std::convert::TryFrom;
 #[derive(Deserialize, Serialize, Clone, Debug, Copy)]
 pub enum InterpreterType {
     Binary = 1,
+    #[cfg(debug_assertions)]
     Duktape = 2,
 }
 
@@ -22,6 +23,7 @@ impl TryFrom<u8> for InterpreterType {
     fn try_from(val: u8) -> Result<InterpreterType, Self::Error> {
         match val {
             1 => Ok(InterpreterType::Binary),
+            #[cfg(debug_assertions)]
             2 => Ok(InterpreterType::Duktape),
             _ => Err("unsupport interpreter"),
         }
