@@ -111,7 +111,7 @@ RISCV_SRC := $(CURRENT_DIR)/built-in-services/riscv/src/vm/c
 DUKTAPE_SRC := $(RISCV_SRC)/duktape
 
 duktape:
-	$(CC) -I$(DUKTAPE_SRC) $(DUKTAPE_SRC)/duktape.c $(RISCV_SRC)/duktape_ee.c $(LDFLAGS) -o $(RISCV_SRC)/duktape_ee
+	$(CC) -I$(DUKTAPE_SRC) $(DUKTAPE_SRC)/duktape.c $(RISCV_SRC)/duktape_ee.c $(LDFLAGS) -o $(RISCV_SRC)/duktape_ee.bin
 
 duktape_docker:
 	$(DOCKER_BUILD) "cd /src && make duktape"

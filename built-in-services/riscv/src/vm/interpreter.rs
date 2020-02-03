@@ -16,7 +16,7 @@ use crate::vm::ChainInterface;
 
 // Duktape execution environment
 #[cfg(debug_assertions)]
-const DUKTAPE_EE: &[u8] = std::include_bytes!("c/duktape_ee");
+const DUKTAPE_EE: &[u8] = std::include_bytes!("c/duktape_ee.bin");
 
 #[derive(Clone, Debug)]
 pub enum MachineType {

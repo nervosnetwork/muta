@@ -30,6 +30,3 @@ logs/
 
 # cargo.lock
 Cargo.lock
-
-# duktape ee
-built-in-services/riscv/src/vm/c/duktape_ee
