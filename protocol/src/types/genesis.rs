@@ -13,7 +13,7 @@ impl Genesis {
             .services
             .iter()
             .find(|&service| service.name == name)
-            .expect("miss metadata service!")
+            .unwrap_or_else(|| panic!("miss {:?} service!", name))
             .payload
     }
 }

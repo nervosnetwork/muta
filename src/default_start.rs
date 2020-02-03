@@ -178,7 +178,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     let exec_resp = futures::executor::block_on(api_adapter.query_service(
         Context::new(),
         current_block.header.height,
-        99999,
+        u64::max_value(),
         1,
         my_address.clone(),
         "metadata".to_string(),
