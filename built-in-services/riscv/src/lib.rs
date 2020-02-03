@@ -59,7 +59,7 @@ impl<SDK: ServiceSDK + 'static> RiscvService<SDK> {
             Rc::new(RefCell::new(ChainInterfaceImpl::new(
                 ctx.clone(),
                 payload.clone(),
-                self.sdk.clone(),
+                Rc::<RefCell<_>>::clone(&self.sdk),
             ))),
         );
         let r = interpreter.run().map_err(ServiceError::CkbVm)?;

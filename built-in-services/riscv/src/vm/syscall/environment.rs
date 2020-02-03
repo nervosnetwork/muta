@@ -123,7 +123,7 @@ impl<Mac: ckb_vm::SupportMachine> ckb_vm::Syscalls<Mac> for SyscallEnvironment {
                 let msg_size = machine.registers()[ckb_vm::registers::A1].to_u64();
                 let msg_bytes = get_arr(machine, msg_addr, msg_size)?;
 
-                if let Ok(msg) = String::from_utf8(msg_bytes.into()) {
+                if let Ok(msg) = String::from_utf8(msg_bytes) {
                     // Note: Right now, emit event is infallible
                     if let Err(e) = self.context.emit_event(msg) {
                         error!("impossible emit event failed {}", e);

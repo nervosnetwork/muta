@@ -305,7 +305,7 @@ fn should_support_pvm_emit_event() {
     assert_eq!(ret, "emit success");
 
     let events = ctx.get_events();
-    assert!(events.iter().find(|ev| ev.data == msg).is_some());
+    assert!(events.iter().any(|ev| ev.data == msg));
 }
 
 #[test]
@@ -345,13 +345,13 @@ fn should_support_pvm_tx_nonce() {
     let payload = ExecPayload::new(address.clone(), args);
 
     let ctx = context.make();
-    let ret = service.exec(ctx.clone(), payload).expect("tx no nonce");
+    let ret = service.exec(ctx, payload).expect("tx no nonce");
 
     assert_eq!(ret, "no tx nonce");
 
     // Should return tx nonce
     let mut ctx_params = context.new_params();
-    ctx_params.nonce = Some(Hash::digest(Bytes::from(format!("{}", "test nonce"))));
+    ctx_params.nonce = Some(Hash::digest(Bytes::from("test_nonce".to_owned())));
     let ctx = ServiceContext::new(ctx_params);
 
     let args = json!({"method": "test_tx_nonce"}).to_string();

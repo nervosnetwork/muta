@@ -107,9 +107,11 @@ impl Interpreter {
                 )))
                 .syscall(Box::new(vm::SyscallIO::new(
                     self.iparams.args.to_vec(),
-                    ret_data.clone(),
+                    Rc::<RefCell<_>>::clone(&ret_data),
                 )))
-                .syscall(Box::new(vm::SyscallChainInterface::new(self.chain.clone())))
+                .syscall(Box::new(vm::SyscallChainInterface::new(
+                    Rc::<RefCell<_>>::clone(&self.chain),
+                )))
                 .build();
                 machine.load_program(&code, &args[..]).unwrap();
                 let exitcode = machine.run()?;
@@ -127,9 +129,11 @@ impl Interpreter {
                     )))
                     .syscall(Box::new(vm::SyscallIO::new(
                         self.iparams.args.to_vec(),
-                        ret_data.clone(),
+                        Rc::<RefCell<_>>::clone(&ret_data),
                     )))
-                    .syscall(Box::new(vm::SyscallChainInterface::new(self.chain.clone())))
+                    .syscall(Box::new(vm::SyscallChainInterface::new(
+                        Rc::<RefCell<_>>::clone(&self.chain),
+                    )))
                     .build();
                 let mut machine = AsmMachine::new(machine, None);
                 machine.load_program(&code, &args[..]).unwrap();
