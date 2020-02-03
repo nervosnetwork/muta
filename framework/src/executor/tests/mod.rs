@@ -8,6 +8,7 @@ use cita_trie::MemoryDB;
 
 use asset::types::{Asset, GetBalanceResponse};
 use asset::AssetService;
+use metadata::MetadataService;
 use protocol::traits::{Executor, ExecutorParams, Service, ServiceMapping, ServiceSDK, Storage};
 use protocol::types::{
     Address, Block, Genesis, Hash, Proof, RawTransaction, Receipt, SignedTransaction,
@@ -131,15 +132,16 @@ impl ServiceMapping for MockServiceMapping {
         sdk: SDK,
     ) -> ProtocolResult<Box<dyn Service>> {
         let service = match name {
-            "asset" => AssetService::new(sdk)?,
+            "asset" => Box::new(AssetService::new(sdk)?) as Box<dyn Service>,
+            "metadata" => Box::new(MetadataService::new(sdk)?) as Box<dyn Service>,
             _ => panic!("not found service"),
         };
 
-        Ok(Box::new(service))
+        Ok(service)
     }
 
     fn list_service_name(&self) -> Vec<String> {
-        vec!["asset".to_owned()]
+        vec!["asset".to_owned(), "metadata".to_owned()]
     }
 }
 

@@ -151,7 +151,6 @@ where
     pub fn new(
         network: N,
         storage: Arc<S>,
-        timeout_gap: u64,
         broadcast_txs_size: usize,
         broadcast_txs_interval: u64,
     ) -> Self {
@@ -176,7 +175,7 @@ where
             network,
             storage,
 
-            timeout_gap: AtomicU64::new(timeout_gap),
+            timeout_gap: AtomicU64::new(0),
 
             stx_tx,
             err_rx: Mutex::new(err_rx),
@@ -305,6 +304,10 @@ where
     async fn get_latest_height(&self, _ctx: Context) -> ProtocolResult<u64> {
         let height = self.storage.get_latest_block().await?.header.height;
         Ok(height)
+    }
+
+    fn set_timeout_gap(&self, timeout_gap: u64) {
+        self.timeout_gap.store(timeout_gap, Ordering::Relaxed);
     }
 }
 
