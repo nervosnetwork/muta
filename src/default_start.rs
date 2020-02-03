@@ -20,7 +20,8 @@ use core_consensus::message::{
 };
 use core_consensus::status::{CurrentConsensusStatus, StatusAgent};
 use core_consensus::{
-    Node, OverlordConsensus, OverlordConsensusAdapter, OverlordSynchronization, WalInfoQueue,
+    DurationConfig, Node, OverlordConsensus, OverlordConsensusAdapter, OverlordSynchronization,
+    WalInfoQueue,
 };
 use core_mempool::{
     DefaultMemPoolAdapter, HashMemPool, MsgPushTxs, NewTxsHandler, PullTxsHandler,
@@ -30,9 +31,9 @@ use core_network::{NetworkConfig, NetworkService};
 use core_storage::{adapter::rocks::RocksAdapter, ImplStorage};
 use framework::binding::state::RocksTrieDB;
 use framework::executor::{ServiceExecutor, ServiceExecutorFactory};
-use protocol::traits::{MessageCodec, NodeInfo, ServiceMapping, Storage};
-use protocol::types::{Address, Block, BlockHeader, Bloom, Genesis, Hash, Proof, Validator};
-use protocol::{fixed_codec::FixedCodec, ProtocolError, ProtocolResult};
+use protocol::traits::{APIAdapter, Context, MessageCodec, NodeInfo, ServiceMapping, Storage};
+use protocol::types::{Address, Block, BlockHeader, Bloom, Genesis, Hash, Metadata, Proof};
+use protocol::{fixed_codec::FixedCodec, ProtocolResult};
 
 use crate::config::Config;
 use crate::MainError;
@@ -42,7 +43,8 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
     genesis: &Genesis,
     servive_mapping: Arc<Mapping>,
 ) -> ProtocolResult<Block> {
-    let chain_id = Hash::from_hex(&config.chain_id)?;
+    let metadata: Metadata =
+        serde_json::from_str(genesis.get_payload("metadata")).expect("Decode metadata failed!");
 
     // Read genesis.
     log::info!("Genesis data: {:?}", genesis);
@@ -78,7 +80,7 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
 
     // Build genesis block.
     let genesis_block_header = BlockHeader {
-        chain_id:          chain_id.clone(),
+        chain_id:          metadata.chain_id.clone(),
         height:            0,
         exec_height:       0,
         pre_hash:          Hash::from_empty(),
@@ -98,7 +100,7 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
             bitmap:     Bytes::new(),
         },
         validator_version: 0,
-        validators:        vec![],
+        validators:        metadata.verifier_list.clone(),
     };
     let latest_proof = genesis_block_header.proof.clone();
     let genesis_block = Block {
@@ -116,15 +118,6 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     config: Config,
     service_mapping: Arc<Mapping>,
 ) -> ProtocolResult<()> {
-    let chain_id = Hash::from_hex(&config.chain_id)?;
-
-    // self private key
-    let hex_privkey = hex::decode(config.privkey.clone()).map_err(MainError::FromHex)?;
-    let my_privkey =
-        Secp256k1PrivateKey::try_from(hex_privkey.as_ref()).map_err(MainError::Crypto)?;
-    let my_pubkey = my_privkey.pub_key();
-    let my_address = Address::from_pubkey_bytes(my_pubkey.to_bytes())?;
-
     // Init Block db
     let path_block = config.data_path_for_block();
     log::info!("Data path for block: {:?}", path_block);
@@ -155,15 +148,48 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     let mempool_adapter = DefaultMemPoolAdapter::<Secp256k1, _, _>::new(
         network_service.handle(),
         Arc::clone(&storage),
-        config.mempool.timeout_gap,
         config.mempool.broadcast_txs_size,
         config.mempool.broadcast_txs_interval,
     );
     let mempool = Arc::new(HashMemPool::new(
         config.mempool.pool_size as usize,
-        config.mempool.timeout_gap,
         mempool_adapter,
     ));
+
+    // Init trie db
+    let path_state = config.data_path_for_state();
+    let trie_db = Arc::new(RocksTrieDB::new(path_state, config.executor.light)?);
+
+    // self private key
+    let hex_privkey = hex::decode(config.privkey.clone()).map_err(MainError::FromHex)?;
+    let my_privkey =
+        Secp256k1PrivateKey::try_from(hex_privkey.as_ref()).map_err(MainError::Crypto)?;
+    let my_pubkey = my_privkey.pub_key();
+    let my_address = Address::from_pubkey_bytes(my_pubkey.to_bytes())?;
+
+    // Get metadata
+    let api_adapter = DefaultAPIAdapter::<ServiceExecutorFactory, _, _, _, _>::new(
+        Arc::clone(&mempool),
+        Arc::clone(&storage),
+        Arc::clone(&trie_db),
+        Arc::clone(&service_mapping),
+    );
+
+    let exec_resp = futures::executor::block_on(api_adapter.query_service(
+        Context::new(),
+        current_block.header.height,
+        u64::max_value(),
+        1,
+        my_address.clone(),
+        "metadata".to_string(),
+        "get_metadata".to_string(),
+        "".to_string(),
+    ))?;
+
+    let metadata: Metadata = serde_json::from_str(&exec_resp.ret).expect("Decode metadata failed!");
+
+    // set timeout_gap in mempool
+    mempool.set_timeout_gap(metadata.timeout_gap);
 
     // register broadcast new transaction
     network_service.register_endpoint_handler(
@@ -181,13 +207,9 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     )?;
     network_service.register_rpc_response::<MsgPushTxs>(RPC_RESP_PULL_TXS)?;
 
-    // Init trie db
-    let path_state = config.data_path_for_state();
-    let trie_db = Arc::new(RocksTrieDB::new(path_state, config.executor.light)?);
-
     // Init Consensus
     let node_info = NodeInfo {
-        chain_id:     chain_id.clone(),
+        chain_id:     metadata.chain_id.clone(),
         self_address: my_address.clone(),
     };
     let current_header = &current_block.header;
@@ -197,8 +219,8 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         MessageCodec::decode(wal_info).await?
     } else {
         CurrentConsensusStatus {
-            cycles_price:       config.consensus.cycles_price,
-            cycles_limit:       config.consensus.cycles_limit,
+            cycles_price:       metadata.cycles_price,
+            cycles_limit:       metadata.cycles_limit,
             height:             current_block.header.height + 1,
             exec_height:        current_block.header.height,
             prev_hash:          prevhash,
@@ -209,40 +231,25 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
             receipt_root:       vec![],
             cycles_used:        current_header.cycles_used.clone(),
             proof:              current_header.proof.clone(),
-            validators:         config
-                .consensus
-                .verifier_list
-                .iter()
-                .map(|v| {
-                    Ok(Validator {
-                        address:        Address::from_hex(v)?,
-                        propose_weight: 1,
-                        vote_weight:    1,
-                    })
-                })
-                .collect::<Result<Vec<Validator>, ProtocolError>>()?,
-            consensus_interval: config.consensus.interval,
+            validators:         metadata.verifier_list.clone(),
+            consensus_interval: metadata.interval,
         }
     };
 
-    let authority_list = config
-        .consensus
-        .verifier_list
-        .iter()
-        .map(|addr| Node::new(Address::from_hex(addr).unwrap().as_bytes()))
-        .collect::<Vec<_>>();
     let consensus_interval = current_consensus_status.consensus_interval;
     let status_agent = StatusAgent::new(current_consensus_status);
 
-    assert!(config.consensus.verifier_list.len() == config.consensus.public_keys.len());
+    assert_eq!(
+        metadata.verifier_list.len(),
+        config.consensus.public_keys.len()
+    );
     let mut bls_pub_keys = HashMap::new();
-    for (addr, bls_pub_key) in config
-        .consensus
+    for (validator, bls_pub_key) in metadata
         .verifier_list
         .iter()
         .zip(config.consensus.public_keys.iter())
     {
-        let address = Address::from_hex(addr)?.as_bytes();
+        let address = validator.address.as_bytes();
         let hex_pubkey = hex::decode(bls_pub_key).map_err(MainError::FromHex)?;
         let pub_key = BlsPublicKey::try_from(hex_pubkey.as_ref()).map_err(MainError::Crypto)?;
         bls_pub_keys.insert(address, pub_key);
@@ -254,8 +261,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     priv_key.append(&mut tmp);
     let bls_priv_key = BlsPrivateKey::try_from(priv_key.as_ref()).map_err(MainError::Crypto)?;
 
-    let hex_common_ref =
-        hex::decode(config.consensus.common_ref.as_str()).map_err(MainError::FromHex)?;
+    let hex_common_ref = hex::decode(metadata.common_ref.as_str()).map_err(MainError::FromHex)?;
     let common_ref: BlsCommonReference = std::str::from_utf8(hex_common_ref.as_ref())
         .map_err(MainError::Utf8)?
         .into();
@@ -341,12 +347,6 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     tokio::spawn(network_service);
 
     // Init graphql
-    let api_adapter = DefaultAPIAdapter::<ServiceExecutorFactory, _, _, _, _>::new(
-        Arc::clone(&mempool),
-        Arc::clone(&storage),
-        Arc::clone(&trie_db),
-        Arc::clone(&service_mapping),
-    );
     let mut graphql_config = GraphQLConfig::default();
     graphql_config.listening_address = config.graphql.listening_address;
     graphql_config.graphql_uri = config.graphql.graphql_uri.clone();
@@ -363,13 +363,25 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     });
 
     // Run consensus
+    let authority_list = metadata
+        .verifier_list
+        .iter()
+        .map(|v| Node {
+            address:        v.address.as_bytes(),
+            propose_weight: v.propose_weight,
+            vote_weight:    v.vote_weight,
+        })
+        .collect::<Vec<_>>();
+
+    let timer_config = DurationConfig {
+        propose_ratio:   metadata.propose_ratio,
+        prevote_ratio:   metadata.prevote_ratio,
+        precommit_ratio: metadata.precommit_ratio,
+    };
+
     tokio::spawn(async move {
         if let Err(e) = overlord_consensus
-            .run(
-                consensus_interval,
-                authority_list,
-                Some(config.consensus.duration.clone()),
-            )
+            .run(consensus_interval, authority_list, Some(timer_config))
             .await
         {
             log::error!("muta-consensus: {:?} error", e);
