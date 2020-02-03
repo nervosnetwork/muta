@@ -17,7 +17,8 @@ use common_merkle::Merkle;
 use protocol::fixed_codec::FixedCodec;
 use protocol::traits::{ConsensusAdapter, Context, MessageCodec, MessageTarget, NodeInfo};
 use protocol::types::{
-    Address, Block, BlockHeader, Hash, MerkleRoot, Pill, Proof, SignedTransaction, Validator,
+    Address, Block, BlockHeader, Hash, MerkleRoot, Metadata, Pill, Proof, SignedTransaction,
+    Validator,
 };
 use protocol::{Bytes, ProtocolError, ProtocolResult};
 
@@ -205,7 +206,13 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         .await?;
 
         trace_block(&pill.block);
-        self.update_status(height, pill.block, proof, full_txs)
+        let metadata = self.adapter.get_metadata(
+            ctx.clone(),
+            pill.block.header.state_root.clone(),
+            pill.block.header.height,
+            pill.block.header.timestamp,
+        )?;
+        self.update_status(height, metadata, pill.block, proof, full_txs)
             .await?;
 
         self.adapter.broadcast_height(ctx.clone(), height).await?;
@@ -458,6 +465,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
     pub async fn update_status(
         &self,
         height: u64,
+        metadata: Metadata,
         block: Block,
         proof: Proof,
         txs: Vec<SignedTransaction>,
@@ -472,7 +480,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
 
         let prev_hash = Hash::digest(block.encode_fixed()?);
         self.status_agent
-            .update_after_commit(height + 1, block, prev_hash, proof)?;
+            .update_after_commit(height + 1, metadata, block, prev_hash, proof)?;
         self.save_wal().await
     }
 

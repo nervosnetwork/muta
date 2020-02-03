@@ -10,7 +10,7 @@ use serde_json::json;
 use common_merkle::Merkle;
 use protocol::fixed_codec::FixedCodec;
 use protocol::traits::ExecutorResp;
-use protocol::types::{Block, Bloom, Hash, MerkleRoot, Proof, Validator};
+use protocol::types::{Block, Bloom, Hash, MerkleRoot, Metadata, Proof, Validator};
 use protocol::ProtocolResult;
 
 use crate::engine::check_vec_roots;
@@ -35,13 +35,14 @@ impl StatusAgent {
     pub fn update_after_commit(
         &self,
         height: u64,
+        metadata: Metadata,
         block: Block,
         prev_hash: Hash,
         proof: Proof,
     ) -> ProtocolResult<()> {
         self.status
             .write()
-            .update_after_commit(height, block, prev_hash, proof)
+            .update_after_commit(height, metadata, block, prev_hash, proof)
     }
 
     pub fn update_after_sync_commit(
@@ -122,12 +123,18 @@ impl CurrentConsensusStatus {
     pub fn update_after_commit(
         &mut self,
         height: u64,
+        metadata: Metadata,
         block: Block,
         prev_hash: Hash,
         proof: Proof,
     ) -> ProtocolResult<()> {
         info!("update info {}, {:?}", height, prev_hash);
         info!("update after commit cache: {}", self);
+
+        self.cycles_limit = metadata.cycles_limit;
+        self.cycles_price = metadata.cycles_price;
+        self.consensus_interval = metadata.interval;
+        self.validators = metadata.verifier_list;
 
         self.height = height;
         self.prev_hash = prev_hash;

@@ -3,7 +3,7 @@ use creep::Context;
 
 use crate::traits::{ExecutorParams, ExecutorResp};
 use crate::types::{
-    Address, Block, Bytes, Hash, MerkleRoot, Proof, Receipt, SignedTransaction, Validator,
+    Address, Block, Bytes, Hash, MerkleRoot, Metadata, Proof, Receipt, SignedTransaction, Validator,
 };
 use crate::{traits::mempool::MixedTxHashes, ProtocolResult};
 
@@ -198,4 +198,13 @@ pub trait ConsensusAdapter: CommonConsensusAdapter + Send + Sync {
         ctx: Context,
         block_hash: Hash,
     ) -> ProtocolResult<Vec<SignedTransaction>>;
+
+    /// Get metadata by the giving height.
+    fn get_metadata(
+        &self,
+        ctx: Context,
+        state_root: MerkleRoot,
+        height: u64,
+        timestamp: u64,
+    ) -> ProtocolResult<Metadata>;
 }

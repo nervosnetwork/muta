@@ -79,8 +79,6 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
     )?;
 
     // Build genesis block.
-    let validators = metadata.verifier_list.clone().sort();
-
     let genesis_block_header = BlockHeader {
         chain_id:          metadata.chain_id.clone(),
         height:            0,
@@ -102,7 +100,7 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
             bitmap:     Bytes::new(),
         },
         validator_version: 0,
-        validators,
+        validators:        metadata.verifier_list,
     };
     let latest_proof = genesis_block_header.proof.clone();
     let genesis_block = Block {
@@ -210,7 +208,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     network_service.register_rpc_response::<MsgPushTxs>(RPC_RESP_PULL_TXS)?;
 
     // Init Consensus
-    verifier_list = metadata.verifier_list.clone().sort();
+    let verifier_list = metadata.verifier_list.clone();
 
     let node_info = NodeInfo {
         chain_id:     metadata.chain_id.clone(),
@@ -243,10 +241,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     let consensus_interval = current_consensus_status.consensus_interval;
     let status_agent = StatusAgent::new(current_consensus_status);
 
-    assert_eq!(
-        verifier_list.len(),
-        config.consensus.public_keys.len()
-    );
+    assert_eq!(verifier_list.len(), config.consensus.public_keys.len());
     let mut bls_pub_keys = HashMap::new();
     for (validator, bls_pub_key) in verifier_list
         .iter()
