@@ -288,8 +288,8 @@ pub fn mock_event() -> Event {
 pub fn mock_validator() -> Validator {
     Validator {
         address:        mock_address(),
-        propose_weight: 1u8,
-        vote_weight:    1u8,
+        propose_weight: 1,
+        vote_weight:    1,
     }
 }
 

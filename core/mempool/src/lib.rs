@@ -67,11 +67,6 @@ where
     pub fn get_adapter(&self) -> &Adapter {
         &self.adapter
     }
-
-    pub fn set_timeout_gap(&self, timeout_gap: u64) {
-        self.adapter.set_timeout_gap(timeout_gap);
-        self.timeout_gap.store(timeout_gap, Ordering::Relaxed);
-    }
 }
 
 #[async_trait]
@@ -185,6 +180,11 @@ where
             });
         }
         Ok(())
+    }
+
+    fn set_timeout_gap(&self, timeout_gap: u64) {
+        self.adapter.set_timeout_gap(timeout_gap);
+        self.timeout_gap.store(timeout_gap, Ordering::Relaxed);
     }
 }
 

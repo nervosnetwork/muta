@@ -41,6 +41,8 @@ pub trait MemPool: Send + Sync {
         ctx: Context,
         propose_tx_hashes: Vec<Hash>,
     ) -> ProtocolResult<()>;
+
+    fn set_timeout_gap(&self, timeout_gap: u64);
 }
 
 #[async_trait]

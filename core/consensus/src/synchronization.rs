@@ -143,8 +143,20 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
 
         let block = &rich_block.block;
         let block_hash = Hash::digest(block.encode_fixed()?);
+
+        let metadata = self.adapter.get_metadata(
+            ctx.clone(),
+            block.header.state_root.clone(),
+            block.header.height,
+            block.header.timestamp,
+        )?;
+
+        self.adapter
+            .set_timeout_gap(ctx.clone(), metadata.timeout_gap);
+
         status_agent.update_after_sync_commit(
             block.header.height,
+            metadata,
             block.clone(),
             block_hash,
             block.header.proof.clone(),

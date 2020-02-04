@@ -31,7 +31,9 @@ use core_network::{NetworkConfig, NetworkService};
 use core_storage::{adapter::rocks::RocksAdapter, ImplStorage};
 use framework::binding::state::RocksTrieDB;
 use framework::executor::{ServiceExecutor, ServiceExecutorFactory};
-use protocol::traits::{APIAdapter, Context, MessageCodec, NodeInfo, ServiceMapping, Storage};
+use protocol::traits::{
+    APIAdapter, Context, MemPool, MessageCodec, NodeInfo, ServiceMapping, Storage,
+};
 use protocol::types::{Address, Block, BlockHeader, Bloom, Genesis, Hash, Metadata, Proof};
 use protocol::{fixed_codec::FixedCodec, ProtocolResult};
 
@@ -100,7 +102,7 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
             bitmap:     Bytes::new(),
         },
         validator_version: 0,
-        validators:        metadata.verifier_list.clone(),
+        validators:        metadata.verifier_list,
     };
     let latest_proof = genesis_block_header.proof.clone();
     let genesis_block = Block {
@@ -208,6 +210,8 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     network_service.register_rpc_response::<MsgPushTxs>(RPC_RESP_PULL_TXS)?;
 
     // Init Consensus
+    let verifier_list = metadata.verifier_list.clone();
+
     let node_info = NodeInfo {
         chain_id:     metadata.chain_id.clone(),
         self_address: my_address.clone(),
@@ -231,7 +235,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
             receipt_root:       vec![],
             cycles_used:        current_header.cycles_used.clone(),
             proof:              current_header.proof.clone(),
-            validators:         metadata.verifier_list.clone(),
+            validators:         verifier_list.clone(),
             consensus_interval: metadata.interval,
         }
     };
@@ -239,13 +243,9 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     let consensus_interval = current_consensus_status.consensus_interval;
     let status_agent = StatusAgent::new(current_consensus_status);
 
-    assert_eq!(
-        metadata.verifier_list.len(),
-        config.consensus.public_keys.len()
-    );
+    assert_eq!(verifier_list.len(), config.consensus.public_keys.len());
     let mut bls_pub_keys = HashMap::new();
-    for (validator, bls_pub_key) in metadata
-        .verifier_list
+    for (validator, bls_pub_key) in verifier_list
         .iter()
         .zip(config.consensus.public_keys.iter())
     {
@@ -363,13 +363,12 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     });
 
     // Run consensus
-    let authority_list = metadata
-        .verifier_list
+    let authority_list = verifier_list
         .iter()
         .map(|v| Node {
             address:        v.address.as_bytes(),
-            propose_weight: v.propose_weight,
-            vote_weight:    v.vote_weight,
+            propose_weight: v.propose_weight as u8,
+            vote_weight:    v.vote_weight as u8,
         })
         .collect::<Vec<_>>();
 
