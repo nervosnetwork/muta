@@ -4,7 +4,6 @@ use std::path::PathBuf;
 
 use serde_derive::Deserialize;
 
-use core_consensus::DurationConfig;
 use core_mempool::{DEFAULT_BROADCAST_TXS_INTERVAL, DEFAULT_BROADCAST_TXS_SIZE};
 
 #[derive(Debug, Deserialize)]
@@ -37,8 +36,7 @@ fn default_broadcast_txs_interval() -> u64 {
 
 #[derive(Debug, Deserialize)]
 pub struct ConfigMempool {
-    pub timeout_gap: u64,
-    pub pool_size:   u64,
+    pub pool_size: u64,
 
     #[serde(default = "default_broadcast_txs_size")]
     pub broadcast_txs_size:     usize,
@@ -48,13 +46,7 @@ pub struct ConfigMempool {
 
 #[derive(Debug, Deserialize)]
 pub struct ConfigConsensus {
-    pub cycles_limit:  u64,
-    pub cycles_price:  u64,
-    pub interval:      u64,
-    pub duration:      DurationConfig,
-    pub verifier_list: Vec<String>,
-    pub public_keys:   Vec<String>,
-    pub common_ref:    String,
+    pub public_keys: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -90,8 +82,6 @@ impl Default for ConfigLogger {
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
-    // chain id
-    pub chain_id:  String,
     // crypto
     pub privkey:   String,
     // db config

@@ -303,8 +303,8 @@ impl From<block::Validator> for Validator {
 
         Validator {
             address,
-            propose_weight: u32::from(validator.propose_weight),
-            vote_weight: u32::from(validator.vote_weight),
+            propose_weight: validator.propose_weight,
+            vote_weight: validator.vote_weight,
         }
     }
 }
@@ -317,8 +317,8 @@ impl TryFrom<Validator> for block::Validator {
 
         let validator = block::Validator {
             address:        protocol_primitive::Address::try_from(address)?,
-            propose_weight: validator.propose_weight as u8,
-            vote_weight:    validator.vote_weight as u8,
+            propose_weight: validator.propose_weight,
+            vote_weight:    validator.vote_weight,
         };
 
         Ok(validator)

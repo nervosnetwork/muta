@@ -17,7 +17,8 @@ use protocol::traits::{
     ServiceMapping, Storage, SynchronizationAdapter,
 };
 use protocol::types::{
-    Address, Block, Bytes, Hash, MerkleRoot, Proof, Receipt, SignedTransaction, Validator,
+    Address, Block, Bytes, Hash, MerkleRoot, Metadata, Proof, Receipt, SignedTransaction,
+    TransactionRequest, Validator,
 };
 use protocol::{fixed_codec::FixedCodec, ProtocolResult};
 
@@ -59,10 +60,10 @@ where
     EF: ExecutorFactory<DB, S, Mapping>,
     G: Gossip + Sync + Send,
     R: Rpc + Sync + Send,
-    M: MemPool,
-    S: Storage,
-    DB: cita_trie::DB,
-    Mapping: ServiceMapping,
+    M: MemPool + 'static,
+    S: Storage + 'static,
+    DB: cita_trie::DB + 'static,
+    Mapping: ServiceMapping + 'static,
 {
     async fn get_txs_from_mempool(
         &self,
@@ -231,10 +232,10 @@ where
     EF: ExecutorFactory<DB, S, Mapping>,
     G: Gossip + Sync + Send,
     R: Rpc + Sync + Send,
-    M: MemPool,
-    S: Storage,
-    DB: cita_trie::DB,
-    Mapping: ServiceMapping,
+    M: MemPool + 'static,
+    S: Storage + 'static,
+    DB: cita_trie::DB + 'static,
+    Mapping: ServiceMapping + 'static,
 {
     fn update_status(
         &self,
@@ -317,10 +318,10 @@ where
     EF: ExecutorFactory<DB, S, Mapping>,
     G: Gossip + Sync + Send,
     R: Rpc + Sync + Send,
-    M: MemPool,
-    S: Storage,
-    DB: cita_trie::DB,
-    Mapping: ServiceMapping,
+    M: MemPool + 'static,
+    S: Storage + 'static,
+    DB: cita_trie::DB + 'static,
+    Mapping: ServiceMapping + 'static,
 {
     /// Save a block to the database.
     async fn save_block(&self, _: Context, block: Block) -> ProtocolResult<()> {
@@ -373,6 +374,42 @@ where
             .broadcast(ctx.clone(), BROADCAST_HEIGHT, height, Priority::High)
             .await
     }
+
+    /// Get metadata by the giving height.
+    fn get_metadata(
+        &self,
+        _: Context,
+        state_root: MerkleRoot,
+        height: u64,
+        timestamp: u64,
+    ) -> ProtocolResult<Metadata> {
+        let executor = EF::from_root(
+            state_root.clone(),
+            Arc::clone(&self.trie_db),
+            Arc::clone(&self.storage),
+            Arc::clone(&self.service_mapping),
+        )?;
+
+        let caller = Address::from_hex("0000000000000000000000000000000000000000")?;
+
+        let params = ExecutorParams {
+            state_root,
+            height,
+            timestamp,
+            cycles_limit: u64::max_value(),
+        };
+        let exec_resp = executor.read(&params, &caller, 1, &TransactionRequest {
+            service_name: "metadata".to_string(),
+            method:       "get_metadata".to_string(),
+            payload:      "".to_string(),
+        })?;
+
+        Ok(serde_json::from_str(&exec_resp.ret).expect("Decode metadata failed!"))
+    }
+
+    fn set_timeout_gap(&self, _context: Context, timeout_gap: u64) {
+        self.mempool.set_timeout_gap(timeout_gap);
+    }
 }
 
 impl<EF, G, M, R, S, DB, Mapping> OverlordConsensusAdapter<EF, G, M, R, S, DB, Mapping>
@@ -380,10 +417,10 @@ where
     EF: ExecutorFactory<DB, S, Mapping>,
     G: Gossip + Sync + Send,
     R: Rpc + Sync + Send,
-    M: MemPool,
-    S: Storage,
-    DB: cita_trie::DB,
-    Mapping: ServiceMapping,
+    M: MemPool + 'static,
+    S: Storage + 'static,
+    DB: cita_trie::DB + 'static,
+    Mapping: ServiceMapping + 'static,
 {
     pub fn new(
         rpc: Arc<R>,

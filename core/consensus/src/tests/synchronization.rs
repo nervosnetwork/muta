@@ -11,7 +11,7 @@ use protocol::fixed_codec::FixedCodec;
 use protocol::traits::{CommonConsensusAdapter, Synchronization, SynchronizationAdapter};
 use protocol::traits::{Context, ExecutorParams, ExecutorResp};
 use protocol::types::{
-    Address, Block, BlockHeader, Bytes, Hash, MerkleRoot, Proof, RawTransaction, Receipt,
+    Address, Block, BlockHeader, Bytes, Hash, MerkleRoot, Metadata, Proof, RawTransaction, Receipt,
     ReceiptResponse, SignedTransaction, TransactionRequest, Validator,
 };
 use protocol::ProtocolResult;
@@ -211,6 +211,35 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
     async fn broadcast_height(&self, _: Context, _: u64) -> ProtocolResult<()> {
         Ok(())
     }
+
+    fn get_metadata(
+        &self,
+        _context: Context,
+        _state_root: MerkleRoot,
+        _height: u64,
+        _timestamp: u64,
+    ) -> ProtocolResult<Metadata> {
+        Ok(Metadata {
+            chain_id:        Hash::from_empty(),
+            common_ref:      "703873635a6b51513451".to_string(),
+            timeout_gap:     20,
+            cycles_limit:    9999,
+            cycles_price:    1,
+            interval:        3000,
+            verifier_list:   vec![Validator {
+                address:        Address::from_hex("1c9776983b2f251fa5c9cc562c1b667d1f05ff83")
+                    .unwrap(),
+                propose_weight: 0,
+                vote_weight:    0,
+            }],
+            propose_ratio:   10,
+            prevote_ratio:   10,
+            precommit_ratio: 10,
+        })
+    }
+
+    /// Set timeout_gap in mempool.
+    fn set_timeout_gap(&self, _context: Context, _timeout_gap: u64) {}
 }
 
 fn gen_remote_tx_hashmap(list: Vec<RichBlock>) -> SafeHashMap<Hash, SignedTransaction> {
