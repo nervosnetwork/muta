@@ -93,6 +93,9 @@ impl<Adapter: ConsensusAdapter + 'static> OverlordConsensus<Adapter> {
                     OverlordMsg::RichStatus(gen_overlord_status(
                         status.height,
                         status.consensus_interval,
+                        status.propose_ratio,
+                        status.prevote_ratio,
+                        status.precommit_ratio,
                         status.validators,
                     )),
                 )
@@ -124,13 +127,20 @@ impl<Adapter: ConsensusAdapter + 'static> OverlordConsensus<Adapter> {
     }
 }
 
-pub fn gen_overlord_status(height: u64, interval: u64, validators: Vec<Validator>) -> Status {
+pub fn gen_overlord_status(
+    height: u64,
+    interval: u64,
+    propose_ratio: u64,
+    prevote_ratio: u64,
+    precommit_ratio: u64,
+    validators: Vec<Validator>,
+) -> Status {
     let mut authority_list = validators
         .into_iter()
         .map(|v| Node {
             address:        v.address.as_bytes(),
-            propose_weight: v.propose_weight as u8,
-            vote_weight:    v.vote_weight as u8,
+            propose_weight: v.propose_weight,
+            vote_weight:    v.vote_weight,
         })
         .collect::<Vec<_>>();
 
@@ -138,6 +148,11 @@ pub fn gen_overlord_status(height: u64, interval: u64, validators: Vec<Validator
     Status {
         height,
         interval: Some(interval),
+        timer_config: Some(DurationConfig {
+            propose_ratio,
+            prevote_ratio,
+            precommit_ratio,
+        }),
         authority_list,
     }
 }

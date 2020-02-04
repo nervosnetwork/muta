@@ -82,6 +82,9 @@ impl<Adapter: SynchronizationAdapter> Synchronization for OverlordSynchronizatio
                     ctx.clone(),
                     sync_status.height,
                     sync_status.consensus_interval,
+                    sync_status.propose_ratio,
+                    sync_status.prevote_ratio,
+                    sync_status.precommit_ratio,
                     sync_status.validators,
                 )?;
                 break;
@@ -277,6 +280,9 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
             cycles_limit:       current_status.cycles_limit,
             validators:         current_status.validators.clone(),
             consensus_interval: current_status.consensus_interval,
+            propose_ratio:      current_status.propose_ratio,
+            prevote_ratio:      current_status.prevote_ratio,
+            precommit_ratio:    current_status.precommit_ratio,
             prev_hash:          block.header.pre_hash.clone(),
             height:             block.header.height,
             exec_height:        block.header.exec_height,
