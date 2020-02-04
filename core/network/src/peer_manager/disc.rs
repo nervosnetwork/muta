@@ -1,9 +1,6 @@
 use futures::channel::mpsc::UnboundedSender;
 use log::debug;
-use tentacle::{
-    multiaddr::{Multiaddr, Protocol},
-    SessionId,
-};
+use tentacle::{multiaddr::Multiaddr, SessionId};
 use tentacle_discovery::{AddressManager, MisbehaveResult, Misbehavior};
 
 use crate::{
