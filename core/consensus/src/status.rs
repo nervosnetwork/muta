@@ -120,8 +120,11 @@ impl CurrentConsensusStatus {
         self.cycles_used.push(info.cycles_used);
         self.confirm_root.push(info.confirm_root.clone());
         self.logs_bloom.push(info.logs_bloom.clone());
-        self.state_root.push(info.state_root.clone());
-        self.receipt_root.push(info.receipt_root);
+        self.receipt_root.push(info.receipt_root.clone());
+
+        if self.state_root.last().expect("empty state root") != &info.state_root {
+            self.state_root.push(info.state_root);
+        }
     }
 
     pub fn update_after_commit(
