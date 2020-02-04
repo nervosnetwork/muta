@@ -37,7 +37,7 @@ use parking_lot::RwLock;
 use protocol::types::Address;
 use rand::seq::IteratorRandom;
 use tentacle::{
-    multiaddr::{multiaddr, Multiaddr, Protocol},
+    multiaddr::{Multiaddr, Protocol},
     secio::{PeerId, PublicKey},
     service::{SessionType, TargetProtocol, TargetSession},
     SessionId,

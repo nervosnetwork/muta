@@ -17,31 +17,32 @@ pub const BACKOFF_BASE: usize = 5;
 pub const VALID_ATTEMPT_INTERVAL: u64 = 4;
 
 #[derive(Debug, Display, PartialEq, Eq, Serialize, Deserialize, Clone)]
-#[display(fmt = "{}", _0)]
-pub struct ConnectedAddr(String);
+#[display(fmt = "{}:{}", host, port)]
+pub struct ConnectedAddr {
+    host: String,
+    port: u16,
+}
 
 impl From<&Multiaddr> for ConnectedAddr {
     fn from(multiaddr: &Multiaddr) -> Self {
         use tentacle::multiaddr::Protocol::*;
 
-        let mut connected_addr = None;
+        let mut host = None;
+        let mut port = 0u16;
 
         for comp in multiaddr.iter() {
             match comp {
-                IP4(ip_addr) => {
-                    connected_addr = Some(ip_addr.to_string());
-                }
-                IP6(ip_addr) => {
-                    connected_addr = Some(ip_addr.to_string());
-                }
-                DNS4(dns_addr) | DNS6(dns_addr) => {
-                    connected_addr = Some(dns_addr.to_string());
-                }
+                IP4(ip_addr) => host = Some(ip_addr.to_string()),
+                IP6(ip_addr) => host = Some(ip_addr.to_string()),
+                DNS4(dns_addr) | DNS6(dns_addr) => host = Some(dns_addr.to_string()),
+                TLS(tls_addr) => host = Some(tls_addr.to_string()),
+                TCP(p) => port = p,
                 _ => (),
             }
         }
 
-        ConnectedAddr(connected_addr.unwrap_or_else(|| multiaddr.to_string()))
+        let host = host.unwrap_or_else(|| multiaddr.to_string());
+        ConnectedAddr { host, port }
     }
 }
 
