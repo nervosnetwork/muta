@@ -60,6 +60,9 @@ fn sync_gap_test() {
             proof:              genesis_block.header.proof,
             validators:         genesis_block.header.validators,
             consensus_interval: 3000,
+            propose_ratio:      15,
+            prevote_ratio:      10,
+            precommit_ratio:    10,
         };
         let status_agent = StatusAgent::new(status);
         let lock = Arc::new(Mutex::new(()));
@@ -109,7 +112,16 @@ impl MockCommonConsensusAdapter {
 
 #[async_trait]
 impl SynchronizationAdapter for MockCommonConsensusAdapter {
-    fn update_status(&self, _: Context, _: u64, _: u64, _: Vec<Validator>) -> ProtocolResult<()> {
+    fn update_status(
+        &self,
+        _: Context,
+        _: u64,
+        _: u64,
+        _: u64,
+        _: u64,
+        _: u64,
+        _: Vec<Validator>,
+    ) -> ProtocolResult<()> {
         Ok(())
     }
 

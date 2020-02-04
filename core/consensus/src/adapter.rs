@@ -242,6 +242,9 @@ where
         ctx: Context,
         height: u64,
         consensus_interval: u64,
+        propose_ratio: u64,
+        prevote_ratio: u64,
+        precommit_ratio: u64,
         validators: Vec<Validator>,
     ) -> ProtocolResult<()> {
         self.overlord_handler
@@ -253,6 +256,9 @@ where
                 OverlordMsg::RichStatus(gen_overlord_status(
                     height,
                     consensus_interval,
+                    propose_ratio,
+                    prevote_ratio,
+                    precommit_ratio,
                     validators,
                 )),
             )
