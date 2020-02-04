@@ -1030,7 +1030,7 @@ impl Future for PeerManager {
             self.process_event(event);
         }
 
-        info!(
+        debug!(
             "network: {:?}: connected peer_addr(s): {:?}",
             self.peer_id,
             self.connected_peers_addr()
