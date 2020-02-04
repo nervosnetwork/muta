@@ -21,4 +21,4 @@ tokio = { version = "0.2", features = [ "sync" ] }
 [dev-dependencies]
 num-traits = "0.2"
 rand = "0.6"
-hex = "0.3"
+hex = "0.4"
