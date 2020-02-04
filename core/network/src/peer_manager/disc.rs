@@ -1,6 +1,9 @@
 use futures::channel::mpsc::UnboundedSender;
 use log::debug;
-use tentacle::{multiaddr::Multiaddr, SessionId};
+use tentacle::{
+    multiaddr::{Multiaddr, Protocol},
+    SessionId,
+};
 use tentacle_discovery::{AddressManager, MisbehaveResult, Misbehavior};
 
 use crate::{
@@ -74,6 +77,6 @@ impl AddressManager for DiscoveryAddrManager {
     }
 
     fn get_random(&mut self, n: usize) -> Vec<Multiaddr> {
-        self.peer_mgr.random_addrs(n)
+        self.peer_mgr.random_addrs(n).into_iter().collect()
     }
 }

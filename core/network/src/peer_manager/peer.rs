@@ -1,7 +1,6 @@
 use std::{
     collections::HashSet,
     default::Default,
-    net::IpAddr,
     sync::Arc,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
@@ -17,18 +16,47 @@ use tentacle::{
 pub const BACKOFF_BASE: usize = 5;
 pub const VALID_ATTEMPT_INTERVAL: u64 = 4;
 
+#[derive(Debug, Display, PartialEq, Eq, Serialize, Deserialize, Clone)]
+#[display(fmt = "{}", _0)]
+pub struct ConnectedAddr(String);
+
+impl From<&Multiaddr> for ConnectedAddr {
+    fn from(multiaddr: &Multiaddr) -> Self {
+        use tentacle::multiaddr::Protocol;
+
+        let mut connected_addr = None;
+
+        for comp in multiaddr.iter() {
+            match comp {
+                Protocol::Ip4(ip_addr) => {
+                    connected_addr = Some(ip_addr.to_string());
+                }
+                Protocol::Ip6(ip_addr) => {
+                    connected_addr = Some(ip_addr.to_string());
+                }
+                Protocol::Dns4(dns_addr) | Protocol::Dns6(dns_addr) => {
+                    connected_addr = Some(dns_addr.to_string());
+                }
+                _ => (),
+            }
+        }
+
+        ConnectedAddr(connected_addr.unwrap_or_else(|| multiaddr.to_string()))
+    }
+}
+
 // TODO: display next_retry
 #[derive(Debug, Clone, Serialize, Deserialize, Display)]
 #[display(
-    fmt = "connection_ip: {:?}, retry: {}, last_connect: {}, alive: {}",
-    connection_ip,
+    fmt = "connected_addr: {:?}, retry: {}, last_connect: {}, alive: {}",
+    connected_addr,
     retry_count,
     connect_at,
     alive
 )]
 pub(super) struct PeerState {
-    // Current connection ip
-    connection_ip: Option<IpAddr>,
+    // Current connection address
+    connected_addr: Option<ConnectedAddr>,
 
     // Peer address set (Multiple format, p2p, quic etc)
     addr_set: HashSet<Multiaddr>,
@@ -70,14 +98,14 @@ pub struct Peer {
 impl PeerState {
     pub fn new() -> Self {
         PeerState {
-            connection_ip: None,
-            addr_set:      Default::default(),
-            retry_count:   0,
-            next_retry:    Instant::now(),
-            connect_at:    0,
-            disconnect_at: 0,
-            attempt_at:    0,
-            alive:         0,
+            connected_addr: None,
+            addr_set:       Default::default(),
+            retry_count:    0,
+            next_retry:     Instant::now(),
+            connect_at:     0,
+            disconnect_at:  0,
+            attempt_at:     0,
+            alive:          0,
         }
     }
 
@@ -125,8 +153,8 @@ impl Peer {
         &self.pubkey
     }
 
-    pub fn connection_ip(&self) -> Option<IpAddr> {
-        self.state.connection_ip
+    pub fn connected_addr(&self) -> Option<ConnectedAddr> {
+        self.state.connected_addr.clone()
     }
 
     pub fn user_addr(&self) -> &Address {
@@ -153,8 +181,8 @@ impl Peer {
         self.state = state
     }
 
-    pub fn set_connection_ip(&mut self, ip: Option<IpAddr>) {
-        self.state.connection_ip = ip;
+    pub fn set_connected_addr(&mut self, addr: Option<ConnectedAddr>) {
+        self.state.connected_addr = addr;
     }
 
     pub fn add_addr(&mut self, addr: Multiaddr) {

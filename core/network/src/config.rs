@@ -2,12 +2,13 @@ use std::{
     default::Default,
     net::{IpAddr, Ipv4Addr, SocketAddr},
     path::{Path, PathBuf},
+    str::FromStr,
     time::Duration,
 };
 
 use protocol::ProtocolResult;
 use tentacle::{
-    multiaddr::{Multiaddr, Protocol},
+    multiaddr::{multiaddr, Multiaddr, Protocol},
     secio::{PublicKey, SecioKeyPair},
 };
 
@@ -43,6 +44,43 @@ pub const DEFAULT_RPC_TIMEOUT: u64 = 10;
 
 pub type PublicKeyHexStr = String;
 pub type PrivateKeyHexStr = String;
+pub type PeerAddrStr = String;
+
+// Example:
+//  example.com:2077
+struct DnsAddr {
+    host: String,
+    port: u16,
+}
+
+impl FromStr for DnsAddr {
+    type Err = NetworkError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        use NetworkError::*;
+
+        let comps = s.split(':').collect::<Vec<_>>();
+        if comps.len() != 2 {
+            return Err(UnexpectedPeerAddr(s.to_owned()));
+        }
+
+        let port = comps[1]
+            .parse::<u16>()
+            .map_err(|_| UnexpectedPeerAddr(s.to_owned()))?;
+
+        Ok(DnsAddr {
+            host: comps[0].to_owned(),
+            port,
+        })
+    }
+}
+
+// TODO: support Dns6
+impl From<DnsAddr> for Multiaddr {
+    fn from(addr: DnsAddr) -> Self {
+        multiaddr!(Dns4(&addr.host), Tcp(addr.port))
+    }
+}
 
 #[derive(Debug)]
 pub struct NetworkConfig {
@@ -115,13 +153,16 @@ impl NetworkConfig {
     }
 
     // TODO: Remove explicit secp256k1
-    pub fn bootstraps(mut self, pairs: Vec<(PublicKeyHexStr, SocketAddr)>) -> ProtocolResult<Self> {
-        let to_peer = |(pk_hex, socket_addr): (PublicKeyHexStr, SocketAddr)| -> _ {
+    pub fn bootstraps(
+        mut self,
+        pairs: Vec<(PublicKeyHexStr, PeerAddrStr)>,
+    ) -> ProtocolResult<Self> {
+        let to_peer = |(pk_hex, peer_addr): (PublicKeyHexStr, PeerAddrStr)| -> _ {
             let pk = hex::decode(pk_hex)
                 .map(PublicKey::Secp256k1)
                 .map_err(|_| NetworkError::InvalidPublicKey)?;
 
-            let multi_addr = socket_to_multi_addr(socket_addr);
+            let multi_addr = Self::parse_peer_addr(peer_addr)?;
 
             Ok(Peer::from_pair((pk, multi_addr)))
         };
@@ -193,6 +234,16 @@ impl NetworkConfig {
         }
 
         self
+    }
+
+    fn parse_peer_addr(addr: PeerAddrStr) -> ProtocolResult<Multiaddr> {
+        if let Ok(socket_addr) = addr.parse::<SocketAddr>() {
+            Ok(socket_to_multi_addr(socket_addr))
+        } else if let Ok(dns_addr) = addr.parse::<DnsAddr>() {
+            Ok(Multiaddr::from(dns_addr))
+        } else {
+            Err(NetworkError::UnexpectedPeerAddr(addr).into())
+        }
     }
 }
 

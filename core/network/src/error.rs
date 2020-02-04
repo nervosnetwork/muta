@@ -75,6 +75,9 @@ pub enum NetworkError {
     #[display(fmt = "cannot decode private key bytes")]
     InvalidPrivateKey,
 
+    #[display(fmt = "unsupported peer address {}", _0)]
+    UnexpectedPeerAddr(String),
+
     #[display(fmt = "unknown endpoint scheme {}", _0)]
     UnexpectedScheme(String),
 
