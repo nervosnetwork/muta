@@ -21,8 +21,10 @@ pub struct BlockHeader {
         description = "Identifier of a chain in order to prevent replay attacks across channels "
     )]
     pub chain_id:          Hash,
-    #[graphql(description = "Known as the block height like other blockchain")]
+    #[graphql(description = "block height")]
     pub height:            Uint64,
+    #[graphql(description = "The height to which the block has been executed")]
+    pub exec_height:       Uint64,
     #[graphql(description = "The hash of the serialized previous block")]
     pub pre_hash:          Hash,
     #[graphql(description = "A timestamp that records when the block was created")]
@@ -68,6 +70,7 @@ impl From<protocol::types::BlockHeader> for BlockHeader {
         BlockHeader {
             chain_id:          Hash::from(block_header.chain_id),
             height:            Uint64::from(block_header.height),
+            exec_height:       Uint64::from(block_header.exec_height),
             pre_hash:          Hash::from(block_header.pre_hash),
             timestamp:         Uint64::from(block_header.timestamp),
             order_root:        MerkleRoot::from(block_header.order_root),
