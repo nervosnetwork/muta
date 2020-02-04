@@ -33,7 +33,6 @@ impl<Mac: ckb_vm::SupportMachine> ckb_vm::Syscalls<Mac> for SyscallEnvironment {
         match code.to_u64() {
             SYSCODE_ADDRESS => {
                 let addr = machine.registers()[ckb_vm::registers::A0].to_u64();
-                dbg!(self.iparams.address.as_hex());
                 machine
                     .memory_mut()
                     .store_bytes(addr, self.iparams.address.as_hex().as_ref())?;

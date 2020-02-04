@@ -477,7 +477,7 @@ fn test_js_erc20() {
         "supply": 1_000_000_000,
     })
     .to_string();
-    dbg!(&init_args);
+
     let dep_payoad = DeployPayload {
         code: hex::encode(buffer),
         intp_type: InterpreterType::Duktape,
