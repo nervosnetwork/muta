@@ -122,7 +122,7 @@ impl CurrentConsensusStatus {
         self.logs_bloom.push(info.logs_bloom.clone());
         self.receipt_root.push(info.receipt_root.clone());
 
-        if self.state_root.last().expect("empty state root") != &info.state_root {
+        if self.state_root.last() != Some(&info.state_root) {
             self.state_root.push(info.state_root);
         }
     }
@@ -168,7 +168,6 @@ impl CurrentConsensusStatus {
 
         self.cycles_used = self.cycles_used.split_off(block.header.cycles_used.len());
         self.logs_bloom = self.logs_bloom.split_off(block.header.logs_bloom.len());
-        self.state_root = self.state_root.split_off(block.header.cycles_used.len());
         self.confirm_root = self.confirm_root.split_off(block.header.confirm_root.len());
         self.receipt_root = self.receipt_root.split_off(block.header.receipt_root.len());
     }
