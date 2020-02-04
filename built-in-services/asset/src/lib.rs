@@ -75,13 +75,15 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
 
         let asset_balance = self
             .sdk
-            .get_account_value(&ctx.get_caller(), &payload.asset_id)?
+            .get_account_value(&payload.user, &payload.asset_id)?
             .unwrap_or(AssetBalance {
                 value:     0,
                 allowance: BTreeMap::new(),
             });
+
         Ok(GetBalanceResponse {
             asset_id: payload.asset_id,
+            user:     payload.user,
             balance:  asset_balance.value,
         })
     }
@@ -102,19 +104,21 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
 
         let opt_asset_balance: Option<AssetBalance> = self
             .sdk
-            .get_account_value(&ctx.get_caller(), &payload.asset_id)?;
+            .get_account_value(&payload.grantor, &payload.asset_id)?;
 
         if let Some(v) = opt_asset_balance {
             let allowance = v.allowance.get(&payload.grantee).unwrap_or(&0);
 
             Ok(GetAllowanceResponse {
                 asset_id: payload.asset_id,
-                grantee:  payload.grantee.clone(),
+                grantor:  payload.grantor,
+                grantee:  payload.grantee,
                 value:    *allowance,
             })
         } else {
             Ok(GetAllowanceResponse {
                 asset_id: payload.asset_id,
+                grantor:  payload.grantor,
                 grantee:  payload.grantee,
                 value:    0,
             })

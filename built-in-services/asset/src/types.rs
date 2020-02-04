@@ -75,23 +75,27 @@ pub struct TransferFromEvent {
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct GetBalancePayload {
     pub asset_id: Hash,
+    pub user:     Address,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct GetBalanceResponse {
     pub asset_id: Hash,
+    pub user:     Address,
     pub balance:  u64,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct GetAllowancePayload {
     pub asset_id: Hash,
+    pub grantor:  Address,
     pub grantee:  Address,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct GetAllowanceResponse {
     pub asset_id: Hash,
+    pub grantor:  Address,
     pub grantee:  Address,
     pub value:    u64,
 }
