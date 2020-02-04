@@ -37,7 +37,7 @@ macro_rules! service_ready {
 
 pub fn socket_to_multi_addr(socket_addr: SocketAddr) -> Multiaddr {
     let mut multi_addr = Multiaddr::from(socket_addr.ip());
-    multi_addr.push(Protocol::Tcp(socket_addr.port()));
+    multi_addr.push(Protocol::TCP(socket_addr.port()));
 
     multi_addr
 }

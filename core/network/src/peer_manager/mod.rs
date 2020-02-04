@@ -37,7 +37,7 @@ use parking_lot::RwLock;
 use protocol::types::Address;
 use rand::seq::IteratorRandom;
 use tentacle::{
-    multiaddr::{Multiaddr, Protocol},
+    multiaddr::{multiaddr, Multiaddr, Protocol},
     secio::{PeerId, PublicKey},
     service::{SessionType, TargetProtocol, TargetSession},
     SessionId,
@@ -248,20 +248,19 @@ impl Inner {
             return None;
         }
 
-        let root = Multiaddr::empty()
-            .with(comps[0].clone())
-            .with(comps[1].clone());
+        let mut root = Multiaddr::from(comps[0].clone());
+        root.push(comps[1].clone());
 
         // Currently support P2P address match
         if let Some(match_pid) = addr_pid.get(&root) {
             return match comps.get(2) {
-                Some(Protocol::P2p(addr_pid)) if match_pid.as_bytes() == addr_pid.as_bytes() => {
+                Some(Protocol::P2P(addr_pid)) if addr_pid == &match_pid.as_bytes() => {
                     Some(match_pid.clone())
                 }
                 // Root exact match
                 None => Some(match_pid.clone()),
                 // Not match means this address is other peer's outdated address
-                Some(Protocol::P2p(_)) => None,
+                Some(Protocol::P2P(_)) => None,
                 _ => {
                     warn!("network: unsupported multiaddr {}", addr);
 

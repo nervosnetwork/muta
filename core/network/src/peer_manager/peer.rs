@@ -22,19 +22,19 @@ pub struct ConnectedAddr(String);
 
 impl From<&Multiaddr> for ConnectedAddr {
     fn from(multiaddr: &Multiaddr) -> Self {
-        use tentacle::multiaddr::Protocol;
+        use tentacle::multiaddr::Protocol::*;
 
         let mut connected_addr = None;
 
         for comp in multiaddr.iter() {
             match comp {
-                Protocol::Ip4(ip_addr) => {
+                IP4(ip_addr) => {
                     connected_addr = Some(ip_addr.to_string());
                 }
-                Protocol::Ip6(ip_addr) => {
+                IP6(ip_addr) => {
                     connected_addr = Some(ip_addr.to_string());
                 }
-                Protocol::Dns4(dns_addr) | Protocol::Dns6(dns_addr) => {
+                DNS4(dns_addr) | DNS6(dns_addr) => {
                     connected_addr = Some(dns_addr.to_string());
                 }
                 _ => (),

@@ -78,7 +78,7 @@ impl FromStr for DnsAddr {
 // TODO: support Dns6
 impl From<DnsAddr> for Multiaddr {
     fn from(addr: DnsAddr) -> Self {
-        multiaddr!(Dns4(&addr.host), Tcp(addr.port))
+        multiaddr!(DNS4(&addr.host), TCP(addr.port))
     }
 }
 
@@ -113,7 +113,7 @@ pub struct NetworkConfig {
 impl NetworkConfig {
     pub fn new() -> Self {
         let mut listen_addr = Multiaddr::from(DEFAULT_LISTEN_IP_ADDR);
-        listen_addr.push(Protocol::Tcp(DEFAULT_LISTEN_PORT));
+        listen_addr.push(Protocol::TCP(DEFAULT_LISTEN_PORT));
 
         let peer_manager_hb_interval =
             Duration::from_secs(DEFAULT_PEER_MANAGER_HEART_BEAT_INTERVAL);
