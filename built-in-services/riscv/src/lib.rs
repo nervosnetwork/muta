@@ -58,7 +58,7 @@ impl<SDK: ServiceSDK + 'static> RiscvService<SDK> {
             interpreter_params,
             Rc::new(RefCell::new(ChainInterfaceImpl::new(
                 ctx.clone(),
-                payload.clone(),
+                payload,
                 Rc::<RefCell<_>>::clone(&self.sdk),
             ))),
         );
