@@ -43,6 +43,9 @@ pub trait SynchronizationAdapter: CommonConsensusAdapter + Send + Sync {
         ctx: Context,
         height: u64,
         consensus_interval: u64,
+        propose_ratio: u64,
+        prevote_ratio: u64,
+        precommit_ratio: u64,
         validators: Vec<Validator>,
     ) -> ProtocolResult<()>;
 

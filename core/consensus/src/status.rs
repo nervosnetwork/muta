@@ -103,6 +103,9 @@ pub struct CurrentConsensusStatus {
     pub proof:              Proof,
     pub validators:         Vec<Validator>,
     pub consensus_interval: u64,
+    pub propose_ratio:      u64,
+    pub prevote_ratio:      u64,
+    pub precommit_ratio:    u64,
 }
 
 impl CurrentConsensusStatus {
@@ -132,10 +135,7 @@ impl CurrentConsensusStatus {
         info!("update info {}, {:?}", height, prev_hash);
         info!("update after commit cache: {}", self);
 
-        self.cycles_limit = metadata.cycles_limit;
-        self.cycles_price = metadata.cycles_price;
-        self.consensus_interval = metadata.interval;
-        self.validators = metadata.verifier_list;
+        self.set_metadata(metadata);
 
         self.height = height;
         self.prev_hash = prev_hash;
@@ -157,10 +157,7 @@ impl CurrentConsensusStatus {
         prev_hash: Hash,
         proof: Proof,
     ) {
-        self.cycles_limit = metadata.cycles_limit;
-        self.cycles_price = metadata.cycles_price;
-        self.consensus_interval = metadata.interval;
-        self.validators = metadata.verifier_list;
+        self.set_metadata(metadata);
 
         self.height = height;
         self.prev_hash = prev_hash;
@@ -171,6 +168,16 @@ impl CurrentConsensusStatus {
         self.state_root = self.state_root.split_off(block.header.cycles_used.len());
         self.confirm_root = self.confirm_root.split_off(block.header.confirm_root.len());
         self.receipt_root = self.receipt_root.split_off(block.header.receipt_root.len());
+    }
+
+    fn set_metadata(&mut self, metadata: Metadata) {
+        self.cycles_limit = metadata.cycles_limit;
+        self.cycles_price = metadata.cycles_price;
+        self.consensus_interval = metadata.interval;
+        self.validators = metadata.verifier_list;
+        self.propose_ratio = metadata.propose_ratio;
+        self.prevote_ratio = metadata.prevote_ratio;
+        self.precommit_ratio = metadata.precommit_ratio;
     }
 
     fn update_cycles(&mut self, cycles: &[u64]) -> ProtocolResult<()> {

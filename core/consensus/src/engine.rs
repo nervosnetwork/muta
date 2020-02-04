@@ -8,7 +8,7 @@ use futures::lock::Mutex;
 use log::error;
 use moodyblues_sdk::trace;
 use overlord::types::{Commit, Node, OverlordMsg, Status};
-use overlord::{Consensus as Engine, Wal};
+use overlord::{Consensus as Engine, DurationConfig, Wal};
 use parking_lot::RwLock;
 use rlp::Encodable;
 use serde_json::json;
@@ -153,6 +153,11 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             let status = Status {
                 height:         height + 1,
                 interval:       Some(current_consensus_status.consensus_interval),
+                timer_config:   Some(DurationConfig {
+                    propose_ratio:   current_consensus_status.propose_ratio,
+                    prevote_ratio:   current_consensus_status.prevote_ratio,
+                    precommit_ratio: current_consensus_status.precommit_ratio,
+                }),
                 authority_list: covert_to_overlord_authority(&current_consensus_status.validators),
             };
             return Ok(status);
@@ -223,6 +228,11 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         let status = Status {
             height:         height + 1,
             interval:       Some(current_consensus_status.consensus_interval),
+            timer_config:   Some(DurationConfig {
+                propose_ratio:   current_consensus_status.propose_ratio,
+                prevote_ratio:   current_consensus_status.prevote_ratio,
+                precommit_ratio: current_consensus_status.precommit_ratio,
+            }),
             authority_list: covert_to_overlord_authority(&current_consensus_status.validators),
         };
 
@@ -301,8 +311,8 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             .into_iter()
             .map(|v| Node {
                 address:        v.address.as_bytes(),
-                propose_weight: v.propose_weight as u8,
-                vote_weight:    v.vote_weight as u8,
+                propose_weight: v.propose_weight,
+                vote_weight:    v.vote_weight,
             })
             .collect::<Vec<_>>();
 
@@ -500,8 +510,8 @@ fn covert_to_overlord_authority(validators: &[Validator]) -> Vec<Node> {
         .iter()
         .map(|v| Node {
             address:        v.address.as_bytes(),
-            propose_weight: v.propose_weight as u8,
-            vote_weight:    v.vote_weight as u8,
+            propose_weight: v.propose_weight,
+            vote_weight:    v.vote_weight,
         })
         .collect::<Vec<_>>();
     authority.sort();
