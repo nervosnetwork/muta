@@ -1,10 +1,19 @@
 #[cfg(test)]
 mod tests;
+mod types;
+
+use derive_more::{Display, From};
 
 use binding_macro::{cycles, genesis, service};
 use protocol::traits::{ExecutorParams, ServiceSDK};
-use protocol::types::{Metadata, ServiceContext, METADATA_KEY};
-use protocol::ProtocolResult;
+use protocol::types::{Address, Metadata, ServiceContext, METADATA_KEY};
+use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
+
+use crate::types::{
+    InitGenesisPayload, UpdateMetadataPayload, UpdateRatioPayload, UpdateValidatorsPayload,
+};
+
+pub const ADMIN_KEY: &str = "admin";
 
 pub struct MetadataService<SDK> {
     sdk: SDK,
@@ -17,8 +26,11 @@ impl<SDK: ServiceSDK> MetadataService<SDK> {
     }
 
     #[genesis]
-    fn init_genesis(&mut self, metadata: Metadata) -> ProtocolResult<()> {
-        self.sdk.set_value(METADATA_KEY.to_string(), metadata)
+    fn init_genesis(&mut self, payload: InitGenesisPayload) -> ProtocolResult<()> {
+        self.sdk
+            .set_value(ADMIN_KEY.to_string(), payload.admin.clone())?;
+        self.sdk
+            .set_value(METADATA_KEY.to_string(), payload.metadata)
     }
 
     #[cycles(210_00)]
@@ -29,5 +41,135 @@ impl<SDK: ServiceSDK> MetadataService<SDK> {
             .get_value(&METADATA_KEY.to_owned())?
             .expect("Metadata should always be in the genesis block");
         Ok(metadata)
+    }
+
+    #[cycles(210_00)]
+    #[read]
+    fn get_admin(&self, ctx: ServiceContext) -> ProtocolResult<Address> {
+        let admin: Address = self
+            .sdk
+            .get_value(&ADMIN_KEY.to_owned())?
+            .expect("Admin should not be none");
+        Ok(admin)
+    }
+
+    #[cycles(210_00)]
+    #[write]
+    fn update_metadata(
+        &mut self,
+        ctx: ServiceContext,
+        payload: UpdateMetadataPayload,
+    ) -> ProtocolResult<()> {
+        if self.verify_authority(ctx.get_caller())? {
+            let mut metadata: Metadata = self
+                .sdk
+                .get_value(&METADATA_KEY.to_owned())?
+                .expect("Metadata should always be in the genesis block");
+
+            metadata.verifier_list = payload.verifier_list;
+            metadata.interval = payload.interval;
+            metadata.precommit_ratio = payload.precommit_ratio;
+            metadata.prevote_ratio = payload.prevote_ratio;
+            metadata.propose_ratio = payload.propose_ratio;
+
+            self.sdk.set_value(METADATA_KEY.to_string(), metadata)
+        } else {
+            Err(ServiceError::NonAuthorized.into())
+        }
+    }
+
+    #[cycles(210_00)]
+    #[write]
+    fn update_validators(
+        &mut self,
+        ctx: ServiceContext,
+        payload: UpdateValidatorsPayload,
+    ) -> ProtocolResult<()> {
+        if self.verify_authority(ctx.get_caller())? {
+            let mut metadata: Metadata = self
+                .sdk
+                .get_value(&METADATA_KEY.to_owned())?
+                .expect("Metadata should always be in the genesis block");
+
+            metadata.verifier_list = payload.verifier_list;
+
+            self.sdk.set_value(METADATA_KEY.to_string(), metadata)
+        } else {
+            Err(ServiceError::NonAuthorized.into())
+        }
+    }
+
+    #[cycles(210_00)]
+    #[write]
+    fn update_interval(&mut self, ctx: ServiceContext, interval: u64) -> ProtocolResult<()> {
+        if self.verify_authority(ctx.get_caller())? {
+            let mut metadata: Metadata = self
+                .sdk
+                .get_value(&METADATA_KEY.to_owned())?
+                .expect("Metadata should always be in the genesis block");
+            metadata.interval = interval;
+            self.sdk.set_value(METADATA_KEY.to_string(), metadata)
+        } else {
+            Err(ServiceError::NonAuthorized.into())
+        }
+    }
+
+    #[cycles(210_00)]
+    #[write]
+    fn update_ratio(
+        &mut self,
+        ctx: ServiceContext,
+        payload: UpdateRatioPayload,
+    ) -> ProtocolResult<()> {
+        if self.verify_authority(ctx.get_caller())? {
+            let mut metadata: Metadata = self
+                .sdk
+                .get_value(&METADATA_KEY.to_owned())?
+                .expect("Metadata should always be in the genesis block");
+
+            metadata.precommit_ratio = payload.precommit_ratio;
+            metadata.prevote_ratio = payload.prevote_ratio;
+            metadata.propose_ratio = payload.propose_ratio;
+
+            self.sdk.set_value(METADATA_KEY.to_string(), metadata)
+        } else {
+            Err(ServiceError::NonAuthorized.into())
+        }
+    }
+
+    #[cycles(210_00)]
+    #[write]
+    fn set_admin(&mut self, ctx: ServiceContext, new_admin: Address) -> ProtocolResult<()> {
+        if self.verify_authority(ctx.get_caller())? {
+            self.sdk.set_value(ADMIN_KEY.to_owned(), new_admin)
+        } else {
+            Err(ServiceError::NonAuthorized.into())
+        }
+    }
+
+    fn verify_authority(&self, caller: Address) -> ProtocolResult<bool> {
+        let admin: Address = self
+            .sdk
+            .get_value(&ADMIN_KEY.to_string())?
+            .expect("Admin should not be none");
+
+        if caller == admin {
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+}
+
+#[derive(Debug, Display, From)]
+pub enum ServiceError {
+    NonAuthorized,
+}
+
+impl std::error::Error for ServiceError {}
+
+impl From<ServiceError> for ProtocolError {
+    fn from(err: ServiceError) -> ProtocolError {
+        ProtocolError::new(ProtocolErrorKind::Service, Box::new(err))
     }
 }
