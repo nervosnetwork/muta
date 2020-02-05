@@ -107,54 +107,33 @@ int pvm_ret(uint8_t *data, size_t size) {
 }
 
 /*
- * Function pvm_cycle_limit loads current block cycle_limit.
- *
- * Params:
- *   cycle_limit[out]: pointer to uint64_t for loaded cycle limit to write
- *
- * Return:
- *   code: 0(success)
+ * Function pvm_cycle_limit returns block cycle limit.
  *
  * Example:
- *   uint64_t cycle_limit;
- *   pvm_cycle_limit(&cycle_limit);
+ *   uint64_t cycle_limit = pvm_cycle_limit();
  */
-int pvm_cycle_limit(uint64_t *cycle_limit) {
-  return syscall(SYSCODE_CYCLE_LIMIT, cycle_limit, 0, 0, 0, 0, 0);
+uint64_t pvm_cycle_limit() {
+  return syscall(SYSCODE_CYCLE_LIMIT, 0, 0, 0, 0, 0, 0);
 }
 
 /*
- * Function pvm_cycle_used loads current block cycle_used.
- *
- * Params:
- *   cycle_used[out]: pointer to uint64_t for loaded cycle used to write
- *
- * Return:
- *   code: 0(success)
+ * Function pvm_cycle_used returns execution used cycle.
  *
  * Example:
- *   uint64_t cycle_used;
- *   pvm_cycle_used(&cycle_used);
+ *   uint64_t cycle_used = pvm_cycle_used();
  */
-int pvm_cycle_used(uint64_t *cycle_used) {
-  return syscall(SYSCODE_CYCLE_USED, cycle_used, 0, 0, 0, 0, 0);
+uint64_t pvm_cycle_used() {
+  return syscall(SYSCODE_CYCLE_USED, 0, 0, 0, 0, 0, 0);
 }
 
 /*
- * Function pvm_cycle_price loads current block cycle_price.
- *
- * Params:
- *   cycle_used[out]: pointer to uint64_t for loaded cycle price to write
- *
- * Return:
- *   code: 0(success)
+ * Function pvm_cycle_price returns cycle price.
  *
  * Example:
- *   uint64_t cycle_price;
- *   pvm_cycle_price(&cycle_price);
+ *   uint64_t cycle_price = pvm_cycle_price();
  */
-int pvm_cycle_price(uint64_t *cycle_price) {
-  return syscall(SYSCODE_CYCLE_PRICE, cycle_price, 0, 0, 0, 0, 0);
+uint64_t pvm_cycle_price() {
+  return syscall(SYSCODE_CYCLE_PRICE, 0, 0, 0, 0, 0, 0);
 }
 
 /*
@@ -209,38 +188,26 @@ int pvm_address(uint8_t *addr) {
 }
 
 /*
- * Function pvm_is_init load whether this contract is initialized. Contract
+ * Function pvm_is_init returns whether this contract is initialized. Contract
  * can be deploy with init args.
  *
- * Params:
- *   is_init[out]: pointer to uint64_t for laoded is_init to write
- *
- * Return:
- *   code: 0(success)
- *
  * Example:
- *   uint64_t is_init;
- *   pvm_is_init(&is_init);
+ *   if (pvm_is_init()) {
+ *     // do something
+ *   }
  */
-int pvm_is_init(uint64_t *is_init) {
-  return syscall(SYSCODE_IS_INIT, is_init, 0, 0, 0, 0, 0);
+int pvm_is_init() {
+  return syscall(SYSCODE_IS_INIT, 0, 0, 0, 0, 0, 0);
 }
 
 /*
- * Function pvm_block_height loads current block height.
- *
- * Params:
- *   block_height[out]: pointer to uint64_t for loaded block height to write
- *
- * Return:
- *   code: 0(success)
+ * Function pvm_block_height returns current block height.
  *
  * Exmaple:
- *   uint64_t block_height;
- *   pvm_block_height(&block_height);
+ *   uint64_t block_height = pvm_block_height();
  */
-int pvm_block_height(uint64_t *block_height) {
-  return syscall(SYSCODE_BLOCK_HEIGHT, block_height, 0, 0, 0, 0, 0);
+uint64_t pvm_block_height() {
+  return syscall(SYSCODE_BLOCK_HEIGHT, 0, 0, 0, 0, 0, 0);
 }
 
 /*
@@ -263,21 +230,14 @@ int pvm_extra(uint8_t *extra, uint64_t *extra_sz) {
 }
 
 /*
- * Function pvm_timestamp loads execution's timestamp. It's seconds since
+ * Function pvm_timestamp returns execution's timestamp. It's seconds since
  * 1970-01-01 00:00:00 UTC.
  *
- * Params:
- *   timestamp[out]: pointer to uint64_t for loaded timestamp
- *
- * Return:
- *   code: 0(success)
- *
  * Example:
- *   uint64_t timestamp;
- *   pvm_timestamp(&timestamp);
+ *   uint64_t timestamp = pvm_timestamp();
  */
-int pvm_timestamp(uint64_t *timestamp) {
-  return syscall(SYSCODE_TIMESTAMP, timestamp, 0, 0, 0, 0, 0);
+uint64_t pvm_timestamp() {
+  return syscall(SYSCODE_TIMESTAMP, 0, 0, 0, 0, 0, 0);
 }
 
 /*

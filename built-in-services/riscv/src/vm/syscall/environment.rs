@@ -40,33 +40,23 @@ impl<Mac: ckb_vm::SupportMachine> ckb_vm::Syscalls<Mac> for SyscallEnvironment {
                 Ok(true)
             }
             SYSCODE_CYCLE_LIMIT => {
-                let addr = machine.registers()[ckb_vm::registers::A0].to_u64();
-                let gaslimit_byte = self.context.get_cycles_limit().to_le_bytes();
-                machine.memory_mut().store_bytes(addr, &gaslimit_byte)?;
-                machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(0));
+                let gaslimit_byte = self.context.get_cycles_limit();
+                machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u64(gaslimit_byte));
                 Ok(true)
             }
             SYSCODE_CYCLE_PRICE => {
-                let addr = machine.registers()[ckb_vm::registers::A0].to_u64();
-                let cycle_price = self.context.get_cycles_price().to_le_bytes();
-                machine.memory_mut().store_bytes(addr, &cycle_price)?;
-                machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(0));
+                let cycle_price = self.context.get_cycles_price();
+                machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u64(cycle_price));
                 Ok(true)
             }
             SYSCODE_CYCLE_USED => {
-                let addr = machine.registers()[ckb_vm::registers::A0].to_u64();
-                let cycles_used = self.context.get_cycles_used().to_le_bytes();
-                machine.memory_mut().store_bytes(addr, &cycles_used)?;
-                machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(0));
+                let cycles_used = self.context.get_cycles_used();
+                machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u64(cycles_used));
                 Ok(true)
             }
             SYSCODE_IS_INIT => {
-                let addr = machine.registers()[ckb_vm::registers::A0].to_u64();
-                let is_init: u64 = if self.iparams.is_init { 1 } else { 0 };
-                machine
-                    .memory_mut()
-                    .store_bytes(addr, &is_init.to_le_bytes())?;
-                machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(0));
+                let is_init = if self.iparams.is_init { 1u8 } else { 0u8 };
+                machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(is_init));
                 Ok(true)
             }
             SYSCODE_ORIGIN => {
@@ -88,10 +78,8 @@ impl<Mac: ckb_vm::SupportMachine> ckb_vm::Syscalls<Mac> for SyscallEnvironment {
                 Ok(true)
             }
             SYSCODE_BLOCK_HEIGHT => {
-                let addr = machine.registers()[ckb_vm::registers::A0].to_u64();
-                let block_height = self.context.get_current_height().to_le_bytes();
-                machine.memory_mut().store_bytes(addr, &block_height)?;
-                machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(0));
+                let block_height = self.context.get_current_height();
+                machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u64(block_height));
                 Ok(true)
             }
             SYSCODE_EXTRA => {
@@ -111,10 +99,8 @@ impl<Mac: ckb_vm::SupportMachine> ckb_vm::Syscalls<Mac> for SyscallEnvironment {
                 Ok(true)
             }
             SYSCODE_TIMESTAMP => {
-                let ts_addr = machine.registers()[ckb_vm::registers::A0].to_u64();
-                let timestamp = self.context.get_timestamp().to_le_bytes();
-                machine.memory_mut().store_bytes(ts_addr, &timestamp)?;
-                machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(0));
+                let timestamp = self.context.get_timestamp();
+                machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u64(timestamp));
                 Ok(true)
             }
             SYSCODE_EMIT_EVENT => {

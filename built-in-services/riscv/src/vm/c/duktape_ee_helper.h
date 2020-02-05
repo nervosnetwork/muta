@@ -105,37 +105,25 @@ static duk_ret_t duk_pvm_load_json_args(duk_context *ctx) {
 }
 
 static duk_ret_t duk_pvm_cycle_limit(duk_context *ctx) {
-  uint64_t cycle_limit;
-
-  pvm_cycle_limit(&cycle_limit);
-  push_checked_integer(ctx, cycle_limit);
+  push_checked_integer(ctx, pvm_cycle_limit());
 
   return 1;
 }
 
 static duk_ret_t duk_pvm_cycle_used(duk_context *ctx) {
-  uint64_t cycle_used;
-
-  pvm_cycle_used(&cycle_used);
-  push_checked_integer(ctx, cycle_used);
+  push_checked_integer(ctx, pvm_cycle_used());
 
   return 1;
 }
 
 static duk_ret_t duk_pvm_cycle_price(duk_context *ctx) {
-  uint64_t cycle_price;
-
-  pvm_cycle_price(&cycle_price);
-  push_checked_integer(ctx, cycle_price);
+  push_checked_integer(ctx, pvm_cycle_price());
 
   return 1;
 }
 
 static duk_ret_t duk_pvm_block_height(duk_context *ctx) {
-  uint64_t block_height;
-
-  pvm_block_height(&block_height);
-  push_checked_integer(ctx, block_height);
+  push_checked_integer(ctx, pvm_block_height());
 
   return 1;
 }
@@ -163,10 +151,7 @@ static duk_ret_t duk_pvm_extra(duk_context *ctx) {
 }
 
 static duk_ret_t duk_pvm_timestamp(duk_context *ctx) {
-  uint64_t timestamp;
-
-  pvm_timestamp(&timestamp);
-  push_checked_integer(ctx, timestamp);
+  push_checked_integer(ctx, pvm_timestamp());
 
   return 1;
 }
@@ -260,13 +245,10 @@ static duk_ret_t duk_pvm_set_storage(duk_context *ctx) {
 }
 
 static duk_ret_t duk_pvm_is_init(duk_context *ctx) {
-  uint64_t is_init;
-  pvm_is_init(&is_init);
-
-  if (0 == is_init) {
-    duk_push_false(ctx);
-  } else {
+  if (pvm_is_init()) {
     duk_push_true(ctx);
+  } else {
+    duk_push_false(ctx);
   }
 
   return 1;
