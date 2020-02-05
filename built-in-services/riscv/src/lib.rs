@@ -93,14 +93,18 @@ impl<SDK: ServiceSDK + 'static> RiscvService<SDK> {
         payload: DeployPayload,
     ) -> ProtocolResult<DeployResp> {
         let code = Bytes::from(hex::decode(&payload.code).map_err(ServiceError::HexDecode)?);
+
+        // Save code
         let code_hash = Hash::digest(code.clone());
-        // FIXME:
-        // let code_len = code.len() as u64;
-        // ctx.sub_cycles(code_len)?;
+        let code_len = code.len() as u64;
+        // Every bytes cost 10 cycles
+        ctx.sub_cycles(code_len * 10)?;
         self.sdk.borrow_mut().set_value(code_hash.clone(), code)?;
+
         let tx_hash = ctx
             .get_tx_hash()
             .ok_or_else(|| ServiceError::NotInExecContext("riscv deploy".to_owned()))?;
+
         let contract_address =
             Address::from_bytes(Hash::digest(tx_hash.as_bytes()).as_bytes().slice(0..20))?;
 
