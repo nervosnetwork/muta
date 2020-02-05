@@ -332,7 +332,7 @@ int pvm_get_storage(const uint8_t *k, uint64_t k_size, uint8_t *v,
  *   const char *val = "punk"
  *   pvm_set_storage((uint8_t *)key, strlen(key), (uint8_t *)val, strlen(val));
  */
-int pvm_set_storage(const uint8_t *k, uint64_t k_size, uint8_t *v,
+int pvm_set_storage(const uint8_t *k, uint64_t k_size, const uint8_t *v,
                     uint64_t v_size) {
   return syscall(SYSCODE_SET_STORAGE, k, k_size, v, v_size, 0, 0);
 }
