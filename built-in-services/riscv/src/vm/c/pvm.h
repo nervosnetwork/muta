@@ -102,7 +102,7 @@ int pvm_load_args(uint8_t *data, uint64_t *size) {
  * Note: This syscall(s) only allowed to call once. If called it multiple times,
  * the last call will replace the previous call.
  */
-int pvm_ret(uint8_t *data, size_t size) {
+int pvm_ret(const uint8_t *data, size_t size) {
   return syscall(SYSCODE_RET, data, size, 0, 0, 0, 0);
 }
 
@@ -252,7 +252,7 @@ uint64_t pvm_timestamp() {
  *   const char *msg = "{ \"msg\": \"test event\" }";
  *   pvm_emit_event((uint8_t *)msg, strlen(msg));
  */
-int pvm_emit_event(uint8_t *msg, uint64_t msg_sz) {
+int pvm_emit_event(const uint8_t *msg, uint64_t msg_sz) {
   return syscall(SYSCODE_EMIT_EVENT, msg, msg_sz, 0, 0, 0, 0);
 }
 
@@ -309,7 +309,8 @@ int pvm_tx_nonce(uint8_t *addr) {
  *   uint64_t val_sz;
  *   pvm_get_storage((uint8_t *)key, strlen(key), val, &val_sz);
  */
-int pvm_get_storage(uint8_t *k, uint64_t k_size, uint8_t *v, uint64_t *v_size) {
+int pvm_get_storage(const uint8_t *k, uint64_t k_size, uint8_t *v,
+                    uint64_t *v_size) {
   return syscall(SYSCODE_GET_STORAGE, k, k_size, v, v_size, 0, 0);
 }
 
@@ -331,7 +332,8 @@ int pvm_get_storage(uint8_t *k, uint64_t k_size, uint8_t *v, uint64_t *v_size) {
  *   const char *val = "punk"
  *   pvm_set_storage((uint8_t *)key, strlen(key), (uint8_t *)val, strlen(val));
  */
-int pvm_set_storage(uint8_t *k, uint64_t k_size, uint8_t *v, uint64_t v_size) {
+int pvm_set_storage(const uint8_t *k, uint64_t k_size, uint8_t *v,
+                    uint64_t v_size) {
   return syscall(SYSCODE_SET_STORAGE, k, k_size, v, v_size, 0, 0);
 }
 
@@ -356,8 +358,8 @@ int pvm_set_storage(uint8_t *k, uint64_t k_size, uint8_t *v, uint64_t v_size) {
  *   uint64_t ret_size;
  *   pvm_contract_call(ctr_addr, (uint8_t *)args, strlen(args), ret, &ret_size);
  */
-int pvm_contract_call(uint8_t *addr, uint8_t *args, uint64_t args_size,
-                      uint8_t *ret, uint64_t *ret_size) {
+int pvm_contract_call(const uint8_t *addr, const uint8_t *args,
+                      uint64_t args_size, uint8_t *ret, uint64_t *ret_size) {
   return syscall(SYSCODE_CONTRACT_CALL, addr, args, args_size, ret, ret_size,
                  0);
 }
@@ -391,8 +393,9 @@ int pvm_contract_call(uint8_t *addr, uint8_t *args, uint64_t args_size,
  *   pvm_service_call(service, method, (uint8_t *)payload, strlen(payload), ret,
  * &ret_size);
  */
-int pvm_service_call(const char *service, const char *method, uint8_t *payload,
-                     uint64_t payload_size, uint8_t *ret, uint64_t *ret_size) {
+int pvm_service_call(const char *service, const char *method,
+                     const uint8_t *payload, uint64_t payload_size,
+                     uint8_t *ret, uint64_t *ret_size) {
   return syscall(SYSCODE_SERVICE_CALL, service, method, payload, payload_size,
                  ret, ret_size);
 }
