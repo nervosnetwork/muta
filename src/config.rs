@@ -23,7 +23,7 @@ pub struct ConfigNetwork {
 #[derive(Debug, Deserialize)]
 pub struct ConfigNetworkBootstrap {
     pub pubkey:  String,
-    pub address: SocketAddr,
+    pub address: String,
 }
 
 fn default_broadcast_txs_size() -> usize {

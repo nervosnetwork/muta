@@ -140,7 +140,7 @@ pub async fn main() {
         let port = std::env::args().nth(1).unwrap().parse::<u16>().unwrap();
         let peer_addr = SocketAddr::new(IP_ADDR, port);
         let peer_conf = NetworkConfig::new()
-            .bootstraps(vec![(bt_pubkey, bt_addr)])
+            .bootstraps(vec![(bt_pubkey, bt_addr.to_string())])
             .unwrap();
 
         let mut peer = NetworkService::new(peer_conf);

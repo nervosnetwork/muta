@@ -74,6 +74,6 @@ impl AddressManager for DiscoveryAddrManager {
     }
 
     fn get_random(&mut self, n: usize) -> Vec<Multiaddr> {
-        self.peer_mgr.random_addrs(n)
+        self.peer_mgr.random_addrs(n).into_iter().collect()
     }
 }
