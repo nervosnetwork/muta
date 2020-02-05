@@ -196,9 +196,7 @@ int pvm_address(uint8_t *addr) {
  *     // do something
  *   }
  */
-int pvm_is_init() {
-  return syscall(SYSCODE_IS_INIT, 0, 0, 0, 0, 0, 0);
-}
+int pvm_is_init() { return syscall(SYSCODE_IS_INIT, 0, 0, 0, 0, 0, 0); }
 
 /*
  * Function pvm_block_height returns current block height.
