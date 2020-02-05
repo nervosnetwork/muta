@@ -6,23 +6,24 @@
 #ifndef _PVM_H
 #define _PVM_H
 
-static inline long
-__internal_syscall(long n, long _a0, long _a1, long _a2, long _a3, long _a4, long _a5)
-{
-    register long a0 asm("a0") = _a0;
-    register long a1 asm("a1") = _a1;
-    register long a2 asm("a2") = _a2;
-    register long a3 asm("a3") = _a3;
-    register long a4 asm("a4") = _a4;
-    register long a5 asm("a5") = _a5;
-    register long syscall_id asm("a7") = n;
-    asm volatile ("scall": "+r"(a0) : "r"(a1), "r"(a2), "r"(a3), "r"(a4), "r"(a5), "r"(syscall_id));
-    return a0;
+static inline long __internal_syscall(long n, long _a0, long _a1, long _a2,
+                                      long _a3, long _a4, long _a5) {
+  register long a0 asm("a0") = _a0;
+  register long a1 asm("a1") = _a1;
+  register long a2 asm("a2") = _a2;
+  register long a3 asm("a3") = _a3;
+  register long a4 asm("a4") = _a4;
+  register long a5 asm("a5") = _a5;
+  register long syscall_id asm("a7") = n;
+  asm volatile("scall"
+               : "+r"(a0)
+               : "r"(a1), "r"(a2), "r"(a3), "r"(a4), "r"(a5), "r"(syscall_id));
+  return a0;
 }
 
-#define syscall(n, a, b, c, d, e, f) \
-    __internal_syscall(n, (long)(a), (long)(b), (long)(c), (long)(d), (long)(e), (long)(f))
-
+#define syscall(n, a, b, c, d, e, f)                                           \
+  __internal_syscall(n, (long)(a), (long)(b), (long)(c), (long)(d), (long)(e), \
+                     (long)(f))
 
 #define SYSCODE_DEBUG 2000
 #define SYSCODE_LOAD_ARGS 2001
@@ -60,8 +61,7 @@ __internal_syscall(long n, long _a0, long _a1, long _a2, long _a3, long _a4, lon
  * Example:
  *   pvm_debug("Hello World!");
  */
-int pvm_debug(const char* s)
-{
+int pvm_debug(const char *s) {
   return syscall(SYSCODE_DEBUG, s, 0, 0, 0, 0, 0);
 }
 
@@ -80,13 +80,13 @@ int pvm_debug(const char* s)
  *   uint64_t size = 0;
  *   pvm_load_args(data, &size);
  */
-int pvm_load_args(uint8_t *data, uint64_t *size)
-{
-    return syscall(SYSCODE_LOAD_ARGS, data, size, 0, 0, 0, 0);
+int pvm_load_args(uint8_t *data, uint64_t *size) {
+  return syscall(SYSCODE_LOAD_ARGS, data, size, 0, 0, 0, 0);
 }
 
 /*
- * Function ret returns any bytes to host, as the output of the current contract.
+ * Function ret returns any bytes to host, as the output of the current
+ * contract.
  *
  * Params:
  *   data[in]: point to data to returen
@@ -102,9 +102,8 @@ int pvm_load_args(uint8_t *data, uint64_t *size)
  * Note: This syscall(s) only allowed to call once. If called it multiple times,
  * the last call will replace the previous call.
  */
-int pvm_ret(uint8_t *data, size_t size)
-{
-    return syscall(SYSCODE_RET, data, size, 0, 0, 0, 0);
+int pvm_ret(uint8_t *data, size_t size) {
+  return syscall(SYSCODE_RET, data, size, 0, 0, 0, 0);
 }
 
 /*
@@ -120,9 +119,8 @@ int pvm_ret(uint8_t *data, size_t size)
  *   uint64_t cycle_limit;
  *   pvm_cycle_limit(&cycle_limit);
  */
-int pvm_cycle_limit(uint64_t *cycle_limit)
-{
-    return syscall(SYSCODE_CYCLE_LIMIT, cycle_limit, 0, 0, 0, 0, 0);
+int pvm_cycle_limit(uint64_t *cycle_limit) {
+  return syscall(SYSCODE_CYCLE_LIMIT, cycle_limit, 0, 0, 0, 0, 0);
 }
 
 /*
@@ -138,9 +136,8 @@ int pvm_cycle_limit(uint64_t *cycle_limit)
  *   uint64_t cycle_used;
  *   pvm_cycle_used(&cycle_used);
  */
-int pvm_cycle_used(uint64_t *cycle_used)
-{
-    return syscall(SYSCODE_CYCLE_USED, cycle_used, 0, 0, 0, 0, 0);
+int pvm_cycle_used(uint64_t *cycle_used) {
+  return syscall(SYSCODE_CYCLE_USED, cycle_used, 0, 0, 0, 0, 0);
 }
 
 /*
@@ -156,9 +153,8 @@ int pvm_cycle_used(uint64_t *cycle_used)
  *   uint64_t cycle_price;
  *   pvm_cycle_price(&cycle_price);
  */
-int pvm_cycle_price(uint64_t *cycle_price)
-{
-    return syscall(SYSCODE_CYCLE_PRICE, cycle_price, 0, 0, 0, 0, 0);
+int pvm_cycle_price(uint64_t *cycle_price) {
+  return syscall(SYSCODE_CYCLE_PRICE, cycle_price, 0, 0, 0, 0, 0);
 }
 
 /*
@@ -174,9 +170,8 @@ int pvm_cycle_price(uint64_t *cycle_price)
  *   uint8_t addr[50];
  *   pvm_origin(addr);
  */
-int pvm_origin(uint8_t *addr)
-{
-    return syscall(SYSCODE_ORIGIN, addr, 0, 0, 0, 0, 0);
+int pvm_origin(uint8_t *addr) {
+  return syscall(SYSCODE_ORIGIN, addr, 0, 0, 0, 0, 0);
 }
 
 /*
@@ -192,9 +187,8 @@ int pvm_origin(uint8_t *addr)
  *   uint8_t addr[50];
  *   pvm_caller(addr);
  */
-int pvm_caller(uint8_t *addr)
-{
-    return syscall(SYSCODE_CALLER, addr, 0, 0, 0, 0, 0);
+int pvm_caller(uint8_t *addr) {
+  return syscall(SYSCODE_CALLER, addr, 0, 0, 0, 0, 0);
 }
 
 /*
@@ -210,9 +204,8 @@ int pvm_caller(uint8_t *addr)
  *    uint8_t addr[50];
  *    pvm_adress(addr);
  */
-int pvm_address(uint8_t *addr)
-{
-    return syscall(SYSCODE_ADDRESS, addr, 0, 0, 0, 0, 0);
+int pvm_address(uint8_t *addr) {
+  return syscall(SYSCODE_ADDRESS, addr, 0, 0, 0, 0, 0);
 }
 
 /*
@@ -229,9 +222,8 @@ int pvm_address(uint8_t *addr)
  *   uint64_t is_init;
  *   pvm_is_init(&is_init);
  */
-int pvm_is_init(uint64_t *is_init)
-{
-    return syscall(SYSCODE_IS_INIT, is_init, 0, 0, 0, 0, 0);
+int pvm_is_init(uint64_t *is_init) {
+  return syscall(SYSCODE_IS_INIT, is_init, 0, 0, 0, 0, 0);
 }
 
 /*
@@ -247,9 +239,8 @@ int pvm_is_init(uint64_t *is_init)
  *   uint64_t block_height;
  *   pvm_block_height(&block_height);
  */
-int pvm_block_height(uint64_t *block_height)
-{
-    return syscall(SYSCODE_BLOCK_HEIGHT, block_height, 0, 0, 0, 0, 0);
+int pvm_block_height(uint64_t *block_height) {
+  return syscall(SYSCODE_BLOCK_HEIGHT, block_height, 0, 0, 0, 0, 0);
 }
 
 /*
@@ -267,9 +258,8 @@ int pvm_block_height(uint64_t *block_height)
  *   uint64_t extra_sz;
  *   pvm_extra(extra, &extra_sz);
  */
-int pvm_extra(uint8_t *extra, uint64_t *extra_sz)
-{
-    return syscall(SYSCODE_EXTRA, extra, extra_sz, 0, 0, 0, 0);
+int pvm_extra(uint8_t *extra, uint64_t *extra_sz) {
+  return syscall(SYSCODE_EXTRA, extra, extra_sz, 0, 0, 0, 0);
 }
 
 /*
@@ -286,9 +276,8 @@ int pvm_extra(uint8_t *extra, uint64_t *extra_sz)
  *   uint64_t timestamp;
  *   pvm_timestamp(&timestamp);
  */
-int pvm_timestamp(uint64_t *timestamp)
-{
-    return syscall(SYSCODE_TIMESTAMP, timestamp, 0, 0, 0, 0, 0);
+int pvm_timestamp(uint64_t *timestamp) {
+  return syscall(SYSCODE_TIMESTAMP, timestamp, 0, 0, 0, 0, 0);
 }
 
 /*
@@ -305,9 +294,8 @@ int pvm_timestamp(uint64_t *timestamp)
  *   const char *msg = "{ \"msg\": \"test event\" }";
  *   pvm_emit_event((uint8_t *)msg, strlen(msg));
  */
-int pvm_emit_event(uint8_t *msg, uint64_t msg_sz)
-{
-    return syscall(SYSCODE_EMIT_EVENT, msg, msg_sz, 0, 0, 0, 0);
+int pvm_emit_event(uint8_t *msg, uint64_t msg_sz) {
+  return syscall(SYSCODE_EMIT_EVENT, msg, msg_sz, 0, 0, 0, 0);
 }
 
 /*
@@ -323,9 +311,8 @@ int pvm_emit_event(uint8_t *msg, uint64_t msg_sz)
  *   uint8_t addr[50];
  *   pvm_tx_hash(addr);
  */
-int pvm_tx_hash(uint8_t *addr)
-{
-    return syscall(SYSCODE_TX_HASH, addr, 0, 0, 0, 0, 0);
+int pvm_tx_hash(uint8_t *addr) {
+  return syscall(SYSCODE_TX_HASH, addr, 0, 0, 0, 0, 0);
 }
 
 /*
@@ -341,9 +328,8 @@ int pvm_tx_hash(uint8_t *addr)
  *   uint8_t nonce[50];
  *   pvm_tx_nonce(nonce);
  */
-int pvm_tx_nonce(uint8_t *addr)
-{
-    return syscall(SYSCODE_TX_NONCE, addr, 0, 0, 0, 0, 0);
+int pvm_tx_nonce(uint8_t *addr) {
+  return syscall(SYSCODE_TX_NONCE, addr, 0, 0, 0, 0, 0);
 }
 
 /*
@@ -365,9 +351,8 @@ int pvm_tx_nonce(uint8_t *addr)
  *   uint64_t val_sz;
  *   pvm_get_storage((uint8_t *)key, strlen(key), val, &val_sz);
  */
-int pvm_get_storage(uint8_t *k, uint64_t k_size, uint8_t *v, uint64_t *v_size)
-{
-    return syscall(SYSCODE_GET_STORAGE, k, k_size, v, v_size, 0, 0);
+int pvm_get_storage(uint8_t *k, uint64_t k_size, uint8_t *v, uint64_t *v_size) {
+  return syscall(SYSCODE_GET_STORAGE, k, k_size, v, v_size, 0, 0);
 }
 
 /*
@@ -388,9 +373,8 @@ int pvm_get_storage(uint8_t *k, uint64_t k_size, uint8_t *v, uint64_t *v_size)
  *   const char *val = "punk"
  *   pvm_set_storage((uint8_t *)key, strlen(key), (uint8_t *)val, strlen(val));
  */
-int pvm_set_storage(uint8_t *k, uint64_t k_size, uint8_t *v, uint64_t v_size)
-{
-    return syscall(SYSCODE_SET_STORAGE, k, k_size, v, v_size, 0, 0);
+int pvm_set_storage(uint8_t *k, uint64_t k_size, uint8_t *v, uint64_t v_size) {
+  return syscall(SYSCODE_SET_STORAGE, k, k_size, v, v_size, 0, 0);
 }
 
 /*
@@ -414,9 +398,10 @@ int pvm_set_storage(uint8_t *k, uint64_t k_size, uint8_t *v, uint64_t v_size)
  *   uint64_t ret_size;
  *   pvm_contract_call(ctr_addr, (uint8_t *)args, strlen(args), ret, &ret_size);
  */
-int pvm_contract_call(uint8_t *addr, uint8_t *args, uint64_t args_size, uint8_t *ret, uint64_t *ret_size)
-{
-    return syscall(SYSCODE_CONTRACT_CALL, addr, args, args_size, ret, ret_size, 0);
+int pvm_contract_call(uint8_t *addr, uint8_t *args, uint64_t args_size,
+                      uint8_t *ret, uint64_t *ret_size) {
+  return syscall(SYSCODE_CONTRACT_CALL, addr, args, args_size, ret, ret_size,
+                 0);
 }
 
 /*
@@ -445,11 +430,13 @@ int pvm_contract_call(uint8_t *addr, uint8_t *args, uint64_t args_size, uint8_t 
  *   }";
  *   uint8_t ret[2048];
  *   uint64_t ret_size;
- *   pvm_service_call(service, method, (uint8_t *)payload, strlen(payload), ret, &ret_size);
+ *   pvm_service_call(service, method, (uint8_t *)payload, strlen(payload), ret,
+ * &ret_size);
  */
-int pvm_service_call(const char* service, const char* method, uint8_t *payload, uint64_t payload_size, uint8_t *ret, uint64_t *ret_size)
-{
-    return syscall(SYSCODE_SERVICE_CALL, service, method, payload, payload_size, ret, ret_size);
+int pvm_service_call(const char *service, const char *method, uint8_t *payload,
+                     uint64_t payload_size, uint8_t *ret, uint64_t *ret_size) {
+  return syscall(SYSCODE_SERVICE_CALL, service, method, payload, payload_size,
+                 ret, ret_size);
 }
 
 #endif
