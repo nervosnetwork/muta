@@ -68,7 +68,7 @@ fn test_set_admin() {
 
     let init_metadata = mock_metadata_1();
 
-    let mut service = new_metadata_service(init_metadata.clone(), admin_1.clone());
+    let mut service = new_metadata_service(init_metadata, admin_1.clone());
     let old_admin = service.get_admin(context.clone()).unwrap();
     assert_eq!(old_admin, admin_1);
 
