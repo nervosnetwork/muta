@@ -3,7 +3,7 @@ mod ident;
 mod peer;
 mod persist;
 
-use peer::PeerState;
+use peer::{ConnectedAddr, PeerState};
 use persist::{NoopPersistence, PeerPersistence, Persistence};
 
 pub use disc::DiscoveryAddrManager;
@@ -15,7 +15,6 @@ use std::{
     collections::{HashMap, HashSet},
     future::Future,
     hash::{Hash, Hasher},
-    net::IpAddr,
     path::PathBuf,
     pin::Pin,
     sync::atomic::{AtomicBool, Ordering},
@@ -45,7 +44,7 @@ use tentacle::{
 };
 
 use crate::{
-    common::{multi_addr_ip, HeartBeat},
+    common::HeartBeat,
     error::NetworkError,
     event::{ConnectionEvent, ConnectionType, MultiUsersMessage, PeerManagerEvent, Session},
 };
@@ -153,9 +152,9 @@ impl Inner {
             .collect()
     }
 
-    pub fn connection_ip(&self, pid: &PeerId) -> Option<IpAddr> {
-        if let Some(Some(ip)) = self.pool.read().get(pid).map(|peer| peer.connection_ip()) {
-            Some(ip)
+    pub fn connected_addr(&self, pid: &PeerId) -> Option<ConnectedAddr> {
+        if let Some(Some(addr)) = self.pool.read().get(pid).map(|peer| peer.connected_addr()) {
+            Some(addr)
         } else {
             None
         }
@@ -249,20 +248,19 @@ impl Inner {
             return None;
         }
 
-        let root = Multiaddr::empty()
-            .with(comps[0].clone())
-            .with(comps[1].clone());
+        let mut root = Multiaddr::from(comps[0].clone());
+        root.push(comps[1].clone());
 
         // Currently support P2P address match
         if let Some(match_pid) = addr_pid.get(&root) {
             return match comps.get(2) {
-                Some(Protocol::P2p(addr_pid)) if match_pid.as_bytes() == addr_pid.as_bytes() => {
+                Some(Protocol::P2P(addr_pid)) if addr_pid == &match_pid.as_bytes() => {
                     Some(match_pid.clone())
                 }
                 // Root exact match
                 None => Some(match_pid.clone()),
                 // Not match means this address is other peer's outdated address
-                Some(Protocol::P2p(_)) => None,
+                Some(Protocol::P2P(_)) => None,
                 _ => {
                     warn!("network: unsupported multiaddr {}", addr);
 
@@ -318,7 +316,7 @@ impl Inner {
         self.connecting.write().insert(peer_id.clone());
     }
 
-    pub fn set_connected(&self, peer_id: &PeerId, ip: Option<IpAddr>) {
+    pub fn set_connected(&self, peer_id: &PeerId, addr: Option<ConnectedAddr>) {
         // Clean outbound connection
         self.connecting.write().remove(peer_id);
         self.connected.write().insert(peer_id.clone());
@@ -326,7 +324,7 @@ impl Inner {
         let mut pool = self.pool.write();
         if let Some(peer) = pool.get_mut(peer_id) {
             peer.update_connect();
-            peer.set_connection_ip(ip);
+            peer.set_connected_addr(addr);
         }
     }
 
@@ -338,7 +336,7 @@ impl Inner {
         if let Some(peer) = pool.get_mut(peer_id) {
             peer.update_disconnect();
             peer.update_alive();
-            peer.set_connection_ip(None);
+            peer.set_connected_addr(None);
         }
     }
 
@@ -623,7 +621,7 @@ impl PeerManager {
     fn attach_peer_session(&mut self, pubkey: PublicKey, session: Session) {
         let Session { sid, addr, ty } = session;
 
-        let connection_ip = multi_addr_ip(&addr).ok();
+        let connected_addr = ConnectedAddr::from(&addr);
         let user_addr = Peer::pubkey_to_addr(&pubkey).as_hex();
         let pid = pubkey.peer_id();
 
@@ -649,7 +647,7 @@ impl PeerManager {
             self.inner.add_peer_addr(&pid, addr);
         }
 
-        self.inner.set_connected(&pid, connection_ip);
+        self.inner.set_connected(&pid, Some(connected_addr));
 
         self.peer_session.insert(pid.clone(), sid);
         self.session_peer.insert(sid, pid);
@@ -754,12 +752,12 @@ impl PeerManager {
         }
     }
 
-    fn connected_peers_ip(&self) -> Vec<(PeerId, Option<IpAddr>)> {
+    fn connected_peers_addr(&self) -> Vec<(PeerId, Option<ConnectedAddr>)> {
         let connected_pids = self.inner.connected_peers();
 
         connected_pids
             .into_iter()
-            .map(|pid| (pid.clone(), self.inner.connection_ip(&pid)))
+            .map(|pid| (pid.clone(), self.inner.connected_addr(&pid)))
             .collect()
     }
 
@@ -1032,10 +1030,10 @@ impl Future for PeerManager {
             self.process_event(event);
         }
 
-        info!(
-            "network: {:?}: connected peer_ip(s): {:?}",
+        debug!(
+            "network: {:?}: connected peer_addr(s): {:?}",
             self.peer_id,
-            self.connected_peers_ip()
+            self.connected_peers_addr()
         );
 
         // Check connecting count

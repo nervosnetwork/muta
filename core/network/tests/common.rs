@@ -36,7 +36,10 @@ pub async fn setup_bootstrap() -> NetworkService {
 
 pub async fn setup_peer(port: u16) -> NetworkService {
     let peer_conf = NetworkConfig::new()
-        .bootstraps(vec![(BOOTSTRAP_PUBKEY.to_string(), *BOOTSTRAP_ADDR)])
+        .bootstraps(vec![(
+            BOOTSTRAP_PUBKEY.to_string(),
+            (*BOOTSTRAP_ADDR).to_string(),
+        )])
         .expect("peer bootstraps");
 
     let mut peer = NetworkService::new(peer_conf);
