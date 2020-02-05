@@ -89,14 +89,7 @@ security-audit:
 .PHONY: build prod prod-test
 .PHONY: fmt test clippy doc doc-deps doc-api check stats
 .PHONY: ci info security-audit
-.PHONY: test_riscv
 .PHONY: duktape
-
-test_riscv:
-	# docker run --rm -it -v `pwd`:/code nervos/ckb-riscv-gnu-toolchain:xenial bash -c 'cd /code && riscv64-unknown-elf-gcc -I/code/built-in-services/riscv/src/vm/c built-in-services/riscv/src/tests/simple_storage.c -o built-in-services/riscv/src/tests/simple_storage'
-	# docker run --rm -it -v `pwd`:/code nervos/ckb-riscv-gnu-toolchain:xenial bash -c 'cd /code && riscv64-unknown-elf-gcc -I/code/built-in-services/riscv/src/vm/c built-in-services/riscv/src/tests/sys_call.c -o built-in-services/riscv/src/tests/sys_call'
-	cargo fmt
-	cargo test -p riscv --lib -- test_js_erc20 --nocapture
 
 # For duktape
 TARGET := riscv64-unknown-elf
