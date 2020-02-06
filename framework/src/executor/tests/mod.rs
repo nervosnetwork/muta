@@ -1,3 +1,5 @@
+extern crate test;
+
 mod service_call_service;
 
 use std::sync::Arc;
@@ -5,6 +7,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
 use cita_trie::MemoryDB;
+use test::Bencher;
 
 use asset::types::{Asset, GetBalanceResponse};
 use asset::AssetService;
@@ -90,6 +93,56 @@ fn test_exec() {
         cycles_limit: std::u64::MAX,
     };
 
+    let stx = mock_signed_tx();
+    let txs = vec![stx];
+    let executor_resp = executor.exec(&params, &txs).unwrap();
+    let receipt = &executor_resp.receipts[0];
+
+    assert_eq!(receipt.response.is_error, false);
+    let asset: Asset = serde_json::from_str(&receipt.response.ret).unwrap();
+    assert_eq!(asset.name, "MutaToken2");
+    assert_eq!(asset.symbol, "MT2");
+    assert_eq!(asset.supply, 320_000_011);
+}
+
+#[bench]
+fn bench_execute(b: &mut Bencher) {
+    let toml_str = include_str!("./genesis_services.toml");
+    let genesis: Genesis = toml::from_str(toml_str).unwrap();
+
+    let db = Arc::new(MemoryDB::new(false));
+
+    let root = ServiceExecutor::create_genesis(
+        genesis.services,
+        Arc::clone(&db),
+        Arc::new(MockStorage {}),
+        Arc::new(MockServiceMapping {}),
+    )
+    .unwrap();
+
+    let mut executor = ServiceExecutor::with_root(
+        root.clone(),
+        Arc::clone(&db),
+        Arc::new(MockStorage {}),
+        Arc::new(MockServiceMapping {}),
+    )
+    .unwrap();
+
+    let txs: Vec<SignedTransaction> = (0..1000).map(|_| mock_signed_tx()).collect();
+
+    b.iter(|| {
+        let params = ExecutorParams {
+            state_root:   root.clone(),
+            height:       1,
+            timestamp:    0,
+            cycles_limit: std::u64::MAX,
+        };
+        let txs = txs.clone();
+        executor.exec(&params, &txs).unwrap();
+    });
+}
+
+fn mock_signed_tx() -> SignedTransaction {
     let raw = RawTransaction {
         chain_id:     Hash::from_empty(),
         nonce:        Hash::from_empty(),
@@ -103,7 +156,8 @@ fn test_exec() {
                 .to_owned(),
         },
     };
-    let stx = SignedTransaction {
+
+    SignedTransaction {
         raw,
         tx_hash: Hash::from_empty(),
         pubkey: Bytes::from(
@@ -111,16 +165,7 @@ fn test_exec() {
                 .unwrap(),
         ),
         signature: BytesMut::from("").freeze(),
-    };
-    let txs = vec![stx];
-    let executor_resp = executor.exec(&params, &txs).unwrap();
-    let receipt = &executor_resp.receipts[0];
-
-    assert_eq!(receipt.response.is_error, false);
-    let asset: Asset = serde_json::from_str(&receipt.response.ret).unwrap();
-    assert_eq!(asset.name, "MutaToken2");
-    assert_eq!(asset.symbol, "MT2");
-    assert_eq!(asset.supply, 320_000_011);
+    }
 }
 
 struct MockServiceMapping;
