@@ -42,3 +42,6 @@ env:
 
 before_cache:
   - rm -rf "$TRAVIS_HOME"/.cargo/registry"
+
+before_script:
+  - git lfs pull

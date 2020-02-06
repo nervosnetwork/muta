@@ -36,6 +36,7 @@ tokio = { version = "0.2", features = ["macros", "rt-core"]}
 [dev-dependencies]
 asset = { path = "built-in-services/asset"}
 metadata = { path = "built-in-services/metadata"}
+riscv = { path = "built-in-services/riscv"}
 
 [workspace]
 members = [
@@ -59,6 +60,7 @@ members = [
   "framework",
   "built-in-services/asset",
   "built-in-services/metadata",
+  "built-in-services/riscv",
 
   "protocol",
 ]
@@ -66,3 +68,14 @@ members = [
 [[example]]
 name = "muta-chain"
 crate-type = ["bin"]
+
+# Make sure cfg(debug-assertions) is properly enabled for development
+# and disable for release.
+[profile.dev]
+debug-assertions = true
+
+[profile.test]
+debug-assertions = true
+
+[profile.release]
+debug-assertions = false
