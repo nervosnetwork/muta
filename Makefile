@@ -60,7 +60,6 @@ docker-build:
 	docker build -t mutadev/muta:${COMMIT} .
 
 docker-push:
-	docker tag nervos/muta:${COMMIT}  mutadev/muta:${COMMIT}
 	docker push mutadev/muta:${COMMIT}
 
 e2e-test:
