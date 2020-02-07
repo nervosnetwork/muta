@@ -90,8 +90,9 @@ security-audit:
 .PHONY: fmt test clippy doc doc-deps doc-api check stats
 .PHONY: ci info security-audit
 .PHONY: duktape
+.PHONY: libpvm.a
 
-# For duktape
+# For riscv service
 TARGET := riscv64-unknown-elf
 CC := $(TARGET)-gcc
 LD := $(TARGET)-gcc
@@ -109,14 +110,14 @@ duktape:
 duktape_docker:
 	$(DOCKER_BUILD) "cd /src && make duktape"
 
-primitive:
-	$(CC) -I$(RISCV_SRC) $(TEST_SRC)/primitive.c $(LDFLAGS) -o $(TEST_SRC)/primitive
+libpvm.a:
+	$(CC) -I$(RISCV_SRC) -c $(RISCV_SRC)/pvm.c -o /tmp/pvm.o
+	$(CC) -I$(RISCV_SRC) -c $(RISCV_SRC)/UsefulBuf.c -o /tmp/UsefulBuf.o
+	$(CC) -I$(RISCV_SRC) -c $(RISCV_SRC)/pvm_structs.c -o /tmp/pvm_structs.o
+	ar rcs $(RISCV_SRC)/libpvm.a /tmp/UsefulBuf.o /tmp/pvm_structs.o /tmp/pvm.o
 
-primitive_docker:
-	$(DOCKER_BUILD) "cd /src && make primitive"
+pvm_structs_test: libpvm.a
+	$(CC) -I$(RISCV_SRC) $(TEST_SRC)/pvm_structs.c $(RISCV_SRC)/libpvm.a $(LDFLAGS) -o $(TEST_SRC)/pvm_structs.bin
 
-usefulbuf:
-	$(CC) -I$(RISCV_SRC) $(RISCV_SRC)/UsefulBuf.c $(TEST_SRC)/usefulbuf.c $(LDFLAGS) -o $(TEST_SRC)/usefulbuf
-
-usefulbuf_docker:
-	$(DOCKER_BUILD) "cd /src && make usefulbuf"
+pvm_docker:
+	$(DOCKER_BUILD) "cd /src && make pvm_structs_test"

@@ -1,22 +1,15 @@
-use std::{
-    cell::RefCell,
-    io::Read,
-    rc::Rc,
-    time::{SystemTime, UNIX_EPOCH},
-};
+use std::io::Read;
 
 use protocol::{
-    types::{Address, Hash, ServiceContext, ServiceContextParams},
+    types::{Address, Hash},
     Bytes,
 };
-use serde::{Deserialize, Serialize};
-use serde_json::json;
 
-use super::{mock_context, new_riscv_service, with_dispatcher_service};
-use crate::types::{DeployPayload, ExecPayload, InterpreterType};
+use super::{mock_context, new_riscv_service};
+use crate::types::{DeployPayload, InterpreterType};
 
 #[test]
-fn test_usefulbuf() {
+fn test_pvm_structs() {
     let cycles_limit = 0x99_9999; // 1024 * 1024 * 1024; // 1073741824
     let caller = Address::from_hex("0x755cdba6ae4f479f7164792b318b2a06c759833b").unwrap();
     let tx_hash =
@@ -27,7 +20,7 @@ fn test_usefulbuf() {
 
     let mut service = new_riscv_service();
 
-    let mut file = std::fs::File::open("src/tests/usefulbuf").unwrap();
+    let mut file = std::fs::File::open("src/tests/pvm_structs.bin").unwrap();
     let mut buffer = Vec::new();
     file.read_to_end(&mut buffer).unwrap();
     let buffer = Bytes::from(buffer);

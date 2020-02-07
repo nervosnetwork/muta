@@ -63,9 +63,7 @@ static inline long __internal_syscall(long n, long _a0, long _a1, long _a2,
  * Example:
  *   pvm_debug("Hello World!");
  */
-int pvm_debug(const char *s) {
-  return syscall(SYSCODE_DEBUG, s, 0, 0, 0, 0, 0);
-}
+int pvm_debug(const char *s);
 
 /*
  * Function pvm_assert accepts bool statement and a assertion message that
@@ -80,9 +78,7 @@ int pvm_debug(const char *s) {
  * Example:
  *   pvm_assert(2 > 1, "1 should never bigger than 2");
  */
-void pvm_assert(int statement, const char *msg) {
-  syscall(SYSCODE_ASSERT, statement, msg, 0, 0, 0, 0);
-}
+void pvm_assert(int statement, const char *msg);
 
 /*
  * Function pvm_load_args load contract invocation arguments.
@@ -99,9 +95,7 @@ void pvm_assert(int statement, const char *msg) {
  *   uint64_t size = 0;
  *   pvm_load_args(data, &size);
  */
-int pvm_load_args(uint8_t *data, uint64_t *size) {
-  return syscall(SYSCODE_LOAD_ARGS, data, size, 0, 0, 0, 0);
-}
+int pvm_load_args(uint8_t *data, uint64_t *size);
 
 /*
  * Function ret returns any bytes to host, as the output of the current
@@ -121,9 +115,7 @@ int pvm_load_args(uint8_t *data, uint64_t *size) {
  * Note: This syscall(s) only allowed to call once. If called it multiple times,
  * the last call will replace the previous call.
  */
-int pvm_ret(const uint8_t *data, size_t size) {
-  return syscall(SYSCODE_RET, data, size, 0, 0, 0, 0);
-}
+int pvm_ret(const uint8_t *data, size_t size);
 
 /*
  * Function pvm_cycle_limit returns block cycle limit.
@@ -131,9 +123,7 @@ int pvm_ret(const uint8_t *data, size_t size) {
  * Example:
  *   uint64_t cycle_limit = pvm_cycle_limit();
  */
-uint64_t pvm_cycle_limit() {
-  return syscall(SYSCODE_CYCLE_LIMIT, 0, 0, 0, 0, 0, 0);
-}
+uint64_t pvm_cycle_limit();
 
 /*
  * Function pvm_cycle_used returns execution used cycle.
@@ -141,9 +131,7 @@ uint64_t pvm_cycle_limit() {
  * Example:
  *   uint64_t cycle_used = pvm_cycle_used();
  */
-uint64_t pvm_cycle_used() {
-  return syscall(SYSCODE_CYCLE_USED, 0, 0, 0, 0, 0, 0);
-}
+uint64_t pvm_cycle_used();
 
 /*
  * Function pvm_cycle_price returns cycle price.
@@ -151,9 +139,7 @@ uint64_t pvm_cycle_used() {
  * Example:
  *   uint64_t cycle_price = pvm_cycle_price();
  */
-uint64_t pvm_cycle_price() {
-  return syscall(SYSCODE_CYCLE_PRICE, 0, 0, 0, 0, 0, 0);
-}
+uint64_t pvm_cycle_price();
 
 /*
  * Function pvm_origin loads current origin address.
@@ -168,9 +154,7 @@ uint64_t pvm_cycle_price() {
  *   uint8_t addr[50];
  *   pvm_origin(addr);
  */
-int pvm_origin(uint8_t *addr) {
-  return syscall(SYSCODE_ORIGIN, addr, 0, 0, 0, 0, 0);
-}
+int pvm_origin(uint8_t *addr);
 
 /*
  * Function pvm_caller loads current caller address.
@@ -185,9 +169,7 @@ int pvm_origin(uint8_t *addr) {
  *   uint8_t addr[50];
  *   pvm_caller(addr);
  */
-int pvm_caller(uint8_t *addr) {
-  return syscall(SYSCODE_CALLER, addr, 0, 0, 0, 0, 0);
-}
+int pvm_caller(uint8_t *addr);
 
 /*
  * Function pvm_address load this contract address.
@@ -202,9 +184,7 @@ int pvm_caller(uint8_t *addr) {
  *    uint8_t addr[50];
  *    pvm_adress(addr);
  */
-int pvm_address(uint8_t *addr) {
-  return syscall(SYSCODE_ADDRESS, addr, 0, 0, 0, 0, 0);
-}
+int pvm_address(uint8_t *addr);
 
 /*
  * Function pvm_is_init returns whether this contract is initialized. Contract
@@ -215,7 +195,7 @@ int pvm_address(uint8_t *addr) {
  *     // do something
  *   }
  */
-int pvm_is_init() { return syscall(SYSCODE_IS_INIT, 0, 0, 0, 0, 0, 0); }
+int pvm_is_init();
 
 /*
  * Function pvm_block_height returns current block height.
@@ -223,9 +203,7 @@ int pvm_is_init() { return syscall(SYSCODE_IS_INIT, 0, 0, 0, 0, 0, 0); }
  * Exmaple:
  *   uint64_t block_height = pvm_block_height();
  */
-uint64_t pvm_block_height() {
-  return syscall(SYSCODE_BLOCK_HEIGHT, 0, 0, 0, 0, 0, 0);
-}
+uint64_t pvm_block_height();
 
 /*
  * Function pvm_extra loads extra data.
@@ -242,9 +220,7 @@ uint64_t pvm_block_height() {
  *   uint64_t extra_sz;
  *   pvm_extra(extra, &extra_sz);
  */
-int pvm_extra(uint8_t *extra, uint64_t *extra_sz) {
-  return syscall(SYSCODE_EXTRA, extra, extra_sz, 0, 0, 0, 0);
-}
+int pvm_extra(uint8_t *extra, uint64_t *extra_sz);
 
 /*
  * Function pvm_timestamp returns execution's timestamp. It's seconds since
@@ -253,9 +229,7 @@ int pvm_extra(uint8_t *extra, uint64_t *extra_sz) {
  * Example:
  *   uint64_t timestamp = pvm_timestamp();
  */
-uint64_t pvm_timestamp() {
-  return syscall(SYSCODE_TIMESTAMP, 0, 0, 0, 0, 0, 0);
-}
+uint64_t pvm_timestamp();
 
 /*
  * Function pvm_emit_event emit event message string. Message is UTF-8 encoded.
@@ -271,9 +245,7 @@ uint64_t pvm_timestamp() {
  *   const char *msg = "{ \"msg\": \"test event\" }";
  *   pvm_emit_event((uint8_t *)msg, strlen(msg));
  */
-int pvm_emit_event(const uint8_t *msg, uint64_t msg_sz) {
-  return syscall(SYSCODE_EMIT_EVENT, msg, msg_sz, 0, 0, 0, 0);
-}
+int pvm_emit_event(const uint8_t *msg, uint64_t msg_sz) ;
 
 /*
  * Function pvm_tx_hash loads transaction hash.
@@ -288,9 +260,7 @@ int pvm_emit_event(const uint8_t *msg, uint64_t msg_sz) {
  *   uint8_t addr[50];
  *   pvm_tx_hash(addr);
  */
-int pvm_tx_hash(uint8_t *addr) {
-  return syscall(SYSCODE_TX_HASH, addr, 0, 0, 0, 0, 0);
-}
+int pvm_tx_hash(uint8_t *addr);
 
 /*
  * Function pvm_nonce loads transaction nonce hash.
@@ -305,9 +275,7 @@ int pvm_tx_hash(uint8_t *addr) {
  *   uint8_t nonce[50];
  *   pvm_tx_nonce(nonce);
  */
-int pvm_tx_nonce(uint8_t *addr) {
-  return syscall(SYSCODE_TX_NONCE, addr, 0, 0, 0, 0, 0);
-}
+int pvm_tx_nonce(uint8_t *addr);
 
 /*
  * Function pvm_get_storage load value from contract state.
@@ -329,9 +297,7 @@ int pvm_tx_nonce(uint8_t *addr) {
  *   pvm_get_storage((uint8_t *)key, strlen(key), val, &val_sz);
  */
 int pvm_get_storage(const uint8_t *k, uint64_t k_size, uint8_t *v,
-                    uint64_t *v_size) {
-  return syscall(SYSCODE_GET_STORAGE, k, k_size, v, v_size, 0, 0);
-}
+                    uint64_t *v_size);
 
 /*
  * Function pvm_get_storage_value_size return value size of given key.
@@ -345,9 +311,7 @@ int pvm_get_storage(const uint8_t *k, uint64_t k_size, uint8_t *v,
  *   uint64_t val_size = pvm_get_storage((uint8_t *)key, strlen(key));
  *   pvm_assert(val_size == 4, "should have 4 bytes");
  */
-uint64_t pvm_get_storage_value_size(const uint8_t *k, uint64_t k_size) {
-  return syscall(SYSCODE_GET_STORAGE_VALUE_SIZE, k, k_size, 0, 0, 0, 0);
-}
+uint64_t pvm_get_storage_value_size(const uint8_t *k, uint64_t k_size);
 
 /*
  * Function pvm_set_storage save value to contract state using given key.
@@ -368,9 +332,7 @@ uint64_t pvm_get_storage_value_size(const uint8_t *k, uint64_t k_size) {
  *   pvm_set_storage((uint8_t *)key, strlen(key), (uint8_t *)val, strlen(val));
  */
 int pvm_set_storage(const uint8_t *k, uint64_t k_size, const uint8_t *v,
-                    uint64_t v_size) {
-  return syscall(SYSCODE_SET_STORAGE, k, k_size, v, v_size, 0, 0);
-}
+                    uint64_t v_size);
 
 /*
  * Function pvm_contract_call invokes a contract located at given address.
@@ -394,10 +356,7 @@ int pvm_set_storage(const uint8_t *k, uint64_t k_size, const uint8_t *v,
  *   pvm_contract_call(ctr_addr, (uint8_t *)args, strlen(args), ret, &ret_size);
  */
 int pvm_contract_call(const uint8_t *addr, const uint8_t *args,
-                      uint64_t args_size, uint8_t *ret, uint64_t *ret_size) {
-  return syscall(SYSCODE_CONTRACT_CALL, addr, args, args_size, ret, ret_size,
-                 0);
-}
+                      uint64_t args_size, uint8_t *ret, uint64_t *ret_size);
 
 /*
  * Function pvm_service_call invokes a service method.
@@ -430,9 +389,6 @@ int pvm_contract_call(const uint8_t *addr, const uint8_t *args,
  */
 int pvm_service_call(const char *service, const char *method,
                      const uint8_t *payload, uint64_t payload_size,
-                     uint8_t *ret, uint64_t *ret_size) {
-  return syscall(SYSCODE_SERVICE_CALL, service, method, payload, payload_size,
-                 ret, ret_size);
-}
+                     uint8_t *ret, uint64_t *ret_size);
 
 #endif
