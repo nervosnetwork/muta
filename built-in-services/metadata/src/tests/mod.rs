@@ -14,24 +14,76 @@ use protocol::types::{
 };
 use protocol::{types::Bytes, ProtocolResult};
 
-use crate::MetadataService;
+use crate::types::{SetAdminPayload, UpdateMetadataPayload};
+use crate::{MetadataService, ADMIN_KEY};
 
 #[test]
 fn test_get_metadata() {
     let cycles_limit = 1024 * 1024 * 1024; // 1073741824
     let caller = Address::from_hex("0x755cdba6ae4f479f7164792b318b2a06c759833b").unwrap();
-    let context = mock_context(cycles_limit, caller);
+    let context = mock_context(cycles_limit, caller.clone());
 
-    let init_metadata = mock_metadata();
+    let init_metadata = mock_metadata_1();
 
-    let service = new_metadata_service_with_metadata(init_metadata.clone());
+    let service = new_metadata_service(init_metadata.clone(), caller);
     let metadata = service.get_metadata(context).unwrap();
 
     assert_eq!(metadata, init_metadata);
 }
 
-fn new_metadata_service_with_metadata(
+#[test]
+fn test_update_metadata() {
+    let cycles_limit = 1024 * 1024 * 1024; // 1073741824
+    let caller = Address::from_hex("0x755cdba6ae4f479f7164792b318b2a06c759833b").unwrap();
+    let context = mock_context(cycles_limit, caller.clone());
+
+    let init_metadata = mock_metadata_1();
+    let mut service = new_metadata_service(init_metadata.clone(), caller);
+
+    let metadata = service.get_metadata(context.clone()).unwrap();
+    assert_eq!(metadata, init_metadata);
+
+    let update_metadata = mock_metadata_2();
+    service
+        .update_metadata(context.clone(), UpdateMetadataPayload {
+            verifier_list:   update_metadata.verifier_list.clone(),
+            interval:        update_metadata.interval,
+            propose_ratio:   update_metadata.propose_ratio,
+            prevote_ratio:   update_metadata.prevote_ratio,
+            precommit_ratio: update_metadata.precommit_ratio,
+        })
+        .unwrap();
+
+    let metadata = service.get_metadata(context).unwrap();
+    assert_eq!(metadata, update_metadata);
+}
+
+#[test]
+fn test_set_admin() {
+    let admin_1: Address = Address::from_hex("0x755cdba6ae4f479f7164792b318b2a06c759833b").unwrap();
+    let admin_2: Address = Address::from_hex("f8389d774afdad8755ef8e629e5a154fddc6325a").unwrap();
+
+    let cycles_limit = 1024 * 1024 * 1024; // 1073741824
+    let context = mock_context(cycles_limit, admin_1.clone());
+
+    let init_metadata = mock_metadata_1();
+
+    let mut service = new_metadata_service(init_metadata, admin_1.clone());
+    let old_admin = service.get_admin(context.clone()).unwrap();
+    assert_eq!(old_admin, admin_1);
+
+    service
+        .set_admin(context.clone(), SetAdminPayload {
+            admin: admin_2.clone(),
+        })
+        .unwrap();
+    let new_admin = service.get_admin(context).unwrap();
+    assert_eq!(new_admin, admin_2);
+}
+
+fn new_metadata_service(
     metadata: Metadata,
+    admin: Address,
 ) -> MetadataService<
     DefalutServiceSDK<
         GeneralServiceState<MemoryDB>,
@@ -50,11 +102,12 @@ fn new_metadata_service_with_metadata(
     );
 
     sdk.set_value(METADATA_KEY.to_string(), metadata).unwrap();
+    sdk.set_value(ADMIN_KEY.to_string(), admin).unwrap();
 
     MetadataService::new(sdk).unwrap()
 }
 
-fn mock_metadata() -> Metadata {
+fn mock_metadata_1() -> Metadata {
     Metadata {
         chain_id:        Hash::digest(Bytes::from("test")),
         common_ref:      "703873635a6b51513451".to_string(),
@@ -71,6 +124,34 @@ fn mock_metadata() -> Metadata {
         propose_ratio:   10,
         prevote_ratio:   10,
         precommit_ratio: 10,
+    }
+}
+fn mock_metadata_2() -> Metadata {
+    Metadata {
+        chain_id:        Hash::digest(Bytes::from("test")),
+        common_ref:      "703873635a6b51513451".to_string(),
+        timeout_gap:     20,
+        cycles_limit:    99_999_999,
+        cycles_price:    1,
+        interval:        6000,
+        verifier_list:   [
+            Validator {
+                address:        Address::from_hex("CAB8EEA4799C21379C20EF5BAA2CC8AFFFFFFFFF")
+                    .unwrap(),
+                propose_weight: 3,
+                vote_weight:    13,
+            },
+            Validator {
+                address:        Address::from_hex("FFFFFEA4799C21379C20EF5BAA2CC8AFFFFFFFFF")
+                    .unwrap(),
+                propose_weight: 3,
+                vote_weight:    13,
+            },
+        ]
+        .to_vec(),
+        propose_ratio:   1,
+        prevote_ratio:   1,
+        precommit_ratio: 1,
     }
 }
 
