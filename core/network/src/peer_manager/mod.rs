@@ -797,6 +797,29 @@ impl PeerManager {
         condidates
     }
 
+    fn reconnect_later(&mut self, addr: Multiaddr) {
+        if let Some(mut unknown) = self.unknown_addrs.take(&addr.clone().into()) {
+            unknown.set_connecting(false);
+            unknown.increase_retry_count();
+
+            if !unknown.reach_max_retry() {
+                self.unknown_addrs.insert(unknown);
+            }
+        }
+
+        if let Some(pid) = self.inner.match_pid(&addr) {
+            // If peer is already connected, don't need to reconnect
+            // this address.
+            if self.inner.peer_connected(&pid) {
+                return;
+            }
+
+            // Make sure we disconnect peer
+            self.inner.disconnect_peer(&pid);
+            self.increase_peer_retry(&pid);
+        }
+    }
+
     fn route_multi_users_message(
         &mut self,
         users_msg: MultiUsersMessage,
@@ -965,27 +988,7 @@ impl PeerManager {
             }
             PeerManagerEvent::ReconnectLater { addr, kind, .. } => {
                 info!("reconnect later address {} {}", addr, kind);
-
-                if let Some(mut unknown) = self.unknown_addrs.take(&addr.clone().into()) {
-                    unknown.set_connecting(false);
-                    unknown.increase_retry_count();
-
-                    if !unknown.reach_max_retry() {
-                        self.unknown_addrs.insert(unknown);
-                    }
-                }
-
-                if let Some(pid) = self.inner.match_pid(&addr) {
-                    // If peer is already connected, don't need to reconnect
-                    // this address.
-                    if self.inner.peer_connected(&pid) {
-                        return;
-                    }
-
-                    // Make sure we disconnect peer
-                    self.inner.disconnect_peer(&pid);
-                    self.increase_peer_retry(&pid);
-                }
+                self.reconnect_later(addr);
             }
             PeerManagerEvent::AddListenAddr { addr } => {
                 self.inner.add_peer_addr(&self.config.our_id, addr);
