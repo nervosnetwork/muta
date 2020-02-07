@@ -29,6 +29,6 @@ fn test_pvm_structs() {
         intp_type: InterpreterType::Binary,
         init_args: "kkk".into(),
     };
-    let deploy_result = service.deploy(context.clone(), deploy_payload).unwrap();
+    let deploy_result = service.deploy(context, deploy_payload).unwrap();
     assert_eq!(&deploy_result.init_ret, "");
 }
