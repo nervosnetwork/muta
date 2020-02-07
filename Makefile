@@ -108,3 +108,15 @@ duktape:
 
 duktape_docker:
 	$(DOCKER_BUILD) "cd /src && make duktape"
+
+primitive:
+	$(CC) -I$(RISCV_SRC) $(TEST_SRC)/primitive.c $(LDFLAGS) -o $(TEST_SRC)/primitive
+
+primitive_docker:
+	$(DOCKER_BUILD) "cd /src && make primitive"
+
+usefulbuf:
+	$(CC) -I$(RISCV_SRC) $(RISCV_SRC)/UsefulBuf.c $(TEST_SRC)/usefulbuf.c $(LDFLAGS) -o $(TEST_SRC)/usefulbuf
+
+usefulbuf_docker:
+	$(DOCKER_BUILD) "cd /src && make usefulbuf"

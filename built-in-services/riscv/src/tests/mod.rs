@@ -1,4 +1,5 @@
 pub mod duktape;
+pub mod usefulbuf;
 
 use std::cell::RefCell;
 use std::io::Read;
