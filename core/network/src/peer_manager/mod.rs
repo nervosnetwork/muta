@@ -963,7 +963,9 @@ impl PeerManager {
                 }
                 self.inner.try_remove_addr(&addr);
             }
-            PeerManagerEvent::ReconnectLater { addr, .. } => {
+            PeerManagerEvent::ReconnectLater { addr, kind, .. } => {
+                info!("reconnect later address {} {}", addr, kind);
+
                 if let Some(mut unknown) = self.unknown_addrs.take(&addr.clone().into()) {
                     unknown.set_connecting(false);
                     unknown.increase_retry_count();
@@ -980,6 +982,8 @@ impl PeerManager {
                         return;
                     }
 
+                    // Make sure we disconnect peer
+                    self.inner.disconnect_peer(&pid);
                     self.increase_peer_retry(&pid);
                 }
             }
