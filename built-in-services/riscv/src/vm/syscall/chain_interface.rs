@@ -9,7 +9,8 @@ use protocol::{types::Address, Bytes};
 use crate::vm::cost_model::CONTRACT_CALL_FIXED_CYCLE;
 use crate::vm::syscall::common::{get_arr, get_str};
 use crate::vm::syscall::convention::{
-    SYSCODE_CONTRACT_CALL, SYSCODE_GET_STORAGE, SYSCODE_SERVICE_CALL, SYSCODE_SET_STORAGE,
+    SYSCODE_CONTRACT_CALL, SYSCODE_GET_STORAGE, SYSCODE_GET_STORAGE_VALUE_SIZE,
+    SYSCODE_SERVICE_CALL, SYSCODE_SET_STORAGE,
 };
 use crate::ChainInterface;
 
@@ -77,6 +78,21 @@ impl<Mac: ckb_vm::SupportMachine> ckb_vm::Syscalls<Mac> for SyscallChainInterfac
                     .memory_mut()
                     .store_bytes(v_size, &(val.len() as u64).to_le_bytes())?;
                 machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(0));
+                Ok(true)
+            }
+            SYSCODE_GET_STORAGE_VALUE_SIZE => {
+                let k_addr = machine.registers()[ckb_vm::registers::A0].to_u64();
+                let k_size = machine.registers()[ckb_vm::registers::A1].to_u64();
+                let k = get_arr(machine, k_addr, k_size)?;
+
+                let v = self
+                    .chain
+                    .borrow()
+                    .get_storage(&Bytes::from(k))
+                    .map_err(|_e| ckb_vm::Error::InvalidEcall(code))?;
+
+                let v_size = v.len() as u64;
+                machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u64(v_size));
                 Ok(true)
             }
             SYSCODE_CONTRACT_CALL => {
