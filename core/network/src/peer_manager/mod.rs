@@ -952,14 +952,15 @@ impl PeerManager {
             }
             // TODO: ban unconnectable address for a while instead of repeated
             // connection attempts.
-            PeerManagerEvent::UnconnectableAddress { addr, .. } => {
-                self.unknown_addrs.remove(&addr.clone().into());
+            PeerManagerEvent::UnconnectableAddress { addr, kind, .. } => {
+                // Since io::Other is unexpected, it's ok warning here.
+                warn!("unconnectable address {} {}", addr, kind);
 
+                self.unknown_addrs.remove(&addr.clone().into());
                 if self.bootstraps.contains(&addr) {
                     error!("network: unconnectable bootstrap address {}", addr);
                     return;
                 }
-
                 self.inner.try_remove_addr(&addr);
             }
             PeerManagerEvent::ReconnectLater { addr, .. } => {

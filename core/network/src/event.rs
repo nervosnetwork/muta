@@ -34,8 +34,8 @@ pub enum RetryKind {
     #[display(fmt = "peer connection timeout")]
     TimedOut,
 
-    #[display(fmt = "peer connection interrupted")]
-    Interrupted,
+    #[display(fmt = "peer {:?}", _0)]
+    Io(std::io::ErrorKind),
 
     #[display(fmt = "peer protocol select failure, unstable connection")]
     ProtocolSelect,
