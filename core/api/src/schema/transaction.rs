@@ -2,7 +2,7 @@ use protocol::ProtocolResult;
 
 use crate::schema::{Bytes, Hash, SchemaError, Uint64};
 
-#[derive(GraphQLObject, Clone)]
+#[derive(juniper::GraphQLObject, Clone)]
 pub struct SignedTransaction {
     pub chain_id:     Hash,
     pub cycles_limit: Uint64,
@@ -39,14 +39,14 @@ impl From<protocol::types::SignedTransaction> for SignedTransaction {
 // GraphQLInputObject
 // #####################
 
-#[derive(GraphQLInputObject, Clone)]
+#[derive(juniper::GraphQLInputObject, Clone)]
 #[graphql(description = "There was many types of transaction in Muta, \
                          A transaction often require computing resources or write data to chain,\
                          these resources are valuable so we need to pay some token for them.\
                          InputRawTransaction describes information above")]
 pub struct InputRawTransaction {
     #[graphql(description = "Identifier of the chain.")]
-    pub chain_id:     Hash,
+    pub chain_id: Hash,
     #[graphql(
         description = "Mostly like the gas limit in Ethereum, describes the fee that \
                        you are willing to pay the highest price for the transaction"
@@ -57,24 +57,24 @@ pub struct InputRawTransaction {
         description = "Every transaction has its own id, unlike Ethereum's nonce,\
                        the nonce in Muta is an hash"
     )]
-    pub nonce:        Hash,
+    pub nonce: Hash,
     #[graphql(description = "For security and performance reasons, \
     Muta will only deal with trade request over a period of time,\
     the `timeout` should be `timeout > current_block_height` and `timeout < current_block_height + timeout_gap`,\
     the `timeout_gap` generally equal to 20.")]
-    pub timeout:      Uint64,
+    pub timeout: Uint64,
     pub service_name: String,
-    pub method:       String,
-    pub payload:      String,
+    pub method: String,
+    pub payload: String,
 }
 
-#[derive(GraphQLInputObject, Clone)]
+#[derive(juniper::GraphQLInputObject, Clone)]
 #[graphql(description = "Signature of the transaction")]
 pub struct InputTransactionEncryption {
     #[graphql(description = "The digest of the transaction")]
-    pub tx_hash:   Hash,
+    pub tx_hash: Hash,
     #[graphql(description = "The public key of transfer")]
-    pub pubkey:    Bytes,
+    pub pubkey: Bytes,
     #[graphql(description = "The signature of the transaction")]
     pub signature: Bytes,
 }

@@ -1,6 +1,6 @@
 use crate::schema::{Hash, MerkleRoot, Uint64};
 
-#[derive(GraphQLObject, Clone)]
+#[derive(juniper::GraphQLObject, Clone)]
 pub struct Receipt {
     pub state_root:  MerkleRoot,
     pub height:      Uint64,
@@ -10,13 +10,13 @@ pub struct Receipt {
     pub response:    ReceiptResponse,
 }
 
-#[derive(GraphQLObject, Clone)]
+#[derive(juniper::GraphQLObject, Clone)]
 pub struct Event {
     pub service: String,
     pub data:    String,
 }
 
-#[derive(GraphQLObject, Clone)]
+#[derive(juniper::GraphQLObject, Clone)]
 pub struct ReceiptResponse {
     pub service_name: String,
     pub method:       String,
