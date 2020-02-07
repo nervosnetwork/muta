@@ -27,6 +27,7 @@ typedef UsefulOutBuf pvm_bytes_t;
   UsefulInputBuf_Init(&name, UsefulOutBuf_OutUBuf(outbuf));
 
 void pvm_assert_not_null(pvm_bytes_t *bytes, const char *msg) {
+  pvm_assert(bytes != NULL, msg);
   pvm_assert(!UsefulOutBuf_IsBufferNULL(bytes), msg);
 }
 
@@ -53,6 +54,11 @@ pvm_bytes_t pvm_bytes_alloc(uint64_t size) {
 
 void pvm_bytes_free(pvm_bytes_t *val) { free(val->UB.ptr); }
 
+pvm_bytes_t pvm_bytes_empty()
+{
+    return pvm_bytes_alloc(0);
+}
+
 int pvm_bytes_is_empty(pvm_bytes_t *val) {
   UsefulBufC buf = UsefulOutBuf_OutUBuf(val);
   if (UsefulBuf_IsEmptyC(buf)) {
@@ -63,10 +69,21 @@ int pvm_bytes_is_empty(pvm_bytes_t *val) {
 }
 
 int pvm_bytes_compare(pvm_bytes_t *src, pvm_bytes_t *other) {
+  pvm_assert_not_null(src, "compare src null");
+  pvm_assert_not_null(other, "compare other null");
+
   UsefulBufC src_buf = UsefulOutBuf_OutUBuf(src);
   UsefulBufC other_buf = UsefulOutBuf_OutUBuf(other);
 
   return UsefulBuf_Compare(src_buf, other_buf);
+}
+
+pvm_bytes_t pvm_bytes_copy(pvm_bytes_t *src) {
+  pvm_assert_not_null(src, "copy src null");
+  pvm_bytes_t dest = pvm_bytes_alloc(src->data_len);
+  UsefulOutBuf_AppendUsefulBuf(&dest, UsefulOutBuf_OutUBuf(src));
+
+  return dest;
 }
 
 int pvm_bytes_set_u64(pvm_bytes_t *val, uint64_t n) {
@@ -216,11 +233,7 @@ int pvm_bytes_append_nbytes(pvm_bytes_t *dest, const void *ptr, uint64_t size) {
 int pvm_set(pvm_bytes_t *key, pvm_bytes_t *val) {
   pvm_assert_not_null(key, "set key null");
   pvm_assert_not_empty(key, "set key empty");
-
   pvm_assert_not_null(val, "set val null");
-  if (pvm_bytes_is_empty(val)) {
-    return PVM_SUCCESS;
-  }
 
   const void *key_ptr = key->UB.ptr;
   size_t key_len = UsefulOutBuf_GetEndPosition(key);
@@ -328,6 +341,160 @@ int pvm_get_bool(pvm_bytes_t *key) {
   return PVM_FALSE;
 }
 
+typedef struct pvm_array_t {
+    pvm_bytes_t name;
+} pvm_array_t;
+
+pvm_array_t pvm_array_new(const char *name) {
+    pvm_assert(name != NULL, "array name null");
+    pvm_assert(strlen(name) != 0, "array name empty");
+
+    pvm_array_t array;
+    array.name = pvm_bytes_str(name);
+
+    return array;
+}
+
+uint64_t pvm_array_length(pvm_array_t *array) {
+    pvm_assert(array != NULL, "array null");
+    pvm_assert_not_null(&array->name, "array name null");
+    pvm_assert_not_empty(&array->name, "array name empty");
+
+    return pvm_get_u64(&array->name);
+}
+
+void pvm_array_push(pvm_array_t *array, pvm_bytes_t *item)
+{
+    pvm_assert(array != NULL, "array null");
+    pvm_assert_not_null(item, "item null");
+    pvm_assert_not_null(&array->name, "array name null");
+    pvm_assert_not_empty(&array->name, "array name empty");
+
+    uint64_t length = pvm_get_u64(&array->name);
+    pvm_bytes_t idx_key = pvm_bytes_copy(&array->name);
+    pvm_bytes_append_u64(&idx_key, length);
+
+    pvm_set(&idx_key, item);
+    pvm_set_u64(&array->name, length + 1);
+}
+
+pvm_bytes_t pvm_array_get(pvm_array_t *array, uint64_t idx)
+{
+    pvm_assert(array != NULL, "array null");
+    pvm_assert_not_null(&array->name, "array name null");
+    pvm_assert_not_empty(&array->name, "array name empty");
+
+    uint64_t length = pvm_get_u64(&array->name);
+    pvm_assert(idx < length, "array get out of bound");
+
+    pvm_bytes_t idx_key = pvm_bytes_copy(&array->name);
+    pvm_bytes_append_u64(&idx_key, idx);
+
+    uint64_t item_size = pvm_get_size(&idx_key);
+    pvm_bytes_t item = pvm_bytes_alloc(item_size);
+    pvm_get(&idx_key, &item);
+
+    return item;
+}
+
+pvm_bytes_t pvm_array_pop(pvm_array_t *array)
+{
+    pvm_assert(array != NULL, "array null");
+    pvm_assert_not_null(&array->name, "array name null");
+    pvm_assert_not_empty(&array->name, "array name empty");
+
+    uint64_t length = pvm_get_u64(&array->name);
+    pvm_bytes_t last_idx = pvm_bytes_copy(&array->name);
+    pvm_bytes_append_u64(&last_idx, length - 1);
+
+    uint64_t item_size = pvm_get_size(&last_idx);
+    pvm_bytes_t item = pvm_bytes_alloc(item_size);
+    pvm_get(&last_idx, &item);
+
+    pvm_set_u64(&array->name, length - 1);
+
+    return item;
+}
+
+typedef struct pvm_map_t {
+    pvm_bytes_t name;
+} pvm_map_t;
+
+pvm_map_t pvm_map_new(const char *name) {
+    pvm_assert(name != NULL, "map name null");
+    pvm_assert(strlen(name) != 0, "map name empty");
+
+    pvm_map_t map;
+    map.name = pvm_bytes_str(name);
+
+    return map;
+}
+
+uint64_t pvm_map_length(pvm_map_t *map) {
+    pvm_assert(map != NULL, "map null");
+    pvm_assert_not_null(&map->name, "map name null");
+    pvm_assert_not_empty(&map->name, "map name empty");
+
+    return pvm_get_u64(&map->name);
+}
+
+pvm_bytes_t pvm_map_get(pvm_map_t *map, pvm_bytes_t *key)
+{
+    pvm_assert(map != NULL, "map null");
+    pvm_assert_not_null(key, "map key null");
+    pvm_assert_not_null(&map->name, "map name null");
+    pvm_assert_not_empty(&map->name, "map name empty");
+
+    pvm_bytes_t map_key = pvm_bytes_copy(&map->name);
+    pvm_bytes_append(&map_key, key);
+
+    uint64_t val_size = pvm_get_size(&map_key);
+    pvm_bytes_t val = pvm_bytes_alloc(val_size);
+    pvm_get(&map_key, &val);
+
+    return val;
+}
+
+void pvm_map_set(pvm_map_t *map, pvm_bytes_t *key, pvm_bytes_t *val)
+{
+    pvm_assert(map != NULL, "map null");
+    pvm_assert_not_null(&map->name, "map name null");
+    pvm_assert_not_empty(&map->name, "map name empty");
+
+    pvm_assert_not_null(key, "map key null");
+    pvm_assert_not_null(val, "map val null");
+
+    pvm_bytes_t map_key = pvm_bytes_copy(&map->name);
+    pvm_bytes_append(&map_key, key);
+    pvm_set(&map_key, val);
+
+    uint64_t length = pvm_get_u64(&map->name);
+    pvm_set_u64(&map->name, length + 1);
+}
+
+pvm_bytes_t pvm_map_delete(pvm_map_t *map, pvm_bytes_t *key)
+{
+    pvm_assert(map != NULL, "map null");
+    pvm_assert_not_null(key, "map key null");
+    pvm_assert_not_null(&map->name, "map name null");
+    pvm_assert_not_empty(&map->name, "map name empty");
+
+    pvm_bytes_t map_key = pvm_bytes_copy(&map->name);
+    pvm_bytes_append(&map_key, key);
+
+    uint64_t val_size = pvm_get_size(&map_key);
+    pvm_bytes_t val = pvm_bytes_alloc(val_size);
+    pvm_get(&map_key, &val);
+
+    uint64_t length = pvm_get_u64(&map->name);
+    pvm_set_u64(&map->name, length - 1);
+
+    pvm_bytes_t empty = pvm_bytes_empty();
+    pvm_set(&map_key, &empty);
+
+    return val;
+}
+
 int main() {
   // Test str val
   pvm_bytes_t key = pvm_bytes_str("test key");
@@ -419,6 +586,55 @@ int main() {
 
   pvm_bytes_append_nbytes(&val, "dododo", strlen("dododo"));
   pvm_debug(pvm_bytes_raw_ptr(&val));
+
+  // Test copy
+  val = pvm_bytes_str("hello");
+  val2 = pvm_bytes_copy(&val);
+  pvm_debug(pvm_bytes_get_str(&val));
+  pvm_debug(pvm_bytes_get_str(&val2));
+
+  pvm_bytes_set_str(&val, "world");
+  pvm_debug(pvm_bytes_get_str(&val));
+  pvm_debug(pvm_bytes_get_str(&val2));
+
+  // Test array
+  pvm_array_t array = pvm_array_new("hello");
+  pvm_assert(0 == pvm_array_length(&array), "array length should be 0");
+
+  pvm_bytes_t item = pvm_bytes_str("world");
+  pvm_array_push(&array, &item);
+  pvm_assert(1 == pvm_array_length(&array), "array length should be 1");
+
+  pvm_bytes_t item2 = pvm_array_get(&array, 0);
+  pvm_assert(0 == pvm_bytes_compare(&item, &item2), "array item should be same");
+
+  pvm_bytes_t item3 = pvm_array_pop(&array);
+  pvm_assert(0 == pvm_bytes_compare(&item, &item3), "array item should be same");
+  pvm_assert(0 == pvm_array_length(&array), "array length should be 0");
+
+  // Test map
+  pvm_bytes_t empty = pvm_bytes_empty();
+  pvm_bytes_t empty_key = pvm_bytes_str("empty key");
+  pvm_set(&empty_key, &empty);
+
+  pvm_bytes_t empty_val = pvm_bytes_alloc(1);
+  pvm_get(&empty_key, &empty_val);
+  pvm_assert(pvm_bytes_is_empty(&empty_val), "empty val should be empty");
+
+  pvm_map_t map = pvm_map_new("test map");
+  pvm_assert(0 == pvm_map_length(&map), "map length should be 0");
+
+  key = pvm_bytes_str("cdpr");
+  item = pvm_bytes_str("2077");
+  pvm_map_set(&map, &key, &item);
+  pvm_assert(1 == pvm_map_length(&map), "map length should be 1");
+
+  item2 = pvm_map_get(&map, &key);
+  pvm_assert(0 == pvm_bytes_compare(&item2, &item), "map item should be same");
+
+  item3 = pvm_map_delete(&map, &key);
+  pvm_assert(0 == pvm_bytes_compare(&item3, &item), "map item should be same");
+  pvm_assert(0 == pvm_map_length(&map), "map length should be 0");
 
   return 0;
 }
