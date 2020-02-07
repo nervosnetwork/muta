@@ -73,10 +73,16 @@ impl Interpreter {
     }
 
     pub fn run(&mut self) -> Result<InterpreterResult, ckb_vm::Error> {
-        let output: Box<dyn io::Write> = if self.cfg.print_debug {
-            Box::new(io::stdout())
+        let (debug_output, assert_output) = if self.cfg.print_debug {
+            (
+                Box::new(io::stdout()) as Box<dyn io::Write>,
+                Box::new(io::stdout()) as Box<dyn io::Write>,
+            )
         } else {
-            Box::new(io::sink())
+            (
+                Box::new(io::sink()) as Box<dyn io::Write>,
+                Box::new(io::sink()) as Box<dyn io::Write>,
+            )
         };
 
         let (code, init_payload) = match self.r#type {
@@ -102,7 +108,14 @@ impl Interpreter {
                     ckb_vm::DefaultCoreMachine<u64, ckb_vm::SparseMemory<u64>>,
                 >::new(core_machine)
                 .instruction_cycle_func(Box::new(vm::cost_model::instruction_cycles))
-                .syscall(Box::new(vm::SyscallDebug::new("[ckb-vm debug]", output)))
+                .syscall(Box::new(vm::SyscallDebug::new(
+                    "[ckb-vm debug]",
+                    debug_output,
+                )))
+                .syscall(Box::new(vm::SyscallAssert::new(
+                    "[ckb-vm assert]",
+                    assert_output,
+                )))
                 .syscall(Box::new(vm::SyscallEnvironment::new(
                     self.context.clone(),
                     self.iparams.clone(),
@@ -124,7 +137,14 @@ impl Interpreter {
                 let core_machine = AsmCoreMachine::new_with_max_cycles(cycles_lmit);
                 let machine = DefaultMachineBuilder::<Box<AsmCoreMachine>>::new(core_machine)
                     .instruction_cycle_func(Box::new(vm::cost_model::instruction_cycles))
-                    .syscall(Box::new(vm::SyscallDebug::new("[ckb-vm debug]", output)))
+                    .syscall(Box::new(vm::SyscallDebug::new(
+                        "[ckb-vm debug]",
+                        debug_output,
+                    )))
+                    .syscall(Box::new(vm::SyscallAssert::new(
+                        "[ckb-vm assert]",
+                        assert_output,
+                    )))
                     .syscall(Box::new(vm::SyscallEnvironment::new(
                         self.context.clone(),
                         self.iparams.clone(),

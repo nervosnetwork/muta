@@ -5,6 +5,9 @@ mod convention;
 mod debug;
 pub use debug::SyscallDebug;
 
+mod assert;
+pub use assert::SyscallAssert;
+
 mod environment;
 pub use environment::SyscallEnvironment;
 
