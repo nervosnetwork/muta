@@ -30,12 +30,12 @@ impl<Mac: ckb_vm::SupportMachine, T: Write> ckb_vm::Syscalls<Mac> for SyscallAss
         }
 
         let assertion = machine.registers()[ckb_vm::registers::A0].to_u64();
-        let msg_addr = machine.registers()[ckb_vm::registers::A1].to_u64();
-        let msg = get_str(machine, msg_addr)?;
-        self.output
-            .write_fmt(format_args!("{} [{}]\n", self.prefix, msg))?;
-
         if assertion == 0 {
+            let msg_addr = machine.registers()[ckb_vm::registers::A1].to_u64();
+            let msg = get_str(machine, msg_addr)?;
+            self.output
+                .write_fmt(format_args!("{} [{}]\n", self.prefix, msg))?;
+
             Err(ckb_vm::Error::Unexpected)
         } else {
             Ok(true)
