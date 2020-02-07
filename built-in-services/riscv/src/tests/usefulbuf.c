@@ -496,106 +496,87 @@ pvm_bytes_t pvm_map_delete(pvm_map_t *map, pvm_bytes_t *key)
 }
 
 int main() {
+  // Test val compare
+  pvm_bytes_t val = pvm_bytes_str("test test");
+  pvm_bytes_t same = pvm_bytes_str("test test");
+  pvm_assert(0 == pvm_bytes_compare(&val, &same), "compare same failed");
+
+  pvm_bytes_t diff = pvm_bytes_str("test diff");
+  pvm_assert(0 != pvm_bytes_compare(&val, &diff), "compare diff failed");
+
+  pvm_bytes_t shorter = pvm_bytes_str("test");
+  pvm_assert(0 > pvm_bytes_compare(&shorter, &val), "compare bigger failed");
+  pvm_assert(0 < pvm_bytes_compare(&val, &shorter), "compare shorter failed");
+
   // Test str val
   pvm_bytes_t key = pvm_bytes_str("test key");
-  pvm_bytes_t val = pvm_bytes_str("test val");
-  pvm_set(&key, &val);
+  pvm_bytes_t str_val = pvm_bytes_str("test val");
+  pvm_set(&key, &str_val);
 
-  pvm_debug(pvm_bytes_get_str(&key));
-  pvm_debug(pvm_get_str(&key));
-
-  pvm_bytes_t val2 = pvm_bytes_alloc(200);
-  pvm_get(&key, &val2);
-  pvm_debug(pvm_bytes_get_str(&val2));
-
-  pvm_bytes_free(&key);
-  pvm_bytes_free(&val);
-  pvm_bytes_free(&val2);
-
-  // Test val compare
-  key = pvm_bytes_str("test test");
-  val = pvm_bytes_str("test test");
-  if (pvm_bytes_compare(&key, &val) == 0) {
-    pvm_debug("val matched");
-  }
-  key = pvm_bytes_str("test");
-  if (pvm_bytes_compare(&key, &val) < 0) {
-    pvm_debug("key is shorter");
-  }
+  pvm_bytes_t str_val2 = pvm_bytes_alloc(200);
+  pvm_get(&key, &str_val2);
+  pvm_assert(0 == pvm_bytes_compare(&str_val, &str_val2), "get set str failed");
 
   // Test u64 val
   key = pvm_bytes_str("test key2");
   val = pvm_bytes_u64(12345678);
   pvm_set(&key, &val);
 
-  val2 = pvm_bytes_alloc(8);
-  pvm_get(&key, &val2);
-  if (pvm_bytes_get_u64(&val2) == 12345678) {
-    pvm_debug("get u64");
-  }
-
-  pvm_bytes_free(&key);
-  pvm_bytes_free(&val);
-  pvm_bytes_free(&val2);
+  pvm_bytes_t u64_val = pvm_bytes_alloc(8);
+  pvm_get(&key, &u64_val);
+  pvm_assert(12345678 == pvm_bytes_get_u64(&u64_val), "get set u64 failed");
 
   // Test val u64 to str
-  pvm_bytes_t u64_str = pvm_bytes_u64_to_str(&val);
-  pvm_debug(pvm_bytes_get_str(&u64_str));
-
-  pvm_bytes_free(&u64_str);
+  u64_val = pvm_bytes_u64(12345);
+  pvm_bytes_t u64_str = pvm_bytes_u64_to_str(&u64_val);
+  pvm_bytes_t expected = pvm_bytes_str("12345");
+  pvm_assert(0 == pvm_bytes_compare(&u64_str, &expected), "u64 to str failed");
 
   // Test val bool
   key = pvm_bytes_str("test key3");
   pvm_set_bool(&key, PVM_TRUE);
-  if (pvm_get_bool(&key)) {
-    pvm_debug("get true");
-  }
+  pvm_assert(pvm_get_bool(&key), "get set bool failed");
 
-  pvm_bytes_free(&key);
-
-  // Test str realloc
+  // Test realloc
   val = pvm_bytes_alloc(1);
+  expected = pvm_bytes_str("hello world");
   pvm_bytes_set_str(&val, "hello world");
-  pvm_debug(pvm_bytes_get_str(&val));
+  pvm_assert(0 == pvm_bytes_compare(&val, &expected), "realloc str failed");
 
-  pvm_bytes_free(&val);
-
-  // Test u64 realloc
   val = pvm_bytes_alloc(1);
-  pvm_bytes_set_u64(&val, 99999);
-  if (pvm_bytes_get_u64(&val) == 99999) {
-    pvm_debug("realloc u64");
-  }
+  expected = pvm_bytes_u64(12345);
+  pvm_bytes_set_u64(&val, 12345);
+  pvm_assert(0 == pvm_bytes_compare(&val, &expected), "realloc u64 failed");
 
-  pvm_bytes_free(&val);
+  // Test append
+  pvm_bytes_t dest = pvm_bytes_str("hello");
+  pvm_bytes_t src = pvm_bytes_str(" world");
+  pvm_bytes_append(&dest, &src);
+  expected = pvm_bytes_str("hello world");
+  pvm_assert(0 == pvm_bytes_compare(&dest, &expected), "append bytes failed");
 
-  // Test str append
-  val = pvm_bytes_str("hello");
-  val2 = pvm_bytes_str(" world");
-  pvm_bytes_append(&val, &val2);
-  pvm_debug(pvm_bytes_get_str(&val));
-
-  pvm_bytes_append_str(&val, " fly to the moon");
-  pvm_debug(pvm_bytes_get_str(&val));
+  pvm_bytes_append_str(&dest, " fly to the moon");
+  expected = pvm_bytes_str("hello world fly to the moon");
+  pvm_assert(0 == pvm_bytes_compare(&dest, &expected), "append str failed");
 
   // Test bytes
-  val = pvm_bytes_alloc(1);
+  dest = pvm_bytes_alloc(1);
   const char *str = "play gwent";
-  pvm_bytes_set_nbytes(&val, str, strlen(str));
-  pvm_debug(pvm_bytes_raw_ptr(&val));
+  pvm_bytes_set_nbytes(&dest, str, strlen(str));
+  expected = pvm_bytes_str("play gwent");
+  pvm_assert(0 == pvm_bytes_compare(&dest, &expected), "set nbytes failed");
 
-  pvm_bytes_append_nbytes(&val, "dododo", strlen("dododo"));
-  pvm_debug(pvm_bytes_raw_ptr(&val));
+  pvm_bytes_append_nbytes(&dest, " dododo", strlen(" dododo"));
+  expected = pvm_bytes_str("play gwent dododo");
+  pvm_assert(0 == pvm_bytes_compare(&dest, &expected), "append nbytes failed");
 
   // Test copy
-  val = pvm_bytes_str("hello");
-  val2 = pvm_bytes_copy(&val);
-  pvm_debug(pvm_bytes_get_str(&val));
-  pvm_debug(pvm_bytes_get_str(&val2));
+  src = pvm_bytes_str("hello");
+  pvm_bytes_t copy = pvm_bytes_copy(&src);
+  pvm_assert(0 == pvm_bytes_compare(&src, &copy), "copy should be same");
 
-  pvm_bytes_set_str(&val, "world");
-  pvm_debug(pvm_bytes_get_str(&val));
-  pvm_debug(pvm_bytes_get_str(&val2));
+  pvm_bytes_set_str(&src, "world");
+  pvm_assert(0 != pvm_bytes_compare(&src, &copy), "modified src should be different");
 
   // Test array
   pvm_array_t array = pvm_array_new("hello");
