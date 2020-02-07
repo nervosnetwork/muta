@@ -8,7 +8,9 @@ mod interpreter;
 pub use interpreter::{Interpreter, InterpreterConf, InterpreterParams};
 
 mod syscall;
-pub use syscall::{SyscallChainInterface, SyscallDebug, SyscallEnvironment, SyscallIO};
+pub use syscall::{
+    SyscallAssert, SyscallChainInterface, SyscallDebug, SyscallEnvironment, SyscallIO,
+};
 
 mod chain_interface;
 pub use chain_interface::ChainInterface;

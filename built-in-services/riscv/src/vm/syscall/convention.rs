@@ -1,6 +1,7 @@
 pub const SYSCODE_DEBUG: u64 = 2000;
 pub const SYSCODE_LOAD_ARGS: u64 = 2001;
 pub const SYSCODE_RET: u64 = 2002;
+pub const SYSCODE_ASSERT: u64 = 2003;
 
 pub const SYSCODE_CYCLE_LIMIT: u64 = 3000;
 pub const SYSCODE_IS_INIT: u64 = 3001;
