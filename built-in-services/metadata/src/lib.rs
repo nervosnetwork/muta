@@ -74,7 +74,10 @@ impl<SDK: ServiceSDK> MetadataService<SDK> {
             metadata.prevote_ratio = payload.prevote_ratio;
             metadata.propose_ratio = payload.propose_ratio;
 
-            self.sdk.set_value(METADATA_KEY.to_string(), metadata)
+            self.sdk
+                .set_value(METADATA_KEY.to_string(), metadata.clone())?;
+            let event_str = serde_json::to_string(&metadata).map_err(ServiceError::JsonParse)?;
+            ctx.emit_event(event_str)
         } else {
             Err(ServiceError::NonAuthorized.into())
         }
@@ -93,9 +96,11 @@ impl<SDK: ServiceSDK> MetadataService<SDK> {
                 .get_value(&METADATA_KEY.to_owned())?
                 .expect("Metadata should always be in the genesis block");
 
-            metadata.verifier_list = payload.verifier_list;
+            metadata.verifier_list = payload.verifier_list.clone();
 
-            self.sdk.set_value(METADATA_KEY.to_string(), metadata)
+            self.sdk.set_value(METADATA_KEY.to_string(), metadata)?;
+            let event_str = serde_json::to_string(&payload).map_err(ServiceError::JsonParse)?;
+            ctx.emit_event(event_str)
         } else {
             Err(ServiceError::NonAuthorized.into())
         }
@@ -114,7 +119,9 @@ impl<SDK: ServiceSDK> MetadataService<SDK> {
                 .get_value(&METADATA_KEY.to_owned())?
                 .expect("Metadata should always be in the genesis block");
             metadata.interval = payload.interval;
-            self.sdk.set_value(METADATA_KEY.to_string(), metadata)
+            self.sdk.set_value(METADATA_KEY.to_string(), metadata)?;
+            let event_str = serde_json::to_string(&payload).map_err(ServiceError::JsonParse)?;
+            ctx.emit_event(event_str)
         } else {
             Err(ServiceError::NonAuthorized.into())
         }
@@ -137,7 +144,9 @@ impl<SDK: ServiceSDK> MetadataService<SDK> {
             metadata.prevote_ratio = payload.prevote_ratio;
             metadata.propose_ratio = payload.propose_ratio;
 
-            self.sdk.set_value(METADATA_KEY.to_string(), metadata)
+            self.sdk.set_value(METADATA_KEY.to_string(), metadata)?;
+            let event_str = serde_json::to_string(&payload).map_err(ServiceError::JsonParse)?;
+            ctx.emit_event(event_str)
         } else {
             Err(ServiceError::NonAuthorized.into())
         }
@@ -147,7 +156,10 @@ impl<SDK: ServiceSDK> MetadataService<SDK> {
     #[write]
     fn set_admin(&mut self, ctx: ServiceContext, payload: SetAdminPayload) -> ProtocolResult<()> {
         if self.verify_authority(ctx.get_caller())? {
-            self.sdk.set_value(ADMIN_KEY.to_owned(), payload.admin)
+            self.sdk
+                .set_value(ADMIN_KEY.to_owned(), payload.admin.clone())?;
+            let event_str = serde_json::to_string(&payload).map_err(ServiceError::JsonParse)?;
+            ctx.emit_event(event_str)
         } else {
             Err(ServiceError::NonAuthorized.into())
         }
@@ -170,6 +182,9 @@ impl<SDK: ServiceSDK> MetadataService<SDK> {
 #[derive(Debug, Display, From)]
 pub enum ServiceError {
     NonAuthorized,
+
+    #[display(fmt = "Parsing payload to json failed {:?}", _0)]
+    JsonParse(serde_json::Error),
 }
 
 impl std::error::Error for ServiceError {}
