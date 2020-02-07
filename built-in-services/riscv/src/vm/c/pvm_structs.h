@@ -55,8 +55,10 @@ int pvm_bytes_append_nbytes(pvm_bytes_t *dest, const void *ptr, uint64_t size);
 int pvm_set(pvm_bytes_t *key, pvm_bytes_t *val);
 uint64_t pvm_get_size(pvm_bytes_t *key);
 int pvm_get(pvm_bytes_t *key, pvm_bytes_t *val);
+int pvm_set_u64(pvm_bytes_t *key, uint64_t val);
 uint64_t pvm_get_u64(pvm_bytes_t *key);
 const char *pvm_get_str(pvm_bytes_t *key);
+int pvm_set_str(pvm_bytes_t *key, const char *str);
 int pvm_set_bool(pvm_bytes_t *key, uint8_t flag);
 int pvm_get_bool(pvm_bytes_t *key);
 
