@@ -13,8 +13,8 @@ common-crypto = { path = "../../common/crypto"}
 
 http-service = "0.4"
 http = "0.2"
-tide = "0.5"
-juniper = "0.14"
+tide = "0.6"
+juniper = { git = "https://github.com/graphql-rust/juniper", rev = "eff086a", features = ["async"] }
 juniper_codegen = "0.14"
 async-trait = "0.1"
 hex = "0.4"

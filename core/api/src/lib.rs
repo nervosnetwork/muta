@@ -1,6 +1,3 @@
-#[macro_use]
-extern crate juniper_codegen;
-
 pub mod adapter;
 pub mod config;
 mod schema;
@@ -10,7 +7,7 @@ use std::sync::Arc;
 
 use futures::executor::block_on;
 use http::status::StatusCode;
-use juniper::{FieldError, FieldResult};
+use juniper::FieldResult;
 use tide::{Request, Response, ResultExt, Server};
 
 use common_crypto::{
@@ -38,31 +35,32 @@ struct State {
 // context.
 struct Query;
 // Switch to async/await fn https://github.com/graphql-rust/juniper/issues/2
-#[juniper::object(Context = State)]
+#[juniper::graphql_object(Context = State)]
 impl Query {
     #[graphql(name = "getBlock", description = "Get the block")]
-    fn get_latest_block(state_ctx: &State, height: Option<Uint64>) -> FieldResult<Block> {
+    async fn get_latest_block(state_ctx: &State, height: Option<Uint64>) -> FieldResult<Block> {
         let height = match height {
             Some(id) => Some(id.try_into_u64()?),
             None => None,
         };
 
-        let block = block_on(
-            state_ctx
-                .adapter
-                .get_block_by_height(Context::new(), height),
-        )?;
+        let block = state_ctx
+            .adapter
+            .get_block_by_height(Context::new(), height)
+            .await?;
+
         Ok(Block::from(block))
     }
 
     #[graphql(name = "getTransaction", description = "Get the transaction by hash")]
-    fn get_transaction(state_ctx: &State, tx_hash: Hash) -> FieldResult<SignedTransaction> {
+    async fn get_transaction(state_ctx: &State, tx_hash: Hash) -> FieldResult<SignedTransaction> {
         let hash = protocol::types::Hash::from_hex(&tx_hash.as_hex())?;
-        let stx = block_on(
-            state_ctx
-                .adapter
-                .get_transaction_by_hash(Context::new(), hash),
-        )?;
+
+        let stx = state_ctx
+            .adapter
+            .get_transaction_by_hash(Context::new(), hash)
+            .await?;
+
         Ok(SignedTransaction::from(stx))
     }
 
@@ -70,19 +68,19 @@ impl Query {
         name = "getReceipt",
         description = "Get the receipt by transaction hash"
     )]
-    fn get_receipt(state_ctx: &State, tx_hash: Hash) -> FieldResult<Receipt> {
+    async fn get_receipt(state_ctx: &State, tx_hash: Hash) -> FieldResult<Receipt> {
         let hash = protocol::types::Hash::from_hex(&tx_hash.as_hex())?;
-        let receipt = block_on(
-            state_ctx
-                .adapter
-                .get_receipt_by_tx_hash(Context::new(), hash),
-        )?;
+
+        let receipt = state_ctx
+            .adapter
+            .get_receipt_by_tx_hash(Context::new(), hash)
+            .await?;
 
         Ok(Receipt::from(receipt))
     }
 
     #[graphql(name = "queryService", description = "query service")]
-    fn query_service(
+    async fn query_service(
         state_ctx: &State,
         height: Option<Uint64>,
         cycles_limit: Option<Uint64>,
@@ -112,26 +110,29 @@ impl Query {
 
         let address = protocol::types::Address::from_hex(&caller.as_hex())?;
 
-        let exec_resp = block_on(state_ctx.adapter.query_service(
-            Context::new(),
-            height,
-            cycles_limit,
-            cycles_price,
-            address,
-            service_name,
-            method,
-            payload,
-        ))?;
+        let exec_resp = state_ctx
+            .adapter
+            .query_service(
+                Context::new(),
+                height,
+                cycles_limit,
+                cycles_price,
+                address,
+                service_name,
+                method,
+                payload,
+            )
+            .await?;
         Ok(ExecResp::from(exec_resp))
     }
 }
 
 struct Mutation;
 // Switch to async/await fn https://github.com/graphql-rust/juniper/issues/2
-#[juniper::object(Context = State)]
+#[juniper::graphql_object(Context = State)]
 impl Mutation {
     #[graphql(name = "sendTransaction", description = "send transaction")]
-    fn send_transaction(
+    async fn send_transaction(
         state_ctx: &State,
         input_raw: InputRawTransaction,
         input_encryption: InputTransactionEncryption,
@@ -139,8 +140,10 @@ impl Mutation {
         let stx = to_signed_transaction(input_raw, input_encryption)?;
         let tx_hash = stx.tx_hash.clone();
 
-        block_on(state_ctx.adapter.insert_signed_txs(Context::new(), stx))
-            .map_err(FieldError::from)?;
+        state_ctx
+            .adapter
+            .insert_signed_txs(Context::new(), stx)
+            .await?;
 
         Ok(Hash::from(tx_hash))
     }
@@ -149,7 +152,7 @@ impl Mutation {
         name = "unsafeSendTransaction",
         deprecated = "DON'T use it in production! This is just for development."
     )]
-    fn unsafe_send_transaction(
+    async fn unsafe_send_transaction(
         state_ctx: &State,
         input_raw: InputRawTransaction,
         input_privkey: Bytes,
@@ -168,8 +171,10 @@ impl Mutation {
             signature: signature.to_bytes(),
             pubkey:    pubkey.to_bytes(),
         };
-        block_on(state_ctx.adapter.insert_signed_txs(Context::new(), stx))
-            .map_err(FieldError::from)?;
+        state_ctx
+            .adapter
+            .insert_signed_txs(Context::new(), stx)
+            .await?;
 
         Ok(Hash::from(tx_hash))
     }
@@ -191,7 +196,8 @@ async fn handle_graphql(mut req: Request<State>) -> Response {
     };
 
     let schema = Schema::new(Query, Mutation);
-    let response = query.execute(&schema, req.state());
+    let state = &req.state().clone();
+    let response = query.execute_async(&schema, state).await;
     let status = if response.is_ok() {
         StatusCode::OK
     } else {

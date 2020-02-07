@@ -16,7 +16,7 @@ pub use transaction::{
     SignedTransaction,
 };
 
-#[derive(GraphQLObject, Clone)]
+#[derive(juniper::GraphQLObject, Clone)]
 pub struct ExecResp {
     ret:      String,
     is_error: bool,
@@ -31,20 +31,20 @@ impl From<protocol::traits::ExecResp> for ExecResp {
     }
 }
 
-#[derive(GraphQLScalarValue, Clone)]
+#[derive(juniper::GraphQLScalarValue, Clone)]
 #[graphql(description = "The output digest of Keccak hash function")]
 pub struct Hash(String);
 pub type MerkleRoot = Hash;
 
-#[derive(GraphQLScalarValue, Clone)]
+#[derive(juniper::GraphQLScalarValue, Clone)]
 #[graphql(description = "20 bytes of account address")]
 pub struct Address(String);
 
-#[derive(GraphQLScalarValue, Clone)]
+#[derive(juniper::GraphQLScalarValue, Clone)]
 #[graphql(description = "Uint64")]
 pub struct Uint64(String);
 
-#[derive(GraphQLScalarValue, Clone)]
+#[derive(juniper::GraphQLScalarValue, Clone)]
 #[graphql(description = "Bytes corresponding hex string.")]
 pub struct Bytes(String);
 

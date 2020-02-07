@@ -2,7 +2,7 @@ use protocol::ProtocolResult;
 
 use crate::schema::{Bytes, Hash, SchemaError, Uint64};
 
-#[derive(GraphQLObject, Clone)]
+#[derive(juniper::GraphQLObject, Clone)]
 pub struct SignedTransaction {
     pub chain_id:     Hash,
     pub cycles_limit: Uint64,
@@ -39,7 +39,7 @@ impl From<protocol::types::SignedTransaction> for SignedTransaction {
 // GraphQLInputObject
 // #####################
 
-#[derive(GraphQLInputObject, Clone)]
+#[derive(juniper::GraphQLInputObject, Clone)]
 #[graphql(description = "There was many types of transaction in Muta, \
                          A transaction often require computing resources or write data to chain,\
                          these resources are valuable so we need to pay some token for them.\
@@ -68,7 +68,7 @@ pub struct InputRawTransaction {
     pub payload:      String,
 }
 
-#[derive(GraphQLInputObject, Clone)]
+#[derive(juniper::GraphQLInputObject, Clone)]
 #[graphql(description = "Signature of the transaction")]
 pub struct InputTransactionEncryption {
     #[graphql(description = "The digest of the transaction")]
