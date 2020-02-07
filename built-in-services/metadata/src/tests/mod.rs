@@ -14,7 +14,7 @@ use protocol::types::{
 };
 use protocol::{types::Bytes, ProtocolResult};
 
-use crate::types::UpdateMetadataPayload;
+use crate::types::{SetAdminPayload, UpdateMetadataPayload};
 use crate::{MetadataService, ADMIN_KEY};
 
 #[test]
@@ -72,7 +72,11 @@ fn test_set_admin() {
     let old_admin = service.get_admin(context.clone()).unwrap();
     assert_eq!(old_admin, admin_1);
 
-    service.set_admin(context.clone(), admin_2.clone()).unwrap();
+    service
+        .set_admin(context.clone(), SetAdminPayload {
+            admin: admin_2.clone(),
+        })
+        .unwrap();
     let new_admin = service.get_admin(context).unwrap();
     assert_eq!(new_admin, admin_2);
 }

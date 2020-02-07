@@ -10,10 +10,12 @@ use protocol::types::{Address, Metadata, ServiceContext, METADATA_KEY};
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
 use crate::types::{
-    InitGenesisPayload, UpdateMetadataPayload, UpdateRatioPayload, UpdateValidatorsPayload,
+    SetAdminPayload, UpdateIntervalPayload, UpdateMetadataPayload, UpdateRatioPayload,
+    UpdateValidatorsPayload,
 };
 
 pub const ADMIN_KEY: &str = "admin";
+pub const ADMIN_GENESIS: &str = "0xf8389d774afdad8755ef8e629e5a154fddc6325a";
 
 pub struct MetadataService<SDK> {
     sdk: SDK,
@@ -26,11 +28,11 @@ impl<SDK: ServiceSDK> MetadataService<SDK> {
     }
 
     #[genesis]
-    fn init_genesis(&mut self, payload: InitGenesisPayload) -> ProtocolResult<()> {
-        self.sdk
-            .set_value(ADMIN_KEY.to_string(), payload.admin.clone())?;
-        self.sdk
-            .set_value(METADATA_KEY.to_string(), payload.metadata)
+    fn init_genesis(&mut self, metadata: Metadata) -> ProtocolResult<()> {
+        self.sdk.set_value(METADATA_KEY.to_string(), metadata)?;
+
+        let admin = Address::from_hex(ADMIN_GENESIS)?;
+        self.sdk.set_value(ADMIN_KEY.to_string(), admin)
     }
 
     #[cycles(210_00)]
@@ -101,13 +103,17 @@ impl<SDK: ServiceSDK> MetadataService<SDK> {
 
     #[cycles(210_00)]
     #[write]
-    fn update_interval(&mut self, ctx: ServiceContext, interval: u64) -> ProtocolResult<()> {
+    fn update_interval(
+        &mut self,
+        ctx: ServiceContext,
+        payload: UpdateIntervalPayload,
+    ) -> ProtocolResult<()> {
         if self.verify_authority(ctx.get_caller())? {
             let mut metadata: Metadata = self
                 .sdk
                 .get_value(&METADATA_KEY.to_owned())?
                 .expect("Metadata should always be in the genesis block");
-            metadata.interval = interval;
+            metadata.interval = payload.interval;
             self.sdk.set_value(METADATA_KEY.to_string(), metadata)
         } else {
             Err(ServiceError::NonAuthorized.into())
@@ -139,9 +145,9 @@ impl<SDK: ServiceSDK> MetadataService<SDK> {
 
     #[cycles(210_00)]
     #[write]
-    fn set_admin(&mut self, ctx: ServiceContext, new_admin: Address) -> ProtocolResult<()> {
+    fn set_admin(&mut self, ctx: ServiceContext, payload: SetAdminPayload) -> ProtocolResult<()> {
         if self.verify_authority(ctx.get_caller())? {
-            self.sdk.set_value(ADMIN_KEY.to_owned(), new_admin)
+            self.sdk.set_value(ADMIN_KEY.to_owned(), payload.admin)
         } else {
             Err(ServiceError::NonAuthorized.into())
         }

@@ -1,12 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use protocol::types::{Address, Metadata, Validator};
-
-#[derive(Deserialize, Serialize, Clone, Debug)]
-pub struct InitGenesisPayload {
-    pub admin:    Address,
-    pub metadata: Metadata,
-}
+use protocol::types::{Address, Validator};
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct UpdateMetadataPayload {
@@ -27,4 +21,14 @@ pub struct UpdateRatioPayload {
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct UpdateValidatorsPayload {
     pub verifier_list: Vec<Validator>,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug)]
+pub struct SetAdminPayload {
+    pub admin: Address,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug)]
+pub struct UpdateIntervalPayload {
+    pub interval: u64,
 }
