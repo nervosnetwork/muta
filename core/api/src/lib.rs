@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use futures::executor::block_on;
 use http::status::StatusCode;
-use juniper::{FieldError, FieldResult};
+use juniper::FieldResult;
 use tide::{Request, Response, ResultExt, Server};
 
 use common_crypto::{
