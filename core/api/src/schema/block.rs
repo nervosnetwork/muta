@@ -1,6 +1,6 @@
 use crate::schema::{Address, Bytes, Hash, MerkleRoot, Uint64};
 
-#[derive(GraphQLObject, Clone)]
+#[derive(juniper::GraphQLObject, Clone)]
 #[graphql(
     description = "Block is a single digital record created within a blockchain. \
                    Each block contains a record of the previous Block, \
@@ -14,7 +14,7 @@ pub struct Block {
     ordered_tx_hashes: Vec<Hash>,
 }
 
-#[derive(GraphQLObject, Clone)]
+#[derive(juniper::GraphQLObject, Clone)]
 #[graphql(description = "A block header is like the metadata of a block.")]
 pub struct BlockHeader {
     #[graphql(
@@ -47,7 +47,7 @@ pub struct BlockHeader {
     pub validators:        Vec<Validator>,
 }
 
-#[derive(GraphQLObject, Clone)]
+#[derive(juniper::GraphQLObject, Clone)]
 #[graphql(description = "The verifier of the block header proved")]
 pub struct Proof {
     pub height:     Uint64,
@@ -57,7 +57,7 @@ pub struct Proof {
     pub bitmap:     Bytes,
 }
 
-#[derive(GraphQLObject, Clone)]
+#[derive(juniper::GraphQLObject, Clone)]
 #[graphql(description = "Validator address set")]
 pub struct Validator {
     pub address:        Address,
