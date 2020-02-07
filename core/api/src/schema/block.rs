@@ -9,7 +9,7 @@ use crate::schema::{Address, Bytes, Hash, MerkleRoot, Uint64};
 )]
 pub struct Block {
     #[graphql(description = "The header section of a block")]
-    header: BlockHeader,
+    header:            BlockHeader,
     #[graphql(description = "The body section of a block")]
     ordered_tx_hashes: Vec<Hash>,
 }
@@ -20,31 +20,31 @@ pub struct BlockHeader {
     #[graphql(
         description = "Identifier of a chain in order to prevent replay attacks across channels "
     )]
-    pub chain_id: Hash,
+    pub chain_id:          Hash,
     #[graphql(description = "block height")]
-    pub height: Uint64,
+    pub height:            Uint64,
     #[graphql(description = "The height to which the block has been executed")]
-    pub exec_height: Uint64,
+    pub exec_height:       Uint64,
     #[graphql(description = "The hash of the serialized previous block")]
-    pub pre_hash: Hash,
+    pub pre_hash:          Hash,
     #[graphql(description = "A timestamp that records when the block was created")]
-    pub timestamp: Uint64,
+    pub timestamp:         Uint64,
     #[graphql(description = "The merkle root of ordered transactions")]
-    pub order_root: MerkleRoot,
+    pub order_root:        MerkleRoot,
     #[graphql(description = "The merkle roots of all the confirms")]
-    pub confirm_root: Vec<MerkleRoot>,
+    pub confirm_root:      Vec<MerkleRoot>,
     #[graphql(description = "The merkle root of state root")]
-    pub state_root: MerkleRoot,
+    pub state_root:        MerkleRoot,
     #[graphql(description = "The merkle roots of receipts")]
-    pub receipt_root: Vec<MerkleRoot>,
+    pub receipt_root:      Vec<MerkleRoot>,
     #[graphql(description = "The sum of all transactions costs")]
-    pub cycles_used: Vec<Uint64>,
+    pub cycles_used:       Vec<Uint64>,
     #[graphql(description = "The address descirbed who packed the block")]
-    pub proposer: Address,
-    pub proof: Proof,
+    pub proposer:          Address,
+    pub proof:             Proof,
     #[graphql(description = "The version of validator is designed for cross chain")]
     pub validator_version: Uint64,
-    pub validators: Vec<Validator>,
+    pub validators:        Vec<Validator>,
 }
 
 #[derive(juniper::GraphQLObject, Clone)]
