@@ -65,6 +65,11 @@ int pvm_bytes_is_empty(pvm_bytes_t *val) {
   return PVM_FALSE;
 }
 
+uint64_t pvm_bytes_len(pvm_bytes_t *val) {
+  pvm_assert_not_null(val, "len val null");
+  return val->data_len;
+}
+
 int pvm_bytes_compare(pvm_bytes_t *src, pvm_bytes_t *other) {
   pvm_assert_not_null(src, "compare src null");
   pvm_assert_not_null(other, "compare other null");
@@ -100,8 +105,14 @@ int pvm_bytes_set_u64(pvm_bytes_t *val, uint64_t n) {
 
 uint64_t pvm_bytes_get_u64(pvm_bytes_t *val) {
   pvm_assert_not_null(val, "get u64 val null");
-  pvm_assert_not_empty(val, "get u64 val empty");
   pvm_assert_not_corruption(val, "get u64 val corruption");
+
+  if (pvm_bytes_is_empty(val)) {
+    return 0;
+  }
+  if (pvm_bytes_len(val) != 8) {
+    return 0;
+  }
 
   __pvm_input_buf(u64, val);
   return UsefulInputBuf_GetUint64(&u64);
@@ -338,6 +349,74 @@ int pvm_get_bool(pvm_bytes_t *key) {
   return PVM_FALSE;
 }
 
+typedef struct pvm_u64_t {
+  uint64_t val;
+} pvm_u64_t;
+
+pvm_u64_t pvm_u64_new(uint64_t n) {
+  pvm_u64_t u64;
+  u64.val = n;
+
+  return u64;
+}
+
+pvm_u64_t pvm_u64_zero() { return pvm_u64_new(0); }
+
+uint64_t pvm_u64_raw(pvm_u64_t u64) { return u64.val; }
+
+pvm_bytes_t pvm_u64_to_bytes(pvm_u64_t u64) { return pvm_bytes_u64(u64.val); }
+
+pvm_u64_t pvm_u64_from_bytes(pvm_bytes_t *src) {
+  pvm_assert_not_null(src, "u64 from bytes null");
+  if (pvm_bytes_is_empty(src)) {
+    return pvm_u64_zero();
+  }
+
+  uint64_t n = pvm_bytes_get_u64(src);
+  return pvm_u64_new(n);
+}
+
+int pvm_u64_compare(pvm_u64_t left, pvm_u64_t right) {
+  uint64_t l = left.val;
+  uint64_t r = right.val;
+
+  if (l == r)
+    return 0;
+  else if (l > r)
+    return 1;
+  else
+    return -1;
+}
+
+pvm_u64_t pvm_u64_add(pvm_u64_t a, pvm_u64_t b) {
+  uint64_t sum;
+
+  pvm_assert(!__builtin_add_overflow(a.val, b.val, &sum), "u64 add overflow");
+  return pvm_u64_new(sum);
+}
+
+pvm_u64_t pvm_u64_sub(pvm_u64_t a, pvm_u64_t b) {
+  uint64_t rem;
+
+  pvm_assert(!__builtin_sub_overflow(a.val, b.val, &rem), "u64 sub overflow");
+  return pvm_u64_new(rem);
+}
+
+pvm_u64_t pvm_u64_mul(pvm_u64_t a, pvm_u64_t b) {
+  uint64_t ret;
+
+  pvm_assert(!__builtin_mul_overflow(a.val, b.val, &ret), "u64 mul overflow");
+  return pvm_u64_new(ret);
+}
+
+pvm_u64_t pvm_u64_div(pvm_u64_t a, pvm_u64_t b) {
+  return pvm_u64_new(a.val / b.val);
+}
+
+pvm_u64_t pvm_u64_mod(pvm_u64_t a, pvm_u64_t b) {
+  return pvm_u64_new(a.val % b.val);
+}
+
 typedef struct pvm_array_t {
   pvm_bytes_t name;
 } pvm_array_t;
@@ -569,6 +648,30 @@ int main() {
   pvm_bytes_set_str(&src, "world");
   pvm_assert(0 != pvm_bytes_compare(&src, &copy),
              "modified src should be different");
+
+  // Test u64
+  pvm_u64_t a = pvm_u64_new(1);
+  pvm_u64_t b = pvm_u64_new(2);
+  pvm_u64_t c = pvm_u64_new(1);
+  pvm_assert(-1 == pvm_u64_compare(a, b), "u64 smaller compare failed");
+  pvm_assert(1 == pvm_u64_compare(b, a), "u64 bigger compare failed");
+  pvm_assert(0 == pvm_u64_compare(a, c), "u64 same compare failed");
+
+  pvm_bytes_t d = pvm_bytes_u64(2);
+  pvm_u64_t e = pvm_u64_from_bytes(&d);
+  pvm_assert(0 == pvm_u64_compare(e, b), "u64 from bytes failed");
+
+  pvm_bytes_t f = pvm_u64_to_bytes(e);
+  pvm_assert(0 == pvm_bytes_compare(&f, &d), "u64 to bytes failed");
+
+  pvm_u64_t g = pvm_u64_add(a, b);
+  pvm_assert(0 == pvm_u64_compare(g, pvm_u64_new(3)), "u64 add failed");
+
+  g = pvm_u64_mul(a, b);
+  pvm_assert(0 == pvm_u64_compare(g, b), "u64 mul failed");
+
+  g = pvm_u64_sub(pvm_u64_new(2), pvm_u64_new(1));
+  pvm_assert(0 == pvm_u64_compare(g, pvm_u64_new(1)), "u64 sub failed");
 
   // Test array
   pvm_array_t array = pvm_array_new("hello");
