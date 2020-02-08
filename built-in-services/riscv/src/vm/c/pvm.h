@@ -80,23 +80,6 @@ int pvm_debug(const char *s);
 void pvm_assert(int statement, const char *msg);
 
 /*
- * Function pvm_assert accepts bool statement and a assertion message that
- * contains the text to be written to stdout(It depends on the VM). If bool
- * statement evaluates to false, execution will be aborted. Assertion message
- * only output in debug mode.
- *
- * Params:
- *   statement[in]: bool statement
- *   msg[in]: same as the standard C function `printf()`
- *
- * Example:
- *   pvm_assert(2 > 1, "1 should never bigger than 2");
- */
-void pvm_assert(int statement, const char *msg) {
-  syscall(SYSCODE_ASSERT, statement, msg, 0, 0, 0, 0);
-}
-
-/*
  * Function pvm_load_args load contract invocation arguments.
  *
  * Params:
