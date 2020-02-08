@@ -174,7 +174,7 @@ int main() {
       pvm_bytes_t caller = _caller();
       balance = balance_of(&asset, &caller);
     }
-    pvm_ret_u64(pvm_u64_raw(balance));
+    pvm_ret_u64_str(pvm_u64_raw(balance));
   }
 
   else {

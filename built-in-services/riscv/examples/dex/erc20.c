@@ -1,10 +1,11 @@
 #include <stdint.h>
 
-#include "./UsefulBuf.h"
+#include <UsefulBuf.h>
+#include <pvm.h>
+#include <pvm_extend.h>
+#include <pvm_structs.h>
+
 #include "./cJSON.h"
-#include "./pvm.h"
-#include "./pvm_extend.h"
-#include "./pvm_structs.h"
 
 pvm_bytes_t _load_args() {
   uint8_t buf[2048];
@@ -17,13 +18,14 @@ pvm_bytes_t _load_args() {
 pvm_bytes_t _balance_key(pvm_bytes_t *account) {
   pvm_bytes_t key = pvm_bytes_str("balance: ");
   pvm_bytes_append(&key, account);
+
   return key;
 }
 
 pvm_bytes_t _caller() {
-  uint8_t buf[50];
+  uint8_t buf[40];
   pvm_caller(buf);
-  return pvm_bytes_nbytes(buf, 50);
+  return pvm_bytes_nbytes(buf, 40);
 }
 
 pvm_u64_t total_supply() {
@@ -40,7 +42,7 @@ void set_balance(pvm_bytes_t *account, pvm_u64_t amount) {
 }
 
 void init(const char *name, const char *symbol, pvm_u64_t supply) {
-  pvm_assert(!pvm_is_init(), "init can only be invoked by deploy function");
+  pvm_assert(pvm_is_init(), "init can only be invoked by deploy function");
 
   pvm_bytes_t name_key = pvm_bytes_str("name");
   pvm_bytes_t symbol_key = pvm_bytes_str("symbol");
@@ -71,8 +73,8 @@ void _transfer(pvm_bytes_t *sender, pvm_bytes_t *recipient, pvm_u64_t amount) {
   from_balance = pvm_u64_sub(from_balance, amount);
   to_balance = pvm_u64_add(to_balance, amount);
 
-  pvm_set_u64(sender, pvm_u64_raw(from_balance));
-  pvm_set_u64(recipient, pvm_u64_raw(to_balance));
+  set_balance(sender, from_balance);
+  set_balance(recipient, to_balance);
 }
 
 void transfer(pvm_bytes_t recipient, pvm_u64_t amount) {
@@ -106,7 +108,7 @@ pvm_u64_t allowances(pvm_bytes_t *owner, pvm_bytes_t *spender) {
 void transfer_from(pvm_bytes_t *sender, pvm_bytes_t *recipient,
                    pvm_u64_t amount) {
   pvm_bytes_t caller = _caller();
-  pvm_u64_t before_allowance = allowances(sender, recipient);
+  pvm_u64_t before_allowance = allowances(sender, &caller);
   pvm_u64_t after_allowance = pvm_u64_sub(before_allowance, amount);
 
   _transfer(sender, recipient, amount);
@@ -147,9 +149,7 @@ pvm_u64_t _cjson_get_u64(cJSON *json, const char *item_name) {
   item = cJSON_GetObjectItemCaseSensitive(json, item_name);
   pvm_assert(cJSON_IsNumber(item), "item isn't number");
 
-  uint64_t u64;
-  memcpy(&u64, &item->valuedouble, sizeof(uint64_t));
-  return pvm_u64_new(u64);
+  return pvm_u64_new(item->valuedouble);
 }
 
 int main() {
@@ -165,15 +165,15 @@ int main() {
 
     init(name, symbol, supply);
   } else if (0 == strcmp(method, "total_supply")) {
-    pvm_ret_u64(pvm_u64_raw(total_supply()));
+    pvm_ret_u64_str(pvm_u64_raw(total_supply()));
   } else if (0 == strcmp(method, "balance_of")) {
     pvm_bytes_t account = _cjson_get_str_bytes_or_empty(args, "account");
 
     if (!pvm_bytes_is_empty(&account)) {
-      pvm_ret_u64(pvm_u64_raw(balance_of(&account)));
+      pvm_ret_u64_str(pvm_u64_raw(balance_of(&account)));
     } else {
       pvm_bytes_t caller = _caller();
-      pvm_ret_u64(pvm_u64_raw(balance_of(&caller)));
+      pvm_ret_u64_str(pvm_u64_raw(balance_of(&caller)));
     }
   } else if (0 == strcmp(method, "transfer")) {
     pvm_bytes_t recipient = _cjson_get_str_bytes(args, "recipient");
@@ -184,7 +184,8 @@ int main() {
     pvm_bytes_t owner = _cjson_get_str_bytes(args, "owner");
     pvm_bytes_t spender = _cjson_get_str_bytes(args, "spender");
 
-    allowances(&owner, &spender);
+    pvm_u64_t amount = allowances(&owner, &spender);
+    pvm_ret_u64_str(pvm_u64_raw(amount));
   } else if (0 == strcmp(method, "approve")) {
     pvm_bytes_t spender = _cjson_get_str_bytes(args, "spender");
     pvm_u64_t amount = _cjson_get_u64(args, "amount");
@@ -197,6 +198,7 @@ int main() {
 
     transfer_from(&sender, &recipient, amount);
   } else {
+
     // Alway false
     pvm_assert(0 > 1, "method not found");
   }
