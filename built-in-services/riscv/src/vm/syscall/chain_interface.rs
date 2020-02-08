@@ -72,10 +72,16 @@ impl<Mac: ckb_vm::SupportMachine> ckb_vm::Syscalls<Mac> for SyscallChainInterfac
                     .get_storage(&Bytes::from(k))
                     .map_err(|_e| ckb_vm::Error::InvalidEcall(code))?;
 
-                machine.memory_mut().store_bytes(v_addr, &val)?;
-                machine
-                    .memory_mut()
-                    .store_bytes(v_size, &(val.len() as u64).to_le_bytes())?;
+                if v_addr != 0 {
+                    machine.memory_mut().store_bytes(v_addr, &val)?;
+                }
+
+                if v_size != 0 {
+                    machine
+                        .memory_mut()
+                        .store_bytes(v_size, &(val.len() as u64).to_le_bytes())?;
+                }
+
                 machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(0));
                 Ok(true)
             }
