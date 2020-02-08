@@ -1,3 +1,2 @@
-*duktape_ee.bin filter=lfs diff=lfs merge=lfs -text
+*.bin filter=lfs diff=lfs merge=lfs -text
 *libpvm.a filter=lfs diff=lfs merge=lfs -text
-*pvm_structs.bin filter=lfs diff=lfs merge=lfs -text
