@@ -256,7 +256,9 @@ uint64_t pvm_get_size(pvm_bytes_t *key) {
   const void *key_ptr = key->UB.ptr;
   size_t key_len = UsefulOutBuf_GetEndPosition(key);
 
-  return pvm_get_storage_value_size(key_ptr, key_len);
+  uint64_t val_size = 0;
+  pvm_get_storage(key_ptr, key_len, NULL, &val_size);
+  return val_size;
 }
 
 int pvm_get(pvm_bytes_t *key, pvm_bytes_t *val) {
@@ -264,10 +266,7 @@ int pvm_get(pvm_bytes_t *key, pvm_bytes_t *val) {
   pvm_assert_not_empty(key, "get key empty");
   pvm_assert_not_null(val, "get val null");
 
-  const void *key_ptr = key->UB.ptr;
-  size_t key_len = UsefulOutBuf_GetEndPosition(key);
-
-  uint64_t val_size = pvm_get_storage_value_size(key_ptr, key_len);
+  uint64_t val_size = pvm_get_size(key);
   if (val_size == 0) {
     UsefulOutBuf_Reset(val);
     return PVM_SUCCESS;
@@ -278,6 +277,9 @@ int pvm_get(pvm_bytes_t *key, pvm_bytes_t *val) {
     pvm_bytes_t buf = pvm_bytes_alloc(val_size);
     val->UB = buf.UB;
   }
+
+  const void *key_ptr = key->UB.ptr;
+  size_t key_len = UsefulOutBuf_GetEndPosition(key);
 
   return pvm_get_storage(key_ptr, key_len, val->UB.ptr, &val->data_len);
 }

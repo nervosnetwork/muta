@@ -71,10 +71,6 @@ int pvm_get_storage(const uint8_t *k, uint64_t k_size, uint8_t *v,
   return syscall(SYSCODE_GET_STORAGE, k, k_size, v, v_size, 0, 0);
 }
 
-uint64_t pvm_get_storage_value_size(const uint8_t *k, uint64_t k_size) {
-  return syscall(SYSCODE_GET_STORAGE_VALUE_SIZE, k, k_size, 0, 0, 0, 0);
-}
-
 int pvm_set_storage(const uint8_t *k, uint64_t k_size, const uint8_t *v,
                     uint64_t v_size) {
   return syscall(SYSCODE_SET_STORAGE, k, k_size, v, v_size, 0, 0);
