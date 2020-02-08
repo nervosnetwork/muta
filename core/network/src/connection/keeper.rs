@@ -94,16 +94,8 @@ impl ConnectionServiceKeeper {
 
                 self.report_peer(repeated_connection);
             }
-            TentacleError::IoError(ref err)
-                if err.kind() == io::ErrorKind::TimedOut
-                    || err.kind() == io::ErrorKind::Interrupted =>
-            {
-                let kind = if err.kind() == io::ErrorKind::TimedOut {
-                    RetryKind::TimedOut
-                } else {
-                    RetryKind::Interrupted
-                };
-
+            TentacleError::IoError(ref err) if err.kind() != io::ErrorKind::Other => {
+                let kind = RetryKind::Io(err.kind());
                 let retry_connect_later = PeerManagerEvent::ReconnectLater { addr, kind };
 
                 self.report_peer(retry_connect_later);
