@@ -131,7 +131,11 @@ const char *pvm_bytes_get_str(pvm_bytes_t *val) {
     return "";
   }
 
-  return val->UB.ptr;
+  pvm_bytes_t str = pvm_bytes_alloc(pvm_bytes_len(val) + 1); // +1 for \0
+  pvm_bytes_append(&str, val);
+  UsefulOutBuf_AppendByte(&str, '\0');
+
+  return pvm_bytes_raw_ptr(&str);
 }
 
 int pvm_bytes_set_nbytes(pvm_bytes_t *dest, const void *ptr, uint64_t size) {
