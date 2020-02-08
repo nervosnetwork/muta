@@ -18,6 +18,7 @@ use crate::fixed_types::{FixedBlock, FixedHeight, FixedSignedTxs, PullTxsRequest
 pub const END_GOSSIP_SIGNED_PROPOSAL: &str = "/gossip/consensus/signed_proposal";
 pub const END_GOSSIP_SIGNED_VOTE: &str = "/gossip/consensus/signed_vote";
 pub const END_GOSSIP_AGGREGATED_VOTE: &str = "/gossip/consensus/qc";
+pub const END_GOSSIP_SIGNED_CHOKE: &str = "/gossip/consensus/signed_choke";
 pub const RPC_SYNC_PULL_BLOCK: &str = "/rpc_call/consensus/sync_pull_block";
 pub const RPC_RESP_SYNC_PULL_BLOCK: &str = "/rpc_resp/consensus/sync_pull_block";
 pub const RPC_SYNC_PULL_TXS: &str = "/rpc_call/consensus/sync_pull_txs";

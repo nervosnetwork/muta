@@ -44,6 +44,9 @@ pub enum MsgType {
 
     #[display(fmt = "Rpc Pull Transactions")]
     RpcPullTxs,
+
+    #[display(fmt = "Signed Choke")]
+    SignedChoke,
 }
 
 #[derive(Clone, Debug, Display)]

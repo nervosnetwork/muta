@@ -240,6 +240,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
             propose_ratio:      metadata.propose_ratio,
             prevote_ratio:      metadata.prevote_ratio,
             precommit_ratio:    metadata.precommit_ratio,
+            brake_ratio:        metadata.brake_ratio,
         }
     };
 
@@ -379,6 +380,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         propose_ratio:   metadata.propose_ratio,
         prevote_ratio:   metadata.prevote_ratio,
         precommit_ratio: metadata.precommit_ratio,
+        brake_ratio:     metadata.brake_ratio,
     };
 
     tokio::spawn(async move {

@@ -24,7 +24,8 @@ use protocol::{Bytes, ProtocolError, ProtocolResult};
 
 use crate::fixed_types::FixedPill;
 use crate::message::{
-    END_GOSSIP_AGGREGATED_VOTE, END_GOSSIP_SIGNED_PROPOSAL, END_GOSSIP_SIGNED_VOTE,
+    END_GOSSIP_AGGREGATED_VOTE, END_GOSSIP_SIGNED_CHOKE, END_GOSSIP_SIGNED_PROPOSAL,
+    END_GOSSIP_SIGNED_VOTE,
 };
 use crate::status::StatusAgent;
 use crate::{ConsensusError, StatusCacheField};
@@ -157,6 +158,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
                     propose_ratio:   current_consensus_status.propose_ratio,
                     prevote_ratio:   current_consensus_status.prevote_ratio,
                     precommit_ratio: current_consensus_status.precommit_ratio,
+                    brake_ratio:     current_consensus_status.brake_ratio,
                 }),
                 authority_list: covert_to_overlord_authority(&current_consensus_status.validators),
             };
@@ -232,6 +234,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
                 propose_ratio:   current_consensus_status.propose_ratio,
                 prevote_ratio:   current_consensus_status.prevote_ratio,
                 precommit_ratio: current_consensus_status.precommit_ratio,
+                brake_ratio:     current_consensus_status.brake_ratio,
             }),
             authority_list: covert_to_overlord_authority(&current_consensus_status.validators),
         };
@@ -255,6 +258,12 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
                 let bytes = av.rlp_bytes();
                 (END_GOSSIP_AGGREGATED_VOTE, bytes)
             }
+
+            OverlordMsg::SignedChoke(sc) => {
+                let bytes = sc.rlp_bytes();
+                (END_GOSSIP_SIGNED_CHOKE, bytes)
+            }
+
             _ => unreachable!(),
         };
 
