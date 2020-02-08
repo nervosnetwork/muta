@@ -191,7 +191,7 @@ const pvm_bytes_t pvm_bytes_u64_to_str(pvm_bytes_t *val) {
   char buf[24];
   uint64_t n = pvm_bytes_get_u64(val);
   int size = snprintf(buf, 24, "%lu", n); // Enough to hold uint64_t string
-  
+
   pvm_bytes_t output = pvm_bytes_alloc(size);
   pvm_bytes_append_str(&output, buf);
 
@@ -354,6 +354,12 @@ pvm_u64_t pvm_u64_new(uint64_t n) {
 }
 
 pvm_u64_t pvm_u64_zero() { return pvm_u64_new(0); }
+
+void pvm_u64_dump(pvm_u64_t u64) {
+    char buf[24];
+    snprintf(buf, 24, "%lu", u64);
+    pvm_debug(buf);
+}
 
 uint64_t pvm_u64_raw(pvm_u64_t u64) { return u64.val; }
 

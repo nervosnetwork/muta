@@ -71,6 +71,7 @@ typedef struct pvm_u64_t {
 
 pvm_u64_t pvm_u64_new(uint64_t n);
 pvm_u64_t pvm_u64_zero();
+void pvm_u64_dump(pvm_u64_t u64);
 
 uint64_t pvm_u64_raw(pvm_u64_t u64);
 pvm_bytes_t pvm_u64_to_bytes(pvm_u64_t u64);
