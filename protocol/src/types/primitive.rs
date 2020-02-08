@@ -236,6 +236,7 @@ pub struct Metadata {
     pub propose_ratio:   u64,
     pub prevote_ratio:   u64,
     pub precommit_ratio: u64,
+    pub brake_ratio:     u64,
 }
 
 fn clean_0x(s: &str) -> &str {

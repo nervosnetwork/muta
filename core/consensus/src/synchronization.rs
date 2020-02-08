@@ -85,6 +85,7 @@ impl<Adapter: SynchronizationAdapter> Synchronization for OverlordSynchronizatio
                     sync_status.propose_ratio,
                     sync_status.prevote_ratio,
                     sync_status.precommit_ratio,
+                    sync_status.brake_ratio,
                     sync_status.validators,
                 )?;
                 break;
@@ -283,6 +284,7 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
             propose_ratio:      current_status.propose_ratio,
             prevote_ratio:      current_status.prevote_ratio,
             precommit_ratio:    current_status.precommit_ratio,
+            brake_ratio:        current_status.brake_ratio,
             prev_hash:          block.header.pre_hash.clone(),
             height:             block.header.height,
             exec_height:        block.header.exec_height,
