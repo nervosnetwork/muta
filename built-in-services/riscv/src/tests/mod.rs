@@ -1,5 +1,6 @@
 pub mod duktape;
 pub mod pvm_structs;
+pub mod erc20;
 
 use std::cell::RefCell;
 use std::io::Read;

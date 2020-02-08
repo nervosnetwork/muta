@@ -1,10 +1,11 @@
 #include <stdint.h>
 
-#include "./UsefulBuf.h"
+#include <UsefulBuf.h>
+#include <pvm.h>
+#include <pvm_extend.h>
+#include <pvm_structs.h>
+
 #include "./cJSON.h"
-#include "./pvm.h"
-#include "./pvm_extend.h"
-#include "./pvm_structs.h"
 
 pvm_bytes_t _load_args() {
   uint8_t buf[2048];
