@@ -3,7 +3,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use bincode::serialize;
 use log::debug;
-use overlord::types::{AggregatedVote, SignedProposal, SignedVote};
+use overlord::types::{AggregatedVote, SignedChoke, SignedProposal, SignedVote};
 use overlord::Codec;
 use rlp::Encodable;
 use serde::{Deserialize, Serialize};
@@ -61,6 +61,15 @@ impl From<FixedHeight> for RichHeight {
     }
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct Choke(pub Vec<u8>);
+
+impl From<SignedChoke> for Choke {
+    fn from(signed_choke: SignedChoke) -> Self {
+        Choke(signed_choke.rlp_bytes())
+    }
+}
+
 pub struct ProposalMessageHandler<C> {
     consensus: Arc<C>,
 }
@@ -115,6 +124,25 @@ impl<C: Consensus + 'static> MessageHandler for QCMessageHandler<C> {
 
     async fn process(&self, ctx: Context, msg: Self::Message) -> ProtocolResult<()> {
         self.consensus.set_qc(ctx, msg.0).await
+    }
+}
+
+pub struct ChokeMessageHandler<C> {
+    consensus: Arc<C>,
+}
+
+impl<C: Consensus + 'static> ChokeMessageHandler<C> {
+    pub fn new(consensus: Arc<C>) -> Self {
+        Self { consensus }
+    }
+}
+
+#[async_trait]
+impl<C: Consensus + 'static> MessageHandler for ChokeMessageHandler<C> {
+    type Message = Choke;
+
+    async fn process(&self, ctx: Context, msg: Self::Message) -> ProtocolResult<()> {
+        self.consensus.set_choke(ctx, msg.0).await
     }
 }
 
