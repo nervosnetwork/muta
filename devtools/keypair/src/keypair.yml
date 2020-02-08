@@ -16,3 +16,9 @@ args:
         long: private_keys
         multiple: true
         takes_value: true
+
+    - common_ref:
+        help: common_ref for bls signature, it will be randomly generated if not passed
+        short: c
+        long: common_ref
+        default_value: ""

@@ -41,10 +41,18 @@ pub fn main() {
         panic!("private keys length can not be larger than number");
     }
 
-    let common_ref = rand::thread_rng()
-        .sample_iter(&Alphanumeric)
-        .take(10)
-        .collect::<String>();
+    let common_ref_encoded = value_t!(m, "common_ref", String).unwrap();
+    let common_ref = if common_ref_encoded.is_empty() {
+        rand::thread_rng()
+            .sample_iter(&Alphanumeric)
+            .take(10)
+            .collect::<String>()
+    } else {
+        String::from_utf8(
+            hex::decode(common_ref_encoded).expect("common_ref should be a hex string"),
+        )
+        .expect("common_ref should be a valid utf8 string")
+    };
 
     let mut output = Output {
         common_ref: hex::encode(common_ref.clone()),
