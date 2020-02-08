@@ -797,6 +797,29 @@ impl PeerManager {
         condidates
     }
 
+    fn reconnect_later(&mut self, addr: Multiaddr) {
+        if let Some(mut unknown) = self.unknown_addrs.take(&addr.clone().into()) {
+            unknown.set_connecting(false);
+            unknown.increase_retry_count();
+
+            if !unknown.reach_max_retry() {
+                self.unknown_addrs.insert(unknown);
+            }
+        }
+
+        if let Some(pid) = self.inner.match_pid(&addr) {
+            // If peer is already connected, don't need to reconnect
+            // this address.
+            if self.inner.peer_connected(&pid) {
+                return;
+            }
+
+            // Make sure we disconnect peer
+            self.inner.disconnect_peer(&pid);
+            self.increase_peer_retry(&pid);
+        }
+    }
+
     fn route_multi_users_message(
         &mut self,
         users_msg: MultiUsersMessage,
@@ -952,35 +975,20 @@ impl PeerManager {
             }
             // TODO: ban unconnectable address for a while instead of repeated
             // connection attempts.
-            PeerManagerEvent::UnconnectableAddress { addr, .. } => {
-                self.unknown_addrs.remove(&addr.clone().into());
+            PeerManagerEvent::UnconnectableAddress { addr, kind, .. } => {
+                // Since io::Other is unexpected, it's ok warning here.
+                warn!("unconnectable address {} {}", addr, kind);
 
+                self.unknown_addrs.remove(&addr.clone().into());
                 if self.bootstraps.contains(&addr) {
                     error!("network: unconnectable bootstrap address {}", addr);
                     return;
                 }
-
                 self.inner.try_remove_addr(&addr);
             }
-            PeerManagerEvent::ReconnectLater { addr, .. } => {
-                if let Some(mut unknown) = self.unknown_addrs.take(&addr.clone().into()) {
-                    unknown.set_connecting(false);
-                    unknown.increase_retry_count();
-
-                    if !unknown.reach_max_retry() {
-                        self.unknown_addrs.insert(unknown);
-                    }
-                }
-
-                if let Some(pid) = self.inner.match_pid(&addr) {
-                    // If peer is already connected, don't need to reconnect
-                    // this address.
-                    if self.inner.peer_connected(&pid) {
-                        return;
-                    }
-
-                    self.increase_peer_retry(&pid);
-                }
+            PeerManagerEvent::ReconnectLater { addr, kind, .. } => {
+                info!("reconnect later address {} {}", addr, kind);
+                self.reconnect_later(addr);
             }
             PeerManagerEvent::AddListenAddr { addr } => {
                 self.inner.add_peer_addr(&self.config.our_id, addr);
