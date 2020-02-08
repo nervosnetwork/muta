@@ -188,10 +188,12 @@ const pvm_bytes_t pvm_bytes_u64_to_str(pvm_bytes_t *val) {
   pvm_assert_not_null(val, "u64 to str null");
   pvm_assert_not_empty(val, "u64 to str empty");
 
+  char buf[24];
   uint64_t n = pvm_bytes_get_u64(val);
-  pvm_bytes_t output = pvm_bytes_alloc(24); // Enough to hold uint64_t string
-  int size = snprintf(output.UB.ptr, 24, "%lu", n);
-  output.data_len = size;
+  int size = snprintf(buf, 24, "%lu", n); // Enough to hold uint64_t string
+  
+  pvm_bytes_t output = pvm_bytes_alloc(size);
+  pvm_bytes_append_str(&output, buf);
 
   return output;
 }
