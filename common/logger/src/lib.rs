@@ -1,8 +1,8 @@
-use backtrace::Backtrace;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::{panic, thread};
 
+use backtrace::Backtrace;
 use json::JsonValue;
 use log::LevelFilter;
 use log4rs::append::console::ConsoleAppender;
