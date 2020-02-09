@@ -4,7 +4,7 @@ use std::io::Write;
 
 use ckb_vm::instructions::Register;
 
-use crate::vm::syscall::common::get_str;
+use crate::vm::syscall::common::{get_str, invalid_ecall};
 use crate::vm::syscall::convention::SYSCODE_DEBUG;
 
 pub struct SyscallDebug<T> {
@@ -24,14 +24,20 @@ impl<Mac: ckb_vm::SupportMachine, T: Write> ckb_vm::Syscalls<Mac> for SyscallDeb
     }
 
     fn ecall(&mut self, machine: &mut Mac) -> Result<bool, ckb_vm::Error> {
-        let code = &machine.registers()[ckb_vm::registers::A7];
-        if code.to_u64() != SYSCODE_DEBUG {
+        let code = machine.registers()[ckb_vm::registers::A7].to_u64();
+        if code != SYSCODE_DEBUG {
             return Ok(false);
         }
-        let addr = machine.registers()[ckb_vm::registers::A0].to_u64();
-        let s = get_str(machine, addr)?;
+
+        let ptr = machine.registers()[ckb_vm::registers::A0].to_u64();
+        if ptr == 0 {
+            return Err(invalid_ecall(code));
+        }
+
+        let msg = get_str(machine, ptr)?;
         self.output
-            .write_fmt(format_args!("{} [{}]\n", self.prefix, s))?;
+            .write_fmt(format_args!("{} [{}]\n", self.prefix, msg))?;
+
         machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(0));
         Ok(true)
     }
