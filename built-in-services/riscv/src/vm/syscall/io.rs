@@ -28,38 +28,38 @@ impl<Mac: ckb_vm::SupportMachine> ckb_vm::Syscalls<Mac> for SyscallIO {
     fn ecall(&mut self, machine: &mut Mac) -> Result<bool, ckb_vm::Error> {
         let code = machine.registers()[ckb_vm::registers::A7].to_u64();
 
-        if code == SYSCODE_RET {
-            let ptr = machine.registers()[ckb_vm::registers::A0].to_u64();
-            let size = machine.registers()[ckb_vm::registers::A1].to_u64();
+        match code {
+            SYSCODE_RET => {
+                let ptr = machine.registers()[ckb_vm::registers::A0].to_u64();
+                let size = machine.registers()[ckb_vm::registers::A1].to_u64();
 
-            if ptr == 0 {
-                return Err(ckb_vm::Error::IO(io::ErrorKind::InvalidInput));
+                if ptr == 0 {
+                    return Err(ckb_vm::Error::IO(io::ErrorKind::InvalidInput));
+                }
+
+                let buffer = get_arr(machine, ptr, size)?;
+                self.output.borrow_mut().clear();
+                self.output.borrow_mut().extend_from_slice(&buffer[..]);
+
+                machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(0));
+                Ok(true)
             }
+            SYSCODE_LOAD_ARGS => {
+                let ptr = machine.registers()[ckb_vm::registers::A0].to_u64();
+                let len_ptr = machine.registers()[ckb_vm::registers::A1].to_u64();
 
-            let buffer = get_arr(machine, ptr, size)?;
-            self.output.borrow_mut().clear();
-            self.output.borrow_mut().extend_from_slice(&buffer[..]);
+                if ptr != 0 {
+                    machine.memory_mut().store_bytes(ptr, &self.input)?;
+                }
+                if len_ptr != 0 {
+                    let len_bytes = (self.input.len() as u64).to_le_bytes();
+                    machine.memory_mut().store_bytes(len_ptr, &len_bytes)?;
+                }
 
-            machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(0));
-            return Ok(true);
+                machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(0));
+                Ok(true)
+            }
+            _ => Ok(false),
         }
-
-        if code.to_u64() == SYSCODE_LOAD_ARGS {
-            let ptr = machine.registers()[ckb_vm::registers::A0].to_u64();
-            let len_ptr = machine.registers()[ckb_vm::registers::A1].to_u64();
-
-            if ptr != 0 {
-                machine.memory_mut().store_bytes(ptr, &self.input)?;
-            }
-            if len_ptr != 0 {
-                let len_bytes = (self.input.len() as u64).to_le_bytes();
-                machine.memory_mut().store_bytes(len_ptr, &len_bytes)?;
-            }
-
-            machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(0));
-            return Ok(true);
-        }
-
-        Ok(false)
     }
 }
