@@ -1,3 +1,5 @@
+use std::io::ErrorKind;
+
 use ckb_vm::instructions::Register;
 use ckb_vm::Memory;
 
@@ -8,6 +10,7 @@ pub fn get_str<Mac: ckb_vm::SupportMachine>(
 ) -> Result<String, ckb_vm::Error> {
     let mut addr = addr;
     let mut buffer = Vec::new();
+
     loop {
         let byte = machine
             .memory_mut()
@@ -19,8 +22,9 @@ pub fn get_str<Mac: ckb_vm::SupportMachine>(
         buffer.push(byte);
         addr += 1;
     }
+
     machine.add_cycles(buffer.len() as u64 * 10)?;
-    Ok(String::from_utf8(buffer).map_err(|_| ckb_vm::Error::ParseError)?)
+    Ok(String::from_utf8(buffer).map_err(|_| ckb_vm::Error::IO(ErrorKind::InvalidData))?)
 }
 
 // Get a byte array from memory by exact size

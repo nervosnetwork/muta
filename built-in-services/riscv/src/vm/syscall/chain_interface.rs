@@ -1,6 +1,6 @@
 //! Environmental Information
 use std::cell::RefCell;
-use std::rc::Rc;
+use std::{io, rc::Rc};
 
 use ckb_vm::instructions::Register;
 use ckb_vm::memory::Memory;
@@ -48,7 +48,11 @@ impl<Mac: ckb_vm::SupportMachine> ckb_vm::Syscalls<Mac> for SyscallChainInterfac
     }
 
     fn ecall(&mut self, machine: &mut Mac) -> Result<bool, ckb_vm::Error> {
+        use ckb_vm::Error::*;
+        use std::io::ErrorKind::*;
+
         let code = machine.registers()[ckb_vm::registers::A7].to_u64();
+
         match code {
             SYSCODE_SET_STORAGE => {
                 let key_ptr = machine.registers()[ckb_vm::registers::A0].to_u64();
@@ -106,22 +110,17 @@ impl<Mac: ckb_vm::SupportMachine> ckb_vm::Syscalls<Mac> for SyscallChainInterfac
                     return Err(invalid_ecall(code));
                 }
 
-                let call_args = get_arr(machine, args_ptr, args_len)?;
-
-                // TODO: from bytes?
-                let address_bytes = get_arr(machine, addr_ptr, 40)?;
-                let address_hex = String::from_utf8_lossy(&address_bytes);
-                let address = Address::from_hex(&address_hex).map_err(|_e| {
-                    ckb_vm::Error::EcallError(
-                        SYSCODE_CONTRACT_CALL,
-                        format!("invalid address: {}", address_hex),
-                    )
-                })?;
+                let call_args = Bytes::from(get_arr(machine, args_ptr, args_len)?);
+                let address = {
+                    let hex = String::from_utf8(get_arr(machine, addr_ptr, 40)?)
+                        .map_err(|_| IO(InvalidData))?;
+                    Address::from_hex(&hex).map_err(|_| IO(InvalidData))?
+                };
 
                 let (ret, current_cycle) = self
                     .chain
                     .borrow_mut()
-                    .contract_call(address, Bytes::from(call_args), machine.cycles())
+                    .contract_call(address, call_args, machine.cycles())
                     .map_err(|e| {
                         ckb_vm::Error::EcallError(
                             SYSCODE_CONTRACT_CALL,
@@ -149,14 +148,14 @@ impl<Mac: ckb_vm::SupportMachine> ckb_vm::Syscalls<Mac> for SyscallChainInterfac
 
                 let service = get_str(machine, service_ptr)?;
                 let method = get_str(machine, method_ptr)?;
-                let payload = get_arr(machine, payload_ptr, payload_len)?;
-                // TODO: bytes?
-                let payload_str = String::from_utf8_lossy(&payload);
+                // Right now, service payload is hardcoded json
+                let json_payload = String::from_utf8(get_arr(machine, payload_ptr, payload_len)?)
+                    .map_err(|_| IO(InvalidData))?;
 
                 let (ret, current_cycle) = self
                     .chain
                     .borrow_mut()
-                    .service_call(&service, &method, &payload_str, machine.cycles())
+                    .service_call(&service, &method, &json_payload, machine.cycles())
                     .map_err(|e| {
                         ckb_vm::Error::EcallError(
                             SYSCODE_SERVICE_CALL,

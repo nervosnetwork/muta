@@ -125,20 +125,16 @@ impl<Mac: ckb_vm::SupportMachine> ckb_vm::Syscalls<Mac> for SyscallEnvironment {
             SYSCODE_EMIT_EVENT => {
                 let ptr = machine.registers()[ckb_vm::registers::A0].to_u64();
                 let len = machine.registers()[ckb_vm::registers::A1].to_u64();
-                let msg_bytes = get_arr(machine, ptr, len)?;
 
-                if let Ok(msg) = String::from_utf8(msg_bytes) {
-                    // Note: Right now, emit event is infallible
-                    if let Err(e) = self.context.emit_event(msg) {
-                        error!("impossible emit event failed {}", e);
-                    }
+                let msg = String::from_utf8(get_arr(machine, ptr, len)?)
+                    .map_err(|_| ckb_vm::Error::IO(std::io::ErrorKind::InvalidData))?;
 
-                    machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(0));
-                } else {
-                    // TODO: throw error
-                    machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(1));
+                // Note: Right now, emit event is infallible
+                if let Err(e) = self.context.emit_event(msg) {
+                    error!("impossible emit event failed {}", e);
                 }
 
+                machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(0));
                 Ok(true)
             }
             SYSCODE_TX_HASH => {
