@@ -197,10 +197,6 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             }
         };
 
-        self.adapter
-            .flush_mempool(ctx.clone(), &ordered_tx_hashes)
-            .await?;
-
         // Execute transactions
         self.exec(
             pill.block.header.order_root.clone(),
@@ -220,6 +216,10 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             pill.block.header.timestamp,
         )?;
         self.update_status(height, metadata, pill.block, proof, full_txs)
+            .await?;
+
+        self.adapter
+            .flush_mempool(ctx.clone(), &ordered_tx_hashes)
             .await?;
 
         self.adapter.broadcast_height(ctx.clone(), height).await?;
