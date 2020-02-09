@@ -792,6 +792,16 @@ base@^0.11.1:
     mixin-deep "^1.2.0"
     pascalcase "^0.1.1"
 
+bignumber.js@^7.0.0:
+  version "7.2.1"
+  resolved "https://registry.npm.taobao.org/bignumber.js/download/bignumber.js-7.2.1.tgz#80c048759d826800807c4bfd521e50edbba57a5f"
+  integrity sha1-gMBIdZ2CaACAfEv9Uh5Q7bulel8=
+
+bignumber.js@^9.0.0:
+  version "9.0.0"
+  resolved "https://registry.npm.taobao.org/bignumber.js/download/bignumber.js-9.0.0.tgz#805880f84a329b5eac6e7cb6f8274b6d82bdf075"
+  integrity sha1-gFiA+Eoym16sbny2+CdLbYK98HU=
+
 bindings@^1.5.0:
   version "1.5.0"
   resolved "https://registry.npm.taobao.org/bindings/download/bindings-1.5.0.tgz#10353c9e945334bc0511a6d90b38fbc7c9c504df"
@@ -1612,6 +1622,13 @@ jsesc@^2.5.1:
   resolved "https://registry.npm.taobao.org/jsesc/download/jsesc-2.5.2.tgz#80564d2e483dacf6e8ef209650a67df3f0c283a4"
   integrity sha1-gFZNLkg9rPbo7yCWUKZ98/DCg6Q=
 
+json-bigint@^0.3.0:
+  version "0.3.0"
+  resolved "https://registry.npm.taobao.org/json-bigint/download/json-bigint-0.3.0.tgz#0ccd912c4b8270d05f056fbd13814b53d3825b1e"
+  integrity sha1-DM2RLEuCcNBfBW+9E4FLU9OCWx4=
+  dependencies:
+    bignumber.js "^7.0.0"
+
 json5@^2.1.0:
   version "2.1.1"
   resolved "https://registry.npm.taobao.org/json5/download/json5-2.1.1.tgz#81b6cb04e9ba496f1c7005d07b4368a2638f90b6"
@@ -1763,10 +1780,10 @@ ms@^2.1.1:
   resolved "https://registry.npm.taobao.org/ms/download/ms-2.1.2.tgz#d09d1f357b443f493382a8eb3ccd183872ae6009"
   integrity sha1-0J0fNXtEP0kzgqjrPM0YOHKuYAk=
 
-muta-sdk@^0.3.0:
-  version "0.3.0"
-  resolved "https://registry.npm.taobao.org/muta-sdk/download/muta-sdk-0.3.0.tgz#8e3f40b92c8a7e549dc8a1621faeb4ec5cc02108"
-  integrity sha1-jj9AuSyKflSdyKFiH6607FzAIQg=
+muta-sdk@^0.7.0-alpha.0:
+  version "0.7.0-alpha.0"
+  resolved "https://registry.npm.taobao.org/muta-sdk/download/muta-sdk-0.7.0-alpha.0.tgz#dd55419bc7551e1fdbbce0c264849a2ab16ac25e"
+  integrity sha1-3VVBm8dVHh/bvODCZISaKrFqwl4=
   dependencies:
     "@graphql-codegen/typescript" "^1.10.0"
     "@graphql-codegen/typescript-graphql-request" "^1.10.0"
@@ -1776,6 +1793,7 @@ muta-sdk@^0.3.0:
     "@types/secp256k1" "^3.5.0"
     apollo-boost "^0.4.4"
     apollo-client "^2.6.4"
+    bignumber.js "^9.0.0"
     bip39 "^3.0.2"
     cross-fetch "^3.0.4"
     debug "^4.1.1"
@@ -1783,6 +1801,7 @@ muta-sdk@^0.3.0:
     graphql-request "^1.8.2"
     graphql-tag "^2.10.1"
     hdkey "^1.1.1"
+    json-bigint "^0.3.0"
     keccak "^2.0.0"
     lodash "^4.17.15"
     random-bytes "^1.0.0"

@@ -134,12 +134,13 @@ pvm_bytes_t _cjson_get_str_bytes_or_empty(cJSON *json, const char *item_name) {
   const cJSON *item = NULL;
 
   item = cJSON_GetObjectItemCaseSensitive(json, item_name);
-  pvm_assert(cJSON_IsString(item), "item isn't string");
 
-  if (item->valuestring == NULL) {
-    return pvm_bytes_empty();
-  } else {
+  // pvm_assert(cJSON_IsString(item) || cJSON_IsNull(item), "item isn't string or null");
+
+  if (item->valuestring != NULL) {
     return pvm_bytes_str(item->valuestring);
+  } else {
+    return pvm_bytes_empty();
   }
 }
 

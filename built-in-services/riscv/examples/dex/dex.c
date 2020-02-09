@@ -16,15 +16,15 @@ pvm_bytes_t _load_args() {
 }
 
 pvm_bytes_t _caller() {
-  uint8_t buf[50];
+  uint8_t buf[40];
   pvm_caller(buf);
-  return pvm_bytes_nbytes(buf, 50);
+  return pvm_bytes_nbytes(buf, 40);
 }
 
 pvm_bytes_t _contract_address() {
-  uint8_t buf[50];
+  uint8_t buf[40];
   pvm_address(buf);
-  return pvm_bytes_nbytes(buf, 50);
+  return pvm_bytes_nbytes(buf, 40);
 }
 
 pvm_bytes_t _balance_key(pvm_bytes_t *asset, pvm_bytes_t *account) {
@@ -50,6 +50,9 @@ void deposit(pvm_bytes_t *asset, pvm_u64_t amount) {
   pvm_bytes_t caller = _caller();
   pvm_bytes_t recipient = _contract_address();
 
+  char amount_str[20];
+  sprintf(amount_str, "%d", amount);
+
   cJSON *args = cJSON_CreateObject();
   pvm_assert(NULL != cJSON_AddStringToObject(args, "method", "transfer_from"),
              "deposit method");
@@ -60,7 +63,7 @@ void deposit(pvm_bytes_t *asset, pvm_u64_t amount) {
                                              pvm_bytes_get_str(&recipient)),
              "deposit recipent");
   pvm_assert(NULL !=
-                 cJSON_AddNumberToObject(args, "amount", pvm_u64_raw(amount)),
+                 cJSON_AddRawToObject(args, "amount", amount_str),
              "deposit amount");
 
   const char *json_args = cJSON_Print(args);
@@ -70,7 +73,7 @@ void deposit(pvm_bytes_t *asset, pvm_u64_t amount) {
                     strlen(json_args), NULL, NULL);
 
   pvm_u64_t amount_before = _balance(asset, &caller);
-  pvm_u64_t amount_after = pvm_u64_sub(amount_before, amount);
+  pvm_u64_t amount_after = pvm_u64_add(amount_before, amount);
   _set_balance(asset, &caller, amount_after);
 }
 
@@ -80,7 +83,7 @@ void withdraw(pvm_bytes_t *asset, pvm_u64_t amount) {
   pvm_u64_t amount_after = pvm_u64_sub(amount_before, amount);
 
   cJSON *args = cJSON_CreateObject();
-  pvm_assert(NULL != cJSON_AddStringToObject(args, "method", "withdraw"),
+  pvm_assert(NULL != cJSON_AddStringToObject(args, "method", "transfer"),
              "withdraw method");
   pvm_assert(NULL != cJSON_AddStringToObject(args, "recipient",
                                              pvm_bytes_get_str(&caller)),
@@ -126,8 +129,7 @@ pvm_u64_t _cjson_get_u64(cJSON *json, const char *item_name) {
   item = cJSON_GetObjectItemCaseSensitive(json, item_name);
   pvm_assert(cJSON_IsNumber(item), "item isn't number");
 
-  uint64_t u64;
-  memcpy(&u64, &item->valuedouble, sizeof(uint64_t));
+  uint64_t u64 = (uint64_t) item->valuedouble;
   return pvm_u64_new(u64);
 }
 
