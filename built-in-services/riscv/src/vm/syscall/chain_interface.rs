@@ -69,7 +69,7 @@ impl<Mac: ckb_vm::SupportMachine> ckb_vm::Syscalls<Mac> for SyscallChainInterfac
                 self.chain
                     .borrow_mut()
                     .set_storage(Bytes::from(key), Bytes::from(val))
-                    .map_err(|_| ckb_vm::Error::InvalidEcall(code))?;
+                    .map_err(|_| ckb_vm::Error::IO(io::ErrorKind::Other))?;
 
                 machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(0));
                 Ok(true)
@@ -91,7 +91,7 @@ impl<Mac: ckb_vm::SupportMachine> ckb_vm::Syscalls<Mac> for SyscallChainInterfac
                     .chain
                     .borrow()
                     .get_storage(&Bytes::from(key))
-                    .map_err(|_e| ckb_vm::Error::InvalidEcall(code))?;
+                    .map_err(|_| ckb_vm::Error::IO(io::ErrorKind::Other))?;
 
                 self.set_bytes(machine, val_ptr, len_ptr, &val)?;
                 machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(0));
@@ -121,12 +121,7 @@ impl<Mac: ckb_vm::SupportMachine> ckb_vm::Syscalls<Mac> for SyscallChainInterfac
                     .chain
                     .borrow_mut()
                     .contract_call(address, call_args, machine.cycles())
-                    .map_err(|e| {
-                        ckb_vm::Error::EcallError(
-                            SYSCODE_CONTRACT_CALL,
-                            format!("contract call err: {}", e),
-                        )
-                    })?;
+                    .map_err(|_| ckb_vm::Error::IO(io::ErrorKind::Other))?;
 
                 machine.set_cycles(current_cycle);
                 self.set_bytes(machine, ret_ptr, len_ptr, ret.as_bytes())?;
@@ -156,12 +151,7 @@ impl<Mac: ckb_vm::SupportMachine> ckb_vm::Syscalls<Mac> for SyscallChainInterfac
                     .chain
                     .borrow_mut()
                     .service_call(&service, &method, &json_payload, machine.cycles())
-                    .map_err(|e| {
-                        ckb_vm::Error::EcallError(
-                            SYSCODE_SERVICE_CALL,
-                            format!("service call err: {}", e),
-                        )
-                    })?;
+                    .map_err(|_| ckb_vm::Error::IO(io::ErrorKind::Other))?;
 
                 machine.set_cycles(current_cycle);
                 self.set_bytes(machine, ret_ptr, len_ptr, ret.as_bytes())?;
