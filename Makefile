@@ -90,8 +90,9 @@ security-audit:
 .PHONY: fmt test clippy doc doc-deps doc-api check stats
 .PHONY: ci info security-audit
 .PHONY: duktape
+.PHONY: libpvm.a
 
-# For duktape
+# For riscv service
 TARGET := riscv64-unknown-elf
 CC := $(TARGET)-gcc
 LD := $(TARGET)-gcc
@@ -102,9 +103,29 @@ DOCKER_BUILD := docker run --rm -it -v $(CURRENT_DIR):/src nervos/ckb-riscv-gnu-
 TEST_SRC := $(CURRENT_DIR)/built-in-services/riscv/src/tests
 RISCV_SRC := $(CURRENT_DIR)/built-in-services/riscv/src/vm/c
 DUKTAPE_SRC := $(RISCV_SRC)/duktape
+DEMO_SRC := $(CURRENT_DIR)/built-in-services/riscv/examples/dex
 
-duktape:
-	$(CC) -I$(DUKTAPE_SRC) $(DUKTAPE_SRC)/duktape.c $(RISCV_SRC)/duktape_ee.c $(LDFLAGS) -o $(RISCV_SRC)/duktape_ee.bin
+duktape: libpvm.a
+	$(CC) -I$(DUKTAPE_SRC) -I$(RISCV_SRC) $(DUKTAPE_SRC)/duktape.c $(RISCV_SRC)/duktape_ee.c $(RISCV_SRC)/libpvm.a $(LDFLAGS) -o $(RISCV_SRC)/duktape_ee.bin
 
 duktape_docker:
 	$(DOCKER_BUILD) "cd /src && make duktape"
+
+libpvm.a:
+	$(CC) -I$(RISCV_SRC) -c $(RISCV_SRC)/pvm.c -o /tmp/pvm.o
+	$(CC) -I$(RISCV_SRC) -c $(RISCV_SRC)/UsefulBuf.c -o /tmp/UsefulBuf.o
+	$(CC) -I$(RISCV_SRC) -c $(RISCV_SRC)/pvm_structs.c -o /tmp/pvm_structs.o
+	ar rcs $(RISCV_SRC)/libpvm.a /tmp/UsefulBuf.o /tmp/pvm_structs.o /tmp/pvm.o
+
+pvm_structs_test: libpvm.a
+	$(CC) -I$(RISCV_SRC) $(TEST_SRC)/pvm_structs.c $(RISCV_SRC)/libpvm.a $(LDFLAGS) -o $(TEST_SRC)/pvm_structs.bin
+
+riscv_demo: libpvm.a
+	$(CC) -I$(RISCV_SRC) $(DEMO_SRC)/cJSON.h $(DEMO_SRC)/cJSON.c $(DEMO_SRC)/erc20.c $(RISCV_SRC)/libpvm.a $(LDFLAGS) -o $(DEMO_SRC)/erc20.bin
+	$(CC) -I$(RISCV_SRC) $(DEMO_SRC)/cJSON.h $(DEMO_SRC)/cJSON.c $(DEMO_SRC)/dex.c $(RISCV_SRC)/libpvm.a $(LDFLAGS) -o $(DEMO_SRC)/dex.bin
+
+pvm_docker:
+	$(DOCKER_BUILD) "cd /src && make pvm_structs_test"
+
+riscv_demo_docker:
+	$(DOCKER_BUILD) "cd /src && make riscv_demo"

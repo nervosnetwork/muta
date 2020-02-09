@@ -48,6 +48,7 @@ static inline long __internal_syscall(long n, long _a0, long _a1, long _a2,
 #define SYSCODE_SET_STORAGE 4001
 #define SYSCODE_CONTRACT_CALL 4002
 #define SYSCODE_SERVICE_CALL 4003
+#define SYSCODE_GET_STORAGE_VALUE_SIZE 4004
 
 /*
  * Function pvm_debug accepts a string that contains the text to be written to
@@ -297,6 +298,20 @@ int pvm_tx_nonce(uint8_t *addr);
  */
 int pvm_get_storage(const uint8_t *k, uint64_t k_size, uint8_t *v,
                     uint64_t *v_size);
+
+/*
+ * Function pvm_get_storage_value_size return value size of given key.
+ *
+ * Params:
+ *   k[in]: pointer to key
+ *   k_size[in]: size of key
+ *
+ * Example:
+ *   const char *key = "cyber";
+ *   uint64_t val_size = pvm_get_storage((uint8_t *)key, strlen(key));
+ *   pvm_assert(val_size == 4, "should have 4 bytes");
+ */
+uint64_t pvm_get_storage_value_size(const uint8_t *k, uint64_t k_size);
 
 /*
  * Function pvm_set_storage save value to contract state using given key.

@@ -79,10 +79,3 @@ int pvm_ret_str(const char *s) {
  *   0(success)
  */
 int pvm_ret_u64(uint64_t n) { return pvm_ret((uint8_t *)&n, 8); }
-
-void pvm_ret_u64_str(uint64_t n) {
-  char buf[24];
-
-  size_t size = snprintf(buf, 24, "%lu", n);
-  pvm_ret((uint8_t *)buf, size);
-}
