@@ -143,14 +143,15 @@ impl<Mac: ckb_vm::SupportMachine> ckb_vm::Syscalls<Mac> for SyscallChainInterfac
 
                 let service = get_str(machine, service_ptr)?;
                 let method = get_str(machine, method_ptr)?;
-                // Right now, service payload is hardcoded json
-                let json_payload = String::from_utf8(get_arr(machine, payload_ptr, payload_len)?)
-                    .map_err(|_| IO(InvalidData))?;
+                // FIXME: Right now, service call payload is json, but this may
+                // change. Use from_utf8_lossy here so we're not force json.
+                let payload = get_arr(machine, payload_ptr, payload_len)?;
+                let payload = String::from_utf8_lossy(&payload);
 
                 let (ret, current_cycle) = self
                     .chain
                     .borrow_mut()
-                    .service_call(&service, &method, &json_payload, machine.cycles())
+                    .service_call(&service, &method, &payload, machine.cycles())
                     .map_err(|_| ckb_vm::Error::IO(io::ErrorKind::Other))?;
 
                 machine.set_cycles(current_cycle);
