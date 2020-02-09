@@ -163,10 +163,10 @@ static duk_ret_t duk_pvm_emit_event(duk_context *ctx) {
     return duk_throw(ctx);
   }
 
-  const char *msg = duk_safe_to_string(ctx, -1);
-  duk_pop(ctx);
+  duk_size_t msg_size = 0;
+  const void *msg = duk_get_lstring(ctx, -1, &msg_size);
 
-  if (pvm_emit_event((uint8_t *)msg, strlen(msg))) {
+  if (pvm_emit_event(msg, msg_size)) {
     duk_push_error_object(ctx, DUK_ERR_EVAL_ERROR, "Invalid UTF-8 string");
     return duk_throw(ctx);
   }
@@ -213,14 +213,14 @@ static duk_ret_t duk_pvm_get_storage(duk_context *ctx) {
     return duk_throw(ctx);
   }
 
-  const char *key = duk_safe_to_string(ctx, -1);
-  duk_pop(ctx);
+  duk_size_t key_size = 0;
+  const void *key = duk_get_lstring(ctx, -1, &key_size);
 
   duk_push_fixed_buffer(ctx, MAX_LOAD_SIZE);
-  void *val = duk_get_buffer(ctx, 0, NULL);
+  void *val = duk_get_buffer(ctx, -1, NULL);
 
   uint64_t val_size = 0;
-  pvm_get_storage((uint8_t *)key, strlen(key), val, &val_size);
+  pvm_get_storage(key, key_size, val, &val_size);
 
   duk_buffer_to_string(ctx, -1);
   duk_push_string(ctx, duk_safe_to_string(ctx, -1));
@@ -235,11 +235,13 @@ static duk_ret_t duk_pvm_set_storage(duk_context *ctx) {
     return duk_throw(ctx);
   }
 
-  const char *key = duk_safe_to_string(ctx, -2);
-  const char *val = duk_safe_to_string(ctx, -1);
-  duk_pop_n(ctx, 2);
+  duk_size_t key_size = 0;
+  const void *key = duk_get_lstring(ctx, -2, &key_size);
 
-  pvm_set_storage((uint8_t *)key, strlen(key), (uint8_t *)val, strlen(val));
+  duk_size_t val_size = 0;
+  const void *val = duk_get_lstring(ctx, -1, &val_size);
+
+  pvm_set_storage(key, key_size, val, val_size);
 
   return 0;
 }
@@ -264,15 +266,16 @@ static duk_ret_t duk_pvm_service_call(duk_context *ctx) {
 
   const char *service = duk_safe_to_string(ctx, 0);
   const char *method = duk_safe_to_string(ctx, 1);
-  const char *payload = duk_safe_to_string(ctx, 2);
-  duk_pop_n(ctx, 3);
+
+  duk_size_t payload_size = 0;
+  const void *payload = duk_get_lstring(ctx, 2, &payload_size);
 
   duk_push_fixed_buffer(ctx, MAX_LOAD_SIZE);
-  void *ret = duk_get_buffer(ctx, 0, NULL);
+  void *ret = duk_get_buffer(ctx, -1, NULL);
 
   int ret_code = 0;
-  if (ret_code != pvm_service_call(service, method, (uint8_t *)payload,
-                                   strlen(payload), ret, NULL)) {
+  if (ret_code !=
+      pvm_service_call(service, method, payload, payload_size, ret, NULL)) {
     return ret_code;
   }
 
@@ -289,16 +292,17 @@ static duk_ret_t duk_pvm_contract_call(duk_context *ctx) {
     return duk_throw(ctx);
   }
 
-  const char *addr = duk_safe_to_string(ctx, -2);
-  const char *call_args = duk_safe_to_string(ctx, -1);
-  duk_pop_n(ctx, 2);
+  duk_size_t addr_size = 0;
+  const void *addr = duk_get_lstring(ctx, -2, &addr_size);
+
+  duk_size_t args_size = 0;
+  const void *call_args = duk_get_lstring(ctx, -1, &args_size);
 
   duk_push_fixed_buffer(ctx, MAX_LOAD_SIZE);
-  void *ret = duk_get_buffer(ctx, 0, NULL);
+  void *ret = duk_get_buffer(ctx, -1, NULL);
 
   int ret_code = 0;
-  if (ret_code != pvm_contract_call((uint8_t *)addr, (uint8_t *)call_args,
-                                    strlen(call_args), ret, NULL)) {
+  if (ret_code != pvm_contract_call(addr, call_args, args_size, ret, NULL)) {
     return ret_code;
   }
 
