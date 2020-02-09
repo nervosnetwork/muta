@@ -108,6 +108,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         let time = std::time::Instant::now();
 
         let order_hashes = block.get_ordered_hashes();
+        let order_hashes_len = order_hashes.len();
         let exemption = { self.exemption_hash.read().contains(&hash) };
         let sync_tx_hashes = block.get_propose_hashes();
 
@@ -131,7 +132,11 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         self.adapter
             .save_wal_transactions(Context::new(), Hash::digest(hash.clone()), inner)
             .await?;
-        log::info!("[consensus-engine]: check block cost {:?}", time.elapsed());
+        log::info!(
+            "[consensus-engine]: check block cost {:?} order_hashes_len {:?}",
+            time.elapsed(),
+            order_hashes_len
+        );
         Ok(())
     }
 
