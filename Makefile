@@ -105,8 +105,8 @@ RISCV_SRC := $(CURRENT_DIR)/built-in-services/riscv/src/vm/c
 DUKTAPE_SRC := $(RISCV_SRC)/duktape
 DEMO_SRC := $(CURRENT_DIR)/built-in-services/riscv/examples/dex
 
-duktape:
-	$(CC) -I$(DUKTAPE_SRC) $(DUKTAPE_SRC)/duktape.c $(RISCV_SRC)/duktape_ee.c $(LDFLAGS) -o $(RISCV_SRC)/duktape_ee.bin
+duktape: libpvm.a
+	$(CC) -I$(DUKTAPE_SRC) -I$(RISCV_SRC) $(DUKTAPE_SRC)/duktape.c $(RISCV_SRC)/duktape_ee.c $(RISCV_SRC)/libpvm.a $(LDFLAGS) -o $(RISCV_SRC)/duktape_ee.bin
 
 duktape_docker:
 	$(DOCKER_BUILD) "cd /src && make duktape"

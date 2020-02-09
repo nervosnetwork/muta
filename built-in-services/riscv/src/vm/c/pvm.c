@@ -84,4 +84,7 @@ int pvm_contract_call(const uint8_t *addr, const uint8_t *args,
 
 int pvm_service_call(const char *service, const char *method,
                      const uint8_t *payload, uint64_t payload_size,
-                     uint8_t *ret, uint64_t *ret_size) ;
+                     uint8_t *ret, uint64_t *ret_size) {
+  return syscall(SYSCODE_SERVICE_CALL, service, method, payload, payload_size,
+                 ret, ret_size);
+}
