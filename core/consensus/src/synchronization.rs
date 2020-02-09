@@ -33,6 +33,15 @@ pub struct OverlordSynchronization<Adapter: SynchronizationAdapter> {
 #[async_trait]
 impl<Adapter: SynchronizationAdapter> Synchronization for OverlordSynchronization<Adapter> {
     async fn receive_remote_block(&self, ctx: Context, remote_height: u64) -> ProtocolResult<()> {
+        let block = self
+            .get_block_from_remote(ctx.clone(), remote_height)
+            .await?;
+
+        if block.header.height != remote_height {
+            log::error!("[synchronization]: block that doesn't match is found");
+            return Ok(());
+        }
+
         let current_height = self.adapter.get_current_height(Context::new()).await?;
         if remote_height == 0 || current_height >= remote_height - 1 {
             return Ok(());
@@ -58,12 +67,15 @@ impl<Adapter: SynchronizationAdapter> Synchronization for OverlordSynchronizatio
                 remote_height,
             )
             .await;
-        
         let mut sync_status = sync_status_agent.to_inner();
         let current_height = sync_status.height;
 
         match sync_resp {
-            Err(e) => log::error!("[synchronization]: err, current_height {:?} err_msg: {:?}", current_height, e),
+            Err(e) => log::error!(
+                "[synchronization]: err, current_height {:?} err_msg: {:?}",
+                current_height,
+                e
+            ),
             _ => {}
         };
 
@@ -207,16 +219,19 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
         ctx: Context,
         height: u64,
     ) -> ProtocolResult<RichBlock> {
-        let block = self
-            .adapter
-            .get_block_from_remote(ctx.clone(), height)
-            .await?;
+        let block = self.get_block_from_remote(ctx.clone(), height).await?;
         let txs = self
             .adapter
             .get_txs_from_remote(ctx, &block.ordered_tx_hashes)
             .await?;
 
         Ok(RichBlock { block, txs })
+    }
+
+    async fn get_block_from_remote(&self, ctx: Context, height: u64) -> ProtocolResult<Block> {
+        self.adapter
+            .get_block_from_remote(ctx.clone(), height)
+            .await
     }
 
     async fn save_chain_data(
