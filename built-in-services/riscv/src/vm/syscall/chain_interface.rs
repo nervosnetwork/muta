@@ -7,7 +7,7 @@ use ckb_vm::memory::Memory;
 use protocol::{types::Address, Bytes};
 
 use crate::vm::cost_model::CONTRACT_CALL_FIXED_CYCLE;
-use crate::vm::syscall::common::{get_arr, get_str, invalid_ecall};
+use crate::vm::syscall::common::{get_arr, get_str};
 use crate::vm::syscall::convention::{
     SYSCODE_CONTRACT_CALL, SYSCODE_GET_STORAGE, SYSCODE_SERVICE_CALL, SYSCODE_SET_STORAGE,
 };
@@ -60,7 +60,7 @@ impl<Mac: ckb_vm::SupportMachine> ckb_vm::Syscalls<Mac> for SyscallChainInterfac
                 let val_ptr = machine.registers()[ckb_vm::registers::A2].to_u64();
                 let val_len = machine.registers()[ckb_vm::registers::A3].to_u64();
                 if key_ptr == 0 || val_ptr == 0 || key_len == 0 {
-                    return Err(invalid_ecall(code));
+                    return Err(ckb_vm::Error::IO(io::ErrorKind::InvalidInput));
                 }
 
                 let key = get_arr(machine, key_ptr, key_len)?;
@@ -69,7 +69,7 @@ impl<Mac: ckb_vm::SupportMachine> ckb_vm::Syscalls<Mac> for SyscallChainInterfac
                 self.chain
                     .borrow_mut()
                     .set_storage(Bytes::from(key), Bytes::from(val))
-                    .map_err(|_| invalid_ecall(code))?;
+                    .map_err(|_| ckb_vm::Error::InvalidEcall(code))?;
 
                 machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(0));
                 Ok(true)
@@ -80,7 +80,7 @@ impl<Mac: ckb_vm::SupportMachine> ckb_vm::Syscalls<Mac> for SyscallChainInterfac
                 let val_ptr = machine.registers()[ckb_vm::registers::A2].to_u64();
                 let len_ptr = machine.registers()[ckb_vm::registers::A3].to_u64();
                 if key_ptr == 0 || key_len == 0 {
-                    return Err(invalid_ecall(code));
+                    return Err(ckb_vm::Error::IO(io::ErrorKind::InvalidInput));
                 }
                 if val_ptr == 0 && len_ptr == 0 {
                     return Ok(true);
@@ -91,7 +91,7 @@ impl<Mac: ckb_vm::SupportMachine> ckb_vm::Syscalls<Mac> for SyscallChainInterfac
                     .chain
                     .borrow()
                     .get_storage(&Bytes::from(key))
-                    .map_err(|_e| invalid_ecall(code))?;
+                    .map_err(|_e| ckb_vm::Error::InvalidEcall(code))?;
 
                 self.set_bytes(machine, val_ptr, len_ptr, &val)?;
                 machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(0));
@@ -107,7 +107,7 @@ impl<Mac: ckb_vm::SupportMachine> ckb_vm::Syscalls<Mac> for SyscallChainInterfac
                 let ret_ptr = machine.registers()[ckb_vm::registers::A3].to_u64();
                 let len_ptr = machine.registers()[ckb_vm::registers::A4].to_u64();
                 if addr_ptr == 0 || args_ptr == 0 || args_len == 0 {
-                    return Err(invalid_ecall(code));
+                    return Err(ckb_vm::Error::IO(io::ErrorKind::InvalidInput));
                 }
 
                 let call_args = Bytes::from(get_arr(machine, args_ptr, args_len)?);
@@ -143,7 +143,7 @@ impl<Mac: ckb_vm::SupportMachine> ckb_vm::Syscalls<Mac> for SyscallChainInterfac
                 let ret_ptr = machine.registers()[ckb_vm::registers::A4].to_u64();
                 let len_ptr = machine.registers()[ckb_vm::registers::A5].to_u64();
                 if service_ptr == 0 || method_ptr == 0 || payload_ptr == 0 || payload_len == 0 {
-                    return Err(invalid_ecall(code));
+                    return Err(ckb_vm::Error::IO(io::ErrorKind::InvalidInput));
                 }
 
                 let service = get_str(machine, service_ptr)?;

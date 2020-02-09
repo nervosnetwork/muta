@@ -1,12 +1,12 @@
 // Since ckb-vm can only return 0 or 1 as exit code, We must find another way to
 // return string, u64...
 use std::cell::RefCell;
-use std::rc::Rc;
+use std::{io, rc::Rc};
 
 use ckb_vm::instructions::Register;
 use ckb_vm::Memory;
 
-use crate::vm::syscall::common::{get_arr, invalid_ecall};
+use crate::vm::syscall::common::get_arr;
 use crate::vm::syscall::convention::{SYSCODE_LOAD_ARGS, SYSCODE_RET};
 
 pub struct SyscallIO {
@@ -33,7 +33,7 @@ impl<Mac: ckb_vm::SupportMachine> ckb_vm::Syscalls<Mac> for SyscallIO {
             let size = machine.registers()[ckb_vm::registers::A1].to_u64();
 
             if ptr == 0 {
-                return Err(invalid_ecall(code));
+                return Err(ckb_vm::Error::IO(io::ErrorKind::InvalidInput));
             }
 
             let buffer = get_arr(machine, ptr, size)?;

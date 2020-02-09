@@ -1,10 +1,12 @@
 //! Environmental Information
+use std::io;
+
 use ckb_vm::instructions::Register;
 use ckb_vm::memory::Memory;
 use log::error;
 use protocol::{types::ServiceContext, Bytes};
 
-use crate::vm::syscall::common::{get_arr, invalid_ecall};
+use crate::vm::syscall::common::get_arr;
 use crate::vm::syscall::convention::{
     SYSCODE_ADDRESS, SYSCODE_BLOCK_HEIGHT, SYSCODE_CALLER, SYSCODE_CYCLE_LIMIT,
     SYSCODE_CYCLE_PRICE, SYSCODE_CYCLE_USED, SYSCODE_EMIT_EVENT, SYSCODE_EXTRA, SYSCODE_IS_INIT,
@@ -35,7 +37,7 @@ impl<Mac: ckb_vm::SupportMachine> ckb_vm::Syscalls<Mac> for SyscallEnvironment {
             SYSCODE_ADDRESS => {
                 let ptr = machine.registers()[ckb_vm::registers::A0].to_u64();
                 if ptr == 0 {
-                    return Err(invalid_ecall(code));
+                    return Err(ckb_vm::Error::IO(io::ErrorKind::InvalidInput));
                 }
 
                 machine
@@ -68,7 +70,7 @@ impl<Mac: ckb_vm::SupportMachine> ckb_vm::Syscalls<Mac> for SyscallEnvironment {
             SYSCODE_ORIGIN => {
                 let ptr = machine.registers()[ckb_vm::registers::A0].to_u64();
                 if ptr == 0 {
-                    return Err(invalid_ecall(code));
+                    return Err(ckb_vm::Error::IO(io::ErrorKind::InvalidInput));
                 }
 
                 machine
@@ -81,7 +83,7 @@ impl<Mac: ckb_vm::SupportMachine> ckb_vm::Syscalls<Mac> for SyscallEnvironment {
             SYSCODE_CALLER => {
                 let ptr = machine.registers()[ckb_vm::registers::A0].to_u64();
                 if ptr == 0 {
-                    return Err(invalid_ecall(code));
+                    return Err(ckb_vm::Error::IO(io::ErrorKind::InvalidInput));
                 }
 
                 let caller = self
@@ -140,7 +142,7 @@ impl<Mac: ckb_vm::SupportMachine> ckb_vm::Syscalls<Mac> for SyscallEnvironment {
             SYSCODE_TX_HASH => {
                 let ptr = machine.registers()[ckb_vm::registers::A0].to_u64();
                 if ptr == 0 {
-                    return Err(invalid_ecall(code));
+                    return Err(ckb_vm::Error::IO(io::ErrorKind::InvalidInput));
                 }
 
                 if let Some(tx_hash) = self.context.get_tx_hash().map(|h| h.as_hex()) {
@@ -155,7 +157,7 @@ impl<Mac: ckb_vm::SupportMachine> ckb_vm::Syscalls<Mac> for SyscallEnvironment {
             SYSCODE_TX_NONCE => {
                 let ptr = machine.registers()[ckb_vm::registers::A0].to_u64();
                 if ptr == 0 {
-                    return Err(invalid_ecall(code));
+                    return Err(ckb_vm::Error::IO(io::ErrorKind::InvalidInput));
                 }
 
                 if let Some(nonce) = self.context.get_nonce().map(|n| n.as_hex()) {

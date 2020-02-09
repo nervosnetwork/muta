@@ -4,7 +4,7 @@ use std::io::Write;
 
 use ckb_vm::instructions::Register;
 
-use crate::vm::syscall::common::{get_str, invalid_ecall};
+use crate::vm::syscall::common::get_str;
 use crate::vm::syscall::convention::SYSCODE_DEBUG;
 
 pub struct SyscallDebug<T> {
@@ -31,7 +31,7 @@ impl<Mac: ckb_vm::SupportMachine, T: Write> ckb_vm::Syscalls<Mac> for SyscallDeb
 
         let ptr = machine.registers()[ckb_vm::registers::A0].to_u64();
         if ptr == 0 {
-            return Err(invalid_ecall(code));
+            return Err(ckb_vm::Error::IO(std::io::ErrorKind::InvalidInput));
         }
 
         let msg = get_str(machine, ptr)?;

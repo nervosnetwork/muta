@@ -46,7 +46,3 @@ pub fn get_arr<Mac: ckb_vm::SupportMachine>(
     machine.add_cycles(buffer.len() as u64 * 10)?;
     Ok(buffer)
 }
-
-pub fn invalid_ecall(code: u64) -> ckb_vm::Error {
-    ckb_vm::Error::InvalidEcall(code)
-}
