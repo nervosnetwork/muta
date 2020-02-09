@@ -55,7 +55,7 @@ impl<Mac: ckb_vm::SupportMachine> ckb_vm::Syscalls<Mac> for SyscallChainInterfac
                 let key_len = machine.registers()[ckb_vm::registers::A1].to_u64();
                 let val_ptr = machine.registers()[ckb_vm::registers::A2].to_u64();
                 let val_len = machine.registers()[ckb_vm::registers::A3].to_u64();
-                if key_ptr == 0 || val_ptr == 0 || key_len == 0 || val_len == 0 {
+                if key_ptr == 0 || val_ptr == 0 || key_len == 0 {
                     return Err(invalid_ecall(code));
                 }
 
