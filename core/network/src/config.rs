@@ -245,6 +245,14 @@ impl NetworkConfig {
         self
     }
 
+    pub fn selfcheck_interval(mut self, interval: Option<u64>) -> Self {
+        if let Some(interval) = interval {
+            self.selfcheck_interval = Duration::from_secs(interval);
+        }
+
+        self
+    }
+
     fn parse_peer_addr(addr: PeerAddrStr) -> ProtocolResult<Multiaddr> {
         if let Ok(socket_addr) = addr.parse::<SocketAddr>() {
             Ok(socket_to_multi_addr(socket_addr))

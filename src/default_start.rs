@@ -127,7 +127,9 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     let storage = Arc::new(ImplStorage::new(Arc::clone(&rocks_adapter)));
 
     // Init network
-    let network_config = NetworkConfig::new().rpc_timeout(config.network.rpc_timeout.clone());
+    let network_config = NetworkConfig::new()
+        .rpc_timeout(config.network.rpc_timeout.clone())
+        .selfcheck_interval(config.network.selfcheck_interval.clone());
     let network_privkey = config.privkey.clone();
 
     let mut bootstrap_pairs = vec![];
