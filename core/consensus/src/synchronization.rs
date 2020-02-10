@@ -70,14 +70,13 @@ impl<Adapter: SynchronizationAdapter> Synchronization for OverlordSynchronizatio
         let mut sync_status = sync_status_agent.to_inner();
         let current_height = sync_status.height;
 
-        match sync_resp {
-            Err(e) => log::error!(
+        if let Err(e) = sync_resp {
+            log::error!(
                 "[synchronization]: err, current_height {:?} err_msg: {:?}",
                 current_height,
                 e
-            ),
-            _ => {}
-        };
+            );
+        }
 
         sync_status.height += 1;
         self.status.replace(sync_status.clone());
