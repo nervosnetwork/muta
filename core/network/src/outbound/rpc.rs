@@ -3,6 +3,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use futures::future::{self, Either};
 use futures_timer::Delay;
+use log::warn;
 use protocol::{
     traits::{Context, MessageCodec, Priority, Rpc},
     Bytes, ProtocolResult,
@@ -79,6 +80,10 @@ where
                 ret.map_err(|_| NetworkError::from(ErrorKind::RpcDropped(connected_addr)))?
             }
             Either::Right((_unresolved, _timeout)) => {
+                if let Err(err) = self.map.take::<R>(sid, rid) {
+                    warn!("rpc: remove {}, maybe we just got response", err);
+                }
+
                 return Err(NetworkError::from(ErrorKind::RpcTimeout(connected_addr)).into());
             }
         };

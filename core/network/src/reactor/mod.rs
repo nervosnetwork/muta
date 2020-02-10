@@ -87,8 +87,13 @@ where
                 }
                 EndpointScheme::RpcResponse => {
                     let rpc_endpoint = RpcEndpoint::try_from(endpoint)?;
-                    let resp_tx = rpc_map.take::<M>(sid, rpc_endpoint.rpc_id().value())?;
+                    let rpc_id = rpc_endpoint.rpc_id().value();
+                    if !rpc_map.contains(sid, rpc_id) {
+                        warn!("network: reactor: rpc entry not found, if there's timeout message, it's ok here");
+                        return Ok(());
+                    }
 
+                    let resp_tx = rpc_map.take::<M>(sid, rpc_endpoint.rpc_id().value())?;
                     if resp_tx.send(content).is_err() {
                         let end = rpc_endpoint.endpoint().full_url();
 
