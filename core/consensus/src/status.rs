@@ -91,10 +91,10 @@ impl StatusAgent {
 pub struct CurrentConsensusStatus {
     pub cycles_price:       u64,
     pub cycles_limit:       u64,
-    pub height:           u64,
-    pub exec_height:      u64,
+    pub height:             u64,
+    pub exec_height:        u64,
     pub prev_hash:          Hash,
-    pub latest_state_root: MerkleRoot,
+    pub latest_state_root:  MerkleRoot,
     pub logs_bloom:         Vec<Bloom>,
     pub confirm_root:       Vec<MerkleRoot>,
     pub state_root:         Vec<MerkleRoot>,
@@ -106,7 +106,7 @@ pub struct CurrentConsensusStatus {
     pub propose_ratio:      u64,
     pub prevote_ratio:      u64,
     pub precommit_ratio:    u64,
-    pub brake_ratio: u64,
+    pub brake_ratio:        u64,
 }
 
 impl CurrentConsensusStatus {
