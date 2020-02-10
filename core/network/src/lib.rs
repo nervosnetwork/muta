@@ -11,6 +11,7 @@ mod peer_manager;
 mod protocols;
 mod reactor;
 mod rpc_map;
+mod selfcheck;
 mod service;
 mod traits;
 

@@ -19,7 +19,7 @@ use crate::{
     endpoint::Endpoint,
     error::{ErrorKind, NetworkError},
     message::{NetworkMessage, RawSessionMessage, SessionMessage},
-    traits::{Compression, PeerInfoQuerier},
+    traits::{Compression, PeerQuerier},
 };
 
 pub struct MessageRouter<C, PQ> {
@@ -42,7 +42,7 @@ pub struct MessageRouter<C, PQ> {
 impl<C, PQ> MessageRouter<C, PQ>
 where
     C: Compression + Send + Unpin + Clone + 'static,
-    PQ: PeerInfoQuerier + Send + Unpin + Clone + 'static,
+    PQ: PeerQuerier + Send + Unpin + Clone + 'static,
 {
     pub fn new(
         raw_msg_rx: UnboundedReceiver<RawSessionMessage>,
@@ -112,7 +112,7 @@ where
 impl<C, PQ> Future for MessageRouter<C, PQ>
 where
     C: Compression + Send + Unpin + Clone + 'static,
-    PQ: PeerInfoQuerier + Send + Unpin + Clone + 'static,
+    PQ: PeerQuerier + Send + Unpin + Clone + 'static,
 {
     type Output = ();
 

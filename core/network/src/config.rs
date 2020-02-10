@@ -17,6 +17,7 @@ use crate::{
     connection::ConnectionConfig,
     error::NetworkError,
     peer_manager::{Peer, PeerManagerConfig},
+    selfcheck::SelfCheckConfig,
 };
 
 // TODO: 0.0.0.0 expose? 127.0.0.1 doesn't work because of tentacle-discovery.
@@ -41,6 +42,9 @@ pub const DEFAULT_PEER_MANAGER_HEART_BEAT_INTERVAL: u64 = 30;
 pub const DEFAULT_SELF_HEART_BEAT_INTERVAL: u64 = 35;
 
 pub const DEFAULT_RPC_TIMEOUT: u64 = 10;
+
+// Selfcheck
+pub const DEFAULT_SELF_CHECK_INTERVAL: u64 = 10;
 
 pub type PublicKeyHexStr = String;
 pub type PrivateKeyHexStr = String;
@@ -108,6 +112,9 @@ pub struct NetworkConfig {
 
     // rpc
     pub rpc_timeout: Duration,
+
+    // self check
+    pub selfcheck_interval: Duration,
 }
 
 impl NetworkConfig {
@@ -137,6 +144,8 @@ impl NetworkConfig {
             heart_beat_interval:              Duration::from_secs(DEFAULT_SELF_HEART_BEAT_INTERVAL),
 
             rpc_timeout: Duration::from_secs(DEFAULT_RPC_TIMEOUT),
+
+            selfcheck_interval: Duration::from_secs(DEFAULT_SELF_CHECK_INTERVAL),
         }
     }
 
@@ -284,6 +293,14 @@ impl From<&NetworkConfig> for TimeoutConfig {
     fn from(config: &NetworkConfig) -> TimeoutConfig {
         TimeoutConfig {
             rpc: config.rpc_timeout,
+        }
+    }
+}
+
+impl From<&NetworkConfig> for SelfCheckConfig {
+    fn from(config: &NetworkConfig) -> SelfCheckConfig {
+        SelfCheckConfig {
+            interval: config.selfcheck_interval,
         }
     }
 }

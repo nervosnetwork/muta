@@ -47,7 +47,7 @@ use crate::{
     common::{ConnectedAddr, HeartBeat},
     error::NetworkError,
     event::{ConnectionEvent, ConnectionType, MultiUsersMessage, PeerManagerEvent, Session},
-    traits::PeerInfoQuerier,
+    traits::PeerQuerier,
 };
 
 const MAX_RETRY_COUNT: usize = 6;
@@ -159,6 +159,14 @@ impl Inner {
         } else {
             None
         }
+    }
+
+    pub fn pending_data_size(&self, pid: &PeerId) -> usize {
+        self.pool
+            .read()
+            .get(pid)
+            .map(|peer| peer.pending_data_size())
+            .unwrap_or_else(|| 0)
     }
 
     pub fn peer_exist(&self, pid: &PeerId) -> bool {
@@ -472,9 +480,17 @@ impl PeerManagerHandle {
     }
 }
 
-impl PeerInfoQuerier for PeerManagerHandle {
+impl PeerQuerier for PeerManagerHandle {
     fn connected_addr(&self, pid: &PeerId) -> Option<ConnectedAddr> {
         self.inner.connected_addr(pid)
+    }
+
+    fn connected_peers(&self) -> Vec<PeerId> {
+        self.inner.connected_peers()
+    }
+
+    fn pending_data_size(&self, pid: &PeerId) -> usize {
+        self.inner.pending_data_size(pid)
     }
 }
 

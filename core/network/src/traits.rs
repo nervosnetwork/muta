@@ -56,8 +56,10 @@ pub trait ListenExchangeManager {
     fn misbehave(&mut self, sid: SessionId);
 }
 
-pub trait PeerInfoQuerier {
+pub trait PeerQuerier {
     fn connected_addr(&self, pid: &PeerId) -> Option<ConnectedAddr>;
+    fn connected_peers(&self) -> Vec<PeerId>;
+    fn pending_data_size(&self, pid: &PeerId) -> usize;
 }
 
 #[derive(Debug, Clone)]
