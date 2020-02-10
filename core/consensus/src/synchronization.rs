@@ -148,10 +148,6 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
             self.commit_block(ctx.clone(), next_rich_block, sync_status_agent.clone())
                 .await?;
 
-            self.adapter
-                .broadcast_height(ctx.clone(), current_height)
-                .await?;
-
             current_height = next_height;
 
             if current_height >= remote_height {
