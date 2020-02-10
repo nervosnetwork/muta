@@ -3,7 +3,7 @@ mod ident;
 mod peer;
 mod persist;
 
-use peer::{ConnectedAddr, PeerState};
+use peer::PeerState;
 use persist::{NoopPersistence, PeerPersistence, Persistence};
 
 pub use disc::DiscoveryAddrManager;
@@ -44,9 +44,10 @@ use tentacle::{
 };
 
 use crate::{
-    common::HeartBeat,
+    common::{ConnectedAddr, HeartBeat},
     error::NetworkError,
     event::{ConnectionEvent, ConnectionType, MultiUsersMessage, PeerManagerEvent, Session},
+    traits::PeerInfoQuerier,
 };
 
 const MAX_RETRY_COUNT: usize = 6;
@@ -468,6 +469,12 @@ impl PeerManagerHandle {
         debug_assert!(listen.is_some(), "listen should alway be set");
 
         listen.map(|addr| vec![addr]).unwrap_or_else(Vec::new)
+    }
+}
+
+impl PeerInfoQuerier for PeerManagerHandle {
+    fn connected_addr(&self, pid: &PeerId) -> Option<ConnectedAddr> {
+        self.inner.connected_addr(pid)
     }
 }
 
@@ -1038,10 +1045,12 @@ impl Future for PeerManager {
             self.process_event(event);
         }
 
+        let connected_peers_addr = self.connected_peers_addr();
         debug!(
-            "network: {:?}: connected peer_addr(s): {:?}",
+            "network: {:?}: connected peer_addr(s) {}: {:?}",
             self.peer_id,
-            self.connected_peers_addr()
+            connected_peers_addr.len(),
+            connected_peers_addr
         );
 
         // Check connecting count

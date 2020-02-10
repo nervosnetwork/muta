@@ -31,7 +31,9 @@ use crate::{
     event::{ConnectionEvent, PeerManagerEvent},
     message::RawSessionMessage,
     outbound::{NetworkGossip, NetworkRpc},
-    peer_manager::{DiscoveryAddrManager, IdentifyCallback, PeerManager, PeerManagerConfig},
+    peer_manager::{
+        DiscoveryAddrManager, IdentifyCallback, PeerManager, PeerManagerConfig, PeerManagerHandle,
+    },
     protocols::CoreProtocol,
     reactor::{MessageRouter, Reactor},
     rpc_map::RpcMap,
@@ -112,7 +114,7 @@ pub struct NetworkService {
     // Core service
     net_conn_srv: Option<NetworkConnectionService>,
     peer_mgr:     Option<PeerManager>,
-    router:       Option<MessageRouter<Snappy>>,
+    router:       Option<MessageRouter<Snappy, PeerManagerHandle>>,
 }
 
 impl NetworkService {
@@ -147,7 +149,7 @@ impl NetworkService {
         // Build service protocol
         let disc_sync_interval = config.discovery_sync_interval;
         let disc_addr_mgr = DiscoveryAddrManager::new(peer_mgr_handle.clone(), mgr_tx.clone());
-        let ident_callback = IdentifyCallback::new(peer_mgr_handle, mgr_tx.clone());
+        let ident_callback = IdentifyCallback::new(peer_mgr_handle.clone(), mgr_tx.clone());
         let proto = CoreProtocol::build()
             .ping(config.ping_interval, config.ping_timeout, mgr_tx.clone())
             .identify(ident_callback)
@@ -165,7 +167,7 @@ impl NetworkService {
         let gossip = NetworkGossip::new(conn_ctrl.clone(), Snappy);
         let rpc_map_clone = Arc::clone(&rpc_map);
         let rpc = NetworkRpc::new(conn_ctrl, Snappy, rpc_map_clone, (&config).into());
-        let router = MessageRouter::new(raw_msg_rx, Snappy, sys_tx);
+        let router = MessageRouter::new(raw_msg_rx, Snappy, peer_mgr_handle, sys_tx);
 
         NetworkService {
             sys_rx,
