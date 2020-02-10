@@ -6,7 +6,7 @@ GraphQL provides a complete and understandable description of the data in your A
 gives clients the power to ask for exactly what they need and nothing more,
 makes it easier to evolve APIs over time, and enables powerful developer tools.
 
-Muta has embeded a [Graph*i*QL](https://github.com/graphql/graphiql) for checking and calling API. Started a the Muta
+Muta has embeded a [Graph**i**QL](https://github.com/graphql/graphiql) for checking and calling API. Started a the Muta
 node, and then try open http://127.0.0.1:8000/graphiql in the browser.
 
 
@@ -18,19 +18,22 @@ node, and then try open http://127.0.0.1:8000/graphiql in the browser.
   * [Objects](#objects)
     * [Block](#block)
     * [BlockHeader](#blockheader)
+    * [Event](#event)
+    * [ExecResp](#execresp)
+    * [Proof](#proof)
+    * [Receipt](#receipt)
+    * [ReceiptResponse](#receiptresponse)
+    * [SignedTransaction](#signedtransaction)
+    * [Validator](#validator)
   * [Inputs](#inputs)
-    * [InputDeployAction](#inputdeployaction)
     * [InputRawTransaction](#inputrawtransaction)
     * [InputTransactionEncryption](#inputtransactionencryption)
-    * [InputTransferAction](#inputtransferaction)
-  * [Enums](#enums)
-    * [ContractType](#contracttype)
   * [Scalars](#scalars)
     * [Address](#address)
-    * [Balance](#balance)
     * [Boolean](#boolean)
     * [Bytes](#bytes)
     * [Hash](#hash)
+    * [Int](#int)
     * [String](#string)
     * [Uint64](#uint64)
 
@@ -48,45 +51,89 @@ node, and then try open http://127.0.0.1:8000/graphiql in the browser.
 </thead>
 <tbody>
 <tr>
-<td colspan="2" valign="top"><strong>getLatestBlock</strong></td>
-<td valign="top"><a href="#block">Block</a>!</td>
+<td colspan="2" valign="top"><strong>getBlock</strong></td>
+<td valign="top"><a href="#/graphql_api?id=block">Block</a>!</td>
 <td>
 
-Get the latest block
+Get the block
 
 </td>
 </tr>
 <tr>
 <td colspan="2" align="right" valign="top">height</td>
-<td valign="top"><a href="#uint64">Uint64</a></td>
+<td valign="top"><a href="#/graphql_api?id=uint64">Uint64</a></td>
 <td></td>
 </tr>
 <tr>
-<td colspan="2" valign="top"><strong>getBalance</strong></td>
-<td valign="top"><a href="#balance">Balance</a>!</td>
+<td colspan="2" valign="top"><strong>getTransaction</strong></td>
+<td valign="top"><a href="#/graphql_api?id=signedtransaction">SignedTransaction</a>!</td>
 <td>
 
-Get the asset balance of an account
+Get the transaction by hash
 
 </td>
 </tr>
 <tr>
-<td colspan="2" align="right" valign="top">address</td>
-<td valign="top"><a href="#address">Address</a>!</td>
+<td colspan="2" align="right" valign="top">txHash</td>
+<td valign="top"><a href="#/graphql_api?id=hash">Hash</a>!</td>
 <td></td>
 </tr>
 <tr>
-<td colspan="2" align="right" valign="top">id</td>
-<td valign="top"><a href="#hash">Hash</a>!</td>
+<td colspan="2" valign="top"><strong>getReceipt</strong></td>
+<td valign="top"><a href="#/graphql_api?id=receipt">Receipt</a>!</td>
 <td>
 
-The asset id. Asset is the first-class in Muta, and the UDT(User Defined Token) will be supported in the future
+Get the receipt by transaction hash
+
+</td>
+</tr>
+<tr>
+<td colspan="2" align="right" valign="top">txHash</td>
+<td valign="top"><a href="#/graphql_api?id=hash">Hash</a>!</td>
+<td></td>
+</tr>
+<tr>
+<td colspan="2" valign="top"><strong>queryService</strong></td>
+<td valign="top"><a href="#/graphql_api?id=execresp">ExecResp</a>!</td>
+<td>
+
+query service
 
 </td>
 </tr>
 <tr>
 <td colspan="2" align="right" valign="top">height</td>
-<td valign="top"><a href="#uint64">Uint64</a></td>
+<td valign="top"><a href="#/graphql_api?id=uint64">Uint64</a></td>
+<td></td>
+</tr>
+<tr>
+<td colspan="2" align="right" valign="top">cyclesLimit</td>
+<td valign="top"><a href="#/graphql_api?id=uint64">Uint64</a></td>
+<td></td>
+</tr>
+<tr>
+<td colspan="2" align="right" valign="top">cyclesPrice</td>
+<td valign="top"><a href="#/graphql_api?id=uint64">Uint64</a></td>
+<td></td>
+</tr>
+<tr>
+<td colspan="2" align="right" valign="top">caller</td>
+<td valign="top"><a href="#/graphql_api?id=address">Address</a>!</td>
+<td></td>
+</tr>
+<tr>
+<td colspan="2" align="right" valign="top">serviceName</td>
+<td valign="top"><a href="#/graphql_api?id=string">String</a>!</td>
+<td></td>
+</tr>
+<tr>
+<td colspan="2" align="right" valign="top">method</td>
+<td valign="top"><a href="#/graphql_api?id=string">String</a>!</td>
+<td></td>
+</tr>
+<tr>
+<td colspan="2" align="right" valign="top">payload</td>
+<td valign="top"><a href="#/graphql_api?id=string">String</a>!</td>
 <td></td>
 </tr>
 </tbody>
@@ -104,56 +151,27 @@ The asset id. Asset is the first-class in Muta, and the UDT(User Defined Token) 
 </thead>
 <tbody>
 <tr>
-<td colspan="2" valign="top"><strong>sendTransferTransaction</strong></td>
-<td valign="top"><a href="#hash">Hash</a>!</td>
+<td colspan="2" valign="top"><strong>sendTransaction</strong></td>
+<td valign="top"><a href="#/graphql_api?id=hash">Hash</a>!</td>
 <td>
 
-Send a transfer transaction to the blockchain.
+send transaction
 
 </td>
 </tr>
 <tr>
 <td colspan="2" align="right" valign="top">inputRaw</td>
-<td valign="top"><a href="#inputrawtransaction">InputRawTransaction</a>!</td>
-<td></td>
-</tr>
-<tr>
-<td colspan="2" align="right" valign="top">inputAction</td>
-<td valign="top"><a href="#inputtransferaction">InputTransferAction</a>!</td>
+<td valign="top"><a href="#/graphql_api?id=inputrawtransaction">InputRawTransaction</a>!</td>
 <td></td>
 </tr>
 <tr>
 <td colspan="2" align="right" valign="top">inputEncryption</td>
-<td valign="top"><a href="#inputtransactionencryption">InputTransactionEncryption</a>!</td>
+<td valign="top"><a href="#/graphql_api?id=inputtransactionencryption">InputTransactionEncryption</a>!</td>
 <td></td>
 </tr>
 <tr>
-<td colspan="2" valign="top"><strong>sendDeployTransaction</strong></td>
-<td valign="top"><a href="#hash">Hash</a>!</td>
-<td>
-
-Send deployment contract transaction to the blockchain.
-
-</td>
-</tr>
-<tr>
-<td colspan="2" align="right" valign="top">inputRaw</td>
-<td valign="top"><a href="#inputrawtransaction">InputRawTransaction</a>!</td>
-<td></td>
-</tr>
-<tr>
-<td colspan="2" align="right" valign="top">inputAction</td>
-<td valign="top"><a href="#inputdeployaction">InputDeployAction</a>!</td>
-<td></td>
-</tr>
-<tr>
-<td colspan="2" align="right" valign="top">inputEncryption</td>
-<td valign="top"><a href="#inputtransactionencryption">InputTransactionEncryption</a>!</td>
-<td></td>
-</tr>
-<tr>
-<td colspan="2" valign="top"><strong>sendUnsafeTransferTransaction</strong> ⚠️</td>
-<td valign="top"><a href="#hash">Hash</a>!</td>
+<td colspan="2" valign="top"><strong>unsafeSendTransaction</strong> ⚠️</td>
+<td valign="top"><a href="#/graphql_api?id=hash">Hash</a>!</td>
 <td>
 <p>⚠️ <strong>DEPRECATED</strong></p>
 <blockquote>
@@ -165,44 +183,12 @@ DON'T use it in production! This is just for development.
 </tr>
 <tr>
 <td colspan="2" align="right" valign="top">inputRaw</td>
-<td valign="top"><a href="#inputrawtransaction">InputRawTransaction</a>!</td>
-<td></td>
-</tr>
-<tr>
-<td colspan="2" align="right" valign="top">inputAction</td>
-<td valign="top"><a href="#inputtransferaction">InputTransferAction</a>!</td>
+<td valign="top"><a href="#/graphql_api?id=inputrawtransaction">InputRawTransaction</a>!</td>
 <td></td>
 </tr>
 <tr>
 <td colspan="2" align="right" valign="top">inputPrivkey</td>
-<td valign="top"><a href="#bytes">Bytes</a>!</td>
-<td></td>
-</tr>
-<tr>
-<td colspan="2" valign="top"><strong>sendUnsafeDeployTransaction</strong> ⚠️</td>
-<td valign="top"><a href="#hash">Hash</a>!</td>
-<td>
-<p>⚠️ <strong>DEPRECATED</strong></p>
-<blockquote>
-
-DON'T use it in production! This is just for development.
-
-</blockquote>
-</td>
-</tr>
-<tr>
-<td colspan="2" align="right" valign="top">inputRaw</td>
-<td valign="top"><a href="#inputrawtransaction">InputRawTransaction</a>!</td>
-<td></td>
-</tr>
-<tr>
-<td colspan="2" align="right" valign="top">inputAction</td>
-<td valign="top"><a href="#inputdeployaction">InputDeployAction</a>!</td>
-<td></td>
-</tr>
-<tr>
-<td colspan="2" align="right" valign="top">inputPrivkey</td>
-<td valign="top"><a href="#bytes">Bytes</a>!</td>
+<td valign="top"><a href="#/graphql_api?id=bytes">Bytes</a>!</td>
 <td></td>
 </tr>
 </tbody>
@@ -226,7 +212,7 @@ Block is a single digital record created within a blockchain. Each block contain
 <tbody>
 <tr>
 <td colspan="2" valign="top"><strong>header</strong></td>
-<td valign="top"><a href="#blockheader">BlockHeader</a>!</td>
+<td valign="top"><a href="#/graphql_api?id=blockheader">BlockHeader</a>!</td>
 <td>
 
 The header section of a block
@@ -235,7 +221,7 @@ The header section of a block
 </tr>
 <tr>
 <td colspan="2" valign="top"><strong>orderedTxHashes</strong></td>
-<td valign="top">[<a href="#hash">Hash</a>!]!</td>
+<td valign="top">[<a href="#/graphql_api?id=hash">Hash</a>!]!</td>
 <td>
 
 The body section of a block
@@ -261,7 +247,7 @@ A block header is like the metadata of a block.
 <tbody>
 <tr>
 <td colspan="2" valign="top"><strong>chainId</strong></td>
-<td valign="top"><a href="#hash">Hash</a>!</td>
+<td valign="top"><a href="#/graphql_api?id=hash">Hash</a>!</td>
 <td>
 
 Identifier of a chain in order to prevent replay attacks across channels 
@@ -270,25 +256,34 @@ Identifier of a chain in order to prevent replay attacks across channels
 </tr>
 <tr>
 <td colspan="2" valign="top"><strong>height</strong></td>
-<td valign="top"><a href="#uint64">Uint64</a>!</td>
+<td valign="top"><a href="#/graphql_api?id=uint64">Uint64</a>!</td>
 <td>
 
-Known as the block height like other blockchain
+block height
+
+</td>
+</tr>
+<tr>
+<td colspan="2" valign="top"><strong>execHeight</strong></td>
+<td valign="top"><a href="#/graphql_api?id=uint64">Uint64</a>!</td>
+<td>
+
+The height to which the block has been executed
 
 </td>
 </tr>
 <tr>
 <td colspan="2" valign="top"><strong>preHash</strong></td>
-<td valign="top"><a href="#hash">Hash</a>!</td>
+<td valign="top"><a href="#/graphql_api?id=hash">Hash</a>!</td>
 <td>
 
-The merkle proof of the previous block
+The hash of the serialized previous block
 
 </td>
 </tr>
 <tr>
 <td colspan="2" valign="top"><strong>timestamp</strong></td>
-<td valign="top"><a href="#uint64">Uint64</a>!</td>
+<td valign="top"><a href="#/graphql_api?id=uint64">Uint64</a>!</td>
 <td>
 
 A timestamp that records when the block was created
@@ -297,43 +292,43 @@ A timestamp that records when the block was created
 </tr>
 <tr>
 <td colspan="2" valign="top"><strong>orderRoot</strong></td>
-<td valign="top"><a href="#hash">Hash</a>!</td>
+<td valign="top"><a href="#/graphql_api?id=hash">Hash</a>!</td>
 <td>
 
-The merkle proof of ordered transactions
+The merkle root of ordered transactions
 
 </td>
 </tr>
 <tr>
 <td colspan="2" valign="top"><strong>confirmRoot</strong></td>
-<td valign="top">[<a href="#hash">Hash</a>!]!</td>
+<td valign="top">[<a href="#/graphql_api?id=hash">Hash</a>!]!</td>
 <td>
 
-The merkle proofs of all the confirms
+The merkle roots of all the confirms
 
 </td>
 </tr>
 <tr>
 <td colspan="2" valign="top"><strong>stateRoot</strong></td>
-<td valign="top"><a href="#hash">Hash</a>!</td>
+<td valign="top"><a href="#/graphql_api?id=hash">Hash</a>!</td>
 <td>
 
-The merkle proof of state root
+The merkle root of state root
 
 </td>
 </tr>
 <tr>
 <td colspan="2" valign="top"><strong>receiptRoot</strong></td>
-<td valign="top">[<a href="#hash">Hash</a>!]!</td>
+<td valign="top">[<a href="#/graphql_api?id=hash">Hash</a>!]!</td>
 <td>
 
-The merkle proof of receipts
+The merkle roots of receipts
 
 </td>
 </tr>
 <tr>
 <td colspan="2" valign="top"><strong>cyclesUsed</strong></td>
-<td valign="top"><a href="#uint64">Uint64</a>!</td>
+<td valign="top">[<a href="#/graphql_api?id=uint64">Uint64</a>!]!</td>
 <td>
 
 The sum of all transactions costs
@@ -342,7 +337,7 @@ The sum of all transactions costs
 </tr>
 <tr>
 <td colspan="2" valign="top"><strong>proposer</strong></td>
-<td valign="top"><a href="#address">Address</a>!</td>
+<td valign="top"><a href="#/graphql_api?id=address">Address</a>!</td>
 <td>
 
 The address descirbed who packed the block
@@ -350,56 +345,306 @@ The address descirbed who packed the block
 </td>
 </tr>
 <tr>
+<td colspan="2" valign="top"><strong>proof</strong></td>
+<td valign="top"><a href="#/graphql_api?id=proof">Proof</a>!</td>
+<td></td>
+</tr>
+<tr>
 <td colspan="2" valign="top"><strong>validatorVersion</strong></td>
-<td valign="top"><a href="#uint64">Uint64</a>!</td>
+<td valign="top"><a href="#/graphql_api?id=uint64">Uint64</a>!</td>
 <td>
 
 The version of validator is designed for cross chain
 
 </td>
 </tr>
+<tr>
+<td colspan="2" valign="top"><strong>validators</strong></td>
+<td valign="top">[<a href="#/graphql_api?id=validator">Validator</a>!]!</td>
+<td></td>
+</tr>
 </tbody>
 </table>
 
-## Inputs
-
-### InputDeployAction
-
-The deploy transfer transaction
+### Event
 
 <table>
 <thead>
 <tr>
-<th colspan="2" align="left">Field</th>
+<th align="left">Field</th>
+<th align="right">Argument</th>
 <th align="left">Type</th>
 <th align="left">Description</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td colspan="2" valign="top"><strong>code</strong></td>
-<td valign="top"><a href="#bytes">Bytes</a>!</td>
-<td>
-
-Encoded contract code
-
-</td>
+<td colspan="2" valign="top"><strong>service</strong></td>
+<td valign="top"><a href="#/graphql_api?id=string">String</a>!</td>
+<td></td>
 </tr>
 <tr>
-<td colspan="2" valign="top"><strong>contractType</strong></td>
-<td valign="top"><a href="#contracttype">ContractType</a>!</td>
-<td>
-
-The type of contract
-
-</td>
+<td colspan="2" valign="top"><strong>data</strong></td>
+<td valign="top"><a href="#/graphql_api?id=string">String</a>!</td>
+<td></td>
 </tr>
 </tbody>
 </table>
 
+### ExecResp
+
+<table>
+<thead>
+<tr>
+<th align="left">Field</th>
+<th align="right">Argument</th>
+<th align="left">Type</th>
+<th align="left">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td colspan="2" valign="top"><strong>ret</strong></td>
+<td valign="top"><a href="#/graphql_api?id=string">String</a>!</td>
+<td></td>
+</tr>
+<tr>
+<td colspan="2" valign="top"><strong>isError</strong></td>
+<td valign="top"><a href="#/graphql_api?id=boolean">Boolean</a>!</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+
+### Proof
+
+The verifier of the block header proved
+
+<table>
+<thead>
+<tr>
+<th align="left">Field</th>
+<th align="right">Argument</th>
+<th align="left">Type</th>
+<th align="left">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td colspan="2" valign="top"><strong>height</strong></td>
+<td valign="top"><a href="#/graphql_api?id=uint64">Uint64</a>!</td>
+<td></td>
+</tr>
+<tr>
+<td colspan="2" valign="top"><strong>round</strong></td>
+<td valign="top"><a href="#/graphql_api?id=uint64">Uint64</a>!</td>
+<td></td>
+</tr>
+<tr>
+<td colspan="2" valign="top"><strong>blockHash</strong></td>
+<td valign="top"><a href="#/graphql_api?id=hash">Hash</a>!</td>
+<td></td>
+</tr>
+<tr>
+<td colspan="2" valign="top"><strong>signature</strong></td>
+<td valign="top"><a href="#/graphql_api?id=bytes">Bytes</a>!</td>
+<td></td>
+</tr>
+<tr>
+<td colspan="2" valign="top"><strong>bitmap</strong></td>
+<td valign="top"><a href="#/graphql_api?id=bytes">Bytes</a>!</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+
+### Receipt
+
+<table>
+<thead>
+<tr>
+<th align="left">Field</th>
+<th align="right">Argument</th>
+<th align="left">Type</th>
+<th align="left">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td colspan="2" valign="top"><strong>stateRoot</strong></td>
+<td valign="top"><a href="#/graphql_api?id=hash">Hash</a>!</td>
+<td></td>
+</tr>
+<tr>
+<td colspan="2" valign="top"><strong>height</strong></td>
+<td valign="top"><a href="#/graphql_api?id=uint64">Uint64</a>!</td>
+<td></td>
+</tr>
+<tr>
+<td colspan="2" valign="top"><strong>txHash</strong></td>
+<td valign="top"><a href="#/graphql_api?id=hash">Hash</a>!</td>
+<td></td>
+</tr>
+<tr>
+<td colspan="2" valign="top"><strong>cyclesUsed</strong></td>
+<td valign="top"><a href="#/graphql_api?id=uint64">Uint64</a>!</td>
+<td></td>
+</tr>
+<tr>
+<td colspan="2" valign="top"><strong>events</strong></td>
+<td valign="top">[<a href="#/graphql_api?id=event">Event</a>!]!</td>
+<td></td>
+</tr>
+<tr>
+<td colspan="2" valign="top"><strong>response</strong></td>
+<td valign="top"><a href="#/graphql_api?id=receiptresponse">ReceiptResponse</a>!</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+
+### ReceiptResponse
+
+<table>
+<thead>
+<tr>
+<th align="left">Field</th>
+<th align="right">Argument</th>
+<th align="left">Type</th>
+<th align="left">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td colspan="2" valign="top"><strong>serviceName</strong></td>
+<td valign="top"><a href="#/graphql_api?id=string">String</a>!</td>
+<td></td>
+</tr>
+<tr>
+<td colspan="2" valign="top"><strong>method</strong></td>
+<td valign="top"><a href="#/graphql_api?id=string">String</a>!</td>
+<td></td>
+</tr>
+<tr>
+<td colspan="2" valign="top"><strong>ret</strong></td>
+<td valign="top"><a href="#/graphql_api?id=string">String</a>!</td>
+<td></td>
+</tr>
+<tr>
+<td colspan="2" valign="top"><strong>isError</strong></td>
+<td valign="top"><a href="#/graphql_api?id=boolean">Boolean</a>!</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+
+### SignedTransaction
+
+<table>
+<thead>
+<tr>
+<th align="left">Field</th>
+<th align="right">Argument</th>
+<th align="left">Type</th>
+<th align="left">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td colspan="2" valign="top"><strong>chainId</strong></td>
+<td valign="top"><a href="#/graphql_api?id=hash">Hash</a>!</td>
+<td></td>
+</tr>
+<tr>
+<td colspan="2" valign="top"><strong>cyclesLimit</strong></td>
+<td valign="top"><a href="#/graphql_api?id=uint64">Uint64</a>!</td>
+<td></td>
+</tr>
+<tr>
+<td colspan="2" valign="top"><strong>cyclesPrice</strong></td>
+<td valign="top"><a href="#/graphql_api?id=uint64">Uint64</a>!</td>
+<td></td>
+</tr>
+<tr>
+<td colspan="2" valign="top"><strong>nonce</strong></td>
+<td valign="top"><a href="#/graphql_api?id=hash">Hash</a>!</td>
+<td></td>
+</tr>
+<tr>
+<td colspan="2" valign="top"><strong>timeout</strong></td>
+<td valign="top"><a href="#/graphql_api?id=uint64">Uint64</a>!</td>
+<td></td>
+</tr>
+<tr>
+<td colspan="2" valign="top"><strong>serviceName</strong></td>
+<td valign="top"><a href="#/graphql_api?id=string">String</a>!</td>
+<td></td>
+</tr>
+<tr>
+<td colspan="2" valign="top"><strong>method</strong></td>
+<td valign="top"><a href="#/graphql_api?id=string">String</a>!</td>
+<td></td>
+</tr>
+<tr>
+<td colspan="2" valign="top"><strong>payload</strong></td>
+<td valign="top"><a href="#/graphql_api?id=string">String</a>!</td>
+<td></td>
+</tr>
+<tr>
+<td colspan="2" valign="top"><strong>txHash</strong></td>
+<td valign="top"><a href="#/graphql_api?id=hash">Hash</a>!</td>
+<td></td>
+</tr>
+<tr>
+<td colspan="2" valign="top"><strong>pubkey</strong></td>
+<td valign="top"><a href="#/graphql_api?id=bytes">Bytes</a>!</td>
+<td></td>
+</tr>
+<tr>
+<td colspan="2" valign="top"><strong>signature</strong></td>
+<td valign="top"><a href="#/graphql_api?id=bytes">Bytes</a>!</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+
+### Validator
+
+Validator address set
+
+<table>
+<thead>
+<tr>
+<th align="left">Field</th>
+<th align="right">Argument</th>
+<th align="left">Type</th>
+<th align="left">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td colspan="2" valign="top"><strong>address</strong></td>
+<td valign="top"><a href="#/graphql_api?id=address">Address</a>!</td>
+<td></td>
+</tr>
+<tr>
+<td colspan="2" valign="top"><strong>proposeWeight</strong></td>
+<td valign="top"><a href="#/graphql_api?id=int">Int</a>!</td>
+<td></td>
+</tr>
+<tr>
+<td colspan="2" valign="top"><strong>voteWeight</strong></td>
+<td valign="top"><a href="#/graphql_api?id=int">Int</a>!</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+
+## Inputs
+
 ### InputRawTransaction
 
-There was many types transaction in Muta, A transaction often require computing resources or write data to chain,these resources are valuable so we need to pay some token for them.InputRawTransaction describes information above
+There was many types of transaction in Muta, A transaction often require computing resources or write data to chain,these resources are valuable so we need to pay some token for them.InputRawTransaction describes information above
 
 <table>
 <thead>
@@ -412,7 +657,7 @@ There was many types transaction in Muta, A transaction often require computing 
 <tbody>
 <tr>
 <td colspan="2" valign="top"><strong>chainId</strong></td>
-<td valign="top"><a href="#hash">Hash</a>!</td>
+<td valign="top"><a href="#/graphql_api?id=hash">Hash</a>!</td>
 <td>
 
 Identifier of the chain.
@@ -420,8 +665,8 @@ Identifier of the chain.
 </td>
 </tr>
 <tr>
-<td colspan="2" valign="top"><strong>feeCycle</strong></td>
-<td valign="top"><a href="#uint64">Uint64</a>!</td>
+<td colspan="2" valign="top"><strong>cyclesLimit</strong></td>
+<td valign="top"><a href="#/graphql_api?id=uint64">Uint64</a>!</td>
 <td>
 
 Mostly like the gas limit in Ethereum, describes the fee that you are willing to pay the highest price for the transaction
@@ -429,17 +674,13 @@ Mostly like the gas limit in Ethereum, describes the fee that you are willing to
 </td>
 </tr>
 <tr>
-<td colspan="2" valign="top"><strong>feeAssetId</strong></td>
-<td valign="top"><a href="#hash">Hash</a>!</td>
-<td>
-
-asset type
-
-</td>
+<td colspan="2" valign="top"><strong>cyclesPrice</strong></td>
+<td valign="top"><a href="#/graphql_api?id=uint64">Uint64</a>!</td>
+<td></td>
 </tr>
 <tr>
 <td colspan="2" valign="top"><strong>nonce</strong></td>
-<td valign="top"><a href="#hash">Hash</a>!</td>
+<td valign="top"><a href="#/graphql_api?id=hash">Hash</a>!</td>
 <td>
 
 Every transaction has its own id, unlike Ethereum's nonce,the nonce in Muta is an hash
@@ -448,12 +689,27 @@ Every transaction has its own id, unlike Ethereum's nonce,the nonce in Muta is a
 </tr>
 <tr>
 <td colspan="2" valign="top"><strong>timeout</strong></td>
-<td valign="top"><a href="#uint64">Uint64</a>!</td>
+<td valign="top"><a href="#/graphql_api?id=uint64">Uint64</a>!</td>
 <td>
 
 For security and performance reasons, Muta will only deal with trade request over a period of time,the `timeout` should be `timeout > current_block_height` and `timeout < current_block_height + timeout_gap`,the `timeout_gap` generally equal to 20.
 
 </td>
+</tr>
+<tr>
+<td colspan="2" valign="top"><strong>serviceName</strong></td>
+<td valign="top"><a href="#/graphql_api?id=string">String</a>!</td>
+<td></td>
+</tr>
+<tr>
+<td colspan="2" valign="top"><strong>method</strong></td>
+<td valign="top"><a href="#/graphql_api?id=string">String</a>!</td>
+<td></td>
+</tr>
+<tr>
+<td colspan="2" valign="top"><strong>payload</strong></td>
+<td valign="top"><a href="#/graphql_api?id=string">String</a>!</td>
+<td></td>
 </tr>
 </tbody>
 </table>
@@ -473,7 +729,7 @@ Signature of the transaction
 <tbody>
 <tr>
 <td colspan="2" valign="top"><strong>txHash</strong></td>
-<td valign="top"><a href="#hash">Hash</a>!</td>
+<td valign="top"><a href="#/graphql_api?id=hash">Hash</a>!</td>
 <td>
 
 The digest of the transaction
@@ -482,7 +738,7 @@ The digest of the transaction
 </tr>
 <tr>
 <td colspan="2" valign="top"><strong>pubkey</strong></td>
-<td valign="top"><a href="#bytes">Bytes</a>!</td>
+<td valign="top"><a href="#/graphql_api?id=bytes">Bytes</a>!</td>
 <td>
 
 The public key of transfer
@@ -491,92 +747,10 @@ The public key of transfer
 </tr>
 <tr>
 <td colspan="2" valign="top"><strong>signature</strong></td>
-<td valign="top"><a href="#bytes">Bytes</a>!</td>
+<td valign="top"><a href="#/graphql_api?id=bytes">Bytes</a>!</td>
 <td>
 
 The signature of the transaction
-
-</td>
-</tr>
-</tbody>
-</table>
-
-### InputTransferAction
-
-The action of transfer transaction
-
-<table>
-<thead>
-<tr>
-<th colspan="2" align="left">Field</th>
-<th align="left">Type</th>
-<th align="left">Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td colspan="2" valign="top"><strong>carryingAmount</strong></td>
-<td valign="top"><a href="#balance">Balance</a>!</td>
-<td>
-
-The amount of the transfer
-
-</td>
-</tr>
-<tr>
-<td colspan="2" valign="top"><strong>carryingAssetId</strong></td>
-<td valign="top"><a href="#hash">Hash</a>!</td>
-<td>
-
-The asset of of the transfer
-
-</td>
-</tr>
-<tr>
-<td colspan="2" valign="top"><strong>receiver</strong></td>
-<td valign="top"><a href="#address">Address</a>!</td>
-<td>
-
-The receiver of the transfer
-
-</td>
-</tr>
-</tbody>
-</table>
-
-## Enums
-
-### ContractType
-
-According to different purposes, Muta has many contract type
-
-<table>
-<thead>
-<th align="left">Value</th>
-<th align="left">Description</th>
-</thead>
-<tbody>
-<tr>
-<td valign="top"><strong>ASSET</strong></td>
-<td>
-
-Asset contract often use for creating User Define Asset(also known as (User Define Token))
-
-</td>
-</tr>
-<tr>
-<td valign="top"><strong>APP</strong></td>
-<td>
-
-App contract often use for creating DAPP(Decentralized APPlication) 
-
-</td>
-</tr>
-<tr>
-<td valign="top"><strong>LIBRARY</strong></td>
-<td>
-
-Library contract often providing reusable and immutable function
 
 </td>
 </tr>
@@ -587,11 +761,7 @@ Library contract often providing reusable and immutable function
 
 ### Address
 
-21 bytes of account address, the first bytes of which is the identifier.
-
-### Balance
-
-uint256
+20 bytes of account address
 
 ### Boolean
 
@@ -602,6 +772,8 @@ Bytes corresponding hex string.
 ### Hash
 
 The output digest of Keccak hash function
+
+### Int
 
 ### String
 
