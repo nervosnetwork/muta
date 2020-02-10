@@ -67,6 +67,14 @@ where
     pub fn get_adapter(&self) -> &Adapter {
         &self.adapter
     }
+
+    fn show_unknown_txs(&self, tx_hashes: Vec<Hash>) -> Vec<Hash> {
+        self.tx_cache
+            .show_unknown(tx_hashes)
+            .into_iter()
+            .filter(|tx_hash| !self.callback_cache.contains_key(tx_hash))
+            .collect()
+    }
 }
 
 #[async_trait]
@@ -145,7 +153,7 @@ where
         ctx: Context,
         order_tx_hashes: Vec<Hash>,
     ) -> ProtocolResult<()> {
-        let unknown_hashes = self.tx_cache.show_unknown(order_tx_hashes);
+        let unknown_hashes = self.show_unknown_txs(order_tx_hashes);
         if !unknown_hashes.is_empty() {
             let unknown_len = unknown_hashes.len();
             let txs = self.adapter.pull_txs(ctx.clone(), unknown_hashes).await?;
@@ -170,7 +178,7 @@ where
         ctx: Context,
         propose_tx_hashes: Vec<Hash>,
     ) -> ProtocolResult<()> {
-        let unknown_hashes = self.tx_cache.show_unknown(propose_tx_hashes);
+        let unknown_hashes = self.show_unknown_txs(propose_tx_hashes);
         if !unknown_hashes.is_empty() {
             let txs = self.adapter.pull_txs(ctx.clone(), unknown_hashes).await?;
             txs.into_iter().for_each(|tx| {
