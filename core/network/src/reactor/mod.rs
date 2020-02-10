@@ -59,10 +59,19 @@ where
         let handler = Arc::clone(&self.handler);
         let rpc_map = Arc::clone(&self.rpc_map);
 
-        let SessionMessage { sid, msg: net_msg } = smsg;
+        let SessionMessage {
+            sid,
+            msg: net_msg,
+            pid,
+            connected_addr,
+            ..
+        } = smsg;
 
         let endpoint = net_msg.url.to_owned();
-        let mut ctx = Context::new().set_session_id(sid);
+        let mut ctx = Context::new().set_session_id(sid).set_remote_peer_id(pid);
+        if let Some(connected_addr) = connected_addr {
+            ctx = ctx.set_remote_connected_addr(connected_addr);
+        }
 
         let react = async move {
             let endpoint = net_msg.url.parse::<Endpoint>()?;

@@ -12,7 +12,10 @@ use tentacle::{
     ProtocolId, SessionId,
 };
 
-use crate::error::{ErrorKind, NetworkError};
+use crate::{
+    common::ConnectedAddr,
+    error::{ErrorKind, NetworkError},
+};
 
 pub trait NetworkProtocol {
     // TODO: change to TargetProtocol after tentacle 0.3
@@ -38,6 +41,11 @@ pub trait Compression {
 pub trait NetworkContext: Sized {
     fn session_id(&self) -> Result<SessionId, NetworkError>;
     fn set_session_id(&mut self, sid: SessionId) -> Self;
+    fn remote_peer_id(&self) -> Result<PeerId, NetworkError>;
+    fn set_remote_peer_id(&mut self, pid: PeerId) -> Self;
+    // This connected address is for debug purpose, so soft failure is ok.
+    fn remote_connected_addr(&self) -> Option<ConnectedAddr>;
+    fn set_remote_connected_addr(&mut self, addr: ConnectedAddr) -> Self;
     fn rpc_id(&self) -> Result<u64, NetworkError>;
     fn set_rpc_id(&mut self, rid: u64) -> Self;
 }
@@ -46,6 +54,10 @@ pub trait ListenExchangeManager {
     fn listen_addr(&self) -> Multiaddr;
     fn add_remote_listen_addr(&mut self, pid: PeerId, addr: Multiaddr);
     fn misbehave(&mut self, sid: SessionId);
+}
+
+pub trait PeerInfoQuerier {
+    fn connected_addr(&self, pid: &PeerId) -> Option<ConnectedAddr>;
 }
 
 #[derive(Debug, Clone)]
@@ -64,6 +76,27 @@ impl NetworkContext for Context {
     #[must_use]
     fn set_session_id(&mut self, sid: SessionId) -> Self {
         self.with_value::<CtxSessionId>("session_id", CtxSessionId(sid))
+    }
+
+    fn remote_peer_id(&self) -> Result<PeerId, NetworkError> {
+        self.get::<PeerId>("remote_peer_id")
+            .map(ToOwned::to_owned)
+            .ok_or_else(|| ErrorKind::NoRemotePeerId.into())
+    }
+
+    #[must_use]
+    fn set_remote_peer_id(&mut self, pid: PeerId) -> Self {
+        self.with_value::<PeerId>("remote_peer_id", pid)
+    }
+
+    fn remote_connected_addr(&self) -> Option<ConnectedAddr> {
+        self.get::<ConnectedAddr>("remote_connected_addr")
+            .map(ToOwned::to_owned)
+    }
+
+    #[must_use]
+    fn set_remote_connected_addr(&mut self, addr: ConnectedAddr) -> Self {
+        self.with_value::<ConnectedAddr>("remote_connected_addr", addr)
     }
 
     fn rpc_id(&self) -> Result<u64, NetworkError> {

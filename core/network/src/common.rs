@@ -8,8 +8,10 @@ use std::{
     time::{Duration, Instant},
 };
 
+use derive_more::Display;
 use futures::{pin_mut, task::AtomicWaker};
 use futures_timer::Delay;
+use serde_derive::{Deserialize, Serialize};
 use tentacle::multiaddr::{Multiaddr, Protocol};
 
 #[macro_export]
@@ -82,5 +84,35 @@ impl Future for HeartBeat {
         }
 
         Poll::Pending
+    }
+}
+
+#[derive(Debug, Display, PartialEq, Eq, Serialize, Deserialize, Clone)]
+#[display(fmt = "{}:{}", host, port)]
+pub struct ConnectedAddr {
+    host: String,
+    port: u16,
+}
+
+impl From<&Multiaddr> for ConnectedAddr {
+    fn from(multiaddr: &Multiaddr) -> Self {
+        use tentacle::multiaddr::Protocol::*;
+
+        let mut host = None;
+        let mut port = 0u16;
+
+        for comp in multiaddr.iter() {
+            match comp {
+                IP4(ip_addr) => host = Some(ip_addr.to_string()),
+                IP6(ip_addr) => host = Some(ip_addr.to_string()),
+                DNS4(dns_addr) | DNS6(dns_addr) => host = Some(dns_addr.to_string()),
+                TLS(tls_addr) => host = Some(tls_addr.to_string()),
+                TCP(p) => port = p,
+                _ => (),
+            }
+        }
+
+        let host = host.unwrap_or_else(|| multiaddr.to_string());
+        ConnectedAddr { host, port }
     }
 }

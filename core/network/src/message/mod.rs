@@ -4,16 +4,19 @@ pub mod serde_multi;
 use derive_more::Constructor;
 use prost::Message;
 use protocol::Bytes;
-use tentacle::SessionId;
+use tentacle::{secio::PeerId, SessionId};
 
 use crate::{
+    common::ConnectedAddr,
     endpoint::Endpoint,
     error::{ErrorKind, NetworkError},
 };
 
 #[derive(Constructor)]
+#[non_exhaustive]
 pub struct RawSessionMessage {
     pub(crate) sid: SessionId,
+    pub(crate) pid: PeerId,
     pub(crate) msg: Bytes,
 }
 
@@ -49,9 +52,12 @@ impl NetworkMessage {
 }
 
 #[derive(Constructor)]
+#[non_exhaustive]
 pub struct SessionMessage {
-    pub(crate) sid: SessionId,
-    pub(crate) msg: NetworkMessage,
+    pub(crate) sid:            SessionId,
+    pub(crate) pid:            PeerId,
+    pub(crate) msg:            NetworkMessage,
+    pub(crate) connected_addr: Option<ConnectedAddr>,
 }
 
 #[cfg(test)]

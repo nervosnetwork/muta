@@ -13,38 +13,10 @@ use tentacle::{
     secio::{PeerId, PublicKey},
 };
 
+use crate::common::ConnectedAddr;
+
 pub const BACKOFF_BASE: usize = 5;
 pub const VALID_ATTEMPT_INTERVAL: u64 = 4;
-
-#[derive(Debug, Display, PartialEq, Eq, Serialize, Deserialize, Clone)]
-#[display(fmt = "{}:{}", host, port)]
-pub struct ConnectedAddr {
-    host: String,
-    port: u16,
-}
-
-impl From<&Multiaddr> for ConnectedAddr {
-    fn from(multiaddr: &Multiaddr) -> Self {
-        use tentacle::multiaddr::Protocol::*;
-
-        let mut host = None;
-        let mut port = 0u16;
-
-        for comp in multiaddr.iter() {
-            match comp {
-                IP4(ip_addr) => host = Some(ip_addr.to_string()),
-                IP6(ip_addr) => host = Some(ip_addr.to_string()),
-                DNS4(dns_addr) | DNS6(dns_addr) => host = Some(dns_addr.to_string()),
-                TLS(tls_addr) => host = Some(tls_addr.to_string()),
-                TCP(p) => port = p,
-                _ => (),
-            }
-        }
-
-        let host = host.unwrap_or_else(|| multiaddr.to_string());
-        ConnectedAddr { host, port }
-    }
-}
 
 // TODO: display next_retry
 #[derive(Debug, Clone, Serialize, Deserialize, Display)]
