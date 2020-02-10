@@ -29,6 +29,9 @@ pub trait Consensus: Send + Sync {
 
     /// Network set a received quorum certificate to consensus.
     async fn set_qc(&self, ctx: Context, qc: Vec<u8>) -> ProtocolResult<()>;
+
+    /// Network set a received signed choke to consensus.
+    async fn set_choke(&self, ctx: Context, choke: Vec<u8>) -> ProtocolResult<()>;
 }
 
 #[async_trait]
@@ -46,6 +49,7 @@ pub trait SynchronizationAdapter: CommonConsensusAdapter + Send + Sync {
         propose_ratio: u64,
         prevote_ratio: u64,
         precommit_ratio: u64,
+        brake_ratio: u64,
         validators: Vec<Validator>,
     ) -> ProtocolResult<()>;
 

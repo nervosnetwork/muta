@@ -122,7 +122,7 @@ impl rlp::Decodable for Address {
 
 impl rlp::Encodable for Metadata {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
-        s.begin_list(10)
+        s.begin_list(11)
             .append(&self.chain_id)
             .append(&self.common_ref)
             .append(&self.timeout_gap)
@@ -132,7 +132,8 @@ impl rlp::Encodable for Metadata {
             .append_list(&self.verifier_list)
             .append(&self.propose_ratio)
             .append(&self.prevote_ratio)
-            .append(&self.precommit_ratio);
+            .append(&self.precommit_ratio)
+            .append(&self.brake_ratio);
     }
 }
 
@@ -148,6 +149,7 @@ impl rlp::Decodable for Metadata {
         let propose_ratio: u64 = r.at(7)?.as_val()?;
         let prevote_ratio: u64 = r.at(8)?.as_val()?;
         let precommit_ratio: u64 = r.at(9)?.as_val()?;
+        let brake_ratio: u64 = r.at(10)?.as_val()?;
 
         Ok(Self {
             chain_id,
@@ -160,6 +162,7 @@ impl rlp::Decodable for Metadata {
             propose_ratio,
             prevote_ratio,
             precommit_ratio,
+            brake_ratio,
         })
     }
 }

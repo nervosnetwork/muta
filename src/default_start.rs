@@ -13,10 +13,11 @@ use core_api::adapter::DefaultAPIAdapter;
 use core_api::config::GraphQLConfig;
 use core_consensus::fixed_types::{FixedBlock, FixedSignedTxs};
 use core_consensus::message::{
-    ProposalMessageHandler, PullBlockRpcHandler, PullTxsRpcHandler, QCMessageHandler,
-    RemoteHeightMessageHandler, VoteMessageHandler, BROADCAST_HEIGHT, END_GOSSIP_AGGREGATED_VOTE,
-    END_GOSSIP_SIGNED_PROPOSAL, END_GOSSIP_SIGNED_VOTE, RPC_RESP_SYNC_PULL_BLOCK,
-    RPC_RESP_SYNC_PULL_TXS, RPC_SYNC_PULL_BLOCK, RPC_SYNC_PULL_TXS,
+    ChokeMessageHandler, ProposalMessageHandler, PullBlockRpcHandler, PullTxsRpcHandler,
+    QCMessageHandler, RemoteHeightMessageHandler, VoteMessageHandler, BROADCAST_HEIGHT,
+    END_GOSSIP_AGGREGATED_VOTE, END_GOSSIP_SIGNED_CHOKE, END_GOSSIP_SIGNED_PROPOSAL,
+    END_GOSSIP_SIGNED_VOTE, RPC_RESP_SYNC_PULL_BLOCK, RPC_RESP_SYNC_PULL_TXS, RPC_SYNC_PULL_BLOCK,
+    RPC_SYNC_PULL_TXS,
 };
 use core_consensus::status::{CurrentConsensusStatus, StatusAgent};
 use core_consensus::{
@@ -92,7 +93,7 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
         confirm_root:      vec![],
         state_root:        genesis_state_root,
         receipt_root:      vec![Hash::from_empty()],
-        cycles_used:       vec![0],
+        cycles_used:       vec![],
         proposer:          Address::from_hex("0000000000000000000000000000000000000000")?,
         proof:             Proof {
             height:     0,
@@ -240,6 +241,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
             propose_ratio:      metadata.propose_ratio,
             prevote_ratio:      metadata.prevote_ratio,
             precommit_ratio:    metadata.precommit_ratio,
+            brake_ratio:        metadata.brake_ratio,
         }
     };
 
@@ -324,6 +326,10 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         Box::new(VoteMessageHandler::new(Arc::clone(&overlord_consensus))),
     )?;
     network_service.register_endpoint_handler(
+        END_GOSSIP_SIGNED_CHOKE,
+        Box::new(ChokeMessageHandler::new(Arc::clone(&overlord_consensus))),
+    )?;
+    network_service.register_endpoint_handler(
         BROADCAST_HEIGHT,
         Box::new(RemoteHeightMessageHandler::new(Arc::clone(
             &synchronization,
@@ -379,6 +385,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         propose_ratio:   metadata.propose_ratio,
         prevote_ratio:   metadata.prevote_ratio,
         precommit_ratio: metadata.precommit_ratio,
+        brake_ratio:     metadata.brake_ratio,
     };
 
     tokio::spawn(async move {

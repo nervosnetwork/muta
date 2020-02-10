@@ -3,7 +3,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use bincode::serialize;
 use log::debug;
-use overlord::types::{AggregatedVote, SignedProposal, SignedVote};
+use overlord::types::{AggregatedVote, SignedChoke, SignedProposal, SignedVote};
 use overlord::Codec;
 use rlp::Encodable;
 use serde::{Deserialize, Serialize};
@@ -18,6 +18,7 @@ use crate::fixed_types::{FixedBlock, FixedHeight, FixedSignedTxs, PullTxsRequest
 pub const END_GOSSIP_SIGNED_PROPOSAL: &str = "/gossip/consensus/signed_proposal";
 pub const END_GOSSIP_SIGNED_VOTE: &str = "/gossip/consensus/signed_vote";
 pub const END_GOSSIP_AGGREGATED_VOTE: &str = "/gossip/consensus/qc";
+pub const END_GOSSIP_SIGNED_CHOKE: &str = "/gossip/consensus/signed_choke";
 pub const RPC_SYNC_PULL_BLOCK: &str = "/rpc_call/consensus/sync_pull_block";
 pub const RPC_RESP_SYNC_PULL_BLOCK: &str = "/rpc_resp/consensus/sync_pull_block";
 pub const RPC_SYNC_PULL_TXS: &str = "/rpc_call/consensus/sync_pull_txs";
@@ -57,6 +58,15 @@ pub struct RichHeight(pub Vec<u8>);
 impl From<FixedHeight> for RichHeight {
     fn from(id: FixedHeight) -> Self {
         RichHeight(serialize(&id).unwrap())
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct Choke(pub Vec<u8>);
+
+impl From<SignedChoke> for Choke {
+    fn from(signed_choke: SignedChoke) -> Self {
+        Choke(signed_choke.rlp_bytes())
     }
 }
 
@@ -114,6 +124,25 @@ impl<C: Consensus + 'static> MessageHandler for QCMessageHandler<C> {
 
     async fn process(&self, ctx: Context, msg: Self::Message) -> ProtocolResult<()> {
         self.consensus.set_qc(ctx, msg.0).await
+    }
+}
+
+pub struct ChokeMessageHandler<C> {
+    consensus: Arc<C>,
+}
+
+impl<C: Consensus + 'static> ChokeMessageHandler<C> {
+    pub fn new(consensus: Arc<C>) -> Self {
+        Self { consensus }
+    }
+}
+
+#[async_trait]
+impl<C: Consensus + 'static> MessageHandler for ChokeMessageHandler<C> {
+    type Message = Choke;
+
+    async fn process(&self, ctx: Context, msg: Self::Message) -> ProtocolResult<()> {
+        self.consensus.set_choke(ctx, msg.0).await
     }
 }
 
