@@ -63,6 +63,7 @@ fn sync_gap_test() {
             propose_ratio:      15,
             prevote_ratio:      10,
             precommit_ratio:    10,
+            brake_ratio:        3,
         };
         let status_agent = StatusAgent::new(status);
         let lock = Arc::new(Mutex::new(()));
@@ -115,6 +116,7 @@ impl SynchronizationAdapter for MockCommonConsensusAdapter {
     fn update_status(
         &self,
         _: Context,
+        _: u64,
         _: u64,
         _: u64,
         _: u64,
@@ -247,6 +249,7 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
             propose_ratio:   10,
             prevote_ratio:   10,
             precommit_ratio: 10,
+            brake_ratio:     10,
         })
     }
 

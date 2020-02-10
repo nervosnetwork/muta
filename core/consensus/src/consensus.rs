@@ -4,7 +4,9 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use creep::Context;
 use futures::lock::Mutex;
-use overlord::types::{AggregatedVote, Node, OverlordMsg, SignedProposal, SignedVote, Status};
+use overlord::types::{
+    AggregatedVote, Node, OverlordMsg, SignedChoke, SignedProposal, SignedVote, Status,
+};
 use overlord::{DurationConfig, Overlord, OverlordHandler};
 
 use common_crypto::{BlsCommonReference, BlsPrivateKey, BlsPublicKey};
@@ -57,6 +59,15 @@ impl<Adapter: ConsensusAdapter + 'static> Consensus for OverlordConsensus<Adapte
             .map_err(|e| ConsensusError::OverlordErr(Box::new(e)))?;
         Ok(())
     }
+
+    async fn set_choke(&self, ctx: Context, choke: Vec<u8>) -> ProtocolResult<()> {
+        let signed_choke: SignedChoke =
+            rlp::decode(&choke).map_err(|_| ConsensusError::DecodeErr(MsgType::SignedChoke))?;
+        self.handler
+            .send_msg(ctx, OverlordMsg::SignedChoke(signed_choke))
+            .map_err(|e| ConsensusError::OverlordErr(Box::new(e)))?;
+        Ok(())
+    }
 }
 
 impl<Adapter: ConsensusAdapter + 'static> OverlordConsensus<Adapter> {
@@ -96,6 +107,7 @@ impl<Adapter: ConsensusAdapter + 'static> OverlordConsensus<Adapter> {
                         status.propose_ratio,
                         status.prevote_ratio,
                         status.precommit_ratio,
+                        status.brake_ratio,
                         status.validators,
                     )),
                 )
@@ -133,6 +145,7 @@ pub fn gen_overlord_status(
     propose_ratio: u64,
     prevote_ratio: u64,
     precommit_ratio: u64,
+    brake_ratio: u64,
     validators: Vec<Validator>,
 ) -> Status {
     let mut authority_list = validators
@@ -152,6 +165,7 @@ pub fn gen_overlord_status(
             propose_ratio,
             prevote_ratio,
             precommit_ratio,
+            brake_ratio,
         }),
         authority_list,
     }

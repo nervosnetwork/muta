@@ -245,6 +245,7 @@ where
         propose_ratio: u64,
         prevote_ratio: u64,
         precommit_ratio: u64,
+        brake_ratio: u64,
         validators: Vec<Validator>,
     ) -> ProtocolResult<()> {
         self.overlord_handler
@@ -259,6 +260,7 @@ where
                     propose_ratio,
                     prevote_ratio,
                     precommit_ratio,
+                    brake_ratio,
                     validators,
                 )),
             )

@@ -33,7 +33,16 @@ pub struct OverlordSynchronization<Adapter: SynchronizationAdapter> {
 #[async_trait]
 impl<Adapter: SynchronizationAdapter> Synchronization for OverlordSynchronization<Adapter> {
     async fn receive_remote_block(&self, ctx: Context, remote_height: u64) -> ProtocolResult<()> {
-        let mut current_height = self.adapter.get_current_height(Context::new()).await?;
+        let block = self
+            .get_block_from_remote(ctx.clone(), remote_height)
+            .await?;
+
+        if block.header.height != remote_height {
+            log::error!("[synchronization]: block that doesn't match is found");
+            return Ok(());
+        }
+
+        let current_height = self.adapter.get_current_height(Context::new()).await?;
         if remote_height == 0 || current_height >= remote_height - 1 {
             return Ok(());
         }
@@ -50,49 +59,40 @@ impl<Adapter: SynchronizationAdapter> Synchronization for OverlordSynchronizatio
         );
 
         let sync_status_agent = self.init_status_agent(ctx.clone(), current_height).await?;
+        let sync_resp = self
+            .start_sync(
+                ctx.clone(),
+                sync_status_agent.clone(),
+                current_height,
+                remote_height,
+            )
+            .await;
+        let mut sync_status = sync_status_agent.to_inner();
+        let current_height = sync_status.height;
 
-        loop {
-            let current_block = self
-                .adapter
-                .get_block_by_height(ctx.clone(), current_height)
-                .await?;
-
-            let next_height = current_height + 1;
-
-            let next_rich_block = self
-                .get_rich_block_from_remote(ctx.clone(), next_height)
-                .await?;
-
-            self.verify_block(&current_block, &next_rich_block.block)?;
-
-            self.commit_block(ctx.clone(), next_rich_block, sync_status_agent.clone())
-                .await?;
-
-            self.adapter
-                .broadcast_height(ctx.clone(), current_height)
-                .await?;
-
-            current_height = next_height;
-
-            if current_height >= remote_height {
-                let mut sync_status = sync_status_agent.to_inner();
-                sync_status.height += 1;
-                self.status.replace(sync_status.clone());
-                self.adapter.update_status(
-                    ctx.clone(),
-                    sync_status.height,
-                    sync_status.consensus_interval,
-                    sync_status.propose_ratio,
-                    sync_status.prevote_ratio,
-                    sync_status.precommit_ratio,
-                    sync_status.validators,
-                )?;
-                break;
-            }
+        if let Err(e) = sync_resp {
+            log::error!(
+                "[synchronization]: err, current_height {:?} err_msg: {:?}",
+                current_height,
+                e
+            );
         }
 
+        sync_status.height += 1;
+        self.status.replace(sync_status.clone());
+        self.adapter.update_status(
+            ctx.clone(),
+            sync_status.height,
+            sync_status.consensus_interval,
+            sync_status.propose_ratio,
+            sync_status.prevote_ratio,
+            sync_status.precommit_ratio,
+            sync_status.brake_ratio,
+            sync_status.validators,
+        )?;
+
         log::info!(
-            "[synchronization] end, remote block height {:?} current block height {:?}",
+            "[synchronization]: end, remote block height {:?} current block height {:?}",
             remote_height,
             current_height,
         );
@@ -118,6 +118,40 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
                     .await?;
             }
             Delay::new(Duration::from_millis(POLLING_BROADCAST)).await;
+        }
+    }
+
+    async fn start_sync(
+        &self,
+        ctx: Context,
+        sync_status_agent: StatusAgent,
+        current_height: u64,
+        remote_height: u64,
+    ) -> ProtocolResult<()> {
+        let mut current_height = current_height;
+
+        loop {
+            let current_block = self
+                .adapter
+                .get_block_by_height(ctx.clone(), current_height)
+                .await?;
+
+            let next_height = current_height + 1;
+
+            let next_rich_block = self
+                .get_rich_block_from_remote(ctx.clone(), next_height)
+                .await?;
+
+            self.verify_block(&current_block, &next_rich_block.block)?;
+
+            self.commit_block(ctx.clone(), next_rich_block, sync_status_agent.clone())
+                .await?;
+
+            current_height = next_height;
+
+            if current_height >= remote_height {
+                return Ok(());
+            }
         }
     }
 
@@ -180,16 +214,19 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
         ctx: Context,
         height: u64,
     ) -> ProtocolResult<RichBlock> {
-        let block = self
-            .adapter
-            .get_block_from_remote(ctx.clone(), height)
-            .await?;
+        let block = self.get_block_from_remote(ctx.clone(), height).await?;
         let txs = self
             .adapter
             .get_txs_from_remote(ctx, &block.ordered_tx_hashes)
             .await?;
 
         Ok(RichBlock { block, txs })
+    }
+
+    async fn get_block_from_remote(&self, ctx: Context, height: u64) -> ProtocolResult<Block> {
+        self.adapter
+            .get_block_from_remote(ctx.clone(), height)
+            .await
     }
 
     async fn save_chain_data(
@@ -283,6 +320,7 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
             propose_ratio:      current_status.propose_ratio,
             prevote_ratio:      current_status.prevote_ratio,
             precommit_ratio:    current_status.precommit_ratio,
+            brake_ratio:        current_status.brake_ratio,
             prev_hash:          block.header.pre_hash.clone(),
             height:             block.header.height,
             exec_height:        block.header.exec_height,
