@@ -5,6 +5,8 @@ use tentacle::{ProtocolId, SessionId};
 
 use protocol::{types::Address, ProtocolError, ProtocolErrorKind};
 
+use crate::common::ConnectedAddr;
+
 #[derive(Debug, Display)]
 pub enum ErrorKind {
     #[display(fmt = "{} offline", _0)]
@@ -40,14 +42,17 @@ pub enum ErrorKind {
     #[display(fmt = "kind: session id not found in context")]
     NoSessionId,
 
+    #[display(fmt = "kind: remote peer id not found in context")]
+    NoRemotePeerId,
+
     #[display(fmt = "kind: rpc id not found in context")]
     NoRpcId,
 
-    #[display(fmt = "kind: rpc future dropped")]
-    RpcDropped,
+    #[display(fmt = "kind: rpc future dropped {:?}", _0)]
+    RpcDropped(Option<ConnectedAddr>),
 
-    #[display(fmt = "kind: rpc timeout")]
-    RpcTimeout,
+    #[display(fmt = "kind: rpc timeout {:?}", _0)]
+    RpcTimeout(Option<ConnectedAddr>),
 
     #[display(fmt = "kind: not reactor register for {}", _0)]
     NoReactor(String),

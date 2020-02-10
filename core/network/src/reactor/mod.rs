@@ -59,10 +59,19 @@ where
         let handler = Arc::clone(&self.handler);
         let rpc_map = Arc::clone(&self.rpc_map);
 
-        let SessionMessage { sid, msg: net_msg } = smsg;
+        let SessionMessage {
+            sid,
+            msg: net_msg,
+            pid,
+            connected_addr,
+            ..
+        } = smsg;
 
         let endpoint = net_msg.url.to_owned();
-        let mut ctx = Context::new().set_session_id(sid);
+        let mut ctx = Context::new().set_session_id(sid).set_remote_peer_id(pid);
+        if let Some(ref connected_addr) = connected_addr {
+            ctx = ctx.set_remote_connected_addr(connected_addr.clone());
+        }
 
         let react = async move {
             let endpoint = net_msg.url.parse::<Endpoint>()?;
@@ -78,8 +87,19 @@ where
                 }
                 EndpointScheme::RpcResponse => {
                     let rpc_endpoint = RpcEndpoint::try_from(endpoint)?;
-                    let resp_tx = rpc_map.take::<M>(sid, rpc_endpoint.rpc_id().value())?;
+                    let rpc_id = rpc_endpoint.rpc_id().value();
 
+                    if !rpc_map.contains(sid, rpc_id) {
+                        let full_url = rpc_endpoint.endpoint().full_url();
+
+                        warn!(
+                            "rpc entry for {} from {:?} not found, maybe timeout",
+                            full_url, connected_addr
+                        );
+                        return Ok(());
+                    }
+
+                    let resp_tx = rpc_map.take::<M>(sid, rpc_endpoint.rpc_id().value())?;
                     if resp_tx.send(content).is_err() {
                         let end = rpc_endpoint.endpoint().full_url();
 

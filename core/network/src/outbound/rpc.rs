@@ -3,6 +3,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use futures::future::{self, Either};
 use futures_timer::Delay;
+use log::warn;
 use protocol::{
     traits::{Context, MessageCodec, Priority, Rpc},
     Bytes, ProtocolResult,
@@ -64,6 +65,7 @@ where
         let endpoint = end.parse::<Endpoint>()?;
         let sid = cx.session_id()?;
         let rid = self.map.next_rpc_id();
+        let connected_addr = cx.remote_connected_addr();
         let done_rx = self.map.insert::<R>(sid, rid);
 
         let data = msg.encode().await?;
@@ -75,10 +77,14 @@ where
         let timeout = Delay::new(self.timeout.rpc);
         let ret = match future::select(done_rx, timeout).await {
             Either::Left((ret, _timeout)) => {
-                ret.map_err(|_| NetworkError::from(ErrorKind::RpcDropped))?
+                ret.map_err(|_| NetworkError::from(ErrorKind::RpcDropped(connected_addr)))?
             }
             Either::Right((_unresolved, _timeout)) => {
-                return Err(NetworkError::from(ErrorKind::RpcTimeout).into());
+                if let Err(err) = self.map.take::<R>(sid, rid) {
+                    warn!("rpc: remove {}, maybe we just got response", err);
+                }
+
+                return Err(NetworkError::from(ErrorKind::RpcTimeout(connected_addr)).into());
             }
         };
 

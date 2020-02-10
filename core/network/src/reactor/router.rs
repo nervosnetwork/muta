@@ -19,10 +19,10 @@ use crate::{
     endpoint::Endpoint,
     error::{ErrorKind, NetworkError},
     message::{NetworkMessage, RawSessionMessage, SessionMessage},
-    traits::Compression,
+    traits::{Compression, PeerInfoQuerier},
 };
 
-pub struct MessageRouter<C> {
+pub struct MessageRouter<C, PQ> {
     // Endpoint to reactor channel map
     reactor_map: Arc<RwLock<HashMap<Endpoint, UnboundedSender<SessionMessage>>>>,
 
@@ -32,17 +32,22 @@ pub struct MessageRouter<C> {
     // Compression to decompress message
     compression: C,
 
+    // PeerInfo Querier
+    peer_info_querier: PQ,
+
     // Fatal system error reporter
     sys_tx: UnboundedSender<NetworkError>,
 }
 
-impl<C> MessageRouter<C>
+impl<C, PQ> MessageRouter<C, PQ>
 where
     C: Compression + Send + Unpin + Clone + 'static,
+    PQ: PeerInfoQuerier + Send + Unpin + Clone + 'static,
 {
     pub fn new(
         raw_msg_rx: UnboundedReceiver<RawSessionMessage>,
         compression: C,
+        peer_info_querier: PQ,
         sys_tx: UnboundedSender<NetworkError>,
     ) -> Self {
         MessageRouter {
@@ -50,6 +55,7 @@ where
 
             raw_msg_rx,
             compression,
+            peer_info_querier,
 
             sys_tx,
         }
@@ -66,6 +72,7 @@ where
     pub fn route_raw_message(&self, raw_msg: RawSessionMessage) -> impl Future<Output = ()> {
         let reactor_map = Arc::clone(&self.reactor_map);
         let compression = self.compression.clone();
+        let peer_info_querier = self.peer_info_querier.clone();
         let sys_tx = self.sys_tx.clone();
 
         let route = async move {
@@ -78,9 +85,14 @@ where
             let opt_smsg_tx = reactor_map.get(&endpoint).cloned();
             let smsg_tx = opt_smsg_tx.ok_or_else(|| ErrorKind::NoReactor(endpoint.root()))?;
 
+            // Peer may disconnect when we try to fetch its connected address.
+            // This connected addr is mainly for debug purpose, so no error.
+            let connected_addr = peer_info_querier.connected_addr(&raw_msg.pid);
             let smsg = SessionMessage {
                 sid: raw_msg.sid,
+                pid: raw_msg.pid,
                 msg: net_msg,
+                connected_addr,
             };
 
             if smsg_tx.unbounded_send(smsg).is_err() {
@@ -97,9 +109,10 @@ where
     }
 }
 
-impl<C> Future for MessageRouter<C>
+impl<C, PQ> Future for MessageRouter<C, PQ>
 where
     C: Compression + Send + Unpin + Clone + 'static,
+    PQ: PeerInfoQuerier + Send + Unpin + Clone + 'static,
 {
     type Output = ();
 

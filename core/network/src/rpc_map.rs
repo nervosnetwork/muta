@@ -49,6 +49,11 @@ impl RpcMap {
         done_rx
     }
 
+    pub fn contains(&self, sid: SessionId, rid: u64) -> bool {
+        let key = Key::new(sid, rid);
+        self.map.read().contains_key(&key)
+    }
+
     pub fn take<T: Send + 'static>(
         &self,
         sid: SessionId,
