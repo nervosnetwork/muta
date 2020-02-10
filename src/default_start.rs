@@ -129,7 +129,11 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     // Init network
     let network_config = NetworkConfig::new()
         .rpc_timeout(config.network.rpc_timeout.clone())
-        .selfcheck_interval(config.network.selfcheck_interval.clone());
+        .selfcheck_interval(config.network.selfcheck_interval.clone())
+        .max_frame_length(config.network.max_frame_length.clone())
+        .send_buffer_size(config.network.send_buffer_size.clone())
+        .recv_buffer_size(config.network.recv_buffer_size.clone());
+
     let network_privkey = config.privkey.clone();
 
     let mut bootstrap_pairs = vec![];

@@ -33,6 +33,12 @@ pub struct ConnectionConfig {
 
     /// Max stream window size
     pub max_frame_length: Option<usize>,
+
+    /// Send buffer size
+    pub send_buffer_size: Option<usize>,
+
+    /// Write buffer size
+    pub recv_buffer_size: Option<usize>,
 }
 
 pub struct ConnectionService<P: NetworkProtocol> {
@@ -59,6 +65,14 @@ impl<P: NetworkProtocol> ConnectionService<P> {
 
         if let Some(max) = config.max_frame_length {
             builder = builder.max_frame_length(max);
+        }
+
+        if let Some(send) = config.send_buffer_size {
+            builder = builder.set_send_buffer_size(send);
+        }
+
+        if let Some(recv) = config.recv_buffer_size {
+            builder = builder.set_recv_buffer_size(recv);
         }
 
         for proto_meta in protocol.metas().into_iter() {

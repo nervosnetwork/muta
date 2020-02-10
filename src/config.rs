@@ -19,6 +19,9 @@ pub struct ConfigNetwork {
     pub listening_address:  SocketAddr,
     pub rpc_timeout:        Option<u64>,
     pub selfcheck_interval: Option<u64>,
+    pub send_buffer_size:   Option<usize>,
+    pub recv_buffer_size:   Option<usize>,
+    pub max_frame_length:   Option<usize>,
 }
 
 #[derive(Debug, Deserialize)]

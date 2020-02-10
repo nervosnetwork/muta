@@ -28,6 +28,7 @@ pub const DEFAULT_LISTEN_PORT: u16 = 2337;
 pub const DEFAULT_MAX_CONNECTIONS: usize = 40;
 // Default connection stream frame window lenght
 pub const DEFAULT_MAX_FRAME_LENGTH: usize = 4 * 1024 * 1024; // 4 Mib
+pub const DEFAULT_BUFFER_SIZE: usize = 24 * 1024 * 1024; // same as tentacle
 
 // Default peer data persistent path
 pub const DEFAULT_PEER_FILE_NAME: &str = "peers";
@@ -92,6 +93,8 @@ pub struct NetworkConfig {
     pub default_listen:   Multiaddr,
     pub max_connections:  usize,
     pub max_frame_length: usize,
+    pub send_buffer_size: usize,
+    pub recv_buffer_size: usize,
 
     // peer manager
     pub bootstraps:         Vec<Peer>,
@@ -129,6 +132,8 @@ impl NetworkConfig {
             default_listen:   listen_addr,
             max_connections:  DEFAULT_MAX_CONNECTIONS,
             max_frame_length: DEFAULT_MAX_FRAME_LENGTH,
+            send_buffer_size: DEFAULT_BUFFER_SIZE,
+            recv_buffer_size: DEFAULT_BUFFER_SIZE,
 
             bootstraps:         Default::default(),
             enable_persistence: false,
@@ -155,8 +160,26 @@ impl NetworkConfig {
         self
     }
 
-    pub fn max_frame_length(mut self, max: usize) -> Self {
-        self.max_frame_length = max;
+    pub fn max_frame_length(mut self, max: Option<usize>) -> Self {
+        if let Some(max) = max {
+            self.max_frame_length = max;
+        }
+
+        self
+    }
+
+    pub fn send_buffer_size(mut self, size: Option<usize>) -> Self {
+        if let Some(size) = size {
+            self.send_buffer_size = size;
+        }
+
+        self
+    }
+
+    pub fn recv_buffer_size(mut self, size: Option<usize>) -> Self {
+        if let Some(size) = size {
+            self.recv_buffer_size = size;
+        }
 
         self
     }
@@ -275,6 +298,8 @@ impl From<&NetworkConfig> for ConnectionConfig {
         ConnectionConfig {
             secio_keypair:    config.secio_keypair.clone(),
             max_frame_length: Some(config.max_frame_length),
+            send_buffer_size: Some(config.send_buffer_size),
+            recv_buffer_size: Some(config.recv_buffer_size),
         }
     }
 }
