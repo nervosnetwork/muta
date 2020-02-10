@@ -1045,10 +1045,12 @@ impl Future for PeerManager {
             self.process_event(event);
         }
 
+        let connected_peers_addr = self.connected_peers_addr();
         debug!(
-            "network: {:?}: connected peer_addr(s): {:?}",
+            "network: {:?}: connected peer_addr(s) {}: {:?}",
             self.peer_id,
-            self.connected_peers_addr()
+            connected_peers_addr.len(),
+            connected_peers_addr
         );
 
         // Check connecting count
