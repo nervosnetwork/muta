@@ -20,8 +20,10 @@ pub struct ConfigNetwork {
     pub rpc_timeout:        Option<u64>,
     pub selfcheck_interval: Option<u64>,
     pub send_buffer_size:   Option<usize>,
+    pub write_timeout:      Option<u64>,
     pub recv_buffer_size:   Option<usize>,
     pub max_frame_length:   Option<usize>,
+    pub max_wait_streams:   Option<usize>,
 }
 
 #[derive(Debug, Deserialize)]

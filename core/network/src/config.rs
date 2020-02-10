@@ -30,6 +30,11 @@ pub const DEFAULT_MAX_CONNECTIONS: usize = 40;
 pub const DEFAULT_MAX_FRAME_LENGTH: usize = 4 * 1024 * 1024; // 4 Mib
 pub const DEFAULT_BUFFER_SIZE: usize = 24 * 1024 * 1024; // same as tentacle
 
+// Default max wait streams for accept
+pub const DEFAULT_MAX_WAIT_STREAMS: usize = 256;
+// Default write timeout
+pub const DEFAULT_WRITE_TIMEOUT: u64 = 10; // seconds
+
 // Default peer data persistent path
 pub const DEFAULT_PEER_FILE_NAME: &str = "peers";
 pub const DEFAULT_PEER_FILE_EXT: &str = "dat";
@@ -95,6 +100,8 @@ pub struct NetworkConfig {
     pub max_frame_length: usize,
     pub send_buffer_size: usize,
     pub recv_buffer_size: usize,
+    pub max_wait_streams: usize,
+    pub write_timeout:    u64,
 
     // peer manager
     pub bootstraps:         Vec<Peer>,
@@ -134,6 +141,8 @@ impl NetworkConfig {
             max_frame_length: DEFAULT_MAX_FRAME_LENGTH,
             send_buffer_size: DEFAULT_BUFFER_SIZE,
             recv_buffer_size: DEFAULT_BUFFER_SIZE,
+            max_wait_streams: DEFAULT_MAX_WAIT_STREAMS,
+            write_timeout:    DEFAULT_WRITE_TIMEOUT,
 
             bootstraps:         Default::default(),
             enable_persistence: false,
@@ -179,6 +188,22 @@ impl NetworkConfig {
     pub fn recv_buffer_size(mut self, size: Option<usize>) -> Self {
         if let Some(size) = size {
             self.recv_buffer_size = size;
+        }
+
+        self
+    }
+
+    pub fn max_wait_streams(mut self, max: Option<usize>) -> Self {
+        if let Some(max) = max {
+            self.max_wait_streams = max;
+        }
+
+        self
+    }
+
+    pub fn write_timeout(mut self, timeout: Option<u64>) -> Self {
+        if let Some(timeout) = timeout {
+            self.write_timeout = timeout;
         }
 
         self
@@ -300,6 +325,8 @@ impl From<&NetworkConfig> for ConnectionConfig {
             max_frame_length: Some(config.max_frame_length),
             send_buffer_size: Some(config.send_buffer_size),
             recv_buffer_size: Some(config.recv_buffer_size),
+            max_wait_streams: Some(config.max_wait_streams),
+            write_timeout:    Some(config.write_timeout),
         }
     }
 }

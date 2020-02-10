@@ -9,6 +9,7 @@ use std::{
     marker::PhantomData,
     pin::Pin,
     task::{Context, Poll},
+    time::Duration,
 };
 
 use futures::{
@@ -39,6 +40,12 @@ pub struct ConnectionConfig {
 
     /// Write buffer size
     pub recv_buffer_size: Option<usize>,
+
+    /// Max wait streams
+    pub max_wait_streams: Option<usize>,
+
+    /// Write timeout
+    pub write_timeout: Option<u64>,
 }
 
 pub struct ConnectionService<P: NetworkProtocol> {
@@ -63,16 +70,28 @@ impl<P: NetworkProtocol> ConnectionService<P> {
             .key_pair(config.secio_keypair)
             .forever(true);
 
+        let mut yamux_config = tentacle::yamux::Config::default();
+
+        if let Some(max) = config.max_wait_streams {
+            yamux_config.accept_backlog = max;
+        }
+
+        if let Some(size) = config.send_buffer_size {
+            yamux_config.send_buffer_size = size;
+        }
+
+        if let Some(size) = config.recv_buffer_size {
+            yamux_config.recv_buffer_size = size;
+        }
+
+        if let Some(timeout) = config.write_timeout {
+            yamux_config.connection_write_timeout = Duration::from_secs(timeout);
+        }
+
+        builder = builder.yamux_config(yamux_config);
+
         if let Some(max) = config.max_frame_length {
             builder = builder.max_frame_length(max);
-        }
-
-        if let Some(send) = config.send_buffer_size {
-            builder = builder.set_send_buffer_size(send);
-        }
-
-        if let Some(recv) = config.recv_buffer_size {
-            builder = builder.set_recv_buffer_size(recv);
         }
 
         for proto_meta in protocol.metas().into_iter() {
