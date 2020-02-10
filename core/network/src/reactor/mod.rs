@@ -69,8 +69,8 @@ where
 
         let endpoint = net_msg.url.to_owned();
         let mut ctx = Context::new().set_session_id(sid).set_remote_peer_id(pid);
-        if let Some(connected_addr) = connected_addr {
-            ctx = ctx.set_remote_connected_addr(connected_addr);
+        if let Some(ref connected_addr) = connected_addr {
+            ctx = ctx.set_remote_connected_addr(connected_addr.clone());
         }
 
         let react = async move {
@@ -88,8 +88,14 @@ where
                 EndpointScheme::RpcResponse => {
                     let rpc_endpoint = RpcEndpoint::try_from(endpoint)?;
                     let rpc_id = rpc_endpoint.rpc_id().value();
+
                     if !rpc_map.contains(sid, rpc_id) {
-                        warn!("network: reactor: rpc entry not found, if there's timeout message, it's ok here");
+                        let full_url = rpc_endpoint.endpoint().full_url();
+
+                        warn!(
+                            "rpc entry for {} from {:?} not found, maybe timeout",
+                            full_url, connected_addr
+                        );
                         return Ok(());
                     }
 
