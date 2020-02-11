@@ -153,6 +153,7 @@ fn mock_metadata_2() -> Metadata {
         propose_ratio:   1,
         prevote_ratio:   1,
         precommit_ratio: 1,
+        brake_ratio:     7,
     }
 }
 
