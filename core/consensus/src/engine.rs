@@ -229,7 +229,9 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
 
         let mut new_addr_pubkey: HashMap<Bytes, BlsPublicKey> = HashMap::new();
         for validator in metadata.verifier_list.iter() {
-            let pubkey = BlsPublicKey::try_from(validator.bls_pub_key.as_ref())
+            let tmp = hex::decode(validator.bls_pub_key.clone())
+                .map_err(|e| ProtocolError::from(ConsensusError::CryptoErr(Box::new(e.into()))))?;
+            let pubkey = BlsPublicKey::try_from(tmp.as_ref())
                 .map_err(|e| ProtocolError::from(ConsensusError::CryptoErr(Box::new(e))))?;
             new_addr_pubkey.insert(validator.address.as_bytes(), pubkey);
         }
