@@ -34,6 +34,6 @@ payload = '''
     "propose_ratio": 15,
     "prevote_ratio": 10,
     "precommit_ratio": 10,
-    "brake_ratio: 7
+    "brake_ratio": 7
 }
 '''
