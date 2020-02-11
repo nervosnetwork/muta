@@ -3,16 +3,14 @@
 
 #include "pvm.h"
 
-/*
+/**
+ * @brief convert hex string to bytes
+ *
  * Function pvm_hex2bin decode given hex string to binary data.
  *
- * Params:
- *   s[in]: string to decode
- *
- *   buf[out]: pointer to buffer for decoded data to write
- *
- * Return:
- *   n: size of decoded data
+ * @param s[in] hex string to decode
+ * @param buf[out]: pointer to buffer for decoded data to write
+ * @return size of decoded data
  */
 int pvm_hex2bin(char *s, char *buf) {
   int i, n = 0;
@@ -31,55 +29,59 @@ int pvm_hex2bin(char *s, char *buf) {
   return n;
 }
 
-/*
+/**
+ * @brief encode bytes to hex string
+ *
  * Function pvm_bin2hex encode given data to hex string
  *
- * Params:
- *   bin[in]: pointer to data to encode
- *   len[in]: size of data
- *
- *   out[out]: pointer to buffer for encoded string to write
- *
- * Return:
- *   0(success)
+ * @param bin[in]: pointer to data to encode
+ * @param len[in]: size of data
+ * @param out[out]: pointer to buffer for encoded string to write
+ * @return Void
  */
-int pvm_bin2hex(uint8_t *bin, uint8_t len, char *out) {
+void pvm_bin2hex(uint8_t *bin, uint8_t len, char *out) {
   uint8_t i;
   for (i = 0; i < len; i++) {
     out[i * 2] = "0123456789abcdef"[bin[i] >> 4];
     out[i * 2 + 1] = "0123456789abcdef"[bin[i] & 0x0F];
   }
   out[len * 2] = '\0';
-  return 0;
 }
 
-/*
+/**
+ * @brief wapper to pvm_ret to return string
+ *
  * Function pvm_ret_str is a wrapper function to pvm_ret to easily return
  * string.
  *
- * Params:
- *   s[in]: string to return
- *
- * Return:
- *   0(success)
+ * @param s[in]: string to return
+ * @return Void
  */
-int pvm_ret_str(const char *s) {
+void pvm_ret_str(const char *s) {
   uint8_t *buffer = (uint8_t *)s;
-  return pvm_ret(&buffer[0], strlen(buffer));
+  pvm_ret((uint8_t *)s, strlen(buffer));
 }
 
-/*
+/**
+ * @brief wrapper to pvm_ret to return uint64_t
+ *
  * Function pvm_ret_u64 is a wrapper function to pvm_ret to easily return
  * uint64_t.
  *
- * Params:
- *   n[in]: given number to return
- *
- * Return:
- *   0(success)
+ * @param n[in]: given number to return
+ * @return Void
  */
-int pvm_ret_u64(uint64_t n) { return pvm_ret((uint8_t *)&n, 8); }
+void pvm_ret_u64(uint64_t n) { pvm_ret((uint8_t *)&n, 8); }
 
+/**
+ * @brief wrapper to pvm_ret to return uint64_t in string
+ *
+ * Function pvm_ret_u64_str is a wrapper function to pvm_ret to easily return
+ * uint64_t in string.
+ *
+ * @param n[in]: given number to return
+ * @return Void
+ */
 void pvm_ret_u64_str(uint64_t n) {
   char buf[24];
 
