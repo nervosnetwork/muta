@@ -80,14 +80,16 @@ impl<Adapter: ConsensusAdapter + 'static> OverlordConsensus<Adapter> {
         adapter: Arc<Adapter>,
         lock: Arc<Mutex<()>>,
     ) -> Self {
+        let crypto = Arc::new(OverlordCrypto::new(priv_key, addr_pubkey, common_ref));
+
         let engine = Arc::new(ConsensusEngine::new(
             status_agent.clone(),
             node_info.clone(),
             Arc::clone(&adapter),
+            Arc::clone(&crypto),
             lock,
         ));
 
-        let crypto = OverlordCrypto::new(priv_key, addr_pubkey, common_ref);
         let overlord = Overlord::new(
             node_info.self_address.as_bytes(),
             Arc::clone(&engine),
