@@ -19,7 +19,7 @@ if [ ! -z "$1" ]; then
 fi
 
 res_code=$(curl --write-out %{http_code} --silent --output /dev/null \
-            -X POST -d '{"query":"query { getLatestBlock { header { height }}}"}' \
+            -X POST -d '{"query":"{\n  getBlock(height: \"3\") {\n    header {\n      height\n      preHash\n    }\n    orderedTxHashes\n  }\n}\n"}' \
             $endpoint)
 
 if [ $res_code -ne 200 ]; then
@@ -34,8 +34,10 @@ GraphQL provides a complete and understandable description of the data in your A
 gives clients the power to ask for exactly what they need and nothing more,
 makes it easier to evolve APIs over time, and enables powerful developer tools.
 
-Muta has embeded a [Graph*i*QL](https://github.com/graphql/graphiql) for checking and calling API. Started a the Muta
+Muta has embeded a [Graph**i**QL](https://github.com/graphql/graphiql) for checking and calling API. Started a the Muta
 node, and then try open http://127.0.0.1:8000/graphiql in the browser.
 "
 
 graphql-markdown $endpoint --title "Muta GraphQL API" --prologue "$prologue" > $BASEDIR/../graphql_api.md
+
+sed -i -E 's/<a href="#(.+)">/<a href="#\/graphql_api?id=\1">/g'  $BASEDIR/../graphql_api.md
