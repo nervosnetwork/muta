@@ -241,7 +241,7 @@ pub struct Metadata {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct ValidatorExtend {
-    pub pub_key:        String,
+    pub bls_pub_key:    String,
     pub address:        Address,
     pub propose_weight: u32,
     pub vote_weight:    u32,

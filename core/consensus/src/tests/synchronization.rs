@@ -241,7 +241,7 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
             cycles_price:    1,
             interval:        3000,
             verifier_list:   vec![ValidatorExtend {
-                pub_key: "04188ef9488c19458a963cc57b567adde7db8f8b6bec392d5cb7b67b0abc1ed6cd966edc451f6ac2ef38079460eb965e890d1f576e4039a20467820237cda753f07a8b8febae1ec052190973a1bcf00690ea8fc0168b3fbbccd1c4e402eda5ef22".to_owned(),
+                bls_pub_key: "04188ef9488c19458a963cc57b567adde7db8f8b6bec392d5cb7b67b0abc1ed6cd966edc451f6ac2ef38079460eb965e890d1f576e4039a20467820237cda753f07a8b8febae1ec052190973a1bcf00690ea8fc0168b3fbbccd1c4e402eda5ef22".to_owned(),
                 address:        Address::from_hex("1c9776983b2f251fa5c9cc562c1b667d1f05ff83")
                     .unwrap(),
                 propose_weight: 0,

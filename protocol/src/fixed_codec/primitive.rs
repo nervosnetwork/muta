@@ -170,7 +170,7 @@ impl rlp::Decodable for Metadata {
 impl rlp::Encodable for ValidatorExtend {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
         s.begin_list(4)
-            .append(&self.pub_key)
+            .append(&self.bls_pub_key)
             .append(&self.address)
             .append(&self.propose_weight)
             .append(&self.vote_weight);
@@ -183,13 +183,13 @@ impl rlp::Decodable for ValidatorExtend {
             return Err(rlp::DecoderError::RlpIncorrectListLen);
         }
 
-        let pub_key = rlp::decode(r.at(0)?.as_raw())?;
+        let bls_pub_key = rlp::decode(r.at(0)?.as_raw())?;
         let address = rlp::decode(r.at(1)?.as_raw())?;
         let propose_weight = r.at(2)?.as_val()?;
         let vote_weight = r.at(3)?.as_val()?;
 
         Ok(ValidatorExtend {
-            pub_key,
+            bls_pub_key,
             address,
             propose_weight,
             vote_weight,
