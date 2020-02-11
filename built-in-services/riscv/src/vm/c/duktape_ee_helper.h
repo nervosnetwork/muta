@@ -4,8 +4,6 @@
 #include "./duktape/duktape.h"
 #include "pvm.h"
 
-#define ADDRESS_LEN 50
-#define MAX_HASH_LEN 64
 // load at most 1KB data
 #define MAX_LOAD_SIZE 1024
 
@@ -44,10 +42,8 @@ static duk_ret_t duk_pvm_debug(duk_context *ctx) {
 }
 
 static duk_ret_t duk_pvm_load_args(duk_context *ctx) {
-  duk_push_fixed_buffer(ctx, MAX_LOAD_SIZE);
-
-  void *args = duk_get_buffer(ctx, 0, NULL);
-  pvm_load_args(args, NULL);
+  duk_push_fixed_buffer(ctx, pvm_load_args(NULL));
+  pvm_load_args(duk_get_buffer(ctx, 0, NULL));
 
   duk_buffer_to_string(ctx, -1);
   duk_push_string(ctx, duk_safe_to_string(ctx, -1));
@@ -56,10 +52,8 @@ static duk_ret_t duk_pvm_load_args(duk_context *ctx) {
 }
 
 static duk_ret_t duk_pvm_origin(duk_context *ctx) {
-  duk_push_fixed_buffer(ctx, ADDRESS_LEN);
-
-  void *args = duk_get_buffer(ctx, 0, NULL);
-  pvm_origin(args);
+  duk_push_fixed_buffer(ctx, pvm_origin(NULL));
+  pvm_origin(duk_get_buffer(ctx, 0, NULL));
 
   duk_buffer_to_string(ctx, -1);
   duk_push_string(ctx, duk_safe_to_string(ctx, -1));
@@ -68,10 +62,8 @@ static duk_ret_t duk_pvm_origin(duk_context *ctx) {
 }
 
 static duk_ret_t duk_pvm_address(duk_context *ctx) {
-  duk_push_fixed_buffer(ctx, ADDRESS_LEN);
-
-  void *args = duk_get_buffer(ctx, 0, NULL);
-  pvm_address(args);
+  duk_push_fixed_buffer(ctx, pvm_address(NULL));
+  pvm_address(duk_get_buffer(ctx, 0, NULL));
 
   duk_buffer_to_string(ctx, -1);
   duk_push_string(ctx, duk_safe_to_string(ctx, -1));
@@ -80,10 +72,8 @@ static duk_ret_t duk_pvm_address(duk_context *ctx) {
 }
 
 static duk_ret_t duk_pvm_caller(duk_context *ctx) {
-  duk_push_fixed_buffer(ctx, ADDRESS_LEN);
-
-  void *args = duk_get_buffer(ctx, 0, NULL);
-  pvm_caller(args);
+  duk_push_fixed_buffer(ctx, pvm_caller(NULL));
+  pvm_caller(duk_get_buffer(ctx, 0, NULL));
 
   duk_buffer_to_string(ctx, -1);
   duk_push_string(ctx, duk_safe_to_string(ctx, -1));
@@ -92,10 +82,8 @@ static duk_ret_t duk_pvm_caller(duk_context *ctx) {
 }
 
 static duk_ret_t duk_pvm_load_json_args(duk_context *ctx) {
-  duk_push_fixed_buffer(ctx, MAX_LOAD_SIZE);
-
-  void *args = duk_get_buffer(ctx, 0, NULL);
-  pvm_load_args(args, NULL);
+  duk_push_fixed_buffer(ctx, pvm_load_args(NULL));
+  pvm_load_args(duk_get_buffer(ctx, 0, NULL));
 
   duk_buffer_to_string(ctx, -1);
   duk_push_string(ctx, duk_safe_to_string(ctx, -1));
@@ -134,18 +122,16 @@ static duk_ret_t duk_pvm_block_height(duk_context *ctx) {
 // Note: it assumes that injected extra data can be converted
 // to String type. Same as pvm_load_args function.
 static duk_ret_t duk_pvm_extra(duk_context *ctx) {
-  duk_push_fixed_buffer(ctx, MAX_LOAD_SIZE);
-
-  uint64_t extra_sz = 0;
-  void *extra = duk_get_buffer(ctx, -1, NULL);
-  int no_extra = pvm_extra(extra, &extra_sz);
-  if (no_extra) {
-    duk_pop(ctx); // Pop previous pushed fixed buffer
+  uint64_t extra_size = pvm_extra(NULL);
+  if (extra_size == 0) {
     duk_push_null(ctx);
-  } else {
-    duk_buffer_to_string(ctx, -1);
-    duk_push_string(ctx, duk_safe_to_string(ctx, -1));
+    return 1;
   }
+
+  duk_push_fixed_buffer(ctx, extra_size);
+  pvm_extra(duk_get_buffer(ctx, 0, NULL));
+  duk_buffer_to_string(ctx, -1);
+  duk_push_string(ctx, duk_safe_to_string(ctx, -1));
 
   return 1;
 }
@@ -165,26 +151,22 @@ static duk_ret_t duk_pvm_emit_event(duk_context *ctx) {
 
   duk_size_t msg_size = 0;
   const void *msg = duk_get_lstring(ctx, -1, &msg_size);
-
-  if (pvm_emit_event(msg, msg_size)) {
-    duk_push_error_object(ctx, DUK_ERR_EVAL_ERROR, "Invalid UTF-8 string");
-    return duk_throw(ctx);
-  }
+  pvm_emit_event(msg, msg_size);
 
   return 0;
 }
 
 static duk_ret_t duk_pvm_tx_hash(duk_context *ctx) {
-  duk_push_fixed_buffer(ctx, MAX_HASH_LEN);
-
-  void *hash = duk_get_buffer(ctx, 0, NULL);
-  if (pvm_tx_hash(hash)) {
-    duk_pop(ctx);
+  uint64_t hash_size = pvm_tx_hash(NULL);
+  if (hash_size == 0) {
     duk_push_null(ctx);
-  } else {
-    duk_buffer_to_string(ctx, -1);
-    duk_push_string(ctx, duk_safe_to_string(ctx, -1));
+    return 1;
   }
+
+  duk_push_fixed_buffer(ctx, hash_size);
+  pvm_tx_hash(duk_get_buffer(ctx, 0, NULL));
+  duk_buffer_to_string(ctx, -1);
+  duk_push_string(ctx, duk_safe_to_string(ctx, -1));
 
   return 1;
 }
@@ -192,16 +174,16 @@ static duk_ret_t duk_pvm_tx_hash(duk_context *ctx) {
 // Function duk_pvm_tx_nonce inject extra data. If no nonce, null
 // is returned.
 static duk_ret_t duk_pvm_tx_nonce(duk_context *ctx) {
-  duk_push_fixed_buffer(ctx, MAX_HASH_LEN);
-
-  void *nonce = duk_get_buffer(ctx, 0, NULL);
-  if (pvm_tx_nonce(nonce)) {
-    duk_pop(ctx);
+  uint64_t hash_size = pvm_tx_nonce(NULL);
+  if (hash_size == 0) {
     duk_push_null(ctx);
-  } else {
-    duk_buffer_to_string(ctx, -1);
-    duk_push_string(ctx, duk_safe_to_string(ctx, -1));
+    return 1;
   }
+
+  duk_push_fixed_buffer(ctx, hash_size);
+  pvm_tx_nonce(duk_get_buffer(ctx, 0, NULL));
+  duk_buffer_to_string(ctx, -1);
+  duk_push_string(ctx, duk_safe_to_string(ctx, -1));
 
   return 1;
 }
@@ -216,12 +198,8 @@ static duk_ret_t duk_pvm_get_storage(duk_context *ctx) {
   duk_size_t key_size = 0;
   const void *key = duk_get_lstring(ctx, -1, &key_size);
 
-  duk_push_fixed_buffer(ctx, MAX_LOAD_SIZE);
-  void *val = duk_get_buffer(ctx, -1, NULL);
-
-  uint64_t val_size = 0;
-  pvm_get_storage(key, key_size, val, &val_size);
-
+  duk_push_fixed_buffer(ctx, pvm_get_storage(key, key_size, NULL));
+  pvm_get_storage(key, key_size, duk_get_buffer(ctx, -1, NULL));
   duk_buffer_to_string(ctx, -1);
   duk_push_string(ctx, duk_safe_to_string(ctx, -1));
 
@@ -273,11 +251,8 @@ static duk_ret_t duk_pvm_service_call(duk_context *ctx) {
   duk_push_fixed_buffer(ctx, MAX_LOAD_SIZE);
   void *ret = duk_get_buffer(ctx, -1, NULL);
 
-  int ret_code = 0;
-  if (ret_code !=
-      pvm_service_call(service, method, payload, payload_size, ret, NULL)) {
-    return ret_code;
-  }
+  pvm_service_call(service, method, payload, payload_size, ret);
+  pvm_assert(2 > 1, "service call success");
 
   duk_buffer_to_string(ctx, -1);
   duk_push_string(ctx, duk_safe_to_string(ctx, -1));
@@ -301,10 +276,8 @@ static duk_ret_t duk_pvm_contract_call(duk_context *ctx) {
   duk_push_fixed_buffer(ctx, MAX_LOAD_SIZE);
   void *ret = duk_get_buffer(ctx, -1, NULL);
 
-  int ret_code = 0;
-  if (ret_code != pvm_contract_call(addr, call_args, args_size, ret, NULL)) {
-    return ret_code;
-  }
+  pvm_contract_call(addr, call_args, args_size, ret);
+  pvm_assert(2 > 1, "contract call success");
 
   duk_buffer_to_string(ctx, -1);
   duk_push_string(ctx, duk_safe_to_string(ctx, -1));

@@ -113,9 +113,7 @@ duktape_docker:
 
 libpvm.a:
 	$(CC) -I$(RISCV_SRC) -c $(RISCV_SRC)/pvm.c -o /tmp/pvm.o
-	$(CC) -I$(RISCV_SRC) -c $(RISCV_SRC)/UsefulBuf.c -o /tmp/UsefulBuf.o
-	$(CC) -I$(RISCV_SRC) -c $(RISCV_SRC)/pvm_structs.c -o /tmp/pvm_structs.o
-	ar rcs $(RISCV_SRC)/libpvm.a /tmp/UsefulBuf.o /tmp/pvm_structs.o /tmp/pvm.o
+	ar rcs $(RISCV_SRC)/libpvm.a /tmp/pvm.o
 
 pvm_structs_test: libpvm.a
 	$(CC) -I$(RISCV_SRC) $(TEST_SRC)/pvm_structs.c $(RISCV_SRC)/libpvm.a $(LDFLAGS) -o $(TEST_SRC)/pvm_structs.bin
