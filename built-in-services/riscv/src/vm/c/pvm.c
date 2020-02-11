@@ -1,6 +1,6 @@
 #include "pvm.h"
 
-void pvm_debug(const char *s) { syscall(SYSCODE_DEBUG, s, 0, 0, 0, 0, 0); }
+void pvm_debug(const char *msg) { syscall(SYSCODE_DEBUG, msg, 0, 0, 0, 0, 0); }
 
 void pvm_assert(int statement, const char *msg) {
   syscall(SYSCODE_ASSERT, statement, msg, 0, 0, 0, 0);
