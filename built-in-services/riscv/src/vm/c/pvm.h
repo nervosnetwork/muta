@@ -56,13 +56,10 @@ static inline long __internal_syscall(long n, long _a0, long _a1, long _a2,
  * Params:
  *   format[in]: same as the standard C function `printf()`
  *
- * Return:
- *   code: 0(success)
- *
  * Example:
  *   pvm_debug("Hello World!");
  */
-int pvm_debug(const char *s);
+void pvm_debug(const char *s);
 
 /*
  * Function pvm_assert accepts bool statement and a assertion message that
@@ -84,17 +81,15 @@ void pvm_assert(int statement, const char *msg);
  *
  * Params:
  *   data[out]: pointer to data for loaded args to write
- *   size[out]: size of loaded args
  *
  * Return:
- *   code: 0(success)
+ *   size of loaded args, if no args, 0 is returned.
  *
  * Example:
  *   char data[2048];
- *   uint64_t size = 0;
- *   pvm_load_args(data, &size);
+ *   uint64_t size = pvm_load_args(data, &size);
  */
-int pvm_load_args(uint8_t *data, uint64_t *size);
+uint64_t pvm_load_args(uint8_t *data);
 
 /*
  * Function ret returns any bytes to host, as the output of the current
@@ -104,9 +99,6 @@ int pvm_load_args(uint8_t *data, uint64_t *size);
  *   data[in]: point to data to returen
  *   size[in]: size of the data
  *
- * Return:
- *   code: 0(success)
- *
  * Example:
  *   const char *ret = "return message";
  *   pvm_ret((uint8_t *)ret, strlen(ret));
@@ -114,7 +106,7 @@ int pvm_load_args(uint8_t *data, uint64_t *size);
  * Note: This syscall(s) only allowed to call once. If called it multiple times,
  * the last call will replace the previous call.
  */
-int pvm_ret(const uint8_t *data, size_t size);
+void pvm_ret(const uint8_t *data, size_t size);
 
 /*
  * Function pvm_cycle_limit returns block cycle limit.
@@ -147,13 +139,13 @@ uint64_t pvm_cycle_price();
  *   addr[out]: pointer to buffer for loaded origin address to write
  *
  * Return:
- *   code: 0(success)
+ *   size of origin bytes
  *
  * Example:
- *   uint8_t addr[50];
+ *   uint8_t *addr = malloc(pvm_origin(NULL));
  *   pvm_origin(addr);
  */
-int pvm_origin(uint8_t *addr);
+uint64_t pvm_origin(uint8_t *addr);
 
 /*
  * Function pvm_caller loads current caller address.
@@ -162,13 +154,13 @@ int pvm_origin(uint8_t *addr);
  *   addr[out]: pointer to bufer for loaded caller address to write
  *
  * Return:
- *   code: 0(success)
+ *   size of caller bytes
  *
  * Example:
- *   uint8_t addr[50];
+ *   uint8_t *addr = malloc(pvm_caller(NULL));
  *   pvm_caller(addr);
  */
-int pvm_caller(uint8_t *addr);
+uint64_t pvm_caller(uint8_t *addr);
 
 /*
  * Function pvm_address load this contract address.
@@ -176,14 +168,14 @@ int pvm_caller(uint8_t *addr);
  * Params:
  *   addr[out]: pointer to buffer for loaded contract address to write
  *
- *  Return:
- *    code: 0(success)
+ * Return:
+ *    size of address bytes
  *
- *  Example:
+ * Example:
  *    uint8_t addr[50];
  *    pvm_adress(addr);
  */
-int pvm_address(uint8_t *addr);
+uint64_t pvm_address(uint8_t *addr);
 
 /*
  * Function pvm_is_init returns whether this contract is initialized. Contract
@@ -209,17 +201,15 @@ uint64_t pvm_block_height();
  *
  * Params:
  *   extra[out]: pointer to buffer for loaded extra to write
- *   extra_sz[out]: size of extra data if there is one
  *
  * Return:
- *   code: 0(success), 1(no extra data)
+ *   size of extra data
  *
  * Example:
- *   uint8_t extra[2048];
- *   uint64_t extra_sz;
- *   pvm_extra(extra, &extra_sz);
+ *   uint8_t *extra = malloc(pvm_extra(NULL));
+ *   pvm_extra(extra);
  */
-int pvm_extra(uint8_t *extra, uint64_t *extra_sz);
+uint64_t pvm_extra(uint8_t *extra);
 
 /*
  * Function pvm_timestamp returns execution's timestamp. It's seconds since
@@ -235,46 +225,42 @@ uint64_t pvm_timestamp();
  *
  * Params:
  *   msg[in]: a pointer to msg to emit
- *   msg_sz[in]: size of message buffer
- *
- * Return:
- *   code: 0(success), 1(invalid utf8)
  *
  * Example:
  *   const char *msg = "{ \"msg\": \"test event\" }";
  *   pvm_emit_event((uint8_t *)msg, strlen(msg));
  */
-int pvm_emit_event(const uint8_t *msg, uint64_t msg_sz) ;
+void pvm_emit_event(const uint8_t *msg, uint64_t msg_sz);
 
 /*
  * Function pvm_tx_hash loads transaction hash.
  *
  * Params:
- *   addr[out]: pointer to buffer for loaded tx hash to write
+ *   tx_hash[out]: pointer to buffer for loaded tx hash to write
  *
  * Return:
- *   code: 0(success) 1(no tx hash)
+ *   size of tx hash
  *
  * Example:
- *   uint8_t addr[50];
- *   pvm_tx_hash(addr);
+ *   uint8_t *tx_hash = malloc(pvm_tx_hash(NULL));
+ *   pvm_tx_hash(tx_hash);
  */
-int pvm_tx_hash(uint8_t *addr);
+uint64_t pvm_tx_hash(uint8_t *tx_hash);
 
 /*
  * Function pvm_nonce loads transaction nonce hash.
  *
  * Params:
- *   addr[out]: pointer to buffer for loaded nonce to write
+ *   nonce[out]: pointer to buffer for loaded nonce to write
  *
  * Return:
- *   code: 0(success) 1(no nonce)
+ *   size of nonce
  *
  * Example:
- *   uint8_t nonce[50];
+ *   uint8_t *nonce = malloc(pvm_nonce(NULL));
  *   pvm_tx_nonce(nonce);
  */
-int pvm_tx_nonce(uint8_t *addr);
+uint64_t pvm_tx_nonce(uint8_t *nonce);
 
 /*
  * Function pvm_get_storage load value from contract state.
@@ -284,19 +270,16 @@ int pvm_tx_nonce(uint8_t *addr);
  *   k_size[in]: size of key
  *
  *   v[out]: pointer to buffer for loaded value to write
- *   v_size[out]: size of val
  *
  * Return:
- *   code: 0(success) 1(key not found)
+ *   size of loaded value
  *
  * Example:
  *   const char *key = "cyber";
- *   uint8_t val[2048];
- *   uint64_t val_sz;
- *   pvm_get_storage((uint8_t *)key, strlen(key), val, &val_sz);
+ *   uint8_t *val = pvm_get_storage((uint8_t *key), strlen(key), NULL);
+ *   pvm_get_storage((uint8_t *)key, strlen(key), val);
  */
-int pvm_get_storage(const uint8_t *k, uint64_t k_size, uint8_t *v,
-                    uint64_t *v_size);
+uint64_t pvm_get_storage(const uint8_t *k, uint64_t k_size, uint8_t *v);
 
 /*
  * Function pvm_set_storage save value to contract state using given key.
@@ -308,16 +291,13 @@ int pvm_get_storage(const uint8_t *k, uint64_t k_size, uint8_t *v,
  *   v[in]: pointer to value
  *   v_size[in]: size of val
  *
- * Return:
- *   code: 0(success)
- *
  * Example:
  *   const char *key = "cyber";
  *   const char *val = "punk"
  *   pvm_set_storage((uint8_t *)key, strlen(key), (uint8_t *)val, strlen(val));
  */
-int pvm_set_storage(const uint8_t *k, uint64_t k_size, const uint8_t *v,
-                    uint64_t v_size);
+void pvm_set_storage(const uint8_t *k, uint64_t k_size, const uint8_t *v,
+                     uint64_t v_size);
 
 /*
  * Function pvm_contract_call invokes a contract located at given address.
@@ -328,20 +308,20 @@ int pvm_set_storage(const uint8_t *k, uint64_t k_size, const uint8_t *v,
  *   args_size[in]: size of args
  *
  *   ret[out]: pointer to a buffer for invocation result to write
- *   ret_size[out]: size of result
  *
  * Return:
- *   code: 0(success)
+ *   size of result
  *
  * Example:
  *   uint8_t *ctr_addr = xxxx; // target contract address
  *   const char *args = "{\"method\": \"test_contract_call\"}"; // json
  *   uint8_t ret[2048];
- *   uint64_t ret_size;
- *   pvm_contract_call(ctr_addr, (uint8_t *)args, strlen(args), ret, &ret_size);
+ *   uint64_t size = pvm_contract_call(ctr_addr, (uint8_t *)args, strlen(args),
+ *   pvm_assert(2 > 1, "contract call success");
+ * ret);
  */
-int pvm_contract_call(const uint8_t *addr, const uint8_t *args,
-                      uint64_t args_size, uint8_t *ret, uint64_t *ret_size);
+uint64_t pvm_contract_call(const uint8_t *addr, const uint8_t *args,
+                           uint64_t args_size, uint8_t *ret);
 
 /*
  * Function pvm_service_call invokes a service method.
@@ -353,10 +333,9 @@ int pvm_contract_call(const uint8_t *addr, const uint8_t *args,
  *   payload_size[in]: size of payload
  *
  *   ret[out]: pointer to buffer for invocation result to write
- *   ret_size[out]: size of result
  *
  * Return:
- *   code: 0(success)
+ *   size of result
  *
  * Example:
  *   const char *service = "riscv";
@@ -368,12 +347,12 @@ int pvm_contract_call(const uint8_t *addr, const uint8_t *args,
  *      } \
  *   }";
  *   uint8_t ret[2048];
- *   uint64_t ret_size;
- *   pvm_service_call(service, method, (uint8_t *)payload, strlen(payload), ret,
- * &ret_size);
+ *   uint64_t size = pvm_service_call(service, method, (uint8_t *)payload,
+ * strlen(payload), ret);
+ *   pvm_assert(2 > 1, "service call success");
  */
-int pvm_service_call(const char *service, const char *method,
-                     const uint8_t *payload, uint64_t payload_size,
-                     uint8_t *ret, uint64_t *ret_size);
+uint64_t pvm_service_call(const char *service, const char *method,
+                          const uint8_t *payload, uint64_t payload_size,
+                          uint8_t *ret);
 
 #endif

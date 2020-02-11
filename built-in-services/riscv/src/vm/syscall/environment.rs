@@ -36,15 +36,16 @@ impl<Mac: ckb_vm::SupportMachine> ckb_vm::Syscalls<Mac> for SyscallEnvironment {
         match code {
             SYSCODE_ADDRESS => {
                 let ptr = machine.registers()[ckb_vm::registers::A0].to_u64();
-                if ptr == 0 {
-                    return Err(ckb_vm::Error::IO(io::ErrorKind::InvalidInput));
+                let address = self.iparams.address.as_hex();
+
+                if ptr != 0 {
+                    machine.memory_mut().store_bytes(ptr, address.as_ref())?;
                 }
+                machine.set_register(
+                    ckb_vm::registers::A0,
+                    Mac::REG::from_u64(address.len() as u64),
+                );
 
-                machine
-                    .memory_mut()
-                    .store_bytes(ptr, self.iparams.address.as_hex().as_ref())?;
-
-                machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(0));
                 Ok(true)
             }
             SYSCODE_CYCLE_LIMIT => {
@@ -69,30 +70,35 @@ impl<Mac: ckb_vm::SupportMachine> ckb_vm::Syscalls<Mac> for SyscallEnvironment {
             }
             SYSCODE_ORIGIN => {
                 let ptr = machine.registers()[ckb_vm::registers::A0].to_u64();
-                if ptr == 0 {
-                    return Err(ckb_vm::Error::IO(io::ErrorKind::InvalidInput));
+                let origin = self.context.get_caller().as_hex();
+
+                if ptr != 0 {
+                    machine.memory_mut().store_bytes(ptr, origin.as_ref())?;
                 }
+                machine.set_register(
+                    ckb_vm::registers::A0,
+                    Mac::REG::from_u64(origin.len() as u64),
+                );
 
-                machine
-                    .memory_mut()
-                    .store_bytes(ptr, self.context.get_caller().as_hex().as_ref())?;
-
-                machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(0));
                 Ok(true)
             }
             SYSCODE_CALLER => {
                 let ptr = machine.registers()[ckb_vm::registers::A0].to_u64();
-                if ptr == 0 {
-                    return Err(ckb_vm::Error::IO(io::ErrorKind::InvalidInput));
-                }
 
+                // For service call, caller is passed by extra.
                 let caller = self
                     .context
                     .get_extra()
                     .unwrap_or_else(|| Bytes::from(self.context.get_caller().as_hex()));
 
-                machine.memory_mut().store_bytes(ptr, &caller)?;
-                machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(0));
+                if ptr != 0 {
+                    machine.memory_mut().store_bytes(ptr, &caller)?;
+                }
+                machine.set_register(
+                    ckb_vm::registers::A0,
+                    Mac::REG::from_u64(caller.len() as u64),
+                );
+
                 Ok(true)
             }
             SYSCODE_BLOCK_HEIGHT => {
@@ -102,21 +108,19 @@ impl<Mac: ckb_vm::SupportMachine> ckb_vm::Syscalls<Mac> for SyscallEnvironment {
             }
             SYSCODE_EXTRA => {
                 let ptr = machine.registers()[ckb_vm::registers::A0].to_u64();
-                let len_ptr = machine.registers()[ckb_vm::registers::A1].to_u64();
 
                 if let Some(extra) = self.context.get_extra() {
                     if ptr != 0 {
                         machine.memory_mut().store_bytes(ptr, &extra)?;
                     }
-                    if len_ptr != 0 {
-                        let extra_len = (extra.len() as u64).to_le_bytes();
-                        machine.memory_mut().store_bytes(len_ptr, &extra_len)?;
-                    }
-
-                    machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(0));
+                    machine.set_register(
+                        ckb_vm::registers::A0,
+                        Mac::REG::from_u64(extra.len() as u64),
+                    );
                 } else {
-                    machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(1));
+                    machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u64(0));
                 }
+
                 Ok(true)
             }
             SYSCODE_TIMESTAMP => {
@@ -127,6 +131,9 @@ impl<Mac: ckb_vm::SupportMachine> ckb_vm::Syscalls<Mac> for SyscallEnvironment {
             SYSCODE_EMIT_EVENT => {
                 let ptr = machine.registers()[ckb_vm::registers::A0].to_u64();
                 let len = machine.registers()[ckb_vm::registers::A1].to_u64();
+                if ptr == 0 {
+                    return Err(ckb_vm::Error::IO(io::ErrorKind::InvalidInput));
+                }
 
                 let msg = String::from_utf8(get_arr(machine, ptr, len)?)
                     .map_err(|_| ckb_vm::Error::IO(std::io::ErrorKind::InvalidData))?;
@@ -136,35 +143,38 @@ impl<Mac: ckb_vm::SupportMachine> ckb_vm::Syscalls<Mac> for SyscallEnvironment {
                     error!("impossible emit event failed {}", e);
                 }
 
-                machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(0));
                 Ok(true)
             }
             SYSCODE_TX_HASH => {
                 let ptr = machine.registers()[ckb_vm::registers::A0].to_u64();
-                if ptr == 0 {
-                    return Err(ckb_vm::Error::IO(io::ErrorKind::InvalidInput));
-                }
 
                 if let Some(tx_hash) = self.context.get_tx_hash().map(|h| h.as_hex()) {
-                    machine.memory_mut().store_bytes(ptr, tx_hash.as_ref())?;
-                    machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(0));
+                    if ptr != 0 {
+                        machine.memory_mut().store_bytes(ptr, tx_hash.as_ref())?;
+                    }
+                    machine.set_register(
+                        ckb_vm::registers::A0,
+                        Mac::REG::from_u64(tx_hash.len() as u64),
+                    );
                 } else {
-                    machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(1));
+                    machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(0));
                 }
 
                 Ok(true)
             }
             SYSCODE_TX_NONCE => {
                 let ptr = machine.registers()[ckb_vm::registers::A0].to_u64();
-                if ptr == 0 {
-                    return Err(ckb_vm::Error::IO(io::ErrorKind::InvalidInput));
-                }
 
                 if let Some(nonce) = self.context.get_nonce().map(|n| n.as_hex()) {
-                    machine.memory_mut().store_bytes(ptr, nonce.as_ref())?;
-                    machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(0));
+                    if ptr != 0 {
+                        machine.memory_mut().store_bytes(ptr, nonce.as_ref())?;
+                    }
+                    machine.set_register(
+                        ckb_vm::registers::A0,
+                        Mac::REG::from_u64(nonce.len() as u64),
+                    );
                 } else {
-                    machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(1));
+                    machine.set_register(ckb_vm::registers::A0, Mac::REG::from_u8(0));
                 }
 
                 Ok(true)
