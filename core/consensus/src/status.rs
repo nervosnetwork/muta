@@ -177,7 +177,16 @@ impl CurrentConsensusStatus {
         self.cycles_limit = metadata.cycles_limit;
         self.cycles_price = metadata.cycles_price;
         self.consensus_interval = metadata.interval;
-        self.validators = metadata.verifier_list;
+        let validators: Vec<Validator> = metadata
+            .verifier_list
+            .iter()
+            .map(|v| Validator {
+                address:        v.address.clone(),
+                propose_weight: v.propose_weight,
+                vote_weight:    v.vote_weight,
+            })
+            .collect();
+        self.validators = validators;
         self.propose_ratio = metadata.propose_ratio;
         self.prevote_ratio = metadata.prevote_ratio;
         self.precommit_ratio = metadata.precommit_ratio;

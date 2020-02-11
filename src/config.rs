@@ -45,11 +45,6 @@ pub struct ConfigMempool {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct ConfigConsensus {
-    pub public_keys: Vec<String>,
-}
-
-#[derive(Debug, Deserialize)]
 pub struct ConfigExecutor {
     pub light: bool,
 }
@@ -87,13 +82,12 @@ pub struct Config {
     // db config
     pub data_path: PathBuf,
 
-    pub graphql:   ConfigGraphQL,
-    pub network:   ConfigNetwork,
-    pub mempool:   ConfigMempool,
-    pub consensus: ConfigConsensus,
-    pub executor:  ConfigExecutor,
+    pub graphql:  ConfigGraphQL,
+    pub network:  ConfigNetwork,
+    pub mempool:  ConfigMempool,
+    pub executor: ConfigExecutor,
     #[serde(default)]
-    pub logger:    ConfigLogger,
+    pub logger:   ConfigLogger,
 }
 
 impl Config {
