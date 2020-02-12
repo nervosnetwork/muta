@@ -262,18 +262,16 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
         let cycles_limit = current_status.cycles_limit;
 
         let exec_params = ExecutorParams {
-            state_root: current_status.latest_state_root.clone(),
+            state_root: current_status.latest_state_root,
             height: rich_block.block.header.height,
             timestamp: rich_block.block.header.timestamp,
             cycles_limit,
         };
-        let resp = self
-            .adapter
-            .sync_exec(ctx.clone(), &exec_params, &rich_block.txs)?;
+        let resp = self.adapter.sync_exec(ctx, &exec_params, &rich_block.txs)?;
 
         status_agent.update_after_exec(UpdateInfo::with_after_exec(
             rich_block.block.header.height,
-            rich_block.block.header.order_root.clone(),
+            rich_block.block.header.order_root,
             resp.clone(),
         ));
 
