@@ -481,6 +481,22 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
             return Err(ConsensusError::CheckBlockErr(StatusCacheField::CyclesUsed).into());
         }
 
+        // check logs bloom
+        if !check_vec_roots(&status.logs_bloom, &block.logs_bloom) {
+            trace::error(
+                "check_block_logs_bloom_diff".to_string(),
+                Some(json!({
+                    "block_state_root": block.logs_bloom,
+                    "cache_state_roots": status.logs_bloom,
+                })),
+            );
+            error!(
+                "cache logs bloom {:?}, block logs bloom {:?}",
+                status.logs_bloom, block.logs_bloom
+            );
+            return Err(ConsensusError::CheckBlockErr(StatusCacheField::LogsBloom).into());
+        }
+        
         Ok(())
     }
 
