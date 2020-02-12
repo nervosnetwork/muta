@@ -119,6 +119,7 @@ impl Crypto for OverlordCrypto {
     }
 }
 
+#![allow(dead_code)]
 impl OverlordCrypto {
     pub fn new(
         private_key: BlsPrivateKey,
