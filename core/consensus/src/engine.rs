@@ -496,7 +496,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
             );
             return Err(ConsensusError::CheckBlockErr(StatusCacheField::LogsBloom).into());
         }
-        
+
         Ok(())
     }
 
