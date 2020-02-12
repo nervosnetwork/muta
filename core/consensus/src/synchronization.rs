@@ -206,6 +206,13 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
             rich_block.block.clone(),
         )
         .await?;
+
+        // If there are transactions in the trasnaction pool that have been on chain
+        // after this execution, make sure they are cleaned up.
+        self.adapter
+            .flush_mempool(ctx.clone(), &rich_block.block.ordered_tx_hashes)
+            .await?;
+
         Ok(())
     }
 
@@ -270,11 +277,6 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
             resp.clone(),
         ));
 
-        // If there are transactions in the trasnaction pool that have been on chain
-        // after this execution, make sure they are cleaned up.
-        self.adapter
-            .flush_mempool(ctx.clone(), &rich_block.block.ordered_tx_hashes)
-            .await?;
         Ok(resp)
     }
 
