@@ -33,24 +33,17 @@ pub struct OverlordSynchronization<Adapter: SynchronizationAdapter> {
 #[async_trait]
 impl<Adapter: SynchronizationAdapter> Synchronization for OverlordSynchronization<Adapter> {
     async fn receive_remote_block(&self, ctx: Context, remote_height: u64) -> ProtocolResult<()> {
-        let block = self
-            .get_block_from_remote(ctx.clone(), remote_height)
-            .await?;
-
-        if block.header.height != remote_height {
-            log::error!("[synchronization]: block that doesn't match is found");
+        if !self.need_sync(ctx.clone(), remote_height).await? {
             return Ok(());
         }
 
-        let current_height = self.adapter.get_current_height(Context::new()).await?;
-        if remote_height == 0 || current_height >= remote_height - 1 {
-            return Ok(());
-        }
         // Lock the consensus engine, block commit process.
         let commit_lock = self.lock.try_lock();
         if commit_lock.is_none() {
             return Ok(());
         }
+
+        let current_height = self.adapter.get_current_height(ctx.clone()).await?;
 
         log::info!(
             "[synchronization]: start, remote block height {:?} current block height {:?}",
@@ -350,5 +343,37 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
         }
 
         Ok(status_agent)
+    }
+
+    async fn need_sync(&self, ctx: Context, remote_height: u64) -> ProtocolResult<bool> {
+        let mut current_height = self.adapter.get_current_height(ctx.clone()).await?;
+        if remote_height == 0 {
+            return Ok(false);
+        }
+
+        if remote_height <= current_height {
+            return Ok(false);
+        }
+
+        if current_height == remote_height - 1 {
+            let status = self.status.to_inner();
+            Delay::new(Duration::from_millis(status.consensus_interval)).await;
+
+            current_height = self.adapter.get_current_height(ctx.clone()).await?;
+            if current_height == remote_height {
+                return Ok(false);
+            }
+        }
+
+        let block = self
+            .get_block_from_remote(ctx.clone(), remote_height)
+            .await?;
+
+        if block.header.height != remote_height {
+            log::error!("[synchronization]: block that doesn't match is found");
+            return Ok(false);
+        }
+
+        Ok(true)
     }
 }
