@@ -1,9 +1,8 @@
-use std::sync::Arc;
+use std::{marker::PhantomData, sync::Arc};
 
 use async_trait::async_trait;
 use futures::future::{self, Either};
 use futures_timer::Delay;
-use log::warn;
 use protocol::{
     traits::{Context, MessageCodec, Priority, Rpc},
     Bytes, ProtocolResult,
@@ -68,6 +67,28 @@ where
         let connected_addr = cx.remote_connected_addr();
         let done_rx = self.map.insert::<R>(sid, rid);
 
+        struct _Guard<R: MessageCodec> {
+            map: Arc<RpcMap>,
+            sid: SessionId,
+            rid: u64,
+
+            _r: PhantomData<R>,
+        }
+
+        impl<R: MessageCodec> Drop for _Guard<R> {
+            fn drop(&mut self) {
+                // Simple take then drop if there is one
+                let _ = self.map.take::<R>(self.sid, self.rid);
+            }
+        }
+
+        let _guard = _Guard::<R> {
+            map: Arc::clone(&self.map),
+            sid,
+            rid,
+            _r: PhantomData,
+        };
+
         let data = msg.encode().await?;
         let endpoint = endpoint.extend(&rid.to_string())?;
         let net_msg = NetworkMessage::new(endpoint, data).encode().await?;
@@ -80,10 +101,6 @@ where
                 ret.map_err(|_| NetworkError::from(ErrorKind::RpcDropped(connected_addr)))?
             }
             Either::Right((_unresolved, _timeout)) => {
-                if let Err(err) = self.map.take::<R>(sid, rid) {
-                    warn!("rpc: remove {}, maybe we just got response", err);
-                }
-
                 return Err(NetworkError::from(ErrorKind::RpcTimeout(connected_addr)).into());
             }
         };
