@@ -119,16 +119,16 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             self.adapter
                 .check_txs(ctx.clone(), order_hashes.clone())
                 .await?;
+
+            tokio::spawn(async move {
+                if let Err(e) = sync_txs(ctx, adapter, sync_tx_hashes).await {
+                    error!("Consensus sync block error {}", e);
+                }
+            });
         }
 
         let inner = self.adapter.get_full_txs(ctx.clone(), order_hashes).await?;
         let adapter = Arc::clone(&self.adapter);
-
-        tokio::spawn(async move {
-            if let Err(e) = sync_txs(ctx, adapter, sync_tx_hashes).await {
-                error!("Consensus sync block error {}", e);
-            }
-        });
         self.adapter
             .save_wal_transactions(Context::new(), Hash::digest(hash.clone()), inner)
             .await?;
