@@ -85,8 +85,9 @@ impl StatusAgent {
 #[derive(Serialize, Deserialize, Clone, Debug, Display)]
 #[rustfmt::skip]
 #[display(
-    fmt = "height {}, exec height {}, prev_hash {:?},latest_state_root {:?} state root {:?}, receipt root {:?}, confirm root {:?}, cycle used {:?}",
-    height, exec_height, prev_hash, latest_state_root, state_root, receipt_root, confirm_root, cycles_used
+    fmt = "height {}, exec height {}, prev_hash {:?},latest_state_root {:?} state root {:?}, receipt root {:?}, confirm root {:?}, cycle used {:?}, logs bloom {:?}",
+    height, exec_height, prev_hash, latest_state_root, state_root, receipt_root, confirm_root,
+    cycles_used, "logs_bloom.iter().map(|bloom| bloom.to_low_u64_be()).collect::<Vec<_>>()"
 )]
 pub struct CurrentConsensusStatus {
     pub cycles_price:       u64,
@@ -136,7 +137,10 @@ impl CurrentConsensusStatus {
         prev_hash: Hash,
         proof: Proof,
     ) -> ProtocolResult<()> {
-        info!("update info {}, {:?}", height, prev_hash);
+        info!(
+            "update info {}, prev hash {:?}, state root {:?}",
+            height, prev_hash, block.header.state_root
+        );
         info!("update after commit cache: {}", self);
 
         self.set_metadata(metadata);
@@ -186,7 +190,7 @@ impl CurrentConsensusStatus {
     fn update_cycles(&mut self, cycles: &[u64]) -> ProtocolResult<()> {
         if !check_vec_roots(&self.cycles_used, cycles) {
             error!(
-                "cycles used {:?}, cache cycles used {:?}",
+                "block cycles used {:?}, cache cycles used {:?}",
                 cycles, self.cycles_used
             );
             return Err(ConsensusError::StatusErr(StatusCacheField::CyclesUsed).into());
@@ -198,6 +202,16 @@ impl CurrentConsensusStatus {
 
     fn update_logs_bloom(&mut self, logs: &[Bloom]) -> ProtocolResult<()> {
         if !check_vec_roots(&self.logs_bloom, logs) {
+            error!(
+                "block cycles used {:?}, cache cycles used {:?}",
+                logs.iter()
+                    .map(|bloom| bloom.to_low_u64_be())
+                    .collect::<Vec<_>>(),
+                self.logs_bloom
+                    .iter()
+                    .map(|bloom| bloom.to_low_u64_be())
+                    .collect::<Vec<_>>(),
+            );
             return Err(ConsensusError::StatusErr(StatusCacheField::LogsBloom).into());
         }
 
@@ -235,7 +249,10 @@ impl CurrentConsensusStatus {
 
     fn update_receipt_root(&mut self, receipt_roots: &[MerkleRoot]) -> ProtocolResult<()> {
         if !check_vec_roots(&self.receipt_root, receipt_roots) {
-            error!("receipt root: {:?}", receipt_roots);
+            error!(
+                "block receipt root: {:?}, cache receipt roots {:?}",
+                receipt_roots, self.receipt_root
+            );
             return Err(ConsensusError::StatusErr(StatusCacheField::ReceiptRoot).into());
         }
 
@@ -250,7 +267,10 @@ impl CurrentConsensusStatus {
 
         let len = confirm_root.len();
         if self.confirm_root.len() < len || self.confirm_root[len - 1] != confirm_root[len - 1] {
-            error!("confirm root: {:?}", confirm_root);
+            error!(
+                "block confirm root: {:?}, cache confirm roots {:?}",
+                confirm_root, self.confirm_root
+            );
             return Err(ConsensusError::StatusErr(StatusCacheField::ConfirmRoot).into());
         }
 
@@ -263,8 +283,8 @@ impl CurrentConsensusStatus {
 #[derive(Clone, Debug, Display)]
 #[rustfmt::skip]
 #[display(
-    fmt = "exec height {}, cycles used {}, state root {:?}, receipt root {:?}, confirm root {:?}",
-    exec_height, cycles_used, state_root, receipt_root, confirm_root
+    fmt = "exec height {}, cycles used {}, state root {:?}, receipt root {:?}, confirm root {:?}, logs bloom {}",
+    exec_height, cycles_used, state_root, receipt_root, confirm_root, "logs_bloom.to_low_u64_be()"
 )]
 pub struct UpdateInfo {
     pub exec_height: u64,

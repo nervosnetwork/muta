@@ -492,7 +492,16 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
             );
             error!(
                 "cache logs bloom {:?}, block logs bloom {:?}",
-                status.logs_bloom, block.logs_bloom
+                status
+                    .logs_bloom
+                    .iter()
+                    .map(|bloom| bloom.to_low_u64_be())
+                    .collect::<Vec<_>>(),
+                block
+                    .logs_bloom
+                    .iter()
+                    .map(|bloom| bloom.to_low_u64_be())
+                    .collect::<Vec<_>>()
             );
             return Err(ConsensusError::CheckBlockErr(StatusCacheField::LogsBloom).into());
         }
