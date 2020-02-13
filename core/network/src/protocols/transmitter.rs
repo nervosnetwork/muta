@@ -1,6 +1,5 @@
 use futures::channel::mpsc::UnboundedSender;
 use log::error;
-use protocol::BytesMut;
 use tentacle::{
     builder::MetaBuilder,
     context::{ProtocolContext, ProtocolContextMutRef},
@@ -42,7 +41,6 @@ impl ServiceProtocol for Transmitter {
         let pubkey = ctx.session.remote_pubkey.as_ref();
         // Peers without encryption will not able to connect to us.
         let peer_id = pubkey.expect("impossible, no public key").peer_id();
-        let data = BytesMut::from(data.as_ref()).freeze();
 
         let raw_msg = RawSessionMessage::new(ctx.session.id, peer_id, data);
         if self.msg_deliver.unbounded_send(raw_msg).is_err() {
