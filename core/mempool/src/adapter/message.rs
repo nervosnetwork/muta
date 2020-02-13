@@ -61,7 +61,7 @@ where
         .map(|_| ())
         .is_err()
         {
-            log::error!("mempool batch insert error");
+            log::error!("[core_mempool] mempool batch insert error");
         }
     }
 }
@@ -112,7 +112,7 @@ where
         };
 
         push_txs
-            .unwrap_or_else(move |err| log::warn!("process pull txs {}", err))
+            .unwrap_or_else(move |err| log::warn!("[core_mempool] push txs {}", err))
             .await;
     }
 }

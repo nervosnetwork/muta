@@ -215,7 +215,7 @@ impl<R: Rpc + 'static, S: Storage + 'static> MessageHandler for PullBlockRpcHand
         };
 
         push_block
-            .unwrap_or_else(move |e: ProtocolError| warn!("push block {}", e))
+            .unwrap_or_else(move |e: ProtocolError| warn!("[core_consensus] push block {}", e))
             .await;
     }
 }
@@ -258,7 +258,7 @@ impl<R: Rpc + 'static, S: Storage + 'static> MessageHandler for PullTxsRpcHandle
         };
 
         push_txs
-            .unwrap_or_else(move |e: ProtocolError| warn!("push txs {}", e))
+            .unwrap_or_else(move |e: ProtocolError| warn!("[core_consensus] push txs {}", e))
             .await;
     }
 }
