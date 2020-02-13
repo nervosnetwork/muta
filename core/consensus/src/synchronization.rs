@@ -28,11 +28,17 @@ pub struct OverlordSynchronization<Adapter: SynchronizationAdapter> {
     adapter: Arc<Adapter>,
     status:  StatusAgent,
     lock:    Arc<Mutex<()>>,
+    syncing: Mutex<()>,
 }
 
 #[async_trait]
 impl<Adapter: SynchronizationAdapter> Synchronization for OverlordSynchronization<Adapter> {
     async fn receive_remote_block(&self, ctx: Context, remote_height: u64) -> ProtocolResult<()> {
+        let syncing_lock = self.syncing.try_lock();
+        if syncing_lock.is_none() {
+            return Ok(());
+        }
+
         if !self.need_sync(ctx.clone(), remote_height).await? {
             return Ok(());
         }
@@ -99,10 +105,13 @@ impl<Adapter: SynchronizationAdapter> Synchronization for OverlordSynchronizatio
 
 impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
     pub fn new(adapter: Arc<Adapter>, status: StatusAgent, lock: Arc<Mutex<()>>) -> Self {
+        let syncing = Mutex::new(());
+
         Self {
             adapter,
             status,
             lock,
+            syncing,
         }
     }
 
