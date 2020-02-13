@@ -1,16 +1,14 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use futures::future::try_join_all;
+use futures::future::{try_join_all, TryFutureExt};
 use protocol::{
     traits::{Context, MemPool, MessageHandler, Priority, Rpc},
     types::{Hash, SignedTransaction},
-    ProtocolError, ProtocolResult,
 };
 use serde_derive::{Deserialize, Serialize};
 
 use crate::context::TxContext;
-use crate::MemPoolError;
 
 pub const END_GOSSIP_NEW_TXS: &str = "/gossip/mempool/new_txs";
 pub const RPC_PULL_TXS: &str = "/rpc_call/mempool/pull_txs";
@@ -42,7 +40,7 @@ where
 {
     type Message = MsgNewTxs;
 
-    async fn process(&self, ctx: Context, msg: Self::Message) -> ProtocolResult<()> {
+    async fn process(&self, ctx: Context, msg: Self::Message) {
         let ctx = ctx.mark_network_origin_new_txs();
 
         let insert_stx = |stx| -> _ {
@@ -53,7 +51,7 @@ where
         };
 
         // Concurrently insert them
-        try_join_all(
+        if try_join_all(
             msg.batch_stxs
                 .into_iter()
                 .map(insert_stx)
@@ -61,7 +59,10 @@ where
         )
         .await
         .map(|_| ())
-        .map_err(|_e| ProtocolError::from(MemPoolError::BatchInsertErr))
+        .is_err()
+        {
+            log::error!("mempool batch insert error");
+        }
     }
 }
 
@@ -100,12 +101,18 @@ where
 {
     type Message = MsgPullTxs;
 
-    async fn process(&self, ctx: Context, msg: Self::Message) -> ProtocolResult<()> {
-        let sig_txs = self.mem_pool.get_full_txs(ctx.clone(), msg.hashes).await?;
-        let resp_msg = MsgPushTxs { sig_txs };
+    async fn process(&self, ctx: Context, msg: Self::Message) {
+        let push_txs = async move {
+            let sig_txs = self.mem_pool.get_full_txs(ctx.clone(), msg.hashes).await?;
+            let resp_msg = MsgPushTxs { sig_txs };
 
-        self.network
-            .response::<MsgPushTxs>(ctx, RPC_RESP_PULL_TXS, resp_msg, Priority::High)
-            .await
+            self.network
+                .response::<MsgPushTxs>(ctx, RPC_RESP_PULL_TXS, resp_msg, Priority::High)
+                .await
+        };
+
+        push_txs
+            .unwrap_or_else(move |err| log::warn!("process pull txs {}", err))
+            .await;
     }
 }
