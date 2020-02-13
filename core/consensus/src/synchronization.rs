@@ -373,6 +373,11 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
             .get_block_from_remote(ctx.clone(), remote_height)
             .await?;
 
+        log::debug!(
+            "[synchronization] get block from remote success {:?} ",
+            remote_height
+        );
+
         if block.header.height != remote_height {
             log::error!("[synchronization]: block that doesn't match is found");
             return Ok(false);
