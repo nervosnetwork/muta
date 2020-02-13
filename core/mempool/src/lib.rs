@@ -192,7 +192,7 @@ where
             txs.into_iter().for_each(|tx| {
                 // Should not handle error here, it is normal that transactions response here
                 // are exist in pool.
-                let _ = self.tx_cache.insert_propose_tx(tx);
+                let _ = self.insert(ctx.clone(), tx);
             });
         }
         Ok(())
