@@ -242,9 +242,6 @@ pub enum MemPoolError {
 
     #[display(fmt = "Tx: {:?} invalid timeout", tx_hash)]
     InvalidTimeout { tx_hash: Hash },
-
-    #[display(fmt = "Batch insert error")]
-    BatchInsertErr,
 }
 
 impl Error for MemPoolError {}

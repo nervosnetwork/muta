@@ -6,7 +6,8 @@ use std::{
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use log::info;
+use futures::TryFutureExt;
+use log::{info, warn};
 use serde_derive::{Deserialize, Serialize};
 use tentacle::secio::SecioKeyPair;
 
@@ -14,7 +15,7 @@ use core_network::{NetworkConfig, NetworkService};
 use protocol::{
     traits::{Context, Gossip, MessageHandler, Priority, Rpc},
     types::Hash,
-    ProtocolResult,
+    ProtocolError,
 };
 
 const IP_ADDR: IpAddr = IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0));
@@ -40,16 +41,21 @@ struct TakeMyMoney<N: Rpc> {
 impl<N: Rpc + Send + Sync + 'static> MessageHandler for TakeMyMoney<N> {
     type Message = Cyber7702Released;
 
-    async fn process(&self, ctx: Context, msg: Self::Message) -> ProtocolResult<()> {
-        println!("Rush to {}. Shut up, take my money", msg.shop);
+    async fn process(&self, ctx: Context, msg: Self::Message) {
+        let sell = async move {
+            println!("Rush to {}. Shut up, take my money", msg.shop);
 
-        let copy: ACopy = self
-            .shop
-            .call(ctx, SHOP_CASH_CHANNEL, BuyACopy, Priority::High)
-            .await?;
-        println!("Got my copy {:?}", copy);
+            let copy: ACopy = self
+                .shop
+                .call(ctx, SHOP_CASH_CHANNEL, BuyACopy, Priority::High)
+                .await?;
+            println!("Got my copy {:?}", copy);
 
-        Ok(())
+            Ok(())
+        };
+
+        sell.unwrap_or_else(move |e: ProtocolError| warn!("sell {}", e))
+            .await;
     }
 }
 
@@ -75,7 +81,7 @@ struct Checkout<N: Rpc> {
 impl<N: Rpc + Send + Sync + 'static> MessageHandler for Checkout<N> {
     type Message = BuyACopy;
 
-    async fn process(&self, ctx: Context, _msg: Self::Message) -> ProtocolResult<()> {
+    async fn process(&self, ctx: Context, _msg: Self::Message) {
         let acopy = ACopy {
             hash: Hash::digest(Bytes::new()),
             gifs: vec![
@@ -85,9 +91,13 @@ impl<N: Rpc + Send + Sync + 'static> MessageHandler for Checkout<N> {
             ],
         };
 
-        self.dealer
+        if let Err(e) = self
+            .dealer
             .response(ctx, SHOP_CHANNEL, acopy, Priority::High)
             .await
+        {
+            warn!("send acopy {}", e);
+        }
     }
 }
 
