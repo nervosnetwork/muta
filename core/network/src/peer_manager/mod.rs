@@ -50,7 +50,7 @@ use crate::{
     traits::PeerInfoQuerier,
 };
 
-const MAX_RETRY_COUNT: usize = 6;
+const MAX_RETRY_COUNT: usize = 30;
 const ALIVE_RETRY_INTERVAL: u64 = 3; // seconds
 
 #[derive(Debug, Clone)]
