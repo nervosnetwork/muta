@@ -31,21 +31,17 @@ impl cita_trie::DB for RocksTrieDB {
     type Error = RocksTrieDBError;
 
     fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Self::Error> {
-        Ok(self
-            .db
-            .get(key)
-            .map_err(RocksTrieDBError::from)?
-            .map(|v| v.to_vec()))
+        Ok(self.db.get(key).map_err(to_store_err)?.map(|v| v.to_vec()))
     }
 
     fn contains(&self, key: &[u8]) -> Result<bool, Self::Error> {
-        Ok(self.db.get(key).map_err(RocksTrieDBError::from)?.is_some())
+        Ok(self.db.get(key).map_err(to_store_err)?.is_some())
     }
 
     fn insert(&self, key: Vec<u8>, value: Vec<u8>) -> Result<(), Self::Error> {
         self.db
             .put(Bytes::from(key), Bytes::from(value))
-            .map_err(RocksTrieDBError::from)?;
+            .map_err(to_store_err)?;
         Ok(())
     }
 
@@ -58,16 +54,16 @@ impl cita_trie::DB for RocksTrieDB {
         for i in 0..keys.len() {
             let key = &keys[i];
             let value = &values[i];
-            batch.put(key, value).map_err(RocksTrieDBError::from)?;
+            batch.put(key, value).map_err(to_store_err)?;
         }
 
-        self.db.write(batch).map_err(RocksTrieDBError::from)?;
+        self.db.write(batch).map_err(to_store_err)?;
         Ok(())
     }
 
     fn remove(&self, key: &[u8]) -> Result<(), Self::Error> {
         if self.light {
-            self.db.delete(key).map_err(RocksTrieDBError::from)?;
+            self.db.delete(key).map_err(to_store_err)?;
         }
         Ok(())
     }
@@ -76,10 +72,10 @@ impl cita_trie::DB for RocksTrieDB {
         if self.light {
             let mut batch = WriteBatch::default();
             for key in keys {
-                batch.delete(key).map_err(RocksTrieDBError::from)?;
+                batch.delete(key).map_err(to_store_err)?;
             }
 
-            self.db.write(batch).map_err(RocksTrieDBError::from)?;
+            self.db.write(batch).map_err(to_store_err)?;
         }
 
         Ok(())
@@ -92,6 +88,9 @@ impl cita_trie::DB for RocksTrieDB {
 
 #[derive(Debug, Display, From)]
 pub enum RocksTrieDBError {
+    #[display(fmt = "store error")]
+    Store,
+
     #[display(fmt = "rocksdb {}", _0)]
     RocksDB(rocksdb::Error),
 
@@ -108,4 +107,9 @@ impl From<RocksTrieDBError> for ProtocolError {
     fn from(err: RocksTrieDBError) -> ProtocolError {
         ProtocolError::new(ProtocolErrorKind::Binding, Box::new(err))
     }
+}
+
+fn to_store_err(e: rocksdb::Error) -> RocksTrieDBError {
+    log::error!("[framework] trie db {:?}", e);
+    RocksTrieDBError::Store
 }
