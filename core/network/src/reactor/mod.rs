@@ -15,7 +15,7 @@ use futures::{channel::mpsc::UnboundedReceiver, future::TryFutureExt, pin_mut, s
 use log::warn;
 use protocol::{
     traits::{Context, MessageCodec, MessageHandler},
-    Bytes, ProtocolError, ProtocolResult,
+    Bytes, ProtocolError,
 };
 
 use crate::{
@@ -78,12 +78,12 @@ where
             let content = M::decode(Bytes::from(net_msg.content)).await?;
 
             match endpoint.scheme() {
-                EndpointScheme::Gossip => handler.process(ctx, content).await?,
+                EndpointScheme::Gossip => handler.process(ctx, content).await,
                 EndpointScheme::RpcCall => {
                     let rpc_endpoint = RpcEndpoint::try_from(endpoint)?;
 
                     let ctx = ctx.set_rpc_id(rpc_endpoint.rpc_id().value());
-                    handler.process(ctx, content).await?
+                    handler.process(ctx, content).await
                 }
                 EndpointScheme::RpcResponse => {
                     let rpc_endpoint = RpcEndpoint::try_from(endpoint)?;
@@ -157,7 +157,5 @@ where
 {
     type Message = M;
 
-    async fn process(&self, _: Context, _: Self::Message) -> ProtocolResult<()> {
-        Ok(())
-    }
+    async fn process(&self, _: Context, _: Self::Message) {}
 }

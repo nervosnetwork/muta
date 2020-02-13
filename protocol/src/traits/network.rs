@@ -82,5 +82,5 @@ pub trait Rpc: Send + Sync {
 pub trait MessageHandler: Sync + Send + 'static {
     type Message: MessageCodec;
 
-    async fn process(&self, ctx: Context, msg: Self::Message) -> ProtocolResult<()>;
+    async fn process(&self, ctx: Context, msg: Self::Message);
 }
