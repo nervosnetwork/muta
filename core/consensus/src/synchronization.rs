@@ -45,6 +45,10 @@ impl<Adapter: SynchronizationAdapter> Synchronization for OverlordSynchronizatio
 
         let current_height = self.adapter.get_current_height(ctx.clone()).await?;
 
+        if remote_height <= current_height {
+            return Ok(());
+        }
+
         log::info!(
             "[synchronization]: start, remote block height {:?} current block height {:?}",
             remote_height,
