@@ -189,11 +189,12 @@ where
         let unknown_hashes = self.show_unknown_txs(propose_tx_hashes);
         if !unknown_hashes.is_empty() {
             let txs = self.adapter.pull_txs(ctx.clone(), unknown_hashes).await?;
-            txs.into_iter().for_each(|tx| {
-                // Should not handle error here, it is normal that transactions response here
-                // are exist in pool.
-                let _ = self.insert(ctx.clone(), tx);
-            });
+            // TODO: concurrently insert
+            for tx in txs.into_iter() {
+                // Should not handle error here, it is normal that transactions
+                // response here are exist in pool.
+                let _ = self.insert(ctx.clone(), tx).await;
+            }
         }
         Ok(())
     }
