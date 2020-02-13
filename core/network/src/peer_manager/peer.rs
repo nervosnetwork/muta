@@ -16,7 +16,8 @@ use tentacle::{
 
 use crate::common::ConnectedAddr;
 
-pub const BACKOFF_BASE: usize = 5;
+pub const BACKOFF_BASE: usize = 2;
+pub const MAX_RETRY_INTERVAL: u64 = 512; // seconds
 pub const VALID_ATTEMPT_INTERVAL: u64 = 4;
 
 // TODO: display next_retry
@@ -223,7 +224,10 @@ impl Peer {
         self.state.retry_count += 1;
         self.state.attempt_at = duration_since(SystemTime::now(), UNIX_EPOCH).as_secs();
 
-        let secs = BACKOFF_BASE.pow(self.state.retry_count) as u64;
+        let mut secs = BACKOFF_BASE.pow(self.state.retry_count) as u64;
+        if secs > MAX_RETRY_INTERVAL {
+            secs = MAX_RETRY_INTERVAL;
+        }
         self.state.next_retry = Instant::now() + Duration::from_secs(secs);
     }
 
