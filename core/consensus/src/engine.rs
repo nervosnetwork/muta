@@ -1,5 +1,4 @@
-use std::collections::{HashMap, HashSet};
-use std::convert::TryFrom;
+use std::collections::HashSet;
 use std::error::Error;
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::{cmp::Eq, sync::Arc};
@@ -14,7 +13,6 @@ use parking_lot::RwLock;
 use rlp::Encodable;
 use serde_json::json;
 
-use common_crypto::BlsPublicKey;
 use common_merkle::Merkle;
 use protocol::fixed_codec::FixedCodec;
 use protocol::traits::{ConsensusAdapter, Context, MessageCodec, MessageTarget, NodeInfo};
@@ -30,7 +28,6 @@ use crate::message::{
     END_GOSSIP_SIGNED_VOTE,
 };
 use crate::status::StatusAgent;
-use crate::util::OverlordCrypto;
 use crate::{ConsensusError, StatusCacheField};
 
 /// validator is for create new block, and authority is for build overlord
@@ -41,7 +38,6 @@ pub struct ConsensusEngine<Adapter> {
     exemption_hash: RwLock<HashSet<Bytes>>,
 
     adapter: Arc<Adapter>,
-    crypto:  Arc<OverlordCrypto>,
     lock:    Arc<Mutex<()>>,
 }
 
@@ -364,7 +360,6 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
         status_agent: StatusAgent,
         node_info: NodeInfo,
         adapter: Arc<Adapter>,
-        crypto: Arc<OverlordCrypto>,
         lock: Arc<Mutex<()>>,
     ) -> Self {
         Self {
@@ -372,7 +367,6 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
             node_info,
             exemption_hash: RwLock::new(HashSet::new()),
             adapter,
-            crypto,
             lock,
         }
     }
