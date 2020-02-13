@@ -35,6 +35,7 @@ use framework::executor::{ServiceExecutor, ServiceExecutorFactory};
 use protocol::traits::{
     APIAdapter, Context, MemPool, MessageCodec, NodeInfo, ServiceMapping, Storage,
 };
+
 use protocol::types::{
     Address, Block, BlockHeader, Bloom, Genesis, Hash, Metadata, Proof, Validator,
 };
@@ -100,11 +101,11 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
         exec_height: 0,
         pre_hash: Hash::from_empty(),
         timestamp: genesis.timestamp,
-        logs_bloom: vec![Bloom::default()],
+        logs_bloom: vec![],
         order_root: Hash::from_empty(),
         confirm_root: vec![],
         state_root: genesis_state_root,
-        receipt_root: vec![Hash::from_empty()],
+        receipt_root: vec![],
         cycles_used: vec![],
         proposer: Address::from_hex("0000000000000000000000000000000000000000")?,
         proof: Proof {
@@ -248,9 +249,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     let current_header = &current_block.header;
     let prevhash = Hash::digest(current_block.encode_fixed()?);
 
-    let current_consensus_status = if let Ok(wal_info) = storage.load_muta_wal().await {
-        MessageCodec::decode(wal_info).await?
-    } else {
+    let current_consensus_status = if current_header.height == 0 {
         CurrentConsensusStatus {
             cycles_price:       metadata.cycles_price,
             cycles_limit:       metadata.cycles_limit,
@@ -258,11 +257,11 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
             exec_height:        current_block.header.height,
             prev_hash:          prevhash,
             latest_state_root:  current_header.state_root.clone(),
-            logs_bloom:         current_header.logs_bloom.clone(),
+            logs_bloom:         vec![],
             confirm_root:       vec![],
             state_root:         vec![current_header.state_root.clone()],
             receipt_root:       vec![],
-            cycles_used:        current_header.cycles_used.clone(),
+            cycles_used:        vec![],
             proof:              current_header.proof.clone(),
             validators:         validators.clone(),
             consensus_interval: metadata.interval,
@@ -271,6 +270,9 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
             precommit_ratio:    metadata.precommit_ratio,
             brake_ratio:        metadata.brake_ratio,
         }
+    } else {
+        let wal_info = storage.load_muta_wal().await.expect("Load muta wal error");
+        MessageCodec::decode(wal_info).await?
     };
 
     let consensus_interval = current_consensus_status.consensus_interval;
