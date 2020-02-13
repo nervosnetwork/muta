@@ -186,10 +186,10 @@ impl<R: Rpc + 'static, S: Storage + 'static> MessageHandler for PullBlockRpcHand
     type Message = FixedHeight;
 
     async fn process(&self, ctx: Context, msg: FixedHeight) -> ProtocolResult<()> {
-        debug!("message: get rpc pull block {:?}, {:?}", msg.inner, ctx);
         let id = msg.inner;
         let block = self.storage.get_block_by_height(id).await?;
 
+        debug!("[core_consensus] pull block rpc get block {:?} ", id);
         self.rpc
             .response(
                 ctx,
@@ -197,7 +197,9 @@ impl<R: Rpc + 'static, S: Storage + 'static> MessageHandler for PullBlockRpcHand
                 FixedBlock::new(block),
                 Priority::High,
             )
-            .await
+            .await?;
+        debug!("[core_consensus] pull block rpc send msg {:?} ", id);
+        Ok(())
     }
 }
 
@@ -222,7 +224,6 @@ impl<R: Rpc + 'static, S: Storage + 'static> MessageHandler for PullTxsRpcHandle
     type Message = PullTxsRequest;
 
     async fn process(&self, ctx: Context, msg: PullTxsRequest) -> ProtocolResult<()> {
-        debug!("message: get rpc pull txs {:?}", msg.inner.len());
         let mut res = Vec::new();
         for tx in msg.inner.into_iter() {
             res.push(self.storage.get_transaction_by_hash(tx).await?);

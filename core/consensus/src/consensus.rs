@@ -86,7 +86,6 @@ impl<Adapter: ConsensusAdapter + 'static> OverlordConsensus<Adapter> {
             status_agent.clone(),
             node_info.clone(),
             Arc::clone(&adapter),
-            Arc::clone(&crypto),
             lock,
         ));
 
