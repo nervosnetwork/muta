@@ -37,6 +37,7 @@ use crate::{
     protocols::CoreProtocol,
     reactor::{MessageRouter, Reactor},
     rpc_map::RpcMap,
+    selfcheck::SelfCheck,
     NetworkConfig,
 };
 
@@ -115,6 +116,9 @@ pub struct NetworkService {
     net_conn_srv: Option<NetworkConnectionService>,
     peer_mgr:     Option<PeerManager>,
     router:       Option<MessageRouter<Snappy, PeerManagerHandle>>,
+
+    // Self check
+    selfcheck: Option<SelfCheck<PeerManagerHandle>>,
 }
 
 impl NetworkService {
@@ -167,7 +171,10 @@ impl NetworkService {
         let gossip = NetworkGossip::new(conn_ctrl.clone(), Snappy);
         let rpc_map_clone = Arc::clone(&rpc_map);
         let rpc = NetworkRpc::new(conn_ctrl, Snappy, rpc_map_clone, (&config).into());
-        let router = MessageRouter::new(raw_msg_rx, Snappy, peer_mgr_handle, sys_tx);
+        let router = MessageRouter::new(raw_msg_rx, Snappy, peer_mgr_handle.clone(), sys_tx);
+
+        // Build selfcheck service
+        let selfcheck = SelfCheck::new(peer_mgr_handle, (&config).into());
 
         NetworkService {
             sys_rx,
@@ -187,6 +194,8 @@ impl NetworkService {
             net_conn_srv: Some(NetworkConnectionService::NoListen(conn_srv)),
             peer_mgr: Some(peer_mgr),
             router: Some(router),
+
+            selfcheck: Some(selfcheck),
         }
     }
 
@@ -325,6 +334,10 @@ impl Future for NetworkService {
 
         if let Some(router) = self.router.take() {
             tokio::spawn(router);
+        }
+
+        if let Some(selfcheck) = self.selfcheck.take() {
+            tokio::spawn(selfcheck);
         }
 
         // Heart beats

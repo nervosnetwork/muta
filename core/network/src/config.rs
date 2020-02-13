@@ -17,6 +17,7 @@ use crate::{
     connection::ConnectionConfig,
     error::NetworkError,
     peer_manager::{Peer, PeerManagerConfig},
+    selfcheck::SelfCheckConfig,
 };
 
 // TODO: 0.0.0.0 expose? 127.0.0.1 doesn't work because of tentacle-discovery.
@@ -27,6 +28,12 @@ pub const DEFAULT_LISTEN_PORT: u16 = 2337;
 pub const DEFAULT_MAX_CONNECTIONS: usize = 40;
 // Default connection stream frame window lenght
 pub const DEFAULT_MAX_FRAME_LENGTH: usize = 4 * 1024 * 1024; // 4 Mib
+pub const DEFAULT_BUFFER_SIZE: usize = 24 * 1024 * 1024; // same as tentacle
+
+// Default max wait streams for accept
+pub const DEFAULT_MAX_WAIT_STREAMS: usize = 256;
+// Default write timeout
+pub const DEFAULT_WRITE_TIMEOUT: u64 = 10; // seconds
 
 // Default peer data persistent path
 pub const DEFAULT_PEER_FILE_NAME: &str = "peers";
@@ -41,6 +48,9 @@ pub const DEFAULT_PEER_MANAGER_HEART_BEAT_INTERVAL: u64 = 30;
 pub const DEFAULT_SELF_HEART_BEAT_INTERVAL: u64 = 35;
 
 pub const DEFAULT_RPC_TIMEOUT: u64 = 10;
+
+// Selfcheck
+pub const DEFAULT_SELF_CHECK_INTERVAL: u64 = 10;
 
 pub type PublicKeyHexStr = String;
 pub type PrivateKeyHexStr = String;
@@ -88,6 +98,10 @@ pub struct NetworkConfig {
     pub default_listen:   Multiaddr,
     pub max_connections:  usize,
     pub max_frame_length: usize,
+    pub send_buffer_size: usize,
+    pub recv_buffer_size: usize,
+    pub max_wait_streams: usize,
+    pub write_timeout:    u64,
 
     // peer manager
     pub bootstraps:         Vec<Peer>,
@@ -108,6 +122,9 @@ pub struct NetworkConfig {
 
     // rpc
     pub rpc_timeout: Duration,
+
+    // self check
+    pub selfcheck_interval: Duration,
 }
 
 impl NetworkConfig {
@@ -122,6 +139,10 @@ impl NetworkConfig {
             default_listen:   listen_addr,
             max_connections:  DEFAULT_MAX_CONNECTIONS,
             max_frame_length: DEFAULT_MAX_FRAME_LENGTH,
+            send_buffer_size: DEFAULT_BUFFER_SIZE,
+            recv_buffer_size: DEFAULT_BUFFER_SIZE,
+            max_wait_streams: DEFAULT_MAX_WAIT_STREAMS,
+            write_timeout:    DEFAULT_WRITE_TIMEOUT,
 
             bootstraps:         Default::default(),
             enable_persistence: false,
@@ -137,6 +158,8 @@ impl NetworkConfig {
             heart_beat_interval:              Duration::from_secs(DEFAULT_SELF_HEART_BEAT_INTERVAL),
 
             rpc_timeout: Duration::from_secs(DEFAULT_RPC_TIMEOUT),
+
+            selfcheck_interval: Duration::from_secs(DEFAULT_SELF_CHECK_INTERVAL),
         }
     }
 
@@ -146,8 +169,42 @@ impl NetworkConfig {
         self
     }
 
-    pub fn max_frame_length(mut self, max: usize) -> Self {
-        self.max_frame_length = max;
+    pub fn max_frame_length(mut self, max: Option<usize>) -> Self {
+        if let Some(max) = max {
+            self.max_frame_length = max;
+        }
+
+        self
+    }
+
+    pub fn send_buffer_size(mut self, size: Option<usize>) -> Self {
+        if let Some(size) = size {
+            self.send_buffer_size = size;
+        }
+
+        self
+    }
+
+    pub fn recv_buffer_size(mut self, size: Option<usize>) -> Self {
+        if let Some(size) = size {
+            self.recv_buffer_size = size;
+        }
+
+        self
+    }
+
+    pub fn max_wait_streams(mut self, max: Option<usize>) -> Self {
+        if let Some(max) = max {
+            self.max_wait_streams = max;
+        }
+
+        self
+    }
+
+    pub fn write_timeout(mut self, timeout: Option<u64>) -> Self {
+        if let Some(timeout) = timeout {
+            self.write_timeout = timeout;
+        }
 
         self
     }
@@ -236,6 +293,14 @@ impl NetworkConfig {
         self
     }
 
+    pub fn selfcheck_interval(mut self, interval: Option<u64>) -> Self {
+        if let Some(interval) = interval {
+            self.selfcheck_interval = Duration::from_secs(interval);
+        }
+
+        self
+    }
+
     fn parse_peer_addr(addr: PeerAddrStr) -> ProtocolResult<Multiaddr> {
         if let Ok(socket_addr) = addr.parse::<SocketAddr>() {
             Ok(socket_to_multi_addr(socket_addr))
@@ -258,6 +323,10 @@ impl From<&NetworkConfig> for ConnectionConfig {
         ConnectionConfig {
             secio_keypair:    config.secio_keypair.clone(),
             max_frame_length: Some(config.max_frame_length),
+            send_buffer_size: Some(config.send_buffer_size),
+            recv_buffer_size: Some(config.recv_buffer_size),
+            max_wait_streams: Some(config.max_wait_streams),
+            write_timeout:    Some(config.write_timeout),
         }
     }
 }
@@ -284,6 +353,14 @@ impl From<&NetworkConfig> for TimeoutConfig {
     fn from(config: &NetworkConfig) -> TimeoutConfig {
         TimeoutConfig {
             rpc: config.rpc_timeout,
+        }
+    }
+}
+
+impl From<&NetworkConfig> for SelfCheckConfig {
+    fn from(config: &NetworkConfig) -> SelfCheckConfig {
+        SelfCheckConfig {
+            interval: config.selfcheck_interval,
         }
     }
 }
