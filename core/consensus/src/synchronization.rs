@@ -130,11 +130,11 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
     pub async fn reset_status(
         &self,
         ctx: Context,
+        exec_height: u64,
         current_status: CurrentConsensusStatus,
         block: Block,
     ) -> ProtocolResult<StatusAgent> {
         let height = block.header.height;
-        let exec_height = block.header.exec_height;
         let status = CurrentConsensusStatus {
             cycles_price:       current_status.cycles_price,
             cycles_limit:       current_status.cycles_limit,
@@ -364,7 +364,8 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
             .await?;
         let current_status = self.status.to_inner();
 
-        self.reset_status(ctx, current_status, block).await
+        self.reset_status(ctx, block.header.exec_height, current_status, block)
+            .await
     }
 
     async fn need_sync(&self, ctx: Context, remote_height: u64) -> ProtocolResult<bool> {
