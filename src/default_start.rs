@@ -35,10 +35,7 @@ use framework::executor::{ServiceExecutor, ServiceExecutorFactory};
 use protocol::traits::{
     APIAdapter, Context, MemPool, MessageCodec, NodeInfo, ServiceMapping, Storage,
 };
-
-use protocol::types::{
-    Address, Block, BlockHeader, Bloom, Genesis, Hash, Metadata, Proof, Validator,
-};
+use protocol::types::{Address, Block, BlockHeader, Genesis, Hash, Metadata, Proof, Validator};
 use protocol::{fixed_codec::FixedCodec, ProtocolResult};
 
 use crate::config::Config;
