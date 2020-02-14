@@ -35,7 +35,9 @@ use framework::executor::{ServiceExecutor, ServiceExecutorFactory};
 use protocol::traits::{
     APIAdapter, Context, MemPool, MessageCodec, NodeInfo, ServiceMapping, Storage,
 };
-use protocol::types::{Address, Block, BlockHeader, Bloom, Genesis, Hash, Metadata, Proof};
+use protocol::types::{
+    Address, Block, BlockHeader, Bloom, Genesis, Hash, Metadata, Proof, Validator,
+};
 use protocol::{fixed_codec::FixedCodec, ProtocolResult};
 
 use crate::config::Config;
@@ -48,6 +50,16 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
 ) -> ProtocolResult<Block> {
     let metadata: Metadata =
         serde_json::from_str(genesis.get_payload("metadata")).expect("Decode metadata failed!");
+
+    let validators: Vec<Validator> = metadata
+        .verifier_list
+        .iter()
+        .map(|v| Validator {
+            address:        v.address.clone(),
+            propose_weight: v.propose_weight,
+            vote_weight:    v.vote_weight,
+        })
+        .collect();
 
     // Read genesis.
     log::info!("Genesis data: {:?}", genesis);
@@ -83,19 +95,19 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
 
     // Build genesis block.
     let genesis_block_header = BlockHeader {
-        chain_id:          metadata.chain_id.clone(),
-        height:            0,
-        exec_height:       0,
-        pre_hash:          Hash::from_empty(),
-        timestamp:         genesis.timestamp,
-        logs_bloom:        vec![Bloom::default()],
-        order_root:        Hash::from_empty(),
-        confirm_root:      vec![],
-        state_root:        genesis_state_root,
-        receipt_root:      vec![Hash::from_empty()],
-        cycles_used:       vec![],
-        proposer:          Address::from_hex("0000000000000000000000000000000000000000")?,
-        proof:             Proof {
+        chain_id: metadata.chain_id.clone(),
+        height: 0,
+        exec_height: 0,
+        pre_hash: Hash::from_empty(),
+        timestamp: genesis.timestamp,
+        logs_bloom: vec![Bloom::default()],
+        order_root: Hash::from_empty(),
+        confirm_root: vec![],
+        state_root: genesis_state_root,
+        receipt_root: vec![Hash::from_empty()],
+        cycles_used: vec![],
+        proposer: Address::from_hex("0000000000000000000000000000000000000000")?,
+        proof: Proof {
             height:     0,
             round:      0,
             block_hash: Hash::from_empty(),
@@ -103,7 +115,7 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
             bitmap:     Bytes::new(),
         },
         validator_version: 0,
-        validators:        metadata.verifier_list,
+        validators,
     };
     let latest_proof = genesis_block_header.proof.clone();
     let genesis_block = Block {
@@ -219,7 +231,15 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     network_service.register_rpc_response::<MsgPushTxs>(RPC_RESP_PULL_TXS)?;
 
     // Init Consensus
-    let verifier_list = metadata.verifier_list.clone();
+    let validators: Vec<Validator> = metadata
+        .verifier_list
+        .iter()
+        .map(|v| Validator {
+            address:        v.address.clone(),
+            propose_weight: v.propose_weight,
+            vote_weight:    v.vote_weight,
+        })
+        .collect();
 
     let node_info = NodeInfo {
         chain_id:     metadata.chain_id.clone(),
@@ -244,7 +264,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
             receipt_root:       vec![],
             cycles_used:        current_header.cycles_used.clone(),
             proof:              current_header.proof.clone(),
-            validators:         verifier_list.clone(),
+            validators:         validators.clone(),
             consensus_interval: metadata.interval,
             propose_ratio:      metadata.propose_ratio,
             prevote_ratio:      metadata.prevote_ratio,
@@ -256,14 +276,11 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     let consensus_interval = current_consensus_status.consensus_interval;
     let status_agent = StatusAgent::new(current_consensus_status);
 
-    assert_eq!(verifier_list.len(), config.consensus.public_keys.len());
     let mut bls_pub_keys = HashMap::new();
-    for (validator, bls_pub_key) in verifier_list
-        .iter()
-        .zip(config.consensus.public_keys.iter())
-    {
-        let address = validator.address.as_bytes();
-        let hex_pubkey = hex::decode(bls_pub_key).map_err(MainError::FromHex)?;
+    for validator_extend in metadata.verifier_list.iter() {
+        let address = validator_extend.address.as_bytes();
+        let hex_pubkey =
+            hex::decode(validator_extend.bls_pub_key.clone()).map_err(MainError::FromHex)?;
         let pub_key = BlsPublicKey::try_from(hex_pubkey.as_ref()).map_err(MainError::Crypto)?;
         bls_pub_keys.insert(address, pub_key);
     }
@@ -380,7 +397,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     });
 
     // Run consensus
-    let authority_list = verifier_list
+    let authority_list = validators
         .iter()
         .map(|v| Node {
             address:        v.address.as_bytes(),

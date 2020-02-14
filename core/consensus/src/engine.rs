@@ -1,4 +1,5 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
+use std::convert::TryFrom;
 use std::error::Error;
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::{cmp::Eq, sync::Arc};
@@ -13,6 +14,7 @@ use parking_lot::RwLock;
 use rlp::Encodable;
 use serde_json::json;
 
+use common_crypto::BlsPublicKey;
 use common_merkle::Merkle;
 use protocol::fixed_codec::FixedCodec;
 use protocol::traits::{ConsensusAdapter, Context, MessageCodec, MessageTarget, NodeInfo};
@@ -28,6 +30,7 @@ use crate::message::{
     END_GOSSIP_SIGNED_VOTE,
 };
 use crate::status::StatusAgent;
+use crate::util::OverlordCrypto;
 use crate::{ConsensusError, StatusCacheField};
 
 /// validator is for create new block, and authority is for build overlord
@@ -38,6 +41,7 @@ pub struct ConsensusEngine<Adapter> {
     exemption_hash: RwLock<HashSet<Bytes>>,
 
     adapter: Arc<Adapter>,
+    crypto:  Arc<OverlordCrypto>,
     lock:    Arc<Mutex<()>>,
 }
 
@@ -175,7 +179,6 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         }
 
         let pill = commit.content.inner;
-
         let block_hash = commit.proof.block_hash.clone();
         let signature = commit.proof.signature.signature.clone();
         let bitmap = commit.proof.signature.address_bitmap.clone();
@@ -224,6 +227,17 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             pill.block.header.height,
             pill.block.header.timestamp,
         )?;
+
+        let mut new_addr_pubkey: HashMap<Bytes, BlsPublicKey> = HashMap::new();
+        for validator in metadata.verifier_list.iter() {
+            let tmp = hex::decode(validator.bls_pub_key.clone())
+                .map_err(|e| ProtocolError::from(ConsensusError::CryptoErr(Box::new(e.into()))))?;
+            let pubkey = BlsPublicKey::try_from(tmp.as_ref())
+                .map_err(|e| ProtocolError::from(ConsensusError::CryptoErr(Box::new(e))))?;
+            new_addr_pubkey.insert(validator.address.as_bytes(), pubkey);
+        }
+        self.crypto.update(new_addr_pubkey);
+
         self.update_status(height, metadata, pill.block, proof, full_txs)
             .await?;
 
@@ -235,6 +249,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
 
         let mut set = self.exemption_hash.write();
         set.clear();
+
         let current_consensus_status = self.status_agent.to_inner();
         let status = Status {
             height:         height + 1,
@@ -333,9 +348,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
                 vote_weight:    v.vote_weight,
             })
             .collect::<Vec<_>>();
-
         res.sort();
-
         Ok(res)
     }
 }
@@ -361,6 +374,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
         status_agent: StatusAgent,
         node_info: NodeInfo,
         adapter: Arc<Adapter>,
+        crypto: Arc<OverlordCrypto>,
         lock: Arc<Mutex<()>>,
     ) -> Self {
         Self {
@@ -368,6 +382,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
             node_info,
             exemption_hash: RwLock::new(HashSet::new()),
             adapter,
+            crypto,
             lock,
         }
     }

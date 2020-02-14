@@ -7,7 +7,7 @@ use num_bigint::BigUint;
 use serde::de;
 use serde::{Deserialize, Serialize};
 
-use crate::types::{TypesError, Validator};
+use crate::types::TypesError;
 use crate::ProtocolResult;
 
 pub const METADATA_KEY: &str = "metadata";
@@ -232,11 +232,19 @@ pub struct Metadata {
     pub cycles_limit:    u64,
     pub cycles_price:    u64,
     pub interval:        u64,
-    pub verifier_list:   Vec<Validator>,
+    pub verifier_list:   Vec<ValidatorExtend>,
     pub propose_ratio:   u64,
     pub prevote_ratio:   u64,
     pub precommit_ratio: u64,
     pub brake_ratio:     u64,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct ValidatorExtend {
+    pub bls_pub_key:    String,
+    pub address:        Address,
+    pub propose_weight: u32,
+    pub vote_weight:    u32,
 }
 
 fn clean_0x(s: &str) -> &str {

@@ -4,7 +4,7 @@ use byteorder::{ByteOrder, LittleEndian};
 use bytes::{Bytes, BytesMut};
 
 use crate::fixed_codec::{FixedCodec, FixedCodecError};
-use crate::types::{Address, Hash, Metadata, Validator};
+use crate::types::{Address, Hash, Metadata, ValidatorExtend};
 use crate::{impl_default_fixed_codec_for, ProtocolResult};
 
 // Impl FixedCodec trait for types
@@ -145,7 +145,7 @@ impl rlp::Decodable for Metadata {
         let cycles_limit: u64 = r.at(3)?.as_val()?;
         let cycles_price: u64 = r.at(4)?.as_val()?;
         let interval: u64 = r.at(5)?.as_val()?;
-        let verifier_list: Vec<Validator> = r.at(6)?.as_list()?;
+        let verifier_list: Vec<ValidatorExtend> = r.at(6)?.as_list()?;
         let propose_ratio: u64 = r.at(7)?.as_val()?;
         let prevote_ratio: u64 = r.at(8)?.as_val()?;
         let precommit_ratio: u64 = r.at(9)?.as_val()?;
@@ -163,6 +163,36 @@ impl rlp::Decodable for Metadata {
             prevote_ratio,
             precommit_ratio,
             brake_ratio,
+        })
+    }
+}
+
+impl rlp::Encodable for ValidatorExtend {
+    fn rlp_append(&self, s: &mut rlp::RlpStream) {
+        s.begin_list(4)
+            .append(&self.bls_pub_key)
+            .append(&self.address)
+            .append(&self.propose_weight)
+            .append(&self.vote_weight);
+    }
+}
+
+impl rlp::Decodable for ValidatorExtend {
+    fn decode(r: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
+        if !r.is_list() && r.size() != 4 {
+            return Err(rlp::DecoderError::RlpIncorrectListLen);
+        }
+
+        let bls_pub_key = rlp::decode(r.at(0)?.as_raw())?;
+        let address = rlp::decode(r.at(1)?.as_raw())?;
+        let propose_weight = r.at(2)?.as_val()?;
+        let vote_weight = r.at(3)?.as_val()?;
+
+        Ok(ValidatorExtend {
+            bls_pub_key,
+            address,
+            propose_weight,
+            vote_weight,
         })
     }
 }
