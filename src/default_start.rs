@@ -245,17 +245,19 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     let current_header = &current_block.header;
     let prevhash = Hash::digest(current_block.encode_fixed()?);
 
-    let current_consensus_status = if current_header.height == 0 {
+    let current_consensus_status = if let Ok(wal_info) = storage.load_muta_wal().await {
+        MessageCodec::decode(wal_info).await?
+    } else {
         CurrentConsensusStatus {
             cycles_price:       metadata.cycles_price,
             cycles_limit:       metadata.cycles_limit,
-            height:             current_block.header.height + 1,
-            exec_height:        current_block.header.height,
+            height:             current_block.header.height,
+            exec_height:        current_block.header.exec_height,
             prev_hash:          prevhash,
             latest_state_root:  current_header.state_root.clone(),
             logs_bloom:         vec![],
             confirm_root:       vec![],
-            state_root:         vec![current_header.state_root.clone()],
+            state_root:         vec![],
             receipt_root:       vec![],
             cycles_used:        vec![],
             proof:              current_header.proof.clone(),
@@ -266,9 +268,6 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
             precommit_ratio:    metadata.precommit_ratio,
             brake_ratio:        metadata.brake_ratio,
         }
-    } else {
-        let wal_info = storage.load_muta_wal().await.expect("Load muta wal error");
-        MessageCodec::decode(wal_info).await?
     };
 
     let consensus_interval = current_consensus_status.consensus_interval;
@@ -344,7 +343,9 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
             current_block,
         )
         .await?;
-    status_agent.replace(new_status_agnet.to_inner());
+    let mut new_status = new_status_agnet.to_inner();
+    new_status.height += 1;
+    status_agent.replace(new_status);
 
     // register consensus
     network_service.register_endpoint_handler(

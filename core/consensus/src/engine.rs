@@ -417,7 +417,9 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
         }
 
         // check state root
-        if !status.state_root.contains(&block.state_root) {
+        if block.state_root != status.latest_state_root
+            || !status.state_root.contains(&block.state_root)
+        {
             trace::error(
                 "check_block_state_root_diff".to_string(),
                 Some(json!({
