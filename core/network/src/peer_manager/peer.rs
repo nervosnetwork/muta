@@ -35,7 +35,7 @@ pub(super) struct PeerState {
 
     // Session for debug write pending data size
     #[serde(skip)]
-    session: Option<SessionContext>,
+    session: Option<Arc<SessionContext>>,
 
     // Peer address set (Multiple format, p2p, quic etc)
     addr_set: HashSet<Multiaddr>,
@@ -174,7 +174,7 @@ impl Peer {
         self.state.connected_addr = addr;
     }
 
-    pub fn set_session(&mut self, session: SessionContext) {
+    pub fn set_session(&mut self, session: Arc<SessionContext>) {
         self.state.session = Some(session);
     }
 

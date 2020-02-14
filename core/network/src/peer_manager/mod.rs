@@ -37,6 +37,7 @@ use parking_lot::RwLock;
 use protocol::types::Address;
 use rand::seq::IteratorRandom;
 use tentacle::{
+    context::SessionContext,
     multiaddr::{Multiaddr, Protocol},
     secio::{PeerId, PublicKey},
     service::{SessionType, TargetProtocol, TargetSession},
@@ -325,7 +326,12 @@ impl Inner {
         self.connecting.write().insert(peer_id.clone());
     }
 
-    pub fn set_connected(&self, peer_id: &PeerId, addr: Option<ConnectedAddr>) {
+    pub fn set_connected(
+        &self,
+        peer_id: &PeerId,
+        ctx: Arc<SessionContext>,
+        addr: Option<ConnectedAddr>,
+    ) {
         // Clean outbound connection
         self.connecting.write().remove(peer_id);
         self.connected.write().insert(peer_id.clone());
@@ -334,6 +340,7 @@ impl Inner {
         if let Some(peer) = pool.get_mut(peer_id) {
             peer.update_connect();
             peer.set_connected_addr(addr);
+            peer.set_session(ctx);
         }
     }
 
@@ -642,7 +649,7 @@ impl PeerManager {
     }
 
     fn attach_peer_session(&mut self, pubkey: PublicKey, session: Session) {
-        let Session { sid, addr, ty } = session;
+        let Session { sid, addr, ty, ctx } = session;
 
         if self.inner.connected.read().len() >= self.config.max_connections {
             let disconnect_peer = ConnectionEvent::Disconnect(sid);
@@ -678,7 +685,7 @@ impl PeerManager {
             self.inner.add_peer_addr(&pid, addr);
         }
 
-        self.inner.set_connected(&pid, Some(connected_addr));
+        self.inner.set_connected(&pid, ctx, Some(connected_addr));
 
         self.peer_session.insert(pid.clone(), sid);
         self.session_peer.insert(sid, pid);

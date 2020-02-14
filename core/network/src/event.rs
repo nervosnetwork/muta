@@ -1,9 +1,10 @@
-use std::error::Error;
+use std::{error::Error, sync::Arc};
 
 use derive_more::{Display, From};
 use futures::channel::oneshot::Sender;
 use protocol::{traits::Priority, types::Address, Bytes};
 use tentacle::{
+    context::SessionContext,
     multiaddr::Multiaddr,
     secio::{PeerId, PublicKey},
     service::{SessionType, TargetProtocol, TargetSession},
@@ -98,6 +99,7 @@ pub struct Session {
     pub sid:  SessionId,
     pub addr: Multiaddr,
     pub ty:   SessionType,
+    pub ctx:  Arc<SessionContext>,
 }
 
 #[derive(Debug, Display)]

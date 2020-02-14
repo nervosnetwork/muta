@@ -199,6 +199,7 @@ impl ServiceHandle for ConnectionServiceKeeper {
                     sid: session_context.id,
                     addr: session_context.address.clone(),
                     ty: session_context.ty,
+                    ctx: session_context,
                 };
                 
                 let attach_peer_session = PeerManagerEvent::AttachPeerSession { pubkey, session };
