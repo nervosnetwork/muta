@@ -61,7 +61,7 @@ impl<Adapter: SynchronizationAdapter> Synchronization for OverlordSynchronizatio
             current_height,
         );
 
-        let sync_status_agent = self.init_status_agent(ctx.clone(), current_height).await?;
+        let sync_status_agent = self.init_status_agent().await?;
         let sync_resp = self
             .start_sync(
                 ctx.clone(),
@@ -131,11 +131,9 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
         &self,
         ctx: Context,
         current_status: CurrentConsensusStatus,
-        block: Block,
     ) -> ProtocolResult<StatusAgent> {
-        let prevhash = Hash::digest(block.encode_fixed()?);
-        let height = block.header.height;
-        let exec_height = block.header.exec_height;
+        let height = current_status.height;
+        let exec_height = current_status.exec_height;
 
         let status = CurrentConsensusStatus {
             cycles_price:       current_status.cycles_price,
@@ -146,16 +144,16 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
             prevote_ratio:      current_status.prevote_ratio,
             precommit_ratio:    current_status.precommit_ratio,
             brake_ratio:        current_status.brake_ratio,
-            prev_hash:          prevhash,
-            height:             block.header.height,
-            exec_height:        block.header.exec_height,
-            latest_state_root:  block.header.state_root.clone(),
+            prev_hash:          current_status.prev_hash.clone(),
+            height:             current_status.height,
+            exec_height:        current_status.exec_height,
+            latest_state_root:  current_status.latest_state_root.clone(),
             logs_bloom:         vec![],
             confirm_root:       vec![],
             receipt_root:       vec![],
             cycles_used:        vec![],
             state_root:         vec![],
-            proof:              block.header.proof,
+            proof:              current_status.proof.clone(),
         };
 
         let status_agent = StatusAgent::new(status);
@@ -349,7 +347,7 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
         Ok(RichBlock { block, txs })
     }
 
-    async fn init_status_agent(&self, ctx: Context, height: u64) -> ProtocolResult<StatusAgent> {
+    async fn init_status_agent(&self) -> ProtocolResult<StatusAgent> {
         loop {
             let current_status = self.status.to_inner();
 
@@ -360,13 +358,9 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
             }
         }
 
-        let block = self
-            .adapter
-            .get_block_by_height(ctx.clone(), height)
-            .await?;
-        let current_status = self.status.to_inner();
-
-        self.reset_status(ctx, current_status, block).await
+        let mut current_status = self.status.to_inner();
+        current_status.height = current_status.height - 1;
+        Ok(StatusAgent::new(current_status))
     }
 
     async fn need_sync(&self, ctx: Context, remote_height: u64) -> ProtocolResult<bool> {

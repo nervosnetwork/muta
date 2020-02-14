@@ -159,9 +159,9 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         }
 
         let current_consensus_status = self.status_agent.to_inner();
-        if current_consensus_status.exec_height == height {
+        if current_consensus_status.height > height {
             let status = Status {
-                height:         height + 1,
+                height:         current_consensus_status.height,
                 interval:       Some(current_consensus_status.consensus_interval),
                 timer_config:   Some(DurationConfig {
                     propose_ratio:   current_consensus_status.propose_ratio,

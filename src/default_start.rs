@@ -247,13 +247,39 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
 
     let mut is_load_wal = false;
     let current_consensus_status = if let Ok(wal_info) = storage.load_muta_wal().await {
-        let wal_status = MessageCodec::decode(wal_info).await?;
+        let wal_status: CurrentConsensusStatus = MessageCodec::decode(wal_info).await?;
         is_load_wal = true;
-        wal_status
+        CurrentConsensusStatus {
+            cycles_price:       wal_status.cycles_price,
+            cycles_limit:       wal_status.cycles_limit,
+            consensus_interval: wal_status.consensus_interval,
+            propose_ratio:      wal_status.propose_ratio,
+            prevote_ratio:      wal_status.prevote_ratio,
+            precommit_ratio:    wal_status.precommit_ratio,
+            brake_ratio:        wal_status.brake_ratio,
+            height:             current_block.header.height,
+            exec_height:        current_block.header.exec_height,
+            prev_hash:          wal_status.prev_hash.clone(),
+            latest_state_root:  current_header.state_root.clone(),
+            logs_bloom:         vec![],
+            confirm_root:       vec![],
+            state_root:         vec![],
+            receipt_root:       vec![],
+            cycles_used:        vec![],
+            proof:              wal_status.proof.clone(),
+            // FIXME(@rev-chaos): The set of validators should be retrieved from the current height
+            // of metadata.
+            validators: validators.clone(),
+        }
     } else {
         CurrentConsensusStatus {
             cycles_price:       metadata.cycles_price,
             cycles_limit:       metadata.cycles_limit,
+            consensus_interval: metadata.interval,
+            propose_ratio:      metadata.propose_ratio,
+            prevote_ratio:      metadata.prevote_ratio,
+            precommit_ratio:    metadata.precommit_ratio,
+            brake_ratio:        metadata.brake_ratio,
             height:             current_block.header.height,
             exec_height:        current_block.header.exec_height,
             prev_hash:          prevhash,
@@ -265,11 +291,6 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
             cycles_used:        vec![],
             proof:              current_header.proof.clone(),
             validators:         validators.clone(),
-            consensus_interval: metadata.interval,
-            propose_ratio:      metadata.propose_ratio,
-            prevote_ratio:      metadata.prevote_ratio,
-            precommit_ratio:    metadata.precommit_ratio,
-            brake_ratio:        metadata.brake_ratio,
         }
     };
 
@@ -340,7 +361,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     );
 
     let new_status_agnet = synchronization
-        .reset_status(Context::new(), current_consensus_status, current_block)
+        .reset_status(Context::new(), current_consensus_status)
         .await?;
     let mut new_status = new_status_agnet.to_inner();
     new_status.height += 1;
