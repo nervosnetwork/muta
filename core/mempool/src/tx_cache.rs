@@ -303,7 +303,11 @@ impl TxCache {
 
         // If queue inserts into queue failed, removes from map.
         if rst.is_err() {
-            log::error!("{:?} insert queue failed! {:?}", &tx_hash, rst);
+            log::error!(
+                "[core_mempool]:{:?} insert queue failed! {:?}",
+                &tx_hash,
+                rst
+            );
             // If tx_hash exists, it will panic. So repeat check must do before insertion.
             self.map.remove(&tx_hash);
             Err(MemPoolError::Insert { tx_hash }.into())
