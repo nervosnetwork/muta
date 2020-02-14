@@ -332,6 +332,11 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     ));
 
     if status_height != status_exec_height + 1 {
+        log::info!(
+            "[muta] execute from {} to {}",
+            status_exec_height + 1,
+            status_height
+        );
         let new_status_agnet = synchronization
             .backtracking_exec(
                 Context::new(),
