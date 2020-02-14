@@ -340,12 +340,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     );
 
     let new_status_agnet = synchronization
-        .reset_status(
-            Context::new(),
-            current_consensus_status.exec_height,
-            current_consensus_status,
-            current_block,
-        )
+        .reset_status(Context::new(), current_consensus_status, current_block)
         .await?;
     let mut new_status = new_status_agnet.to_inner();
     new_status.height += 1;
