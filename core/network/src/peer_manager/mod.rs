@@ -939,6 +939,11 @@ impl PeerManager {
                 self.cleanly_remove_peer(&pid);
             }
             PeerManagerEvent::RemovePeerBySession { sid, .. } => {
+                let disconnect_peer = ConnectionEvent::Disconnect(sid);
+                if self.conn_tx.unbounded_send(disconnect_peer).is_err() {
+                    debug!("network: connection service exit");
+                }
+
                 if let Some(pid) = self.session_peer.get(&sid).cloned() {
                     info!("network: {:?}: remove peer {:?}", self.peer_id, pid);
 
