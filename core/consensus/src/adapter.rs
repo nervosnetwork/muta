@@ -4,7 +4,6 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use futures::channel::mpsc::{channel, Receiver, Sender};
-use futures::executor::block_on;
 use futures::stream::StreamExt;
 use overlord::types::OverlordMsg;
 use overlord::OverlordHandler;
@@ -26,7 +25,7 @@ use crate::consensus::gen_overlord_status;
 use crate::fixed_types::{FixedBlock, FixedHeight, FixedPill, FixedSignedTxs, PullTxsRequest};
 use crate::message::{BROADCAST_HEIGHT, RPC_SYNC_PULL_BLOCK, RPC_SYNC_PULL_TXS};
 use crate::status::{StatusAgent, UpdateInfo};
-use crate::util::{ExecuteInfo, WalInfoQueue};
+use crate::util::ExecuteInfo;
 use crate::ConsensusError;
 
 const OVERLORD_GAP: usize = 10;
@@ -48,9 +47,8 @@ pub struct OverlordConsensusAdapter<
     service_mapping:  Arc<Mapping>,
     overlord_handler: RwLock<Option<OverlordHandler<FixedPill>>>,
 
-    exec_queue:     Sender<ExecuteInfo>,
-    exec_queue_wal: Arc<RwLock<WalInfoQueue>>,
-    exec_demons:    Option<ExecDemons<S, DB, EF, Mapping>>,
+    exec_queue:  Sender<ExecuteInfo>,
+    exec_demons: Option<ExecDemons<S, DB, EF, Mapping>>,
 }
 
 #[async_trait]
@@ -137,7 +135,6 @@ where
         };
 
         let mut tx = self.exec_queue.clone();
-        self.save_queue_wal(exec_info.clone()).await?;
         tx.try_send(exec_info)
             .map_err(|e| ConsensusError::ExecuteErr(e.to_string()))?;
         Ok(())
@@ -438,16 +435,13 @@ where
         trie_db: Arc<DB>,
         service_mapping: Arc<Mapping>,
         status_agent: StatusAgent,
-        queue_wal: WalInfoQueue,
     ) -> ProtocolResult<Self> {
         let (exec_queue, rx) = channel(OVERLORD_GAP);
-        let exec_queue_wal = Arc::new(RwLock::new(WalInfoQueue::new()));
         let exec_demons = Some(ExecDemons::new(
             Arc::clone(&storage),
             Arc::clone(&trie_db),
             Arc::clone(&service_mapping),
             rx,
-            Arc::clone(&exec_queue_wal),
             status_agent,
         ));
 
@@ -460,11 +454,8 @@ where
             service_mapping,
             overlord_handler: RwLock::new(None),
             exec_queue,
-            exec_queue_wal,
             exec_demons,
         };
-
-        block_on(adapter.init_exec_queue(queue_wal))?;
         Ok(adapter)
     }
 
@@ -476,40 +467,6 @@ where
     pub fn set_overlord_handler(&self, handler: OverlordHandler<FixedPill>) {
         *self.overlord_handler.write() = Some(handler)
     }
-
-    async fn save_queue_wal(&self, exec_info: ExecuteInfo) -> ProtocolResult<()> {
-        let wal_info = {
-            let mut map = self.exec_queue_wal.write();
-            map.insert(exec_info.into());
-            map.clone()
-        };
-
-        self.storage
-            .update_exec_queue_wal(Bytes::from(rlp::encode(&wal_info)))
-            .await?;
-        Ok(())
-    }
-
-    async fn init_exec_queue(&self, queue: WalInfoQueue) -> ProtocolResult<()> {
-        for (_id, info) in queue.inner.into_iter() {
-            let txs = self
-                .load_wal_transactions(Context::new(), info.block_hash.clone())
-                .await?;
-            self.execute(
-                info.chain_id,
-                info.order_root,
-                info.height,
-                info.cycles_price,
-                info.coinbase,
-                info.block_hash,
-                txs,
-                info.cycles_limit,
-                info.timestamp,
-            )
-            .await?;
-        }
-        Ok(())
-    }
 }
 
 #[derive(Debug)]
@@ -518,10 +475,9 @@ pub struct ExecDemons<S, DB, EF, Mapping> {
     trie_db:         Arc<DB>,
     service_mapping: Arc<Mapping>,
 
-    pin_ef:    PhantomData<EF>,
-    queue:     Receiver<ExecuteInfo>,
-    queue_wal: Arc<RwLock<WalInfoQueue>>,
-    status:    StatusAgent,
+    pin_ef: PhantomData<EF>,
+    queue:  Receiver<ExecuteInfo>,
+    status: StatusAgent,
 }
 
 impl<S, DB, EF, Mapping> ExecDemons<S, DB, EF, Mapping>
@@ -536,7 +492,6 @@ where
         trie_db: Arc<DB>,
         service_mapping: Arc<Mapping>,
         rx: Receiver<ExecuteInfo>,
-        wal: Arc<RwLock<WalInfoQueue>>,
         status_agent: StatusAgent,
     ) -> Self {
         ExecDemons {
@@ -544,7 +499,6 @@ where
             trie_db,
             service_mapping,
             queue: rx,
-            queue_wal: wal,
             pin_ef: PhantomData,
             status: status_agent,
         }
@@ -581,7 +535,7 @@ where
             self.save_receipts(resp.receipts.clone()).await?;
             self.status
                 .update_after_exec(gen_update_info(resp.clone(), height, order_root));
-            self.save_wal(height).await?;
+            self.save_wal().await?;
         } else {
             return Err(ConsensusError::Other("Queue disconnect".to_string()).into());
         }
@@ -592,17 +546,9 @@ where
         self.storage.insert_receipts(receipts).await
     }
 
-    async fn save_wal(&self, height: u64) -> ProtocolResult<()> {
-        let info = {
-            let mut map = self.queue_wal.write();
-            map.remove_by_height(height)?;
-            map.clone()
-        };
-        let queue_info = Bytes::from(rlp::encode(&info));
+    async fn save_wal(&self) -> ProtocolResult<()> {
         let mut info = self.status.to_inner();
         let wal_info = MessageCodec::encode(&mut info).await?;
-
-        self.storage.update_exec_queue_wal(queue_info).await?;
         self.storage.update_muta_wal(wal_info).await
     }
 }

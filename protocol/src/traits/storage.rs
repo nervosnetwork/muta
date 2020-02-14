@@ -56,10 +56,6 @@ pub trait Storage: Send + Sync {
 
     async fn load_muta_wal(&self) -> ProtocolResult<Bytes>;
 
-    async fn update_exec_queue_wal(&self, info: Bytes) -> ProtocolResult<()>;
-
-    async fn load_exec_queue_wal(&self) -> ProtocolResult<Bytes>;
-
     async fn insert_wal_transactions(
         &self,
         block_hash: Hash,

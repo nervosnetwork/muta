@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::error::Error;
 
@@ -12,7 +12,7 @@ use common_crypto::{
     PrivateKey, Signature,
 };
 use protocol::types::{Address, Hash, MerkleRoot, SignedTransaction};
-use protocol::{Bytes, ProtocolError, ProtocolResult};
+use protocol::{Bytes, ProtocolError};
 
 pub struct OverlordCrypto {
     private_key: BlsPrivateKey,
@@ -233,67 +233,6 @@ impl Decodable for ExecWalInfo {
             }
             _ => Err(DecoderError::RlpInconsistentLengthAndData),
         }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct WalInfoQueue {
-    pub inner: BTreeMap<u64, ExecWalInfo>,
-}
-
-impl Encodable for WalInfoQueue {
-    fn rlp_append(&self, s: &mut RlpStream) {
-        s.begin_list(1).append_list(
-            &self
-                .inner
-                .iter()
-                .map(|(_id, info)| info.clone())
-                .collect::<Vec<ExecWalInfo>>(),
-        );
-    }
-}
-
-impl Decodable for WalInfoQueue {
-    fn decode(r: &Rlp) -> Result<Self, DecoderError> {
-        match r.prototype()? {
-            Prototype::List(1) => {
-                let tmp: Vec<ExecWalInfo> = r.list_at(0)?;
-                let inner = tmp
-                    .into_iter()
-                    .map(|info| (info.height, info))
-                    .collect::<BTreeMap<_, _>>();
-                Ok(WalInfoQueue { inner })
-            }
-            _ => Err(DecoderError::RlpInconsistentLengthAndData),
-        }
-    }
-}
-
-#[allow(clippy::new_without_default)]
-impl WalInfoQueue {
-    pub fn new() -> Self {
-        WalInfoQueue {
-            inner: BTreeMap::new(),
-        }
-    }
-
-    pub fn insert(&mut self, info: ExecWalInfo) {
-        self.inner.insert(info.height, info);
-    }
-
-    pub fn remove_by_height(&mut self, height: u64) -> ProtocolResult<()> {
-        match self.inner.remove(&height) {
-            Some(_) => Ok(()),
-            None => Err(ConsensusError::ExecuteErr(format!(
-                "wal info queue does not contain height {}",
-                height
-            ))
-            .into()),
-        }
-    }
-
-    pub fn clear(&mut self) {
-        self.inner.clear();
     }
 }
 

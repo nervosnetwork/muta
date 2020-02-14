@@ -127,6 +127,52 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
         }
     }
 
+    pub async fn backtracking_exec(
+        &self,
+        ctx: Context,
+        height: u64,
+        exec_height: u64,
+        current_status: CurrentConsensusStatus,
+        block: Block,
+    ) -> ProtocolResult<StatusAgent> {
+        let status = CurrentConsensusStatus {
+            cycles_price:       current_status.cycles_price,
+            cycles_limit:       current_status.cycles_limit,
+            validators:         current_status.validators.clone(),
+            consensus_interval: current_status.consensus_interval,
+            propose_ratio:      current_status.propose_ratio,
+            prevote_ratio:      current_status.prevote_ratio,
+            precommit_ratio:    current_status.precommit_ratio,
+            brake_ratio:        current_status.brake_ratio,
+            prev_hash:          block.header.pre_hash.clone(),
+            height:             block.header.height,
+            exec_height:        block.header.exec_height,
+            latest_state_root:  block.header.state_root.clone(),
+            logs_bloom:         vec![],
+            confirm_root:       vec![],
+            receipt_root:       vec![],
+            cycles_used:        vec![],
+            state_root:         vec![],
+            proof:              block.header.proof,
+        };
+
+        let status_agent = StatusAgent::new(status);
+
+        // Discard previous execution results and re-execute.
+        if height != 0 {
+            let exec_gap = height - exec_height;
+
+            for gap in 1..=exec_gap {
+                let rich_block = self
+                    .get_rich_block_from_local(ctx.clone(), exec_height + gap)
+                    .await?;
+                self.exec_block(ctx.clone(), rich_block, status_agent.clone())
+                    .await?;
+            }
+        }
+        Ok(status_agent)
+    }
+
     async fn start_sync(
         &self,
         ctx: Context,
@@ -318,44 +364,8 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
             .await?;
         let current_status = self.status.to_inner();
 
-        let status = CurrentConsensusStatus {
-            cycles_price:       current_status.cycles_price,
-            cycles_limit:       current_status.cycles_limit,
-            validators:         current_status.validators.clone(),
-            consensus_interval: current_status.consensus_interval,
-            propose_ratio:      current_status.propose_ratio,
-            prevote_ratio:      current_status.prevote_ratio,
-            precommit_ratio:    current_status.precommit_ratio,
-            brake_ratio:        current_status.brake_ratio,
-            prev_hash:          block.header.pre_hash.clone(),
-            height:             block.header.height,
-            exec_height:        block.header.exec_height,
-            latest_state_root:  block.header.state_root.clone(),
-            logs_bloom:         vec![],
-            confirm_root:       vec![],
-            receipt_root:       vec![],
-            cycles_used:        vec![],
-            state_root:         vec![],
-            proof:              block.header.proof,
-        };
-
-        let status_agent = StatusAgent::new(status);
-        let exec_height = block.header.exec_height;
-
-        // Discard previous execution results and re-execute.
-        if height != 0 {
-            let exec_gap = height - exec_height;
-
-            for gap in 1..=exec_gap {
-                let rich_block = self
-                    .get_rich_block_from_local(ctx.clone(), exec_height + gap)
-                    .await?;
-                self.exec_block(ctx.clone(), rich_block, status_agent.clone())
-                    .await?;
-            }
-        }
-
-        Ok(status_agent)
+        self.backtracking_exec(ctx, height, block.header.exec_height, current_status, block)
+            .await
     }
 
     async fn need_sync(&self, ctx: Context, remote_height: u64) -> ProtocolResult<bool> {
