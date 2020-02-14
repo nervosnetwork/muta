@@ -73,7 +73,6 @@ impl_storage_schema_for!(LatestBlockSchema, Hash, Block, Block);
 impl_storage_schema_for!(LatestProofSchema, Hash, Proof, Block);
 impl_storage_schema_for!(OverlordWalSchema, Hash, Bytes, Wal);
 impl_storage_schema_for!(MutaWalSchema, Hash, Bytes, Wal);
-impl_storage_schema_for!(ExecQueueWalSchema, Hash, Bytes, Wal);
 impl_storage_schema_for!(WalTransactionSchema, Hash, WalSaveTxs, Wal);
 
 macro_rules! batch_insert {
@@ -215,18 +214,6 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
 
     async fn load_muta_wal(&self) -> ProtocolResult<Bytes> {
         let wal_info = get!(self, MUTA_WAL_KEY.clone(), MutaWalSchema);
-        Ok(wal_info)
-    }
-
-    async fn update_exec_queue_wal(&self, info: Bytes) -> ProtocolResult<()> {
-        self.adapter
-            .insert::<ExecQueueWalSchema>(EXEC_QUEUE_WAL_KEY.clone(), info)
-            .await?;
-        Ok(())
-    }
-
-    async fn load_exec_queue_wal(&self) -> ProtocolResult<Bytes> {
-        let wal_info = get!(self, EXEC_QUEUE_WAL_KEY.clone(), ExecQueueWalSchema);
         Ok(wal_info)
     }
 

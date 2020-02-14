@@ -177,14 +177,6 @@ impl Storage for MockStorage {
         Err(StoreError::GetNone.into())
     }
 
-    async fn update_exec_queue_wal(&self, _info: Bytes) -> ProtocolResult<()> {
-        Ok(())
-    }
-
-    async fn load_exec_queue_wal(&self) -> ProtocolResult<Bytes> {
-        Err(StoreError::GetNone.into())
-    }
-
     async fn insert_wal_transactions(
         &self,
         _block_hash: Hash,

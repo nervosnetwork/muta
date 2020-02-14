@@ -22,7 +22,6 @@ use core_consensus::message::{
 use core_consensus::status::{CurrentConsensusStatus, StatusAgent};
 use core_consensus::{
     DurationConfig, Node, OverlordConsensus, OverlordConsensusAdapter, OverlordSynchronization,
-    WalInfoQueue,
 };
 use core_mempool::{
     DefaultMemPoolAdapter, HashMemPool, MsgPushTxs, NewTxsHandler, PullTxsHandler,
@@ -272,8 +271,10 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         MessageCodec::decode(wal_info).await?
     };
 
+    let status_height = current_consensus_status.height;
+    let status_exec_height = current_consensus_status.exec_height;
     let consensus_interval = current_consensus_status.consensus_interval;
-    let status_agent = StatusAgent::new(current_consensus_status);
+    let status_agent = StatusAgent::new(current_consensus_status.clone());
 
     let mut bls_pub_keys = HashMap::new();
     for validator_extend in metadata.verifier_list.iter() {
@@ -297,11 +298,6 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
 
     core_consensus::trace::init_tracer(my_address.as_hex())?;
 
-    let exec_wal = match storage.load_exec_queue_wal().await {
-        Ok(bytes) => rlp::decode(bytes.as_ref()).unwrap(),
-        Err(_) => WalInfoQueue::new(),
-    };
-
     let mut consensus_adapter =
         OverlordConsensusAdapter::<ServiceExecutorFactory, _, _, _, _, _, _>::new(
             Arc::new(network_service.handle()),
@@ -311,7 +307,6 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
             Arc::clone(&trie_db),
             Arc::clone(&service_mapping),
             status_agent.clone(),
-            exec_wal,
         )?;
 
     let exec_demon = consensus_adapter.take_exec_demon();
@@ -332,9 +327,23 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
 
     let synchronization = Arc::new(OverlordSynchronization::new(
         consensus_adapter,
-        status_agent,
+        status_agent.clone(),
         lock,
     ));
+
+    if status_height != status_exec_height + 1 {
+        let new_status_agnet = synchronization
+            .backtracking_exec(
+                Context::new(),
+                status_height,
+                status_exec_height,
+                current_consensus_status,
+                current_block,
+            )
+            .await?;
+
+        status_agent.replace(new_status_agnet.to_inner());
+    }
 
     // register consensus
     network_service.register_endpoint_handler(

@@ -164,14 +164,6 @@ impl Storage for MockStorage {
         unimplemented!()
     }
 
-    async fn update_exec_queue_wal(&self, _info: Bytes) -> ProtocolResult<()> {
-        unimplemented!()
-    }
-
-    async fn load_exec_queue_wal(&self) -> ProtocolResult<Bytes> {
-        unimplemented!()
-    }
-
     async fn insert_wal_transactions(
         &self,
         _block_hash: Hash,
