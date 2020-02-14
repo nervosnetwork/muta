@@ -134,6 +134,7 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
         current_status: CurrentConsensusStatus,
         block: Block,
     ) -> ProtocolResult<StatusAgent> {
+        let prevhash = Hash::digest(block.encode_fixed()?);
         let height = block.header.height;
         let status = CurrentConsensusStatus {
             cycles_price:       current_status.cycles_price,
@@ -144,7 +145,7 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
             prevote_ratio:      current_status.prevote_ratio,
             precommit_ratio:    current_status.precommit_ratio,
             brake_ratio:        current_status.brake_ratio,
-            prev_hash:          block.header.pre_hash.clone(),
+            prev_hash:          prevhash,
             height:             block.header.height,
             exec_height:        block.header.exec_height,
             latest_state_root:  block.header.state_root.clone(),
