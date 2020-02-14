@@ -271,8 +271,6 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         MessageCodec::decode(wal_info).await?
     };
 
-    let status_height = current_consensus_status.height;
-    let status_exec_height = current_consensus_status.exec_height;
     let consensus_interval = current_consensus_status.consensus_interval;
     let status_agent = StatusAgent::new(current_consensus_status.clone());
 
@@ -331,24 +329,17 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         lock,
     ));
 
-    if status_height != status_exec_height + 1 {
-        log::info!(
-            "[muta] execute from {} to {}",
-            status_exec_height + 1,
-            status_height
-        );
-        let new_status_agnet = synchronization
-            .backtracking_exec(
-                Context::new(),
-                status_height,
-                status_exec_height,
-                current_consensus_status,
-                current_block,
-            )
-            .await?;
+    // reset cache status
+    log::info!(
+        "[muta] execute from {} to {}",
+        current_consensus_status.exec_height + 1,
+        current_consensus_status.height
+    );
 
-        status_agent.replace(new_status_agnet.to_inner());
-    }
+    let new_status_agnet = synchronization
+        .reset_status(Context::new(), current_consensus_status, current_block)
+        .await?;
+    status_agent.replace(new_status_agnet.to_inner());
 
     // register consensus
     network_service.register_endpoint_handler(
