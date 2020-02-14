@@ -195,6 +195,10 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
         let value = payload.value;
         let to = payload.to;
 
+        if caller == to {
+            return Err(ServiceError::ApproveToYourself.into());
+        }
+
         if !self.assets.contains(&asset_id)? {
             return Err(ServiceError::NotFoundAsset { id: asset_id }.into());
         }
@@ -289,6 +293,10 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
         asset_id: Hash,
         value: u64,
     ) -> ProtocolResult<()> {
+        if recipient == sender {
+            return Err(ServiceError::RecipientIsSender.into());
+        }
+
         let mut sender_asset_balance: AssetBalance = self
             .sdk
             .get_account_value(&sender, &asset_id)?
@@ -357,6 +365,10 @@ pub enum ServiceError {
     },
 
     U64Overflow,
+
+    RecipientIsSender,
+
+    ApproveToYourself,
 }
 
 impl std::error::Error for ServiceError {}
