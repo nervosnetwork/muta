@@ -74,7 +74,7 @@ fn test_service_call_service() {
     let txs = vec![stx];
     let executor_resp = executor.exec(&params, &txs).unwrap();
     let receipt = &executor_resp.receipts[0];
-    let event = &receipt.events[1];
+    let event = &receipt.events[0];
 
     assert_eq!(50_000, receipt.cycles_used);
     assert_eq!(
