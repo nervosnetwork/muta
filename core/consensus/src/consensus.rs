@@ -79,6 +79,7 @@ impl<Adapter: ConsensusAdapter + 'static> OverlordConsensus<Adapter> {
         common_ref: BlsCommonReference,
         adapter: Arc<Adapter>,
         lock: Arc<Mutex<()>>,
+        is_load_wal: bool,
     ) -> Self {
         let crypto = Arc::new(OverlordCrypto::new(priv_key, addr_pubkey, common_ref));
 
@@ -98,7 +99,7 @@ impl<Adapter: ConsensusAdapter + 'static> OverlordConsensus<Adapter> {
         let overlord_handler = overlord.get_handler();
 
         let status = status_agent.to_inner();
-        if status.height == 0 {
+        if !is_load_wal {
             overlord_handler
                 .send_msg(
                     Context::new(),

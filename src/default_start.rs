@@ -245,8 +245,11 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     let current_header = &current_block.header;
     let prevhash = Hash::digest(current_block.encode_fixed()?);
 
+    let mut is_load_wal = false;
     let current_consensus_status = if let Ok(wal_info) = storage.load_muta_wal().await {
-        MessageCodec::decode(wal_info).await?
+        let wal_status = MessageCodec::decode(wal_info).await?;
+        is_load_wal = true;
+        wal_status
     } else {
         CurrentConsensusStatus {
             cycles_price:       metadata.cycles_price,
@@ -318,6 +321,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         common_ref,
         Arc::clone(&consensus_adapter),
         Arc::clone(&lock),
+        is_load_wal,
     ));
 
     consensus_adapter.set_overlord_handler(overlord_consensus.get_overlord_handler());
@@ -331,7 +335,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     // reset cache status
     log::info!(
         "[muta] execute from {} to {}",
-        current_consensus_status.exec_height + 1,
+        current_consensus_status.exec_height,
         current_consensus_status.height
     );
 
