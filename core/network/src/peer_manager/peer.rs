@@ -137,6 +137,10 @@ impl Peer {
         self.state.connected_addr.clone()
     }
 
+    pub fn session(&self) -> Option<Arc<SessionContext>> {
+        self.state.session.clone()
+    }
+
     // Pending data size in write buffer
     pub fn pending_data_size(&self) -> usize {
         if let Some(ref session) = self.state.session {
@@ -174,8 +178,8 @@ impl Peer {
         self.state.connected_addr = addr;
     }
 
-    pub fn set_session(&mut self, session: Arc<SessionContext>) {
-        self.state.session = Some(session);
+    pub fn set_session(&mut self, session: Option<Arc<SessionContext>>) {
+        self.state.session = session;
     }
 
     pub fn add_addr(&mut self, addr: Multiaddr) {

@@ -340,7 +340,7 @@ impl Inner {
         if let Some(peer) = pool.get_mut(peer_id) {
             peer.update_connect();
             peer.set_connected_addr(addr);
-            peer.set_session(ctx);
+            peer.set_session(Some(ctx));
         }
     }
 
