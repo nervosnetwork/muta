@@ -206,8 +206,14 @@ impl TxCache {
                 queue_role
                     .candidate
                     .push(Arc::<TxWrapper>::clone(&shared_tx))
-                    .map_err(|_| MemPoolError::InsertCandidate {
-                        len: queue_role.candidate.len(),
+                    .map_err(|_| {
+                        log::error!(
+                            "{:?} insert failed while package into candidate from incument!",
+                            tx_hash
+                        );
+                        MemPoolError::InsertCandidate {
+                            len: queue_role.candidate.len(),
+                        }
                     })?;
 
                 if stage == Stage::Finished
@@ -320,7 +326,16 @@ impl TxCache {
                 while let Ok(shared_tx) = queue_role.candidate.pop() {
                     let _ = queue_role
                         .incumbent
-                        .push(Arc::<TxWrapper>::clone(&shared_tx));
+                        .push(Arc::<TxWrapper>::clone(&shared_tx))
+                        .map_err(|_| {
+                            log::error!(
+                                "{:?} insert failed while process_omission_txs!",
+                                &shared_tx.tx.tx_hash
+                            );
+                            MemPoolError::InsertCandidate {
+                                len: queue_role.candidate.len(),
+                            }
+                        });
                 }
                 break 'outer;
             }
