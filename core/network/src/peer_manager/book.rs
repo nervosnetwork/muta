@@ -2,7 +2,8 @@ use super::{ArcSession, Inner};
 use crate::traits::SessionBook;
 
 use parking_lot::RwLock;
-use tentacle::SessionId;
+use protocol::types::Address;
+use tentacle::{multiaddr::Multiaddr, SessionId};
 
 use std::{collections::HashSet, sync::Arc};
 
@@ -61,5 +62,13 @@ impl SessionBook for SharedSessions {
                 session.unblock()
             }
         }
+    }
+
+    fn by_chain(&self, addrs: Vec<Address>) -> (Vec<SessionId>, Vec<Address>) {
+        todo!()
+    }
+
+    fn multiaddrs(&self, addrs: Vec<Address>) -> (Vec<Multiaddr>, Vec<Address>) {
+        todo!()
     }
 }

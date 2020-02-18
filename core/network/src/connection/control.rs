@@ -1,24 +1,24 @@
 use std::{io, marker::PhantomData};
 
 use async_trait::async_trait;
-use futures::channel::{mpsc::UnboundedSender, oneshot};
-use log::debug;
+use futures::channel::mpsc::UnboundedSender;
+use log::error;
 use protocol::{traits::Priority, types::Address, Bytes};
 use tentacle::{
     error::Error as TentacleError,
-    service::{ServiceControl, TargetSession},
+    service::{ServiceControl, TargetProtocol, TargetSession},
     SessionId,
 };
 
 use crate::{
     error::NetworkError,
-    event::{MultiUsersMessage, PeerManagerEvent},
+    event::ConnectionEvent,
     traits::{MessageSender, NetworkProtocol, SessionBook},
 };
 
 pub struct ConnectionServiceControl<P: NetworkProtocol, B: SessionBook> {
     inner:    ServiceControl,
-    mgr_tx:   UnboundedSender<PeerManagerEvent>,
+    conn_srv: UnboundedSender<ConnectionEvent>,
     sessions: B,
 
     // Indicate which protocol this connection service control
@@ -28,12 +28,12 @@ pub struct ConnectionServiceControl<P: NetworkProtocol, B: SessionBook> {
 impl<P: NetworkProtocol, B: SessionBook> ConnectionServiceControl<P, B> {
     pub fn new(
         control: ServiceControl,
-        mgr_tx: UnboundedSender<PeerManagerEvent>,
+        conn_srv: UnboundedSender<ConnectionEvent>,
         book: B,
     ) -> Self {
         ConnectionServiceControl {
             inner: control,
-            mgr_tx,
+            conn_srv,
             sessions: book,
 
             pin_protocol: PhantomData,
@@ -86,7 +86,7 @@ impl<P: NetworkProtocol, B: SessionBook + Clone> Clone for ConnectionServiceCont
     fn clone(&self) -> Self {
         ConnectionServiceControl {
             inner:    self.inner.clone(),
-            mgr_tx:   self.mgr_tx.clone(),
+            conn_srv: self.conn_srv.clone(),
             sessions: self.sessions.clone(),
 
             pin_protocol: PhantomData,
@@ -141,30 +141,51 @@ where
 
     async fn users_send(
         &self,
-        user_addrs: Vec<Address>,
+        chain_addrs: Vec<Address>,
         msg: Bytes,
         pri: Priority,
     ) -> Result<(), NetworkError> {
-        let (miss_tx, miss_rx) = oneshot::channel();
-        let users_msg = MultiUsersMessage {
-            user_addrs,
-            msg,
-            pri,
+        let (connected, unconnected) = self.sessions.by_chain(chain_addrs);
+
+        let send_ret = self.send(TargetSession::Multi(connected), msg, pri);
+        if unconnected.is_empty() {
+            return send_ret;
+        }
+
+        let (multiaddrs, unknown) = self.sessions.multiaddrs(unconnected.clone());
+        let connect_peers = ConnectionEvent::Connect {
+            addrs: multiaddrs,
+            proto: TargetProtocol::All,
         };
-        let route_users_msg = PeerManagerEvent::RouteMultiUsersMessage { users_msg, miss_tx };
-
-        if self.mgr_tx.unbounded_send(route_users_msg).is_err() {
-            debug!("network: connection service control: peer manager service exit");
+        if self.conn_srv.unbounded_send(connect_peers).is_err() {
+            error!("network: connection service exit");
         }
 
-        let missed_users = miss_rx
-            .await
-            .map_err(|err| NetworkError::UnexpectedError(Box::new(err)))?;
+        let unconnected = unconnected
+            .into_iter()
+            .filter(|a| !unknown.contains(a))
+            .collect::<Vec<_>>();
 
-        if !missed_users.is_empty() {
-            Err(NetworkError::PartialRouteMessage { miss: missed_users })
-        } else {
-            Ok(())
+        if send_ret.is_err() || !unconnected.is_empty() || !unknown.is_empty() {
+            let other = send_ret.err().map(NetworkError::boxed);
+            let unconnected = if unconnected.is_empty() {
+                None
+            } else {
+                Some(unconnected)
+            };
+            let unknown = if unknown.is_empty() {
+                None
+            } else {
+                Some(unknown)
+            };
+
+            return Err(NetworkError::UserSend {
+                unconnected,
+                unknown,
+                other,
+            });
         }
+
+        Ok(())
     }
 }

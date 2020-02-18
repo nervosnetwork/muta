@@ -172,7 +172,7 @@ impl NetworkService {
         // Build connection service
         let keeper = ConnectionServiceKeeper::new(mgr_tx.clone(), sys_tx.clone());
         let conn_srv = ConnectionService::<CoreProtocol>::new(proto, conn_config, keeper, conn_rx);
-        let conn_ctrl = conn_srv.control(mgr_tx.clone(), session_book);
+        let conn_ctrl = conn_srv.control(conn_tx.clone(), session_book);
 
         // Build public service components
         let rpc_map = Arc::new(RpcMap::new());

@@ -65,10 +65,22 @@ pub enum NetworkError {
     #[display(fmt = "temporary unavailable, try again later")]
     Busy,
 
-    #[display(fmt = "send busy, blocked {:?}, other {:?}", blocked, other)]
+    #[display(fmt = "send incompletely, blocked {:?}, other {:?}", blocked, other)]
     Send {
         blocked: Option<Vec<SessionId>>,
         other:   Option<Box<dyn Error + Send>>,
+    },
+
+    #[display(
+        fmt = "send incompletely, unconnected {:?} unknown {:?}, other {:?}",
+        unconnected,
+        unknown,
+        other
+    )]
+    UserSend {
+        unconnected: Option<Vec<Address>>,
+        unknown:     Option<Vec<Address>>,
+        other:       Option<Box<dyn Error + Send>>,
     },
 
     #[display(fmt = "shutdown")]
