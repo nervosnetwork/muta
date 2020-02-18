@@ -108,7 +108,7 @@ where
     async fn package(&self, ctx: Context, cycle_limit: u64) -> ProtocolResult<MixedTxHashes> {
         let current_height = self.adapter.get_latest_height(ctx.clone()).await?;
         log::info!(
-            "[mempool]: {:?} txs in map and {:?} txs in queue while package",
+            "[core_mempool]: {:?} txs in map and {:?} txs in queue while package",
             self.tx_cache.len(),
             self.tx_cache.queue_len(),
         );
@@ -119,12 +119,17 @@ where
         )
     }
 
-    async fn flush(&self, _ctx: Context, tx_hashes: Vec<Hash>) -> ProtocolResult<()> {
+    async fn flush(&self, ctx: Context, tx_hashes: Vec<Hash>) -> ProtocolResult<()> {
+        let current_height = self.adapter.get_latest_height(ctx.clone()).await?;
         log::info!(
-            "[mempool]: flush mempool with {:?} tx_hashes",
+            "[core_mempool]: flush mempool with {:?} tx_hashes",
             tx_hashes.len(),
         );
-        self.tx_cache.flush(&tx_hashes);
+        self.tx_cache.flush(
+            &tx_hashes,
+            current_height,
+            current_height + self.timeout_gap.load(Ordering::Relaxed),
+        );
         self.callback_cache.clear();
         Ok(())
     }

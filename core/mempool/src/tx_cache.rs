@@ -165,7 +165,7 @@ impl TxCache {
             .collect()
     }
 
-    pub fn flush(&self, tx_hashes: &[Hash]) {
+    pub fn flush(&self, tx_hashes: &[Hash], current_height: u64, timeout: u64) {
         for tx_hash in tx_hashes {
             let opt = self.map.get(tx_hash);
             if let Some(shared_tx) = opt {
@@ -174,6 +174,7 @@ impl TxCache {
         }
         // Dividing set removed and remove into two loops is to avoid lock competition.
         self.map.deletes(tx_hashes);
+        self.flush_incumbent_queue(current_height, timeout);
     }
 
     pub fn package(
@@ -203,18 +204,16 @@ impl TxCache {
                     continue;
                 }
                 // After previous filter, tx are valid and should cache in temp_queue.
-                queue_role
+                if let Err(e) = queue_role
                     .candidate
                     .push(Arc::<TxWrapper>::clone(&shared_tx))
-                    .map_err(|_| {
-                        log::error!(
-                            "{:?} insert failed while package into candidate from incument!",
-                            tx_hash
-                        );
-                        MemPoolError::InsertCandidate {
-                            len: queue_role.candidate.len(),
-                        }
-                    })?;
+                {
+                    log::error!(
+                        "[core_mempool]: {:?}, leak a tx {:?} while package",
+                        e,
+                        &shared_tx.tx.tx_hash
+                    );
+                }
 
                 if stage == Stage::Finished
                     || (stage == Stage::ProposeTxs && shared_tx.is_proposed())
@@ -324,22 +323,58 @@ impl TxCache {
             // pop off previous incumbent queue and push them into current incumbent queue.
             if self.concurrent_count.load(Ordering::SeqCst) == 0 {
                 while let Ok(shared_tx) = queue_role.candidate.pop() {
-                    let _ = queue_role
+                    if let Err(e) = queue_role
                         .incumbent
                         .push(Arc::<TxWrapper>::clone(&shared_tx))
-                        .map_err(|_| {
-                            log::error!(
-                                "{:?} insert failed while process_omission_txs!",
-                                &shared_tx.tx.tx_hash
-                            );
-                            MemPoolError::InsertCandidate {
-                                len: queue_role.candidate.len(),
-                            }
-                        });
+                    {
+                        log::error!(
+                            "[core_mempool]: {:?}, leak a tx {:?} while process_omission_txs",
+                            e,
+                            &shared_tx.tx.tx_hash
+                        );
+                    }
                 }
                 break 'outer;
             }
         }
+    }
+
+    fn flush_incumbent_queue(&self, current_height: u64, timeout: u64) {
+        let queue_role = self.get_queue_role();
+        let mut timeout_tx_hashes = Vec::new();
+
+        loop {
+            if let Ok(shared_tx) = queue_role.incumbent.pop() {
+                let tx_hash = &shared_tx.tx.tx_hash;
+
+                if shared_tx.is_removed() {
+                    continue;
+                }
+                if shared_tx.is_timeout(current_height, timeout) {
+                    timeout_tx_hashes.push(tx_hash.clone());
+                    continue;
+                }
+                // After previous filter, tx are valid and should cache in temp_queue.
+                if let Err(e) = queue_role
+                    .candidate
+                    .push(Arc::<TxWrapper>::clone(&shared_tx))
+                {
+                    log::error!(
+                        "[core_mempool]: {:?}, leak a tx {:?} while flush_incumbent_queue",
+                        e,
+                        &shared_tx.tx.tx_hash
+                    );
+                }
+            } else {
+                // Switch queue_roles
+                let new_role = self.switch_queue_role();
+                // Transactions may insert into previous incumbent queue during role switch.
+                self.process_omission_txs(new_role);
+                break;
+            }
+        }
+        // Remove timeout tx in map
+        self.map.deletes(&timeout_tx_hashes);
     }
 
     fn switch_queue_role(&self) -> QueueRole {
@@ -436,11 +471,15 @@ mod tests {
         });
     }
 
-    fn concurrent_flush(tx_cache: &Arc<TxCache>, tx_hashes: Vec<Hash>) -> JoinHandle<()> {
+    fn concurrent_flush(
+        tx_cache: &Arc<TxCache>,
+        tx_hashes: Vec<Hash>,
+        height: u64,
+    ) -> JoinHandle<()> {
         let tx_cache_clone = Arc::<TxCache>::clone(tx_cache);
 
         thread::spawn(move || {
-            tx_cache_clone.flush(&tx_hashes);
+            tx_cache_clone.flush(&tx_hashes, height, height + TIMEOUT);
         })
     }
 
@@ -517,9 +556,9 @@ mod tests {
             concurrent_insert(txs.clone(), &tx_cache);
             assert_eq!(tx_cache.len(), TX_NUM);
             assert_eq!(tx_cache.queue_len(), TX_NUM);
-            tx_cache.flush(tx_hashes.as_slice());
+            tx_cache.flush(tx_hashes.as_slice(), CURRENT_H, CURRENT_H + TIMEOUT);
             assert_eq!(tx_cache.len(), 0);
-            assert_eq!(tx_cache.queue_len(), TX_NUM);
+            assert_eq!(tx_cache.queue_len(), 0);
         });
     }
 
@@ -534,11 +573,11 @@ mod tests {
         b.iter(|| {
             let tx_cache = Arc::new(TxCache::new(POOL_SIZE));
             concurrent_insert(txs_base.clone(), &tx_cache);
-            let handle = concurrent_flush(&tx_cache, txs_flush.clone());
+            let handle = concurrent_flush(&tx_cache, txs_flush.clone(), CURRENT_H);
             concurrent_insert(txs_insert.clone(), &tx_cache);
             handle.join().unwrap();
             assert_eq!(tx_cache.len(), TX_NUM / 2);
-            assert_eq!(tx_cache.queue_len(), TX_NUM);
+            assert_eq!(tx_cache.queue_len(), TX_NUM / 2);
         });
     }
 
