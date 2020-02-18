@@ -21,9 +21,6 @@ pub enum ErrorKind {
         cause:    Box<dyn Error + Send>,
     },
 
-    #[display(fmt = "kind: session blocked, may be bad protocol code")]
-    SessionBlocked,
-
     #[display(fmt = "kind: given string isn't an id: {}", _0)]
     NotIdString(ParseIntError),
 
@@ -67,6 +64,12 @@ pub enum NetworkError {
 
     #[display(fmt = "temporary unavailable, try again later")]
     Busy,
+
+    #[display(fmt = "send busy, blocked {:?}, other {:?}", blocked, other)]
+    Send {
+        blocked: Option<Vec<SessionId>>,
+        other:   Option<Box<dyn Error + Send>>,
+    },
 
     #[display(fmt = "shutdown")]
     Shutdown,
@@ -125,5 +128,11 @@ impl From<NetworkError> for ProtocolError {
 impl From<std::io::Error> for NetworkError {
     fn from(err: std::io::Error) -> NetworkError {
         NetworkError::IoError(err)
+    }
+}
+
+impl NetworkError {
+    pub fn boxed(self) -> Box<dyn Error + Send> {
+        Box::new(self) as Box<dyn Error + Send>
     }
 }

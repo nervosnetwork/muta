@@ -70,9 +70,6 @@ pub enum RemoveKind {
         err:      Box<dyn Error + Send>,
     },
 
-    #[display(fmt = "protocol blocked on peer {:?} session {}", pid, sid)]
-    SessionBlocked { pid: PeerId, sid: SessionId },
-
     #[display(fmt = "bad session peer: {}", _0)]
     BadSessionPeer(String),
 }
@@ -95,7 +92,7 @@ pub enum ConnectionType {
 
 #[derive(Debug, Display)]
 #[display(fmt = "session {:?} addr {:?} ty {:?}", sid, addr, ty)]
-pub struct Session {
+pub struct PeerSession {
     pub sid:  SessionId,
     pub addr: Multiaddr,
     pub ty:   SessionType,
@@ -108,7 +105,7 @@ pub enum PeerManagerEvent {
     #[display(fmt = "attach peer session {}", session)]
     AttachPeerSession {
         pubkey:  PublicKey,
-        session: Session,
+        session: PeerSession,
     },
 
     #[display(fmt = "detach peer {:?} session {:?} ty {:?}", pid, sid, ty)]
@@ -126,6 +123,12 @@ pub enum PeerManagerEvent {
 
     #[display(fmt = "remove peer by session {} kind: {}", sid, kind)]
     RemovePeerBySession { sid: SessionId, kind: RemoveKind },
+
+    #[display(fmt = "session {} blocked", sid)]
+    SessionBlocked {
+        sid: SessionId,
+        ctx: Arc<SessionContext>,
+    },
 
     #[display(fmt = "retry peer {:?} later, disconnect now, kind: {}", pid, kind)]
     RetryPeerLater { pid: PeerId, kind: RetryKind },

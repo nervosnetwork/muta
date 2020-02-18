@@ -12,7 +12,7 @@ use tentacle::{
 
 use crate::{
     error::{ErrorKind, NetworkError},
-    event::{ConnectionType, PeerManagerEvent, RemoveKind, RetryKind, Session},
+    event::{ConnectionType, PeerManagerEvent, PeerSession, RemoveKind, RetryKind},
 };
 
 // This macro tries to extract PublicKey from SessionContext, it's Optional.
@@ -182,11 +182,10 @@ impl ServiceHandle for ConnectionServiceKeeper {
                 let pid = peer_pubkey!(&session_context).peer_id();
                 let sid = session_context.id;
 
-                let kind = RemoveKind::SessionBlocked { pid, sid };
-                let blocked_session = PeerManagerEvent::RemovePeerBySession { sid, kind };
-
-                self.report_peer(blocked_session);
-                self.report_error(ErrorKind::SessionBlocked);
+                let session_blocked = PeerManagerEvent::SessionBlocked {
+                    sid, ctx: session_context
+                };
+                self.report_peer(session_blocked);
             }
         }
     }
@@ -195,13 +194,13 @@ impl ServiceHandle for ConnectionServiceKeeper {
         match evt {
             ServiceEvent::SessionOpen { session_context } => {
                 let pubkey = peer_pubkey!(&session_context).clone();
-                let session = Session {
+                let session = PeerSession {
                     sid: session_context.id,
                     addr: session_context.address.clone(),
                     ty: session_context.ty,
                     ctx: session_context,
                 };
-                
+
                 let attach_peer_session = PeerManagerEvent::AttachPeerSession { pubkey, session };
 
                 self.report_peer(attach_peer_session);

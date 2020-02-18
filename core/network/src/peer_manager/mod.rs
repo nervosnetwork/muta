@@ -11,10 +11,12 @@ pub use ident::IdentifyCallback;
 pub use peer::Peer;
 
 use std::{
+    borrow::Borrow,
     cmp::PartialEq,
     collections::{HashMap, HashSet},
     future::Future,
     hash::{Hash, Hasher},
+    ops::Deref,
     path::PathBuf,
     pin::Pin,
     sync::atomic::{AtomicBool, Ordering},
@@ -115,11 +117,71 @@ impl Hash for UnknownAddr {
 
 impl Eq for UnknownAddr {}
 
+#[derive(Debug)]
+struct Session {
+    id:      SessionId,
+    pid:     PeerId,
+    ctx:     Arc<SessionContext>,
+    blocked: AtomicBool,
+}
+
+#[derive(Debug, Clone)]
+struct ArcSession(Arc<Session>);
+
+impl ArcSession {
+    pub fn new(pid: PeerId, ctx: Arc<SessionContext>) -> Self {
+        let session = Session {
+            id: ctx.id,
+            pid,
+            ctx,
+            blocked: AtomicBool::new(false),
+        };
+
+        ArcSession(Arc::new(session))
+    }
+
+    pub fn is_blocked(&self) -> bool {
+        self.blocked.load(Ordering::SeqCst)
+    }
+}
+
+impl Borrow<SessionId> for ArcSession {
+    fn borrow(&self) -> &SessionId {
+        &self.0.id
+    }
+}
+
+impl PartialEq for ArcSession {
+    fn eq(&self, other: &ArcSession) -> bool {
+        self.0.id == other.0.id
+    }
+}
+
+impl Eq for ArcSession {}
+
+impl Hash for ArcSession {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.id.hash(state)
+    }
+}
+
+impl Deref for ArcSession {
+    type Target = Session;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+// TODO: refactor peer state
+// TODO: enforce peer id in multiaddr
 // The only purpose we separate Inner from PeerManager is because
 // discovery protocol needs directly access to PeerManager.
 struct Inner {
     connecting: RwLock<HashSet<PeerId>>,
     connected:  RwLock<HashSet<PeerId>>,
+
+    sessions: RwLock<HashSet<ArcSession>>,
 
     addr_pid: RwLock<HashMap<Multiaddr, PeerId>>,
     user_pid: RwLock<HashMap<Address, PeerId>>,
@@ -135,6 +197,8 @@ impl Inner {
         Inner {
             connecting: Default::default(),
             connected:  Default::default(),
+
+            sessions: Default::default(),
 
             addr_pid: Default::default(),
             user_pid: Default::default(),
@@ -336,11 +400,21 @@ impl Inner {
         self.connecting.write().remove(peer_id);
         self.connected.write().insert(peer_id.clone());
 
+        let session = ArcSession::new(peer_id.to_owned(), Arc::clone(&ctx));
+        self.sessions.write().insert(session);
+
         let mut pool = self.pool.write();
         if let Some(peer) = pool.get_mut(peer_id) {
             peer.update_connect();
             peer.set_connected_addr(addr);
             peer.set_session(Some(ctx));
+        }
+    }
+
+    pub fn set_blocked(&self, sid: SessionId) {
+        let opt_sess = { self.sessions.read().get(&sid).cloned() };
+        if let Some(sess) = opt_sess {
+            sess.blocked.store(true, Ordering::SeqCst);
         }
     }
 
@@ -350,9 +424,14 @@ impl Inner {
 
         let mut pool = self.pool.write();
         if let Some(peer) = pool.get_mut(peer_id) {
+            if let Some(session) = peer.session() {
+                self.sessions.write().remove(&session.id);
+            }
+
             peer.update_disconnect();
             peer.update_alive();
             peer.set_connected_addr(None);
+            peer.set_session(None);
         }
     }
 
@@ -648,8 +727,8 @@ impl PeerManager {
         }
     }
 
-    fn attach_peer_session(&mut self, pubkey: PublicKey, session: Session) {
-        let Session { sid, addr, ty, ctx } = session;
+    fn attach_peer_session(&mut self, pubkey: PublicKey, session: PeerSession) {
+        let PeerSession { sid, addr, ty, ctx } = session;
 
         if self.inner.connected.read().len() >= self.config.max_connections {
             let disconnect_peer = ConnectionEvent::Disconnect(sid);
@@ -858,6 +937,10 @@ impl PeerManager {
         }
     }
 
+    fn session_blocked(&mut self, sid: SessionId) {
+        self.inner.set_blocked(sid)
+    }
+
     fn route_multi_users_message(
         &mut self,
         users_msg: MultiUsersMessage,
@@ -953,6 +1036,15 @@ impl PeerManager {
 
                     self.detach_session_id(sid);
                 }
+            }
+            PeerManagerEvent::SessionBlocked { ctx, .. } => {
+                warn!(
+                    "network: session {} blocked, pending data size {}",
+                    ctx.id,
+                    ctx.pending_data_size()
+                );
+
+                self.session_blocked(ctx.id);
             }
             PeerManagerEvent::RetryPeerLater { pid, .. } => {
                 info!(
