@@ -28,10 +28,7 @@ use std::{
 };
 
 use futures::{
-    channel::{
-        mpsc::{UnboundedReceiver, UnboundedSender},
-        oneshot,
-    },
+    channel::mpsc::{UnboundedReceiver, UnboundedSender},
     pin_mut,
     stream::Stream,
     task::AtomicWaker,
@@ -44,14 +41,14 @@ use tentacle::{
     context::SessionContext,
     multiaddr::{Multiaddr, Protocol},
     secio::{PeerId, PublicKey},
-    service::{SessionType, TargetProtocol, TargetSession},
+    service::{SessionType, TargetProtocol},
     SessionId,
 };
 
 use crate::{
     common::{ConnectedAddr, HeartBeat},
     error::NetworkError,
-    event::{ConnectionEvent, ConnectionType, MultiUsersMessage, PeerManagerEvent, PeerSession},
+    event::{ConnectionEvent, ConnectionType, PeerManagerEvent, PeerSession},
     traits::PeerQuerier,
 };
 
@@ -246,13 +243,6 @@ impl Inner {
 
     pub fn listen(&self) -> Option<Multiaddr> {
         self.listen.read().clone()
-    }
-
-    pub fn user_peer(&self, user: &Address) -> Option<Peer> {
-        let user_pid = self.user_pid.read();
-        let pool = self.pool.read();
-
-        user_pid.get(user).and_then(|pid| pool.get(pid).cloned())
     }
 
     pub fn pid_user_addr(&self, pid: &PeerId) -> Option<Address> {
@@ -951,63 +941,6 @@ impl PeerManager {
         self.inner.set_blocked(sid)
     }
 
-    fn route_multi_users_message(
-        &mut self,
-        users_msg: MultiUsersMessage,
-        miss_tx: oneshot::Sender<Vec<Address>>,
-    ) {
-        let mut no_peers = vec![];
-        let mut connected = vec![];
-        let mut unconnected_peers = vec![];
-
-        for user_addr in users_msg.user_addrs.into_iter() {
-            if let Some(peer) = self.inner.user_peer(&user_addr) {
-                if let Some(sid) = self.peer_session.get(&peer.id()) {
-                    connected.push(*sid);
-                } else {
-                    unconnected_peers.push(peer);
-                }
-            } else {
-                no_peers.push(user_addr);
-            }
-        }
-
-        if !no_peers.is_empty() {
-            warn!("network: no peers {:?}", no_peers);
-        }
-
-        // Send message to connected users
-        let tar = TargetSession::Multi(connected);
-        let MultiUsersMessage { msg, pri, .. } = users_msg;
-        let send_msg = ConnectionEvent::SendMsg { tar, msg, pri };
-
-        if self.conn_tx.unbounded_send(send_msg).is_err() {
-            error!("network: connection service exit");
-        }
-
-        // Try connect to unconnected peers
-        let unconnected_addrs = unconnected_peers
-            .iter()
-            .map(Peer::owned_addrs)
-            .flatten()
-            .collect::<Vec<_>>();
-
-        self.connect_peers(unconnected_addrs);
-
-        // Report missed user addresses
-        let mut missed_accounts = unconnected_peers
-            .iter()
-            .map(Peer::user_addr)
-            .cloned()
-            .collect::<Vec<_>>();
-
-        missed_accounts.extend(no_peers);
-
-        if miss_tx.send(missed_accounts).is_err() {
-            warn!("network: route multi accounts message dropped")
-        }
-    }
-
     fn process_event(&mut self, event: PeerManagerEvent) {
         match event {
             PeerManagerEvent::AttachPeerSession { pubkey, session } => {
@@ -1155,9 +1088,6 @@ impl PeerManager {
             }
             PeerManagerEvent::RemoveListenAddr { addr } => {
                 self.inner.remove_peer_addr(&self.config.our_id, &addr);
-            }
-            PeerManagerEvent::RouteMultiUsersMessage { users_msg, miss_tx } => {
-                self.route_multi_users_message(users_msg, miss_tx);
             }
         }
     }

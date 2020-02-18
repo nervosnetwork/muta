@@ -1,13 +1,12 @@
 use std::{error::Error, sync::Arc};
 
 use derive_more::{Display, From};
-use futures::channel::oneshot::Sender;
 use protocol::{traits::Priority, types::Address, Bytes};
 use tentacle::{
     context::SessionContext,
     multiaddr::Multiaddr,
     secio::{PeerId, PublicKey},
-    service::{SessionType, TargetProtocol, TargetSession},
+    service::{SessionType, TargetProtocol},
     ProtocolId, SessionId,
 };
 
@@ -21,13 +20,6 @@ pub enum ConnectionEvent {
 
     #[display(fmt = "disconnect session {}", _0)]
     Disconnect(SessionId),
-
-    #[display(fmt = "send message to {:?}", tar)]
-    SendMsg {
-        tar: TargetSession,
-        msg: Bytes,
-        pri: Priority,
-    },
 }
 
 #[derive(Debug, Display, From)]
@@ -168,11 +160,4 @@ pub enum PeerManagerEvent {
 
     #[display(fmt = "rmeove listen addr {}", addr)]
     RemoveListenAddr { addr: Multiaddr },
-
-    // Account addresses
-    #[display(fmt = "try route multi accounts message: {}", users_msg)]
-    RouteMultiUsersMessage {
-        users_msg: MultiUsersMessage,
-        miss_tx:   Sender<Vec<Address>>,
-    },
 }
