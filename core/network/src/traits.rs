@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use async_trait::async_trait;
 use protocol::{
     traits::{Context, Priority},
@@ -64,7 +62,7 @@ pub trait PeerQuerier {
     fn pending_data_size(&self, pid: &PeerId) -> usize;
 }
 
-pub trait SessionQuerier {
+pub trait SessionBook {
     fn all_sendable(&self) -> Vec<SessionId>;
     fn all_blocked(&self) -> Vec<SessionId>;
     fn refresh_blocked(&self);

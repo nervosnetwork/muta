@@ -179,7 +179,6 @@ impl ServiceHandle for ConnectionServiceKeeper {
             // Partial protocol task logic take long time to process, usually
             // indicate bad protocol implement.
             ServiceError::SessionBlocked { session_context } => {
-                let pid = peer_pubkey!(&session_context).peer_id();
                 let sid = session_context.id;
 
                 let session_blocked = PeerManagerEvent::SessionBlocked {

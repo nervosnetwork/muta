@@ -25,7 +25,7 @@ use tentacle::{
 use crate::{
     error::NetworkError,
     event::{ConnectionEvent, PeerManagerEvent},
-    traits::NetworkProtocol,
+    traits::{NetworkProtocol, SessionBook},
 };
 
 pub struct ConnectionConfig {
@@ -115,13 +115,14 @@ impl<P: NetworkProtocol> ConnectionService<P> {
         Ok(())
     }
 
-    pub fn control(
+    pub fn control<B: SessionBook>(
         &self,
         mgr_tx: UnboundedSender<PeerManagerEvent>,
-    ) -> ConnectionServiceControl<P> {
+        book: B,
+    ) -> ConnectionServiceControl<P, B> {
         let control_ref = self.inner.control();
 
-        ConnectionServiceControl::new(control_ref.clone(), mgr_tx)
+        ConnectionServiceControl::new(control_ref.clone(), mgr_tx, book)
     }
 
     // NOTE: control.dial() and control.disconnect() both return same two

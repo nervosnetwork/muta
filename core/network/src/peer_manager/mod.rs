@@ -1,3 +1,4 @@
+mod book;
 mod disc;
 mod ident;
 mod peer;
@@ -6,6 +7,7 @@ mod persist;
 use peer::PeerState;
 use persist::{NoopPersistence, PeerPersistence, Persistence};
 
+pub use book::{SharedSessions, SharedSessionsConfig};
 pub use disc::DiscoveryAddrManager;
 pub use ident::IdentifyCallback;
 pub use peer::Peer;
@@ -49,7 +51,7 @@ use tentacle::{
 use crate::{
     common::{ConnectedAddr, HeartBeat},
     error::NetworkError,
-    event::{ConnectionEvent, ConnectionType, MultiUsersMessage, PeerManagerEvent, Session},
+    event::{ConnectionEvent, ConnectionType, MultiUsersMessage, PeerManagerEvent, PeerSession},
     traits::PeerQuerier,
 };
 
@@ -142,6 +144,10 @@ impl ArcSession {
 
     pub fn is_blocked(&self) -> bool {
         self.blocked.load(Ordering::SeqCst)
+    }
+
+    pub fn unblock(&self) {
+        self.blocked.store(false, Ordering::SeqCst);
     }
 }
 
@@ -646,6 +652,10 @@ impl PeerManager {
         PeerManagerHandle {
             inner: Arc::clone(&self.inner),
         }
+    }
+
+    pub fn share_session_book(&self, config: SharedSessionsConfig) -> SharedSessions {
+        SharedSessions::new(Arc::clone(&self.inner), config)
     }
 
     pub fn enable_persistence(&mut self) {

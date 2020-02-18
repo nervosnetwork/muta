@@ -33,6 +33,7 @@ use crate::{
     outbound::{NetworkGossip, NetworkRpc},
     peer_manager::{
         DiscoveryAddrManager, IdentifyCallback, PeerManager, PeerManagerConfig, PeerManagerHandle,
+        SharedSessions,
     },
     protocols::CoreProtocol,
     reactor::{MessageRouter, Reactor},
@@ -43,8 +44,8 @@ use crate::{
 
 #[derive(Clone)]
 pub struct NetworkServiceHandle {
-    gossip: NetworkGossip<ConnectionServiceControl<CoreProtocol>, Snappy>,
-    rpc:    NetworkRpc<ConnectionServiceControl<CoreProtocol>, Snappy>,
+    gossip: NetworkGossip<ConnectionServiceControl<CoreProtocol, SharedSessions>, Snappy>,
+    rpc:    NetworkRpc<ConnectionServiceControl<CoreProtocol, SharedSessions>, Snappy>,
 }
 
 #[async_trait]
@@ -114,8 +115,8 @@ pub struct NetworkService {
     config: NetworkConfig,
 
     // Public service components
-    gossip:  NetworkGossip<ConnectionServiceControl<CoreProtocol>, Snappy>,
-    rpc:     NetworkRpc<ConnectionServiceControl<CoreProtocol>, Snappy>,
+    gossip:  NetworkGossip<ConnectionServiceControl<CoreProtocol, SharedSessions>, Snappy>,
+    rpc:     NetworkRpc<ConnectionServiceControl<CoreProtocol, SharedSessions>, Snappy>,
     rpc_map: Arc<RpcMap>,
 
     // Core service
@@ -143,6 +144,7 @@ impl NetworkService {
         // Build peer manager
         let mut peer_mgr = PeerManager::new(mgr_config, mgr_rx, conn_tx.clone());
         let peer_mgr_handle = peer_mgr.handle();
+        let session_book = peer_mgr.share_session_book((&config).into());
 
         if config.enable_persistence {
             peer_mgr.enable_persistence();
@@ -170,7 +172,7 @@ impl NetworkService {
         // Build connection service
         let keeper = ConnectionServiceKeeper::new(mgr_tx.clone(), sys_tx.clone());
         let conn_srv = ConnectionService::<CoreProtocol>::new(proto, conn_config, keeper, conn_rx);
-        let conn_ctrl = conn_srv.control(mgr_tx.clone());
+        let conn_ctrl = conn_srv.control(mgr_tx.clone(), session_book);
 
         // Build public service components
         let rpc_map = Arc::new(RpcMap::new());

@@ -13,28 +13,28 @@ use tentacle::{
 use crate::{
     error::NetworkError,
     event::{MultiUsersMessage, PeerManagerEvent},
-    traits::{MessageSender, NetworkProtocol, SessionQuerier},
+    traits::{MessageSender, NetworkProtocol, SessionBook},
 };
 
-pub struct ConnectionServiceControl<P: NetworkProtocol, Q: SessionQuerier> {
-    inner:        ServiceControl,
-    mgr_tx:       UnboundedSender<PeerManagerEvent>,
-    sessions: Q,
+pub struct ConnectionServiceControl<P: NetworkProtocol, B: SessionBook> {
+    inner:    ServiceControl,
+    mgr_tx:   UnboundedSender<PeerManagerEvent>,
+    sessions: B,
 
     // Indicate which protocol this connection service control
     pin_protocol: PhantomData<fn() -> P>,
 }
 
-impl<P: NetworkProtocol, Q: SessionQuerier> ConnectionServiceControl<P, Q> {
+impl<P: NetworkProtocol, B: SessionBook> ConnectionServiceControl<P, B> {
     pub fn new(
         control: ServiceControl,
         mgr_tx: UnboundedSender<PeerManagerEvent>,
-        session_querier: Q,
+        book: B,
     ) -> Self {
         ConnectionServiceControl {
             inner: control,
             mgr_tx,
-            sessions: session_querier,
+            sessions: book,
 
             pin_protocol: PhantomData,
         }
@@ -55,7 +55,7 @@ impl<P: NetworkProtocol, Q: SessionQuerier> ConnectionServiceControl<P, Q> {
             TargetSession::Single(sid) => {
                 if all_blocked.contains(&sid) {
                     (None, Some(vec![sid]))
-                }else {
+                } else {
                     (Some(TargetSession::Single(sid)), None)
                 }
             }
@@ -82,11 +82,11 @@ impl<P: NetworkProtocol, Q: SessionQuerier> ConnectionServiceControl<P, Q> {
     }
 }
 
-impl<P: NetworkProtocol, Q: SessionQuerier + Clone> Clone for ConnectionServiceControl<P, Q> {
+impl<P: NetworkProtocol, B: SessionBook + Clone> Clone for ConnectionServiceControl<P, B> {
     fn clone(&self) -> Self {
         ConnectionServiceControl {
-            inner:        self.inner.clone(),
-            mgr_tx:       self.mgr_tx.clone(),
+            inner:    self.inner.clone(),
+            mgr_tx:   self.mgr_tx.clone(),
             sessions: self.sessions.clone(),
 
             pin_protocol: PhantomData,
@@ -95,10 +95,10 @@ impl<P: NetworkProtocol, Q: SessionQuerier + Clone> Clone for ConnectionServiceC
 }
 
 #[async_trait]
-impl<P, Q> MessageSender for ConnectionServiceControl<P, Q>
+impl<P, B> MessageSender for ConnectionServiceControl<P, B>
 where
     P: NetworkProtocol,
-    Q: SessionQuerier + Send + Sync + Unpin + 'static,
+    B: SessionBook + Send + Sync + Unpin + 'static,
 {
     fn send(&self, tar: TargetSession, msg: Bytes, pri: Priority) -> Result<(), NetworkError> {
         let proto_id = P::message_proto_id();
@@ -132,7 +132,7 @@ where
             let other = ret.err();
             return Err(NetworkError::Send {
                 blocked: opt_blocked,
-                other: other.map(NetworkError::boxed),
+                other:   other.map(NetworkError::boxed),
             });
         }
 

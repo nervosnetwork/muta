@@ -16,7 +16,7 @@ use crate::{
     common::socket_to_multi_addr,
     connection::ConnectionConfig,
     error::NetworkError,
-    peer_manager::{Peer, PeerManagerConfig},
+    peer_manager::{Peer, PeerManagerConfig, SharedSessionsConfig},
     selfcheck::SelfCheckConfig,
 };
 
@@ -361,6 +361,16 @@ impl From<&NetworkConfig> for SelfCheckConfig {
     fn from(config: &NetworkConfig) -> SelfCheckConfig {
         SelfCheckConfig {
             interval: config.selfcheck_interval,
+        }
+    }
+}
+
+// TODO: checkout max_frame_length
+impl From<&NetworkConfig> for SharedSessionsConfig {
+    fn from(config: &NetworkConfig) -> Self {
+        SharedSessionsConfig {
+            write_timeout:          config.write_timeout,
+            max_stream_window_size: config.max_frame_length,
         }
     }
 }
