@@ -1,4 +1,4 @@
-use super::{ArcSession, Inner};
+use super::{ArcSession, Inner, Peer};
 use crate::traits::SessionBook;
 
 use parking_lot::RwLock;
@@ -26,14 +26,14 @@ impl SharedSessions {
         }
     }
 
-    fn inner(&self) -> &RwLock<HashSet<ArcSession>> {
+    fn sessions(&self) -> &RwLock<HashSet<ArcSession>> {
         &self.inner.sessions
     }
 }
 
 impl SessionBook for SharedSessions {
     fn all_sendable(&self) -> Vec<SessionId> {
-        self.inner()
+        self.sessions()
             .read()
             .iter()
             .filter(|s| !s.is_blocked())
@@ -42,7 +42,7 @@ impl SessionBook for SharedSessions {
     }
 
     fn all_blocked(&self) -> Vec<SessionId> {
-        self.inner()
+        self.sessions()
             .read()
             .iter()
             .filter(|s| s.is_blocked())
@@ -51,7 +51,7 @@ impl SessionBook for SharedSessions {
     }
 
     fn refresh_blocked(&self) {
-        let all_sessions = { self.inner().read().clone() };
+        let all_sessions = { self.sessions().read().clone() };
 
         for session in all_sessions {
             let pending_data_size = session.ctx.pending_data_size();
@@ -65,10 +65,42 @@ impl SessionBook for SharedSessions {
     }
 
     fn by_chain(&self, addrs: Vec<Address>) -> (Vec<SessionId>, Vec<Address>) {
-        todo!()
+        let user_pid = self.inner.user_pid.read();
+        let pool = self.inner.pool.read();
+
+        let mut connected = Vec::new();
+        let mut unconnected = Vec::new();
+        for addr in addrs {
+            if let Some(Some(Some(sid))) = user_pid
+                .get(&addr)
+                .map(|pid| pool.get(&pid).map(|p| p.session().map(|ctx| ctx.id)))
+            {
+                connected.push(sid);
+            } else {
+                unconnected.push(addr);
+            }
+        }
+
+        (connected, unconnected)
     }
 
     fn multiaddrs(&self, addrs: Vec<Address>) -> (Vec<Multiaddr>, Vec<Address>) {
-        todo!()
+        let user_pid = self.inner.user_pid.read();
+        let pool = self.inner.pool.read();
+
+        let mut multiaddrs = Vec::new();
+        let mut unknown = Vec::new();
+        for addr in addrs {
+            if let Some(Some(peer_addrs)) = user_pid
+                .get(&addr)
+                .map(|pid| pool.get(&pid).map(Peer::owned_addrs))
+            {
+                multiaddrs.extend(peer_addrs);
+            } else {
+                unknown.push(addr);
+            }
+        }
+
+        (multiaddrs, unknown)
     }
 }
