@@ -133,6 +133,9 @@ pub enum PeerManagerEvent {
     #[display(fmt = "retry peer {:?} later, disconnect now, kind: {}", pid, kind)]
     RetryPeerLater { pid: PeerId, kind: RetryKind },
 
+    #[display(fmt = "connect peers {:?} now", pids)]
+    ConnectPeers { pids: Vec<PeerId> },
+
     // Address
     #[display(fmt = "discover addr {}", addr)]
     DiscoverAddr { addr: Multiaddr },

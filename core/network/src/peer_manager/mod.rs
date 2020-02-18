@@ -1079,6 +1079,21 @@ impl PeerManager {
                     }
                 }
             }
+            PeerManagerEvent::ConnectPeers { pids } => {
+                let mut multiaddrs = Vec::new();
+
+                {
+                    let pool = self.inner.pool.read();
+                    for pid in pids.iter() {
+                        self.inner.connect_peer(&pid);
+                        if let Some(peer) = pool.get(&pid) {
+                            multiaddrs.extend(peer.owned_addrs());
+                        }
+                    }
+                }
+
+                self.connect_peers(multiaddrs);
+            }
             PeerManagerEvent::DiscoverAddr { addr } => {
                 self.identify_addr(addr);
             }

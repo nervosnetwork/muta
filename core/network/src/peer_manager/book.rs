@@ -1,10 +1,10 @@
-use super::{ArcSession, Inner, Peer};
+use super::{ArcSession, Inner};
 use crate::traits::SessionBook;
 
 use log::debug;
 use parking_lot::RwLock;
 use protocol::types::Address;
-use tentacle::{multiaddr::Multiaddr, SessionId};
+use tentacle::{secio::PeerId, SessionId};
 
 use std::{collections::HashSet, sync::Arc};
 
@@ -86,23 +86,19 @@ impl SessionBook for SharedSessions {
         (connected, unconnected)
     }
 
-    fn multiaddrs(&self, addrs: Vec<Address>) -> (Vec<Multiaddr>, Vec<Address>) {
+    fn peers_by_chain(&self, addrs: Vec<Address>) -> (Vec<PeerId>, Vec<Address>) {
         let user_pid = self.inner.user_pid.read();
-        let pool = self.inner.pool.read();
 
-        let mut multiaddrs = Vec::new();
+        let mut peers = Vec::new();
         let mut unknown = Vec::new();
         for addr in addrs {
-            if let Some(Some(peer_addrs)) = user_pid
-                .get(&addr)
-                .map(|pid| pool.get(&pid).map(Peer::owned_addrs))
-            {
-                multiaddrs.extend(peer_addrs);
+            if let Some(pid) = user_pid.get(&addr) {
+                peers.push(pid.to_owned());
             } else {
                 unknown.push(addr);
             }
         }
 
-        (multiaddrs, unknown)
+        (peers, unknown)
     }
 }

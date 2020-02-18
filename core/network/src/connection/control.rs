@@ -6,19 +6,19 @@ use log::error;
 use protocol::{traits::Priority, types::Address, Bytes};
 use tentacle::{
     error::Error as TentacleError,
-    service::{ServiceControl, TargetProtocol, TargetSession},
+    service::{ServiceControl, TargetSession},
     SessionId,
 };
 
 use crate::{
     error::NetworkError,
-    event::ConnectionEvent,
+    event::PeerManagerEvent,
     traits::{MessageSender, NetworkProtocol, SessionBook},
 };
 
 pub struct ConnectionServiceControl<P: NetworkProtocol, B: SessionBook> {
     inner:    ServiceControl,
-    conn_srv: UnboundedSender<ConnectionEvent>,
+    mgr_srv:  UnboundedSender<PeerManagerEvent>,
     sessions: B,
 
     // Indicate which protocol this connection service control
@@ -28,12 +28,12 @@ pub struct ConnectionServiceControl<P: NetworkProtocol, B: SessionBook> {
 impl<P: NetworkProtocol, B: SessionBook> ConnectionServiceControl<P, B> {
     pub fn new(
         control: ServiceControl,
-        conn_srv: UnboundedSender<ConnectionEvent>,
+        mgr_srv: UnboundedSender<PeerManagerEvent>,
         book: B,
     ) -> Self {
         ConnectionServiceControl {
             inner: control,
-            conn_srv,
+            mgr_srv,
             sessions: book,
 
             pin_protocol: PhantomData,
@@ -86,7 +86,7 @@ impl<P: NetworkProtocol, B: SessionBook + Clone> Clone for ConnectionServiceCont
     fn clone(&self) -> Self {
         ConnectionServiceControl {
             inner:    self.inner.clone(),
-            conn_srv: self.conn_srv.clone(),
+            mgr_srv:  self.mgr_srv.clone(),
             sessions: self.sessions.clone(),
 
             pin_protocol: PhantomData,
@@ -152,13 +152,10 @@ where
             return send_ret;
         }
 
-        let (multiaddrs, unknown) = self.sessions.multiaddrs(unconnected.clone());
-        let connect_peers = ConnectionEvent::Connect {
-            addrs: multiaddrs,
-            proto: TargetProtocol::All,
-        };
-        if self.conn_srv.unbounded_send(connect_peers).is_err() {
-            error!("network: connection service exit");
+        let (pids, unknown) = self.sessions.peers_by_chain(unconnected.clone());
+        let connect_peers = PeerManagerEvent::ConnectPeers { pids };
+        if self.mgr_srv.unbounded_send(connect_peers).is_err() {
+            error!("network: peer manager service exit");
         }
 
         let unconnected = unconnected

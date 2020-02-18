@@ -67,7 +67,7 @@ pub trait SessionBook {
     fn all_blocked(&self) -> Vec<SessionId>;
     fn refresh_blocked(&self);
     fn by_chain(&self, addrs: Vec<Address>) -> (Vec<SessionId>, Vec<Address>);
-    fn multiaddrs(&self, addrs: Vec<Address>) -> (Vec<Multiaddr>, Vec<Address>);
+    fn peers_by_chain(&self, addrs: Vec<Address>) -> (Vec<PeerId>, Vec<Address>);
 }
 
 #[derive(Debug, Clone)]
