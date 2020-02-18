@@ -1,6 +1,7 @@
 use super::{ArcSession, Inner, Peer};
 use crate::traits::SessionBook;
 
+use log::debug;
 use parking_lot::RwLock;
 use protocol::types::Address;
 use tentacle::{multiaddr::Multiaddr, SessionId};
@@ -59,6 +60,7 @@ impl SessionBook for SharedSessions {
             let estimated_time = (pending_data_size / self.config.max_stream_window_size) as u64;
 
             if estimated_time < self.config.write_timeout {
+                debug!("unblock session {}", session.id);
                 session.unblock()
             }
         }
