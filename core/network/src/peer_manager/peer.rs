@@ -162,8 +162,32 @@ impl Peer {
         self.session_id.load(Ordering::SeqCst).into()
     }
 
+    pub fn next_attempt(&self) -> u64 {
+        self.next_attempt.load(Ordering::SeqCst)
+    }
+
+    pub fn connected_at(&self) -> u64 {
+        self.connected_at.load(Ordering::SeqCst)
+    }
+
+    pub(super) fn set_connected_at(&self, at: u64) {
+        self.connected_at.store(at, Ordering::SeqCst);
+    }
+
+    pub fn disconnected_at(&self) -> u64 {
+        self.disconnected_at.load(Ordering::SeqCst)
+    }
+
+    pub(super) fn set_disconnected_at(&self, at: u64) {
+        self.disconnected_at.store(at, Ordering::SeqCst);
+    }
+
     pub fn alive(&self) -> u64 {
         self.alive.load(Ordering::SeqCst)
+    }
+
+    pub(super) fn set_alive(&self, live: u64) {
+        self.alive.store(live, Ordering::SeqCst);
     }
 
     pub fn retry_ready(&self) -> bool {
@@ -187,6 +211,10 @@ impl Peer {
 
         let next_attempt = Self::now().saturating_add(secs);
         self.next_attempt.store(next_attempt, Ordering::SeqCst);
+    }
+
+    pub(super) fn set_next_attempt(&self, at: u64) {
+        self.next_attempt.store(at, Ordering::SeqCst);
     }
 
     pub fn increase_retry(&self) {

@@ -2,9 +2,9 @@ mod book;
 mod disc;
 mod ident;
 mod peer;
-// mod persist;
+mod save_restore;
 
-// use persist::{NoopPersistence, PeerPersistence, Persistence};
+use save_restore::{NoPeerDatFile, PeerDatFile, SaveRestore};
 
 pub use book::{SharedSessions, SharedSessionsConfig};
 pub use disc::DiscoveryAddrManager;
@@ -282,6 +282,13 @@ impl Inner {
         self.chain.write().insert(ArcPeerByChain(peer));
     }
 
+    pub(self) fn restore(&self, peers: Vec<ArcPeer>) {
+        let chain_peers: Vec<_> = peers.clone().into_iter().map(ArcPeerByChain).collect();
+
+        self.peers.write().extend(peers);
+        self.chain.write().extend(chain_peers);
+    }
+
     pub fn peer(&self, peer_id: &PeerId) -> Option<ArcPeer> {
         self.peers.read().get(peer_id).cloned()
     }
@@ -324,6 +331,10 @@ impl Inner {
 
         Ok(self.add_peer(peer))
     }
+
+    pub fn package_peers(&self) -> Vec<ArcPeer> {
+        self.peers.read().iter().cloned().collect()
+    }
 }
 
 // TODO: Store our secret key?
@@ -344,8 +355,8 @@ pub struct PeerManagerConfig {
     /// Routine job interval
     pub routine_interval: Duration,
 
-    /// Peer persistence path
-    pub persistence_path: PathBuf,
+    /// Peer dat file path
+    pub peer_dat_file: PathBuf,
 }
 
 #[derive(Clone)]
@@ -420,8 +431,9 @@ pub struct PeerManager {
     // heart beat, for current connections check, etc
     heart_beat: Option<HeartBeat>,
     hb_waker:   Arc<AtomicWaker>,
-    /* persistence
-     * persistence: Box<dyn Persistence>, */
+
+    // save restore
+    peer_dat_file: Box<dyn SaveRestore>,
 }
 
 impl PeerManager {
@@ -436,7 +448,7 @@ impl PeerManager {
         let bootstraps = HashSet::from_iter(config.bootstraps.clone());
         let waker = Arc::new(AtomicWaker::new());
         let heart_beat = HeartBeat::new(Arc::clone(&waker), config.routine_interval);
-        // let persistence = Box::new(NoopPersistence);
+        let peer_dat_file = Box::new(NoPeerDatFile);
 
         // Register our self
         inner
@@ -457,7 +469,8 @@ impl PeerManager {
 
             heart_beat: Some(heart_beat),
             hb_waker: waker,
-            // persistence,
+
+            peer_dat_file,
         }
     }
 
@@ -471,11 +484,16 @@ impl PeerManager {
         SharedSessions::new(Arc::clone(&self.inner), config)
     }
 
-    // pub fn enable_persistence(&mut self) {
-    //     let persistence = PeerPersistence::new(&self.config.persistence_path);
-    //
-    //     self.persistence = Box::new(persistence);
-    // }
+    pub fn enable_save_restore(&mut self) {
+        let peer_dat_file = PeerDatFile::new(&self.config.peer_dat_file);
+
+        self.peer_dat_file = Box::new(peer_dat_file);
+    }
+
+    pub fn restore_peers(&self) -> Result<(), NetworkError> {
+        let peers = self.peer_dat_file.restore()?;
+        Ok(self.inner.restore(peers))
+    }
 
     pub fn set_listen(&self, addr: Multiaddr) {
         self.inner.set_listen(addr)
@@ -884,6 +902,17 @@ impl PeerManager {
                     peer.remove_multiaddr(&addr);
                 }
             }
+        }
+    }
+}
+
+// Save peers during shutdown
+impl Drop for PeerManager {
+    fn drop(&mut self) {
+        let peers = self.inner.package_peers();
+
+        if let Err(err) = self.peer_dat_file.save(peers) {
+            error!("network: peer dat file: {}", err);
         }
     }
 }

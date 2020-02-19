@@ -146,13 +146,13 @@ impl NetworkService {
         let peer_mgr_handle = peer_mgr.handle();
         let session_book = peer_mgr.share_session_book((&config).into());
 
-        // if config.enable_persistence {
-        //     peer_mgr.enable_persistence();
-        // }
-        //
-        // if let Err(err) = peer_mgr.load_peers() {
-        //     error!("network: peer manager: load peers failure: {}", err);
-        // }
+        if config.enable_save_restore {
+            peer_mgr.enable_save_restore();
+        }
+
+        if let Err(err) = peer_mgr.restore_peers() {
+            error!("network: peer manager: load peers failure: {}", err);
+        }
 
         if !config.bootstraps.is_empty() {
             peer_mgr.bootstrap();

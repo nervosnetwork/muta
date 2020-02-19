@@ -38,7 +38,7 @@ pub const DEFAULT_WRITE_TIMEOUT: u64 = 10; // seconds
 // Default peer data persistent path
 pub const DEFAULT_PEER_FILE_NAME: &str = "peers";
 pub const DEFAULT_PEER_FILE_EXT: &str = "dat";
-pub const DEFAULT_PEER_PERSISTENCE_PATH: &str = "./peers.dat";
+pub const DEFAULT_PEER_DAT_FILE: &str = "./peers.dat";
 
 pub const DEFAULT_PING_INTERVAL: u64 = 15;
 pub const DEFAULT_PING_TIMEOUT: u64 = 30;
@@ -104,9 +104,9 @@ pub struct NetworkConfig {
     pub write_timeout:    u64,
 
     // peer manager
-    pub bootstraps:         Vec<ArcPeer>,
-    pub enable_persistence: bool,
-    pub persistence_path:   PathBuf,
+    pub bootstraps:          Vec<ArcPeer>,
+    pub enable_save_restore: bool,
+    pub peer_dat_file:       PathBuf,
 
     // identity and encryption
     pub secio_keypair: SecioKeyPair,
@@ -144,9 +144,9 @@ impl NetworkConfig {
             max_wait_streams: DEFAULT_MAX_WAIT_STREAMS,
             write_timeout:    DEFAULT_WRITE_TIMEOUT,
 
-            bootstraps:         Default::default(),
-            enable_persistence: false,
-            persistence_path:   PathBuf::from(DEFAULT_PEER_PERSISTENCE_PATH.to_owned()),
+            bootstraps:          Default::default(),
+            enable_save_restore: false,
+            peer_dat_file:       PathBuf::from(DEFAULT_PEER_DAT_FILE.to_owned()),
 
             secio_keypair: SecioKeyPair::secp256k1_generated(),
 
@@ -234,12 +234,12 @@ impl NetworkConfig {
         Ok(self)
     }
 
-    pub fn persistence_path<P: AsRef<Path>>(mut self, path: P) -> Self {
+    pub fn peer_dat_file<P: AsRef<Path>>(mut self, path: P) -> Self {
         let mut path = path.as_ref().to_owned();
         path.push(DEFAULT_PEER_FILE_NAME);
         path.set_extension(DEFAULT_PEER_FILE_EXT);
 
-        self.persistence_path = path;
+        self.peer_dat_file = path;
 
         self
     }
@@ -340,7 +340,7 @@ impl From<&NetworkConfig> for PeerManagerConfig {
             bootstraps:       config.bootstraps.clone(),
             max_connections:  config.max_connections,
             routine_interval: config.peer_manager_heart_beat_interval,
-            persistence_path: config.persistence_path.clone(),
+            peer_dat_file:    config.peer_dat_file.clone(),
         }
     }
 }
