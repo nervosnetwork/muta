@@ -52,6 +52,14 @@ use crate::{
     traits::{MultiaddrExt, PeerQuerier},
 };
 
+macro_rules! peer_id_from_multiaddr {
+    ($multiaddr:expr) => {
+        $multiaddr
+            .peer_id_bytes()
+            .map(|bs| PeerId::from_bytes(bs.to_vec()))
+    };
+}
+
 const MAX_RETRY_COUNT: u8 = 30;
 const ALIVE_RETRY_INTERVAL: u64 = 3; // seconds
 
@@ -99,6 +107,12 @@ impl Into<Multiaddr> for UnknownAddr {
 impl Into<UnknownAddr> for Multiaddr {
     fn into(self) -> UnknownAddr {
         UnknownAddr::new(self)
+    }
+}
+
+impl Borrow<Multiaddr> for UnknownAddr {
+    fn borrow(&self) -> &Multiaddr {
+        &self.addr
     }
 }
 
@@ -530,7 +544,7 @@ impl PeerManager {
     }
 
     fn new_session(&mut self, pubkey: PublicKey, ctx: Arc<SessionContext>) {
-        self.unknown_addrs.remove(&ctx.address.clone().into());
+        self.unknown_addrs.remove(&ctx.address);
 
         let remote_peer_id = pubkey.peer_id();
         let peer = match self.inner.peer(&remote_peer_id) {
@@ -570,8 +584,8 @@ impl PeerManager {
                     multiaddr.push_id(remote_peer_id);
                 }
 
-                peer.add_multiaddrs(vec![multiaddr.clone()]);
-                self.unknown_addrs.remove(&multiaddr.into());
+                self.unknown_addrs.remove(&multiaddr);
+                peer.add_multiaddrs(vec![multiaddr]);
             }
         }
     }
@@ -664,7 +678,7 @@ impl PeerManager {
             }
         }
 
-        session.peer.mark_disconnected();
+        peer.mark_disconnected();
         peer.increase_retry();
     }
 
@@ -706,10 +720,7 @@ impl PeerManager {
     }
 
     fn discover_multiaddr(&mut self, addr: Multiaddr) {
-        let peer_id = match addr
-            .peer_id_bytes()
-            .map(|bs| PeerId::from_bytes(bs.to_vec()))
-        {
+        let peer_id = match peer_id_from_multiaddr!(addr) {
             Some(Ok(p)) => p,
             _ => return, // Ignore multiaddr without peer id included
         };
@@ -757,7 +768,7 @@ impl PeerManager {
             self.peer_id, sid, ty, addr
         );
 
-        self.unknown_addrs.remove(&addr.clone().into());
+        self.unknown_addrs.remove(&addr);
 
         // TODO: For ConnectionType::Listen, records repeated count,
         // reduce that peer's score, eventually ban it for a while.
@@ -770,18 +781,15 @@ impl PeerManager {
                 addr.push_id(session.peer.id.as_ref().to_owned());
             }
 
-            session.peer.add_multiaddrs(vec![addr.clone()]);
-            self.unknown_addrs.remove(&addr.into());
+            self.unknown_addrs.remove(&addr);
+            session.peer.add_multiaddrs(vec![addr]);
         }
     }
 
     fn unconnectable_multiaddr(&mut self, addr: Multiaddr) {
-        self.unknown_addrs.remove(&addr.clone().into());
+        self.unknown_addrs.remove(&addr);
 
-        let peer_id = match addr
-            .peer_id_bytes()
-            .map(|bs| PeerId::from_bytes(bs.to_vec()))
-        {
+        let peer_id = match peer_id_from_multiaddr!(addr) {
             Some(Ok(p)) => p,
             _ => return,
         };
@@ -796,7 +804,7 @@ impl PeerManager {
     }
 
     fn reconnect_addr_later(&mut self, addr: Multiaddr) {
-        if let Some(mut unknown) = self.unknown_addrs.take(&addr.clone().into()) {
+        if let Some(mut unknown) = self.unknown_addrs.take(&addr) {
             unknown.set_connecting(false);
             unknown.increase_retry_count();
 
@@ -807,10 +815,7 @@ impl PeerManager {
             return;
         }
 
-        let peer_id = match addr
-            .peer_id_bytes()
-            .map(|bs| PeerId::from_bytes(bs.to_vec()))
-        {
+        let peer_id = match peer_id_from_multiaddr!(addr) {
             Some(Ok(p)) => p,
             _ => return,
         };
