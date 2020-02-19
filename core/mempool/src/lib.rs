@@ -75,14 +75,13 @@ where
             .filter(|tx_hash| !self.callback_cache.contains_key(tx_hash))
             .collect()
     }
-}
 
-#[async_trait]
-impl<Adapter> MemPool for HashMemPool<Adapter>
-where
-    Adapter: MemPoolAdapter,
-{
-    async fn insert(&self, ctx: Context, tx: SignedTransaction) -> ProtocolResult<()> {
+    async fn insert_tx(
+        &self,
+        ctx: Context,
+        tx: SignedTransaction,
+        tx_type: TxType,
+    ) -> ProtocolResult<()> {
         let tx_hash = &tx.tx_hash;
 
         self.tx_cache.check_reach_limit(self.pool_size)?;
@@ -96,13 +95,26 @@ where
         self.adapter
             .check_storage_exist(ctx.clone(), tx_hash.clone())
             .await?;
-        self.tx_cache.insert_new_tx(tx.clone())?;
+        match tx_type {
+            TxType::NewTx => self.tx_cache.insert_new_tx(tx.clone())?,
+            TxType::ProposeTx => self.tx_cache.insert_propose_tx(tx.clone())?,
+        }
 
         if !ctx.is_network_origin_txs() {
             self.adapter.broadcast_tx(ctx, tx).await?;
         }
 
         Ok(())
+    }
+}
+
+#[async_trait]
+impl<Adapter> MemPool for HashMemPool<Adapter>
+where
+    Adapter: MemPoolAdapter,
+{
+    async fn insert(&self, ctx: Context, tx: SignedTransaction) -> ProtocolResult<()> {
+        self.insert_tx(ctx, tx, TxType::NewTx).await
     }
 
     async fn package(&self, ctx: Context, cycle_limit: u64) -> ProtocolResult<MixedTxHashes> {
@@ -198,7 +210,7 @@ where
             for tx in txs.into_iter() {
                 // Should not handle error here, it is normal that transactions
                 // response here are exist in pool.
-                let _ = self.insert(ctx.clone(), tx).await;
+                let _ = self.insert_tx(ctx.clone(), tx, TxType::ProposeTx).await;
             }
         }
         Ok(())
@@ -208,6 +220,11 @@ where
         self.adapter.set_timeout_gap(timeout_gap);
         self.timeout_gap.store(timeout_gap, Ordering::Relaxed);
     }
+}
+
+pub enum TxType {
+    NewTx,
+    ProposeTx,
 }
 
 #[derive(Debug, Display)]
