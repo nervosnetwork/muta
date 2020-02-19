@@ -556,11 +556,7 @@ impl PeerManager {
 
         let session = ArcSession::new(peer.clone(), Arc::clone(&ctx));
         self.inner.sessions.write().insert(session);
-
-        peer.set_connectedness(Connectedness::Connected);
-        peer.set_session_id(ctx.id);
-        peer.reset_retry();
-        peer.update_connected();
+        peer.mark_connected(ctx.id);
 
         // Update peer multiaddr
         match ctx.ty {
@@ -587,10 +583,7 @@ impl PeerManager {
         };
 
         self.inner.dec_conn_count();
-        session.peer.set_connectedness(Connectedness::CanConnect);
-        session.peer.set_session_id(0.into());
-        session.peer.update_disconnected();
-        session.peer.update_alive();
+        session.peer.mark_disconnected();
 
         if session.peer.alive() < ALIVE_RETRY_INTERVAL {
             debug!(
@@ -626,11 +619,7 @@ impl PeerManager {
         self.inner.dec_conn_count();
         if self.bootstraps.contains(&*session.peer.id) {
             // Increase bootstrap retry instead of removing it
-            session.peer.set_connectedness(Connectedness::CanConnect);
-            session.peer.set_session_id(0.into());
-            session.peer.update_disconnected();
-            session.peer.update_alive();
-
+            session.peer.mark_disconnected();
             session.peer.reset_retry();
             session.peer.set_retry(MAX_RETRY_COUNT);
         } else {
@@ -675,10 +664,7 @@ impl PeerManager {
             }
         }
 
-        peer.set_connectedness(Connectedness::CanConnect);
-        peer.set_session_id(0.into());
-        peer.update_disconnected();
-        peer.update_alive();
+        session.peer.mark_disconnected();
         peer.increase_retry();
     }
 

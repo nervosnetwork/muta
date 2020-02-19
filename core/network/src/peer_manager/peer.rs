@@ -162,22 +162,6 @@ impl Peer {
         self.session_id.load(Ordering::SeqCst).into()
     }
 
-    pub fn update_connected(&self) {
-        self.connected_at.store(Self::now(), Ordering::SeqCst);
-    }
-
-    pub fn update_disconnected(&self) {
-        self.disconnected_at.store(Self::now(), Ordering::SeqCst);
-    }
-
-    pub fn update_alive(&self) {
-        let connected_at =
-            UNIX_EPOCH + Duration::from_secs(self.connected_at.load(Ordering::SeqCst));
-        let alive = duration_since(SystemTime::now(), connected_at).as_secs();
-
-        self.alive.store(alive, Ordering::SeqCst);
-    }
-
     pub fn alive(&self) -> u64 {
         self.alive.load(Ordering::SeqCst)
     }
@@ -229,6 +213,36 @@ impl Peer {
             pubkey: pubkey_bytes,
             cause:  Box::new(e),
         })
+    }
+
+    pub fn mark_connected(&self, sid: SessionId) {
+        self.set_connectedness(Connectedness::Connected);
+        self.set_session_id(sid);
+        self.reset_retry();
+        self.update_connected();
+    }
+
+    pub fn mark_disconnected(&self) {
+        self.set_connectedness(Connectedness::CanConnect);
+        self.set_session_id(0.into());
+        self.update_disconnected();
+        self.update_alive();
+    }
+
+    fn update_connected(&self) {
+        self.connected_at.store(Self::now(), Ordering::SeqCst);
+    }
+
+    fn update_alive(&self) {
+        let connected_at =
+            UNIX_EPOCH + Duration::from_secs(self.connected_at.load(Ordering::SeqCst));
+        let alive = duration_since(SystemTime::now(), connected_at).as_secs();
+
+        self.alive.store(alive, Ordering::SeqCst);
+    }
+
+    fn update_disconnected(&self) {
+        self.disconnected_at.store(Self::now(), Ordering::SeqCst);
     }
 
     fn now() -> u64 {
