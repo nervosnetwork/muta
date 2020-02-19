@@ -3,7 +3,7 @@ use std::{error::Error, num::ParseIntError};
 use derive_more::Display;
 use tentacle::{ProtocolId, SessionId};
 
-use protocol::{types::Address, ProtocolError, ProtocolErrorKind};
+use protocol::{types::Address, Bytes, ProtocolError, ProtocolErrorKind};
 
 use crate::common::ConnectedAddr;
 
@@ -53,6 +53,16 @@ pub enum ErrorKind {
 
     #[display(fmt = "kind: not reactor register for {}", _0)]
     NoReactor(String),
+
+    #[display(
+        fmt = "kind: cannot create chain address from bytes {:?} {}",
+        pubkey,
+        cause
+    )]
+    NoChainAddress {
+        pubkey: Bytes,
+        cause:  Box<dyn Error + Send>,
+    },
 }
 
 impl Error for ErrorKind {}

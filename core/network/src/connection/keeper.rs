@@ -12,7 +12,7 @@ use tentacle::{
 
 use crate::{
     error::{ErrorKind, NetworkError},
-    event::{ConnectionType, PeerManagerEvent, PeerSession, RemoveKind, RetryKind},
+    event::{ConnectionType, PeerManagerEvent, RemoveKind, RetryKind},
 };
 
 // This macro tries to extract PublicKey from SessionContext, it's Optional.
@@ -96,7 +96,7 @@ impl ConnectionServiceKeeper {
             }
             TentacleError::IoError(ref err) if err.kind() != io::ErrorKind::Other => {
                 let kind = RetryKind::Io(err.kind());
-                let retry_connect_later = PeerManagerEvent::ReconnectLater { addr, kind };
+                let retry_connect_later = PeerManagerEvent::ReconnectAddrLater { addr, kind };
 
                 self.report_peer(retry_connect_later);
             }
@@ -115,7 +115,7 @@ impl ConnectionServiceKeeper {
 
 #[rustfmt::skip]
 impl ServiceHandle for ConnectionServiceKeeper {
-    fn handle_error(&mut self, _ctx: &mut ServiceContext, err: ServiceError) {
+    fn handle_error(&mut self, ctx: &mut ServiceContext, err: ServiceError) {
         match err {
             ServiceError::DialerError { error, address } => {
                 self.process_connect_error(ConnectionType::Dialer, error, address)
@@ -124,20 +124,18 @@ impl ServiceHandle for ConnectionServiceKeeper {
                 self.process_connect_error(ConnectionType::Listen, error, address)
             }
             ServiceError::ProtocolSelectError { session_context, proto_name } => {
-                let pid = peer_pubkey!(&session_context).peer_id();
-
-                let report = if let Some(proto_name) = proto_name {
-                    let kind = RemoveKind::UnknownProtocol(proto_name);
-
-                    PeerManagerEvent::RemovePeer { pid, kind }
+                let kind = if let Some(proto_name) = proto_name {
+                    RemoveKind::UnknownProtocol(proto_name)
                 } else {
-                    // maybe unstable connection
-                    let kind = RetryKind::ProtocolSelect;
-
-                    PeerManagerEvent::RetryPeerLater { pid, kind }
+                    RemoveKind::ProtocolSelect
                 };
 
-                self.report_peer(report);
+                let protocol_select_failure = PeerManagerEvent::RemovePeerBySession {
+                    sid: session_context.id,
+                    kind,
+                };
+
+                self.report_peer(protocol_select_failure);
             }
 
             ServiceError::ProtocolError { id, error, proto_id } => {
@@ -179,39 +177,36 @@ impl ServiceHandle for ConnectionServiceKeeper {
             // Partial protocol task logic take long time to process, usually
             // indicate bad protocol implement.
             ServiceError::SessionBlocked { session_context } => {
-                let sid = session_context.id;
-
                 let session_blocked = PeerManagerEvent::SessionBlocked {
-                    sid, ctx: session_context
+                    ctx: session_context
                 };
                 self.report_peer(session_blocked);
             }
         }
     }
 
-    fn handle_event(&mut self, _ctx: &mut ServiceContext, evt: ServiceEvent) {
+    fn handle_event(&mut self, ctx: &mut ServiceContext, evt: ServiceEvent) {
         match evt {
             ServiceEvent::SessionOpen { session_context } => {
+                if session_context.remote_pubkey.is_none() {
+                    error!("impossible, got connection from/to {:?} without public key, disconnect it", session_context.address);
+
+                    ctx.disconnect(session_context.id);
+                }
+
                 let pubkey = peer_pubkey!(&session_context).clone();
-                let session = PeerSession {
-                    sid: session_context.id,
-                    addr: session_context.address.clone(),
-                    ty: session_context.ty,
-                    ctx: session_context,
-                };
+                let pid = pubkey.peer_id();
+                let new_peer_session = PeerManagerEvent::NewSession { pid, pubkey, ctx: session_context };
 
-                let attach_peer_session = PeerManagerEvent::AttachPeerSession { pubkey, session };
-
-                self.report_peer(attach_peer_session);
+                self.report_peer(new_peer_session);
             }
             ServiceEvent::SessionClose { session_context } => {
                 let pid = peer_pubkey!(&session_context).peer_id();
                 let sid = session_context.id;
-                let ty = session_context.ty;
 
-                let detach_peer_session = PeerManagerEvent::DetachPeerSession { pid, sid, ty };
+                let peer_session_closed = PeerManagerEvent::SessionClosed { pid, sid };
 
-                self.report_peer(detach_peer_session);
+                self.report_peer(peer_session_closed);
             }
             ServiceEvent::ListenStarted { address } => {
                 let start_listen = PeerManagerEvent::AddListenAddr { addr: address };

@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use async_trait::async_trait;
 use protocol::{
     traits::{Context, Priority},
@@ -68,6 +70,12 @@ pub trait SessionBook {
     fn refresh_blocked(&self);
     fn by_chain(&self, addrs: Vec<Address>) -> (Vec<SessionId>, Vec<Address>);
     fn peers_by_chain(&self, addrs: Vec<Address>) -> (Vec<PeerId>, Vec<Address>);
+}
+
+pub trait MultiaddrExt {
+    fn peer_id_bytes(&self) -> Option<Cow<'_, [u8]>>;
+    fn has_peer_id(&self) -> bool;
+    fn push_id(&mut self, peer_id: PeerId);
 }
 
 #[derive(Debug, Clone)]

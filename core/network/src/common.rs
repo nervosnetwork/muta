@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     future::Future,
     net::SocketAddr,
     ops::Add,
@@ -12,7 +13,12 @@ use derive_more::Display;
 use futures::{pin_mut, task::AtomicWaker};
 use futures_timer::Delay;
 use serde_derive::{Deserialize, Serialize};
-use tentacle::multiaddr::{Multiaddr, Protocol};
+use tentacle::{
+    multiaddr::{Multiaddr, Protocol},
+    secio::PeerId,
+};
+
+use crate::traits::MultiaddrExt;
 
 #[macro_export]
 macro_rules! loop_ready {
@@ -42,6 +48,30 @@ pub fn socket_to_multi_addr(socket_addr: SocketAddr) -> Multiaddr {
     multi_addr.push(Protocol::TCP(socket_addr.port()));
 
     multi_addr
+}
+
+impl MultiaddrExt for Multiaddr {
+    fn peer_id_bytes(&self) -> Option<Cow<'_, [u8]>> {
+        for proto in self.iter() {
+            match proto {
+                Protocol::P2P(bytes) => return Some(bytes),
+                _ => (),
+            }
+        }
+
+        None
+    }
+
+    fn has_peer_id(&self) -> bool {
+        self.iter().any(|proto| match proto {
+            Protocol::P2P(_) => true,
+            _ => false,
+        })
+    }
+
+    fn push_id(&mut self, peer_id: PeerId) {
+        self.push(Protocol::P2P(Cow::Owned(peer_id.as_bytes().to_vec())))
+    }
 }
 
 pub struct HeartBeat {

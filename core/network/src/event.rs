@@ -30,9 +30,6 @@ pub enum RetryKind {
     #[display(fmt = "peer {:?}", _0)]
     Io(std::io::ErrorKind),
 
-    #[display(fmt = "peer protocol select failure, unstable connection")]
-    ProtocolSelect,
-
     #[display(fmt = "peer multiplex stream error: {}", _0)]
     Multiplex(Box<dyn Error + Send>),
 
@@ -55,6 +52,9 @@ pub enum RemoveKind {
 
     #[display(fmt = "unknown protocol {}", _0)]
     UnknownProtocol(String),
+
+    #[display(fmt = "protocol select")]
+    ProtocolSelect,
 
     #[display(fmt = "broken protocol {}: {}", proto_id, err)]
     BrokenProtocol {
@@ -83,44 +83,36 @@ pub enum ConnectionType {
 }
 
 #[derive(Debug, Display)]
-#[display(fmt = "session {:?} addr {:?} ty {:?}", sid, addr, ty)]
-pub struct PeerSession {
-    pub sid:  SessionId,
-    pub addr: Multiaddr,
-    pub ty:   SessionType,
-    pub ctx:  Arc<SessionContext>,
-}
-
-#[derive(Debug, Display)]
 pub enum PeerManagerEvent {
     // Peer
-    #[display(fmt = "attach peer session {}", session)]
-    AttachPeerSession {
-        pubkey:  PublicKey,
-        session: PeerSession,
+    #[display(
+        fmt = "new session {} peer {:?} addr {} ty {:?}",
+        "ctx.id",
+        pid,
+        "ctx.address",
+        "ctx.ty"
+    )]
+    NewSession {
+        pid:    PeerId,
+        pubkey: PublicKey,
+        ctx:    Arc<SessionContext>,
     },
 
-    #[display(fmt = "detach peer {:?} session {:?} ty {:?}", pid, sid, ty)]
-    DetachPeerSession {
-        pid: PeerId,
-        sid: SessionId,
-        ty:  SessionType,
-    },
+    #[display(fmt = "peer {:?} session {} closed", pid, sid)]
+    SessionClosed { pid: PeerId, sid: SessionId },
 
     #[display(fmt = "peer {:?} alive", pid)]
     PeerAlive { pid: PeerId },
 
-    #[display(fmt = "remove peer {:?} kind: {}", pid, kind)]
-    RemovePeer { pid: PeerId, kind: RemoveKind },
+    #[display(
+        fmt = "session {} blocked, pending data size {}",
+        "ctx.id",
+        "ctx.pending_data_size()"
+    )]
+    SessionBlocked { ctx: Arc<SessionContext> },
 
     #[display(fmt = "remove peer by session {} kind: {}", sid, kind)]
     RemovePeerBySession { sid: SessionId, kind: RemoveKind },
-
-    #[display(fmt = "session {} blocked", sid)]
-    SessionBlocked {
-        sid: SessionId,
-        ctx: Arc<SessionContext>,
-    },
 
     #[display(fmt = "retry peer {:?} later, disconnect now, kind: {}", pid, kind)]
     RetryPeerLater { pid: PeerId, kind: RetryKind },
@@ -151,8 +143,8 @@ pub enum PeerManagerEvent {
     #[display(fmt = "unconnectable addr {}, kind: {}", addr, kind)]
     UnconnectableAddress { addr: Multiaddr, kind: RemoveKind },
 
-    #[display(fmt = "re-connect later, addr {}, kind: {}", addr, kind)]
-    ReconnectLater { addr: Multiaddr, kind: RetryKind },
+    #[display(fmt = "reconnect later, addr {}, kind: {}", addr, kind)]
+    ReconnectAddrLater { addr: Multiaddr, kind: RetryKind },
 
     // Self
     #[display(fmt = "add listen addr {}", addr)]

@@ -4,13 +4,12 @@ mod ident;
 mod peer;
 mod persist;
 
-use peer::PeerState;
 use persist::{NoopPersistence, PeerPersistence, Persistence};
 
 pub use book::{SharedSessions, SharedSessionsConfig};
 pub use disc::DiscoveryAddrManager;
 pub use ident::IdentifyCallback;
-pub use peer::Peer;
+pub use peer::{ArcPeer, Connectedness};
 
 use std::{
     borrow::Borrow,
@@ -18,10 +17,11 @@ use std::{
     collections::{HashMap, HashSet},
     future::Future,
     hash::{Hash, Hasher},
+    iter::FromIterator,
     ops::Deref,
     path::PathBuf,
     pin::Pin,
-    sync::atomic::{AtomicBool, Ordering},
+    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
     sync::Arc,
     task::{Context, Poll},
     time::Duration,
@@ -48,11 +48,11 @@ use tentacle::{
 use crate::{
     common::{ConnectedAddr, HeartBeat},
     error::NetworkError,
-    event::{ConnectionEvent, ConnectionType, PeerManagerEvent, PeerSession},
-    traits::PeerQuerier,
+    event::{ConnectionEvent, ConnectionType, PeerManagerEvent},
+    traits::{MultiaddrExt, PeerQuerier},
 };
 
-const MAX_RETRY_COUNT: usize = 30;
+const MAX_RETRY_COUNT: u8 = 30;
 const ALIVE_RETRY_INTERVAL: u64 = 3; // seconds
 
 #[derive(Debug, Clone)]
@@ -118,25 +118,32 @@ impl Eq for UnknownAddr {}
 
 #[derive(Debug)]
 struct Session {
-    id:      SessionId,
-    pid:     PeerId,
-    ctx:     Arc<SessionContext>,
-    blocked: AtomicBool,
+    id:             SessionId,
+    ctx:            Arc<SessionContext>,
+    peer:           ArcPeer,
+    blocked:        AtomicBool,
+    connected_addr: ConnectedAddr,
 }
 
 #[derive(Debug, Clone)]
 struct ArcSession(Arc<Session>);
 
 impl ArcSession {
-    pub fn new(pid: PeerId, ctx: Arc<SessionContext>) -> Self {
+    pub fn new(peer: ArcPeer, ctx: Arc<SessionContext>) -> Self {
+        let connected_addr = ConnectedAddr::from(&ctx.address);
         let session = Session {
             id: ctx.id,
-            pid,
             ctx,
+            peer,
             blocked: AtomicBool::new(false),
+            connected_addr,
         };
 
         ArcSession(Arc::new(session))
+    }
+
+    pub fn block(&self) {
+        self.blocked.store(true, Ordering::SeqCst);
     }
 
     pub fn is_blocked(&self) -> bool {
@@ -150,13 +157,13 @@ impl ArcSession {
 
 impl Borrow<SessionId> for ArcSession {
     fn borrow(&self) -> &SessionId {
-        &self.0.id
+        &self.id
     }
 }
 
 impl PartialEq for ArcSession {
     fn eq(&self, other: &ArcSession) -> bool {
-        self.0.id == other.0.id
+        self.id == other.id
     }
 }
 
@@ -164,7 +171,7 @@ impl Eq for ArcSession {}
 
 impl Hash for ArcSession {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.0.id.hash(state)
+        self.id.hash(state)
     }
 }
 
@@ -176,345 +183,138 @@ impl Deref for ArcSession {
     }
 }
 
-// TODO: refactor peer state
-// TODO: enforce peer id in multiaddr
-// The only purpose we separate Inner from PeerManager is because
-// discovery protocol needs directly access to PeerManager.
+#[derive(Debug, Clone)]
+struct ArcPeerByChain(ArcPeer);
+
+impl Borrow<Address> for ArcPeerByChain {
+    fn borrow(&self) -> &Address {
+        &self.chain_addr
+    }
+}
+
+impl PartialEq for ArcPeerByChain {
+    fn eq(&self, other: &ArcPeerByChain) -> bool {
+        self.chain_addr == other.chain_addr
+    }
+}
+
+impl Eq for ArcPeerByChain {}
+
+impl Hash for ArcPeerByChain {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.chain_addr.hash(state)
+    }
+}
+
+impl Deref for ArcPeerByChain {
+    type Target = ArcPeer;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 struct Inner {
-    connecting: RwLock<HashSet<PeerId>>,
-    connected:  RwLock<HashSet<PeerId>>,
+    connection_count: AtomicUsize,
 
     sessions: RwLock<HashSet<ArcSession>>,
+    peers:    RwLock<HashSet<ArcPeer>>,
+    chain:    RwLock<HashSet<ArcPeerByChain>>,
 
-    addr_pid: RwLock<HashMap<Multiaddr, PeerId>>,
-    user_pid: RwLock<HashMap<Address, PeerId>>,
-    pool:     RwLock<HashMap<PeerId, Peer>>,
-
-    // Self PeerId
-    peer_id: Arc<PeerId>,
-    listen:  RwLock<Option<Multiaddr>>,
+    id:     Arc<PeerId>,
+    listen: RwLock<Option<Multiaddr>>,
 }
 
 impl Inner {
-    pub fn new(pid: PeerId) -> Self {
+    pub fn new(id: PeerId) -> Self {
         Inner {
-            connecting: Default::default(),
-            connected:  Default::default(),
+            connection_count: AtomicUsize::new(0),
 
             sessions: Default::default(),
+            peers:    Default::default(),
+            chain:    Default::default(),
 
-            addr_pid: Default::default(),
-            user_pid: Default::default(),
-            pool:     Default::default(),
-
-            peer_id: Arc::new(pid),
-            listen:  RwLock::new(None),
+            id:     Arc::new(id),
+            listen: Default::default(),
         }
     }
 
-    pub fn connected_peers(&self) -> Vec<PeerId> {
-        self.connected
-            .read()
-            .iter()
-            .filter(|pid| pid != &self.peer_id.as_ref())
-            .cloned()
-            .collect()
-    }
-
-    pub fn connected_addr(&self, pid: &PeerId) -> Option<ConnectedAddr> {
-        if let Some(Some(addr)) = self.pool.read().get(pid).map(|peer| peer.connected_addr()) {
-            Some(addr)
-        } else {
-            None
+    pub fn set_listen(&self, mut multiaddr: Multiaddr) {
+        if !multiaddr.has_peer_id() {
+            multiaddr.push_id(self.id.as_ref().to_owned());
         }
-    }
 
-    pub fn pending_data_size(&self, pid: &PeerId) -> usize {
-        self.pool
-            .read()
-            .get(pid)
-            .map(|peer| peer.pending_data_size())
-            .unwrap_or_else(|| 0)
-    }
-
-    pub fn peer_exist(&self, pid: &PeerId) -> bool {
-        self.pool.read().contains_key(pid)
+        *self.listen.write() = Some(multiaddr);
     }
 
     pub fn listen(&self) -> Option<Multiaddr> {
         self.listen.read().clone()
     }
 
-    pub fn pid_user_addr(&self, pid: &PeerId) -> Option<Address> {
-        let pool = self.pool.read();
-
-        pool.get(pid).map(|peer| peer.user_addr().clone())
+    pub fn inc_conn_count(&self) {
+        self.connection_count.fetch_add(1, Ordering::SeqCst);
     }
 
-    pub fn peer_addrs(&self, pid: &PeerId) -> Option<Vec<Multiaddr>> {
-        self.pool.read().get(pid).map(Peer::owned_addrs)
+    pub fn dec_conn_count(&self) {
+        self.connection_count.fetch_sub(1, Ordering::SeqCst);
     }
 
-    pub fn set_listen(&self, addr: Multiaddr) {
-        *self.listen.write() = Some(addr);
+    pub fn conn_count(&self) -> usize {
+        self.connection_count.load(Ordering::SeqCst)
     }
 
-    pub fn add_peer(&self, peer: Peer) {
-        let mut pool = self.pool.write();
-        let mut addr_pid = self.addr_pid.write();
-        let mut user_pid = self.user_pid.write();
-
-        user_pid.insert(peer.user_addr().clone(), peer.id().clone());
-
-        for addr in peer.addrs().into_iter() {
-            addr_pid.insert(addr.clone(), peer.id().clone());
-        }
-
-        pool.insert(peer.id().clone(), peer);
+    pub fn add_peer(&self, peer: ArcPeer) {
+        self.peers.write().insert(peer.clone());
+        self.chain.write().insert(ArcPeerByChain(peer));
     }
 
-    pub fn add_peer_addr(&self, peer_id: &PeerId, addr: Multiaddr) {
-        let mut pool = self.pool.write();
-
-        if !pool.contains_key(&peer_id) {
-            debug_assert!(false, "peer {:?} not found", peer_id);
-
-            error!("network: peer {:?} not found", peer_id);
-            return;
-        }
-
-        self.addr_pid.write().insert(addr.clone(), peer_id.clone());
-
-        pool.entry(peer_id.to_owned())
-            .and_modify(|peer| peer.add_addr(addr));
+    pub fn peer(&self, peer_id: &PeerId) -> Option<ArcPeer> {
+        self.peers.read().get(peer_id).cloned()
     }
 
-    pub fn remove_peer_addr(&self, peer_id: &PeerId, addr: &Multiaddr) {
-        self.addr_pid.write().remove(addr);
-
-        if let Some(peer) = self.pool.write().get_mut(peer_id) {
-            peer.remove_addr(addr);
-        }
+    pub fn peer_by_chain(&self, addr: &Address) -> Option<ArcPeer> {
+        self.chain.read().get(addr).map(|p| &*p.to_owned()).cloned()
     }
 
-    // /ip4/[ip]/[tcp]/[port]
-    // /ip4/[ip]/[tcp]/[port]/[p2p]/[peerid]
-    pub fn match_pid(&self, addr: &Multiaddr) -> Option<PeerId> {
-        let addr_pid = self.addr_pid.read();
-
-        // exact match
-        if let Some(pid) = addr_pid.get(addr) {
-            return Some(pid.clone());
-        }
-
-        // Try root match
-        let comps = addr.iter().collect::<Vec<_>>();
-        debug_assert!(
-            comps.len() > 1,
-            "network: multiaddr should contains at least 2 components",
-        );
-
-        if comps.len() < 2 {
-            return None;
-        }
-
-        let mut root = Multiaddr::from(comps[0].clone());
-        root.push(comps[1].clone());
-
-        // Currently support P2P address match
-        if let Some(match_pid) = addr_pid.get(&root) {
-            return match comps.get(2) {
-                Some(Protocol::P2P(addr_pid)) if addr_pid == &match_pid.as_bytes() => {
-                    Some(match_pid.clone())
-                }
-                // Root exact match
-                None => Some(match_pid.clone()),
-                // Not match means this address is other peer's outdated address
-                Some(Protocol::P2P(_)) => None,
-                _ => {
-                    warn!("network: unsupported multiaddr {}", addr);
-
-                    None
-                }
-            };
-        }
-
-        None
-    }
-
-    pub fn try_remove_addr(&self, addr: &Multiaddr) {
-        let opt_pid = self.addr_pid.read().get(addr).cloned();
-
-        if let Some(pid) = opt_pid {
-            self.remove_peer_addr(&pid, addr);
-        }
-    }
-
-    pub fn remove_peer(&self, peer_id: &PeerId) {
-        self.connecting.write().remove(peer_id);
-        self.connected.write().remove(peer_id);
-
-        let mut addr_pid = self.addr_pid.write();
-        if let Some(peer) = self.pool.write().remove(peer_id) {
-            self.user_pid.write().remove(peer.user_addr());
-
-            for addr in peer.addrs().into_iter() {
-                addr_pid.remove(addr);
-            }
-        }
-    }
-
-    pub fn register_self(&self, peer_id: PeerId, pubkey: PublicKey) {
-        let user_addr = Peer::pubkey_to_addr(&pubkey);
-        let peer = Peer::new(peer_id.clone(), pubkey);
-
-        self.pool.write().insert(peer_id.clone(), peer);
-        self.user_pid.write().insert(user_addr, peer_id.clone());
-        self.connected.write().insert(peer_id);
-    }
-
-    pub fn peer_connected(&self, peer_id: &PeerId) -> bool {
-        self.connected.read().contains(peer_id)
-    }
-
-    pub fn connect_peer(&self, peer_id: &PeerId) {
-        if self.connected.read().contains(peer_id) {
-            warn!("network: peer {:?} already connected", peer_id);
-            return;
-        }
-
-        self.connecting.write().insert(peer_id.clone());
-    }
-
-    pub fn set_connected(
-        &self,
-        peer_id: &PeerId,
-        ctx: Arc<SessionContext>,
-        addr: Option<ConnectedAddr>,
-    ) {
-        // Clean outbound connection
-        self.connecting.write().remove(peer_id);
-        self.connected.write().insert(peer_id.clone());
-
-        let session = ArcSession::new(peer_id.to_owned(), Arc::clone(&ctx));
-        self.sessions.write().insert(session);
-
-        let mut pool = self.pool.write();
-        if let Some(peer) = pool.get_mut(peer_id) {
-            peer.update_connect();
-            peer.set_connected_addr(addr);
-            peer.set_session(Some(ctx));
-        }
-    }
-
-    pub fn set_blocked(&self, sid: SessionId) {
-        let opt_sess = { self.sessions.read().get(&sid).cloned() };
-        if let Some(sess) = opt_sess {
-            sess.blocked.store(true, Ordering::SeqCst);
-        }
-    }
-
-    pub fn disconnect_peer(&self, peer_id: &PeerId) {
-        self.connecting.write().remove(peer_id);
-        self.connected.write().remove(peer_id);
-
-        let mut pool = self.pool.write();
-        if let Some(peer) = pool.get_mut(peer_id) {
-            if let Some(session) = peer.session() {
-                self.sessions.write().remove(&session.id);
-            }
-
-            peer.update_disconnect();
-            peer.update_alive();
-            peer.set_connected_addr(None);
-            peer.set_session(None);
-        }
-    }
-
-    pub fn peer_alive(&self, peer_id: &PeerId) -> Option<u64> {
-        self.pool.read().get(peer_id).map(Peer::alive)
-    }
-
-    pub fn connection_count(&self) -> usize {
-        // -1 to remove ourself
-        self.connected.read().len() + self.connecting.read().len() - 1
-    }
-
-    pub fn unconnected_peers(&self, max: usize) -> Vec<PeerId> {
-        let connecting = self.connecting.read();
-        let connected = self.connected.read();
-        let pool = self.pool.read();
+    pub fn unconnected_peers(&self, max: usize) -> Vec<ArcPeer> {
         let mut rng = rand::thread_rng();
-
-        let qualified_peers = pool.values().filter(|peer| {
-            let pid = peer.id();
-
-            !connected.contains(pid) && !connecting.contains(pid) && peer.retry_ready()
-        });
+        let book = self.peers.read();
+        let qualified_peers = book
+            .iter()
+            .filter(|p| p.connectedness() == Connectedness::CanConnect && p.retry_ready());
 
         qualified_peers
             .choose_multiple(&mut rng, max)
-            .into_iter()
-            .map(Peer::id)
             .cloned()
             .collect()
     }
 
-    pub fn increase_retry_count(&self, peer_id: &PeerId) {
-        if let Some(peer) = self.pool.write().get_mut(peer_id) {
-            peer.increase_retry();
-
-            debug_assert!(MAX_RETRY_COUNT + 1 >= peer.retry_count())
-        }
-    }
-
-    pub fn reset_retry(&self, peer_id: &PeerId) {
-        if let Some(peer) = self.pool.write().get_mut(peer_id) {
-            peer.reset_retry();
-        }
-    }
-
-    pub fn reach_max_retry(&self, peer_id: &PeerId) -> bool {
-        if let Some(peer) = self.pool.read().get(peer_id) {
-            MAX_RETRY_COUNT <= peer.retry_count()
+    pub fn remove_peer(&self, peer_id: &PeerId) -> Option<ArcPeer> {
+        let opt_peer = { self.peers.write().take(peer_id) };
+        if let Some(peer) = opt_peer {
+            self.chain.write().take(&*peer.chain_addr).map(|cp| cp.0)
         } else {
-            true
+            None
         }
     }
 
-    pub fn package_peers(&self) -> Vec<(PublicKey, PeerState)> {
-        let pool = self.pool.read();
-        let mut peer_box = Vec::with_capacity(pool.len());
-
-        for peer in pool.values() {
-            let pubkey = peer.pubkey().clone();
-            let state = peer.state().clone();
-
-            peer_box.push((pubkey, state))
-        }
-
-        peer_box
+    pub fn session(&self, sid: &SessionId) -> Option<ArcSession> {
+        self.sessions.read().get(sid).cloned()
     }
 
-    pub fn insert_peers(&self, peers: Vec<(PublicKey, PeerState)>) {
-        let mut pool = self.pool.write();
-        let mut user_pid = self.user_pid.write();
-        let mut addr_pid = self.addr_pid.write();
+    pub fn share_sessions(&self) -> Vec<ArcSession> {
+        self.sessions.read().iter().collect()
+    }
 
-        for (pubkey, state) in peers.into_iter() {
-            let peer_id = pubkey.peer_id();
-            let user_addr = Peer::pubkey_to_addr(&pubkey);
+    pub fn remove_session(&self, sid: &SessionId) -> Option<ArcSession> {
+        self.sessions.write().take(sid)
+    }
 
-            user_pid.insert(user_addr, peer_id.clone());
+    pub fn register_self(&self, pubkey: PublicKey) -> Result<(), NetworkError> {
+        let peer = ArcPeer::from_pubkey(pubkey)?;
+        peer.set_connectedness(Connectedness::Connected);
 
-            for addr in state.addrs().into_iter() {
-                addr_pid.insert(addr.clone(), peer_id.clone());
-            }
-
-            pool.entry(peer_id.clone())
-                .or_insert_with(|| Peer::new(peer_id.clone(), pubkey))
-                .set_state(state);
-        }
+        Ok(self.add_peer(peer))
     }
 }
 
@@ -528,7 +328,7 @@ pub struct PeerManagerConfig {
     pub pubkey: PublicKey,
 
     /// Bootstrap peers
-    pub bootstraps: Vec<Peer>,
+    pub bootstraps: Vec<ArcPeer>,
 
     /// Max connections
     pub max_connections: usize,
@@ -548,10 +348,14 @@ pub struct PeerManagerHandle {
 impl PeerManagerHandle {
     pub fn random_addrs(&self, max: usize) -> Vec<Multiaddr> {
         let mut rng = rand::thread_rng();
-        let pool = self.inner.pool.read();
-        let peers = pool.values().choose_multiple(&mut rng, max);
+        let book = self.inner.peers.read();
+        let peers = book.iter().choose_multiple(&mut rng, max);
 
-        peers.into_iter().map(Peer::owned_addrs).flatten().collect()
+        peers
+            .into_iter()
+            .map(|p| p.multiaddrs())
+            .flatten()
+            .collect()
     }
 
     pub fn listen_addrs(&self) -> Vec<Multiaddr> {
@@ -562,30 +366,12 @@ impl PeerManagerHandle {
     }
 }
 
-impl PeerQuerier for PeerManagerHandle {
-    fn connected_addr(&self, pid: &PeerId) -> Option<ConnectedAddr> {
-        self.inner.connected_addr(pid)
-    }
-
-    fn connected_peers(&self) -> Vec<PeerId> {
-        self.inner.connected_peers()
-    }
-
-    fn pending_data_size(&self, pid: &PeerId) -> usize {
-        self.inner.pending_data_size(pid)
-    }
-}
-
 pub struct PeerManager {
     // core peer pool
-    inner:   Arc<Inner>,
-    config:  PeerManagerConfig,
-    peer_id: PeerId,
-
-    // query purpose
-    peer_session: HashMap<PeerId, SessionId>,
-    session_peer: HashMap<SessionId, PeerId>,
-    bootstraps:   HashSet<Multiaddr>,
+    inner:      Arc<Inner>,
+    config:     PeerManagerConfig,
+    peer_id:    PeerId,
+    bootstraps: HashSet<ArcPeer>,
 
     // unknown
     unknown_addrs: HashSet<UnknownAddr>,
@@ -615,16 +401,14 @@ impl PeerManager {
         let persistence = Box::new(NoopPersistence);
 
         // Register our self
-        inner.register_self(config.our_id.clone(), config.pubkey.clone());
+        inner.register_self(config.pubkey.clone());
 
         PeerManager {
             inner,
             config,
             peer_id,
 
-            peer_session: Default::default(),
-            session_peer: Default::default(),
-            bootstraps: Default::default(),
+            bootstraps: HashSet::from_iter(config.bootstraps),
 
             unknown_addrs: Default::default(),
 
@@ -654,13 +438,6 @@ impl PeerManager {
         self.persistence = Box::new(persistence);
     }
 
-    pub fn load_peers(&self) -> Result<(), NetworkError> {
-        let peer_box = self.persistence.load()?;
-        self.inner.insert_peers(peer_box);
-
-        Ok(())
-    }
-
     pub fn set_listen(&self, addr: Multiaddr) {
         self.inner.set_listen(addr)
     }
@@ -669,236 +446,24 @@ impl PeerManager {
         self.inner.listen()
     }
 
-    pub fn bootstrap(&mut self) {
-        let peers = &self.config.bootstraps;
-
-        // Insert bootstrap peers
-        for peer in peers.iter() {
-            info!("network: {:?}: bootstrap peer: {}", self.peer_id, peer);
-
-            self.inner.add_peer(peer.clone());
-            self.inner.connect_peer(peer.id());
-        }
-
-        // Collect bootstrap addrs
-        let addrs: Vec<Multiaddr> = peers.iter().map(Peer::owned_addrs).flatten().collect();
-
-        // Insert bootstrap addrs, so that we can check if an addr is bootstrap
-        for addr in addrs.iter() {
-            self.bootstraps.insert(addr.clone());
-        }
-
-        // Connect bootstrap addrs
-        self.connect_peers(addrs)
+    pub fn connected_addrs(&self) -> Vec<ConnectedAddr> {
+        let sessions = self.inner.share_sessions();
+        sessions.into_iter().map(|s| s.connected_addr).collect()
     }
 
-    // TODO: Store protocol in Peer or remove it? Right now, `proto`
-    // is ignored in ConnectionService.
-    fn connect_peers(&mut self, addrs: Vec<Multiaddr>) {
-        info!("network: {:?}: connect addrs {:?}", self.peer_id, addrs);
-
-        let connect = ConnectionEvent::Connect {
-            addrs,
-            proto: TargetProtocol::All,
-        };
-
-        if self.conn_tx.unbounded_send(connect).is_err() {
-            error!("network: connection service offline");
-        }
-    }
-
-    fn add_session_addr(&mut self, sid: SessionId, addr: Multiaddr) {
-        self.unknown_addrs.remove(&addr.clone().into());
-
-        if !self.session_peer.contains_key(&sid) {
-            debug_assert!(false, "session {} no peer id", sid);
-
-            error!("network: fatal!!! session {} no peer id", sid);
-            return;
-        }
-
-        if let Some(pid) = self.session_peer.get(&sid) {
-            debug!(
-                "network: {:?}: add session addr {} to peer {:?}",
-                self.peer_id, addr, pid
-            );
-
-            self.inner.add_peer_addr(&pid, addr);
-        }
-    }
-
-    fn attach_peer_session(&mut self, pubkey: PublicKey, session: PeerSession) {
-        let PeerSession { sid, addr, ty, ctx } = session;
-
-        if self.inner.connected.read().len() >= self.config.max_connections {
-            let disconnect_peer = ConnectionEvent::Disconnect(sid);
-            if self.conn_tx.unbounded_send(disconnect_peer).is_err() {
-                debug!("network: connection service exit");
-            }
-            return;
-        }
-
-        let connected_addr = ConnectedAddr::from(&addr);
-        let user_addr = Peer::pubkey_to_addr(&pubkey).as_hex();
-        let pid = pubkey.peer_id();
-
-        let peer_listen = match ty {
-            SessionType::Inbound => {
-                // Inbound address is useless, we cannot use it to
-                // connect to that peer.
-                debug!("network: {:?}: inbound addr {:?}", self.peer_id, addr);
-
-                None
-            }
-            SessionType::Outbound => Some(addr),
-        };
-
-        if !self.inner.peer_exist(&pid) {
-            info!(
-                "network: {:?}: new peer {:?}, user addr {}, session {:?}",
-                self.peer_id, pid, user_addr, sid
-            );
-
-            self.add_peer(pubkey, peer_listen);
-        } else if let Some(addr) = peer_listen {
-            self.inner.add_peer_addr(&pid, addr);
-        }
-
-        self.inner.set_connected(&pid, ctx, Some(connected_addr));
-
-        self.peer_session.insert(pid.clone(), sid);
-        self.session_peer.insert(sid, pid);
-    }
-
-    fn detach_peer_session(&mut self, pid: PeerId) {
-        let user_addr = self.inner.pid_user_addr(&pid);
-        info!("network: detach session user addr {:?}", user_addr);
-
-        self.close_peer_session(&pid);
-
-        if let Some(alive) = self.inner.peer_alive(&pid) {
-            if alive < ALIVE_RETRY_INTERVAL {
-                warn!(
-                    "network: {:?}: peer {:?} connection live too short",
-                    self.peer_id, pid
-                );
-
-                self.increase_peer_retry(&pid);
-            }
-        }
-    }
-
-    fn close_peer_session(&mut self, pid: &PeerId) {
-        self.inner.disconnect_peer(pid);
-
-        if let Some(sid) = self.peer_session.remove(pid) {
-            self.session_peer.remove(&sid);
-        }
-    }
-
-    fn detach_session_id(&mut self, sid: SessionId) {
-        if let Some(pid) = self.session_peer.remove(&sid) {
-            self.inner.disconnect_peer(&pid);
-            self.peer_session.remove(&pid);
-        }
-    }
-
-    fn add_peer(&mut self, pubkey: PublicKey, addr: Option<Multiaddr>) {
-        if let Some(addr) = addr {
-            self.unknown_addrs.remove(&UnknownAddr::new(addr.clone()));
-            self.inner.add_peer(Peer::from_pair((pubkey, addr)));
-        } else {
-            let pid = pubkey.peer_id();
-            self.inner.add_peer(Peer::new(pid, pubkey));
-        }
-    }
-
-    fn identify_addr(&mut self, addr: Multiaddr) {
-        match self.inner.match_pid(&addr) {
-            // Only add identified addr to connected peer, offline peer address
-            // maybe outdated
-            Some(ref pid) if self.inner.peer_connected(pid) => self.inner.add_peer_addr(&pid, addr),
-            // Match an offline peer, noop, peer maybe next connection condidate
-            Some(_) => (),
-            _ => {
-                info!(
-                    "network: {:?}: discover unknown addr {}",
-                    self.peer_id, addr
-                );
-
-                self.unknown_addrs.insert(UnknownAddr::new(addr));
-            }
-        }
-    }
-
-    fn is_bootstrap_peer(&self, pid: &PeerId) -> bool {
-        for bootstrap in self.config.bootstraps.iter() {
-            if bootstrap.id() == pid {
-                return true;
-            }
-        }
-
-        false
-    }
-
-    fn cleanly_remove_peer(&mut self, pid: &PeerId) {
-        // Clean up session mapping
-        self.close_peer_session(&pid);
-
-        if self.is_bootstrap_peer(pid) {
-            error!("network: reset max bootstrap {:?} retry count", pid);
-
-            // Reset bootstrap to reasonable retry count
-            self.inner.reset_retry(&pid);
-            self.inner.increase_retry_count(&pid);
-            self.inner.increase_retry_count(&pid);
-
-            return;
-        }
-
-        self.inner.remove_peer(&pid);
-    }
-
-    // TODO: reduce score base on kind, may be ban this peer for a
-    // while
-    fn increase_peer_retry(&mut self, pid: &PeerId) {
-        self.inner.increase_retry_count(&pid);
-
-        if self.inner.reach_max_retry(&pid) {
-            self.cleanly_remove_peer(&pid);
-        }
-    }
-
-    fn connected_peers_addr(&self) -> Vec<(PeerId, Option<ConnectedAddr>)> {
-        let connected_pids = self.inner.connected_peers();
-
-        connected_pids
-            .into_iter()
-            .map(|pid| (pid.clone(), self.inner.connected_addr(&pid)))
-            .collect()
-    }
-
-    fn unconnected_unknowns(&self, max: usize) -> Vec<&UnknownAddr> {
-        self.unknown_addrs
-            .iter()
-            .filter(|unknown| !unknown.connecting())
-            .take(max)
-            .collect()
-    }
-
-    fn unconnected_addrs(&self, max: usize) -> Vec<Multiaddr> {
+    pub fn unconnected_addrs(&self, max: usize) -> Vec<Multiaddr> {
         let mut condidates = Vec::new();
         let mut remain = max;
 
-        let condidate_pids = self.inner.unconnected_peers(max);
-        if !condidate_pids.is_empty() {
-            let addrs = condidate_pids.iter().map(|pid| {
-                self.inner.connect_peer(pid);
-                self.inner.peer_addrs(pid).unwrap_or_else(Vec::new)
+        let condidate_peers = self.inner.unconnected_peers(remain);
+        if !condidate_peers.is_empty() {
+            let addrs = condidate_peers.iter().map(|p| {
+                peer.set_connectedness(Connectedness::Connecting);
+                peer.multiaddrs()
             });
 
             condidates = addrs.flatten().collect();
-            remain -= condidate_pids.len();
+            remain -= condidate_peers.len()
         }
 
         let unknown_condidates = self.unconnected_unknowns(remain);
@@ -914,7 +479,287 @@ impl PeerManager {
         condidates
     }
 
-    fn reconnect_later(&mut self, addr: Multiaddr) {
+    fn unconnected_unknowns(&self, max: usize) -> Vec<&UnknownAddr> {
+        self.unknown_addrs
+            .iter()
+            .filter(|unknown| !unknown.connecting())
+            .take(max)
+            .collect()
+    }
+
+    fn new_session(&mut self, pubkey: PublicKey, ctx: Arc<SessionContext>) {
+        self.unknown_addrs.remove(&ctx.address.clone().into());
+
+        let remote_peer_id = pubkey.peer_id();
+        let peer = match self.inner.peer(&remote_peer_id) {
+            Some(p) => p,
+            None => {
+                let peer = match ArcPeer::from_pubkey(pubkey) {
+                    Ok(p) => p,
+                    Err(e) => {
+                        warn!("network: {}", e);
+                        return;
+                    }
+                };
+
+                self.inner.add_peer(peer);
+                peer
+            }
+        };
+
+        let connectedness = peer.connectedness();
+        if connectedness != Connectedness::Connecting || connectedness != Connectedness::Connected {
+            self.inner.inc_conn_count();
+        }
+
+        let session = ArcSession::new(peer, Arc::clone(&ctx));
+        self.inner.sessions.write().insert(session);
+
+        peer.set_connectedness(Connectedness::Connected);
+        peer.set_session_id(ctx.id);
+        peer.reset_retry();
+        peer.update_connected();
+
+        // Update peer multiaddr
+        match ctx.ty {
+            SessionType::Inbound => {
+                // We can't use inbound address to connect to this peer
+                debug!("network: {:?}: inbound {:?}", self.peer_id, ctx.address);
+            }
+            SessionType::Outbound => {
+                let mut multiaddr = ctx.address;
+                if !multiaddr.has_peer_id() {
+                    multiaddr.push_id(remote_peer_id);
+                }
+
+                peer.add_multiaddrs(vec![multiaddr.clone()]);
+                self.unknown_addrs.remove(&multiaddr.into());
+            }
+        }
+    }
+
+    fn session_closed(&mut self, sid: SessionId) {
+        let session = match self.inner.remove_session(&sid) {
+            Some(s) => s,
+            None => return, // Session may be removed by other event
+        };
+
+        self.inner.dec_conn_count();
+        session.peer.set_connectedness(Connectedness::CanConnect);
+        session.peer.set_session_id(0.into());
+        session.peer.update_disconnected();
+        session.peer.update_alive();
+
+        if session.peer.alive() < ALIVE_RETRY_INTERVAL {
+            debug!(
+                "network: {:?}: peer {:?} short live session",
+                self.peer_id, session.peer.id
+            );
+
+            session.peer.increase_retry();
+        }
+    }
+
+    fn update_peer_alive(&self, pid: &PeerId) {
+        if let Some(peer) = self.inner.peer(pid) {
+            debug!(
+                "network: {:?}: peer alive, chain addr {:?}",
+                self.peer_id, peer.chain_addr
+            );
+
+            // Just in cast
+            peer.reset_retry();
+        }
+    }
+
+    fn remove_peer_by_session(&self, sid: SessionId) {
+        let session = match self.inner.remove_session(&sid) {
+            Some(s) => s,
+            None => {
+                warn!("impossible, unregistered session {}", sid);
+                return;
+            }
+        };
+
+        self.inner.dec_conn_count();
+        if self.bootstraps.contains(&*session.peer.id) {
+            // Increase bootstrap retry instead of removing it
+            session.peer.set_connectedness(Connectedness::CanConnect);
+            session.peer.set_session_id(0.into());
+            session.peer.update_disconnected();
+            session.peer.update_alive();
+
+            session.peer.reset_retry();
+            session.peer.set_retry(MAX_RETRY_COUNT);
+        } else {
+            self.inner.remove_peer(&session.peer.id);
+        }
+
+        let disconnect_peer = ConnectionEvent::Disconnect(sid);
+        if self.conn_tx.unbounded_send(disconnect_peer).is_err() {
+            debug!("network: connection service exit");
+        }
+    }
+
+    fn session_blocked(&self, ctx: Arc<SessionContext>) {
+        warn!(
+            "network: session {} blocked, pending data size {}",
+            ctx.id,
+            ctx.pending_data_size()
+        );
+
+        if let Some(session) = self.inner.session(&ctx.id) {
+            session.block();
+        }
+    }
+
+    fn retry_peer_later(&self, pid: &PeerId) {
+        info!("network: {:?}: retry peer later {:?}", self.peer_id, pid);
+
+        let peer = match self.inner.peer(pid) {
+            Some(p) => p,
+            None => return,
+        };
+
+        if peer.connectedness() == Connectedness::Connected {
+            let sid = peer.session_id();
+            self.inner.remove_session(&sid);
+            self.inner.dec_conn_count();
+
+            // Make sure we disconnect this peer
+            let disconnect_peer = ConnectionEvent::Disconnect(sid);
+            if self.conn_tx.unbounded_send(disconnect_peer).is_err() {
+                debug!("network: connection service exit");
+            }
+        }
+
+        peer.set_connectedness(Connectedness::CanConnect);
+        peer.set_session_id(0.into());
+        peer.update_disconnected();
+        peer.update_alive();
+        peer.increase_retry();
+    }
+
+    fn connect_multiaddrs(&self, addrs: Vec<Multiaddr>) {
+        info!("network: {:?}: connect addrs {:?}", self.peer_id, addrs);
+
+        let connect_attempt = ConnectionEvent::Connect {
+            addrs,
+            proto: TargetProtocol::All,
+        };
+
+        if self.conn_tx.unbounded_send(connect_attempt).is_err() {
+            error!("network: connection service offline");
+        }
+    }
+
+    fn connect_peers(&self, pids: Vec<PeerId>) {
+        let mut multiaddrs = Vec::new();
+
+        {
+            let book = self.inner.peers.read();
+            for pid in pids.iter() {
+                if let Some(peer) = book.get(pid) {
+                    peer.set_connectedness(Connectedness::Connecting);
+                    multiaddrs.extend(peer.multiaddrs());
+                }
+            }
+        }
+
+        self.connect_multiaddrs(multiaddrs);
+    }
+
+    fn discover_multiaddr(&mut self, addr: Multiaddr) {
+        let peer_id = match addr
+            .peer_id_bytes()
+            .map(|bs| PeerId::from_bytes(bs.to_vec()))
+        {
+            Some(Ok(p)) => p,
+            _ => return, // Ignore multiaddr without peer id included
+        };
+
+        if let Some(peer) = self.inner.peer(&peer_id) {
+            if !peer.contains_multiaddr(&addr) {
+                // Verify this multiaddr by connecting to it, if result in
+                // repeated conection, then we can add it to that peer
+                self.unknown_addrs.insert(addr.into());
+            }
+        }
+    }
+
+    fn dicover_multi_multiaddrs(&mut self, addrs: Vec<Multiaddr>) {
+        for addr in addrs.into_iter() {
+            self.discover_multiaddr(addr);
+        }
+    }
+
+    fn identified_addrs(&self, pid: &PeerId, addrs: Vec<Multiaddr>) {
+        info!(
+            "network: {:?}: peer {:?} multi identified addrs {:?}",
+            self.peer_id, pid, addrs
+        );
+
+        if let Some(peer) = self.inner.peer(pid) {
+            // Make sure all addresses include peer id
+            let addrs = addrs
+                .into_iter()
+                .map(|mut ma| {
+                    if !ma.has_peer_id() {
+                        ma.push_id(pid.to_owned())
+                    }
+                    ma
+                })
+                .collect::<Vec<_>>();
+
+            peer.add_multiaddrs(addrs);
+        }
+    }
+
+    fn repeated_connection(&self, ty: ConnectionType, sid: SessionId, mut addr: Multiaddr) {
+        info!(
+            "network: {:?}: repeated session {:?}, ty {}, remote addr {:?}",
+            self.peer_id, sid, ty, addr
+        );
+
+        self.unknown_addrs.remove(&addr.clone().into());
+
+        // TODO: For ConnectionType::Listen, records repeated count,
+        // reduce that peer's score, eventually ban it for a while.
+        if ty == ConnectionType::Listen {
+            return;
+        }
+
+        if let Some(session) = self.inner.session(&sid) {
+            if !addr.has_peer_id() {
+                addr.push_id(session.peer.id.as_ref().to_owned());
+            }
+
+            session.peer.add_multiaddrs(vec![addr.clone()]);
+            self.unknown_addrs.remove(&addr.into());
+        }
+    }
+
+    fn unconnectable_multiaddr(&self, addr: Multiaddr) {
+        self.unknown_addrs.remove(&addr.clone().into());
+
+        let peer_id = match addr
+            .peer_id_bytes()
+            .map(|bs| PeerId::from_bytes(bs.to_vec()))
+        {
+            Some(Ok(p)) => p,
+            _ => return,
+        };
+
+        if let Some(peer) = self.inner.peer(&peer_id) {
+            // For bootstrap peer, we'll keep at least one multiaddr.
+            if !self.bootstraps.contains(&peer_id) || peer.multiaddrs_len() > 1 {
+                peer.remove_multiaddr(&addr);
+            }
+            peer.increase_retry();
+        }
+    }
+
+    fn reconnect_addr_later(&self, addr: Multiaddr) {
         if let Some(mut unknown) = self.unknown_addrs.take(&addr.clone().into()) {
             unknown.set_connecting(false);
             unknown.increase_retry_count();
@@ -922,172 +767,81 @@ impl PeerManager {
             if !unknown.reach_max_retry() {
                 self.unknown_addrs.insert(unknown);
             }
+
+            return;
         }
 
-        if let Some(pid) = self.inner.match_pid(&addr) {
-            // If peer is already connected, don't need to reconnect
-            // this address.
-            if self.inner.peer_connected(&pid) {
+        let peer_id = match addr
+            .peer_id_bytes()
+            .map(|bs| PeerId::from_bytes(bs.to_vec()))
+        {
+            Some(Ok(p)) => p,
+            _ => return,
+        };
+
+        if let Some(peer) = self.inner.peer(&peer_id) {
+            let connectedness = peer.connectedness();
+            if Connectedness::Connected == connectedness {
+                // Peer already connected, doesn't need to reconnect address
                 return;
             }
 
-            // Make sure we disconnect peer
-            self.inner.disconnect_peer(&pid);
-            self.increase_peer_retry(&pid);
+            // TODO: Remove address that retry many times
+            peer.set_connectedness(Connectedness::CanConnect);
+            peer.increase_retry();
         }
     }
 
-    fn session_blocked(&mut self, sid: SessionId) {
-        self.inner.set_blocked(sid)
-    }
-
     fn process_event(&mut self, event: PeerManagerEvent) {
+        debug!("peer event: {:?} {}", self.peer_id, event);
+
         match event {
-            PeerManagerEvent::AttachPeerSession { pubkey, session } => {
-                self.attach_peer_session(pubkey, session);
-            }
-            PeerManagerEvent::DetachPeerSession { pid, .. } => {
-                self.detach_peer_session(pid);
-            }
-            PeerManagerEvent::PeerAlive { pid } => {
-                let user_addr = self.inner.pid_user_addr(&pid);
-
-                debug!(
-                    "network: {:?}: peer alive, user addr {:?}",
-                    self.peer_id, user_addr
-                );
-
-                self.inner.reset_retry(&pid);
-            }
-            PeerManagerEvent::RemovePeer { pid, .. } => {
-                info!("network: {:?}: remove peer {:?}", self.peer_id, pid);
-
-                self.cleanly_remove_peer(&pid);
-            }
-            PeerManagerEvent::RemovePeerBySession { sid, .. } => {
-                let disconnect_peer = ConnectionEvent::Disconnect(sid);
-                if self.conn_tx.unbounded_send(disconnect_peer).is_err() {
-                    debug!("network: connection service exit");
-                }
-
-                if let Some(pid) = self.session_peer.get(&sid).cloned() {
-                    info!("network: {:?}: remove peer {:?}", self.peer_id, pid);
-
-                    self.cleanly_remove_peer(&pid);
-                } else {
-                    info!("network: {:?}: disconnect session {}", self.peer_id, sid);
-
-                    self.detach_session_id(sid);
-                }
-            }
-            PeerManagerEvent::SessionBlocked { ctx, .. } => {
-                warn!(
-                    "network: session {} blocked, pending data size {}",
-                    ctx.id,
-                    ctx.pending_data_size()
-                );
-
-                self.session_blocked(ctx.id);
-            }
-            PeerManagerEvent::RetryPeerLater { pid, .. } => {
-                info!(
-                    "network: {:?}: reconnect peer later {:?}",
-                    self.peer_id, pid
-                );
-
-                self.increase_peer_retry(&pid);
-
-                if !self.peer_session.contains_key(&pid) {
-                    debug!("network: retry peer {:?} but session id not found", pid);
-                    return;
-                }
-
-                // Make sure that we disconnect this peer
-                if let Some(sid) = self.peer_session.get(&pid) {
-                    let disconnect_peer = ConnectionEvent::Disconnect(*sid);
-
-                    // TODO: report upstream or wrap some how
-                    if self.conn_tx.unbounded_send(disconnect_peer).is_err() {
-                        debug!("network: connection service exit");
-                    }
-                }
-            }
-            PeerManagerEvent::ConnectPeers { pids } => {
-                let mut multiaddrs = Vec::new();
-
-                {
-                    let pool = self.inner.pool.read();
-                    for pid in pids.iter() {
-                        self.inner.connect_peer(&pid);
-                        if let Some(peer) = pool.get(&pid) {
-                            multiaddrs.extend(peer.owned_addrs());
-                        }
-                    }
-                }
-
-                self.connect_peers(multiaddrs);
-            }
-            PeerManagerEvent::DiscoverAddr { addr } => {
-                self.identify_addr(addr);
-            }
-            PeerManagerEvent::DiscoverMultiAddrs { addrs } => {
-                for addr in addrs.into_iter() {
-                    self.identify_addr(addr);
-                }
-            }
-            PeerManagerEvent::IdentifiedAddrs { pid, addrs } => {
-                info!(
-                    "network: {:?}: add peer {:?} multi identified addrs {:?}",
-                    self.peer_id, pid, addrs
-                );
-
-                for addr in addrs.into_iter() {
-                    self.inner.add_peer_addr(&pid, addr);
-                }
-            }
+            PeerManagerEvent::NewSession { pubkey, ctx, .. } => self.new_session(pubkey, ctx),
+            PeerManagerEvent::SessionClosed { sid, .. } => self.session_closed(sid),
+            PeerManagerEvent::PeerAlive { pid } => self.update_peer_alive(&pid),
+            PeerManagerEvent::RemovePeerBySession { sid, .. } => self.remove_peer_by_session(sid),
+            PeerManagerEvent::SessionBlocked { ctx, .. } => self.session_blocked(ctx),
+            PeerManagerEvent::RetryPeerLater { pid, .. } => self.retry_peer_later(&pid),
+            PeerManagerEvent::ConnectPeers { pids } => self.connect_peers(pids),
+            PeerManagerEvent::DiscoverAddr { addr } => self.discover_multiaddr(addr),
+            PeerManagerEvent::DiscoverMultiAddrs { addrs } => self.dicover_multi_multiaddrs(addrs),
+            PeerManagerEvent::IdentifiedAddrs { pid, addrs } => self.identified_addrs(&pid, addrs),
             // NOTE: Alice may disconnect to Bob, but bob didn't know
             // that, so the next time, Alice try to connect to Bob will
             // cause repeated connection. The only way to fix this right
             // now is wait for time out.
             PeerManagerEvent::RepeatedConnection { ty, sid, addr } => {
-                let remote_addr = match ty {
-                    ConnectionType::Dialer => Some(&addr),
-                    ConnectionType::Listen => None,
-                };
-
-                info!(
-                    "network: {:?}: repeated connection, ty {}, session {:?} remote_addr {:?}",
-                    self.peer_id, ty, sid, remote_addr
-                );
-
-                // TODO: For ConnectionType::Listen, records repeated count,
-                // reduce that peer's score, eventually ban it for a while.
-                if ty == ConnectionType::Dialer {
-                    self.add_session_addr(sid, addr);
-                }
+                self.repeated_connection(ty, sid, addr)
             }
             // TODO: ban unconnectable address for a while instead of repeated
             // connection attempts.
             PeerManagerEvent::UnconnectableAddress { addr, kind, .. } => {
                 // Since io::Other is unexpected, it's ok warning here.
                 warn!("unconnectable address {} {}", addr, kind);
-
-                self.unknown_addrs.remove(&addr.clone().into());
-                if self.bootstraps.contains(&addr) {
-                    error!("network: unconnectable bootstrap address {}", addr);
-                    return;
+                self.unconnectable_multiaddr(addr)
+            }
+            PeerManagerEvent::ReconnectAddrLater { addr, kind, .. } => {
+                info!("reconnect address {} later {}", addr, kind);
+                self.reconnect_addr_later(addr);
+            }
+            PeerManagerEvent::AddListenAddr { mut addr } => {
+                if !addr.has_peer_id() {
+                    addr.push_id(self.peer_id.to_owned());
                 }
-                self.inner.try_remove_addr(&addr);
+
+                // TODO: listen on multi ports?
+                if let Some(peer) = self.inner.peer(&self.peer_id) {
+                    peer.add_multiaddrs(vec![addr]);
+                }
             }
-            PeerManagerEvent::ReconnectLater { addr, kind, .. } => {
-                info!("reconnect later address {} {}", addr, kind);
-                self.reconnect_later(addr);
-            }
-            PeerManagerEvent::AddListenAddr { addr } => {
-                self.inner.add_peer_addr(&self.config.our_id, addr);
-            }
-            PeerManagerEvent::RemoveListenAddr { addr } => {
-                self.inner.remove_peer_addr(&self.config.our_id, &addr);
+            PeerManagerEvent::RemoveListenAddr { mut addr } => {
+                if !addr.has_peer_id() {
+                    addr.push_id(self.peer_id.to_owned());
+                }
+
+                if let Some(peer) = self.inner.peer(&self.peer_id) {
+                    peer.remove_multiaddr(&addr);
+                }
             }
         }
     }
@@ -1128,16 +882,16 @@ impl Future for PeerManager {
             self.process_event(event);
         }
 
-        let connected_peers_addr = self.connected_peers_addr();
+        let connected_addrs = self.connected_addrs();
         debug!(
             "network: {:?}: connected peer_addr(s) {}: {:?}",
             self.peer_id,
-            connected_peers_addr.len(),
-            connected_peers_addr
+            connected_addrs.len(),
+            connected_addrs
         );
 
         // Check connecting count
-        let connection_count = self.inner.connection_count();
+        let connection_count = self.inner.conn_count();
         if connection_count < self.config.max_connections {
             let remain_count = self.config.max_connections - connection_count;
             let unconnected_addrs = self.unconnected_addrs(remain_count);
@@ -1149,7 +903,7 @@ impl Future for PeerManager {
             );
 
             if !unconnected_addrs.is_empty() {
-                self.connect_peers(unconnected_addrs);
+                self.connect_multiaddrs(unconnected_addrs);
             }
         }
 
