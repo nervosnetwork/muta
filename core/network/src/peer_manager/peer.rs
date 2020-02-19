@@ -285,7 +285,7 @@ impl Eq for ArcPeer {}
 
 impl Hash for ArcPeer {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.id.hash(&mut state)
+        self.id.hash(state)
     }
 }
 

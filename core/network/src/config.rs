@@ -219,7 +219,7 @@ impl NetworkConfig {
                 .map_err(|_| NetworkError::InvalidPublicKey)?;
 
             let multiaddr = Self::parse_peer_addr(peer_addr)?;
-            let peer = ArcPeer::from_pubkey(pk)?;
+            let peer = ArcPeer::from_pubkey(pk).map_err(NetworkError::from)?;
             peer.set_multiaddrs(vec![multiaddr]);
 
             Ok(peer)

@@ -115,7 +115,7 @@ impl ConnectionServiceKeeper {
 
 #[rustfmt::skip]
 impl ServiceHandle for ConnectionServiceKeeper {
-    fn handle_error(&mut self, ctx: &mut ServiceContext, err: ServiceError) {
+    fn handle_error(&mut self, _ctx: &mut ServiceContext, err: ServiceError) {
         match err {
             ServiceError::DialerError { error, address } => {
                 self.process_connect_error(ConnectionType::Dialer, error, address)
@@ -189,9 +189,14 @@ impl ServiceHandle for ConnectionServiceKeeper {
         match evt {
             ServiceEvent::SessionOpen { session_context } => {
                 if session_context.remote_pubkey.is_none() {
+                    // Peer without encryption will not be able to connect to us
                     error!("impossible, got connection from/to {:?} without public key, disconnect it", session_context.address);
 
-                    ctx.disconnect(session_context.id);
+                    // Just in case
+                    if let Err(e) = ctx.disconnect(session_context.id) {            
+                        error!("disconnect session {} {}", session_context.id, e);
+                    }
+                    return;
                 }
 
                 let pubkey = peer_pubkey!(&session_context).clone();

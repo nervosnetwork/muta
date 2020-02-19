@@ -1,4 +1,4 @@
-use super::{ArcSession, Inner};
+use super::{ArcSession, Connectedness, Inner};
 use crate::traits::SessionBook;
 
 use log::debug;
@@ -67,19 +67,17 @@ impl SessionBook for SharedSessions {
     }
 
     fn by_chain(&self, addrs: Vec<Address>) -> (Vec<SessionId>, Vec<Address>) {
-        let user_pid = self.inner.user_pid.read();
-        let pool = self.inner.pool.read();
+        let chain = self.inner.chain.read();
 
         let mut connected = Vec::new();
         let mut unconnected = Vec::new();
         for addr in addrs {
-            if let Some(Some(Some(sid))) = user_pid
-                .get(&addr)
-                .map(|pid| pool.get(&pid).map(|p| p.session().map(|ctx| ctx.id)))
-            {
-                connected.push(sid);
-            } else {
-                unconnected.push(addr);
+            if let Some(peer) = chain.get(&addr) {
+                if peer.connectedness() == Connectedness::Connected {
+                    connected.push(peer.session_id());
+                } else {
+                    unconnected.push(addr);
+                }
             }
         }
 
@@ -87,13 +85,13 @@ impl SessionBook for SharedSessions {
     }
 
     fn peers_by_chain(&self, addrs: Vec<Address>) -> (Vec<PeerId>, Vec<Address>) {
-        let user_pid = self.inner.user_pid.read();
+        let chain = self.inner.chain.read();
 
         let mut peers = Vec::new();
         let mut unknown = Vec::new();
         for addr in addrs {
-            if let Some(pid) = user_pid.get(&addr) {
-                peers.push(pid.to_owned());
+            if let Some(peer) = chain.get(&addr) {
+                peers.push(peer.id.as_ref().to_owned());
             } else {
                 unknown.push(addr);
             }

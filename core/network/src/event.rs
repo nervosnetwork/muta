@@ -6,7 +6,7 @@ use tentacle::{
     context::SessionContext,
     multiaddr::Multiaddr,
     secio::{PeerId, PublicKey},
-    service::{SessionType, TargetProtocol},
+    service::TargetProtocol,
     ProtocolId, SessionId,
 };
 
