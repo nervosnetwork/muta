@@ -412,9 +412,8 @@ pub struct PeerManager {
     // heart beat, for current connections check, etc
     heart_beat: Option<HeartBeat>,
     hb_waker:   Arc<AtomicWaker>,
-
-    // persistence
-    persistence: Box<dyn Persistence>,
+    /* persistence
+     * persistence: Box<dyn Persistence>, */
 }
 
 impl PeerManager {
@@ -428,7 +427,7 @@ impl PeerManager {
         let inner = Arc::new(Inner::new(peer_id.clone()));
         let waker = Arc::new(AtomicWaker::new());
         let heart_beat = HeartBeat::new(Arc::clone(&waker), config.routine_interval);
-        let persistence = Box::new(NoopPersistence);
+        // let persistence = Box::new(NoopPersistence);
 
         // Register our self
         inner.register_self(config.pubkey.clone());
@@ -447,8 +446,7 @@ impl PeerManager {
 
             heart_beat: Some(heart_beat),
             hb_waker: waker,
-
-            persistence,
+            // persistence,
         }
     }
 
@@ -462,11 +460,11 @@ impl PeerManager {
         SharedSessions::new(Arc::clone(&self.inner), config)
     }
 
-    pub fn enable_persistence(&mut self) {
-        let persistence = PeerPersistence::new(&self.config.persistence_path);
-
-        self.persistence = Box::new(persistence);
-    }
+    // pub fn enable_persistence(&mut self) {
+    //     let persistence = PeerPersistence::new(&self.config.persistence_path);
+    //
+    //     self.persistence = Box::new(persistence);
+    // }
 
     pub fn set_listen(&self, addr: Multiaddr) {
         self.inner.set_listen(addr)
