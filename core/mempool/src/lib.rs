@@ -18,6 +18,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use async_trait::async_trait;
 use derive_more::Display;
+use tokio::sync::RwLock;
 
 use protocol::traits::{Context, MemPool, MemPoolAdapter, MixedTxHashes};
 use protocol::types::{Hash, SignedTransaction};
@@ -40,6 +41,8 @@ pub struct HashMemPool<Adapter: MemPoolAdapter> {
     callback_cache: Map<SignedTransaction>,
     /// Supply necessary functions from outer modules.
     adapter:        Adapter,
+    /// exclusive flush_memory and insert_tx to avoid repeat txs insertion.
+    flush_lock:     RwLock<bool>,
 }
 
 impl<Adapter> HashMemPool<Adapter>
@@ -53,6 +56,7 @@ where
             tx_cache: TxCache::new(pool_size * 2),
             callback_cache: Map::new(pool_size),
             adapter,
+            flush_lock: RwLock::new(true),
         }
     }
 
@@ -82,8 +86,9 @@ where
         tx: SignedTransaction,
         tx_type: TxType,
     ) -> ProtocolResult<()> {
-        let tx_hash = &tx.tx_hash;
+        let _lock = self.flush_lock.read().await;
 
+        let tx_hash = &tx.tx_hash;
         self.tx_cache.check_reach_limit(self.pool_size)?;
         self.tx_cache.check_exist(tx_hash)?;
         self.adapter
@@ -132,6 +137,8 @@ where
     }
 
     async fn flush(&self, ctx: Context, tx_hashes: Vec<Hash>) -> ProtocolResult<()> {
+        let _lock = self.flush_lock.write().await;
+
         let current_height = self.adapter.get_latest_height(ctx.clone()).await?;
         log::info!(
             "[core_mempool]: flush mempool with {:?} tx_hashes",
@@ -143,6 +150,7 @@ where
             current_height + self.timeout_gap.load(Ordering::Relaxed),
         );
         self.callback_cache.clear();
+
         Ok(())
     }
 
