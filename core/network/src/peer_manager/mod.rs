@@ -366,6 +366,36 @@ impl PeerManagerHandle {
     }
 }
 
+impl PeerQuerier for PeerManagerHandle {
+    fn connected_addr(&self, pid: &PeerId) -> Option<ConnectedAddr> {
+        if let Some(peer) = self.inner.peer(pid) {
+            if let Some(session) = self.inner.session(&peer.session_id()) {
+                return Some(session.connected_addr.to_owned());
+            }
+        }
+
+        None
+    }
+
+    fn connected_peers(&self) -> Vec<PeerId> {
+        self.inner
+            .share_sessions()
+            .into_iter()
+            .map(|s| s.peer.id.to_owned())
+            .collect()
+    }
+
+    fn pending_data_size(&self, pid: &PeerId) -> usize {
+        if let Some(peer) = self.inner.peer(pid) {
+            if let Some(session) = self.inner.session(&peer.session_id()) {
+                return session.ctx.pending_data_size();
+            }
+        }
+
+        0
+    }
+}
+
 pub struct PeerManager {
     // core peer pool
     inner:      Arc<Inner>,
