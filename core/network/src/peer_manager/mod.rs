@@ -2,9 +2,9 @@ mod book;
 mod disc;
 mod ident;
 mod peer;
-mod persist;
+// mod persist;
 
-use persist::{NoopPersistence, PeerPersistence, Persistence};
+// use persist::{NoopPersistence, PeerPersistence, Persistence};
 
 pub use book::{SharedSessions, SharedSessionsConfig};
 pub use disc::DiscoveryAddrManager;
@@ -873,17 +873,6 @@ impl PeerManager {
                     peer.remove_multiaddr(&addr);
                 }
             }
-        }
-    }
-}
-
-// Persist peers during shutdown
-impl Drop for PeerManager {
-    fn drop(&mut self) {
-        let peer_box = self.inner.package_peers();
-
-        if let Err(err) = self.persistence.save(peer_box) {
-            error!("network: persistence: {}", err);
         }
     }
 }
