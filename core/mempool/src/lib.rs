@@ -42,7 +42,7 @@ pub struct HashMemPool<Adapter: MemPoolAdapter> {
     /// Supply necessary functions from outer modules.
     adapter:        Adapter,
     /// exclusive flush_memory and insert_tx to avoid repeat txs insertion.
-    flush_lock:     RwLock<bool>,
+    flush_lock:     RwLock<()>,
 }
 
 impl<Adapter> HashMemPool<Adapter>
@@ -56,7 +56,7 @@ where
             tx_cache: TxCache::new(pool_size * 2),
             callback_cache: Map::new(pool_size),
             adapter,
-            flush_lock: RwLock::new(true),
+            flush_lock: RwLock::new(()),
         }
     }
 
