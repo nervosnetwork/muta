@@ -16,7 +16,7 @@ use crate::{
     common::socket_to_multi_addr,
     connection::ConnectionConfig,
     error::NetworkError,
-    peer_manager::{Peer, PeerManagerConfig, SharedSessionsConfig},
+    peer_manager::{ArcPeer, PeerManagerConfig, SharedSessionsConfig},
     selfcheck::SelfCheckConfig,
 };
 
@@ -104,7 +104,7 @@ pub struct NetworkConfig {
     pub write_timeout:    u64,
 
     // peer manager
-    pub bootstraps:         Vec<Peer>,
+    pub bootstraps:         Vec<ArcPeer>,
     pub enable_persistence: bool,
     pub persistence_path:   PathBuf,
 
@@ -209,7 +209,6 @@ impl NetworkConfig {
         self
     }
 
-    // TODO: Remove explicit secp256k1
     pub fn bootstraps(
         mut self,
         pairs: Vec<(PublicKeyHexStr, PeerAddrStr)>,
@@ -219,9 +218,11 @@ impl NetworkConfig {
                 .map(PublicKey::Secp256k1)
                 .map_err(|_| NetworkError::InvalidPublicKey)?;
 
-            let multi_addr = Self::parse_peer_addr(peer_addr)?;
+            let multiaddr = Self::parse_peer_addr(peer_addr)?;
+            let peer = ArcPeer::from_pubkey(pk)?;
+            peer.set_multiaddrs(vec![multiaddr]);
 
-            Ok(Peer::from_pair((pk, multi_addr)))
+            Ok(peer)
         };
 
         let bootstrap_peers = pairs

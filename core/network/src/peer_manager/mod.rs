@@ -486,8 +486,8 @@ impl PeerManager {
         let condidate_peers = self.inner.unconnected_peers(remain);
         if !condidate_peers.is_empty() {
             let addrs = condidate_peers.iter().map(|p| {
-                peer.set_connectedness(Connectedness::Connecting);
-                peer.multiaddrs()
+                p.set_connectedness(Connectedness::Connecting);
+                p.multiaddrs()
             });
 
             condidates = addrs.flatten().collect();
