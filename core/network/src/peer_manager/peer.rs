@@ -166,6 +166,13 @@ impl Peer {
         self.next_attempt.load(Ordering::SeqCst)
     }
 
+    pub fn next_attempt_since_now(&self) -> u64 {
+        let next_attempt =
+            UNIX_EPOCH + Duration::from_secs(self.next_attempt.load(Ordering::SeqCst));
+
+        duration_since(next_attempt, SystemTime::now()).as_secs()
+    }
+
     pub fn connected_at(&self) -> u64 {
         self.connected_at.load(Ordering::SeqCst)
     }
@@ -184,6 +191,14 @@ impl Peer {
 
     pub fn alive(&self) -> u64 {
         self.alive.load(Ordering::SeqCst)
+    }
+
+    pub fn update_alive(&self) {
+        let connected_at =
+            UNIX_EPOCH + Duration::from_secs(self.connected_at.load(Ordering::SeqCst));
+        let alive = duration_since(SystemTime::now(), connected_at).as_secs();
+
+        self.alive.store(alive, Ordering::SeqCst);
     }
 
     pub(super) fn set_alive(&self, live: u64) {
@@ -259,14 +274,6 @@ impl Peer {
 
     fn update_connected(&self) {
         self.connected_at.store(Self::now(), Ordering::SeqCst);
-    }
-
-    fn update_alive(&self) {
-        let connected_at =
-            UNIX_EPOCH + Duration::from_secs(self.connected_at.load(Ordering::SeqCst));
-        let alive = duration_since(SystemTime::now(), connected_at).as_secs();
-
-        self.alive.store(alive, Ordering::SeqCst);
     }
 
     fn update_disconnected(&self) {

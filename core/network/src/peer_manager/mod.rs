@@ -609,6 +609,8 @@ impl PeerManager {
     }
 
     fn session_closed(&mut self, sid: SessionId) {
+        info!("network: session {} closed", sid);
+
         let session = match self.inner.remove_session(&sid) {
             Some(s) => s,
             None => return, // Session may be removed by other event
@@ -629,13 +631,9 @@ impl PeerManager {
 
     fn update_peer_alive(&self, pid: &PeerId) {
         if let Some(peer) = self.inner.peer(pid) {
-            debug!(
-                "network: {:?}: peer alive, chain addr {:?}",
-                self.peer_id, peer.chain_addr
-            );
-
             // Just in cast
             peer.reset_retry();
+            peer.update_alive();
         }
     }
 
@@ -714,10 +712,25 @@ impl PeerManager {
     }
 
     fn connect_peers(&self, peers: Vec<ArcPeer>) {
-        let multiaddrs = peers.into_iter().map(|p| {
-            p.set_connectedness(Connectedness::Connecting);
-            p.multiaddrs()
-        });
+        let multiaddrs = peers
+            .into_iter()
+            .filter(|p| {
+                let connectedness = p.connectedness();
+                if connectedness != Connectedness::CanConnect {
+                    info!("network: peer {:?} connectedness {}", p.id, connectedness);
+                    return false;
+                }
+                if !p.retry_ready() {
+                    let eta = p.next_attempt_since_now();
+                    info!("network: peer {:?} isn't ready, ETA {} seconds", p.id, eta);
+                    return false;
+                }
+                true
+            })
+            .map(|p| {
+                p.set_connectedness(Connectedness::Connecting);
+                p.multiaddrs()
+            });
 
         self.connect_multiaddrs(multiaddrs.flatten().collect());
     }
