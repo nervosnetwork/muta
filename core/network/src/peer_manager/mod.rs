@@ -514,7 +514,15 @@ impl PeerManager {
         for peer in peers.iter() {
             info!("network: {:?}: bootstrap peer: {}", self.peer_id, peer);
 
-            self.inner.add_peer(peer.clone());
+            if let Some(peer_exist) = self.inner.peer(&peer.id) {
+                info!(
+                    "network: {:?}: restored peer found, add multiaddr only",
+                    self.peer_id
+                );
+                peer_exist.add_multiaddrs(peer.multiaddrs());
+            } else {
+                self.inner.add_peer(peer.clone());
+            }
         }
 
         self.connect_peers(peers.clone());
