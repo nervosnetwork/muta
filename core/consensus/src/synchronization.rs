@@ -12,7 +12,7 @@ use protocol::traits::{
 use protocol::types::{Block, Hash, Receipt, SignedTransaction};
 use protocol::ProtocolResult;
 
-use crate::status::{CurrentConsensusStatus, StatusAgent, UpdateInfo};
+use crate::status::{ExecutedInfo, StatusAgent};
 use crate::ConsensusError;
 
 const POLLING_BROADCAST: u64 = 2000;
@@ -49,7 +49,7 @@ impl<Adapter: SynchronizationAdapter> Synchronization for OverlordSynchronizatio
             return Ok(());
         }
 
-        let current_height = self.adapter.get_current_height(ctx.clone()).await?;
+        let current_height = self.status.to_inner().current_height;
 
         if remote_height <= current_height {
             return Ok(());
@@ -61,7 +61,7 @@ impl<Adapter: SynchronizationAdapter> Synchronization for OverlordSynchronizatio
             current_height,
         );
 
-        let sync_status_agent = self.init_status_agent(ctx.clone(), current_height).await?;
+        let sync_status_agent = self.init_status_agent().await?;
         let sync_resp = self
             .start_sync(
                 ctx.clone(),
@@ -70,22 +70,20 @@ impl<Adapter: SynchronizationAdapter> Synchronization for OverlordSynchronizatio
                 remote_height,
             )
             .await;
-        let mut sync_status = sync_status_agent.to_inner();
-        let current_height = sync_status.height;
+        let sync_status = sync_status_agent.to_inner();
 
         if let Err(e) = sync_resp {
             log::error!(
                 "[synchronization]: err, current_height {:?} err_msg: {:?}",
-                current_height,
+                sync_status.current_height,
                 e
             );
         }
 
-        sync_status.height += 1;
         self.status.replace(sync_status.clone());
         self.adapter.update_status(
             ctx.clone(),
-            sync_status.height,
+            sync_status.current_height,
             sync_status.consensus_interval,
             sync_status.propose_ratio,
             sync_status.prevote_ratio,
@@ -117,7 +115,7 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
 
     pub async fn polling_broadcast(&self) -> ProtocolResult<()> {
         loop {
-            let current_height = self.adapter.get_current_height(Context::new()).await?;
+            let current_height = self.status.to_inner().current_height;
             if current_height != 0 {
                 self.adapter
                     .broadcast_height(Context::new(), current_height)
@@ -201,11 +199,11 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
             metadata.max_tx_size,
         );
 
-        status_agent.update_after_sync_commit(
-            block.header.height,
+        status_agent.update_by_commited(
             metadata,
             block.clone(),
             block_hash,
+            // TODO(@yejiayu): need to get proof for the next block
             block.header.proof.clone(),
         );
 
@@ -279,7 +277,7 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
         };
         let resp = self.adapter.sync_exec(ctx, &exec_params, &rich_block.txs)?;
 
-        status_agent.update_after_exec(UpdateInfo::with_after_exec(
+        status_agent.update_by_executed(ExecutedInfo::new(
             rich_block.block.header.height,
             rich_block.block.header.order_root,
             resp.clone(),
@@ -288,84 +286,22 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
         Ok(resp)
     }
 
-    async fn get_rich_block_from_local(
-        &self,
-        ctx: Context,
-        height: u64,
-    ) -> ProtocolResult<RichBlock> {
-        let block = self
-            .adapter
-            .get_block_by_height(ctx.clone(), height)
-            .await?;
-        let txs = self
-            .adapter
-            .get_txs_from_storage(ctx.clone(), &block.ordered_tx_hashes)
-            .await?;
-
-        Ok(RichBlock { block, txs })
-    }
-
-    async fn init_status_agent(&self, ctx: Context, height: u64) -> ProtocolResult<StatusAgent> {
+    async fn init_status_agent(&self) -> ProtocolResult<StatusAgent> {
         loop {
             let current_status = self.status.to_inner();
 
-            if current_status.exec_height != current_status.height - 1 {
+            if current_status.exec_height != current_status.current_height {
                 Delay::new(Duration::from_millis(WAIT_EXECUTION)).await;
             } else {
                 break;
             }
         }
-
-        let block = self
-            .adapter
-            .get_block_by_height(ctx.clone(), height)
-            .await?;
         let current_status = self.status.to_inner();
-
-        let status = CurrentConsensusStatus {
-            cycles_price:       current_status.cycles_price,
-            cycles_limit:       current_status.cycles_limit,
-            validators:         current_status.validators.clone(),
-            consensus_interval: current_status.consensus_interval,
-            propose_ratio:      current_status.propose_ratio,
-            prevote_ratio:      current_status.prevote_ratio,
-            precommit_ratio:    current_status.precommit_ratio,
-            brake_ratio:        current_status.brake_ratio,
-            tx_num_limit:       current_status.tx_num_limit,
-            max_tx_size:        current_status.max_tx_size,
-            prev_hash:          block.header.pre_hash.clone(),
-            height:             block.header.height,
-            exec_height:        block.header.exec_height,
-            latest_state_root:  block.header.state_root.clone(),
-            logs_bloom:         vec![],
-            confirm_root:       vec![],
-            receipt_root:       vec![],
-            cycles_used:        vec![],
-            state_root:         vec![],
-            proof:              block.header.proof,
-        };
-
-        let status_agent = StatusAgent::new(status);
-        let exec_height = block.header.exec_height;
-
-        // Discard previous execution results and re-execute.
-        if height != 0 {
-            let exec_gap = height - exec_height;
-
-            for gap in 1..=exec_gap {
-                let rich_block = self
-                    .get_rich_block_from_local(ctx.clone(), exec_height + gap)
-                    .await?;
-                self.exec_block(ctx.clone(), rich_block, status_agent.clone())
-                    .await?;
-            }
-        }
-
-        Ok(status_agent)
+        Ok(StatusAgent::new(current_status))
     }
 
     async fn need_sync(&self, ctx: Context, remote_height: u64) -> ProtocolResult<bool> {
-        let mut current_height = self.adapter.get_current_height(ctx.clone()).await?;
+        let mut current_height = self.status.to_inner().current_height;
         if remote_height == 0 {
             return Ok(false);
         }
@@ -378,7 +314,7 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
             let status = self.status.to_inner();
             Delay::new(Duration::from_millis(status.consensus_interval)).await;
 
-            current_height = self.adapter.get_current_height(ctx.clone()).await?;
+            current_height = self.status.to_inner().current_height;
             if current_height == remote_height {
                 return Ok(false);
             }

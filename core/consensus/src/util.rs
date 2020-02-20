@@ -1,3 +1,4 @@
+use std::cmp::Eq;
 use std::collections::{BTreeMap, HashMap};
 use std::convert::TryFrom;
 use std::error::Error;
@@ -298,6 +299,14 @@ impl WalInfoQueue {
     }
 }
 
+pub fn check_list_roots<T: Eq>(cache_roots: &[T], block_roots: &[T]) -> bool {
+    block_roots.len() <= cache_roots.len()
+        && cache_roots
+            .iter()
+            .zip(block_roots.iter())
+            .all(|(c_root, e_root)| c_root == e_root)
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -336,5 +345,19 @@ mod test {
         let res = signature.verify(&hash, &aggregate_key, &"muta".into());
         println!("{:?}", res);
         assert!(res.is_ok());
+    }
+
+    #[test]
+    fn test_zip_roots() {
+        let roots_1 = vec![1, 2, 3, 4, 5];
+        let roots_2 = vec![1, 2, 3];
+        let roots_3 = vec![];
+        let roots_4 = vec![1, 2];
+        let roots_5 = vec![3, 4, 5, 6, 8];
+
+        assert!(check_list_roots(&roots_1, &roots_2));
+        assert!(!check_list_roots(&roots_3, &roots_2));
+        assert!(!check_list_roots(&roots_4, &roots_2));
+        assert!(!check_list_roots(&roots_5, &roots_2));
     }
 }

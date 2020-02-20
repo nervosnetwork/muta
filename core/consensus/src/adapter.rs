@@ -25,7 +25,7 @@ use protocol::{fixed_codec::FixedCodec, ProtocolResult};
 use crate::consensus::gen_overlord_status;
 use crate::fixed_types::{FixedBlock, FixedHeight, FixedPill, FixedSignedTxs, PullTxsRequest};
 use crate::message::{BROADCAST_HEIGHT, RPC_SYNC_PULL_BLOCK, RPC_SYNC_PULL_TXS};
-use crate::status::{StatusAgent, UpdateInfo};
+use crate::status::{ExecutedInfo, StatusAgent};
 use crate::util::{ExecuteInfo, WalInfoQueue};
 use crate::ConsensusError;
 
@@ -255,7 +255,7 @@ where
             .send_msg(
                 ctx,
                 OverlordMsg::RichStatus(gen_overlord_status(
-                    height,
+                    height + 1,
                     consensus_interval,
                     propose_ratio,
                     prevote_ratio,
@@ -590,7 +590,7 @@ where
             let resp = executor.exec(&exec_params, &txs)?;
             self.save_receipts(resp.receipts.clone()).await?;
             self.status
-                .update_after_exec(gen_update_info(resp.clone(), height, order_root));
+                .update_by_executed(gen_executed_info(resp.clone(), height, order_root));
             self.save_wal(height).await?;
         } else {
             return Err(ConsensusError::Other("Queue disconnect".to_string()).into());
@@ -617,7 +617,7 @@ where
     }
 }
 
-fn gen_update_info(exec_resp: ExecutorResp, height: u64, order_root: MerkleRoot) -> UpdateInfo {
+fn gen_executed_info(exec_resp: ExecutorResp, height: u64, order_root: MerkleRoot) -> ExecutedInfo {
     let cycles = exec_resp.all_cycles_used;
 
     let receipt = Merkle::from_hashes(
@@ -630,7 +630,7 @@ fn gen_update_info(exec_resp: ExecutorResp, height: u64, order_root: MerkleRoot)
     .get_root_hash()
     .unwrap_or_else(Hash::from_empty);
 
-    UpdateInfo {
+    ExecutedInfo {
         exec_height:  height,
         cycles_used:  cycles,
         receipt_root: receipt,

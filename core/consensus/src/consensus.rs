@@ -104,7 +104,7 @@ impl<Adapter: ConsensusAdapter + 'static> OverlordConsensus<Adapter> {
             .send_msg(
                 Context::new(),
                 OverlordMsg::RichStatus(gen_overlord_status(
-                    status.height,
+                    status.height + 1,
                     status.consensus_interval,
                     status.propose_ratio,
                     status.prevote_ratio,
