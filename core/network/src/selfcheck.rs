@@ -37,14 +37,14 @@ where
     }
 
     fn report_pending_data(&self) {
-        let peers = self.sessions.peers();
+        let sids = self.sessions.all();
         let mut total_size = 0;
 
-        let peer_report = peers
+        let report = sids
             .into_iter()
-            .map(|peer| {
-                let connected_addr = self.sessions.connected_addr(&peer);
-                let data_size = self.sessions.pending_data_size(&peer) / (1000 * 1000); // MB not MiB
+            .map(|sid| {
+                let connected_addr = self.sessions.connected_addr(sid);
+                let data_size = self.sessions.pending_data_size(sid) / (1000 * 1000); // MB not MiB
 
                 total_size += data_size;
                 (connected_addr, data_size)
@@ -52,8 +52,8 @@ where
             .collect::<Vec<_>>();
 
         info!(
-            "total pending size {} MB, peer(s) {:?}",
-            total_size, peer_report
+            "total pending size {} MB, session(s) {:?}",
+            total_size, report
         );
     }
 }

@@ -87,7 +87,7 @@ where
 
             // Peer may disconnect when we try to fetch its connected address.
             // This connected addr is mainly for debug purpose, so no error.
-            let connected_addr = sessions.connected_addr(&raw_msg.pid);
+            let connected_addr = sessions.connected_addr(raw_msg.sid);
             let smsg = SessionMessage {
                 sid: raw_msg.sid,
                 pid: raw_msg.pid,

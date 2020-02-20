@@ -107,35 +107,22 @@ impl SessionBook for SharedSessions {
         (peers, unknown)
     }
 
-    fn peers(&self) -> Vec<PeerId> {
+    fn all(&self) -> Vec<SessionId> {
+        self.sessions().read().iter().map(|s| s.id).collect()
+    }
+
+    fn connected_addr(&self, sid: SessionId) -> Option<ConnectedAddr> {
         self.sessions()
             .read()
-            .iter()
-            .map(|s| s.peer.id.as_ref().to_owned())
-            .collect()
+            .get(&sid)
+            .map(|s| s.connected_addr.to_owned())
     }
 
-    fn connected_addr(&self, pid: &PeerId) -> Option<ConnectedAddr> {
-        if let Some(peer) = self.inner.peer(pid) {
-            if peer.connectedness() == Connectedness::Connected {
-                if let Some(session) = self.sessions().read().get(&peer.session_id()) {
-                    return Some(session.connected_addr.to_owned());
-                }
-            }
-        }
-
-        None
-    }
-
-    fn pending_data_size(&self, pid: &PeerId) -> usize {
-        if let Some(peer) = self.inner.peer(pid) {
-            if peer.connectedness() == Connectedness::Connected {
-                if let Some(session) = self.sessions().read().get(&peer.session_id()) {
-                    return session.ctx.pending_data_size();
-                }
-            }
-        }
-
-        0
+    fn pending_data_size(&self, sid: SessionId) -> usize {
+        self.sessions()
+            .read()
+            .get(&sid)
+            .map(|s| s.ctx.pending_data_size())
+            .unwrap_or_else(|| 0)
     }
 }

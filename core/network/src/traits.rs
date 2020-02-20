@@ -64,9 +64,9 @@ pub trait SessionBook {
     fn refresh_blocked(&self);
     fn by_chain(&self, addrs: Vec<Address>) -> (Vec<SessionId>, Vec<Address>);
     fn peers_by_chain(&self, addrs: Vec<Address>) -> (Vec<PeerId>, Vec<Address>);
-    fn peers(&self) -> Vec<PeerId>;
-    fn connected_addr(&self, pid: &PeerId) -> Option<ConnectedAddr>;
-    fn pending_data_size(&self, pid: &PeerId) -> usize;
+    fn all(&self) -> Vec<SessionId>;
+    fn connected_addr(&self, sid: SessionId) -> Option<ConnectedAddr>;
+    fn pending_data_size(&self, sid: SessionId) -> usize;
 }
 
 pub trait MultiaddrExt {
