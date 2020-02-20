@@ -1,3 +1,6 @@
+use protocol::fixed_codec::FixedCodec;
+use protocol::types::Hash as PHash;
+
 use crate::schema::{Address, Bytes, Hash, MerkleRoot, Uint64};
 
 #[derive(juniper::GraphQLObject, Clone)]
@@ -12,6 +15,8 @@ pub struct Block {
     header:            BlockHeader,
     #[graphql(description = "The body section of a block")]
     ordered_tx_hashes: Vec<Hash>,
+    #[graphql(description = "Hash of the block")]
+    hash:              Hash,
 }
 
 #[derive(juniper::GraphQLObject, Clone)]
@@ -105,12 +110,16 @@ impl From<protocol::types::BlockHeader> for BlockHeader {
 impl From<protocol::types::Block> for Block {
     fn from(block: protocol::types::Block) -> Self {
         Block {
-            header:            BlockHeader::from(block.header),
+            header:            BlockHeader::from(block.header.clone()),
             ordered_tx_hashes: block
                 .ordered_tx_hashes
+                .clone()
                 .into_iter()
                 .map(MerkleRoot::from)
                 .collect(),
+            hash:              Hash::from(PHash::digest(
+                block.encode_fixed().expect("rlp encode never fail"),
+            )),
         }
     }
 }
