@@ -52,9 +52,16 @@ impl SessionBook for SharedSessions {
     }
 
     fn refresh_blocked(&self) {
-        let all_sessions = { self.sessions().read().clone() };
+        let all_blocked = {
+            self.sessions()
+                .read()
+                .iter()
+                .filter(|s| s.is_blocked())
+                .cloned()
+                .collect::<Vec<_>>()
+        };
 
-        for session in all_sessions {
+        for session in all_blocked {
             let pending_data_size = session.ctx.pending_data_size();
             // FIXME: multi streams
             let estimated_time = (pending_data_size / self.config.max_stream_window_size) as u64;
