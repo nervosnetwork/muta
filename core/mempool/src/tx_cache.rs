@@ -204,15 +204,16 @@ impl TxCache {
                     continue;
                 }
                 // After previous filter, tx are valid and should cache in temp_queue.
-                if let Err(e) = queue_role
+                if queue_role
                     .candidate
                     .push(Arc::<TxWrapper>::clone(&shared_tx))
+                    .is_err()
                 {
                     log::error!(
-                        "[core_mempool]: {:?}, leak a tx {:?} while package",
-                        e,
+                        "[core_mempool]: candidate queue is full while package, delete {:?}",
                         &shared_tx.tx.tx_hash
                     );
+                    self.map.remove(&shared_tx.tx.tx_hash);
                 }
 
                 if stage == Stage::Finished
@@ -323,15 +324,16 @@ impl TxCache {
             // pop off previous incumbent queue and push them into current incumbent queue.
             if self.concurrent_count.load(Ordering::SeqCst) == 0 {
                 while let Ok(shared_tx) = queue_role.candidate.pop() {
-                    if let Err(e) = queue_role
+                    if queue_role
                         .incumbent
                         .push(Arc::<TxWrapper>::clone(&shared_tx))
+                        .is_err()
                     {
                         log::error!(
-                            "[core_mempool]: {:?}, leak a tx {:?} while process_omission_txs",
-                            e,
+                            "[core_mempool]: incumbent queue is full while process_omission_txs, delete {:?}",
                             &shared_tx.tx.tx_hash
                         );
+                        self.map.remove(&shared_tx.tx.tx_hash);
                     }
                 }
                 break 'outer;
@@ -355,15 +357,16 @@ impl TxCache {
                     continue;
                 }
                 // After previous filter, tx are valid and should cache in temp_queue.
-                if let Err(e) = queue_role
+                if queue_role
                     .candidate
                     .push(Arc::<TxWrapper>::clone(&shared_tx))
+                    .is_err()
                 {
                     log::error!(
-                        "[core_mempool]: {:?}, leak a tx {:?} while flush_incumbent_queue",
-                        e,
+                        "[core_mempool]: candidate queue is full while flush_incumbent_queue, delete {:?}",
                         &shared_tx.tx.tx_hash
                     );
+                    self.map.remove(&shared_tx.tx.tx_hash);
                 }
             } else {
                 // Switch queue_roles
