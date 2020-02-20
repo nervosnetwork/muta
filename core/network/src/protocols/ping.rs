@@ -53,9 +53,8 @@ impl Future for EventTranslator {
             };
 
             let mgr_event = match event {
-                PingEvent::Ping(ref pid) | PingEvent::Pong(ref pid, _) => {
-                    PeerManagerEvent::PeerAlive { pid: pid.clone() }
-                }
+                PingEvent::Ping(ref _pid) => continue,
+                PingEvent::Pong(ref pid, _) => PeerManagerEvent::PeerAlive { pid: pid.clone() },
                 PingEvent::Timeout(ref pid) => {
                     let kind = RetryKind::TimedOut;
 
