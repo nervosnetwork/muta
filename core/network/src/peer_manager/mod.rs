@@ -1,15 +1,15 @@
-mod book;
 mod disc;
 mod ident;
 mod peer;
 mod save_restore;
+mod shared;
 
 use save_restore::{NoPeerDatFile, PeerDatFile, SaveRestore};
 
-pub use book::{SharedSessions, SharedSessionsConfig};
 pub use disc::DiscoveryAddrManager;
 pub use ident::IdentifyCallback;
 pub use peer::{ArcPeer, Connectedness};
+pub use shared::{SharedSessions, SharedSessionsConfig};
 
 use std::{
     borrow::Borrow,
