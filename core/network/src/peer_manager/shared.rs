@@ -1,5 +1,5 @@
 use super::{ArcSession, Connectedness, Inner};
-use crate::traits::SessionBook;
+use crate::{common::ConnectedAddr, traits::SessionBook};
 
 use log::debug;
 use parking_lot::RwLock;
@@ -105,5 +105,37 @@ impl SessionBook for SharedSessions {
         }
 
         (peers, unknown)
+    }
+
+    fn peers(&self) -> Vec<PeerId> {
+        self.sessions()
+            .read()
+            .iter()
+            .map(|s| s.peer.id.as_ref().to_owned())
+            .collect()
+    }
+
+    fn connected_addr(&self, pid: &PeerId) -> Option<ConnectedAddr> {
+        if let Some(peer) = self.inner.peer(pid) {
+            if peer.connectedness() == Connectedness::Connected {
+                if let Some(session) = self.sessions().read().get(&peer.session_id()) {
+                    return Some(session.connected_addr.to_owned());
+                }
+            }
+        }
+
+        None
+    }
+
+    fn pending_data_size(&self, pid: &PeerId) -> usize {
+        if let Some(peer) = self.inner.peer(pid) {
+            if peer.connectedness() == Connectedness::Connected {
+                if let Some(session) = self.sessions().read().get(&peer.session_id()) {
+                    return session.ctx.pending_data_size();
+                }
+            }
+        }
+
+        0
     }
 }

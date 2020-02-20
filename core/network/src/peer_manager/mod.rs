@@ -49,7 +49,7 @@ use crate::{
     common::{ConnectedAddr, HeartBeat},
     error::NetworkError,
     event::{ConnectionEvent, ConnectionType, PeerManagerEvent},
-    traits::{MultiaddrExt, PeerQuerier},
+    traits::MultiaddrExt,
 };
 
 macro_rules! peer_id_from_multiaddr {
@@ -386,36 +386,6 @@ impl PeerManagerHandle {
         debug_assert!(listen.is_some(), "listen should alway be set");
 
         listen.map(|addr| vec![addr]).unwrap_or_else(Vec::new)
-    }
-}
-
-impl PeerQuerier for PeerManagerHandle {
-    fn connected_addr(&self, pid: &PeerId) -> Option<ConnectedAddr> {
-        if let Some(peer) = self.inner.peer(pid) {
-            if let Some(session) = self.inner.session(&peer.session_id()) {
-                return Some(session.connected_addr.to_owned());
-            }
-        }
-
-        None
-    }
-
-    fn connected_peers(&self) -> Vec<PeerId> {
-        self.inner
-            .share_sessions()
-            .into_iter()
-            .map(|s| s.peer.id.as_ref().to_owned())
-            .collect()
-    }
-
-    fn pending_data_size(&self, pid: &PeerId) -> usize {
-        if let Some(peer) = self.inner.peer(pid) {
-            if let Some(session) = self.inner.session(&peer.session_id()) {
-                return session.ctx.pending_data_size();
-            }
-        }
-
-        0
     }
 }
 

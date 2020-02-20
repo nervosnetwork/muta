@@ -58,18 +58,15 @@ pub trait ListenExchangeManager {
     fn misbehave(&mut self, sid: SessionId);
 }
 
-pub trait PeerQuerier {
-    fn connected_addr(&self, pid: &PeerId) -> Option<ConnectedAddr>;
-    fn connected_peers(&self) -> Vec<PeerId>;
-    fn pending_data_size(&self, pid: &PeerId) -> usize;
-}
-
 pub trait SessionBook {
     fn all_sendable(&self) -> Vec<SessionId>;
     fn all_blocked(&self) -> Vec<SessionId>;
     fn refresh_blocked(&self);
     fn by_chain(&self, addrs: Vec<Address>) -> (Vec<SessionId>, Vec<Address>);
     fn peers_by_chain(&self, addrs: Vec<Address>) -> (Vec<PeerId>, Vec<Address>);
+    fn peers(&self) -> Vec<PeerId>;
+    fn connected_addr(&self, pid: &PeerId) -> Option<ConnectedAddr>;
+    fn pending_data_size(&self, pid: &PeerId) -> usize;
 }
 
 pub trait MultiaddrExt {
