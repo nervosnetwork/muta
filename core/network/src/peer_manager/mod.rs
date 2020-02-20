@@ -749,6 +749,8 @@ impl PeerManager {
                 // repeated conection, then we can add it to that peer
                 self.unknown_addrs.insert(addr.into());
             }
+        } else {
+            self.unknown_addrs.insert(addr.into());
         }
     }
 
