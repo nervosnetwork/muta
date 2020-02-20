@@ -282,9 +282,10 @@ impl fmt::Display for Peer {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "{:?} chain addr {:?} last connected at {} alive {} retry {} current {}",
+            "{:?} chain addr {:?} multiaddr {:?} last connected at {} alive {} retry {} current {}",
             self.id,
             self.chain_addr,
+            self.multiaddrs.read().iter(),
             self.connected_at.load(Ordering::SeqCst),
             self.alive.load(Ordering::SeqCst),
             self.retry.load(Ordering::SeqCst),

@@ -6,6 +6,7 @@ use std::{
     time::Duration,
 };
 
+use log::error;
 use protocol::ProtocolResult;
 use tentacle::{
     multiaddr::{multiaddr, Multiaddr, Protocol},
@@ -18,6 +19,7 @@ use crate::{
     error::NetworkError,
     peer_manager::{ArcPeer, PeerManagerConfig, SharedSessionsConfig},
     selfcheck::SelfCheckConfig,
+    traits::MultiaddrExt,
 };
 
 // TODO: 0.0.0.0 expose? 127.0.0.1 doesn't work because of tentacle-discovery.
@@ -217,9 +219,21 @@ impl NetworkConfig {
             let pk = hex::decode(pk_hex)
                 .map(PublicKey::Secp256k1)
                 .map_err(|_| NetworkError::InvalidPublicKey)?;
+            let peer_id = pk.peer_id();
 
-            let multiaddr = Self::parse_peer_addr(peer_addr)?;
+            let mut multiaddr = Self::parse_peer_addr(peer_addr)?;
             let peer = ArcPeer::from_pubkey(pk).map_err(NetworkError::from)?;
+
+            if let Some(peer_id_bytes) = multiaddr.peer_id_bytes() {
+                if peer_id_bytes != peer_id.as_bytes() {
+                    error!("network: pubkey doesn't match peer id in {}", multiaddr);
+                    return Ok(peer);
+                }
+            }
+            if !multiaddr.has_peer_id() {
+                multiaddr.push_id(peer_id);
+            }
+
             peer.set_multiaddrs(vec![multiaddr]);
 
             Ok(peer)

@@ -852,8 +852,6 @@ impl PeerManager {
     }
 
     fn process_event(&mut self, event: PeerManagerEvent) {
-        debug!("peer event: {:?} {}", self.peer_id, event);
-
         match event {
             PeerManagerEvent::NewSession { pubkey, ctx, .. } => self.new_session(pubkey, ctx),
             PeerManagerEvent::SessionClosed { sid, .. } => self.session_closed(sid),
