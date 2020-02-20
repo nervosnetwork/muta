@@ -832,8 +832,8 @@ impl PeerManager {
         };
 
         if let Some(peer) = self.inner.peer(&peer_id) {
-            // For bootstrap peer, we'll keep at least one multiaddr.
-            if !self.bootstraps.contains(&peer_id) || peer.multiaddrs_len() > 1 {
+            // We keep bootstrap peer addresses
+            if !self.bootstraps.contains(&peer_id) {
                 peer.remove_multiaddr(&addr);
             }
             peer.increase_retry();
