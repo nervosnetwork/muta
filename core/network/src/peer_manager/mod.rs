@@ -13,6 +13,9 @@ pub use ident::IdentifyCallback;
 pub use peer::{ArcPeer, Connectedness};
 pub use shared::{SharedSessions, SharedSessionsConfig};
 
+#[cfg(test)]
+mod test_manager;
+
 use std::{
     borrow::Borrow,
     cmp::PartialEq,
@@ -39,8 +42,9 @@ use log::{debug, error, info, warn};
 use parking_lot::RwLock;
 use protocol::types::Address;
 use rand::seq::IteratorRandom;
+#[cfg(not(test))]
+use tentacle::context::SessionContext;
 use tentacle::{
-    context::SessionContext,
     multiaddr::Multiaddr,
     secio::{PeerId, PublicKey},
     service::{SessionType, TargetProtocol},
@@ -53,6 +57,9 @@ use crate::{
     event::{ConnectionEvent, ConnectionType, PeerManagerEvent},
     traits::MultiaddrExt,
 };
+
+#[cfg(test)]
+use crate::test::mock::SessionContext;
 
 macro_rules! peer_id_from_multiaddr {
     ($multiaddr:expr) => {
@@ -387,6 +394,11 @@ impl PeerManager {
         PeerManagerHandle {
             inner: Arc::clone(&self.inner),
         }
+    }
+
+    #[cfg(test)]
+    pub(self) fn inner(&self) -> Arc<Inner> {
+        Arc::clone(&self.inner)
     }
 
     pub fn share_session_book(&self, config: SharedSessionsConfig) -> SharedSessions {

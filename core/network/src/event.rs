@@ -2,13 +2,17 @@ use std::{error::Error, sync::Arc};
 
 use derive_more::{Display, From};
 use protocol::{traits::Priority, types::Address, Bytes};
+#[cfg(not(test))]
+use tentacle::context::SessionContext;
 use tentacle::{
-    context::SessionContext,
     multiaddr::Multiaddr,
     secio::{PeerId, PublicKey},
     service::TargetProtocol,
     ProtocolId, SessionId,
 };
+
+#[cfg(test)]
+use crate::test::mock::SessionContext;
 
 #[derive(Debug, Display)]
 pub enum ConnectionEvent {

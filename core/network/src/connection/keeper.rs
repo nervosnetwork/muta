@@ -15,6 +15,9 @@ use crate::{
     event::{ConnectionType, PeerManagerEvent, RemoveKind, RetryKind},
 };
 
+#[cfg(test)]
+use crate::test::mock::SessionContext;
+
 // This macro tries to extract PublicKey from SessionContext, it's Optional.
 // If it get None, then simple `return` to exit caller function. Otherwise,
 // return PublicKey reference.
@@ -177,6 +180,9 @@ impl ServiceHandle for ConnectionServiceKeeper {
             // Partial protocol task logic take long time to process, usually
             // indicate bad protocol implement.
             ServiceError::SessionBlocked { session_context } => {
+                #[cfg(test)]
+                let session_context = SessionContext::from(session_context).arced();
+
                 let session_blocked = PeerManagerEvent::SessionBlocked {
                     ctx: session_context
                 };
@@ -193,7 +199,7 @@ impl ServiceHandle for ConnectionServiceKeeper {
                     error!("impossible, got connection from/to {:?} without public key, disconnect it", session_context.address);
 
                     // Just in case
-                    if let Err(e) = ctx.disconnect(session_context.id) {            
+                    if let Err(e) = ctx.disconnect(session_context.id) {
                         error!("disconnect session {} {}", session_context.id, e);
                     }
                     return;
@@ -201,6 +207,8 @@ impl ServiceHandle for ConnectionServiceKeeper {
 
                 let pubkey = peer_pubkey!(&session_context).clone();
                 let pid = pubkey.peer_id();
+                #[cfg(test)]
+                let session_context = SessionContext::from(session_context).arced();
                 let new_peer_session = PeerManagerEvent::NewSession { pid, pubkey, ctx: session_context };
 
                 self.report_peer(new_peer_session);
