@@ -224,13 +224,13 @@ impl NetworkConfig {
             let mut multiaddr = Self::parse_peer_addr(peer_addr)?;
             let peer = ArcPeer::from_pubkey(pk).map_err(NetworkError::from)?;
 
-            if let Some(peer_id_bytes) = multiaddr.peer_id_bytes() {
-                if peer_id_bytes != peer_id.as_bytes() {
+            if let Some(id_bytes) = multiaddr.id_bytes() {
+                if id_bytes != peer_id.as_bytes() {
                     error!("network: pubkey doesn't match peer id in {}", multiaddr);
                     return Ok(peer);
                 }
             }
-            if !multiaddr.has_peer_id() {
+            if !multiaddr.has_id() {
                 multiaddr.push_id(peer_id);
             }
 

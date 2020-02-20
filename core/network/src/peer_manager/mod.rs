@@ -55,7 +55,7 @@ use crate::{
 macro_rules! peer_id_from_multiaddr {
     ($multiaddr:expr) => {
         $multiaddr
-            .peer_id_bytes()
+            .id_bytes()
             .map(|bs| PeerId::from_bytes(bs.to_vec()))
     };
 }
@@ -254,7 +254,7 @@ impl Inner {
     }
 
     pub fn set_listen(&self, mut multiaddr: Multiaddr) {
-        if !multiaddr.has_peer_id() {
+        if !multiaddr.has_id() {
             multiaddr.push_id(self.id.as_ref().to_owned());
         }
 
@@ -580,7 +580,7 @@ impl PeerManager {
             }
             SessionType::Outbound => {
                 let mut multiaddr = ctx.address.to_owned();
-                if !multiaddr.has_peer_id() {
+                if !multiaddr.has_id() {
                     multiaddr.push_id(remote_peer_id);
                 }
 
@@ -766,7 +766,7 @@ impl PeerManager {
             let addrs = addrs
                 .into_iter()
                 .map(|mut ma| {
-                    if !ma.has_peer_id() {
+                    if !ma.has_id() {
                         ma.push_id(pid.to_owned())
                     }
                     ma
@@ -792,7 +792,7 @@ impl PeerManager {
         }
 
         if let Some(session) = self.inner.session(&sid) {
-            if !addr.has_peer_id() {
+            if !addr.has_id() {
                 addr.push_id(session.peer.id.as_ref().to_owned());
             }
 
@@ -879,7 +879,7 @@ impl PeerManager {
                 self.reconnect_addr_later(addr);
             }
             PeerManagerEvent::AddListenAddr { mut addr } => {
-                if !addr.has_peer_id() {
+                if !addr.has_id() {
                     addr.push_id(self.peer_id.to_owned());
                 }
 
@@ -890,7 +890,7 @@ impl PeerManager {
                 self.inner.set_listen(addr);
             }
             PeerManagerEvent::RemoveListenAddr { mut addr } => {
-                if !addr.has_peer_id() {
+                if !addr.has_id() {
                     addr.push_id(self.peer_id.to_owned());
                 }
 

@@ -60,7 +60,7 @@ impl TryFrom<SerdePeer> for ArcPeer {
             .multiaddrs
             .into_iter()
             .map(|mut ma| {
-                if !ma.has_peer_id() {
+                if !ma.has_id() {
                     ma.push_id(pid.clone())
                 }
                 ma

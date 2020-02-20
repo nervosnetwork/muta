@@ -106,7 +106,7 @@ impl Peer {
     }
 
     fn validate_multiaddr(pid: &PeerId, ma: &Multiaddr) -> bool {
-        ma.has_peer_id() && ma.peer_id_bytes() == Some(Cow::Borrowed(pid.as_bytes()))
+        ma.has_id() && ma.id_bytes() == Some(Cow::Borrowed(pid.as_bytes()))
     }
 
     /// # note: we only accept multiaddr with peer id included

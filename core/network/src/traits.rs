@@ -20,7 +20,6 @@ use crate::{
 };
 
 pub trait NetworkProtocol {
-    // TODO: change to TargetProtocol after tentacle 0.3
     fn target() -> TargetProtocol;
 
     fn metas(self) -> Vec<ProtocolMeta>;
@@ -70,8 +69,9 @@ pub trait SessionBook {
 }
 
 pub trait MultiaddrExt {
-    fn peer_id_bytes(&self) -> Option<Cow<'_, [u8]>>;
-    fn has_peer_id(&self) -> bool;
+    fn no_id(self) -> Multiaddr;
+    fn id_bytes(&self) -> Option<Cow<'_, [u8]>>;
+    fn has_id(&self) -> bool;
     fn push_id(&mut self, peer_id: PeerId);
 }
 
