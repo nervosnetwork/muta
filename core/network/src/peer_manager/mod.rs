@@ -298,7 +298,11 @@ impl Inner {
         let book = self.peers.read();
         let qualified_peers = book
             .iter()
-            .filter(|p| p.connectedness() == Connectedness::CanConnect && p.retry_ready())
+            .filter(|p| {
+                p.connectedness() == Connectedness::CanConnect
+                    && p.retry_ready()
+                    && p.multiaddrs_len() > 0
+            })
             .map(|p| p.to_owned());
 
         qualified_peers.choose_multiple(&mut rng, max)
