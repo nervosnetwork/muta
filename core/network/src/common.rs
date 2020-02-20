@@ -51,29 +51,6 @@ pub fn socket_to_multi_addr(socket_addr: SocketAddr) -> Multiaddr {
 }
 
 impl MultiaddrExt for Multiaddr {
-    fn no_id(mut self) -> Multiaddr {
-        if !self.has_id() {
-            return self.to_owned();
-        }
-
-        let mut id_count = self
-            .iter()
-            .filter(|p| match p {
-                Protocol::P2P(_) => true,
-                _ => false,
-            })
-            .count();
-
-        while id_count > 0 {
-            match self.pop() {
-                Some(Protocol::P2P(_)) => id_count -= 1,
-                _ => (),
-            }
-        }
-
-        self
-    }
-
     fn id_bytes(&self) -> Option<Cow<'_, [u8]>> {
         for proto in self.iter() {
             match proto {

@@ -69,7 +69,6 @@ pub trait SessionBook {
 }
 
 pub trait MultiaddrExt {
-    fn no_id(self) -> Multiaddr;
     fn id_bytes(&self) -> Option<Cow<'_, [u8]>>;
     fn has_id(&self) -> bool;
     fn push_id(&mut self, peer_id: PeerId);

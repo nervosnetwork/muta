@@ -1,9 +1,11 @@
+mod addr_info;
 mod disc;
 mod ident;
 mod peer;
 mod save_restore;
 mod shared;
 
+use addr_info::AddrInfo;
 use save_restore::{NoPeerDatFile, PeerDatFile, SaveRestore};
 
 pub use disc::DiscoveryAddrManager;
@@ -62,73 +64,6 @@ macro_rules! peer_id_from_multiaddr {
 
 const MAX_RETRY_COUNT: u8 = 30;
 const ALIVE_RETRY_INTERVAL: u64 = 3; // seconds
-
-#[derive(Debug, Clone)]
-pub struct UnknownAddr {
-    addr:        Multiaddr,
-    connecting:  Arc<AtomicBool>,
-    retry_count: u8,
-}
-
-impl UnknownAddr {
-    pub fn new(addr: Multiaddr) -> Self {
-        UnknownAddr {
-            addr,
-            connecting: Arc::new(AtomicBool::new(false)),
-            retry_count: 0,
-        }
-    }
-
-    pub fn connecting(&self) -> bool {
-        self.connecting.load(Ordering::SeqCst)
-    }
-
-    pub fn set_connecting(&self, state: bool) {
-        self.connecting.store(state, Ordering::SeqCst);
-    }
-
-    pub fn increase_retry_count(&mut self) {
-        self.retry_count += 1;
-
-        debug_assert!(self.retry_count < MAX_RETRY_COUNT + 1);
-    }
-
-    pub fn reach_max_retry(&self) -> bool {
-        MAX_RETRY_COUNT + 1 >= self.retry_count
-    }
-}
-
-impl Into<Multiaddr> for UnknownAddr {
-    fn into(self) -> Multiaddr {
-        self.addr
-    }
-}
-
-impl Into<UnknownAddr> for Multiaddr {
-    fn into(self) -> UnknownAddr {
-        UnknownAddr::new(self)
-    }
-}
-
-impl Borrow<Multiaddr> for UnknownAddr {
-    fn borrow(&self) -> &Multiaddr {
-        &self.addr
-    }
-}
-
-impl PartialEq for UnknownAddr {
-    fn eq(&self, other: &Self) -> bool {
-        self.addr == other.addr
-    }
-}
-
-impl Hash for UnknownAddr {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.addr.hash(state);
-    }
-}
-
-impl Eq for UnknownAddr {}
 
 #[derive(Debug)]
 struct Session {
@@ -397,7 +332,7 @@ pub struct PeerManager {
     bootstraps: HashSet<ArcPeer>,
 
     // unknown
-    unknown_addrs: HashSet<UnknownAddr>,
+    unknown_addrs: HashSet<AddrInfo>,
 
     event_rx: UnboundedReceiver<PeerManagerEvent>,
     conn_tx:  UnboundedSender<ConnectionEvent>,
@@ -525,8 +460,8 @@ impl PeerManager {
         let unknown_condidates = self.unconnected_unknowns(remain);
         if !unknown_condidates.is_empty() {
             let addrs = unknown_condidates.into_iter().map(|unknown| {
-                unknown.set_connecting(true);
-                unknown.addr.clone()
+                unknown.mark_connecting();
+                unknown.clone().into()
             });
 
             condidates.extend(addrs);
@@ -535,17 +470,16 @@ impl PeerManager {
         condidates
     }
 
-    fn unconnected_unknowns(&self, max: usize) -> Vec<&UnknownAddr> {
+    fn unconnected_unknowns(&self, max: usize) -> Vec<&AddrInfo> {
         self.unknown_addrs
             .iter()
-            .filter(|unknown| !unknown.connecting())
+            .filter(|unknown| !unknown.is_connecting() && unknown.retry_ready())
             .take(max)
             .collect()
     }
 
     fn new_session(&mut self, pubkey: PublicKey, ctx: Arc<SessionContext>) {
         self.unknown_addrs.remove(&ctx.address);
-        self.unknown_addrs.remove(&ctx.address.clone().no_id());
 
         let remote_peer_id = pubkey.peer_id();
         let peer = match self.inner.peer(&remote_peer_id) {
@@ -820,11 +754,9 @@ impl PeerManager {
     }
 
     fn reconnect_addr_later(&mut self, addr: Multiaddr) {
-        if let Some(mut unknown) = self.unknown_addrs.take(&addr) {
-            unknown.set_connecting(false);
-            unknown.increase_retry_count();
-
-            if !unknown.reach_max_retry() {
+        if let Some(unknown) = self.unknown_addrs.take(&addr) {
+            unknown.inc_retry();
+            if !unknown.run_out_retry() {
                 self.unknown_addrs.insert(unknown);
             }
 
@@ -962,6 +894,31 @@ impl Future for PeerManager {
                 self.connect_multiaddrs(unconnected_addrs);
             }
         }
+
+        // Clean unknown addrs
+        let run_out_retry = |addr: &'_ &AddrInfo| -> bool {
+            if addr.is_timeout() {
+                addr.inc_retry();
+            }
+            if addr.run_out_retry() {
+                true
+            } else {
+                false
+            }
+        };
+
+        let ghost: HashSet<_> = self
+            .unknown_addrs
+            .iter()
+            .filter(run_out_retry)
+            .cloned()
+            .collect();
+
+        self.unknown_addrs = self
+            .unknown_addrs
+            .symmetric_difference(&ghost)
+            .cloned()
+            .collect();
 
         Poll::Pending
     }
