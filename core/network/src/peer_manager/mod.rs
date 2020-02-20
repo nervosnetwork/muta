@@ -545,6 +545,7 @@ impl PeerManager {
 
     fn new_session(&mut self, pubkey: PublicKey, ctx: Arc<SessionContext>) {
         self.unknown_addrs.remove(&ctx.address);
+        self.unknown_addrs.remove(&ctx.address.clone().no_id());
 
         let remote_peer_id = pubkey.peer_id();
         let peer = match self.inner.peer(&remote_peer_id) {
