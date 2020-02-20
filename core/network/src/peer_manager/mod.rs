@@ -907,8 +907,9 @@ impl PeerManager {
 
                 // TODO: listen on multi ports?
                 if let Some(peer) = self.inner.peer(&self.peer_id) {
-                    peer.add_multiaddrs(vec![addr]);
+                    peer.set_multiaddrs(vec![addr.clone()]);
                 }
+                self.inner.set_listen(addr);
             }
             PeerManagerEvent::RemoveListenAddr { mut addr } => {
                 if !addr.has_peer_id() {
