@@ -862,3 +862,66 @@ async fn should_skip_peers_not_retry_ready_on_connect_peers() {
         _ => panic!("should not have any connection event"),
     }
 }
+
+// DiscoverMultiAddrs reuse DiscoverAddr logic
+#[tokio::test]
+async fn should_add_multiaddrs_to_unknown_book_on_discover_multi_addrs() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+    let test_multiaddrs: Vec<Multiaddr> = (0..10)
+        .into_iter()
+        .map(|port| {
+            let peer = make_peer(port + 7000);
+            peer.multiaddrs().pop().expect("peer multiaddr")
+        })
+        .collect();
+
+    assert!(mgr.inner.unknown_addrs.is_empty());
+
+    let discover_multi_addrs = PeerManagerEvent::DiscoverMultiAddrs {
+        addrs: test_multiaddrs.clone(),
+    };
+    mgr.poll_event(discover_multi_addrs).await;
+
+    let unknown_book = &mgr.inner.unknown_addrs;
+    assert_eq!(unknown_book.len(), 10, "should have 10 multiaddrs");
+    assert!(
+        !test_multiaddrs.iter().any(|ma| !unknown_book.contains(ma)),
+        "test multiaddrs should all be inserted"
+    );
+}
+
+#[tokio::test]
+async fn should_skip_already_exist_peer_multiaddr_on_discover_multi_addrs() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+    let remote_peers = make_sessions(&mut mgr, 1).await;
+    let test_peer = remote_peers.first().expect("get first");
+
+    assert!(mgr.inner.unknown_addrs.is_empty());
+
+    let discover_multi_addrs = PeerManagerEvent::DiscoverMultiAddrs {
+        addrs: vec![test_peer.multiaddrs().pop().expect("peer multiaddr")],
+    };
+    mgr.poll_event(discover_multi_addrs).await;
+
+    assert!(
+        mgr.inner.unknown_addrs.is_empty(),
+        "should not add exist peer's multiaddr"
+    );
+}
+
+#[tokio::test]
+async fn should_skip_multiaddrs_without_id_included_on_discover_multi_addrs() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+    let test_multiaddr = make_multiaddr(2077, None);
+
+    assert!(mgr.inner.unknown_addrs.is_empty());
+    let discover_multi_addrs = PeerManagerEvent::DiscoverMultiAddrs {
+        addrs: vec![test_multiaddr],
+    };
+    mgr.poll_event(discover_multi_addrs).await;
+
+    assert!(
+        mgr.inner.unknown_addrs.is_empty(),
+        "should ignore multiaddr without id included"
+    );
+}
