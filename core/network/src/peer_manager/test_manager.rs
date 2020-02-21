@@ -483,6 +483,43 @@ async fn should_keep_new_connection_for_error_outdated_peer_session_on_new_sessi
 }
 
 #[tokio::test]
+async fn should_reject_new_connections_when_we_reach_max_connections_on_new_session() {
+    let (mut mgr, mut conn_rx) = make_manager(0, 10); // set max to 10
+    let _remote_peers = make_sessions(&mut mgr, 10).await;
+
+    let remote_pubkey = make_pubkey();
+    let remote_addr = make_multiaddr(2077, Some(remote_pubkey.peer_id()));
+    mgr.inner.unknown_addrs.insert(remote_addr.clone().into());
+
+    let sess_ctx = SessionContext::make(
+        SessionId::new(99),
+        remote_addr.clone(),
+        SessionType::Outbound,
+        remote_pubkey.clone(),
+    );
+    let new_session = PeerManagerEvent::NewSession {
+        pid:    remote_pubkey.peer_id(),
+        pubkey: remote_pubkey.clone(),
+        ctx:    sess_ctx.arced(),
+    };
+    mgr.poll_event(new_session).await;
+
+    let inner = mgr.core_inner();
+    assert_eq!(inner.conn_count(), 10, "should not increase conn count");
+    assert_eq!(
+        mgr.inner.unknown_addrs.len(),
+        1,
+        "should not touch unknown addr"
+    );
+
+    let conn_event = conn_rx.next().await.expect("should have disconnect event");
+    match conn_event {
+        ConnectionEvent::Disconnect(sid) => assert_eq!(sid, 99.into(), "should be new session id"),
+        _ => panic!("should be disconnect event"),
+    }
+}
+
+#[tokio::test]
 async fn should_remove_session_on_session_closed() {
     let (mut mgr, _conn_rx) = make_manager(2, 20);
     let remote_peers = make_sessions(&mut mgr, 1).await;

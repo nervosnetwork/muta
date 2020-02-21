@@ -507,6 +507,13 @@ impl PeerManager {
     }
 
     fn new_session(&mut self, pubkey: PublicKey, ctx: Arc<SessionContext>) {
+        // TODO: always allow connections from consensus peers even when
+        // we reach max connections
+        if self.inner.conn_count() >= self.config.max_connections {
+            self.disconnect_session(ctx.id);
+            return;
+        }
+
         self.unknown_addrs.remove(&ctx.address);
 
         let remote_peer_id = pubkey.peer_id();
