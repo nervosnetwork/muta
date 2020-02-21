@@ -449,6 +449,13 @@ impl PeerManager {
         self.connect_peers(peers.clone());
     }
 
+    pub fn disconnect_session(&self, sid: SessionId) {
+        let disconnect_peer = ConnectionEvent::Disconnect(sid);
+        if self.conn_tx.unbounded_send(disconnect_peer).is_err() {
+            error!("network: connection service exit");
+        }
+    }
+
     pub fn connected_addrs(&self) -> Vec<ConnectedAddr> {
         let sessions = self.inner.share_sessions();
 
@@ -520,6 +527,24 @@ impl PeerManager {
         };
 
         let connectedness = peer.connectedness();
+        if connectedness == Connectedness::Connected {
+            // This should not happen, because of repeated connection event
+            error!("network: got new session event on same peer {:?}", peer.id);
+
+            let exist_sid = peer.session_id();
+            if exist_sid != ctx.id && self.inner.session(&exist_sid).is_some() {
+                // We don't support multiple connections, disconnect new one
+                self.disconnect_session(ctx.id);
+                return;
+            }
+
+            if self.inner.session(&exist_sid).is_none() {
+                // We keep new session, outdated will be updated after we insert
+                // it.
+                error!("network: bug peer session {} outdated", exist_sid);
+            }
+        }
+
         // Connecting/Connected was already counted
         if connectedness != Connectedness::Connecting && connectedness != Connectedness::Connected {
             self.inner.inc_conn_count();
@@ -595,10 +620,7 @@ impl PeerManager {
             self.inner.remove_peer(&session.peer.id);
         }
 
-        let disconnect_peer = ConnectionEvent::Disconnect(sid);
-        if self.conn_tx.unbounded_send(disconnect_peer).is_err() {
-            debug!("network: connection service exit");
-        }
+        self.disconnect_session(sid);
     }
 
     fn session_blocked(&self, ctx: Arc<SessionContext>) {
@@ -627,10 +649,7 @@ impl PeerManager {
             self.inner.dec_conn_count();
 
             // Make sure we disconnect this peer
-            let disconnect_peer = ConnectionEvent::Disconnect(sid);
-            if self.conn_tx.unbounded_send(disconnect_peer).is_err() {
-                debug!("network: connection service exit");
-            }
+            self.disconnect_session(sid);
         }
 
         peer.mark_disconnected();
@@ -646,7 +665,7 @@ impl PeerManager {
         };
 
         if self.conn_tx.unbounded_send(connect_attempt).is_err() {
-            error!("network: connection service offline");
+            error!("network: connection service exit");
         }
     }
 

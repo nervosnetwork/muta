@@ -8,7 +8,10 @@ use crate::{
     traits::MultiaddrExt,
 };
 
-use futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
+use futures::{
+    channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
+    StreamExt,
+};
 use tentacle::{
     multiaddr::Multiaddr,
     secio::{PeerId, PublicKey, SecioKeyPair},
@@ -409,6 +412,77 @@ async fn should_remove_mutiaddr_with_id_in_unknown_book_on_new_session() {
 }
 
 #[tokio::test]
+async fn should_reject_new_connection_for_same_peer_on_new_session() {
+    let (mut mgr, mut conn_rx) = make_manager(0, 20);
+    let remote_peers = make_sessions(&mut mgr, 1).await;
+
+    let test_peer = remote_peers.first().expect("get first peer");
+    let expect_sid = test_peer.session_id();
+    let sess_ctx = SessionContext::make(
+        SessionId::new(99),
+        test_peer.multiaddrs().pop().expect("get multiaddr"),
+        SessionType::Outbound,
+        test_peer.owned_pubkey(),
+    );
+
+    let new_session = PeerManagerEvent::NewSession {
+        pid:    test_peer.owned_id(),
+        pubkey: test_peer.owned_pubkey(),
+        ctx:    sess_ctx.arced(),
+    };
+    mgr.poll_event(new_session).await;
+
+    let inner = mgr.core_inner();
+    assert_eq!(inner.conn_count(), 1, "should not increase conn count");
+    assert_eq!(
+        test_peer.session_id(),
+        expect_sid,
+        "should not change peer session id"
+    );
+
+    let conn_event = conn_rx.next().await.expect("should have disconnect event");
+    match conn_event {
+        ConnectionEvent::Disconnect(sid) => assert_eq!(sid, 99.into(), "should be new session id"),
+        _ => panic!("should be disconnect event"),
+    }
+}
+
+#[tokio::test]
+async fn should_keep_new_connection_for_error_outdated_peer_session_on_new_session() {
+    let (mut mgr, mut conn_rx) = make_manager(0, 20);
+    let remote_peers = make_sessions(&mut mgr, 1).await;
+
+    let inner = mgr.core_inner();
+    let test_peer = remote_peers.first().expect("get first peer");
+    inner.remove_session(&test_peer.session_id());
+
+    let sess_ctx = SessionContext::make(
+        SessionId::new(99),
+        test_peer.multiaddrs().pop().expect("get multiaddr"),
+        SessionType::Outbound,
+        test_peer.owned_pubkey(),
+    );
+    let new_session = PeerManagerEvent::NewSession {
+        pid:    test_peer.owned_id(),
+        pubkey: test_peer.owned_pubkey(),
+        ctx:    sess_ctx.arced(),
+    };
+    mgr.poll_event(new_session).await;
+
+    assert_eq!(inner.conn_count(), 1, "should not increase conn count");
+    assert_eq!(
+        test_peer.session_id(),
+        99.into(),
+        "should update session id"
+    );
+
+    match conn_rx.try_next() {
+        Err(_) => (), // Err means channel is empty, it's expected
+        _ => panic!("should not have any connection event"),
+    }
+}
+
+#[tokio::test]
 async fn should_remove_session_on_session_closed() {
     let (mut mgr, _conn_rx) = make_manager(2, 20);
     let remote_peers = make_sessions(&mut mgr, 1).await;
@@ -450,7 +524,11 @@ async fn should_increase_retry_for_short_alive_session_on_session_closed() {
     mgr.poll_event(session_closed).await;
 
     let inner = mgr.core_inner();
-    assert_eq!(inner.conn_count(), 0, "should have no session because of retry");
+    assert_eq!(
+        inner.conn_count(),
+        0,
+        "should have no session because of retry"
+    );
     assert_eq!(inner.share_sessions().len(), 0, "should have no session");
     assert_eq!(test_peer.connectedness(), Connectedness::CanConnect);
     assert_eq!(test_peer.retry(), 1, "should increase retry count");
