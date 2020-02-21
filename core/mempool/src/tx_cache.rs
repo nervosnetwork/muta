@@ -178,7 +178,7 @@ impl TxCache {
 
     pub fn package(
         &self,
-        cycle_limit: u64,
+        tx_num_limit: u64,
         current_height: u64,
         timeout: u64,
     ) -> ProtocolResult<MixedTxHashes> {
@@ -188,7 +188,7 @@ impl TxCache {
         let mut propose_tx_hashes = Vec::new();
         let mut timeout_tx_hashes = Vec::new();
 
-        let mut cycle_count: u64 = 0;
+        let mut tx_count: u64 = 0;
         let mut stage = Stage::OrderTxs;
 
         loop {
@@ -215,12 +215,10 @@ impl TxCache {
                 {
                     continue;
                 }
-                // Accumulate cycles. The order_tx_hashes and the propose_tx_hashes both collect
-                // transactions under cycle limit.
-                cycle_count += shared_tx.tx.raw.cycles_limit;
-                if cycle_count > cycle_limit {
+                tx_count += 1;
+                if tx_count > tx_num_limit {
                     stage = stage.next();
-                    cycle_count = shared_tx.tx.raw.cycles_limit;
+                    tx_count = 0;
                 }
 
                 match stage {

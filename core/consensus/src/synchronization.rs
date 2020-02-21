@@ -194,8 +194,12 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
             block.header.timestamp,
         )?;
 
-        self.adapter
-            .set_timeout_gap(ctx.clone(), metadata.timeout_gap);
+        self.adapter.set_args(
+            ctx.clone(),
+            metadata.timeout_gap,
+            metadata.cycles_limit,
+            metadata.max_tx_size,
+        );
 
         status_agent.update_after_sync_commit(
             block.header.height,

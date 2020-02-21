@@ -209,8 +209,12 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
 
     let metadata: Metadata = serde_json::from_str(&exec_resp.ret).expect("Decode metadata failed!");
 
-    // set timeout_gap in mempool
-    mempool.set_timeout_gap(metadata.timeout_gap);
+    // set args in mempool
+    mempool.set_args(
+        metadata.timeout_gap,
+        metadata.cycles_limit,
+        metadata.max_tx_size,
+    );
 
     // register broadcast new transaction
     network_service.register_endpoint_handler(

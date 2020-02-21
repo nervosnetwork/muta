@@ -415,8 +415,9 @@ where
         Ok(serde_json::from_str(&exec_resp.ret).expect("Decode metadata failed!"))
     }
 
-    fn set_timeout_gap(&self, _context: Context, timeout_gap: u64) {
-        self.mempool.set_timeout_gap(timeout_gap);
+    fn set_args(&self, _context: Context, timeout_gap: u64, cycles_limit: u64, max_tx_size: u64) {
+        self.mempool
+            .set_args(timeout_gap, cycles_limit, max_tx_size);
     }
 }
 

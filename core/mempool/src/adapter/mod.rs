@@ -134,7 +134,9 @@ pub struct DefaultMemPoolAdapter<C, N, S> {
     network: N,
     storage: Arc<S>,
 
-    timeout_gap: AtomicU64,
+    timeout_gap:  AtomicU64,
+    cycles_limit: AtomicU64,
+    max_tx_size:  AtomicU64,
 
     stx_tx: UnboundedSender<SignedTransaction>,
     err_rx: Mutex<UnboundedReceiver<ProtocolError>>,
@@ -176,6 +178,8 @@ where
             storage,
 
             timeout_gap: AtomicU64::new(0),
+            cycles_limit: AtomicU64::new(0),
+            max_tx_size: AtomicU64::new(0),
 
             stx_tx,
             err_rx: Mutex::new(err_rx),
@@ -242,6 +246,7 @@ where
     async fn check_transaction(&self, _ctx: Context, stx: SignedTransaction) -> ProtocolResult<()> {
         // Verify transaction hash
         let fixed_bytes = stx.raw.encode_fixed()?;
+        let size = fixed_bytes.len() as u64;
         let tx_hash = Hash::digest(fixed_bytes);
 
         if tx_hash != stx.tx_hash {
@@ -251,6 +256,29 @@ where
             };
 
             return Err(wrong_hash.into());
+        }
+
+        // check tx size
+        let max_tx_size = self.max_tx_size.load(Ordering::SeqCst);
+        if size > max_tx_size {
+            return Err(MemPoolError::ExceedSizeLimit {
+                tx_hash,
+                max_tx_size,
+                size,
+            }
+            .into());
+        }
+
+        // check cycle limit
+        let cycles_limit_config = self.cycles_limit.load(Ordering::SeqCst);
+        let cycles_limit_tx = stx.raw.cycles_limit;
+        if cycles_limit_tx > cycles_limit_config {
+            return Err(MemPoolError::ExceedCyclesLimit {
+                tx_hash,
+                cycles_limit_tx,
+                cycles_limit_config,
+            }
+            .into());
         }
 
         // Verify chain id
@@ -306,8 +334,10 @@ where
         Ok(height)
     }
 
-    fn set_timeout_gap(&self, timeout_gap: u64) {
+    fn set_args(&self, timeout_gap: u64, cycles_limit: u64, max_tx_size: u64) {
         self.timeout_gap.store(timeout_gap, Ordering::Relaxed);
+        self.cycles_limit.store(cycles_limit, Ordering::Relaxed);
+        self.max_tx_size.store(max_tx_size, Ordering::Relaxed);
     }
 }
 

@@ -42,7 +42,7 @@ pub trait MemPool: Send + Sync {
         propose_tx_hashes: Vec<Hash>,
     ) -> ProtocolResult<()>;
 
-    fn set_timeout_gap(&self, timeout_gap: u64);
+    fn set_args(&self, timeout_gap: u64, cycles_limit: u64, max_tx_size: u64);
 }
 
 #[async_trait]
@@ -63,5 +63,5 @@ pub trait MemPoolAdapter: Send + Sync {
 
     async fn get_latest_height(&self, ctx: Context) -> ProtocolResult<u64>;
 
-    fn set_timeout_gap(&self, timeout_gap: u64);
+    fn set_args(&self, timeout_gap: u64, cycles_limit: u64, max_tx_size: u64);
 }

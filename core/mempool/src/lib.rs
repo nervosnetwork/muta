@@ -199,14 +199,39 @@ where
         Ok(())
     }
 
-    fn set_timeout_gap(&self, timeout_gap: u64) {
-        self.adapter.set_timeout_gap(timeout_gap);
+    fn set_args(&self, timeout_gap: u64, cycles_limit: u64, max_tx_size: u64) {
+        self.adapter
+            .set_args(timeout_gap, cycles_limit, max_tx_size);
         self.timeout_gap.store(timeout_gap, Ordering::Relaxed);
     }
 }
 
 #[derive(Debug, Display)]
 pub enum MemPoolError {
+    #[display(
+        fmt = "Tx: {:?} exceeds size limit, now: {}, limit: {} Bytes",
+        tx_hash,
+        size,
+        max_tx_size
+    )]
+    ExceedSizeLimit {
+        tx_hash:     Hash,
+        max_tx_size: u64,
+        size:        u64,
+    },
+
+    #[display(
+        fmt = "Tx: {:?} exceeds cycle limit, tx: {}, config: {}",
+        tx_hash,
+        cycles_limit_tx,
+        cycles_limit_config
+    )]
+    ExceedCyclesLimit {
+        tx_hash:             Hash,
+        cycles_limit_config: u64,
+        cycles_limit_tx:     u64,
+    },
+
     #[display(fmt = "Tx: {:?} inserts failed", tx_hash)]
     Insert { tx_hash: Hash },
 

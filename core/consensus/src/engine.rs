@@ -531,8 +531,12 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
             .await?;
 
         // update timeout_gap of mempool
-        self.adapter
-            .set_timeout_gap(Context::new(), metadata.timeout_gap);
+        self.adapter.set_args(
+            Context::new(),
+            metadata.timeout_gap,
+            metadata.cycles_limit,
+            metadata.max_tx_size,
+        );
 
         let prev_hash = Hash::digest(block.encode_fixed()?);
         self.status_agent
