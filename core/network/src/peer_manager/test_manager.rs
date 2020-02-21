@@ -4,7 +4,7 @@ use super::{
 };
 use crate::{
     common::ConnectedAddr,
-    event::{ConnectionEvent, PeerManagerEvent, RemoveKind},
+    event::{ConnectionEvent, PeerManagerEvent, RemoveKind, RetryKind},
     test::mock::SessionContext,
     traits::MultiaddrExt,
 };
@@ -735,4 +735,31 @@ async fn should_mark_session_blocked_on_session_blocked() {
         .session(&test_peer.session_id())
         .expect("should have a session");
     assert!(session.is_blocked(), "should be blocked");
+}
+
+#[tokio::test]
+async fn should_disconnect_peer_and_increase_retry_on_retry_peer_later() {
+    let (mut mgr, mut conn_rx) = make_manager(0, 20);
+    let remote_peers = make_sessions(&mut mgr, 1).await;
+
+    let test_peer = remote_peers.first().expect("get first peer");
+    let expect_sid = test_peer.session_id();
+    let retry_peer = PeerManagerEvent::RetryPeerLater {
+        pid: test_peer.owned_id(),
+        kind: RetryKind::TimedOut,
+    };
+    mgr.poll_event(retry_peer).await;
+
+    let inner = mgr.core_inner();
+    assert_eq!(inner.conn_count(), 0, "should have no session");
+    assert_eq!(test_peer.connectedness(), Connectedness::CanConnect);
+    assert_eq!(test_peer.retry(), 1, "should increase peer retry");
+
+    let conn_event = conn_rx.next().await.expect("should have disconnect event");
+    match conn_event {
+        ConnectionEvent::Disconnect(sid) => {
+            assert_eq!(sid, expect_sid, "should disconnect session")
+        }
+        _ => panic!("should be disconnect event"),
+    }
 }
