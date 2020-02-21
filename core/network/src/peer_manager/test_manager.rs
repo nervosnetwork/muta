@@ -712,3 +712,27 @@ async fn should_keep_bootstrap_peer_but_max_retry_on_remove_peer_by_session() {
         _ => panic!("should be disconnect event"),
     }
 }
+
+#[tokio::test]
+async fn should_mark_session_blocked_on_session_blocked() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+    let remote_peers = make_sessions(&mut mgr, 1).await;
+
+    let test_peer = remote_peers.first().expect("get first peer");
+    let sess_ctx = SessionContext::make(
+        test_peer.session_id(),
+        test_peer.multiaddrs().pop().expect("get multiaddr"),
+        SessionType::Outbound,
+        test_peer.owned_pubkey(),
+    );
+    let session_blocked = PeerManagerEvent::SessionBlocked {
+        ctx: sess_ctx.arced(),
+    };
+    mgr.poll_event(session_blocked).await;
+
+    let inner = mgr.core_inner();
+    let session = inner
+        .session(&test_peer.session_id())
+        .expect("should have a session");
+    assert!(session.is_blocked(), "should be blocked");
+}
