@@ -1,6 +1,6 @@
 use super::{
-    peer::Peer, ArcPeer, Connectedness, Inner, PeerManager, PeerManagerConfig,
-    ALIVE_RETRY_INTERVAL, MAX_RETRY_COUNT,
+    addr_info::MAX_ADDR_RETRY, peer::Peer, ArcPeer, Connectedness, Inner, PeerManager,
+    PeerManagerConfig, ALIVE_RETRY_INTERVAL, MAX_RETRY_COUNT,
 };
 use crate::{
     common::ConnectedAddr,
@@ -1154,4 +1154,103 @@ async fn should_not_remove_bootstrap_mutiaddr_on_unconnectable_multiaddr() {
         "should not remove boot multiaddr"
     );
     assert_eq!(boot_peer.retry(), 1, "should increase boot retry");
+}
+
+#[tokio::test]
+async fn should_increase_retry_for_multiaddr_in_unknown_on_reconnect_addr_later() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+    let test_peer = make_peer(2077);
+    let test_multiaddr = test_peer.multiaddrs().pop().expect("peer multiaddr");
+
+    mgr.inner
+        .unknown_addrs
+        .insert(test_multiaddr.clone().into());
+    assert_eq!(
+        mgr.inner.unknown_addrs.len(),
+        1,
+        "should have 1 multiaddr in unknown book"
+    );
+
+    let reconnect_addr_later = PeerManagerEvent::ReconnectAddrLater {
+        addr: test_multiaddr.clone(),
+        kind: RetryKind::TimedOut,
+    };
+    mgr.poll_event(reconnect_addr_later).await;
+
+    let addr_in_unknown_book = mgr
+        .inner
+        .unknown_addrs
+        .get(&test_multiaddr)
+        .expect("get addr from unknown book");
+    assert_eq!(addr_in_unknown_book.retry(), 1, "should increase retry");
+}
+
+#[tokio::test]
+async fn should_remove_multiaddr_from_unknown_book_when_run_out_retry_on_reconnect_addr_later() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+    let test_peer = make_peer(2077);
+    let test_multiaddr = test_peer.multiaddrs().pop().expect("peer multiaddr");
+
+    mgr.inner
+        .unknown_addrs
+        .insert(test_multiaddr.clone().into());
+    let addr_in_unknown_book = mgr
+        .inner
+        .unknown_addrs
+        .get(&test_multiaddr)
+        .expect("get addr from unknown book")
+        .clone();
+
+    addr_in_unknown_book.inc_retry_by(MAX_ADDR_RETRY);
+
+    let reconnect_addr_later = PeerManagerEvent::ReconnectAddrLater {
+        addr: test_multiaddr.clone(),
+        kind: RetryKind::TimedOut,
+    };
+    mgr.poll_event(reconnect_addr_later).await;
+
+    assert!(addr_in_unknown_book.run_out_retry(), "should run out retry");
+    assert!(
+        mgr.inner.unknown_addrs.is_empty(),
+        "should be remove from unknown book"
+    );
+}
+
+#[tokio::test]
+async fn should_set_connectedness_and_increase_peer_retry_on_reconnect_addr_later() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+    let test_peer = make_peer(2077);
+    let test_multiaddr = test_peer.multiaddrs().pop().expect("peer multiaddr");
+
+    let inner = mgr.core_inner();
+    inner.add_peer(test_peer.clone());
+    assert_eq!(test_peer.retry(), 0, "should have 0 retry");
+
+    let reconnect_addr_later = PeerManagerEvent::ReconnectAddrLater {
+        addr: test_multiaddr.clone(),
+        kind: RetryKind::TimedOut,
+    };
+    mgr.poll_event(reconnect_addr_later).await;
+
+    assert_eq!(test_peer.connectedness(), Connectedness::CanConnect);
+    assert_eq!(test_peer.retry(), 1, "should increase peer retry");
+}
+
+#[tokio::test]
+async fn should_skip_on_connected_peer_on_reconnect_addr_later() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+    let remote_peers = make_sessions(&mut mgr, 1).await;
+    let test_peer = remote_peers.first().expect("get first");
+    let test_multiaddr = make_multiaddr(2077, None);
+
+    assert_eq!(test_peer.retry(), 0, "should have 0 retry");
+
+    let reconnect_addr_later = PeerManagerEvent::ReconnectAddrLater {
+        addr: test_multiaddr.clone(),
+        kind: RetryKind::TimedOut,
+    };
+    mgr.poll_event(reconnect_addr_later).await;
+
+    assert_eq!(test_peer.connectedness(), Connectedness::Connected);
+    assert_eq!(test_peer.retry(), 0, "should have not increase retry");
 }

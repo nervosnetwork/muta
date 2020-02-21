@@ -9,9 +9,9 @@ use std::{
 
 use tentacle::multiaddr::Multiaddr;
 
-const ADDR_BACKOFF_BASE: u64 = 2;
-const MAX_ADDR_RETRY: u8 = 8;
-const ADDR_TIMEOUT: u64 = 10;
+pub const ADDR_BACKOFF_BASE: u64 = 2;
+pub const MAX_ADDR_RETRY: u8 = 8;
+pub const ADDR_TIMEOUT: u64 = 10;
 
 #[derive(Debug, Clone)]
 pub struct AddrInfo {
@@ -45,11 +45,21 @@ impl AddrInfo {
     pub fn inc_retry(&self) {
         self.connecting.store(false, Ordering::SeqCst);
         let retry = self.retry.fetch_add(1, Ordering::SeqCst).saturating_add(1);
-        debug_assert!(retry <= MAX_ADDR_RETRY);
+        debug_assert!(retry <= MAX_ADDR_RETRY + 1);
 
         let secs = ADDR_BACKOFF_BASE.pow(retry as u32);
         let next_attempt = Self::now().saturating_add(secs);
         self.next_attempt.store(next_attempt, Ordering::SeqCst);
+    }
+
+    #[cfg(test)]
+    pub(crate) fn retry(&self) -> u8 {
+        self.retry.load(Ordering::SeqCst)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn inc_retry_by(&self, n: u8) {
+        self.retry.fetch_add(n, Ordering::SeqCst);
     }
 
     pub fn retry_ready(&self) -> bool {
