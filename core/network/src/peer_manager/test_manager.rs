@@ -745,7 +745,7 @@ async fn should_disconnect_peer_and_increase_retry_on_retry_peer_later() {
     let test_peer = remote_peers.first().expect("get first peer");
     let expect_sid = test_peer.session_id();
     let retry_peer = PeerManagerEvent::RetryPeerLater {
-        pid: test_peer.owned_id(),
+        pid:  test_peer.owned_id(),
         kind: RetryKind::TimedOut,
     };
     mgr.poll_event(retry_peer).await;
@@ -761,5 +761,104 @@ async fn should_disconnect_peer_and_increase_retry_on_retry_peer_later() {
             assert_eq!(sid, expect_sid, "should disconnect session")
         }
         _ => panic!("should be disconnect event"),
+    }
+}
+
+#[tokio::test]
+async fn should_try_all_peer_multiaddrs_on_connect_peers() {
+    let (mut mgr, mut conn_rx) = make_manager(0, 20);
+    let peers = (0..10)
+        .into_iter()
+        .map(|port| {
+            // Every peer has two multiaddrs
+            let p = make_peer(port + 7000);
+            p.add_multiaddrs(vec![make_multiaddr(port + 8000, Some(p.owned_id()))]);
+            p
+        })
+        .collect::<Vec<_>>();
+
+    let inner = mgr.core_inner();
+    for peer in peers.iter() {
+        inner.add_peer(peer.clone());
+    }
+
+    let connect_peers = PeerManagerEvent::ConnectPeers {
+        pids: peers.iter().map(|p| p.owned_id()).collect(),
+    };
+    mgr.poll_event(connect_peers).await;
+
+    let conn_event = conn_rx.next().await.expect("should have connect event");
+    let multiaddrs_in_event = match conn_event {
+        ConnectionEvent::Connect { addrs, .. } => addrs,
+        _ => panic!("should be connect event"),
+    };
+
+    let expect_multiaddrs = peers
+        .into_iter()
+        .map(|p| p.multiaddrs())
+        .flatten()
+        .collect::<Vec<_>>();
+
+    assert_eq!(
+        multiaddrs_in_event.len(),
+        expect_multiaddrs.len(),
+        "should have same number of multiaddrs"
+    );
+    assert!(
+        !multiaddrs_in_event
+            .iter()
+            .any(|ma| !expect_multiaddrs.contains(ma)),
+        "all multiaddrs should be included"
+    );
+}
+
+#[tokio::test]
+async fn should_skip_peers_not_in_can_connect_connectedness_on_connect_peers() {
+    let (mut mgr, mut conn_rx) = make_manager(0, 20);
+    let peer_in_connecting = make_peer(2077);
+    let peer_in_connected = make_peer(2020);
+    let peer_in_unconnectable = make_peer(2059);
+
+    peer_in_unconnectable.set_connectedness(Connectedness::Unconnectable);
+    peer_in_connected.set_connectedness(Connectedness::Connected);
+    peer_in_connecting.set_connectedness(Connectedness::Connecting);
+
+    let inner = mgr.core_inner();
+    inner.add_peer(peer_in_connecting.clone());
+    inner.add_peer(peer_in_connected.clone());
+    inner.add_peer(peer_in_unconnectable.clone());
+
+    let connect_peers = PeerManagerEvent::ConnectPeers {
+        pids: vec![
+            peer_in_unconnectable.owned_id(),
+            peer_in_connected.owned_id(),
+            peer_in_connecting.owned_id(),
+        ],
+    };
+    mgr.poll_event(connect_peers).await;
+
+    match conn_rx.try_next() {
+        Err(_) => (), // Err means channel is empty, it's expected
+        _ => panic!("should not have any connection event"),
+    }
+}
+
+#[tokio::test]
+async fn should_skip_peers_not_retry_ready_on_connect_peers() {
+    let (mut mgr, mut conn_rx) = make_manager(0, 20);
+    let not_ready_peer = make_peer(2077);
+    not_ready_peer.increase_retry();
+
+    let inner = mgr.core_inner();
+    inner.add_peer(not_ready_peer.clone());
+
+    let connect_peers = PeerManagerEvent::ConnectPeers {
+        pids: vec![not_ready_peer.owned_id()],
+    };
+    mgr.poll_event(connect_peers).await;
+
+    match conn_rx.try_next() {
+        Err(_) => (), // Err means channel is empty, it's expected
+        _ => panic!("should not have any connection event"),
     }
 }

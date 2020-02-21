@@ -677,27 +677,31 @@ impl PeerManager {
     }
 
     fn connect_peers(&self, peers: Vec<ArcPeer>) {
-        let multiaddrs = peers
-            .into_iter()
-            .filter(|p| {
-                let connectedness = p.connectedness();
-                if connectedness != Connectedness::CanConnect {
-                    info!("network: peer {:?} connectedness {}", p.id, connectedness);
-                    return false;
-                }
-                if !p.retry_ready() {
-                    let eta = p.next_attempt_since_now();
-                    info!("network: peer {:?} isn't ready, ETA {} seconds", p.id, eta);
-                    return false;
-                }
-                true
-            })
-            .map(|p| {
-                p.set_connectedness(Connectedness::Connecting);
-                p.multiaddrs()
-            });
+        let connectable = |p: &'_ ArcPeer| -> bool {
+            let connectedness = p.connectedness();
+            if connectedness != Connectedness::CanConnect {
+                info!("network: peer {:?} connectedness {}", p.id, connectedness);
+                return false;
+            }
+            if !p.retry_ready() {
+                let eta = p.next_attempt_since_now();
+                info!("network: peer {:?} isn't ready, ETA {} seconds", p.id, eta);
+                return false;
+            }
+            true
+        };
 
-        self.connect_multiaddrs(multiaddrs.flatten().collect());
+        let multiaddrs = peers.into_iter().filter(connectable).map(|p| {
+            p.set_connectedness(Connectedness::Connecting);
+            p.multiaddrs()
+        });
+        let multiaddrs = multiaddrs.flatten().collect::<Vec<_>>();
+
+        if multiaddrs.is_empty() {
+            debug!("network: no peer is connectable");
+        } else {
+            self.connect_multiaddrs(multiaddrs);
+        }
     }
 
     fn connect_peer_ids(&self, pids: Vec<PeerId>) {
