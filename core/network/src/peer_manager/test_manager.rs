@@ -652,40 +652,40 @@ async fn should_disconnect_session_and_remove_peer_on_remove_peer_by_session() {
 async fn should_keep_bootstrap_peer_but_max_retry_on_remove_peer_by_session() {
     let (mut mgr, mut conn_rx) = make_manager(1, 20);
     let bootstraps = &mgr.config().bootstraps;
-    let test_peer = bootstraps.first().expect("get one bootstrap peer").clone();
+    let boot_peer = bootstraps.first().expect("get one bootstrap peer").clone();
 
     // Insert bootstrap peer
     let inner = mgr.core_inner();
-    inner.add_peer(test_peer.clone());
+    inner.add_peer(boot_peer.clone());
 
     // Init bootstrap session
     let sess_ctx = SessionContext::make(
         SessionId::new(1),
-        test_peer.multiaddrs().pop().expect("get multiaddr"),
+        boot_peer.multiaddrs().pop().expect("get multiaddr"),
         SessionType::Outbound,
-        test_peer.owned_pubkey(),
+        boot_peer.owned_pubkey(),
     );
     let new_session = PeerManagerEvent::NewSession {
-        pid:    test_peer.owned_id(),
-        pubkey: test_peer.owned_pubkey(),
+        pid:    boot_peer.owned_id(),
+        pubkey: boot_peer.owned_pubkey(),
         ctx:    sess_ctx.arced(),
     };
     mgr.poll_event(new_session).await;
 
     assert_eq!(inner.conn_count(), 1, "should have one session");
     assert_eq!(
-        test_peer.connectedness(),
+        boot_peer.connectedness(),
         Connectedness::Connected,
         "should connecte"
     );
     assert!(
-        test_peer.session_id() != 0.into(),
+        boot_peer.session_id() != 0.into(),
         "should not be default zero"
     );
 
-    let expect_sid = test_peer.session_id();
+    let expect_sid = boot_peer.session_id();
     let remove_peer_by_session = PeerManagerEvent::RemovePeerBySession {
-        sid:  test_peer.session_id(),
+        sid:  boot_peer.session_id(),
         kind: RemoveKind::ProtocolSelect,
     };
     mgr.poll_event(remove_peer_by_session).await;
@@ -693,13 +693,13 @@ async fn should_keep_bootstrap_peer_but_max_retry_on_remove_peer_by_session() {
     assert_eq!(inner.conn_count(), 0, "should have no session");
     assert_eq!(inner.share_sessions().len(), 0, "should have no session");
     assert!(
-        inner.peer(&test_peer.id).is_some(),
+        inner.peer(&boot_peer.id).is_some(),
         "should not remove bootstrap peer"
     );
 
-    assert_eq!(test_peer.connectedness(), Connectedness::CanConnect);
+    assert_eq!(boot_peer.connectedness(), Connectedness::CanConnect);
     assert_eq!(
-        test_peer.retry(),
+        boot_peer.retry(),
         MAX_RETRY_COUNT,
         "should set to max retry"
     );
@@ -1079,4 +1079,79 @@ async fn should_remove_multiaddr_in_unknown_book_on_repeated_connection() {
         mgr.inner.unknown_addrs.is_empty(),
         "should remove multiaddrs in unknown with/without id included"
     );
+}
+
+#[tokio::test]
+async fn should_remove_multiaddr_in_unknown_book_on_unconnectable_multiaddr() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+    let test_peer = make_peer(2077);
+    let test_multiaddr = test_peer.multiaddrs().pop().expect("peer multiaddr");
+
+    mgr.inner
+        .unknown_addrs
+        .insert(test_multiaddr.clone().into());
+    assert_eq!(
+        mgr.inner.unknown_addrs.len(),
+        1,
+        "should have 1 multiaddr in unknown book"
+    );
+
+    let unconnectable_multiaddr = PeerManagerEvent::UnconnectableAddress {
+        addr: test_multiaddr,
+        kind: RemoveKind::ProtocolSelect,
+    };
+    mgr.poll_event(unconnectable_multiaddr).await;
+
+    assert!(mgr.inner.unknown_addrs.is_empty());
+}
+
+#[tokio::test]
+async fn should_remove_peer_multiaddr_and_increase_retry_on_unconnectable_multiaddr() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+    let test_peer = make_peer(2077);
+    let test_multiaddr = test_peer.multiaddrs().pop().expect("peer multiaddr");
+
+    let inner = mgr.core_inner();
+    inner.add_peer(test_peer.clone());
+    assert_eq!(test_peer.retry(), 0, "should have 0 retry");
+
+    let unconnectable_multiaddr = PeerManagerEvent::UnconnectableAddress {
+        addr: test_multiaddr,
+        kind: RemoveKind::ProtocolSelect,
+    };
+    mgr.poll_event(unconnectable_multiaddr).await;
+
+    assert_eq!(
+        test_peer.multiaddrs_len(),
+        0,
+        "should remove this unconnectable multiaddr from peer"
+    );
+    assert_eq!(test_peer.retry(), 1, "should increase peer retry");
+}
+
+#[tokio::test]
+async fn should_not_remove_bootstrap_mutiaddr_on_unconnectable_multiaddr() {
+    let (mut mgr, _conn_rx) = make_manager(1, 20);
+    let bootstraps = &mgr.config().bootstraps;
+    let boot_peer = bootstraps.first().expect("get one bootstrap peer").clone();
+    let boot_multiaddr = boot_peer.multiaddrs().pop().expect("boot multiaddr");
+    let old_multiaddrs_len = boot_peer.multiaddrs_len();
+
+    // Insert bootstrap peer
+    let inner = mgr.core_inner();
+    inner.add_peer(boot_peer.clone());
+    assert_eq!(boot_peer.retry(), 0, "should have 0 retry");
+
+    let unconnectable_multiaddr = PeerManagerEvent::UnconnectableAddress {
+        addr: boot_multiaddr,
+        kind: RemoveKind::ProtocolSelect,
+    };
+    mgr.poll_event(unconnectable_multiaddr).await;
+
+    assert_eq!(
+        boot_peer.multiaddrs_len(),
+        old_multiaddrs_len,
+        "should not remove boot multiaddr"
+    );
+    assert_eq!(boot_peer.retry(), 1, "should increase boot retry");
 }
