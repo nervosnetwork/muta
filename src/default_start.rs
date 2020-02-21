@@ -378,16 +378,6 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
 
     // Run network
     tokio::spawn(network_service);
-
-    // Init graphql
-    let mut graphql_config = GraphQLConfig::default();
-    graphql_config.listening_address = config.graphql.listening_address;
-    graphql_config.graphql_uri = config.graphql.graphql_uri.clone();
-    graphql_config.graphiql_uri = config.graphql.graphiql_uri.clone();
-
-    // Run GraphQL server
-    tokio::spawn(core_api::start_graphql(graphql_config, api_adapter));
-
     // Run sync
     tokio::spawn(async move {
         if let Err(e) = synchronization.polling_broadcast().await {
@@ -421,7 +411,33 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         }
     });
 
+    // Init graphql
+    let mut graphql_config = GraphQLConfig::default();
+    graphql_config.listening_address = config.graphql.listening_address;
+    graphql_config.graphql_uri = config.graphql.graphql_uri.clone();
+    graphql_config.graphiql_uri = config.graphql.graphiql_uri.clone();
+    if config.graphql.workers != 0 {
+        graphql_config.workers = config.graphql.workers;
+    }
+    if config.graphql.maxconn != 0 {
+        graphql_config.maxconn = config.graphql.maxconn;
+    }
+
     // Run execute demon
-    futures::executor::block_on(exec_demon.run());
+    tokio::spawn(async move {
+        futures::executor::block_on(exec_demon.run());
+    });
+
+    // Run GraphQL server
+    tokio::task::spawn_local(async move {
+        let local = tokio::task::LocalSet::new();
+        let sys = actix_rt::System::run_in_tokio("graphql", &local);
+        // define your actix-web server
+        tokio::spawn(async move { sys.await.unwrap() });
+        core_api::start_graphql(graphql_config, api_adapter).await;
+    })
+    .await
+    .map_err(|e| MainError::Other(e.to_string()))?;
+
     Ok(())
 }

@@ -2,13 +2,13 @@ pub mod adapter;
 pub mod config;
 mod schema;
 
+use actix_web::{web, App, Error, HttpResponse, HttpServer};
+use futures::executor::block_on;
+use juniper::http::GraphQLRequest;
+use juniper::FieldResult;
+use lazy_static::lazy_static;
 use std::convert::TryFrom;
 use std::sync::Arc;
-
-use futures::executor::block_on;
-use http::status::StatusCode;
-use juniper::FieldResult;
-use tide::{Request, Response, ResultExt, Server};
 
 use common_crypto::{
     HashValue, PrivateKey, PublicKey, Secp256k1PrivateKey, Signature, ToPublicKey,
@@ -22,11 +22,15 @@ use crate::schema::{
     InputRawTransaction, InputTransactionEncryption, Receipt, SignedTransaction, Uint64,
 };
 
+lazy_static! {
+    static ref GRAPHIQL_HTML: &'static str = include_str!("../source/graphiql.html");
+}
+
 // This is accessible as state in Tide, and as executor context in Juniper.
 #[derive(Clone)]
 struct State {
-    graphiql_html: String,
-    adapter:       Arc<Box<dyn APIAdapter>>,
+    adapter: Arc<Box<dyn APIAdapter>>,
+    schema:  Arc<Schema>,
 }
 
 // We define `Query` unit struct here. GraphQL queries will refer to this
@@ -184,50 +188,50 @@ impl Mutation {
 // well, the whole GraphQL schema.
 type Schema = juniper::RootNode<'static, Query, Mutation>;
 
-// Finally, we'll bridge between Tide and Juniper. `GraphQLRequest` from Juniper
-// implements `Deserialize`, so we use `Json` extractor to deserialize the
-// request body.
-async fn handle_graphql(mut req: Request<State>) -> Response {
-    let query: juniper::http::GraphQLRequest = match req.body_json().await.client_err() {
-        Ok(query) => query,
-        Err(e) => {
-            return Response::new(StatusCode::BAD_REQUEST.into()).body_string(format!("{:?}", e))
-        }
-    };
-
-    let schema = Schema::new(Query, Mutation);
-    let state = &req.state().clone();
-    let response = query.execute_async(&schema, state).await;
-    let status = if response.is_ok() {
-        StatusCode::OK
-    } else {
-        StatusCode::BAD_REQUEST
-    };
-
-    Response::new(status.into())
-        .body_json(&response)
-        .expect("Json parsing errors on return should never occur.")
+async fn graphiql() -> HttpResponse {
+    HttpResponse::Ok()
+        .content_type("text/html; charset=utf-8")
+        .body(GRAPHIQL_HTML.to_owned())
 }
 
-async fn handle_graphiql(req: Request<State>) -> Response {
-    let html = req.state().graphiql_html.to_owned();
+async fn graphql(
+    st: web::Data<State>,
+    data: web::Json<GraphQLRequest>,
+) -> Result<HttpResponse, Error> {
+    let result = data.execute_async(&st.schema, &st).await;
+    let res = Ok::<_, serde_json::error::Error>(serde_json::to_string(&result)?)?;
 
-    Response::new(StatusCode::OK.into())
-        .body_string(html)
-        .set_header("Content-Type", "text/html")
+    Ok(HttpResponse::Ok()
+        .content_type("application/json")
+        .body(res))
 }
 
 pub async fn start_graphql<Adapter: APIAdapter + 'static>(cfg: GraphQLConfig, adapter: Adapter) {
-    let graphiql_html = include_str!("../source/graphiql.html");
+    let schema = Schema::new(Query, Mutation);
 
     let state = State {
-        graphiql_html: graphiql_html.to_owned(),
-        adapter:       Arc::new(Box::new(adapter)),
+        adapter: Arc::new(Box::new(adapter)),
+        schema:  Arc::new(schema),
     };
 
-    let mut server = Server::with_state(state);
+    let path_graphql_uri = cfg.graphql_uri.to_owned();
+    let path_graphiql_uri = cfg.graphiql_uri.to_owned();
+    let wokers = cfg.workers;
+    let maxconn = cfg.maxconn;
+    let add_listening_address = cfg.listening_address;
 
-    server.at(&cfg.graphiql_uri).get(handle_graphiql);
-    server.at(&cfg.graphql_uri).post(handle_graphql);
-    server.listen(cfg.listening_address).await.unwrap();
+    // Start http server
+    HttpServer::new(move || {
+        App::new()
+            .data(state.clone())
+            .service(web::resource(&path_graphql_uri).route(web::post().to(graphql)))
+            .service(web::resource(&path_graphiql_uri).route(web::get().to(graphiql)))
+    })
+    .workers(wokers)
+    .maxconn(maxconn)
+    .bind(add_listening_address)
+    .unwrap()
+    .run()
+    .await
+    .unwrap()
 }

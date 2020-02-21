@@ -32,8 +32,7 @@ impl ServiceMapping for DefaultServiceMapping {
     }
 }
 
-#[tokio::main]
-async fn main() {
+fn main() {
     let config_path =
         std::env::var("CONFIG").unwrap_or_else(|_| "devtools/chain/config.toml".to_owned());
     let genesis_path =
@@ -51,7 +50,8 @@ async fn main() {
 
     let muta = builer.build().unwrap();
 
-    muta.run().await.unwrap()
+    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    muta.run(&mut rt).unwrap()
 }
 
 #[derive(Debug, Display, From)]

@@ -79,7 +79,7 @@ impl<Mapping: 'static + ServiceMapping> Muta<Mapping> {
         }
     }
 
-    pub async fn run(self) -> ProtocolResult<()> {
+    pub fn run(self, rt: &mut tokio::runtime::Runtime) -> ProtocolResult<()> {
         common_logger::init(
             self.config.logger.filter.clone(),
             self.config.logger.log_to_console,
@@ -90,9 +90,15 @@ impl<Mapping: 'static + ServiceMapping> Muta<Mapping> {
             self.config.logger.modules_level.clone(),
         );
 
-        self.create_genesis().await?;
+        // run muta
+        let local = tokio::task::LocalSet::new();
+        local.block_on(rt, async move {
+            self.create_genesis().await.unwrap();
 
-        start(self.config, Arc::clone(&self.service_mapping)).await?;
+            start(self.config, Arc::clone(&self.service_mapping))
+                .await
+                .unwrap()
+        });
 
         Ok(())
     }
@@ -126,6 +132,9 @@ pub enum MainError {
 
     #[display(fmt = "{:?}", _0)]
     Utf8(std::str::Utf8Error),
+
+    #[display(fmt = "other error {:?}", _0)]
+    Other(String),
 }
 
 impl std::error::Error for MainError {}
