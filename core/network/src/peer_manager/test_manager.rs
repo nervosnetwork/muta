@@ -1254,3 +1254,50 @@ async fn should_skip_on_connected_peer_on_reconnect_addr_later() {
     assert_eq!(test_peer.connectedness(), Connectedness::Connected);
     assert_eq!(test_peer.retry(), 0, "should have not increase retry");
 }
+
+#[tokio::test]
+async fn should_set_listen_on_add_listen_addr() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+    let self_id = mgr.inner.peer_id.to_owned();
+    mgr.inner
+        .set_listen(make_multiaddr(2020, Some(self_id.clone())));
+
+    let test_multiaddr = make_multiaddr(2077, Some(self_id));
+    let listen_multiaddr = mgr.inner.listen().expect("have listen multiaddr");
+    assert!(test_multiaddr != listen_multiaddr);
+
+    let add_listen_addr = PeerManagerEvent::AddListenAddr {
+        addr: test_multiaddr.clone(),
+    };
+    mgr.poll_event(add_listen_addr).await;
+
+    assert_eq!(
+        mgr.inner.listen(),
+        Some(test_multiaddr),
+        "should set to new listen multiaddr"
+    );
+}
+
+#[tokio::test]
+async fn should_push_id_to_listen_multiaddr_if_not_included_on_add_listen_addr() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+    let self_id = mgr.inner.peer_id.to_owned();
+    mgr.inner
+        .set_listen(make_multiaddr(2020, Some(self_id.clone())));
+
+    let test_multiaddr = make_multiaddr(2077, None);
+    let listen_multiaddr = mgr.inner.listen().expect("have listen multiaddr");
+    assert!(test_multiaddr != listen_multiaddr);
+
+    let add_listen_addr = PeerManagerEvent::AddListenAddr {
+        addr: test_multiaddr.clone(),
+    };
+    mgr.poll_event(add_listen_addr).await;
+
+    let with_id = make_multiaddr(2077, Some(self_id));
+    assert_eq!(
+        mgr.inner.listen(),
+        Some(with_id),
+        "should set to new listen multiaddr"
+    );
+}
