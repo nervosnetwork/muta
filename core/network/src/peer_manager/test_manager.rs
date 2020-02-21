@@ -925,3 +925,60 @@ async fn should_skip_multiaddrs_without_id_included_on_discover_multi_addrs() {
         "should ignore multiaddr without id included"
     );
 }
+
+#[tokio::test]
+async fn should_add_multiaddrs_to_peer_on_identified_addrs() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+    let remote_peers = make_sessions(&mut mgr, 1).await;
+    let test_peer = remote_peers.first().expect("get first");
+    let old_multiaddrs_len = test_peer.multiaddrs_len();
+
+    let test_multiaddrs: Vec<_> = (0..2)
+        .into_iter()
+        .map(|port| make_multiaddr(port + 9000, Some(test_peer.owned_id())))
+        .collect();
+
+    let identified_addrs = PeerManagerEvent::IdentifiedAddrs {
+        pid:   test_peer.owned_id(),
+        addrs: test_multiaddrs.clone(),
+    };
+    mgr.poll_event(identified_addrs).await;
+
+    assert_eq!(
+        test_peer.multiaddrs_len(),
+        old_multiaddrs_len + 2,
+        "should have correct multiaddrs len"
+    );
+    assert!(
+        !test_multiaddrs
+            .iter()
+            .any(|ma| !test_peer.multiaddrs().contains(ma)),
+        "should add all multiaddrs to peer"
+    );
+}
+
+#[tokio::test]
+async fn should_push_id_to_multiaddrs_if_not_included_on_identified_addrs() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+    let remote_peers = make_sessions(&mut mgr, 1).await;
+    let test_peer = remote_peers.first().expect("get first");
+
+    let test_multiaddr = make_multiaddr(2077, None);
+
+    let identified_addrs = PeerManagerEvent::IdentifiedAddrs {
+        pid:   test_peer.owned_id(),
+        addrs: vec![test_multiaddr.clone()],
+    };
+    mgr.poll_event(identified_addrs).await;
+
+    assert!(
+        !test_peer.multiaddrs().contains(&test_multiaddr),
+        "should not contain multiaddr without id included"
+    );
+
+    let with_id = make_multiaddr(2077, Some(test_peer.owned_id()));
+    assert!(
+        test_peer.multiaddrs().contains(&with_id),
+        "should push id to multiaddr when add it to peer"
+    );
+}
