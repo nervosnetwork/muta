@@ -1,9 +1,10 @@
 use super::{
-    peer::Peer, ArcPeer, Connectedness, Inner, PeerManager, PeerManagerConfig, ALIVE_RETRY_INTERVAL,
+    peer::Peer, ArcPeer, Connectedness, Inner, PeerManager, PeerManagerConfig,
+    ALIVE_RETRY_INTERVAL, MAX_RETRY_COUNT,
 };
 use crate::{
     common::ConnectedAddr,
-    event::{ConnectionEvent, PeerManagerEvent},
+    event::{ConnectionEvent, PeerManagerEvent, RemoveKind},
     test::mock::SessionContext,
     traits::MultiaddrExt,
 };
@@ -72,6 +73,10 @@ struct MockManager {
 impl MockManager {
     pub fn new(inner: PeerManager, event_tx: UnboundedSender<PeerManagerEvent>) -> Self {
         MockManager { event_tx, inner }
+    }
+
+    pub fn config(&self) -> &PeerManagerConfig {
+        &self.inner.config
     }
 
     pub async fn poll_event(&mut self, event: PeerManagerEvent) {
@@ -306,7 +311,7 @@ async fn should_add_multiaddr_to_peer_on_new_session() {
 }
 
 #[tokio::test]
-async fn should_not_increase_conn_count_for_connecting_on_new_session() {
+async fn should_not_increase_conn_count_for_connecting_peer_on_new_session() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
     let test_peer = make_peer(2020);
 
@@ -611,4 +616,99 @@ async fn should_reset_peer_retry_on_peer_alive() {
     mgr.poll_event(peer_alive).await;
 
     assert_eq!(test_peer.retry(), 0, "should reset retry");
+}
+
+#[tokio::test]
+async fn should_disconnect_session_and_remove_peer_on_remove_peer_by_session() {
+    let (mut mgr, mut conn_rx) = make_manager(0, 20);
+    let remote_peers = make_sessions(&mut mgr, 1).await;
+
+    let test_peer = remote_peers.first().expect("get first peer");
+    let expect_sid = test_peer.session_id();
+    let remove_peer_by_session = PeerManagerEvent::RemovePeerBySession {
+        sid:  test_peer.session_id(),
+        kind: RemoveKind::ProtocolSelect,
+    };
+    mgr.poll_event(remove_peer_by_session).await;
+
+    let inner = mgr.core_inner();
+    assert_eq!(inner.conn_count(), 0, "should have no session");
+    assert_eq!(inner.share_sessions().len(), 0, "should have no session");
+    assert!(
+        inner.peer(&test_peer.id).is_none(),
+        "should remove test peer"
+    );
+
+    let conn_event = conn_rx.next().await.expect("should have disconnect event");
+    match conn_event {
+        ConnectionEvent::Disconnect(sid) => {
+            assert_eq!(sid, expect_sid, "should disconnect session")
+        }
+        _ => panic!("should be disconnect event"),
+    }
+}
+
+#[tokio::test]
+async fn should_keep_bootstrap_peer_but_max_retry_on_remove_peer_by_session() {
+    let (mut mgr, mut conn_rx) = make_manager(1, 20);
+    let bootstraps = &mgr.config().bootstraps;
+    let test_peer = bootstraps.first().expect("get one bootstrap peer").clone();
+
+    // Insert bootstrap peer
+    let inner = mgr.core_inner();
+    inner.add_peer(test_peer.clone());
+
+    // Init bootstrap session
+    let sess_ctx = SessionContext::make(
+        SessionId::new(1),
+        test_peer.multiaddrs().pop().expect("get multiaddr"),
+        SessionType::Outbound,
+        test_peer.owned_pubkey(),
+    );
+    let new_session = PeerManagerEvent::NewSession {
+        pid:    test_peer.owned_id(),
+        pubkey: test_peer.owned_pubkey(),
+        ctx:    sess_ctx.arced(),
+    };
+    mgr.poll_event(new_session).await;
+
+    assert_eq!(inner.conn_count(), 1, "should have one session");
+    assert_eq!(
+        test_peer.connectedness(),
+        Connectedness::Connected,
+        "should connecte"
+    );
+    assert!(
+        test_peer.session_id() != 0.into(),
+        "should not be default zero"
+    );
+
+    let expect_sid = test_peer.session_id();
+    let remove_peer_by_session = PeerManagerEvent::RemovePeerBySession {
+        sid:  test_peer.session_id(),
+        kind: RemoveKind::ProtocolSelect,
+    };
+    mgr.poll_event(remove_peer_by_session).await;
+
+    assert_eq!(inner.conn_count(), 0, "should have no session");
+    assert_eq!(inner.share_sessions().len(), 0, "should have no session");
+    assert!(
+        inner.peer(&test_peer.id).is_some(),
+        "should not remove bootstrap peer"
+    );
+
+    assert_eq!(test_peer.connectedness(), Connectedness::CanConnect);
+    assert_eq!(
+        test_peer.retry(),
+        MAX_RETRY_COUNT,
+        "should set to max retry"
+    );
+
+    let conn_event = conn_rx.next().await.expect("should have disconnect event");
+    match conn_event {
+        ConnectionEvent::Disconnect(sid) => {
+            assert_eq!(sid, expect_sid, "should disconnect session")
+        }
+        _ => panic!("should be disconnect event"),
+    }
 }
