@@ -211,6 +211,10 @@ impl Inner {
         self.connection_count.fetch_add(1, Ordering::SeqCst);
     }
 
+    pub fn inc_conn_count_by(&self, n: usize) {
+        self.connection_count.fetch_add(n, Ordering::SeqCst);
+    }
+
     pub fn dec_conn_count(&self) {
         self.connection_count.fetch_sub(1, Ordering::SeqCst);
     }
@@ -460,8 +464,13 @@ impl PeerManager {
 
         let condidate_peers = self.inner.unconnected_peers(remain);
         if !condidate_peers.is_empty() {
+            self.inner.inc_conn_count_by(condidate_peers.len());
+
             let addrs = condidate_peers.iter().map(|p| {
                 p.set_connectedness(Connectedness::Connecting);
+                if p.multiaddrs_len() == 0 {
+                    error!("network: unconnected peer has no multiaddr");
+                }
                 p.multiaddrs()
             });
 
@@ -511,7 +520,8 @@ impl PeerManager {
         };
 
         let connectedness = peer.connectedness();
-        if connectedness != Connectedness::Connecting || connectedness != Connectedness::Connected {
+        // Connecting/Connected was already counted
+        if connectedness != Connectedness::Connecting && connectedness != Connectedness::Connected {
             self.inner.inc_conn_count();
         }
 

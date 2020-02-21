@@ -109,6 +109,14 @@ impl Peer {
         ma.has_id() && ma.id_bytes() == Some(Cow::Borrowed(pid.as_bytes()))
     }
 
+    pub fn owned_id(&self) -> PeerId {
+        self.id.as_ref().to_owned()
+    }
+
+    pub fn owned_pubkey(&self) -> PublicKey {
+        self.pubkey.as_ref().to_owned()
+    }
+
     /// # note: we only accept multiaddr with peer id included
     pub fn set_multiaddrs(&self, multiaddrs: Vec<Multiaddr>) {
         let multiaddrs = multiaddrs
