@@ -280,7 +280,8 @@ impl Peer {
         self.disconnected_at.store(Self::now(), Ordering::SeqCst);
     }
 
-    fn now() -> u64 {
+    // Pub(super) for test
+    pub(super) fn now() -> u64 {
         duration_since(SystemTime::now(), UNIX_EPOCH).as_secs()
     }
 }
