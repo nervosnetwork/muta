@@ -570,3 +570,45 @@ async fn should_increase_retry_for_short_alive_session_on_session_closed() {
     assert_eq!(test_peer.connectedness(), Connectedness::CanConnect);
     assert_eq!(test_peer.retry(), 1, "should increase retry count");
 }
+
+#[tokio::test]
+async fn should_update_peer_alive_on_peer_alive() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+    let remote_peers = make_sessions(&mut mgr, 1).await;
+
+    let test_peer = remote_peers.first().expect("get first peer");
+    let old_alive = test_peer.alive();
+
+    // Set connected at to older timestamp to increase peer alive
+    test_peer.set_connected_at(Peer::now() - ALIVE_RETRY_INTERVAL - 1);
+
+    let peer_alive = PeerManagerEvent::PeerAlive {
+        pid: test_peer.owned_id(),
+    };
+    mgr.poll_event(peer_alive).await;
+
+    assert_eq!(
+        test_peer.alive(),
+        old_alive + ALIVE_RETRY_INTERVAL + 1,
+        "should update peer alive"
+    );
+}
+
+#[tokio::test]
+async fn should_reset_peer_retry_on_peer_alive() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+    let remote_peers = make_sessions(&mut mgr, 1).await;
+
+    let test_peer = remote_peers.first().expect("get first peer");
+    assert_eq!(test_peer.retry(), 0, "should have 0 retry");
+
+    test_peer.increase_retry();
+    assert_eq!(test_peer.retry(), 1, "should now have 1 retry");
+
+    let peer_alive = PeerManagerEvent::PeerAlive {
+        pid: test_peer.owned_id(),
+    };
+    mgr.poll_event(peer_alive).await;
+
+    assert_eq!(test_peer.retry(), 0, "should reset retry");
+}
