@@ -4,7 +4,7 @@ use super::{
 };
 use crate::{
     common::ConnectedAddr,
-    event::{ConnectionEvent, PeerManagerEvent, RemoveKind, RetryKind},
+    event::{ConnectionEvent, ConnectionType, PeerManagerEvent, RemoveKind, RetryKind},
     test::mock::SessionContext,
     traits::MultiaddrExt,
 };
@@ -962,7 +962,6 @@ async fn should_push_id_to_multiaddrs_if_not_included_on_identified_addrs() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
     let remote_peers = make_sessions(&mut mgr, 1).await;
     let test_peer = remote_peers.first().expect("get first");
-
     let test_multiaddr = make_multiaddr(2077, None);
 
     let identified_addrs = PeerManagerEvent::IdentifiedAddrs {
@@ -980,5 +979,104 @@ async fn should_push_id_to_multiaddrs_if_not_included_on_identified_addrs() {
     assert!(
         test_peer.multiaddrs().contains(&with_id),
         "should push id to multiaddr when add it to peer"
+    );
+}
+
+#[tokio::test]
+async fn should_add_dialer_multiaddr_to_peer_on_repeated_connection() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+    let remote_peers = make_sessions(&mut mgr, 1).await;
+    let test_peer = remote_peers.first().expect("get first");
+    let test_multiaddr = make_multiaddr(2077, Some(test_peer.owned_id()));
+
+    let repeated_connection = PeerManagerEvent::RepeatedConnection {
+        ty:   ConnectionType::Dialer,
+        sid:  test_peer.session_id(),
+        addr: test_multiaddr.clone(),
+    };
+    mgr.poll_event(repeated_connection).await;
+
+    assert!(
+        test_peer.multiaddrs().contains(&test_multiaddr),
+        "should add dialer multiaddr to peer"
+    );
+}
+
+#[tokio::test]
+async fn should_skip_listen_multiaddr_to_peer_on_repeated_connection() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+    let remote_peers = make_sessions(&mut mgr, 1).await;
+    let test_peer = remote_peers.first().expect("get first");
+    let test_multiaddr = make_multiaddr(2077, Some(test_peer.owned_id()));
+
+    let repeated_connection = PeerManagerEvent::RepeatedConnection {
+        ty:   ConnectionType::Listen,
+        sid:  test_peer.session_id(),
+        addr: test_multiaddr.clone(),
+    };
+    mgr.poll_event(repeated_connection).await;
+
+    assert!(
+        !test_peer.multiaddrs().contains(&test_multiaddr),
+        "should skip listen multiaddr to peer"
+    );
+}
+
+#[tokio::test]
+async fn should_push_id_if_multiaddr_not_included_on_repeated_connection() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+    let remote_peers = make_sessions(&mut mgr, 1).await;
+    let test_peer = remote_peers.first().expect("get first");
+    let test_multiaddr = make_multiaddr(2077, None);
+
+    let repeated_connection = PeerManagerEvent::RepeatedConnection {
+        ty:   ConnectionType::Dialer,
+        sid:  test_peer.session_id(),
+        addr: test_multiaddr.clone(),
+    };
+    mgr.poll_event(repeated_connection).await;
+
+    assert!(
+        !test_peer.multiaddrs().contains(&test_multiaddr),
+        "should not add multiaddr without id included"
+    );
+
+    let with_id = make_multiaddr(2077, Some(test_peer.owned_id()));
+    assert!(
+        test_peer.multiaddrs().contains(&with_id),
+        "should add multiaddr wit id included"
+    );
+}
+
+#[tokio::test]
+async fn should_remove_multiaddr_in_unknown_book_on_repeated_connection() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+    let remote_peers = make_sessions(&mut mgr, 1).await;
+    let test_peer = remote_peers.first().expect("get first");
+    let test_multiaddr = make_multiaddr(2077, None);
+    let test_multiaddr_with_id = make_multiaddr(2077, Some(test_peer.owned_id()));
+
+    mgr.inner
+        .unknown_addrs
+        .insert(test_multiaddr.clone().into());
+    mgr.inner
+        .unknown_addrs
+        .insert(test_multiaddr_with_id.clone().into());
+    assert_eq!(
+        mgr.inner.unknown_addrs.len(),
+        2,
+        "should have 2 unknown multiaddrs"
+    );
+
+    let repeated_connection = PeerManagerEvent::RepeatedConnection {
+        ty:   ConnectionType::Dialer,
+        sid:  test_peer.session_id(),
+        addr: test_multiaddr.clone(),
+    };
+    mgr.poll_event(repeated_connection).await;
+
+    assert!(
+        mgr.inner.unknown_addrs.is_empty(),
+        "should remove multiaddrs in unknown with/without id included"
     );
 }
