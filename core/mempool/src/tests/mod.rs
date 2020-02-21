@@ -24,9 +24,10 @@ use protocol::{Bytes, ProtocolResult};
 
 use crate::{HashMemPool, MemPoolError};
 
-const CYCLE_LIMIT: u64 = 10_000;
+const CYCLE_LIMIT: u64 = 1_000_000;
 const CURRENT_HEIGHT: u64 = 999;
 const POOL_SIZE: usize = 100_000;
+const MAX_TX_SIZE: u64 = 1024; // 1KB
 const TIMEOUT: u64 = 1000;
 const TIMEOUT_GAP: u64 = 100;
 const TX_CYCLE: u64 = 1;
@@ -81,7 +82,7 @@ impl MemPoolAdapter for HashMemPoolAdapter {
         Ok(CURRENT_HEIGHT)
     }
 
-    fn set_timeout_gap(&self, _timeout_gap: u64) {}
+    fn set_args(&self, _timeout_gap: u64, _cycles_limit: u64, _max_tx_size: u64) {}
 }
 
 pub fn default_mock_txs(size: usize) -> Vec<SignedTransaction> {
@@ -99,13 +100,18 @@ fn mock_txs(valid_size: usize, invalid_size: usize, timeout: u64) -> Vec<SignedT
 }
 
 fn default_mempool() -> HashMemPool<HashMemPoolAdapter> {
-    new_mempool(POOL_SIZE, TIMEOUT_GAP)
+    new_mempool(POOL_SIZE, TIMEOUT_GAP, CYCLE_LIMIT, MAX_TX_SIZE)
 }
 
-fn new_mempool(pool_size: usize, timeout_gap: u64) -> HashMemPool<HashMemPoolAdapter> {
+fn new_mempool(
+    pool_size: usize,
+    timeout_gap: u64,
+    cycles_limit: u64,
+    max_tx_size: u64,
+) -> HashMemPool<HashMemPoolAdapter> {
     let adapter = HashMemPoolAdapter::new();
     let mempool = HashMemPool::new(pool_size, adapter);
-    mempool.set_timeout_gap(timeout_gap);
+    mempool.set_args(timeout_gap, cycles_limit, max_tx_size);
     mempool
 }
 

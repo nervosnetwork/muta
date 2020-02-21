@@ -73,6 +73,8 @@ fn mock_metadata() -> Metadata {
         prevote_ratio:   10,
         precommit_ratio: 10,
         brake_ratio:     7,
+        tx_num_limit: 20000,
+        max_tx_size: 1_073_741_824,
     }
 }
 

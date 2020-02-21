@@ -251,11 +251,19 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
             prevote_ratio:   10,
             precommit_ratio: 10,
             brake_ratio:     10,
+            tx_num_limit: 20000,
+            max_tx_size: 1_073_741_824,
         })
     }
 
-    /// Set timeout_gap in mempool.
-    fn set_timeout_gap(&self, _context: Context, _timeout_gap: u64) {}
+    fn set_args(
+        &self,
+        _context: Context,
+        _timeout_gap: u64,
+        _cycles_limit: u64,
+        _max_tx_size: u64,
+    ) {
+    }
 }
 
 fn gen_remote_tx_hashmap(list: Vec<RichBlock>) -> SafeHashMap<Hash, SignedTransaction> {
