@@ -508,14 +508,28 @@ impl PeerManager {
     }
 
     fn new_session(&mut self, pubkey: PublicKey, ctx: Arc<SessionContext>) {
-        // TODO: always allow connections from consensus peers even when
+        let remote_multiaddr = if !ctx.address.has_id() {
+            let mut addr = ctx.address.to_owned();
+            addr.push_id(pubkey.peer_id());
+            addr
+        } else {
+            ctx.address.to_owned()
+        };
+
+        if ctx.ty == SessionType::Inbound {
+            // Inbound multiaddrs are useless, always remove them
+            self.unknown_addrs.remove(&remote_multiaddr);
+        }
+
+        // TODO: Always allow connections from consensus peers even when
         // we reach max connections
         if self.inner.conn_count() >= self.config.max_connections {
+            // TODO: If we want to ensure consensus peer connection, then
+            // outbound session number may exceed config.max_connections.
+            // Should check unknown address book.
             self.disconnect_session(ctx.id);
             return;
         }
-
-        self.unknown_addrs.remove(&ctx.address);
 
         let remote_peer_id = pubkey.peer_id();
         let peer = match self.inner.peer(&remote_peer_id) {
@@ -534,6 +548,21 @@ impl PeerManager {
             }
         };
 
+        // peer and ctx are moved into closure
+        let insert_outbound_multiaddr =
+            |self_id: &PeerId, unknown_addrs: &mut HashSet<AddrInfo>| {
+                match ctx.ty {
+                    SessionType::Inbound => {
+                        // We can't use inbound address to connect to this peer
+                        debug!("network: {:?}: inbound {:?}", self_id, ctx.address);
+                    }
+                    SessionType::Outbound => {
+                        unknown_addrs.remove(&remote_multiaddr);
+                        peer.add_multiaddrs(vec![remote_multiaddr]);
+                    }
+                }
+            };
+
         let connectedness = peer.connectedness();
         if connectedness == Connectedness::Connected {
             // This should not happen, because of repeated connection event
@@ -543,6 +572,7 @@ impl PeerManager {
             if exist_sid != ctx.id && self.inner.session(&exist_sid).is_some() {
                 // We don't support multiple connections, disconnect new one
                 self.disconnect_session(ctx.id);
+                insert_outbound_multiaddr(&self.peer_id, &mut self.unknown_addrs);
                 return;
             }
 
@@ -562,22 +592,8 @@ impl PeerManager {
         self.inner.sessions.write().insert(session);
         peer.mark_connected(ctx.id);
 
-        // Update peer multiaddr
-        match ctx.ty {
-            SessionType::Inbound => {
-                // We can't use inbound address to connect to this peer
-                debug!("network: {:?}: inbound {:?}", self.peer_id, ctx.address);
-            }
-            SessionType::Outbound => {
-                let mut multiaddr = ctx.address.to_owned();
-                if !multiaddr.has_id() {
-                    multiaddr.push_id(remote_peer_id);
-                }
-
-                self.unknown_addrs.remove(&multiaddr);
-                peer.add_multiaddrs(vec![multiaddr]);
-            }
-        }
+        // Insert peer multiaddr
+        insert_outbound_multiaddr(&self.peer_id, &mut self.unknown_addrs);
     }
 
     fn session_closed(&mut self, sid: SessionId) {

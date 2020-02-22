@@ -355,6 +355,39 @@ async fn should_not_increase_conn_count_for_connecting_peer_on_new_session() {
 }
 
 #[tokio::test]
+async fn should_always_remove_inbound_mutiaddr_in_unknown_book_even_when_reach_max_connections_on_new_session(
+) {
+    let (mut mgr, _conn_rx) = make_manager(0, 2);
+    let _remote_peers = make_sessions(&mut mgr, 2).await;
+
+    let remote_pubkey = make_pubkey();
+    let remote_addr = make_multiaddr(9527, Some(remote_pubkey.peer_id()));
+    mgr.unknown_book_mut()
+        .insert(remote_addr.clone().try_into().expect("try into addr info"));
+    assert_eq!(mgr.unknown_book().len(), 1, "should have one unknown addr");
+
+    let sess_ctx = SessionContext::make(
+        SessionId::new(1),
+        make_multiaddr(9527, None),
+        SessionType::Inbound,
+        remote_pubkey.clone(),
+    );
+    let new_session = PeerManagerEvent::NewSession {
+        pid:    remote_pubkey.peer_id(),
+        pubkey: remote_pubkey.clone(),
+        ctx:    sess_ctx.arced(),
+    };
+    mgr.poll_event(new_session).await;
+
+    assert_eq!(mgr.unknown_book().len(), 0, "should remove unknown addr");
+    assert_eq!(
+        mgr.core_inner().conn_count(),
+        2,
+        "should not increase conn count"
+    );
+}
+
+#[tokio::test]
 async fn should_remove_same_mutiaddr_in_unknown_book_on_new_session() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
 
@@ -456,6 +489,36 @@ async fn should_reject_new_connection_for_same_peer_on_new_session() {
         ConnectionEvent::Disconnect(sid) => assert_eq!(sid, 99.into(), "should be new session id"),
         _ => panic!("should be disconnect event"),
     }
+}
+
+#[tokio::test]
+async fn should_reject_new_connections_for_same_peer_also_remove_multiaddr_in_unknown_book_on_new_session(
+) {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+    let remote_peers = make_sessions(&mut mgr, 1).await;
+
+    let test_peer = remote_peers.first().expect("get first peer");
+    let test_addr = make_multiaddr(999, Some(test_peer.owned_id()));
+    mgr.unknown_book_mut()
+        .insert(test_addr.clone().try_into().expect("try into addr info"));
+    assert_eq!(mgr.unknown_book().len(), 1, "should have one unknown addr");
+
+    let sess_ctx = SessionContext::make(
+        SessionId::new(99),
+        test_addr,
+        SessionType::Outbound,
+        test_peer.owned_pubkey(),
+    );
+    let new_session = PeerManagerEvent::NewSession {
+        pid:    test_peer.owned_id(),
+        pubkey: test_peer.owned_pubkey(),
+        ctx:    sess_ctx.arced(),
+    };
+    mgr.poll_event(new_session).await;
+
+    let inner = mgr.core_inner();
+    assert_eq!(inner.conn_count(), 1, "should not increase conn count");
+    assert_eq!(mgr.unknown_book().len(), 0, "should remove unknown addr");
 }
 
 #[tokio::test]
