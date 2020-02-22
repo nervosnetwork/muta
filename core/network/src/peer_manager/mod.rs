@@ -490,7 +490,7 @@ impl PeerManager {
             }
         }
 
-        self.connect_peers(peers.clone());
+        self.connect_peers_now(peers.clone());
     }
 
     pub fn disconnect_session(&self, sid: SessionId) {
@@ -736,16 +736,11 @@ impl PeerManager {
         }
     }
 
-    fn connect_peers(&self, peers: Vec<ArcPeer>) {
+    fn connect_peers_now(&self, peers: Vec<ArcPeer>) {
         let connectable = |p: &'_ ArcPeer| -> bool {
             let connectedness = p.connectedness();
             if connectedness != Connectedness::CanConnect {
                 info!("network: peer {:?} connectedness {}", p.id, connectedness);
-                return false;
-            }
-            if !p.retry_ready() {
-                let eta = p.next_attempt_since_now();
-                info!("network: peer {:?} isn't ready, ETA {} seconds", p.id, eta);
                 return false;
             }
             true
@@ -764,7 +759,7 @@ impl PeerManager {
         }
     }
 
-    fn connect_peer_ids(&self, pids: Vec<PeerId>) {
+    fn connect_peer_by_ids_now(&self, pids: Vec<PeerId>) {
         let mut peers = Vec::new();
 
         {
@@ -776,7 +771,7 @@ impl PeerManager {
             }
         }
 
-        self.connect_peers(peers);
+        self.connect_peers_now(peers);
     }
 
     fn discover_multiaddr(&mut self, addr: Multiaddr) {
@@ -923,7 +918,7 @@ impl PeerManager {
             PeerManagerEvent::RemovePeerBySession { sid, .. } => self.remove_peer_by_session(sid),
             PeerManagerEvent::SessionBlocked { ctx, .. } => self.session_blocked(ctx),
             PeerManagerEvent::RetryPeerLater { pid, .. } => self.retry_peer_later(&pid),
-            PeerManagerEvent::ConnectPeers { pids } => self.connect_peer_ids(pids),
+            PeerManagerEvent::ConnectPeersNow { pids } => self.connect_peer_by_ids_now(pids),
             PeerManagerEvent::DiscoverAddr { addr } => self.discover_multiaddr(addr),
             PeerManagerEvent::DiscoverMultiAddrs { addrs } => self.dicover_multi_multiaddrs(addrs),
             PeerManagerEvent::IdentifiedAddrs { pid, addrs } => self.identified_addrs(&pid, addrs),

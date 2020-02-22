@@ -174,13 +174,6 @@ impl Peer {
         self.next_attempt.load(Ordering::SeqCst)
     }
 
-    pub fn next_attempt_since_now(&self) -> u64 {
-        let next_attempt =
-            UNIX_EPOCH + Duration::from_secs(self.next_attempt.load(Ordering::SeqCst));
-
-        duration_since(next_attempt, SystemTime::now()).as_secs()
-    }
-
     pub fn connected_at(&self) -> u64 {
         self.connected_at.load(Ordering::SeqCst)
     }

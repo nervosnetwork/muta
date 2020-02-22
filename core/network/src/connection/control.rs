@@ -153,7 +153,7 @@ where
         }
 
         let (pids, unknown) = self.sessions.peers_by_chain(unconnected.clone());
-        let connect_peers = PeerManagerEvent::ConnectPeers { pids };
+        let connect_peers = PeerManagerEvent::ConnectPeersNow { pids };
         if self.mgr_srv.unbounded_send(connect_peers).is_err() {
             error!("network: peer manager service exit");
         }
