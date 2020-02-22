@@ -64,6 +64,8 @@ fn sync_gap_test() {
             prevote_ratio:      10,
             precommit_ratio:    10,
             brake_ratio:        3,
+            tx_num_limit:       20000,
+            max_tx_size:        1_073_741_824,
         };
         let status_agent = StatusAgent::new(status);
         let lock = Arc::new(Mutex::new(()));

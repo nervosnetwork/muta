@@ -105,7 +105,12 @@ where
         Ok(())
     }
 
-    async fn package(&self, ctx: Context, cycle_limit: u64) -> ProtocolResult<MixedTxHashes> {
+    async fn package(
+        &self,
+        ctx: Context,
+        cycles_limit: u64,
+        tx_num_limit: u64,
+    ) -> ProtocolResult<MixedTxHashes> {
         let current_height = self.adapter.get_latest_height(ctx.clone()).await?;
         log::info!(
             "[mempool]: {:?} txs in map and {:?} txs in queue while package",
@@ -113,7 +118,8 @@ where
             self.tx_cache.queue_len(),
         );
         self.tx_cache.package(
-            cycle_limit,
+            cycles_limit,
+            tx_num_limit,
             current_height,
             current_height + self.timeout_gap.load(Ordering::Relaxed),
         )

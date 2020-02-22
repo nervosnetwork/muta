@@ -25,6 +25,7 @@ use protocol::{Bytes, ProtocolResult};
 use crate::{HashMemPool, MemPoolError};
 
 const CYCLE_LIMIT: u64 = 1_000_000;
+const TX_NUM_LIMIT: u64 = 10_000;
 const CURRENT_HEIGHT: u64 = 999;
 const POOL_SIZE: usize = 100_000;
 const MAX_TX_SIZE: u64 = 1024; // 1KB
@@ -177,8 +178,17 @@ fn exec_flush(remove_hashes: Vec<Hash>, mempool: Arc<HashMemPool<HashMemPoolAdap
     });
 }
 
-fn exec_package(mempool: Arc<HashMemPool<HashMemPoolAdapter>>, cycle_limit: u64) -> MixedTxHashes {
-    executor::block_on(async { mempool.package(Context::new(), cycle_limit).await.unwrap() })
+fn exec_package(
+    mempool: Arc<HashMemPool<HashMemPoolAdapter>>,
+    cycle_limit: u64,
+    tx_num_limit: u64,
+) -> MixedTxHashes {
+    executor::block_on(async {
+        mempool
+            .package(Context::new(), cycle_limit, tx_num_limit)
+            .await
+            .unwrap()
+    })
 }
 
 fn exec_ensure_order_txs(require_hashes: Vec<Hash>, mempool: Arc<HashMemPool<HashMemPoolAdapter>>) {

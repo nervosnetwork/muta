@@ -127,6 +127,7 @@ pub trait ConsensusAdapter: CommonConsensusAdapter + Send + Sync {
         ctx: Context,
         height: u64,
         cycle_limit: u64,
+        tx_num_limit: u64,
     ) -> ProtocolResult<MixedTxHashes>;
 
     /// Check the correctness of the given transactions.

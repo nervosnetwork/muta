@@ -20,7 +20,12 @@ impl MixedTxHashes {
 pub trait MemPool: Send + Sync {
     async fn insert(&self, ctx: Context, tx: SignedTransaction) -> ProtocolResult<()>;
 
-    async fn package(&self, ctx: Context, cycle_limit: u64) -> ProtocolResult<MixedTxHashes>;
+    async fn package(
+        &self,
+        ctx: Context,
+        cycles_limit: u64,
+        tx_num_limit: u64,
+    ) -> ProtocolResult<MixedTxHashes>;
 
     async fn flush(&self, ctx: Context, tx_hashes: Vec<Hash>) -> ProtocolResult<()>;
 

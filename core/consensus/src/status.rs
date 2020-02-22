@@ -108,6 +108,8 @@ pub struct CurrentConsensusStatus {
     pub prevote_ratio:      u64,
     pub precommit_ratio:    u64,
     pub brake_ratio:        u64,
+    pub tx_num_limit:       u64,
+    pub max_tx_size:        u64,
 }
 
 impl CurrentConsensusStatus {

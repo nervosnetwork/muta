@@ -270,6 +270,8 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
             prevote_ratio:      metadata.prevote_ratio,
             precommit_ratio:    metadata.precommit_ratio,
             brake_ratio:        metadata.brake_ratio,
+            tx_num_limit:       metadata.tx_num_limit,
+            max_tx_size:        metadata.max_tx_size,
         }
     } else {
         let wal_info = storage.load_muta_wal().await.expect("Load muta wal error");

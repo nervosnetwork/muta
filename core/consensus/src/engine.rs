@@ -52,7 +52,12 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
 
         let (ordered_tx_hashes, propose_hashes) = self
             .adapter
-            .get_txs_from_mempool(ctx, height, current_consensus_status.cycles_limit)
+            .get_txs_from_mempool(
+                ctx,
+                height,
+                current_consensus_status.cycles_limit,
+                current_consensus_status.tx_num_limit,
+            )
             .await?
             .clap();
 

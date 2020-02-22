@@ -70,8 +70,9 @@ where
         ctx: Context,
         _height: u64,
         cycle_limit: u64,
+        tx_num_limit: u64,
     ) -> ProtocolResult<MixedTxHashes> {
-        self.mempool.package(ctx, cycle_limit).await
+        self.mempool.package(ctx, cycle_limit, tx_num_limit).await
     }
 
     async fn check_txs(&self, ctx: Context, check_txs: Vec<Hash>) -> ProtocolResult<()> {
