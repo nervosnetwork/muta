@@ -821,7 +821,11 @@ impl PeerManager {
 
         let peer_id = match peer_id_from_multiaddr!(addr) {
             Some(Ok(p)) => p,
-            _ => return,
+            _ => {
+                // All multiaddrs we dial have peer id included
+                error!("network: unconnectable multiaddr without peer id");
+                return;
+            }
         };
 
         if let Some(peer) = self.inner.peer(&peer_id) {
