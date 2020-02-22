@@ -28,10 +28,10 @@ use std::{
     ops::Deref,
     path::PathBuf,
     pin::Pin,
-    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
+    sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
     sync::Arc,
     task::{Context, Poll},
-    time::Duration,
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 use derive_more::Display;
@@ -75,6 +75,7 @@ macro_rules! peer_id_from_multiaddr {
 
 const MAX_RETRY_COUNT: u8 = 30;
 const ALIVE_RETRY_INTERVAL: u64 = 3; // seconds
+const WHITELIST_TIMEOUT: u64 = 60 * 60; // 1 hour
 
 #[derive(Debug, Clone, Display, Serialize, Deserialize)]
 #[display(fmt = "{}", _0)]
@@ -138,7 +139,8 @@ impl Into<Multiaddr> for PeerMultiaddr {
 
 #[derive(Debug)]
 struct ProtectedPeer {
-    chain_addr: Address,
+    chain_addr:    Address,
+    authorized_at: AtomicU64,
 }
 
 #[derive(Debug, Clone)]
@@ -146,7 +148,46 @@ struct ArcProtectedPeer(Arc<ProtectedPeer>);
 
 impl ArcProtectedPeer {
     pub fn new(chain_addr: Address) -> Self {
-        ArcProtectedPeer(Arc::new(ProtectedPeer { chain_addr }))
+        let peer = ProtectedPeer {
+            chain_addr,
+            authorized_at: AtomicU64::new(Self::now()),
+        };
+
+        ArcProtectedPeer(Arc::new(peer))
+    }
+
+    pub fn refresh_authorized(&self) {
+        self.authorized_at.store(Self::now(), Ordering::SeqCst);
+    }
+
+    #[cfg(test)]
+    pub fn set_authorized_at(&self, at: u64) {
+        self.authorized_at.store(at, Ordering::SeqCst);
+    }
+
+    #[cfg(test)]
+    pub fn authorized_at(&self) -> u64 {
+        self.authorized_at.load(Ordering::SeqCst)
+    }
+
+    pub fn is_expired(&self) -> bool {
+        let expired_at = self
+            .authorized_at
+            .load(Ordering::SeqCst)
+            .saturating_add(WHITELIST_TIMEOUT);
+
+        Self::now() > expired_at
+    }
+
+    pub(self) fn now() -> u64 {
+        Self::duration_since(SystemTime::now(), UNIX_EPOCH).as_secs()
+    }
+
+    fn duration_since(now: SystemTime, early: SystemTime) -> Duration {
+        match now.duration_since(early) {
+            Ok(duration) => duration,
+            Err(e) => e.duration(),
+        }
     }
 }
 
@@ -374,12 +415,20 @@ impl Inner {
     }
 
     pub fn protect_peers_by_chain_addr(&self, chain_addrs: Vec<Address>) {
-        let peers = chain_addrs
-            .into_iter()
-            .map(ArcProtectedPeer::new)
-            .collect::<Vec<_>>();
+        let mut new_protected = Vec::new();
 
-        self.whitelist.write().extend(peers);
+        {
+            let whitelist = self.whitelist.read();
+            for ca in chain_addrs.into_iter() {
+                if let Some(peer) = whitelist.get(&ca) {
+                    peer.refresh_authorized();
+                } else {
+                    new_protected.push(ArcProtectedPeer::new(ca))
+                }
+            }
+        }
+
+        self.whitelist.write().extend(new_protected);
     }
 
     pub fn is_protected_by_chain_addr(&self, chain_addr: &Address) -> bool {
@@ -1071,6 +1120,9 @@ impl Future for PeerManager {
                 self.connect_multiaddrs(unconnected_addrs);
             }
         }
+
+        // Clean expired whitelisted peer
+        self.inner.whitelist.write().retain(|p| !p.is_expired());
 
         // Clean unknown addrs
         let run_out_retry = |addr: &'_ &AddrInfo| -> bool {

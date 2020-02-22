@@ -1,8 +1,8 @@
 use super::{
     addr_info::{ADDR_TIMEOUT, MAX_ADDR_RETRY},
     peer::Peer,
-    AddrInfo, ArcPeer, Connectedness, Inner, PeerManager, PeerManagerConfig, PeerMultiaddr,
-    ALIVE_RETRY_INTERVAL, MAX_RETRY_COUNT,
+    AddrInfo, ArcPeer, ArcProtectedPeer, Connectedness, Inner, PeerManager, PeerManagerConfig,
+    PeerMultiaddr, ALIVE_RETRY_INTERVAL, MAX_RETRY_COUNT, WHITELIST_TIMEOUT,
 };
 use crate::{
     common::ConnectedAddr,
@@ -1705,5 +1705,63 @@ async fn should_allow_whitelisted_peer_session_even_if_we_reach_max_connections_
     assert_eq!(
         session.peer.id, whitelisted_peer.id,
         "should be whitelisted peer"
+    );
+}
+
+#[tokio::test]
+async fn should_refresh_whitelist_on_protect_peers_by_chain_addrs() {
+    let (mut mgr, _conn_rx) = make_manager(0, 10);
+    let peer = make_peer(2077);
+
+    let inner = mgr.core_inner();
+    inner.protect_peers_by_chain_addr(vec![peer.chain_addr.as_ref().to_owned()]);
+    assert_eq!(inner.whitelist().len(), 1, "should have one whitelisted");
+
+    let peer_in_list = inner
+        .whitelist()
+        .iter()
+        .next()
+        .expect("should have one whitelist peer")
+        .clone();
+    // Set authorized_at to older timestamp
+    peer_in_list.set_authorized_at(ArcProtectedPeer::now() - WHITELIST_TIMEOUT + 20);
+    assert!(!peer_in_list.is_expired(), "should not be expired");
+
+    let protect_peers_by_chain_addrs = PeerManagerEvent::ProtectPeersByChainAddr {
+        chain_addrs: vec![peer.chain_addr.as_ref().to_owned()],
+    };
+    mgr.poll_event(protect_peers_by_chain_addrs).await;
+
+    assert_eq!(
+        peer_in_list.authorized_at(),
+        ArcProtectedPeer::now(),
+        "should be refreshed"
+    );
+}
+
+#[tokio::test]
+async fn should_remove_expired_peers_in_whitelist() {
+    let (mut mgr, _conn_rx) = make_manager(0, 10);
+    let peer = make_peer(2077);
+
+    let inner = mgr.core_inner();
+    inner.protect_peers_by_chain_addr(vec![peer.chain_addr.as_ref().to_owned()]);
+    assert_eq!(inner.whitelist().len(), 1, "should have one whitelisted");
+
+    let peer_in_list = inner
+        .whitelist()
+        .iter()
+        .next()
+        .expect("should have one whitelist peer")
+        .clone();
+    // Set authorized_at to older timestamp
+    peer_in_list.set_authorized_at(ArcProtectedPeer::now() - WHITELIST_TIMEOUT - 1);
+    assert!(peer_in_list.is_expired(), "should be expired");
+
+    mgr.poll().await;
+    assert_eq!(
+        inner.whitelist().len(),
+        0,
+        "should remove expired peers in whitelist"
     );
 }
