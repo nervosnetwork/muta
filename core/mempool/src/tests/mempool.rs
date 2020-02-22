@@ -133,7 +133,7 @@ fn test_flush() {
     let remove_hashes: Vec<Hash> = remove_txs.iter().map(|tx| tx.tx_hash.clone()).collect();
     exec_flush(remove_hashes, Arc::clone(&mempool));
     assert_eq!(mempool.get_tx_cache().len(), 432);
-    assert_eq!(mempool.get_tx_cache().queue_len(), 555);
+    assert_eq!(mempool.get_tx_cache().queue_len(), 432);
     exec_package(Arc::clone(&mempool), CYCLE_LIMIT, TX_NUM_LIMIT);
     assert_eq!(mempool.get_tx_cache().queue_len(), 432);
     assert_eq!(callback_cache.len(), 0);
