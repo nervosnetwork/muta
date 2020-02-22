@@ -671,8 +671,6 @@ impl PeerManager {
             self.unknown_addrs.remove(&remote_multiaddr);
         }
 
-        // TODO: Always allow connections from consensus peers even when
-        // we reach max connections
         if self.inner.conn_count() >= self.config.max_connections {
             let protected = match Peer::pubkey_to_chain_addr(&pubkey) {
                 Ok(ca) => self.inner.is_protected_by_chain_addr(&ca),
@@ -680,9 +678,6 @@ impl PeerManager {
             };
 
             if !protected {
-                // TODO: If we want to ensure consensus peer connection, then
-                // outbound session number may exceed config.max_connections.
-                // Should check unknown address book.
                 self.disconnect_session(ctx.id);
                 return;
             }
@@ -1125,7 +1120,7 @@ impl Future for PeerManager {
         self.inner.whitelist.write().retain(|p| !p.is_expired());
 
         // Clean unknown addrs
-        let run_out_retry = |addr: &'_ &AddrInfo| -> bool {
+        let run_out_retry = |addr: &AddrInfo| -> bool {
             if addr.is_timeout() {
                 addr.inc_retry();
             }
@@ -1135,19 +1130,7 @@ impl Future for PeerManager {
                 false
             }
         };
-
-        let ghost: HashSet<_> = self
-            .unknown_addrs
-            .iter()
-            .filter(run_out_retry)
-            .cloned()
-            .collect();
-
-        self.unknown_addrs = self
-            .unknown_addrs
-            .symmetric_difference(&ghost)
-            .cloned()
-            .collect();
+        self.unknown_addrs.retain(|ua| !run_out_retry(ua));
 
         Poll::Pending
     }
