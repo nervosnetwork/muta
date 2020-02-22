@@ -1,4 +1,4 @@
-use super::{ArcPeer, Connectedness};
+use super::{ArcPeer, Connectedness, PeerMultiaddr};
 
 use std::{
     convert::TryFrom,
@@ -12,13 +12,13 @@ use serde::{de, ser};
 use serde_derive::{Deserialize, Serialize};
 use tentacle::{multiaddr::Multiaddr, secio::PublicKey};
 
-use crate::{error::NetworkError, traits::MultiaddrExt};
+use crate::error::NetworkError;
 
 // TODO: remove skip tag on retry and next_attempt
 #[derive(Debug, Serialize, Deserialize)]
 struct SerdePeer {
     pubkey:          PeerPubKey,
-    multiaddrs:      Vec<Multiaddr>,
+    multiaddrs:      Vec<PeerMultiaddr>,
     connectedness:   usize,
     #[serde(skip)]
     retry:           u8,
@@ -59,11 +59,10 @@ impl TryFrom<SerdePeer> for ArcPeer {
         let multiaddrs = serde_peer
             .multiaddrs
             .into_iter()
-            .map(|mut ma| {
-                if !ma.has_id() {
-                    ma.push_id(pid.clone())
-                }
-                ma
+            .map(|ma| {
+                // Just ensure that our recovered multiaddr has id
+                let ma: Multiaddr = ma.into();
+                PeerMultiaddr::new(ma, &pid)
             })
             .collect();
         peer.set_multiaddrs(multiaddrs);

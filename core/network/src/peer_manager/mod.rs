@@ -44,6 +44,7 @@ use log::{debug, error, info, warn};
 use parking_lot::RwLock;
 use protocol::types::Address;
 use rand::seq::IteratorRandom;
+use serde_derive::{Deserialize, Serialize};
 #[cfg(not(test))]
 use tentacle::context::SessionContext;
 use tentacle::{
@@ -74,9 +75,9 @@ macro_rules! peer_id_from_multiaddr {
 const MAX_RETRY_COUNT: u8 = 30;
 const ALIVE_RETRY_INTERVAL: u64 = 3; // seconds
 
-#[derive(Debug, Clone, Display)]
+#[derive(Debug, Clone, Display, Serialize, Deserialize)]
 #[display(fmt = "{}", _0)]
-struct PeerMultiaddr(Multiaddr);
+pub struct PeerMultiaddr(Multiaddr);
 
 impl PeerMultiaddr {
     pub fn new(mut ma: Multiaddr, peer_id: &PeerId) -> Self {
@@ -379,7 +380,7 @@ impl PeerManagerHandle {
 
         // Should always include our self
         let our_self = self.listen_addrs();
-        let condidates = peers.into_iter().map(|p| p.multiaddrs()).flatten();
+        let condidates = peers.into_iter().map(|p| p.raw_multiaddrs()).flatten();
 
         our_self.into_iter().chain(condidates).take(max).collect()
     }
@@ -522,7 +523,7 @@ impl PeerManager {
                 if p.multiaddrs_len() == 0 {
                     error!("network: unconnected peer has no multiaddr");
                 }
-                p.multiaddrs()
+                p.raw_multiaddrs()
             });
 
             condidates = addrs.flatten().collect();
@@ -551,13 +552,7 @@ impl PeerManager {
     }
 
     fn new_session(&mut self, pubkey: PublicKey, ctx: Arc<SessionContext>) {
-        let remote_multiaddr = if !ctx.address.has_id() {
-            let mut addr = ctx.address.to_owned();
-            addr.push_id(pubkey.peer_id());
-            addr
-        } else {
-            ctx.address.to_owned()
-        };
+        let remote_multiaddr = PeerMultiaddr::new(ctx.address.to_owned(), &pubkey.peer_id());
 
         if ctx.ty == SessionType::Inbound {
             // Inbound multiaddrs are useless, always remove them
@@ -748,7 +743,7 @@ impl PeerManager {
 
         let multiaddrs = peers.into_iter().filter(connectable).map(|p| {
             p.set_connectedness(Connectedness::Connecting);
-            p.multiaddrs()
+            p.raw_multiaddrs()
         });
         let multiaddrs = multiaddrs.flatten().collect::<Vec<_>>();
 
@@ -780,17 +775,15 @@ impl PeerManager {
             _ => return, // Ignore multiaddr without peer id included
         };
 
-        if let Ok(peer_addr) = PeerMultiaddr::try_from(addr.clone()) {
-            if self.inner.listen_contains(&peer_addr) {
-                // Ignore our listen multiaddrs
-                return;
-            }
-        }
-
         let addr: AddrInfo = match addr.try_into() {
             Ok(a) => a,
             _ => return, // Already check peer id above
         };
+
+        // Ignore our listen multiaddrs
+        if self.inner.listen_contains(&addr) {
+            return;
+        }
 
         if let Some(peer) = self.inner.peer(&peer_id) {
             if !peer.contains_multiaddr(&addr) {
@@ -819,19 +812,14 @@ impl PeerManager {
             // Make sure all addresses include peer id
             let addrs = addrs
                 .into_iter()
-                .map(|mut ma| {
-                    if !ma.has_id() {
-                        ma.push_id(pid.to_owned())
-                    }
-                    ma
-                })
+                .map(|ma| PeerMultiaddr::new(ma, pid))
                 .collect::<Vec<_>>();
 
             peer.add_multiaddrs(addrs);
         }
     }
 
-    fn repeated_connection(&mut self, ty: ConnectionType, sid: SessionId, mut addr: Multiaddr) {
+    fn repeated_connection(&mut self, ty: ConnectionType, sid: SessionId, addr: Multiaddr) {
         info!(
             "network: {:?}: repeated session {:?}, ty {}, remote addr {:?}",
             self.peer_id, sid, ty, addr
@@ -845,10 +833,7 @@ impl PeerManager {
             }
         };
 
-        if !addr.has_id() {
-            addr.push_id(session.peer.owned_id());
-        }
-
+        let addr = PeerMultiaddr::new(addr, &session.peer.id);
         self.unknown_addrs.remove(&addr);
 
         // TODO: For ConnectionType::Inbound, records repeated count,
@@ -873,6 +858,7 @@ impl PeerManager {
             }
         };
 
+        let addr = PeerMultiaddr::new(addr, &peer_id);
         if let Some(peer) = self.inner.peer(&peer_id) {
             // We keep bootstrap peer addresses
             if !self.bootstraps.contains(&peer_id) {

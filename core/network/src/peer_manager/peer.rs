@@ -1,6 +1,9 @@
+use super::PeerMultiaddr;
+
 use std::{
     borrow::{Borrow, Cow},
     collections::HashSet,
+    convert::TryFrom,
     fmt,
     hash::{Hash, Hasher},
     ops::Deref,
@@ -20,7 +23,10 @@ use tentacle::{
     SessionId,
 };
 
-use crate::{error::ErrorKind, traits::MultiaddrExt};
+use crate::{
+    error::{ErrorKind, PeerIdNotFound},
+    traits::MultiaddrExt,
+};
 
 pub const BACKOFF_BASE: u64 = 2;
 pub const MAX_RETRY_INTERVAL: u64 = 512; // seconds
@@ -71,7 +77,7 @@ impl From<Connectedness> for usize {
 pub struct Peer {
     pub id:          Arc<PeerId>,
     pub pubkey:      Arc<PublicKey>,
-    multiaddrs:      RwLock<HashSet<Multiaddr>>,
+    multiaddrs:      RwLock<HashSet<PeerMultiaddr>>,
     pub chain_addr:  Arc<Address>,
     connectedness:   AtomicUsize,
     session_id:      AtomicUsize,
@@ -105,10 +111,6 @@ impl Peer {
         Ok(peer)
     }
 
-    fn validate_multiaddr(pid: &PeerId, ma: &Multiaddr) -> bool {
-        ma.has_id() && ma.id_bytes() == Some(Cow::Borrowed(pid.as_bytes()))
-    }
-
     pub fn owned_id(&self) -> PeerId {
         self.id.as_ref().to_owned()
     }
@@ -117,8 +119,11 @@ impl Peer {
         self.pubkey.as_ref().to_owned()
     }
 
-    /// # note: we only accept multiaddr with peer id included
-    pub fn set_multiaddrs(&self, multiaddrs: Vec<Multiaddr>) {
+    fn validate_multiaddr(pid: &PeerId, ma: &PeerMultiaddr) -> bool {
+        ma.has_id() && ma.id_bytes() == Some(Cow::Borrowed(pid.as_bytes()))
+    }
+
+    pub fn set_multiaddrs(&self, multiaddrs: Vec<PeerMultiaddr>) {
         let multiaddrs = multiaddrs
             .into_iter()
             .filter(|ma| Self::validate_multiaddr(self.id.as_ref(), ma))
@@ -127,8 +132,7 @@ impl Peer {
         *self.multiaddrs.write() = multiaddrs;
     }
 
-    /// # note: we only accept multiaddr with peer id included
-    pub fn add_multiaddrs(&self, multiaddrs: Vec<Multiaddr>) {
+    pub fn add_multiaddrs(&self, multiaddrs: Vec<PeerMultiaddr>) {
         let multiaddrs = multiaddrs
             .into_iter()
             .filter(|ma| Self::validate_multiaddr(self.id.as_ref(), ma))
@@ -137,16 +141,36 @@ impl Peer {
         self.multiaddrs.write().extend(multiaddrs)
     }
 
-    pub fn remove_multiaddr(&self, multiaddr: &Multiaddr) {
+    // For NetworkConfig
+    pub fn set_raw_multiaddrs(&self, multiaddrs: Vec<Multiaddr>) -> Result<(), PeerIdNotFound> {
+        let multiaddrs = multiaddrs
+            .into_iter()
+            .map(PeerMultiaddr::try_from)
+            .collect::<Result<Vec<_>, _>>()?;
+
+        self.multiaddrs.write().extend(multiaddrs);
+        Ok(())
+    }
+
+    pub fn remove_multiaddr(&self, multiaddr: &PeerMultiaddr) {
         self.multiaddrs.write().remove(multiaddr);
     }
 
-    pub fn contains_multiaddr(&self, multiaddr: &Multiaddr) -> bool {
+    pub fn contains_multiaddr(&self, multiaddr: &PeerMultiaddr) -> bool {
         self.multiaddrs.read().contains(multiaddr)
     }
 
-    pub fn multiaddrs(&self) -> Vec<Multiaddr> {
+    pub fn multiaddrs(&self) -> Vec<PeerMultiaddr> {
         self.multiaddrs.read().iter().cloned().collect()
+    }
+
+    pub fn raw_multiaddrs(&self) -> Vec<Multiaddr> {
+        self.multiaddrs
+            .read()
+            .iter()
+            .cloned()
+            .map(Into::into)
+            .collect()
     }
 
     pub fn multiaddrs_len(&self) -> usize {

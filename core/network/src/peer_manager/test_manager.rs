@@ -54,7 +54,7 @@ fn make_peer(port: u16) -> ArcPeer {
     let pubkey = keypair.public_key();
     let peer_id = pubkey.peer_id();
     let peer = ArcPeer::from_pubkey(pubkey).expect("make peer");
-    let multiaddr = make_multiaddr(port, Some(peer_id));
+    let multiaddr = make_peer_multiaddr(port, peer_id);
 
     peer.set_multiaddrs(vec![multiaddr]);
     peer
@@ -212,7 +212,7 @@ async fn should_accept_outbound_new_session_and_add_peer() {
     let saved_addrs_len = saved_peer.multiaddrs_len();
     assert_eq!(saved_addrs_len, 1, "should save outbound multiaddr");
     assert!(
-        saved_peer.multiaddrs().contains(&remote_addr),
+        saved_peer.raw_multiaddrs().contains(&remote_addr),
         "should contain remote multiadr"
     );
     assert_eq!(saved_peer.retry(), 0, "should reset retry");
@@ -282,7 +282,7 @@ async fn should_enforce_id_in_multiaddr_on_new_session() {
     let saved_peer = inner
         .peer(&remote_pubkey.peer_id())
         .expect("should save peer");
-    let saved_addrs = saved_peer.multiaddrs();
+    let saved_addrs = saved_peer.raw_multiaddrs();
     assert_eq!(saved_addrs.len(), 1, "should save outbound multiaddr");
 
     let remote_addr = saved_addrs.first().expect("get first multiaddr");
@@ -341,7 +341,7 @@ async fn should_not_increase_conn_count_for_connecting_peer_on_new_session() {
 
     let sess_ctx = SessionContext::make(
         SessionId::new(1),
-        test_peer.multiaddrs().pop().expect("get multiaddr"),
+        test_peer.raw_multiaddrs().pop().expect("get multiaddr"),
         SessionType::Outbound,
         test_peer.owned_pubkey(),
     );
@@ -470,7 +470,7 @@ async fn should_reject_new_connection_for_same_peer_on_new_session() {
     let expect_sid = test_peer.session_id();
     let sess_ctx = SessionContext::make(
         SessionId::new(99),
-        test_peer.multiaddrs().pop().expect("get multiaddr"),
+        test_peer.raw_multiaddrs().pop().expect("get multiaddr"),
         SessionType::Outbound,
         test_peer.owned_pubkey(),
     );
@@ -538,7 +538,7 @@ async fn should_keep_new_connection_for_error_outdated_peer_session_on_new_sessi
 
     let sess_ctx = SessionContext::make(
         SessionId::new(99),
-        test_peer.multiaddrs().pop().expect("get multiaddr"),
+        test_peer.raw_multiaddrs().pop().expect("get multiaddr"),
         SessionType::Outbound,
         test_peer.owned_pubkey(),
     );
@@ -733,7 +733,7 @@ async fn should_keep_bootstrap_peer_but_max_retry_on_remove_peer_by_session() {
     // Init bootstrap session
     let sess_ctx = SessionContext::make(
         SessionId::new(1),
-        boot_peer.multiaddrs().pop().expect("get multiaddr"),
+        boot_peer.raw_multiaddrs().pop().expect("get multiaddr"),
         SessionType::Outbound,
         boot_peer.owned_pubkey(),
     );
@@ -793,7 +793,7 @@ async fn should_mark_session_blocked_on_session_blocked() {
     let test_peer = remote_peers.first().expect("get first peer");
     let sess_ctx = SessionContext::make(
         test_peer.session_id(),
-        test_peer.multiaddrs().pop().expect("get multiaddr"),
+        test_peer.raw_multiaddrs().pop().expect("get multiaddr"),
         SessionType::Outbound,
         test_peer.owned_pubkey(),
     );
@@ -844,7 +844,7 @@ async fn should_try_all_peer_multiaddrs_on_connect_peers_now() {
         .map(|port| {
             // Every peer has two multiaddrs
             let p = make_peer(port + 7000);
-            p.add_multiaddrs(vec![make_multiaddr(port + 8000, Some(p.owned_id()))]);
+            p.add_multiaddrs(vec![make_peer_multiaddr(port + 8000, p.owned_id())]);
             p
         })
         .collect::<Vec<_>>();
@@ -867,7 +867,7 @@ async fn should_try_all_peer_multiaddrs_on_connect_peers_now() {
 
     let expect_multiaddrs = peers
         .into_iter()
-        .map(|p| p.multiaddrs())
+        .map(|p| p.raw_multiaddrs())
         .flatten()
         .collect::<Vec<_>>();
 
@@ -935,7 +935,7 @@ async fn should_connect_peers_even_if_they_are_not_retry_ready_on_connect_peers_
         _ => panic!("should be connect event"),
     };
 
-    let expect_multiaddrs = not_ready_peer.multiaddrs();
+    let expect_multiaddrs = not_ready_peer.raw_multiaddrs();
     assert_eq!(
         multiaddrs_in_event.len(),
         expect_multiaddrs.len(),
@@ -957,7 +957,7 @@ async fn should_add_multiaddrs_to_unknown_book_on_discover_multi_addrs() {
         .into_iter()
         .map(|port| {
             let peer = make_peer(port + 7000);
-            peer.multiaddrs().pop().expect("peer multiaddr")
+            peer.raw_multiaddrs().pop().expect("peer multiaddr")
         })
         .collect();
 
@@ -1010,7 +1010,7 @@ async fn should_skip_already_exist_peer_multiaddr_on_discover_multi_addrs() {
     assert!(mgr.unknown_book().is_empty());
 
     let discover_multi_addrs = PeerManagerEvent::DiscoverMultiAddrs {
-        addrs: vec![test_peer.multiaddrs().pop().expect("peer multiaddr")],
+        addrs: vec![test_peer.raw_multiaddrs().pop().expect("peer multiaddr")],
     };
     mgr.poll_event(discover_multi_addrs).await;
 
@@ -1063,7 +1063,7 @@ async fn should_add_multiaddrs_to_peer_on_identified_addrs() {
     assert!(
         !test_multiaddrs
             .iter()
-            .any(|ma| !test_peer.multiaddrs().contains(ma)),
+            .any(|ma| !test_peer.raw_multiaddrs().contains(ma)),
         "should add all multiaddrs to peer"
     );
 }
@@ -1082,13 +1082,13 @@ async fn should_push_id_to_multiaddrs_if_not_included_on_identified_addrs() {
     mgr.poll_event(identified_addrs).await;
 
     assert!(
-        !test_peer.multiaddrs().contains(&test_multiaddr),
+        !test_peer.raw_multiaddrs().contains(&test_multiaddr),
         "should not contain multiaddr without id included"
     );
 
     let with_id = make_multiaddr(2077, Some(test_peer.owned_id()));
     assert!(
-        test_peer.multiaddrs().contains(&with_id),
+        test_peer.raw_multiaddrs().contains(&with_id),
         "should push id to multiaddr when add it to peer"
     );
 }
@@ -1108,7 +1108,7 @@ async fn should_add_dialer_multiaddr_to_peer_on_repeated_connection() {
     mgr.poll_event(repeated_connection).await;
 
     assert!(
-        test_peer.multiaddrs().contains(&test_multiaddr),
+        test_peer.raw_multiaddrs().contains(&test_multiaddr),
         "should add dialer multiaddr to peer"
     );
 }
@@ -1128,7 +1128,7 @@ async fn should_skip_listen_multiaddr_to_peer_on_repeated_connection() {
     mgr.poll_event(repeated_connection).await;
 
     assert!(
-        !test_peer.multiaddrs().contains(&test_multiaddr),
+        !test_peer.raw_multiaddrs().contains(&test_multiaddr),
         "should skip listen multiaddr to peer"
     );
 }
@@ -1148,13 +1148,13 @@ async fn should_push_id_if_multiaddr_not_included_on_repeated_connection() {
     mgr.poll_event(repeated_connection).await;
 
     assert!(
-        !test_peer.multiaddrs().contains(&test_multiaddr),
+        !test_peer.raw_multiaddrs().contains(&test_multiaddr),
         "should not add multiaddr without id included"
     );
 
     let with_id = make_multiaddr(2077, Some(test_peer.owned_id()));
     assert!(
-        test_peer.multiaddrs().contains(&with_id),
+        test_peer.raw_multiaddrs().contains(&with_id),
         "should add multiaddr wit id included"
     );
 }
@@ -1260,7 +1260,7 @@ async fn should_always_remove_inbound_multiaddr_in_unknown_book_on_repeated_conn
 async fn should_remove_multiaddr_in_unknown_book_on_unconnectable_multiaddr() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
     let test_peer = make_peer(2077);
-    let test_multiaddr = test_peer.multiaddrs().pop().expect("peer multiaddr");
+    let test_multiaddr = test_peer.raw_multiaddrs().pop().expect("peer multiaddr");
 
     mgr.unknown_book_mut().insert(
         test_multiaddr
@@ -1287,7 +1287,7 @@ async fn should_remove_multiaddr_in_unknown_book_on_unconnectable_multiaddr() {
 async fn should_remove_peer_multiaddr_and_increase_peer_retry_on_unconnectable_multiaddr() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
     let test_peer = make_peer(2077);
-    let test_multiaddr = test_peer.multiaddrs().pop().expect("peer multiaddr");
+    let test_multiaddr = test_peer.raw_multiaddrs().pop().expect("peer multiaddr");
 
     let inner = mgr.core_inner();
     inner.add_peer(test_peer.clone());
@@ -1312,7 +1312,7 @@ async fn should_not_remove_bootstrap_mutiaddr_on_unconnectable_multiaddr() {
     let (mut mgr, _conn_rx) = make_manager(1, 20);
     let bootstraps = &mgr.config().bootstraps;
     let boot_peer = bootstraps.first().expect("get one bootstrap peer").clone();
-    let boot_multiaddr = boot_peer.multiaddrs().pop().expect("boot multiaddr");
+    let boot_multiaddr = boot_peer.raw_multiaddrs().pop().expect("boot multiaddr");
     let old_multiaddrs_len = boot_peer.multiaddrs_len();
 
     // Insert bootstrap peer
@@ -1338,7 +1338,7 @@ async fn should_not_remove_bootstrap_mutiaddr_on_unconnectable_multiaddr() {
 async fn should_increase_retry_for_multiaddr_in_unknown_on_reconnect_addr_later() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
     let test_peer = make_peer(2077);
-    let test_multiaddr = test_peer.multiaddrs().pop().expect("peer multiaddr");
+    let test_multiaddr = test_peer.raw_multiaddrs().pop().expect("peer multiaddr");
 
     mgr.unknown_book_mut().insert(
         test_multiaddr
@@ -1370,7 +1370,7 @@ async fn should_increase_retry_for_multiaddr_in_unknown_on_reconnect_addr_later(
 async fn should_remove_multiaddr_from_unknown_book_when_run_out_retry_on_reconnect_addr_later() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
     let test_peer = make_peer(2077);
-    let test_multiaddr = test_peer.multiaddrs().pop().expect("peer multiaddr");
+    let test_multiaddr = test_peer.raw_multiaddrs().pop().expect("peer multiaddr");
 
     mgr.inner.unknown_addrs.insert(
         test_multiaddr
@@ -1404,7 +1404,7 @@ async fn should_remove_multiaddr_from_unknown_book_when_run_out_retry_on_reconne
 async fn should_set_connectedness_and_increase_peer_retry_on_reconnect_addr_later() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
     let test_peer = make_peer(2077);
-    let test_multiaddr = test_peer.multiaddrs().pop().expect("peer multiaddr");
+    let test_multiaddr = test_peer.raw_multiaddrs().pop().expect("peer multiaddr");
 
     let inner = mgr.core_inner();
     inner.add_peer(test_peer.clone());

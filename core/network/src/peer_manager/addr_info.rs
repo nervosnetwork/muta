@@ -142,7 +142,7 @@ impl Hash for AddrInfo {
 }
 
 impl Deref for AddrInfo {
-    type Target = Multiaddr;
+    type Target = PeerMultiaddr;
 
     fn deref(&self) -> &Self::Target {
         &self.addr
