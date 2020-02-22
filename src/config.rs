@@ -47,7 +47,7 @@ pub struct ConfigMempool {
     pub pool_size: u64,
 
     #[serde(default = "default_broadcast_txs_size")]
-    pub broadcast_txs_size: usize,
+    pub broadcast_txs_size:     usize,
     #[serde(default = "default_broadcast_txs_interval")]
     pub broadcast_txs_interval: u64,
 }
@@ -59,14 +59,14 @@ pub struct ConfigExecutor {
 
 #[derive(Debug, Deserialize)]
 pub struct ConfigLogger {
-    pub filter: String,
-    pub log_to_console: bool,
+    pub filter:                     String,
+    pub log_to_console:             bool,
     pub console_show_file_and_line: bool,
-    pub log_to_file: bool,
-    pub metrics: bool,
-    pub log_path: PathBuf,
+    pub log_to_file:                bool,
+    pub metrics:                    bool,
+    pub log_path:                   PathBuf,
     #[serde(default)]
-    pub modules_level: HashMap<String, String>,
+    pub modules_level:              HashMap<String, String>,
 }
 
 impl Default for ConfigLogger {
@@ -86,16 +86,16 @@ impl Default for ConfigLogger {
 #[derive(Debug, Deserialize)]
 pub struct Config {
     // crypto
-    pub privkey: String,
+    pub privkey:   String,
     // db config
     pub data_path: PathBuf,
 
-    pub graphql: ConfigGraphQL,
-    pub network: ConfigNetwork,
-    pub mempool: ConfigMempool,
+    pub graphql:  ConfigGraphQL,
+    pub network:  ConfigNetwork,
+    pub mempool:  ConfigMempool,
     pub executor: ConfigExecutor,
     #[serde(default)]
-    pub logger: ConfigLogger,
+    pub logger:   ConfigLogger,
 }
 
 impl Config {
