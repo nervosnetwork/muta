@@ -152,7 +152,7 @@ pub enum PeerManagerEvent {
 
     // Self
     #[display(fmt = "add listen addr {}", addr)]
-    AddListenAddr { addr: Multiaddr },
+    AddNewListenAddr { addr: Multiaddr },
 
     #[display(fmt = "rmeove listen addr {}", addr)]
     RemoveListenAddr { addr: Multiaddr },

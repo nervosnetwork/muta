@@ -1,6 +1,6 @@
 use super::{
     addr_info::MAX_ADDR_RETRY, peer::Peer, AddrInfo, ArcPeer, Connectedness, Inner, PeerManager,
-    PeerManagerConfig, ALIVE_RETRY_INTERVAL, MAX_RETRY_COUNT,
+    PeerManagerConfig, PeerMultiaddr, ALIVE_RETRY_INTERVAL, MAX_RETRY_COUNT,
 };
 use crate::{
     common::ConnectedAddr,
@@ -41,6 +41,12 @@ fn make_multiaddr(port: u16, id: Option<PeerId>) -> Multiaddr {
     }
 
     multiaddr
+}
+
+fn make_peer_multiaddr(port: u16, id: PeerId) -> PeerMultiaddr {
+    make_multiaddr(port, Some(id))
+        .try_into()
+        .expect("try into peer multiaddr")
 }
 
 fn make_peer(port: u16) -> ArcPeer {
@@ -1395,48 +1401,117 @@ async fn should_skip_on_connected_peer_on_reconnect_addr_later() {
 }
 
 #[tokio::test]
-async fn should_set_listen_on_add_listen_addr() {
+async fn should_add_new_listen_on_add_new_listen_addr() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
     let self_id = mgr.inner.peer_id.to_owned();
-    mgr.inner
-        .set_listen(make_multiaddr(2020, Some(self_id.clone())));
+
+    let inner = mgr.core_inner();
+    let listen_multiaddr = make_peer_multiaddr(2020, self_id.clone());
+    inner.add_listen(listen_multiaddr.clone());
+    assert!(!inner.listen().is_empty(), "should have listen address");
 
     let test_multiaddr = make_multiaddr(2077, Some(self_id));
-    let listen_multiaddr = mgr.inner.listen().expect("have listen multiaddr");
-    assert!(test_multiaddr != listen_multiaddr);
+    assert!(test_multiaddr != *listen_multiaddr);
 
-    let add_listen_addr = PeerManagerEvent::AddListenAddr {
+    let add_listen_addr = PeerManagerEvent::AddNewListenAddr {
         addr: test_multiaddr.clone(),
     };
     mgr.poll_event(add_listen_addr).await;
 
-    assert_eq!(
-        mgr.inner.listen(),
-        Some(test_multiaddr),
-        "should set to new listen multiaddr"
+    assert_eq!(inner.listen().len(), 2, "should have 2 listen addrs");
+    assert!(
+        inner.listen().contains(&test_multiaddr),
+        "should add new listen multiaddr"
     );
 }
 
 #[tokio::test]
-async fn should_push_id_to_listen_multiaddr_if_not_included_on_add_listen_addr() {
+async fn should_push_id_to_listen_multiaddr_if_not_included_on_add_new_listen_addr() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
     let self_id = mgr.inner.peer_id.to_owned();
-    mgr.inner
-        .set_listen(make_multiaddr(2020, Some(self_id.clone())));
 
+    let inner = mgr.core_inner();
     let test_multiaddr = make_multiaddr(2077, None);
-    let listen_multiaddr = mgr.inner.listen().expect("have listen multiaddr");
-    assert!(test_multiaddr != listen_multiaddr);
+    assert!(inner.listen().is_empty(), "should not have any listen addr");
 
-    let add_listen_addr = PeerManagerEvent::AddListenAddr {
+    let add_listen_addr = PeerManagerEvent::AddNewListenAddr {
         addr: test_multiaddr.clone(),
     };
     mgr.poll_event(add_listen_addr).await;
 
     let with_id = make_multiaddr(2077, Some(self_id));
-    assert_eq!(
-        mgr.inner.listen(),
-        Some(with_id),
-        "should set to new listen multiaddr"
+    assert_eq!(inner.listen().len(), 1, "should have one listen addr");
+    assert!(
+        inner.listen().contains(&with_id),
+        "should add new listen multiaddr"
+    );
+}
+
+#[tokio::test]
+async fn should_remove_listen_on_remove_listen_addr() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+    let self_id = mgr.inner.peer_id.to_owned();
+
+    let inner = mgr.core_inner();
+    let listen_multiaddr = make_peer_multiaddr(2020, self_id.clone());
+
+    inner.add_listen(listen_multiaddr.clone());
+    assert!(
+        inner.listen().contains(&listen_multiaddr),
+        "should contains listen addr"
+    );
+
+    let remove_listen_addr = PeerManagerEvent::RemoveListenAddr {
+        addr: make_multiaddr(2020, Some(self_id)),
+    };
+    mgr.poll_event(remove_listen_addr).await;
+
+    assert_eq!(inner.listen().len(), 0, "should have 0 listen addrs");
+}
+
+#[tokio::test]
+async fn should_remove_listen_even_if_no_peer_id_included_on_remove_listen_addr() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+    let self_id = mgr.inner.peer_id.to_owned();
+
+    let inner = mgr.core_inner();
+    let listen_multiaddr = make_peer_multiaddr(2020, self_id.clone());
+
+    inner.add_listen(listen_multiaddr.clone());
+    assert!(
+        inner.listen().contains(&listen_multiaddr),
+        "should contains listen addr"
+    );
+
+    let remove_listen_addr = PeerManagerEvent::RemoveListenAddr {
+        addr: make_multiaddr(2020, None),
+    };
+    mgr.poll_event(remove_listen_addr).await;
+
+    assert_eq!(inner.listen().len(), 0, "should have 0 listen addrs");
+}
+
+#[tokio::test]
+async fn should_always_include_our_listen_addrs_in_return_from_manager_handle_random_addrs() {
+    let (mgr, _conn_rx) = make_manager(0, 20);
+    let self_id = mgr.inner.peer_id.to_owned();
+
+    let inner = mgr.core_inner();
+    let listen_multiaddrs = (0..5)
+        .into_iter()
+        .map(|port| make_peer_multiaddr(port + 9000, self_id.clone()))
+        .collect::<Vec<_>>();
+
+    for ma in listen_multiaddrs.iter() {
+        inner.add_listen(ma.clone());
+    }
+
+    let handle = mgr.inner.handle();
+    let addrs = handle.random_addrs(100);
+    println!("{:?}", addrs);
+
+    assert!(
+        !listen_multiaddrs.iter().any(|lma| !addrs.contains(&*lma)),
+        "should include our listen addresses"
     );
 }

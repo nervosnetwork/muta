@@ -20,7 +20,7 @@ use std::{
     borrow::Borrow,
     cmp::PartialEq,
     collections::HashSet,
-    convert::TryInto,
+    convert::{TryFrom, TryInto},
     future::Future,
     hash::{Hash, Hasher},
     iter::FromIterator,
@@ -33,6 +33,7 @@ use std::{
     time::Duration,
 };
 
+use derive_more::Display;
 use futures::{
     channel::mpsc::{UnboundedReceiver, UnboundedSender},
     pin_mut,
@@ -54,7 +55,7 @@ use tentacle::{
 
 use crate::{
     common::{ConnectedAddr, HeartBeat},
-    error::NetworkError,
+    error::{NetworkError, PeerIdNotFound},
     event::{ConnectionEvent, ConnectionType, PeerManagerEvent},
     traits::MultiaddrExt,
 };
@@ -72,6 +73,66 @@ macro_rules! peer_id_from_multiaddr {
 
 const MAX_RETRY_COUNT: u8 = 30;
 const ALIVE_RETRY_INTERVAL: u64 = 3; // seconds
+
+#[derive(Debug, Clone, Display)]
+#[display(fmt = "{}", _0)]
+struct PeerMultiaddr(Multiaddr);
+
+impl PeerMultiaddr {
+    pub fn new(mut ma: Multiaddr, peer_id: &PeerId) -> Self {
+        if !ma.has_id() {
+            ma.push_id(peer_id.to_owned());
+        }
+
+        PeerMultiaddr(ma)
+    }
+}
+
+impl Borrow<Multiaddr> for PeerMultiaddr {
+    fn borrow(&self) -> &Multiaddr {
+        &self.0
+    }
+}
+
+impl PartialEq for PeerMultiaddr {
+    fn eq(&self, other: &PeerMultiaddr) -> bool {
+        self.0 == other.0
+    }
+}
+
+impl Eq for PeerMultiaddr {}
+
+impl Hash for PeerMultiaddr {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.hash(state)
+    }
+}
+
+impl Deref for PeerMultiaddr {
+    type Target = Multiaddr;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl TryFrom<Multiaddr> for PeerMultiaddr {
+    type Error = PeerIdNotFound;
+
+    fn try_from(ma: Multiaddr) -> Result<PeerMultiaddr, Self::Error> {
+        if !ma.has_id() {
+            Err(PeerIdNotFound(ma))
+        } else {
+            Ok(PeerMultiaddr(ma))
+        }
+    }
+}
+
+impl Into<Multiaddr> for PeerMultiaddr {
+    fn into(self) -> Multiaddr {
+        self.0
+    }
+}
 
 #[derive(Debug)]
 struct Session {
@@ -178,12 +239,11 @@ struct Inner {
     peers:    RwLock<HashSet<ArcPeer>>,
     chain:    RwLock<HashSet<ArcPeerByChain>>,
 
-    id:     Arc<PeerId>,
-    listen: RwLock<Option<Multiaddr>>,
+    listen: RwLock<HashSet<PeerMultiaddr>>,
 }
 
 impl Inner {
-    pub fn new(id: PeerId) -> Self {
+    pub fn new() -> Self {
         Inner {
             connection_count: AtomicUsize::new(0),
 
@@ -191,21 +251,20 @@ impl Inner {
             peers:    Default::default(),
             chain:    Default::default(),
 
-            id:     Arc::new(id),
             listen: Default::default(),
         }
     }
 
-    pub fn set_listen(&self, mut multiaddr: Multiaddr) {
-        if !multiaddr.has_id() {
-            multiaddr.push_id(self.id.as_ref().to_owned());
-        }
-
-        *self.listen.write() = Some(multiaddr);
+    pub fn add_listen(&self, multiaddr: PeerMultiaddr) {
+        self.listen.write().insert(multiaddr);
     }
 
-    pub fn listen(&self) -> Option<Multiaddr> {
+    pub fn listen(&self) -> HashSet<PeerMultiaddr> {
         self.listen.read().clone()
+    }
+
+    pub fn remove_listen(&self, multiaddr: &PeerMultiaddr) {
+        self.listen.write().remove(multiaddr);
     }
 
     pub fn inc_conn_count(&self) {
@@ -276,13 +335,6 @@ impl Inner {
         self.sessions.write().take(sid)
     }
 
-    pub fn register_self(&self, pubkey: PublicKey) -> Result<(), NetworkError> {
-        let peer = ArcPeer::from_pubkey(pubkey)?;
-        peer.set_connectedness(Connectedness::Connected);
-
-        Ok(self.add_peer(peer))
-    }
-
     pub fn package_peers(&self) -> Vec<ArcPeer> {
         self.peers.read().iter().cloned().collect()
     }
@@ -321,18 +373,18 @@ impl PeerManagerHandle {
         let book = self.inner.peers.read();
         let peers = book.iter().choose_multiple(&mut rng, max);
 
-        peers
-            .into_iter()
-            .map(|p| p.multiaddrs())
-            .flatten()
-            .collect()
+        // Should always include our self
+        let our_self = self.listen_addrs();
+        let condidates = peers.into_iter().map(|p| p.multiaddrs()).flatten();
+
+        our_self.into_iter().chain(condidates).take(max).collect()
     }
 
     pub fn listen_addrs(&self) -> Vec<Multiaddr> {
         let listen = self.inner.listen();
-        debug_assert!(listen.is_some(), "listen should alway be set");
+        debug_assert!(!listen.is_empty(), "listen should alway be set");
 
-        listen.map(|addr| vec![addr]).unwrap_or_else(Vec::new)
+        listen.into_iter().map(Into::into).collect()
     }
 }
 
@@ -365,16 +417,11 @@ impl PeerManager {
     ) -> Self {
         let peer_id = config.our_id.clone();
 
-        let inner = Arc::new(Inner::new(peer_id.clone()));
+        let inner = Arc::new(Inner::new());
         let bootstraps = HashSet::from_iter(config.bootstraps.clone());
         let waker = Arc::new(AtomicWaker::new());
         let heart_beat = HeartBeat::new(Arc::clone(&waker), config.routine_interval);
         let peer_dat_file = Box::new(NoPeerDatFile);
-
-        // Register our self
-        inner
-            .register_self(config.pubkey.clone())
-            .expect("register self public key");
 
         PeerManager {
             inner,
@@ -419,14 +466,6 @@ impl PeerManager {
     pub fn restore_peers(&self) -> Result<(), NetworkError> {
         let peers = self.peer_dat_file.restore()?;
         Ok(self.inner.restore(peers))
-    }
-
-    pub fn set_listen(&self, addr: Multiaddr) {
-        self.inner.set_listen(addr)
-    }
-
-    pub fn listen(&self) -> Option<Multiaddr> {
-        self.inner.listen()
     }
 
     pub fn bootstrap(&mut self) {
@@ -490,7 +529,7 @@ impl PeerManager {
         if !unknown_condidates.is_empty() {
             let addrs = unknown_condidates.into_iter().map(|unknown| {
                 unknown.mark_connecting();
-                unknown.clone().into()
+                unknown.clone().owned_addr()
             });
 
             condidates.extend(addrs);
@@ -895,25 +934,13 @@ impl PeerManager {
                 info!("reconnect address {} later {}", addr, kind);
                 self.reconnect_addr_later(addr);
             }
-            PeerManagerEvent::AddListenAddr { mut addr } => {
-                if !addr.has_id() {
-                    addr.push_id(self.peer_id.to_owned());
-                }
-
-                // TODO: listen on multi ports?
-                if let Some(peer) = self.inner.peer(&self.peer_id) {
-                    peer.set_multiaddrs(vec![addr.clone()]);
-                }
-                self.inner.set_listen(addr);
+            PeerManagerEvent::AddNewListenAddr { addr } => {
+                self.inner
+                    .add_listen(PeerMultiaddr::new(addr, &self.peer_id));
             }
-            PeerManagerEvent::RemoveListenAddr { mut addr } => {
-                if !addr.has_id() {
-                    addr.push_id(self.peer_id.to_owned());
-                }
-
-                if let Some(peer) = self.inner.peer(&self.peer_id) {
-                    peer.remove_multiaddr(&addr);
-                }
+            PeerManagerEvent::RemoveListenAddr { addr } => {
+                self.inner
+                    .remove_listen(&PeerMultiaddr::new(addr, &self.peer_id));
             }
         }
     }

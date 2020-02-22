@@ -63,12 +63,15 @@ pub enum ErrorKind {
         pubkey: Bytes,
         cause:  Box<dyn Error + Send>,
     },
-
-    #[display(fmt = "kind: peer id not found in {}", _0)]
-    NoPeerIdMultiaddr(Multiaddr),
 }
 
 impl Error for ErrorKind {}
+
+#[derive(Debug, Display)]
+#[display(fmt = "peer id not found in {}", _0)]
+pub struct PeerIdNotFound(pub(crate) Multiaddr);
+
+impl Error for PeerIdNotFound {}
 
 #[derive(Debug, Display)]
 pub enum NetworkError {
@@ -131,6 +134,12 @@ pub enum NetworkError {
 }
 
 impl Error for NetworkError {}
+
+impl From<PeerIdNotFound> for NetworkError {
+    fn from(err: PeerIdNotFound) -> NetworkError {
+        NetworkError::Internal(Box::new(err))
+    }
+}
 
 impl From<ErrorKind> for NetworkError {
     fn from(kind: ErrorKind) -> NetworkError {

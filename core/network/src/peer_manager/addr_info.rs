@@ -1,4 +1,4 @@
-use crate::{error::ErrorKind, traits::MultiaddrExt};
+use crate::{error::PeerIdNotFound, traits::MultiaddrExt};
 
 use std::{
     borrow::Borrow,
@@ -27,6 +27,10 @@ pub struct AddrInfo {
 }
 
 impl AddrInfo {
+    pub fn owned_addr(&self) -> Multiaddr {
+        self.addr.as_ref().to_owned()
+    }
+
     pub fn is_connecting(&self) -> bool {
         self.connecting.load(Ordering::SeqCst)
     }
@@ -78,18 +82,12 @@ impl AddrInfo {
     }
 }
 
-impl Into<Multiaddr> for AddrInfo {
-    fn into(self) -> Multiaddr {
-        self.addr.as_ref().to_owned()
-    }
-}
-
 impl TryFrom<Multiaddr> for AddrInfo {
-    type Error = ErrorKind;
+    type Error = PeerIdNotFound;
 
     fn try_from(ma: Multiaddr) -> Result<AddrInfo, Self::Error> {
         if !ma.has_id() {
-            Err(ErrorKind::NoPeerIdMultiaddr(ma))
+            Err(PeerIdNotFound(ma))
         } else {
             let ai = AddrInfo {
                 addr:         Arc::new(ma),

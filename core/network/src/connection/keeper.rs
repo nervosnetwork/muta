@@ -87,7 +87,7 @@ impl ConnectionServiceKeeper {
 
         match error {
             TentacleError::ConnectSelf => {
-                let connect_self = PeerManagerEvent::AddListenAddr { addr };
+                let connect_self = PeerManagerEvent::AddNewListenAddr { addr };
 
                 self.report_peer(connect_self);
             }
@@ -221,7 +221,7 @@ impl ServiceHandle for ConnectionServiceKeeper {
                 self.report_peer(peer_session_closed);
             }
             ServiceEvent::ListenStarted { address } => {
-                let start_listen = PeerManagerEvent::AddListenAddr { addr: address };
+                let start_listen = PeerManagerEvent::AddNewListenAddr { addr: address };
 
                 self.report_peer(start_listen);
             }
