@@ -13,14 +13,17 @@ use protocol::types::{
 };
 use protocol::{types::Bytes, ProtocolResult};
 
-use crate::types::{CreateAssetPayload, GetAssetPayload, GetBalancePayload, TransferPayload};
+use crate::types::{
+    ApprovePayload, CreateAssetPayload, GetAllowancePayload, GetAssetPayload, GetBalancePayload,
+    TransferFromPayload, TransferPayload,
+};
 use crate::AssetService;
 
 #[test]
 fn test_create_asset() {
     let cycles_limit = 1024 * 1024 * 1024; // 1073741824
     let caller = Address::from_hex("0x755cdba6ae4f479f7164792b318b2a06c759833b").unwrap();
-    let context = mock_context(cycles_limit, caller);
+    let context = mock_context(cycles_limit, caller.clone());
 
     let mut service = new_asset_service();
 
@@ -44,6 +47,7 @@ fn test_create_asset() {
     let balance_res = service
         .get_balance(context, GetBalancePayload {
             asset_id: asset.id.clone(),
+            user:     caller,
         })
         .unwrap();
     assert_eq!(balance_res.balance, supply);
@@ -54,7 +58,7 @@ fn test_create_asset() {
 fn test_transfer() {
     let cycles_limit = 1024 * 1024 * 1024; // 1073741824
     let caller = Address::from_hex("0x755cdba6ae4f479f7164792b318b2a06c759833b").unwrap();
-    let context = mock_context(cycles_limit, caller);
+    let context = mock_context(cycles_limit, caller.clone());
 
     let mut service = new_asset_service();
 
@@ -80,15 +84,122 @@ fn test_transfer() {
     let balance_res = service
         .get_balance(context, GetBalancePayload {
             asset_id: asset.id.clone(),
+            user:     caller,
         })
         .unwrap();
     assert_eq!(balance_res.balance, supply - 1024);
 
-    let context = mock_context(cycles_limit, to_address);
+    let context = mock_context(cycles_limit, to_address.clone());
     let balance_res = service
-        .get_balance(context, GetBalancePayload { asset_id: asset.id })
+        .get_balance(context, GetBalancePayload {
+            asset_id: asset.id,
+            user:     to_address,
+        })
         .unwrap();
     assert_eq!(balance_res.balance, 1024);
+}
+
+#[test]
+fn test_approve() {
+    let cycles_limit = 1024 * 1024 * 1024; // 1073741824
+    let caller = Address::from_hex("0x755cdba6ae4f479f7164792b318b2a06c759833b").unwrap();
+    let context = mock_context(cycles_limit, caller.clone());
+
+    let mut service = new_asset_service();
+
+    let supply = 1024 * 1024;
+    let asset = service
+        .create_asset(context.clone(), CreateAssetPayload {
+            name: "test".to_owned(),
+            symbol: "test".to_owned(),
+            supply,
+        })
+        .unwrap();
+
+    let to_address = Address::from_hex("0x666cdba6ae4f479f7164792b318b2a06c759833b").unwrap();
+    service
+        .approve(context.clone(), ApprovePayload {
+            asset_id: asset.id.clone(),
+            to:       to_address.clone(),
+            value:    1024,
+        })
+        .unwrap();
+
+    let allowance_res = service
+        .get_allowance(context, GetAllowancePayload {
+            asset_id: asset.id.clone(),
+            grantor:  caller,
+            grantee:  to_address.clone(),
+        })
+        .unwrap();
+    assert_eq!(allowance_res.asset_id, asset.id);
+    assert_eq!(allowance_res.grantee, to_address);
+    assert_eq!(allowance_res.value, 1024);
+}
+
+#[test]
+fn test_transfer_from() {
+    let cycles_limit = 1024 * 1024 * 1024; // 1073741824
+    let caller = Address::from_hex("0x755cdba6ae4f479f7164792b318b2a06c759833b").unwrap();
+    let context = mock_context(cycles_limit, caller.clone());
+
+    let mut service = new_asset_service();
+
+    let supply = 1024 * 1024;
+    let asset = service
+        .create_asset(context.clone(), CreateAssetPayload {
+            name: "test".to_owned(),
+            symbol: "test".to_owned(),
+            supply,
+        })
+        .unwrap();
+
+    let to_address = Address::from_hex("0x666cdba6ae4f479f7164792b318b2a06c759833b").unwrap();
+    service
+        .approve(context.clone(), ApprovePayload {
+            asset_id: asset.id.clone(),
+            to:       to_address.clone(),
+            value:    1024,
+        })
+        .unwrap();
+
+    let to_context = mock_context(cycles_limit, to_address.clone());
+
+    service
+        .transfer_from(to_context.clone(), TransferFromPayload {
+            asset_id:  asset.id.clone(),
+            sender:    caller.clone(),
+            recipient: to_address.clone(),
+            value:     24,
+        })
+        .unwrap();
+
+    let allowance_res = service
+        .get_allowance(context.clone(), GetAllowancePayload {
+            asset_id: asset.id.clone(),
+            grantor:  caller.clone(),
+            grantee:  to_address.clone(),
+        })
+        .unwrap();
+    assert_eq!(allowance_res.asset_id, asset.id.clone());
+    assert_eq!(allowance_res.grantee, to_address.clone());
+    assert_eq!(allowance_res.value, 1000);
+
+    let balance_res = service
+        .get_balance(context, GetBalancePayload {
+            asset_id: asset.id.clone(),
+            user:     caller,
+        })
+        .unwrap();
+    assert_eq!(balance_res.balance, supply - 24);
+
+    let balance_res = service
+        .get_balance(to_context, GetBalancePayload {
+            asset_id: asset.id,
+            user:     to_address,
+        })
+        .unwrap();
+    assert_eq!(balance_res.balance, 24);
 }
 
 fn new_asset_service() -> AssetService<

@@ -136,7 +136,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
 
         let inner = self.adapter.get_full_txs(ctx, order_hashes).await?;
         self.adapter
-            .save_wal_transactions(Context::new(), Hash::digest(hash.clone()), inner)
+            .save_wal_transactions(Context::new(), Hash::from_bytes(hash.clone())?, inner)
             .await?;
         log::info!(
             "[consensus-engine]: check block cost {:?} order_hashes_len {:?}",

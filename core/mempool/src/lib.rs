@@ -18,6 +18,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use async_trait::async_trait;
 use derive_more::Display;
+use tokio::sync::RwLock;
 
 use protocol::traits::{Context, MemPool, MemPoolAdapter, MixedTxHashes};
 use protocol::types::{Hash, SignedTransaction};
@@ -40,6 +41,8 @@ pub struct HashMemPool<Adapter: MemPoolAdapter> {
     callback_cache: Map<SignedTransaction>,
     /// Supply necessary functions from outer modules.
     adapter:        Adapter,
+    /// exclusive flush_memory and insert_tx to avoid repeat txs insertion.
+    flush_lock:     RwLock<()>,
 }
 
 impl<Adapter> HashMemPool<Adapter>
@@ -53,6 +56,7 @@ where
             tx_cache: TxCache::new(pool_size * 2),
             callback_cache: Map::new(pool_size),
             adapter,
+            flush_lock: RwLock::new(()),
         }
     }
 
@@ -75,16 +79,16 @@ where
             .filter(|tx_hash| !self.callback_cache.contains_key(tx_hash))
             .collect()
     }
-}
 
-#[async_trait]
-impl<Adapter> MemPool for HashMemPool<Adapter>
-where
-    Adapter: MemPoolAdapter,
-{
-    async fn insert(&self, ctx: Context, tx: SignedTransaction) -> ProtocolResult<()> {
+    async fn insert_tx(
+        &self,
+        ctx: Context,
+        tx: SignedTransaction,
+        tx_type: TxType,
+    ) -> ProtocolResult<()> {
+        let _lock = self.flush_lock.read().await;
+
         let tx_hash = &tx.tx_hash;
-
         self.tx_cache.check_reach_limit(self.pool_size)?;
         self.tx_cache.check_exist(tx_hash)?;
         self.adapter
@@ -96,13 +100,26 @@ where
         self.adapter
             .check_storage_exist(ctx.clone(), tx_hash.clone())
             .await?;
-        self.tx_cache.insert_new_tx(tx.clone())?;
+        match tx_type {
+            TxType::NewTx => self.tx_cache.insert_new_tx(tx.clone())?,
+            TxType::ProposeTx => self.tx_cache.insert_propose_tx(tx.clone())?,
+        }
 
         if !ctx.is_network_origin_txs() {
             self.adapter.broadcast_tx(ctx, tx).await?;
         }
 
         Ok(())
+    }
+}
+
+#[async_trait]
+impl<Adapter> MemPool for HashMemPool<Adapter>
+where
+    Adapter: MemPoolAdapter,
+{
+    async fn insert(&self, ctx: Context, tx: SignedTransaction) -> ProtocolResult<()> {
+        self.insert_tx(ctx, tx, TxType::NewTx).await
     }
 
     async fn package(
@@ -113,7 +130,7 @@ where
     ) -> ProtocolResult<MixedTxHashes> {
         let current_height = self.adapter.get_latest_height(ctx.clone()).await?;
         log::info!(
-            "[mempool]: {:?} txs in map and {:?} txs in queue while package",
+            "[core_mempool]: {:?} txs in map and {:?} txs in queue while package",
             self.tx_cache.len(),
             self.tx_cache.queue_len(),
         );
@@ -125,13 +142,21 @@ where
         )
     }
 
-    async fn flush(&self, _ctx: Context, tx_hashes: Vec<Hash>) -> ProtocolResult<()> {
+    async fn flush(&self, ctx: Context, tx_hashes: Vec<Hash>) -> ProtocolResult<()> {
+        let _lock = self.flush_lock.write().await;
+
+        let current_height = self.adapter.get_latest_height(ctx.clone()).await?;
         log::info!(
-            "[mempool]: flush mempool with {:?} tx_hashes",
+            "[core_mempool]: flush mempool with {:?} tx_hashes",
             tx_hashes.len(),
         );
-        self.tx_cache.flush(&tx_hashes);
+        self.tx_cache.flush(
+            &tx_hashes,
+            current_height,
+            current_height + self.timeout_gap.load(Ordering::Relaxed),
+        );
         self.callback_cache.clear();
+
         Ok(())
     }
 
@@ -199,7 +224,7 @@ where
             for tx in txs.into_iter() {
                 // Should not handle error here, it is normal that transactions
                 // response here are exist in pool.
-                let _ = self.insert(ctx.clone(), tx).await;
+                let _ = self.insert_tx(ctx.clone(), tx, TxType::ProposeTx).await;
             }
         }
         Ok(())
@@ -210,6 +235,11 @@ where
             .set_args(timeout_gap, cycles_limit, max_tx_size);
         self.timeout_gap.store(timeout_gap, Ordering::Relaxed);
     }
+}
+
+pub enum TxType {
+    NewTx,
+    ProposeTx,
 }
 
 #[derive(Debug, Display)]

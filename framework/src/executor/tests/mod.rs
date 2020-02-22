@@ -54,7 +54,7 @@ fn test_create_genesis() {
         service_name: "asset".to_owned(),
         method:       "get_balance".to_owned(),
         payload:
-            r#"{"asset_id": "f56924db538e77bb5951eb5ff0d02b88983c49c45eea30e8ae3e7234b311436c"}"#
+            r#"{"asset_id": "f56924db538e77bb5951eb5ff0d02b88983c49c45eea30e8ae3e7234b311436c", "user": "f8389d774afdad8755ef8e629e5a154fddc6325a"}"#
                 .to_owned(),
     };
     let res = executor.read(&params, &caller, 1, &request).unwrap();
