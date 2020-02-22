@@ -1181,6 +1181,37 @@ async fn should_remove_multiaddr_in_unknown_book_if_event_multiaddr_doesnt_have_
 }
 
 #[tokio::test]
+async fn should_always_remove_inbound_multiaddr_in_unknown_book_on_repeated_connection() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+    let remote_peers = make_sessions(&mut mgr, 1).await;
+    let test_peer = remote_peers.first().expect("get first");
+    let test_multiaddr = make_multiaddr(2077, None);
+
+    let test_unknown_addr = make_multiaddr(2077, Some(test_peer.owned_id()))
+        .try_into()
+        .expect("try info addr info");
+    mgr.unknown_book_mut().insert(test_unknown_addr);
+
+    assert_eq!(
+        mgr.unknown_book().len(),
+        1,
+        "should have 1 unknown multiaddrs"
+    );
+
+    let repeated_connection = PeerManagerEvent::RepeatedConnection {
+        ty:   ConnectionType::Listen,
+        sid:  test_peer.session_id(),
+        addr: test_multiaddr,
+    };
+    mgr.poll_event(repeated_connection).await;
+
+    assert!(
+        mgr.unknown_book().is_empty(),
+        "should remove multiaddrs in unknown book"
+    );
+}
+
+#[tokio::test]
 async fn should_remove_multiaddr_in_unknown_book_on_unconnectable_multiaddr() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
     let test_peer = make_peer(2077);

@@ -792,6 +792,18 @@ impl PeerManager {
             self.peer_id, sid, ty, addr
         );
 
+        let session = match self.inner.session(&sid) {
+            Some(s) => s,
+            None => {
+                error!("network: repeated connection but session {} not found", sid);
+                return;
+            }
+        };
+
+        if !addr.has_id() {
+            addr.push_id(session.peer.owned_id());
+        }
+
         self.unknown_addrs.remove(&addr);
 
         // TODO: For ConnectionType::Listen, records repeated count,
@@ -800,14 +812,8 @@ impl PeerManager {
             return;
         }
 
-        if let Some(session) = self.inner.session(&sid) {
-            if !addr.has_id() {
-                addr.push_id(session.peer.id.as_ref().to_owned());
-            }
-
-            self.unknown_addrs.remove(&addr);
-            session.peer.add_multiaddrs(vec![addr]);
-        }
+        // Insert multiaddr
+        session.peer.add_multiaddrs(vec![addr]);
     }
 
     fn unconnectable_multiaddr(&mut self, addr: Multiaddr) {
