@@ -79,7 +79,7 @@ impl<Mapping: 'static + ServiceMapping> Muta<Mapping> {
         }
     }
 
-    pub fn run(self, rt: &mut tokio::runtime::Runtime) -> ProtocolResult<()> {
+    pub async fn run(self) -> ProtocolResult<()> {
         common_logger::init(
             self.config.logger.filter.clone(),
             self.config.logger.log_to_console,
@@ -91,16 +91,9 @@ impl<Mapping: 'static + ServiceMapping> Muta<Mapping> {
         );
 
         // run muta
-        let local = tokio::task::LocalSet::new();
-        local.block_on(rt, async move {
-            self.create_genesis().await.unwrap();
+        self.create_genesis().await.unwrap();
 
-            start(self.config, Arc::clone(&self.service_mapping))
-                .await
-                .unwrap()
-        });
-
-        Ok(())
+        start(self.config, Arc::clone(&self.service_mapping)).await
     }
 
     async fn create_genesis(&self) -> ProtocolResult<Block> {

@@ -411,6 +411,10 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         }
     });
 
+    tokio::spawn(async move {
+        futures::executor::block_on(exec_demon.run());
+    });
+
     // Init graphql
     let mut graphql_config = GraphQLConfig::default();
     graphql_config.listening_address = config.graphql.listening_address;
@@ -423,21 +427,18 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         graphql_config.maxconn = config.graphql.maxconn;
     }
 
-    // Run execute demon
-    tokio::spawn(async move {
-        futures::executor::block_on(exec_demon.run());
+    let actix_handle = std::thread::spawn(move || {
+        // Run GraphQL server
+        actix_rt::System::new("muta-graphql").block_on(async move {
+            core_api::start_graphql(graphql_config, api_adapter).await;
+        });
     });
 
-    // Run GraphQL server
-    tokio::task::spawn_local(async move {
-        let local = tokio::task::LocalSet::new();
-        let sys = actix_rt::System::run_in_tokio("graphql", &local);
-        // define your actix-web server
-        tokio::spawn(async move { sys.await.unwrap() });
-        core_api::start_graphql(graphql_config, api_adapter).await;
-    })
-    .await
-    .map_err(|e| MainError::Other(e.to_string()))?;
-
-    Ok(())
+    match actix_handle.join() {
+        Ok(()) => std::process::exit(0),
+        Err(e) => {
+            log::error!("[muta]: process exit {:?}", e);
+            std::process::exit(1);
+        }
+    };
 }
