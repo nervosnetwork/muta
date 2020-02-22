@@ -80,7 +80,7 @@ fn test_package() {
     package!(normal(100, 200, 100, 100));
 
     // 3. 2 * tx_num_limit < pool_size
-    package!(normal(100, 201, 100, 101));
+    package!(normal(100, 201, 100, 100));
 
     // 4. current_height >= tx.timeout
     package!(timeout(50, CURRENT_HEIGHT, 10, 0));
