@@ -1473,6 +1473,30 @@ async fn should_push_id_to_listen_multiaddr_if_not_included_on_add_new_listen_ad
 }
 
 #[tokio::test]
+async fn should_remove_new_listen_multiaddr_in_unknown_book_on_add_new_listen_addr() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+    let self_id = mgr.inner.peer_id.to_owned();
+
+    let test_multiaddr = make_peer_multiaddr(2077, self_id);
+    mgr.unknown_book_mut().insert(test_multiaddr.clone().into());
+    assert_eq!(mgr.unknown_book().len(), 1, "should have one unknown addr");
+
+    let inner = mgr.core_inner();
+    assert!(inner.listen().is_empty(), "should not have any listen addr");
+
+    let add_listen_addr = PeerManagerEvent::AddNewListenAddr {
+        addr: test_multiaddr.into(),
+    };
+    mgr.poll_event(add_listen_addr).await;
+
+    assert_eq!(
+        mgr.unknown_book().len(),
+        0,
+        "should remove new listen addr in unknown book"
+    );
+}
+
+#[tokio::test]
 async fn should_remove_listen_on_remove_listen_addr() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
     let self_id = mgr.inner.peer_id.to_owned();

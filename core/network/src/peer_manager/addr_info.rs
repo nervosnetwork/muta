@@ -1,3 +1,4 @@
+use super::PeerMultiaddr;
 use crate::{error::PeerIdNotFound, traits::MultiaddrExt};
 
 use std::{
@@ -19,7 +20,7 @@ pub const ADDR_TIMEOUT: u64 = 10;
 // Note: AddrInfo enforces peer id in multiaddr
 #[derive(Debug, Clone)]
 pub struct AddrInfo {
-    addr:         Arc<Multiaddr>,
+    addr:         Arc<PeerMultiaddr>,
     connecting:   Arc<AtomicBool>,
     retry:        Arc<AtomicU8>,
     attempt_at:   Arc<AtomicU64>,
@@ -28,7 +29,7 @@ pub struct AddrInfo {
 
 impl AddrInfo {
     pub fn owned_addr(&self) -> Multiaddr {
-        self.addr.as_ref().to_owned()
+        self.addr.as_ref().to_owned().into()
     }
 
     pub fn is_connecting(&self) -> bool {
@@ -82,6 +83,18 @@ impl AddrInfo {
     }
 }
 
+impl From<PeerMultiaddr> for AddrInfo {
+    fn from(pma: PeerMultiaddr) -> AddrInfo {
+        AddrInfo {
+            addr:         Arc::new(pma),
+            connecting:   Arc::new(AtomicBool::new(false)),
+            retry:        Arc::new(AtomicU8::new(0)),
+            attempt_at:   Arc::new(AtomicU64::new(0)),
+            next_attempt: Arc::new(AtomicU64::new(0)),
+        }
+    }
+}
+
 impl TryFrom<Multiaddr> for AddrInfo {
     type Error = PeerIdNotFound;
 
@@ -90,7 +103,7 @@ impl TryFrom<Multiaddr> for AddrInfo {
             Err(PeerIdNotFound(ma))
         } else {
             let ai = AddrInfo {
-                addr:         Arc::new(ma),
+                addr:         Arc::new(PeerMultiaddr(ma)),
                 connecting:   Arc::new(AtomicBool::new(false)),
                 retry:        Arc::new(AtomicU8::new(0)),
                 attempt_at:   Arc::new(AtomicU64::new(0)),
@@ -104,6 +117,12 @@ impl TryFrom<Multiaddr> for AddrInfo {
 
 impl Borrow<Multiaddr> for AddrInfo {
     fn borrow(&self) -> &Multiaddr {
+        &self.addr
+    }
+}
+
+impl Borrow<PeerMultiaddr> for AddrInfo {
+    fn borrow(&self) -> &PeerMultiaddr {
         &self.addr
     }
 }

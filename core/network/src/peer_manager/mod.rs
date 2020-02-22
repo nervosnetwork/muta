@@ -946,8 +946,9 @@ impl PeerManager {
                 self.reconnect_addr_later(addr);
             }
             PeerManagerEvent::AddNewListenAddr { addr } => {
-                self.inner
-                    .add_listen(PeerMultiaddr::new(addr, &self.peer_id));
+                let peer_addr = PeerMultiaddr::new(addr, &self.peer_id);
+                self.unknown_addrs.remove(&peer_addr);
+                self.inner.add_listen(peer_addr);
             }
             PeerManagerEvent::RemoveListenAddr { addr } => {
                 self.inner
