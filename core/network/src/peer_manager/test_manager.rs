@@ -1,6 +1,8 @@
 use super::{
-    addr_info::MAX_ADDR_RETRY, peer::Peer, AddrInfo, ArcPeer, Connectedness, Inner, PeerManager,
-    PeerManagerConfig, PeerMultiaddr, ALIVE_RETRY_INTERVAL, MAX_RETRY_COUNT,
+    addr_info::{ADDR_TIMEOUT, MAX_ADDR_RETRY},
+    peer::Peer,
+    AddrInfo, ArcPeer, Connectedness, Inner, PeerManager, PeerManagerConfig, PeerMultiaddr,
+    ALIVE_RETRY_INTERVAL, MAX_RETRY_COUNT,
 };
 use crate::{
     common::ConnectedAddr,
@@ -367,9 +369,8 @@ async fn should_always_remove_inbound_mutiaddr_in_unknown_book_even_when_reach_m
     let _remote_peers = make_sessions(&mut mgr, 2).await;
 
     let remote_pubkey = make_pubkey();
-    let remote_addr = make_multiaddr(9527, Some(remote_pubkey.peer_id()));
     mgr.unknown_book_mut()
-        .insert(remote_addr.clone().try_into().expect("try into addr info"));
+        .insert(make_peer_multiaddr(9527, remote_pubkey.peer_id()).into());
     assert_eq!(mgr.unknown_book().len(), 1, "should have one unknown addr");
 
     let sess_ctx = SessionContext::make(
@@ -399,9 +400,9 @@ async fn should_remove_same_mutiaddr_in_unknown_book_on_new_session() {
 
     let remote_pubkey = make_pubkey();
     let test_addr = make_multiaddr(2077, Some(remote_pubkey.peer_id()));
-    mgr.unknown_book_mut()
-        .insert(test_addr.clone().try_into().expect("try into addr info"));
 
+    mgr.unknown_book_mut()
+        .insert(make_peer_multiaddr(2077, remote_pubkey.peer_id()).into());
     assert_eq!(mgr.unknown_book().len(), 1, "should have one unknown addr");
 
     let sess_ctx = SessionContext::make(
@@ -432,9 +433,8 @@ async fn should_remove_same_multiaddr_in_unknown_book_if_ctx_address_doesnt_have
 {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
     let remote_pubkey = make_pubkey();
-    let test_addr = make_multiaddr(2077, Some(remote_pubkey.peer_id()));
     mgr.unknown_book_mut()
-        .insert(test_addr.try_into().expect("try into addr"));
+        .insert(make_peer_multiaddr(2077, remote_pubkey.peer_id()).into());
 
     assert_eq!(mgr.unknown_book().len(), 1, "should have one unknown addr");
 
@@ -570,11 +570,11 @@ async fn should_reject_new_connections_when_we_reach_max_connections_on_new_sess
     let remote_pubkey = make_pubkey();
     let remote_addr = make_multiaddr(2077, Some(remote_pubkey.peer_id()));
     mgr.unknown_book_mut()
-        .insert(remote_addr.clone().try_into().expect("try into addr info"));
+        .insert(make_peer_multiaddr(2077, remote_pubkey.peer_id()).into());
 
     let sess_ctx = SessionContext::make(
         SessionId::new(99),
-        remote_addr.clone(),
+        remote_addr,
         SessionType::Outbound,
         remote_pubkey.clone(),
     );
@@ -1166,12 +1166,8 @@ async fn should_remove_multiaddr_in_unknown_book_on_repeated_connection() {
     let test_peer = remote_peers.first().expect("get first");
     let test_multiaddr = make_multiaddr(2077, Some(test_peer.owned_id()));
 
-    let test_unknown_addr = test_multiaddr
-        .clone()
-        .try_into()
-        .expect("try into addr info");
-    mgr.unknown_book_mut().insert(test_unknown_addr);
-
+    mgr.unknown_book_mut()
+        .insert(make_peer_multiaddr(2077, test_peer.owned_id()).into());
     assert_eq!(
         mgr.unknown_book().len(),
         1,
@@ -1199,13 +1195,8 @@ async fn should_remove_multiaddr_in_unknown_book_if_event_multiaddr_doesnt_have_
     let test_peer = remote_peers.first().expect("get first");
     let test_multiaddr = make_multiaddr(2077, None);
 
-    // AddrInfo enforces peer id, no need to insert test_multiaddr which doesn't
-    // include one.
-    let test_unknown_addr = make_multiaddr(2077, Some(test_peer.owned_id()))
-        .try_into()
-        .expect("try info addr info");
-    mgr.unknown_book_mut().insert(test_unknown_addr);
-
+    mgr.unknown_book_mut()
+        .insert(make_peer_multiaddr(2077, test_peer.owned_id()).into());
     assert_eq!(
         mgr.unknown_book().len(),
         1,
@@ -1232,11 +1223,8 @@ async fn should_always_remove_inbound_multiaddr_in_unknown_book_on_repeated_conn
     let test_peer = remote_peers.first().expect("get first");
     let test_multiaddr = make_multiaddr(2077, None);
 
-    let test_unknown_addr = make_multiaddr(2077, Some(test_peer.owned_id()))
-        .try_into()
-        .expect("try info addr info");
-    mgr.unknown_book_mut().insert(test_unknown_addr);
-
+    mgr.unknown_book_mut()
+        .insert(make_peer_multiaddr(2077, test_peer.owned_id()).into());
     assert_eq!(
         mgr.unknown_book().len(),
         1,
@@ -1577,4 +1565,58 @@ async fn should_always_include_our_listen_addrs_in_return_from_manager_handle_ra
         !listen_multiaddrs.iter().any(|lma| !addrs.contains(&*lma)),
         "should include our listen addresses"
     );
+}
+
+#[tokio::test]
+async fn should_increase_retry_for_connecting_timeout_multiaddr_in_unknown_book() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+
+    let remote_pubkey = make_pubkey();
+    mgr.unknown_book_mut()
+        .insert(make_peer_multiaddr(9527, remote_pubkey.peer_id()).into());
+    assert_eq!(mgr.unknown_book().len(), 1, "should have one unknown addr");
+
+    let test_addr = mgr
+        .unknown_book()
+        .iter()
+        .next()
+        .expect("get one unknown addr")
+        .clone();
+    assert_eq!(test_addr.retry(), 0, "should have 0 retry");
+
+    test_addr.mark_connecting();
+    // Set attempt at to oder timestamp, so that we have connecting timeout
+    test_addr.set_attempt_at(AddrInfo::now() - ADDR_TIMEOUT - 1);
+
+    mgr.poll().await;
+    assert_eq!(test_addr.retry(), 1, "should have 1 retry");
+    assert!(!test_addr.is_connecting(), "should reset connecting flag");
+}
+
+#[tokio::test]
+async fn should_remove_timeout_connecting_multiaddr_when_run_out_retry_in_unknown_book() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+
+    let remote_pubkey = make_pubkey();
+    mgr.unknown_book_mut()
+        .insert(make_peer_multiaddr(9527, remote_pubkey.peer_id()).into());
+    assert_eq!(mgr.unknown_book().len(), 1, "should have one unknown addr");
+
+    let test_addr = mgr
+        .unknown_book()
+        .iter()
+        .next()
+        .expect("get one unknown addr")
+        .clone();
+    assert_eq!(test_addr.retry(), 0, "should have 0 retry");
+
+    test_addr.inc_retry_by(MAX_ADDR_RETRY);
+    assert_eq!(test_addr.retry(), MAX_ADDR_RETRY, "should reach max retry");
+
+    test_addr.mark_connecting();
+    // Set attempt at to oder timestamp, so that we have connecting timeout
+    test_addr.set_attempt_at(AddrInfo::now() - ADDR_TIMEOUT - 1);
+
+    mgr.poll().await;
+    assert_eq!(mgr.unknown_book().len(), 0, "should not have any address");
 }

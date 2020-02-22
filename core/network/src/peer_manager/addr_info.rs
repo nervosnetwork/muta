@@ -41,6 +41,11 @@ impl AddrInfo {
         self.attempt_at.store(Self::now(), Ordering::SeqCst);
     }
 
+    #[cfg(test)]
+    pub fn set_attempt_at(&self, at: u64) {
+        self.attempt_at.store(at, Ordering::SeqCst);
+    }
+
     pub fn inc_retry(&self) {
         self.connecting.store(false, Ordering::SeqCst);
         let retry = self.retry.fetch_add(1, Ordering::SeqCst).saturating_add(1);
@@ -78,7 +83,7 @@ impl AddrInfo {
         self.retry.load(Ordering::SeqCst) > MAX_ADDR_RETRY
     }
 
-    fn now() -> u64 {
+    pub(crate) fn now() -> u64 {
         duration_since(SystemTime::now(), UNIX_EPOCH).as_secs()
     }
 }
