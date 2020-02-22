@@ -1056,7 +1056,7 @@ async fn should_add_dialer_multiaddr_to_peer_on_repeated_connection() {
     let test_multiaddr = make_multiaddr(2077, Some(test_peer.owned_id()));
 
     let repeated_connection = PeerManagerEvent::RepeatedConnection {
-        ty:   ConnectionType::Dialer,
+        ty:   ConnectionType::Outbound,
         sid:  test_peer.session_id(),
         addr: test_multiaddr.clone(),
     };
@@ -1076,7 +1076,7 @@ async fn should_skip_listen_multiaddr_to_peer_on_repeated_connection() {
     let test_multiaddr = make_multiaddr(2077, Some(test_peer.owned_id()));
 
     let repeated_connection = PeerManagerEvent::RepeatedConnection {
-        ty:   ConnectionType::Listen,
+        ty:   ConnectionType::Inbound,
         sid:  test_peer.session_id(),
         addr: test_multiaddr.clone(),
     };
@@ -1096,7 +1096,7 @@ async fn should_push_id_if_multiaddr_not_included_on_repeated_connection() {
     let test_multiaddr = make_multiaddr(2077, None);
 
     let repeated_connection = PeerManagerEvent::RepeatedConnection {
-        ty:   ConnectionType::Dialer,
+        ty:   ConnectionType::Outbound,
         sid:  test_peer.session_id(),
         addr: test_multiaddr.clone(),
     };
@@ -1134,7 +1134,7 @@ async fn should_remove_multiaddr_in_unknown_book_on_repeated_connection() {
     );
 
     let repeated_connection = PeerManagerEvent::RepeatedConnection {
-        ty:   ConnectionType::Dialer,
+        ty:   ConnectionType::Outbound,
         sid:  test_peer.session_id(),
         addr: test_multiaddr,
     };
@@ -1168,7 +1168,7 @@ async fn should_remove_multiaddr_in_unknown_book_if_event_multiaddr_doesnt_have_
     );
 
     let repeated_connection = PeerManagerEvent::RepeatedConnection {
-        ty:   ConnectionType::Dialer,
+        ty:   ConnectionType::Outbound,
         sid:  test_peer.session_id(),
         addr: test_multiaddr,
     };
@@ -1199,7 +1199,7 @@ async fn should_always_remove_inbound_multiaddr_in_unknown_book_on_repeated_conn
     );
 
     let repeated_connection = PeerManagerEvent::RepeatedConnection {
-        ty:   ConnectionType::Listen,
+        ty:   ConnectionType::Inbound,
         sid:  test_peer.session_id(),
         addr: test_multiaddr,
     };

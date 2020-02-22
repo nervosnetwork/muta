@@ -806,9 +806,9 @@ impl PeerManager {
 
         self.unknown_addrs.remove(&addr);
 
-        // TODO: For ConnectionType::Listen, records repeated count,
+        // TODO: For ConnectionType::Inbound, records repeated count,
         // reduce that peer's score, eventually ban it for a while.
-        if ty == ConnectionType::Listen {
+        if ty == ConnectionType::Inbound {
             return;
         }
 

@@ -81,9 +81,9 @@ pub struct MultiUsersMessage {
 #[derive(Debug, Display, PartialEq, Eq)]
 pub enum ConnectionType {
     #[display(fmt = "Receive an repeated connection")]
-    Listen,
+    Inbound,
     #[display(fmt = "Dial an repeated connection")]
-    Dialer,
+    Outbound,
 }
 
 #[derive(Debug, Display)]

@@ -92,7 +92,6 @@ impl ConnectionServiceKeeper {
                 self.report_peer(connect_self);
             }
             TentacleError::RepeatedConnection(sid) => {
-                // For ConnectionType::Listen, addr is remote peer's listen addr
                 let repeated_connection = PeerManagerEvent::RepeatedConnection { ty, sid, addr };
 
                 self.report_peer(repeated_connection);
@@ -121,10 +120,10 @@ impl ServiceHandle for ConnectionServiceKeeper {
     fn handle_error(&mut self, _ctx: &mut ServiceContext, err: ServiceError) {
         match err {
             ServiceError::DialerError { error, address } => {
-                self.process_connect_error(ConnectionType::Dialer, error, address)
+                self.process_connect_error(ConnectionType::Outbound, error, address)
             }
             ServiceError::ListenError { error, address } => {
-                self.process_connect_error(ConnectionType::Listen, error, address)
+                self.process_connect_error(ConnectionType::Inbound, error, address)
             }
             ServiceError::ProtocolSelectError { session_context, proto_name } => {
                 let kind = if let Some(proto_name) = proto_name {
