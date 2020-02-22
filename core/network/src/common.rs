@@ -53,9 +53,8 @@ pub fn socket_to_multi_addr(socket_addr: SocketAddr) -> Multiaddr {
 impl MultiaddrExt for Multiaddr {
     fn id_bytes(&self) -> Option<Cow<'_, [u8]>> {
         for proto in self.iter() {
-            match proto {
-                Protocol::P2P(bytes) => return Some(bytes),
-                _ => (),
+            if let Protocol::P2P(bytes) = proto {
+                return Some(bytes);
             }
         }
 

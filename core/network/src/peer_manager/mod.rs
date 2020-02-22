@@ -440,16 +440,16 @@ impl Inner {
         self.whitelist.read().iter().cloned().collect()
     }
 
-    pub fn session(&self, sid: &SessionId) -> Option<ArcSession> {
-        self.sessions.read().get(sid).cloned()
+    pub fn session(&self, sid: SessionId) -> Option<ArcSession> {
+        self.sessions.read().get(&sid).cloned()
     }
 
     pub fn share_sessions(&self) -> Vec<ArcSession> {
         self.sessions.read().iter().cloned().collect()
     }
 
-    pub fn remove_session(&self, sid: &SessionId) -> Option<ArcSession> {
-        self.sessions.write().take(sid)
+    pub fn remove_session(&self, sid: SessionId) -> Option<ArcSession> {
+        self.sessions.write().take(&sid)
     }
 
     pub fn package_peers(&self) -> Vec<ArcPeer> {
@@ -582,7 +582,8 @@ impl PeerManager {
 
     pub fn restore_peers(&self) -> Result<(), NetworkError> {
         let peers = self.peer_dat_file.restore()?;
-        Ok(self.inner.restore(peers))
+        self.inner.restore(peers);
+        Ok(())
     }
 
     pub fn bootstrap(&mut self) {
@@ -721,14 +722,14 @@ impl PeerManager {
             error!("network: got new session event on same peer {:?}", peer.id);
 
             let exist_sid = peer.session_id();
-            if exist_sid != ctx.id && self.inner.session(&exist_sid).is_some() {
+            if exist_sid != ctx.id && self.inner.session(exist_sid).is_some() {
                 // We don't support multiple connections, disconnect new one
                 self.disconnect_session(ctx.id);
                 insert_outbound_multiaddr(&self.peer_id, &mut self.unknown_addrs);
                 return;
             }
 
-            if self.inner.session(&exist_sid).is_none() {
+            if self.inner.session(exist_sid).is_none() {
                 // We keep new session, outdated will be updated after we insert
                 // it.
                 error!("network: bug peer session {} outdated", exist_sid);
@@ -751,7 +752,7 @@ impl PeerManager {
     fn session_closed(&mut self, sid: SessionId) {
         info!("network: session {} closed", sid);
 
-        let session = match self.inner.remove_session(&sid) {
+        let session = match self.inner.remove_session(sid) {
             Some(s) => s,
             None => return, // Session may be removed by other event
         };
@@ -778,7 +779,7 @@ impl PeerManager {
     }
 
     fn remove_peer_by_session(&self, sid: SessionId) {
-        let session = match self.inner.remove_session(&sid) {
+        let session = match self.inner.remove_session(sid) {
             Some(s) => s,
             None => {
                 warn!("impossible, unregistered session {}", sid);
@@ -806,7 +807,7 @@ impl PeerManager {
             ctx.pending_data_size()
         );
 
-        if let Some(session) = self.inner.session(&ctx.id) {
+        if let Some(session) = self.inner.session(ctx.id) {
             session.block();
         }
     }
@@ -821,7 +822,7 @@ impl PeerManager {
 
         if peer.connectedness() == Connectedness::Connected {
             let sid = peer.session_id();
-            self.inner.remove_session(&sid);
+            self.inner.remove_session(sid);
             self.inner.dec_conn_count();
 
             // Make sure we disconnect this peer
@@ -939,7 +940,7 @@ impl PeerManager {
             self.peer_id, sid, ty, addr
         );
 
-        let session = match self.inner.session(&sid) {
+        let session = match self.inner.session(sid) {
             Some(s) => s,
             None => {
                 error!("network: repeated connection but session {} not found", sid);
@@ -1134,11 +1135,7 @@ impl Future for PeerManager {
             if addr.is_timeout() {
                 addr.inc_retry();
             }
-            if addr.run_out_retry() {
-                true
-            } else {
-                false
-            }
+            addr.run_out_retry()
         };
         self.unknown_addrs.retain(|ua| !run_out_retry(ua));
 

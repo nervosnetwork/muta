@@ -66,7 +66,6 @@ fn make_bootstraps(num: usize) -> Vec<ArcPeer> {
     let mut init_port = 5000;
 
     (0..num)
-        .into_iter()
         .map(|_| {
             let peer = make_peer(init_port);
             init_port += 1;
@@ -219,7 +218,7 @@ async fn should_accept_outbound_new_session_and_add_peer() {
     );
     assert_eq!(saved_peer.retry(), 0, "should reset retry");
 
-    let saved_session = inner.session(&1.into()).expect("should save session");
+    let saved_session = inner.session(1.into()).expect("should save session");
     assert_eq!(saved_session.peer.id.as_ref(), &remote_pubkey.peer_id());
     assert!(!saved_session.is_blocked());
     assert_eq!(
@@ -534,7 +533,7 @@ async fn should_keep_new_connection_for_error_outdated_peer_session_on_new_sessi
 
     let inner = mgr.core_inner();
     let test_peer = remote_peers.first().expect("get first peer");
-    inner.remove_session(&test_peer.session_id());
+    inner.remove_session(test_peer.session_id());
 
     let sess_ctx = SessionContext::make(
         SessionId::new(99),
@@ -804,7 +803,7 @@ async fn should_mark_session_blocked_on_session_blocked() {
 
     let inner = mgr.core_inner();
     let session = inner
-        .session(&test_peer.session_id())
+        .session(test_peer.session_id())
         .expect("should have a session");
     assert!(session.is_blocked(), "should be blocked");
 }
@@ -840,7 +839,6 @@ async fn should_disconnect_peer_and_increase_retry_on_retry_peer_later() {
 async fn should_try_all_peer_multiaddrs_on_connect_peers_now() {
     let (mut mgr, mut conn_rx) = make_manager(0, 20);
     let peers = (0..10)
-        .into_iter()
         .map(|port| {
             // Every peer has two multiaddrs
             let p = make_peer(port + 7000);
@@ -954,7 +952,6 @@ async fn should_connect_peers_even_if_they_are_not_retry_ready_on_connect_peers_
 async fn should_add_multiaddrs_to_unknown_book_on_discover_multi_addrs() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
     let test_multiaddrs: Vec<Multiaddr> = (0..10)
-        .into_iter()
         .map(|port| {
             let peer = make_peer(port + 7000);
             peer.raw_multiaddrs().pop().expect("peer multiaddr")
@@ -1045,7 +1042,6 @@ async fn should_add_multiaddrs_to_peer_on_identified_addrs() {
     let old_multiaddrs_len = test_peer.multiaddrs_len();
 
     let test_multiaddrs: Vec<_> = (0..2)
-        .into_iter()
         .map(|port| make_multiaddr(port + 9000, Some(test_peer.owned_id())))
         .collect();
 
@@ -1642,7 +1638,6 @@ async fn should_always_include_our_listen_addrs_in_return_from_manager_handle_ra
 
     let inner = mgr.core_inner();
     let listen_multiaddrs = (0..5)
-        .into_iter()
         .map(|port| make_peer_multiaddr(port + 9000, self_id.clone()))
         .collect::<Vec<_>>();
 
@@ -1717,7 +1712,6 @@ async fn should_remove_timeout_connecting_multiaddr_when_run_out_retry_in_unknow
 async fn should_whitelist_peer_chain_addrs_on_protect_peers_by_chain_addrs() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
     let peers = (0..5)
-        .into_iter()
         .map(|port| make_peer(port + 9000))
         .collect::<Vec<_>>();
     let chain_addrs = peers
@@ -1793,7 +1787,7 @@ async fn should_allow_whitelisted_peer_session_even_if_we_reach_max_connections_
     mgr.poll_event(new_session).await;
 
     assert_eq!(inner.conn_count(), 11, "should remain 11 connections");
-    let session = inner.session(&666.into()).expect("should have session");
+    let session = inner.session(666.into()).expect("should have session");
     assert_eq!(
         session.peer.id, whitelisted_peer.id,
         "should be whitelisted peer"
