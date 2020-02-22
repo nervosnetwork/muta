@@ -124,6 +124,9 @@ pub enum PeerManagerEvent {
     #[display(fmt = "connect peers {:?} now", pids)]
     ConnectPeersNow { pids: Vec<PeerId> },
 
+    #[display(fmt = "protect peers by chain addresses {:?}", chain_addrs)]
+    ProtectPeersByChainAddr { chain_addrs: Vec<Address> },
+
     // Address
     #[display(fmt = "discover addr {}", addr)]
     DiscoverAddr { addr: Multiaddr },

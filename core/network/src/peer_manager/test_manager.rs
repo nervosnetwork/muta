@@ -1620,3 +1620,90 @@ async fn should_remove_timeout_connecting_multiaddr_when_run_out_retry_in_unknow
     mgr.poll().await;
     assert_eq!(mgr.unknown_book().len(), 0, "should not have any address");
 }
+
+#[tokio::test]
+async fn should_whitelist_peer_chain_addrs_on_protect_peers_by_chain_addrs() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+    let peers = (0..5)
+        .into_iter()
+        .map(|port| make_peer(port + 9000))
+        .collect::<Vec<_>>();
+    let chain_addrs = peers
+        .into_iter()
+        .map(|p| p.chain_addr.as_ref().to_owned())
+        .collect::<Vec<_>>();
+
+    let inner = mgr.core_inner();
+    assert!(inner.whitelist().is_empty(), "should have empty whitelist");
+
+    let protect_peers_by_chain_addrs = PeerManagerEvent::ProtectPeersByChainAddr {
+        chain_addrs: chain_addrs.clone(),
+    };
+    mgr.poll_event(protect_peers_by_chain_addrs).await;
+
+    let whitelist = inner.whitelist();
+    assert_eq!(
+        whitelist.len(),
+        chain_addrs.len(),
+        "should have chain addrs"
+    );
+    assert!(
+        !chain_addrs.into_iter().any(|ca| !whitelist.contains(&ca)),
+        "should add all chain addrs"
+    );
+}
+
+#[tokio::test]
+async fn should_allow_whitelisted_peer_session_even_if_we_reach_max_connections_on_new_session() {
+    let (mut mgr, _conn_rx) = make_manager(0, 10);
+    let _remote_peers = make_sessions(&mut mgr, 10).await;
+
+    let whitelisted_peer = make_peer(2077);
+    let peer = make_peer(2019);
+
+    let inner = mgr.core_inner();
+    inner.protect_peers_by_chain_addr(vec![whitelisted_peer.chain_addr.as_ref().to_owned()]);
+
+    assert_eq!(inner.whitelist().len(), 1, "should have one whitelisted");
+    assert_eq!(inner.conn_count(), 10, "should have 10 connections");
+
+    // First no whitelisted one
+    let sess_ctx = SessionContext::make(
+        SessionId::new(233),
+        peer.raw_multiaddrs().pop().expect("peer multiaddr"),
+        SessionType::Inbound,
+        peer.owned_pubkey(),
+    );
+    let new_session = PeerManagerEvent::NewSession {
+        pid:    peer.owned_id(),
+        pubkey: peer.owned_pubkey(),
+        ctx:    sess_ctx.arced(),
+    };
+    mgr.poll_event(new_session).await;
+
+    assert_eq!(inner.conn_count(), 10, "should remain 10 connections");
+
+    // Now whitelistd one
+    let sess_ctx = SessionContext::make(
+        SessionId::new(666),
+        whitelisted_peer
+            .raw_multiaddrs()
+            .pop()
+            .expect("peer multiaddr"),
+        SessionType::Inbound,
+        whitelisted_peer.owned_pubkey(),
+    );
+    let new_session = PeerManagerEvent::NewSession {
+        pid:    whitelisted_peer.owned_id(),
+        pubkey: whitelisted_peer.owned_pubkey(),
+        ctx:    sess_ctx.arced(),
+    };
+    mgr.poll_event(new_session).await;
+
+    assert_eq!(inner.conn_count(), 11, "should remain 11 connections");
+    let session = inner.session(&666.into()).expect("should have session");
+    assert_eq!(
+        session.peer.id, whitelisted_peer.id,
+        "should be whitelisted peer"
+    );
+}

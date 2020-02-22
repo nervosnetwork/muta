@@ -6,6 +6,7 @@ mod save_restore;
 mod shared;
 
 use addr_info::AddrInfo;
+use peer::Peer;
 use save_restore::{NoPeerDatFile, PeerDatFile, SaveRestore};
 
 pub use disc::DiscoveryAddrManager;
@@ -136,6 +137,48 @@ impl Into<Multiaddr> for PeerMultiaddr {
 }
 
 #[derive(Debug)]
+struct ProtectedPeer {
+    chain_addr: Address,
+}
+
+#[derive(Debug, Clone)]
+struct ArcProtectedPeer(Arc<ProtectedPeer>);
+
+impl ArcProtectedPeer {
+    pub fn new(chain_addr: Address) -> Self {
+        ArcProtectedPeer(Arc::new(ProtectedPeer { chain_addr }))
+    }
+}
+
+impl Borrow<Address> for ArcProtectedPeer {
+    fn borrow(&self) -> &Address {
+        &self.chain_addr
+    }
+}
+
+impl PartialEq for ArcProtectedPeer {
+    fn eq(&self, other: &ArcProtectedPeer) -> bool {
+        self.chain_addr == other.chain_addr
+    }
+}
+
+impl Eq for ArcProtectedPeer {}
+
+impl Hash for ArcProtectedPeer {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.chain_addr.hash(state)
+    }
+}
+
+impl Deref for ArcProtectedPeer {
+    type Target = ProtectedPeer;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+#[derive(Debug)]
 struct Session {
     id:             SessionId,
     ctx:            Arc<SessionContext>,
@@ -236,9 +279,10 @@ impl Deref for ArcPeerByChain {
 struct Inner {
     connection_count: AtomicUsize,
 
-    sessions: RwLock<HashSet<ArcSession>>,
-    peers:    RwLock<HashSet<ArcPeer>>,
-    chain:    RwLock<HashSet<ArcPeerByChain>>,
+    whitelist: RwLock<HashSet<ArcProtectedPeer>>,
+    sessions:  RwLock<HashSet<ArcSession>>,
+    peers:     RwLock<HashSet<ArcPeer>>,
+    chain:     RwLock<HashSet<ArcPeerByChain>>,
 
     listen: RwLock<HashSet<PeerMultiaddr>>,
 }
@@ -248,9 +292,10 @@ impl Inner {
         Inner {
             connection_count: AtomicUsize::new(0),
 
-            sessions: Default::default(),
-            peers:    Default::default(),
-            chain:    Default::default(),
+            whitelist: Default::default(),
+            sessions:  Default::default(),
+            peers:     Default::default(),
+            chain:     Default::default(),
 
             listen: Default::default(),
         }
@@ -326,6 +371,24 @@ impl Inner {
         } else {
             None
         }
+    }
+
+    pub fn protect_peers_by_chain_addr(&self, chain_addrs: Vec<Address>) {
+        let peers = chain_addrs
+            .into_iter()
+            .map(ArcProtectedPeer::new)
+            .collect::<Vec<_>>();
+
+        self.whitelist.write().extend(peers);
+    }
+
+    pub fn is_protected_by_chain_addr(&self, chain_addr: &Address) -> bool {
+        self.whitelist.read().contains(chain_addr)
+    }
+
+    #[cfg(test)]
+    pub fn whitelist(&self) -> HashSet<ArcProtectedPeer> {
+        self.whitelist.read().iter().cloned().collect()
     }
 
     pub fn session(&self, sid: &SessionId) -> Option<ArcSession> {
@@ -562,11 +625,18 @@ impl PeerManager {
         // TODO: Always allow connections from consensus peers even when
         // we reach max connections
         if self.inner.conn_count() >= self.config.max_connections {
-            // TODO: If we want to ensure consensus peer connection, then
-            // outbound session number may exceed config.max_connections.
-            // Should check unknown address book.
-            self.disconnect_session(ctx.id);
-            return;
+            let protected = match Peer::pubkey_to_chain_addr(&pubkey) {
+                Ok(ca) => self.inner.is_protected_by_chain_addr(&ca),
+                _ => false,
+            };
+
+            if !protected {
+                // TODO: If we want to ensure consensus peer connection, then
+                // outbound session number may exceed config.max_connections.
+                // Should check unknown address book.
+                self.disconnect_session(ctx.id);
+                return;
+            }
         }
 
         let remote_peer_id = pubkey.peer_id();
@@ -905,6 +975,9 @@ impl PeerManager {
             PeerManagerEvent::SessionBlocked { ctx, .. } => self.session_blocked(ctx),
             PeerManagerEvent::RetryPeerLater { pid, .. } => self.retry_peer_later(&pid),
             PeerManagerEvent::ConnectPeersNow { pids } => self.connect_peer_by_ids_now(pids),
+            PeerManagerEvent::ProtectPeersByChainAddr { chain_addrs } => {
+                self.inner.protect_peers_by_chain_addr(chain_addrs);
+            }
             PeerManagerEvent::DiscoverAddr { addr } => self.discover_multiaddr(addr),
             PeerManagerEvent::DiscoverMultiAddrs { addrs } => self.dicover_multi_multiaddrs(addrs),
             PeerManagerEvent::IdentifiedAddrs { pid, addrs } => self.identified_addrs(&pid, addrs),

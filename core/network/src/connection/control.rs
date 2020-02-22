@@ -145,11 +145,16 @@ where
         msg: Bytes,
         pri: Priority,
     ) -> Result<(), NetworkError> {
-        let (connected, unconnected) = self.sessions.by_chain(chain_addrs);
+        let (connected, unconnected) = self.sessions.by_chain(chain_addrs.clone());
 
         let send_ret = self.send(TargetSession::Multi(connected), msg, pri);
         if unconnected.is_empty() {
             return send_ret;
+        }
+
+        let protect_peers = PeerManagerEvent::ProtectPeersByChainAddr { chain_addrs };
+        if self.mgr_srv.unbounded_send(protect_peers).is_err() {
+            error!("network: peer manager service exit");
         }
 
         let (pids, unknown) = self.sessions.peers_by_chain(unconnected.clone());
