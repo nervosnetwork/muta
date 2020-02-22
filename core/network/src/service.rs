@@ -271,13 +271,6 @@ impl NetworkService {
 
             conn_srv.listen(addr.clone()).await?;
 
-            // Update peer manager listen
-            // if let Some(peer_mgr) = self.peer_mgr.take() {
-            //     peer_mgr.set_listen(addr);
-            //
-            //     self.peer_mgr = Some(peer_mgr);
-            // }
-
             // Update service state
             if let Some(NetworkConnectionService::NoListen(conn_srv)) = self.net_conn_srv.take() {
                 self.net_conn_srv = Some(NetworkConnectionService::Ready(conn_srv));
@@ -332,10 +325,6 @@ impl Future for NetworkService {
         }
 
         if let Some(peer_mgr) = self.peer_mgr.take() {
-            // if peer_mgr.listen().is_empty() {
-            //     peer_mgr.set_listen(self.config.default_listen.clone());
-            // }
-
             tokio::spawn(peer_mgr);
         }
 
