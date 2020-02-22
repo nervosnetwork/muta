@@ -1,6 +1,6 @@
 use super::{
     addr_info::{ADDR_TIMEOUT, MAX_ADDR_RETRY},
-    peer::Peer,
+    peer::{Peer, VALID_ATTEMPT_INTERVAL},
     AddrInfo, ArcPeer, ArcProtectedPeer, Connectedness, Inner, PeerManager, PeerManagerConfig,
     PeerMultiaddr, ALIVE_RETRY_INTERVAL, MAX_RETRY_COUNT, WHITELIST_TIMEOUT,
 };
@@ -1428,6 +1428,99 @@ async fn should_skip_on_connected_peer_on_reconnect_addr_later() {
 }
 
 #[tokio::test]
+async fn should_remove_peer_when_it_run_out_of_retry_on_reconnect_addr_later() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+    let test_peer = make_peer(2077);
+    let test_multiaddr = test_peer.raw_multiaddrs().pop().expect("peer multiaddr");
+
+    let inner = mgr.core_inner();
+    inner.add_peer(test_peer.clone());
+
+    test_peer.set_retry(MAX_RETRY_COUNT);
+    assert_eq!(
+        test_peer.retry(),
+        MAX_RETRY_COUNT,
+        "should have reach max retry"
+    );
+    // Set to older timestamp, so that we can increase retry
+    test_peer.set_attempt_at(Peer::now() - VALID_ATTEMPT_INTERVAL - 1);
+
+    let reconnect_addr_later = PeerManagerEvent::ReconnectAddrLater {
+        addr: test_multiaddr.clone(),
+        kind: RetryKind::TimedOut,
+    };
+    mgr.poll_event(reconnect_addr_later).await;
+
+    assert!(inner.peer(&test_peer.id).is_none(), "should remove peer");
+}
+
+#[tokio::test]
+async fn should_reset_bootstrap_retry_when_it_run_out_of_retry_on_reconnect_addr_later() {
+    let (mut mgr, _conn_rx) = make_manager(1, 20);
+    let bootstraps = &mgr.config().bootstraps;
+    let boot_peer = bootstraps.first().expect("get one bootstrap peer").clone();
+    let boot_multiaddr = boot_peer.raw_multiaddrs().pop().expect("boot multiaddr");
+
+    // Insert bootstrap peer
+    let inner = mgr.core_inner();
+    inner.add_peer(boot_peer.clone());
+
+    boot_peer.set_retry(MAX_RETRY_COUNT);
+    assert_eq!(
+        boot_peer.retry(),
+        MAX_RETRY_COUNT,
+        "should have reach max retry"
+    );
+    // Set to older timestamp, so that we can increase retry
+    boot_peer.set_attempt_at(Peer::now() - VALID_ATTEMPT_INTERVAL - 1);
+
+    let reconnect_addr_later = PeerManagerEvent::ReconnectAddrLater {
+        addr: boot_multiaddr.clone(),
+        kind: RetryKind::TimedOut,
+    };
+    mgr.poll_event(reconnect_addr_later).await;
+
+    assert!(
+        inner.peer(&boot_peer.id).is_some(),
+        "should not remove bootstrap peer"
+    );
+    assert_eq!(boot_peer.retry(), 0, "should reset bootstrap retry");
+}
+
+#[tokio::test]
+async fn should_reset_protected_peer_retry_when_it_run_out_of_retry_on_reconnect_addr_later() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+    let test_peer = make_peer(2077);
+    let test_multiaddr = test_peer.raw_multiaddrs().pop().expect("peer multiaddr");
+
+    let inner = mgr.core_inner();
+    inner.add_peer(test_peer.clone());
+    inner.protect_peers_by_chain_addr(vec![test_peer.chain_addr.as_ref().to_owned()]);
+    assert_eq!(inner.whitelist().len(), 1, "should have one whitelisted");
+
+    test_peer.set_retry(MAX_RETRY_COUNT);
+    assert_eq!(
+        test_peer.retry(),
+        MAX_RETRY_COUNT,
+        "should have reach max retry"
+    );
+    // Set to older timestamp, so that we can increase retry
+    test_peer.set_attempt_at(Peer::now() - VALID_ATTEMPT_INTERVAL - 1);
+
+    let reconnect_addr_later = PeerManagerEvent::ReconnectAddrLater {
+        addr: test_multiaddr.clone(),
+        kind: RetryKind::TimedOut,
+    };
+    mgr.poll_event(reconnect_addr_later).await;
+
+    assert!(
+        inner.peer(&test_peer.id).is_some(),
+        "should not remove protected peer"
+    );
+    assert_eq!(test_peer.retry(), 0, "should reset protected peer's retry");
+}
+
+#[tokio::test]
 async fn should_add_new_listen_on_add_new_listen_addr() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
     let self_id = mgr.inner.peer_id.to_owned();
@@ -1559,7 +1652,6 @@ async fn should_always_include_our_listen_addrs_in_return_from_manager_handle_ra
 
     let handle = mgr.inner.handle();
     let addrs = handle.random_addrs(100);
-    println!("{:?}", addrs);
 
     assert!(
         !listen_multiaddrs.iter().any(|lma| !addrs.contains(&*lma)),

@@ -1,4 +1,4 @@
-use super::PeerMultiaddr;
+use super::{PeerMultiaddr, MAX_RETRY_COUNT};
 
 use std::{
     borrow::{Borrow, Cow},
@@ -253,6 +253,11 @@ impl Peer {
         self.next_attempt.store(next_attempt, Ordering::SeqCst);
     }
 
+    #[cfg(test)]
+    pub fn set_attempt_at(&self, at: u64) {
+        self.attempt_at.store(at, Ordering::SeqCst);
+    }
+
     pub(super) fn set_next_attempt(&self, at: u64) {
         self.next_attempt.store(at, Ordering::SeqCst);
     }
@@ -272,6 +277,10 @@ impl Peer {
 
     pub fn reset_retry(&self) {
         self.retry.store(0, Ordering::SeqCst);
+    }
+
+    pub fn run_out_retry(&self) -> bool {
+        self.retry.load(Ordering::SeqCst) > MAX_RETRY_COUNT
     }
 
     pub fn pubkey_to_chain_addr(pubkey: &PublicKey) -> Result<Address, ErrorKind> {

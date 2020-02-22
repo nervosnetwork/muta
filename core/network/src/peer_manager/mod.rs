@@ -1004,9 +1004,19 @@ impl PeerManager {
                 return;
             }
 
-            // TODO: Remove address that retry many times
             peer.set_connectedness(Connectedness::CanConnect);
             peer.increase_retry();
+
+            if peer.run_out_retry() {
+                // We don't remove bootstrap peer or protected peer
+                if self.bootstraps.contains(&*peer.id)
+                    || self.inner.is_protected_by_chain_addr(&peer.chain_addr)
+                {
+                    peer.reset_retry();
+                } else {
+                    self.inner.remove_peer(&peer.id);
+                }
+            }
         }
     }
 
