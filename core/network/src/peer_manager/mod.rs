@@ -259,6 +259,10 @@ impl Inner {
         self.listen.write().insert(multiaddr);
     }
 
+    pub fn listen_contains(&self, multiaddr: &PeerMultiaddr) -> bool {
+        self.listen.read().contains(multiaddr)
+    }
+
     pub fn listen(&self) -> HashSet<PeerMultiaddr> {
         self.listen.read().clone()
     }
@@ -780,6 +784,13 @@ impl PeerManager {
             Some(Ok(p)) => p,
             _ => return, // Ignore multiaddr without peer id included
         };
+
+        if let Ok(peer_addr) = PeerMultiaddr::try_from(addr.clone()) {
+            if self.inner.listen_contains(&peer_addr) {
+                // Ignore our listen multiaddrs
+                return;
+            }
+        }
 
         let addr: AddrInfo = match addr.try_into() {
             Ok(a) => a,

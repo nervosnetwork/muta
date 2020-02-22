@@ -963,6 +963,31 @@ async fn should_add_multiaddrs_to_unknown_book_on_discover_multi_addrs() {
 }
 
 #[tokio::test]
+async fn should_skip_our_listen_multiaddrs_on_discover_multi_addrs() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+    let self_id = mgr.inner.peer_id.to_owned();
+
+    let inner = mgr.core_inner();
+    let listen_multiaddr = make_peer_multiaddr(2020, self_id.clone());
+
+    inner.add_listen(listen_multiaddr.clone());
+    assert!(
+        inner.listen().contains(&listen_multiaddr),
+        "should contains listen addr"
+    );
+
+    let discover_multi_addrs = PeerManagerEvent::DiscoverMultiAddrs {
+        addrs: vec![make_multiaddr(2020, Some(self_id.clone()))],
+    };
+    mgr.poll_event(discover_multi_addrs).await;
+
+    assert!(
+        mgr.unknown_book().is_empty(),
+        "should not add our listen addr to unknown"
+    );
+}
+
+#[tokio::test]
 async fn should_skip_already_exist_peer_multiaddr_on_discover_multi_addrs() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
     let remote_peers = make_sessions(&mut mgr, 1).await;
