@@ -225,7 +225,7 @@ impl TxCache {
                 tx_count += 1;
                 if tx_count > tx_num_limit {
                     stage = stage.next();
-                    tx_count = 0;
+                    tx_count = 1;
                 }
 
                 match stage {
