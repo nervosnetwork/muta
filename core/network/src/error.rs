@@ -1,7 +1,7 @@
 use std::{error::Error, num::ParseIntError};
 
 use derive_more::Display;
-use tentacle::{ProtocolId, SessionId};
+use tentacle::{multiaddr::Multiaddr, ProtocolId, SessionId};
 
 use protocol::{types::Address, Bytes, ProtocolError, ProtocolErrorKind};
 
@@ -63,6 +63,9 @@ pub enum ErrorKind {
         pubkey: Bytes,
         cause:  Box<dyn Error + Send>,
     },
+
+    #[display(fmt = "kind: peer id not found in {}", _0)]
+    NoPeerIdMultiaddr(Multiaddr),
 }
 
 impl Error for ErrorKind {}

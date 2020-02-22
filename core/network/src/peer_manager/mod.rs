@@ -20,6 +20,7 @@ use std::{
     borrow::Borrow,
     cmp::PartialEq,
     collections::HashSet,
+    convert::TryInto,
     future::Future,
     hash::{Hash, Hasher},
     iter::FromIterator,
@@ -725,14 +726,19 @@ impl PeerManager {
             _ => return, // Ignore multiaddr without peer id included
         };
 
+        let addr: AddrInfo = match addr.try_into() {
+            Ok(a) => a,
+            _ => return, // Already check peer id above
+        };
+
         if let Some(peer) = self.inner.peer(&peer_id) {
             if !peer.contains_multiaddr(&addr) {
                 // Verify this multiaddr by connecting to it, if result in
                 // repeated conection, then we can add it to that peer
-                self.unknown_addrs.insert(addr.into());
+                self.unknown_addrs.insert(addr);
             }
         } else {
-            self.unknown_addrs.insert(addr.into());
+            self.unknown_addrs.insert(addr);
         }
     }
 

@@ -1,5 +1,5 @@
 use super::{
-    addr_info::MAX_ADDR_RETRY, peer::Peer, ArcPeer, Connectedness, Inner, PeerManager,
+    addr_info::MAX_ADDR_RETRY, peer::Peer, AddrInfo, ArcPeer, Connectedness, Inner, PeerManager,
     PeerManagerConfig, ALIVE_RETRY_INTERVAL, MAX_RETRY_COUNT,
 };
 use crate::{
@@ -22,6 +22,8 @@ use tentacle::{
 
 use std::{
     borrow::Cow,
+    collections::HashSet,
+    convert::TryInto,
     future::Future,
     pin::Pin,
     sync::Arc,
@@ -86,6 +88,14 @@ impl MockManager {
 
     pub async fn poll(&mut self) {
         self.await
+    }
+
+    pub fn unknown_book(&self) -> &HashSet<AddrInfo> {
+        &self.inner.unknown_addrs
+    }
+
+    pub fn unknown_book_mut(&mut self) -> &mut HashSet<AddrInfo> {
+        &mut self.inner.unknown_addrs
     }
 
     pub fn core_inner(&self) -> Arc<Inner> {
@@ -345,17 +355,16 @@ async fn should_not_increase_conn_count_for_connecting_peer_on_new_session() {
 }
 
 #[tokio::test]
-async fn should_remove_same_multiaddr_in_unknown_book_on_new_session() {
+async fn should_remove_same_mutiaddr_in_unknown_book_on_new_session() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let test_addr = make_multiaddr(2077, None);
-    mgr.inner.unknown_addrs.insert(test_addr.clone().into());
-    assert_eq!(
-        mgr.inner.unknown_addrs.len(),
-        1,
-        "should have one unknown addr"
-    );
 
     let remote_pubkey = make_pubkey();
+    let test_addr = make_multiaddr(2077, Some(remote_pubkey.peer_id()));
+    mgr.unknown_book_mut()
+        .insert(test_addr.clone().try_into().expect("try into addr info"));
+
+    assert_eq!(mgr.unknown_book().len(), 1, "should have one unknown addr");
+
     let sess_ctx = SessionContext::make(
         SessionId::new(1),
         test_addr,
@@ -373,29 +382,26 @@ async fn should_remove_same_multiaddr_in_unknown_book_on_new_session() {
     let inner = mgr.core_inner();
     assert_eq!(inner.conn_count(), 1, "should have one connection");
     assert_eq!(
-        mgr.inner.unknown_addrs.len(),
+        mgr.unknown_book().len(),
         0,
         "should remove same unknown addr"
     );
 }
 
 #[tokio::test]
-async fn should_remove_mutiaddr_with_id_in_unknown_book_on_new_session() {
+async fn should_remove_same_multiaddr_in_unknown_book_if_ctx_address_doesnt_have_id_on_new_session()
+{
     let (mut mgr, _conn_rx) = make_manager(0, 20);
-
     let remote_pubkey = make_pubkey();
-    let test_addr = make_multiaddr(2077, None);
-    let test_id_addr = make_multiaddr(2077, Some(remote_pubkey.peer_id()));
-    mgr.inner.unknown_addrs.insert(test_id_addr.into());
-    assert_eq!(
-        mgr.inner.unknown_addrs.len(),
-        1,
-        "should have one unknown addr"
-    );
+    let test_addr = make_multiaddr(2077, Some(remote_pubkey.peer_id()));
+    mgr.unknown_book_mut()
+        .insert(test_addr.try_into().expect("try into addr"));
+
+    assert_eq!(mgr.unknown_book().len(), 1, "should have one unknown addr");
 
     let sess_ctx = SessionContext::make(
         SessionId::new(1),
-        test_addr,
+        make_multiaddr(2077, None), // Multiaddr without id in ctx
         SessionType::Outbound,
         remote_pubkey.clone(),
     );
@@ -410,7 +416,7 @@ async fn should_remove_mutiaddr_with_id_in_unknown_book_on_new_session() {
     let inner = mgr.core_inner();
     assert_eq!(inner.conn_count(), 1, "should have one connection");
     assert_eq!(
-        mgr.inner.unknown_addrs.len(),
+        mgr.unknown_book().len(),
         0,
         "should remove same unknown addr"
     );
@@ -494,7 +500,8 @@ async fn should_reject_new_connections_when_we_reach_max_connections_on_new_sess
 
     let remote_pubkey = make_pubkey();
     let remote_addr = make_multiaddr(2077, Some(remote_pubkey.peer_id()));
-    mgr.inner.unknown_addrs.insert(remote_addr.clone().into());
+    mgr.unknown_book_mut()
+        .insert(remote_addr.clone().try_into().expect("try into addr info"));
 
     let sess_ctx = SessionContext::make(
         SessionId::new(99),
@@ -511,11 +518,7 @@ async fn should_reject_new_connections_when_we_reach_max_connections_on_new_sess
 
     let inner = mgr.core_inner();
     assert_eq!(inner.conn_count(), 10, "should not increase conn count");
-    assert_eq!(
-        mgr.inner.unknown_addrs.len(),
-        1,
-        "should not touch unknown addr"
-    );
+    assert_eq!(mgr.unknown_book().len(), 1, "should not touch unknown addr");
 
     let conn_event = conn_rx.next().await.expect("should have disconnect event");
     match conn_event {
@@ -875,7 +878,7 @@ async fn should_add_multiaddrs_to_unknown_book_on_discover_multi_addrs() {
         })
         .collect();
 
-    assert!(mgr.inner.unknown_addrs.is_empty());
+    assert!(mgr.unknown_book().is_empty());
 
     let discover_multi_addrs = PeerManagerEvent::DiscoverMultiAddrs {
         addrs: test_multiaddrs.clone(),
@@ -896,7 +899,7 @@ async fn should_skip_already_exist_peer_multiaddr_on_discover_multi_addrs() {
     let remote_peers = make_sessions(&mut mgr, 1).await;
     let test_peer = remote_peers.first().expect("get first");
 
-    assert!(mgr.inner.unknown_addrs.is_empty());
+    assert!(mgr.unknown_book().is_empty());
 
     let discover_multi_addrs = PeerManagerEvent::DiscoverMultiAddrs {
         addrs: vec![test_peer.multiaddrs().pop().expect("peer multiaddr")],
@@ -904,7 +907,7 @@ async fn should_skip_already_exist_peer_multiaddr_on_discover_multi_addrs() {
     mgr.poll_event(discover_multi_addrs).await;
 
     assert!(
-        mgr.inner.unknown_addrs.is_empty(),
+        mgr.unknown_book().is_empty(),
         "should not add exist peer's multiaddr"
     );
 }
@@ -914,14 +917,14 @@ async fn should_skip_multiaddrs_without_id_included_on_discover_multi_addrs() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
     let test_multiaddr = make_multiaddr(2077, None);
 
-    assert!(mgr.inner.unknown_addrs.is_empty());
+    assert!(mgr.unknown_book().is_empty());
     let discover_multi_addrs = PeerManagerEvent::DiscoverMultiAddrs {
         addrs: vec![test_multiaddr],
     };
     mgr.poll_event(discover_multi_addrs).await;
 
     assert!(
-        mgr.inner.unknown_addrs.is_empty(),
+        mgr.unknown_book().is_empty(),
         "should ignore multiaddr without id included"
     );
 }
@@ -1053,31 +1056,64 @@ async fn should_remove_multiaddr_in_unknown_book_on_repeated_connection() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
     let remote_peers = make_sessions(&mut mgr, 1).await;
     let test_peer = remote_peers.first().expect("get first");
-    let test_multiaddr = make_multiaddr(2077, None);
-    let test_multiaddr_with_id = make_multiaddr(2077, Some(test_peer.owned_id()));
+    let test_multiaddr = make_multiaddr(2077, Some(test_peer.owned_id()));
 
-    mgr.inner
-        .unknown_addrs
-        .insert(test_multiaddr.clone().into());
-    mgr.inner
-        .unknown_addrs
-        .insert(test_multiaddr_with_id.clone().into());
+    let test_unknown_addr = test_multiaddr
+        .clone()
+        .try_into()
+        .expect("try into addr info");
+    mgr.unknown_book_mut().insert(test_unknown_addr);
+
     assert_eq!(
-        mgr.inner.unknown_addrs.len(),
-        2,
-        "should have 2 unknown multiaddrs"
+        mgr.unknown_book().len(),
+        1,
+        "should have 1 unknown multiaddrs"
     );
 
     let repeated_connection = PeerManagerEvent::RepeatedConnection {
         ty:   ConnectionType::Dialer,
         sid:  test_peer.session_id(),
-        addr: test_multiaddr.clone(),
+        addr: test_multiaddr,
     };
     mgr.poll_event(repeated_connection).await;
 
     assert!(
-        mgr.inner.unknown_addrs.is_empty(),
-        "should remove multiaddrs in unknown with/without id included"
+        mgr.unknown_book().is_empty(),
+        "should remove multiaddrs in unknown book"
+    );
+}
+
+#[tokio::test]
+async fn should_remove_multiaddr_in_unknown_book_if_event_multiaddr_doesnt_have_id_on_repeated_connection(
+) {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+    let remote_peers = make_sessions(&mut mgr, 1).await;
+    let test_peer = remote_peers.first().expect("get first");
+    let test_multiaddr = make_multiaddr(2077, None);
+
+    // AddrInfo enforces peer id, no need to insert test_multiaddr which doesn't
+    // include one.
+    let test_unknown_addr = make_multiaddr(2077, Some(test_peer.owned_id()))
+        .try_into()
+        .expect("try info addr info");
+    mgr.unknown_book_mut().insert(test_unknown_addr);
+
+    assert_eq!(
+        mgr.unknown_book().len(),
+        1,
+        "should have 1 unknown multiaddrs"
+    );
+
+    let repeated_connection = PeerManagerEvent::RepeatedConnection {
+        ty:   ConnectionType::Dialer,
+        sid:  test_peer.session_id(),
+        addr: test_multiaddr,
+    };
+    mgr.poll_event(repeated_connection).await;
+
+    assert!(
+        mgr.unknown_book().is_empty(),
+        "should remove multiaddrs in unknown book"
     );
 }
 
@@ -1087,11 +1123,14 @@ async fn should_remove_multiaddr_in_unknown_book_on_unconnectable_multiaddr() {
     let test_peer = make_peer(2077);
     let test_multiaddr = test_peer.multiaddrs().pop().expect("peer multiaddr");
 
-    mgr.inner
-        .unknown_addrs
-        .insert(test_multiaddr.clone().into());
+    mgr.unknown_book_mut().insert(
+        test_multiaddr
+            .clone()
+            .try_into()
+            .expect("try into addr info"),
+    );
     assert_eq!(
-        mgr.inner.unknown_addrs.len(),
+        mgr.unknown_book().len(),
         1,
         "should have 1 multiaddr in unknown book"
     );
@@ -1102,11 +1141,11 @@ async fn should_remove_multiaddr_in_unknown_book_on_unconnectable_multiaddr() {
     };
     mgr.poll_event(unconnectable_multiaddr).await;
 
-    assert!(mgr.inner.unknown_addrs.is_empty());
+    assert!(mgr.unknown_book().is_empty());
 }
 
 #[tokio::test]
-async fn should_remove_peer_multiaddr_and_increase_retry_on_unconnectable_multiaddr() {
+async fn should_remove_peer_multiaddr_and_increase_peer_retry_on_unconnectable_multiaddr() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
     let test_peer = make_peer(2077);
     let test_multiaddr = test_peer.multiaddrs().pop().expect("peer multiaddr");
@@ -1162,11 +1201,14 @@ async fn should_increase_retry_for_multiaddr_in_unknown_on_reconnect_addr_later(
     let test_peer = make_peer(2077);
     let test_multiaddr = test_peer.multiaddrs().pop().expect("peer multiaddr");
 
-    mgr.inner
-        .unknown_addrs
-        .insert(test_multiaddr.clone().into());
+    mgr.unknown_book_mut().insert(
+        test_multiaddr
+            .clone()
+            .try_into()
+            .expect("try into addr info"),
+    );
     assert_eq!(
-        mgr.inner.unknown_addrs.len(),
+        mgr.unknown_book().len(),
         1,
         "should have 1 multiaddr in unknown book"
     );
@@ -1191,9 +1233,12 @@ async fn should_remove_multiaddr_from_unknown_book_when_run_out_retry_on_reconne
     let test_peer = make_peer(2077);
     let test_multiaddr = test_peer.multiaddrs().pop().expect("peer multiaddr");
 
-    mgr.inner
-        .unknown_addrs
-        .insert(test_multiaddr.clone().into());
+    mgr.inner.unknown_addrs.insert(
+        test_multiaddr
+            .clone()
+            .try_into()
+            .expect("try into addr info"),
+    );
     let addr_in_unknown_book = mgr
         .inner
         .unknown_addrs
@@ -1211,7 +1256,7 @@ async fn should_remove_multiaddr_from_unknown_book_when_run_out_retry_on_reconne
 
     assert!(addr_in_unknown_book.run_out_retry(), "should run out retry");
     assert!(
-        mgr.inner.unknown_addrs.is_empty(),
+        mgr.unknown_book().is_empty(),
         "should be remove from unknown book"
     );
 }

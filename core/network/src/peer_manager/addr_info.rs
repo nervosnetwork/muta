@@ -1,5 +1,8 @@
+use crate::{error::ErrorKind, traits::MultiaddrExt};
+
 use std::{
     borrow::Borrow,
+    convert::TryFrom,
     hash::{Hash, Hasher},
     ops::Deref,
     sync::atomic::{AtomicBool, AtomicU64, AtomicU8, Ordering},
@@ -13,6 +16,7 @@ pub const ADDR_BACKOFF_BASE: u64 = 2;
 pub const MAX_ADDR_RETRY: u8 = 8;
 pub const ADDR_TIMEOUT: u64 = 10;
 
+// Note: AddrInfo enforces peer id in multiaddr
 #[derive(Debug, Clone)]
 pub struct AddrInfo {
     addr:         Arc<Multiaddr>,
@@ -23,16 +27,6 @@ pub struct AddrInfo {
 }
 
 impl AddrInfo {
-    pub fn new(addr: Multiaddr) -> Self {
-        AddrInfo {
-            addr:         Arc::new(addr),
-            connecting:   Arc::new(AtomicBool::new(false)),
-            retry:        Arc::new(AtomicU8::new(0)),
-            attempt_at:   Arc::new(AtomicU64::new(0)),
-            next_attempt: Arc::new(AtomicU64::new(0)),
-        }
-    }
-
     pub fn is_connecting(&self) -> bool {
         self.connecting.load(Ordering::SeqCst)
     }
@@ -90,9 +84,23 @@ impl Into<Multiaddr> for AddrInfo {
     }
 }
 
-impl Into<AddrInfo> for Multiaddr {
-    fn into(self) -> AddrInfo {
-        AddrInfo::new(self)
+impl TryFrom<Multiaddr> for AddrInfo {
+    type Error = ErrorKind;
+
+    fn try_from(ma: Multiaddr) -> Result<AddrInfo, Self::Error> {
+        if !ma.has_id() {
+            Err(ErrorKind::NoPeerIdMultiaddr(ma))
+        } else {
+            let ai = AddrInfo {
+                addr:         Arc::new(ma),
+                connecting:   Arc::new(AtomicBool::new(false)),
+                retry:        Arc::new(AtomicU8::new(0)),
+                attempt_at:   Arc::new(AtomicU64::new(0)),
+                next_attempt: Arc::new(AtomicU64::new(0)),
+            };
+
+            Ok(ai)
+        }
     }
 }
 
