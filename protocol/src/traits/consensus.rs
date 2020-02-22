@@ -114,7 +114,7 @@ pub trait CommonConsensusAdapter: Send + Sync {
         timestamp: u64,
     ) -> ProtocolResult<Metadata>;
 
-    fn set_args(&self, _context: Context, timeout_gap: u64, cycles_limit: u64, max_tx_size: u64);
+    fn set_args(&self, context: Context, timeout_gap: u64, cycles_limit: u64, max_tx_size: u64);
 }
 
 #[async_trait]
