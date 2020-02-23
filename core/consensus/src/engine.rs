@@ -206,7 +206,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             Ok(txs) => txs,
             Err(_) => {
                 self.adapter
-                    .load_wal_transactions(ctx.clone(), Hash::digest(block_hash))
+                    .load_wal_transactions(ctx.clone(), Hash::from_bytes(block_hash)?)
                     .await?
             }
         };
