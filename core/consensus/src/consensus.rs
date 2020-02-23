@@ -89,8 +89,6 @@ impl<Adapter: ConsensusAdapter + 'static> OverlordConsensus<Adapter> {
             lock,
         ));
 
-        println!("=======node info {:?}", node_info);
-
         let overlord = Overlord::new(
             node_info.self_address.as_bytes(),
             Arc::clone(&engine),
@@ -160,13 +158,6 @@ pub fn gen_overlord_status(
         .collect::<Vec<_>>();
 
     authority_list.sort();
-    println!(
-        "======={:?}",
-        authority_list
-            .iter()
-            .map(|node| hex::encode(node.address.clone()))
-            .collect::<Vec<_>>()
-    );
 
     Status {
         height,
