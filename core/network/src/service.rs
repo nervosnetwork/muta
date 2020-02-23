@@ -208,7 +208,7 @@ impl NetworkService {
             .ping(config.ping_interval, config.ping_timeout, mgr_tx.clone())
             .identify(ident_callback)
             .discovery(disc_addr_mgr, disc_sync_interval)
-            .transmitter(raw_msg_tx.clone())
+            .transmitters(raw_msg_tx.clone())
             .build();
 
         // Build connection service

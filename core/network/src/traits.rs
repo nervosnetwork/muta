@@ -24,7 +24,7 @@ pub trait NetworkProtocol {
 
     fn metas(self) -> Vec<ProtocolMeta>;
 
-    fn message_proto_id() -> ProtocolId;
+    fn transmitter_id() -> ProtocolId;
 }
 
 #[rustfmt::skip]

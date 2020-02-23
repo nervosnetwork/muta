@@ -102,7 +102,7 @@ where
     B: SessionBook + Send + Sync + Unpin + 'static,
 {
     fn send(&self, tar: TargetSession, msg: Bytes, pri: Priority) -> Result<(), NetworkError> {
-        let proto_id = P::message_proto_id();
+        let proto_id = P::transmitter_id();
 
         let (tar, opt_blocked) = match self.filter_blocked(tar) {
             (None, None) => unreachable!(),
