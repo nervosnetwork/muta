@@ -644,6 +644,14 @@ impl PeerManager {
     fn attach_peer_session(&mut self, pubkey: PublicKey, session: Session) {
         let Session { sid, addr, ty } = session;
 
+        if self.inner.connected.read().len() >= self.config.max_connections {
+            let disconnect_peer = ConnectionEvent::Disconnect(sid);
+            if self.conn_tx.unbounded_send(disconnect_peer).is_err() {
+                debug!("network: connection service exit");
+            }
+            return;
+        }
+
         let connected_addr = ConnectedAddr::from(&addr);
         let user_addr = Peer::pubkey_to_addr(&pubkey).as_hex();
         let pid = pubkey.peer_id();
