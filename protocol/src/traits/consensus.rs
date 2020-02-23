@@ -217,4 +217,7 @@ pub trait ConsensusAdapter: CommonConsensusAdapter + Send + Sync {
         ctx: Context,
         block_hash: Hash,
     ) -> ProtocolResult<Vec<SignedTransaction>>;
+
+    /// Remove full transactions corresponding to the given block hash.
+    async fn remove_wal_transactions(&self, block_hash: Hash) -> ProtocolResult<()>;
 }

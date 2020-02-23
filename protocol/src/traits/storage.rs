@@ -70,6 +70,8 @@ pub trait Storage: Send + Sync {
         &self,
         block_hash: Hash,
     ) -> ProtocolResult<Vec<SignedTransaction>>;
+
+    async fn remove_wal_transactions(&self, block_hash: Hash) -> ProtocolResult<()>;
 }
 
 pub enum StorageBatchModify<S: StorageSchema> {
