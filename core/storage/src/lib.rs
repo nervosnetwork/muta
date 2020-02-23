@@ -110,6 +110,12 @@ macro_rules! get {
     }};
 }
 
+macro_rules! remove {
+    ($self_:ident, $key: expr, $schema: ident) => {{
+        $self_.adapter.remove::<$schema>($key).await
+    }};
+}
+
 #[async_trait]
 impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
     async fn insert_transactions(&self, signed_txs: Vec<SignedTransaction>) -> ProtocolResult<()> {
@@ -248,6 +254,11 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
     ) -> ProtocolResult<Vec<SignedTransaction>> {
         let stxs = get!(self, block_hash, WalTransactionSchema);
         Ok(stxs.inner)
+    }
+
+    async fn remove_wal_transactions(&self, block_hash: Hash) -> ProtocolResult<()> {
+        remove!(self, block_hash, WalTransactionSchema)?;
+        Ok(())
     }
 }
 

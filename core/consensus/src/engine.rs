@@ -1,7 +1,8 @@
+use std::cmp::Eq;
 use std::collections::HashSet;
 use std::error::Error;
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
-use std::{cmp::Eq, sync::Arc};
 
 use async_trait::async_trait;
 use futures::lock::Mutex;
@@ -217,6 +218,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         .await?;
 
         trace_block(&pill.block);
+        let prev_hash = pill.block.header.pre_hash.clone();
         let metadata = self.adapter.get_metadata(
             ctx.clone(),
             pill.block.header.state_root.clone(),
@@ -248,6 +250,16 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             }),
             authority_list: covert_to_overlord_authority(&current_consensus_status.validators),
         };
+
+        let adapter = Arc::clone(&self.adapter);
+        tokio::spawn(async move {
+            if let Err(e) = remove_wal_txs(adapter, prev_hash.clone()).await {
+                error!(
+                    "[storage]: remove wal txs error {:?}, block hash {:?}",
+                    e, prev_hash
+                );
+            }
+        });
 
         Ok(status)
     }
@@ -609,6 +621,13 @@ async fn sync_txs<CA: ConsensusAdapter>(
     propose_hashes: Vec<Hash>,
 ) -> ProtocolResult<()> {
     adapter.sync_txs(ctx, propose_hashes).await
+}
+
+async fn remove_wal_txs<CA: ConsensusAdapter>(
+    adapter: Arc<CA>,
+    block_hash: Hash,
+) -> ProtocolResult<()> {
+    adapter.remove_wal_transactions(block_hash).await
 }
 
 #[cfg(test)]

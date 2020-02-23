@@ -199,6 +199,10 @@ impl Storage for MockStorage {
     ) -> ProtocolResult<Vec<SignedTransaction>> {
         Err(StoreError::GetNone.into())
     }
+
+    async fn remove_wal_transactions(&self, _block_hash: Hash) -> ProtocolResult<()> {
+        Ok(())
+    }
 }
 
 // #####################

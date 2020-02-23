@@ -185,6 +185,10 @@ where
         self.storage.get_wal_transactions(block_hash).await
     }
 
+    async fn remove_wal_transactions(&self, block_hash: Hash) -> ProtocolResult<()> {
+        self.storage.remove_wal_transactions(block_hash).await
+    }
+
     async fn pull_block(&self, ctx: Context, height: u64, end: &str) -> ProtocolResult<Block> {
         log::debug!("consensus: send rpc pull block {}", height);
         let res = self
