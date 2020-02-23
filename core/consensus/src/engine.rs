@@ -252,8 +252,13 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         };
 
         let adapter = Arc::clone(&self.adapter);
-        tokio::spawn(async {
-            let _ = remove_wal_txs(adapter, prev_hash).await;
+        tokio::spawn(async move {
+            if let Err(e) = remove_wal_txs(adapter, prev_hash.clone()).await {
+                error!(
+                    "[storage]: remove wal txs error {:?}, block hash {:?}",
+                    e, prev_hash
+                );
+            }
         });
 
         Ok(status)
