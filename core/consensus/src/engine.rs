@@ -53,7 +53,12 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
 
         let (ordered_tx_hashes, propose_hashes) = self
             .adapter
-            .get_txs_from_mempool(ctx, height, current_consensus_status.cycles_limit)
+            .get_txs_from_mempool(
+                ctx,
+                height,
+                current_consensus_status.cycles_limit,
+                current_consensus_status.tx_num_limit,
+            )
             .await?
             .clap();
 
@@ -543,8 +548,12 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
             .await?;
 
         // update timeout_gap of mempool
-        self.adapter
-            .set_timeout_gap(Context::new(), metadata.timeout_gap);
+        self.adapter.set_args(
+            Context::new(),
+            metadata.timeout_gap,
+            metadata.cycles_limit,
+            metadata.max_tx_size,
+        );
 
         let prev_hash = Hash::digest(block.encode_fixed()?);
         self.status_agent

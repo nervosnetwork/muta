@@ -20,7 +20,12 @@ impl MixedTxHashes {
 pub trait MemPool: Send + Sync {
     async fn insert(&self, ctx: Context, tx: SignedTransaction) -> ProtocolResult<()>;
 
-    async fn package(&self, ctx: Context, cycle_limit: u64) -> ProtocolResult<MixedTxHashes>;
+    async fn package(
+        &self,
+        ctx: Context,
+        cycles_limit: u64,
+        tx_num_limit: u64,
+    ) -> ProtocolResult<MixedTxHashes>;
 
     async fn flush(&self, ctx: Context, tx_hashes: Vec<Hash>) -> ProtocolResult<()>;
 
@@ -42,7 +47,7 @@ pub trait MemPool: Send + Sync {
         propose_tx_hashes: Vec<Hash>,
     ) -> ProtocolResult<()>;
 
-    fn set_timeout_gap(&self, timeout_gap: u64);
+    fn set_args(&self, timeout_gap: u64, cycles_limit: u64, max_tx_size: u64);
 }
 
 #[async_trait]
@@ -63,5 +68,5 @@ pub trait MemPoolAdapter: Send + Sync {
 
     async fn get_latest_height(&self, ctx: Context) -> ProtocolResult<u64>;
 
-    fn set_timeout_gap(&self, timeout_gap: u64);
+    fn set_args(&self, timeout_gap: u64, cycles_limit: u64, max_tx_size: u64);
 }

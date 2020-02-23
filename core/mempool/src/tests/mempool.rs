@@ -17,7 +17,12 @@ macro_rules! insert {
         insert!(inner($valid * 10, 1, $valid, $invalid, $output));
     };
     (inner($pool_size: expr, $repeat: expr, $valid: expr, $invalid: expr, $output: expr)) => {
-        let mempool = Arc::new(new_mempool($pool_size, TIMEOUT_GAP));
+        let mempool = Arc::new(new_mempool(
+            $pool_size,
+            TIMEOUT_GAP,
+            CYCLE_LIMIT,
+            MAX_TX_SIZE,
+        ));
         let txs = mock_txs($valid, $invalid, TIMEOUT);
         for _ in 0..$repeat {
             concurrent_insert(txs.clone(), Arc::clone(&mempool));
@@ -36,9 +41,9 @@ fn test_insert() {
 }
 
 macro_rules! package {
-    (normal($cycle_limit: expr, $insert: expr, $expect_order: expr, $expect_propose: expr)) => {
+    (normal($tx_num_limit: expr, $insert: expr, $expect_order: expr, $expect_propose: expr)) => {
         package!(inner(
-            $cycle_limit,
+            $tx_num_limit,
             TIMEOUT_GAP,
             TIMEOUT,
             $insert,
@@ -49,11 +54,16 @@ macro_rules! package {
     (timeout($timeout_gap: expr, $timeout: expr, $insert: expr, $expect: expr)) => {
         package!(inner($insert, $timeout_gap, $timeout, $insert, $expect, 0));
     };
-    (inner($cycle_limit: expr, $timeout_gap: expr, $timeout: expr, $insert: expr, $expect_order: expr, $expect_propose: expr)) => {
-        let mempool = &Arc::new(new_mempool($insert * 10, $timeout_gap));
+    (inner($tx_num_limit: expr, $timeout_gap: expr, $timeout: expr, $insert: expr, $expect_order: expr, $expect_propose: expr)) => {
+        let mempool = &Arc::new(new_mempool(
+            $insert * 10,
+            $timeout_gap,
+            CYCLE_LIMIT,
+            MAX_TX_SIZE,
+        ));
         let txs = mock_txs($insert, 0, $timeout);
         concurrent_insert(txs.clone(), Arc::clone(mempool));
-        let mixed_tx_hashes = exec_package(Arc::clone(mempool), $cycle_limit);
+        let mixed_tx_hashes = exec_package(Arc::clone(mempool), CYCLE_LIMIT, $tx_num_limit);
         assert_eq!(mixed_tx_hashes.order_tx_hashes.len(), $expect_order);
         assert_eq!(mixed_tx_hashes.propose_tx_hashes.len(), $expect_propose);
     };
@@ -61,15 +71,15 @@ macro_rules! package {
 
 #[test]
 fn test_package() {
-    // 1. pool_size <= cycle_limit
+    // 1. pool_size <= tx_num_limit
     package!(normal(100, 50, 50, 0));
     package!(normal(100, 100, 100, 0));
 
-    // 2. cycle_limit < pool_size <= 2 * cycle_limit
+    // 2. tx_num_limit < pool_size <= 2 * tx_num_limit
     package!(normal(100, 101, 100, 1));
     package!(normal(100, 200, 100, 100));
 
-    // 3. 2 * cycle_limit < pool_size
+    // 3. 2 * tx_num_limit < pool_size
     package!(normal(100, 201, 100, 100));
 
     // 4. current_height >= tx.timeout
@@ -92,14 +102,14 @@ fn test_package_order_consistent_with_insert_order() {
     let txs = &default_mock_txs(100);
     txs.iter()
         .for_each(|signed_tx| exec_insert(signed_tx, Arc::clone(mempool)));
-    let mixed_tx_hashes = exec_package(Arc::clone(mempool), CYCLE_LIMIT);
+    let mixed_tx_hashes = exec_package(Arc::clone(mempool), CYCLE_LIMIT, TX_NUM_LIMIT);
     assert!(check_order_consistant(&mixed_tx_hashes, txs));
 
     // flush partial txs and test order consistency
     let (remove_txs, reserve_txs) = txs.split_at(50);
     let remove_hashes: Vec<Hash> = remove_txs.iter().map(|tx| tx.tx_hash.clone()).collect();
     exec_flush(remove_hashes, Arc::clone(mempool));
-    let mixed_tx_hashes = exec_package(Arc::clone(mempool), CYCLE_LIMIT);
+    let mixed_tx_hashes = exec_package(Arc::clone(mempool), CYCLE_LIMIT, TX_NUM_LIMIT);
     assert!(check_order_consistant(&mixed_tx_hashes, reserve_txs));
 }
 
@@ -124,7 +134,7 @@ fn test_flush() {
     exec_flush(remove_hashes, Arc::clone(&mempool));
     assert_eq!(mempool.get_tx_cache().len(), 432);
     assert_eq!(mempool.get_tx_cache().queue_len(), 432);
-    exec_package(Arc::clone(&mempool), CYCLE_LIMIT);
+    exec_package(Arc::clone(&mempool), CYCLE_LIMIT, TX_NUM_LIMIT);
     assert_eq!(mempool.get_tx_cache().queue_len(), 432);
     assert_eq!(callback_cache.len(), 0);
 
@@ -196,7 +206,7 @@ fn bench_package(b: &mut Bencher) {
     let txs = default_mock_txs(50_000);
     concurrent_insert(txs, Arc::clone(&mempool));
     b.iter(|| {
-        exec_package(Arc::clone(&mempool), CYCLE_LIMIT);
+        exec_package(Arc::clone(&mempool), CYCLE_LIMIT, TX_NUM_LIMIT);
     });
 }
 
@@ -208,7 +218,7 @@ fn bench_flush(b: &mut Bencher) {
     b.iter(|| {
         concurrent_insert(txs.clone(), Arc::clone(mempool));
         exec_flush(remove_hashes.clone(), Arc::clone(mempool));
-        exec_package(Arc::clone(mempool), CYCLE_LIMIT);
+        exec_package(Arc::clone(mempool), CYCLE_LIMIT, TX_NUM_LIMIT);
     });
 }
 

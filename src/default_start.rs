@@ -209,8 +209,12 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
 
     let metadata: Metadata = serde_json::from_str(&exec_resp.ret).expect("Decode metadata failed!");
 
-    // set timeout_gap in mempool
-    mempool.set_timeout_gap(metadata.timeout_gap);
+    // set args in mempool
+    mempool.set_args(
+        metadata.timeout_gap,
+        metadata.cycles_limit,
+        metadata.max_tx_size,
+    );
 
     // register broadcast new transaction
     network_service.register_endpoint_handler(
@@ -266,6 +270,8 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
             prevote_ratio:      metadata.prevote_ratio,
             precommit_ratio:    metadata.precommit_ratio,
             brake_ratio:        metadata.brake_ratio,
+            tx_num_limit:       metadata.tx_num_limit,
+            max_tx_size:        metadata.max_tx_size,
         }
     } else {
         let wal_info = storage.load_muta_wal().await.expect("Load muta wal error");

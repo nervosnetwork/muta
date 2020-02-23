@@ -70,8 +70,9 @@ where
         ctx: Context,
         _height: u64,
         cycle_limit: u64,
+        tx_num_limit: u64,
     ) -> ProtocolResult<MixedTxHashes> {
-        self.mempool.package(ctx, cycle_limit).await
+        self.mempool.package(ctx, cycle_limit, tx_num_limit).await
     }
 
     async fn check_txs(&self, ctx: Context, check_txs: Vec<Hash>) -> ProtocolResult<()> {
@@ -419,8 +420,9 @@ where
         Ok(serde_json::from_str(&exec_resp.ret).expect("Decode metadata failed!"))
     }
 
-    fn set_timeout_gap(&self, _context: Context, timeout_gap: u64) {
-        self.mempool.set_timeout_gap(timeout_gap);
+    fn set_args(&self, _context: Context, timeout_gap: u64, cycles_limit: u64, max_tx_size: u64) {
+        self.mempool
+            .set_args(timeout_gap, cycles_limit, max_tx_size);
     }
 }
 

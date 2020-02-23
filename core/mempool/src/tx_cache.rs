@@ -179,7 +179,8 @@ impl TxCache {
 
     pub fn package(
         &self,
-        cycle_limit: u64,
+        _cycles_limit: u64,
+        tx_num_limit: u64,
         current_height: u64,
         timeout: u64,
     ) -> ProtocolResult<MixedTxHashes> {
@@ -189,7 +190,7 @@ impl TxCache {
         let mut propose_tx_hashes = Vec::new();
         let mut timeout_tx_hashes = Vec::new();
 
-        let mut cycle_count: u64 = 0;
+        let mut tx_count: u64 = 0;
         let mut stage = Stage::OrderTxs;
 
         loop {
@@ -221,12 +222,10 @@ impl TxCache {
                 {
                     continue;
                 }
-                // Accumulate cycles. The order_tx_hashes and the propose_tx_hashes both collect
-                // transactions under cycle limit.
-                cycle_count += shared_tx.tx.raw.cycles_limit;
-                if cycle_count > cycle_limit {
+                tx_count += 1;
+                if tx_count > tx_num_limit {
                     stage = stage.next();
-                    cycle_count = shared_tx.tx.raw.cycles_limit;
+                    tx_count = 1;
                 }
 
                 match stage {
@@ -422,6 +421,7 @@ mod tests {
     const BYTES_LEN: usize = 10;
     const TX_NUM: usize = 1000;
     const TX_CYCLE: u64 = 1;
+    const TX_NUM_LIMIT: u64 = 20000;
     const CYCLE_LIMIT: u64 = 500;
     const CURRENT_H: u64 = 100;
     const TIMEOUT: u64 = 150;
@@ -490,7 +490,7 @@ mod tests {
         let tx_cache_clone = Arc::<TxCache>::clone(tx_cache);
         thread::spawn(move || {
             tx_cache_clone
-                .package(CYCLE_LIMIT, CURRENT_H, TIMEOUT)
+                .package(CYCLE_LIMIT, TX_NUM_LIMIT, CURRENT_H, TIMEOUT)
                 .unwrap();
         })
     }
@@ -590,7 +590,9 @@ mod tests {
         let tx_cache = TxCache::new(POOL_SIZE);
         concurrent_insert(txs, &tx_cache);
         b.iter(|| {
-            let mixed_tx_hashes = tx_cache.package(CYCLE_LIMIT, CURRENT_H, TIMEOUT).unwrap();
+            let mixed_tx_hashes = tx_cache
+                .package(TX_NUM_LIMIT, CYCLE_LIMIT, CURRENT_H, TIMEOUT)
+                .unwrap();
             assert_eq!(
                 mixed_tx_hashes.order_tx_hashes.len(),
                 (CYCLE_LIMIT / TX_CYCLE) as usize

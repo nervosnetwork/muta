@@ -20,7 +20,7 @@ payload = '''
     "chain_id": "b6a4d7da21443f5e816e8700eea87610e6d769657d6b8ec73028457bf2ca4036",
     "common_ref": "703873635a6b51513451",
     "timeout_gap": 20,
-    "cycles_limit": 999999999999,
+    "cycles_limit": 1000000,
     "cycles_price": 1,
     "interval": 3000,
     "verifier_list": [
@@ -34,6 +34,8 @@ payload = '''
     "propose_ratio": 15,
     "prevote_ratio": 10,
     "precommit_ratio": 10,
-    "brake_ratio": 7
+    "brake_ratio": 7,
+    "tx_num_limit": 20000,
+    "max_tx_size": 1024
 }
 '''

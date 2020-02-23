@@ -194,8 +194,12 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
             block.header.timestamp,
         )?;
 
-        self.adapter
-            .set_timeout_gap(ctx.clone(), metadata.timeout_gap);
+        self.adapter.set_args(
+            ctx.clone(),
+            metadata.timeout_gap,
+            metadata.cycles_limit,
+            metadata.max_tx_size,
+        );
 
         status_agent.update_after_sync_commit(
             block.header.height,
@@ -327,6 +331,8 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
             prevote_ratio:      current_status.prevote_ratio,
             precommit_ratio:    current_status.precommit_ratio,
             brake_ratio:        current_status.brake_ratio,
+            tx_num_limit:       current_status.tx_num_limit,
+            max_tx_size:        current_status.max_tx_size,
             prev_hash:          block.header.pre_hash.clone(),
             height:             block.header.height,
             exec_height:        block.header.exec_height,

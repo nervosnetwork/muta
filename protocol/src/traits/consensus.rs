@@ -114,8 +114,7 @@ pub trait CommonConsensusAdapter: Send + Sync {
         timestamp: u64,
     ) -> ProtocolResult<Metadata>;
 
-    /// Set timeout_gap in mempool.
-    fn set_timeout_gap(&self, context: Context, timeout_gap: u64);
+    fn set_args(&self, context: Context, timeout_gap: u64, cycles_limit: u64, max_tx_size: u64);
 }
 
 #[async_trait]
@@ -128,6 +127,7 @@ pub trait ConsensusAdapter: CommonConsensusAdapter + Send + Sync {
         ctx: Context,
         height: u64,
         cycle_limit: u64,
+        tx_num_limit: u64,
     ) -> ProtocolResult<MixedTxHashes>;
 
     /// Check the correctness of the given transactions.
