@@ -16,7 +16,7 @@ use crate::status::{CurrentConsensusStatus, StatusAgent, UpdateInfo};
 use crate::ConsensusError;
 
 const POLLING_BROADCAST: u64 = 2000;
-const WAIT_EXECUTION: u64 = 1000;
+const WAIT_EXECUTION: u64 = 200;
 
 #[derive(Clone, Debug)]
 pub struct RichBlock {
