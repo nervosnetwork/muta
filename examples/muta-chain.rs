@@ -50,8 +50,7 @@ async fn main() {
     let builer = builder.service_mapping(DefaultServiceMapping {});
 
     let muta = builer.build().unwrap();
-
-    muta.run().await.unwrap()
+    muta.run().await.unwrap();
 }
 
 #[derive(Debug, Display, From)]

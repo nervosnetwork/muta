@@ -90,11 +90,10 @@ impl<Mapping: 'static + ServiceMapping> Muta<Mapping> {
             self.config.logger.modules_level.clone(),
         );
 
-        self.create_genesis().await?;
+        // run muta
+        self.create_genesis().await.unwrap();
 
-        start(self.config, Arc::clone(&self.service_mapping)).await?;
-
-        Ok(())
+        start(self.config, Arc::clone(&self.service_mapping)).await
     }
 
     async fn create_genesis(&self) -> ProtocolResult<Block> {
@@ -126,6 +125,9 @@ pub enum MainError {
 
     #[display(fmt = "{:?}", _0)]
     Utf8(std::str::Utf8Error),
+
+    #[display(fmt = "other error {:?}", _0)]
+    Other(String),
 }
 
 impl std::error::Error for MainError {}

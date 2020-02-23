@@ -378,16 +378,6 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
 
     // Run network
     tokio::spawn(network_service);
-
-    // Init graphql
-    let mut graphql_config = GraphQLConfig::default();
-    graphql_config.listening_address = config.graphql.listening_address;
-    graphql_config.graphql_uri = config.graphql.graphql_uri.clone();
-    graphql_config.graphiql_uri = config.graphql.graphiql_uri.clone();
-
-    // Run GraphQL server
-    tokio::spawn(core_api::start_graphql(graphql_config, api_adapter));
-
     // Run sync
     tokio::spawn(async move {
         if let Err(e) = synchronization.polling_broadcast().await {
@@ -421,7 +411,34 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         }
     });
 
-    // Run execute demon
-    futures::executor::block_on(exec_demon.run());
-    Ok(())
+    tokio::spawn(async move {
+        futures::executor::block_on(exec_demon.run());
+    });
+
+    // Init graphql
+    let mut graphql_config = GraphQLConfig::default();
+    graphql_config.listening_address = config.graphql.listening_address;
+    graphql_config.graphql_uri = config.graphql.graphql_uri.clone();
+    graphql_config.graphiql_uri = config.graphql.graphiql_uri.clone();
+    if config.graphql.workers != 0 {
+        graphql_config.workers = config.graphql.workers;
+    }
+    if config.graphql.maxconn != 0 {
+        graphql_config.maxconn = config.graphql.maxconn;
+    }
+
+    let actix_handle = std::thread::spawn(move || {
+        // Run GraphQL server
+        actix_rt::System::new("muta-graphql").block_on(async move {
+            core_api::start_graphql(graphql_config, api_adapter).await;
+        });
+    });
+
+    match actix_handle.join() {
+        Ok(()) => std::process::exit(0),
+        Err(e) => {
+            log::error!("[muta]: process exit {:?}", e);
+            std::process::exit(1);
+        }
+    };
 }
