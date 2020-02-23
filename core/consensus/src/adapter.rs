@@ -503,7 +503,7 @@ where
         current_height: u64,
     ) -> ProtocolResult<()> {
         for (height, info) in queue.inner.into_iter() {
-            if height > current_height {
+            if height >= current_height {
                 break;
             }
 
