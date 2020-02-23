@@ -117,7 +117,7 @@ impl CurrentConsensusStatus {
         if info.exec_height <= self.exec_height {
             return;
         }
-        
+
         info!("update_after_exec info {}", info);
         info!("update_after_exec cache: {}", self);
         trace_after_exec(&info);

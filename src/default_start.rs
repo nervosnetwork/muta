@@ -32,9 +32,7 @@ use core_network::{NetworkConfig, NetworkService};
 use core_storage::{adapter::rocks::RocksAdapter, ImplStorage};
 use framework::binding::state::RocksTrieDB;
 use framework::executor::{ServiceExecutor, ServiceExecutorFactory};
-use protocol::traits::{
-    APIAdapter, Context, MemPool, MessageCodec, NodeInfo, ServiceMapping, Storage,
-};
+use protocol::traits::{APIAdapter, Context, MemPool, NodeInfo, ServiceMapping, Storage};
 use protocol::types::{Address, Block, BlockHeader, Genesis, Hash, Metadata, Proof, Validator};
 use protocol::{fixed_codec::FixedCodec, ProtocolResult};
 
@@ -272,10 +270,6 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         max_tx_size:        metadata.max_tx_size,
         tx_num_limit:       metadata.tx_num_limit,
     };
-    // else {
-    //     let wal_info = storage.load_muta_wal().await.expect("Load muta wal
-    // error");     MessageCodec::decode(wal_info).await?
-    // };
 
     let consensus_interval = current_consensus_status.consensus_interval;
     let status_agent = StatusAgent::new(current_consensus_status);

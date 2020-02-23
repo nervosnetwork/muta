@@ -497,12 +497,16 @@ where
         Ok(())
     }
 
-    async fn init_exec_queue(&self, queue: WalInfoQueue, current_height: u64) -> ProtocolResult<()> {
+    async fn init_exec_queue(
+        &self,
+        queue: WalInfoQueue,
+        current_height: u64,
+    ) -> ProtocolResult<()> {
         for (height, info) in queue.inner.into_iter() {
             if height > current_height {
                 break;
             }
-            
+
             let txs = self
                 .load_wal_transactions(Context::new(), info.block_hash.clone())
                 .await?;
