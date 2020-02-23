@@ -1,0 +1,33 @@
+data_path = "./devtools/chain/data/4"
+privkey = "8e065679aa8b1185406c7514343073cd8c1695218925c9b2d5e98c3483d71d81"
+
+[network]
+listening_address = "0.0.0.0:1340"
+rpc_timeout = 10
+
+[[network.bootstraps]]
+pubkey = "02fa3a27712962a70e3e474363f38661f6a9e56f9cc91efd0d343713d51f3fa355"
+address = "localhost:1337" # Replace it with your IP
+
+[graphql]
+graphiql_uri = "/graphiql"
+listening_address = "0.0.0.0:8004"
+graphql_uri = "/graphql"
+workers = 0 # if 0, uses number of available logical cpu as threads count.
+maxconn = 25000
+
+[executor]
+light = false
+
+[mempool]
+broadcast_txs_size = 200
+broadcast_txs_interval = 200
+pool_size = 200000
+
+[logger]
+metrics = false
+log_path = "./devtools/chain/logs/4"
+log_to_console = true
+filter = "info"
+log_to_file = true
+console_show_file_and_line = false

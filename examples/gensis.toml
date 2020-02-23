@@ -1,0 +1,57 @@
+timestamp = 0
+prevhash = "44915be5b6c20b0678cf05fcddbbaa832e25d7e6ac538784cd5c24de00d47472"
+
+[[services]]
+name = "asset"
+payload = '''
+{
+    "id": "f56924db538e77bb5951eb5ff0d02b88983c49c45eea30e8ae3e7234b311436c",
+    "name": "MutaToken",
+    "symbol": "MT",
+    "supply": 320000011,
+    "issuer": "f8389d774afdad8755ef8e629e5a154fddc6325a"
+}
+'''
+
+[[services]]
+name = "metadata"
+payload = '''
+{
+    "chain_id": "b6a4d7da21443f5e816e8700eea87610e6d769657d6b8ec73028457bf2ca4036",
+    "common_ref": "7446645045376b553041",
+    "timeout_gap": 20,
+    "cycles_limit": 999999999999,
+    "cycles_price": 1,
+    "interval": 3000,
+    "verifier_list": [
+        {
+            "bls_pub_key": "040386a8ac1cce6fd90c31effa628bc8513cbd625c752ca76ade6ff37b97edbdfb97d94caeddd261d9e2fd6b5456aecc100ea730ddee3c94f040a54152ded330a4e409f39bfbc34b286536790fef8bbaf734431679ba6a8d5d6994e557e82306df",
+            "address": "12d8baf8c4efb32a7983efac2d8535fe57deb756",
+            "propose_weight": 1,
+            "vote_weight": 1
+        },
+        {
+            "bls_pub_key": "040e7b00b59d37d4d735041ea1b69a55cd7fd80e920b5d70d85d051af6b847c3aec5b412b128f85ad8b4c6bac0561105a80fa8dd5f60cd42c3a2da0fd0b946fa3d761b1d21c569e0958b847da22dec14a132121027006df8c5d4ccf7caf8535f70",
+            "address": "a55e1261a73116c755291140e427caa0cbb5309e",
+            "propose_weight": 1,
+            "vote_weight": 1
+        },
+        {
+            "bls_pub_key": "0413584a15f1dec552bb12233bf73a886ed49a3f56c68eda080743577005417635c9ac72a528a961a0e14a2df3a50a5c660641f446f629788486d7935d4ad4918035ce884a98bbaaa4c96307a2428729cba694329a693ce60c02e13b039c6a8978",
+            "address": "78ef0eff2fb9f569d86d75d22b69ea8407f6f092",
+            "propose_weight": 1,
+            "vote_weight": 1
+        },
+        {
+            "bls_pub_key": "041611b7da94a7fb7a8ff1c802bbf61da689f8d6f974d99466adeb1f47bcaff70470b6f279763abeb0cec5565abcfcb4ce13e79b8c310f0d1b26605b61ac2c04e0efcedbae18e763a86adb7a0e8ed0fcb1dc11fded12583972403815a7aa3dc300",
+            "address": "103252cad4e0380fe57a0c73f549f1ee2c9ea8e8",
+            "propose_weight": 1,
+            "vote_weight": 1
+        }
+    ],
+    "propose_ratio": 15,
+    "prevote_ratio": 10,
+    "precommit_ratio": 10,
+    "brake_ratio": 7
+}
+'''
