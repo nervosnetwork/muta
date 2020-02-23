@@ -433,18 +433,26 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         graphql_config.maxconn = config.graphql.maxconn;
     }
 
-    let actix_handle = std::thread::spawn(move || {
-        // Run GraphQL server
-        actix_rt::System::new("muta-graphql").block_on(async move {
-            core_api::start_graphql(graphql_config, api_adapter).await;
-        });
+    let local = tokio::task::LocalSet::new();
+    let actix_rt = actix_rt::System::run_in_tokio("muta-graphql", &local);
+    tokio::spawn(async move {
+        actix_rt.await.unwrap();
     });
 
-    match actix_handle.join() {
-        Ok(()) => std::process::exit(0),
-        Err(e) => {
-            log::error!("[muta]: process exit {:?}", e);
-            std::process::exit(1);
-        }
-    };
+    core_api::start_graphql(graphql_config, api_adapter).await;
+    Ok(())
+    // let actix_handle = std::thread::spawn(move || {
+    //     // Run GraphQL server
+    //     actix_rt::System::new("muta-graphql").block_on(async move {
+    //         core_api::start_graphql(graphql_config, api_adapter).await;
+    //     });
+    // });
+    //
+    // match actix_handle.join() {
+    //     Ok(()) => std::process::exit(0),
+    //     Err(e) => {
+    //         log::error!("[muta]: process exit {:?}", e);
+    //         std::process::exit(1);
+    //     }
+    // };
 }
