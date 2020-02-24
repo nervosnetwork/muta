@@ -114,6 +114,10 @@ pub struct CurrentConsensusStatus {
 
 impl CurrentConsensusStatus {
     pub fn update_after_exec(&mut self, info: UpdateInfo) {
+        if info.exec_height <= self.exec_height {
+            return;
+        }
+
         info!("update_after_exec info {}", info);
         info!("update_after_exec cache: {}", self);
         trace_after_exec(&info);

@@ -448,6 +448,7 @@ where
     ) -> ProtocolResult<Self> {
         let (exec_queue, rx) = channel(OVERLORD_GAP);
         let exec_queue_wal = Arc::new(RwLock::new(WalInfoQueue::new()));
+        let current_height = status_agent.to_inner().height;
         let exec_demons = Some(ExecDemons::new(
             Arc::clone(&storage),
             Arc::clone(&trie_db),
@@ -470,7 +471,7 @@ where
             exec_demons,
         };
 
-        block_on(adapter.init_exec_queue(queue_wal))?;
+        block_on(adapter.init_exec_queue(queue_wal, current_height))?;
         Ok(adapter)
     }
 
@@ -496,8 +497,16 @@ where
         Ok(())
     }
 
-    async fn init_exec_queue(&self, queue: WalInfoQueue) -> ProtocolResult<()> {
-        for (_id, info) in queue.inner.into_iter() {
+    async fn init_exec_queue(
+        &self,
+        queue: WalInfoQueue,
+        current_height: u64,
+    ) -> ProtocolResult<()> {
+        for (height, info) in queue.inner.into_iter() {
+            if height >= current_height {
+                break;
+            }
+
             let txs = self
                 .load_wal_transactions(Context::new(), info.block_hash.clone())
                 .await?;

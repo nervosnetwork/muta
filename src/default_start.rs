@@ -32,9 +32,7 @@ use core_network::{NetworkConfig, NetworkService};
 use core_storage::{adapter::rocks::RocksAdapter, ImplStorage};
 use framework::binding::state::RocksTrieDB;
 use framework::executor::{ServiceExecutor, ServiceExecutorFactory};
-use protocol::traits::{
-    APIAdapter, Context, MemPool, MessageCodec, NodeInfo, ServiceMapping, Storage,
-};
+use protocol::traits::{APIAdapter, Context, MemPool, NodeInfo, ServiceMapping, Storage};
 use protocol::types::{Address, Block, BlockHeader, Genesis, Hash, Metadata, Proof, Validator};
 use protocol::{fixed_codec::FixedCodec, ProtocolResult};
 
@@ -250,32 +248,27 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     let current_header = &current_block.header;
     let prevhash = Hash::digest(current_block.encode_fixed()?);
 
-    let current_consensus_status = if current_header.height == 0 {
-        CurrentConsensusStatus {
-            cycles_price:       metadata.cycles_price,
-            cycles_limit:       metadata.cycles_limit,
-            height:             current_block.header.height + 1,
-            exec_height:        current_block.header.height,
-            prev_hash:          prevhash,
-            latest_state_root:  current_header.state_root.clone(),
-            logs_bloom:         vec![],
-            confirm_root:       vec![],
-            state_root:         vec![current_header.state_root.clone()],
-            receipt_root:       vec![],
-            cycles_used:        vec![],
-            proof:              current_header.proof.clone(),
-            validators:         validators.clone(),
-            consensus_interval: metadata.interval,
-            propose_ratio:      metadata.propose_ratio,
-            prevote_ratio:      metadata.prevote_ratio,
-            precommit_ratio:    metadata.precommit_ratio,
-            brake_ratio:        metadata.brake_ratio,
-            tx_num_limit:       metadata.tx_num_limit,
-            max_tx_size:        metadata.max_tx_size,
-        }
-    } else {
-        let wal_info = storage.load_muta_wal().await.expect("Load muta wal error");
-        MessageCodec::decode(wal_info).await?
+    let current_consensus_status = CurrentConsensusStatus {
+        cycles_price:       metadata.cycles_price,
+        cycles_limit:       metadata.cycles_limit,
+        height:             current_block.header.height + 1,
+        exec_height:        current_block.header.height,
+        prev_hash:          prevhash,
+        latest_state_root:  current_header.state_root.clone(),
+        logs_bloom:         vec![],
+        confirm_root:       vec![],
+        state_root:         vec![current_header.state_root.clone()],
+        receipt_root:       vec![],
+        cycles_used:        vec![],
+        proof:              current_header.proof.clone(),
+        validators:         validators.clone(),
+        consensus_interval: metadata.interval,
+        propose_ratio:      metadata.propose_ratio,
+        prevote_ratio:      metadata.prevote_ratio,
+        precommit_ratio:    metadata.precommit_ratio,
+        brake_ratio:        metadata.brake_ratio,
+        max_tx_size:        metadata.max_tx_size,
+        tx_num_limit:       metadata.tx_num_limit,
     };
 
     let consensus_interval = current_consensus_status.consensus_interval;
