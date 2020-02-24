@@ -2,7 +2,7 @@ pub mod adapter;
 pub mod config;
 mod schema;
 
-use actix_web::{web, App, Error, HttpResponse, HttpServer};
+use actix_web::{web, App, Error, FromRequest, HttpResponse, HttpServer};
 use futures::executor::block_on;
 use juniper::http::GraphQLRequest;
 use juniper::FieldResult;
@@ -224,6 +224,7 @@ pub async fn start_graphql<Adapter: APIAdapter + 'static>(cfg: GraphQLConfig, ad
     HttpServer::new(move || {
         App::new()
             .data(state.clone())
+            .data(String::configure(|cfg| cfg.limit(1024 * 1024 * 1024)))
             .service(web::resource(&path_graphql_uri).route(web::post().to(graphql)))
             .service(web::resource(&path_graphiql_uri).route(web::get().to(graphiql)))
     })
