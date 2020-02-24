@@ -5,6 +5,7 @@ mod default_start;
 
 use std::fs;
 use std::sync::Arc;
+use std::time::Duration;
 
 use derive_more::{Display, From};
 
@@ -64,6 +65,12 @@ impl<Mapping: 'static + ServiceMapping> MutaBuilder<Mapping> {
     }
 }
 
+#[derive(Debug, Display)]
+#[display(fmt = "exit timeout {}s", "_0.as_secs()")]
+struct ExitTimeout(Duration);
+
+impl std::error::Error for ExitTimeout {}
+
 pub struct Muta<Mapping: ServiceMapping> {
     config:          Config,
     genesis:         Genesis,
@@ -91,9 +98,15 @@ impl<Mapping: 'static + ServiceMapping> Muta<Mapping> {
         );
 
         // run muta
-        self.create_genesis().await.unwrap();
+        let mut rt = tokio::runtime::Runtime::new().expect("new tokio runtime");
+        let local = tokio::task::LocalSet::new();
+        local.block_on(&mut rt, async move {
+            self.create_genesis().await?;
 
-        start(self.config, Arc::clone(&self.service_mapping)).await
+            start(self.config, Arc::clone(&self.service_mapping)).await
+        })?;
+
+        Ok(())
     }
 
     async fn create_genesis(&self) -> ProtocolResult<Block> {

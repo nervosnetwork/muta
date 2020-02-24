@@ -3,7 +3,7 @@ use std::convert::TryFrom;
 use std::sync::Arc;
 
 use bytes::Bytes;
-use futures::lock::Mutex;
+use futures::{future, lock::Mutex};
 
 use common_crypto::{
     BlsCommonReference, BlsPrivateKey, BlsPublicKey, PublicKey, Secp256k1, Secp256k1PrivateKey,
@@ -377,6 +377,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
 
     // Run network
     tokio::spawn(network_service);
+
     // Run sync
     tokio::spawn(async move {
         if let Err(e) = synchronization.polling_broadcast().await {
@@ -410,9 +411,8 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         }
     });
 
-    tokio::spawn(async move {
-        futures::executor::block_on(exec_demon.run());
-    });
+    let (abortable_demon, abort_handle) = future::abortable(exec_demon.run());
+    tokio::task::spawn_local(abortable_demon);
 
     // Init graphql
     let mut graphql_config = GraphQLConfig::default();
@@ -434,6 +434,10 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         core_api::start_graphql(graphql_config, api_adapter).await;
     });
 
-    core_api::start_graphql(graphql_config, api_adapter).await;
+    // Io error, just process shutdown
+    let _ = tokio::signal::ctrl_c().await;
+    // Abort consensus
+    abort_handle.abort();
+
     Ok(())
 }
