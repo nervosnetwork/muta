@@ -1851,3 +1851,39 @@ async fn should_remove_expired_peers_in_whitelist() {
         "should remove expired peers in whitelist"
     );
 }
+
+#[tokio::test]
+async fn should_include_both_connecting_and_connected_as_conn_count() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+    let _remote_peers = make_sessions(&mut mgr, 5).await; // 5 connected peers
+
+    let inner = mgr.core_inner();
+    assert_eq!(inner.conn_count(), 5, "should have 5 connected peers");
+
+    // Register peers
+    let peers = (0..5)
+        .map(|port| make_peer(port + 5000))
+        .collect::<Vec<_>>();
+    for peer in peers.iter() {
+        inner.add_peer(peer.clone());
+    }
+    assert!(
+        !peers
+            .iter()
+            .any(|p| p.connectedness() != Connectedness::CanConnect),
+        "should all be CanConnect"
+    );
+
+    mgr.poll().await;
+    assert_eq!(
+        inner.conn_count(),
+        10,
+        "should have 10 conn now (connected and connecting)"
+    );
+    assert!(
+        !peers
+            .iter()
+            .any(|p| p.connectedness() != Connectedness::Connecting),
+        "should all be Connecting"
+    );
+}
