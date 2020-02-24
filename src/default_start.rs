@@ -194,16 +194,18 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         Arc::clone(&service_mapping),
     );
 
-    let exec_resp = futures::executor::block_on(api_adapter.query_service(
-        Context::new(),
-        current_block.header.height,
-        u64::max_value(),
-        1,
-        my_address.clone(),
-        "metadata".to_string(),
-        "get_metadata".to_string(),
-        "".to_string(),
-    ))?;
+    let exec_resp = api_adapter
+        .query_service(
+            Context::new(),
+            current_block.header.height,
+            u64::max_value(),
+            1,
+            my_address.clone(),
+            "metadata".to_string(),
+            "get_metadata".to_string(),
+            "".to_string(),
+        )
+        .await?;
 
     let metadata: Metadata = serde_json::from_str(&exec_resp.ret).expect("Decode metadata failed!");
 

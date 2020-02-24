@@ -5,7 +5,6 @@ mod default_start;
 
 use std::fs;
 use std::sync::Arc;
-use std::time::Duration;
 
 use derive_more::{Display, From};
 
@@ -65,12 +64,6 @@ impl<Mapping: 'static + ServiceMapping> MutaBuilder<Mapping> {
     }
 }
 
-#[derive(Debug, Display)]
-#[display(fmt = "exit timeout {}s", "_0.as_secs()")]
-struct ExitTimeout(Duration);
-
-impl std::error::Error for ExitTimeout {}
-
 pub struct Muta<Mapping: ServiceMapping> {
     config:          Config,
     genesis:         Genesis,
@@ -86,7 +79,7 @@ impl<Mapping: 'static + ServiceMapping> Muta<Mapping> {
         }
     }
 
-    pub async fn run(self) -> ProtocolResult<()> {
+    pub fn run(self) -> ProtocolResult<()> {
         common_logger::init(
             self.config.logger.filter.clone(),
             self.config.logger.log_to_console,
