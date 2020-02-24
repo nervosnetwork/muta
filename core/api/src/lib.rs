@@ -224,8 +224,11 @@ pub async fn start_graphql<Adapter: APIAdapter + 'static>(cfg: GraphQLConfig, ad
     HttpServer::new(move || {
         App::new()
             .data(state.clone())
-            .data(String::configure(|cfg| cfg.limit(1024 * 1024 * 1024)))
-            .service(web::resource(&path_graphql_uri).route(web::post().to(graphql)))
+            .service(
+                web::resource(&path_graphql_uri)
+                    .route(web::post().to(graphql))
+                    .data(String::configure(|cfg| cfg.limit(1024 * 1024 * 1024))),
+            )
             .service(web::resource(&path_graphiql_uri).route(web::get().to(graphiql)))
     })
     .workers(wokers)
