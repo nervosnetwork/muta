@@ -426,10 +426,12 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         graphql_config.maxconn = config.graphql.maxconn;
     }
 
-    let local = tokio::task::LocalSet::new();
-    let actix_rt = actix_rt::System::run_in_tokio("muta-graphql", &local);
-    tokio::spawn(async move {
-        actix_rt.await.unwrap();
+    tokio::task::spawn_local(async move {
+        let local = tokio::task::LocalSet::new();
+        let actix_rt = actix_rt::System::run_in_tokio("muta-graphql", &local);
+        tokio::task::spawn_local(actix_rt);
+
+        core_api::start_graphql(graphql_config, api_adapter).await;
     });
 
     core_api::start_graphql(graphql_config, api_adapter).await;
