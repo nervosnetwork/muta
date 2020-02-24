@@ -11,6 +11,7 @@ listening_address = "0.0.0.0:8000"
 graphql_uri = "/graphql"
 workers = 0 # if 0, uses number of available logical cpu as threads count.
 maxconn = 25000
+max_payload_size = 1048576
 
 [executor]
 light = false
