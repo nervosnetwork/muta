@@ -15,6 +15,11 @@ pub struct GraphQLConfig {
     // All socket listeners will stop accepting connections when this limit is reached for each
     // worker. By default max connections is set to a 25k.
     pub maxconn: usize,
+
+    // Set the max payload size of graphql interface.
+    // It is used to prevent DOS attacking through memory exhaustion.
+    // The default value is 1024 * 1024, which is 1MB.
+    pub max_payload_size: usize,
 }
 
 impl Default for GraphQLConfig {
@@ -24,10 +29,11 @@ impl Default for GraphQLConfig {
                 .parse()
                 .expect("Unable to parse socket address"),
 
-            graphql_uri:  "/graphql".to_owned(),
-            graphiql_uri: "/graphiql".to_owned(),
-            workers:      num_cpus::get(),
-            maxconn:      25000,
+            graphql_uri:      "/graphql".to_owned(),
+            graphiql_uri:     "/graphiql".to_owned(),
+            workers:          num_cpus::get(),
+            maxconn:          25000,
+            max_payload_size: 1024 * 1024, // 1MB
         }
     }
 }

@@ -219,6 +219,7 @@ pub async fn start_graphql<Adapter: APIAdapter + 'static>(cfg: GraphQLConfig, ad
     let wokers = cfg.workers;
     let maxconn = cfg.maxconn;
     let add_listening_address = cfg.listening_address;
+    let max_payload_size = cfg.max_payload_size;
 
     // Start http server
     HttpServer::new(move || {
@@ -226,8 +227,10 @@ pub async fn start_graphql<Adapter: APIAdapter + 'static>(cfg: GraphQLConfig, ad
             .data(state.clone())
             .service(
                 web::resource(&path_graphql_uri)
-                    .route(web::post().to(graphql))
-                    .data(String::configure(|cfg| cfg.limit(1024 * 1024 * 1024))),
+                    .app_data(web::Json::<GraphQLRequest>::configure(|cfg| {
+                        cfg.limit(max_payload_size)
+                    }))
+                    .route(web::post().to(graphql)),
             )
             .service(web::resource(&path_graphiql_uri).route(web::get().to(graphiql)))
     })

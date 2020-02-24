@@ -11,8 +11,12 @@ pub struct ConfigGraphQL {
     pub listening_address: SocketAddr,
     pub graphql_uri:       String,
     pub graphiql_uri:      String,
+    #[serde(default)]
     pub workers:           usize,
+    #[serde(default)]
     pub maxconn:           usize,
+    #[serde(default)]
+    pub max_payload_size:  usize,
 }
 
 #[derive(Debug, Deserialize)]

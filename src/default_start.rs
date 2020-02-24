@@ -425,6 +425,9 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     if config.graphql.maxconn != 0 {
         graphql_config.maxconn = config.graphql.maxconn;
     }
+    if config.graphql.max_payload_size != 0 {
+        graphql_config.max_payload_size = config.graphql.max_payload_size;
+    }
 
     let local = tokio::task::LocalSet::new();
     let actix_rt = actix_rt::System::run_in_tokio("muta-graphql", &local);
