@@ -1880,3 +1880,48 @@ async fn should_count_connecting_and_connected() {
         "should all be Connecting"
     );
 }
+
+#[tokio::test]
+async fn should_dec_connecting_and_update_peer_state_when_connecting_peer_is_rejected_due_to_max_connections_on_new_session(
+) {
+    let (mut mgr, _conn_rx) = make_manager(0, 2);
+
+    let inner = mgr.core_inner();
+    let peers = (0..3)
+        .map(|port| make_peer(port + 5000))
+        .collect::<Vec<_>>();
+
+    for peer in peers.iter() {
+        inner.add_peer(peer.clone());
+    }
+    mgr.poll().await;
+    assert_eq!(inner.connecting(), 3, "should have 3 connecting attempts");
+
+    for (idx, peer) in peers.iter().enumerate() {
+        let sess_ctx = SessionContext::make(
+            SessionId::new(idx + 1),
+            peer.raw_multiaddrs().pop().expect("get multiaddr"),
+            SessionType::Outbound,
+            peer.owned_pubkey(),
+        );
+        let new_session = PeerManagerEvent::NewSession {
+            pid:    peer.owned_id(),
+            pubkey: peer.owned_pubkey(),
+            ctx:    sess_ctx.arced(),
+        };
+        mgr.poll_event(new_session).await;
+    }
+
+    // Since we set max connections to 2, only first two sessions are accepted
+    assert_eq!(inner.connected(), 2, "should have 2 connections");
+    assert_eq!(inner.connecting(), 0, "should have 0 connecting attempt");
+
+    let available_peers = peers
+        .iter()
+        .filter(|p| p.connectedness() == Connectedness::CanConnect)
+        .count();
+    assert_eq!(
+        available_peers, 1,
+        "should have 1 peer available for connecting"
+    );
+}

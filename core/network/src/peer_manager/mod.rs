@@ -683,6 +683,14 @@ impl PeerManager {
             self.unknown_addrs.remove(&remote_multiaddr);
         }
 
+        let remote_peer_id = pubkey.peer_id();
+        let opt_peer = self.inner.peer(&remote_peer_id);
+        if let Some(ref peer) = opt_peer {
+            if peer.connectedness() == Connectedness::Connecting {
+                self.inner.dec_connecting();
+            }
+        }
+
         if self.inner.connected() >= self.config.max_connections {
             let protected = match Peer::pubkey_to_chain_addr(&pubkey) {
                 Ok(ca) => self.inner.is_protected_by_chain_addr(&ca),
@@ -690,12 +698,17 @@ impl PeerManager {
             };
 
             if !protected {
+                // Eearly disconnect, should not rely on session closed event
+                // to update peer state.
+                if let Some(ref peer) = opt_peer {
+                    peer.mark_disconnected();
+                }
+
                 self.disconnect_session(ctx.id);
                 return;
             }
         }
 
-        let remote_peer_id = pubkey.peer_id();
         let peer = match self.inner.peer(&remote_peer_id) {
             Some(p) => p,
             None => {
@@ -747,9 +760,6 @@ impl PeerManager {
             }
         }
 
-        if connectedness == Connectedness::Connecting {
-            self.inner.dec_connecting();
-        }
         if connectedness != Connectedness::Connected {
             self.inner.inc_connected();
         }
@@ -767,7 +777,8 @@ impl PeerManager {
 
         let session = match self.inner.remove_session(sid) {
             Some(s) => s,
-            None => return, // Session may be removed by other event
+            None => return, /* Session may be removed by other event or rejected
+                             * due to max connections before insert */
         };
 
         self.inner.dec_connected();
