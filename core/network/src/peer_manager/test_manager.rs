@@ -1925,3 +1925,22 @@ async fn should_dec_connecting_and_update_peer_state_when_connecting_peer_is_rej
         "should have 1 peer available for connecting"
     );
 }
+
+#[tokio::test]
+async fn should_dec_connecting_for_connecting_peer_on_retry_peer_ater() {
+    let (mut mgr, _conn_rx) = make_manager(0, 5);
+
+    let inner = mgr.core_inner();
+    let peer = make_peer(9527);
+    inner.add_peer(peer.clone());
+    mgr.poll().await;
+    assert_eq!(inner.connecting(), 1, "should have one connecting attempt");
+
+    let retry_peer = PeerManagerEvent::RetryPeerLater {
+        pid:  peer.owned_id(),
+        kind: RetryKind::TimedOut,
+    };
+    mgr.poll_event(retry_peer).await;
+
+    assert_eq!(inner.connecting(), 0, "should have 0 connecting attempt");
+}

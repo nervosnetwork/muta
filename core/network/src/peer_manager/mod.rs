@@ -852,6 +852,9 @@ impl PeerManager {
             // Make sure we disconnect this peer
             self.disconnect_session(sid);
         }
+        if peer.connectedness() == Connectedness::Connecting {
+            self.inner.dec_connecting();
+        }
 
         peer.mark_disconnected();
         peer.increase_retry();
