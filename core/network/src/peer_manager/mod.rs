@@ -76,6 +76,7 @@ macro_rules! peer_id_from_multiaddr {
 const MAX_RETRY_COUNT: u8 = 30;
 const ALIVE_RETRY_INTERVAL: u64 = 3; // seconds
 const WHITELIST_TIMEOUT: u64 = 60 * 60; // 1 hour
+const MAX_CONNECTING_MARGIN: usize = 10;
 
 #[derive(Debug, Clone, Display, Serialize, Deserialize)]
 #[display(fmt = "{}", _0)]
@@ -318,7 +319,8 @@ impl Deref for ArcPeerByChain {
 }
 
 struct Inner {
-    connection_count: AtomicUsize,
+    connecting: AtomicUsize,
+    connected:  AtomicUsize,
 
     whitelist: RwLock<HashSet<ArcProtectedPeer>>,
     sessions:  RwLock<HashSet<ArcSession>>,
@@ -331,7 +333,8 @@ struct Inner {
 impl Inner {
     pub fn new() -> Self {
         Inner {
-            connection_count: AtomicUsize::new(0),
+            connecting: AtomicUsize::new(0),
+            connected:  AtomicUsize::new(0),
 
             whitelist: Default::default(),
             sessions:  Default::default(),
@@ -358,20 +361,28 @@ impl Inner {
         self.listen.write().remove(multiaddr);
     }
 
-    pub fn inc_conn_count(&self) {
-        self.connection_count.fetch_add(1, Ordering::SeqCst);
+    pub fn inc_connecting_by(&self, n: usize) {
+        self.connecting.fetch_add(n, Ordering::SeqCst);
     }
 
-    pub fn inc_conn_count_by(&self, n: usize) {
-        self.connection_count.fetch_add(n, Ordering::SeqCst);
+    pub fn dec_connecting(&self) {
+        self.connecting.fetch_sub(1, Ordering::SeqCst);
     }
 
-    pub fn dec_conn_count(&self) {
-        self.connection_count.fetch_sub(1, Ordering::SeqCst);
+    pub fn connecting(&self) -> usize {
+        self.connecting.load(Ordering::SeqCst)
     }
 
-    pub fn conn_count(&self) -> usize {
-        self.connection_count.load(Ordering::SeqCst)
+    pub fn inc_connected(&self) {
+        self.connected.fetch_add(1, Ordering::SeqCst);
+    }
+
+    pub fn dec_connected(&self) {
+        self.connected.fetch_sub(1, Ordering::SeqCst);
+    }
+
+    pub fn connected(&self) -> usize {
+        self.connected.load(Ordering::SeqCst)
     }
 
     pub fn add_peer(&self, peer: ArcPeer) {
@@ -629,7 +640,7 @@ impl PeerManager {
 
         let condidate_peers = self.inner.unconnected_peers(remain);
         if !condidate_peers.is_empty() {
-            self.inner.inc_conn_count_by(condidate_peers.len());
+            self.inner.inc_connecting_by(condidate_peers.len());
 
             let addrs = condidate_peers.iter().map(|p| {
                 p.set_connectedness(Connectedness::Connecting);
@@ -672,7 +683,7 @@ impl PeerManager {
             self.unknown_addrs.remove(&remote_multiaddr);
         }
 
-        if self.inner.conn_count() >= self.config.max_connections {
+        if self.inner.connected() >= self.config.max_connections {
             let protected = match Peer::pubkey_to_chain_addr(&pubkey) {
                 Ok(ca) => self.inner.is_protected_by_chain_addr(&ca),
                 _ => false,
@@ -736,9 +747,11 @@ impl PeerManager {
             }
         }
 
-        // Connecting/Connected was already counted
-        if connectedness != Connectedness::Connecting && connectedness != Connectedness::Connected {
-            self.inner.inc_conn_count();
+        if connectedness == Connectedness::Connecting {
+            self.inner.dec_connecting();
+        }
+        if connectedness != Connectedness::Connected {
+            self.inner.inc_connected();
         }
 
         let session = ArcSession::new(peer.clone(), Arc::clone(&ctx));
@@ -757,7 +770,7 @@ impl PeerManager {
             None => return, // Session may be removed by other event
         };
 
-        self.inner.dec_conn_count();
+        self.inner.dec_connected();
         session.peer.mark_disconnected();
 
         if session.peer.alive() < ALIVE_RETRY_INTERVAL {
@@ -787,7 +800,7 @@ impl PeerManager {
             }
         };
 
-        self.inner.dec_conn_count();
+        self.inner.dec_connected();
         if self.bootstraps.contains(&*session.peer.id) {
             // Increase bootstrap retry instead of removing it
             session.peer.mark_disconnected();
@@ -823,7 +836,7 @@ impl PeerManager {
         if peer.connectedness() == Connectedness::Connected {
             let sid = peer.session_id();
             self.inner.remove_session(sid);
-            self.inner.dec_conn_count();
+            self.inner.dec_connected();
 
             // Make sure we disconnect this peer
             self.disconnect_session(sid);
@@ -1111,9 +1124,14 @@ impl Future for PeerManager {
         );
 
         // Check connecting count
-        let connection_count = self.inner.conn_count();
-        if connection_count < self.config.max_connections {
-            let remain_count = self.config.max_connections - connection_count;
+        let connected_count = self.inner.connected();
+        let connection_attempts = connected_count + self.inner.connecting();
+        let max_connection_attempts = self.config.max_connections + MAX_CONNECTING_MARGIN;
+
+        if connected_count < self.config.max_connections
+            && connection_attempts < max_connection_attempts
+        {
+            let remain_count = max_connection_attempts - connection_attempts;
             let unconnected_addrs = self.unconnected_addrs(remain_count);
             let candidate_count = unconnected_addrs.len();
 

@@ -178,7 +178,7 @@ async fn make_sessions(mgr: &mut MockManager, num: usize) -> Vec<ArcPeer> {
         peers.push(inner.peer(&remote_pid).expect("make peer session"));
     }
 
-    assert_eq!(inner.conn_count(), num, "make some sessions");
+    assert_eq!(inner.connected(), num, "make some sessions");
     peers
 }
 
@@ -203,7 +203,7 @@ async fn should_accept_outbound_new_session_and_add_peer() {
     mgr.poll_event(new_session).await;
 
     let inner = mgr.core_inner();
-    assert_eq!(inner.conn_count(), 1, "should have one without bootstrap");
+    assert_eq!(inner.connected(), 1, "should have one without bootstrap");
 
     let saved_peer = inner
         .peer(&remote_pubkey.peer_id())
@@ -248,7 +248,7 @@ async fn should_ignore_inbound_address_on_new_session() {
     mgr.poll_event(new_session).await;
 
     let inner = mgr.core_inner();
-    assert_eq!(inner.conn_count(), 1, "should have one without bootstrap");
+    assert_eq!(inner.connected(), 1, "should have one without bootstrap");
 
     let saved_peer = inner
         .peer(&remote_pubkey.peer_id())
@@ -278,7 +278,7 @@ async fn should_enforce_id_in_multiaddr_on_new_session() {
     mgr.poll_event(new_session).await;
 
     let inner = mgr.core_inner();
-    assert_eq!(inner.conn_count(), 1, "should have one without bootstrap");
+    assert_eq!(inner.connected(), 1, "should have one without bootstrap");
 
     let saved_peer = inner
         .peer(&remote_pubkey.peer_id())
@@ -301,7 +301,7 @@ async fn should_add_multiaddr_to_peer_on_new_session() {
     let remote_peers = make_sessions(&mut mgr, 1).await;
 
     let inner = mgr.core_inner();
-    assert_eq!(inner.conn_count(), 1, "should have one without bootstrap");
+    assert_eq!(inner.connected(), 1, "should have one without bootstrap");
 
     let test_peer = remote_peers.first().expect("get first");
     let session_closed = PeerManagerEvent::SessionClosed {
@@ -328,16 +328,17 @@ async fn should_add_multiaddr_to_peer_on_new_session() {
 }
 
 #[tokio::test]
-async fn should_not_increase_conn_count_for_connecting_peer_on_new_session() {
+async fn should_dec_connecting_and_inc_connected_for_connecting_peer_on_new_session() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
     let test_peer = make_peer(2020);
 
     let inner = mgr.core_inner();
-    assert_eq!(inner.conn_count(), 0, "should not have any connection");
+    assert_eq!(inner.connected(), 0, "should not have any connection");
+    assert_eq!(inner.connecting(), 0, "should not have any connection");
 
     inner.add_peer(test_peer.clone());
     mgr.poll().await;
-    assert_eq!(inner.conn_count(), 1, "should try connect test peer");
+    assert_eq!(inner.connecting(), 1, "should try connect test peer");
     assert_eq!(test_peer.connectedness(), Connectedness::Connecting);
 
     let sess_ctx = SessionContext::make(
@@ -354,11 +355,8 @@ async fn should_not_increase_conn_count_for_connecting_peer_on_new_session() {
     mgr.poll_event(new_session).await;
 
     assert_eq!(test_peer.connectedness(), Connectedness::Connected);
-    assert_eq!(
-        inner.conn_count(),
-        1,
-        "should not increase conn count on connecting"
-    );
+    assert_eq!(inner.connected(), 1, "should have one connected");
+    assert_eq!(inner.connecting(), 0, "should not have any connecting");
 }
 
 #[tokio::test]
@@ -385,12 +383,9 @@ async fn should_always_remove_inbound_mutiaddr_in_unknown_book_even_when_reach_m
     };
     mgr.poll_event(new_session).await;
 
+    let inner = mgr.core_inner();
     assert_eq!(mgr.unknown_book().len(), 0, "should remove unknown addr");
-    assert_eq!(
-        mgr.core_inner().conn_count(),
-        2,
-        "should not increase conn count"
-    );
+    assert_eq!(inner.connected(), 2, "should not increase conn count");
 }
 
 #[tokio::test]
@@ -419,7 +414,7 @@ async fn should_remove_same_mutiaddr_in_unknown_book_on_new_session() {
     mgr.poll_event(new_session).await;
 
     let inner = mgr.core_inner();
-    assert_eq!(inner.conn_count(), 1, "should have one connection");
+    assert_eq!(inner.connected(), 1, "should have one connection");
     assert_eq!(
         mgr.unknown_book().len(),
         0,
@@ -452,7 +447,7 @@ async fn should_remove_same_multiaddr_in_unknown_book_if_ctx_address_doesnt_have
     mgr.poll_event(new_session).await;
 
     let inner = mgr.core_inner();
-    assert_eq!(inner.conn_count(), 1, "should have one connection");
+    assert_eq!(inner.connected(), 1, "should have one connection");
     assert_eq!(
         mgr.unknown_book().len(),
         0,
@@ -482,7 +477,7 @@ async fn should_reject_new_connection_for_same_peer_on_new_session() {
     mgr.poll_event(new_session).await;
 
     let inner = mgr.core_inner();
-    assert_eq!(inner.conn_count(), 1, "should not increase conn count");
+    assert_eq!(inner.connected(), 1, "should not increase conn count");
     assert_eq!(
         test_peer.session_id(),
         expect_sid,
@@ -522,7 +517,7 @@ async fn should_reject_new_connections_for_same_peer_also_remove_multiaddr_in_un
     mgr.poll_event(new_session).await;
 
     let inner = mgr.core_inner();
-    assert_eq!(inner.conn_count(), 1, "should not increase conn count");
+    assert_eq!(inner.connected(), 1, "should not increase conn count");
     assert_eq!(mgr.unknown_book().len(), 0, "should remove unknown addr");
 }
 
@@ -548,7 +543,7 @@ async fn should_keep_new_connection_for_error_outdated_peer_session_on_new_sessi
     };
     mgr.poll_event(new_session).await;
 
-    assert_eq!(inner.conn_count(), 1, "should not increase conn count");
+    assert_eq!(inner.connected(), 1, "should not increase conn count");
     assert_eq!(
         test_peer.session_id(),
         99.into(),
@@ -585,7 +580,7 @@ async fn should_reject_new_connections_when_we_reach_max_connections_on_new_sess
     mgr.poll_event(new_session).await;
 
     let inner = mgr.core_inner();
-    assert_eq!(inner.conn_count(), 10, "should not increase conn count");
+    assert_eq!(inner.connected(), 10, "should not increase conn count");
     assert_eq!(mgr.unknown_book().len(), 1, "should not touch unknown addr");
 
     let conn_event = conn_rx.next().await.expect("should have disconnect event");
@@ -612,8 +607,9 @@ async fn should_remove_session_on_session_closed() {
     mgr.poll_event(session_closed).await;
 
     let inner = mgr.core_inner();
-    assert_eq!(inner.conn_count(), 1, "should have one connecting session");
+    assert_eq!(inner.connected(), 0, "shoulld have zero connected");
     assert_eq!(inner.share_sessions().len(), 0, "should have no session");
+    assert_eq!(inner.connecting(), 1, "should have one connecting attempt");
     assert_eq!(
         test_peer.connectedness(),
         Connectedness::Connecting,
@@ -638,7 +634,7 @@ async fn should_increase_retry_for_short_alive_session_on_session_closed() {
 
     let inner = mgr.core_inner();
     assert_eq!(
-        inner.conn_count(),
+        inner.connected(),
         0,
         "should have no session because of retry"
     );
@@ -703,7 +699,7 @@ async fn should_disconnect_session_and_remove_peer_on_remove_peer_by_session() {
     mgr.poll_event(remove_peer_by_session).await;
 
     let inner = mgr.core_inner();
-    assert_eq!(inner.conn_count(), 0, "should have no session");
+    assert_eq!(inner.connected(), 0, "should have no session");
     assert_eq!(inner.share_sessions().len(), 0, "should have no session");
     assert!(
         inner.peer(&test_peer.id).is_none(),
@@ -743,7 +739,7 @@ async fn should_keep_bootstrap_peer_but_max_retry_on_remove_peer_by_session() {
     };
     mgr.poll_event(new_session).await;
 
-    assert_eq!(inner.conn_count(), 1, "should have one session");
+    assert_eq!(inner.connected(), 1, "should have one session");
     assert_eq!(
         boot_peer.connectedness(),
         Connectedness::Connected,
@@ -761,7 +757,7 @@ async fn should_keep_bootstrap_peer_but_max_retry_on_remove_peer_by_session() {
     };
     mgr.poll_event(remove_peer_by_session).await;
 
-    assert_eq!(inner.conn_count(), 0, "should have no session");
+    assert_eq!(inner.connected(), 0, "should have no session");
     assert_eq!(inner.share_sessions().len(), 0, "should have no session");
     assert!(
         inner.peer(&boot_peer.id).is_some(),
@@ -822,7 +818,7 @@ async fn should_disconnect_peer_and_increase_retry_on_retry_peer_later() {
     mgr.poll_event(retry_peer).await;
 
     let inner = mgr.core_inner();
-    assert_eq!(inner.conn_count(), 0, "should have no session");
+    assert_eq!(inner.connected(), 0, "should have no session");
     assert_eq!(test_peer.connectedness(), Connectedness::CanConnect);
     assert_eq!(test_peer.retry(), 1, "should increase peer retry");
 
@@ -1751,7 +1747,7 @@ async fn should_allow_whitelisted_peer_session_even_if_we_reach_max_connections_
     inner.protect_peers_by_chain_addr(vec![whitelisted_peer.chain_addr.as_ref().to_owned()]);
 
     assert_eq!(inner.whitelist().len(), 1, "should have one whitelisted");
-    assert_eq!(inner.conn_count(), 10, "should have 10 connections");
+    assert_eq!(inner.connected(), 10, "should have 10 connections");
 
     // First no whitelisted one
     let sess_ctx = SessionContext::make(
@@ -1767,7 +1763,7 @@ async fn should_allow_whitelisted_peer_session_even_if_we_reach_max_connections_
     };
     mgr.poll_event(new_session).await;
 
-    assert_eq!(inner.conn_count(), 10, "should remain 10 connections");
+    assert_eq!(inner.connected(), 10, "should remain 10 connections");
 
     // Now whitelistd one
     let sess_ctx = SessionContext::make(
@@ -1786,7 +1782,7 @@ async fn should_allow_whitelisted_peer_session_even_if_we_reach_max_connections_
     };
     mgr.poll_event(new_session).await;
 
-    assert_eq!(inner.conn_count(), 11, "should remain 11 connections");
+    assert_eq!(inner.connected(), 11, "should remain 11 connections");
     let session = inner.session(666.into()).expect("should have session");
     assert_eq!(
         session.peer.id, whitelisted_peer.id,
@@ -1853,12 +1849,12 @@ async fn should_remove_expired_peers_in_whitelist() {
 }
 
 #[tokio::test]
-async fn should_include_both_connecting_and_connected_as_conn_count() {
+async fn should_count_connecting_and_connected() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
     let _remote_peers = make_sessions(&mut mgr, 5).await; // 5 connected peers
 
     let inner = mgr.core_inner();
-    assert_eq!(inner.conn_count(), 5, "should have 5 connected peers");
+    assert_eq!(inner.connected(), 5, "should have 5 connected peers");
 
     // Register peers
     let peers = (0..5)
@@ -1875,11 +1871,8 @@ async fn should_include_both_connecting_and_connected_as_conn_count() {
     );
 
     mgr.poll().await;
-    assert_eq!(
-        inner.conn_count(),
-        10,
-        "should have 10 conn now (connected and connecting)"
-    );
+    assert_eq!(inner.connected(), 5, "should still have 5 connected peers");
+    assert_eq!(inner.connecting(), 5, "should have 5 connecting peers");
     assert!(
         !peers
             .iter()
