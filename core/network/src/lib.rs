@@ -10,6 +10,7 @@ mod outbound;
 mod peer_manager;
 mod protocols;
 mod reactor;
+mod rpc;
 mod rpc_map;
 mod selfcheck;
 mod service;
