@@ -7,6 +7,7 @@ use futures::executor::block_on;
 use juniper::http::GraphQLRequest;
 use juniper::FieldResult;
 use lazy_static::lazy_static;
+use std::cmp;
 use std::convert::TryFrom;
 use std::sync::Arc;
 
@@ -216,7 +217,7 @@ pub async fn start_graphql<Adapter: APIAdapter + 'static>(cfg: GraphQLConfig, ad
 
     let path_graphql_uri = cfg.graphql_uri.to_owned();
     let path_graphiql_uri = cfg.graphiql_uri.to_owned();
-    let wokers = cfg.workers;
+    let workers = cfg.workers;
     let maxconn = cfg.maxconn;
     let add_listening_address = cfg.listening_address;
     let max_payload_size = cfg.max_payload_size;
@@ -234,8 +235,8 @@ pub async fn start_graphql<Adapter: APIAdapter + 'static>(cfg: GraphQLConfig, ad
             )
             .service(web::resource(&path_graphiql_uri).route(web::get().to(graphiql)))
     })
-    .workers(wokers)
-    .maxconn(maxconn)
+    .workers(workers)
+    .maxconn(cmp::max(maxconn / workers, 1))
     .bind(add_listening_address)
     .unwrap()
     .run()
