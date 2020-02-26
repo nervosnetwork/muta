@@ -25,6 +25,23 @@ pub const TRANSMITTERS_NUM: usize = 10;
 pub const INIT_TRANSMITTER_PROTOCOL_ID: usize = 100;
 pub const NEXT_TRANSMITTER_PROTOCOL_ID: AtomicUsize = AtomicUsize::new(100);
 
+lazy_static::lazy_static! {
+    static ref TARGET_PROTOCOL: TargetProtocol = {
+        let mut tar_protos = vec![
+            ProtocolId::new(PING_PROTOCOL_ID),
+            ProtocolId::new(IDENTIFY_PROTOCOL_ID),
+            ProtocolId::new(DISCOVERY_PROTOCOL_ID),
+        ];
+
+        let trans_protos = (0..TRANSMITTERS_NUM)
+            .map(|i| ProtocolId::new(INIT_TRANSMITTER_PROTOCOL_ID + i))
+            .collect::<Vec<_>>();
+
+        tar_protos.extend(trans_protos);
+        TargetProtocol::Multi(tar_protos)
+    };
+}
+
 #[derive(Default)]
 pub struct CoreProtocolBuilder<M, C> {
     ping:         Option<Ping>,
@@ -49,18 +66,7 @@ impl CoreProtocol {
 
 impl NetworkProtocol for CoreProtocol {
     fn target() -> TargetProtocol {
-        let mut tar_protos = vec![
-            ProtocolId::new(PING_PROTOCOL_ID),
-            ProtocolId::new(IDENTIFY_PROTOCOL_ID),
-            ProtocolId::new(DISCOVERY_PROTOCOL_ID),
-        ];
-
-        let trans_protos = (0..TRANSMITTERS_NUM)
-            .map(|i| ProtocolId::new(INIT_TRANSMITTER_PROTOCOL_ID + i))
-            .collect::<Vec<_>>();
-
-        tar_protos.extend(trans_protos);
-        TargetProtocol::Multi(tar_protos)
+        TARGET_PROTOCOL.clone()
     }
 
     fn metas(self) -> Vec<ProtocolMeta> {
