@@ -23,9 +23,10 @@ pub const IDENTIFY_PROTOCOL_ID: usize = 2;
 pub const DISCOVERY_PROTOCOL_ID: usize = 3;
 pub const TRANSMITTERS_NUM: usize = 10;
 pub const INIT_TRANSMITTER_PROTOCOL_ID: usize = 100;
-pub const NEXT_TRANSMITTER_PROTOCOL_ID: AtomicUsize = AtomicUsize::new(100);
 
 lazy_static::lazy_static! {
+    static ref NEXT_TRANSMITTER_PROTOCOL_ID: AtomicUsize = AtomicUsize::new(INIT_TRANSMITTER_PROTOCOL_ID);
+
     static ref TARGET_PROTOCOL: TargetProtocol = {
         let mut tar_protos = vec![
             ProtocolId::new(PING_PROTOCOL_ID),
