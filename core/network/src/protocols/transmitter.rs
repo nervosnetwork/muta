@@ -11,7 +11,7 @@ use tentacle::{
 use crate::message::RawSessionMessage;
 
 pub const NAME: &str = "chain_transmitter";
-pub const SUPPORT_VERSIONS: [&str; 1] = ["0.1"];
+pub const SUPPORT_VERSIONS: [&str; 1] = ["0.2"];
 
 pub struct Transmitter {
     msg_deliver: UnboundedSender<RawSessionMessage>,
