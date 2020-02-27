@@ -60,7 +60,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             .adapter
             .get_txs_from_mempool(
                 ctx,
-                height,
+                next_height,
                 current_consensus_status.cycles_limit,
                 current_consensus_status.tx_num_limit,
             )

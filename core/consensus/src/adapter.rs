@@ -443,7 +443,7 @@ where
     ) -> ProtocolResult<Self> {
         let (exec_queue, rx) = channel(OVERLORD_GAP);
         let exec_queue_wal = Arc::new(RwLock::new(WalInfoQueue::new()));
-        let current_height = status_agent.to_inner().height;
+        let current_height = status_agent.to_inner().current_height;
         let exec_demons = Some(ExecDemons::new(
             Arc::clone(&storage),
             Arc::clone(&trie_db),

@@ -269,6 +269,8 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         prevote_ratio:      metadata.prevote_ratio,
         precommit_ratio:    metadata.precommit_ratio,
         brake_ratio:        metadata.brake_ratio,
+        max_tx_size:        metadata.max_tx_size,
+        tx_num_limit:       metadata.tx_num_limit,
     };
 
     let consensus_interval = current_consensus_status.consensus_interval;
