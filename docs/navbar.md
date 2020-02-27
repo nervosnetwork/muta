@@ -1,0 +1,7 @@
+- Nervos
+  - [官网](https://www.nervos.org)
+  - [GitHub](https://github.com/nervosnetwork)
+  - [论坛](https://talk.nervos.org/)
+- Translations
+  - [:cn: 中文](/)
+  - [:uk: English](/en-us/)
