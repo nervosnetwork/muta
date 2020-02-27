@@ -3,7 +3,7 @@ use std::convert::TryFrom;
 use std::sync::Arc;
 
 use bytes::Bytes;
-use futures::lock::Mutex;
+use futures::{future, lock::Mutex};
 
 use common_crypto::{
     BlsCommonReference, BlsPrivateKey, BlsPublicKey, PublicKey, Secp256k1, Secp256k1PrivateKey,
@@ -194,16 +194,18 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         Arc::clone(&service_mapping),
     );
 
-    let exec_resp = futures::executor::block_on(api_adapter.query_service(
-        Context::new(),
-        current_block.header.height,
-        u64::max_value(),
-        1,
-        my_address.clone(),
-        "metadata".to_string(),
-        "get_metadata".to_string(),
-        "".to_string(),
-    ))?;
+    let exec_resp = api_adapter
+        .query_service(
+            Context::new(),
+            current_block.header.height,
+            u64::max_value(),
+            1,
+            my_address.clone(),
+            "metadata".to_string(),
+            "get_metadata".to_string(),
+            "".to_string(),
+        )
+        .await?;
 
     let metadata: Metadata = serde_json::from_str(&exec_resp.ret).expect("Decode metadata failed!");
 
@@ -377,6 +379,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
 
     // Run network
     tokio::spawn(network_service);
+
     // Run sync
     tokio::spawn(async move {
         if let Err(e) = synchronization.polling_broadcast().await {
@@ -410,9 +413,8 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         }
     });
 
-    tokio::spawn(async move {
-        futures::executor::block_on(exec_demon.run());
-    });
+    let (abortable_demon, abort_handle) = future::abortable(exec_demon.run());
+    tokio::task::spawn_local(abortable_demon);
 
     // Init graphql
     let mut graphql_config = GraphQLConfig::default();
@@ -429,12 +431,18 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         graphql_config.max_payload_size = config.graphql.max_payload_size;
     }
 
-    let local = tokio::task::LocalSet::new();
-    let actix_rt = actix_rt::System::run_in_tokio("muta-graphql", &local);
-    tokio::spawn(async move {
-        actix_rt.await.unwrap();
+    tokio::task::spawn_local(async move {
+        let local = tokio::task::LocalSet::new();
+        let actix_rt = actix_rt::System::run_in_tokio("muta-graphql", &local);
+        tokio::task::spawn_local(actix_rt);
+
+        core_api::start_graphql(graphql_config, api_adapter).await;
     });
 
-    core_api::start_graphql(graphql_config, api_adapter).await;
+    // Io error, just process shutdown
+    let _ = tokio::signal::ctrl_c().await;
+    // Abort consensus
+    abort_handle.abort();
+
     Ok(())
 }
