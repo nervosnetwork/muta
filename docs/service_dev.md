@@ -213,7 +213,9 @@ fn init_genesis(&mut self, payload: GenesisPayload) -> ProtocolResult<()> {
 
 ## 资源消耗统计：cycle
 
-调用 Service 的接口方法，会消耗一定数量的 cycles，使用过程宏 `#[cycles(amount)]` 标记接口方法，框架会自动扣除 `amount ` 数量的 cycles。
+调用 Service 的接口方法，会消耗一定数量的 cycles，使用过程宏 `#[cycles(amount)]` 标记接口方法，框架会自动扣除 `amount` 数量的 cycles。
+
+目前对 cycle 的计算只支持在接口方法上标记固定的数量，具体数值由开发者自行设定。未来会增加 cycle 消耗多种维度的统计方式。
 
 ## 事件
 
@@ -310,6 +312,105 @@ pub trait ServiceSDK {
 // Hook method in dex service
 #[hook_after]
     fn deal(&mut self, params: &ExecutorParams) -> ProtocolResult<()>;
+```
+
+## 序列化
+
+Service 主要使用两种序列化方案: Json 和 [RLP](https://github.com/ethereum/wiki/wiki/RLP);
+
+### Json
+
+用户发送交易和返回结果，均使用 json 序列化，因此接口方法的输入参数中的 `payload` 和返回值 `ProtocolResult<Response>` 中的 `Response` 都需要实现 json 序列化的 trait。以 [Asset Service](https://github.com/mkxbl/muta-tutorial-dex/tree/master/services/asset) 的 `fn create_asset` 接口方法为例：
+
+```rust
+// 接口方法
+#[cycles(210_00)]
+#[write]
+fn create_asset(&mut self, ctx: ServiceContext, payload: CreateAssetPayload) -> ProtocolResult<Asset>;
+
+// 标记 #[derive(Deserialize, Serialize)] 以实现 json 序列化
+#[derive(Deserialize, Serialize, Clone, Debug)]
+pub struct CreateAssetPayload {
+    pub name:   String,
+    pub symbol: String,
+    pub supply: u64,
+}
+// 标记 #[derive(Deserialize, Serialize)] 以实现 json 序列化
+#[derive(Deserialize, Serialize, Clone, Debug)]
+pub struct Asset {
+    pub id:     Hash,
+    pub name:   String,
+    pub symbol: String,
+    pub supply: u64,
+    pub issuer: Address,
+}
+```
+
+Service 之间调用的参数和返回值同样使用 json 序列化，以 [Dex Service](https://github.com/mkxbl/muta-tutorial-dex/tree/master/services/dex) 调用 [Asset Service](https://github.com/mkxbl/muta-tutorial-dex/tree/master/services/asset) 为例：
+
+```rust
+let payload_str =
+    serde_json::to_string(&lock_asset_payload).map_err(DexError::JsonParse)?;
+
+// 使用 json 序列化之后的参数，进行 service 调用
+self.sdk.write(
+    &self.get_call_asset_ctx(),
+    Some(ADMISSION_TOKEN.clone()),
+    "asset",
+    "lock",
+    &payload_str,
+)?;
+```
+
+### RLP
+
+对于存储到世界状态的数据结构，为了保证序列化的一致性，该数据结构需要实现 `trait FixedCodec`，我们使用 RLP 方案来实现该 trait 。以 [Asset Service](https://github.com/mkxbl/muta-tutorial-dex/tree/master/services/asset) 为例：
+
+```rust
+// Asset 需要存入世界状态 
+pub struct AssetService<SDK> {
+    sdk:    SDK,
+    assets: Box<dyn StoreMap<Hash, Asset>>,
+}
+
+pub trait FixedCodec: Sized {
+    fn encode_fixed(&self) -> ProtocolResult<Bytes>;
+    fn decode_fixed(bytes: Bytes) -> ProtocolResult<Self>;
+}
+
+// 对 Asset 实现 trait FixedCodec
+impl FixedCodec for Asset {
+    fn encode_fixed(&self) -> ProtocolResult<Bytes> {
+        Ok(Bytes::from(rlp::encode(self)))
+    }
+
+    fn decode_fixed(bytes: Bytes) -> ProtocolResult<Self> {
+        Ok(rlp::decode(bytes.as_ref()).map_err(FixedCodecError::from)?)
+    }
+}
+// 对 Asset 实现 RLP 反序列化方案
+impl rlp::Decodable for Asset {
+    fn decode(rlp: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
+        Ok(Self {
+            id:     rlp.at(0)?.as_val()?,
+            name:   rlp.at(1)?.as_val()?,
+            symbol: rlp.at(2)?.as_val()?,
+            supply: rlp.at(3)?.as_val()?,
+            issuer: rlp.at(4)?.as_val()?,
+        })
+    }
+}
+// 对 Asset 实现 RLP 序列化方案
+impl rlp::Encodable for Asset {
+    fn rlp_append(&self, s: &mut rlp::RlpStream) {
+        s.begin_list(5)
+            .append(&self.id)
+            .append(&self.name)
+            .append(&self.symbol)
+            .append(&self.supply)
+            .append(&self.issuer);
+    }
+}
 ```
 
 ## 构造方法

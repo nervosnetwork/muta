@@ -211,10 +211,6 @@ Service 工程目录如下：
 
 Service 的组件定义在 lib.rs 中，组件需要用到的数据结构，如输入输出参数(`TransferPayload`)、事件类型(`TransferEvent`)、存储类型(`Asset`)定义在 types.rs 中。
 
-#### 序列化
-
-接口方法的输入输出参数、事件类型均使用 json 序列化，存入世界状态的数据类型，如 `Asset` 、`Balance` ，需要实现 `FixedCodec` trait，该 trait 使用 rlp 作为固定序列化方案。
-
 #### 创世配置
 
 Asset Service 通过 `fn init_genesis` 方法，注册了 Muta Tutorial Token，该 token 信息将包含在创世块的世界状态里：
