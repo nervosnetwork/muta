@@ -3,7 +3,7 @@
 - **快速开始**
 	- [快速开始](/getting_started.md)
 	- [配置说明](/config.md)
-	- [多节点部署指南](./multi_node_deploy.md)
+	- [多节点部署指南](/multi_node_deploy.md)
 - **架构设计**
 	<!-- - [整体架构](/arch.md) -->
 	- [交易池](/transaction_pool.md)
@@ -15,7 +15,7 @@
 - **Service 介绍**
 	- [Service 开发指南](/service_dev.md)
 	- [Service 示例](/service_eg.md)
-	- [内置 Service 说明](/build_in_service.md)
+	- [内置 Service 说明](/built_in_service.md)
 - **开发指南**
     - [开发一条 DEX 应用链](dex.md)
 - **接口**

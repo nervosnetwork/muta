@@ -14,7 +14,7 @@
 - **Diving into Service**
 	- [Development Guide](en-us/service_dev.md)
 	- [Service Examples](en-us/service_eg.md)
-	- [Build-in Service](en-us/build_in_service.md)
+	- [Built-in Service](en-us/built_in_service.md)
 - **Tutorial**
     - [Develop a DEX chain](en-us/dex.md)
 - **API**

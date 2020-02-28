@@ -13,13 +13,17 @@
 
 Metadata Service 负责存储链的元数据信息，为起链所必须配置的服务，以支持链的运营方在起链前对链的相关信息进行配置。
 
-详细信息和接口请参考[Metadata Service 文档](./buildin_service)。
+详细信息和接口请参考[Metadata Service 文档](./built_in_service)。
 
 ## Asset Service
 
 Asset Service 是一个资产管理服务，用来支持用户发行原生资产，并且管理这些原生资产。
 
+<<<<<<< HEAD
 * 详细信息和接口请参考[Asset Service 文档](./buildin_service)
+=======
+* 详细信息和接口请参考[Asset Service 文档](./built_in_service)
+>>>>>>> 626f54c4250a93992a287e3e16f7d3ec0c85eacc
 * [源代码](https://github.com/nervosnetwork/muta/tree/master/built-in-services/asset)
 
 ## RISC-V Service
