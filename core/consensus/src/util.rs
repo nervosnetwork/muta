@@ -1,7 +1,8 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::error::Error;
 
+use lru_cache::LruCache;
 use overlord::Crypto;
 use parking_lot::RwLock;
 use rlp::{Decodable, DecoderError, Encodable, Prototype, Rlp, RlpStream};
@@ -14,9 +15,11 @@ use common_crypto::{
 use protocol::types::{Address, Hash, MerkleRoot, SignedTransaction};
 use protocol::{Bytes, ProtocolError, ProtocolResult};
 
+const REDUNDANCY_RATE: usize = 3;
+
 pub struct OverlordCrypto {
     private_key: BlsPrivateKey,
-    addr_pubkey: RwLock<HashMap<Bytes, BlsPublicKey>>,
+    addr_pubkey: RwLock<LruCache<Bytes, BlsPublicKey>>,
     common_ref:  BlsCommonReference,
 }
 
@@ -41,13 +44,13 @@ impl Crypto for OverlordCrypto {
         hash: Bytes,
         voter: Bytes,
     ) -> Result<(), Box<dyn Error + Send>> {
-        let map = self.addr_pubkey.read();
+        let mut map = self.addr_pubkey.write();
         let hash = HashValue::try_from(hash.as_ref()).map_err(|_| {
             ProtocolError::from(ConsensusError::Other(
                 "failed to convert hash value".to_string(),
             ))
         })?;
-        let pub_key = map.get(&voter).ok_or_else(|| {
+        let pub_key = map.get_mut(&voter).ok_or_else(|| {
             ProtocolError::from(ConsensusError::Other("lose public key".to_string()))
         })?;
         let signature = BlsSignature::try_from(signature.as_ref())
@@ -71,13 +74,13 @@ impl Crypto for OverlordCrypto {
             .into());
         }
 
-        let map = self.addr_pubkey.read();
+        let mut map = self.addr_pubkey.write();
         let mut sigs_pubkeys = Vec::with_capacity(signatures.len());
         for (sig, addr) in signatures.iter().zip(voters.iter()) {
             let signature = BlsSignature::try_from(sig.as_ref())
                 .map_err(|e| ProtocolError::from(ConsensusError::CryptoErr(Box::new(e))))?;
 
-            let pub_key = map.get(addr).ok_or_else(|| {
+            let pub_key = map.get_mut(addr).ok_or_else(|| {
                 ProtocolError::from(ConsensusError::Other("lose public key".to_string()))
             })?;
 
@@ -94,16 +97,20 @@ impl Crypto for OverlordCrypto {
         hash: Bytes,
         voters: Vec<Bytes>,
     ) -> Result<(), Box<dyn Error + Send>> {
-        let map = self.addr_pubkey.read();
+        let mut map = self.addr_pubkey.write();
         let mut pub_keys = Vec::new();
         for addr in voters.iter() {
-            let pub_key = map.get(addr).ok_or_else(|| {
-                ProtocolError::from(ConsensusError::Other("lose public key".to_string()))
-            })?;
+            let pub_key = map
+                .get_mut(addr)
+                .ok_or_else(|| {
+                    ProtocolError::from(ConsensusError::Other("lose public key".to_string()))
+                })?
+                .clone();
             pub_keys.push(pub_key);
         }
 
-        let aggregate_key = BlsPublicKey::aggregate(pub_keys);
+        let aggregate_key =
+            BlsPublicKey::aggregate(pub_keys.iter().map(|key| key).collect::<Vec<_>>());
         let aggregated_signature = BlsSignature::try_from(aggregated_signature.as_ref())
             .map_err(|e| ProtocolError::from(ConsensusError::CryptoErr(Box::new(e))))?;
         let hash = HashValue::try_from(hash.as_ref()).map_err(|_| {
@@ -122,19 +129,26 @@ impl Crypto for OverlordCrypto {
 impl OverlordCrypto {
     pub fn new(
         private_key: BlsPrivateKey,
-        addr_pubkey: HashMap<Bytes, BlsPublicKey>,
+        addr_pubkey: Vec<(Bytes, BlsPublicKey)>,
         common_ref: BlsCommonReference,
     ) -> Self {
+        let mut map = LruCache::new(addr_pubkey.len() * REDUNDANCY_RATE);
+        map.extend(addr_pubkey.into_iter());
+
         OverlordCrypto {
-            addr_pubkey: RwLock::new(addr_pubkey),
+            addr_pubkey: RwLock::new(map),
             private_key,
             common_ref,
         }
     }
 
-    pub fn update(&self, new_addr_pubkey: HashMap<Bytes, BlsPublicKey>) {
+    pub fn update(&self, new_addr_pubkey: Vec<(Bytes, BlsPublicKey)>) {
         let mut map = self.addr_pubkey.write();
-        *map = new_addr_pubkey;
+
+        if map.capacity() < new_addr_pubkey.len() * REDUNDANCY_RATE {
+            map.set_capacity(new_addr_pubkey.len() * REDUNDANCY_RATE);
+        }
+        map.extend(new_addr_pubkey.into_iter());
     }
 }
 

@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -74,18 +73,19 @@ impl<Adapter: ConsensusAdapter + 'static> OverlordConsensus<Adapter> {
     pub fn new(
         status_agent: StatusAgent,
         node_info: NodeInfo,
-        addr_pubkey: HashMap<Bytes, BlsPublicKey>,
+        addr_pubkey_list: Vec<(Bytes, BlsPublicKey)>,
         priv_key: BlsPrivateKey,
         common_ref: BlsCommonReference,
         adapter: Arc<Adapter>,
         lock: Arc<Mutex<()>>,
     ) -> Self {
-        let crypto = Arc::new(OverlordCrypto::new(priv_key, addr_pubkey, common_ref));
+        let crypto = Arc::new(OverlordCrypto::new(priv_key, addr_pubkey_list, common_ref));
 
         let engine = Arc::new(ConsensusEngine::new(
             status_agent.clone(),
             node_info.clone(),
             Arc::clone(&adapter),
+            Arc::clone(&crypto),
             lock,
         ));
 

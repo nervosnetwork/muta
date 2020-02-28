@@ -218,11 +218,6 @@ where
         Ok(res.inner)
     }
 
-    /// Get a block corresponding to the given height.
-    async fn get_block_by_height(&self, _: Context, height: u64) -> ProtocolResult<Block> {
-        self.storage.get_block_by_height(height).await
-    }
-
     /// Get the current height from storage.
     async fn get_current_height(&self, _: Context) -> ProtocolResult<u64> {
         let res = self.storage.get_latest_block().await?;
