@@ -241,12 +241,31 @@ pub struct Metadata {
     pub max_tx_size:     u64,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct ValidatorExtend {
     pub bls_pub_key:    String,
     pub address:        Address,
     pub propose_weight: u32,
     pub vote_weight:    u32,
+}
+
+impl fmt::Debug for ValidatorExtend {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let pk = if self.bls_pub_key.len() > 8 {
+            unsafe { self.bls_pub_key.get_unchecked(0..8) }
+        } else {
+            self.bls_pub_key.as_str()
+        };
+        
+        write!(
+            f,
+            "bls public key {:?}, address {:?}, propose weight {}, vote weight {}",
+            pk,
+            self.address.as_hex(),
+            self.propose_weight,
+            self.vote_weight
+        )
+    }
 }
 
 fn clean_0x(s: &str) -> &str {

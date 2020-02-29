@@ -148,12 +148,18 @@ impl OverlordCrypto {
         if map.capacity() < new_addr_pubkey.len() * REDUNDANCY_RATE {
             map.set_capacity(new_addr_pubkey.len() * REDUNDANCY_RATE);
             info!(
-                "[consensus]: reset capacity to {}",
+                "[consensus]: reset height {} crypto cache capacity to {}",
+                height,
                 new_addr_pubkey.len() * REDUNDANCY_RATE
             );
         }
         map.extend(new_addr_pubkey.into_iter());
-        log::info!("[consensus]: crypto map len {}, {:?}", map.len(), map);
+        log::info!(
+            "[consensus]: height {} crypto map len {}, {:?}",
+            height,
+            map.len(),
+            map
+        );
     }
 }
 
