@@ -348,7 +348,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             ctx,
             old_block.header.state_root.clone(),
             old_block.header.timestamp,
-            height - 1,
+            old_block.header.height,
         )?;
         let mut validators = metadata
             .verifier_list
@@ -590,7 +590,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
             })?;
             new_addr_pubkey_list.push((addr, pubkey));
         }
-        self.crypto.update(new_addr_pubkey_list);
+        self.crypto.update(height + 1, new_addr_pubkey_list);
 
         self.save_wal().await
     }

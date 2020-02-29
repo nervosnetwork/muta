@@ -141,13 +141,14 @@ impl OverlordCrypto {
         }
     }
 
-    pub fn update(&self, new_addr_pubkey: Vec<(Bytes, BlsPublicKey)>) {
+    pub fn update(&self, height: u64, new_addr_pubkey: Vec<(Bytes, BlsPublicKey)>) {
         let mut map = self.addr_pubkey.write();
 
         if map.capacity() < new_addr_pubkey.len() * REDUNDANCY_RATE {
             map.set_capacity(new_addr_pubkey.len() * REDUNDANCY_RATE);
         }
         map.extend(new_addr_pubkey.into_iter());
+        log::info!("[consensus]: crypto map {:?}");
     }
 }
 
