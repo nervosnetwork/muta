@@ -148,7 +148,7 @@ impl OverlordCrypto {
             map.set_capacity(new_addr_pubkey.len() * REDUNDANCY_RATE);
         }
         map.extend(new_addr_pubkey.into_iter());
-        log::info!("[consensus]: crypto map {:?}");
+        log::info!("[consensus]: crypto map {:?}", map);
     }
 }
 
