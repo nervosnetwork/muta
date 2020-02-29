@@ -336,6 +336,10 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         ctx: Context,
         height: u64,
     ) -> Result<Vec<Node>, Box<dyn Error + Send>> {
+        if height == 0 {
+            return Ok(vec![]);
+        }
+        
         let old_block = self
             .adapter
             .get_block_by_height(ctx.clone(), height - 1)
