@@ -339,7 +339,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         if height == 0 {
             return Ok(vec![]);
         }
-        
+
         let old_block = self
             .adapter
             .get_block_by_height(ctx.clone(), height - 1)

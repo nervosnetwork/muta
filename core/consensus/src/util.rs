@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::error::Error;
 
+use log::info;
 use lru_cache::LruCache;
 use overlord::Crypto;
 use parking_lot::RwLock;
@@ -146,9 +147,13 @@ impl OverlordCrypto {
 
         if map.capacity() < new_addr_pubkey.len() * REDUNDANCY_RATE {
             map.set_capacity(new_addr_pubkey.len() * REDUNDANCY_RATE);
+            info!(
+                "[consensus]: reset capacity to {}",
+                new_addr_pubkey.len() * REDUNDANCY_RATE
+            );
         }
         map.extend(new_addr_pubkey.into_iter());
-        log::info!("[consensus]: crypto map {:?}", map);
+        log::info!("[consensus]: crypto map len {}, {:?}", map.len(), map);
     }
 }
 
