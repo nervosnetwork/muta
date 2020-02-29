@@ -1,54 +1,33 @@
-# chain id
-chain_id = "b6a4d7da21443f5e816e8700eea87610e6d769657d6b8ec73028457bf2ca4036"  # by sha256(Muta)
-
-# crypto
-privkey = "037ddeb069fdfeede6993eb587b394bc1984a3ba21b8ea64d5b8679b0d673d77"
-
-# db config
-data_path = "./devtools/chain/data"
+privkey = "926bb710e17454a78d71e36c16a5cd3536f8483943112ce6979adeb78caa61bc"
+data_path = "/app/devtools/chain/data"
 
 [graphql]
-listening_address = "0.0.0.0:8000"
+listening_address = "0.0.0.0:8002"
 graphql_uri = "/graphql"
 graphiql_uri = "/graphiql"
+workers = 0
+maxconn = 25000
+max_payload_size = 1048576
 
 [network]
-listening_address = "0.0.0.0:1337"
-
+listening_address = "0.0.0.0:1339"
+rpc_timeout = 10
 [[network.bootstraps]]
-pubkey = "03d158fb85df6201708f2cbde51e0b7c2d8835a28aaea7ed243e5db1aa442b18b1"
+pubkey = "035cbdb9a9617a011cd780c036da0ac8641b681803bbfefdda207806de856df321"
 address = "173.20.0.21:1337"
 
 [mempool]
-timeout_gap = 200
-pool_size = 20000
-
-[consensus]
-cycles_limit = 99999999
-cycles_price = 1
-interval = 3000
-verifier_list = [ 
-    "10ecc2746d8ad8ca82872bf0af59ebefbe003b2d0c",
-    "10c198d22b505a51f11f0358353f341abff4dfee61",
-    "10bbd58fe01f00aeb469175585bd2858b5b21c5092",
-    "104c52183d10fe7f65f3b22b45528d97212507bd6c" 
-]
-private_key = "00000000000000000000000000000000225f706e92685de787b8dcfae639ff5490d0f9ed290c7c9eed255eed4b4b9b49"
-public_keys = [
-    "040093d0344b912ea2052626714b03917dc1143323b0a4ee64fd038b872360a2c0638cffbc6a057eb2c9b06791517048db0fa29a4cc0817cc484ca30ca89972ed0fc15c0ca6ee02a7a1243e63e3af92b3af0abe7f39b4aa4166b7a39496b24fa6d",
-    "0400cb2ef3a26fc5d8cec600a9a8e9636bb9aa6ff2a76d415a21423cb9c793024189462d53d7a932a9a1830e7c7b5bb44406b4eb64d3f804e5e0985df659cae5a9e343eecaecbc0a54bba611c69c2dda2635bfbd0d13247179339296d91a13c73f",
-    "040f9c45d8f424fbfe4528f0126dc35ef78a0b649629b5bb9c718b53af2d797ac73ebb94787fd72d47b9fbb56251d98c0500bf5212d5814acdf9814ae2721ee5867f15fb8db4ee46a99e1711e5139b91dec7fda2cc35b94f0c05eb1f5a9a7f9915",
-    "0408296f313314f4507b93c93d76cdb63f1b93553a6d19114bc1c07732a2d528799e216c6fb03931b3fba31ce6420e01e40875e4595bd8cb70cb6af7bcf0a62259628acab7b22ec7bbbcf9e1e0fd60fab7be85f4e199de13da332656a8cecc84a0"
-]
-common_ref = "6d757461"
-
-[consensus.duration]
-propose_numerator = 24
-propose_denominator = 30
-prevote_numerator = 6
-prevote_denominator = 30
-precommit_numerator = 6
-precommit_denominator = 30
+pool_size = 200000
+broadcast_txs_size = 200
+broadcast_txs_interval = 200
 
 [executor]
 light = false
+
+[logger]
+filter = "info"
+log_to_console = true
+console_show_file_and_line = false
+log_path = "/app/devtools/chain/data/logs"
+log_to_file = true
+metrics = true

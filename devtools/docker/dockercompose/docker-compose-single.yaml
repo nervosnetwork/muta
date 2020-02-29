@@ -3,13 +3,14 @@ version: '2'
 services:
   node0:
     container_name: node0
-    image: nervos/muta:latest
+    image: mutadev/muta:latest
     hostname: node0
     environment:
       - RUST_BACKTRACE
     volumes:
       - ./config-single.toml:/app/devtools/chain/config.toml
-      - ../../../target/data/single:/app/devtools/chain/data
+      - ./genesis-single.toml:/app/devtools/chain/genesis.toml
+      - /tmp/data:/app/devtools/chain/data
     ports:
       - "1337:1337"
       - "8000:8000"

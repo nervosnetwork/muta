@@ -1,0 +1,9 @@
+timestamp = 0
+prevhash = "44915be5b6c20b0678cf05fcddbbaa832e25d7e6ac538784cd5c24de00d47472"
+[[services]]
+name = "asset"
+payload = "{\n    \"id\": \"f56924db538e77bb5951eb5ff0d02b88983c49c45eea30e8ae3e7234b311436c\",\n    \"name\": \"MutaToken\",\n    \"symbol\": \"MT\",\n    \"supply\": 320000011,\n    \"issuer\": \"f8389d774afdad8755ef8e629e5a154fddc6325a\"\n}\n"
+
+[[services]]
+name = "metadata"
+payload = "{\"chain_id\": \"b6a4d7da21443f5e816e8700eea87610e6d769657d6b8ec73028457bf2ca4036\", \"common_ref\": \"763256784d7731546479\", \"timeout_gap\": 999999, \"cycles_limit\": 630000000, \"cycles_price\": 1, \"interval\": 3000, \"verifier_list\": [{\"bls_pub_key\": \"04059354574a6dd8dcef05954f4c591eeeacff7743c0a192ead01579c3ab0d25a2ba7462a76a3d7d5b414806606983981e079e461bcf0e19c4a7c6a2f45577bc9fc18bf4d7aa2ce3978884fd3bb5add116fd0f003606455f584fd963e6a9fbe241\", \"address\": \"71f9121b8da0ec9e398f358185fb305347007a86\", \"propose_weight\": 1, \"vote_weight\": 1}], \"propose_ratio\": 15, \"prevote_ratio\": 10, \"precommit_ratio\": 10, \"brake_ratio\": 7, \"tx_num_limit\": 30000, \"max_tx_size\": 1024}"
