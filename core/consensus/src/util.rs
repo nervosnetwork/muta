@@ -109,8 +109,7 @@ impl Crypto for OverlordCrypto {
             pub_keys.push(pub_key);
         }
 
-        let aggregate_key =
-            BlsPublicKey::aggregate(pub_keys.iter().map(|key| key).collect::<Vec<_>>());
+        let aggregate_key = BlsPublicKey::aggregate(pub_keys);
         let aggregated_signature = BlsSignature::try_from(aggregated_signature.as_ref())
             .map_err(|e| ProtocolError::from(ConsensusError::CryptoErr(Box::new(e))))?;
         let hash = HashValue::try_from(hash.as_ref()).map_err(|_| {
