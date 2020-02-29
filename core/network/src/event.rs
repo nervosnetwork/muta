@@ -37,11 +37,6 @@ pub enum RetryKind {
     #[display(fmt = "peer multiplex stream error: {}", _0)]
     Multiplex(Box<dyn Error + Send>),
 
-    // FIXME
-    #[allow(dead_code)]
-    #[display(fmt = "peer session closed")]
-    SessionClosed,
-
     #[display(fmt = "{}", _0)]
     Other(&'static str),
 }
@@ -116,7 +111,7 @@ pub enum PeerManagerEvent {
     SessionBlocked { ctx: Arc<SessionContext> },
 
     #[display(fmt = "remove peer by session {} kind: {}", sid, kind)]
-    RemovePeerBySession { sid: SessionId, kind: RemoveKind },
+    BadSession { sid: SessionId, kind: RemoveKind },
 
     #[display(fmt = "retry peer {:?} later, disconnect now, kind: {}", pid, kind)]
     RetryPeerLater { pid: PeerId, kind: RetryKind },

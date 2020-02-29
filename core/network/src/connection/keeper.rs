@@ -132,7 +132,7 @@ impl ServiceHandle for ConnectionServiceKeeper {
                     RemoveKind::ProtocolSelect
                 };
 
-                let protocol_select_failure = PeerManagerEvent::RemovePeerBySession {
+                let protocol_select_failure = PeerManagerEvent::BadSession {
                     sid: session_context.id,
                     kind,
                 };
@@ -145,7 +145,7 @@ impl ServiceHandle for ConnectionServiceKeeper {
                     proto_id,
                     err: Box::new(error),
                 };
-                let broken_protocol = PeerManagerEvent::RemovePeerBySession { sid: id, kind };
+                let broken_protocol = PeerManagerEvent::BadSession { sid: id, kind };
 
                 self.report_peer(broken_protocol);
             }

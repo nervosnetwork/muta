@@ -1,36 +1,25 @@
-use super::{PeerMultiaddr, MAX_RETRY_COUNT};
+use super::{time, ArcUnknownPeer, PeerAddrSet, Retry, MAX_RETRY_COUNT};
 
 use std::{
-    borrow::{Borrow, Cow},
-    collections::HashSet,
-    convert::TryFrom,
+    borrow::Borrow,
     fmt,
     hash::{Hash, Hasher},
     ops::Deref,
     sync::{
-        atomic::{AtomicU64, AtomicU8, AtomicUsize, Ordering},
+        atomic::{AtomicU64, AtomicUsize, Ordering},
         Arc,
     },
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 use derive_more::Display;
-use parking_lot::RwLock;
 use protocol::{types::Address, Bytes};
 use tentacle::{
-    multiaddr::Multiaddr,
     secio::{PeerId, PublicKey},
     SessionId,
 };
 
-use crate::{
-    error::{ErrorKind, PeerIdNotFound},
-    traits::MultiaddrExt,
-};
-
-pub const BACKOFF_BASE: u64 = 2;
-pub const MAX_RETRY_INTERVAL: u64 = 512; // seconds
-pub const VALID_ATTEMPT_INTERVAL: u64 = 4;
+use crate::error::ErrorKind;
 
 const CONNECTEDNESS_MASK: usize = 0b110;
 
@@ -77,34 +66,31 @@ impl From<Connectedness> for usize {
 pub struct Peer {
     pub id:          Arc<PeerId>,
     pub pubkey:      Arc<PublicKey>,
-    multiaddrs:      RwLock<HashSet<PeerMultiaddr>>,
     pub chain_addr:  Arc<Address>,
+    pub multiaddrs:  Arc<PeerAddrSet>,
+    pub retry:       Retry,
     connectedness:   AtomicUsize,
     session_id:      AtomicUsize,
-    retry:           AtomicU8,
-    next_attempt:    AtomicU64,
     connected_at:    AtomicU64,
     disconnected_at: AtomicU64,
-    attempt_at:      AtomicU64,
     alive:           AtomicU64,
 }
 
 impl Peer {
     pub fn from_pubkey(pubkey: PublicKey) -> Result<Self, ErrorKind> {
         let chain_addr = Peer::pubkey_to_chain_addr(&pubkey)?;
+        let peer_id = pubkey.peer_id();
 
         let peer = Peer {
-            id:              Arc::new(pubkey.peer_id()),
+            id:              Arc::new(peer_id.clone()),
             pubkey:          Arc::new(pubkey),
-            multiaddrs:      RwLock::new(HashSet::new()),
+            multiaddrs:      Arc::new(PeerAddrSet::new(peer_id)),
             chain_addr:      Arc::new(chain_addr),
+            retry:           Retry::new(MAX_RETRY_COUNT),
             connectedness:   AtomicUsize::new(Connectedness::CanConnect as usize),
             session_id:      AtomicUsize::new(0),
-            retry:           AtomicU8::new(0),
-            next_attempt:    AtomicU64::new(0),
             connected_at:    AtomicU64::new(0),
             disconnected_at: AtomicU64::new(0),
-            attempt_at:      AtomicU64::new(0),
             alive:           AtomicU64::new(0),
         };
 
@@ -117,64 +103,6 @@ impl Peer {
 
     pub fn owned_pubkey(&self) -> PublicKey {
         self.pubkey.as_ref().to_owned()
-    }
-
-    fn validate_multiaddr(pid: &PeerId, ma: &PeerMultiaddr) -> bool {
-        ma.has_id() && ma.id_bytes() == Some(Cow::Borrowed(pid.as_bytes()))
-    }
-
-    pub fn set_multiaddrs(&self, multiaddrs: Vec<PeerMultiaddr>) {
-        let multiaddrs = multiaddrs
-            .into_iter()
-            .filter(|ma| Self::validate_multiaddr(self.id.as_ref(), ma))
-            .collect::<HashSet<_>>();
-
-        *self.multiaddrs.write() = multiaddrs;
-    }
-
-    pub fn add_multiaddrs(&self, multiaddrs: Vec<PeerMultiaddr>) {
-        let multiaddrs = multiaddrs
-            .into_iter()
-            .filter(|ma| Self::validate_multiaddr(self.id.as_ref(), ma))
-            .collect::<Vec<_>>();
-
-        self.multiaddrs.write().extend(multiaddrs)
-    }
-
-    // For NetworkConfig
-    pub fn set_raw_multiaddrs(&self, multiaddrs: Vec<Multiaddr>) -> Result<(), PeerIdNotFound> {
-        let multiaddrs = multiaddrs
-            .into_iter()
-            .map(PeerMultiaddr::try_from)
-            .collect::<Result<Vec<_>, _>>()?;
-
-        self.multiaddrs.write().extend(multiaddrs);
-        Ok(())
-    }
-
-    pub fn remove_multiaddr(&self, multiaddr: &PeerMultiaddr) {
-        self.multiaddrs.write().remove(multiaddr);
-    }
-
-    pub fn contains_multiaddr(&self, multiaddr: &PeerMultiaddr) -> bool {
-        self.multiaddrs.read().contains(multiaddr)
-    }
-
-    pub fn multiaddrs(&self) -> Vec<PeerMultiaddr> {
-        self.multiaddrs.read().iter().cloned().collect()
-    }
-
-    pub fn raw_multiaddrs(&self) -> Vec<Multiaddr> {
-        self.multiaddrs
-            .read()
-            .iter()
-            .cloned()
-            .map(Into::into)
-            .collect()
-    }
-
-    pub fn multiaddrs_len(&self) -> usize {
-        self.multiaddrs.read().len()
     }
 
     pub fn connectedness(&self) -> Connectedness {
@@ -192,10 +120,6 @@ impl Peer {
 
     pub fn session_id(&self) -> SessionId {
         self.session_id.load(Ordering::SeqCst).into()
-    }
-
-    pub fn next_attempt(&self) -> u64 {
-        self.next_attempt.load(Ordering::SeqCst)
     }
 
     pub fn connected_at(&self) -> u64 {
@@ -221,66 +145,13 @@ impl Peer {
     pub fn update_alive(&self) {
         let connected_at =
             UNIX_EPOCH + Duration::from_secs(self.connected_at.load(Ordering::SeqCst));
-        let alive = duration_since(SystemTime::now(), connected_at).as_secs();
+        let alive = time::duration_since(SystemTime::now(), connected_at).as_secs();
 
         self.alive.store(alive, Ordering::SeqCst);
     }
 
     pub(super) fn set_alive(&self, live: u64) {
         self.alive.store(live, Ordering::SeqCst);
-    }
-
-    pub fn retry_ready(&self) -> bool {
-        let next_attempt = Duration::from_secs(self.next_attempt.load(Ordering::SeqCst));
-
-        Self::now() > next_attempt.as_secs()
-    }
-
-    pub fn retry(&self) -> u8 {
-        self.retry.load(Ordering::SeqCst)
-    }
-
-    pub fn set_retry(&self, retry: u8) {
-        self.retry.store(retry, Ordering::SeqCst);
-        self.attempt_at.store(Self::now(), Ordering::SeqCst);
-
-        let mut secs = BACKOFF_BASE.pow(retry as u32);
-        if secs > MAX_RETRY_INTERVAL {
-            secs = MAX_RETRY_INTERVAL;
-        }
-
-        let next_attempt = Self::now().saturating_add(secs);
-        self.next_attempt.store(next_attempt, Ordering::SeqCst);
-    }
-
-    #[cfg(test)]
-    pub fn set_attempt_at(&self, at: u64) {
-        self.attempt_at.store(at, Ordering::SeqCst);
-    }
-
-    pub(super) fn set_next_attempt(&self, at: u64) {
-        self.next_attempt.store(at, Ordering::SeqCst);
-    }
-
-    pub fn increase_retry(&self) {
-        let last_attempt = UNIX_EPOCH + Duration::from_secs(self.attempt_at.load(Ordering::SeqCst));
-
-        // Every time we try connect to a peer, we use all addresses. If
-        // fail, we should only increase once.
-        if duration_since(SystemTime::now(), last_attempt).as_secs() < VALID_ATTEMPT_INTERVAL {
-            return;
-        }
-
-        let retry = self.retry.load(Ordering::SeqCst).saturating_add(1);
-        self.set_retry(retry);
-    }
-
-    pub fn reset_retry(&self) {
-        self.retry.store(0, Ordering::SeqCst);
-    }
-
-    pub fn run_out_retry(&self) -> bool {
-        self.retry.load(Ordering::SeqCst) > MAX_RETRY_COUNT
     }
 
     pub fn pubkey_to_chain_addr(pubkey: &PublicKey) -> Result<Address, ErrorKind> {
@@ -295,7 +166,7 @@ impl Peer {
     pub fn mark_connected(&self, sid: SessionId) {
         self.set_connectedness(Connectedness::Connected);
         self.set_session_id(sid);
-        self.reset_retry();
+        self.retry.reset();
         self.update_connected();
     }
 
@@ -307,16 +178,11 @@ impl Peer {
     }
 
     fn update_connected(&self) {
-        self.connected_at.store(Self::now(), Ordering::SeqCst);
+        self.connected_at.store(time::now(), Ordering::SeqCst);
     }
 
     fn update_disconnected(&self) {
-        self.disconnected_at.store(Self::now(), Ordering::SeqCst);
-    }
-
-    // Pub(super) for test
-    pub(super) fn now() -> u64 {
-        duration_since(SystemTime::now(), UNIX_EPOCH).as_secs()
+        self.disconnected_at.store(time::now(), Ordering::SeqCst);
     }
 }
 
@@ -330,7 +196,7 @@ impl fmt::Display for Peer {
             self.multiaddrs.read().iter(),
             self.connected_at.load(Ordering::SeqCst),
             self.alive.load(Ordering::SeqCst),
-            self.retry.load(Ordering::SeqCst),
+            self.retry.count(),
             Connectedness::from(self.connectedness.load(Ordering::SeqCst))
         )
     }
@@ -343,6 +209,12 @@ pub struct ArcPeer(Arc<Peer>);
 impl ArcPeer {
     pub fn from_pubkey(pubkey: PublicKey) -> Result<Self, ErrorKind> {
         Ok(ArcPeer(Arc::new(Peer::from_pubkey(pubkey)?)))
+    }
+
+    pub fn from_unknown(unknown: ArcUnknownPeer, pubkey: PublicKey) -> Result<Self, ErrorKind> {
+        let mut peer = Peer::from_pubkey(pubkey)?;
+        peer.multiaddrs = Arc::clone(&unknown.multiaddrs);
+        Ok(ArcPeer(Arc::new(peer)))
     }
 }
 
@@ -371,12 +243,5 @@ impl Eq for ArcPeer {}
 impl Hash for ArcPeer {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.id.hash(state)
-    }
-}
-
-fn duration_since(now: SystemTime, early: SystemTime) -> Duration {
-    match now.duration_since(early) {
-        Ok(duration) => duration,
-        Err(e) => e.duration(),
     }
 }

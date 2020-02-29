@@ -234,9 +234,7 @@ impl NetworkConfig {
                 multiaddr.push_id(peer_id);
             }
 
-            peer.set_raw_multiaddrs(vec![multiaddr])
-                .map_err(NetworkError::from)?;
-
+            peer.multiaddrs.insert_raw(multiaddr);
             Ok(peer)
         };
 

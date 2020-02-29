@@ -692,7 +692,7 @@ async fn should_disconnect_session_and_remove_peer_on_remove_peer_by_session() {
 
     let test_peer = remote_peers.first().expect("get first peer");
     let expect_sid = test_peer.session_id();
-    let remove_peer_by_session = PeerManagerEvent::RemovePeerBySession {
+    let remove_peer_by_session = PeerManagerEvent::BadSession {
         sid:  test_peer.session_id(),
         kind: RemoveKind::ProtocolSelect,
     };
@@ -751,7 +751,7 @@ async fn should_keep_bootstrap_peer_but_max_retry_on_remove_peer_by_session() {
     );
 
     let expect_sid = boot_peer.session_id();
-    let remove_peer_by_session = PeerManagerEvent::RemovePeerBySession {
+    let remove_peer_by_session = PeerManagerEvent::BadSession {
         sid:  boot_peer.session_id(),
         kind: RemoveKind::ProtocolSelect,
     };

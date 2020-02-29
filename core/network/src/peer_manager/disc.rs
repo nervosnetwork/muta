@@ -67,7 +67,7 @@ impl AddressManager for DiscoveryAddrManager {
 
         // Right now, we just remove peer
         let kind = RemoveKind::BadSessionPeer("discovery misbehavior".to_owned());
-        let remove_peer_by_session = PeerManagerEvent::RemovePeerBySession { sid, kind };
+        let remove_peer_by_session = PeerManagerEvent::BadSession { sid, kind };
 
         self.reporter.report(remove_peer_by_session);
         MisbehaveResult::Disconnect

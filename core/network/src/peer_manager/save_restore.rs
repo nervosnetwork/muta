@@ -14,7 +14,8 @@ use tentacle::{multiaddr::Multiaddr, secio::PublicKey};
 
 use crate::error::NetworkError;
 
-// TODO: remove skip tag on retry and next_attempt
+// TODO: remove skip tag on retry and next_attempt_at
+// TODO: save multiaddr failure count
 #[derive(Debug, Serialize, Deserialize)]
 struct SerdePeer {
     pubkey:          PeerPubKey,
@@ -23,7 +24,7 @@ struct SerdePeer {
     #[serde(skip)]
     retry:           u8,
     #[serde(skip)]
-    next_attempt:    u64,
+    next_attempt_at: u64,
     connected_at:    u64,
     disconnected_at: u64,
     alive:           u64,
@@ -38,10 +39,10 @@ impl From<ArcPeer> for SerdePeer {
 
         SerdePeer {
             pubkey:          PeerPubKey(peer.pubkey.as_ref().to_owned()),
-            multiaddrs:      peer.multiaddrs(),
+            multiaddrs:      peer.multiaddrs.all(),
             connectedness:   connectedness as usize,
-            retry:           peer.retry(),
-            next_attempt:    peer.next_attempt(),
+            retry:           peer.retry.count(),
+            next_attempt_at: peer.retry.next_attempt_at(),
             connected_at:    peer.connected_at(),
             disconnected_at: peer.disconnected_at(),
             alive:           peer.alive(),
@@ -65,11 +66,11 @@ impl TryFrom<SerdePeer> for ArcPeer {
                 PeerMultiaddr::new(ma, &pid)
             })
             .collect();
-        peer.set_multiaddrs(multiaddrs);
+        peer.multiaddrs.set(multiaddrs);
 
         peer.set_connectedness(Connectedness::from(serde_peer.connectedness));
-        peer.set_retry(serde_peer.retry);
-        peer.set_next_attempt(serde_peer.next_attempt);
+        peer.retry.set(serde_peer.retry);
+        peer.retry.set_next_attempt_at(serde_peer.next_attempt_at);
         peer.set_connected_at(serde_peer.connected_at);
         peer.set_disconnected_at(serde_peer.disconnected_at);
         peer.set_alive(serde_peer.alive);
