@@ -344,13 +344,13 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             .adapter
             .get_block_by_height(ctx.clone(), height - 1)
             .await?;
-        let metadata = self.adapter.get_metadata(
+        let old_metadata = self.adapter.get_metadata(
             ctx,
             old_block.header.state_root.clone(),
             old_block.header.timestamp,
             old_block.header.height,
         )?;
-        let mut validators = metadata
+        let mut old_validators = old_metadata
             .verifier_list
             .into_iter()
             .map(|v| Node {
@@ -359,8 +359,8 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
                 vote_weight:    v.vote_weight,
             })
             .collect::<Vec<_>>();
-        validators.sort();
-        Ok(validators)
+        old_validators.sort();
+        Ok(old_validators)
     }
 }
 
