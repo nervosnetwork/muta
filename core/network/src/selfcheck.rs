@@ -40,7 +40,7 @@ where
         let sids = self.sessions.all();
         let mut total_size = 0;
 
-        let report = sids
+        let peer_reports = sids
             .into_iter()
             .map(|sid| {
                 let connected_addr = self.sessions.connected_addr(sid);
@@ -52,8 +52,10 @@ where
             .collect::<Vec<_>>();
 
         info!(
-            "total pending size {} MB, session(s) {:?}",
-            total_size, report
+            "total connected peers: {}, pending size {} MB, session(s) {:?}",
+            peer_reports.len(),
+            total_size,
+            peer_reports
         );
     }
 }

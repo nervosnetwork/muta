@@ -530,6 +530,7 @@ impl Inner {
         self.sessions.read().get(&sid).cloned()
     }
 
+    #[allow(dead_code)]
     pub fn share_sessions(&self) -> Vec<ArcSession> {
         self.sessions.read().iter().cloned().collect()
     }
@@ -700,15 +701,6 @@ impl PeerManager {
         if self.conn_tx.unbounded_send(disconnect_peer).is_err() {
             error!("network: connection service exit");
         }
-    }
-
-    pub fn connected_addrs(&self) -> Vec<ConnectedAddr> {
-        let sessions = self.inner.share_sessions();
-
-        sessions
-            .into_iter()
-            .map(|s| s.connected_addr.to_owned())
-            .collect()
     }
 
     fn connectable_unknowns(&self, max: usize) -> Vec<ArcUnknownPeer> {
@@ -1169,14 +1161,6 @@ impl Future for PeerManager {
 
             self.process_event(event);
         }
-
-        let connected_addrs = self.connected_addrs();
-        debug!(
-            "network: {:?}: connected peer_addr(s) {}: {:?}",
-            self.peer_id,
-            connected_addrs.len(),
-            connected_addrs
-        );
 
         // Check connecting count
         let connected_count = self.inner.connected();
