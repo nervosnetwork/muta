@@ -52,7 +52,7 @@ pub const DEFAULT_SELF_HEART_BEAT_INTERVAL: u64 = 35;
 pub const DEFAULT_RPC_TIMEOUT: u64 = 10;
 
 // Selfcheck
-pub const DEFAULT_SELF_CHECK_INTERVAL: u64 = 10;
+pub const DEFAULT_SELF_CHECK_INTERVAL: u64 = 30;
 
 pub type PublicKeyHexStr = String;
 pub type PrivateKeyHexStr = String;
