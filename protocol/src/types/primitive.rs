@@ -256,7 +256,7 @@ impl fmt::Debug for ValidatorExtend {
         } else {
             self.bls_pub_key.as_str()
         };
-        
+
         write!(
             f,
             "bls public key {:?}, address {:?}, propose weight {}, vote weight {}",
