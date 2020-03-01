@@ -1084,9 +1084,8 @@ impl PeerManager {
 
         let peer_addr = PeerMultiaddr::new(addr, &session.peer.id);
 
-        // TODO: For ConnectionType::Inbound, records repeated count,
-        // reduce that peer's score, eventually ban it for a while.
         if ty == ConnectionType::Inbound {
+            session.peer.multiaddrs.remove(&peer_addr);
             return;
         }
 
