@@ -1082,6 +1082,8 @@ impl PeerManager {
             }
         };
 
+        let peer_addr = PeerMultiaddr::new(addr, &session.peer.id);
+
         // TODO: For ConnectionType::Inbound, records repeated count,
         // reduce that peer's score, eventually ban it for a while.
         if ty == ConnectionType::Inbound {
@@ -1089,8 +1091,11 @@ impl PeerManager {
         }
 
         // Insert multiaddr
-        let peer_addr = PeerMultiaddr::new(addr, &session.peer.id);
-        session.peer.multiaddrs.insert(vec![peer_addr]);
+        if session.peer.multiaddrs.contains(&peer_addr) {
+            session.peer.multiaddrs.reset_failure(&peer_addr);
+        } else {
+            session.peer.multiaddrs.insert(vec![peer_addr.clone()]);
+        }
     }
 
     fn process_event(&mut self, event: PeerManagerEvent) {
