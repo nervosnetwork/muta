@@ -63,7 +63,10 @@ use tentacle::{
 use crate::{
     common::{ConnectedAddr, HeartBeat},
     error::{NetworkError, PeerIdNotFound},
-    event::{ConnectionEvent, ConnectionType, PeerManagerEvent},
+    event::{
+        ConnectionErrorKind, ConnectionEvent, ConnectionType, MisbehaviorKind, PeerManagerEvent,
+        SessionErrorKind,
+    },
     traits::MultiaddrExt,
 };
 
@@ -568,6 +571,10 @@ pub struct PeerManagerHandle {
 }
 
 impl PeerManagerHandle {
+    pub fn peer_id(&self, sid: SessionId) -> Option<PeerId> {
+        self.inner.session(sid).map(|s| s.peer.owned_id())
+    }
+
     pub fn random_addrs(&self, max: usize) -> Vec<Multiaddr> {
         let mut rng = rand::thread_rng();
         let book = self.inner.peers.read();
@@ -853,6 +860,81 @@ impl PeerManager {
         }
     }
 
+    fn connect_failed(&mut self, addr: Multiaddr, kind: ConnectionErrorKind) {
+        let peer_addr: PeerMultiaddr = match addr.clone().try_into() {
+            Ok(pma) => pma,
+            Err(e) => {
+                // All multiaddrs we dial have peer id included
+                error!("unconnectable multiaddr {} without peer id {}", addr, e);
+                return;
+            }
+        };
+
+        let peer_id = peer_addr.peer_id();
+        match self.connecting.take(&peer_id) {
+            Some(attempt) => {
+                attempt.complete_one_multiaddr();
+                if let ConnectionErrorKind::Io(_) | ConnectionErrorKind::DNSResolver(_) = kind {
+                    attempt.peer.multiaddrs().inc_failure(&peer_addr);
+                } else {
+                    warn!("give up {} because {}", peer_addr, kind);
+                    attempt.peer.multiaddrs().give_up(&peer_addr);
+                }
+
+                if attempt.multiaddrs() == 0 {
+                    // No more connecting multiaddrs from this peer
+                    // This means all multiaddrs failure
+                    attempt.peer.retry().inc();
+                    attempt.peer.set_connectedness(Connectedness::CanConnect);
+
+                    if attempt.peer.retry().run_out() {
+                        attempt.peer.set_connectedness(Connectedness::Unconnectable);
+                        if let ConnectablePeer::Unknown(ref p) = attempt.peer {
+                            self.unknowns.remove(p.id.as_ref());
+                        }
+                    }
+                } else {
+                    // Wait for other connecting multiaddrs result
+                    self.connecting.insert(attempt);
+                }
+            }
+            None => {
+                // Peer is already connected using one of its multiaddrs
+                if let Some(peer) = self.inner.peer(&peer_id) {
+                    if let ConnectionErrorKind::Io(_) | ConnectionErrorKind::DNSResolver(_) = kind {
+                        peer.multiaddrs.inc_failure(&peer_addr);
+                    } else {
+                        warn!("give up {} because {}", peer_addr, kind);
+                        peer.multiaddrs.give_up(&peer_addr);
+                    }
+                }
+            }
+        }
+    }
+
+    fn session_failed(&self, sid: SessionId, kind: SessionErrorKind) {
+        debug!("session {} failed", sid);
+
+        let session = match self.inner.remove_session(sid) {
+            Some(s) => s,
+            None => return, /* Session may be removed by other event or rejected
+                             * due to max connections before insert */
+        };
+        // Ensure we disconnect this peer
+        self.disconnect_session(sid);
+        session.peer.mark_disconnected();
+
+        if let SessionErrorKind::Io(_) = kind {
+            session.peer.retry.inc();
+        } else {
+            let pid = &session.peer.id;
+            let remote_addr = &session.connected_addr;
+
+            warn!("give up peer {:?} from {} {}", pid, remote_addr, kind);
+            session.peer.set_connectedness(Connectedness::Unconnectable);
+        }
+    }
+
     fn update_peer_alive(&self, pid: &PeerId) {
         if let Some(peer) = self.inner.peer(pid) {
             peer.retry.reset(); // Just in case
@@ -860,20 +942,33 @@ impl PeerManager {
         }
     }
 
-    // Dont dial this peer unless it get its problem solved. But
-    // this doesn't mean ban. We still allow its incoming connection.
-    fn bad_session(&self, sid: SessionId) {
-        let session = match self.inner.remove_session(sid) {
-            Some(s) => s,
+    // TODO: score system
+    fn peer_misbehave(&self, pid: PeerId, kind: MisbehaviorKind) {
+        use MisbehaviorKind::*;
+
+        let peer = match self.inner.peer(&pid) {
+            Some(p) => p,
             None => {
-                warn!("impossible, unregistered session {}", sid);
+                error!("misbehave peer {:?} not found", pid);
                 return;
             }
         };
 
-        session.peer.mark_disconnected();
-        session.peer.set_connectedness(Connectedness::Unconnectable);
+        let sid = peer.session_id();
+        if sid == SessionId::new(0) {
+            error!("misbehave peer with session id 0");
+            return;
+        }
+
+        self.inner.remove_session(sid);
+        peer.mark_disconnected();
+        // Ensure we disconnect from this peer
         self.disconnect_session(sid);
+
+        match kind {
+            PingTimeout => peer.retry.inc(),
+            PingUnexpect | Discovery => peer.set_connectedness(Connectedness::Unconnectable), /* Give up this peer */
+        }
     }
 
     fn session_blocked(&self, ctx: Arc<SessionContext>) {
@@ -886,29 +981,6 @@ impl PeerManager {
         if let Some(session) = self.inner.session(ctx.id) {
             session.block();
         }
-    }
-
-    fn retry_peer_later(&self, pid: &PeerId) {
-        let peer = match self.inner.peer(pid) {
-            Some(p) => p,
-            None => return,
-        };
-        info!("retry peer later {:?}", pid);
-
-        if peer.connectedness() == Connectedness::Connected {
-            let sid = peer.session_id();
-            self.inner.remove_session(sid);
-
-            // Make sure we disconnect this peer
-            self.disconnect_session(sid);
-        }
-        // FIXME: rename to peer session failure
-        // if peer.connectedness() == Connectedness::Connecting {
-        //     self.connecting.remove(pid);
-        // }
-
-        peer.mark_disconnected();
-        peer.retry.inc();
     }
 
     fn connect_peers_now(&mut self, peers: Vec<ConnectablePeer>) {
@@ -1029,105 +1101,11 @@ impl PeerManager {
         session.peer.multiaddrs.insert(vec![peer_addr]);
     }
 
-    fn unconnectable_multiaddr(&mut self, addr: Multiaddr) {
-        let peer_addr: PeerMultiaddr = match addr.clone().try_into() {
-            Ok(pma) => pma,
-            Err(e) => {
-                // All multiaddrs we dial have peer id included
-                error!("unconnectable multiaddr {} without peer id {}", addr, e);
-                return;
-            }
-        };
-
-        let peer_id = peer_addr.peer_id();
-        match self.connecting.take(&peer_id) {
-            Some(attempt) => {
-                attempt.complete_one_multiaddr();
-                attempt.peer.multiaddrs().set_max_failure(&peer_addr);
-
-                if attempt.multiaddrs() == 0 {
-                    // No more connecting multiaddrs from this peer
-                    // This means all multiaddrs failure
-                    attempt.peer.retry().inc();
-                    attempt.peer.set_connectedness(Connectedness::CanConnect);
-
-                    if attempt.peer.retry().run_out() {
-                        attempt.peer.set_connectedness(Connectedness::Unconnectable);
-                        if let ConnectablePeer::Unknown(ref p) = attempt.peer {
-                            self.unknowns.remove(p.id.as_ref());
-                        }
-                    }
-                } else {
-                    // Wait for other connecting multiaddrs result
-                    self.connecting.insert(attempt);
-                }
-            }
-            None => {
-                // Peer is already connected using one of its multiaddrs
-                if let Some(peer) = self.inner.peer(&peer_id) {
-                    peer.multiaddrs.set_max_failure(&peer_addr);
-                }
-            }
-        }
-    }
-
-    fn reconnect_addr_later(&mut self, addr: Multiaddr) {
-        let peer_addr: PeerMultiaddr = match addr.clone().try_into() {
-            Ok(pma) => pma,
-            Err(e) => {
-                // All multiaddrs we dial have peer id included
-                error!("unconnectable multiaddr {} without peer id {}", addr, e);
-                return;
-            }
-        };
-
-        let peer_id = peer_addr.peer_id();
-        match self.connecting.take(&peer_id) {
-            Some(attempt) => {
-                attempt.complete_one_multiaddr();
-                attempt.peer.multiaddrs().inc_failure(&peer_addr);
-
-                if attempt.multiaddrs() == 0 {
-                    // No more connecting multiaddrs from this peer
-                    // This means all multiaddrs failure
-                    attempt.peer.retry().inc();
-                    attempt.peer.set_connectedness(Connectedness::CanConnect);
-
-                    if attempt.peer.retry().run_out() {
-                        attempt.peer.set_connectedness(Connectedness::Unconnectable);
-                        if let ConnectablePeer::Unknown(ref p) = attempt.peer {
-                            self.unknowns.remove(p.id.as_ref());
-                        }
-                    }
-                } else {
-                    // Wait for other connecting multiaddrs result
-                    self.connecting.insert(attempt);
-                }
-            }
-            None => {
-                // Peer is already connected using one of its multiaddrs
-                if let Some(peer) = self.inner.peer(&peer_id) {
-                    peer.multiaddrs.inc_failure(&peer_addr);
-                }
-            }
-        }
-    }
-
     fn process_event(&mut self, event: PeerManagerEvent) {
         match event {
-            PeerManagerEvent::NewSession { pubkey, ctx, .. } => self.new_session(pubkey, ctx),
-            PeerManagerEvent::SessionClosed { sid, .. } => self.session_closed(sid),
-            PeerManagerEvent::PeerAlive { pid } => self.update_peer_alive(&pid),
-            PeerManagerEvent::BadSession { sid, .. } => self.bad_session(sid),
-            PeerManagerEvent::SessionBlocked { ctx, .. } => self.session_blocked(ctx),
-            PeerManagerEvent::RetryPeerLater { pid, .. } => self.retry_peer_later(&pid),
             PeerManagerEvent::ConnectPeersNow { pids } => self.connect_peers_by_id(pids),
-            PeerManagerEvent::ProtectPeersByChainAddr { chain_addrs } => {
-                self.inner.protect_peers_by_chain_addr(chain_addrs);
-            }
-            PeerManagerEvent::DiscoverAddr { addr } => self.discover_multiaddr(addr),
-            PeerManagerEvent::DiscoverMultiAddrs { addrs } => self.dicover_multi_multiaddrs(addrs),
-            PeerManagerEvent::IdentifiedAddrs { pid, addrs } => self.identified_addrs(&pid, addrs),
+            PeerManagerEvent::ConnectFailed { addr, kind } => self.connect_failed(addr, kind),
+            PeerManagerEvent::NewSession { pubkey, ctx, .. } => self.new_session(pubkey, ctx),
             // NOTE: Alice may disconnect to Bob, but bob didn't know
             // that, so the next time, Alice try to connect to Bob will
             // cause repeated connection. The only way to fix this right
@@ -1135,17 +1113,16 @@ impl PeerManager {
             PeerManagerEvent::RepeatedConnection { ty, sid, addr } => {
                 self.repeated_connection(ty, sid, addr)
             }
-            // TODO: ban unconnectable address for a while instead of repeated
-            // connection attempts.
-            PeerManagerEvent::UnconnectableAddress { addr, kind, .. } => {
-                // Since io::Other is unexpected, it's ok warning here.
-                warn!("unconnectable address {} {}", addr, kind);
-                self.unconnectable_multiaddr(addr)
+            PeerManagerEvent::SessionBlocked { ctx, .. } => self.session_blocked(ctx),
+            PeerManagerEvent::SessionClosed { sid, .. } => self.session_closed(sid),
+            PeerManagerEvent::SessionFailed { sid, kind } => self.session_failed(sid, kind),
+            PeerManagerEvent::PeerAlive { pid } => self.update_peer_alive(&pid),
+            PeerManagerEvent::Misbehave { pid, kind } => self.peer_misbehave(pid, kind),
+            PeerManagerEvent::ProtectPeersByChainAddr { chain_addrs } => {
+                self.inner.protect_peers_by_chain_addr(chain_addrs);
             }
-            PeerManagerEvent::ReconnectAddrLater { addr, kind, .. } => {
-                info!("reconnect address {} later {}", addr, kind);
-                self.reconnect_addr_later(addr);
-            }
+            PeerManagerEvent::DiscoverMultiAddrs { addrs } => self.dicover_multi_multiaddrs(addrs),
+            PeerManagerEvent::IdentifiedAddrs { pid, addrs } => self.identified_addrs(&pid, addrs),
             PeerManagerEvent::AddNewListenAddr { addr } => {
                 let peer_addr = PeerMultiaddr::new(addr, &self.peer_id);
                 self.inner.add_listen(peer_addr);

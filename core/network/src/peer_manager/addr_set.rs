@@ -30,7 +30,7 @@ impl AddrInfo {
         self.failure.fetch_add(1, Ordering::SeqCst);
     }
 
-    pub fn set_max_failure(&self) {
+    pub fn give_up(&self) {
         self.failure
             .store(MAX_ADDR_FAILURE as usize + 1, Ordering::SeqCst);
     }
@@ -173,8 +173,8 @@ impl PeerAddrSet {
         self.read().get(pma).map(|a| a.inc_failure());
     }
 
-    pub fn set_max_failure(&self, pma: &PeerMultiaddr) {
-        self.read().get(pma).map(|a| a.set_max_failure());
+    pub fn give_up(&self, pma: &PeerMultiaddr) {
+        self.read().get(pma).map(|a| a.give_up());
     }
 
     pub fn reset_failure(&self, pma: &PeerMultiaddr) {

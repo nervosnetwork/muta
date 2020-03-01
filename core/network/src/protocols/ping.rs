@@ -20,7 +20,7 @@ use tentacle::{
 };
 use tentacle_ping::{Event as PingEvent, PingHandler};
 
-use crate::event::{PeerManagerEvent, RetryKind};
+use crate::event::{MisbehaviorKind, PeerManagerEvent};
 
 pub const NAME: &str = "chain_ping";
 pub const SUPPORT_VERSIONS: [&str; 1] = ["0.1"];
@@ -56,17 +56,17 @@ impl Future for EventTranslator {
                 PingEvent::Ping(ref _pid) => continue,
                 PingEvent::Pong(ref pid, _) => PeerManagerEvent::PeerAlive { pid: pid.clone() },
                 PingEvent::Timeout(ref pid) => {
-                    let kind = RetryKind::TimedOut;
+                    let kind = MisbehaviorKind::PingTimeout;
 
-                    PeerManagerEvent::RetryPeerLater {
+                    PeerManagerEvent::Misbehave {
                         pid: pid.clone(),
                         kind,
                     }
                 }
                 PingEvent::UnexpectedError(ref pid) => {
-                    let kind = RetryKind::Other("ping unexpected error, maybe unstable network");
+                    let kind = MisbehaviorKind::PingUnexpect;
 
-                    PeerManagerEvent::RetryPeerLater {
+                    PeerManagerEvent::Misbehave {
                         pid: pid.clone(),
                         kind,
                     }

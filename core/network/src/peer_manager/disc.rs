@@ -1,10 +1,10 @@
 use futures::channel::mpsc::UnboundedSender;
-use log::debug;
+use log::{error, warn};
 use tentacle::{multiaddr::Multiaddr, SessionId};
 use tentacle_discovery::{AddressManager, MisbehaveResult, Misbehavior};
 
 use crate::{
-    event::{PeerManagerEvent, RemoveKind},
+    event::{MisbehaviorKind, PeerManagerEvent},
     peer_manager::PeerManagerHandle,
 };
 
@@ -28,7 +28,7 @@ impl AddrReporter {
         }
 
         if self.inner.unbounded_send(event).is_err() {
-            debug!("network: discovery: peer manager offline");
+            error!("network: discovery: peer manager offline");
 
             self.shutdown = true;
         }
@@ -50,7 +50,7 @@ impl DiscoveryAddrManager {
 
 impl AddressManager for DiscoveryAddrManager {
     fn add_new_addr(&mut self, _sid: SessionId, addr: Multiaddr) {
-        let add_addr = PeerManagerEvent::DiscoverAddr { addr };
+        let add_addr = PeerManagerEvent::DiscoverMultiAddrs { addrs: vec![addr] };
 
         self.reporter.report(add_addr);
     }
@@ -63,13 +63,21 @@ impl AddressManager for DiscoveryAddrManager {
 
     // TODO: reduce peer score based on kind
     fn misbehave(&mut self, sid: SessionId, _kind: Misbehavior) -> MisbehaveResult {
-        debug!("network: session {} misbehave", sid);
+        warn!("network: session {} misbehave", sid);
+
+        let pid = match self.peer_mgr.peer_id(sid) {
+            Some(id) => id,
+            None => {
+                error!("network: session {} peer id not found", sid);
+                return MisbehaveResult::Disconnect;
+            }
+        };
 
         // Right now, we just remove peer
-        let kind = RemoveKind::BadSessionPeer("discovery misbehavior".to_owned());
-        let remove_peer_by_session = PeerManagerEvent::BadSession { sid, kind };
+        let kind = MisbehaviorKind::Discovery;
+        let peer_misbehave = PeerManagerEvent::Misbehave { pid, kind };
 
-        self.reporter.report(remove_peer_by_session);
+        self.reporter.report(peer_misbehave);
         MisbehaveResult::Disconnect
     }
 

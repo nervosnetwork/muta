@@ -1,7 +1,7 @@
 use std::{error::Error, sync::Arc};
 
-use derive_more::{Display, From};
-use protocol::{traits::Priority, types::Address, Bytes};
+use derive_more::Display;
+use protocol::types::Address;
 #[cfg(not(test))]
 use tentacle::context::SessionContext;
 use tentacle::{
@@ -26,51 +26,60 @@ pub enum ConnectionEvent {
     Disconnect(SessionId),
 }
 
-#[derive(Debug, Display, From)]
-pub enum RetryKind {
-    #[display(fmt = "peer connection timeout")]
-    TimedOut,
-
-    #[display(fmt = "peer {:?}", _0)]
-    Io(std::io::ErrorKind),
-
-    #[display(fmt = "peer multiplex stream error: {}", _0)]
-    Multiplex(Box<dyn Error + Send>),
-
-    #[display(fmt = "{}", _0)]
-    Other(&'static str),
+#[derive(Debug, Display)]
+pub enum ProtocolIdentity {
+    #[display(fmt = "protocol id {}", _0)]
+    Id(ProtocolId),
+    #[display(fmt = "protocol name {}", _0)]
+    Name(String),
 }
 
 #[derive(Debug, Display)]
-pub enum RemoveKind {
-    #[display(fmt = "unable to connect peer address {}: {}", addr, err)]
-    UnableToConnect {
-        addr: Multiaddr,
-        err:  Box<dyn Error + Send>,
-    },
+pub enum ConnectionErrorKind {
+    #[display(fmt = "io {:?}", _0)]
+    Io(std::io::Error),
 
-    #[display(fmt = "unknown protocol {}", _0)]
-    UnknownProtocol(String),
+    #[display(fmt = "dns resolver {}", _0)]
+    DNSResolver(Box<dyn Error + Send>),
 
-    #[display(fmt = "protocol select")]
-    ProtocolSelect,
+    #[display(fmt = "remote peer doesn't match one in multiaddr")]
+    PeerIdNotMatch,
 
-    #[display(fmt = "broken protocol {}: {}", proto_id, err)]
-    BrokenProtocol {
-        proto_id: ProtocolId,
-        err:      Box<dyn Error + Send>,
-    },
+    #[display(fmt = "handshake {}", _0)]
+    SecioHandshake(Box<dyn Error + Send>),
 
-    #[display(fmt = "bad session peer: {}", _0)]
-    BadSessionPeer(String),
+    #[display(fmt = "protocol handle block or abnormally closed")]
+    ProtocolHandle,
 }
 
 #[derive(Debug, Display)]
-#[display(fmt = "multi users message, addrs: {:?}", user_addrs)]
-pub struct MultiUsersMessage {
-    pub user_addrs: Vec<Address>,
-    pub msg:        Bytes,
-    pub pri:        Priority,
+pub enum SessionErrorKind {
+    #[display(fmt = "io {:?}", _0)]
+    Io(std::io::Error),
+
+    // Maybe unknown protocol, protocol version incompatible, protocol codec
+    // error
+    #[display(fmt = "protocol identity {:?} {:?}", identity, cause)]
+    Protocol {
+        identity: Option<ProtocolIdentity>,
+        cause:    Option<Box<dyn Error + Send>>,
+    },
+
+    #[display(fmt = "unexpect {}", _0)]
+    Unexpect(Box<dyn Error + Send>),
+}
+
+#[derive(Debug, Display)]
+pub enum MisbehaviorKind {
+    #[display(fmt = "discovery")]
+    Discovery,
+
+    #[display(fmt = "ping time out")]
+    PingTimeout,
+
+    // Maybe message codec or nonce incorrect
+    #[display(fmt = "ping unexpect")]
+    PingUnexpect,
 }
 
 #[derive(Debug, Display, PartialEq, Eq)]
@@ -84,6 +93,15 @@ pub enum ConnectionType {
 #[derive(Debug, Display)]
 pub enum PeerManagerEvent {
     // Peer
+    #[display(fmt = "connect peers {:?} now", pids)]
+    ConnectPeersNow { pids: Vec<PeerId> },
+
+    #[display(fmt = "connect to {} failed, kind: {}", addr, kind)]
+    ConnectFailed {
+        addr: Multiaddr,
+        kind: ConnectionErrorKind,
+    },
+
     #[display(
         fmt = "new session {} peer {:?} addr {} ty {:?}",
         "ctx.id",
@@ -97,11 +115,12 @@ pub enum PeerManagerEvent {
         ctx:    Arc<SessionContext>,
     },
 
-    #[display(fmt = "peer {:?} session {} closed", pid, sid)]
-    SessionClosed { pid: PeerId, sid: SessionId },
-
-    #[display(fmt = "peer {:?} alive", pid)]
-    PeerAlive { pid: PeerId },
+    #[display(fmt = "repeated connection type {} session {} addr {}", ty, sid, addr)]
+    RepeatedConnection {
+        ty:   ConnectionType,
+        sid:  SessionId,
+        addr: Multiaddr,
+    },
 
     #[display(
         fmt = "session {} blocked, pending data size {}",
@@ -110,22 +129,25 @@ pub enum PeerManagerEvent {
     )]
     SessionBlocked { ctx: Arc<SessionContext> },
 
-    #[display(fmt = "remove peer by session {} kind: {}", sid, kind)]
-    BadSession { sid: SessionId, kind: RemoveKind },
+    #[display(fmt = "peer {:?} session {} closed", pid, sid)]
+    SessionClosed { pid: PeerId, sid: SessionId },
 
-    #[display(fmt = "retry peer {:?} later, disconnect now, kind: {}", pid, kind)]
-    RetryPeerLater { pid: PeerId, kind: RetryKind },
+    #[display(fmt = "session {} failed, kind: {}", sid, kind)]
+    SessionFailed {
+        sid:  SessionId,
+        kind: SessionErrorKind,
+    },
 
-    #[display(fmt = "connect peers {:?} now", pids)]
-    ConnectPeersNow { pids: Vec<PeerId> },
+    #[display(fmt = "peer {:?} alive", pid)]
+    PeerAlive { pid: PeerId },
+
+    #[display(fmt = "peer {:?} misbehave {}", pid, kind)]
+    Misbehave { pid: PeerId, kind: MisbehaviorKind },
 
     #[display(fmt = "protect peers by chain addresses {:?}", chain_addrs)]
     ProtectPeersByChainAddr { chain_addrs: Vec<Address> },
 
     // Address
-    #[display(fmt = "discover addr {}", addr)]
-    DiscoverAddr { addr: Multiaddr },
-
     #[display(fmt = "discover multi addrs {:?}", addrs)]
     DiscoverMultiAddrs { addrs: Vec<Multiaddr> },
 
@@ -134,19 +156,6 @@ pub enum PeerManagerEvent {
         pid:   PeerId,
         addrs: Vec<Multiaddr>,
     },
-
-    #[display(fmt = "repeated connection type {} session {} addr {}", ty, sid, addr)]
-    RepeatedConnection {
-        ty:   ConnectionType,
-        sid:  SessionId,
-        addr: Multiaddr,
-    },
-
-    #[display(fmt = "unconnectable addr {}, kind: {}", addr, kind)]
-    UnconnectableAddress { addr: Multiaddr, kind: RemoveKind },
-
-    #[display(fmt = "reconnect later, addr {}, kind: {}", addr, kind)]
-    ReconnectAddrLater { addr: Multiaddr, kind: RetryKind },
 
     // Self
     #[display(fmt = "add listen addr {}", addr)]
