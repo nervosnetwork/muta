@@ -17,7 +17,6 @@ futures = { version = "0.3", features = ["async-await"] }
 futures-timer = "3.0"
 hex = "0.4"
 log = "0.4"
-lru-cache = "0.1"
 moodyblues-sdk = "0.3"
 overlord = "0.2.0-alpha.9"
 parking_lot = "0.10"

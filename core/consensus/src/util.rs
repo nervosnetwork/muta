@@ -330,12 +330,8 @@ mod test {
         }
 
         let signature = BlsSignature::combine(sigs_and_pub_keys.clone());
-        let aggregate_key = BlsPublicKey::aggregate(
-            sigs_and_pub_keys
-                .into_iter()
-                .map(|s| s.1)
-                .collect::<Vec<_>>(),
-        );
+        let aggregate_key =
+            BlsPublicKey::aggregate(sigs_and_pub_keys.iter().map(|s| &s.1).collect::<Vec<_>>());
 
         let res = signature.verify(&hash, &aggregate_key, &"muta".into());
         println!("{:?}", res);
