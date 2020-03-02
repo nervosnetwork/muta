@@ -336,7 +336,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         ctx: Context,
         next_height: u64,
     ) -> Result<Vec<Node>, Box<dyn Error + Send>> {
-        if height == 0 {
+        if next_height == 0 {
             panic!("Overlord get height 0 validator list");
         }
 
