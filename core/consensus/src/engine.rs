@@ -334,15 +334,15 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
     async fn get_authority_list(
         &self,
         ctx: Context,
-        height: u64,
+        next_height: u64,
     ) -> Result<Vec<Node>, Box<dyn Error + Send>> {
         if height == 0 {
-            return Ok(vec![]);
+            panic!("Overlord get height 0 validator list");
         }
 
         let old_block = self
             .adapter
-            .get_block_by_height(ctx.clone(), height - 1)
+            .get_block_by_height(ctx.clone(), next_height - 1)
             .await?;
         let old_metadata = self.adapter.get_metadata(
             ctx,
