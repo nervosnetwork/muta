@@ -74,13 +74,13 @@ impl<Adapter: ConsensusAdapter + 'static> OverlordConsensus<Adapter> {
     pub fn new(
         status_agent: StatusAgent,
         node_info: NodeInfo,
-        addr_pubkey_list: HashMap<Bytes, BlsPublicKey>,
+        addr_pubkey_map: HashMap<Bytes, BlsPublicKey>,
         priv_key: BlsPrivateKey,
         common_ref: BlsCommonReference,
         adapter: Arc<Adapter>,
         lock: Arc<Mutex<()>>,
     ) -> Self {
-        let crypto = Arc::new(OverlordCrypto::new(priv_key, addr_pubkey_list, common_ref));
+        let crypto = Arc::new(OverlordCrypto::new(priv_key, addr_pubkey_map, common_ref));
 
         let engine = Arc::new(ConsensusEngine::new(
             status_agent.clone(),
