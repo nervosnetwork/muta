@@ -8,6 +8,6 @@ repository = "https://github.com/nervosnetwork/muta"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ophelia-bls-amcl = "0.2"
+ophelia-bls-amcl = "0.1"
 ophelia-secp256k1 = "0.2"
 ophelia = "0.2"

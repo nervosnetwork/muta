@@ -1,5 +1,5 @@
 use std::cmp::Eq;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
 use std::error::Error;
 use std::sync::Arc;
@@ -573,25 +573,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
             proof,
         )?;
 
-        let mut new_addr_pubkey_list = Vec::new();
-        for validator in metadata.verifier_list.into_iter() {
-            let addr = validator.address.as_bytes();
-            let hex_pubkey = hex::decode(validator.bls_pub_key).map_err(|err| {
-                ConsensusError::Other(format!(
-                    "hex decode metadata bls pubkey error {:?}, height {}",
-                    err, height
-                ))
-            })?;
-            let pubkey = BlsPublicKey::try_from(hex_pubkey.as_ref()).map_err(|err| {
-                ConsensusError::Other(format!(
-                    "try from bls pubkey error {:?}, height {}",
-                    err, height
-                ))
-            })?;
-            new_addr_pubkey_list.push((addr, pubkey));
-        }
-        self.crypto.update(height + 1, new_addr_pubkey_list);
-
+        self.update_overlord_crypto(metadata)?;
         self.save_wal().await
     }
 
@@ -599,6 +581,22 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
         let mut info = self.status_agent.to_inner();
         let wal_info = MessageCodec::encode(&mut info).await?;
         self.adapter.save_muta_wal(Context::new(), wal_info).await
+    }
+
+    fn update_overlord_crypto(&self, metadata: Metadata) -> ProtocolResult<()> {
+        let mut new_addr_pubkey_map = HashMap::new();
+        for validator in metadata.verifier_list.into_iter() {
+            let addr = validator.address.as_bytes();
+            let hex_pubkey = hex::decode(validator.bls_pub_key).map_err(|err| {
+                ConsensusError::Other(format!("hex decode metadata bls pubkey error {:?}", err))
+            })?;
+            let pubkey = BlsPublicKey::try_from(hex_pubkey.as_ref()).map_err(|err| {
+                ConsensusError::Other(format!("try from bls pubkey error {:?}", err))
+            })?;
+            new_addr_pubkey_map.insert(addr, pubkey);
+        }
+        self.crypto.update(new_addr_pubkey_map);
+        Ok(())
     }
 }
 

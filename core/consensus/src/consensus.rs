@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -73,7 +74,7 @@ impl<Adapter: ConsensusAdapter + 'static> OverlordConsensus<Adapter> {
     pub fn new(
         status_agent: StatusAgent,
         node_info: NodeInfo,
-        addr_pubkey_list: Vec<(Bytes, BlsPublicKey)>,
+        addr_pubkey_list: HashMap<Bytes, BlsPublicKey>,
         priv_key: BlsPrivateKey,
         common_ref: BlsCommonReference,
         adapter: Arc<Adapter>,

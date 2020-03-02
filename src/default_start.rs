@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::sync::Arc;
 
@@ -275,13 +276,13 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     let consensus_interval = current_consensus_status.consensus_interval;
     let status_agent = StatusAgent::new(current_consensus_status);
 
-    let mut bls_pub_keys = Vec::new();
+    let mut bls_pub_keys = HashMap::new();
     for validator_extend in metadata.verifier_list.iter() {
         let address = validator_extend.address.as_bytes();
         let hex_pubkey =
             hex::decode(validator_extend.bls_pub_key.clone()).map_err(MainError::FromHex)?;
         let pub_key = BlsPublicKey::try_from(hex_pubkey.as_ref()).map_err(MainError::Crypto)?;
-        bls_pub_keys.push((address, pub_key));
+        bls_pub_keys.insert(address, pub_key);
     }
 
     let mut priv_key = Vec::new();
