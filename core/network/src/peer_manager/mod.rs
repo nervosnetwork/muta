@@ -648,10 +648,6 @@ impl PeerManager {
             }
         }
 
-        if !self.inner.contains(&remote_peer_id) {
-            self.inner.add_peer(remote_peer.clone());
-        }
-
         // Inbound address is client address, it's useless
         match ctx.ty {
             SessionType::Inbound => remote_peer.multiaddrs.remove(&remote_multiaddr),
@@ -675,6 +671,13 @@ impl PeerManager {
                 self.disconnect_session(ctx.id);
                 return;
             }
+        }
+
+        // Currently we only save accepted peer.
+        // TODO: ban ip for too many different peer id within a short period
+        // TODO: save to database
+        if !self.inner.contains(&remote_peer_id) {
+            self.inner.add_peer(remote_peer.clone());
         }
 
         let connectedness = remote_peer.connectedness();
