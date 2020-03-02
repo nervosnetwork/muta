@@ -1,4 +1,4 @@
-use super::{time, ArcUnknownPeer, PeerAddrSet, Retry, MAX_RETRY_COUNT};
+use super::{time, PeerAddrSet, Retry, MAX_RETRY_COUNT};
 
 use std::{
     borrow::Borrow,
@@ -13,6 +13,7 @@ use std::{
 };
 
 use derive_more::Display;
+use parking_lot::RwLock;
 use protocol::{types::Address, Bytes};
 use tentacle::{
     secio::{PeerId, PublicKey},
@@ -26,11 +27,11 @@ const CONNECTEDNESS_MASK: usize = 0b110;
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Clone, Copy, Display)]
 #[repr(usize)]
 pub enum Connectedness {
-    #[display(fmt = "can connect")]
-    CanConnect = 0 << 1,
+    #[display(fmt = "not connected")]
+    NotConnected = 0 << 1,
 
-    #[display(fmt = "connecting")]
-    Connecting = 1 << 1,
+    #[display(fmt = "can connect")]
+    CanConnect = 1 << 1,
 
     #[display(fmt = "connected")]
     Connected = 2 << 1,
@@ -44,8 +45,8 @@ impl From<usize> for Connectedness {
         use self::Connectedness::*;
 
         debug_assert!(
-            src == CanConnect as usize
-                || src == Connecting as usize
+            src == NotConnected as usize
+                || src == CanConnect as usize
                 || src == Connected as usize
                 || src == Unconnectable as usize
         );
@@ -64,11 +65,11 @@ impl From<Connectedness> for usize {
 
 #[derive(Debug)]
 pub struct Peer {
-    pub id:          Arc<PeerId>,
-    pub pubkey:      Arc<PublicKey>,
-    pub chain_addr:  Arc<Address>,
-    pub multiaddrs:  Arc<PeerAddrSet>,
+    pub id:          PeerId,
+    pub multiaddrs:  PeerAddrSet,
     pub retry:       Retry,
+    pubkey:          RwLock<Option<PublicKey>>,
+    chain_addr:      RwLock<Option<Address>>,
     connectedness:   AtomicUsize,
     session_id:      AtomicUsize,
     connected_at:    AtomicU64,
@@ -77,32 +78,57 @@ pub struct Peer {
 }
 
 impl Peer {
-    pub fn from_pubkey(pubkey: PublicKey) -> Result<Self, ErrorKind> {
-        let chain_addr = Peer::pubkey_to_chain_addr(&pubkey)?;
-        let peer_id = pubkey.peer_id();
-
-        let peer = Peer {
-            id:              Arc::new(peer_id.clone()),
-            pubkey:          Arc::new(pubkey),
-            multiaddrs:      Arc::new(PeerAddrSet::new(peer_id)),
-            chain_addr:      Arc::new(chain_addr),
+    pub fn new(peer_id: PeerId) -> Self {
+        Peer {
+            id:              peer_id.clone(),
+            multiaddrs:      PeerAddrSet::new(peer_id),
             retry:           Retry::new(MAX_RETRY_COUNT),
-            connectedness:   AtomicUsize::new(Connectedness::CanConnect as usize),
+            pubkey:          RwLock::new(None),
+            chain_addr:      RwLock::new(None),
+            connectedness:   AtomicUsize::new(Connectedness::NotConnected as usize),
             session_id:      AtomicUsize::new(0),
             connected_at:    AtomicU64::new(0),
             disconnected_at: AtomicU64::new(0),
             alive:           AtomicU64::new(0),
-        };
+        }
+    }
+
+    pub fn from_pubkey(pubkey: PublicKey) -> Result<Self, ErrorKind> {
+        let peer = Peer::new(pubkey.peer_id());
+        peer.set_pubkey(pubkey)?;
 
         Ok(peer)
     }
 
     pub fn owned_id(&self) -> PeerId {
-        self.id.as_ref().to_owned()
+        self.id.to_owned()
     }
 
-    pub fn owned_pubkey(&self) -> PublicKey {
-        self.pubkey.as_ref().to_owned()
+    pub fn has_pubkey(&self) -> bool {
+        self.pubkey.read().is_some()
+    }
+
+    pub fn owned_pubkey(&self) -> Option<PublicKey> {
+        self.pubkey.read().clone()
+    }
+
+    pub fn owned_chain_addr(&self) -> Option<Address> {
+        self.chain_addr.read().clone()
+    }
+
+    pub fn set_pubkey(&self, pubkey: PublicKey) -> Result<(), ErrorKind> {
+        if pubkey.peer_id() != self.id {
+            Err(ErrorKind::PublicKeyNotMatchId {
+                pubkey,
+                id: self.id.clone(),
+            })
+        } else {
+            let chain_addr = Peer::pubkey_to_chain_addr(&pubkey)?;
+
+            *self.pubkey.write() = Some(pubkey);
+            *self.chain_addr.write() = Some(chain_addr);
+            Ok(())
+        }
     }
 
     pub fn connectedness(&self) -> Connectedness {
@@ -193,7 +219,7 @@ impl fmt::Display for Peer {
             "{:?} chain addr {:?} multiaddr {:?} last connected at {} alive {} retry {} current {}",
             self.id,
             self.chain_addr,
-            self.multiaddrs.read().iter(),
+            self.multiaddrs.all(),
             self.connected_at.load(Ordering::SeqCst),
             self.alive.load(Ordering::SeqCst),
             self.retry.count(),
@@ -207,14 +233,12 @@ impl fmt::Display for Peer {
 pub struct ArcPeer(Arc<Peer>);
 
 impl ArcPeer {
-    pub fn from_pubkey(pubkey: PublicKey) -> Result<Self, ErrorKind> {
-        Ok(ArcPeer(Arc::new(Peer::from_pubkey(pubkey)?)))
+    pub fn new(peer_id: PeerId) -> Self {
+        ArcPeer(Arc::new(Peer::new(peer_id)))
     }
 
-    pub fn from_unknown(unknown: ArcUnknownPeer, pubkey: PublicKey) -> Result<Self, ErrorKind> {
-        let mut peer = Peer::from_pubkey(pubkey)?;
-        peer.multiaddrs = Arc::clone(&unknown.multiaddrs);
-        Ok(ArcPeer(Arc::new(peer)))
+    pub fn from_pubkey(pubkey: PublicKey) -> Result<Self, ErrorKind> {
+        Ok(ArcPeer(Arc::new(Peer::from_pubkey(pubkey)?)))
     }
 }
 

@@ -6,13 +6,11 @@ mod retry;
 mod save_restore;
 mod shared;
 mod time;
-mod unknown;
 
 use addr_set::PeerAddrSet;
 use peer::Peer;
 use retry::Retry;
 use save_restore::{NoPeerDatFile, PeerDatFile, SaveRestore};
-use unknown::ArcUnknownPeer;
 
 pub use disc::DiscoveryAddrManager;
 pub use ident::IdentifyCallback;
@@ -25,7 +23,7 @@ mod test_manager;
 use std::{
     borrow::Borrow,
     cmp::PartialEq,
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     convert::{TryFrom, TryInto},
     future::Future,
     hash::{Hash, Hasher},
@@ -77,7 +75,6 @@ const REPEATED_CONNECTION_TIMEOUT: u64 = 30; // seconds
 const BACKOFF_BASE: u64 = 2;
 const MAX_RETRY_INTERVAL: u64 = 512; // seconds
 const MAX_RETRY_COUNT: u8 = 30;
-const MAX_UNKNOWN_RETRY: u8 = 10;
 const SHORT_ALIVE_SESSION: u64 = 3; // seconds
 const WHITELIST_TIMEOUT: u64 = 60 * 60; // 1 hour
 const MAX_CONNECTING_MARGIN: usize = 10;
@@ -158,48 +155,18 @@ impl Into<Multiaddr> for PeerMultiaddr {
 }
 
 #[derive(Debug)]
-enum ConnectablePeer {
-    Peer(ArcPeer),
-    Unknown(ArcUnknownPeer),
-}
-
-impl ConnectablePeer {
-    pub fn id(&self) -> &PeerId {
-        match self {
-            Self::Peer(p) => &p.id,
-            Self::Unknown(p) => &p.id,
-        }
-    }
-
-    pub fn multiaddrs(&self) -> &PeerAddrSet {
-        match self {
-            Self::Peer(p) => &p.multiaddrs,
-            Self::Unknown(p) => &p.multiaddrs,
-        }
-    }
-
-    pub fn retry(&self) -> &Retry {
-        match self {
-            Self::Peer(p) => &p.retry,
-            Self::Unknown(p) => &p.retry,
-        }
-    }
-
-    pub fn set_connectedness(&self, connectedness: Connectedness) {
-        match self {
-            Self::Peer(p) => p.set_connectedness(connectedness),
-            Self::Unknown(_p) => (),
-        }
-    }
-}
-
-#[derive(Debug)]
 struct ConnectingAttempt {
-    peer:       ConnectablePeer,
+    peer:       ArcPeer,
     multiaddrs: AtomicUsize,
 }
 
 impl ConnectingAttempt {
+    fn new(peer: ArcPeer) -> Self {
+        let multiaddrs = AtomicUsize::new(peer.multiaddrs.connectable_len());
+
+        ConnectingAttempt { peer, multiaddrs }
+    }
+
     fn multiaddrs(&self) -> usize {
         self.multiaddrs.load(Ordering::SeqCst)
     }
@@ -211,13 +178,13 @@ impl ConnectingAttempt {
 
 impl Borrow<PeerId> for ConnectingAttempt {
     fn borrow(&self) -> &PeerId {
-        self.peer.id()
+        &self.peer.id
     }
 }
 
 impl PartialEq for ConnectingAttempt {
     fn eq(&self, other: &ConnectingAttempt) -> bool {
-        self.peer.id() == other.peer.id()
+        self.peer.id == other.peer.id
     }
 }
 
@@ -225,15 +192,7 @@ impl Eq for ConnectingAttempt {}
 
 impl Hash for ConnectingAttempt {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.peer.id().hash(state)
-    }
-}
-
-impl From<ConnectablePeer> for ConnectingAttempt {
-    fn from(peer: ConnectablePeer) -> Self {
-        let multiaddrs = AtomicUsize::new(peer.multiaddrs().connectable_len());
-
-        ConnectingAttempt { peer, multiaddrs }
+        self.peer.id.hash(state)
     }
 }
 
@@ -386,43 +345,12 @@ impl Deref for ArcSession {
     }
 }
 
-#[derive(Debug, Clone)]
-struct ArcPeerByChain(ArcPeer);
-
-impl Borrow<Address> for ArcPeerByChain {
-    fn borrow(&self) -> &Address {
-        &self.chain_addr
-    }
-}
-
-impl PartialEq for ArcPeerByChain {
-    fn eq(&self, other: &ArcPeerByChain) -> bool {
-        self.chain_addr == other.chain_addr
-    }
-}
-
-impl Eq for ArcPeerByChain {}
-
-impl Hash for ArcPeerByChain {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.chain_addr.hash(state)
-    }
-}
-
-impl Deref for ArcPeerByChain {
-    type Target = ArcPeer;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
 struct Inner {
     whitelist: RwLock<HashSet<ArcProtectedPeer>>,
 
     sessions: RwLock<HashSet<ArcSession>>,
     peers:    RwLock<HashSet<ArcPeer>>,
-    chain:    RwLock<HashSet<ArcPeerByChain>>,
+    chain:    RwLock<HashMap<Address, ArcPeer>>,
 
     listen: RwLock<HashSet<PeerMultiaddr>>,
 }
@@ -458,11 +386,17 @@ impl Inner {
 
     pub fn add_peer(&self, peer: ArcPeer) {
         self.peers.write().insert(peer.clone());
-        self.chain.write().insert(ArcPeerByChain(peer));
+        if let Some(chain_addr) = peer.owned_chain_addr() {
+            self.chain.write().insert(chain_addr, peer);
+        }
     }
 
     pub(self) fn restore(&self, peers: Vec<ArcPeer>) {
-        let chain_peers: Vec<_> = peers.clone().into_iter().map(ArcPeerByChain).collect();
+        let chain_peers: Vec<_> = peers
+            .clone()
+            .into_iter()
+            .filter_map(|p| p.owned_chain_addr().map(|a| (a, p)))
+            .collect();
 
         self.peers.write().extend(peers);
         self.chain.write().extend(chain_peers);
@@ -478,7 +412,8 @@ impl Inner {
 
     pub fn connectable_peers(&self, max: usize) -> Vec<ArcPeer> {
         let connectable = |p: &'_ &ArcPeer| -> bool {
-            p.connectedness() == Connectedness::CanConnect
+            (p.connectedness() == Connectedness::NotConnected
+                || p.connectedness() == Connectedness::CanConnect)
                 && p.retry.ready()
                 && p.multiaddrs.connectable_len() > 0
         };
@@ -490,11 +425,10 @@ impl Inner {
         qualified_peers.choose_multiple(&mut rng, max)
     }
 
-    #[allow(dead_code)]
     pub fn remove_peer(&self, peer_id: &PeerId) -> Option<ArcPeer> {
         let opt_peer = { self.peers.write().take(peer_id) };
-        if let Some(peer) = opt_peer {
-            self.chain.write().take(&*peer.chain_addr).map(|cp| cp.0)
+        if let Some(chain_addr) = opt_peer.and_then(|p| p.owned_chain_addr()) {
+            self.chain.write().remove(&chain_addr)
         } else {
             None
         }
@@ -603,8 +537,6 @@ pub struct PeerManager {
     peer_id:    PeerId,
     bootstraps: HashSet<ArcPeer>,
 
-    // peers without public
-    unknowns:   HashSet<ArcUnknownPeer>,
     // peers currently connecting
     connecting: HashSet<ConnectingAttempt>,
 
@@ -637,10 +569,8 @@ impl PeerManager {
             inner,
             config,
             peer_id,
-
             bootstraps,
 
-            unknowns: Default::default(),
             connecting: Default::default(),
 
             event_rx,
@@ -703,72 +633,20 @@ impl PeerManager {
         }
     }
 
-    fn connectable_unknowns(&self, max: usize) -> Vec<ArcUnknownPeer> {
-        let connectable = |u: &'_ &ArcUnknownPeer| -> bool {
-            !self.connecting.contains(u.id.as_ref())
-                && u.retry.ready()
-                && u.multiaddrs.connectable_len() > 0
-        };
-
-        let condidates = self.unknowns.iter().filter(connectable);
-        condidates.take(max).cloned().collect()
-    }
-
-    fn collect_connectable_peers(&self, max: usize) -> Vec<ConnectablePeer> {
-        let mut condidates = Vec::new();
-        let mut remain = max;
-
-        let condidate_peers = self.inner.connectable_peers(remain);
-        if !condidate_peers.is_empty() {
-            remain -= condidate_peers.len();
-            let peers = condidate_peers.into_iter().map(|p| {
-                if p.multiaddrs.connectable_len() == 0 {
-                    error!("connected peer {:?} has no connectable multiaddr", p.id);
-                }
-                ConnectablePeer::Peer(p)
-            });
-
-            condidates.extend(peers);
-        }
-
-        let unknown_condidates = self.connectable_unknowns(remain);
-        if !unknown_condidates.is_empty() {
-            let peers = unknown_condidates.into_iter().map(|p| {
-                if p.multiaddrs.connectable_len() == 0 {
-                    error!("unknown peer {:?} has no connectable multiaddrs", p.id);
-                }
-                ConnectablePeer::Unknown(p)
-            });
-
-            condidates.extend(peers);
-        }
-
-        condidates
-    }
-
     fn new_session(&mut self, pubkey: PublicKey, ctx: Arc<SessionContext>) {
         let remote_peer_id = pubkey.peer_id();
         let remote_multiaddr = PeerMultiaddr::new(ctx.address.to_owned(), &remote_peer_id);
 
         // Remove from connecting if we dial this peer or create new one
-        let maybe_remote_peer = match self.connecting.take(&remote_peer_id) {
-            Some(ConnectingAttempt {
-                peer: ConnectablePeer::Peer(p),
-                ..
-            }) => Ok(p),
-            Some(ConnectingAttempt {
-                peer: ConnectablePeer::Unknown(p),
-                ..
-            }) => ArcPeer::from_unknown(p, pubkey.clone()),
-            None => ArcPeer::from_pubkey(pubkey.clone()),
-        };
-        let remote_peer = match maybe_remote_peer {
-            Ok(p) => p,
-            Err(e) => {
-                error!("network: impossible, create peer failed, {}", e);
-                return;
+        self.connecting.remove(&remote_peer_id);
+        let opt_peer = self.inner.peer(&remote_peer_id);
+        let remote_peer = opt_peer.unwrap_or_else(|| ArcPeer::new(remote_peer_id.clone()));
+
+        if !remote_peer.has_pubkey() {
+            if let Err(e) = remote_peer.set_pubkey(pubkey.clone()) {
+                error!("impossible, set public key failed {}", e);
             }
-        };
+        }
 
         if !self.inner.contains(&remote_peer_id) {
             self.inner.add_peer(remote_peer.clone());
@@ -862,28 +740,29 @@ impl PeerManager {
             }
         };
 
+        let count_multiaddr_failure = |multiaddrs: &PeerAddrSet| {
+            if let ConnectionErrorKind::Io(_) | ConnectionErrorKind::DNSResolver(_) = kind {
+                multiaddrs.inc_failure(&peer_addr);
+            } else {
+                warn!("give up {} because {}", peer_addr, kind);
+                multiaddrs.give_up(&peer_addr);
+            }
+        };
+
         let peer_id = peer_addr.peer_id();
         match self.connecting.take(&peer_id) {
             Some(attempt) => {
                 attempt.complete_one_multiaddr();
-                if let ConnectionErrorKind::Io(_) | ConnectionErrorKind::DNSResolver(_) = kind {
-                    attempt.peer.multiaddrs().inc_failure(&peer_addr);
-                } else {
-                    warn!("give up {} because {}", peer_addr, kind);
-                    attempt.peer.multiaddrs().give_up(&peer_addr);
-                }
+                count_multiaddr_failure(&attempt.peer.multiaddrs);
 
                 if attempt.multiaddrs() == 0 {
                     // No more connecting multiaddrs from this peer
                     // This means all multiaddrs failure
-                    attempt.peer.retry().inc();
+                    attempt.peer.retry.inc();
                     attempt.peer.set_connectedness(Connectedness::CanConnect);
 
-                    if attempt.peer.retry().run_out() {
+                    if attempt.peer.retry.run_out() {
                         attempt.peer.set_connectedness(Connectedness::Unconnectable);
-                        if let ConnectablePeer::Unknown(ref p) = attempt.peer {
-                            self.unknowns.remove(p.id.as_ref());
-                        }
                     }
                 } else {
                     // Wait for other connecting multiaddrs result
@@ -893,12 +772,7 @@ impl PeerManager {
             None => {
                 // Peer is already connected using one of its multiaddrs
                 if let Some(peer) = self.inner.peer(&peer_id) {
-                    if let ConnectionErrorKind::Io(_) | ConnectionErrorKind::DNSResolver(_) = kind {
-                        peer.multiaddrs.inc_failure(&peer_addr);
-                    } else {
-                        warn!("give up {} because {}", peer_addr, kind);
-                        peer.multiaddrs.give_up(&peer_addr);
-                    }
+                    count_multiaddr_failure(&peer.multiaddrs);
                 }
             }
         }
@@ -975,14 +849,10 @@ impl PeerManager {
         }
     }
 
-    fn connect_peers_now(&mut self, peers: Vec<ConnectablePeer>) {
+    fn connect_peers_now(&mut self, peers: Vec<ArcPeer>) {
         let peer_addrs = peers.into_iter().map(|peer| {
-            if let ConnectablePeer::Peer(ref p) = peer {
-                p.set_connectedness(Connectedness::Connecting);
-            }
-
-            let addrs = peer.multiaddrs().all_raw();
-            self.connecting.insert(ConnectingAttempt::from(peer));
+            let addrs = peer.multiaddrs.all_raw();
+            self.connecting.insert(ConnectingAttempt::new(peer));
 
             addrs
         });
@@ -1001,13 +871,15 @@ impl PeerManager {
     }
 
     fn connect_peers(&mut self, peers: Vec<ArcPeer>) {
-        let connectable = |p: ArcPeer| -> Option<ConnectablePeer> {
+        let connectable = |p: ArcPeer| -> Option<ArcPeer> {
             let connectedness = p.connectedness();
-            if connectedness != Connectedness::CanConnect {
+            if connectedness != Connectedness::CanConnect
+                && connectedness != Connectedness::NotConnected
+            {
                 debug!("peer {:?} connectedness {}", p.id, connectedness);
                 None
             } else {
-                Some(ConnectablePeer::Peer(p))
+                Some(p)
             }
         };
 
@@ -1040,10 +912,9 @@ impl PeerManager {
         let peer_id = peer_addr.peer_id();
         if let Some(peer) = self.inner.peer(&peer_id) {
             peer.multiaddrs.insert(vec![peer_addr]);
-        } else if let Some(unknown_peer) = self.unknowns.get(&peer_id) {
-            unknown_peer.multiaddrs.insert(vec![peer_addr]);
         } else {
-            self.unknowns.insert(ArcUnknownPeer::from(peer_addr));
+            let new_peer = ArcPeer::new(peer_addr.peer_id());
+            new_peer.multiaddrs.insert(vec![peer_addr]);
         }
     }
 
@@ -1175,7 +1046,7 @@ impl Future for PeerManager {
             && connection_attempts < max_connection_attempts
         {
             let remain_count = max_connection_attempts - connection_attempts;
-            let connectable_peers = self.collect_connectable_peers(remain_count);
+            let connectable_peers = self.inner.connectable_peers(remain_count);
             let candidate_count = connectable_peers.len();
 
             debug!(

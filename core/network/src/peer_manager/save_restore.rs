@@ -10,7 +10,10 @@ use std::{
 
 use serde::{de, ser};
 use serde_derive::{Deserialize, Serialize};
-use tentacle::{multiaddr::Multiaddr, secio::PublicKey};
+use tentacle::{
+    multiaddr::Multiaddr,
+    secio::{PeerId, PublicKey},
+};
 
 use crate::error::NetworkError;
 
@@ -18,7 +21,8 @@ use crate::error::NetworkError;
 // TODO: save multiaddr failure count
 #[derive(Debug, Serialize, Deserialize)]
 struct SerdePeer {
-    pubkey:          PeerPubKey,
+    id:              SerdePeerId,
+    pubkey:          Option<SerdePubKey>,
     multiaddrs:      Vec<PeerMultiaddr>,
     connectedness:   usize,
     #[serde(skip)]
@@ -38,7 +42,8 @@ impl From<ArcPeer> for SerdePeer {
         };
 
         SerdePeer {
-            pubkey:          PeerPubKey(peer.pubkey.as_ref().to_owned()),
+            id:              SerdePeerId(peer.owned_id()),
+            pubkey:          peer.owned_pubkey().map(SerdePubKey),
             multiaddrs:      peer.multiaddrs.all(),
             connectedness:   connectedness as usize,
             retry:           peer.retry.count(),
@@ -54,8 +59,12 @@ impl TryFrom<SerdePeer> for ArcPeer {
     type Error = NetworkError;
 
     fn try_from(serde_peer: SerdePeer) -> Result<Self, Self::Error> {
-        let pid = serde_peer.pubkey.0.peer_id();
-        let peer = ArcPeer::from_pubkey(serde_peer.pubkey.0)?;
+        let peer_id = serde_peer.id.0;
+
+        let peer = ArcPeer::new(peer_id.clone());
+        if let Some(pubkey) = serde_peer.pubkey {
+            peer.set_pubkey(pubkey.0)?;
+        }
 
         let multiaddrs = serde_peer
             .multiaddrs
@@ -63,7 +72,7 @@ impl TryFrom<SerdePeer> for ArcPeer {
             .map(|ma| {
                 // Just ensure that our recovered multiaddr has id
                 let ma: Multiaddr = ma.into();
-                PeerMultiaddr::new(ma, &pid)
+                PeerMultiaddr::new(ma, &peer_id)
             })
             .collect();
         peer.multiaddrs.set(multiaddrs);
@@ -142,9 +151,9 @@ impl SaveRestore for NoPeerDatFile {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-pub struct PeerPubKey(PublicKey);
+pub struct SerdePubKey(PublicKey);
 
-impl ser::Serialize for PeerPubKey {
+impl ser::Serialize for SerdePubKey {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: ser::Serializer,
@@ -153,7 +162,7 @@ impl ser::Serialize for PeerPubKey {
     }
 }
 
-impl<'de> de::Deserialize<'de> for PeerPubKey {
+impl<'de> de::Deserialize<'de> for SerdePubKey {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: de::Deserializer<'de>,
@@ -161,7 +170,7 @@ impl<'de> de::Deserialize<'de> for PeerPubKey {
         struct Visitor;
 
         impl<'de> de::Visitor<'de> for Visitor {
-            type Value = PeerPubKey;
+            type Value = SerdePubKey;
 
             fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
                 formatter.write_str("peer pubkey")
@@ -184,7 +193,58 @@ impl<'de> de::Deserialize<'de> for PeerPubKey {
             fn visit_bytes<E: de::Error>(self, v: &[u8]) -> Result<Self::Value, E> {
                 PublicKey::decode(v)
                     .ok_or_else(|| de::Error::custom("not valid public key"))
-                    .map(PeerPubKey)
+                    .map(SerdePubKey)
+            }
+        }
+
+        deserializer.deserialize_bytes(Visitor)
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct SerdePeerId(PeerId);
+
+impl ser::Serialize for SerdePeerId {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: ser::Serializer,
+    {
+        serializer.serialize_bytes(self.0.as_bytes())
+    }
+}
+
+impl<'de> de::Deserialize<'de> for SerdePeerId {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        struct Visitor;
+
+        impl<'de> de::Visitor<'de> for Visitor {
+            type Value = SerdePeerId;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+                formatter.write_str("peer pubkey")
+            }
+
+            fn visit_seq<A: de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+                let mut buf: Vec<u8> = Vec::with_capacity(seq.size_hint().unwrap_or(0));
+
+                while let Some(val) = seq.next_element()? {
+                    buf.push(val);
+                }
+
+                self.visit_byte_buf(buf)
+            }
+
+            fn visit_byte_buf<E: de::Error>(self, v: Vec<u8>) -> Result<Self::Value, E> {
+                self.visit_bytes(v.as_slice())
+            }
+
+            fn visit_bytes<E: de::Error>(self, v: &[u8]) -> Result<Self::Value, E> {
+                PeerId::from_bytes(v.to_vec())
+                    .map_err(|_| de::Error::custom("not valid peer id"))
+                    .map(SerdePeerId)
             }
         }
 

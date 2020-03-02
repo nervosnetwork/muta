@@ -1,7 +1,11 @@
 use std::{error::Error, num::ParseIntError};
 
 use derive_more::Display;
-use tentacle::{multiaddr::Multiaddr, ProtocolId, SessionId};
+use tentacle::{
+    multiaddr::Multiaddr,
+    secio::{PeerId, PublicKey},
+    ProtocolId, SessionId,
+};
 
 use protocol::{types::Address, Bytes, ProtocolError, ProtocolErrorKind};
 
@@ -63,6 +67,9 @@ pub enum ErrorKind {
         pubkey: Bytes,
         cause:  Box<dyn Error + Send>,
     },
+
+    #[display(fmt = "kind: public key {:?} not match {:?}", pubkey, id)]
+    PublicKeyNotMatchId { pubkey: PublicKey, id: PeerId },
 }
 
 impl Error for ErrorKind {}

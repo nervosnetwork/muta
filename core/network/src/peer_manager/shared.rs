@@ -98,7 +98,7 @@ impl SessionBook for SharedSessions {
         let mut unknown = Vec::new();
         for addr in addrs {
             if let Some(peer) = chain.get(&addr) {
-                peers.push(peer.id.as_ref().to_owned());
+                peers.push(peer.owned_id());
             } else {
                 unknown.push(addr);
             }
