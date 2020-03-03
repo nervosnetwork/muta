@@ -132,7 +132,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     // Init Block db
     let path_block = config.data_path_for_block();
     log::info!("Data path for block: {:?}", path_block.clone());
-    let rocks_adapter = Arc::new(RocksAdapter::new(path_block)?);
+    let rocks_adapter = Arc::new(RocksAdapter::new(path_block.clone())?);
     let storage = Arc::new(ImplStorage::new(Arc::clone(&rocks_adapter)));
 
     // Init network

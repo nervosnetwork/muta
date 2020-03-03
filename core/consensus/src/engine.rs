@@ -206,7 +206,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         let proof = Proof {
             height: commit.proof.height,
             round: commit.proof.round,
-            block_hash,
+            block_hash: block_hash.clone(),
             signature,
             bitmap,
         };
@@ -221,7 +221,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             .await
         {
             Ok(txs) => txs,
-            Err(_) => self.full_txs.get(height, block_hash)?.inner,
+            Err(_) => self.full_txs.load_txs(height, block_hash)?.inner,
         };
 
         // Execute transactions
@@ -236,6 +236,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         .await?;
 
         trace_block(&pill.block);
+        let block_exec_height = pill.block.header.exec_height;
         let metadata = self.adapter.get_metadata(
             ctx.clone(),
             pill.block.header.state_root.clone(),
@@ -250,14 +251,11 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             .flush_mempool(ctx.clone(), &ordered_tx_hashes)
             .await?;
 
-<<<<<<< HEAD
         self.adapter
             .broadcast_height(ctx.clone(), current_height)
             .await?;
-=======
-        self.adapter.broadcast_height(ctx.clone(), height).await?;
-        self.full_txs.remove(pill.block.exec_height)?;
->>>>>>> feat: remove outdated txs
+        self.full_txs.remove(block_exec_height)?;
+
 
         let mut set = self.exemption_hash.write();
         set.clear();
