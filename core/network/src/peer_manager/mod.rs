@@ -856,6 +856,8 @@ impl PeerManager {
 
     fn connect_peers_now(&mut self, peers: Vec<ArcPeer>) {
         let peer_addrs = peers.into_iter().map(|peer| {
+            peer.set_connectedness(Connectedness::Connecting);
+
             let addrs = peer.multiaddrs.all_raw();
             self.connecting.insert(ConnectingAttempt::new(peer));
 

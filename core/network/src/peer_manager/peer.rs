@@ -22,7 +22,7 @@ use tentacle::{
 
 use crate::error::ErrorKind;
 
-const CONNECTEDNESS_MASK: usize = 0b110;
+const CONNECTEDNESS_MASK: usize = 0b1110;
 
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Clone, Copy, Display)]
 #[repr(usize)]
@@ -38,6 +38,9 @@ pub enum Connectedness {
 
     #[display(fmt = "unconnectable")]
     Unconnectable = 3 << 1,
+
+    #[display(fmt = "connecting")]
+    Connecting = 4 << 1,
 }
 
 impl From<usize> for Connectedness {
@@ -49,6 +52,7 @@ impl From<usize> for Connectedness {
                 || src == CanConnect as usize
                 || src == Connected as usize
                 || src == Unconnectable as usize
+                || src == Connecting as usize
         );
 
         unsafe { ::std::mem::transmute(src) }

@@ -687,8 +687,8 @@ async fn should_remove_session_on_session_closed() {
     );
     assert_eq!(
         test_peer.connectedness(),
-        Connectedness::CanConnect,
-        "should set peer connectednes to CanConnect"
+        Connectedness::Connecting,
+        "should set peer connectednes to Connecting since we have't reach max connection"
     );
     assert_eq!(test_peer.retry.count(), 0, "should keep retry to 0");
 }
