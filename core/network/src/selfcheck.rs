@@ -36,6 +36,13 @@ where
         }
     }
 
+    fn report_whitelist(&self) {
+        info!(
+            "whitelist peers by chain address: {:?}",
+            self.sessions.whitelist()
+        );
+    }
+
     fn report_pending_data(&self) {
         let sids = self.sessions.all();
         let mut total_size = 0;
@@ -78,6 +85,7 @@ where
         }
 
         self.as_ref().report_pending_data();
+        self.as_ref().report_whitelist();
 
         Poll::Pending
     }

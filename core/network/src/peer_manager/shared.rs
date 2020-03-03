@@ -125,4 +125,13 @@ impl SessionBook for SharedSessions {
             .map(|s| s.ctx.pending_data_size())
             .unwrap_or_else(|| 0)
     }
+
+    fn whitelist(&self) -> Vec<Address> {
+        self.inner
+            .whitelist
+            .read()
+            .iter()
+            .map(|p| p.owned_chain_addr())
+            .collect()
+    }
 }

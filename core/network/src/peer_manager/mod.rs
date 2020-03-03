@@ -215,6 +215,10 @@ impl ArcProtectedPeer {
         ArcProtectedPeer(Arc::new(peer))
     }
 
+    pub fn owned_chain_addr(&self) -> Address {
+        self.chain_addr.to_owned()
+    }
+
     pub fn refresh_authorized(&self) {
         self.authorized_at.store(time::now(), Ordering::SeqCst);
     }
