@@ -95,8 +95,8 @@ pub fn mock_sign_tx() -> SignedTransaction {
     }
 }
 
-pub fn mock_wal_txs(tx_size: usize) -> WalSaveTxs {
-    let inner = (0..tx_size).map(|_| mock_sign_tx()).collect::<Vec<_>>();
+pub fn mock_wal_txs() -> WalSaveTxs {
+    let inner = (0..5000).map(|_| mock_sign_tx()).collect::<Vec<_>>();
     WalSaveTxs { inner }
 }
 

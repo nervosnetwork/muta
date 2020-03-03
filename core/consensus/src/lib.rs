@@ -9,6 +9,7 @@ pub mod synchronization;
 mod tests;
 pub mod trace;
 pub mod util;
+pub mod wal;
 
 pub use crate::adapter::OverlordConsensusAdapter;
 pub use crate::consensus::OverlordConsensus;
@@ -107,7 +108,11 @@ pub enum ConsensusError {
     ExecuteErr(String),
 
     ///
-    WalErr(String),
+    #[display(fmt = "Status cache error {:?}", _0)]
+    StatusErr(StatusCacheField),
+
+    ///
+    WalErr(std::io::Error),
 
     /// Other error used for very few errors.
     #[display(fmt = "{:?}", _0)]

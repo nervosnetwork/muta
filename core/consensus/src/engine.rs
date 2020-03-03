@@ -369,7 +369,7 @@ impl<Adapter: ConsensusAdapter + 'static> Wal for ConsensusEngine<Adapter> {
         self.adapter
             .save_overlord_wal(Context::new(), info)
             .await
-            .map_err(|e| ProtocolError::from(ConsensusError::WalErr(e.to_string())))?;
+            .map_err(|e| ProtocolError::from(ConsensusError::Other(e.to_string())))?;
         Ok(())
     }
 
