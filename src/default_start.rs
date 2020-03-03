@@ -21,7 +21,8 @@ use core_consensus::message::{
 };
 use core_consensus::status::{CurrentConsensusStatus, StatusAgent};
 use core_consensus::{
-    DurationConfig, Node, OverlordConsensus, OverlordConsensusAdapter, OverlordSynchronization,
+    DurationConfig, FullTxsWal, Node, OverlordConsensus, OverlordConsensusAdapter,
+    OverlordSynchronization,
 };
 use core_mempool::{
     DefaultMemPoolAdapter, HashMemPool, MsgPushTxs, NewTxsHandler, PullTxsHandler,
@@ -130,7 +131,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
 ) -> ProtocolResult<()> {
     // Init Block db
     let path_block = config.data_path_for_block();
-    log::info!("Data path for block: {:?}", path_block);
+    log::info!("Data path for block: {:?}", path_block.clone());
     let rocks_adapter = Arc::new(RocksAdapter::new(path_block)?);
     let storage = Arc::new(ImplStorage::new(Arc::clone(&rocks_adapter)));
 
@@ -195,6 +196,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         Arc::clone(&trie_db),
         Arc::clone(&service_mapping),
     );
+    let muta_wal = Arc::new(FullTxsWal::new(path_block.to_str().unwrap().to_string()));
 
     let exec_resp = api_adapter
         .query_service(
@@ -322,6 +324,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         bls_pub_keys,
         bls_priv_key,
         common_ref,
+        muta_wal,
         Arc::clone(&consensus_adapter),
         Arc::clone(&lock),
     ));

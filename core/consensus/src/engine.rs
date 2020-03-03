@@ -21,7 +21,7 @@ use protocol::fixed_codec::FixedCodec;
 use protocol::traits::{ConsensusAdapter, Context, MessageTarget, NodeInfo};
 use protocol::types::{
     Address, Block, BlockHeader, Hash, MerkleRoot, Metadata, Pill, Proof, SignedTransaction,
-    Validator,
+    Validator, WalSaveTxs,
 };
 use protocol::{Bytes, ProtocolError, ProtocolResult};
 
@@ -31,8 +31,17 @@ use crate::message::{
     END_GOSSIP_SIGNED_VOTE,
 };
 use crate::status::StatusAgent;
+<<<<<<< HEAD
 use crate::util::{check_list_roots, OverlordCrypto};
 use crate::ConsensusError;
+=======
+<<<<<<< HEAD
+use crate::util::OverlordCrypto;
+=======
+use crate::wal::FullTxsWal;
+>>>>>>> feat: remove outdated txs
+use crate::{ConsensusError, StatusCacheField};
+>>>>>>> feat: remove outdated txs
 
 /// validator is for create new block, and authority is for build overlord
 /// status.
@@ -42,8 +51,9 @@ pub struct ConsensusEngine<Adapter> {
     exemption_hash: RwLock<HashSet<Bytes>>,
 
     adapter: Arc<Adapter>,
-    crypto:  Arc<OverlordCrypto>,
-    lock:    Arc<Mutex<()>>,
+    full_txs: Arc<FullTxsWal>,
+    adapter:  Arc<Adapter>,
+    lock:     Arc<Mutex<()>>,
 }
 
 #[async_trait]
@@ -143,7 +153,9 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             });
         }
 
-        let _inner = self.adapter.get_full_txs(ctx, order_hashes).await?;
+        let inner = self.adapter.get_full_txs(ctx, order_hashes).await?;
+        self.full_txs
+            .save_txs(height, Hash::from_bytes(hash)?, WalSaveTxs { inner })?;
         log::info!(
             "[consensus-engine]: check block cost {:?} order_hashes_len {:?}",
             time.elapsed(),
@@ -186,7 +198,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         }
 
         let pill = commit.content.inner;
-        let block_hash = commit.proof.block_hash.clone();
+        let block_hash = Hash::from_bytes(commit.proof.block_hash.clone())?;
         let signature = commit.proof.signature.signature.clone();
         let bitmap = commit.proof.signature.address_bitmap.clone();
 
@@ -194,7 +206,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         let proof = Proof {
             height: commit.proof.height,
             round: commit.proof.round,
-            block_hash: Hash::from_bytes(block_hash.clone())?,
+            block_hash,
             signature,
             bitmap,
         };
@@ -209,8 +221,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             .await
         {
             Ok(txs) => txs,
-            // TODO
-            Err(_) => unreachable!(),
+            Err(_) => self.full_txs.get(height, block_hash)?.inner,
         };
 
         // Execute transactions
@@ -239,9 +250,14 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             .flush_mempool(ctx.clone(), &ordered_tx_hashes)
             .await?;
 
+<<<<<<< HEAD
         self.adapter
             .broadcast_height(ctx.clone(), current_height)
             .await?;
+=======
+        self.adapter.broadcast_height(ctx.clone(), height).await?;
+        self.full_txs.remove(pill.block.exec_height)?;
+>>>>>>> feat: remove outdated txs
 
         let mut set = self.exemption_hash.write();
         set.clear();
@@ -382,6 +398,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
     pub fn new(
         status_agent: StatusAgent,
         node_info: NodeInfo,
+        wal: Arc<FullTxsWal>,
         adapter: Arc<Adapter>,
         crypto: Arc<OverlordCrypto>,
         lock: Arc<Mutex<()>>,
@@ -390,6 +407,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
             status_agent,
             node_info,
             exemption_hash: RwLock::new(HashSet::new()),
+            full_txs: wal,
             adapter,
             crypto,
             lock,
