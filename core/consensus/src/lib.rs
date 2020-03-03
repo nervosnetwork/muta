@@ -13,7 +13,6 @@ pub mod util;
 pub use crate::adapter::OverlordConsensusAdapter;
 pub use crate::consensus::OverlordConsensus;
 pub use crate::synchronization::OverlordSynchronization;
-pub use crate::util::WalInfoQueue;
 pub use overlord::{types::Node, DurationConfig};
 
 use std::error::Error;

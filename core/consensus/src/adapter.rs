@@ -4,7 +4,6 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use futures::channel::mpsc::{channel, Receiver, Sender};
-use futures::executor::block_on;
 use futures::stream::StreamExt;
 use overlord::types::OverlordMsg;
 use overlord::OverlordHandler;
@@ -13,8 +12,8 @@ use parking_lot::RwLock;
 use common_merkle::Merkle;
 use protocol::traits::{
     CommonConsensusAdapter, ConsensusAdapter, Context, ExecutorFactory, ExecutorParams,
-    ExecutorResp, Gossip, MemPool, MessageCodec, MessageTarget, MixedTxHashes, Priority, Rpc,
-    ServiceMapping, Storage, SynchronizationAdapter,
+    ExecutorResp, Gossip, MemPool, MessageTarget, MixedTxHashes, Priority, Rpc, ServiceMapping,
+    Storage, SynchronizationAdapter,
 };
 use protocol::types::{
     Address, Block, Bytes, Hash, MerkleRoot, Metadata, Proof, Receipt, SignedTransaction,
@@ -26,7 +25,7 @@ use crate::consensus::gen_overlord_status;
 use crate::fixed_types::{FixedBlock, FixedHeight, FixedPill, FixedSignedTxs, PullTxsRequest};
 use crate::message::{BROADCAST_HEIGHT, RPC_SYNC_PULL_BLOCK, RPC_SYNC_PULL_TXS};
 use crate::status::{ExecutedInfo, StatusAgent, UpdateInfo};
-use crate::util::{ExecuteInfo};
+use crate::util::ExecuteInfo;
 use crate::ConsensusError;
 
 const OVERLORD_GAP: usize = 10;
@@ -48,8 +47,8 @@ pub struct OverlordConsensusAdapter<
     service_mapping:  Arc<Mapping>,
     overlord_handler: RwLock<Option<OverlordHandler<FixedPill>>>,
 
-    exec_queue:     Sender<ExecuteInfo>,
-    exec_demons:    Option<ExecDemons<S, DB, EF, Mapping>>,
+    exec_queue:  Sender<ExecuteInfo>,
+    exec_demons: Option<ExecDemons<S, DB, EF, Mapping>>,
 }
 
 #[async_trait]

@@ -18,7 +18,7 @@ use common_crypto::BlsPublicKey;
 use common_merkle::Merkle;
 
 use protocol::fixed_codec::FixedCodec;
-use protocol::traits::{ConsensusAdapter, Context, MessageCodec, MessageTarget, NodeInfo};
+use protocol::traits::{ConsensusAdapter, Context, MessageTarget, NodeInfo};
 use protocol::types::{
     Address, Block, BlockHeader, Hash, MerkleRoot, Metadata, Pill, Proof, SignedTransaction,
     Validator,
@@ -209,11 +209,8 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             .await
         {
             Ok(txs) => txs,
-            Err(_) => {
-                self.adapter
-                    .load_wal_transactions(ctx.clone(), Hash::from_bytes(block_hash)?)
-                    .await?
-            }
+            // TODO
+            Err(_) => unreachable!(),
         };
 
         // Execute transactions

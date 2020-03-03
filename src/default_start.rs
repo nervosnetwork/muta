@@ -22,7 +22,6 @@ use core_consensus::message::{
 use core_consensus::status::{CurrentConsensusStatus, StatusAgent};
 use core_consensus::{
     DurationConfig, Node, OverlordConsensus, OverlordConsensusAdapter, OverlordSynchronization,
-    WalInfoQueue,
 };
 use core_mempool::{
     DefaultMemPoolAdapter, HashMemPool, MsgPushTxs, NewTxsHandler, PullTxsHandler,
@@ -302,11 +301,6 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
 
     core_consensus::trace::init_tracer(my_address.as_hex())?;
 
-    let exec_wal = match storage.load_exec_queue_wal().await {
-        Ok(bytes) => rlp::decode(bytes.as_ref()).unwrap(),
-        Err(_) => WalInfoQueue::new(),
-    };
-
     let mut consensus_adapter =
         OverlordConsensusAdapter::<ServiceExecutorFactory, _, _, _, _, _, _>::new(
             Arc::new(network_service.handle()),
@@ -316,7 +310,6 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
             Arc::clone(&trie_db),
             Arc::clone(&service_mapping),
             status_agent.clone(),
-            exec_wal,
         )?;
 
     let exec_demon = consensus_adapter.take_exec_demon();

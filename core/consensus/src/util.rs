@@ -1,11 +1,9 @@
-use std::cmp::Eq;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::error::Error;
 
 use overlord::Crypto;
 use parking_lot::RwLock;
-use rlp::{Decodable, DecoderError, Encodable, Prototype, Rlp, RlpStream};
 
 use crate::ConsensusError;
 use common_crypto::{
@@ -13,7 +11,7 @@ use common_crypto::{
     PrivateKey, Signature,
 };
 use protocol::types::{Address, Hash, MerkleRoot, SignedTransaction};
-use protocol::{Bytes, ProtocolError, ProtocolResult};
+use protocol::{Bytes, ProtocolError};
 
 pub struct OverlordCrypto {
     private_key: BlsPrivateKey,
