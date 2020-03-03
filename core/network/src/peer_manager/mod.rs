@@ -140,7 +140,7 @@ impl TryFrom<Multiaddr> for PeerMultiaddr {
     type Error = PeerIdNotFound;
 
     fn try_from(ma: Multiaddr) -> Result<PeerMultiaddr, Self::Error> {
-        if let Some(_) = Self::extract_id(&ma) {
+        if Self::extract_id(&ma).is_some() {
             Ok(PeerMultiaddr(ma))
         } else {
             Err(PeerIdNotFound(ma))

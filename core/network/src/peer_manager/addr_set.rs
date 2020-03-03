@@ -185,15 +185,21 @@ impl PeerAddrSet {
     }
 
     pub fn inc_failure(&self, pma: &PeerMultiaddr) {
-        self.inner.read().get(pma).map(|a| a.inc_failure());
+        if let Some(info) = self.inner.read().get(pma) {
+            info.inc_failure();
+        }
     }
 
     pub fn give_up(&self, pma: &PeerMultiaddr) {
-        self.inner.read().get(pma).map(|a| a.give_up());
+        if let Some(info) = self.inner.read().get(pma) {
+            info.give_up();
+        }
     }
 
     pub fn reset_failure(&self, pma: &PeerMultiaddr) {
-        self.inner.read().get(pma).map(|a| a.reset_failure());
+        if let Some(info) = self.inner.read().get(pma) {
+            info.reset_failure();
+        }
     }
 
     fn match_peer_id(&self, pma: &PeerMultiaddr) -> bool {
