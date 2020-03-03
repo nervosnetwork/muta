@@ -76,7 +76,7 @@ const BACKOFF_BASE: u64 = 2;
 const MAX_RETRY_INTERVAL: u64 = 512; // seconds
 const MAX_RETRY_COUNT: u8 = 30;
 const SHORT_ALIVE_SESSION: u64 = 3; // seconds
-const WHITELIST_TIMEOUT: u64 = 60 * 60; // 1 hour
+const WHITELIST_TIMEOUT: u64 = 2 * 60 * 60; // 1 hour
 const MAX_CONNECTING_MARGIN: usize = 10;
 
 #[derive(Debug, Clone, Display, Serialize, Deserialize)]
