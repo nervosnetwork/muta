@@ -143,10 +143,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             });
         }
 
-        let inner = self.adapter.get_full_txs(ctx, order_hashes).await?;
-        self.adapter
-            .save_wal_transactions(Context::new(), Hash::from_bytes(hash.clone())?, inner)
-            .await?;
+        let _inner = self.adapter.get_full_txs(ctx, order_hashes).await?;
         log::info!(
             "[consensus-engine]: check block cost {:?} order_hashes_len {:?}",
             time.elapsed(),
@@ -574,13 +571,6 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
         self.status_agent
             .update_by_commited(metadata.clone(), block, block_hash, proof);
         self.update_overlord_crypto(metadata)?;
-        self.save_wal().await
-    }
-
-    async fn save_wal(&self) -> ProtocolResult<()> {
-        let mut info = self.status_agent.to_inner();
-        let wal_info = MessageCodec::encode(&mut info).await?;
-        self.adapter.save_muta_wal(Context::new(), wal_info).await
     }
 
     fn update_overlord_crypto(&self, metadata: Metadata) -> ProtocolResult<()> {
