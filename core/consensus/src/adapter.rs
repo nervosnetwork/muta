@@ -161,35 +161,6 @@ where
         self.storage.load_overlord_wal().await
     }
 
-    async fn save_muta_wal(&self, _ctx: Context, info: Bytes) -> ProtocolResult<()> {
-        self.storage.update_muta_wal(info).await
-    }
-
-    async fn load_muta_wal(&self, _ctx: Context) -> ProtocolResult<Bytes> {
-        self.storage.load_muta_wal().await
-    }
-
-    async fn save_wal_transactions(
-        &self,
-        _ctx: Context,
-        block_hash: Hash,
-        txs: Vec<SignedTransaction>,
-    ) -> ProtocolResult<()> {
-        self.storage.insert_wal_transactions(block_hash, txs).await
-    }
-
-    async fn load_wal_transactions(
-        &self,
-        _ctx: Context,
-        block_hash: Hash,
-    ) -> ProtocolResult<Vec<SignedTransaction>> {
-        self.storage.get_wal_transactions(block_hash).await
-    }
-
-    async fn remove_wal_transactions(&self, block_hash: Hash) -> ProtocolResult<()> {
-        self.storage.remove_wal_transactions(block_hash).await
-    }
-
     async fn pull_block(&self, ctx: Context, height: u64, end: &str) -> ProtocolResult<Block> {
         log::debug!("consensus: send rpc pull block {}", height);
         let res = self

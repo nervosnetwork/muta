@@ -193,28 +193,4 @@ pub trait ConsensusAdapter: CommonConsensusAdapter + Send + Sync {
 
     /// Load latest overlord wal info.
     async fn load_overlord_wal(&self, ctx: Context) -> ProtocolResult<Bytes>;
-
-    /// Save muta wal info.
-    async fn save_muta_wal(&self, ctx: Context, info: Bytes) -> ProtocolResult<()>;
-
-    /// Load lastest muta wal info.
-    async fn load_muta_wal(&self, ctx: Context) -> ProtocolResult<Bytes>;
-
-    /// Save full transcations with the block hash when check block.
-    async fn save_wal_transactions(
-        &self,
-        ctx: Context,
-        block_hash: Hash,
-        txs: Vec<SignedTransaction>,
-    ) -> ProtocolResult<()>;
-
-    /// Load full transactions by the given block hash.
-    async fn load_wal_transactions(
-        &self,
-        ctx: Context,
-        block_hash: Hash,
-    ) -> ProtocolResult<Vec<SignedTransaction>>;
-
-    /// Remove full transactions corresponding to the given block hash.
-    async fn remove_wal_transactions(&self, block_hash: Hash) -> ProtocolResult<()>;
 }

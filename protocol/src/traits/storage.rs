@@ -50,28 +50,7 @@ pub trait Storage: Send + Sync {
 
     async fn update_overlord_wal(&self, info: Bytes) -> ProtocolResult<()>;
 
-    async fn update_muta_wal(&self, info: Bytes) -> ProtocolResult<()>;
-
     async fn load_overlord_wal(&self) -> ProtocolResult<Bytes>;
-
-    async fn load_muta_wal(&self) -> ProtocolResult<Bytes>;
-
-    async fn update_exec_queue_wal(&self, info: Bytes) -> ProtocolResult<()>;
-
-    async fn load_exec_queue_wal(&self) -> ProtocolResult<Bytes>;
-
-    async fn insert_wal_transactions(
-        &self,
-        block_hash: Hash,
-        signed_txs: Vec<SignedTransaction>,
-    ) -> ProtocolResult<()>;
-
-    async fn get_wal_transactions(
-        &self,
-        block_hash: Hash,
-    ) -> ProtocolResult<Vec<SignedTransaction>>;
-
-    async fn remove_wal_transactions(&self, block_hash: Hash) -> ProtocolResult<()>;
 }
 
 pub enum StorageBatchModify<S: StorageSchema> {
