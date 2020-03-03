@@ -165,8 +165,10 @@ impl NetworkConfig {
         }
     }
 
-    pub fn max_connections(mut self, max: usize) -> Self {
-        self.max_connections = max;
+    pub fn max_connections(mut self, max: Option<usize>) -> Self {
+        if let Some(max) = max {
+            self.max_connections = max;
+        }
 
         self
     }
