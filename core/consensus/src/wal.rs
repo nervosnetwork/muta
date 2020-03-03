@@ -15,7 +15,7 @@ pub struct FullTxsWal {
 impl FullTxsWal {
     pub fn new(path: String) -> Self {
         if fs::read_dir(&path).is_err() {
-            fs::create_dir(&path).expect("Failed to create wal directory");
+            fs::create_dir_all(&path).expect("Failed to create wal directory");
         }
 
         FullTxsWal { path }
@@ -73,5 +73,76 @@ impl FullTxsWal {
             }
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use rand::random;
+
+    use protocol::types::{Hash, RawTransaction, SignedTransaction, TransactionRequest};
+
+    use super::*;
+
+    static FULL_TXS_PATH: &str = "./devtools/chain/data";
+
+    pub fn mock_hash() -> Hash {
+        Hash::digest(get_random_bytes(10))
+    }
+
+    pub fn mock_raw_tx() -> RawTransaction {
+        RawTransaction {
+            chain_id:     mock_hash(),
+            nonce:        mock_hash(),
+            timeout:      100,
+            cycles_price: 1,
+            cycles_limit: 100,
+            request:      mock_transaction_request(),
+        }
+    }
+
+    pub fn mock_transaction_request() -> TransactionRequest {
+        TransactionRequest {
+            service_name: "mock-service".to_owned(),
+            method:       "mock-method".to_owned(),
+            payload:      "mock-payload".to_owned(),
+        }
+    }
+
+    pub fn mock_sign_tx() -> SignedTransaction {
+        SignedTransaction {
+            raw:       mock_raw_tx(),
+            tx_hash:   mock_hash(),
+            pubkey:    Default::default(),
+            signature: Default::default(),
+        }
+    }
+
+    pub fn mock_wal_txs() -> WalSaveTxs {
+        let inner = (0..5000).map(|_| mock_sign_tx()).collect::<Vec<_>>();
+        WalSaveTxs { inner }
+    }
+
+    pub fn get_random_bytes(len: usize) -> Bytes {
+        let vec: Vec<u8> = (0..len).map(|_| random::<u8>()).collect();
+        Bytes::from(vec)
+    }
+
+    #[test]
+    fn test_txs_wal() {
+        let wal = FullTxsWal::new(FULL_TXS_PATH.to_string());
+        let txs_01 = mock_wal_txs();
+        let hash_01 = Hash::digest(txs_01.encode_fixed().unwrap());
+        wal.save_txs(1u64, hash_01.clone(), txs_01.clone()).unwrap();
+        let txs_02 = mock_wal_txs();
+        let hash_02 = Hash::digest(txs_02.encode_fixed().unwrap());
+        wal.save_txs(3u64, hash_02.clone(), txs_02.clone()).unwrap();
+
+        assert_eq!(wal.load_txs(1u64, hash_01.clone()).unwrap(), txs_01);
+        assert_eq!(wal.load_txs(3u64, hash_02.clone()).unwrap(), txs_02);
+
+        wal.remove(2u64).unwrap();
+        assert!(wal.load_txs(1u64, hash_01).is_err());
+        assert!(wal.load_txs(2u64, hash_02).is_err());
     }
 }

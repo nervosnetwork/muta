@@ -14,6 +14,7 @@ pub mod wal;
 pub use crate::adapter::OverlordConsensusAdapter;
 pub use crate::consensus::OverlordConsensus;
 pub use crate::synchronization::OverlordSynchronization;
+pub use crate::wal::FullTxsWal;
 pub use overlord::{types::Node, DurationConfig};
 
 use std::error::Error;
