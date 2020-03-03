@@ -42,11 +42,11 @@ pub enum ConnectionErrorKind {
     #[display(fmt = "dns resolver {}", _0)]
     DNSResolver(Box<dyn Error + Send>),
 
-    #[display(fmt = "remote peer doesn't match one in multiaddr")]
-    PeerIdNotMatch,
-
     #[display(fmt = "handshake {}", _0)]
     SecioHandshake(Box<dyn Error + Send>),
+
+    #[display(fmt = "remote peer doesn't match one in multiaddr")]
+    PeerIdNotMatch,
 
     #[display(fmt = "protocol handle block or abnormally closed")]
     ProtocolHandle,
@@ -66,7 +66,7 @@ pub enum SessionErrorKind {
     },
 
     #[display(fmt = "unexpect {}", _0)]
-    Unexpect(Box<dyn Error + Send>),
+    Unexpected(Box<dyn Error + Send>),
 }
 
 #[derive(Debug, Display)]

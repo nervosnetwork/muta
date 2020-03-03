@@ -165,7 +165,7 @@ impl ServiceHandle for ConnectionServiceKeeper {
                 let kind = if let TentacleError::IoError(err) = error {
                     SessionErrorKind::Io(err)
                 } else {
-                    SessionErrorKind::Unexpect(Box::new(error))
+                    SessionErrorKind::Unexpected(Box::new(error))
                 };
                 let muxer_broken = PeerManagerEvent::SessionFailed {
                     sid: session_context.id,

@@ -1,12 +1,13 @@
 use super::{
-    addr_info::{ADDR_TIMEOUT, MAX_ADDR_RETRY},
-    peer::{Peer, VALID_ATTEMPT_INTERVAL},
-    AddrInfo, ArcPeer, ArcProtectedPeer, Connectedness, Inner, PeerManager, PeerManagerConfig,
-    PeerMultiaddr, ALIVE_RETRY_INTERVAL, MAX_RETRY_COUNT, WHITELIST_TIMEOUT,
+    time, ArcPeer, Connectedness, ConnectingAttempt, Inner, MisbehaviorKind, PeerManager,
+    PeerManagerConfig, PeerMultiaddr, MAX_RETRY_COUNT, REPEATED_CONNECTION_TIMEOUT,
+    SHORT_ALIVE_SESSION, WHITELIST_TIMEOUT,
 };
 use crate::{
     common::ConnectedAddr,
-    event::{ConnectionEvent, ConnectionType, PeerManagerEvent, RemoveKind, RetryKind},
+    event::{
+        ConnectionErrorKind, ConnectionEvent, ConnectionType, PeerManagerEvent, SessionErrorKind,
+    },
     test::mock::SessionContext,
     traits::MultiaddrExt,
 };
@@ -58,7 +59,7 @@ fn make_peer(port: u16) -> ArcPeer {
     let peer = ArcPeer::from_pubkey(pubkey).expect("make peer");
     let multiaddr = make_peer_multiaddr(port, peer_id);
 
-    peer.set_multiaddrs(vec![multiaddr]);
+    peer.multiaddrs.set(vec![multiaddr]);
     peer
 }
 
@@ -84,10 +85,6 @@ impl MockManager {
         MockManager { event_tx, inner }
     }
 
-    pub fn config(&self) -> &PeerManagerConfig {
-        &self.inner.config
-    }
-
     pub async fn poll_event(&mut self, event: PeerManagerEvent) {
         self.event_tx.unbounded_send(event).expect("send event");
         self.await
@@ -97,12 +94,12 @@ impl MockManager {
         self.await
     }
 
-    pub fn unknown_book(&self) -> &HashSet<AddrInfo> {
-        &self.inner.unknown_addrs
+    pub fn connecting(&self) -> &HashSet<ConnectingAttempt> {
+        &self.inner.connecting
     }
 
-    pub fn unknown_book_mut(&mut self) -> &mut HashSet<AddrInfo> {
-        &mut self.inner.unknown_addrs
+    pub fn connecting_mut(&mut self) -> &mut HashSet<ConnectingAttempt> {
+        &mut self.inner.connecting
     }
 
     pub fn core_inner(&self) -> Arc<Inner> {
@@ -150,15 +147,15 @@ fn make_pubkey() -> PublicKey {
     keypair.public_key()
 }
 
-async fn make_sessions(mgr: &mut MockManager, num: usize) -> Vec<ArcPeer> {
+async fn make_sessions(mgr: &mut MockManager, num: u16, init_port: u16) -> Vec<ArcPeer> {
     let mut next_sid = 1;
-    let mut peers = Vec::with_capacity(num);
+    let mut peers = Vec::with_capacity(num as usize);
     let inner = mgr.core_inner();
 
-    for _ in (0..num).into_iter() {
+    for n in (0..num).into_iter() {
         let remote_pubkey = make_pubkey();
         let remote_pid = remote_pubkey.peer_id();
-        let remote_addr = make_multiaddr(6000, Some(remote_pid.clone()));
+        let remote_addr = make_multiaddr(init_port + n, Some(remote_pid.clone()));
 
         let sess_ctx = SessionContext::make(
             SessionId::new(next_sid),
@@ -178,25 +175,26 @@ async fn make_sessions(mgr: &mut MockManager, num: usize) -> Vec<ArcPeer> {
         peers.push(inner.peer(&remote_pid).expect("make peer session"));
     }
 
-    assert_eq!(inner.connected(), num, "make some sessions");
+    assert_eq!(inner.connected(), num as usize, "make some sessions");
     peers
 }
 
 #[tokio::test]
-async fn should_accept_outbound_new_session_and_add_peer() {
-    let (mut mgr, _conn_rx) = make_manager(2, 20);
+async fn should_accept_new_peer_inbound_connection_on_new_session() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
 
     let remote_pubkey = make_pubkey();
+    let remote_peer_id = remote_pubkey.peer_id();
     let remote_addr = make_multiaddr(6000, Some(remote_pubkey.peer_id()));
+
     let sess_ctx = SessionContext::make(
         SessionId::new(1),
         remote_addr.clone(),
-        SessionType::Outbound,
+        SessionType::Inbound,
         remote_pubkey.clone(),
     );
-
     let new_session = PeerManagerEvent::NewSession {
-        pid:    remote_pubkey.peer_id(),
+        pid:    remote_peer_id.clone(),
         pubkey: remote_pubkey.clone(),
         ctx:    sess_ctx.arced(),
     };
@@ -205,21 +203,21 @@ async fn should_accept_outbound_new_session_and_add_peer() {
     let inner = mgr.core_inner();
     assert_eq!(inner.connected(), 1, "should have one without bootstrap");
 
-    let saved_peer = inner
-        .peer(&remote_pubkey.peer_id())
-        .expect("should save peer");
+    let saved_peer = inner.peer(&remote_peer_id).expect("should save peer");
     assert_eq!(saved_peer.session_id(), 1.into());
-    assert_eq!(saved_peer.connectedness(), Connectedness::Connected);
-    let saved_addrs_len = saved_peer.multiaddrs_len();
-    assert_eq!(saved_addrs_len, 1, "should save outbound multiaddr");
+    assert!(saved_peer.has_pubkey(), "should have public key");
     assert!(
-        saved_peer.raw_multiaddrs().contains(&remote_addr),
-        "should contain remote multiadr"
+        saved_peer.owned_chain_addr().is_some(),
+        "should have chain addr"
     );
-    assert_eq!(saved_peer.retry(), 0, "should reset retry");
+    assert_eq!(saved_peer.connectedness(), Connectedness::Connected);
+    assert_eq!(saved_peer.retry.count(), 0, "should reset retry");
 
-    let saved_session = inner.session(1.into()).expect("should save session");
-    assert_eq!(saved_session.peer.id.as_ref(), &remote_pubkey.peer_id());
+    let saved_session = inner.session(1.into()).expect(
+        "should save
+session",
+    );
+    assert_eq!(saved_session.peer.id, remote_pubkey.peer_id());
     assert!(!saved_session.is_blocked());
     assert_eq!(
         saved_session.connected_addr,
@@ -228,20 +226,131 @@ async fn should_accept_outbound_new_session_and_add_peer() {
 }
 
 #[tokio::test]
+async fn should_accept_outbound_connection_and_remove_mached_connecting_on_new_session() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+
+    let test_peer = make_peer(9527);
+    let test_multiaddr = test_peer.multiaddrs.all_raw().pop().expect("get multiaddr");
+    let target_attempt = ConnectingAttempt::new(test_peer.clone());
+
+    let inner = mgr.core_inner();
+    assert_eq!(inner.connected(), 0, "should have zero connected");
+
+    mgr.connecting_mut().insert(target_attempt);
+    assert_eq!(
+        mgr.connecting().len(),
+        1,
+        "should have one connecting
+attempt"
+    );
+
+    let sess_ctx = SessionContext::make(
+        SessionId::new(1),
+        test_multiaddr.clone(),
+        SessionType::Outbound,
+        test_peer.owned_pubkey().expect("pubkey"),
+    );
+    let new_session = PeerManagerEvent::NewSession {
+        pid:    test_peer.owned_id(),
+        pubkey: test_peer.owned_pubkey().expect("pubkey"),
+        ctx:    sess_ctx.arced(),
+    };
+    mgr.poll_event(new_session).await;
+
+    assert_eq!(
+        mgr.connecting().len(),
+        0,
+        "should have 0 connecting attempt"
+    );
+    assert_eq!(inner.connected(), 1, "should have 1 connected");
+    assert!(inner.peer(&test_peer.id).is_some(), "should match peer");
+}
+
+#[tokio::test]
+async fn should_set_matched_peer_pubkey_on_new_session() {
+    let (mut mgr, _conn_rx) = make_manager(0, 2);
+
+    let inner = mgr.core_inner();
+    let test_pubkey = make_pubkey();
+    let test_peer = ArcPeer::new(test_pubkey.peer_id());
+    inner.add_peer(test_peer.clone());
+
+    let sess_ctx = SessionContext::make(
+        SessionId::new(1),
+        make_multiaddr(9527, None),
+        SessionType::Outbound,
+        test_pubkey.clone(),
+    );
+    let new_session = PeerManagerEvent::NewSession {
+        pid:    test_pubkey.peer_id(),
+        pubkey: test_pubkey.clone(),
+        ctx:    sess_ctx.arced(),
+    };
+    mgr.poll_event(new_session).await;
+
+    let inner = mgr.core_inner();
+    assert_eq!(inner.connected(), 1, "should one connection");
+    assert_eq!(
+        test_peer.owned_pubkey(),
+        Some(test_pubkey),
+        "should set peer pubkey"
+    );
+}
+
+#[tokio::test]
+async fn should_reset_outbound_peer_multiaddr_failure_count_on_new_session() {
+    let (mut mgr, _conn_rx) = make_manager(0, 2);
+
+    let inner = mgr.core_inner();
+    let test_peer = make_peer(9527);
+    inner.add_peer(test_peer.clone());
+
+    let test_multiaddr = test_peer.multiaddrs.all().pop().expect("test multiaddr");
+    test_peer.multiaddrs.inc_failure(&test_multiaddr);
+    assert_eq!(
+        test_peer.multiaddrs.failure(&test_multiaddr),
+        Some(1),
+        "should have one failure"
+    );
+
+    let sess_ctx = SessionContext::make(
+        SessionId::new(1),
+        make_multiaddr(9527, None),
+        SessionType::Outbound,
+        test_peer.owned_pubkey().expect("pubkey"),
+    );
+    let new_session = PeerManagerEvent::NewSession {
+        pid:    test_peer.owned_id(),
+        pubkey: test_peer.owned_pubkey().expect("pubkey"),
+        ctx:    sess_ctx.arced(),
+    };
+    mgr.poll_event(new_session).await;
+
+    let inner = mgr.core_inner();
+    assert_eq!(inner.connected(), 1, "should one connection");
+    assert_eq!(
+        test_peer.multiaddrs.failure(&test_multiaddr),
+        Some(0),
+        "should reset matched outbound multiaddr's failure"
+    );
+}
+
+#[tokio::test]
 async fn should_ignore_inbound_address_on_new_session() {
     let (mut mgr, _conn_rx) = make_manager(2, 20);
 
     let remote_pubkey = make_pubkey();
+    let remote_peer_id = remote_pubkey.peer_id();
     let remote_addr = make_multiaddr(6000, Some(remote_pubkey.peer_id()));
+
     let sess_ctx = SessionContext::make(
         SessionId::new(1),
         remote_addr.clone(),
         SessionType::Inbound,
         remote_pubkey.clone(),
     );
-
     let new_session = PeerManagerEvent::NewSession {
-        pid:    remote_pubkey.peer_id(),
+        pid:    remote_peer_id.clone(),
         pubkey: remote_pubkey.clone(),
         ctx:    sess_ctx.arced(),
     };
@@ -250,11 +359,12 @@ async fn should_ignore_inbound_address_on_new_session() {
     let inner = mgr.core_inner();
     assert_eq!(inner.connected(), 1, "should have one without bootstrap");
 
-    let saved_peer = inner
-        .peer(&remote_pubkey.peer_id())
-        .expect("should save peer");
-    let saved_addrs_len = saved_peer.multiaddrs_len();
-    assert_eq!(saved_addrs_len, 0, "should not save inbound multiaddr");
+    let saved_peer = inner.peer(&remote_peer_id).expect("should save peer");
+    assert_eq!(
+        saved_peer.multiaddrs.len(),
+        0,
+        "should not save inbound multiaddr"
+    );
 }
 
 #[tokio::test]
@@ -262,14 +372,15 @@ async fn should_enforce_id_in_multiaddr_on_new_session() {
     let (mut mgr, _conn_rx) = make_manager(2, 20);
 
     let remote_pubkey = make_pubkey();
+    let remote_peer_id = remote_pubkey.peer_id();
     let remote_addr = make_multiaddr(6000, None);
+
     let sess_ctx = SessionContext::make(
         SessionId::new(1),
         remote_addr.clone(),
         SessionType::Outbound,
         remote_pubkey.clone(),
     );
-
     let new_session = PeerManagerEvent::NewSession {
         pid:    remote_pubkey.peer_id(),
         pubkey: remote_pubkey.clone(),
@@ -280,10 +391,8 @@ async fn should_enforce_id_in_multiaddr_on_new_session() {
     let inner = mgr.core_inner();
     assert_eq!(inner.connected(), 1, "should have one without bootstrap");
 
-    let saved_peer = inner
-        .peer(&remote_pubkey.peer_id())
-        .expect("should save peer");
-    let saved_addrs = saved_peer.raw_multiaddrs();
+    let saved_peer = inner.peer(&remote_peer_id).expect("should save peer");
+    let saved_addrs = saved_peer.multiaddrs.all_raw();
     assert_eq!(saved_addrs.len(), 1, "should save outbound multiaddr");
 
     let remote_addr = saved_addrs.first().expect("get first multiaddr");
@@ -296,9 +405,9 @@ async fn should_enforce_id_in_multiaddr_on_new_session() {
 }
 
 #[tokio::test]
-async fn should_add_multiaddr_to_peer_on_new_session() {
+async fn should_add_new_outbound_multiaddr_to_peer_on_new_session() {
     let (mut mgr, _conn_rx) = make_manager(2, 20);
-    let remote_peers = make_sessions(&mut mgr, 1).await;
+    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
 
     let inner = mgr.core_inner();
     assert_eq!(inner.connected(), 1, "should have one without bootstrap");
@@ -315,100 +424,84 @@ async fn should_add_multiaddr_to_peer_on_new_session() {
         SessionId::new(2),
         new_multiaddr,
         SessionType::Outbound,
-        test_peer.owned_pubkey(),
+        test_peer.owned_pubkey().expect("pubkey"),
     );
     let new_session = PeerManagerEvent::NewSession {
         pid:    test_peer.owned_id(),
-        pubkey: test_peer.owned_pubkey(),
+        pubkey: test_peer.owned_pubkey().expect("pubkey"),
         ctx:    sess_ctx.arced(),
     };
     mgr.poll_event(new_session).await;
 
-    assert_eq!(test_peer.multiaddrs_len(), 2, "should have 2 addrs");
+    assert_eq!(test_peer.multiaddrs.len(), 2, "should have 2 addrs");
+
+    let test_peer_multiaddr = make_peer_multiaddr(9999, test_peer.owned_id());
+    assert!(
+        test_peer.multiaddrs.contains(&test_peer_multiaddr),
+        "should have this new multiaddr"
+    );
 }
 
 #[tokio::test]
-async fn should_dec_connecting_and_inc_connected_for_connecting_peer_on_new_session() {
-    let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let test_peer = make_peer(2020);
+async fn should_always_remove_inbound_multiaddr_even_if_we_reach_max_connections_on_new_session() {
+    let (mut mgr, _conn_rx) = make_manager(0, 2);
+    let _remote_peers = make_sessions(&mut mgr, 2, 5000).await;
 
     let inner = mgr.core_inner();
-    assert_eq!(inner.connected(), 0, "should not have any connection");
-    assert_eq!(inner.connecting(), 0, "should not have any connection");
-
+    let test_peer = make_peer(9527);
     inner.add_peer(test_peer.clone());
-    mgr.poll().await;
-    assert_eq!(inner.connecting(), 1, "should try connect test peer");
-    assert_eq!(test_peer.connectedness(), Connectedness::Connecting);
+    assert_eq!(
+        test_peer.multiaddrs.len(),
+        1,
+        "should have on inbound address"
+    );
 
     let sess_ctx = SessionContext::make(
         SessionId::new(1),
-        test_peer.raw_multiaddrs().pop().expect("get multiaddr"),
-        SessionType::Outbound,
-        test_peer.owned_pubkey(),
+        make_multiaddr(9527, Some(test_peer.owned_id())),
+        SessionType::Inbound,
+        test_peer.owned_pubkey().expect("pubkey"),
     );
     let new_session = PeerManagerEvent::NewSession {
         pid:    test_peer.owned_id(),
-        pubkey: test_peer.owned_pubkey(),
+        pubkey: test_peer.owned_pubkey().expect("pubkey"),
         ctx:    sess_ctx.arced(),
     };
     mgr.poll_event(new_session).await;
 
-    assert_eq!(test_peer.connectedness(), Connectedness::Connected);
-    assert_eq!(inner.connected(), 1, "should have one connected");
-    assert_eq!(inner.connecting(), 0, "should not have any connecting");
+    let inner = mgr.core_inner();
+    assert_eq!(inner.connected(), 2, "should not increase conn count");
+
+    assert_eq!(
+        test_peer.multiaddrs.len(),
+        0,
+        "should remove inbound address"
+    );
 }
 
 #[tokio::test]
-async fn should_always_remove_inbound_mutiaddr_in_unknown_book_even_when_reach_max_connections_on_new_session(
+async fn should_remove_matched_peer_inbound_address_from_ctx_even_if_it_doesnt_have_id_on_new_session(
 ) {
     let (mut mgr, _conn_rx) = make_manager(0, 2);
-    let _remote_peers = make_sessions(&mut mgr, 2).await;
 
-    let remote_pubkey = make_pubkey();
-    mgr.unknown_book_mut()
-        .insert(make_peer_multiaddr(9527, remote_pubkey.peer_id()).into());
-    assert_eq!(mgr.unknown_book().len(), 1, "should have one unknown addr");
+    let inner = mgr.core_inner();
+    let test_peer = make_peer(9527);
+    inner.add_peer(test_peer.clone());
+    assert_eq!(
+        test_peer.multiaddrs.len(),
+        1,
+        "should have on inbound address"
+    );
 
     let sess_ctx = SessionContext::make(
         SessionId::new(1),
         make_multiaddr(9527, None),
         SessionType::Inbound,
-        remote_pubkey.clone(),
+        test_peer.owned_pubkey().expect("pubkey"),
     );
     let new_session = PeerManagerEvent::NewSession {
-        pid:    remote_pubkey.peer_id(),
-        pubkey: remote_pubkey.clone(),
-        ctx:    sess_ctx.arced(),
-    };
-    mgr.poll_event(new_session).await;
-
-    let inner = mgr.core_inner();
-    assert_eq!(mgr.unknown_book().len(), 0, "should remove unknown addr");
-    assert_eq!(inner.connected(), 2, "should not increase conn count");
-}
-
-#[tokio::test]
-async fn should_remove_same_mutiaddr_in_unknown_book_on_new_session() {
-    let (mut mgr, _conn_rx) = make_manager(0, 20);
-
-    let remote_pubkey = make_pubkey();
-    let test_addr = make_multiaddr(2077, Some(remote_pubkey.peer_id()));
-
-    mgr.unknown_book_mut()
-        .insert(make_peer_multiaddr(2077, remote_pubkey.peer_id()).into());
-    assert_eq!(mgr.unknown_book().len(), 1, "should have one unknown addr");
-
-    let sess_ctx = SessionContext::make(
-        SessionId::new(1),
-        test_addr,
-        SessionType::Outbound,
-        remote_pubkey.clone(),
-    );
-
-    let new_session = PeerManagerEvent::NewSession {
-        pid:    remote_pubkey.peer_id(),
-        pubkey: remote_pubkey.clone(),
+        pid:    test_peer.owned_id(),
+        pubkey: test_peer.owned_pubkey().expect("pubkey"),
         ctx:    sess_ctx.arced(),
     };
     mgr.poll_event(new_session).await;
@@ -416,62 +509,29 @@ async fn should_remove_same_mutiaddr_in_unknown_book_on_new_session() {
     let inner = mgr.core_inner();
     assert_eq!(inner.connected(), 1, "should have one connection");
     assert_eq!(
-        mgr.unknown_book().len(),
+        test_peer.multiaddrs.len(),
         0,
-        "should remove same unknown addr"
-    );
-}
-
-#[tokio::test]
-async fn should_remove_same_multiaddr_in_unknown_book_if_ctx_address_doesnt_have_id_on_new_session()
-{
-    let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let remote_pubkey = make_pubkey();
-    mgr.unknown_book_mut()
-        .insert(make_peer_multiaddr(2077, remote_pubkey.peer_id()).into());
-
-    assert_eq!(mgr.unknown_book().len(), 1, "should have one unknown addr");
-
-    let sess_ctx = SessionContext::make(
-        SessionId::new(1),
-        make_multiaddr(2077, None), // Multiaddr without id in ctx
-        SessionType::Outbound,
-        remote_pubkey.clone(),
-    );
-
-    let new_session = PeerManagerEvent::NewSession {
-        pid:    remote_pubkey.peer_id(),
-        pubkey: remote_pubkey.clone(),
-        ctx:    sess_ctx.arced(),
-    };
-    mgr.poll_event(new_session).await;
-
-    let inner = mgr.core_inner();
-    assert_eq!(inner.connected(), 1, "should have one connection");
-    assert_eq!(
-        mgr.unknown_book().len(),
-        0,
-        "should remove same unknown addr"
+        "should remove inbound address"
     );
 }
 
 #[tokio::test]
 async fn should_reject_new_connection_for_same_peer_on_new_session() {
     let (mut mgr, mut conn_rx) = make_manager(0, 20);
-    let remote_peers = make_sessions(&mut mgr, 1).await;
+    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
 
     let test_peer = remote_peers.first().expect("get first peer");
     let expect_sid = test_peer.session_id();
+
     let sess_ctx = SessionContext::make(
         SessionId::new(99),
-        test_peer.raw_multiaddrs().pop().expect("get multiaddr"),
+        test_peer.multiaddrs.all_raw().pop().expect("get multiaddr"),
         SessionType::Outbound,
-        test_peer.owned_pubkey(),
+        test_peer.owned_pubkey().expect("pubkey"),
     );
-
     let new_session = PeerManagerEvent::NewSession {
         pid:    test_peer.owned_id(),
-        pubkey: test_peer.owned_pubkey(),
+        pubkey: test_peer.owned_pubkey().expect("pubkey"),
         ctx:    sess_ctx.arced(),
     };
     mgr.poll_event(new_session).await;
@@ -492,39 +552,9 @@ async fn should_reject_new_connection_for_same_peer_on_new_session() {
 }
 
 #[tokio::test]
-async fn should_reject_new_connections_for_same_peer_also_remove_multiaddr_in_unknown_book_on_new_session(
-) {
-    let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let remote_peers = make_sessions(&mut mgr, 1).await;
-
-    let test_peer = remote_peers.first().expect("get first peer");
-    let test_addr = make_multiaddr(999, Some(test_peer.owned_id()));
-    mgr.unknown_book_mut()
-        .insert(test_addr.clone().try_into().expect("try into addr info"));
-    assert_eq!(mgr.unknown_book().len(), 1, "should have one unknown addr");
-
-    let sess_ctx = SessionContext::make(
-        SessionId::new(99),
-        test_addr,
-        SessionType::Outbound,
-        test_peer.owned_pubkey(),
-    );
-    let new_session = PeerManagerEvent::NewSession {
-        pid:    test_peer.owned_id(),
-        pubkey: test_peer.owned_pubkey(),
-        ctx:    sess_ctx.arced(),
-    };
-    mgr.poll_event(new_session).await;
-
-    let inner = mgr.core_inner();
-    assert_eq!(inner.connected(), 1, "should not increase conn count");
-    assert_eq!(mgr.unknown_book().len(), 0, "should remove unknown addr");
-}
-
-#[tokio::test]
 async fn should_keep_new_connection_for_error_outdated_peer_session_on_new_session() {
     let (mut mgr, mut conn_rx) = make_manager(0, 20);
-    let remote_peers = make_sessions(&mut mgr, 1).await;
+    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
 
     let inner = mgr.core_inner();
     let test_peer = remote_peers.first().expect("get first peer");
@@ -532,13 +562,13 @@ async fn should_keep_new_connection_for_error_outdated_peer_session_on_new_sessi
 
     let sess_ctx = SessionContext::make(
         SessionId::new(99),
-        test_peer.raw_multiaddrs().pop().expect("get multiaddr"),
+        test_peer.multiaddrs.all_raw().pop().expect("get multiaddr"),
         SessionType::Outbound,
-        test_peer.owned_pubkey(),
+        test_peer.owned_pubkey().expect("pubkey"),
     );
     let new_session = PeerManagerEvent::NewSession {
         pid:    test_peer.owned_id(),
-        pubkey: test_peer.owned_pubkey(),
+        pubkey: test_peer.owned_pubkey().expect("pubkey"),
         ctx:    sess_ctx.arced(),
     };
     mgr.poll_event(new_session).await;
@@ -559,12 +589,10 @@ async fn should_keep_new_connection_for_error_outdated_peer_session_on_new_sessi
 #[tokio::test]
 async fn should_reject_new_connections_when_we_reach_max_connections_on_new_session() {
     let (mut mgr, mut conn_rx) = make_manager(0, 10); // set max to 10
-    let _remote_peers = make_sessions(&mut mgr, 10).await;
+    let _remote_peers = make_sessions(&mut mgr, 10, 7000).await;
 
     let remote_pubkey = make_pubkey();
     let remote_addr = make_multiaddr(2077, Some(remote_pubkey.peer_id()));
-    mgr.unknown_book_mut()
-        .insert(make_peer_multiaddr(2077, remote_pubkey.peer_id()).into());
 
     let sess_ctx = SessionContext::make(
         SessionId::new(99),
@@ -581,7 +609,46 @@ async fn should_reject_new_connections_when_we_reach_max_connections_on_new_sess
 
     let inner = mgr.core_inner();
     assert_eq!(inner.connected(), 10, "should not increase conn count");
-    assert_eq!(mgr.unknown_book().len(), 1, "should not touch unknown addr");
+
+    let conn_event = conn_rx.next().await.expect("should have disconnect event");
+    match conn_event {
+        ConnectionEvent::Disconnect(sid) => assert_eq!(sid, 99.into(), "should be new session id"),
+        _ => panic!("should be disconnect event"),
+    }
+}
+
+#[tokio::test]
+async fn should_remove_connecting_even_if_session_is_reject_due_to_reach_max_connections_on_new_session(
+) {
+    let (mut mgr, mut conn_rx) = make_manager(0, 5); // set max to 5
+    let _remote_peers = make_sessions(&mut mgr, 5, 7000).await;
+
+    let test_peer = make_peer(2020);
+    let inner = mgr.core_inner();
+    inner.add_peer(test_peer.clone());
+    mgr.connecting_mut()
+        .insert(ConnectingAttempt::new(test_peer.clone()));
+    assert_eq!(mgr.connecting().len(), 1, "should have one attempt");
+
+    let sess_ctx = SessionContext::make(
+        SessionId::new(99),
+        test_peer.multiaddrs.all_raw().pop().expect("multiaddr"),
+        SessionType::Outbound,
+        test_peer.owned_pubkey().expect("pubkey"),
+    );
+    let new_session = PeerManagerEvent::NewSession {
+        pid:    test_peer.owned_id(),
+        pubkey: test_peer.owned_pubkey().expect("pubkey"),
+        ctx:    sess_ctx.arced(),
+    };
+    mgr.poll_event(new_session).await;
+
+    assert_eq!(inner.connected(), 5, "should not increase conn count");
+    assert_eq!(
+        mgr.connecting().len(),
+        0,
+        "should remove connecting attempt"
+    );
 
     let conn_event = conn_rx.next().await.expect("should have disconnect event");
     match conn_event {
@@ -593,12 +660,16 @@ async fn should_reject_new_connections_when_we_reach_max_connections_on_new_sess
 #[tokio::test]
 async fn should_remove_session_on_session_closed() {
     let (mut mgr, _conn_rx) = make_manager(2, 20);
-    let remote_peers = make_sessions(&mut mgr, 1).await;
+    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
 
     let test_peer = remote_peers.first().expect("get first peer");
-    assert_eq!(test_peer.retry(), 0, "should reset retry after connect");
+    assert_eq!(
+        test_peer.retry.count(),
+        0,
+        "should reset retry after connect"
+    );
     // Set connected at to older timestamp to increase peer alive
-    test_peer.set_connected_at(Peer::now() - ALIVE_RETRY_INTERVAL - 1);
+    test_peer.set_connected_at(time::now() - SHORT_ALIVE_SESSION - 1);
 
     let session_closed = PeerManagerEvent::SessionClosed {
         pid: test_peer.owned_id(),
@@ -609,22 +680,30 @@ async fn should_remove_session_on_session_closed() {
     let inner = mgr.core_inner();
     assert_eq!(inner.connected(), 0, "shoulld have zero connected");
     assert_eq!(inner.share_sessions().len(), 0, "should have no session");
-    assert_eq!(inner.connecting(), 1, "should have one connecting attempt");
+    assert_eq!(
+        mgr.connecting().len(),
+        1,
+        "should have one connecting attempt"
+    );
     assert_eq!(
         test_peer.connectedness(),
-        Connectedness::Connecting,
-        "should try reconnect since we aren't reach max connections"
+        Connectedness::CanConnect,
+        "should set peer connectednes to CanConnect"
     );
-    assert_eq!(test_peer.retry(), 0, "should keep retry to 0");
+    assert_eq!(test_peer.retry.count(), 0, "should keep retry to 0");
 }
 
 #[tokio::test]
 async fn should_increase_retry_for_short_alive_session_on_session_closed() {
     let (mut mgr, _conn_rx) = make_manager(2, 20);
-    let remote_peers = make_sessions(&mut mgr, 1).await;
+    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
 
     let test_peer = remote_peers.first().expect("get first peer");
-    assert_eq!(test_peer.retry(), 0, "should reset retry after connect");
+    assert_eq!(
+        test_peer.retry.count(),
+        0,
+        "should reset retry after connect"
+    );
 
     let session_closed = PeerManagerEvent::SessionClosed {
         pid: test_peer.owned_id(),
@@ -640,19 +719,364 @@ async fn should_increase_retry_for_short_alive_session_on_session_closed() {
     );
     assert_eq!(inner.share_sessions().len(), 0, "should have no session");
     assert_eq!(test_peer.connectedness(), Connectedness::CanConnect);
-    assert_eq!(test_peer.retry(), 1, "should increase retry count");
+    assert!(
+        test_peer.retry.eta() > REPEATED_CONNECTION_TIMEOUT,
+        "should increase retry count enough to cover repeated connection timeout"
+    );
+}
+
+#[tokio::test]
+async fn should_inc_peer_multiaddr_failure_count_for_io_error_on_connect_failed() {
+    let (mut mgr, _conn_rx) = make_manager(1, 20);
+
+    let inner = mgr.core_inner();
+    let test_peer = make_peer(2077);
+    let test_multiaddr = test_peer.multiaddrs.all().pop().expect("multiaddr");
+
+    inner.add_peer(test_peer.clone());
+    mgr.connecting_mut()
+        .insert(ConnectingAttempt::new(test_peer.clone()));
+
+    let connect_failed = PeerManagerEvent::ConnectFailed {
+        addr: (*test_multiaddr).to_owned(),
+        kind: ConnectionErrorKind::Io(std::io::ErrorKind::Other.into()),
+    };
+    mgr.poll_event(connect_failed).await;
+
+    assert_eq!(
+        test_peer.multiaddrs.failure(&test_multiaddr),
+        Some(1),
+        "should increase failure count"
+    );
+}
+
+#[tokio::test]
+async fn should_inc_peer_multiaddr_failure_count_for_dns_error_on_connect_failed() {
+    let (mut mgr, _conn_rx) = make_manager(1, 20);
+
+    let inner = mgr.core_inner();
+    let test_peer = make_peer(2077);
+    let test_multiaddr = test_peer.multiaddrs.all().pop().expect("multiaddr");
+
+    inner.add_peer(test_peer.clone());
+    mgr.connecting_mut()
+        .insert(ConnectingAttempt::new(test_peer.clone()));
+
+    let connect_failed = PeerManagerEvent::ConnectFailed {
+        addr: (*test_multiaddr).to_owned(),
+        kind: ConnectionErrorKind::DNSResolver(Box::new(std::io::Error::from(
+            std::io::ErrorKind::Other,
+        )) as Box<dyn std::error::Error + Send>),
+    };
+    mgr.poll_event(connect_failed).await;
+
+    assert_eq!(
+        test_peer.multiaddrs.failure(&test_multiaddr),
+        Some(1),
+        "should increase failure count"
+    );
+}
+
+#[tokio::test]
+async fn should_give_up_peer_multiaddr_if_peer_id_not_match_on_connect_failed() {
+    let (mut mgr, _conn_rx) = make_manager(1, 20);
+
+    let inner = mgr.core_inner();
+    let test_peer = make_peer(2077);
+    let test_multiaddr = test_peer.multiaddrs.all().pop().expect("multiaddr");
+    assert_eq!(
+        test_peer.multiaddrs.connectable_len(),
+        1,
+        "should have one connectable multiaddr"
+    );
+
+    inner.add_peer(test_peer.clone());
+    mgr.connecting_mut()
+        .insert(ConnectingAttempt::new(test_peer.clone()));
+
+    let connect_failed = PeerManagerEvent::ConnectFailed {
+        addr: (*test_multiaddr).to_owned(),
+        kind: ConnectionErrorKind::PeerIdNotMatch,
+    };
+    mgr.poll_event(connect_failed).await;
+
+    assert_eq!(
+        test_peer.multiaddrs.connectable_len(),
+        0,
+        "should not have any connectable multiaddr"
+    );
+}
+
+#[tokio::test]
+async fn should_give_up_peer_itself_if_secio_handshake_error_on_connect_failed() {
+    let (mut mgr, _conn_rx) = make_manager(1, 20);
+
+    let inner = mgr.core_inner();
+    let test_peer = make_peer(2077);
+    let test_multiaddr = test_peer.multiaddrs.all().pop().expect("multiaddr");
+
+    inner.add_peer(test_peer.clone());
+    mgr.connecting_mut()
+        .insert(ConnectingAttempt::new(test_peer.clone()));
+
+    let connect_failed = PeerManagerEvent::ConnectFailed {
+        addr: (*test_multiaddr).to_owned(),
+        kind: ConnectionErrorKind::SecioHandshake(Box::new(std::io::Error::from(
+            std::io::ErrorKind::Other,
+        )) as Box<dyn std::error::Error + Send>),
+    };
+    mgr.poll_event(connect_failed).await;
+
+    assert_eq!(test_peer.connectedness(), Connectedness::Unconnectable);
+}
+
+#[tokio::test]
+async fn should_give_up_peer_itself_if_protocol_handle_error_on_connect_failed() {
+    let (mut mgr, _conn_rx) = make_manager(1, 20);
+
+    let inner = mgr.core_inner();
+    let test_peer = make_peer(2077);
+    let test_multiaddr = test_peer.multiaddrs.all().pop().expect("multiaddr");
+
+    inner.add_peer(test_peer.clone());
+    mgr.connecting_mut()
+        .insert(ConnectingAttempt::new(test_peer.clone()));
+
+    let connect_failed = PeerManagerEvent::ConnectFailed {
+        addr: (*test_multiaddr).to_owned(),
+        kind: ConnectionErrorKind::ProtocolHandle,
+    };
+    mgr.poll_event(connect_failed).await;
+
+    assert_eq!(test_peer.connectedness(), Connectedness::Unconnectable);
+}
+
+#[tokio::test]
+async fn should_increase_peer_retry_if_all_multiaddrs_failed_on_conect_failed() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+
+    let inner = mgr.core_inner();
+    let test_peer = make_peer(2077);
+    let test_multiaddr = test_peer.multiaddrs.all().pop().expect("multiaddr");
+
+    inner.add_peer(test_peer.clone());
+    mgr.connecting_mut()
+        .insert(ConnectingAttempt::new(test_peer.clone()));
+
+    let connect_failed = PeerManagerEvent::ConnectFailed {
+        addr: (*test_multiaddr).to_owned(),
+        kind: ConnectionErrorKind::Io(std::io::ErrorKind::Other.into()),
+    };
+    mgr.poll_event(connect_failed).await;
+
+    assert_eq!(mgr.connecting().len(), 0, "should not have any connecting");
+    assert_eq!(test_peer.retry.count(), 1, "should have 1 retry");
+    assert_eq!(test_peer.connectedness(), Connectedness::CanConnect);
+}
+
+#[tokio::test]
+async fn should_give_up_peer_if_run_out_retry_on_connect_failed() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+
+    let inner = mgr.core_inner();
+    let test_peer = make_peer(2077);
+    let test_multiaddr = test_peer.multiaddrs.all().pop().expect("multiaddr");
+
+    inner.add_peer(test_peer.clone());
+    mgr.connecting_mut()
+        .insert(ConnectingAttempt::new(test_peer.clone()));
+
+    test_peer.retry.set(MAX_RETRY_COUNT);
+    let connect_failed = PeerManagerEvent::ConnectFailed {
+        addr: (*test_multiaddr).to_owned(),
+        kind: ConnectionErrorKind::Io(std::io::ErrorKind::Other.into()),
+    };
+    mgr.poll_event(connect_failed).await;
+
+    assert_eq!(mgr.connecting().len(), 0, "should not have any connecting");
+    assert_eq!(
+        test_peer.retry.count(),
+        MAX_RETRY_COUNT + 1,
+        "should exceed max retry"
+    );
+    assert_eq!(test_peer.connectedness(), Connectedness::Unconnectable);
+}
+
+#[tokio::test]
+async fn should_return_early_if_we_already_give_up_peer_on_connect_failed() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+
+    let inner = mgr.core_inner();
+    let test_peer = make_peer(2077);
+    let test_multiaddr = test_peer.multiaddrs.all().pop().expect("multiaddr");
+
+    inner.add_peer(test_peer.clone());
+    mgr.connecting_mut()
+        .insert(ConnectingAttempt::new(test_peer.clone()));
+
+    let connect_failed = PeerManagerEvent::ConnectFailed {
+        addr: (*test_multiaddr).to_owned(),
+        kind: ConnectionErrorKind::ProtocolHandle,
+    };
+    mgr.poll_event(connect_failed).await;
+
+    assert_eq!(mgr.connecting().len(), 0, "should not have any connecting");
+    assert_eq!(test_peer.connectedness(), Connectedness::Unconnectable);
+    assert_eq!(test_peer.retry.count(), 0, "should not touch peer retry");
+}
+
+#[tokio::test]
+async fn should_wait_for_other_connecting_multiaddrs_if_we_dont_give_up_peer_on_connect_failed() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+
+    let inner = mgr.core_inner();
+    let test_peer = make_peer(2077);
+    let test_multiaddr = test_peer.multiaddrs.all().pop().expect("multiaddr");
+    test_peer
+        .multiaddrs
+        .insert(vec![make_peer_multiaddr(2020, test_peer.owned_id())]);
+    assert_eq!(
+        test_peer.multiaddrs.connectable_len(),
+        2,
+        "should have two connectable multiaddrs"
+    );
+
+    inner.add_peer(test_peer.clone());
+    mgr.connecting_mut()
+        .insert(ConnectingAttempt::new(test_peer.clone()));
+
+    let attempt = mgr.connecting().iter().next().expect("attempt");
+    assert_eq!(
+        attempt.multiaddrs(),
+        2,
+        "should still have two connecting multiaddrs"
+    );
+
+    let connect_failed = PeerManagerEvent::ConnectFailed {
+        addr: (*test_multiaddr).to_owned(),
+        kind: ConnectionErrorKind::Io(std::io::ErrorKind::Other.into()),
+    };
+    mgr.poll_event(connect_failed).await;
+
+    assert_eq!(mgr.connecting().len(), 1, "should not have any connecting");
+
+    let attempt = mgr.connecting().iter().next().expect("attempt");
+    assert_eq!(
+        attempt.multiaddrs(),
+        1,
+        "should still have one connecting multiaddr"
+    );
+}
+
+#[tokio::test]
+async fn should_ensure_disconnect_session_on_session_failed() {
+    let (mut mgr, mut conn_rx) = make_manager(0, 20);
+    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+
+    let test_peer = remote_peers.first().expect("get first peer");
+    let expect_sid = test_peer.session_id();
+    let session_failed = PeerManagerEvent::SessionFailed {
+        sid:  expect_sid,
+        kind: SessionErrorKind::Io(std::io::ErrorKind::Other.into()),
+    };
+    mgr.poll_event(session_failed).await;
+
+    let inner = mgr.core_inner();
+    assert_eq!(inner.share_sessions().len(), 0, "should disconnect session");
+    assert_eq!(inner.connected(), 0, "should disconnect session");
+    assert_eq!(
+        test_peer.connectedness(),
+        Connectedness::CanConnect,
+        "should disconnect peer"
+    );
+
+    let conn_event = conn_rx.next().await.expect("should have disconnect event");
+    match conn_event {
+        ConnectionEvent::Disconnect(sid) => {
+            assert_eq!(sid, expect_sid, "should disconnect session")
+        }
+        _ => panic!("should be disconnect event"),
+    }
+}
+
+#[tokio::test]
+async fn should_increase_retry_for_io_error_on_session_failed() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+
+    let test_peer = remote_peers.first().expect("get first peer");
+    let expect_sid = test_peer.session_id();
+    let session_failed = PeerManagerEvent::SessionFailed {
+        sid:  expect_sid,
+        kind: SessionErrorKind::Io(std::io::ErrorKind::Other.into()),
+    };
+    mgr.poll_event(session_failed).await;
+
+    let inner = mgr.core_inner();
+    assert_eq!(inner.connected(), 0, "should disconnect session");
+    assert_eq!(test_peer.retry.count(), 1, "should increase onen retry");
+}
+
+#[tokio::test]
+async fn should_give_up_peer_for_protocol_error_on_session_failed() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+
+    let test_peer = remote_peers.first().expect("get first peer");
+    let expect_sid = test_peer.session_id();
+    let session_failed = PeerManagerEvent::SessionFailed {
+        sid:  expect_sid,
+        kind: SessionErrorKind::Protocol {
+            identity: None,
+            cause:    None,
+        },
+    };
+    mgr.poll_event(session_failed).await;
+
+    let inner = mgr.core_inner();
+    assert_eq!(inner.connected(), 0, "should disconnect session");
+    assert_eq!(
+        test_peer.connectedness(),
+        Connectedness::Unconnectable,
+        "should give up peer"
+    );
+}
+
+#[tokio::test]
+async fn should_give_up_peer_for_unexpected_error_on_session_failed() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+
+    let test_peer = remote_peers.first().expect("get first peer");
+    let expect_sid = test_peer.session_id();
+    let session_failed = PeerManagerEvent::SessionFailed {
+        sid:  expect_sid,
+        kind: SessionErrorKind::Unexpected(
+            Box::new(std::io::Error::from(std::io::ErrorKind::Other))
+                as Box<dyn std::error::Error + Send>,
+        ),
+    };
+    mgr.poll_event(session_failed).await;
+
+    let inner = mgr.core_inner();
+    assert_eq!(inner.connected(), 0, "should disconnect session");
+    assert_eq!(
+        test_peer.connectedness(),
+        Connectedness::Unconnectable,
+        "should give up peer"
+    );
 }
 
 #[tokio::test]
 async fn should_update_peer_alive_on_peer_alive() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let remote_peers = make_sessions(&mut mgr, 1).await;
+    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
 
     let test_peer = remote_peers.first().expect("get first peer");
     let old_alive = test_peer.alive();
 
     // Set connected at to older timestamp to increase peer alive
-    test_peer.set_connected_at(Peer::now() - ALIVE_RETRY_INTERVAL - 1);
+    test_peer.set_connected_at(time::now() - SHORT_ALIVE_SESSION - 1);
 
     let peer_alive = PeerManagerEvent::PeerAlive {
         pid: test_peer.owned_id(),
@@ -661,7 +1085,7 @@ async fn should_update_peer_alive_on_peer_alive() {
 
     assert_eq!(
         test_peer.alive(),
-        old_alive + ALIVE_RETRY_INTERVAL + 1,
+        old_alive + SHORT_ALIVE_SESSION + 1,
         "should update peer alive"
     );
 }
@@ -669,42 +1093,38 @@ async fn should_update_peer_alive_on_peer_alive() {
 #[tokio::test]
 async fn should_reset_peer_retry_on_peer_alive() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let remote_peers = make_sessions(&mut mgr, 1).await;
+    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
 
     let test_peer = remote_peers.first().expect("get first peer");
-    assert_eq!(test_peer.retry(), 0, "should have 0 retry");
+    assert_eq!(test_peer.retry.count(), 0, "should have 0 retry");
 
-    test_peer.increase_retry();
-    assert_eq!(test_peer.retry(), 1, "should now have 1 retry");
+    test_peer.retry.inc();
+    assert_eq!(test_peer.retry.count(), 1, "should now have 1 retry");
 
     let peer_alive = PeerManagerEvent::PeerAlive {
         pid: test_peer.owned_id(),
     };
     mgr.poll_event(peer_alive).await;
 
-    assert_eq!(test_peer.retry(), 0, "should reset retry");
+    assert_eq!(test_peer.retry.count(), 0, "should reset retry");
 }
 
 #[tokio::test]
-async fn should_disconnect_session_and_remove_peer_on_remove_peer_by_session() {
+async fn should_disconnect_peer_on_misbehave() {
     let (mut mgr, mut conn_rx) = make_manager(0, 20);
-    let remote_peers = make_sessions(&mut mgr, 1).await;
+    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
 
     let test_peer = remote_peers.first().expect("get first peer");
     let expect_sid = test_peer.session_id();
-    let remove_peer_by_session = PeerManagerEvent::BadSession {
-        sid:  test_peer.session_id(),
-        kind: RemoveKind::ProtocolSelect,
+    let peer_misbehave = PeerManagerEvent::Misbehave {
+        pid:  test_peer.owned_id(),
+        kind: MisbehaviorKind::PingTimeout,
     };
-    mgr.poll_event(remove_peer_by_session).await;
+    mgr.poll_event(peer_misbehave).await;
 
     let inner = mgr.core_inner();
-    assert_eq!(inner.connected(), 0, "should have no session");
-    assert_eq!(inner.share_sessions().len(), 0, "should have no session");
-    assert!(
-        inner.peer(&test_peer.id).is_none(),
-        "should remove test peer"
-    );
+    assert_eq!(inner.connected(), 0, "should disconnect session");
+    assert_eq!(inner.share_sessions().len(), 0, "should disconnect session");
 
     let conn_event = conn_rx.next().await.expect("should have disconnect event");
     match conn_event {
@@ -716,81 +1136,75 @@ async fn should_disconnect_session_and_remove_peer_on_remove_peer_by_session() {
 }
 
 #[tokio::test]
-async fn should_keep_bootstrap_peer_but_max_retry_on_remove_peer_by_session() {
-    let (mut mgr, mut conn_rx) = make_manager(1, 20);
-    let bootstraps = &mgr.config().bootstraps;
-    let boot_peer = bootstraps.first().expect("get one bootstrap peer").clone();
+async fn should_increase_retry_for_ping_timeout_on_misbehave() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
 
-    // Insert bootstrap peer
+    let test_peer = remote_peers.first().expect("get first peer");
+    let peer_misbehave = PeerManagerEvent::Misbehave {
+        pid:  test_peer.owned_id(),
+        kind: MisbehaviorKind::PingTimeout,
+    };
+    mgr.poll_event(peer_misbehave).await;
+
     let inner = mgr.core_inner();
-    inner.add_peer(boot_peer.clone());
+    assert_eq!(inner.connected(), 0, "should disconnect session");
+    assert_eq!(test_peer.retry.count(), 1, "should increase retry");
+}
 
-    // Init bootstrap session
-    let sess_ctx = SessionContext::make(
-        SessionId::new(1),
-        boot_peer.raw_multiaddrs().pop().expect("get multiaddr"),
-        SessionType::Outbound,
-        boot_peer.owned_pubkey(),
-    );
-    let new_session = PeerManagerEvent::NewSession {
-        pid:    boot_peer.owned_id(),
-        pubkey: boot_peer.owned_pubkey(),
-        ctx:    sess_ctx.arced(),
+#[tokio::test]
+async fn should_give_up_peer_for_ping_unexpect_on_misbehave() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+
+    let test_peer = remote_peers.first().expect("get first peer");
+    let peer_misbehave = PeerManagerEvent::Misbehave {
+        pid:  test_peer.owned_id(),
+        kind: MisbehaviorKind::PingUnexpect,
     };
-    mgr.poll_event(new_session).await;
+    mgr.poll_event(peer_misbehave).await;
 
-    assert_eq!(inner.connected(), 1, "should have one session");
+    let inner = mgr.core_inner();
+    assert_eq!(inner.connected(), 0, "should disconnect session");
     assert_eq!(
-        boot_peer.connectedness(),
-        Connectedness::Connected,
-        "should connecte"
+        test_peer.connectedness(),
+        Connectedness::Unconnectable,
+        "should give up peer"
     );
-    assert!(
-        boot_peer.session_id() != 0.into(),
-        "should not be default zero"
-    );
+}
 
-    let expect_sid = boot_peer.session_id();
-    let remove_peer_by_session = PeerManagerEvent::BadSession {
-        sid:  boot_peer.session_id(),
-        kind: RemoveKind::ProtocolSelect,
+#[tokio::test]
+async fn should_give_up_peer_for_discovery_on_misbehave() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+
+    let test_peer = remote_peers.first().expect("get first peer");
+    let peer_misbehave = PeerManagerEvent::Misbehave {
+        pid:  test_peer.owned_id(),
+        kind: MisbehaviorKind::Discovery,
     };
-    mgr.poll_event(remove_peer_by_session).await;
+    mgr.poll_event(peer_misbehave).await;
 
-    assert_eq!(inner.connected(), 0, "should have no session");
-    assert_eq!(inner.share_sessions().len(), 0, "should have no session");
-    assert!(
-        inner.peer(&boot_peer.id).is_some(),
-        "should not remove bootstrap peer"
-    );
-
-    assert_eq!(boot_peer.connectedness(), Connectedness::CanConnect);
+    let inner = mgr.core_inner();
+    assert_eq!(inner.connected(), 0, "should disconnect session");
     assert_eq!(
-        boot_peer.retry(),
-        MAX_RETRY_COUNT,
-        "should set to max retry"
+        test_peer.connectedness(),
+        Connectedness::Unconnectable,
+        "should give up peer"
     );
-
-    let conn_event = conn_rx.next().await.expect("should have disconnect event");
-    match conn_event {
-        ConnectionEvent::Disconnect(sid) => {
-            assert_eq!(sid, expect_sid, "should disconnect session")
-        }
-        _ => panic!("should be disconnect event"),
-    }
 }
 
 #[tokio::test]
 async fn should_mark_session_blocked_on_session_blocked() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let remote_peers = make_sessions(&mut mgr, 1).await;
+    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
 
     let test_peer = remote_peers.first().expect("get first peer");
     let sess_ctx = SessionContext::make(
         test_peer.session_id(),
-        test_peer.raw_multiaddrs().pop().expect("get multiaddr"),
+        test_peer.multiaddrs.all_raw().pop().expect("get multiaddr"),
         SessionType::Outbound,
-        test_peer.owned_pubkey(),
+        test_peer.owned_pubkey().expect("pubkey"),
     );
     let session_blocked = PeerManagerEvent::SessionBlocked {
         ctx: sess_ctx.arced(),
@@ -805,40 +1219,14 @@ async fn should_mark_session_blocked_on_session_blocked() {
 }
 
 #[tokio::test]
-async fn should_disconnect_peer_and_increase_retry_on_retry_peer_later() {
-    let (mut mgr, mut conn_rx) = make_manager(0, 20);
-    let remote_peers = make_sessions(&mut mgr, 1).await;
-
-    let test_peer = remote_peers.first().expect("get first peer");
-    let expect_sid = test_peer.session_id();
-    let retry_peer = PeerManagerEvent::RetryPeerLater {
-        pid:  test_peer.owned_id(),
-        kind: RetryKind::TimedOut,
-    };
-    mgr.poll_event(retry_peer).await;
-
-    let inner = mgr.core_inner();
-    assert_eq!(inner.connected(), 0, "should have no session");
-    assert_eq!(test_peer.connectedness(), Connectedness::CanConnect);
-    assert_eq!(test_peer.retry(), 1, "should increase peer retry");
-
-    let conn_event = conn_rx.next().await.expect("should have disconnect event");
-    match conn_event {
-        ConnectionEvent::Disconnect(sid) => {
-            assert_eq!(sid, expect_sid, "should disconnect session")
-        }
-        _ => panic!("should be disconnect event"),
-    }
-}
-
-#[tokio::test]
 async fn should_try_all_peer_multiaddrs_on_connect_peers_now() {
     let (mut mgr, mut conn_rx) = make_manager(0, 20);
     let peers = (0..10)
         .map(|port| {
             // Every peer has two multiaddrs
             let p = make_peer(port + 7000);
-            p.add_multiaddrs(vec![make_peer_multiaddr(port + 8000, p.owned_id())]);
+            p.multiaddrs
+                .insert(vec![make_peer_multiaddr(port + 8000, p.owned_id())]);
             p
         })
         .collect::<Vec<_>>();
@@ -848,10 +1236,22 @@ async fn should_try_all_peer_multiaddrs_on_connect_peers_now() {
         inner.add_peer(peer.clone());
     }
 
+    assert_eq!(
+        mgr.connecting().len(),
+        0,
+        "should have 0 connecting attempt"
+    );
+
     let connect_peers = PeerManagerEvent::ConnectPeersNow {
         pids: peers.iter().map(|p| p.owned_id()).collect(),
     };
     mgr.poll_event(connect_peers).await;
+
+    assert_eq!(
+        mgr.connecting().len(),
+        10,
+        "should have all peer in connecting attempt"
+    );
 
     let conn_event = conn_rx.next().await.expect("should have connect event");
     let multiaddrs_in_event = match conn_event {
@@ -861,7 +1261,7 @@ async fn should_try_all_peer_multiaddrs_on_connect_peers_now() {
 
     let expect_multiaddrs = peers
         .into_iter()
-        .map(|p| p.raw_multiaddrs())
+        .map(|p| p.multiaddrs.all_raw())
         .flatten()
         .collect::<Vec<_>>();
 
@@ -879,18 +1279,16 @@ async fn should_try_all_peer_multiaddrs_on_connect_peers_now() {
 }
 
 #[tokio::test]
-async fn should_skip_peers_not_in_can_connect_connectedness_on_connect_peers_now() {
+async fn should_skip_peers_not_in_can_connect_or_not_connected_connectedness_on_connect_peers_now()
+{
     let (mut mgr, mut conn_rx) = make_manager(0, 20);
-    let peer_in_connecting = make_peer(2077);
     let peer_in_connected = make_peer(2020);
     let peer_in_unconnectable = make_peer(2059);
 
     peer_in_unconnectable.set_connectedness(Connectedness::Unconnectable);
     peer_in_connected.set_connectedness(Connectedness::Connected);
-    peer_in_connecting.set_connectedness(Connectedness::Connecting);
 
     let inner = mgr.core_inner();
-    inner.add_peer(peer_in_connecting.clone());
     inner.add_peer(peer_in_connected.clone());
     inner.add_peer(peer_in_unconnectable.clone());
 
@@ -898,7 +1296,6 @@ async fn should_skip_peers_not_in_can_connect_connectedness_on_connect_peers_now
         pids: vec![
             peer_in_unconnectable.owned_id(),
             peer_in_connected.owned_id(),
-            peer_in_connecting.owned_id(),
         ],
     };
     mgr.poll_event(connect_peers).await;
@@ -913,7 +1310,7 @@ async fn should_skip_peers_not_in_can_connect_connectedness_on_connect_peers_now
 async fn should_connect_peers_even_if_they_are_not_retry_ready_on_connect_peers_now() {
     let (mut mgr, mut conn_rx) = make_manager(0, 20);
     let not_ready_peer = make_peer(2077);
-    not_ready_peer.increase_retry();
+    not_ready_peer.retry.inc();
 
     let inner = mgr.core_inner();
     inner.add_peer(not_ready_peer.clone());
@@ -929,7 +1326,7 @@ async fn should_connect_peers_even_if_they_are_not_retry_ready_on_connect_peers_
         _ => panic!("should be connect event"),
     };
 
-    let expect_multiaddrs = not_ready_peer.raw_multiaddrs();
+    let expect_multiaddrs = not_ready_peer.multiaddrs.all_raw();
     assert_eq!(
         multiaddrs_in_event.len(),
         expect_multiaddrs.len(),
@@ -943,29 +1340,57 @@ async fn should_connect_peers_even_if_they_are_not_retry_ready_on_connect_peers_
     );
 }
 
-// DiscoverMultiAddrs reuse DiscoverAddr logic
 #[tokio::test]
-async fn should_add_multiaddrs_to_unknown_book_on_discover_multi_addrs() {
+async fn should_insert_peers_on_discover_multi_addrs() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let test_multiaddrs: Vec<Multiaddr> = (0..10)
-        .map(|port| {
-            let peer = make_peer(port + 7000);
-            peer.raw_multiaddrs().pop().expect("peer multiaddr")
-        })
-        .collect();
+    let peers = (0..10)
+        .map(|port| make_peer(port + 7000))
+        .collect::<Vec<_>>();
 
-    assert!(mgr.unknown_book().is_empty());
+    let peer_ids = peers
+        .clone()
+        .into_iter()
+        .map(|p| p.owned_id())
+        .collect::<Vec<_>>();
+    let test_multiaddrs = peers
+        .into_iter()
+        .map(|p| p.multiaddrs.all_raw().pop().expect("multiaddr"))
+        .collect::<Vec<_>>();
 
     let discover_multi_addrs = PeerManagerEvent::DiscoverMultiAddrs {
-        addrs: test_multiaddrs.clone(),
+        addrs: test_multiaddrs,
     };
     mgr.poll_event(discover_multi_addrs).await;
 
-    let unknown_book = &mgr.inner.unknown_addrs;
-    assert_eq!(unknown_book.len(), 10, "should have 10 multiaddrs");
+    let inner = mgr.core_inner();
     assert!(
-        !test_multiaddrs.iter().any(|ma| !unknown_book.contains(ma)),
-        "test multiaddrs should all be inserted"
+        !peer_ids.iter().any(|pid| !inner.contains(pid)),
+        "should insert all discovered peers"
+    );
+}
+
+#[tokio::test]
+async fn should_not_reset_exist_multiaddr_failure_count_on_discover_multi_addrs() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+    let test_peer = make_peer(2077);
+    let test_multiaddr = test_peer.multiaddrs.all().pop().expect("multiaddr");
+
+    test_peer.multiaddrs.inc_failure(&test_multiaddr);
+    assert_eq!(
+        test_peer.multiaddrs.failure(&test_multiaddr),
+        Some(1),
+        "should have one failure"
+    );
+
+    let discover_multi_addrs = PeerManagerEvent::DiscoverMultiAddrs {
+        addrs: vec![test_multiaddr.clone().into()],
+    };
+    mgr.poll_event(discover_multi_addrs).await;
+
+    assert_eq!(
+        test_peer.multiaddrs.failure(&test_multiaddr),
+        Some(1),
+        "should have one failure"
     );
 }
 
@@ -988,54 +1413,15 @@ async fn should_skip_our_listen_multiaddrs_on_discover_multi_addrs() {
     };
     mgr.poll_event(discover_multi_addrs).await;
 
-    assert!(
-        mgr.unknown_book().is_empty(),
-        "should not add our listen addr to unknown"
-    );
-}
-
-#[tokio::test]
-async fn should_skip_already_exist_peer_multiaddr_on_discover_multi_addrs() {
-    let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let remote_peers = make_sessions(&mut mgr, 1).await;
-    let test_peer = remote_peers.first().expect("get first");
-
-    assert!(mgr.unknown_book().is_empty());
-
-    let discover_multi_addrs = PeerManagerEvent::DiscoverMultiAddrs {
-        addrs: vec![test_peer.raw_multiaddrs().pop().expect("peer multiaddr")],
-    };
-    mgr.poll_event(discover_multi_addrs).await;
-
-    assert!(
-        mgr.unknown_book().is_empty(),
-        "should not add exist peer's multiaddr"
-    );
-}
-
-#[tokio::test]
-async fn should_skip_multiaddrs_without_id_included_on_discover_multi_addrs() {
-    let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let test_multiaddr = make_multiaddr(2077, None);
-
-    assert!(mgr.unknown_book().is_empty());
-    let discover_multi_addrs = PeerManagerEvent::DiscoverMultiAddrs {
-        addrs: vec![test_multiaddr],
-    };
-    mgr.poll_event(discover_multi_addrs).await;
-
-    assert!(
-        mgr.unknown_book().is_empty(),
-        "should ignore multiaddr without id included"
-    );
+    assert!(!inner.contains(&self_id), "should not add our self peer id");
 }
 
 #[tokio::test]
 async fn should_add_multiaddrs_to_peer_on_identified_addrs() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let remote_peers = make_sessions(&mut mgr, 1).await;
+    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
     let test_peer = remote_peers.first().expect("get first");
-    let old_multiaddrs_len = test_peer.multiaddrs_len();
+    let old_multiaddrs_len = test_peer.multiaddrs.len();
 
     let test_multiaddrs: Vec<_> = (0..2)
         .map(|port| make_multiaddr(port + 9000, Some(test_peer.owned_id())))
@@ -1048,14 +1434,14 @@ async fn should_add_multiaddrs_to_peer_on_identified_addrs() {
     mgr.poll_event(identified_addrs).await;
 
     assert_eq!(
-        test_peer.multiaddrs_len(),
+        test_peer.multiaddrs.len(),
         old_multiaddrs_len + 2,
         "should have correct multiaddrs len"
     );
     assert!(
         !test_multiaddrs
             .iter()
-            .any(|ma| !test_peer.raw_multiaddrs().contains(ma)),
+            .any(|ma| !test_peer.multiaddrs.all_raw().contains(ma)),
         "should add all multiaddrs to peer"
     );
 }
@@ -1063,7 +1449,7 @@ async fn should_add_multiaddrs_to_peer_on_identified_addrs() {
 #[tokio::test]
 async fn should_push_id_to_multiaddrs_if_not_included_on_identified_addrs() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let remote_peers = make_sessions(&mut mgr, 1).await;
+    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
     let test_peer = remote_peers.first().expect("get first");
     let test_multiaddr = make_multiaddr(2077, None);
 
@@ -1074,442 +1460,120 @@ async fn should_push_id_to_multiaddrs_if_not_included_on_identified_addrs() {
     mgr.poll_event(identified_addrs).await;
 
     assert!(
-        !test_peer.raw_multiaddrs().contains(&test_multiaddr),
+        !test_peer.multiaddrs.all_raw().contains(&test_multiaddr),
         "should not contain multiaddr without id included"
     );
 
-    let with_id = make_multiaddr(2077, Some(test_peer.owned_id()));
+    let with_id = make_peer_multiaddr(2077, test_peer.owned_id());
     assert!(
-        test_peer.raw_multiaddrs().contains(&with_id),
+        test_peer.multiaddrs.contains(&with_id),
         "should push id to multiaddr when add it to peer"
     );
 }
 
 #[tokio::test]
-async fn should_add_dialer_multiaddr_to_peer_on_repeated_connection() {
+async fn should_not_reset_exist_multiaddr_failure_count_on_identified_addrs() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let remote_peers = make_sessions(&mut mgr, 1).await;
+    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
     let test_peer = remote_peers.first().expect("get first");
-    let test_multiaddr = make_multiaddr(2077, Some(test_peer.owned_id()));
+    let test_multiaddr = test_peer.multiaddrs.all().pop().expect("multiaddr");
 
-    let repeated_connection = PeerManagerEvent::RepeatedConnection {
-        ty:   ConnectionType::Outbound,
-        sid:  test_peer.session_id(),
-        addr: test_multiaddr.clone(),
+    test_peer.multiaddrs.inc_failure(&test_multiaddr);
+    assert_eq!(
+        test_peer.multiaddrs.failure(&test_multiaddr),
+        Some(1),
+        "should have one failure"
+    );
+
+    let identified_addrs = PeerManagerEvent::IdentifiedAddrs {
+        pid:   test_peer.owned_id(),
+        addrs: vec![test_multiaddr.clone().into()],
     };
-    mgr.poll_event(repeated_connection).await;
+    mgr.poll_event(identified_addrs).await;
 
-    assert!(
-        test_peer.raw_multiaddrs().contains(&test_multiaddr),
-        "should add dialer multiaddr to peer"
+    assert_eq!(
+        test_peer.multiaddrs.failure(&test_multiaddr),
+        Some(1),
+        "should have one failure"
     );
 }
 
 #[tokio::test]
-async fn should_skip_listen_multiaddr_to_peer_on_repeated_connection() {
+async fn should_reset_peer_failure_for_outbound_multiaddr_on_repeated_connection() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let remote_peers = make_sessions(&mut mgr, 1).await;
+    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
     let test_peer = remote_peers.first().expect("get first");
-    let test_multiaddr = make_multiaddr(2077, Some(test_peer.owned_id()));
+    let test_multiaddr = test_peer.multiaddrs.all().pop().expect("multiaddr");
+
+    test_peer.multiaddrs.inc_failure(&test_multiaddr);
+    assert_eq!(
+        test_peer.multiaddrs.failure(&test_multiaddr),
+        Some(1),
+        "should have one failure"
+    );
+
+    let repeated_connection = PeerManagerEvent::RepeatedConnection {
+        ty:   ConnectionType::Outbound,
+        sid:  test_peer.session_id(),
+        addr: test_multiaddr.clone().into(),
+    };
+    mgr.poll_event(repeated_connection).await;
+
+    assert_eq!(
+        test_peer.multiaddrs.failure(&test_multiaddr),
+        Some(0),
+        "should have one failure"
+    );
+}
+
+#[tokio::test]
+async fn should_remove_inbound_multiaddr_on_repeated_connection() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+    let test_peer = remote_peers.first().expect("get first");
+
+    let test_multiaddr = make_peer_multiaddr(2077, test_peer.owned_id());
+    test_peer.multiaddrs.insert(vec![test_multiaddr.clone()]);
 
     let repeated_connection = PeerManagerEvent::RepeatedConnection {
         ty:   ConnectionType::Inbound,
         sid:  test_peer.session_id(),
-        addr: test_multiaddr.clone(),
+        addr: test_multiaddr.clone().into(),
     };
     mgr.poll_event(repeated_connection).await;
 
     assert!(
-        !test_peer.raw_multiaddrs().contains(&test_multiaddr),
-        "should skip listen multiaddr to peer"
+        !test_peer.multiaddrs.contains(&test_multiaddr),
+        "should remove inbound multiaddr"
     );
 }
 
 #[tokio::test]
-async fn should_push_id_if_multiaddr_not_included_on_repeated_connection() {
+async fn should_enforce_id_if_not_included_on_repeated_connection() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let remote_peers = make_sessions(&mut mgr, 1).await;
+    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
     let test_peer = remote_peers.first().expect("get first");
-    let test_multiaddr = make_multiaddr(2077, None);
+    let test_multiaddr = test_peer.multiaddrs.all().pop().expect("multiaddr");
 
-    let repeated_connection = PeerManagerEvent::RepeatedConnection {
-        ty:   ConnectionType::Outbound,
-        sid:  test_peer.session_id(),
-        addr: test_multiaddr.clone(),
-    };
-    mgr.poll_event(repeated_connection).await;
-
-    assert!(
-        !test_peer.raw_multiaddrs().contains(&test_multiaddr),
-        "should not add multiaddr without id included"
-    );
-
-    let with_id = make_multiaddr(2077, Some(test_peer.owned_id()));
-    assert!(
-        test_peer.raw_multiaddrs().contains(&with_id),
-        "should add multiaddr wit id included"
-    );
-}
-
-#[tokio::test]
-async fn should_remove_multiaddr_in_unknown_book_on_repeated_connection() {
-    let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let remote_peers = make_sessions(&mut mgr, 1).await;
-    let test_peer = remote_peers.first().expect("get first");
-    let test_multiaddr = make_multiaddr(2077, Some(test_peer.owned_id()));
-
-    mgr.unknown_book_mut()
-        .insert(make_peer_multiaddr(2077, test_peer.owned_id()).into());
+    test_peer.multiaddrs.inc_failure(&test_multiaddr);
     assert_eq!(
-        mgr.unknown_book().len(),
-        1,
-        "should have 1 unknown multiaddrs"
+        test_peer.multiaddrs.failure(&test_multiaddr),
+        Some(1),
+        "should have one failure"
     );
 
     let repeated_connection = PeerManagerEvent::RepeatedConnection {
         ty:   ConnectionType::Outbound,
         sid:  test_peer.session_id(),
-        addr: test_multiaddr,
+        addr: test_multiaddr.clone().into(),
     };
     mgr.poll_event(repeated_connection).await;
 
-    assert!(
-        mgr.unknown_book().is_empty(),
-        "should remove multiaddrs in unknown book"
-    );
-}
-
-#[tokio::test]
-async fn should_remove_multiaddr_in_unknown_book_if_event_multiaddr_doesnt_have_id_on_repeated_connection(
-) {
-    let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let remote_peers = make_sessions(&mut mgr, 1).await;
-    let test_peer = remote_peers.first().expect("get first");
-    let test_multiaddr = make_multiaddr(2077, None);
-
-    mgr.unknown_book_mut()
-        .insert(make_peer_multiaddr(2077, test_peer.owned_id()).into());
     assert_eq!(
-        mgr.unknown_book().len(),
-        1,
-        "should have 1 unknown multiaddrs"
+        test_peer.multiaddrs.failure(&test_multiaddr),
+        Some(0),
+        "should have one failure"
     );
-
-    let repeated_connection = PeerManagerEvent::RepeatedConnection {
-        ty:   ConnectionType::Outbound,
-        sid:  test_peer.session_id(),
-        addr: test_multiaddr,
-    };
-    mgr.poll_event(repeated_connection).await;
-
-    assert!(
-        mgr.unknown_book().is_empty(),
-        "should remove multiaddrs in unknown book"
-    );
-}
-
-#[tokio::test]
-async fn should_always_remove_inbound_multiaddr_in_unknown_book_on_repeated_connection() {
-    let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let remote_peers = make_sessions(&mut mgr, 1).await;
-    let test_peer = remote_peers.first().expect("get first");
-    let test_multiaddr = make_multiaddr(2077, None);
-
-    mgr.unknown_book_mut()
-        .insert(make_peer_multiaddr(2077, test_peer.owned_id()).into());
-    assert_eq!(
-        mgr.unknown_book().len(),
-        1,
-        "should have 1 unknown multiaddrs"
-    );
-
-    let repeated_connection = PeerManagerEvent::RepeatedConnection {
-        ty:   ConnectionType::Inbound,
-        sid:  test_peer.session_id(),
-        addr: test_multiaddr,
-    };
-    mgr.poll_event(repeated_connection).await;
-
-    assert!(
-        mgr.unknown_book().is_empty(),
-        "should remove multiaddrs in unknown book"
-    );
-}
-
-#[tokio::test]
-async fn should_remove_multiaddr_in_unknown_book_on_unconnectable_multiaddr() {
-    let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let test_peer = make_peer(2077);
-    let test_multiaddr = test_peer.raw_multiaddrs().pop().expect("peer multiaddr");
-
-    mgr.unknown_book_mut().insert(
-        test_multiaddr
-            .clone()
-            .try_into()
-            .expect("try into addr info"),
-    );
-    assert_eq!(
-        mgr.unknown_book().len(),
-        1,
-        "should have 1 multiaddr in unknown book"
-    );
-
-    let unconnectable_multiaddr = PeerManagerEvent::UnconnectableAddress {
-        addr: test_multiaddr,
-        kind: RemoveKind::ProtocolSelect,
-    };
-    mgr.poll_event(unconnectable_multiaddr).await;
-
-    assert!(mgr.unknown_book().is_empty());
-}
-
-#[tokio::test]
-async fn should_remove_peer_multiaddr_and_increase_peer_retry_on_unconnectable_multiaddr() {
-    let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let test_peer = make_peer(2077);
-    let test_multiaddr = test_peer.raw_multiaddrs().pop().expect("peer multiaddr");
-
-    let inner = mgr.core_inner();
-    inner.add_peer(test_peer.clone());
-    assert_eq!(test_peer.retry(), 0, "should have 0 retry");
-
-    let unconnectable_multiaddr = PeerManagerEvent::UnconnectableAddress {
-        addr: test_multiaddr,
-        kind: RemoveKind::ProtocolSelect,
-    };
-    mgr.poll_event(unconnectable_multiaddr).await;
-
-    assert_eq!(
-        test_peer.multiaddrs_len(),
-        0,
-        "should remove this unconnectable multiaddr from peer"
-    );
-    assert_eq!(test_peer.retry(), 1, "should increase peer retry");
-}
-
-#[tokio::test]
-async fn should_not_remove_bootstrap_mutiaddr_on_unconnectable_multiaddr() {
-    let (mut mgr, _conn_rx) = make_manager(1, 20);
-    let bootstraps = &mgr.config().bootstraps;
-    let boot_peer = bootstraps.first().expect("get one bootstrap peer").clone();
-    let boot_multiaddr = boot_peer.raw_multiaddrs().pop().expect("boot multiaddr");
-    let old_multiaddrs_len = boot_peer.multiaddrs_len();
-
-    // Insert bootstrap peer
-    let inner = mgr.core_inner();
-    inner.add_peer(boot_peer.clone());
-    assert_eq!(boot_peer.retry(), 0, "should have 0 retry");
-
-    let unconnectable_multiaddr = PeerManagerEvent::UnconnectableAddress {
-        addr: boot_multiaddr,
-        kind: RemoveKind::ProtocolSelect,
-    };
-    mgr.poll_event(unconnectable_multiaddr).await;
-
-    assert_eq!(
-        boot_peer.multiaddrs_len(),
-        old_multiaddrs_len,
-        "should not remove boot multiaddr"
-    );
-    assert_eq!(boot_peer.retry(), 1, "should increase boot retry");
-}
-
-#[tokio::test]
-async fn should_increase_retry_for_multiaddr_in_unknown_on_reconnect_addr_later() {
-    let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let test_peer = make_peer(2077);
-    let test_multiaddr = test_peer.raw_multiaddrs().pop().expect("peer multiaddr");
-
-    mgr.unknown_book_mut().insert(
-        test_multiaddr
-            .clone()
-            .try_into()
-            .expect("try into addr info"),
-    );
-    assert_eq!(
-        mgr.unknown_book().len(),
-        1,
-        "should have 1 multiaddr in unknown book"
-    );
-
-    let reconnect_addr_later = PeerManagerEvent::ReconnectAddrLater {
-        addr: test_multiaddr.clone(),
-        kind: RetryKind::TimedOut,
-    };
-    mgr.poll_event(reconnect_addr_later).await;
-
-    let addr_in_unknown_book = mgr
-        .inner
-        .unknown_addrs
-        .get(&test_multiaddr)
-        .expect("get addr from unknown book");
-    assert_eq!(addr_in_unknown_book.retry(), 1, "should increase retry");
-}
-
-#[tokio::test]
-async fn should_remove_multiaddr_from_unknown_book_when_run_out_retry_on_reconnect_addr_later() {
-    let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let test_peer = make_peer(2077);
-    let test_multiaddr = test_peer.raw_multiaddrs().pop().expect("peer multiaddr");
-
-    mgr.inner.unknown_addrs.insert(
-        test_multiaddr
-            .clone()
-            .try_into()
-            .expect("try into addr info"),
-    );
-    let addr_in_unknown_book = mgr
-        .inner
-        .unknown_addrs
-        .get(&test_multiaddr)
-        .expect("get addr from unknown book")
-        .clone();
-
-    addr_in_unknown_book.inc_retry_by(MAX_ADDR_RETRY);
-
-    let reconnect_addr_later = PeerManagerEvent::ReconnectAddrLater {
-        addr: test_multiaddr.clone(),
-        kind: RetryKind::TimedOut,
-    };
-    mgr.poll_event(reconnect_addr_later).await;
-
-    assert!(addr_in_unknown_book.run_out_retry(), "should run out retry");
-    assert!(
-        mgr.unknown_book().is_empty(),
-        "should be remove from unknown book"
-    );
-}
-
-#[tokio::test]
-async fn should_set_connectedness_and_increase_peer_retry_on_reconnect_addr_later() {
-    let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let test_peer = make_peer(2077);
-    let test_multiaddr = test_peer.raw_multiaddrs().pop().expect("peer multiaddr");
-
-    let inner = mgr.core_inner();
-    inner.add_peer(test_peer.clone());
-    assert_eq!(test_peer.retry(), 0, "should have 0 retry");
-
-    let reconnect_addr_later = PeerManagerEvent::ReconnectAddrLater {
-        addr: test_multiaddr.clone(),
-        kind: RetryKind::TimedOut,
-    };
-    mgr.poll_event(reconnect_addr_later).await;
-
-    assert_eq!(test_peer.connectedness(), Connectedness::CanConnect);
-    assert_eq!(test_peer.retry(), 1, "should increase peer retry");
-}
-
-#[tokio::test]
-async fn should_skip_on_connected_peer_on_reconnect_addr_later() {
-    let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let remote_peers = make_sessions(&mut mgr, 1).await;
-    let test_peer = remote_peers.first().expect("get first");
-    let test_multiaddr = make_multiaddr(2077, None);
-
-    assert_eq!(test_peer.retry(), 0, "should have 0 retry");
-
-    let reconnect_addr_later = PeerManagerEvent::ReconnectAddrLater {
-        addr: test_multiaddr.clone(),
-        kind: RetryKind::TimedOut,
-    };
-    mgr.poll_event(reconnect_addr_later).await;
-
-    assert_eq!(test_peer.connectedness(), Connectedness::Connected);
-    assert_eq!(test_peer.retry(), 0, "should have not increase retry");
-}
-
-#[tokio::test]
-async fn should_remove_peer_when_it_run_out_of_retry_on_reconnect_addr_later() {
-    let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let test_peer = make_peer(2077);
-    let test_multiaddr = test_peer.raw_multiaddrs().pop().expect("peer multiaddr");
-
-    let inner = mgr.core_inner();
-    inner.add_peer(test_peer.clone());
-
-    test_peer.set_retry(MAX_RETRY_COUNT);
-    assert_eq!(
-        test_peer.retry(),
-        MAX_RETRY_COUNT,
-        "should have reach max retry"
-    );
-    // Set to older timestamp, so that we can increase retry
-    test_peer.set_attempt_at(Peer::now() - VALID_ATTEMPT_INTERVAL - 1);
-
-    let reconnect_addr_later = PeerManagerEvent::ReconnectAddrLater {
-        addr: test_multiaddr.clone(),
-        kind: RetryKind::TimedOut,
-    };
-    mgr.poll_event(reconnect_addr_later).await;
-
-    assert!(inner.peer(&test_peer.id).is_none(), "should remove peer");
-}
-
-#[tokio::test]
-async fn should_reset_bootstrap_retry_when_it_run_out_of_retry_on_reconnect_addr_later() {
-    let (mut mgr, _conn_rx) = make_manager(1, 20);
-    let bootstraps = &mgr.config().bootstraps;
-    let boot_peer = bootstraps.first().expect("get one bootstrap peer").clone();
-    let boot_multiaddr = boot_peer.raw_multiaddrs().pop().expect("boot multiaddr");
-
-    // Insert bootstrap peer
-    let inner = mgr.core_inner();
-    inner.add_peer(boot_peer.clone());
-
-    boot_peer.set_retry(MAX_RETRY_COUNT);
-    assert_eq!(
-        boot_peer.retry(),
-        MAX_RETRY_COUNT,
-        "should have reach max retry"
-    );
-    // Set to older timestamp, so that we can increase retry
-    boot_peer.set_attempt_at(Peer::now() - VALID_ATTEMPT_INTERVAL - 1);
-
-    let reconnect_addr_later = PeerManagerEvent::ReconnectAddrLater {
-        addr: boot_multiaddr.clone(),
-        kind: RetryKind::TimedOut,
-    };
-    mgr.poll_event(reconnect_addr_later).await;
-
-    assert!(
-        inner.peer(&boot_peer.id).is_some(),
-        "should not remove bootstrap peer"
-    );
-    assert_eq!(boot_peer.retry(), 0, "should reset bootstrap retry");
-}
-
-#[tokio::test]
-async fn should_reset_protected_peer_retry_when_it_run_out_of_retry_on_reconnect_addr_later() {
-    let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let test_peer = make_peer(2077);
-    let test_multiaddr = test_peer.raw_multiaddrs().pop().expect("peer multiaddr");
-
-    let inner = mgr.core_inner();
-    inner.add_peer(test_peer.clone());
-    inner.protect_peers_by_chain_addr(vec![test_peer.chain_addr.as_ref().to_owned()]);
-    assert_eq!(inner.whitelist().len(), 1, "should have one whitelisted");
-
-    test_peer.set_retry(MAX_RETRY_COUNT);
-    assert_eq!(
-        test_peer.retry(),
-        MAX_RETRY_COUNT,
-        "should have reach max retry"
-    );
-    // Set to older timestamp, so that we can increase retry
-    test_peer.set_attempt_at(Peer::now() - VALID_ATTEMPT_INTERVAL - 1);
-
-    let reconnect_addr_later = PeerManagerEvent::ReconnectAddrLater {
-        addr: test_multiaddr.clone(),
-        kind: RetryKind::TimedOut,
-    };
-    mgr.poll_event(reconnect_addr_later).await;
-
-    assert!(
-        inner.peer(&test_peer.id).is_some(),
-        "should not remove protected peer"
-    );
-    assert_eq!(test_peer.retry(), 0, "should reset protected peer's retry");
 }
 
 #[tokio::test]
@@ -1556,30 +1620,6 @@ async fn should_push_id_to_listen_multiaddr_if_not_included_on_add_new_listen_ad
     assert!(
         inner.listen().contains(&with_id),
         "should add new listen multiaddr"
-    );
-}
-
-#[tokio::test]
-async fn should_remove_new_listen_multiaddr_in_unknown_book_on_add_new_listen_addr() {
-    let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let self_id = mgr.inner.peer_id.to_owned();
-
-    let test_multiaddr = make_peer_multiaddr(2077, self_id);
-    mgr.unknown_book_mut().insert(test_multiaddr.clone().into());
-    assert_eq!(mgr.unknown_book().len(), 1, "should have one unknown addr");
-
-    let inner = mgr.core_inner();
-    assert!(inner.listen().is_empty(), "should not have any listen addr");
-
-    let add_listen_addr = PeerManagerEvent::AddNewListenAddr {
-        addr: test_multiaddr.into(),
-    };
-    mgr.poll_event(add_listen_addr).await;
-
-    assert_eq!(
-        mgr.unknown_book().len(),
-        0,
-        "should remove new listen addr in unknown book"
     );
 }
 
@@ -1651,68 +1691,15 @@ async fn should_always_include_our_listen_addrs_in_return_from_manager_handle_ra
 }
 
 #[tokio::test]
-async fn should_increase_retry_for_connecting_timeout_multiaddr_in_unknown_book() {
-    let (mut mgr, _conn_rx) = make_manager(0, 20);
-
-    let remote_pubkey = make_pubkey();
-    mgr.unknown_book_mut()
-        .insert(make_peer_multiaddr(9527, remote_pubkey.peer_id()).into());
-    assert_eq!(mgr.unknown_book().len(), 1, "should have one unknown addr");
-
-    let test_addr = mgr
-        .unknown_book()
-        .iter()
-        .next()
-        .expect("get one unknown addr")
-        .clone();
-    assert_eq!(test_addr.retry(), 0, "should have 0 retry");
-
-    test_addr.mark_connecting();
-    // Set attempt at to oder timestamp, so that we have connecting timeout
-    test_addr.set_attempt_at(AddrInfo::now() - ADDR_TIMEOUT - 1);
-
-    mgr.poll().await;
-    assert_eq!(test_addr.retry(), 1, "should have 1 retry");
-    assert!(!test_addr.is_connecting(), "should reset connecting flag");
-}
-
-#[tokio::test]
-async fn should_remove_timeout_connecting_multiaddr_when_run_out_retry_in_unknown_book() {
-    let (mut mgr, _conn_rx) = make_manager(0, 20);
-
-    let remote_pubkey = make_pubkey();
-    mgr.unknown_book_mut()
-        .insert(make_peer_multiaddr(9527, remote_pubkey.peer_id()).into());
-    assert_eq!(mgr.unknown_book().len(), 1, "should have one unknown addr");
-
-    let test_addr = mgr
-        .unknown_book()
-        .iter()
-        .next()
-        .expect("get one unknown addr")
-        .clone();
-    assert_eq!(test_addr.retry(), 0, "should have 0 retry");
-
-    test_addr.inc_retry_by(MAX_ADDR_RETRY);
-    assert_eq!(test_addr.retry(), MAX_ADDR_RETRY, "should reach max retry");
-
-    test_addr.mark_connecting();
-    // Set attempt at to oder timestamp, so that we have connecting timeout
-    test_addr.set_attempt_at(AddrInfo::now() - ADDR_TIMEOUT - 1);
-
-    mgr.poll().await;
-    assert_eq!(mgr.unknown_book().len(), 0, "should not have any address");
-}
-
-#[tokio::test]
 async fn should_whitelist_peer_chain_addrs_on_protect_peers_by_chain_addrs() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
+
     let peers = (0..5)
         .map(|port| make_peer(port + 9000))
         .collect::<Vec<_>>();
     let chain_addrs = peers
         .into_iter()
-        .map(|p| p.chain_addr.as_ref().to_owned())
+        .map(|p| p.owned_chain_addr().expect("chain addr"))
         .collect::<Vec<_>>();
 
     let inner = mgr.core_inner();
@@ -1738,13 +1725,15 @@ async fn should_whitelist_peer_chain_addrs_on_protect_peers_by_chain_addrs() {
 #[tokio::test]
 async fn should_allow_whitelisted_peer_session_even_if_we_reach_max_connections_on_new_session() {
     let (mut mgr, _conn_rx) = make_manager(0, 10);
-    let _remote_peers = make_sessions(&mut mgr, 10).await;
+    let _remote_peers = make_sessions(&mut mgr, 10, 5000).await;
 
     let whitelisted_peer = make_peer(2077);
     let peer = make_peer(2019);
 
     let inner = mgr.core_inner();
-    inner.protect_peers_by_chain_addr(vec![whitelisted_peer.chain_addr.as_ref().to_owned()]);
+    inner.protect_peers_by_chain_addr(vec![whitelisted_peer
+        .owned_chain_addr()
+        .expect("chain addr")]);
 
     assert_eq!(inner.whitelist().len(), 1, "should have one whitelisted");
     assert_eq!(inner.connected(), 10, "should have 10 connections");
@@ -1752,13 +1741,13 @@ async fn should_allow_whitelisted_peer_session_even_if_we_reach_max_connections_
     // First no whitelisted one
     let sess_ctx = SessionContext::make(
         SessionId::new(233),
-        peer.raw_multiaddrs().pop().expect("peer multiaddr"),
+        peer.multiaddrs.all_raw().pop().expect("peer multiaddr"),
         SessionType::Inbound,
-        peer.owned_pubkey(),
+        peer.owned_pubkey().expect("pubkey"),
     );
     let new_session = PeerManagerEvent::NewSession {
         pid:    peer.owned_id(),
-        pubkey: peer.owned_pubkey(),
+        pubkey: peer.owned_pubkey().expect("pubkey"),
         ctx:    sess_ctx.arced(),
     };
     mgr.poll_event(new_session).await;
@@ -1769,15 +1758,16 @@ async fn should_allow_whitelisted_peer_session_even_if_we_reach_max_connections_
     let sess_ctx = SessionContext::make(
         SessionId::new(666),
         whitelisted_peer
-            .raw_multiaddrs()
+            .multiaddrs
+            .all_raw()
             .pop()
             .expect("peer multiaddr"),
         SessionType::Inbound,
-        whitelisted_peer.owned_pubkey(),
+        whitelisted_peer.owned_pubkey().expect("whitelist pubkey"),
     );
     let new_session = PeerManagerEvent::NewSession {
         pid:    whitelisted_peer.owned_id(),
-        pubkey: whitelisted_peer.owned_pubkey(),
+        pubkey: whitelisted_peer.owned_pubkey().expect("whitelist pubkey"),
         ctx:    sess_ctx.arced(),
     };
     mgr.poll_event(new_session).await;
@@ -1796,7 +1786,7 @@ async fn should_refresh_whitelist_on_protect_peers_by_chain_addrs() {
     let peer = make_peer(2077);
 
     let inner = mgr.core_inner();
-    inner.protect_peers_by_chain_addr(vec![peer.chain_addr.as_ref().to_owned()]);
+    inner.protect_peers_by_chain_addr(vec![peer.owned_chain_addr().expect("chain addr")]);
     assert_eq!(inner.whitelist().len(), 1, "should have one whitelisted");
 
     let peer_in_list = inner
@@ -1805,18 +1795,19 @@ async fn should_refresh_whitelist_on_protect_peers_by_chain_addrs() {
         .next()
         .expect("should have one whitelist peer")
         .clone();
+
     // Set authorized_at to older timestamp
-    peer_in_list.set_authorized_at(ArcProtectedPeer::now() - WHITELIST_TIMEOUT + 20);
+    peer_in_list.set_authorized_at(time::now() - WHITELIST_TIMEOUT + 20);
     assert!(!peer_in_list.is_expired(), "should not be expired");
 
     let protect_peers_by_chain_addrs = PeerManagerEvent::ProtectPeersByChainAddr {
-        chain_addrs: vec![peer.chain_addr.as_ref().to_owned()],
+        chain_addrs: vec![peer.owned_chain_addr().expect("chain addr")],
     };
     mgr.poll_event(protect_peers_by_chain_addrs).await;
 
     assert_eq!(
         peer_in_list.authorized_at(),
-        ArcProtectedPeer::now(),
+        time::now(),
         "should be refreshed"
     );
 }
@@ -1827,7 +1818,7 @@ async fn should_remove_expired_peers_in_whitelist() {
     let peer = make_peer(2077);
 
     let inner = mgr.core_inner();
-    inner.protect_peers_by_chain_addr(vec![peer.chain_addr.as_ref().to_owned()]);
+    inner.protect_peers_by_chain_addr(vec![peer.owned_chain_addr().expect("chain addr")]);
     assert_eq!(inner.whitelist().len(), 1, "should have one whitelisted");
 
     let peer_in_list = inner
@@ -1837,7 +1828,7 @@ async fn should_remove_expired_peers_in_whitelist() {
         .expect("should have one whitelist peer")
         .clone();
     // Set authorized_at to older timestamp
-    peer_in_list.set_authorized_at(ArcProtectedPeer::now() - WHITELIST_TIMEOUT - 1);
+    peer_in_list.set_authorized_at(time::now() - WHITELIST_TIMEOUT - 1);
     assert!(peer_in_list.is_expired(), "should be expired");
 
     mgr.poll().await;
@@ -1846,101 +1837,4 @@ async fn should_remove_expired_peers_in_whitelist() {
         0,
         "should remove expired peers in whitelist"
     );
-}
-
-#[tokio::test]
-async fn should_count_connecting_and_connected() {
-    let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let _remote_peers = make_sessions(&mut mgr, 5).await; // 5 connected peers
-
-    let inner = mgr.core_inner();
-    assert_eq!(inner.connected(), 5, "should have 5 connected peers");
-
-    // Register peers
-    let peers = (0..5)
-        .map(|port| make_peer(port + 5000))
-        .collect::<Vec<_>>();
-    for peer in peers.iter() {
-        inner.add_peer(peer.clone());
-    }
-    assert!(
-        !peers
-            .iter()
-            .any(|p| p.connectedness() != Connectedness::CanConnect),
-        "should all be CanConnect"
-    );
-
-    mgr.poll().await;
-    assert_eq!(inner.connected(), 5, "should still have 5 connected peers");
-    assert_eq!(inner.connecting(), 5, "should have 5 connecting peers");
-    assert!(
-        !peers
-            .iter()
-            .any(|p| p.connectedness() != Connectedness::Connecting),
-        "should all be Connecting"
-    );
-}
-
-#[tokio::test]
-async fn should_dec_connecting_and_update_peer_state_when_connecting_peer_is_rejected_due_to_max_connections_on_new_session(
-) {
-    let (mut mgr, _conn_rx) = make_manager(0, 2);
-
-    let inner = mgr.core_inner();
-    let peers = (0..3)
-        .map(|port| make_peer(port + 5000))
-        .collect::<Vec<_>>();
-
-    for peer in peers.iter() {
-        inner.add_peer(peer.clone());
-    }
-    mgr.poll().await;
-    assert_eq!(inner.connecting(), 3, "should have 3 connecting attempts");
-
-    for (idx, peer) in peers.iter().enumerate() {
-        let sess_ctx = SessionContext::make(
-            SessionId::new(idx + 1),
-            peer.raw_multiaddrs().pop().expect("get multiaddr"),
-            SessionType::Outbound,
-            peer.owned_pubkey(),
-        );
-        let new_session = PeerManagerEvent::NewSession {
-            pid:    peer.owned_id(),
-            pubkey: peer.owned_pubkey(),
-            ctx:    sess_ctx.arced(),
-        };
-        mgr.poll_event(new_session).await;
-    }
-
-    // Since we set max connections to 2, only first two sessions are accepted
-    assert_eq!(inner.connected(), 2, "should have 2 connections");
-    assert_eq!(inner.connecting(), 0, "should have 0 connecting attempt");
-
-    let available_peers = peers
-        .iter()
-        .filter(|p| p.connectedness() == Connectedness::CanConnect)
-        .count();
-    assert_eq!(
-        available_peers, 1,
-        "should have 1 peer available for connecting"
-    );
-}
-
-#[tokio::test]
-async fn should_dec_connecting_for_connecting_peer_on_retry_peer_ater() {
-    let (mut mgr, _conn_rx) = make_manager(0, 5);
-
-    let inner = mgr.core_inner();
-    let peer = make_peer(9527);
-    inner.add_peer(peer.clone());
-    mgr.poll().await;
-    assert_eq!(inner.connecting(), 1, "should have one connecting attempt");
-
-    let retry_peer = PeerManagerEvent::RetryPeerLater {
-        pid:  peer.owned_id(),
-        kind: RetryKind::TimedOut,
-    };
-    mgr.poll_event(retry_peer).await;
-
-    assert_eq!(inner.connecting(), 0, "should have 0 connecting attempt");
 }

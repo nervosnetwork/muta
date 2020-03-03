@@ -30,6 +30,11 @@ impl AddrInfo {
         (*self.addr).to_owned()
     }
 
+    #[cfg(test)]
+    pub fn failure(&self) -> usize {
+        self.failure.load(Ordering::SeqCst)
+    }
+
     pub fn inc_failure(&self) {
         self.failure.fetch_add(1, Ordering::SeqCst);
     }
@@ -172,6 +177,11 @@ impl PeerAddrSet {
 
     pub fn connectable_len(&self) -> usize {
         self.inner.read().iter().filter(|a| a.connectable()).count()
+    }
+
+    #[cfg(test)]
+    pub fn failure(&self, pma: &PeerMultiaddr) -> Option<usize> {
+        self.inner.read().get(pma).map(|a| a.failure())
     }
 
     pub fn inc_failure(&self, pma: &PeerMultiaddr) {

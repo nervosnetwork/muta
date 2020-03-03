@@ -34,7 +34,7 @@ use std::{
     sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
     sync::Arc,
     task::{Context, Poll},
-    time::{Duration, SystemTime, UNIX_EPOCH},
+    time::Duration,
 };
 
 use derive_more::Display;
@@ -209,14 +209,14 @@ impl ArcProtectedPeer {
     pub fn new(chain_addr: Address) -> Self {
         let peer = ProtectedPeer {
             chain_addr,
-            authorized_at: AtomicU64::new(Self::now()),
+            authorized_at: AtomicU64::new(time::now()),
         };
 
         ArcProtectedPeer(Arc::new(peer))
     }
 
     pub fn refresh_authorized(&self) {
-        self.authorized_at.store(Self::now(), Ordering::SeqCst);
+        self.authorized_at.store(time::now(), Ordering::SeqCst);
     }
 
     #[cfg(test)]
@@ -235,18 +235,7 @@ impl ArcProtectedPeer {
             .load(Ordering::SeqCst)
             .saturating_add(WHITELIST_TIMEOUT);
 
-        Self::now() > expired_at
-    }
-
-    pub(self) fn now() -> u64 {
-        Self::duration_since(SystemTime::now(), UNIX_EPOCH).as_secs()
-    }
-
-    fn duration_since(now: SystemTime, early: SystemTime) -> Duration {
-        match now.duration_since(early) {
-            Ok(duration) => duration,
-            Err(e) => e.duration(),
-        }
+        time::now() > expired_at
     }
 }
 
@@ -425,6 +414,7 @@ impl Inner {
         qualified_peers.choose_multiple(&mut rng, max)
     }
 
+    #[allow(dead_code)]
     pub fn remove_peer(&self, peer_id: &PeerId) -> Option<ArcPeer> {
         let opt_peer = { self.peers.write().take(peer_id) };
         if let Some(chain_addr) = opt_peer.and_then(|p| p.owned_chain_addr()) {
@@ -464,7 +454,7 @@ impl Inner {
         self.sessions.read().get(&sid).cloned()
     }
 
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub fn share_sessions(&self) -> Vec<ArcSession> {
         self.sessions.read().iter().cloned().collect()
     }
@@ -733,7 +723,9 @@ impl PeerManager {
         }
     }
 
-    fn connect_failed(&mut self, addr: Multiaddr, kind: ConnectionErrorKind) {
+    fn connect_failed(&mut self, addr: Multiaddr, error_kind: ConnectionErrorKind) {
+        use ConnectionErrorKind::*;
+
         let peer_addr: PeerMultiaddr = match addr.clone().try_into() {
             Ok(pma) => pma,
             Err(e) => {
@@ -743,45 +735,53 @@ impl PeerManager {
             }
         };
 
-        let count_multiaddr_failure = |multiaddrs: &PeerAddrSet| {
-            if let ConnectionErrorKind::Io(_) | ConnectionErrorKind::DNSResolver(_) = kind {
-                multiaddrs.inc_failure(&peer_addr);
-            } else {
-                warn!("give up {} because {}", peer_addr, kind);
-                multiaddrs.give_up(&peer_addr);
+        let peer_id = peer_addr.peer_id();
+        let peer = match self.inner.peer(&peer_id) {
+            Some(p) => p,
+            None => {
+                // Impossibe
+                error!("outbound connecting peer not found {:?}", peer_id);
+                return;
             }
         };
 
-        let peer_id = peer_addr.peer_id();
-        match self.connecting.take(&peer_id) {
-            Some(attempt) => {
-                attempt.complete_one_multiaddr();
-                count_multiaddr_failure(&attempt.peer.multiaddrs);
-
-                if attempt.multiaddrs() == 0 {
-                    // No more connecting multiaddrs from this peer
-                    // This means all multiaddrs failure
-                    attempt.peer.retry.inc();
-                    attempt.peer.set_connectedness(Connectedness::CanConnect);
-
-                    if attempt.peer.retry.run_out() {
-                        attempt.peer.set_connectedness(Connectedness::Unconnectable);
-                    }
-                } else {
-                    // Wait for other connecting multiaddrs result
-                    self.connecting.insert(attempt);
-                }
+        match error_kind {
+            Io(_) | DNSResolver(_) => peer.multiaddrs.inc_failure(&peer_addr),
+            PeerIdNotMatch => {
+                warn!("give up multiaddr {} because peer id not match", peer_addr);
+                peer.multiaddrs.give_up(&peer_addr);
             }
-            None => {
-                // Peer is already connected using one of its multiaddrs
-                if let Some(peer) = self.inner.peer(&peer_id) {
-                    count_multiaddr_failure(&peer.multiaddrs);
+            SecioHandshake(_) | ProtocolHandle => {
+                warn!("give up peer {:?} becasue {}", peer.id, error_kind);
+                peer.set_connectedness(Connectedness::Unconnectable);
+            }
+        }
+
+        if let Some(attempt) = self.connecting.take(&peer_id) {
+            if attempt.peer.connectedness() == Connectedness::Unconnectable {
+                // We already give up peer
+                return;
+            }
+
+            attempt.complete_one_multiaddr();
+            // No more connecting multiaddrs from this peer
+            // This means all multiaddrs failure
+            if attempt.multiaddrs() == 0 {
+                attempt.peer.retry.inc();
+                attempt.peer.set_connectedness(Connectedness::CanConnect);
+
+                if attempt.peer.retry.run_out() {
+                    attempt.peer.set_connectedness(Connectedness::Unconnectable);
                 }
+            } else {
+                // Wait for other connecting multiaddrs result
+                self.connecting.insert(attempt);
             }
         }
     }
 
-    fn session_failed(&self, sid: SessionId, kind: SessionErrorKind) {
+    fn session_failed(&self, sid: SessionId, error_kind: SessionErrorKind) {
+        use SessionErrorKind::*;
         debug!("session {} failed", sid);
 
         let session = match self.inner.remove_session(sid) {
@@ -793,14 +793,15 @@ impl PeerManager {
         self.disconnect_session(sid);
         session.peer.mark_disconnected();
 
-        if let SessionErrorKind::Io(_) = kind {
-            session.peer.retry.inc();
-        } else {
-            let pid = &session.peer.id;
-            let remote_addr = &session.connected_addr;
+        match error_kind {
+            Io(_) => session.peer.retry.inc(),
+            Protocol { .. } | Unexpected(_) => {
+                let pid = &session.peer.id;
+                let remote_addr = &session.connected_addr;
 
-            warn!("give up peer {:?} from {} {}", pid, remote_addr, kind);
-            session.peer.set_connectedness(Connectedness::Unconnectable);
+                warn!("give up peer {:?} from {} {}", pid, remote_addr, error_kind);
+                session.peer.set_connectedness(Connectedness::Unconnectable);
+            }
         }
     }
 
@@ -825,6 +826,7 @@ impl PeerManager {
 
         let sid = peer.session_id();
         if sid == SessionId::new(0) {
+            // Impossible, connected session always bigger than 0
             error!("misbehave peer with session id 0");
             return;
         }
@@ -886,8 +888,11 @@ impl PeerManager {
             }
         };
 
-        let connectable_peers = peers.into_iter().filter_map(connectable).collect();
-        self.connect_peers_now(connectable_peers);
+        let connectable_peers: Vec<_> = peers.into_iter().filter_map(connectable).collect();
+
+        if !connectable_peers.is_empty() {
+            self.connect_peers_now(connectable_peers);
+        }
     }
 
     fn connect_peers_by_id(&mut self, pids: Vec<PeerId>) {
@@ -918,6 +923,8 @@ impl PeerManager {
         } else {
             let new_peer = ArcPeer::new(peer_addr.peer_id());
             new_peer.multiaddrs.insert(vec![peer_addr]);
+
+            self.inner.add_peer(new_peer);
         }
     }
 
@@ -957,17 +964,9 @@ impl PeerManager {
         };
 
         let peer_addr = PeerMultiaddr::new(addr, &session.peer.id);
-
-        if ty == ConnectionType::Inbound {
-            session.peer.multiaddrs.remove(&peer_addr);
-            return;
-        }
-
-        // Insert multiaddr
-        if session.peer.multiaddrs.contains(&peer_addr) {
-            session.peer.multiaddrs.reset_failure(&peer_addr);
-        } else {
-            session.peer.multiaddrs.insert(vec![peer_addr.clone()]);
+        match ty {
+            ConnectionType::Inbound => session.peer.multiaddrs.remove(&peer_addr),
+            ConnectionType::Outbound => session.peer.multiaddrs.reset_failure(&peer_addr),
         }
     }
 
