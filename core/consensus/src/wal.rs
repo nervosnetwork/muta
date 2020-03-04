@@ -58,15 +58,15 @@ impl FullTxsWal {
             let folder = entry.map_err(ConsensusError::WalErr)?.path();
             let folder_name = folder
                 .file_stem()
-                .ok_or_else(|| ConsensusError::Other("file stem".to_string()))?
+                .ok_or_else(|| ConsensusError::Other("file stem error".to_string()))?
                 .to_os_string()
                 .clone();
-            let folder_name = folder_name
-                .into_string()
-                .map_err(|err| ConsensusError::Other(format!("{:?}", err)))?;
-            let height = folder_name
-                .parse::<u64>()
-                .map_err(|err| ConsensusError::Other(format!("{:?}", err)))?;
+            let folder_name = folder_name.into_string().map_err(|err| {
+                ConsensusError::Other(format!("transfer os string to string error {:?}", err))
+            })?;
+            let height = folder_name.parse::<u64>().map_err(|err| {
+                ConsensusError::Other(format!("parse folder name string error {:?}", err))
+            })?;
 
             if height < exec_height {
                 fs::remove_dir_all(folder).map_err(ConsensusError::WalErr)?;
