@@ -230,6 +230,25 @@ where
         Ok(())
     }
 
+    async fn check_sync_stxs(
+        &self,
+        ctx: Context,
+        stxs: Vec<SignedTransaction>,
+    ) -> ProtocolResult<()> {
+        for stx in stxs.into_iter() {
+            self.adapter
+                .check_signature(ctx.clone(), stx.clone())
+                .await?;
+            self.adapter
+                .check_transaction(ctx.clone(), stx.clone())
+                .await?;
+            self.adapter
+                .check_storage_exist(ctx.clone(), stx.tx_hash)
+                .await?;
+        }
+        Ok(())
+    }
+
     fn set_args(&self, timeout_gap: u64, cycles_limit: u64, max_tx_size: u64) {
         self.adapter
             .set_args(timeout_gap, cycles_limit, max_tx_size);

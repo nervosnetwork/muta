@@ -47,6 +47,12 @@ pub trait MemPool: Send + Sync {
         propose_tx_hashes: Vec<Hash>,
     ) -> ProtocolResult<()>;
 
+    async fn check_sync_stxs(
+        &self,
+        ctx: Context,
+        stxs: Vec<SignedTransaction>,
+    ) -> ProtocolResult<()>;
+
     fn set_args(&self, timeout_gap: u64, cycles_limit: u64, max_tx_size: u64);
 }
 
