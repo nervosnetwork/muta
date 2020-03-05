@@ -46,7 +46,7 @@ pub struct ConsensusEngine<Adapter> {
 
     adapter:  Arc<Adapter>,
     full_txs: Arc<FullTxsWal>,
-    adapter:  Arc<Adapter>,
+    crypto:   Arc<OverlordCrypto>,
     lock:     Arc<Mutex<()>>,
 }
 
@@ -578,6 +578,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
         self.status_agent
             .update_by_commited(metadata.clone(), block, block_hash, proof);
         self.update_overlord_crypto(metadata)?;
+        Ok(())
     }
 
     fn update_overlord_crypto(&self, metadata: Metadata) -> ProtocolResult<()> {
