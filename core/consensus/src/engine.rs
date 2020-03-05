@@ -1,5 +1,6 @@
 use std::cmp::Eq;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
+use std::convert::TryFrom;
 use std::error::Error;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -14,7 +15,9 @@ use parking_lot::RwLock;
 use rlp::Encodable;
 use serde_json::json;
 
+use common_crypto::BlsPublicKey;
 use common_merkle::Merkle;
+
 use protocol::fixed_codec::FixedCodec;
 use protocol::traits::{ConsensusAdapter, Context, MessageCodec, MessageTarget, NodeInfo};
 use protocol::types::{
@@ -29,6 +32,7 @@ use crate::message::{
     END_GOSSIP_SIGNED_VOTE,
 };
 use crate::status::StatusAgent;
+use crate::util::OverlordCrypto;
 use crate::{ConsensusError, StatusCacheField};
 
 /// validator is for create new block, and authority is for build overlord
@@ -39,6 +43,7 @@ pub struct ConsensusEngine<Adapter> {
     exemption_hash: RwLock<HashSet<Bytes>>,
 
     adapter: Arc<Adapter>,
+    crypto:  Arc<OverlordCrypto>,
     lock:    Arc<Mutex<()>>,
 }
 
@@ -329,10 +334,24 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
     async fn get_authority_list(
         &self,
         ctx: Context,
-        height: u64,
+        next_height: u64,
     ) -> Result<Vec<Node>, Box<dyn Error + Send>> {
-        let validators = self.adapter.get_last_validators(ctx, height).await?;
-        let mut res = validators
+        if next_height == 0 {
+            panic!("Overlord get height 0 validator list");
+        }
+
+        let old_block = self
+            .adapter
+            .get_block_by_height(ctx.clone(), next_height - 1)
+            .await?;
+        let old_metadata = self.adapter.get_metadata(
+            ctx,
+            old_block.header.state_root.clone(),
+            old_block.header.timestamp,
+            old_block.header.height,
+        )?;
+        let mut old_validators = old_metadata
+            .verifier_list
             .into_iter()
             .map(|v| Node {
                 address:        v.address.as_bytes(),
@@ -340,8 +359,8 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
                 vote_weight:    v.vote_weight,
             })
             .collect::<Vec<_>>();
-        res.sort();
-        Ok(res)
+        old_validators.sort();
+        Ok(old_validators)
     }
 }
 
@@ -365,6 +384,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
         status_agent: StatusAgent,
         node_info: NodeInfo,
         adapter: Arc<Adapter>,
+        crypto: Arc<OverlordCrypto>,
         lock: Arc<Mutex<()>>,
     ) -> Self {
         Self {
@@ -372,6 +392,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
             node_info,
             exemption_hash: RwLock::new(HashSet::new()),
             adapter,
+            crypto,
             lock,
         }
     }
@@ -544,8 +565,15 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
         );
 
         let prev_hash = Hash::digest(block.encode_fixed()?);
-        self.status_agent
-            .update_after_commit(height + 1, metadata, block, prev_hash, proof)?;
+        self.status_agent.update_after_commit(
+            height + 1,
+            metadata.clone(),
+            block,
+            prev_hash,
+            proof,
+        )?;
+
+        self.update_overlord_crypto(metadata)?;
         self.save_wal().await
     }
 
@@ -553,6 +581,22 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
         let mut info = self.status_agent.to_inner();
         let wal_info = MessageCodec::encode(&mut info).await?;
         self.adapter.save_muta_wal(Context::new(), wal_info).await
+    }
+
+    fn update_overlord_crypto(&self, metadata: Metadata) -> ProtocolResult<()> {
+        let mut new_addr_pubkey_map = HashMap::new();
+        for validator in metadata.verifier_list.into_iter() {
+            let addr = validator.address.as_bytes();
+            let hex_pubkey = hex::decode(validator.bls_pub_key).map_err(|err| {
+                ConsensusError::Other(format!("hex decode metadata bls pubkey error {:?}", err))
+            })?;
+            let pubkey = BlsPublicKey::try_from(hex_pubkey.as_ref()).map_err(|err| {
+                ConsensusError::Other(format!("try from bls pubkey error {:?}", err))
+            })?;
+            new_addr_pubkey_map.insert(addr, pubkey);
+        }
+        self.crypto.update(new_addr_pubkey_map);
+        Ok(())
     }
 }
 

@@ -134,6 +134,7 @@ impl OverlordCrypto {
 
     pub fn update(&self, new_addr_pubkey: HashMap<Bytes, BlsPublicKey>) {
         let mut map = self.addr_pubkey.write();
+
         *map = new_addr_pubkey;
     }
 }

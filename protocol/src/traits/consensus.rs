@@ -188,9 +188,6 @@ pub trait ConsensusAdapter: CommonConsensusAdapter + Send + Sync {
         end: &str,
     ) -> ProtocolResult<Vec<SignedTransaction>>;
 
-    /// Get a block corresponding to the given height.
-    async fn get_block_by_height(&self, ctx: Context, height: u64) -> ProtocolResult<Block>;
-
     /// Save overlord wal info.
     async fn save_overlord_wal(&self, ctx: Context, info: Bytes) -> ProtocolResult<()>;
 
