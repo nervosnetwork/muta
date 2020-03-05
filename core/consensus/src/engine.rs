@@ -31,17 +31,11 @@ use crate::message::{
     END_GOSSIP_SIGNED_VOTE,
 };
 use crate::status::StatusAgent;
-<<<<<<< HEAD
 use crate::util::{check_list_roots, OverlordCrypto};
 use crate::ConsensusError;
-=======
-<<<<<<< HEAD
-use crate::util::OverlordCrypto;
-=======
 use crate::wal::FullTxsWal;
->>>>>>> feat: remove outdated txs
 use crate::{ConsensusError, StatusCacheField};
->>>>>>> feat: remove outdated txs
+
 
 /// validator is for create new block, and authority is for build overlord
 /// status.
@@ -50,7 +44,7 @@ pub struct ConsensusEngine<Adapter> {
     node_info:      NodeInfo,
     exemption_hash: RwLock<HashSet<Bytes>>,
 
-    adapter: Arc<Adapter>,
+    adapter:  Arc<Adapter>,
     full_txs: Arc<FullTxsWal>,
     adapter:  Arc<Adapter>,
     lock:     Arc<Mutex<()>>,
