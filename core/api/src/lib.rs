@@ -59,7 +59,7 @@ impl Query {
 
     #[graphql(name = "getTransaction", description = "Get the transaction by hash")]
     async fn get_transaction(state_ctx: &State, tx_hash: Hash) -> FieldResult<SignedTransaction> {
-        let hash = protocol::types::Hash::from_hex(&tx_hash.as_hex())?;
+        let hash = protocol::types::Hash::from_hex(&tx_hash.as_hex()?)?;
 
         let stx = state_ctx
             .adapter
@@ -74,7 +74,7 @@ impl Query {
         description = "Get the receipt by transaction hash"
     )]
     async fn get_receipt(state_ctx: &State, tx_hash: Hash) -> FieldResult<Receipt> {
-        let hash = protocol::types::Hash::from_hex(&tx_hash.as_hex())?;
+        let hash = protocol::types::Hash::from_hex(&tx_hash.as_hex()?)?;
 
         let receipt = state_ctx
             .adapter
@@ -113,7 +113,7 @@ impl Query {
             None => 1,
         };
 
-        let address = protocol::types::Address::from_hex(&caller.as_hex())?;
+        let address = protocol::types::Address::from_hex(&caller.as_hex()?)?;
 
         let exec_resp = state_ctx
             .adapter

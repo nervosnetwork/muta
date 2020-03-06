@@ -83,13 +83,13 @@ pub fn to_signed_transaction(
     raw: InputRawTransaction,
     encryption: InputTransactionEncryption,
 ) -> ProtocolResult<protocol::types::SignedTransaction> {
-    let pubkey: &[u8] = &hex::decode(encryption.pubkey.as_hex()).map_err(SchemaError::from)?;
+    let pubkey: &[u8] = &hex::decode(encryption.pubkey.as_hex()?).map_err(SchemaError::from)?;
     let signature: &[u8] =
-        &hex::decode(encryption.signature.as_hex()).map_err(SchemaError::from)?;
+        &hex::decode(encryption.signature.as_hex()?).map_err(SchemaError::from)?;
 
     Ok(protocol::types::SignedTransaction {
         raw:       to_transaction(raw)?,
-        tx_hash:   protocol::types::Hash::from_hex(&encryption.tx_hash.as_hex())?,
+        tx_hash:   protocol::types::Hash::from_hex(&encryption.tx_hash.as_hex()?)?,
         pubkey:    bytes::BytesMut::from(pubkey).freeze(),
         signature: bytes::BytesMut::from(signature).freeze(),
     })
@@ -97,8 +97,8 @@ pub fn to_signed_transaction(
 
 pub fn to_transaction(raw: InputRawTransaction) -> ProtocolResult<protocol::types::RawTransaction> {
     Ok(protocol::types::RawTransaction {
-        chain_id:     protocol::types::Hash::from_hex(&raw.chain_id.as_hex())?,
-        nonce:        protocol::types::Hash::from_hex(&raw.nonce.as_hex())?,
+        chain_id:     protocol::types::Hash::from_hex(&raw.chain_id.as_hex()?)?,
+        nonce:        protocol::types::Hash::from_hex(&raw.nonce.as_hex()?)?,
         timeout:      raw.timeout.try_into_u64()?,
         cycles_price: raw.cycles_price.try_into_u64()?,
         cycles_limit: raw.cycles_limit.try_into_u64()?,
