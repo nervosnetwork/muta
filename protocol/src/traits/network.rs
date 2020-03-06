@@ -73,7 +73,13 @@ pub trait Rpc: Send + Sync {
         M: MessageCodec,
         R: MessageCodec;
 
-    async fn response<M>(&self, cx: Context, end: &str, msg: M, p: Priority) -> ProtocolResult<()>
+    async fn response<M>(
+        &self,
+        cx: Context,
+        end: &str,
+        ret: ProtocolResult<M>,
+        p: Priority,
+    ) -> ProtocolResult<()>
     where
         M: MessageCodec;
 }

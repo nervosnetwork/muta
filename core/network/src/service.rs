@@ -81,7 +81,13 @@ impl Rpc for NetworkServiceHandle {
         self.rpc.call(cx, end, msg, p).await
     }
 
-    async fn response<M>(&self, cx: Context, end: &str, msg: M, p: Priority) -> ProtocolResult<()>
+    async fn response<M>(
+        &self,
+        cx: Context,
+        end: &str,
+        msg: ProtocolResult<M>,
+        p: Priority,
+    ) -> ProtocolResult<()>
     where
         M: MessageCodec,
     {

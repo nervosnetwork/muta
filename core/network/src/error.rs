@@ -95,6 +95,9 @@ pub enum NetworkError {
     #[display(fmt = "{:?} account addrs aren't connecting, try connect them", miss)]
     PartialRouteMessage { miss: Vec<Address> },
 
+    #[display(fmt = "remote response {}", _0)]
+    RemoteResponse(Box<dyn Error + Send>),
+
     #[display(fmt = "internal error: {}", _0)]
     Internal(Box<dyn Error + Send>),
 }

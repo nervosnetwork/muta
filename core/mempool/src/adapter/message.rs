@@ -103,11 +103,14 @@ where
 
     async fn process(&self, ctx: Context, msg: Self::Message) {
         let push_txs = async move {
-            let sig_txs = self.mem_pool.get_full_txs(ctx.clone(), msg.hashes).await?;
-            let resp_msg = MsgPushTxs { sig_txs };
+            let ret = self
+                .mem_pool
+                .get_full_txs(ctx.clone(), msg.hashes)
+                .await
+                .map(|sig_txs| MsgPushTxs { sig_txs });
 
             self.network
-                .response::<MsgPushTxs>(ctx, RPC_RESP_PULL_TXS, resp_msg, Priority::High)
+                .response::<MsgPushTxs>(ctx, RPC_RESP_PULL_TXS, ret, Priority::High)
                 .await
         };
 

@@ -1,4 +1,4 @@
-use std::{marker::PhantomData, sync::Arc};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use futures::future::{self, Either};
@@ -14,6 +14,7 @@ use crate::{
     endpoint::Endpoint,
     error::{ErrorKind, NetworkError},
     message::NetworkMessage,
+    rpc::{RpcErrorMessage, RpcResponse, RpcResponseCode},
     rpc_map::RpcMap,
     traits::{Compression, MessageSender, NetworkContext},
 };
@@ -65,28 +66,25 @@ where
         let sid = cx.session_id()?;
         let rid = self.map.next_rpc_id();
         let connected_addr = cx.remote_connected_addr();
-        let done_rx = self.map.insert::<R>(sid, rid);
+        let done_rx = self.map.insert::<RpcResponse>(sid, rid);
 
-        struct _Guard<R: MessageCodec> {
+        struct _Guard {
             map: Arc<RpcMap>,
             sid: SessionId,
             rid: u64,
-
-            _r: PhantomData<R>,
         }
 
-        impl<R: MessageCodec> Drop for _Guard<R> {
+        impl Drop for _Guard {
             fn drop(&mut self) {
                 // Simple take then drop if there is one
-                let _ = self.map.take::<R>(self.sid, self.rid);
+                let _ = self.map.take::<RpcResponse>(self.sid, self.rid);
             }
         }
 
-        let _guard = _Guard::<R> {
+        let _guard = _Guard {
             map: Arc::clone(&self.map),
             sid,
             rid,
-            _r: PhantomData,
         };
 
         let data = msg.encode().await?;
@@ -105,14 +103,17 @@ where
             }
         };
 
-        Ok(ret)
+        match ret {
+            RpcResponse::Success(v) => Ok(R::decode(v).await?),
+            RpcResponse::Error(e) => Err(NetworkError::RemoteResponse(Box::new(e)).into()),
+        }
     }
 
     async fn response<M>(
         &self,
         cx: Context,
         end: &str,
-        mut msg: M,
+        ret: ProtocolResult<M>,
         p: Priority,
     ) -> ProtocolResult<()>
     where
@@ -122,9 +123,17 @@ where
         let sid = cx.session_id()?;
         let rid = cx.rpc_id()?;
 
-        let data = msg.encode().await?;
+        let mut resp = match ret.map_err(|e| e.to_string()) {
+            Ok(mut m) => RpcResponse::Success(m.encode().await?),
+            Err(err_msg) => RpcResponse::Error(RpcErrorMessage {
+                code: RpcResponseCode::ServerError,
+                msg:  err_msg,
+            }),
+        };
+
+        let encoded_resp = resp.encode().await?;
         let endpoint = endpoint.extend(&rid.to_string())?;
-        let net_msg = NetworkMessage::new(endpoint, data).encode().await?;
+        let net_msg = NetworkMessage::new(endpoint, encoded_resp).encode().await?;
 
         self.send(cx, sid, net_msg, p)?;
 

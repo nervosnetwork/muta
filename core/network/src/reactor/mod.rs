@@ -21,6 +21,7 @@ use protocol::{
 use crate::{
     endpoint::{Endpoint, EndpointScheme, RpcEndpoint},
     message::SessionMessage,
+    rpc::RpcResponse,
     rpc_map::RpcMap,
     traits::NetworkContext,
 };
@@ -75,17 +76,21 @@ where
 
         let react = async move {
             let endpoint = net_msg.url.parse::<Endpoint>()?;
-            let content = M::decode(Bytes::from(net_msg.content)).await?;
 
             match endpoint.scheme() {
-                EndpointScheme::Gossip => handler.process(ctx, content).await,
+                EndpointScheme::Gossip => {
+                    let content = M::decode(Bytes::from(net_msg.content)).await?;
+                    handler.process(ctx, content).await
+                }
                 EndpointScheme::RpcCall => {
+                    let content = M::decode(Bytes::from(net_msg.content)).await?;
                     let rpc_endpoint = RpcEndpoint::try_from(endpoint)?;
 
                     let ctx = ctx.set_rpc_id(rpc_endpoint.rpc_id().value());
                     handler.process(ctx, content).await
                 }
                 EndpointScheme::RpcResponse => {
+                    let content = RpcResponse::decode(Bytes::from(net_msg.content)).await?;
                     let rpc_endpoint = RpcEndpoint::try_from(endpoint)?;
                     let rpc_id = rpc_endpoint.rpc_id().value();
 
@@ -99,7 +104,8 @@ where
                         return Ok(());
                     }
 
-                    let resp_tx = rpc_map.take::<M>(sid, rpc_endpoint.rpc_id().value())?;
+                    let resp_tx =
+                        rpc_map.take::<RpcResponse>(sid, rpc_endpoint.rpc_id().value())?;
                     if resp_tx.send(content).is_err() {
                         let end = rpc_endpoint.endpoint().full_url();
 

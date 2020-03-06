@@ -93,7 +93,7 @@ impl<N: Rpc + Send + Sync + 'static> MessageHandler for Checkout<N> {
 
         if let Err(e) = self
             .dealer
-            .response(ctx, SHOP_CHANNEL, acopy, Priority::High)
+            .response(ctx, SHOP_CHANNEL, Ok(acopy), Priority::High)
             .await
         {
             warn!("send acopy {}", e);

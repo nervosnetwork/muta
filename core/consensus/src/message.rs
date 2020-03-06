@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use bincode::serialize;
-use futures::TryFutureExt;
-use log::{debug, warn};
+use futures::{future::try_join_all, TryFutureExt};
+use log::warn;
 use overlord::types::{AggregatedVote, SignedChoke, SignedProposal, SignedVote};
 use overlord::Codec;
 use rlp::Encodable;
@@ -197,24 +197,15 @@ impl<R: Rpc + 'static, S: Storage + 'static> MessageHandler for PullBlockRpcHand
     type Message = FixedHeight;
 
     async fn process(&self, ctx: Context, msg: FixedHeight) {
-        let push_block = async move {
-            let id = msg.inner;
-            let block = self.storage.get_block_by_height(id).await?;
+        let id = msg.inner;
 
-            debug!("[core_consensus] pull block rpc get block {:?} ", id);
-            self.rpc
-                .response(
-                    ctx,
-                    RPC_RESP_SYNC_PULL_BLOCK,
-                    FixedBlock::new(block),
-                    Priority::High,
-                )
-                .await?;
-            debug!("[core_consensus] pull block rpc send msg {:?} ", id);
-            Ok(())
-        };
-
-        push_block
+        let ret = self
+            .storage
+            .get_block_by_height(id)
+            .await
+            .map(FixedBlock::new);
+        self.rpc
+            .response(ctx, RPC_RESP_SYNC_PULL_BLOCK, ret, Priority::High)
             .unwrap_or_else(move |e: ProtocolError| warn!("[core_consensus] push block {}", e))
             .await;
     }
@@ -241,23 +232,15 @@ impl<R: Rpc + 'static, S: Storage + 'static> MessageHandler for PullTxsRpcHandle
     type Message = PullTxsRequest;
 
     async fn process(&self, ctx: Context, msg: PullTxsRequest) {
-        let push_txs = async move {
-            let mut res = Vec::new();
-            for tx in msg.inner.into_iter() {
-                res.push(self.storage.get_transaction_by_hash(tx).await?);
-            }
+        let futs = msg
+            .inner
+            .into_iter()
+            .map(|tx_hash| self.storage.get_transaction_by_hash(tx_hash))
+            .collect::<Vec<_>>();
+        let ret = try_join_all(futs).await.map(FixedSignedTxs::new);
 
-            self.rpc
-                .response(
-                    ctx,
-                    RPC_RESP_SYNC_PULL_TXS,
-                    FixedSignedTxs::new(res),
-                    Priority::High,
-                )
-                .await
-        };
-
-        push_txs
+        self.rpc
+            .response(ctx, RPC_RESP_SYNC_PULL_TXS, ret, Priority::High)
             .unwrap_or_else(move |e: ProtocolError| warn!("[core_consensus] push txs {}", e))
             .await;
     }
