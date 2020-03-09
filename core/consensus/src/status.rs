@@ -49,9 +49,9 @@ impl StatusAgent {
         status.current_height = new_status.current_height;
         status.exec_height = new_status.exec_height;
         status.current_hash = new_status.current_hash;
+        status.latest_commited_state_root = new_status.latest_commited_state_root;
         status.list_logs_bloom = new_status.list_logs_bloom;
         status.list_confirm_root = new_status.list_confirm_root;
-        status.latest_state_root = new_status.latest_state_root;
         status.list_state_root = new_status.list_state_root;
         status.list_receipt_root = new_status.list_receipt_root;
         status.list_cycles_used = new_status.list_cycles_used;
@@ -66,37 +66,50 @@ impl StatusAgent {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Display)]
-#[rustfmt::skip]
 #[display(
-    fmt = "current_height {}, exec height {}, current_hash {:?}, latest_state_root {:?} list state root {:?}, list receipt root {:?}, list confirm root {:?}, list cycle used {:?}, logs bloom {:?}",
-    current_height, exec_height, current_hash, latest_state_root, list_state_root, list_receipt_root, list_confirm_root,
-    list_cycles_used, "list_logs_bloom.iter().map(|bloom| bloom.to_low_u64_be()).collect::<Vec<_>>()"
+    fmt = "current_height {}, exec height {}, current_hash {:?}, latest_commited_state_root {:?} list state root {:?}, list receipt root {:?}, list confirm root {:?}, list cycle used {:?}, logs bloom {:?}",
+    current_height,
+    exec_height,
+    current_hash,
+    latest_commited_state_root,
+    list_state_root,
+    list_receipt_root,
+    list_confirm_root,
+    list_cycles_used,
+    "list_logs_bloom.iter().map(|bloom| bloom.to_low_u64_be()).collect::<Vec<_>>()"
 )]
 pub struct CurrentConsensusStatus {
-    pub cycles_price:       u64,
-    pub cycles_limit:       u64,
-    pub current_height:     u64,
-    pub exec_height:        u64,
-    pub current_hash:       Hash,
-    pub latest_state_root:  MerkleRoot,
-    pub list_logs_bloom:    Vec<Bloom>,
-    pub list_confirm_root:  Vec<MerkleRoot>,
-    pub list_state_root:    Vec<MerkleRoot>,
-    pub list_receipt_root:  Vec<MerkleRoot>,
-    pub list_cycles_used:   Vec<u64>,
-    pub current_proof:      Proof,
-    pub validators:         Vec<Validator>,
-    pub consensus_interval: u64,
-    pub propose_ratio:      u64,
-    pub prevote_ratio:      u64,
-    pub precommit_ratio:    u64,
-    pub brake_ratio:        u64,
-    pub tx_num_limit:       u64,
-    pub max_tx_size:        u64,
+    pub cycles_price:               u64,
+    pub cycles_limit:               u64,
+    pub current_height:             u64,
+    pub exec_height:                u64,
+    pub current_hash:               Hash,
+    pub latest_commited_state_root: MerkleRoot,
+    pub list_logs_bloom:            Vec<Bloom>,
+    pub list_confirm_root:          Vec<MerkleRoot>,
+    pub list_state_root:            Vec<MerkleRoot>,
+    pub list_receipt_root:          Vec<MerkleRoot>,
+    pub list_cycles_used:           Vec<u64>,
+    pub current_proof:              Proof,
+    pub validators:                 Vec<Validator>,
+    pub consensus_interval:         u64,
+    pub propose_ratio:              u64,
+    pub prevote_ratio:              u64,
+    pub precommit_ratio:            u64,
+    pub brake_ratio:                u64,
+    pub tx_num_limit:               u64,
+    pub max_tx_size:                u64,
 }
 
 impl CurrentConsensusStatus {
-    pub fn update_by_executed(&mut self, info: ExecutedInfo) {
+    pub fn get_latest_state_root(&self) -> MerkleRoot {
+        self.list_state_root
+            .last()
+            .unwrap_or(&self.latest_commited_state_root)
+            .clone()
+    }
+
+    fn update_by_executed(&mut self, info: ExecutedInfo) {
         if info.exec_height <= self.exec_height {
             return;
         }
@@ -106,7 +119,6 @@ impl CurrentConsensusStatus {
 
         assert!(info.exec_height == self.exec_height + 1);
         self.exec_height += 1;
-        self.latest_state_root = info.state_root.clone();
         self.list_cycles_used.push(info.cycles_used);
         self.list_confirm_root.push(info.confirm_root.clone());
         self.list_logs_bloom.push(info.logs_bloom.clone());
@@ -114,7 +126,7 @@ impl CurrentConsensusStatus {
         self.list_state_root.push(info.state_root);
     }
 
-    pub fn update_by_commited(
+    fn update_by_commited(
         &mut self,
         metadata: Metadata,
         block: Block,
@@ -136,6 +148,7 @@ impl CurrentConsensusStatus {
         self.current_height = block.header.height;
         self.current_hash = block_hash;
         self.current_proof = current_proof;
+        self.latest_commited_state_root = block.header.state_root.clone();
 
         self.split_off(&block);
     }
@@ -202,18 +215,22 @@ impl CurrentConsensusStatus {
 }
 
 #[derive(Clone, Debug, Display)]
-#[rustfmt::skip]
 #[display(
     fmt = "exec height {}, cycles used {}, state root {:?}, receipt root {:?}, confirm root {:?}, logs bloom {}",
-    exec_height, cycles_used, state_root, receipt_root, confirm_root, "logs_bloom.to_low_u64_be()"
+    exec_height,
+    cycles_used,
+    state_root,
+    receipt_root,
+    confirm_root,
+    "logs_bloom.to_low_u64_be()"
 )]
 pub struct ExecutedInfo {
-    pub exec_height: u64,
-    pub cycles_used:   u64,
-    pub logs_bloom:    Bloom,
-    pub state_root:    MerkleRoot,
-    pub receipt_root:  MerkleRoot,
-    pub confirm_root:  MerkleRoot,
+    pub exec_height:  u64,
+    pub cycles_used:  u64,
+    pub logs_bloom:   Bloom,
+    pub state_root:   MerkleRoot,
+    pub receipt_root: MerkleRoot,
+    pub confirm_root: MerkleRoot,
 }
 
 impl ExecutedInfo {

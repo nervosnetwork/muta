@@ -270,7 +270,7 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
         let cycles_limit = current_status.cycles_limit;
 
         let exec_params = ExecutorParams {
-            state_root: current_status.latest_state_root,
+            state_root: current_status.get_latest_state_root(),
             height: rich_block.block.header.height,
             timestamp: rich_block.block.header.timestamp,
             cycles_limit,

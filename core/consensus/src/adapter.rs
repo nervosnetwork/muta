@@ -573,7 +573,7 @@ where
             let height = info.height;
             let txs = info.signed_txs.clone();
             let order_root = info.order_root.clone();
-            let state_root = self.status.to_inner().latest_state_root;
+            let state_root = self.status.to_inner().get_latest_state_root();
 
             let mut executor = EF::from_root(
                 state_root.clone(),

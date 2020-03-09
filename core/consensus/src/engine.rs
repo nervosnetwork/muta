@@ -76,22 +76,23 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
 
         let order_root = Merkle::from_hashes(ordered_tx_hashes.clone()).get_root_hash();
 
+        let state_root = current_consensus_status.get_latest_state_root();
         let header = BlockHeader {
-            chain_id:          self.node_info.chain_id.clone(),
-            pre_hash:          current_consensus_status.current_hash,
-            height:            next_height,
-            exec_height:       current_consensus_status.exec_height,
-            timestamp:         time_now(),
-            logs_bloom:        current_consensus_status.list_logs_bloom,
-            order_root:        order_root.unwrap_or_else(Hash::from_empty),
-            confirm_root:      current_consensus_status.list_confirm_root,
-            state_root:        current_consensus_status.latest_state_root.clone(),
-            receipt_root:      current_consensus_status.list_receipt_root.clone(),
-            cycles_used:       current_consensus_status.list_cycles_used,
-            proposer:          self.node_info.self_address.clone(),
-            proof:             current_consensus_status.current_proof.clone(),
+            chain_id: self.node_info.chain_id.clone(),
+            pre_hash: current_consensus_status.current_hash,
+            height: next_height,
+            exec_height: current_consensus_status.exec_height,
+            timestamp: time_now(),
+            logs_bloom: current_consensus_status.list_logs_bloom,
+            order_root: order_root.unwrap_or_else(Hash::from_empty),
+            confirm_root: current_consensus_status.list_confirm_root,
+            state_root,
+            receipt_root: current_consensus_status.list_receipt_root.clone(),
+            cycles_used: current_consensus_status.list_cycles_used,
+            proposer: self.node_info.self_address.clone(),
+            proof: current_consensus_status.current_proof.clone(),
             validator_version: 0u64,
-            validators:        current_consensus_status.validators.clone(),
+            validators: current_consensus_status.validators.clone(),
         };
         let block = Block {
             header,
@@ -448,7 +449,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
         }
 
         // check state root
-        if status.latest_state_root != block.state_root
+        if status.latest_commited_state_root != block.state_root
             && !status.list_state_root.contains(&block.state_root)
         {
             trace::error(
@@ -460,7 +461,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
             );
             error!(
                 "invalid status list_state_root, latest {:?}, current list {:?}, block {:?}",
-                status.latest_state_root, status.list_state_root, block.state_root
+                status.latest_commited_state_root, status.list_state_root, block.state_root
             );
             return Err(ConsensusError::InvalidStatusVec.into());
         }
