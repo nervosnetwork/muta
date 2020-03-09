@@ -653,7 +653,7 @@ fn time_now() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
-        .as_secs()
+        .as_millis() as u64
 }
 
 async fn sync_txs<CA: ConsensusAdapter>(
