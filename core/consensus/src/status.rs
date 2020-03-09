@@ -122,12 +122,13 @@ impl CurrentConsensusStatus {
         current_proof: Proof,
     ) {
         log::info!(
-            "update_by_commited: block {:?}, hash {:?}, state root {:?} \ncurrent status {}",
+            "update_by_commited: block {:?}, hash {:?}, state root {:?}",
             block.header,
             block_hash,
             block.header.state_root,
-            self
         );
+
+        log::info!("update_by_commited: current status {}", self);
 
         self.set_metadata(metadata);
 
