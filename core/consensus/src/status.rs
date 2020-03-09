@@ -100,11 +100,8 @@ impl CurrentConsensusStatus {
         if info.exec_height <= self.exec_height {
             return;
         }
-        log::info!(
-            "update_by_executed: info {} \ncurrent status {}",
-            info,
-            self
-        );
+        log::info!("update_by_executed: info {}", info,);
+        log::info!("update_by_executed: current status {}", self);
         // trace_after_exec(&info);
 
         assert!(info.exec_height == self.exec_height + 1);
