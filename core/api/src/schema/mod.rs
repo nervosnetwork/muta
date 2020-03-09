@@ -84,25 +84,25 @@ impl Bytes {
 
 impl From<protocol::types::Hash> for Hash {
     fn from(hash: protocol::types::Hash) -> Self {
-        Hash(hash.as_hex())
+        Hash("0x".to_owned() + &hash.as_hex())
     }
 }
 
 impl From<protocol::types::Address> for Address {
     fn from(address: protocol::types::Address) -> Self {
-        Address(address.as_hex())
+        Address("0x".to_owned() + &address.as_hex())
     }
 }
 
 impl From<u64> for Uint64 {
     fn from(n: u64) -> Self {
-        Uint64(hex::encode(n.to_be_bytes().to_vec()))
+        Uint64("0x".to_owned() + &hex::encode(n.to_be_bytes().to_vec()))
     }
 }
 
 impl From<protocol::Bytes> for Bytes {
     fn from(bytes: protocol::Bytes) -> Self {
-        Bytes(hex::encode(bytes))
+        Bytes("0x".to_owned() + &hex::encode(bytes))
     }
 }
 
