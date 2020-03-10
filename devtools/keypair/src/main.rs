@@ -55,7 +55,7 @@ pub fn main() {
     };
 
     let mut output = Output {
-        common_ref: hex::encode(common_ref.clone()),
+        common_ref: add_0x(hex::encode(common_ref.clone())),
         keypairs:   vec![],
     };
 
@@ -72,17 +72,21 @@ pub fn main() {
         let pubkey = keypair.to_public_key().inner();
         let user_addr = Address::from_pubkey_bytes(pubkey.into()).expect("user addr");
 
-        k.private_key = hex::encode(seckey.as_ref());
-        k.public_key = hex::encode(keypair.to_public_key().inner());
-        k.address = user_addr.as_hex();
+        k.private_key = add_0x(hex::encode(seckey.as_ref()));
+        k.public_key = add_0x(hex::encode(keypair.to_public_key().inner()));
+        k.address = add_0x(user_addr.as_hex());
 
         let priv_key =
             BlsPrivateKey::try_from([&[0u8; 16], seckey.as_ref()].concat().as_ref()).unwrap();
         let pub_key = priv_key.pub_key(&common_ref.as_str().into());
-        k.bls_public_key = hex::encode(pub_key.to_bytes());
+        k.bls_public_key = add_0x(hex::encode(pub_key.to_bytes()));
         k.index = i + 1;
         output.keypairs.push(k);
     }
     let output_str = serde_json::to_string_pretty(&output).unwrap();
     println!("{}", output_str);
+}
+
+fn add_0x(s: String) -> String {
+    "0x".to_owned() + &s
 }
