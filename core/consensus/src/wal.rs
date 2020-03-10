@@ -1,5 +1,6 @@
 use std::fs;
 use std::io::{Read, Write};
+use std::path::Path;
 
 use protocol::types::{Hash, SignedTransaction};
 use protocol::ProtocolResult;
@@ -13,10 +14,10 @@ pub struct FullTxsWal {
 
 impl FullTxsWal {
     pub fn new(path: String) -> Self {
-        if fs::read_dir(&path).is_err() {
+        if !Path::new(&path).exists() {
             fs::create_dir_all(&path).expect("Failed to create wal directory");
         }
-
+        
         FullTxsWal { path }
     }
 
@@ -27,7 +28,7 @@ impl FullTxsWal {
         txs: Vec<SignedTransaction>,
     ) -> ProtocolResult<()> {
         let dir = self.path.clone() + "/" + &height.to_string();
-        if fs::read_dir(&dir).is_err() {
+        if !Path::new(&dir).exists() {
             fs::create_dir(&dir).map_err(ConsensusError::WalErr)?;
         }
 
