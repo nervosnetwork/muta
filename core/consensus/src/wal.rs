@@ -62,7 +62,7 @@ impl FullTxsWal {
         Ok(txs)
     }
 
-    pub fn remove(&self, exec_height: u64) -> ProtocolResult<()> {
+    pub fn remove(&self, till: u64) -> ProtocolResult<()> {
         for entry in fs::read_dir(&self.path).map_err(ConsensusError::WalErr)? {
             let folder = entry.map_err(ConsensusError::WalErr)?.path();
             let folder_name = folder
@@ -74,10 +74,10 @@ impl FullTxsWal {
                 ConsensusError::Other(format!("transfer os string to string error {:?}", err))
             })?;
             let height = folder_name.parse::<u64>().map_err(|err| {
-                ConsensusError::Other(format!("parse folder name string error {:?}", err))
+                ConsensusError::Other(format!("parse folder name {:?} error {:?}", folder, err))
             })?;
 
-            if height < exec_height {
+            if height < till {
                 fs::remove_dir_all(folder).map_err(ConsensusError::WalErr)?;
             }
         }

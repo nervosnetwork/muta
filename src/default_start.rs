@@ -196,7 +196,16 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         Arc::clone(&trie_db),
         Arc::clone(&service_mapping),
     );
-    let muta_wal = Arc::new(FullTxsWal::new(path_block.to_str().unwrap().to_string()));
+    let muta_wal = Arc::new(FullTxsWal::new(
+        path_block
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_string(),
+    ));
 
     let exec_resp = api_adapter
         .query_service(
