@@ -134,7 +134,7 @@ impl CurrentConsensusStatus {
         current_proof: Proof,
     ) {
         log::info!(
-            "update_by_commited: block {:?}, hash {:?}, state root {:?}",
+            "update_by_commited: commoted block {:?}, hash {:?}, state root {:?}",
             block.header,
             block_hash,
             block.header.state_root,
