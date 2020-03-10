@@ -45,27 +45,28 @@ fn sync_gap_test() {
             local_transactions,
             remote_transactions,
         ));
+        let block_hash = Hash::digest(genesis_block.encode_fixed().unwrap());
         let status = CurrentConsensusStatus {
-            cycles_price:       1,
-            cycles_limit:       300_000_000,
-            height:             genesis_block.header.height + 1,
-            exec_height:        genesis_block.header.exec_height,
-            prev_hash:          genesis_block.header.pre_hash,
-            logs_bloom:         vec![],
-            confirm_root:       vec![],
-            latest_state_root:  genesis_block.header.state_root.clone(),
-            state_root:         vec![],
-            receipt_root:       vec![],
-            cycles_used:        vec![],
-            proof:              genesis_block.header.proof,
-            validators:         genesis_block.header.validators,
-            consensus_interval: 3000,
-            propose_ratio:      15,
-            prevote_ratio:      10,
-            precommit_ratio:    10,
-            brake_ratio:        3,
-            tx_num_limit:       20000,
-            max_tx_size:        1_073_741_824,
+            cycles_price:               1,
+            cycles_limit:               300_000_000,
+            current_height:             genesis_block.header.height,
+            exec_height:                genesis_block.header.exec_height,
+            current_hash:               block_hash,
+            list_logs_bloom:            vec![],
+            list_confirm_root:          vec![],
+            latest_commited_state_root: genesis_block.header.state_root.clone(),
+            list_state_root:            vec![],
+            list_receipt_root:          vec![],
+            list_cycles_used:           vec![],
+            current_proof:              genesis_block.header.proof,
+            validators:                 genesis_block.header.validators,
+            consensus_interval:         3000,
+            propose_ratio:              15,
+            prevote_ratio:              10,
+            precommit_ratio:            10,
+            brake_ratio:                3,
+            tx_num_limit:               20000,
+            max_tx_size:                1_073_741_824,
         };
         let status_agent = StatusAgent::new(status);
         let lock = Arc::new(Mutex::new(()));
@@ -74,13 +75,13 @@ fn sync_gap_test() {
 
         let status = status_agent.to_inner();
         let block =
-            block_on(adapter.get_block_by_height(Context::new(), status.height - 1)).unwrap();
+            block_on(adapter.get_block_by_height(Context::new(), status.current_height)).unwrap();
         assert_sync(status, block);
 
         block_on(sync.receive_remote_block(Context::new(), max_height)).unwrap();
         let status = status_agent.to_inner();
         let block =
-            block_on(adapter.get_block_by_height(Context::new(), status.height - 1)).unwrap();
+            block_on(adapter.get_block_by_height(Context::new(), status.current_height)).unwrap();
         assert_sync(status, block);
     }
 }
@@ -499,10 +500,10 @@ fn exec_txs(height: u64, txs: &[SignedTransaction]) -> (ExecutorResp, MerkleRoot
 fn assert_sync(status: CurrentConsensusStatus, latest_block: Block) {
     let exec_gap = latest_block.header.height - latest_block.header.exec_height;
 
-    assert_eq!(status.height - 1, latest_block.header.height);
+    assert_eq!(status.current_height, latest_block.header.height);
     assert_eq!(status.exec_height, latest_block.header.height);
-    assert_eq!(status.confirm_root.len(), exec_gap as usize);
-    assert_eq!(status.cycles_used.len(), exec_gap as usize);
-    assert_eq!(status.logs_bloom.len(), exec_gap as usize);
-    assert_eq!(status.receipt_root.len(), exec_gap as usize);
+    assert_eq!(status.list_confirm_root.len(), exec_gap as usize);
+    assert_eq!(status.list_cycles_used.len(), exec_gap as usize);
+    assert_eq!(status.list_logs_bloom.len(), exec_gap as usize);
+    assert_eq!(status.list_receipt_root.len(), exec_gap as usize);
 }

@@ -1,4 +1,3 @@
-use std::cmp::Eq;
 use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
 use std::error::Error;
@@ -32,8 +31,8 @@ use crate::message::{
     END_GOSSIP_SIGNED_VOTE,
 };
 use crate::status::StatusAgent;
-use crate::util::OverlordCrypto;
-use crate::{ConsensusError, StatusCacheField};
+use crate::util::{check_list_roots, OverlordCrypto};
+use crate::ConsensusError;
 
 /// validator is for create new block, and authority is for build overlord
 /// status.
@@ -52,7 +51,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
     async fn get_block(
         &self,
         ctx: Context,
-        height: u64,
+        next_height: u64,
     ) -> Result<(FixedPill, Bytes), Box<dyn Error + Send>> {
         let current_consensus_status = self.status_agent.to_inner();
 
@@ -60,35 +59,39 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             .adapter
             .get_txs_from_mempool(
                 ctx,
-                height,
+                next_height,
                 current_consensus_status.cycles_limit,
                 current_consensus_status.tx_num_limit,
             )
             .await?
             .clap();
 
-        if current_consensus_status.height != height {
-            return Err(ProtocolError::from(ConsensusError::MissingBlockHeader(height)).into());
+        if current_consensus_status.current_height != next_height - 1 {
+            return Err(ProtocolError::from(ConsensusError::MissingBlockHeader(
+                current_consensus_status.current_height,
+            ))
+            .into());
         }
-        let tmp_height = height;
+
         let order_root = Merkle::from_hashes(ordered_tx_hashes.clone()).get_root_hash();
 
+        let state_root = current_consensus_status.get_latest_state_root();
         let header = BlockHeader {
-            chain_id:          self.node_info.chain_id.clone(),
-            pre_hash:          current_consensus_status.prev_hash,
-            height:            tmp_height,
-            exec_height:       current_consensus_status.exec_height,
-            timestamp:         time_now(),
-            logs_bloom:        current_consensus_status.logs_bloom,
-            order_root:        order_root.unwrap_or_else(Hash::from_empty),
-            confirm_root:      current_consensus_status.confirm_root,
-            state_root:        current_consensus_status.latest_state_root.clone(),
-            receipt_root:      current_consensus_status.receipt_root.clone(),
-            cycles_used:       current_consensus_status.cycles_used,
-            proposer:          self.node_info.self_address.clone(),
-            proof:             current_consensus_status.proof.clone(),
+            chain_id: self.node_info.chain_id.clone(),
+            pre_hash: current_consensus_status.current_hash,
+            height: next_height,
+            exec_height: current_consensus_status.exec_height,
+            timestamp: time_now(),
+            logs_bloom: current_consensus_status.list_logs_bloom,
+            order_root: order_root.unwrap_or_else(Hash::from_empty),
+            confirm_root: current_consensus_status.list_confirm_root,
+            state_root,
+            receipt_root: current_consensus_status.list_receipt_root.clone(),
+            cycles_used: current_consensus_status.list_cycles_used,
+            proposer: self.node_info.self_address.clone(),
+            proof: current_consensus_status.current_proof.clone(),
             validator_version: 0u64,
-            validators:        current_consensus_status.validators.clone(),
+            validators: current_consensus_status.validators.clone(),
         };
         let block = Block {
             header,
@@ -112,7 +115,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
     async fn check_block(
         &self,
         ctx: Context,
-        _height: u64,
+        _next_height: u64,
         hash: Bytes,
         block: FixedPill,
     ) -> Result<(), Box<dyn Error + Send>> {
@@ -158,7 +161,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
     async fn commit(
         &self,
         ctx: Context,
-        height: u64,
+        current_height: u64,
         commit: Commit<FixedPill>,
     ) -> Result<Status, Box<dyn Error + Send>> {
         let lock = self.lock.try_lock();
@@ -170,9 +173,9 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         }
 
         let current_consensus_status = self.status_agent.to_inner();
-        if current_consensus_status.exec_height == height {
+        if current_consensus_status.exec_height == current_height {
             let status = Status {
-                height:         height + 1,
+                height:         current_height + 1,
                 interval:       Some(current_consensus_status.consensus_interval),
                 timer_config:   Some(DurationConfig {
                     propose_ratio:   current_consensus_status.propose_ratio,
@@ -219,7 +222,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         // Execute transactions
         self.exec(
             pill.block.header.order_root.clone(),
-            height,
+            current_height,
             pill.block.header.proposer.clone(),
             pill.block.header.timestamp,
             Hash::digest(pill.block.encode_fixed()?),
@@ -235,21 +238,23 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             pill.block.header.timestamp,
         )?;
 
-        self.update_status(height, metadata, pill.block, proof, full_txs)
+        self.update_status(metadata, pill.block, proof, full_txs)
             .await?;
 
         self.adapter
             .flush_mempool(ctx.clone(), &ordered_tx_hashes)
             .await?;
 
-        self.adapter.broadcast_height(ctx.clone(), height).await?;
+        self.adapter
+            .broadcast_height(ctx.clone(), current_height)
+            .await?;
 
         let mut set = self.exemption_hash.write();
         set.clear();
 
         let current_consensus_status = self.status_agent.to_inner();
         let status = Status {
-            height:         height + 1,
+            height:         current_height + 1,
             interval:       Some(current_consensus_status.consensus_interval),
             timer_config:   Some(DurationConfig {
                 propose_ratio:   current_consensus_status.propose_ratio,
@@ -427,98 +432,100 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
         let status = self.status_agent.to_inner();
 
         // check previous hash
-        if status.prev_hash != block.pre_hash {
+        if status.current_hash != block.pre_hash {
             trace::error(
                 "check_block_prev_hash_diff".to_string(),
                 Some(json!({
-                    "block_prev_hash": block.pre_hash.as_hex(),
-                    "cache_prev_hash": status.prev_hash.as_hex(),
+                    "next block prev_hash": block.pre_hash.as_hex(),
+                    "status current hash": status.current_hash.as_hex(),
                 })),
             );
-            error!(
-                "cache previous hash {:?}, block previous hash {:?}",
-                status.prev_hash, block.pre_hash
-            );
-            return Err(ConsensusError::CheckBlockErr(StatusCacheField::PrevHash).into());
+            return Err(ConsensusError::InvalidPrevhash {
+                expect: status.current_hash,
+                actual: block.pre_hash.clone(),
+            }
+            .into());
         }
 
         // check state root
-        if !status.state_root.contains(&block.state_root) {
+        if status.latest_commited_state_root != block.state_root
+            && !status.list_state_root.contains(&block.state_root)
+        {
             trace::error(
                 "check_block_state_root_diff".to_string(),
                 Some(json!({
                     "block_state_root": block.state_root.as_hex(),
-                    "cache_state_roots": status.state_root.iter().map(|root| root.as_hex()).collect::<Vec<_>>(),
+                    "current_list_state_root": status.list_state_root.iter().map(|root| root.as_hex()).collect::<Vec<_>>(),
                 })),
             );
             error!(
-                "cache state root {:?}, block state root {:?}",
-                status.state_root, block.state_root
+                "invalid status list_state_root, latest {:?}, current list {:?}, block {:?}",
+                status.latest_commited_state_root, status.list_state_root, block.state_root
             );
-            return Err(ConsensusError::CheckBlockErr(StatusCacheField::StateRoot).into());
+            return Err(ConsensusError::InvalidStatusVec.into());
         }
 
         // check confirm root
-        if !check_vec_roots(&status.confirm_root, &block.confirm_root) {
+        if !check_list_roots(&status.list_confirm_root, &block.confirm_root) {
             trace::error(
                 "check_block_confirm_root_diff".to_string(),
                 Some(json!({
                     "block_state_root": block.confirm_root.iter().map(|root| root.as_hex()).collect::<Vec<_>>(),
-                    "cache_state_roots": status.confirm_root.iter().map(|root| root.as_hex()).collect::<Vec<_>>(),
+                    "current_list_confirm_root": status.list_confirm_root.iter().map(|root| root.as_hex()).collect::<Vec<_>>(),
                 })),
             );
             error!(
-                "cache confirm root {:?}, block confirm root {:?}",
-                status.confirm_root, block.confirm_root
+                "current list confirm root {:?}, block confirm root {:?}",
+                status.list_confirm_root, block.confirm_root
             );
-            return Err(ConsensusError::CheckBlockErr(StatusCacheField::ConfirmRoot).into());
+            return Err(ConsensusError::InvalidStatusVec.into());
         }
 
         // check receipt root
-        if !check_vec_roots(&status.receipt_root, &block.receipt_root) {
+        if !check_list_roots(&status.list_receipt_root, &block.receipt_root) {
             trace::error(
                 "check_block_receipt_root_diff".to_string(),
                 Some(json!({
                     "block_state_root": block.receipt_root.iter().map(|root| root.as_hex()).collect::<Vec<_>>(),
-                    "cache_state_roots": status.receipt_root.iter().map(|root| root.as_hex()).collect::<Vec<_>>(),
+                    "current_list_receipt_root": status.list_receipt_root.iter().map(|root| root.as_hex()).collect::<Vec<_>>(),
                 })),
             );
             error!(
-                "cache receipt root {:?}, block receipt root {:?}",
-                status.receipt_root, block.receipt_root
+                "current list receipt root {:?}, block receipt root {:?}",
+                status.list_receipt_root, block.receipt_root
             );
-            return Err(ConsensusError::CheckBlockErr(StatusCacheField::ReceiptRoot).into());
+            return Err(ConsensusError::InvalidStatusVec.into());
         }
 
         // check cycles used
-        if !check_vec_roots(&status.cycles_used, &block.cycles_used) {
+        if !check_list_roots(&status.list_cycles_used, &block.cycles_used) {
             trace::error(
                 "check_block_cycle_used_diff".to_string(),
                 Some(json!({
                     "block_state_root": block.cycles_used,
-                    "cache_state_roots": status.cycles_used,
+                    "current_list_cycles_root": status.list_cycles_used,
                 })),
             );
             error!(
-                "cache cycles used {:?}, block cycles used {:?}",
-                status.cycles_used, block.cycles_used
+                "current list cycles used {:?}, block cycles used {:?}",
+                status.list_cycles_used, block.cycles_used
             );
-            return Err(ConsensusError::CheckBlockErr(StatusCacheField::CyclesUsed).into());
+            return Err(ConsensusError::InvalidStatusVec.into());
         }
 
         // check logs bloom
-        if !check_vec_roots(&status.logs_bloom, &block.logs_bloom) {
+        if !check_list_roots(&status.list_logs_bloom, &block.logs_bloom) {
             trace::error(
                 "check_block_logs_bloom_diff".to_string(),
                 Some(json!({
                     "block_state_root": block.logs_bloom,
-                    "cache_state_roots": status.logs_bloom,
+                    "current_list_cycles_root": status.list_logs_bloom,
                 })),
             );
             error!(
                 "cache logs bloom {:?}, block logs bloom {:?}",
                 status
-                    .logs_bloom
+                    .list_logs_bloom
                     .iter()
                     .map(|bloom| bloom.to_low_u64_be())
                     .collect::<Vec<_>>(),
@@ -528,7 +535,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
                     .map(|bloom| bloom.to_low_u64_be())
                     .collect::<Vec<_>>()
             );
-            return Err(ConsensusError::CheckBlockErr(StatusCacheField::LogsBloom).into());
+            return Err(ConsensusError::InvalidStatusVec.into());
         }
 
         Ok(())
@@ -542,7 +549,6 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
     /// 5. Save the receipt.
     pub async fn update_status(
         &self,
-        height: u64,
         metadata: Metadata,
         block: Block,
         proof: Proof,
@@ -564,15 +570,9 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
             metadata.max_tx_size,
         );
 
-        let prev_hash = Hash::digest(block.encode_fixed()?);
-        self.status_agent.update_after_commit(
-            height + 1,
-            metadata.clone(),
-            block,
-            prev_hash,
-            proof,
-        )?;
-
+        let block_hash = Hash::digest(block.encode_fixed()?);
+        self.status_agent
+            .update_by_commited(metadata.clone(), block, block_hash, proof);
         self.update_overlord_crypto(metadata)?;
         self.save_wal().await
     }
@@ -612,14 +612,6 @@ fn covert_to_overlord_authority(validators: &[Validator]) -> Vec<Node> {
         .collect::<Vec<_>>();
     authority.sort();
     authority
-}
-
-pub fn check_vec_roots<T: Eq>(cache_roots: &[T], block_roots: &[T]) -> bool {
-    block_roots.len() <= cache_roots.len()
-        && cache_roots
-            .iter()
-            .zip(block_roots.iter())
-            .all(|(c_root, e_root)| c_root == e_root)
 }
 
 pub fn trace_block(block: &Block) {
@@ -663,23 +655,4 @@ async fn sync_txs<CA: ConsensusAdapter>(
     propose_hashes: Vec<Hash>,
 ) -> ProtocolResult<()> {
     adapter.sync_txs(ctx, propose_hashes).await
-}
-
-#[cfg(test)]
-mod test {
-    use super::check_vec_roots;
-
-    #[test]
-    fn test_zip_roots() {
-        let roots_1 = vec![1, 2, 3, 4, 5];
-        let roots_2 = vec![1, 2, 3];
-        let roots_3 = vec![];
-        let roots_4 = vec![1, 2];
-        let roots_5 = vec![3, 4, 5, 6, 8];
-
-        assert!(check_vec_roots(&roots_1, &roots_2));
-        assert!(!check_vec_roots(&roots_3, &roots_2));
-        assert!(!check_vec_roots(&roots_4, &roots_2));
-        assert!(!check_vec_roots(&roots_5, &roots_2));
-    }
 }

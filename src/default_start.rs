@@ -251,29 +251,29 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         self_address: my_address.clone(),
     };
     let current_header = &current_block.header;
-    let prevhash = Hash::digest(current_block.encode_fixed()?);
+    let block_hash = Hash::digest(current_block.encode_fixed()?);
 
     let current_consensus_status = CurrentConsensusStatus {
-        cycles_price:       metadata.cycles_price,
-        cycles_limit:       metadata.cycles_limit,
-        height:             current_block.header.height + 1,
-        exec_height:        current_block.header.height,
-        prev_hash:          prevhash,
-        latest_state_root:  current_header.state_root.clone(),
-        logs_bloom:         vec![],
-        confirm_root:       vec![],
-        state_root:         vec![current_header.state_root.clone()],
-        receipt_root:       vec![],
-        cycles_used:        vec![],
-        proof:              current_header.proof.clone(),
-        validators:         validators.clone(),
-        consensus_interval: metadata.interval,
-        propose_ratio:      metadata.propose_ratio,
-        prevote_ratio:      metadata.prevote_ratio,
-        precommit_ratio:    metadata.precommit_ratio,
-        brake_ratio:        metadata.brake_ratio,
-        max_tx_size:        metadata.max_tx_size,
-        tx_num_limit:       metadata.tx_num_limit,
+        cycles_price:               metadata.cycles_price,
+        cycles_limit:               metadata.cycles_limit,
+        current_height:             current_block.header.height,
+        exec_height:                current_block.header.height,
+        current_hash:               block_hash,
+        latest_commited_state_root: current_header.state_root.clone(),
+        list_logs_bloom:            vec![],
+        list_confirm_root:          vec![],
+        list_state_root:            vec![],
+        list_receipt_root:          vec![],
+        list_cycles_used:           vec![],
+        current_proof:              current_header.proof.clone(),
+        validators:                 validators.clone(),
+        consensus_interval:         metadata.interval,
+        propose_ratio:              metadata.propose_ratio,
+        prevote_ratio:              metadata.prevote_ratio,
+        precommit_ratio:            metadata.precommit_ratio,
+        brake_ratio:                metadata.brake_ratio,
+        max_tx_size:                metadata.max_tx_size,
+        tx_num_limit:               metadata.tx_num_limit,
     };
 
     let consensus_interval = current_consensus_status.consensus_interval;
