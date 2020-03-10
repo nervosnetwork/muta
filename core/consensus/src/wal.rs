@@ -88,7 +88,8 @@ impl FullTxsWal {
 mod test {
     use rand::random;
 
-    use protocol::types::{Hash, RawTransaction, SignedTransaction, TransactionRequest};
+    use protocol::types::{Hash, RawTransaction, TransactionRequest};
+    use protocol::Bytes;
 
     use super::*;
 
@@ -126,9 +127,8 @@ mod test {
         }
     }
 
-    pub fn mock_wal_txs() -> WalSaveTxs {
-        let inner = (0..5000).map(|_| mock_sign_tx()).collect::<Vec<_>>();
-        WalSaveTxs { inner }
+    pub fn mock_wal_txs() -> Vec<SignedTransaction> {
+        (0..5000).map(|_| mock_sign_tx()).collect::<Vec<_>>()
     }
 
     pub fn get_random_bytes(len: usize) -> Bytes {
@@ -140,10 +140,10 @@ mod test {
     fn test_txs_wal() {
         let wal = FullTxsWal::new(FULL_TXS_PATH.to_string());
         let txs_01 = mock_wal_txs();
-        let hash_01 = Hash::digest(txs_01.encode_fixed().unwrap());
+        let hash_01 = Hash::digest(Bytes::from(rlp::encode_list(&txs_01)));
         wal.save_txs(1u64, hash_01.clone(), txs_01.clone()).unwrap();
         let txs_02 = mock_wal_txs();
-        let hash_02 = Hash::digest(txs_02.encode_fixed().unwrap());
+        let hash_02 = Hash::digest(Bytes::from(rlp::encode_list(&txs_02)));
         wal.save_txs(3u64, hash_02.clone(), txs_02.clone()).unwrap();
 
         assert_eq!(wal.load_txs(1u64, hash_01.clone()).unwrap(), txs_01);
