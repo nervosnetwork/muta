@@ -151,6 +151,14 @@ pub struct ExecuteInfo {
     pub cycles_limit: u64,
 }
 
+pub fn check_list_roots<T: Eq>(cache_roots: &[T], block_roots: &[T]) -> bool {
+    block_roots.len() <= cache_roots.len()
+        && cache_roots
+            .iter()
+            .zip(block_roots.iter())
+            .all(|(c_root, e_root)| c_root == e_root)
+}
+
 #[cfg(test)]
 mod test {
     use super::*;

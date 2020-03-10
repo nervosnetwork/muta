@@ -34,7 +34,6 @@ use crate::status::StatusAgent;
 use crate::util::{check_list_roots, OverlordCrypto};
 use crate::ConsensusError;
 use crate::wal::FullTxsWal;
-use crate::{ConsensusError, StatusCacheField};
 
 
 /// validator is for create new block, and authority is for build overlord
@@ -119,7 +118,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
     async fn check_block(
         &self,
         ctx: Context,
-        _next_height: u64,
+        next_height: u64,
         hash: Bytes,
         block: FixedPill,
     ) -> Result<(), Box<dyn Error + Send>> {
@@ -149,7 +148,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
 
         let inner = self.adapter.get_full_txs(ctx, order_hashes).await?;
         self.full_txs
-            .save_txs(height, Hash::from_bytes(hash)?, WalSaveTxs { inner })?;
+            .save_txs(next_height, Hash::from_bytes(hash)?, WalSaveTxs { inner })?;
         log::info!(
             "[consensus-engine]: check block cost {:?} order_hashes_len {:?}",
             time.elapsed(),
@@ -215,7 +214,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             .await
         {
             Ok(txs) => txs,
-            Err(_) => self.full_txs.load_txs(height, block_hash)?.inner,
+            Err(_) => self.full_txs.load_txs(current_height, block_hash)?.inner,
         };
 
         // Execute transactions

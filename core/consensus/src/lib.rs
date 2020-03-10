@@ -109,10 +109,6 @@ pub enum ConsensusError {
     ExecuteErr(String),
 
     ///
-    #[display(fmt = "Status cache error {:?}", _0)]
-    StatusErr(StatusCacheField),
-
-    ///
     WalErr(std::io::Error),
 
     /// Other error used for very few errors.

@@ -24,7 +24,7 @@ use protocol::{fixed_codec::FixedCodec, ProtocolResult};
 use crate::consensus::gen_overlord_status;
 use crate::fixed_types::{FixedBlock, FixedHeight, FixedPill, FixedSignedTxs, PullTxsRequest};
 use crate::message::{BROADCAST_HEIGHT, RPC_SYNC_PULL_BLOCK, RPC_SYNC_PULL_TXS};
-use crate::status::{ExecutedInfo, StatusAgent, UpdateInfo};
+use crate::status::{ExecutedInfo, StatusAgent};
 use crate::util::ExecuteInfo;
 use crate::ConsensusError;
 
@@ -409,7 +409,6 @@ where
         status_agent: StatusAgent,
     ) -> ProtocolResult<Self> {
         let (exec_queue, rx) = channel(OVERLORD_GAP);
-        let current_height = status_agent.to_inner().current_height;
         let exec_demons = Some(ExecDemons::new(
             Arc::clone(&storage),
             Arc::clone(&trie_db),
@@ -509,7 +508,6 @@ where
             self.save_receipts(resp.receipts.clone()).await?;
             self.status
                 .update_by_executed(gen_executed_info(resp.clone(), height, order_root));
-            self.save_wal(height).await?;
         } else {
             return Err(ConsensusError::Other("Queue disconnect".to_string()).into());
         }
