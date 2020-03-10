@@ -22,6 +22,70 @@ pub const GENESIS_HEIGHT: u64 = 0;
 /// Hash length
 const HASH_LEN: usize = 32;
 
+// Should started with 0x
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Hex(String);
+
+impl Hex {
+    pub fn from_string(s: String) -> ProtocolResult<Self> {
+        if s.starts_with("0x") {
+            Ok(Self(s))
+        } else {
+            Err(TypesError::HexPrefix.into())
+        }
+    }
+
+    pub fn as_string(&self) -> String {
+        self.0.to_owned()
+    }
+
+    pub fn as_string_trim0x(&self) -> String {
+        (&self.0[2..]).to_owned()
+    }
+}
+
+impl Serialize for Hex {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        serializer.serialize_str(&self.0)
+    }
+}
+
+struct HexVisitor;
+
+impl<'de> de::Visitor<'de> for HexVisitor {
+    type Value = Hex;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("Expect a hex string")
+    }
+
+    fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Hex::from_string(v).map_err(|e| de::Error::custom(e.to_string()))
+    }
+
+    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Hex::from_string(v.to_owned()).map_err(|e| de::Error::custom(e.to_string()))
+    }
+}
+
+impl<'de> Deserialize<'de> for Hex {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        deserializer.deserialize_string(HexVisitor)
+    }
+}
+
 #[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Hash([u8; HASH_LEN]);
 /// Balance
@@ -103,7 +167,7 @@ impl Hash {
     }
 
     pub fn from_hex(s: &str) -> ProtocolResult<Self> {
-        let s = clean_0x(s);
+        let s = clean_0x(s)?;
         let bytes = hex::decode(s).map_err(TypesError::from)?;
 
         let bytes = Bytes::from(bytes);
@@ -115,7 +179,7 @@ impl Hash {
     }
 
     pub fn as_hex(&self) -> String {
-        hex::encode(self.0)
+        "0x".to_owned() + &hex::encode(self.0)
     }
 }
 
@@ -202,7 +266,7 @@ impl Address {
     }
 
     pub fn from_hex(s: &str) -> ProtocolResult<Self> {
-        let s = clean_0x(s);
+        let s = clean_0x(s)?;
         let bytes = hex::decode(s).map_err(TypesError::from)?;
 
         let bytes = Bytes::from(bytes);
@@ -214,7 +278,7 @@ impl Address {
     }
 
     pub fn as_hex(&self) -> String {
-        hex::encode(self.0)
+        "0x".to_owned() + &hex::encode(self.0)
     }
 }
 
@@ -227,7 +291,7 @@ impl fmt::Debug for Address {
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub struct Metadata {
     pub chain_id:        Hash,
-    pub common_ref:      String,
+    pub common_ref:      Hex,
     pub timeout_gap:     u64,
     pub cycles_limit:    u64,
     pub cycles_price:    u64,
@@ -243,7 +307,7 @@ pub struct Metadata {
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct ValidatorExtend {
-    pub bls_pub_key:    String,
+    pub bls_pub_key:    Hex,
     pub address:        Address,
     pub propose_weight: u32,
     pub vote_weight:    u32,
@@ -251,10 +315,11 @@ pub struct ValidatorExtend {
 
 impl fmt::Debug for ValidatorExtend {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let pk = if self.bls_pub_key.len() > 8 {
-            unsafe { self.bls_pub_key.get_unchecked(0..8) }
+        let bls_pub_key = self.bls_pub_key.as_string_trim0x();
+        let pk = if bls_pub_key.len() > 8 {
+            unsafe { bls_pub_key.get_unchecked(0..8) }
         } else {
-            self.bls_pub_key.as_str()
+            bls_pub_key.as_str()
         };
 
         write!(
@@ -268,11 +333,11 @@ impl fmt::Debug for ValidatorExtend {
     }
 }
 
-fn clean_0x(s: &str) -> &str {
-    if s.starts_with("0x") {
-        &s[2..]
+fn clean_0x(s: &str) -> ProtocolResult<&str> {
+    if s.starts_with("0x") || s.starts_with("0X") {
+        Ok(&s[2..])
     } else {
-        s
+        Err(TypesError::HexPrefix.into())
     }
 }
 
@@ -301,7 +366,7 @@ mod tests {
     #[test]
     fn test_from_pubkey_bytes() {
         let pubkey = "031313016e9670deb49779c1b0c646d6a25a545712658f9781995f623bcd0d0b3d";
-        let expect_addr = "c38f8210896e11a75e1a1f13805d39088d157d7f";
+        let expect_addr = "0xc38f8210896e11a75e1a1f13805d39088d157d7f";
 
         let pubkey_bytes = Bytes::from(hex::decode(pubkey).unwrap());
         let addr = Address::from_pubkey_bytes(pubkey_bytes).unwrap();
@@ -315,6 +380,6 @@ mod tests {
         let bytes = Bytes::from(hex::decode(add_str).unwrap());
 
         let address = Address::from_bytes(bytes).unwrap();
-        assert_eq!(add_str, address.as_hex().to_uppercase());
+        assert_eq!(add_str, &address.as_hex().to_uppercase().as_str()[2..]);
     }
 }

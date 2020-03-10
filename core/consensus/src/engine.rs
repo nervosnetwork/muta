@@ -587,9 +587,10 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
         let mut new_addr_pubkey_map = HashMap::new();
         for validator in metadata.verifier_list.into_iter() {
             let addr = validator.address.as_bytes();
-            let hex_pubkey = hex::decode(validator.bls_pub_key).map_err(|err| {
-                ConsensusError::Other(format!("hex decode metadata bls pubkey error {:?}", err))
-            })?;
+            let hex_pubkey =
+                hex::decode(validator.bls_pub_key.as_string_trim0x()).map_err(|err| {
+                    ConsensusError::Other(format!("hex decode metadata bls pubkey error {:?}", err))
+                })?;
             let pubkey = BlsPublicKey::try_from(hex_pubkey.as_ref()).map_err(|err| {
                 ConsensusError::Other(format!("try from bls pubkey error {:?}", err))
             })?;

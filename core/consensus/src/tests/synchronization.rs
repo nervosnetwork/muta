@@ -11,8 +11,8 @@ use protocol::fixed_codec::FixedCodec;
 use protocol::traits::{CommonConsensusAdapter, Synchronization, SynchronizationAdapter};
 use protocol::traits::{Context, ExecutorParams, ExecutorResp};
 use protocol::types::{
-    Address, Block, BlockHeader, Bytes, Hash, MerkleRoot, Metadata, Proof, RawTransaction, Receipt,
-    ReceiptResponse, SignedTransaction, TransactionRequest, Validator, ValidatorExtend,
+    Address, Block, BlockHeader, Bytes, Hash, Hex, MerkleRoot, Metadata, Proof, RawTransaction,
+    Receipt, ReceiptResponse, SignedTransaction, TransactionRequest, Validator, ValidatorExtend,
 };
 use protocol::ProtocolResult;
 
@@ -237,14 +237,14 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
     ) -> ProtocolResult<Metadata> {
         Ok(Metadata {
             chain_id:        Hash::from_empty(),
-            common_ref:      "703873635a6b51513451".to_string(),
+            common_ref:      Hex::from_string("0x703873635a6b51513451".to_string()).unwrap(),
             timeout_gap:     20,
             cycles_limit:    9999,
             cycles_price:    1,
             interval:        3000,
             verifier_list:   vec![ValidatorExtend {
-                bls_pub_key: "04188ef9488c19458a963cc57b567adde7db8f8b6bec392d5cb7b67b0abc1ed6cd966edc451f6ac2ef38079460eb965e890d1f576e4039a20467820237cda753f07a8b8febae1ec052190973a1bcf00690ea8fc0168b3fbbccd1c4e402eda5ef22".to_owned(),
-                address:        Address::from_hex("1c9776983b2f251fa5c9cc562c1b667d1f05ff83")
+                bls_pub_key: Hex::from_string("0x04188ef9488c19458a963cc57b567adde7db8f8b6bec392d5cb7b67b0abc1ed6cd966edc451f6ac2ef38079460eb965e890d1f576e4039a20467820237cda753f07a8b8febae1ec052190973a1bcf00690ea8fc0168b3fbbccd1c4e402eda5ef22".to_owned()).unwrap(),
+                address:        Address::from_hex("0x1c9776983b2f251fa5c9cc562c1b667d1f05ff83")
                     .unwrap(),
                 propose_weight: 0,
                 vote_weight:    0,
@@ -322,7 +322,7 @@ fn mock_chained_rich_block(len: u64, gap: u64) -> Vec<RichBlock> {
             state_root: Hash::from_empty(),
             receipt_root: vec![],
             cycles_used: vec![],
-            proposer: Address::from_hex("1c9776983b2f251fa5c9cc562c1b667d1f05ff83").unwrap(),
+            proposer: Address::from_hex("0x1c9776983b2f251fa5c9cc562c1b667d1f05ff83").unwrap(),
             proof: Proof {
                 height:     current_height,
                 round:      0,
@@ -332,7 +332,7 @@ fn mock_chained_rich_block(len: u64, gap: u64) -> Vec<RichBlock> {
             },
             validator_version: 0,
             validators: vec![Validator {
-                address:        Address::from_hex("1c9776983b2f251fa5c9cc562c1b667d1f05ff83")
+                address:        Address::from_hex("0x1c9776983b2f251fa5c9cc562c1b667d1f05ff83")
                     .unwrap(),
                 propose_weight: 0,
                 vote_weight:    0,
@@ -393,7 +393,7 @@ fn mock_genesis_rich_block() -> RichBlock {
         state_root:        Hash::from_empty(),
         receipt_root:      vec![],
         cycles_used:       vec![],
-        proposer:          Address::from_hex("1c9776983b2f251fa5c9cc562c1b667d1f05ff83").unwrap(),
+        proposer:          Address::from_hex("0x1c9776983b2f251fa5c9cc562c1b667d1f05ff83").unwrap(),
         proof:             Proof {
             height:     0,
             round:      0,
@@ -403,7 +403,8 @@ fn mock_genesis_rich_block() -> RichBlock {
         },
         validator_version: 0,
         validators:        vec![Validator {
-            address:        Address::from_hex("1c9776983b2f251fa5c9cc562c1b667d1f05ff83").unwrap(),
+            address:        Address::from_hex("0x1c9776983b2f251fa5c9cc562c1b667d1f05ff83")
+                .unwrap(),
             propose_weight: 0,
             vote_weight:    0,
         }],

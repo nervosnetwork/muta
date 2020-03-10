@@ -1,9 +1,11 @@
 use serde::Deserialize;
 
+use crate::types::primitive::Hex;
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 pub struct Genesis {
     pub timestamp: u64,
-    pub prevhash:  String,
+    pub prevhash:  Hex,
     pub services:  Vec<ServiceParam>,
 }
 
