@@ -49,12 +49,12 @@ fn test_create_genesis() {
         timestamp:    0,
         cycles_limit: std::u64::MAX,
     };
-    let caller = Address::from_hex("f8389d774afdad8755ef8e629e5a154fddc6325a").unwrap();
+    let caller = Address::from_hex("0xf8389d774afdad8755ef8e629e5a154fddc6325a").unwrap();
     let request = TransactionRequest {
         service_name: "asset".to_owned(),
         method:       "get_balance".to_owned(),
         payload:
-            r#"{"asset_id": "f56924db538e77bb5951eb5ff0d02b88983c49c45eea30e8ae3e7234b311436c", "user": "f8389d774afdad8755ef8e629e5a154fddc6325a"}"#
+            r#"{"asset_id": "0xf56924db538e77bb5951eb5ff0d02b88983c49c45eea30e8ae3e7234b311436c", "user": "0xf8389d774afdad8755ef8e629e5a154fddc6325a"}"#
                 .to_owned(),
     };
     let res = executor.read(&params, &caller, 1, &request).unwrap();

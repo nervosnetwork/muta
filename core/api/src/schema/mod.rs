@@ -49,14 +49,14 @@ pub struct Uint64(String);
 pub struct Bytes(String);
 
 impl Hash {
-    pub fn as_hex(&self) -> ProtocolResult<String> {
-        Ok(clean_0x(&self.0)?.to_uppercase())
+    pub fn as_hex(&self) -> String {
+        self.0.to_uppercase()
     }
 }
 
 impl Address {
-    pub fn as_hex(&self) -> ProtocolResult<String> {
-        Ok(clean_0x(&self.0)?.to_uppercase())
+    pub fn as_hex(&self) -> String {
+        self.0.to_uppercase()
     }
 }
 
@@ -84,13 +84,13 @@ impl Bytes {
 
 impl From<protocol::types::Hash> for Hash {
     fn from(hash: protocol::types::Hash) -> Self {
-        Hash("0x".to_owned() + &hash.as_hex())
+        Hash(hash.as_hex())
     }
 }
 
 impl From<protocol::types::Address> for Address {
     fn from(address: protocol::types::Address) -> Self {
-        Address("0x".to_owned() + &address.as_hex())
+        Address(address.as_hex())
     }
 }
 
@@ -107,7 +107,7 @@ impl From<protocol::Bytes> for Bytes {
 }
 
 fn clean_0x(s: &str) -> ProtocolResult<String> {
-    if s.starts_with("0x") {
+    if s.starts_with("0x") || s.starts_with("0X") {
         Ok(s[2..].to_owned())
     } else {
         Err(SchemaError::HexPrefix.into())

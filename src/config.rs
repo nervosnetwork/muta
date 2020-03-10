@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use serde_derive::Deserialize;
 
 use core_mempool::{DEFAULT_BROADCAST_TXS_INTERVAL, DEFAULT_BROADCAST_TXS_SIZE};
+use protocol::types::Hex;
 
 #[derive(Debug, Deserialize)]
 pub struct ConfigGraphQL {
@@ -34,7 +35,7 @@ pub struct ConfigNetwork {
 
 #[derive(Debug, Deserialize)]
 pub struct ConfigNetworkBootstrap {
-    pub pubkey:  String,
+    pub pubkey:  Hex,
     pub address: String,
 }
 
@@ -90,7 +91,7 @@ impl Default for ConfigLogger {
 #[derive(Debug, Deserialize)]
 pub struct Config {
     // crypto
-    pub privkey:   String,
+    pub privkey:   Hex,
     // db config
     pub data_path: PathBuf,
 

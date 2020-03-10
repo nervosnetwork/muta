@@ -4,11 +4,11 @@ use byteorder::{ByteOrder, LittleEndian};
 use bytes::{Bytes, BytesMut};
 
 use crate::fixed_codec::{FixedCodec, FixedCodecError};
-use crate::types::{Address, Hash, Metadata, ValidatorExtend};
+use crate::types::{Address, Hash, Hex, Metadata, ValidatorExtend};
 use crate::{impl_default_fixed_codec_for, ProtocolResult};
 
 // Impl FixedCodec trait for types
-impl_default_fixed_codec_for!(primitive, [Hash, Address, Metadata]);
+impl_default_fixed_codec_for!(primitive, [Hash, Address, Hex, Metadata]);
 
 impl FixedCodec for bool {
     fn encode_fixed(&self) -> ProtocolResult<Bytes> {
@@ -80,6 +80,21 @@ impl FixedCodec for String {
     }
 }
 
+impl rlp::Encodable for Hex {
+    fn rlp_append(&self, s: &mut rlp::RlpStream) {
+        s.begin_list(1).append(&self.as_string_trim0x());
+    }
+}
+
+impl rlp::Decodable for Hex {
+    fn decode(r: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
+        let s: String = r.at(0)?.as_val()?;
+
+        Hex::from_string("0x".to_owned() + s.as_str())
+            .map_err(|_| rlp::DecoderError::Custom("decode hex from string error"))
+    }
+}
+
 impl FixedCodec for Bytes {
     fn encode_fixed(&self) -> ProtocolResult<Bytes> {
         Ok(self.clone())
@@ -142,7 +157,7 @@ impl rlp::Encodable for Metadata {
 impl rlp::Decodable for Metadata {
     fn decode(r: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
         let chain_id: Hash = r.at(0)?.as_val()?;
-        let common_ref: String = r.at(1)?.as_val()?;
+        let common_ref: Hex = r.at(1)?.as_val()?;
         let timeout_gap: u64 = r.at(2)?.as_val()?;
         let cycles_limit: u64 = r.at(3)?.as_val()?;
         let cycles_price: u64 = r.at(4)?.as_val()?;

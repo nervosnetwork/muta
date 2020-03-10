@@ -398,7 +398,7 @@ where
             Arc::clone(&self.service_mapping),
         )?;
 
-        let caller = Address::from_hex("0000000000000000000000000000000000000000")?;
+        let caller = Address::from_hex("0x0000000000000000000000000000000000000000")?;
 
         let params = ExecutorParams {
             state_root,

@@ -16,7 +16,7 @@ pub use bytes::{Bytes, BytesMut};
 pub use ethbloom::{Bloom, BloomRef, Input as BloomInput};
 pub use genesis::{Genesis, ServiceParam};
 pub use primitive::{
-    Address, Balance, Hash, JsonString, MerkleRoot, Metadata, ValidatorExtend, GENESIS_HEIGHT,
+    Address, Balance, Hash, Hex, JsonString, MerkleRoot, Metadata, ValidatorExtend, GENESIS_HEIGHT,
     METADATA_KEY,
 };
 pub use receipt::{Event, Receipt, ReceiptResponse};
@@ -33,6 +33,9 @@ pub enum TypesError {
 
     #[display(fmt = "{:?} is an invalid address", address)]
     InvalidAddress { address: String },
+
+    #[display(fmt = "Hex should start with 0x")]
+    HexPrefix,
 }
 
 impl Error for TypesError {}
