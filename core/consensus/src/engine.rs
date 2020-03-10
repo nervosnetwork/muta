@@ -1,4 +1,3 @@
-use std::cmp::Eq;
 use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
 use std::error::Error;
