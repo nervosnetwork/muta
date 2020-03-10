@@ -17,7 +17,7 @@ impl FullTxsWal {
         if !Path::new(&path).exists() {
             fs::create_dir_all(&path).expect("Failed to create wal directory");
         }
-        
+
         FullTxsWal { path }
     }
 
