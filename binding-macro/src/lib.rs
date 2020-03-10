@@ -15,9 +15,9 @@ use crate::service::gen_service_code;
 
 #[rustfmt::skip]
 /// `#[genesis]` marks a service method to generate genesis states when fire up the chain
-/// 
+///
 /// Method input params should be `(&mut self)` or `(&mut self, payload: PayloadType)`
-/// 
+///
 /// # Example:
 ///
 /// ```rust
@@ -29,14 +29,14 @@ use crate::service::gen_service_code;
 ///         &mut self,
 ///     ) -> ProtocolResult<()> {
 ///         do_work();
-/// 
+///
 ///         Ok(()))
 ///     }
 /// }
 /// ```
-/// 
+///
 /// Or
-/// 
+///
 /// ```rust
 /// struct Service;
 /// #[service]
@@ -47,13 +47,23 @@ use crate::service::gen_service_code;
 ///         payload: PayloadType,
 ///     ) -> ProtocolResult<()> {
 ///         do_work(payload);
-/// 
+///
 ///         Ok(()))
 ///     }
 /// }
 /// ```
 #[proc_macro_attribute]
 pub fn genesis(_: TokenStream, item: TokenStream) -> TokenStream {
+    item
+}
+
+#[proc_macro_attribute]
+pub fn tx_hook_before(_: TokenStream, item: TokenStream) -> TokenStream {
+    item
+}
+
+#[proc_macro_attribute]
+pub fn tx_hook_after(_: TokenStream, item: TokenStream) -> TokenStream {
     item
 }
 
