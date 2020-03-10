@@ -48,6 +48,8 @@ pub enum MsgType {
 
     #[display(fmt = "Signed Choke")]
     SignedChoke,
+
+    WalTransactions,
 }
 
 /// Consensus errors defines here.

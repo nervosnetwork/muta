@@ -21,7 +21,7 @@ use protocol::fixed_codec::FixedCodec;
 use protocol::traits::{ConsensusAdapter, Context, MessageTarget, NodeInfo};
 use protocol::types::{
     Address, Block, BlockHeader, Hash, MerkleRoot, Metadata, Pill, Proof, SignedTransaction,
-    Validator, WalSaveTxs,
+    Validator,
 };
 use protocol::{Bytes, ProtocolError, ProtocolResult};
 
@@ -32,9 +32,8 @@ use crate::message::{
 };
 use crate::status::StatusAgent;
 use crate::util::{check_list_roots, OverlordCrypto};
-use crate::ConsensusError;
 use crate::wal::FullTxsWal;
-
+use crate::ConsensusError;
 
 /// validator is for create new block, and authority is for build overlord
 /// status.
@@ -148,7 +147,8 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
 
         let inner = self.adapter.get_full_txs(ctx, order_hashes).await?;
         self.full_txs
-            .save_txs(next_height, Hash::from_bytes(hash)?, WalSaveTxs { inner })?;
+            .save_txs(next_height, Hash::from_bytes(hash)?, inner)?;
+
         log::info!(
             "[consensus-engine]: check block cost {:?} order_hashes_len {:?}",
             time.elapsed(),
@@ -214,7 +214,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             .await
         {
             Ok(txs) => txs,
-            Err(_) => self.full_txs.load_txs(current_height, block_hash)?.inner,
+            Err(_) => self.full_txs.load_txs(current_height, block_hash)?,
         };
 
         // Execute transactions
@@ -248,7 +248,6 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             .broadcast_height(ctx.clone(), current_height)
             .await?;
         self.full_txs.remove(block_exec_height)?;
-
 
         let mut set = self.exemption_hash.write();
         set.clear();

@@ -1,9 +1,8 @@
 use std::fs;
 use std::io::{Read, Write};
 
-use protocol::fixed_codec::FixedCodec;
-use protocol::types::{Hash, WalSaveTxs};
-use protocol::{Bytes, ProtocolResult};
+use protocol::types::{Hash, SignedTransaction};
+use protocol::ProtocolResult;
 
 use crate::ConsensusError;
 
@@ -21,7 +20,12 @@ impl FullTxsWal {
         FullTxsWal { path }
     }
 
-    pub fn save_txs(&self, height: u64, block_hash: Hash, txs: WalSaveTxs) -> ProtocolResult<()> {
+    pub fn save_txs(
+        &self,
+        height: u64,
+        block_hash: Hash,
+        txs: Vec<SignedTransaction>,
+    ) -> ProtocolResult<()> {
         let dir = self.path.clone() + "/" + &height.to_string();
         if fs::read_dir(&dir).is_err() {
             fs::create_dir(&dir).map_err(ConsensusError::WalErr)?;
@@ -36,12 +40,16 @@ impl FullTxsWal {
             .map_err(ConsensusError::WalErr)?;
 
         wal_file
-            .write_all(txs.encode_fixed()?.as_ref())
+            .write_all(&rlp::encode_list(&txs))
             .map_err(ConsensusError::WalErr)?;
         Ok(())
     }
 
-    pub fn load_txs(&self, height: u64, block_hash: Hash) -> ProtocolResult<WalSaveTxs> {
+    pub fn load_txs(
+        &self,
+        height: u64,
+        block_hash: Hash,
+    ) -> ProtocolResult<Vec<SignedTransaction>> {
         let file_path =
             self.path.clone() + "/" + &height.to_string() + "/" + &block_hash.as_hex() + ".txt";
         let mut read_buf = Vec::new();
@@ -49,7 +57,7 @@ impl FullTxsWal {
         let _ = file
             .read_to_end(&mut read_buf)
             .map_err(ConsensusError::WalErr)?;
-        let txs: WalSaveTxs = FixedCodec::decode_fixed(Bytes::from(read_buf))?;
+        let txs: Vec<SignedTransaction> = rlp::decode_list(&read_buf);
         Ok(txs)
     }
 
