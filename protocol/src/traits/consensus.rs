@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use creep::Context;
 
-use crate::traits::{ExecutorParams, ExecutorResp};
+use crate::traits::{ExecutorParams, ExecutorResp, TrustFeedback};
 use crate::types::{
     Address, Block, Bytes, Hash, MerkleRoot, Metadata, Proof, Receipt, SignedTransaction, Validator,
 };
@@ -113,6 +113,8 @@ pub trait CommonConsensusAdapter: Send + Sync {
         height: u64,
         timestamp: u64,
     ) -> ProtocolResult<Metadata>;
+
+    fn report_bad(&self, ctx: Context, feedback: TrustFeedback);
 
     fn set_args(&self, context: Context, timeout_gap: u64, cycles_limit: u64, max_tx_size: u64);
 }

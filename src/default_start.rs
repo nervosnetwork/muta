@@ -153,6 +153,12 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     let network_config = NetworkConfig::new()
         .max_connections(config.network.max_connected_peers.clone())
         .whitelist_peers_only(config.network.whitelist_peers_only.clone())
+        .peer_trust_metric(
+            config.network.trust_interval_duration,
+            config.network.trust_max_history_duration,
+        )?
+        .peer_soft_ban(config.network.soft_ban_duration)
+        .peer_fatal_ban(config.network.fatal_ban_duration)
         .rpc_timeout(config.network.rpc_timeout.clone())
         .selfcheck_interval(config.network.selfcheck_interval.clone())
         .max_wait_streams(config.network.max_wait_streams)
@@ -334,8 +340,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     core_consensus::trace::init_tracer(my_address.as_hex())?;
 
     let mut consensus_adapter =
-        OverlordConsensusAdapter::<ServiceExecutorFactory, _, _, _, _, _, _>::new(
-            Arc::new(network_service.handle()),
+        OverlordConsensusAdapter::<ServiceExecutorFactory, _, _, _, _, _>::new(
             Arc::new(network_service.handle()),
             Arc::clone(&mempool),
             Arc::clone(&storage),

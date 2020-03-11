@@ -13,6 +13,20 @@ pub enum Priority {
     Normal,
 }
 
+#[derive(Debug, Display)]
+pub enum TrustFeedback {
+    #[display(fmt = "fatal {}", _0)]
+    Fatal(String),
+    #[display(fmt = "worse {}", _0)]
+    Worse(String),
+    #[display(fmt = "bad {}", _0)]
+    Bad(String),
+    #[display(fmt = "neutral")]
+    Neutral,
+    #[display(fmt = "good")]
+    Good,
+}
+
 #[async_trait]
 pub trait MessageCodec: Sized + Send + Debug + 'static {
     async fn encode(&mut self) -> ProtocolResult<Bytes>;
@@ -84,9 +98,13 @@ pub trait Rpc: Send + Sync {
         M: MessageCodec;
 }
 
+pub trait PeerTrust: Send + Sync {
+    fn report(&self, ctx: Context, feedback: TrustFeedback);
+}
+
 #[async_trait]
 pub trait MessageHandler: Sync + Send + 'static {
     type Message: MessageCodec;
 
-    async fn process(&self, ctx: Context, msg: Self::Message);
+    async fn process(&self, ctx: Context, msg: Self::Message) -> TrustFeedback;
 }

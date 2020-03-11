@@ -1,6 +1,7 @@
 use super::{
     time, ArcPeer, Connectedness, ConnectingAttempt, Inner, MisbehaviorKind, PeerManager,
-    PeerManagerConfig, PeerMultiaddr, TestExpireTime, MAX_RETRY_COUNT, REPEATED_CONNECTION_TIMEOUT,
+    PeerManagerConfig, PeerMultiaddr, TestExpireTime, TrustMetric, TrustMetricConfig,
+    GOOD_TRUST_SCORE, MAX_CONNECTING_MARGIN, MAX_RETRY_COUNT, REPEATED_CONNECTION_TIMEOUT,
     SHORT_ALIVE_SESSION, WHITELIST_TIMEOUT,
 };
 use crate::{
@@ -16,6 +17,7 @@ use futures::{
     channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
     StreamExt,
 };
+use protocol::traits::TrustFeedback;
 use tentacle::{
     multiaddr::Multiaddr,
     secio::{PeerId, PublicKey, SecioKeyPair},
@@ -94,6 +96,10 @@ impl MockManager {
         self.await
     }
 
+    pub fn config(&self) -> PeerManagerConfig {
+        self.inner.config()
+    }
+
     pub fn connecting(&self) -> &HashSet<ConnectingAttempt> {
         &self.inner.connecting
     }
@@ -125,6 +131,9 @@ fn make_manager(
     let bootstraps = make_bootstraps(bootstrap_num);
     let mut peer_dat_file = std::env::temp_dir();
     peer_dat_file.push("peer.dat");
+    let peer_trust_config = Arc::new(TrustMetricConfig::default());
+    let peer_fatal_ban = Duration::from_secs(50);
+    let peer_soft_ban = Duration::from_secs(10);
 
     let config = PeerManagerConfig {
         our_id: manager_id,
@@ -132,6 +141,9 @@ fn make_manager(
         bootstraps,
         whitelist_by_chain_addrs: Default::default(),
         whitelist_peers_only: false,
+        peer_trust_config,
+        peer_fatal_ban,
+        peer_soft_ban,
         max_connections,
         routine_interval: Duration::from_secs(10),
         peer_dat_file,
@@ -660,6 +672,335 @@ async fn should_remove_connecting_even_if_session_is_reject_due_to_reach_max_con
 }
 
 #[tokio::test]
+async fn should_reject_banned_peer_on_new_session() {
+    let (mut mgr, mut conn_rx) = make_manager(0, 10);
+    let test_peer = make_peer(2077);
+
+    let inner = mgr.core_inner();
+    inner.add_peer(test_peer.clone());
+
+    test_peer.ban(Duration::from_secs(10));
+    assert!(test_peer.banned(), "should be banned");
+
+    let sess_ctx = SessionContext::make(
+        SessionId::new(99),
+        test_peer.multiaddrs.all_raw().pop().expect("multiaddr"),
+        SessionType::Outbound,
+        test_peer.owned_pubkey().expect("pubkey"),
+    );
+    let new_session = PeerManagerEvent::NewSession {
+        pid:    test_peer.owned_id(),
+        pubkey: test_peer.owned_pubkey().expect("pubkey"),
+        ctx:    sess_ctx.arced(),
+    };
+    mgr.poll_event(new_session).await;
+
+    assert_eq!(inner.connected(), 0, "should not increase conn count");
+    let conn_event = conn_rx.next().await.expect("should have disconnect event");
+    match conn_event {
+        ConnectionEvent::Disconnect(sid) => assert_eq!(sid, 99.into(), "should be new session id"),
+        _ => panic!("should be disconnect event"),
+    }
+}
+
+#[tokio::test]
+async fn should_start_trust_metric_on_connected_peer_on_new_session() {
+    let (mut mgr, _conn_rx) = make_manager(0, 10);
+    let test_peer = make_peer(2077);
+
+    let inner = mgr.core_inner();
+    inner.add_peer(test_peer.clone());
+
+    let sess_ctx = SessionContext::make(
+        SessionId::new(99),
+        test_peer.multiaddrs.all_raw().pop().expect("multiaddr"),
+        SessionType::Outbound,
+        test_peer.owned_pubkey().expect("pubkey"),
+    );
+    let new_session = PeerManagerEvent::NewSession {
+        pid:    test_peer.owned_id(),
+        pubkey: test_peer.owned_pubkey().expect("pubkey"),
+        ctx:    sess_ctx.arced(),
+    };
+    mgr.poll_event(new_session).await;
+
+    let trust_metric = test_peer.trust_metric().expect("trust metric");
+    assert!(trust_metric.is_started(), "should start trust metric");
+}
+
+#[tokio::test]
+async fn should_replace_low_quality_peer_with_better_one_due_to_max_connections_on_new_session() {
+    let (mut mgr, mut conn_rx) = make_manager(0, 10);
+    let remote_peers = make_sessions(&mut mgr, 10, 5000).await;
+    let target_peer = remote_peers.first().expect("get first peer");
+    let peer_trust_config = Arc::new(TrustMetricConfig::default());
+
+    let inner = mgr.core_inner();
+    assert_eq!(inner.connected(), 10, "should reach max connections");
+
+    if let Some(metric) = target_peer.trust_metric() {
+        for _ in 0..30 {
+            metric.good_events(1);
+            metric.bad_events(1);
+            metric.enter_new_interval();
+        }
+
+        assert!(metric.trust_score() < 80, "should less than 80");
+    }
+
+    // Update alive, only old enough peer can be replaced
+    target_peer.set_alive(peer_trust_config.interval().as_secs() * 20 + 20);
+
+    let test_peer = make_peer(2077);
+    inner.add_peer(test_peer.clone());
+    let trust_metric = TrustMetric::new(Arc::clone(&peer_trust_config));
+    test_peer.set_trust_metric(trust_metric.clone());
+    for _ in 0..10 {
+        trust_metric.good_events(1);
+        trust_metric.enter_new_interval();
+    }
+    assert!(trust_metric.trust_score() > 90, "should have better score");
+
+    let sess_ctx = SessionContext::make(
+        SessionId::new(99),
+        test_peer.multiaddrs.all_raw().pop().expect("multiaddr"),
+        SessionType::Outbound,
+        test_peer.owned_pubkey().expect("pubkey"),
+    );
+    let new_session = PeerManagerEvent::NewSession {
+        pid:    test_peer.owned_id(),
+        pubkey: test_peer.owned_pubkey().expect("pubkey"),
+        ctx:    sess_ctx.arced(),
+    };
+    mgr.poll_event(new_session).await;
+
+    let target_sid = target_peer.session_id();
+    let conn_event = conn_rx.next().await.expect("should have disconnect event");
+    match conn_event {
+        ConnectionEvent::Disconnect(sid) => {
+            assert_eq!(sid, target_sid, "should be replaced session id")
+        }
+        _ => panic!("should be disconnect event"),
+    }
+}
+
+#[tokio::test]
+async fn should_not_replace_any_peer_if_incoming_hasnt_trust_score_due_to_max_connections_on_new_session(
+) {
+    let (mut mgr, mut conn_rx) = make_manager(0, 10);
+    let remote_peers = make_sessions(&mut mgr, 10, 5000).await;
+    let target_peer = remote_peers.first().expect("get first peer");
+    let peer_trust_config = Arc::new(TrustMetricConfig::default());
+
+    let inner = mgr.core_inner();
+    assert_eq!(inner.connected(), 10, "should reach max connections");
+
+    if let Some(metric) = target_peer.trust_metric() {
+        for _ in 0..30 {
+            metric.good_events(1);
+            metric.bad_events(1);
+            metric.enter_new_interval();
+        }
+
+        assert!(metric.trust_score() < 80, "should less than 80");
+    }
+
+    // Update alive, only old enough peer can be replaced
+    target_peer.set_alive(peer_trust_config.interval().as_secs() * 20 + 20);
+
+    let test_peer = make_peer(2077);
+    inner.add_peer(test_peer.clone());
+
+    let sess_ctx = SessionContext::make(
+        SessionId::new(99),
+        test_peer.multiaddrs.all_raw().pop().expect("multiaddr"),
+        SessionType::Outbound,
+        test_peer.owned_pubkey().expect("pubkey"),
+    );
+    let new_session = PeerManagerEvent::NewSession {
+        pid:    test_peer.owned_id(),
+        pubkey: test_peer.owned_pubkey().expect("pubkey"),
+        ctx:    sess_ctx.arced(),
+    };
+    mgr.poll_event(new_session).await;
+
+    let conn_event = conn_rx.next().await.expect("should have disconnect event");
+    match conn_event {
+        ConnectionEvent::Disconnect(sid) => {
+            assert_eq!(sid, 99.into(), "should be replaced session id")
+        }
+        _ => panic!("should be disconnect event"),
+    }
+}
+
+#[tokio::test]
+async fn should_not_replace_any_higher_score_peer_due_to_max_connections_on_new_session() {
+    let (mut mgr, mut conn_rx) = make_manager(0, 10);
+    let remote_peers = make_sessions(&mut mgr, 10, 5000).await;
+    let target_peer = remote_peers.first().expect("get first peer");
+    let peer_trust_config = Arc::new(TrustMetricConfig::default());
+
+    let inner = mgr.core_inner();
+    assert_eq!(inner.connected(), 10, "should reach max connections");
+
+    if let Some(metric) = target_peer.trust_metric() {
+        for _ in 0..30 {
+            metric.good_events(1);
+            metric.enter_new_interval();
+        }
+
+        assert!(metric.trust_score() > 90, "should have better score");
+    }
+
+    // Update alive, only old enough peer can be replaced
+    target_peer.set_alive(peer_trust_config.interval().as_secs() * 20 + 20);
+
+    let test_peer = make_peer(2077);
+    inner.add_peer(test_peer.clone());
+    let trust_metric = TrustMetric::new(Arc::clone(&peer_trust_config));
+    test_peer.set_trust_metric(trust_metric.clone());
+    for _ in 0..30 {
+        trust_metric.good_events(1);
+        trust_metric.bad_events(1);
+        trust_metric.enter_new_interval();
+    }
+    assert!(trust_metric.trust_score() < 90, "should have lower score");
+
+    let sess_ctx = SessionContext::make(
+        SessionId::new(99),
+        test_peer.multiaddrs.all_raw().pop().expect("multiaddr"),
+        SessionType::Outbound,
+        test_peer.owned_pubkey().expect("pubkey"),
+    );
+    let new_session = PeerManagerEvent::NewSession {
+        pid:    test_peer.owned_id(),
+        pubkey: test_peer.owned_pubkey().expect("pubkey"),
+        ctx:    sess_ctx.arced(),
+    };
+    mgr.poll_event(new_session).await;
+
+    let conn_event = conn_rx.next().await.expect("should have disconnect event");
+    match conn_event {
+        ConnectionEvent::Disconnect(sid) => {
+            assert_eq!(sid, 99.into(), "should be replaced session id")
+        }
+        _ => panic!("should be disconnect event"),
+    }
+}
+
+#[tokio::test]
+async fn should_not_replace_whitelisted_peer_even_with_better_score_due_to_max_connections_on_new_session(
+) {
+    let (mut mgr, mut conn_rx) = make_manager(0, 1);
+    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+    let target_peer = remote_peers.first().expect("get first peer");
+    let peer_trust_config = Arc::new(TrustMetricConfig::default());
+
+    let inner = mgr.core_inner();
+    assert_eq!(inner.connected(), 1, "should reach max connections");
+
+    if let Some(metric) = target_peer.trust_metric() {
+        for _ in 0..30 {
+            metric.good_events(1);
+            metric.bad_events(1);
+            metric.enter_new_interval();
+        }
+
+        assert!(metric.trust_score() < 80, "should less than 80");
+    }
+
+    // Update alive, only old enough peer can be replaced
+    target_peer.set_alive(peer_trust_config.interval().as_secs() * 20 + 20);
+
+    // Whitelist peer
+    let target_chain_addr = target_peer.owned_chain_addr().expect("get chain addr");
+    inner.whitelist_peers_by_chain_addr(vec![target_chain_addr]);
+
+    let test_peer = make_peer(2077);
+    inner.add_peer(test_peer.clone());
+    let trust_metric = TrustMetric::new(Arc::clone(&peer_trust_config));
+    test_peer.set_trust_metric(trust_metric.clone());
+    for _ in 0..10 {
+        trust_metric.good_events(1);
+        trust_metric.enter_new_interval();
+    }
+    assert!(trust_metric.trust_score() > 90, "should have better score");
+
+    let sess_ctx = SessionContext::make(
+        SessionId::new(99),
+        test_peer.multiaddrs.all_raw().pop().expect("multiaddr"),
+        SessionType::Outbound,
+        test_peer.owned_pubkey().expect("pubkey"),
+    );
+    let new_session = PeerManagerEvent::NewSession {
+        pid:    test_peer.owned_id(),
+        pubkey: test_peer.owned_pubkey().expect("pubkey"),
+        ctx:    sess_ctx.arced(),
+    };
+    mgr.poll_event(new_session).await;
+
+    let conn_event = conn_rx.next().await.expect("should have disconnect event");
+    match conn_event {
+        ConnectionEvent::Disconnect(sid) => {
+            assert_eq!(sid, 99.into(), "should be replaced session id")
+        }
+        _ => panic!("should be disconnect event"),
+    }
+}
+
+#[tokio::test]
+async fn should_not_replace_peer_not_old_enough_due_to_max_connections_on_new_session() {
+    let (mut mgr, mut conn_rx) = make_manager(0, 10);
+    let remote_peers = make_sessions(&mut mgr, 10, 5000).await;
+    let target_peer = remote_peers.first().expect("get first peer");
+    let peer_trust_config = Arc::new(TrustMetricConfig::default());
+
+    let inner = mgr.core_inner();
+    assert_eq!(inner.connected(), 10, "should reach max connections");
+
+    if let Some(metric) = target_peer.trust_metric() {
+        for _ in 0..30 {
+            metric.good_events(1);
+            metric.bad_events(1);
+            metric.enter_new_interval();
+        }
+
+        assert!(metric.trust_score() < 80, "should less than 80");
+    }
+
+    let test_peer = make_peer(2077);
+    inner.add_peer(test_peer.clone());
+    let trust_metric = TrustMetric::new(Arc::clone(&peer_trust_config));
+    test_peer.set_trust_metric(trust_metric.clone());
+    for _ in 0..10 {
+        trust_metric.good_events(1);
+        trust_metric.enter_new_interval();
+    }
+    assert!(trust_metric.trust_score() > 90, "should have better score");
+
+    let sess_ctx = SessionContext::make(
+        SessionId::new(99),
+        test_peer.multiaddrs.all_raw().pop().expect("multiaddr"),
+        SessionType::Outbound,
+        test_peer.owned_pubkey().expect("pubkey"),
+    );
+    let new_session = PeerManagerEvent::NewSession {
+        pid:    test_peer.owned_id(),
+        pubkey: test_peer.owned_pubkey().expect("pubkey"),
+        ctx:    sess_ctx.arced(),
+    };
+    mgr.poll_event(new_session).await;
+
+    let conn_event = conn_rx.next().await.expect("should have disconnect event");
+    match conn_event {
+        ConnectionEvent::Disconnect(sid) => {
+            assert_eq!(sid, 99.into(), "should be replaced session id")
+        }
+        _ => panic!("should be disconnect event"),
+    }
+}
+
+#[tokio::test]
 async fn should_remove_session_on_session_closed() {
     let (mut mgr, _conn_rx) = make_manager(2, 20);
     let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
@@ -696,10 +1037,25 @@ async fn should_remove_session_on_session_closed() {
 }
 
 #[tokio::test]
+async fn should_pause_trust_metric_on_session_closed() {
+    let (mut mgr, _conn_rx) = make_manager(2, 20);
+    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+    let test_peer = remote_peers.first().expect("get first");
+
+    let session_closed = PeerManagerEvent::SessionClosed {
+        pid: test_peer.owned_id(),
+        sid: test_peer.session_id(),
+    };
+    mgr.poll_event(session_closed).await;
+
+    let trust_metric = test_peer.trust_metric().expect("get trust metric");
+    assert!(!trust_metric.is_started(), "should pause trust metric");
+}
+
+#[tokio::test]
 async fn should_increase_retry_for_short_alive_session_on_session_closed() {
     let (mut mgr, _conn_rx) = make_manager(2, 20);
     let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
-
     let test_peer = remote_peers.first().expect("get first peer");
     assert_eq!(
         test_peer.retry.count(),
@@ -1070,6 +1426,33 @@ async fn should_give_up_peer_for_unexpected_error_on_session_failed() {
 }
 
 #[tokio::test]
+async fn should_reduce_trust_score_on_session_failed() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+    let test_peer = remote_peers.first().expect("get first peer");
+
+    let trust_metric = test_peer.trust_metric().expect("get trust metric");
+    for _ in 0..10 {
+        trust_metric.good_events(1);
+        trust_metric.enter_new_interval();
+    }
+    let before_failed_score = trust_metric.trust_score();
+    assert!(before_failed_score > 90, "should trust score");
+
+    let expect_sid = test_peer.session_id();
+    let session_failed = PeerManagerEvent::SessionFailed {
+        sid:  expect_sid,
+        kind: SessionErrorKind::Io(std::io::ErrorKind::Other.into()),
+    };
+    mgr.poll_event(session_failed).await;
+
+    assert!(
+        trust_metric.trust_score() < before_failed_score,
+        "should reduce trust score"
+    )
+}
+
+#[tokio::test]
 async fn should_update_peer_alive_on_peer_alive() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
     let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
@@ -1135,6 +1518,32 @@ async fn should_disconnect_peer_on_misbehave() {
         }
         _ => panic!("should be disconnect event"),
     }
+}
+
+#[tokio::test]
+async fn should_reduce_trust_score_on_misbehave() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+    let test_peer = remote_peers.first().expect("get first peer");
+
+    let trust_metric = test_peer.trust_metric().expect("get trust metric");
+    for _ in 0..10 {
+        trust_metric.good_events(1);
+        trust_metric.enter_new_interval();
+    }
+    let before_failed_score = trust_metric.trust_score();
+    assert!(before_failed_score > 90, "should trust score");
+
+    let peer_misbehave = PeerManagerEvent::Misbehave {
+        pid:  test_peer.owned_id(),
+        kind: MisbehaviorKind::PingTimeout,
+    };
+    mgr.poll_event(peer_misbehave).await;
+
+    assert!(
+        trust_metric.trust_score() < before_failed_score,
+        "should reduce trust score"
+    )
 }
 
 #[tokio::test]
@@ -1218,6 +1627,32 @@ async fn should_mark_session_blocked_on_session_blocked() {
         .session(test_peer.session_id())
         .expect("should have a session");
     assert!(session.is_blocked(), "should be blocked");
+}
+
+#[tokio::test]
+async fn should_add_one_bad_event_on_session_blocked() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+
+    let test_peer = remote_peers.first().expect("get first peer");
+    let trust_metric = test_peer.trust_metric().expect("get trust metric");
+
+    let sess_ctx = SessionContext::make(
+        test_peer.session_id(),
+        test_peer.multiaddrs.all_raw().pop().expect("get multiaddr"),
+        SessionType::Outbound,
+        test_peer.owned_pubkey().expect("pubkey"),
+    );
+    let session_blocked = PeerManagerEvent::SessionBlocked {
+        ctx: sess_ctx.arced(),
+    };
+    mgr.poll_event(session_blocked).await;
+
+    assert_eq!(
+        trust_metric.bad_events_count(),
+        1,
+        "should add one bad event"
+    );
 }
 
 #[tokio::test]
@@ -1848,6 +2283,9 @@ async fn should_never_expire_peers_from_config_whitelist() {
     let bootstraps = make_bootstraps(10);
     let mut peer_dat_file = std::env::temp_dir();
     peer_dat_file.push("peer.dat");
+    let peer_trust_config = Arc::new(TrustMetricConfig::default());
+    let peer_fatal_ban = Duration::from_secs(50);
+    let peer_soft_ban = Duration::from_secs(10);
 
     let test_peer = make_peer(2077);
     let test_chain_addr = test_peer
@@ -1860,6 +2298,9 @@ async fn should_never_expire_peers_from_config_whitelist() {
         bootstraps,
         whitelist_by_chain_addrs: vec![test_chain_addr.clone()],
         whitelist_peers_only: false,
+        peer_trust_config,
+        peer_fatal_ban,
+        peer_soft_ban,
         max_connections: 10,
         routine_interval: Duration::from_secs(10),
         peer_dat_file,
@@ -1896,6 +2337,9 @@ async fn should_not_refresh_never_expired_peers_from_config_whitelist() {
     let bootstraps = make_bootstraps(10);
     let mut peer_dat_file = std::env::temp_dir();
     peer_dat_file.push("peer.dat");
+    let peer_trust_config = Arc::new(TrustMetricConfig::default());
+    let peer_fatal_ban = Duration::from_secs(50);
+    let peer_soft_ban = Duration::from_secs(10);
 
     let test_peer = make_peer(2077);
     let test_chain_addr = test_peer
@@ -1908,6 +2352,9 @@ async fn should_not_refresh_never_expired_peers_from_config_whitelist() {
         bootstraps,
         whitelist_by_chain_addrs: vec![test_chain_addr.clone()],
         whitelist_peers_only: false,
+        peer_trust_config,
+        peer_fatal_ban,
+        peer_soft_ban,
         max_connections: 10,
         routine_interval: Duration::from_secs(10),
         peer_dat_file,
@@ -1953,6 +2400,9 @@ async fn should_only_connect_peers_in_whitelist_if_whitelist_only_enabled() {
     let manager_id = manager_pubkey.peer_id();
     let mut peer_dat_file = std::env::temp_dir();
     peer_dat_file.push("peer.dat");
+    let peer_trust_config = Arc::new(TrustMetricConfig::default());
+    let peer_fatal_ban = Duration::from_secs(50);
+    let peer_soft_ban = Duration::from_secs(10);
 
     let test_peer = make_peer(2077);
     let test_chain_addr = test_peer
@@ -1967,6 +2417,9 @@ async fn should_only_connect_peers_in_whitelist_if_whitelist_only_enabled() {
         bootstraps: Default::default(),
         whitelist_by_chain_addrs: vec![test_chain_addr.clone()],
         whitelist_peers_only: true,
+        peer_trust_config,
+        peer_fatal_ban,
+        peer_soft_ban,
         max_connections: 10,
         routine_interval: Duration::from_secs(10),
         peer_dat_file,
@@ -2012,6 +2465,9 @@ async fn should_only_allow_incoming_peers_in_whitelist_if_whitelist_only_enabled
     let manager_id = manager_pubkey.peer_id();
     let mut peer_dat_file = std::env::temp_dir();
     peer_dat_file.push("peer.dat");
+    let peer_trust_config = Arc::new(TrustMetricConfig::default());
+    let peer_fatal_ban = Duration::from_secs(50);
+    let peer_soft_ban = Duration::from_secs(10);
 
     let test_peer = make_peer(2077);
     let test_chain_addr = test_peer
@@ -2026,6 +2482,9 @@ async fn should_only_allow_incoming_peers_in_whitelist_if_whitelist_only_enabled
         bootstraps: Default::default(),
         whitelist_by_chain_addrs: vec![test_chain_addr.clone()],
         whitelist_peers_only: true,
+        peer_trust_config,
+        peer_fatal_ban,
+        peer_soft_ban,
         max_connections: 10,
         routine_interval: Duration::from_secs(10),
         peer_dat_file,
@@ -2085,4 +2544,301 @@ async fn should_only_allow_incoming_peers_in_whitelist_if_whitelist_only_enabled
     manager.poll_event(new_session).await;
 
     assert_eq!(inner.connected(), 1, "should have 1 connection");
+}
+
+#[tokio::test]
+async fn should_disconnect_and_ban_peer_for_fatal_feedback_on_trust_metric() {
+    let (mut mgr, mut conn_rx) = make_manager(0, 20);
+    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+    let test_peer = remote_peers.first().expect("get first peer");
+    let target_sid = test_peer.session_id();
+
+    let feedback = PeerManagerEvent::TrustMetric {
+        pid:      test_peer.owned_id(),
+        feedback: TrustFeedback::Fatal("fatal".to_owned()),
+    };
+    mgr.poll_event(feedback).await;
+
+    assert!(test_peer.banned(), "should be banned");
+    assert_eq!(
+        test_peer.ban_expired_at(),
+        time::now() + mgr.config().peer_fatal_ban.as_secs(),
+        "should use fatal ban duration"
+    );
+
+    let trust_metric = test_peer.trust_metric().expect("get trust metric");
+    assert!(!trust_metric.is_started(), "should stop trust metric");
+
+    let conn_event = conn_rx.next().await.expect("should have disconnect event");
+    match conn_event {
+        ConnectionEvent::Disconnect(sid) => {
+            assert_eq!(sid, target_sid, "should be disconnected session id")
+        }
+        _ => panic!("should be disconnect event"),
+    }
+}
+
+#[tokio::test]
+async fn should_exclude_whitelisted_peer_for_fatal_feedback_on_trust_metric() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+    let test_peer = remote_peers.first().expect("get first peer");
+
+    let test_chain_addr = test_peer.owned_chain_addr().expect("chain addr");
+    let inner = mgr.core_inner();
+    inner.whitelist_peers_by_chain_addr(vec![test_chain_addr]);
+
+    let feedback = PeerManagerEvent::TrustMetric {
+        pid:      test_peer.owned_id(),
+        feedback: TrustFeedback::Fatal("fatal".to_owned()),
+    };
+    mgr.poll_event(feedback).await;
+
+    assert!(!test_peer.banned(), "should not ban");
+    let trust_metric = test_peer.trust_metric().expect("get trust metric");
+    assert!(trust_metric.is_started(), "should continue trust metric");
+    assert_eq!(inner.connected(), 1, "should not disconnect peer");
+}
+
+#[tokio::test]
+async fn should_add_one_bad_event_for_bad_feedback_on_trust_metric() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+    let test_peer = remote_peers.first().expect("get first peer");
+    let trust_metric = test_peer.trust_metric().expect("trust metric");
+
+    let feedback = PeerManagerEvent::TrustMetric {
+        pid:      test_peer.owned_id(),
+        feedback: TrustFeedback::Bad("bad".to_owned()),
+    };
+    mgr.poll_event(feedback).await;
+
+    assert_eq!(
+        trust_metric.bad_events_count(),
+        1,
+        "should have one bad event count"
+    );
+}
+
+#[tokio::test]
+async fn should_add_ten_bad_events_for_worse_feedback_on_trust_metric() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+    let test_peer = remote_peers.first().expect("get first peer");
+    let trust_metric = test_peer.trust_metric().expect("trust metric");
+
+    let feedback = PeerManagerEvent::TrustMetric {
+        pid:      test_peer.owned_id(),
+        feedback: TrustFeedback::Worse("worse".to_owned()),
+    };
+    mgr.poll_event(feedback).await;
+
+    assert_eq!(
+        trust_metric.bad_events_count(),
+        10,
+        "should have ten bad events count"
+    );
+}
+
+#[tokio::test]
+async fn should_disconnect_and_soft_ban_peer_if_below_fourty_score_on_worse_feedback_on_trust_metric(
+) {
+    let (mut mgr, mut conn_rx) = make_manager(0, 20);
+    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+    let test_peer = remote_peers.first().expect("get first peer");
+    let trust_metric = test_peer.trust_metric().expect("trust metric");
+    let test_sid = test_peer.session_id();
+
+    for _ in 0..4 {
+        trust_metric.bad_events(1);
+        trust_metric.enter_new_interval();
+    }
+    assert!(
+        trust_metric.trust_score() < 40,
+        "should have score lower than 40"
+    );
+
+    let feedback = PeerManagerEvent::TrustMetric {
+        pid:      test_peer.owned_id(),
+        feedback: TrustFeedback::Worse("worse".to_owned()),
+    };
+    mgr.poll_event(feedback).await;
+
+    assert!(test_peer.banned(), "should be banned");
+    assert_eq!(
+        test_peer.ban_expired_at(),
+        time::now() + mgr.config().peer_soft_ban.as_secs(),
+        "should use soft ban duration"
+    );
+
+    let trust_metric = test_peer.trust_metric().expect("get trust metric");
+    assert!(!trust_metric.is_started(), "should stop trust metric");
+
+    let conn_event = conn_rx.next().await.expect("should have disconnect event");
+    match conn_event {
+        ConnectionEvent::Disconnect(sid) => {
+            assert_eq!(sid, test_sid, "should be replaced session id")
+        }
+        _ => panic!("should be disconnect event"),
+    }
+}
+
+#[tokio::test]
+async fn should_not_knock_out_peer_just_set_up_trust_metric_on_worse_feedback_on_trust_metric() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+    let test_peer = remote_peers.first().expect("get first peer");
+    let trust_metric = test_peer.trust_metric().expect("trust metric");
+
+    assert_eq!(
+        trust_metric.good_events_count(),
+        0,
+        "should not have any good events"
+    );
+    assert_eq!(
+        trust_metric.bad_events_count(),
+        0,
+        "should not have any bad events"
+    );
+    assert_eq!(trust_metric.intervals(), 0, "should not have any intervals");
+
+    let feedback = PeerManagerEvent::TrustMetric {
+        pid:      test_peer.owned_id(),
+        feedback: TrustFeedback::Worse("worse".to_owned()),
+    };
+    mgr.poll_event(feedback).await;
+
+    let inner = mgr.core_inner();
+    assert!(!test_peer.banned(), "should not ban");
+    let trust_metric = test_peer.trust_metric().expect("get trust metric");
+    assert!(trust_metric.is_started(), "should continue trust metric");
+    assert_eq!(inner.connected(), 1, "should still connected");
+}
+
+#[tokio::test]
+async fn should_exclude_whitelisted_peer_if_below_fourty_score_on_worse_feedback_on_trust_metric() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+    let test_peer = remote_peers.first().expect("get first peer");
+    let trust_metric = test_peer.trust_metric().expect("trust metric");
+
+    for _ in 0..4 {
+        trust_metric.bad_events(1);
+        trust_metric.enter_new_interval();
+    }
+    assert!(
+        trust_metric.trust_score() < 40,
+        "should have score lower than 40"
+    );
+
+    let test_chain_addr = test_peer.owned_chain_addr().expect("chain addr");
+    let inner = mgr.core_inner();
+    inner.whitelist_peers_by_chain_addr(vec![test_chain_addr]);
+
+    let feedback = PeerManagerEvent::TrustMetric {
+        pid:      test_peer.owned_id(),
+        feedback: TrustFeedback::Worse("worse".to_owned()),
+    };
+    mgr.poll_event(feedback).await;
+
+    assert!(!test_peer.banned(), "should not ban");
+    let trust_metric = test_peer.trust_metric().expect("get trust metric");
+    assert!(trust_metric.is_started(), "should continue trust metric");
+    assert_eq!(inner.connected(), 1, "should still connected");
+}
+
+#[tokio::test]
+async fn should_do_nothing_for_neutral_feedback_on_trust_metric() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+    let test_peer = remote_peers.first().expect("get first peer");
+    let trust_metric = test_peer.trust_metric().expect("trust metric");
+
+    let feedback = PeerManagerEvent::TrustMetric {
+        pid:      test_peer.owned_id(),
+        feedback: TrustFeedback::Neutral,
+    };
+    mgr.poll_event(feedback).await;
+
+    assert_eq!(
+        trust_metric.good_events_count(),
+        0,
+        "should not increase good events"
+    );
+    assert_eq!(
+        trust_metric.bad_events_count(),
+        0,
+        "should not increase bad events"
+    );
+}
+
+#[tokio::test]
+async fn should_add_one_bad_event_for_good_feedback_on_trust_metric() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+    let test_peer = remote_peers.first().expect("get first peer");
+    let trust_metric = test_peer.trust_metric().expect("trust metric");
+
+    let feedback = PeerManagerEvent::TrustMetric {
+        pid:      test_peer.owned_id(),
+        feedback: TrustFeedback::Good,
+    };
+    mgr.poll_event(feedback).await;
+
+    assert_eq!(
+        trust_metric.good_events_count(),
+        1,
+        "should increase one good event"
+    );
+}
+
+#[tokio::test]
+async fn should_pick_good_peer_first_on_finding_connectable_peers() {
+    let (mut mgr, mut conn_rx) = make_manager(0, 4);
+    let _remote_peers = make_sessions(&mut mgr, 3, 5000).await;
+
+    let inner = mgr.core_inner();
+    assert_eq!(inner.connected(), 3, "should have 3 connections");
+
+    // Fill connecting attempts, left one for our test
+    let fill_peers = (3..4 + MAX_CONNECTING_MARGIN - 1)
+        .map(|port| make_peer(6000u16 + port as u16))
+        .collect::<Vec<_>>();
+    mgr.inner.set_connecting(fill_peers);
+
+    let good_peer = make_peer(2077);
+    let normal_peer = make_peer(2020);
+    inner.add_peer(good_peer.clone());
+    inner.add_peer(normal_peer);
+
+    let trust_metric = TrustMetric::new(Arc::clone(&mgr.config().peer_trust_config));
+    good_peer.set_trust_metric(trust_metric.clone());
+    for _ in 0..10 {
+        trust_metric.good_events(1);
+        trust_metric.enter_new_interval();
+    }
+    assert!(
+        trust_metric.trust_score() > GOOD_TRUST_SCORE,
+        "should have better score"
+    );
+
+    mgr.poll().await;
+
+    let conn_event = conn_rx.next().await.expect("should have connect event");
+    let multiaddrs_in_event = match conn_event {
+        ConnectionEvent::Connect { addrs, .. } => addrs,
+        _ => panic!("should be connect event"),
+    };
+
+    assert_eq!(
+        multiaddrs_in_event.len(),
+        1,
+        "should have one connecting multiaddr"
+    );
+
+    let expect_multiaddrs = good_peer.multiaddrs.all_raw();
+    assert_eq!(
+        multiaddrs_in_event, expect_multiaddrs,
+        "should be peer with better score"
+    );
 }

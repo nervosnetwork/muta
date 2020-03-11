@@ -6,14 +6,13 @@ use std::{
 
 use async_trait::async_trait;
 use bytes::Bytes;
-use futures::TryFutureExt;
 use log::{info, warn};
 use serde_derive::{Deserialize, Serialize};
 use tentacle::secio::SecioKeyPair;
 
 use core_network::{NetworkConfig, NetworkService};
 use protocol::{
-    traits::{Context, Gossip, MessageHandler, Priority, Rpc},
+    traits::{Context, Gossip, MessageHandler, Priority, Rpc, TrustFeedback},
     types::Hash,
     ProtocolError,
 };
@@ -41,7 +40,7 @@ struct TakeMyMoney<N: Rpc> {
 impl<N: Rpc + Send + Sync + 'static> MessageHandler for TakeMyMoney<N> {
     type Message = Cyber7702Released;
 
-    async fn process(&self, ctx: Context, msg: Self::Message) {
+    async fn process(&self, ctx: Context, msg: Self::Message) -> TrustFeedback {
         let sell = async move {
             println!("Rush to {}. Shut up, take my money", msg.shop);
 
@@ -51,11 +50,16 @@ impl<N: Rpc + Send + Sync + 'static> MessageHandler for TakeMyMoney<N> {
                 .await?;
             println!("Got my copy {:?}", copy);
 
-            Ok(())
+            Ok::<(), ProtocolError>(())
         };
 
-        sell.unwrap_or_else(move |e: ProtocolError| warn!("sell {}", e))
-            .await;
+        match sell.await {
+            Ok(_) => TrustFeedback::Good,
+            Err(e) => {
+                warn!("sell {}", e);
+                TrustFeedback::Bad("sell failed".to_owned())
+            }
+        }
     }
 }
 
@@ -81,7 +85,7 @@ struct Checkout<N: Rpc> {
 impl<N: Rpc + Send + Sync + 'static> MessageHandler for Checkout<N> {
     type Message = BuyACopy;
 
-    async fn process(&self, ctx: Context, _msg: Self::Message) {
+    async fn process(&self, ctx: Context, _msg: Self::Message) -> TrustFeedback {
         let acopy = ACopy {
             hash: Hash::digest(Bytes::new()),
             gifs: vec![
@@ -91,12 +95,13 @@ impl<N: Rpc + Send + Sync + 'static> MessageHandler for Checkout<N> {
             ],
         };
 
-        if let Err(e) = self
+        match self
             .dealer
             .response(ctx, SHOP_CHANNEL, Ok(acopy), Priority::High)
             .await
         {
-            warn!("send acopy {}", e);
+            Ok(_) => TrustFeedback::Good,
+            Err(e) => TrustFeedback::Bad(format!("send copy {}", e.to_string())),
         }
     }
 }

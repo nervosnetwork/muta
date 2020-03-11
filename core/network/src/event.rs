@@ -1,7 +1,7 @@
 use std::{error::Error, sync::Arc};
 
 use derive_more::Display;
-use protocol::types::Address;
+use protocol::{traits::TrustFeedback, types::Address};
 #[cfg(not(test))]
 use tentacle::context::SessionContext;
 use tentacle::{
@@ -143,6 +143,12 @@ pub enum PeerManagerEvent {
 
     #[display(fmt = "peer {:?} misbehave {}", pid, kind)]
     Misbehave { pid: PeerId, kind: MisbehaviorKind },
+
+    #[display(fmt = "peer {:?} trust metric feedback {}", pid, feedback)]
+    TrustMetric {
+        pid:      PeerId,
+        feedback: TrustFeedback,
+    },
 
     #[display(fmt = "whitelist peers by chain addresses {:?}", chain_addrs)]
     WhitelistPeersByChainAddr { chain_addrs: Vec<Address> },

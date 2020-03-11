@@ -18,6 +18,7 @@ use parking_lot::RwLock;
 use crate::{
     endpoint::Endpoint,
     error::{ErrorKind, NetworkError},
+    event::PeerManagerEvent,
     message::{NetworkMessage, RawSessionMessage, SessionMessage},
     traits::{Compression, SessionBook},
 };
@@ -28,6 +29,9 @@ pub struct MessageRouter<C, S> {
 
     // Receiver for compressed session message
     raw_msg_rx: UnboundedReceiver<RawSessionMessage>,
+
+    // Sender for peer trust metric feedback
+    trust_tx: UnboundedSender<PeerManagerEvent>,
 
     // Compression to decompress message
     compression: C,
@@ -46,6 +50,7 @@ where
 {
     pub fn new(
         raw_msg_rx: UnboundedReceiver<RawSessionMessage>,
+        trust_tx: UnboundedSender<PeerManagerEvent>,
         compression: C,
         sessions: S,
         sys_tx: UnboundedSender<NetworkError>,
@@ -54,6 +59,7 @@ where
             reactor_map: Default::default(),
 
             raw_msg_rx,
+            trust_tx,
             compression,
             sessions,
 
@@ -74,6 +80,7 @@ where
         let compression = self.compression.clone();
         let sessions = self.sessions.clone();
         let sys_tx = self.sys_tx.clone();
+        let trust_tx = self.trust_tx.clone();
 
         let route = async move {
             let des_msg = compression.decompress(raw_msg.msg)?;
@@ -93,6 +100,7 @@ where
                 pid: raw_msg.pid,
                 msg: net_msg,
                 connected_addr,
+                trust_tx,
             };
 
             if smsg_tx.unbounded_send(smsg).is_err() {

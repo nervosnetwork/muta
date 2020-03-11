@@ -1,4 +1,4 @@
-use super::{time, PeerAddrSet, Retry, MAX_RETRY_COUNT};
+use super::{time, PeerAddrSet, Retry, TrustMetric, MAX_RETRY_COUNT};
 
 use std::{
     borrow::Borrow,
@@ -74,11 +74,13 @@ pub struct Peer {
     pub retry:       Retry,
     pubkey:          RwLock<Option<PublicKey>>,
     chain_addr:      RwLock<Option<Address>>,
+    trust_metric:    RwLock<Option<TrustMetric>>,
     connectedness:   AtomicUsize,
     session_id:      AtomicUsize,
     connected_at:    AtomicU64,
     disconnected_at: AtomicU64,
     alive:           AtomicU64,
+    ban_expired_at:  AtomicU64,
 }
 
 impl Peer {
@@ -89,11 +91,13 @@ impl Peer {
             retry:           Retry::new(MAX_RETRY_COUNT),
             pubkey:          RwLock::new(None),
             chain_addr:      RwLock::new(None),
+            trust_metric:    RwLock::new(None),
             connectedness:   AtomicUsize::new(Connectedness::NotConnected as usize),
             session_id:      AtomicUsize::new(0),
             connected_at:    AtomicU64::new(0),
             disconnected_at: AtomicU64::new(0),
             alive:           AtomicU64::new(0),
+            ban_expired_at:  AtomicU64::new(0),
         }
     }
 
@@ -133,6 +137,14 @@ impl Peer {
             *self.chain_addr.write() = Some(chain_addr);
             Ok(())
         }
+    }
+
+    pub fn trust_metric(&self) -> Option<TrustMetric> {
+        self.trust_metric.read().clone()
+    }
+
+    pub fn set_trust_metric(&self, metric: TrustMetric) {
+        *self.trust_metric.write() = Some(metric);
     }
 
     pub fn connectedness(&self) -> Connectedness {
@@ -207,6 +219,39 @@ impl Peer {
         self.update_alive();
     }
 
+    pub fn ban(&self, timeout: Duration) {
+        let expired_at = Duration::from_secs(time::now()) + timeout;
+        self.ban_expired_at
+            .store(expired_at.as_secs(), Ordering::SeqCst);
+    }
+
+    #[cfg(test)]
+    pub fn ban_expired_at(&self) -> u64 {
+        self.ban_expired_at.load(Ordering::SeqCst)
+    }
+
+    pub fn banned(&self) -> bool {
+        let expired_at = self.ban_expired_at.load(Ordering::SeqCst);
+        if time::now() > expired_at {
+            if expired_at > 0 {
+                self.ban_expired_at.store(0, Ordering::SeqCst);
+                if let Some(trust_metric) = self.trust_metric() {
+                    // TODO: Reset just in case, may remove in
+                    // the future.
+                    trust_metric.reset_history();
+                }
+            }
+            false
+        } else {
+            true
+        }
+    }
+
+    #[cfg(test)]
+    fn set_ban_expired_at(&self, at: u64) {
+        self.ban_expired_at.store(at, Ordering::SeqCst);
+    }
+
     fn update_connected(&self) {
         self.connected_at.store(time::now(), Ordering::SeqCst);
     }
@@ -271,5 +316,40 @@ impl Eq for ArcPeer {}
 impl Hash for ArcPeer {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.id.hash(state)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ArcPeer;
+    use crate::peer_manager::{time, TrustMetric, TrustMetricConfig};
+
+    use tentacle::secio::SecioKeyPair;
+
+    use std::sync::Arc;
+
+    #[test]
+    fn should_reset_trust_metric_history_after_unban() {
+        let keypair = SecioKeyPair::secp256k1_generated();
+        let pubkey = keypair.public_key();
+        let peer = ArcPeer::from_pubkey(pubkey).expect("make peer");
+        let peer_trust_config = Arc::new(TrustMetricConfig::default());
+
+        let trust_metric = TrustMetric::new(Arc::clone(&peer_trust_config));
+        peer.set_trust_metric(trust_metric.clone());
+        for _ in 0..2 {
+            trust_metric.bad_events(10);
+            trust_metric.enter_new_interval();
+        }
+        assert!(trust_metric.trust_score() < 40, "should lower score");
+
+        peer.set_ban_expired_at(time::now() - 20);
+        assert!(!peer.banned(), "should unban");
+
+        assert_eq!(
+            trust_metric.intervals(),
+            0,
+            "should reset peer trust history"
+        );
     }
 }

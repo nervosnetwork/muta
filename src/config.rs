@@ -22,18 +22,22 @@ pub struct ConfigGraphQL {
 
 #[derive(Debug, Deserialize)]
 pub struct ConfigNetwork {
-    pub bootstraps:           Option<Vec<ConfigNetworkBootstrap>>,
-    pub whitelist:            Option<Vec<String>>,
-    pub whitelist_peers_only: Option<bool>,
-    pub max_connected_peers:  Option<usize>,
-    pub listening_address:    SocketAddr,
-    pub rpc_timeout:          Option<u64>,
-    pub selfcheck_interval:   Option<u64>,
-    pub send_buffer_size:     Option<usize>,
-    pub write_timeout:        Option<u64>,
-    pub recv_buffer_size:     Option<usize>,
-    pub max_frame_length:     Option<usize>,
-    pub max_wait_streams:     Option<usize>,
+    pub bootstraps:                 Option<Vec<ConfigNetworkBootstrap>>,
+    pub whitelist:                  Option<Vec<String>>,
+    pub whitelist_peers_only:       Option<bool>,
+    pub trust_interval_duration:    Option<u64>,
+    pub trust_max_history_duration: Option<u64>,
+    pub fatal_ban_duration:         Option<u64>,
+    pub soft_ban_duration:          Option<u64>,
+    pub max_connected_peers:        Option<usize>,
+    pub listening_address:          SocketAddr,
+    pub rpc_timeout:                Option<u64>,
+    pub selfcheck_interval:         Option<u64>,
+    pub send_buffer_size:           Option<usize>,
+    pub write_timeout:              Option<u64>,
+    pub recv_buffer_size:           Option<usize>,
+    pub max_frame_length:           Option<usize>,
+    pub max_wait_streams:           Option<usize>,
 }
 
 #[derive(Debug, Deserialize)]

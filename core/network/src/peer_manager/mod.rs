@@ -6,6 +6,7 @@ mod retry;
 mod save_restore;
 mod shared;
 mod time;
+mod trust_metric;
 
 use addr_set::PeerAddrSet;
 use peer::Peer;
@@ -16,6 +17,7 @@ pub use disc::DiscoveryAddrManager;
 pub use ident::IdentifyCallback;
 pub use peer::{ArcPeer, Connectedness};
 pub use shared::{SharedSessions, SharedSessionsConfig};
+pub use trust_metric::{TrustMetric, TrustMetricConfig};
 
 #[cfg(test)]
 mod test_manager;
@@ -46,7 +48,7 @@ use futures::{
 };
 use log::{debug, error, info, warn};
 use parking_lot::RwLock;
-use protocol::types::Address;
+use protocol::{traits::TrustFeedback, types::Address};
 use rand::seq::IteratorRandom;
 use serde_derive::{Deserialize, Serialize};
 #[cfg(not(test))]
@@ -78,6 +80,8 @@ const MAX_RETRY_COUNT: u8 = 30;
 const SHORT_ALIVE_SESSION: u64 = 3; // seconds
 const WHITELIST_TIMEOUT: u64 = 2 * 60 * 60; // 2 hour
 const MAX_CONNECTING_MARGIN: usize = 10;
+
+const GOOD_TRUST_SCORE: u8 = 80u8;
 
 #[derive(Debug, Clone, Display, Serialize, Deserialize)]
 #[display(fmt = "{}", _0)]
@@ -428,12 +432,17 @@ impl Inner {
         self.peers.read().contains(peer_id)
     }
 
-    pub fn connectable_peers(&self, max: usize) -> Vec<ArcPeer> {
+    pub fn connectable_peers<F>(&self, max: usize, addition_filter: F) -> Vec<ArcPeer>
+    where
+        F: Fn(&ArcPeer) -> bool + 'static,
+    {
         let connectable = |p: &'_ &ArcPeer| -> bool {
             (p.connectedness() == Connectedness::NotConnected
                 || p.connectedness() == Connectedness::CanConnect)
                 && p.retry.ready()
                 && p.multiaddrs.connectable_len() > 0
+                && !p.banned()
+                && addition_filter(p)
         };
 
         let mut rng = rand::thread_rng();
@@ -502,7 +511,6 @@ impl Inner {
         self.sessions.read().get(&sid).cloned()
     }
 
-    #[cfg(test)]
     pub fn share_sessions(&self) -> Vec<ArcSession> {
         self.sessions.read().iter().cloned().collect()
     }
@@ -528,7 +536,7 @@ impl Inner {
 }
 
 // TODO: Store our secret key?
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PeerManagerConfig {
     /// Our Peer ID
     pub our_id: PeerId,
@@ -543,6 +551,11 @@ pub struct PeerManagerConfig {
     pub whitelist_by_chain_addrs: Vec<Address>,
     /// Only allow peers in whitelist
     pub whitelist_peers_only:     bool,
+
+    /// Trust metric config
+    pub peer_trust_config: Arc<TrustMetricConfig>,
+    pub peer_fatal_ban:    Duration,
+    pub peer_soft_ban:     Duration,
 
     /// Max connections
     pub max_connections: usize,
@@ -697,6 +710,18 @@ impl PeerManager {
         Arc::clone(&self.inner)
     }
 
+    #[cfg(test)]
+    fn config(&self) -> PeerManagerConfig {
+        self.config.clone()
+    }
+
+    #[cfg(test)]
+    fn set_connecting(&mut self, peers: Vec<ArcPeer>) {
+        for peer in peers.into_iter() {
+            self.connecting.insert(ConnectingAttempt::new(peer));
+        }
+    }
+
     fn new_session(&mut self, pubkey: PublicKey, ctx: Arc<SessionContext>) {
         let remote_peer_id = pubkey.peer_id();
         let remote_multiaddr = PeerMultiaddr::new(ctx.address.to_owned(), &remote_peer_id);
@@ -725,8 +750,14 @@ impl PeerManager {
         }
 
         if self.config.whitelist_peers_only && !self.inner.whitelisted(&remote_peer) {
-            debug!("reject peer {:?} not in whitelist", remote_peer.id);
+            debug!("whitelist only enabled, reject peer {:?}", remote_peer.id);
+            remote_peer.mark_disconnected();
+            self.disconnect_session(ctx.id);
+            return;
+        }
 
+        if remote_peer.banned() {
+            info!("banned peer {:?} incomming", remote_peer_id);
             remote_peer.mark_disconnected();
             self.disconnect_session(ctx.id);
             return;
@@ -738,7 +769,38 @@ impl PeerManager {
                 _ => false,
             };
 
-            if !whitelisted {
+            let found_replacement = || -> bool {
+                let incoming_trust_score = match remote_peer.trust_metric() {
+                    Some(trust_metric) => trust_metric.trust_score(),
+                    None => return false,
+                };
+
+                for session in self.inner.share_sessions() {
+                    let trust_score = match session.peer.trust_metric() {
+                        Some(trust_metric) => trust_metric.trust_score(),
+                        None => {
+                            // Impossible
+                            error!("session peer {:?} trust metric not found", session.peer.id);
+                            return false;
+                        }
+                    };
+
+                    // Ensure that session be replaced has traveled enough
+                    // intervals
+                    if incoming_trust_score > trust_score
+                        && !self.inner.whitelisted(&session.peer)
+                        && session.peer.alive()
+                            > self.config.peer_trust_config.interval().as_secs() * 20
+                    {
+                        self.disconnect_session(session.id);
+                        return true;
+                    }
+                }
+
+                false
+            };
+
+            if !whitelisted && !found_replacement() {
                 remote_peer.mark_disconnected();
                 self.disconnect_session(ctx.id);
                 return;
@@ -776,6 +838,16 @@ impl PeerManager {
 
         self.inner.sessions.write().insert(session);
         remote_peer.mark_connected(ctx.id);
+
+        match remote_peer.trust_metric() {
+            Some(trust_metric) => trust_metric.start(),
+            None => {
+                let trust_metric = TrustMetric::new(Arc::clone(&self.config.peer_trust_config));
+                trust_metric.start();
+
+                remote_peer.set_trust_metric(trust_metric);
+            }
+        }
     }
 
     fn session_closed(&mut self, sid: SessionId) {
@@ -789,6 +861,11 @@ impl PeerManager {
 
         info!("session closed {}", session.connected_addr);
         session.peer.mark_disconnected();
+
+        match session.peer.trust_metric() {
+            Some(trust_metric) => trust_metric.pause(),
+            None => error!("session peer {:?} trust metric not found", session.peer.id),
+        }
 
         if session.peer.alive() < SHORT_ALIVE_SESSION {
             // NOTE: peer maybe abnormally disconnect from others. When we try
@@ -855,6 +932,11 @@ impl PeerManager {
                 if attempt.peer.retry.run_out() {
                     attempt.peer.set_connectedness(Connectedness::Unconnectable);
                 }
+
+            // FIXME
+            // if let Some(trust_metric) = attempt.peer.trust_metric() {
+            //     trust_metric.bad_events(1);
+            // }
             } else {
                 // Wait for other connecting multiaddrs result
                 self.connecting.insert(attempt);
@@ -875,6 +957,11 @@ impl PeerManager {
         self.disconnect_session(sid);
         session.peer.mark_disconnected();
 
+        match session.peer.trust_metric() {
+            Some(trust_metric) => trust_metric.bad_events(1),
+            None => error!("session peer {:?} trust metric not found", session.peer.id),
+        }
+
         match error_kind {
             Io(_) => session.peer.retry.inc(),
             Protocol { .. } | Unexpected(_) => {
@@ -894,7 +981,6 @@ impl PeerManager {
         }
     }
 
-    // TODO: score system
     fn peer_misbehave(&self, pid: PeerId, kind: MisbehaviorKind) {
         use MisbehaviorKind::*;
 
@@ -905,6 +991,11 @@ impl PeerManager {
                 return;
             }
         };
+
+        match peer.trust_metric() {
+            Some(trust_metric) => trust_metric.bad_events(1),
+            None => error!("session peer {:?} trust metric not found", peer.id),
+        }
 
         let sid = peer.session_id();
         if sid == SessionId::new(0) {
@@ -924,6 +1015,73 @@ impl PeerManager {
         }
     }
 
+    fn trust_metric_feedback(&self, pid: PeerId, feedback: TrustFeedback) {
+        use TrustFeedback::*;
+
+        let peer = match self.inner.peer(&pid) {
+            Some(p) => p,
+            None => {
+                error!("fatal peer {:?} not found", pid);
+                return;
+            }
+        };
+
+        let peer_trust_metric = match peer.trust_metric() {
+            Some(t) => t,
+            None => {
+                error!("fatal peer {:?} trust metric not found", pid);
+                return;
+            }
+        };
+
+        match &feedback {
+            Fatal(reason) => {
+                warn!("peer {:?} trust feedback fatal {}", pid, reason);
+                if self.inner.whitelisted(&peer) {
+                    return;
+                }
+
+                let fatal_ban = self.config.peer_fatal_ban;
+                info!("peer {:?} ban {} seconds", pid, fatal_ban.as_secs());
+                peer_trust_metric.pause();
+                peer.ban(fatal_ban);
+
+                if let Some(session) = self.inner.remove_session(peer.session_id()) {
+                    self.disconnect_session(session.id);
+                }
+                peer.mark_disconnected();
+            }
+            Bad(_) | Worse(_) => {
+                match &feedback {
+                    Bad(reason) => {
+                        info!("peer {:?} trust feedback bad {}", pid, reason);
+                        peer_trust_metric.bad_events(1);
+                    }
+                    Worse(reason) => {
+                        warn!("peer {:?} trust feedback worse {}", pid, reason);
+                        peer_trust_metric.bad_events(10);
+                    }
+                    _ => unreachable!(),
+                };
+
+                if peer_trust_metric.knock_out() && !self.inner.whitelisted(&peer) {
+                    let soft_ban = self.config.peer_soft_ban.as_secs();
+                    info!("peer {:?} knocked out, soft ban {} seconds", pid, soft_ban);
+
+                    peer_trust_metric.pause();
+                    peer.ban(Duration::from_secs(soft_ban));
+
+                    if let Some(session) = self.inner.remove_session(peer.session_id()) {
+                        self.disconnect_session(session.id);
+                    }
+                    peer.mark_disconnected();
+                }
+            }
+            Neutral => (),
+            Good => peer_trust_metric.good_events(1),
+        }
+    }
+
     fn session_blocked(&self, ctx: Arc<SessionContext>) {
         warn!(
             "session {} blocked, pending data size {}",
@@ -933,6 +1091,11 @@ impl PeerManager {
 
         if let Some(session) = self.inner.session(ctx.id) {
             session.block();
+
+            match session.peer.trust_metric() {
+                Some(trust_metric) => trust_metric.bad_events(1),
+                None => error!("session peer {:?} trust metric not found", session.peer.id),
+            };
         }
     }
 
@@ -1076,6 +1239,9 @@ impl PeerManager {
             PeerManagerEvent::SessionFailed { sid, kind } => self.session_failed(sid, kind),
             PeerManagerEvent::PeerAlive { pid } => self.update_peer_alive(&pid),
             PeerManagerEvent::Misbehave { pid, kind } => self.peer_misbehave(pid, kind),
+            PeerManagerEvent::TrustMetric { pid, feedback } => {
+                self.trust_metric_feedback(pid, feedback)
+            }
             PeerManagerEvent::WhitelistPeersByChainAddr { chain_addrs } => {
                 self.inner.whitelist_peers_by_chain_addr(chain_addrs);
             }
@@ -1136,8 +1302,21 @@ impl Future for PeerManager {
         if connected_count < self.config.max_connections
             && connection_attempts < max_connection_attempts
         {
+            let filter_good_peer = |peer: &ArcPeer| -> bool {
+                if let Some(trust_metric) = peer.trust_metric() {
+                    trust_metric.trust_score() > GOOD_TRUST_SCORE
+                } else {
+                    false
+                }
+            };
+            let just_enough = |_: &ArcPeer| -> bool { true };
+
             let remain_count = max_connection_attempts - connection_attempts;
-            let connectable_peers = self.inner.connectable_peers(remain_count);
+            let mut connectable_peers =
+                self.inner.connectable_peers(remain_count, filter_good_peer);
+            if connectable_peers.is_empty() {
+                connectable_peers = self.inner.connectable_peers(remain_count, just_enough);
+            }
             let candidate_count = connectable_peers.len();
 
             debug!(

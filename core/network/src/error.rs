@@ -136,6 +136,9 @@ pub enum NetworkError {
     #[display(fmt = "remote response {}", _0)]
     RemoteResponse(Box<dyn Error + Send>),
 
+    #[display(fmt = "trust max history should be longer than {} secs", _0)]
+    SmallTrustMaxHistory(u64),
+
     #[display(fmt = "internal error: {}", _0)]
     Internal(Box<dyn Error + Send>),
 }

@@ -15,7 +15,9 @@ use futures::{
 };
 use log::{debug, error, info};
 use protocol::{
-    traits::{Context, Gossip, MessageCodec, MessageHandler, Priority, Rpc},
+    traits::{
+        Context, Gossip, MessageCodec, MessageHandler, PeerTrust, Priority, Rpc, TrustFeedback,
+    },
     types::Address,
     ProtocolResult,
 };
@@ -38,13 +40,15 @@ use crate::{
     reactor::{MessageRouter, Reactor},
     rpc_map::RpcMap,
     selfcheck::SelfCheck,
+    traits::NetworkContext,
     NetworkConfig,
 };
 
 #[derive(Clone)]
 pub struct NetworkServiceHandle {
-    gossip: NetworkGossip<ConnectionServiceControl<CoreProtocol, SharedSessions>, Snappy>,
-    rpc:    NetworkRpc<ConnectionServiceControl<CoreProtocol, SharedSessions>, Snappy>,
+    gossip:     NetworkGossip<ConnectionServiceControl<CoreProtocol, SharedSessions>, Snappy>,
+    rpc:        NetworkRpc<ConnectionServiceControl<CoreProtocol, SharedSessions>, Snappy>,
+    peer_trust: UnboundedSender<PeerManagerEvent>,
 }
 
 #[async_trait]
@@ -92,6 +96,30 @@ impl Rpc for NetworkServiceHandle {
         M: MessageCodec,
     {
         self.rpc.response(cx, end, msg, p).await
+    }
+}
+
+impl PeerTrust for NetworkServiceHandle {
+    fn report(&self, ctx: Context, feedback: TrustFeedback) {
+        let remote_peer_id = match ctx.remote_peer_id() {
+            Ok(id) => id,
+            Err(e) => {
+                log::error!(
+                    "peer id not found on trust report ctx, repoort {}, err {}",
+                    feedback,
+                    e
+                );
+                return;
+            }
+        };
+
+        let feedback = PeerManagerEvent::TrustMetric {
+            pid: remote_peer_id,
+            feedback,
+        };
+        if let Err(e) = self.peer_trust.unbounded_send(feedback) {
+            log::error!("peer manager offline {}", e);
+        }
     }
 }
 
@@ -178,7 +206,13 @@ impl NetworkService {
         let gossip = NetworkGossip::new(conn_ctrl.clone(), Snappy);
         let rpc_map_clone = Arc::clone(&rpc_map);
         let rpc = NetworkRpc::new(conn_ctrl, Snappy, rpc_map_clone, (&config).into());
-        let router = MessageRouter::new(raw_msg_rx, Snappy, session_book.clone(), sys_tx);
+        let router = MessageRouter::new(
+            raw_msg_rx,
+            mgr_tx.clone(),
+            Snappy,
+            session_book.clone(),
+            sys_tx,
+        );
 
         // Build selfcheck service
         let selfcheck = SelfCheck::new(session_book, (&config).into());
@@ -258,8 +292,9 @@ impl NetworkService {
 
     pub fn handle(&self) -> NetworkServiceHandle {
         NetworkServiceHandle {
-            gossip: self.gossip.clone(),
-            rpc:    self.rpc.clone(),
+            gossip:     self.gossip.clone(),
+            rpc:        self.rpc.clone(),
+            peer_trust: self.mgr_tx.clone(),
         }
     }
 
