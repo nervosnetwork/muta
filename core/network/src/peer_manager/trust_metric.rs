@@ -1,10 +1,18 @@
+use futures::{
+    future::{self, AbortHandle},
+    pin_mut,
+};
+use futures_timer::Delay;
 use parking_lot::RwLock;
 
 use std::{
-    ops::Deref,
+    future::Future,
+    ops::{Add, Deref},
+    pin::Pin,
     sync::atomic::{AtomicUsize, Ordering::SeqCst},
     sync::Arc,
-    time::Duration,
+    task::{Context, Poll},
+    time::{Duration, Instant},
 };
 
 pub const PROPORTIONAL_WEIGHT: f64 = 0.4;
@@ -12,6 +20,8 @@ pub const INTERGRAL_WEIGHT: f64 = 0.6;
 pub const OPTIMISTIC_HISTORY_WEIGHT: f64 = 0.8;
 pub const DERIVATIVE_POSITIVE_WEIGHT: f64 = 0.0;
 pub const DERIVATIVE_NEGATIVE_WEIGHT: f64 = 0.1;
+
+pub const KNOCK_OUT_SCORE: u8 = 30;
 
 pub const DEFAULT_INTERVAL_DURATION: Duration = Duration::from_secs(60);
 pub const DEFAULT_MAX_HISTORY_DURATION: Duration = Duration::from_secs(24 * 60 * 60 * 10); // 10 day
@@ -23,6 +33,7 @@ lazy_static::lazy_static! {
     static ref HISTORY_TRUST_WEIGHTS: Arc<RwLock<Vec<f64>>> = Arc::new(RwLock::new(Vec::new()));
 }
 
+#[derive(Debug)]
 pub struct TrustMetricConfig {
     interval:          Duration,
     max_history:       Duration,
@@ -172,19 +183,20 @@ impl History {
     }
 }
 
-pub struct TrustMetric {
+#[derive(Debug)]
+pub struct Inner {
     config:      Arc<TrustMetricConfig>,
     history:     RwLock<History>,
     good_events: AtomicUsize,
     bad_events:  AtomicUsize,
 }
 
-impl TrustMetric {
+impl Inner {
     pub fn new(config: Arc<TrustMetricConfig>) -> Self {
         let max_intervals = config.max_intervals;
         let max_memorys = config.max_faded_memorys;
 
-        TrustMetric {
+        Inner {
             config,
             history: RwLock::new(History::new(max_intervals, max_memorys)),
             good_events: AtomicUsize::new(0),
@@ -202,6 +214,10 @@ impl TrustMetric {
 
     pub fn bad_events(&self, num: usize) {
         self.bad_events.fetch_add(num, SeqCst);
+    }
+
+    pub fn knock_out(&self) -> bool {
+        self.trust_score() < KNOCK_OUT_SCORE
     }
 
     pub fn enter_new_interval(&self) {
@@ -252,9 +268,119 @@ impl TrustMetric {
     }
 }
 
+struct HeartBeat {
+    inner:          Arc<Inner>,
+    interval:       Duration,
+    delay:          Delay,
+    pause_save:     Arc<RwLock<Option<Duration>>>,
+    interval_start: Instant,
+}
+
+impl HeartBeat {
+    pub fn new(
+        inner: Arc<Inner>,
+        interval: Duration,
+        resume: Option<Duration>,
+        pause_save: Arc<RwLock<Option<Duration>>>,
+    ) -> Self {
+        let delay = match resume {
+            Some(resume) => {
+                let remain = interval - resume;
+                if remain.as_secs() > 0 {
+                    Delay::new(remain)
+                } else {
+                    Delay::new(interval)
+                }
+            }
+            None => Delay::new(interval),
+        };
+
+        HeartBeat {
+            inner,
+            interval,
+            delay,
+            pause_save,
+            interval_start: Instant::now(),
+        }
+    }
+}
+
+impl Drop for HeartBeat {
+    fn drop(&mut self) {
+        let elapsed = self.interval_start.elapsed();
+        *self.pause_save.write() = Some(elapsed);
+    }
+}
+
+impl Future for HeartBeat {
+    type Output = <Delay as Future>::Output;
+
+    fn poll(mut self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
+        let ecg = &mut self.as_mut();
+
+        loop {
+            let interval = ecg.interval;
+            let delay = &mut ecg.delay;
+            pin_mut!(delay);
+
+            crate::loop_ready!(delay.poll(ctx));
+            ecg.inner.enter_new_interval();
+            ecg.interval_start = Instant::now();
+
+            let next_interval = Instant::now().add(interval);
+            ecg.delay.reset(next_interval);
+        }
+
+        Poll::Pending
+    }
+}
+
+#[derive(Debug)]
+pub struct TrustMetric {
+    inner:     Arc<Inner>,
+    hb_handle: RwLock<Option<AbortHandle>>,
+    pause:     Arc<RwLock<Option<Duration>>>,
+}
+
+impl TrustMetric {
+    pub fn new(config: Arc<TrustMetricConfig>) -> Self {
+        TrustMetric {
+            inner:     Arc::new(Inner::new(config)),
+            hb_handle: RwLock::new(None),
+            pause:     Arc::new(RwLock::new(None)),
+        }
+    }
+
+    pub fn start(&self) {
+        if self.hb_handle.read().is_some() {
+            // Already started
+            return;
+        }
+
+        let interval = self.inner.config.interval;
+        let resume = self.pause.write().take();
+        let heart_beat = HeartBeat::new(
+            Arc::clone(&self.inner),
+            interval,
+            resume,
+            Arc::clone(&self.pause),
+        );
+
+        let (heart_beat, hb_handle) = future::abortable(heart_beat);
+        *self.hb_handle.write() = Some(hb_handle);
+        tokio::spawn(heart_beat);
+    }
+
+    pub fn pause(&self) {
+        if let Some(abort_handle) = self.hb_handle.write().take() {
+            abort_handle.abort();
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{TrustMetric, TrustMetricConfig};
+    use super::{Inner, TrustMetricConfig};
 
     use std::sync::Arc;
 
@@ -263,7 +389,7 @@ mod tests {
         env_logger::init();
 
         let config = Arc::new(TrustMetricConfig::default());
-        let metric = TrustMetric::new(config.clone());
+        let metric = Inner::new(config);
 
         for _ in 0..20 {
             metric.good_events(1);

@@ -17,6 +17,7 @@ pub use disc::DiscoveryAddrManager;
 pub use ident::IdentifyCallback;
 pub use peer::{ArcPeer, Connectedness};
 pub use shared::{SharedSessions, SharedSessionsConfig};
+pub use trust_metric::{TrustMetric, TrustMetricConfig};
 
 #[cfg(test)]
 mod test_manager;
