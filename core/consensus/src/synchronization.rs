@@ -260,7 +260,7 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
         Ok(())
     }
 
-    async fn exec_block(
+    pub async fn exec_block(
         &self,
         ctx: Context,
         rich_block: RichBlock,
