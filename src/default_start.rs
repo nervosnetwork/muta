@@ -336,6 +336,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     consensus_adapter.set_overlord_handler(overlord_consensus.get_overlord_handler());
 
     let synchronization = Arc::new(OverlordSynchronization::new(
+        config.consensus.sync_txs_chunk_size,
         consensus_adapter,
         status_agent,
         lock,
