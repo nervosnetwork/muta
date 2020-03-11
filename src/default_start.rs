@@ -132,6 +132,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     // Init Block db
     let path_block = config.data_path_for_block();
     log::info!("Data path for block: {:?}", path_block.clone());
+
     let rocks_adapter = Arc::new(RocksAdapter::new(path_block.clone())?);
     let storage = Arc::new(ImplStorage::new(Arc::clone(&rocks_adapter)));
 
@@ -196,16 +197,10 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         Arc::clone(&trie_db),
         Arc::clone(&service_mapping),
     );
-    let muta_wal = Arc::new(FullTxsWal::new(
-        path_block
-            .parent()
-            .unwrap()
-            .parent()
-            .unwrap()
-            .to_str()
-            .unwrap()
-            .to_string(),
-    ));
+
+    // Create full transactions wal
+    let wal_path = config.data_path_for_wal().to_str().unwrap().to_string();
+    let muta_wal = Arc::new(FullTxsWal::new(wal_path));
 
     let exec_resp = api_adapter
         .query_service(

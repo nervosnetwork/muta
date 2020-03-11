@@ -118,9 +118,9 @@ impl Config {
         path_state
     }
 
-    // pub fn data_path_for_bft_wal(&self) -> PathBuf {
-    //     let mut path_state = self.data_path.clone();
-    //     path_state.push("bft_wal");
-    //     path_state
-    // }
+    pub fn data_path_for_wal(&self) -> PathBuf {
+        let mut path_state = self.data_path.clone();
+        path_state.push("muta_wal");
+        path_state
+    }
 }
