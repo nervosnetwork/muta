@@ -253,14 +253,15 @@ mod test {
 
     #[test]
     fn test_txs_codec() {
-        use super::Codec;
+        use super::ProtocolCodecSync;
+
         for _ in 0..10 {
             let fixed_txs = FixedSignedTxs {
                 inner: (0..1000).map(|_| gen_signed_tx()).collect::<Vec<_>>(),
             };
 
-            let bytes = fixed_txs.encode().unwrap();
-            assert_eq!(fixed_txs, FixedSignedTxs::decode(bytes).unwrap());
+            let bytes = fixed_txs.encode_sync().unwrap();
+            assert_eq!(fixed_txs, FixedSignedTxs::decode_sync(bytes).unwrap());
         }
     }
 
