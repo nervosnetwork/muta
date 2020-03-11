@@ -138,16 +138,16 @@ mod test {
         let wal = FullTxsWal::new(FULL_TXS_PATH.to_string());
         let txs_01 = mock_wal_txs();
         let hash_01 = Hash::digest(Bytes::from(rlp::encode_list(&txs_01)));
-        wal.save_txs(1u64, hash_01.clone(), txs_01.clone()).unwrap();
+        wal.save(1u64, hash_01.clone(), txs_01.clone()).unwrap();
         let txs_02 = mock_wal_txs();
         let hash_02 = Hash::digest(Bytes::from(rlp::encode_list(&txs_02)));
-        wal.save_txs(3u64, hash_02.clone(), txs_02.clone()).unwrap();
+        wal.save(3u64, hash_02.clone(), txs_02.clone()).unwrap();
 
-        assert_eq!(wal.load_txs(1u64, hash_01.clone()).unwrap(), txs_01);
-        assert_eq!(wal.load_txs(3u64, hash_02.clone()).unwrap(), txs_02);
+        assert_eq!(wal.load(1u64, hash_01.clone()).unwrap(), txs_01);
+        assert_eq!(wal.load(3u64, hash_02.clone()).unwrap(), txs_02);
 
         wal.remove(2u64).unwrap();
-        assert!(wal.load_txs(1u64, hash_01).is_err());
-        assert!(wal.load_txs(2u64, hash_02).is_err());
+        assert!(wal.load(1u64, hash_01).is_err());
+        assert!(wal.load(2u64, hash_02).is_err());
     }
 }
