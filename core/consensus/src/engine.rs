@@ -42,10 +42,10 @@ pub struct ConsensusEngine<Adapter> {
     node_info:      NodeInfo,
     exemption_hash: RwLock<HashSet<Bytes>>,
 
-    adapter:  Arc<Adapter>,
-    full_txs: Arc<SignedTxsWAL>,
-    crypto:   Arc<OverlordCrypto>,
-    lock:     Arc<Mutex<()>>,
+    adapter: Arc<Adapter>,
+    txs_wal: Arc<SignedTxsWAL>,
+    crypto:  Arc<OverlordCrypto>,
+    lock:    Arc<Mutex<()>>,
 }
 
 #[async_trait]
@@ -146,7 +146,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         }
 
         let txs = self.adapter.get_full_txs(ctx, order_hashes).await?;
-        self.full_txs
+        self.txs_wal
             .save(next_height, Hash::from_bytes(hash)?, txs)?;
 
         log::info!(
@@ -208,13 +208,13 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
 
         // Get full transactions from mempool. If is error, try get from wal.
         let ordered_tx_hashes = pill.block.ordered_tx_hashes.clone();
-        let full_txs = match self
+        let signed_txs = match self
             .adapter
             .get_full_txs(ctx.clone(), ordered_tx_hashes.clone())
             .await
         {
             Ok(txs) => txs,
-            Err(_) => self.full_txs.load(current_height, block_hash)?,
+            Err(_) => self.txs_wal.load(current_height, block_hash)?,
         };
 
         // Execute transactions
@@ -224,7 +224,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             pill.block.header.proposer.clone(),
             pill.block.header.timestamp,
             Hash::digest(pill.block.encode_fixed()?),
-            full_txs.clone(),
+            signed_txs.clone(),
         )
         .await?;
 
@@ -237,7 +237,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             pill.block.header.timestamp,
         )?;
 
-        self.update_status(metadata, pill.block, proof, full_txs)
+        self.update_status(metadata, pill.block, proof, signed_txs)
             .await?;
 
         self.adapter
@@ -247,7 +247,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         self.adapter
             .broadcast_height(ctx.clone(), current_height)
             .await?;
-        self.full_txs.remove(block_exec_height)?;
+        self.txs_wal.remove(block_exec_height)?;
 
         let mut set = self.exemption_hash.write();
         set.clear();
@@ -397,7 +397,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
             status_agent,
             node_info,
             exemption_hash: RwLock::new(HashSet::new()),
-            full_txs: wal,
+            txs_wal: wal,
             adapter,
             crypto,
             lock,

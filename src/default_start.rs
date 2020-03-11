@@ -21,8 +21,8 @@ use core_consensus::message::{
 };
 use core_consensus::status::{CurrentConsensusStatus, StatusAgent};
 use core_consensus::{
-    DurationConfig, SignedTxsWAL, Node, OverlordConsensus, OverlordConsensusAdapter,
-    OverlordSynchronization,
+    DurationConfig, Node, OverlordConsensus, OverlordConsensusAdapter, OverlordSynchronization,
+    SignedTxsWAL,
 };
 use core_mempool::{
     DefaultMemPoolAdapter, HashMemPool, MsgPushTxs, NewTxsHandler, PullTxsHandler,
