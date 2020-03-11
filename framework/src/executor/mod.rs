@@ -218,13 +218,38 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
     }
 
     fn catch_call(&self, context: ServiceContext, exec_type: ExecType) -> ExecResp {
-        match self.call(context, exec_type) {
+        let res = match exec_type {
+            ExecType::Read => self.call(context, exec_type),
+            ExecType::Write => self.call_with_tx_hooks(context, exec_type),
+        };
+        match res {
             Ok(resp) => resp,
             Err(e) => ExecResp {
                 ret:      e.to_string(),
                 is_error: true,
             },
         }
+    }
+
+    fn call_with_tx_hooks(
+        &self,
+        context: ServiceContext,
+        exec_type: ExecType,
+    ) -> ProtocolResult<ExecResp> {
+        let mut tx_hook_services = vec![];
+        for name in self.service_mapping.list_service_name().into_iter() {
+            let sdk = self.get_sdk(&name)?;
+            let tx_hook_service = self.service_mapping.get_service(name.as_str(), sdk)?;
+            tx_hook_services.push(tx_hook_service);
+        }
+        for tx_hook_service in tx_hook_services.iter_mut() {
+            tx_hook_service.tx_hook_before_(context.clone())?;
+        }
+        let original_res = self.call(context.clone(), exec_type);
+        for tx_hook_service in tx_hook_services.iter_mut() {
+            tx_hook_service.tx_hook_after_(context.clone())?;
+        }
+        original_res
     }
 
     fn call(&self, context: ServiceContext, exec_type: ExecType) -> ProtocolResult<ExecResp> {
@@ -234,25 +259,9 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
             .service_mapping
             .get_service(context.get_service_name(), sdk)?;
 
-        let mut tx_hook_services = vec![];
-        for name in self.service_mapping.list_service_name().into_iter() {
-            let sdk = self.get_sdk(&name)?;
-            let tx_hook_service = self.service_mapping.get_service(name.as_str(), sdk)?;
-            tx_hook_services.push(tx_hook_service);
-        }
-
         let result = match exec_type {
             ExecType::Read => service.read_(context),
-            ExecType::Write => {
-                for tx_hook_service in tx_hook_services.iter_mut() {
-                    tx_hook_service.tx_hook_before_(context.clone())?;
-                }
-                let res = service.write_(context.clone());
-                for tx_hook_service in tx_hook_services.iter_mut() {
-                    tx_hook_service.tx_hook_after_(context.clone())?;
-                }
-                res
-            }
+            ExecType::Write => service.write_(context),
         };
 
         let (ret, is_error) = match result {
