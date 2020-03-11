@@ -7,14 +7,14 @@ use std::{
     time::Duration,
 };
 
-pub const PROPORTIONAL_WEIGHT: f64 = 0.1;
-pub const INTERGRAL_WEIGHT: f64 = 0.9;
-pub const OPTIMISTIC_HISTORY_WEIGHT: f64 = 0.9;
-pub const DERIVATIVE_POSITIVE_WEIGHT: f64 = 0.05;
-pub const DERIVATIVE_NEGATIVE_WEIGHT: f64 = 0.2;
+pub const PROPORTIONAL_WEIGHT: f64 = 0.4;
+pub const INTERGRAL_WEIGHT: f64 = 0.6;
+pub const OPTIMISTIC_HISTORY_WEIGHT: f64 = 0.8;
+pub const DERIVATIVE_POSITIVE_WEIGHT: f64 = 0.0;
+pub const DERIVATIVE_NEGATIVE_WEIGHT: f64 = 0.1;
 
-pub const DEFAULT_INTERVAL_DURATION: Duration = Duration::from_secs(30);
-pub const DEFAULT_MAX_HISTORY_DURATION: Duration = Duration::from_secs(24 * 60 * 60); // 1 day
+pub const DEFAULT_INTERVAL_DURATION: Duration = Duration::from_secs(60);
+pub const DEFAULT_MAX_HISTORY_DURATION: Duration = Duration::from_secs(24 * 60 * 60 * 10); // 10 day
 
 // HISTORY_VLAUE_WEIGHTS are only determined by max_intervals and
 // OPTIMISTIC_HISTORY_WEIGHT. Right now, all peers share same configuration, so
@@ -83,7 +83,7 @@ impl Deref for FadedMemory {
 }
 
 impl FadedMemory {
-    pub fn new(history_value: f64) -> Self {
+    fn new(history_value: f64) -> Self {
         FadedMemory(history_value)
     }
 }
@@ -99,7 +99,7 @@ struct History {
 }
 
 impl History {
-    pub fn new(max_intervals: u64, max_memorys: u64) -> History {
+    fn new(max_intervals: u64, max_memorys: u64) -> History {
         History {
             max_intervals,
             max_memorys,
@@ -117,7 +117,10 @@ impl History {
             let i = self.intervals;
             self.weights_sum += match HISTORY_TRUST_WEIGHTS.read().get(i as usize - 1).cloned() {
                 Some(v) => v,
-                None => OPTIMISTIC_HISTORY_WEIGHT.powf((i - 1) as f64),
+                None => {
+                    log::warn!(target: "p2p-trust-metric", "precalculated history interval {} trust weight not found", i);
+                    OPTIMISTIC_HISTORY_WEIGHT.powf((i - 1) as f64)
+                }
             };
         }
 
@@ -126,16 +129,16 @@ impl History {
             return;
         }
 
-        let memento = self.memorys.len();
-        self.memorys.insert(0, FadedMemory::new(trust_value));
+        // Update faded memorys
+        let memento = self.memorys.len() - 1;
         self.memorys = (1..=memento)
             .map(|j| {
-                let ftv = (*self.memorys[j - 1]
-                    + (*self.memorys[j] * (2f64.powf(j as f64) - 1f64)))
-                    / 2f64.powf(j as f64);
+                let w = 2f64.powf(j as f64);
+                let ftv = (*self.memorys[j - 1] + (*self.memorys[j] * (w - 1f64))) / w;
                 FadedMemory::new(ftv)
             })
             .collect::<Vec<_>>();
+        self.memorys.insert(0, FadedMemory::new(trust_value));
     }
 
     fn update_aggregate_trust(&mut self) {
@@ -146,6 +149,7 @@ impl History {
 
         self.aggregate_trust = (1..=intervals).map(|i| {
             let memory_idx = (i as f64).log2().floor() as usize;
+
             let i_hist_trust = match self.memorys.get(memory_idx).cloned() {
                 Some(v) => *v,
                 None => {
@@ -156,8 +160,8 @@ impl History {
             let i_hist_weight = match HISTORY_TRUST_WEIGHTS.read().get(i as usize - 1).cloned() {
                 Some(v) => v,
                 None => {
-                    log::error!(target: "p2p-trust-metric", "history interval {} weight not found", i);
-                    0f64
+                    log::warn!(target: "p2p-trust-metric", "precalculated history interval {} weight not found", i);
+                    OPTIMISTIC_HISTORY_WEIGHT.powf((i - 1) as f64)
                 }
             };
 
@@ -165,6 +169,13 @@ impl History {
         }).sum::<f64>();
 
         log::debug!(target: "p2p-trust-metric", "aggregate trust {}", self.aggregate_trust);
+    }
+
+    fn last_trust(&self) -> f64 {
+        match self.memorys.first().cloned() {
+            Some(v) => *v,
+            None => 0f64,
+        }
     }
 }
 
@@ -189,7 +200,7 @@ impl TrustMetric {
     }
 
     pub fn trust_score(&self) -> u8 {
-        (self.trust_value() * 100f64) as u8 + 1
+        (self.trust_value() * 100f64) as u8
     }
 
     pub fn good_events(&self, num: usize) {
@@ -201,12 +212,12 @@ impl TrustMetric {
     }
 
     pub fn enter_new_interval(&self) {
-        let trust_value = self.trust_value();
-        log::debug!(target: "p2p-trust-metric", "enter new interval, passing trust value {}", trust_value);
+        let latest_trust_value = self.trust_value();
+        log::debug!(target: "p2p-trust-metric", "enter new interval, lastest trust value {}", latest_trust_value);
 
         {
             let mut history = self.history.write();
-            history.remember_interval(trust_value);
+            history.remember_interval(latest_trust_value);
             history.update_aggregate_trust();
         }
 
@@ -215,7 +226,11 @@ impl TrustMetric {
     }
 
     fn trust_value(&self) -> f64 {
-        let proportional_value = self.proportional_value();
+        let proportional_value = match self.proportional_value() {
+            Some(v) => v,
+            None => return self.history.read().last_trust(),
+        };
+
         let intergral_value = self.intergral_value();
         let deviation_value = proportional_value - intergral_value;
         let derivative_value = if deviation_value >= 0f64 {
@@ -224,18 +239,18 @@ impl TrustMetric {
             DERIVATIVE_NEGATIVE_WEIGHT * deviation_value
         };
 
+        log::debug!(target: "p2p-trust-metric", "trust value components: r {:?}, h {}, d {}", proportional_value, intergral_value, derivative_value);
         proportional_value + intergral_value + derivative_value
     }
 
-    fn proportional_value(&self) -> f64 {
-        let base = 1.0;
+    fn proportional_value(&self) -> Option<f64> {
         let good_events = self.good_events.load(SeqCst);
         let total = good_events + self.bad_events.load(SeqCst);
 
         if total > 0 {
-            (good_events as f64 / total as f64) * PROPORTIONAL_WEIGHT
+            Some((good_events as f64 / total as f64) * PROPORTIONAL_WEIGHT)
         } else {
-            base * PROPORTIONAL_WEIGHT
+            None
         }
     }
 
@@ -257,10 +272,16 @@ mod tests {
         let config = Arc::new(TrustMetricConfig::default());
         let metric = TrustMetric::new(config.clone());
 
-        for _ in (0..config.max_intervals) {
+        for _ in 0..20 {
             metric.good_events(1);
             metric.enter_new_interval();
         }
-        assert_eq!(metric.trust_score(), 100);
+        assert!(metric.trust_score() > 80);
+
+        for _ in 0..5 {
+            metric.bad_events(1);
+            metric.enter_new_interval();
+        }
+        assert!(metric.trust_score() < 80);
     }
 }
