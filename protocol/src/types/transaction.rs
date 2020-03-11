@@ -26,8 +26,3 @@ pub struct SignedTransaction {
     pub pubkey:    Bytes,
     pub signature: Bytes,
 }
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct WalSaveTxs {
-    pub inner: Vec<SignedTransaction>,
-}

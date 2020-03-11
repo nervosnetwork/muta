@@ -9,7 +9,7 @@ use protocol::fixed_codec::FixedCodec;
 use protocol::types::{Block, Hash, Pill, SignedTransaction};
 use protocol::{traits::MessageCodec, Bytes, BytesMut, ProtocolResult};
 
-use crate::{ConsensusError, MsgType};
+use crate::{ConsensusError, ConsensusType};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum ConsensusRpcRequest {
@@ -36,7 +36,7 @@ impl MessageCodec for ConsensusRpcResponse {
             ConsensusRpcResponse::PullTxs(txs) => {
                 let mut tmp = BytesMut::from(
                     serialize(&txs)
-                        .map_err(|_| ConsensusError::EncodeErr(MsgType::RpcPullTxs))?
+                        .map_err(|_| ConsensusError::EncodeErr(ConsensusType::RpcPullTxs))?
                         .as_slice(),
                 );
                 tmp.extend_from_slice(b"b");
@@ -58,7 +58,7 @@ impl MessageCodec for ConsensusRpcResponse {
 
             b"b" => {
                 let res: FixedSignedTxs = deserialize(&bytes)
-                    .map_err(|_| ConsensusError::DecodeErr(MsgType::RpcPullTxs))?;
+                    .map_err(|_| ConsensusError::DecodeErr(ConsensusType::RpcPullTxs))?;
                 Ok(ConsensusRpcResponse::PullTxs(Box::new(res)))
             }
             _ => unreachable!(),
@@ -145,15 +145,16 @@ pub struct FixedSignedTxs {
     pub inner: Vec<SignedTransaction>,
 }
 
-impl Codec for FixedSignedTxs {
-    fn encode(&self) -> Result<Bytes, Box<dyn Error + Send>> {
-        let bytes = serialize(&self).map_err(|e| e as Box<dyn Error + Send>)?;
+impl ProtocolCodecSync for FixedSignedTxs {
+    fn encode_sync(&self) -> ProtocolResult<Bytes> {
+        let bytes =
+            serialize(&self).map_err(|_| ConsensusError::EncodeErr(ConsensusType::WALSignedTxs))?;
         Ok(Bytes::from(bytes))
     }
 
-    fn decode(data: Bytes) -> Result<Self, Box<dyn Error + Send>> {
-        let res: FixedSignedTxs =
-            deserialize(data.as_ref()).map_err(|e| e as Box<dyn Error + Send>)?;
+    fn decode_sync(data: Bytes) -> ProtocolResult<Self> {
+        let res: FixedSignedTxs = deserialize(data.as_ref())
+            .map_err(|_| ConsensusError::DecodeErr(ConsensusType::WALSignedTxs))?;
         Ok(res)
     }
 }
@@ -252,14 +253,15 @@ mod test {
 
     #[test]
     fn test_txs_codec() {
-        use super::Codec;
+        use super::ProtocolCodecSync;
+
         for _ in 0..10 {
             let fixed_txs = FixedSignedTxs {
                 inner: (0..1000).map(|_| gen_signed_tx()).collect::<Vec<_>>(),
             };
 
-            let bytes = fixed_txs.encode().unwrap();
-            assert_eq!(fixed_txs, FixedSignedTxs::decode(bytes).unwrap());
+            let bytes = fixed_txs.encode_sync().unwrap();
+            assert_eq!(fixed_txs, FixedSignedTxs::decode_sync(bytes).unwrap());
         }
     }
 

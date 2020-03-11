@@ -18,7 +18,7 @@ use common_crypto::BlsPublicKey;
 use common_merkle::Merkle;
 
 use protocol::fixed_codec::FixedCodec;
-use protocol::traits::{ConsensusAdapter, Context, MessageCodec, MessageTarget, NodeInfo};
+use protocol::traits::{ConsensusAdapter, Context, MessageTarget, NodeInfo};
 use protocol::types::{
     Address, Block, BlockHeader, Hash, MerkleRoot, Metadata, Pill, Proof, SignedTransaction,
     Validator,
@@ -32,6 +32,7 @@ use crate::message::{
 };
 use crate::status::StatusAgent;
 use crate::util::{check_list_roots, OverlordCrypto};
+use crate::wal::SignedTxsWAL;
 use crate::ConsensusError;
 
 /// validator is for create new block, and authority is for build overlord
@@ -42,6 +43,7 @@ pub struct ConsensusEngine<Adapter> {
     exemption_hash: RwLock<HashSet<Bytes>>,
 
     adapter: Arc<Adapter>,
+    txs_wal: Arc<SignedTxsWAL>,
     crypto:  Arc<OverlordCrypto>,
     lock:    Arc<Mutex<()>>,
 }
@@ -115,7 +117,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
     async fn check_block(
         &self,
         ctx: Context,
-        _next_height: u64,
+        next_height: u64,
         hash: Bytes,
         block: FixedPill,
     ) -> Result<(), Box<dyn Error + Send>> {
@@ -143,10 +145,10 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             });
         }
 
-        let inner = self.adapter.get_full_txs(ctx, order_hashes).await?;
-        self.adapter
-            .save_wal_transactions(Context::new(), Hash::from_bytes(hash.clone())?, inner)
-            .await?;
+        let txs = self.adapter.get_full_txs(ctx, order_hashes).await?;
+        self.txs_wal
+            .save(next_height, Hash::from_bytes(hash)?, txs)?;
+
         log::info!(
             "[consensus-engine]: check block cost {:?} order_hashes_len {:?}",
             time.elapsed(),
@@ -189,7 +191,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         }
 
         let pill = commit.content.inner;
-        let block_hash = commit.proof.block_hash.clone();
+        let block_hash = Hash::from_bytes(commit.proof.block_hash.clone())?;
         let signature = commit.proof.signature.signature.clone();
         let bitmap = commit.proof.signature.address_bitmap.clone();
 
@@ -197,7 +199,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         let proof = Proof {
             height: commit.proof.height,
             round: commit.proof.round,
-            block_hash: Hash::from_bytes(block_hash.clone())?,
+            block_hash: block_hash.clone(),
             signature,
             bitmap,
         };
@@ -206,17 +208,13 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
 
         // Get full transactions from mempool. If is error, try get from wal.
         let ordered_tx_hashes = pill.block.ordered_tx_hashes.clone();
-        let full_txs = match self
+        let signed_txs = match self
             .adapter
             .get_full_txs(ctx.clone(), ordered_tx_hashes.clone())
             .await
         {
             Ok(txs) => txs,
-            Err(_) => {
-                self.adapter
-                    .load_wal_transactions(ctx.clone(), Hash::from_bytes(block_hash)?)
-                    .await?
-            }
+            Err(_) => self.txs_wal.load(current_height, block_hash)?,
         };
 
         // Execute transactions
@@ -226,11 +224,12 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             pill.block.header.proposer.clone(),
             pill.block.header.timestamp,
             Hash::digest(pill.block.encode_fixed()?),
-            full_txs.clone(),
+            signed_txs.clone(),
         )
         .await?;
 
         trace_block(&pill.block);
+        let block_exec_height = pill.block.header.exec_height;
         let metadata = self.adapter.get_metadata(
             ctx.clone(),
             pill.block.header.state_root.clone(),
@@ -238,7 +237,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             pill.block.header.timestamp,
         )?;
 
-        self.update_status(metadata, pill.block, proof, full_txs)
+        self.update_status(metadata, pill.block, proof, signed_txs)
             .await?;
 
         self.adapter
@@ -248,6 +247,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         self.adapter
             .broadcast_height(ctx.clone(), current_height)
             .await?;
+        self.txs_wal.remove(block_exec_height)?;
 
         let mut set = self.exemption_hash.write();
         set.clear();
@@ -375,7 +375,7 @@ impl<Adapter: ConsensusAdapter + 'static> Wal for ConsensusEngine<Adapter> {
         self.adapter
             .save_overlord_wal(Context::new(), info)
             .await
-            .map_err(|e| ProtocolError::from(ConsensusError::WalErr(e.to_string())))?;
+            .map_err(|e| ProtocolError::from(ConsensusError::Other(e.to_string())))?;
         Ok(())
     }
 
@@ -388,6 +388,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
     pub fn new(
         status_agent: StatusAgent,
         node_info: NodeInfo,
+        wal: Arc<SignedTxsWAL>,
         adapter: Arc<Adapter>,
         crypto: Arc<OverlordCrypto>,
         lock: Arc<Mutex<()>>,
@@ -396,6 +397,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
             status_agent,
             node_info,
             exemption_hash: RwLock::new(HashSet::new()),
+            txs_wal: wal,
             adapter,
             crypto,
             lock,
@@ -574,13 +576,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
         self.status_agent
             .update_by_commited(metadata.clone(), block, block_hash, proof);
         self.update_overlord_crypto(metadata)?;
-        self.save_wal().await
-    }
-
-    async fn save_wal(&self) -> ProtocolResult<()> {
-        let mut info = self.status_agent.to_inner();
-        let wal_info = MessageCodec::encode(&mut info).await?;
-        self.adapter.save_muta_wal(Context::new(), wal_info).await
+        Ok(())
     }
 
     fn update_overlord_crypto(&self, metadata: Metadata) -> ProtocolResult<()> {

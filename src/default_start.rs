@@ -22,7 +22,7 @@ use core_consensus::message::{
 use core_consensus::status::{CurrentConsensusStatus, StatusAgent};
 use core_consensus::{
     DurationConfig, Node, OverlordConsensus, OverlordConsensusAdapter, OverlordSynchronization,
-    WalInfoQueue,
+    SignedTxsWAL,
 };
 use core_mempool::{
     DefaultMemPoolAdapter, HashMemPool, MsgPushTxs, NewTxsHandler, PullTxsHandler,
@@ -132,7 +132,8 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     // Init Block db
     let path_block = config.data_path_for_block();
     log::info!("Data path for block: {:?}", path_block);
-    let rocks_adapter = Arc::new(RocksAdapter::new(path_block)?);
+
+    let rocks_adapter = Arc::new(RocksAdapter::new(path_block.clone())?);
     let storage = Arc::new(ImplStorage::new(Arc::clone(&rocks_adapter)));
 
     // Init network
@@ -196,6 +197,10 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         Arc::clone(&trie_db),
         Arc::clone(&service_mapping),
     );
+
+    // Create full transactions wal
+    let wal_path = config.data_path_for_txs_wal().to_str().unwrap().to_string();
+    let txs_wal = Arc::new(SignedTxsWAL::new(wal_path));
 
     let exec_resp = api_adapter
         .query_service(
@@ -302,11 +307,6 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
 
     core_consensus::trace::init_tracer(my_address.as_hex())?;
 
-    let exec_wal = match storage.load_exec_queue_wal().await {
-        Ok(bytes) => rlp::decode(bytes.as_ref()).unwrap(),
-        Err(_) => WalInfoQueue::new(),
-    };
-
     let mut consensus_adapter =
         OverlordConsensusAdapter::<ServiceExecutorFactory, _, _, _, _, _, _>::new(
             Arc::new(network_service.handle()),
@@ -316,7 +316,6 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
             Arc::clone(&trie_db),
             Arc::clone(&service_mapping),
             status_agent.clone(),
-            exec_wal,
         )?;
 
     let exec_demon = consensus_adapter.take_exec_demon();
@@ -329,6 +328,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         bls_pub_keys,
         bls_priv_key,
         common_ref,
+        txs_wal,
         Arc::clone(&consensus_adapter),
         Arc::clone(&lock),
     ));
