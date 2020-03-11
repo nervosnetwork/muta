@@ -9,7 +9,7 @@ use protocol::fixed_codec::FixedCodec;
 use protocol::types::{Block, Hash, Pill, SignedTransaction};
 use protocol::{traits::MessageCodec, Bytes, BytesMut, ProtocolResult};
 
-use crate::{ConsensusError, MsgType};
+use crate::{ConsensusError, ConsensusType};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum ConsensusRpcRequest {
@@ -36,7 +36,7 @@ impl MessageCodec for ConsensusRpcResponse {
             ConsensusRpcResponse::PullTxs(txs) => {
                 let mut tmp = BytesMut::from(
                     serialize(&txs)
-                        .map_err(|_| ConsensusError::EncodeErr(MsgType::RpcPullTxs))?
+                        .map_err(|_| ConsensusError::EncodeErr(ConsensusType::RpcPullTxs))?
                         .as_slice(),
                 );
                 tmp.extend_from_slice(b"b");
@@ -58,7 +58,7 @@ impl MessageCodec for ConsensusRpcResponse {
 
             b"b" => {
                 let res: FixedSignedTxs = deserialize(&bytes)
-                    .map_err(|_| ConsensusError::DecodeErr(MsgType::RpcPullTxs))?;
+                    .map_err(|_| ConsensusError::DecodeErr(ConsensusType::RpcPullTxs))?;
                 Ok(ConsensusRpcResponse::PullTxs(Box::new(res)))
             }
             _ => unreachable!(),
@@ -148,13 +148,13 @@ pub struct FixedSignedTxs {
 impl ProtocolCodecSync for FixedSignedTxs {
     fn encode_sync(&self) -> ProtocolResult<Bytes> {
         let bytes =
-            serialize(&self).map_err(|_| ConsensusError::EncodeErr(MsgType::WalSignedTxs))?;
+            serialize(&self).map_err(|_| ConsensusError::EncodeErr(ConsensusType::WALSignedTxs))?;
         Ok(Bytes::from(bytes))
     }
 
     fn decode_sync(data: Bytes) -> ProtocolResult<Self> {
         let res: FixedSignedTxs = deserialize(data.as_ref())
-            .map_err(|_| ConsensusError::DecodeErr(MsgType::WalSignedTxs))?;
+            .map_err(|_| ConsensusError::DecodeErr(ConsensusType::WALSignedTxs))?;
         Ok(res)
     }
 }

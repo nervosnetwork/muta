@@ -20,7 +20,7 @@ use crate::fixed_types::FixedPill;
 use crate::status::StatusAgent;
 use crate::util::OverlordCrypto;
 use crate::wal::SignedTxsWAL;
-use crate::{ConsensusError, MsgType};
+use crate::{ConsensusError, ConsensusType};
 
 /// Provide consensus
 pub struct OverlordConsensus<Adapter: ConsensusAdapter + 'static> {
@@ -36,7 +36,7 @@ pub struct OverlordConsensus<Adapter: ConsensusAdapter + 'static> {
 impl<Adapter: ConsensusAdapter + 'static> Consensus for OverlordConsensus<Adapter> {
     async fn set_proposal(&self, ctx: Context, proposal: Vec<u8>) -> ProtocolResult<()> {
         let signed_proposal: SignedProposal<FixedPill> = rlp::decode(&proposal)
-            .map_err(|_| ConsensusError::DecodeErr(MsgType::SignedProposal))?;
+            .map_err(|_| ConsensusError::DecodeErr(ConsensusType::SignedProposal))?;
         self.handler
             .send_msg(ctx, OverlordMsg::SignedProposal(signed_proposal))
             .map_err(|e| ConsensusError::OverlordErr(Box::new(e)))?;
@@ -45,7 +45,7 @@ impl<Adapter: ConsensusAdapter + 'static> Consensus for OverlordConsensus<Adapte
 
     async fn set_vote(&self, ctx: Context, vote: Vec<u8>) -> ProtocolResult<()> {
         let signed_vote: SignedVote =
-            rlp::decode(&vote).map_err(|_| ConsensusError::DecodeErr(MsgType::SignedVote))?;
+            rlp::decode(&vote).map_err(|_| ConsensusError::DecodeErr(ConsensusType::SignedVote))?;
         self.handler
             .send_msg(ctx, OverlordMsg::SignedVote(signed_vote))
             .map_err(|e| ConsensusError::OverlordErr(Box::new(e)))?;
@@ -53,8 +53,8 @@ impl<Adapter: ConsensusAdapter + 'static> Consensus for OverlordConsensus<Adapte
     }
 
     async fn set_qc(&self, ctx: Context, qc: Vec<u8>) -> ProtocolResult<()> {
-        let aggregated_vote: AggregatedVote =
-            rlp::decode(&qc).map_err(|_| ConsensusError::DecodeErr(MsgType::AggregateVote))?;
+        let aggregated_vote: AggregatedVote = rlp::decode(&qc)
+            .map_err(|_| ConsensusError::DecodeErr(ConsensusType::AggregateVote))?;
         self.handler
             .send_msg(ctx, OverlordMsg::AggregatedVote(aggregated_vote))
             .map_err(|e| ConsensusError::OverlordErr(Box::new(e)))?;
@@ -62,8 +62,8 @@ impl<Adapter: ConsensusAdapter + 'static> Consensus for OverlordConsensus<Adapte
     }
 
     async fn set_choke(&self, ctx: Context, choke: Vec<u8>) -> ProtocolResult<()> {
-        let signed_choke: SignedChoke =
-            rlp::decode(&choke).map_err(|_| ConsensusError::DecodeErr(MsgType::SignedChoke))?;
+        let signed_choke: SignedChoke = rlp::decode(&choke)
+            .map_err(|_| ConsensusError::DecodeErr(ConsensusType::SignedChoke))?;
         self.handler
             .send_msg(ctx, OverlordMsg::SignedChoke(signed_choke))
             .map_err(|e| ConsensusError::OverlordErr(Box::new(e)))?;

@@ -27,7 +27,7 @@ use protocol::types::Hash;
 use protocol::{ProtocolError, ProtocolErrorKind};
 
 #[derive(Clone, Debug, Display, PartialEq, Eq)]
-pub enum MsgType {
+pub enum ConsensusType {
     #[display(fmt = "Signed Proposal")]
     SignedProposal,
 
@@ -49,8 +49,8 @@ pub enum MsgType {
     #[display(fmt = "Signed Choke")]
     SignedChoke,
 
-    #[display(fmt = "Wal Signed Transactions")]
-    WalSignedTxs,
+    #[display(fmt = "WAL Signed Transactions")]
+    WALSignedTxs,
 }
 
 /// Consensus errors defines here.
@@ -58,7 +58,7 @@ pub enum MsgType {
 pub enum ConsensusError {
     /// Send consensus message error.
     #[display(fmt = "Send {:?} message failed", _0)]
-    SendMsgErr(MsgType),
+    SendMsgErr(ConsensusType),
 
     /// Check block error.
     #[display(fmt = "Check invalid prev_hash, expect {:?} get {:?}", expect, actual)]
@@ -69,11 +69,11 @@ pub enum ConsensusError {
 
     /// Decode consensus message error.
     #[display(fmt = "Decode {:?} message failed", _0)]
-    DecodeErr(MsgType),
+    DecodeErr(ConsensusType),
 
     /// Encode consensus message error.
     #[display(fmt = "Encode {:?} message failed", _0)]
-    EncodeErr(MsgType),
+    EncodeErr(ConsensusType),
 
     /// Overlord consensus protocol error.
     #[display(fmt = "Overlord error {:?}", _0)]
@@ -101,7 +101,7 @@ pub enum ConsensusError {
 
     /// The Rpc response mismatch the request.
     #[display(fmt = "Synchronization Rpc {:?} message mismatch", _0)]
-    RpcErr(MsgType),
+    RpcErr(ConsensusType),
 
     ///
     #[display(fmt = "Get merkle root failed {:?}", _0)]
@@ -112,7 +112,7 @@ pub enum ConsensusError {
     ExecuteErr(String),
 
     ///
-    WalErr(std::io::Error),
+    WALErr(std::io::Error),
 
     /// Other error used for very few errors.
     #[display(fmt = "{:?}", _0)]

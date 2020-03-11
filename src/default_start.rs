@@ -199,7 +199,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     );
 
     // Create full transactions wal
-    let wal_path = config.data_path_for_wal().to_str().unwrap().to_string();
+    let wal_path = config.data_path_for_txs_wal().to_str().unwrap().to_string();
     let txs_wal = Arc::new(SignedTxsWAL::new(wal_path));
 
     let exec_resp = api_adapter

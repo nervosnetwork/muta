@@ -34,7 +34,7 @@ impl SignedTxsWAL {
         let mut dir = self.path.clone();
         dir.push(height.to_string());
         if !Path::new(&dir).exists() {
-            fs::create_dir(&dir).map_err(ConsensusError::WalErr)?;
+            fs::create_dir(&dir).map_err(ConsensusError::WALErr)?;
         }
 
         dir.push(block_hash.as_hex());
@@ -45,12 +45,12 @@ impl SignedTxsWAL {
             .write(true)
             .create(true)
             .open(dir)
-            .map_err(ConsensusError::WalErr)?;
+            .map_err(ConsensusError::WALErr)?;
 
         let data = FixedSignedTxs::new(txs).encode_sync()?;
         wal_file
             .write_all(data.as_ref())
-            .map_err(ConsensusError::WalErr)?;
+            .map_err(ConsensusError::WALErr)?;
         Ok(())
     }
 
@@ -61,17 +61,17 @@ impl SignedTxsWAL {
         file_path.set_extension("txt");
 
         let mut read_buf = Vec::new();
-        let mut file = fs::File::open(&file_path).map_err(ConsensusError::WalErr)?;
+        let mut file = fs::File::open(&file_path).map_err(ConsensusError::WALErr)?;
         let _ = file
             .read_to_end(&mut read_buf)
-            .map_err(ConsensusError::WalErr)?;
+            .map_err(ConsensusError::WALErr)?;
         let txs: FixedSignedTxs = ProtocolCodecSync::decode_sync(Bytes::from(read_buf))?;
         Ok(txs.inner)
     }
 
     pub fn remove(&self, till: u64) -> ProtocolResult<()> {
-        for entry in fs::read_dir(&self.path).map_err(ConsensusError::WalErr)? {
-            let folder = entry.map_err(ConsensusError::WalErr)?.path();
+        for entry in fs::read_dir(&self.path).map_err(ConsensusError::WALErr)? {
+            let folder = entry.map_err(ConsensusError::WALErr)?.path();
             let folder_name = folder
                 .file_stem()
                 .ok_or_else(|| ConsensusError::Other("file stem error".to_string()))?
@@ -85,7 +85,7 @@ impl SignedTxsWAL {
             })?;
 
             if height < till {
-                fs::remove_dir_all(folder).map_err(ConsensusError::WalErr)?;
+                fs::remove_dir_all(folder).map_err(ConsensusError::WALErr)?;
             }
         }
         Ok(())
