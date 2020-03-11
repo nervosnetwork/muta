@@ -6,6 +6,7 @@ mod retry;
 mod save_restore;
 mod shared;
 mod time;
+mod trust_metric;
 
 use addr_set::PeerAddrSet;
 use peer::Peer;
