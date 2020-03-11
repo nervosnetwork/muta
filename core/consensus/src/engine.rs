@@ -147,7 +147,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
 
         let txs = self.adapter.get_full_txs(ctx, order_hashes).await?;
         self.full_txs
-            .save_txs(next_height, Hash::from_bytes(hash)?, txs)?;
+            .save(next_height, Hash::from_bytes(hash)?, txs)?;
 
         log::info!(
             "[consensus-engine]: check block cost {:?} order_hashes_len {:?}",
@@ -214,7 +214,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             .await
         {
             Ok(txs) => txs,
-            Err(_) => self.full_txs.load_txs(current_height, block_hash)?,
+            Err(_) => self.full_txs.load(current_height, block_hash)?,
         };
 
         // Execute transactions

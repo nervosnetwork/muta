@@ -200,7 +200,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
 
     // Create full transactions wal
     let wal_path = config.data_path_for_wal().to_str().unwrap().to_string();
-    let muta_wal = Arc::new(FullTxsWal::new(wal_path));
+    let txs_wal = Arc::new(FullTxsWal::new(wal_path));
 
     let exec_resp = api_adapter
         .query_service(
@@ -328,7 +328,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         bls_pub_keys,
         bls_priv_key,
         common_ref,
-        muta_wal,
+        txs_wal,
         Arc::clone(&consensus_adapter),
         Arc::clone(&lock),
     ));

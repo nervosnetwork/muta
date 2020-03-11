@@ -21,7 +21,7 @@ impl FullTxsWal {
         FullTxsWal { path }
     }
 
-    pub fn save_txs(
+    pub fn save(
         &self,
         height: u64,
         block_hash: Hash,
@@ -46,11 +46,7 @@ impl FullTxsWal {
         Ok(())
     }
 
-    pub fn load_txs(
-        &self,
-        height: u64,
-        block_hash: Hash,
-    ) -> ProtocolResult<Vec<SignedTransaction>> {
+    pub fn load(&self, height: u64, block_hash: Hash) -> ProtocolResult<Vec<SignedTransaction>> {
         let file_path =
             self.path.clone() + "/" + &height.to_string() + "/" + &block_hash.as_hex() + ".txt";
         let mut read_buf = Vec::new();

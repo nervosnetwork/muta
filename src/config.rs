@@ -120,7 +120,7 @@ impl Config {
 
     pub fn data_path_for_wal(&self) -> PathBuf {
         let mut path_state = self.data_path.clone();
-        path_state.push("muta_wal");
+        path_state.push("txs_wal");
         path_state
     }
 }

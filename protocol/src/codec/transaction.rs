@@ -58,12 +58,6 @@ pub struct SignedTransaction {
     pub signature: Vec<u8>,
 }
 
-#[derive(Clone, Message)]
-pub struct WalSaveTxs {
-    #[prost(message, repeated, tag = "1")]
-    pub inner: Vec<SignedTransaction>,
-}
-
 // #################
 // Conversion
 // #################
@@ -169,34 +163,8 @@ impl TryFrom<SignedTransaction> for transaction::SignedTransaction {
     }
 }
 
-// WalSaveTxs
-
-impl From<transaction::WalSaveTxs> for WalSaveTxs {
-    fn from(wtxs: transaction::WalSaveTxs) -> WalSaveTxs {
-        let inner = wtxs
-            .inner
-            .into_iter()
-            .map(SignedTransaction::from)
-            .collect();
-        WalSaveTxs { inner }
-    }
-}
-
-impl TryFrom<WalSaveTxs> for transaction::WalSaveTxs {
-    type Error = ProtocolError;
-
-    fn try_from(wtxs: WalSaveTxs) -> Result<transaction::WalSaveTxs, Self::Error> {
-        let inner = wtxs
-            .inner
-            .into_iter()
-            .map(transaction::SignedTransaction::try_from)
-            .collect::<Result<Vec<transaction::SignedTransaction>, ProtocolError>>()?;
-        Ok(transaction::WalSaveTxs { inner })
-    }
-}
-
 // #################
 // Codec
 // #################
 
-impl_default_bytes_codec_for!(transaction, [RawTransaction, SignedTransaction, WalSaveTxs]);
+impl_default_bytes_codec_for!(transaction, [RawTransaction, SignedTransaction]);

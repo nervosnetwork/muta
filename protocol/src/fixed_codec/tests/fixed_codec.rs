@@ -49,7 +49,6 @@ fn test_fixed_codec() {
 
     test_eq!(transaction, RawTransaction, mock_raw_tx);
     test_eq!(transaction, SignedTransaction, mock_sign_tx);
-    test_eq!(transaction, WalSaveTxs, mock_wal_txs);
 
     test_eq!(block, Proof, mock_proof);
     test_eq!(block, BlockHeader, mock_block_header);
