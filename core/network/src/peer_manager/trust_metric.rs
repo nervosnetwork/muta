@@ -170,13 +170,6 @@ impl History {
 
         log::debug!(target: "p2p-trust-metric", "aggregate trust {}", self.aggregate_trust);
     }
-
-    fn last_trust(&self) -> f64 {
-        match self.memorys.first().cloned() {
-            Some(v) => *v,
-            None => 0f64,
-        }
-    }
 }
 
 pub struct TrustMetric {
@@ -228,7 +221,7 @@ impl TrustMetric {
     fn trust_value(&self) -> f64 {
         let proportional_value = match self.proportional_value() {
             Some(v) => v,
-            None => return self.history.read().last_trust(),
+            None => return self.history.read().aggregate_trust,
         };
 
         let intergral_value = self.intergral_value();
@@ -276,12 +269,18 @@ mod tests {
             metric.good_events(1);
             metric.enter_new_interval();
         }
-        assert!(metric.trust_score() > 80);
+        assert!(metric.trust_score() > 90);
 
         for _ in 0..5 {
             metric.bad_events(1);
             metric.enter_new_interval();
         }
-        assert!(metric.trust_score() < 80);
+        assert!(metric.trust_score() < 70);
+
+        for _ in 0..20 {
+            metric.good_events(1);
+            metric.enter_new_interval();
+        }
+        assert!(metric.trust_score() > 80 && metric.trust_score() < 90);
     }
 }
