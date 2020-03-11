@@ -8,17 +8,17 @@ use protocol::ProtocolResult;
 use crate::ConsensusError;
 
 #[derive(Debug)]
-pub struct FullTxsWal {
+pub struct SignedTxsWAL {
     path: String,
 }
 
-impl FullTxsWal {
+impl SignedTxsWAL {
     pub fn new(path: String) -> Self {
         if !Path::new(&path).exists() {
             fs::create_dir_all(&path).expect("Failed to create wal directory");
         }
 
-        FullTxsWal { path }
+        SignedTxsWAL { path }
     }
 
     pub fn save(
@@ -135,7 +135,7 @@ mod test {
 
     #[test]
     fn test_txs_wal() {
-        let wal = FullTxsWal::new(FULL_TXS_PATH.to_string());
+        let wal = SignedTxsWAL::new(FULL_TXS_PATH.to_string());
         let txs_01 = mock_wal_txs();
         let hash_01 = Hash::digest(Bytes::from(rlp::encode_list(&txs_01)));
         wal.save(1u64, hash_01.clone(), txs_01.clone()).unwrap();

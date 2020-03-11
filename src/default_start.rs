@@ -21,7 +21,7 @@ use core_consensus::message::{
 };
 use core_consensus::status::{CurrentConsensusStatus, StatusAgent};
 use core_consensus::{
-    DurationConfig, FullTxsWal, Node, OverlordConsensus, OverlordConsensusAdapter,
+    DurationConfig, SignedTxsWAL, Node, OverlordConsensus, OverlordConsensusAdapter,
     OverlordSynchronization,
 };
 use core_mempool::{
@@ -200,7 +200,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
 
     // Create full transactions wal
     let wal_path = config.data_path_for_wal().to_str().unwrap().to_string();
-    let txs_wal = Arc::new(FullTxsWal::new(wal_path));
+    let txs_wal = Arc::new(SignedTxsWAL::new(wal_path));
 
     let exec_resp = api_adapter
         .query_service(

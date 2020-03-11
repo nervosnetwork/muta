@@ -32,7 +32,7 @@ use crate::message::{
 };
 use crate::status::StatusAgent;
 use crate::util::{check_list_roots, OverlordCrypto};
-use crate::wal::FullTxsWal;
+use crate::wal::SignedTxsWAL;
 use crate::ConsensusError;
 
 /// validator is for create new block, and authority is for build overlord
@@ -43,7 +43,7 @@ pub struct ConsensusEngine<Adapter> {
     exemption_hash: RwLock<HashSet<Bytes>>,
 
     adapter:  Arc<Adapter>,
-    full_txs: Arc<FullTxsWal>,
+    full_txs: Arc<SignedTxsWAL>,
     crypto:   Arc<OverlordCrypto>,
     lock:     Arc<Mutex<()>>,
 }
@@ -388,7 +388,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
     pub fn new(
         status_agent: StatusAgent,
         node_info: NodeInfo,
-        wal: Arc<FullTxsWal>,
+        wal: Arc<SignedTxsWAL>,
         adapter: Arc<Adapter>,
         crypto: Arc<OverlordCrypto>,
         lock: Arc<Mutex<()>>,

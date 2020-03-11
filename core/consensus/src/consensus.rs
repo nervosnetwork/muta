@@ -19,7 +19,7 @@ use crate::engine::ConsensusEngine;
 use crate::fixed_types::FixedPill;
 use crate::status::StatusAgent;
 use crate::util::OverlordCrypto;
-use crate::wal::FullTxsWal;
+use crate::wal::SignedTxsWAL;
 use crate::{ConsensusError, MsgType};
 
 /// Provide consensus
@@ -78,7 +78,7 @@ impl<Adapter: ConsensusAdapter + 'static> OverlordConsensus<Adapter> {
         addr_pubkey_map: HashMap<Bytes, BlsPublicKey>,
         priv_key: BlsPrivateKey,
         common_ref: BlsCommonReference,
-        wal: Arc<FullTxsWal>,
+        txs_wal: Arc<SignedTxsWAL>,
         adapter: Arc<Adapter>,
         lock: Arc<Mutex<()>>,
     ) -> Self {
@@ -87,7 +87,7 @@ impl<Adapter: ConsensusAdapter + 'static> OverlordConsensus<Adapter> {
         let engine = Arc::new(ConsensusEngine::new(
             status_agent.clone(),
             node_info.clone(),
-            wal,
+            txs_wal,
             Arc::clone(&adapter),
             Arc::clone(&crypto),
             lock,
