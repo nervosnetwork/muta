@@ -102,7 +102,7 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
         state_root: genesis_state_root,
         receipt_root: vec![],
         cycles_used: vec![],
-        proposer: Address::from_hex("0000000000000000000000000000000000000000")?,
+        proposer: Address::from_hex("0x0000000000000000000000000000000000000000")?,
         proof: Proof {
             height:     0,
             round:      0,
@@ -145,12 +145,15 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         .write_timeout(config.network.write_timeout)
         .recv_buffer_size(config.network.recv_buffer_size.clone());
 
-    let network_privkey = config.privkey.clone();
+    let network_privkey = config.privkey.as_string_trim0x();
 
     let mut bootstrap_pairs = vec![];
     if let Some(bootstrap) = &config.network.bootstraps {
         for bootstrap in bootstrap.iter() {
-            bootstrap_pairs.push((bootstrap.pubkey.to_owned(), bootstrap.address.to_owned()));
+            bootstrap_pairs.push((
+                bootstrap.pubkey.as_string_trim0x(),
+                bootstrap.address.to_owned(),
+            ));
         }
     }
 
@@ -180,7 +183,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     let trie_db = Arc::new(RocksTrieDB::new(path_state, config.executor.light)?);
 
     // self private key
-    let hex_privkey = hex::decode(config.privkey.clone()).map_err(MainError::FromHex)?;
+    let hex_privkey = hex::decode(config.privkey.as_string_trim0x()).map_err(MainError::FromHex)?;
     let my_privkey =
         Secp256k1PrivateKey::try_from(hex_privkey.as_ref()).map_err(MainError::Crypto)?;
     let my_pubkey = my_privkey.pub_key();
@@ -248,29 +251,29 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         self_address: my_address.clone(),
     };
     let current_header = &current_block.header;
-    let prevhash = Hash::digest(current_block.encode_fixed()?);
+    let block_hash = Hash::digest(current_block.encode_fixed()?);
 
     let current_consensus_status = CurrentConsensusStatus {
-        cycles_price:       metadata.cycles_price,
-        cycles_limit:       metadata.cycles_limit,
-        height:             current_block.header.height + 1,
-        exec_height:        current_block.header.height,
-        prev_hash:          prevhash,
-        latest_state_root:  current_header.state_root.clone(),
-        logs_bloom:         vec![],
-        confirm_root:       vec![],
-        state_root:         vec![current_header.state_root.clone()],
-        receipt_root:       vec![],
-        cycles_used:        vec![],
-        proof:              current_header.proof.clone(),
-        validators:         validators.clone(),
-        consensus_interval: metadata.interval,
-        propose_ratio:      metadata.propose_ratio,
-        prevote_ratio:      metadata.prevote_ratio,
-        precommit_ratio:    metadata.precommit_ratio,
-        brake_ratio:        metadata.brake_ratio,
-        max_tx_size:        metadata.max_tx_size,
-        tx_num_limit:       metadata.tx_num_limit,
+        cycles_price:               metadata.cycles_price,
+        cycles_limit:               metadata.cycles_limit,
+        current_height:             current_block.header.height,
+        exec_height:                current_block.header.height,
+        current_hash:               block_hash,
+        latest_commited_state_root: current_header.state_root.clone(),
+        list_logs_bloom:            vec![],
+        list_confirm_root:          vec![],
+        list_state_root:            vec![],
+        list_receipt_root:          vec![],
+        list_cycles_used:           vec![],
+        current_proof:              current_header.proof.clone(),
+        validators:                 validators.clone(),
+        consensus_interval:         metadata.interval,
+        propose_ratio:              metadata.propose_ratio,
+        prevote_ratio:              metadata.prevote_ratio,
+        precommit_ratio:            metadata.precommit_ratio,
+        brake_ratio:                metadata.brake_ratio,
+        max_tx_size:                metadata.max_tx_size,
+        tx_num_limit:               metadata.tx_num_limit,
     };
 
     let consensus_interval = current_consensus_status.consensus_interval;
@@ -279,19 +282,20 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     let mut bls_pub_keys = HashMap::new();
     for validator_extend in metadata.verifier_list.iter() {
         let address = validator_extend.address.as_bytes();
-        let hex_pubkey =
-            hex::decode(validator_extend.bls_pub_key.clone()).map_err(MainError::FromHex)?;
+        let hex_pubkey = hex::decode(validator_extend.bls_pub_key.as_string_trim0x())
+            .map_err(MainError::FromHex)?;
         let pub_key = BlsPublicKey::try_from(hex_pubkey.as_ref()).map_err(MainError::Crypto)?;
         bls_pub_keys.insert(address, pub_key);
     }
 
     let mut priv_key = Vec::new();
     priv_key.extend_from_slice(&[0u8; 16]);
-    let mut tmp = hex::decode(config.privkey.clone()).unwrap();
+    let mut tmp = hex::decode(config.privkey.as_string_trim0x()).unwrap();
     priv_key.append(&mut tmp);
     let bls_priv_key = BlsPrivateKey::try_from(priv_key.as_ref()).map_err(MainError::Crypto)?;
 
-    let hex_common_ref = hex::decode(metadata.common_ref.as_str()).map_err(MainError::FromHex)?;
+    let hex_common_ref =
+        hex::decode(metadata.common_ref.as_string_trim0x()).map_err(MainError::FromHex)?;
     let common_ref: BlsCommonReference = std::str::from_utf8(hex_common_ref.as_ref())
         .map_err(MainError::Utf8)?
         .into();

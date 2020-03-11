@@ -50,34 +50,34 @@ pub struct Bytes(String);
 
 impl Hash {
     pub fn as_hex(&self) -> String {
-        clean_0x(&self.0).to_owned().to_uppercase()
+        self.0.to_uppercase()
     }
 }
 
 impl Address {
     pub fn as_hex(&self) -> String {
-        clean_0x(&self.0).to_owned().to_uppercase()
+        self.0.to_uppercase()
     }
 }
 
 impl Uint64 {
-    pub fn as_hex(&self) -> String {
-        clean_0x(&self.0).to_owned().to_uppercase()
+    pub fn as_hex(&self) -> ProtocolResult<String> {
+        Ok(clean_0x(&self.0)?.to_uppercase())
     }
 
     pub fn try_into_u64(self) -> ProtocolResult<u64> {
-        let n = u64::from_str_radix(&self.as_hex(), 16).map_err(SchemaError::IntoU64)?;
+        let n = u64::from_str_radix(&self.as_hex()?, 16).map_err(SchemaError::IntoU64)?;
         Ok(n)
     }
 }
 
 impl Bytes {
-    pub fn as_hex(&self) -> String {
-        clean_0x(&self.0).to_owned().to_uppercase()
+    pub fn as_hex(&self) -> ProtocolResult<String> {
+        Ok(clean_0x(&self.0)?.to_uppercase())
     }
 
     pub fn to_vec(&self) -> ProtocolResult<Vec<u8>> {
-        let v = hex::decode(self.as_hex()).map_err(SchemaError::FromHex)?;
+        let v = hex::decode(self.as_hex()?).map_err(SchemaError::FromHex)?;
         Ok(v)
     }
 }
@@ -96,21 +96,21 @@ impl From<protocol::types::Address> for Address {
 
 impl From<u64> for Uint64 {
     fn from(n: u64) -> Self {
-        Uint64(hex::encode(n.to_be_bytes().to_vec()))
+        Uint64("0x".to_owned() + &hex::encode(n.to_be_bytes().to_vec()))
     }
 }
 
 impl From<protocol::Bytes> for Bytes {
     fn from(bytes: protocol::Bytes) -> Self {
-        Bytes(hex::encode(bytes))
+        Bytes("0x".to_owned() + &hex::encode(bytes))
     }
 }
 
-fn clean_0x(s: &str) -> &str {
-    if s.starts_with("0x") {
-        &s[2..]
+fn clean_0x(s: &str) -> ProtocolResult<String> {
+    if s.starts_with("0x") || s.starts_with("0X") {
+        Ok(s[2..].to_owned())
     } else {
-        s
+        Err(SchemaError::HexPrefix.into())
     }
 }
 
@@ -121,6 +121,9 @@ pub enum SchemaError {
 
     #[display(fmt = "from hex {:?}", _0)]
     FromHex(hex::FromHexError),
+
+    #[display(fmt = "hex should start with 0x")]
+    HexPrefix,
 }
 
 impl std::error::Error for SchemaError {}

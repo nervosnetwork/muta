@@ -1,4 +1,4 @@
-privkey = "926bb710e17454a78d71e36c16a5cd3536f8483943112ce6979adeb78caa61bc"
+privkey = "0x926bb710e17454a78d71e36c16a5cd3536f8483943112ce6979adeb78caa61bc"
 data_path = "/app/devtools/chain/data"
 
 [graphql]
@@ -13,7 +13,7 @@ max_payload_size = 1048576
 listening_address = "0.0.0.0:1339"
 rpc_timeout = 10
 [[network.bootstraps]]
-pubkey = "035cbdb9a9617a011cd780c036da0ac8641b681803bbfefdda207806de856df321"
+pubkey = "0x035cbdb9a9617a011cd780c036da0ac8641b681803bbfefdda207806de856df321"
 address = "173.20.0.21:1337"
 
 [mempool]

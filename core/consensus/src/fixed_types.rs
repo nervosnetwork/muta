@@ -181,7 +181,7 @@ mod test {
 
     fn gen_block(height: u64, block_hash: Hash) -> Block {
         let nonce = Hash::digest(Bytes::from("XXXX"));
-        let addr_str = "CAB8EEA4799C21379C20EF5BAA2CC8AF1BEC475B";
+        let addr_str = "0xCAB8EEA4799C21379C20EF5BAA2CC8AF1BEC475B";
         let header = BlockHeader {
             chain_id: nonce.clone(),
             height,

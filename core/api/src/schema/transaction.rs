@@ -83,9 +83,9 @@ pub fn to_signed_transaction(
     raw: InputRawTransaction,
     encryption: InputTransactionEncryption,
 ) -> ProtocolResult<protocol::types::SignedTransaction> {
-    let pubkey: &[u8] = &hex::decode(encryption.pubkey.as_hex()).map_err(SchemaError::from)?;
+    let pubkey: &[u8] = &hex::decode(encryption.pubkey.as_hex()?).map_err(SchemaError::from)?;
     let signature: &[u8] =
-        &hex::decode(encryption.signature.as_hex()).map_err(SchemaError::from)?;
+        &hex::decode(encryption.signature.as_hex()?).map_err(SchemaError::from)?;
 
     Ok(protocol::types::SignedTransaction {
         raw:       to_transaction(raw)?,

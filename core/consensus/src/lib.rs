@@ -49,30 +49,6 @@ pub enum MsgType {
     SignedChoke,
 }
 
-#[derive(Clone, Debug, Display)]
-pub enum StatusCacheField {
-    #[display(fmt = "Previous Hash")]
-    PrevHash,
-
-    #[display(fmt = "State Root")]
-    StateRoot,
-
-    #[display(fmt = "Receipt Root")]
-    ReceiptRoot,
-
-    #[display(fmt = "Ordered Root")]
-    OrderedRoot,
-
-    #[display(fmt = "Confirm Root")]
-    ConfirmRoot,
-
-    #[display(fmt = "Cycles Used")]
-    CyclesUsed,
-
-    #[display(fmt = "Logs Bloom")]
-    LogsBloom,
-}
-
 /// Consensus errors defines here.
 #[derive(Debug, Display)]
 pub enum ConsensusError {
@@ -81,8 +57,11 @@ pub enum ConsensusError {
     SendMsgErr(MsgType),
 
     /// Check block error.
-    #[display(fmt = "Check block {:?} error", _0)]
-    CheckBlockErr(StatusCacheField),
+    #[display(fmt = "Check invalid prev_hash, expect {:?} get {:?}", expect, actual)]
+    InvalidPrevhash { expect: Hash, actual: Hash },
+
+    #[display(fmt = "Check invalid status vec")]
+    InvalidStatusVec,
 
     /// Decode consensus message error.
     #[display(fmt = "Decode {:?} message failed", _0)]
@@ -127,10 +106,6 @@ pub enum ConsensusError {
     ///
     #[display(fmt = "Execute transactions error {:?}", _0)]
     ExecuteErr(String),
-
-    ///
-    #[display(fmt = "Status cache error {:?}", _0)]
-    StatusErr(StatusCacheField),
 
     ///
     WalErr(String),

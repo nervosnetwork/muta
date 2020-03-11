@@ -11,8 +11,8 @@ use protocol::fixed_codec::FixedCodec;
 use protocol::traits::{CommonConsensusAdapter, Synchronization, SynchronizationAdapter};
 use protocol::traits::{Context, ExecutorParams, ExecutorResp};
 use protocol::types::{
-    Address, Block, BlockHeader, Bytes, Hash, MerkleRoot, Metadata, Proof, RawTransaction, Receipt,
-    ReceiptResponse, SignedTransaction, TransactionRequest, Validator, ValidatorExtend,
+    Address, Block, BlockHeader, Bytes, Hash, Hex, MerkleRoot, Metadata, Proof, RawTransaction,
+    Receipt, ReceiptResponse, SignedTransaction, TransactionRequest, Validator, ValidatorExtend,
 };
 use protocol::ProtocolResult;
 
@@ -45,27 +45,28 @@ fn sync_gap_test() {
             local_transactions,
             remote_transactions,
         ));
+        let block_hash = Hash::digest(genesis_block.encode_fixed().unwrap());
         let status = CurrentConsensusStatus {
-            cycles_price:       1,
-            cycles_limit:       300_000_000,
-            height:             genesis_block.header.height + 1,
-            exec_height:        genesis_block.header.exec_height,
-            prev_hash:          genesis_block.header.pre_hash,
-            logs_bloom:         vec![],
-            confirm_root:       vec![],
-            latest_state_root:  genesis_block.header.state_root.clone(),
-            state_root:         vec![],
-            receipt_root:       vec![],
-            cycles_used:        vec![],
-            proof:              genesis_block.header.proof,
-            validators:         genesis_block.header.validators,
-            consensus_interval: 3000,
-            propose_ratio:      15,
-            prevote_ratio:      10,
-            precommit_ratio:    10,
-            brake_ratio:        3,
-            tx_num_limit:       20000,
-            max_tx_size:        1_073_741_824,
+            cycles_price:               1,
+            cycles_limit:               300_000_000,
+            current_height:             genesis_block.header.height,
+            exec_height:                genesis_block.header.exec_height,
+            current_hash:               block_hash,
+            list_logs_bloom:            vec![],
+            list_confirm_root:          vec![],
+            latest_commited_state_root: genesis_block.header.state_root.clone(),
+            list_state_root:            vec![],
+            list_receipt_root:          vec![],
+            list_cycles_used:           vec![],
+            current_proof:              genesis_block.header.proof,
+            validators:                 genesis_block.header.validators,
+            consensus_interval:         3000,
+            propose_ratio:              15,
+            prevote_ratio:              10,
+            precommit_ratio:            10,
+            brake_ratio:                3,
+            tx_num_limit:               20000,
+            max_tx_size:                1_073_741_824,
         };
         let status_agent = StatusAgent::new(status);
         let lock = Arc::new(Mutex::new(()));
@@ -74,13 +75,13 @@ fn sync_gap_test() {
 
         let status = status_agent.to_inner();
         let block =
-            block_on(adapter.get_block_by_height(Context::new(), status.height - 1)).unwrap();
+            block_on(adapter.get_block_by_height(Context::new(), status.current_height)).unwrap();
         assert_sync(status, block);
 
         block_on(sync.receive_remote_block(Context::new(), max_height)).unwrap();
         let status = status_agent.to_inner();
         let block =
-            block_on(adapter.get_block_by_height(Context::new(), status.height - 1)).unwrap();
+            block_on(adapter.get_block_by_height(Context::new(), status.current_height)).unwrap();
         assert_sync(status, block);
     }
 }
@@ -237,14 +238,14 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
     ) -> ProtocolResult<Metadata> {
         Ok(Metadata {
             chain_id:        Hash::from_empty(),
-            common_ref:      "703873635a6b51513451".to_string(),
+            common_ref:      Hex::from_string("0x703873635a6b51513451".to_string()).unwrap(),
             timeout_gap:     20,
             cycles_limit:    9999,
             cycles_price:    1,
             interval:        3000,
             verifier_list:   vec![ValidatorExtend {
-                bls_pub_key: "04188ef9488c19458a963cc57b567adde7db8f8b6bec392d5cb7b67b0abc1ed6cd966edc451f6ac2ef38079460eb965e890d1f576e4039a20467820237cda753f07a8b8febae1ec052190973a1bcf00690ea8fc0168b3fbbccd1c4e402eda5ef22".to_owned(),
-                address:        Address::from_hex("1c9776983b2f251fa5c9cc562c1b667d1f05ff83")
+                bls_pub_key: Hex::from_string("0x04188ef9488c19458a963cc57b567adde7db8f8b6bec392d5cb7b67b0abc1ed6cd966edc451f6ac2ef38079460eb965e890d1f576e4039a20467820237cda753f07a8b8febae1ec052190973a1bcf00690ea8fc0168b3fbbccd1c4e402eda5ef22".to_owned()).unwrap(),
+                address:        Address::from_hex("0x1c9776983b2f251fa5c9cc562c1b667d1f05ff83")
                     .unwrap(),
                 propose_weight: 0,
                 vote_weight:    0,
@@ -322,7 +323,7 @@ fn mock_chained_rich_block(len: u64, gap: u64) -> Vec<RichBlock> {
             state_root: Hash::from_empty(),
             receipt_root: vec![],
             cycles_used: vec![],
-            proposer: Address::from_hex("1c9776983b2f251fa5c9cc562c1b667d1f05ff83").unwrap(),
+            proposer: Address::from_hex("0x1c9776983b2f251fa5c9cc562c1b667d1f05ff83").unwrap(),
             proof: Proof {
                 height:     current_height,
                 round:      0,
@@ -332,7 +333,7 @@ fn mock_chained_rich_block(len: u64, gap: u64) -> Vec<RichBlock> {
             },
             validator_version: 0,
             validators: vec![Validator {
-                address:        Address::from_hex("1c9776983b2f251fa5c9cc562c1b667d1f05ff83")
+                address:        Address::from_hex("0x1c9776983b2f251fa5c9cc562c1b667d1f05ff83")
                     .unwrap(),
                 propose_weight: 0,
                 vote_weight:    0,
@@ -393,7 +394,7 @@ fn mock_genesis_rich_block() -> RichBlock {
         state_root:        Hash::from_empty(),
         receipt_root:      vec![],
         cycles_used:       vec![],
-        proposer:          Address::from_hex("1c9776983b2f251fa5c9cc562c1b667d1f05ff83").unwrap(),
+        proposer:          Address::from_hex("0x1c9776983b2f251fa5c9cc562c1b667d1f05ff83").unwrap(),
         proof:             Proof {
             height:     0,
             round:      0,
@@ -403,7 +404,8 @@ fn mock_genesis_rich_block() -> RichBlock {
         },
         validator_version: 0,
         validators:        vec![Validator {
-            address:        Address::from_hex("1c9776983b2f251fa5c9cc562c1b667d1f05ff83").unwrap(),
+            address:        Address::from_hex("0x1c9776983b2f251fa5c9cc562c1b667d1f05ff83")
+                .unwrap(),
             propose_weight: 0,
             vote_weight:    0,
         }],
@@ -498,10 +500,10 @@ fn exec_txs(height: u64, txs: &[SignedTransaction]) -> (ExecutorResp, MerkleRoot
 fn assert_sync(status: CurrentConsensusStatus, latest_block: Block) {
     let exec_gap = latest_block.header.height - latest_block.header.exec_height;
 
-    assert_eq!(status.height - 1, latest_block.header.height);
+    assert_eq!(status.current_height, latest_block.header.height);
     assert_eq!(status.exec_height, latest_block.header.height);
-    assert_eq!(status.confirm_root.len(), exec_gap as usize);
-    assert_eq!(status.cycles_used.len(), exec_gap as usize);
-    assert_eq!(status.logs_bloom.len(), exec_gap as usize);
-    assert_eq!(status.receipt_root.len(), exec_gap as usize);
+    assert_eq!(status.list_confirm_root.len(), exec_gap as usize);
+    assert_eq!(status.list_cycles_used.len(), exec_gap as usize);
+    assert_eq!(status.list_logs_bloom.len(), exec_gap as usize);
+    assert_eq!(status.list_receipt_root.len(), exec_gap as usize);
 }
