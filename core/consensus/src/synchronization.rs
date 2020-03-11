@@ -247,9 +247,8 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
                 .adapter
                 .get_txs_from_remote(ctx.clone(), &tx_hashes)
                 .await?;
-            for tx in remote_txs.into_iter() {
-                txs.push(tx);
-            }
+
+            txs.extend(remote_txs);
         }
 
         Ok(RichBlock { block, txs })
