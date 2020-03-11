@@ -145,15 +145,16 @@ pub struct FixedSignedTxs {
     pub inner: Vec<SignedTransaction>,
 }
 
-impl Codec for FixedSignedTxs {
-    fn encode(&self) -> Result<Bytes, Box<dyn Error + Send>> {
-        let bytes = serialize(&self).map_err(|e| e as Box<dyn Error + Send>)?;
+impl ProtocolCodecSync for FixedSignedTxs {
+    fn encode_sync(&self) -> ProtocolResult<Bytes> {
+        let bytes =
+            serialize(&self).map_err(|_| ConsensusError::EncodeErr(MsgType::WalSignedTxs))?;
         Ok(Bytes::from(bytes))
     }
 
-    fn decode(data: Bytes) -> Result<Self, Box<dyn Error + Send>> {
-        let res: FixedSignedTxs =
-            deserialize(data.as_ref()).map_err(|e| e as Box<dyn Error + Send>)?;
+    fn decode_sync(data: Bytes) -> ProtocolResult<Self> {
+        let res: FixedSignedTxs = deserialize(data.as_ref())
+            .map_err(|_| ConsensusError::DecodeErr(MsgType::WalSignedTxs))?;
         Ok(res)
     }
 }

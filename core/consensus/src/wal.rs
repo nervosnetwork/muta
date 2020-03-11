@@ -1,24 +1,28 @@
 use std::fs;
 use std::io::{Read, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-use protocol::types::{Hash, SignedTransaction};
+use protocol::codec::ProtocolCodecSync;
+use protocol::types::{Bytes, Hash, SignedTransaction};
 use protocol::ProtocolResult;
 
+use crate::fixed_types::FixedSignedTxs;
 use crate::ConsensusError;
 
 #[derive(Debug)]
 pub struct SignedTxsWAL {
-    path: String,
+    path: PathBuf,
 }
 
 impl SignedTxsWAL {
-    pub fn new(path: String) -> Self {
-        if !Path::new(&path).exists() {
+    pub fn new<P: AsRef<Path>>(path: P) -> Self {
+        if !path.as_ref().exists() {
             fs::create_dir_all(&path).expect("Failed to create wal directory");
         }
 
-        SignedTxsWAL { path }
+        SignedTxsWAL {
+            path: path.as_ref().to_path_buf(),
+        }
     }
 
     pub fn save(
@@ -27,35 +31,42 @@ impl SignedTxsWAL {
         block_hash: Hash,
         txs: Vec<SignedTransaction>,
     ) -> ProtocolResult<()> {
-        let dir = self.path.clone() + "/" + &height.to_string();
+        let mut dir = self.path.clone();
+        dir.push(height.to_string());
         if !Path::new(&dir).exists() {
             fs::create_dir(&dir).map_err(ConsensusError::WalErr)?;
         }
 
-        let file_path = dir + "/" + &block_hash.as_hex() + ".txt";
+        dir.push(block_hash.as_hex());
+        dir.set_extension("txt");
+
         let mut wal_file = fs::OpenOptions::new()
             .read(true)
             .write(true)
             .create(true)
-            .open(file_path)
+            .open(dir)
             .map_err(ConsensusError::WalErr)?;
 
+        let data = FixedSignedTxs::new(txs).encode_sync()?;
         wal_file
-            .write_all(&rlp::encode_list(&txs))
+            .write_all(data.as_ref())
             .map_err(ConsensusError::WalErr)?;
         Ok(())
     }
 
     pub fn load(&self, height: u64, block_hash: Hash) -> ProtocolResult<Vec<SignedTransaction>> {
-        let file_path =
-            self.path.clone() + "/" + &height.to_string() + "/" + &block_hash.as_hex() + ".txt";
+        let mut file_path = self.path.clone();
+        file_path.push(height.to_string());
+        file_path.push(block_hash.as_hex());
+        file_path.set_extension("txt");
+
         let mut read_buf = Vec::new();
         let mut file = fs::File::open(&file_path).map_err(ConsensusError::WalErr)?;
         let _ = file
             .read_to_end(&mut read_buf)
             .map_err(ConsensusError::WalErr)?;
-        let txs: Vec<SignedTransaction> = rlp::decode_list(&read_buf);
-        Ok(txs)
+        let txs: FixedSignedTxs = ProtocolCodecSync::decode_sync(Bytes::from(read_buf))?;
+        Ok(txs.inner)
     }
 
     pub fn remove(&self, till: u64) -> ProtocolResult<()> {
