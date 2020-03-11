@@ -1,6 +1,7 @@
 extern crate test;
 
 mod service_call_service;
+mod test_service;
 
 use std::sync::Arc;
 
@@ -20,6 +21,7 @@ use protocol::types::{
 use protocol::ProtocolResult;
 
 use crate::executor::ServiceExecutor;
+use test_service::TestService;
 
 #[test]
 fn test_create_genesis() {
@@ -105,6 +107,84 @@ fn test_exec() {
     assert_eq!(asset.supply, 320_000_011);
 }
 
+#[test]
+fn test_tx_hook() {
+    let toml_str = include_str!("./genesis_services.toml");
+    let genesis: Genesis = toml::from_str(toml_str).unwrap();
+
+    let db = Arc::new(MemoryDB::new(false));
+
+    let root = ServiceExecutor::create_genesis(
+        genesis.services,
+        Arc::clone(&db),
+        Arc::new(MockStorage {}),
+        Arc::new(MockServiceMapping {}),
+    )
+    .unwrap();
+
+    let mut executor = ServiceExecutor::with_root(
+        root.clone(),
+        Arc::clone(&db),
+        Arc::new(MockStorage {}),
+        Arc::new(MockServiceMapping {}),
+    )
+    .unwrap();
+
+    let params = ExecutorParams {
+        state_root:   root,
+        height:       1,
+        timestamp:    0,
+        cycles_limit: std::u64::MAX,
+    };
+
+    // no tx hook
+    let mut stx = mock_signed_tx();
+    stx.raw.request.service_name = "test".to_owned();
+    stx.raw.request.method = "test_write".to_owned();
+    stx.raw.request.payload = r#"{
+        "key": "foo",
+        "value": "bar",
+        "extra": ""
+    }"#
+    .to_owned();
+    let txs = vec![stx.clone()];
+    let executor_resp = executor.exec(&params, &txs).unwrap();
+    let receipt = &executor_resp.receipts[0];
+    assert_eq!(receipt.response.is_error, false);
+    assert_eq!(receipt.events.len(), 0);
+
+    // tx hook
+    stx.raw.request.payload = r#"{
+        "key": "foo",
+        "value": "bar",
+        "extra": "test_hook_before; test_hook_after"
+    }"#
+    .to_owned();
+    let txs = vec![stx.clone()];
+    let executor_resp = executor.exec(&params, &txs).unwrap();
+    let receipt = &executor_resp.receipts[0];
+    assert_eq!(receipt.response.is_error, false);
+    assert_eq!(receipt.events.len(), 2);
+    assert_eq!(&receipt.events[0].data, "test_tx_hook_before invoked");
+    assert_eq!(&receipt.events[1].data, "test_tx_hook_after invoked");
+
+    // test_service_call_invoke_hook_only_once
+    stx.raw.request.method = "test_service_call_invoke_hook_only_once".to_owned();
+    stx.raw.request.payload = r#"{
+        "key": "foo",
+        "value": "bar",
+        "extra": "test_hook_before; test_hook_after"
+    }"#
+    .to_owned();
+    let txs = vec![stx];
+    let executor_resp = executor.exec(&params, &txs).unwrap();
+    let receipt = &executor_resp.receipts[0];
+    assert_eq!(receipt.response.is_error, false);
+    assert_eq!(receipt.events.len(), 2);
+    assert_eq!(&receipt.events[0].data, "test_tx_hook_before invoked");
+    assert_eq!(&receipt.events[1].data, "test_tx_hook_after invoked");
+}
+
 #[bench]
 fn bench_execute(b: &mut Bencher) {
     let toml_str = include_str!("./genesis_services.toml");
@@ -179,6 +259,7 @@ impl ServiceMapping for MockServiceMapping {
         let service = match name {
             "asset" => Box::new(AssetService::new(sdk)?) as Box<dyn Service>,
             "metadata" => Box::new(MetadataService::new(sdk)?) as Box<dyn Service>,
+            "test" => Box::new(TestService::new(sdk)?) as Box<dyn Service>,
             _ => panic!("not found service"),
         };
 
@@ -186,7 +267,7 @@ impl ServiceMapping for MockServiceMapping {
     }
 
     fn list_service_name(&self) -> Vec<String> {
-        vec!["asset".to_owned(), "metadata".to_owned()]
+        vec!["asset".to_owned(), "metadata".to_owned(), "test".to_owned()]
     }
 }
 
