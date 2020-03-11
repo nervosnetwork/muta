@@ -7,6 +7,8 @@ const WRITE_ATTRIBUTE: &str = "write";
 const GENESIS_ATTRIBUTE: &str = "genesis";
 const HOOK_BEFORE_ATTRIBUTE: &str = "hook_before";
 const HOOK_AFTER_ATTRIBUTE: &str = "hook_after";
+const TX_HOOK_BEFORE_ATTRIBUTE: &str = "tx_hook_before";
+const TX_HOOK_AFTER_ATTRIBUTE: &str = "tx_hook_after";
 
 enum ServiceMethod {
     Read(ImplItemMethod),
@@ -14,8 +16,10 @@ enum ServiceMethod {
 }
 
 struct Hooks {
-    before: Option<Ident>,
-    after:  Option<Ident>,
+    before:    Option<Ident>,
+    after:     Option<Ident>,
+    tx_before: Option<Ident>,
+    tx_after:  Option<Ident>,
 }
 
 struct MethodMeta {
@@ -58,6 +62,16 @@ pub fn gen_service_code(_: TokenStream, item: TokenStream) -> TokenStream {
         Some(hook_after) => quote! { self.#hook_after(_params) },
         None => quote! {Ok(())},
     };
+    let tx_hook_before = &hooks.tx_before;
+    let tx_hook_before_body = match tx_hook_before {
+        Some(tx_hook_before) => quote! { self.#tx_hook_before(_ctx) },
+        None => quote! {Ok(())},
+    };
+    let tx_hook_after = &hooks.tx_after;
+    let tx_hook_after_body = match tx_hook_after {
+        Some(tx_hook_after) => quote! { self.#tx_hook_after(_ctx) },
+        None => quote! {Ok(())},
+    };
 
     let list_method_meta: Vec<MethodMeta> = methods.into_iter().map(extract_method_meta).collect();
 
@@ -83,6 +97,14 @@ pub fn gen_service_code(_: TokenStream, item: TokenStream) -> TokenStream {
 
             fn hook_after_(&mut self, _params: &ExecutorParams) -> protocol::ProtocolResult<()> {
                 #hook_after_body
+            }
+
+            fn tx_hook_before_(&mut self, _ctx: ServiceContext) -> ProtocolResult<()> {
+                #tx_hook_before_body
+            }
+
+            fn tx_hook_after_(&mut self, _ctx: ServiceContext) -> ProtocolResult<()> {
+                #tx_hook_after_body
             }
 
             fn read_(&self, ctx: protocol::types::ServiceContext) -> protocol::ProtocolResult<String> {
@@ -265,12 +287,16 @@ fn extract_hooks(items: &[ImplItem]) -> Hooks {
     let methods: Vec<ImplItemMethod> = find_list_for_item_method(items);
 
     let mut hooks = Hooks {
-        before: None,
-        after:  None,
+        before:    None,
+        after:     None,
+        tx_before: None,
+        tx_after:  None,
     };
 
     let mut before_count = 0;
     let mut after_count = 0;
+    let mut tx_before_count = 0;
+    let mut tx_after_count = 0;
 
     for method in methods {
         for attr in &method.attrs {
@@ -288,6 +314,20 @@ fn extract_hooks(items: &[ImplItem]) -> Hooks {
                         after_count = 1;
                     } else {
                         panic!("The after hook can only have one")
+                    }
+                } else if segment.ident == TX_HOOK_BEFORE_ATTRIBUTE {
+                    if tx_before_count == 0 {
+                        hooks.tx_before = Some(method.sig.ident.clone());
+                        tx_before_count = 1;
+                    } else {
+                        panic!("The tx before hook can only have one")
+                    }
+                } else if segment.ident == TX_HOOK_AFTER_ATTRIBUTE {
+                    if tx_after_count == 0 {
+                        hooks.tx_after = Some(method.sig.ident.clone());
+                        tx_after_count = 1;
+                    } else {
+                        panic!("The tx after hook can only have one")
                     }
                 }
             }

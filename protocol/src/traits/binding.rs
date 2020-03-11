@@ -114,6 +114,14 @@ pub trait Service {
         Ok(())
     }
 
+    fn tx_hook_before_(&mut self, _ctx: ServiceContext) -> ProtocolResult<()> {
+        Ok(())
+    }
+
+    fn tx_hook_after_(&mut self, _ctx: ServiceContext) -> ProtocolResult<()> {
+        Ok(())
+    }
+
     fn write_(&mut self, ctx: ServiceContext) -> ProtocolResult<String>;
 
     fn read_(&self, ctx: ServiceContext) -> ProtocolResult<String>;
