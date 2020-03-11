@@ -21,7 +21,6 @@ pub const DEFAULT_MAX_HISTORY_DURATION: Duration = Duration::from_secs(24 * 60 *
 // we can calculate these values once.
 lazy_static::lazy_static! {
     static ref HISTORY_TRUST_WEIGHTS: Arc<RwLock<Vec<f64>>> = Arc::new(RwLock::new(Vec::new()));
-    static ref HISTORY_TRUST_WEIGHTS_SUM: Arc<RwLock<f64>> = Arc::new(RwLock::new(0f64));
 }
 
 pub struct TrustMetricConfig {
@@ -45,17 +44,15 @@ impl TrustMetricConfig {
     }
 
     fn update(&mut self) {
-        self.max_intervals = (self.max_history.as_secs() / self.interval.as_secs());
+        self.max_intervals = self.max_history.as_secs() / self.interval.as_secs();
         self.max_faded_memorys = ((self.max_intervals as f64).log2().floor() as u64) + 1;
+        log::debug!(target: "p2p-trust-metric", "max intervals {}", self.max_intervals);
+        log::debug!(target: "p2p-trust-metric", "max faded memorys {}", self.max_faded_memorys);
 
         {
             *HISTORY_TRUST_WEIGHTS.write() = (1..=self.max_intervals)
-                .map(|k| OPTIMISTIC_HISTORY_WEIGHT.powf(k as f64 - 1.0f64))
+                .map(|k| OPTIMISTIC_HISTORY_WEIGHT.powf((k - 1) as f64))
                 .collect::<Vec<_>>();
-        }
-
-        {
-            *HISTORY_TRUST_WEIGHTS_SUM.write() = HISTORY_TRUST_WEIGHTS.read().iter().sum();
         }
     }
 }
@@ -98,6 +95,7 @@ struct History {
     intervals:       u64,
     memorys:         Vec<FadedMemory>,
     aggregate_trust: f64,
+    weights_sum:     f64,
 }
 
 impl History {
@@ -108,12 +106,19 @@ impl History {
             intervals: 0,
             memorys: Vec::new(),
             aggregate_trust: 0f64,
+            weights_sum: 0f64,
         }
     }
 
     fn remember_interval(&mut self, trust_value: f64) {
         if self.intervals < self.max_intervals {
             self.intervals += 1;
+
+            let i = self.intervals;
+            self.weights_sum += match HISTORY_TRUST_WEIGHTS.read().get(i as usize - 1).cloned() {
+                Some(v) => v,
+                None => OPTIMISTIC_HISTORY_WEIGHT.powf((i - 1) as f64),
+            };
         }
 
         if self.intervals <= self.max_memorys {
@@ -135,7 +140,7 @@ impl History {
 
     fn update_aggregate_trust(&mut self) {
         let intervals = self.intervals;
-        if intervals < 2 {
+        if intervals < 1 {
             return;
         }
 
@@ -148,7 +153,7 @@ impl History {
                     0f64
                 }
             };
-            let i_hist_weight = match HISTORY_TRUST_WEIGHTS.read().get(i as usize).cloned() {
+            let i_hist_weight = match HISTORY_TRUST_WEIGHTS.read().get(i as usize - 1).cloned() {
                 Some(v) => v,
                 None => {
                     log::error!(target: "p2p-trust-metric", "history interval {} weight not found", i);
@@ -156,8 +161,10 @@ impl History {
                 }
             };
 
-            i_hist_trust * i_hist_weight / HISTORY_TRUST_WEIGHTS_SUM.read().to_owned()
+            i_hist_trust * (i_hist_weight / self.weights_sum)
         }).sum::<f64>();
+
+        log::debug!(target: "p2p-trust-metric", "aggregate trust {}", self.aggregate_trust);
     }
 }
 
@@ -226,7 +233,7 @@ impl TrustMetric {
         let total = good_events + self.bad_events.load(SeqCst);
 
         if total > 0 {
-            (good_events / total) as f64 * PROPORTIONAL_WEIGHT
+            (good_events as f64 / total as f64) * PROPORTIONAL_WEIGHT
         } else {
             base * PROPORTIONAL_WEIGHT
         }
@@ -245,11 +252,13 @@ mod tests {
 
     #[test]
     fn basic_metric_test() {
+        env_logger::init();
+
         let config = Arc::new(TrustMetricConfig::default());
         let metric = TrustMetric::new(config.clone());
 
         for _ in (0..config.max_intervals) {
-            metric.good_events(10);
+            metric.good_events(1);
             metric.enter_new_interval();
         }
         assert_eq!(metric.trust_score(), 100);
