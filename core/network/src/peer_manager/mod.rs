@@ -886,9 +886,10 @@ impl PeerManager {
                     attempt.peer.set_connectedness(Connectedness::Unconnectable);
                 }
 
-                if let Some(trust_metric) = attempt.peer.trust_metric() {
-                    trust_metric.bad_events(1);
-                }
+            // FIXME
+            // if let Some(trust_metric) = attempt.peer.trust_metric() {
+            //     trust_metric.bad_events(1);
+            // }
             } else {
                 // Wait for other connecting multiaddrs result
                 self.connecting.insert(attempt);
