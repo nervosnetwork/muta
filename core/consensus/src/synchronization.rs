@@ -29,6 +29,8 @@ pub struct OverlordSynchronization<Adapter: SynchronizationAdapter> {
     status:  StatusAgent,
     lock:    Arc<Mutex<()>>,
     syncing: Mutex<()>,
+
+    sync_txs_chunk_size: usize,
 }
 
 #[async_trait]
@@ -102,7 +104,12 @@ impl<Adapter: SynchronizationAdapter> Synchronization for OverlordSynchronizatio
 }
 
 impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
-    pub fn new(adapter: Arc<Adapter>, status: StatusAgent, lock: Arc<Mutex<()>>) -> Self {
+    pub fn new(
+        sync_txs_chunk_size: usize,
+        adapter: Arc<Adapter>,
+        status: StatusAgent,
+        lock: Arc<Mutex<()>>,
+    ) -> Self {
         let syncing = Mutex::new(());
 
         Self {
@@ -110,6 +117,8 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
             status,
             lock,
             syncing,
+
+            sync_txs_chunk_size,
         }
     }
 
@@ -230,10 +239,17 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
         height: u64,
     ) -> ProtocolResult<RichBlock> {
         let block = self.get_block_from_remote(ctx.clone(), height).await?;
-        let txs = self
-            .adapter
-            .get_txs_from_remote(ctx, &block.ordered_tx_hashes)
-            .await?;
+
+        let mut txs = Vec::with_capacity(block.ordered_tx_hashes.len());
+
+        for tx_hashes in block.ordered_tx_hashes.chunks(self.sync_txs_chunk_size) {
+            let remote_txs = self
+                .adapter
+                .get_txs_from_remote(ctx.clone(), &tx_hashes)
+                .await?;
+
+            txs.extend(remote_txs);
+        }
 
         Ok(RichBlock { block, txs })
     }

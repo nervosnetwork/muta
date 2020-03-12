@@ -70,7 +70,8 @@ fn sync_gap_test() {
         };
         let status_agent = StatusAgent::new(status);
         let lock = Arc::new(Mutex::new(()));
-        let sync = OverlordSynchronization::new(Arc::clone(&adapter), status_agent.clone(), lock);
+        let sync =
+            OverlordSynchronization::new(5000, Arc::clone(&adapter), status_agent.clone(), lock);
         block_on(sync.receive_remote_block(Context::new(), max_height / 2)).unwrap();
 
         let status = status_agent.to_inner();

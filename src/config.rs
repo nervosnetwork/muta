@@ -39,6 +39,19 @@ pub struct ConfigNetworkBootstrap {
     pub address: String,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct ConfigConsensus {
+    pub sync_txs_chunk_size: usize,
+}
+
+impl Default for ConfigConsensus {
+    fn default() -> Self {
+        Self {
+            sync_txs_chunk_size: 5000,
+        }
+    }
+}
+
 fn default_broadcast_txs_size() -> usize {
     DEFAULT_BROADCAST_TXS_SIZE
 }
@@ -95,12 +108,14 @@ pub struct Config {
     // db config
     pub data_path: PathBuf,
 
-    pub graphql:  ConfigGraphQL,
-    pub network:  ConfigNetwork,
-    pub mempool:  ConfigMempool,
-    pub executor: ConfigExecutor,
+    pub graphql:   ConfigGraphQL,
+    pub network:   ConfigNetwork,
+    pub mempool:   ConfigMempool,
+    pub executor:  ConfigExecutor,
     #[serde(default)]
-    pub logger:   ConfigLogger,
+    pub consensus: ConfigConsensus,
+    #[serde(default)]
+    pub logger:    ConfigLogger,
 }
 
 impl Config {
