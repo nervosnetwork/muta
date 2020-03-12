@@ -345,10 +345,12 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
 
     // Re-execute block from exec_height + 1 to current_height, so that init the
     // lost current status.
+    log::info!("Re-execute from {} to {}", exec_height + 1, current_height);
     for height in exec_height + 1..=current_height {
         let block = storage.get_block_by_height(height).await?;
-        let block_hash = Hash::digest(block.encode_fixed()?);
-        let txs = txs_wal.load(height, block_hash)?;
+        let txs = storage
+            .get_transactions(block.ordered_tx_hashes.clone())
+            .await?;
         let rich_block = RichBlock { block, txs };
         let _ = synchronization
             .exec_block(Context::new(), rich_block, status_agent.clone())

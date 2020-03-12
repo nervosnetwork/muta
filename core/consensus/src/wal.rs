@@ -84,7 +84,7 @@ impl SignedTxsWAL {
                 ConsensusError::Other(format!("parse folder name {:?} error {:?}", folder, err))
             })?;
 
-            if height < till {
+            if height <= till {
                 fs::remove_dir_all(folder).map_err(ConsensusError::WALErr)?;
             }
         }

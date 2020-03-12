@@ -380,7 +380,8 @@ impl<Adapter: ConsensusAdapter + 'static> Wal for ConsensusEngine<Adapter> {
     }
 
     async fn load(&self) -> Result<Option<Bytes>, Box<dyn Error + Send>> {
-        Ok(None)
+        let res = self.adapter.load_overlord_wal(Context::new()).await.ok();
+        Ok(res)
     }
 }
 
