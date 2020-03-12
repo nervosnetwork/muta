@@ -18,9 +18,9 @@ use parking_lot::RwLock;
 use crate::{
     endpoint::Endpoint,
     error::{ErrorKind, NetworkError},
+    event::PeerManagerEvent,
     message::{NetworkMessage, RawSessionMessage, SessionMessage},
     traits::{Compression, SessionBook},
-    event::PeerManagerEvent,
 };
 
 pub struct MessageRouter<C, S> {

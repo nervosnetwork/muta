@@ -1,8 +1,8 @@
 pub mod serde;
 pub mod serde_multi;
 
-use futures::channel::mpsc::UnboundedSender;
 use derive_more::Constructor;
+use futures::channel::mpsc::UnboundedSender;
 use prost::Message;
 use protocol::Bytes;
 use tentacle::{secio::PeerId, SessionId};
