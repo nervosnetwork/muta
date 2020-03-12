@@ -933,7 +933,6 @@ impl PeerManager {
         }
     }
 
-    // TODO: score system
     fn peer_misbehave(&self, pid: PeerId, kind: MisbehaviorKind) {
         use MisbehaviorKind::*;
 
