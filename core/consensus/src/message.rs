@@ -180,6 +180,9 @@ impl<Sy: Synchronization + 'static> MessageHandler for RemoteHeightMessageHandle
     async fn process(&self, ctx: Context, msg: Self::Message) -> TrustFeedback {
         if let Err(e) = self.synchronization.receive_remote_block(ctx, msg).await {
             warn!("sync: receive remote block {}", e);
+            if e.to_string().contains("timeout") {
+                return TrustFeedback::Bad("sync block timeout".to_owned());
+            }
         }
         // FIXME
         TrustFeedback::Neutral
