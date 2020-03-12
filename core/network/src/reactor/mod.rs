@@ -12,7 +12,7 @@ use std::{
 
 use async_trait::async_trait;
 use futures::{channel::mpsc::UnboundedReceiver, future::TryFutureExt, pin_mut, stream::Stream};
-use log::{warn, error};
+use log::{error, warn};
 use protocol::{
     traits::{Context, MessageCodec, MessageHandler, TrustFeedback},
     Bytes, ProtocolError,
@@ -20,11 +20,11 @@ use protocol::{
 
 use crate::{
     endpoint::{Endpoint, EndpointScheme, RpcEndpoint},
+    event::PeerManagerEvent,
     message::SessionMessage,
     rpc::RpcResponse,
     rpc_map::RpcMap,
     traits::NetworkContext,
-    event::PeerManagerEvent,
 };
 
 pub struct Reactor<M> {
@@ -71,7 +71,9 @@ where
         } = smsg;
 
         let endpoint = net_msg.url.to_owned();
-        let mut ctx = Context::new().set_session_id(sid).set_remote_peer_id(pid.clone());
+        let mut ctx = Context::new()
+            .set_session_id(sid)
+            .set_remote_peer_id(pid.clone());
         if let Some(ref connected_addr) = connected_addr {
             ctx = ctx.set_remote_connected_addr(connected_addr.clone());
         }
@@ -118,10 +120,7 @@ where
                 }
             };
 
-            let trust_feedback = PeerManagerEvent::TrustMetric {
-                pid,
-                feedback,
-            };
+            let trust_feedback = PeerManagerEvent::TrustMetric { pid, feedback };
             if let Err(e) = trust_tx.unbounded_send(trust_feedback) {
                 error!("send peer trust report {}", e);
             }
