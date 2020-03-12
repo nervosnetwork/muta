@@ -81,6 +81,9 @@ const SHORT_ALIVE_SESSION: u64 = 3; // seconds
 const WHITELIST_TIMEOUT: u64 = 2 * 60 * 60; // 2 hour
 const MAX_CONNECTING_MARGIN: usize = 10;
 
+const HARD_BAN_TIMEOUT: Duration = Duration::from_secs(60 * 60 * 1); // 1 hour
+const SOFT_BAN_TIMEOUT: Duration = Duration::from_secs(60 * 10); // 10 minutes
+
 #[derive(Debug, Clone, Display, Serialize, Deserialize)]
 #[display(fmt = "{}", _0)]
 pub struct PeerMultiaddr(Multiaddr);
@@ -436,6 +439,7 @@ impl Inner {
                 || p.connectedness() == Connectedness::CanConnect)
                 && p.retry.ready()
                 && p.multiaddrs.connectable_len() > 0
+                && !p.banned()
         };
 
         let mut rng = rand::thread_rng();
@@ -731,7 +735,13 @@ impl PeerManager {
 
         if self.config.whitelist_peers_only && !self.inner.whitelisted(&remote_peer) {
             debug!("reject peer {:?} not in whitelist", remote_peer.id);
+            remote_peer.mark_disconnected();
+            self.disconnect_session(ctx.id);
+            return;
+        }
 
+        if remote_peer.banned() {
+            info!("banned peer {:?} incomming", remote_peer_id);
             remote_peer.mark_disconnected();
             self.disconnect_session(ctx.id);
             return;
@@ -958,7 +968,6 @@ impl PeerManager {
         }
     }
 
-    // FIXME: write peer id to blacklist even if trust metric not found
     fn trust_metric_feedback(&self, pid: PeerId, feedback: TrustFeedback) {
         use TrustFeedback::*;
 
@@ -981,15 +990,30 @@ impl PeerManager {
         match feedback {
             Fatal(reason) => {
                 warn!("peer {:?} trust feedback fatal {}", pid, reason);
+                info!("peer {:?} ban {} seconds", pid, HARD_BAN_TIMEOUT.as_secs());
                 peer_trust_metric.pause();
-                todo!() // write to blacklist
+                peer.ban(HARD_BAN_TIMEOUT);
+
+                if let Some(session) = self.inner.remove_session(peer.session_id()) {
+                    self.disconnect_session(session.id);
+                }
+                peer.mark_disconnected();
             }
             Bad(reason) => {
                 info!("peer {:?} trust feedback bad {}", pid, reason);
                 peer_trust_metric.bad_events(1);
 
                 if peer_trust_metric.knock_out() {
-                    todo!() // write to blacklist
+                    let soft_ban = SOFT_BAN_TIMEOUT.as_secs();
+                    info!("peer {:?} knocked out, soft ban {} seconds", pid, soft_ban);
+
+                    peer_trust_metric.pause();
+                    peer.ban(SOFT_BAN_TIMEOUT);
+
+                    if let Some(session) = self.inner.remove_session(peer.session_id()) {
+                        self.disconnect_session(session.id);
+                    }
+                    peer.mark_disconnected();
                 }
             }
             Neutral => (),
