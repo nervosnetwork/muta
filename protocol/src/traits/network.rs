@@ -16,9 +16,9 @@ pub enum Priority {
 #[derive(Debug, Display)]
 pub enum TrustFeedback {
     #[display(fmt = "fatal {}", _0)]
-    Fatal(&'static str),
+    Fatal(String),
     #[display(fmt = "bad {}", _0)]
-    Bad(&'static str),
+    Bad(String),
     #[display(fmt = "neutral")]
     Neutral,
     #[display(fmt = "good")]

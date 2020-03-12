@@ -1,7 +1,7 @@
 use super::{
     time, ArcPeer, Connectedness, ConnectingAttempt, Inner, MisbehaviorKind, PeerManager,
-    PeerManagerConfig, PeerMultiaddr, TestExpireTime, MAX_RETRY_COUNT, REPEATED_CONNECTION_TIMEOUT,
-    SHORT_ALIVE_SESSION, WHITELIST_TIMEOUT,
+    PeerManagerConfig, PeerMultiaddr, TestExpireTime, TrustMetricConfig, MAX_RETRY_COUNT,
+    REPEATED_CONNECTION_TIMEOUT, SHORT_ALIVE_SESSION, WHITELIST_TIMEOUT,
 };
 use crate::{
     common::ConnectedAddr,
@@ -125,6 +125,7 @@ fn make_manager(
     let bootstraps = make_bootstraps(bootstrap_num);
     let mut peer_dat_file = std::env::temp_dir();
     peer_dat_file.push("peer.dat");
+    let peer_trust_config = Arc::new(TrustMetricConfig::default());
 
     let config = PeerManagerConfig {
         our_id: manager_id,
@@ -132,6 +133,7 @@ fn make_manager(
         bootstraps,
         whitelist_by_chain_addrs: Default::default(),
         whitelist_peers_only: false,
+        peer_trust_config,
         max_connections,
         routine_interval: Duration::from_secs(10),
         peer_dat_file,
