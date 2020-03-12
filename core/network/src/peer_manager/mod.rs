@@ -83,6 +83,7 @@ const MAX_CONNECTING_MARGIN: usize = 10;
 
 const HARD_BAN_TIMEOUT: Duration = Duration::from_secs(60 * 60 * 1); // 1 hour
 const SOFT_BAN_TIMEOUT: Duration = Duration::from_secs(60 * 10); // 10 minutes
+const GOOD_TRUST_SCORE: u8 = 80u8;
 
 #[derive(Debug, Clone, Display, Serialize, Deserialize)]
 #[display(fmt = "{}", _0)]
@@ -433,13 +434,17 @@ impl Inner {
         self.peers.read().contains(peer_id)
     }
 
-    pub fn connectable_peers(&self, max: usize) -> Vec<ArcPeer> {
+    pub fn connectable_peers<F>(&self, max: usize, addition_filter: F) -> Vec<ArcPeer>
+    where
+        F: Fn(&ArcPeer) -> bool + 'static,
+    {
         let connectable = |p: &'_ &ArcPeer| -> bool {
             (p.connectedness() == Connectedness::NotConnected
                 || p.connectedness() == Connectedness::CanConnect)
                 && p.retry.ready()
                 && p.multiaddrs.connectable_len() > 0
                 && !p.banned()
+                && addition_filter(p)
         };
 
         let mut rng = rand::thread_rng();
@@ -1240,8 +1245,21 @@ impl Future for PeerManager {
         if connected_count < self.config.max_connections
             && connection_attempts < max_connection_attempts
         {
+            let filter_good_peer = |peer: &ArcPeer| -> bool {
+                if let Some(trust_metric) = peer.trust_metric() {
+                    trust_metric.trust_score() > GOOD_TRUST_SCORE
+                } else {
+                    false
+                }
+            };
+            let just_enough = |_: &ArcPeer| -> bool { true };
+
             let remain_count = max_connection_attempts - connection_attempts;
-            let connectable_peers = self.inner.connectable_peers(remain_count);
+            let mut connectable_peers =
+                self.inner.connectable_peers(remain_count, filter_good_peer);
+            if connectable_peers.is_empty() {
+                connectable_peers = self.inner.connectable_peers(remain_count, just_enough);
+            }
             let candidate_count = connectable_peers.len();
 
             debug!(
