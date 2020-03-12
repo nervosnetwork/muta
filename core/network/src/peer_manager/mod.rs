@@ -990,6 +990,10 @@ impl PeerManager {
         match feedback {
             Fatal(reason) => {
                 warn!("peer {:?} trust feedback fatal {}", pid, reason);
+                if self.inner.whitelisted(&peer) {
+                    return;
+                }
+
                 info!("peer {:?} ban {} seconds", pid, HARD_BAN_TIMEOUT.as_secs());
                 peer_trust_metric.pause();
                 peer.ban(HARD_BAN_TIMEOUT);
@@ -1003,7 +1007,7 @@ impl PeerManager {
                 info!("peer {:?} trust feedback bad {}", pid, reason);
                 peer_trust_metric.bad_events(1);
 
-                if peer_trust_metric.knock_out() {
+                if peer_trust_metric.knock_out() && !self.inner.whitelisted(&peer) {
                     let soft_ban = SOFT_BAN_TIMEOUT.as_secs();
                     info!("peer {:?} knocked out, soft ban {} seconds", pid, soft_ban);
 
