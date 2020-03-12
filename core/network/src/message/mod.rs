@@ -1,6 +1,7 @@
 pub mod serde;
 pub mod serde_multi;
 
+use futures::channel::mpsc::UnboundedSender;
 use derive_more::Constructor;
 use prost::Message;
 use protocol::Bytes;
@@ -10,6 +11,7 @@ use crate::{
     common::ConnectedAddr,
     endpoint::Endpoint,
     error::{ErrorKind, NetworkError},
+    event::PeerManagerEvent,
 };
 
 #[derive(Constructor)]
@@ -58,6 +60,7 @@ pub struct SessionMessage {
     pub(crate) pid:            PeerId,
     pub(crate) msg:            NetworkMessage,
     pub(crate) connected_addr: Option<ConnectedAddr>,
+    pub(crate) trust_tx:       UnboundedSender<PeerManagerEvent>,
 }
 
 #[cfg(test)]
