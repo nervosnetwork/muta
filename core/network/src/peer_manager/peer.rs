@@ -80,6 +80,7 @@ pub struct Peer {
     connected_at:    AtomicU64,
     disconnected_at: AtomicU64,
     alive:           AtomicU64,
+    ban_expired_at:  AtomicU64,
 }
 
 impl Peer {
@@ -96,6 +97,7 @@ impl Peer {
             connected_at:    AtomicU64::new(0),
             disconnected_at: AtomicU64::new(0),
             alive:           AtomicU64::new(0),
+            ban_expired_at:  AtomicU64::new(0),
         }
     }
 
@@ -215,6 +217,21 @@ impl Peer {
         self.set_session_id(0.into());
         self.update_disconnected();
         self.update_alive();
+    }
+
+    pub fn ban(&self, timeout: Duration) {
+        let expired_at = Duration::from_secs(time::now()) + timeout;
+        self.ban_expired_at
+            .store(expired_at.as_secs(), Ordering::SeqCst);
+    }
+
+    pub fn banned(&self) -> bool {
+        if time::now() > self.ban_expired_at.load(Ordering::SeqCst) {
+            self.ban_expired_at.store(0, Ordering::SeqCst);
+            false
+        } else {
+            true
+        }
     }
 
     fn update_connected(&self) {
