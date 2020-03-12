@@ -12,9 +12,9 @@ use std::{
 
 use async_trait::async_trait;
 use futures::{channel::mpsc::UnboundedReceiver, future::TryFutureExt, pin_mut, stream::Stream};
-use log::warn;
+use log::{warn, error};
 use protocol::{
-    traits::{Context, MessageCodec, MessageHandler},
+    traits::{Context, MessageCodec, MessageHandler, TrustFeedback},
     Bytes, ProtocolError,
 };
 
@@ -24,6 +24,7 @@ use crate::{
     rpc::RpcResponse,
     rpc_map::RpcMap,
     traits::NetworkContext,
+    event::PeerManagerEvent,
 };
 
 pub struct Reactor<M> {
@@ -65,11 +66,12 @@ where
             msg: net_msg,
             pid,
             connected_addr,
+            trust_tx,
             ..
         } = smsg;
 
         let endpoint = net_msg.url.to_owned();
-        let mut ctx = Context::new().set_session_id(sid).set_remote_peer_id(pid);
+        let mut ctx = Context::new().set_session_id(sid).set_remote_peer_id(pid.clone());
         if let Some(ref connected_addr) = connected_addr {
             ctx = ctx.set_remote_connected_addr(connected_addr.clone());
         }
@@ -77,7 +79,7 @@ where
         let react = async move {
             let endpoint = net_msg.url.parse::<Endpoint>()?;
 
-            match endpoint.scheme() {
+            let feedback = match endpoint.scheme() {
                 EndpointScheme::Gossip => {
                     let content = M::decode(Bytes::from(net_msg.content)).await?;
                     handler.process(ctx, content).await
@@ -111,7 +113,17 @@ where
 
                         warn!("network: reactor: {} rpc dropped on {}", sid, end);
                     }
+
+                    return Ok::<(), ProtocolError>(());
                 }
+            };
+
+            let trust_feedback = PeerManagerEvent::TrustMetric {
+                pid,
+                feedback,
+            };
+            if let Err(e) = trust_tx.unbounded_send(trust_feedback) {
+                error!("send peer trust report {}", e);
             }
 
             Ok::<(), ProtocolError>(())
@@ -163,5 +175,7 @@ where
 {
     type Message = M;
 
-    async fn process(&self, _: Context, _: Self::Message) {}
+    async fn process(&self, _: Context, _: Self::Message) -> TrustFeedback {
+        TrustFeedback::Neutral
+    }
 }

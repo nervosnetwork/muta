@@ -178,7 +178,7 @@ impl NetworkService {
         let gossip = NetworkGossip::new(conn_ctrl.clone(), Snappy);
         let rpc_map_clone = Arc::clone(&rpc_map);
         let rpc = NetworkRpc::new(conn_ctrl, Snappy, rpc_map_clone, (&config).into());
-        let router = MessageRouter::new(raw_msg_rx, Snappy, session_book.clone(), sys_tx);
+        let router = MessageRouter::new(raw_msg_rx, mgr_tx.clone(), Snappy, session_book.clone(), sys_tx);
 
         // Build selfcheck service
         let selfcheck = SelfCheck::new(session_book, (&config).into());
