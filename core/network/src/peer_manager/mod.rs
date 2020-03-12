@@ -513,7 +513,6 @@ impl Inner {
         self.sessions.read().get(&sid).cloned()
     }
 
-    #[cfg(test)]
     pub fn share_sessions(&self) -> Vec<ArcSession> {
         self.sessions.read().iter().cloned().collect()
     }
@@ -758,7 +757,38 @@ impl PeerManager {
                 _ => false,
             };
 
-            if !whitelisted {
+            let found_replacement = || -> bool {
+                let incoming_trust_score = match remote_peer.trust_metric() {
+                    Some(trust_metric) => trust_metric.trust_score(),
+                    None => return false,
+                };
+
+                for session in self.inner.share_sessions() {
+                    let trust_score = match session.peer.trust_metric() {
+                        Some(trust_metric) => trust_metric.trust_score(),
+                        None => {
+                            // Impossible
+                            error!("session peer {:?} trust metric not found", session.peer.id);
+                            return false;
+                        }
+                    };
+
+                    // Ensure that session be replaced has traveled enough
+                    // intervals
+                    if incoming_trust_score > trust_score
+                        && !self.inner.is_protected(&session.peer)
+                        && session.peer.alive()
+                            > self.config.peer_trust_config.interval().as_secs() * 20
+                    {
+                        self.disconnect_session(session.id);
+                        return true;
+                    }
+                }
+
+                false
+            };
+
+            if !whitelisted && !found_replacement() {
                 remote_peer.mark_disconnected();
                 self.disconnect_session(ctx.id);
                 return;
