@@ -48,7 +48,7 @@ use futures::{
 };
 use log::{debug, error, info, warn};
 use parking_lot::RwLock;
-use protocol::types::Address;
+use protocol::{traits::TrustFeedback, types::Address};
 use rand::seq::IteratorRandom;
 use serde_derive::{Deserialize, Serialize};
 #[cfg(not(test))]
@@ -546,6 +546,9 @@ pub struct PeerManagerConfig {
     /// Only allow peers in whitelist
     pub whitelist_peers_only:     bool,
 
+    /// Trust metric config
+    pub peer_trust_config: Arc<TrustMetricConfig>,
+
     /// Max connections
     pub max_connections: usize,
 
@@ -778,6 +781,16 @@ impl PeerManager {
 
         self.inner.sessions.write().insert(session);
         remote_peer.mark_connected(ctx.id);
+
+        match remote_peer.trust_metric() {
+            Some(trust_metric) => trust_metric.start(),
+            None => {
+                let trust_metric = TrustMetric::new(Arc::clone(&self.config.peer_trust_config));
+                trust_metric.start();
+
+                remote_peer.set_trust_metric(trust_metric);
+            }
+        }
     }
 
     fn session_closed(&mut self, sid: SessionId) {
@@ -791,6 +804,11 @@ impl PeerManager {
 
         info!("session closed {}", session.connected_addr);
         session.peer.mark_disconnected();
+
+        match session.peer.trust_metric() {
+            Some(trust_metric) => trust_metric.pause(),
+            None => error!("session peer {:?} trust metric not found", session.peer.id),
+        }
 
         if session.peer.alive() < SHORT_ALIVE_SESSION {
             // NOTE: peer maybe abnormally disconnect from others. When we try
@@ -857,6 +875,10 @@ impl PeerManager {
                 if attempt.peer.retry.run_out() {
                     attempt.peer.set_connectedness(Connectedness::Unconnectable);
                 }
+
+                if let Some(trust_metric) = attempt.peer.trust_metric() {
+                    trust_metric.bad_events(1);
+                }
             } else {
                 // Wait for other connecting multiaddrs result
                 self.connecting.insert(attempt);
@@ -876,6 +898,11 @@ impl PeerManager {
         // Ensure we disconnect this peer
         self.disconnect_session(sid);
         session.peer.mark_disconnected();
+
+        match session.peer.trust_metric() {
+            Some(trust_metric) => trust_metric.bad_events(1),
+            None => error!("session peer {:?} trust metric not found", session.peer.id),
+        }
 
         match error_kind {
             Io(_) => session.peer.retry.inc(),
@@ -920,9 +947,53 @@ impl PeerManager {
         // Ensure we disconnect from this peer
         self.disconnect_session(sid);
 
+        match peer.trust_metric() {
+            Some(trust_metric) => trust_metric.bad_events(1),
+            None => error!("session peer {:?} trust metric not found", peer.id),
+        }
+
         match kind {
             PingTimeout => peer.retry.inc(),
             PingUnexpect | Discovery => peer.set_connectedness(Connectedness::Unconnectable), /* Give up this peer */
+        }
+    }
+
+    // FIXME: write peer id to blacklist even if trust metric not found
+    fn trust_metric_feedback(&self, pid: PeerId, feedback: TrustFeedback) {
+        use TrustFeedback::*;
+
+        let peer = match self.inner.peer(&pid) {
+            Some(p) => p,
+            None => {
+                error!("fatal peer {:?} not found", pid);
+                return;
+            }
+        };
+
+        let peer_trust_metric = match peer.trust_metric() {
+            Some(t) => t,
+            None => {
+                error!("fatal peer {:?} trust metric not found", pid);
+                return;
+            }
+        };
+
+        match feedback {
+            Fatal(reason) => {
+                warn!("peer {:?} trust feedback fatal {}", pid, reason);
+                peer_trust_metric.pause();
+                todo!() // write to blacklist
+            }
+            Bad(reason) => {
+                info!("peer {:?} trust feedback bad {}", pid, reason);
+                peer_trust_metric.bad_events(1);
+
+                if peer_trust_metric.knock_out() {
+                    todo!() // write to blacklist
+                }
+            }
+            Neutral => (),
+            Good => peer_trust_metric.good_events(1),
         }
     }
 
@@ -1078,6 +1149,9 @@ impl PeerManager {
             PeerManagerEvent::SessionFailed { sid, kind } => self.session_failed(sid, kind),
             PeerManagerEvent::PeerAlive { pid } => self.update_peer_alive(&pid),
             PeerManagerEvent::Misbehave { pid, kind } => self.peer_misbehave(pid, kind),
+            PeerManagerEvent::TrustMetric { pid, feedback } => {
+                self.trust_metric_feedback(pid, feedback)
+            }
             PeerManagerEvent::WhitelistPeersByChainAddr { chain_addrs } => {
                 self.inner.whitelist_peers_by_chain_addr(chain_addrs);
             }

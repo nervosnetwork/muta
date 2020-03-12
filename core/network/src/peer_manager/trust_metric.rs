@@ -42,43 +42,43 @@ pub struct TrustMetricConfig {
 }
 
 impl TrustMetricConfig {
-    pub fn interval(mut self, duration: Duration) -> Self {
-        self.interval = duration;
-        self.update();
-        self
+    pub fn new(interval: Duration, max_history: Duration) -> Self {
+        let partial_config = TrustMetricConfig {
+            interval,
+            max_history,
+            max_intervals: 0,
+            max_faded_memorys: 0,
+        };
+
+        partial_config.finish()
     }
 
-    pub fn max_history(mut self, duration: Duration) -> Self {
-        self.max_history = duration;
-        self.update();
-        self
-    }
-
-    fn update(&mut self) {
+    fn finish(mut self) -> Self {
         self.max_intervals = self.max_history.as_secs() / self.interval.as_secs();
         self.max_faded_memorys = ((self.max_intervals as f64).log2().floor() as u64) + 1;
-        log::debug!(target: "p2p-trust-metric", "max intervals {}", self.max_intervals);
-        log::debug!(target: "p2p-trust-metric", "max faded memorys {}", self.max_faded_memorys);
+        log::debug!(target: "network-trust-metric", "max intervals {}", self.max_intervals);
+        log::debug!(target: "network-trust-metric", "max faded memorys {}", self.max_faded_memorys);
 
         {
             *HISTORY_TRUST_WEIGHTS.write() = (1..=self.max_intervals)
                 .map(|k| OPTIMISTIC_HISTORY_WEIGHT.powf((k - 1) as f64))
                 .collect::<Vec<_>>();
         }
+
+        self
     }
 }
 
 impl Default for TrustMetricConfig {
     fn default() -> Self {
-        let mut config = TrustMetricConfig {
+        let partial_config = TrustMetricConfig {
             interval:          DEFAULT_INTERVAL_DURATION,
             max_history:       DEFAULT_MAX_HISTORY_DURATION,
             max_intervals:     0,
             max_faded_memorys: 0,
         };
 
-        config.update();
-        config
+        partial_config.finish()
     }
 }
 
@@ -129,7 +129,7 @@ impl History {
             self.weights_sum += match HISTORY_TRUST_WEIGHTS.read().get(i as usize - 1).cloned() {
                 Some(v) => v,
                 None => {
-                    log::warn!(target: "p2p-trust-metric", "precalculated history interval {} trust weight not found", i);
+                    log::warn!(target: "network-trust-metric", "precalculated history interval {} trust weight not found", i);
                     OPTIMISTIC_HISTORY_WEIGHT.powf((i - 1) as f64)
                 }
             };
@@ -164,14 +164,14 @@ impl History {
             let i_hist_trust = match self.memorys.get(memory_idx).cloned() {
                 Some(v) => *v,
                 None => {
-                    log::error!(target: "p2p-trust-metric", "history interval {} trust value not found", i);
+                    log::error!(target: "network-trust-metric", "history interval {} trust value not found", i);
                     0f64
                 }
             };
             let i_hist_weight = match HISTORY_TRUST_WEIGHTS.read().get(i as usize - 1).cloned() {
                 Some(v) => v,
                 None => {
-                    log::warn!(target: "p2p-trust-metric", "precalculated history interval {} weight not found", i);
+                    log::warn!(target: "network-trust-metric", "precalculated history interval {} weight not found", i);
                     OPTIMISTIC_HISTORY_WEIGHT.powf((i - 1) as f64)
                 }
             };
@@ -179,7 +179,7 @@ impl History {
             i_hist_trust * (i_hist_weight / self.weights_sum)
         }).sum::<f64>();
 
-        log::debug!(target: "p2p-trust-metric", "aggregate trust {}", self.aggregate_trust);
+        log::debug!(target: "network-trust-metric", "aggregate trust {}", self.aggregate_trust);
     }
 }
 
@@ -222,7 +222,7 @@ impl Inner {
 
     pub fn enter_new_interval(&self) {
         let latest_trust_value = self.trust_value();
-        log::debug!(target: "p2p-trust-metric", "enter new interval, lastest trust value {}", latest_trust_value);
+        log::debug!(target: "network-trust-metric", "enter new interval, lastest trust value {}", latest_trust_value);
 
         {
             let mut history = self.history.write();
@@ -232,6 +232,13 @@ impl Inner {
 
         self.good_events.store(0, SeqCst);
         self.bad_events.store(0, SeqCst);
+    }
+
+    pub fn reset_history(&self) {
+        let max_intervals = self.config.max_intervals;
+        let max_memorys = self.config.max_faded_memorys;
+
+        *self.history.write() = History::new(max_intervals, max_memorys);
     }
 
     fn trust_value(&self) -> f64 {
@@ -248,7 +255,7 @@ impl Inner {
             DERIVATIVE_NEGATIVE_WEIGHT * deviation_value
         };
 
-        log::debug!(target: "p2p-trust-metric", "trust value components: r {:?}, h {}, d {}", proportional_value, intergral_value, derivative_value);
+        log::debug!(target: "network-trust-metric", "trust value components: r {:?}, h {}, d {}", proportional_value, intergral_value, derivative_value);
         proportional_value + intergral_value + derivative_value
     }
 
@@ -335,10 +342,10 @@ impl Future for HeartBeat {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TrustMetric {
     inner:     Arc<Inner>,
-    hb_handle: RwLock<Option<AbortHandle>>,
+    hb_handle: Arc<RwLock<Option<AbortHandle>>>,
     pause:     Arc<RwLock<Option<Duration>>>,
 }
 
@@ -346,7 +353,7 @@ impl TrustMetric {
     pub fn new(config: Arc<TrustMetricConfig>) -> Self {
         TrustMetric {
             inner:     Arc::new(Inner::new(config)),
-            hb_handle: RwLock::new(None),
+            hb_handle: Arc::new(RwLock::new(None)),
             pause:     Arc::new(RwLock::new(None)),
         }
     }
@@ -375,6 +382,14 @@ impl TrustMetric {
         if let Some(abort_handle) = self.hb_handle.write().take() {
             abort_handle.abort();
         }
+    }
+}
+
+impl Deref for TrustMetric {
+    type Target = Arc<Inner>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
     }
 }
 

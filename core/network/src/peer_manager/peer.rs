@@ -1,4 +1,4 @@
-use super::{time, PeerAddrSet, Retry, MAX_RETRY_COUNT};
+use super::{time, PeerAddrSet, Retry, TrustMetric, MAX_RETRY_COUNT};
 
 use std::{
     borrow::Borrow,
@@ -74,6 +74,7 @@ pub struct Peer {
     pub retry:       Retry,
     pubkey:          RwLock<Option<PublicKey>>,
     chain_addr:      RwLock<Option<Address>>,
+    trust_metric:    RwLock<Option<TrustMetric>>,
     connectedness:   AtomicUsize,
     session_id:      AtomicUsize,
     connected_at:    AtomicU64,
@@ -89,6 +90,7 @@ impl Peer {
             retry:           Retry::new(MAX_RETRY_COUNT),
             pubkey:          RwLock::new(None),
             chain_addr:      RwLock::new(None),
+            trust_metric:    RwLock::new(None),
             connectedness:   AtomicUsize::new(Connectedness::NotConnected as usize),
             session_id:      AtomicUsize::new(0),
             connected_at:    AtomicU64::new(0),
@@ -133,6 +135,14 @@ impl Peer {
             *self.chain_addr.write() = Some(chain_addr);
             Ok(())
         }
+    }
+
+    pub fn trust_metric(&self) -> Option<TrustMetric> {
+        self.trust_metric.read().clone()
+    }
+
+    pub fn set_trust_metric(&self, metric: TrustMetric) {
+        *self.trust_metric.write() = Some(metric);
     }
 
     pub fn connectedness(&self) -> Connectedness {
