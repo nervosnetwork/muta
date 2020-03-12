@@ -53,6 +53,10 @@ impl TrustMetricConfig {
         partial_config.finish()
     }
 
+    pub fn interval(&self) -> Duration {
+        self.interval
+    }
+
     fn finish(mut self) -> Self {
         self.max_intervals = self.max_history.as_secs() / self.interval.as_secs();
         self.max_faded_memorys = ((self.max_intervals as f64).log2().floor() as u64) + 1;
