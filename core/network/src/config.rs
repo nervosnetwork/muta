@@ -3,6 +3,7 @@ use std::{
     net::{IpAddr, Ipv4Addr, SocketAddr},
     path::{Path, PathBuf},
     str::FromStr,
+    sync::Arc,
     time::Duration,
 };
 
@@ -17,7 +18,7 @@ use crate::{
     common::socket_to_multi_addr,
     connection::ConnectionConfig,
     error::NetworkError,
-    peer_manager::{ArcPeer, PeerManagerConfig, SharedSessionsConfig},
+    peer_manager::{ArcPeer, PeerManagerConfig, SharedSessionsConfig, TrustMetricConfig},
     selfcheck::SelfCheckConfig,
     traits::MultiaddrExt,
 };
@@ -36,6 +37,11 @@ pub const DEFAULT_BUFFER_SIZE: usize = 24 * 1024 * 1024; // same as tentacle
 pub const DEFAULT_MAX_WAIT_STREAMS: usize = 256;
 // Default write timeout
 pub const DEFAULT_WRITE_TIMEOUT: u64 = 10; // seconds
+
+// Default peer trust metric
+pub const DEFAULT_PEER_TRUST_INTERVAL_DURATION: Duration = Duration::from_secs(60);
+pub const DEFAULT_PEER_TRUST_MAX_HISTORY_DURATION: Duration =
+    Duration::from_secs(24 * 60 * 60 * 10); // 10 day
 
 // Default peer data persistent path
 pub const DEFAULT_PEER_FILE_NAME: &str = "peers";
@@ -106,11 +112,13 @@ pub struct NetworkConfig {
     pub write_timeout:    u64,
 
     // peer manager
-    pub bootstraps:           Vec<ArcPeer>,
-    pub whitelist:            Vec<Address>,
-    pub whitelist_peers_only: bool,
-    pub enable_save_restore:  bool,
-    pub peer_dat_file:        PathBuf,
+    pub bootstraps:             Vec<ArcPeer>,
+    pub whitelist:              Vec<Address>,
+    pub whitelist_peers_only:   bool,
+    pub enable_save_restore:    bool,
+    pub peer_dat_file:          PathBuf,
+    pub peer_trust_interval:    Duration,
+    pub peer_trust_max_history: Duration,
 
     // identity and encryption
     pub secio_keypair: SecioKeyPair,
@@ -148,11 +156,13 @@ impl NetworkConfig {
             max_wait_streams: DEFAULT_MAX_WAIT_STREAMS,
             write_timeout:    DEFAULT_WRITE_TIMEOUT,
 
-            bootstraps:           Default::default(),
-            whitelist:            Default::default(),
-            whitelist_peers_only: false,
-            enable_save_restore:  false,
-            peer_dat_file:        PathBuf::from(DEFAULT_PEER_DAT_FILE.to_owned()),
+            bootstraps:             Default::default(),
+            whitelist:              Default::default(),
+            whitelist_peers_only:   false,
+            enable_save_restore:    false,
+            peer_dat_file:          PathBuf::from(DEFAULT_PEER_DAT_FILE.to_owned()),
+            peer_trust_interval:    DEFAULT_PEER_TRUST_INTERVAL_DURATION,
+            peer_trust_max_history: DEFAULT_PEER_TRUST_MAX_HISTORY_DURATION,
 
             secio_keypair: SecioKeyPair::secp256k1_generated(),
 
@@ -280,6 +290,13 @@ impl NetworkConfig {
         self
     }
 
+    pub fn peer_trust_metric(mut self, interval: Duration, max_history: Duration) -> Self {
+        self.peer_trust_interval = interval;
+        self.peer_trust_max_history = max_history;
+
+        self
+    }
+
     pub fn secio_keypair(mut self, sk_hex: PrivateKeyHexStr) -> ProtocolResult<Self> {
         let maybe_skp = hex::decode(sk_hex).map(SecioKeyPair::secp256k1_raw_key);
 
@@ -370,12 +387,16 @@ impl From<&NetworkConfig> for ConnectionConfig {
 
 impl From<&NetworkConfig> for PeerManagerConfig {
     fn from(config: &NetworkConfig) -> PeerManagerConfig {
+        let peer_trust_config =
+            TrustMetricConfig::new(config.peer_trust_interval, config.peer_trust_max_history);
+
         PeerManagerConfig {
             our_id:                   config.secio_keypair.peer_id(),
             pubkey:                   config.secio_keypair.public_key(),
             bootstraps:               config.bootstraps.clone(),
             whitelist_by_chain_addrs: config.whitelist.clone(),
             whitelist_peers_only:     config.whitelist_peers_only,
+            peer_trust_config:        Arc::new(peer_trust_config),
             max_connections:          config.max_connections,
             routine_interval:         config.peer_manager_heart_beat_interval,
             peer_dat_file:            config.peer_dat_file.clone(),

@@ -13,6 +13,18 @@ pub enum Priority {
     Normal,
 }
 
+#[derive(Debug, Display)]
+pub enum TrustFeedback {
+    #[display(fmt = "fatal {}", _0)]
+    Fatal(&'static str),
+    #[display(fmt = "bad {}", _0)]
+    Bad(&'static str),
+    #[display(fmt = "neutral")]
+    Neutral,
+    #[display(fmt = "good")]
+    Good,
+}
+
 #[async_trait]
 pub trait MessageCodec: Sized + Send + Debug + 'static {
     async fn encode(&mut self) -> ProtocolResult<Bytes>;
