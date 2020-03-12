@@ -944,6 +944,11 @@ impl PeerManager {
             }
         };
 
+        match peer.trust_metric() {
+            Some(trust_metric) => trust_metric.bad_events(1),
+            None => error!("session peer {:?} trust metric not found", peer.id),
+        }
+
         let sid = peer.session_id();
         if sid == SessionId::new(0) {
             // Impossible, connected session always bigger than 0
@@ -955,11 +960,6 @@ impl PeerManager {
         peer.mark_disconnected();
         // Ensure we disconnect from this peer
         self.disconnect_session(sid);
-
-        match peer.trust_metric() {
-            Some(trust_metric) => trust_metric.bad_events(1),
-            None => error!("session peer {:?} trust metric not found", peer.id),
-        }
 
         match kind {
             PingTimeout => peer.retry.inc(),
