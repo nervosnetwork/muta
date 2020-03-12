@@ -12,7 +12,7 @@ use futures::{
     stream::StreamExt,
 };
 
-use protocol::traits::{Context, Gossip, MessageHandler, Priority};
+use protocol::traits::{Context, Gossip, MessageHandler, Priority, TrustFeedback};
 
 const END_TEST_BROADCAST: &str = "/gossip/test/message";
 const TEST_MESSAGE: &str = "spike lee action started";
@@ -49,12 +49,13 @@ impl NewsReader {
 impl MessageHandler for NewsReader {
     type Message = String;
 
-    async fn process(&self, _ctx: Context, msg: Self::Message) {
+    async fn process(&self, _ctx: Context, msg: Self::Message) -> TrustFeedback {
         if !self.sent() {
             assert_eq!(&msg, TEST_MESSAGE);
             self.done_tx.unbounded_send(()).expect("news reader done");
             self.set_sent();
         }
+        TrustFeedback::Neutral
     }
 }
 
