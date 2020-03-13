@@ -65,7 +65,7 @@ impl SignedTxsWAL {
         let _ = file
             .read_to_end(&mut read_buf)
             .map_err(ConsensusError::WALErr)?;
-        let txs: FixedSignedTxs = ProtocolCodecSync::decode_sync(Bytes::from(read_buf))?;
+        let txs = FixedSignedTxs::decode_sync(Bytes::from(read_buf))?;
         Ok(txs.inner)
     }
 
@@ -94,7 +94,10 @@ impl SignedTxsWAL {
 
 #[cfg(test)]
 mod test {
+    extern crate test;
+
     use rand::random;
+    use test::Bencher;
 
     use protocol::types::{Hash, RawTransaction, TransactionRequest};
     use protocol::Bytes;
@@ -136,7 +139,7 @@ mod test {
     }
 
     pub fn mock_wal_txs() -> Vec<SignedTransaction> {
-        (0..5000).map(|_| mock_sign_tx()).collect::<Vec<_>>()
+        (0..20000).map(|_| mock_sign_tx()).collect::<Vec<_>>()
     }
 
     pub fn get_random_bytes(len: usize) -> Bytes {
@@ -160,5 +163,40 @@ mod test {
         wal.remove(2u64).unwrap();
         assert!(wal.load(1u64, hash_01).is_err());
         assert!(wal.load(2u64, hash_02).is_err());
+    }
+
+    #[bench]
+    fn bench_txs_rlp_encode(b: &mut Bencher) {
+        let txs = mock_wal_txs();
+
+        b.iter(move || {
+            let _ = rlp::encode_list(&txs);
+        });
+    }
+
+    #[bench]
+    fn bench_txs_prost_encode(b: &mut Bencher) {
+        let txs = FixedSignedTxs::new(mock_wal_txs());
+
+        b.iter(move || {
+            let _ = txs.encode_sync();
+        });
+    }
+
+    #[bench]
+    fn bench_write_files(b: &mut Bencher) {
+        let mut path = Path::new(FULL_TXS_PATH).to_path_buf();
+        path.push("test.txt");
+        let mut wal_file = fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(path)
+            .unwrap();
+        let data = rlp::encode_list(&mock_wal_txs());
+
+        b.iter(move || {
+            let _ = wal_file.write_all(&data).unwrap();
+        });
     }
 }

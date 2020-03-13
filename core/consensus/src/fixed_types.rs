@@ -1,7 +1,6 @@
 use std::error::Error;
 
 use async_trait::async_trait;
-use bincode::{deserialize, serialize};
 use overlord::Codec;
 
 use protocol::codec::{Deserialize, ProtocolCodecSync, Serialize};
@@ -35,7 +34,7 @@ impl MessageCodec for ConsensusRpcResponse {
 
             ConsensusRpcResponse::PullTxs(txs) => {
                 let mut tmp = BytesMut::from(
-                    serialize(&txs)
+                    bincode::serialize(&txs)
                         .map_err(|_| ConsensusError::EncodeErr(ConsensusType::RpcPullTxs))?
                         .as_slice(),
                 );
@@ -57,7 +56,7 @@ impl MessageCodec for ConsensusRpcResponse {
             }
 
             b"b" => {
-                let res: FixedSignedTxs = deserialize(&bytes)
+                let res: FixedSignedTxs = bincode::deserialize(&bytes)
                     .map_err(|_| ConsensusError::DecodeErr(ConsensusType::RpcPullTxs))?;
                 Ok(ConsensusRpcResponse::PullTxs(Box::new(res)))
             }
@@ -143,20 +142,6 @@ impl PullTxsRequest {
 pub struct FixedSignedTxs {
     #[serde(with = "core_network::serde_multi")]
     pub inner: Vec<SignedTransaction>,
-}
-
-impl ProtocolCodecSync for FixedSignedTxs {
-    fn encode_sync(&self) -> ProtocolResult<Bytes> {
-        let bytes =
-            serialize(&self).map_err(|_| ConsensusError::EncodeErr(ConsensusType::WALSignedTxs))?;
-        Ok(Bytes::from(bytes))
-    }
-
-    fn decode_sync(data: Bytes) -> ProtocolResult<Self> {
-        let res: FixedSignedTxs = deserialize(data.as_ref())
-            .map_err(|_| ConsensusError::DecodeErr(ConsensusType::WALSignedTxs))?;
-        Ok(res)
-    }
 }
 
 impl FixedSignedTxs {

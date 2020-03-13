@@ -1,3 +1,5 @@
+#![feature(test)]
+
 pub mod adapter;
 pub mod consensus;
 mod engine;
@@ -10,6 +12,7 @@ mod tests;
 pub mod trace;
 pub mod util;
 pub mod wal;
+mod wal_proto;
 
 pub use crate::adapter::OverlordConsensusAdapter;
 pub use crate::consensus::OverlordConsensus;
