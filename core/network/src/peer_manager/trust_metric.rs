@@ -405,7 +405,7 @@ mod tests {
 
     #[test]
     fn basic_metric_test() {
-        env_logger::init();
+        // env_logger::init();
 
         let config = Arc::new(TrustMetricConfig::default());
         let metric = Inner::new(config);
