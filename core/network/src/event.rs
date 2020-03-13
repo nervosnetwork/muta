@@ -144,8 +144,8 @@ pub enum PeerManagerEvent {
     #[display(fmt = "peer {:?} misbehave {}", pid, kind)]
     Misbehave { pid: PeerId, kind: MisbehaviorKind },
 
-    #[display(fmt = "protect peers by chain addresses {:?}", chain_addrs)]
-    ProtectPeersByChainAddr { chain_addrs: Vec<Address> },
+    #[display(fmt = "whitelist peers by chain addresses {:?}", chain_addrs)]
+    WhitelistPeersByChainAddr { chain_addrs: Vec<Address> },
 
     // Address
     #[display(fmt = "discover multi addrs {:?}", addrs)]

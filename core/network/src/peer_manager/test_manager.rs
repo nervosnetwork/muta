@@ -1691,7 +1691,7 @@ async fn should_always_include_our_listen_addrs_in_return_from_manager_handle_ra
 }
 
 #[tokio::test]
-async fn should_whitelist_peer_chain_addrs_on_protect_peers_by_chain_addrs() {
+async fn should_whitelist_peer_chain_addrs_on_whitelist_peers_by_chain_addrs() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
 
     let peers = (0..5)
@@ -1705,10 +1705,10 @@ async fn should_whitelist_peer_chain_addrs_on_protect_peers_by_chain_addrs() {
     let inner = mgr.core_inner();
     assert!(inner.whitelist().is_empty(), "should have empty whitelist");
 
-    let protect_peers_by_chain_addrs = PeerManagerEvent::ProtectPeersByChainAddr {
+    let whitelist_peers_by_chain_addrs = PeerManagerEvent::WhitelistPeersByChainAddr {
         chain_addrs: chain_addrs.clone(),
     };
-    mgr.poll_event(protect_peers_by_chain_addrs).await;
+    mgr.poll_event(whitelist_peers_by_chain_addrs).await;
 
     let whitelist = inner.whitelist();
     assert_eq!(
@@ -1731,7 +1731,7 @@ async fn should_allow_whitelisted_peer_session_even_if_we_reach_max_connections_
     let peer = make_peer(2019);
 
     let inner = mgr.core_inner();
-    inner.protect_peers_by_chain_addr(vec![whitelisted_peer
+    inner.whitelist_peers_by_chain_addr(vec![whitelisted_peer
         .owned_chain_addr()
         .expect("chain addr")]);
 
@@ -1781,12 +1781,12 @@ async fn should_allow_whitelisted_peer_session_even_if_we_reach_max_connections_
 }
 
 #[tokio::test]
-async fn should_refresh_whitelist_on_protect_peers_by_chain_addrs() {
+async fn should_refresh_whitelist_on_whitelist_peers_by_chain_addrs() {
     let (mut mgr, _conn_rx) = make_manager(0, 10);
     let peer = make_peer(2077);
 
     let inner = mgr.core_inner();
-    inner.protect_peers_by_chain_addr(vec![peer.owned_chain_addr().expect("chain addr")]);
+    inner.whitelist_peers_by_chain_addr(vec![peer.owned_chain_addr().expect("chain addr")]);
     assert_eq!(inner.whitelist().len(), 1, "should have one whitelisted");
 
     let peer_in_list = inner
@@ -1800,10 +1800,10 @@ async fn should_refresh_whitelist_on_protect_peers_by_chain_addrs() {
     peer_in_list.set_authorized_at(time::now() - WHITELIST_TIMEOUT + 20);
     assert!(!peer_in_list.is_expired(), "should not be expired");
 
-    let protect_peers_by_chain_addrs = PeerManagerEvent::ProtectPeersByChainAddr {
+    let whitelist_peers_by_chain_addrs = PeerManagerEvent::WhitelistPeersByChainAddr {
         chain_addrs: vec![peer.owned_chain_addr().expect("chain addr")],
     };
-    mgr.poll_event(protect_peers_by_chain_addrs).await;
+    mgr.poll_event(whitelist_peers_by_chain_addrs).await;
 
     assert_eq!(
         peer_in_list.authorized_at(),
@@ -1818,7 +1818,7 @@ async fn should_remove_expired_peers_in_whitelist() {
     let peer = make_peer(2077);
 
     let inner = mgr.core_inner();
-    inner.protect_peers_by_chain_addr(vec![peer.owned_chain_addr().expect("chain addr")]);
+    inner.whitelist_peers_by_chain_addr(vec![peer.owned_chain_addr().expect("chain addr")]);
     assert_eq!(inner.whitelist().len(), 1, "should have one whitelisted");
 
     let peer_in_list = inner

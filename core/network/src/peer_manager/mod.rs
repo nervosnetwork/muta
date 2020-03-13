@@ -197,22 +197,22 @@ impl Hash for ConnectingAttempt {
 }
 
 #[derive(Debug)]
-struct ProtectedPeer {
+struct WhitelistedPeer {
     chain_addr:    Address,
     authorized_at: AtomicU64,
 }
 
 #[derive(Debug, Clone)]
-struct ArcProtectedPeer(Arc<ProtectedPeer>);
+struct ArcWhitelistedPeer(Arc<WhitelistedPeer>);
 
-impl ArcProtectedPeer {
+impl ArcWhitelistedPeer {
     pub fn new(chain_addr: Address) -> Self {
-        let peer = ProtectedPeer {
+        let peer = WhitelistedPeer {
             chain_addr,
             authorized_at: AtomicU64::new(time::now()),
         };
 
-        ArcProtectedPeer(Arc::new(peer))
+        ArcWhitelistedPeer(Arc::new(peer))
     }
 
     pub fn owned_chain_addr(&self) -> Address {
@@ -243,28 +243,28 @@ impl ArcProtectedPeer {
     }
 }
 
-impl Borrow<Address> for ArcProtectedPeer {
+impl Borrow<Address> for ArcWhitelistedPeer {
     fn borrow(&self) -> &Address {
         &self.chain_addr
     }
 }
 
-impl PartialEq for ArcProtectedPeer {
-    fn eq(&self, other: &ArcProtectedPeer) -> bool {
+impl PartialEq for ArcWhitelistedPeer {
+    fn eq(&self, other: &ArcWhitelistedPeer) -> bool {
         self.chain_addr == other.chain_addr
     }
 }
 
-impl Eq for ArcProtectedPeer {}
+impl Eq for ArcWhitelistedPeer {}
 
-impl Hash for ArcProtectedPeer {
+impl Hash for ArcWhitelistedPeer {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.chain_addr.hash(state)
     }
 }
 
-impl Deref for ArcProtectedPeer {
-    type Target = ProtectedPeer;
+impl Deref for ArcWhitelistedPeer {
+    type Target = WhitelistedPeer;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -339,7 +339,7 @@ impl Deref for ArcSession {
 }
 
 struct Inner {
-    whitelist: RwLock<HashSet<ArcProtectedPeer>>,
+    whitelist: RwLock<HashSet<ArcWhitelistedPeer>>,
 
     sessions: RwLock<HashSet<ArcSession>>,
     peers:    RwLock<HashSet<ArcPeer>>,
@@ -428,8 +428,8 @@ impl Inner {
         }
     }
 
-    pub fn protect_peers_by_chain_addr(&self, chain_addrs: Vec<Address>) {
-        let mut new_protected = Vec::new();
+    pub fn whitelist_peers_by_chain_addr(&self, chain_addrs: Vec<Address>) {
+        let mut addition_whitelist = Vec::new();
 
         {
             let whitelist = self.whitelist.read();
@@ -437,20 +437,20 @@ impl Inner {
                 if let Some(peer) = whitelist.get(&ca) {
                     peer.refresh_authorized();
                 } else {
-                    new_protected.push(ArcProtectedPeer::new(ca))
+                    addition_whitelist.push(ArcWhitelistedPeer::new(ca))
                 }
             }
         }
 
-        self.whitelist.write().extend(new_protected);
+        self.whitelist.write().extend(addition_whitelist);
     }
 
-    pub fn is_protected_by_chain_addr(&self, chain_addr: &Address) -> bool {
+    pub fn whitelisted_by_chain_addr(&self, chain_addr: &Address) -> bool {
         self.whitelist.read().contains(chain_addr)
     }
 
     #[cfg(test)]
-    pub fn whitelist(&self) -> HashSet<ArcProtectedPeer> {
+    pub fn whitelist(&self) -> HashSet<ArcWhitelistedPeer> {
         self.whitelist.read().iter().cloned().collect()
     }
 
@@ -655,12 +655,12 @@ impl PeerManager {
         }
 
         if self.inner.connected() >= self.config.max_connections {
-            let protected = match Peer::pubkey_to_chain_addr(&pubkey) {
-                Ok(ca) => self.inner.is_protected_by_chain_addr(&ca),
+            let whitelisted = match Peer::pubkey_to_chain_addr(&pubkey) {
+                Ok(ca) => self.inner.whitelisted_by_chain_addr(&ca),
                 _ => false,
             };
 
-            if !protected {
+            if !whitelisted {
                 remote_peer.mark_disconnected();
                 self.disconnect_session(ctx.id);
                 return;
@@ -993,8 +993,8 @@ impl PeerManager {
             PeerManagerEvent::SessionFailed { sid, kind } => self.session_failed(sid, kind),
             PeerManagerEvent::PeerAlive { pid } => self.update_peer_alive(&pid),
             PeerManagerEvent::Misbehave { pid, kind } => self.peer_misbehave(pid, kind),
-            PeerManagerEvent::ProtectPeersByChainAddr { chain_addrs } => {
-                self.inner.protect_peers_by_chain_addr(chain_addrs);
+            PeerManagerEvent::WhitelistPeersByChainAddr { chain_addrs } => {
+                self.inner.whitelist_peers_by_chain_addr(chain_addrs);
             }
             PeerManagerEvent::DiscoverMultiAddrs { addrs } => self.dicover_multi_multiaddrs(addrs),
             PeerManagerEvent::IdentifiedAddrs { pid, addrs } => self.identified_addrs(&pid, addrs),
