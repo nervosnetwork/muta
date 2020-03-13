@@ -196,7 +196,7 @@ mod test {
         let data = rlp::encode_list(&mock_wal_txs());
 
         b.iter(move || {
-            let _ = wal_file.write_all(&data).unwrap();
+            wal_file.write_all(&data).unwrap();
         });
     }
 }
