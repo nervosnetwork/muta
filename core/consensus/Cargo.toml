@@ -20,17 +20,18 @@ log = "0.4"
 moodyblues-sdk = "0.3"
 overlord = "0.2.0-alpha.10"
 parking_lot = "0.10"
+prost = "0.6"
 rlp = "0.4"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tokio = { version = "0.2", features = ["macros", "rt-core"] }
 
-common-crypto = { path = "../../common/crypto"}
+common-crypto = { path = "../../common/crypto" }
 common-logger = { path = "../../common/logger" }
-common-merkle = { path = "../../common/merkle"}
-core-mempool = { path = "../../core/mempool"}
-core-storage = { path = "../../core/storage"}
-core-network = { path = "../../core/network"}
+common-merkle = { path = "../../common/merkle" }
+core-mempool = { path = "../../core/mempool" }
+core-storage = { path = "../../core/storage" }
+core-network = { path = "../../core/network" }
 protocol = { path = "../../protocol", package = "muta-protocol" }
 
 [dev-dependencies]

@@ -1,3 +1,5 @@
+#![feature(test)]
+
 pub mod adapter;
 pub mod consensus;
 mod engine;
@@ -10,10 +12,11 @@ mod tests;
 pub mod trace;
 pub mod util;
 pub mod wal;
+mod wal_proto;
 
 pub use crate::adapter::OverlordConsensusAdapter;
 pub use crate::consensus::OverlordConsensus;
-pub use crate::synchronization::OverlordSynchronization;
+pub use crate::synchronization::{OverlordSynchronization, RichBlock};
 pub use crate::wal::SignedTxsWAL;
 pub use overlord::{types::Node, DurationConfig};
 

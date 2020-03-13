@@ -22,7 +22,7 @@ use core_consensus::message::{
 use core_consensus::status::{CurrentConsensusStatus, StatusAgent};
 use core_consensus::{
     DurationConfig, Node, OverlordConsensus, OverlordConsensusAdapter, OverlordSynchronization,
-    SignedTxsWAL,
+    RichBlock, SignedTxsWAL,
 };
 use core_mempool::{
     DefaultMemPoolAdapter, HashMemPool, MsgPushTxs, NewTxsHandler, PullTxsHandler,
@@ -257,12 +257,14 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     };
     let current_header = &current_block.header;
     let block_hash = Hash::digest(current_block.encode_fixed()?);
+    let current_height = current_block.header.height;
+    let exec_height = current_block.header.exec_height;
 
     let current_consensus_status = CurrentConsensusStatus {
         cycles_price:               metadata.cycles_price,
         cycles_limit:               metadata.cycles_limit,
         current_height:             current_block.header.height,
-        exec_height:                current_block.header.height,
+        exec_height:                current_block.header.exec_height,
         current_hash:               block_hash,
         latest_commited_state_root: current_header.state_root.clone(),
         list_logs_bloom:            vec![],
@@ -328,7 +330,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         bls_pub_keys,
         bls_priv_key,
         common_ref,
-        txs_wal,
+        Arc::clone(&txs_wal),
         Arc::clone(&consensus_adapter),
         Arc::clone(&lock),
     ));
@@ -338,9 +340,23 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     let synchronization = Arc::new(OverlordSynchronization::new(
         config.consensus.sync_txs_chunk_size,
         consensus_adapter,
-        status_agent,
+        status_agent.clone(),
         lock,
     ));
+
+    // Re-execute block from exec_height + 1 to current_height, so that init the
+    // lost current status.
+    log::info!("Re-execute from {} to {}", exec_height + 1, current_height);
+    for height in exec_height + 1..=current_height {
+        let block = storage.get_block_by_height(height).await?;
+        let txs = storage
+            .get_transactions(block.ordered_tx_hashes.clone())
+            .await?;
+        let rich_block = RichBlock { block, txs };
+        let _ = synchronization
+            .exec_block(Context::new(), rich_block, status_agent.clone())
+            .await?;
+    }
 
     // register consensus
     network_service.register_endpoint_handler(

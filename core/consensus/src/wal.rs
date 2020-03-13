@@ -65,11 +65,11 @@ impl SignedTxsWAL {
         let _ = file
             .read_to_end(&mut read_buf)
             .map_err(ConsensusError::WALErr)?;
-        let txs: FixedSignedTxs = ProtocolCodecSync::decode_sync(Bytes::from(read_buf))?;
+        let txs = FixedSignedTxs::decode_sync(Bytes::from(read_buf))?;
         Ok(txs.inner)
     }
 
-    pub fn remove(&self, till: u64) -> ProtocolResult<()> {
+    pub fn remove(&self, committed_height: u64) -> ProtocolResult<()> {
         for entry in fs::read_dir(&self.path).map_err(ConsensusError::WALErr)? {
             let folder = entry.map_err(ConsensusError::WALErr)?.path();
             let folder_name = folder
@@ -84,7 +84,7 @@ impl SignedTxsWAL {
                 ConsensusError::Other(format!("parse folder name {:?} error {:?}", folder, err))
             })?;
 
-            if height < till {
+            if height <= committed_height {
                 fs::remove_dir_all(folder).map_err(ConsensusError::WALErr)?;
             }
         }
@@ -94,7 +94,10 @@ impl SignedTxsWAL {
 
 #[cfg(test)]
 mod test {
+    extern crate test;
+
     use rand::random;
+    use test::Bencher;
 
     use protocol::types::{Hash, RawTransaction, TransactionRequest};
     use protocol::Bytes;
@@ -136,7 +139,7 @@ mod test {
     }
 
     pub fn mock_wal_txs() -> Vec<SignedTransaction> {
-        (0..5000).map(|_| mock_sign_tx()).collect::<Vec<_>>()
+        (0..20000).map(|_| mock_sign_tx()).collect::<Vec<_>>()
     }
 
     pub fn get_random_bytes(len: usize) -> Bytes {
@@ -160,5 +163,34 @@ mod test {
         wal.remove(2u64).unwrap();
         assert!(wal.load(1u64, hash_01).is_err());
         assert!(wal.load(2u64, hash_02).is_err());
+    }
+
+    #[test]
+    fn test_wal_txs_codec() {
+        for _ in 0..10 {
+            let txs = FixedSignedTxs::new(mock_wal_txs());
+            assert_eq!(
+                FixedSignedTxs::decode_sync(txs.encode_sync().unwrap()).unwrap(),
+                txs
+            );
+        }
+    }
+
+    #[bench]
+    fn bench_txs_rlp_encode(b: &mut Bencher) {
+        let txs = mock_wal_txs();
+
+        b.iter(move || {
+            let _ = rlp::encode_list(&txs);
+        });
+    }
+
+    #[bench]
+    fn bench_txs_prost_encode(b: &mut Bencher) {
+        let txs = FixedSignedTxs::new(mock_wal_txs());
+
+        b.iter(move || {
+            let _ = txs.encode_sync();
+        });
     }
 }

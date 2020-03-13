@@ -100,23 +100,24 @@ impl<Adapter: ConsensusAdapter + 'static> OverlordConsensus<Adapter> {
             Arc::clone(&engine),
         );
         let overlord_handler = overlord.get_handler();
-
         let status = status_agent.to_inner();
 
-        overlord_handler
-            .send_msg(
-                Context::new(),
-                OverlordMsg::RichStatus(gen_overlord_status(
-                    status.current_height + 1,
-                    status.consensus_interval,
-                    status.propose_ratio,
-                    status.prevote_ratio,
-                    status.precommit_ratio,
-                    status.brake_ratio,
-                    status.validators,
-                )),
-            )
-            .unwrap();
+        if status.current_height == 0 {
+            overlord_handler
+                .send_msg(
+                    Context::new(),
+                    OverlordMsg::RichStatus(gen_overlord_status(
+                        status.current_height + 1,
+                        status.consensus_interval,
+                        status.propose_ratio,
+                        status.prevote_ratio,
+                        status.precommit_ratio,
+                        status.brake_ratio,
+                        status.validators,
+                    )),
+                )
+                .unwrap();
+        }
 
         Self {
             inner:   Arc::new(overlord),
