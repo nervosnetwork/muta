@@ -19,7 +19,7 @@ pub use executor::{
     Dispatcher, ExecResp, Executor, ExecutorFactory, ExecutorParams, ExecutorResp, NoopDispatcher,
 };
 pub use mempool::{MemPool, MemPoolAdapter, MixedTxHashes};
-pub use network::{Gossip, MessageCodec, MessageHandler, Priority, Rpc, TrustFeedback};
+pub use network::{Gossip, MessageCodec, MessageHandler, PeerTrust, Priority, Rpc, TrustFeedback};
 pub use storage::{Storage, StorageAdapter, StorageBatchModify, StorageCategory, StorageSchema};
 
 pub use creep::{Cloneable, Context};
