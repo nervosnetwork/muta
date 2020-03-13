@@ -570,7 +570,10 @@ impl PeerManagerHandle {
 
         let sanitize = |pma: PeerMultiaddr| -> Multiaddr {
             let ma: Multiaddr = pma.into();
-            resolve_if_unspecified(ma)
+            match resolve_if_unspecified(&ma) {
+                Ok(resolved) => resolved,
+                Err(_) => ma,
+            }
         };
 
         listen.into_iter().map(sanitize).collect()

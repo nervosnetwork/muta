@@ -51,18 +51,27 @@ pub fn socket_to_multi_addr(socket_addr: SocketAddr) -> Multiaddr {
     multi_addr
 }
 
-pub fn resolve_if_unspecified(multiaddr: Multiaddr) -> Multiaddr {
-    let extract_ip = |multiaddr: &Multiaddr| -> Option<IpAddr> {
-        for proto in multiaddr.iter() {
-            match proto {
-                Protocol::IP4(ip) => return Some(IpAddr::V4(ip)),
-                Protocol::IP6(ip) => return Some(IpAddr::V6(ip)),
-                _ => (),
-            }
-        }
-        None
-    };
+pub fn multiaddr_to_socket(multiaddr: &Multiaddr) -> Option<SocketAddr> {
+    let mut extract_ip = None;
+    let mut extract_port = 0u16;
 
+    for proto in multiaddr.iter() {
+        match proto {
+            Protocol::IP4(ip) => extract_ip = Some(IpAddr::V4(ip)),
+            Protocol::IP6(ip) => extract_ip = Some(IpAddr::V6(ip)),
+            Protocol::TCP(port) => extract_port = port,
+            _ => (),
+        }
+    }
+
+    if let Some(ip) = extract_ip {
+        Some(SocketAddr::new(ip, extract_port))
+    } else {
+        None
+    }
+}
+
+pub fn resolve_if_unspecified(multiaddr: &Multiaddr) -> Result<Multiaddr, ()> {
     let match_socket = |iter: IntoIter<SocketAddr>, be_v4: bool| -> Option<SocketAddr> {
         for socket in iter {
             match socket {
@@ -78,36 +87,25 @@ pub fn resolve_if_unspecified(multiaddr: Multiaddr) -> Multiaddr {
         None
     };
 
-    let ip = match extract_ip(&multiaddr) {
-        Some(ip) => ip,
-        None => return multiaddr,
-    };
-
-    if !ip.is_unspecified() {
-        return multiaddr;
+    let sock = multiaddr_to_socket(&multiaddr).ok_or(())?;
+    if !sock.ip().is_unspecified() {
+        return Err(());
     }
 
-    let peer_id = match multiaddr.id_bytes() {
-        Some(id) => id,
-        None => return multiaddr,
-    };
+    let peer_id = multiaddr.id_bytes().clone().ok_or(())?;
+    let hs = hostname::get().map_err(|_| ())?;
 
-    let hs = match hostname::get() {
-        Ok(hs) => hs,
-        Err(_) => return multiaddr,
-    };
+    let hostname_port = hs
+        .to_str()
+        .map(|s| format!("{}:{}", s, sock.port()))
+        .ok_or(())?;
 
-    if let Ok(Some(socket)) = hs
-        .to_string_lossy()
-        .to_socket_addrs()
-        .map(|iter| match_socket(iter, ip.is_ipv4()))
-    {
-        let mut addr = socket_to_multi_addr(socket);
-        addr.push(Protocol::P2P(peer_id));
-        addr
-    } else {
-        multiaddr
-    }
+    let socks_iter = hostname_port.to_socket_addrs().map_err(|_| ())?;
+    let socket = match_socket(socks_iter, sock.ip().is_ipv4()).ok_or_else(|| ())?;
+
+    let mut resolved_addr = socket_to_multi_addr(socket);
+    resolved_addr.push(Protocol::P2P(peer_id));
+    Ok(resolved_addr)
 }
 
 impl MultiaddrExt for Multiaddr {
