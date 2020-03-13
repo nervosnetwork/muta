@@ -69,7 +69,7 @@ impl SignedTxsWAL {
         Ok(txs.inner)
     }
 
-    pub fn remove(&self, till: u64) -> ProtocolResult<()> {
+    pub fn remove(&self, committed_height: u64) -> ProtocolResult<()> {
         for entry in fs::read_dir(&self.path).map_err(ConsensusError::WALErr)? {
             let folder = entry.map_err(ConsensusError::WALErr)?.path();
             let folder_name = folder
@@ -84,7 +84,7 @@ impl SignedTxsWAL {
                 ConsensusError::Other(format!("parse folder name {:?} error {:?}", folder, err))
             })?;
 
-            if height <= till {
+            if height <= committed_height {
                 fs::remove_dir_all(folder).map_err(ConsensusError::WALErr)?;
             }
         }
@@ -165,6 +165,17 @@ mod test {
         assert!(wal.load(2u64, hash_02).is_err());
     }
 
+    #[test]
+    fn test_wal_txs_codec() {
+        for _ in 0..10 {
+            let txs = FixedSignedTxs::new(mock_wal_txs());
+            assert_eq!(
+                FixedSignedTxs::decode_sync(txs.encode_sync().unwrap()).unwrap(),
+                txs
+            );
+        }
+    }
+
     #[bench]
     fn bench_txs_rlp_encode(b: &mut Bencher) {
         let txs = mock_wal_txs();
@@ -180,23 +191,6 @@ mod test {
 
         b.iter(move || {
             let _ = txs.encode_sync();
-        });
-    }
-
-    #[bench]
-    fn bench_write_files(b: &mut Bencher) {
-        let mut path = Path::new(FULL_TXS_PATH).to_path_buf();
-        path.push("test.txt");
-        let mut wal_file = fs::OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .open(path)
-            .unwrap();
-        let data = rlp::encode_list(&mock_wal_txs());
-
-        b.iter(move || {
-            wal_file.write_all(&data).unwrap();
         });
     }
 }

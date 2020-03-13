@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
 use std::error::Error;
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use async_trait::async_trait;
 use futures::lock::Mutex;
@@ -121,7 +121,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         hash: Bytes,
         block: FixedPill,
     ) -> Result<(), Box<dyn Error + Send>> {
-        let time = std::time::Instant::now();
+        let time = Instant::now();
 
         let order_hashes = block.get_ordered_hashes();
         let order_hashes_len = order_hashes.len();
@@ -145,12 +145,23 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             });
         }
 
+        log::info!(
+            "[consensus-engine]: check block cost {:?}",
+            Instant::now() - time
+        );
+        let time = Instant::now();
         let txs = self.adapter.get_full_txs(ctx, order_hashes).await?;
+
+        log::info!(
+            "[consensus-engine]: get txs cost {:?}",
+            Instant::now() - time
+        );
+        let time = Instant::now();
         self.txs_wal
             .save(next_height, Hash::from_bytes(hash)?, txs)?;
 
         log::info!(
-            "[consensus-engine]: check block cost {:?} order_hashes_len {:?}",
+            "[consensus-engine]: write wal cost {:?} order_hashes_len {:?}",
             time.elapsed(),
             order_hashes_len
         );
