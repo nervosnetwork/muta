@@ -29,6 +29,7 @@ tentacle-ping = { git = "https://github.com/zeroqn/p2p", branch = "muta-disc", f
 tentacle-discovery = { git = "https://github.com/zeroqn/p2p", branch = "muta-disc", features = [ "flatc" ]}
 tentacle-identify = { git = "https://github.com/zeroqn/p2p", branch = "muta-disc", features = [ "flatc" ]}
 tokio = { version = "0.2", features = ["macros", "rt-core"]}
+hostname = "0.3"
 
 [dev-dependencies]
 env_logger = "0.6"

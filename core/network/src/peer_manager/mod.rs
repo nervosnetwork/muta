@@ -59,7 +59,7 @@ use tentacle::{
 };
 
 use crate::{
-    common::{ConnectedAddr, HeartBeat},
+    common::{resolve_if_unspecified, ConnectedAddr, HeartBeat},
     error::{NetworkError, PeerIdNotFound},
     event::{
         ConnectionErrorKind, ConnectionEvent, ConnectionType, MisbehaviorKind, PeerManagerEvent,
@@ -568,7 +568,12 @@ impl PeerManagerHandle {
         let listen = self.inner.listen();
         debug_assert!(!listen.is_empty(), "listen should alway be set");
 
-        listen.into_iter().map(Into::into).collect()
+        let sanitize = |pma: PeerMultiaddr| -> Multiaddr {
+            let ma: Multiaddr = pma.into();
+            resolve_if_unspecified(ma)
+        };
+
+        listen.into_iter().map(sanitize).collect()
     }
 }
 

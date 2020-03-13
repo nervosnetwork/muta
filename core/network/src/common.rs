@@ -1,12 +1,13 @@
 use std::{
     borrow::Cow,
     future::Future,
-    net::SocketAddr,
+    net::{IpAddr, SocketAddr, ToSocketAddrs},
     ops::Add,
     pin::Pin,
     sync::Arc,
     task::{Context, Poll},
     time::{Duration, Instant},
+    vec::IntoIter,
 };
 
 use derive_more::Display;
@@ -48,6 +49,65 @@ pub fn socket_to_multi_addr(socket_addr: SocketAddr) -> Multiaddr {
     multi_addr.push(Protocol::TCP(socket_addr.port()));
 
     multi_addr
+}
+
+pub fn resolve_if_unspecified(multiaddr: Multiaddr) -> Multiaddr {
+    let extract_ip = |multiaddr: &Multiaddr| -> Option<IpAddr> {
+        for proto in multiaddr.iter() {
+            match proto {
+                Protocol::IP4(ip) => return Some(IpAddr::V4(ip)),
+                Protocol::IP6(ip) => return Some(IpAddr::V6(ip)),
+                _ => (),
+            }
+        }
+        None
+    };
+
+    let match_socket = |iter: IntoIter<SocketAddr>, be_v4: bool| -> Option<SocketAddr> {
+        for socket in iter {
+            match socket {
+                SocketAddr::V4(_) if be_v4 => {
+                    return Some(socket);
+                }
+                SocketAddr::V6(_) if !be_v4 => {
+                    return Some(socket);
+                }
+                _ => (),
+            }
+        }
+        None
+    };
+
+    let ip = match extract_ip(&multiaddr) {
+        Some(ip) => ip,
+        None => return multiaddr,
+    };
+
+    if !ip.is_unspecified() {
+        return multiaddr;
+    }
+
+    let peer_id = match multiaddr.id_bytes() {
+        Some(id) => id,
+        None => return multiaddr,
+    };
+
+    let hs = match hostname::get() {
+        Ok(hs) => hs,
+        Err(_) => return multiaddr,
+    };
+
+    if let Ok(Some(socket)) = hs
+        .to_string_lossy()
+        .to_socket_addrs()
+        .map(|iter| match_socket(iter, ip.is_ipv4()))
+    {
+        let mut addr = socket_to_multi_addr(socket);
+        addr.push(Protocol::P2P(peer_id));
+        addr
+    } else {
+        multiaddr
+    }
 }
 
 impl MultiaddrExt for Multiaddr {
