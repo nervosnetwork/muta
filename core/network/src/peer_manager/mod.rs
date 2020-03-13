@@ -776,7 +776,7 @@ impl PeerManager {
                     // Ensure that session be replaced has traveled enough
                     // intervals
                     if incoming_trust_score > trust_score
-                        && !self.inner.is_protected(&session.peer)
+                        && !self.inner.whitelisted(&session.peer)
                         && session.peer.alive()
                             > self.config.peer_trust_config.interval().as_secs() * 20
                     {
