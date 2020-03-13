@@ -96,6 +96,10 @@ pub trait Rpc: Send + Sync {
         M: MessageCodec;
 }
 
+pub trait PeerTrust: Send + Sync {
+    fn report(&self, ctx: Context, feedback: TrustFeedback);
+}
+
 #[async_trait]
 pub trait MessageHandler: Sync + Send + 'static {
     type Message: MessageCodec;
