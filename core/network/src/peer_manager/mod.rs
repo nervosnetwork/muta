@@ -81,7 +81,7 @@ const SHORT_ALIVE_SESSION: u64 = 3; // seconds
 const WHITELIST_TIMEOUT: u64 = 2 * 60 * 60; // 2 hour
 const MAX_CONNECTING_MARGIN: usize = 10;
 
-const HARD_BAN_TIMEOUT: Duration = Duration::from_secs(60 * 60 * 1); // 1 hour
+const HARD_BAN_TIMEOUT: Duration = Duration::from_secs(60 * 60); // 1 hour
 const SOFT_BAN_TIMEOUT: Duration = Duration::from_secs(60 * 10); // 10 minutes
 const GOOD_TRUST_SCORE: u8 = 80u8;
 
