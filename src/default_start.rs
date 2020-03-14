@@ -11,13 +11,14 @@ use common_crypto::{
 };
 use core_api::adapter::DefaultAPIAdapter;
 use core_api::config::GraphQLConfig;
-use core_consensus::fixed_types::{FixedBlock, FixedSignedTxs};
+use core_consensus::fixed_types::{FixedBlock, FixedProof, FixedSignedTxs};
 use core_consensus::message::{
-    ChokeMessageHandler, ProposalMessageHandler, PullBlockRpcHandler, PullTxsRpcHandler,
-    QCMessageHandler, RemoteHeightMessageHandler, VoteMessageHandler, BROADCAST_HEIGHT,
-    END_GOSSIP_AGGREGATED_VOTE, END_GOSSIP_SIGNED_CHOKE, END_GOSSIP_SIGNED_PROPOSAL,
-    END_GOSSIP_SIGNED_VOTE, RPC_RESP_SYNC_PULL_BLOCK, RPC_RESP_SYNC_PULL_TXS, RPC_SYNC_PULL_BLOCK,
-    RPC_SYNC_PULL_TXS,
+    ChokeMessageHandler, ProposalMessageHandler, PullBlockRpcHandler, PullProofRpcHandler,
+    PullTxsRpcHandler, QCMessageHandler, RemoteHeightMessageHandler, VoteMessageHandler,
+    BROADCAST_HEIGHT, END_GOSSIP_AGGREGATED_VOTE, END_GOSSIP_SIGNED_CHOKE,
+    END_GOSSIP_SIGNED_PROPOSAL, END_GOSSIP_SIGNED_VOTE, RPC_RESP_SYNC_PULL_BLOCK,
+    RPC_RESP_SYNC_PULL_LATEST_PROOF, RPC_RESP_SYNC_PULL_TXS, RPC_SYNC_PULL_BLOCK,
+    RPC_SYNC_PULL_LATEST_PROOF, RPC_SYNC_PULL_TXS,
 };
 use core_consensus::status::{CurrentConsensusStatus, StatusAgent};
 use core_consensus::{
@@ -38,6 +39,7 @@ use protocol::{fixed_codec::FixedCodec, ProtocolResult};
 
 use crate::config::Config;
 use crate::MainError;
+use core_consensus::util::OverlordCrypto;
 
 pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
     config: &Config,
@@ -129,6 +131,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     config: Config,
     service_mapping: Arc<Mapping>,
 ) -> ProtocolResult<()> {
+    log::info!("node starts");
     // Init Block db
     let path_block = config.data_path_for_block();
     log::info!("Data path for block: {:?}", path_block);
@@ -261,26 +264,26 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     let exec_height = current_block.header.exec_height;
 
     let current_consensus_status = CurrentConsensusStatus {
-        cycles_price:               metadata.cycles_price,
-        cycles_limit:               metadata.cycles_limit,
-        current_height:             current_block.header.height,
-        exec_height:                current_block.header.exec_height,
-        current_hash:               block_hash,
-        latest_commited_state_root: current_header.state_root.clone(),
-        list_logs_bloom:            vec![],
-        list_confirm_root:          vec![],
-        list_state_root:            vec![],
-        list_receipt_root:          vec![],
-        list_cycles_used:           vec![],
-        current_proof:              current_header.proof.clone(),
-        validators:                 validators.clone(),
-        consensus_interval:         metadata.interval,
-        propose_ratio:              metadata.propose_ratio,
-        prevote_ratio:              metadata.prevote_ratio,
-        precommit_ratio:            metadata.precommit_ratio,
-        brake_ratio:                metadata.brake_ratio,
-        max_tx_size:                metadata.max_tx_size,
-        tx_num_limit:               metadata.tx_num_limit,
+        cycles_price:                metadata.cycles_price,
+        cycles_limit:                metadata.cycles_limit,
+        current_height:              current_block.header.height,
+        exec_height:                 current_block.header.exec_height,
+        current_hash:                block_hash,
+        latest_committed_state_root: current_header.state_root.clone(),
+        list_logs_bloom:             vec![],
+        list_confirm_root:           vec![],
+        list_state_root:             vec![],
+        list_receipt_root:           vec![],
+        list_cycles_used:            vec![],
+        current_proof:               current_header.proof.clone(),
+        validators:                  validators.clone(),
+        consensus_interval:          metadata.interval,
+        propose_ratio:               metadata.propose_ratio,
+        prevote_ratio:               metadata.prevote_ratio,
+        precommit_ratio:             metadata.precommit_ratio,
+        brake_ratio:                 metadata.brake_ratio,
+        max_tx_size:                 metadata.max_tx_size,
+        tx_num_limit:                metadata.tx_num_limit,
     };
 
     let consensus_interval = current_consensus_status.consensus_interval;
@@ -309,6 +312,8 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
 
     core_consensus::trace::init_tracer(my_address.as_hex())?;
 
+    let crypto = Arc::new(OverlordCrypto::new(bls_priv_key, bls_pub_keys, common_ref));
+
     let mut consensus_adapter =
         OverlordConsensusAdapter::<ServiceExecutorFactory, _, _, _, _, _, _>::new(
             Arc::new(network_service.handle()),
@@ -318,18 +323,18 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
             Arc::clone(&trie_db),
             Arc::clone(&service_mapping),
             status_agent.clone(),
+            Arc::clone(&crypto),
         )?;
 
     let exec_demon = consensus_adapter.take_exec_demon();
     let consensus_adapter = Arc::new(consensus_adapter);
 
     let lock = Arc::new(Mutex::new(()));
+
     let overlord_consensus = Arc::new(OverlordConsensus::new(
         status_agent.clone(),
         node_info,
-        bls_pub_keys,
-        bls_priv_key,
-        common_ref,
+        Arc::clone(&crypto),
         Arc::clone(&txs_wal),
         Arc::clone(&consensus_adapter),
         Arc::clone(&lock),
@@ -337,11 +342,12 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
 
     consensus_adapter.set_overlord_handler(overlord_consensus.get_overlord_handler());
 
-    let synchronization = Arc::new(OverlordSynchronization::new(
+    let synchronization = Arc::new(OverlordSynchronization::<_, Secp256k1>::new(
         config.consensus.sync_txs_chunk_size,
         consensus_adapter,
         status_agent.clone(),
         lock,
+        Arc::clone(&crypto),
     ));
 
     // Re-execute block from exec_height + 1 to current_height, so that init the
@@ -388,6 +394,15 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
             Arc::clone(&storage),
         )),
     )?;
+
+    network_service.register_endpoint_handler(
+        RPC_SYNC_PULL_LATEST_PROOF,
+        Box::new(PullProofRpcHandler::new(
+            Arc::new(network_service.handle()),
+            Arc::clone(&storage),
+        )),
+    )?;
+
     network_service.register_endpoint_handler(
         RPC_SYNC_PULL_TXS,
         Box::new(PullTxsRpcHandler::new(
@@ -396,6 +411,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         )),
     )?;
     network_service.register_rpc_response::<FixedBlock>(RPC_RESP_SYNC_PULL_BLOCK)?;
+    network_service.register_rpc_response::<FixedProof>(RPC_RESP_SYNC_PULL_LATEST_PROOF)?;
     network_service.register_rpc_response::<FixedSignedTxs>(RPC_RESP_SYNC_PULL_TXS)?;
 
     // Run network

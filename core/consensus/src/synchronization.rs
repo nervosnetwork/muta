@@ -9,11 +9,14 @@ use protocol::fixed_codec::FixedCodec;
 use protocol::traits::{
     Context, ExecutorParams, ExecutorResp, Synchronization, SynchronizationAdapter,
 };
-use protocol::types::{Block, Hash, Receipt, SignedTransaction};
+use protocol::types::{Block, Hash, Proof, Receipt, SignedTransaction};
 use protocol::ProtocolResult;
 
 use crate::status::{ExecutedInfo, StatusAgent};
-use crate::ConsensusError;
+
+use crate::util::OverlordCrypto;
+
+use std::marker::PhantomData;
 
 const POLLING_BROADCAST: u64 = 2000;
 const WAIT_EXECUTION: u64 = 1000;
@@ -24,17 +27,23 @@ pub struct RichBlock {
     pub txs:   Vec<SignedTransaction>,
 }
 
-pub struct OverlordSynchronization<Adapter: SynchronizationAdapter> {
-    adapter: Arc<Adapter>,
-    status:  StatusAgent,
-    lock:    Arc<Mutex<()>>,
-    syncing: Mutex<()>,
-
+pub struct OverlordSynchronization<
+    Adapter: SynchronizationAdapter,
+    C: common_crypto::Crypto + Sync + Send,
+> {
+    adapter:             Arc<Adapter>,
+    status:              StatusAgent,
+    lock:                Arc<Mutex<()>>,
+    syncing:             Mutex<()>,
+    _overlord_crypto:    Arc<OverlordCrypto>,
+    pin_c:               PhantomData<C>,
     sync_txs_chunk_size: usize,
 }
 
 #[async_trait]
-impl<Adapter: SynchronizationAdapter> Synchronization for OverlordSynchronization<Adapter> {
+impl<Adapter: SynchronizationAdapter, C: common_crypto::Crypto + Sync + Send> Synchronization
+    for OverlordSynchronization<Adapter, C>
+{
     async fn receive_remote_block(&self, ctx: Context, remote_height: u64) -> ProtocolResult<()> {
         let syncing_lock = self.syncing.try_lock();
         if syncing_lock.is_none() {
@@ -58,12 +67,13 @@ impl<Adapter: SynchronizationAdapter> Synchronization for OverlordSynchronizatio
         }
 
         log::info!(
-            "[synchronization]: start, remote block height {:?} current block height {:?}",
+            "[synchronization]: sync start, remote block height {:?} current block height {:?}",
             remote_height,
             current_height,
         );
 
         let sync_status_agent = self.init_status_agent().await?;
+
         let sync_resp = self
             .start_sync(
                 ctx.clone(),
@@ -95,20 +105,25 @@ impl<Adapter: SynchronizationAdapter> Synchronization for OverlordSynchronizatio
         )?;
 
         log::info!(
-            "[synchronization]: end, remote block height {:?} current block height {:?}",
+            "[synchronization]: sync end, remote block height {:?} current block height {:?} current exec height {:?} current proof height {:?}",
             remote_height,
-            current_height,
+            self.status.to_inner().current_height,
+            self.status.to_inner().exec_height,
+            self.status.to_inner().current_proof.height,
         );
         Ok(())
     }
 }
 
-impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
+impl<Adapter: SynchronizationAdapter, C: common_crypto::Crypto + Sync + Send>
+    OverlordSynchronization<Adapter, C>
+{
     pub fn new(
         sync_txs_chunk_size: usize,
         adapter: Arc<Adapter>,
         status: StatusAgent,
         lock: Arc<Mutex<()>>,
+        overlord_crypto: Arc<OverlordCrypto>,
     ) -> Self {
         let syncing = Mutex::new(());
 
@@ -117,7 +132,8 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
             status,
             lock,
             syncing,
-
+            _overlord_crypto: overlord_crypto,
+            pin_c: PhantomData,
             sync_txs_chunk_size,
         }
     }
@@ -141,42 +157,75 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
         current_height: u64,
         remote_height: u64,
     ) -> ProtocolResult<()> {
-        let mut current_height = current_height;
+        let mut current_consented_height = current_height;
 
-        loop {
-            let current_block = self
+        let mut prepared_rich_block: Option<RichBlock> = None;
+
+        while current_consented_height < remote_height {
+            let consenting_height = current_consented_height + 1;
+            log::info!(
+                "[synchronization]: try syncing block, current_consented_height:{},syncing_height:{}",
+                current_consented_height,
+                consenting_height
+            );
+
+            let consenting_rich_block: RichBlock = match prepared_rich_block.as_ref() {
+                None => {
+                    self.get_rich_block_from_remote(ctx.clone(), consenting_height)
+                        .await?
+                }
+
+                Some(_) => prepared_rich_block.take().unwrap(),
+            };
+
+            let consenting_proof: Proof = if consenting_height < remote_height {
+                let proof_block = self
+                    .get_rich_block_from_remote(ctx.clone(), consenting_height + 1)
+                    .await?;
+
+                prepared_rich_block = Some(proof_block.clone());
+                proof_block.block.header.proof
+            } else {
+                self.adapter
+                    .get_proof_from_remote(ctx.clone(), consenting_height)
+                    .await?
+            };
+
+            // verify syncing proof
+            self.adapter
+                .verify_proof(ctx.clone(), &consenting_rich_block.block, &consenting_proof)
+                .await?;
+
+            // verify previous proof
+            let previous_block = self
                 .adapter
-                .get_block_by_height(ctx.clone(), current_height)
+                .get_block_by_height(ctx.clone(), consenting_rich_block.block.header.height - 1)
                 .await?;
 
-            let next_height = current_height + 1;
-
-            let next_rich_block = self
-                .get_rich_block_from_remote(ctx.clone(), next_height)
+            self.adapter
+                .verify_proof(
+                    ctx.clone(),
+                    &previous_block,
+                    &consenting_rich_block.block.header.proof,
+                )
                 .await?;
 
-            self.verify_block(&current_block, &next_rich_block.block)?;
+            self.commit_block(
+                ctx.clone(),
+                consenting_rich_block,
+                consenting_proof,
+                sync_status_agent.clone(),
+            )
+            .await?;
 
-            self.commit_block(ctx.clone(), next_rich_block, sync_status_agent.clone())
-                .await?;
+            log::info!(
+                "[synchronization]: try synced block, temp status: height:{}, exec_height:{}, proof_height:{}",
+                sync_status_agent.to_inner().current_height,
+                sync_status_agent.to_inner().exec_height,
+                sync_status_agent.to_inner().current_proof.height
+            );
 
-            current_height = next_height;
-
-            if current_height >= remote_height {
-                return Ok(());
-            }
-        }
-    }
-
-    // TODO(yejiayu):
-    // - Verify the proof
-    // - Verify the block header
-    // - Verify the transaction list
-    fn verify_block(&self, current_block: &Block, next_block: &Block) -> ProtocolResult<()> {
-        let block_hash = Hash::digest(current_block.encode_fixed()?);
-
-        if block_hash != next_block.header.pre_hash {
-            return Err(ConsensusError::SyncBlockHashErr(next_block.header.height).into());
+            current_consented_height += 1;
         }
         Ok(())
     }
@@ -185,6 +234,7 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
         &self,
         ctx: Context,
         rich_block: RichBlock,
+        proof: Proof,
         status_agent: StatusAgent,
     ) -> ProtocolResult<()> {
         let executor_resp = self
@@ -208,13 +258,7 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
             metadata.max_tx_size,
         );
 
-        status_agent.update_by_commited(
-            metadata,
-            block.clone(),
-            block_hash,
-            // TODO(@yejiayu): need to get proof for the next block
-            block.header.proof.clone(),
-        );
+        status_agent.update_by_committed(metadata, block.clone(), block_hash, proof);
 
         self.save_chain_data(
             ctx.clone(),

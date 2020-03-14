@@ -102,6 +102,78 @@ pub enum ConsensusError {
     #[display(fmt = "Synchronization {} block error", _0)]
     SyncBlockHashErr(u64),
 
+    /// The synchronous block does not pass the checks.
+    #[display(fmt = "Synchronization {} block prehash error", _0)]
+    SyncBlockPreHashErr(u64),
+
+    /// The Aggregated Signature doesn't match
+    #[display(fmt = "Synchronization {} block error, proof doesn't match", _0)]
+    SyncBlockProofErr(u64),
+
+    /// The Aggregated Signature doesn't match
+    #[display(fmt = "Synchronization {} block error, weight doesn't exceed 2/3", _0)]
+    SyncBlockVoteWeightErr(u64),
+
+    /// The Aggregated Signature doesn't match
+    #[display(
+        fmt = "Synchronization {} block error, proposer is not in verify list",
+        _0
+    )]
+    SyncBlockProposerErr(u64),
+
+    /// The signed voter is not in the verifier list
+    #[display(
+        fmt = "Synchronization {} block error, signed voter is not in verifier list",
+        _0
+    )]
+    SyncBlockVoterErr(u64),
+
+    /// The signedTransaction's chain id doesn't match
+    #[display(
+        fmt = "Synchronization transaction hash {:?} error, chain id doesn't match",
+        _0
+    )]
+    SyncBlockTransactionChainIdErr(Hash),
+
+    /// The signedTransaction's timeout doesn't compel timeout_gap
+    #[display(
+        fmt = "Synchronization transaction hash {:?} error, timeout doesn't satisfy block {}, timeout_gap {}",
+        _0,
+        _1,
+        _2
+    )]
+    SyncBlockTransactionTimeoutErr(Hash, u64, u64),
+
+    /// The signedTransaction's signature is invalid
+    #[display(
+        fmt = "Synchronization transaction hash {:?} error, signature is invalid",
+        _0
+    )]
+    SyncBlockTransactionSignatureErr(Hash),
+
+    /// The Aggregated Signature doesn't match
+    #[display(fmt = "Consensus verify block {} block error, proof doesn't match", _0)]
+    ConsensusVerifyBlockProofErr(u64),
+
+    #[display(
+        fmt = "Consensus verify block {} block error, proposer is not in verify list",
+        _0
+    )]
+    ConsensusVerifyBlockProposerErr(u64),
+
+    #[display(
+        fmt = "Consensus verify block {} block error, signed voter is not in verifier list",
+        _0
+    )]
+    ConsensusVerifyBlockVoterErr(u64),
+
+    /// The Aggregated Signature doesn't match
+    #[display(
+        fmt = "Consensus verify block {} block error, weight doesn't exceed 2/3",
+        _0
+    )]
+    ConsensusVerifyBlockVoteWeightErr(u64),
+
     /// The Rpc response mismatch the request.
     #[display(fmt = "Synchronization Rpc {:?} message mismatch", _0)]
     RpcErr(ConsensusType),
