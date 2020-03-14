@@ -57,6 +57,17 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
     ) -> Result<(FixedPill, Bytes), Box<dyn Error + Send>> {
         let current_consensus_status = self.status_agent.to_inner();
 
+        log::info!(
+            "[consensus] get_block for {}, current_consensus_status : {:?}",
+            next_height,
+            current_consensus_status
+        );
+        if current_consensus_status.current_height != current_consensus_status.current_proof.height
+        {
+            log::error!("[consensus] get_block for {}, current_consensus_status.current_height {} != current_consensus_status.current_proof.height",
+            current_consensus_status.current_height, current_consensus_status.current_proof.height)
+        }
+
         let (ordered_tx_hashes, propose_hashes) = self
             .adapter
             .get_txs_from_mempool(
@@ -78,6 +89,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         let order_root = Merkle::from_hashes(ordered_tx_hashes.clone()).get_root_hash();
 
         let state_root = current_consensus_status.get_latest_state_root();
+
         let header = BlockHeader {
             chain_id: self.node_info.chain_id.clone(),
             pre_hash: current_consensus_status.current_hash,
@@ -95,6 +107,18 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             validator_version: 0u64,
             validators: current_consensus_status.validators.clone(),
         };
+
+        if header.height != header.proof.height + 1 {
+            log::error!(
+                "get_block, proof error, proof height mismatch, block : {:?}",
+                header.clone(),
+            );
+            log::error!(
+                "get_block, proof error, proof height mismatch, current_consensus_status : {:?}",
+                self.status_agent.to_inner()
+            )
+        }
+
         let block = Block {
             header,
             ordered_tx_hashes,
@@ -111,6 +135,13 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         let mut set = self.exemption_hash.write();
         set.insert(hash.clone());
 
+        log::info!(
+            "[consensus] get_block for {}, blockhash:{:?}, block:{:?}",
+            next_height,
+            hash.clone(),
+            pill.block
+        );
+
         Ok((fixed_pill, hash))
     }
 
@@ -123,6 +154,8 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
     ) -> Result<(), Box<dyn Error + Send>> {
         let time = Instant::now();
 
+        log::info!("[consensus-engine]: check_block for overlord receives a proposal,hash given:{:?},,block:{:?}", hash.clone(),block.clone());
+
         let order_hashes = block.get_ordered_hashes();
         let order_hashes_len = order_hashes.len();
         let exemption = { self.exemption_hash.read().contains(&hash) };
@@ -132,8 +165,27 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         // transactions directly.
         if !exemption {
             self.check_block_roots(&block.inner.block.header)?;
+
             self.adapter
-                .check_txs(ctx.clone(), order_hashes.clone())
+                .verify_block_header(ctx.clone(), &block.inner.block);
+
+            // verify the proof in the block for previous block
+            // skip to get previous proof to compare because the node may just comes from
+            // sync and waste a delay of read
+            let previous_block = self
+                .adapter
+                .get_block_by_height(ctx.clone(), block.inner.block.header.height - 1)
+                .await?;
+            self.adapter
+                .verify_proof(
+                    ctx.clone(),
+                    &previous_block,
+                    &block.inner.block.header.proof,
+                )
+                .await?;
+
+            self.adapter
+                .verify_txs(ctx.clone(), block.inner.block.ordered_tx_hashes.clone())
                 .await?;
 
             let adapter = Arc::clone(&self.adapter);
@@ -206,7 +258,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         let signature = commit.proof.signature.signature.clone();
         let bitmap = commit.proof.signature.address_bitmap.clone();
 
-        // Sorage save the lastest proof.
+        // Storage save the latest proof.
         let proof = Proof {
             height: commit.proof.height,
             round: commit.proof.round,
@@ -462,7 +514,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
         }
 
         // check state root
-        if status.latest_commited_state_root != block.state_root
+        if status.latest_committed_state_root != block.state_root
             && !status.list_state_root.contains(&block.state_root)
         {
             trace::error(
@@ -474,7 +526,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
             );
             error!(
                 "invalid status list_state_root, latest {:?}, current list {:?}, block {:?}",
-                status.latest_commited_state_root, status.list_state_root, block.state_root
+                status.latest_committed_state_root, status.list_state_root, block.state_root
             );
             return Err(ConsensusError::InvalidStatusVec.into());
         }
@@ -585,8 +637,40 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
         );
 
         let block_hash = Hash::digest(block.encode_fixed()?);
+
+        log::info!(
+            "[consensus] update_status for handle_commit, height {}, block:{:?}, proof:{:?}",
+            block.header.height,
+            block.clone(),
+            proof.clone()
+        );
+
         self.status_agent
-            .update_by_commited(metadata.clone(), block, block_hash, proof);
+            .update_by_committed(metadata.clone(), block, block_hash, proof);
+
+        log::info!(
+            "[consensus] committed, consented height {}, proof height {}, status_agent:{:?}",
+            self.status_agent.to_inner().current_height,
+            self.status_agent.to_inner().current_proof.height,
+            self.status_agent.to_inner()
+        );
+
+        // log::info!(
+        // "get block of {}, block {:?}",
+        // self.status_agent.to_inner().current_height,
+        // self.adapter
+        // .get_block_by_height(Context::new(),
+        // self.status_agent.to_inner().current_height) .await?
+        // );
+
+        if self.status_agent.to_inner().current_height
+            != self.status_agent.to_inner().current_proof.height
+        {
+            log::error!("[consensus] commit block {} and update status error, current_height != current_proof.height {}",
+            self.status_agent.to_inner().current_height,
+            self.status_agent.to_inner().current_proof.height)
+        }
+
         self.update_overlord_crypto(metadata)?;
         Ok(())
     }

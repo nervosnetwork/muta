@@ -70,6 +70,9 @@ pub trait SynchronizationAdapter: CommonConsensusAdapter + Send + Sync {
         ctx: Context,
         hashes: &[Hash],
     ) -> ProtocolResult<Vec<SignedTransaction>>;
+
+    async fn get_proof_from_remote(self: &Self, ctx: Context, height: u64)
+        -> ProtocolResult<Proof>;
 }
 
 #[async_trait]
@@ -115,6 +118,17 @@ pub trait CommonConsensusAdapter: Send + Sync {
     ) -> ProtocolResult<Metadata>;
 
     fn set_args(&self, context: Context, timeout_gap: u64, cycles_limit: u64, max_tx_size: u64);
+
+    async fn verify_txs(&self, ctx: Context, txs: Vec<Hash>) -> ProtocolResult<()>;
+
+    async fn verify_proof(
+        self: &Self,
+        ctx: Context,
+        block: &Block,
+        proof: &Proof,
+    ) -> ProtocolResult<()>;
+
+    async fn verify_block_header(&self, ctx: Context, block: &Block) -> ProtocolResult<()>;
 }
 
 #[async_trait]
@@ -130,8 +144,9 @@ pub trait ConsensusAdapter: CommonConsensusAdapter + Send + Sync {
         tx_num_limit: u64,
     ) -> ProtocolResult<MixedTxHashes>;
 
-    /// Check the correctness of the given transactions.
-    async fn check_txs(&self, ctx: Context, order_txs: Vec<Hash>) -> ProtocolResult<()>;
+    // /// Check the correctness of the given transactions.
+    // async fn check_txs(&self, ctx: Context, order_txs: Vec<Hash>) ->
+    // ProtocolResult<()>;
 
     /// Synchronous signed transactions.
     async fn sync_txs(&self, ctx: Context, propose_txs: Vec<Hash>) -> ProtocolResult<()>;

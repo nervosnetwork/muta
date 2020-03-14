@@ -5,7 +5,7 @@ use overlord::Codec;
 
 use protocol::codec::{Deserialize, ProtocolCodecSync, Serialize};
 use protocol::fixed_codec::FixedCodec;
-use protocol::types::{Block, Hash, Pill, SignedTransaction};
+use protocol::types::{Block, Hash, Pill, Proof, SignedTransaction};
 use protocol::{traits::MessageCodec, Bytes, BytesMut, ProtocolResult};
 
 use crate::{ConsensusError, ConsensusType};
@@ -112,6 +112,29 @@ impl MessageCodec for FixedBlock {
 impl FixedBlock {
     pub fn new(inner: Block) -> Self {
         FixedBlock { inner }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FixedProof {
+    pub inner: Proof,
+}
+
+#[async_trait]
+impl MessageCodec for FixedProof {
+    async fn encode(&mut self) -> ProtocolResult<Bytes> {
+        self.inner.encode_sync()
+    }
+
+    async fn decode(bytes: Bytes) -> ProtocolResult<Self> {
+        let inner: Proof = ProtocolCodecSync::decode_sync(bytes)?;
+        Ok(FixedProof::new(inner))
+    }
+}
+
+impl FixedProof {
+    pub fn new(inner: Proof) -> Self {
+        FixedProof { inner }
     }
 }
 
