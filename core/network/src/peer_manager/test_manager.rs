@@ -131,6 +131,7 @@ fn make_manager(
         pubkey: manager_pubkey,
         bootstraps,
         whitelist_by_chain_addrs: Default::default(),
+        whitelist_peers_only: false,
         max_connections,
         routine_interval: Duration::from_secs(10),
         peer_dat_file,
@@ -1858,6 +1859,7 @@ async fn should_never_expire_peers_from_config_whitelist() {
         pubkey: manager_pubkey,
         bootstraps,
         whitelist_by_chain_addrs: vec![test_chain_addr.clone()],
+        whitelist_peers_only: false,
         max_connections: 10,
         routine_interval: Duration::from_secs(10),
         peer_dat_file,
@@ -1905,6 +1907,7 @@ async fn should_not_refresh_never_expired_peers_from_config_whitelist() {
         pubkey: manager_pubkey,
         bootstraps,
         whitelist_by_chain_addrs: vec![test_chain_addr.clone()],
+        whitelist_peers_only: false,
         max_connections: 10,
         routine_interval: Duration::from_secs(10),
         peer_dat_file,
@@ -1942,4 +1945,144 @@ async fn should_not_refresh_never_expired_peers_from_config_whitelist() {
         TestExpireTime::Never,
         "should not be refreshed"
     );
+}
+
+#[tokio::test]
+async fn should_only_connect_peers_in_whitelist_if_whitelist_only_enabled() {
+    let manager_pubkey = make_pubkey();
+    let manager_id = manager_pubkey.peer_id();
+    let mut peer_dat_file = std::env::temp_dir();
+    peer_dat_file.push("peer.dat");
+
+    let test_peer = make_peer(2077);
+    let test_chain_addr = test_peer
+        .owned_chain_addr()
+        .expect("test whitelist chain addr");
+
+    let another_peer = make_peer(2020);
+
+    let config = PeerManagerConfig {
+        our_id: manager_id,
+        pubkey: manager_pubkey,
+        bootstraps: Default::default(),
+        whitelist_by_chain_addrs: vec![test_chain_addr.clone()],
+        whitelist_peers_only: true,
+        max_connections: 10,
+        routine_interval: Duration::from_secs(10),
+        peer_dat_file,
+    };
+
+    let (conn_tx, mut conn_rx) = unbounded();
+    let (mgr_tx, mgr_rx) = unbounded();
+    let manager = PeerManager::new(config, mgr_rx, conn_tx);
+
+    let inner = manager.inner();
+    inner.add_peer(test_peer.clone());
+    inner.add_peer(another_peer);
+    assert!(
+        inner.whitelisted_by_chain_addr(&test_chain_addr),
+        "should be whitelisted"
+    );
+
+    let mut manager = MockManager::new(manager, mgr_tx);
+    manager.poll().await;
+
+    let conn_event = conn_rx.next().await.expect("should have connect event");
+    let multiaddrs_in_event = match conn_event {
+        ConnectionEvent::Connect { addrs, .. } => addrs,
+        _ => panic!("should be connect event"),
+    };
+
+    assert_eq!(
+        multiaddrs_in_event.len(),
+        1,
+        "should have on multiaddr to connect"
+    );
+
+    let test_peer_multiaddr = test_peer.multiaddrs.all_raw().pop().expect("get multiaddr");
+    assert_eq!(
+        multiaddrs_in_event[0], test_peer_multiaddr,
+        "should be peer in whitelist"
+    );
+}
+
+#[tokio::test]
+async fn should_only_allow_incoming_peers_in_whitelist_if_whitelist_only_enabled() {
+    let manager_pubkey = make_pubkey();
+    let manager_id = manager_pubkey.peer_id();
+    let mut peer_dat_file = std::env::temp_dir();
+    peer_dat_file.push("peer.dat");
+
+    let test_peer = make_peer(2077);
+    let test_chain_addr = test_peer
+        .owned_chain_addr()
+        .expect("test whitelist chain addr");
+
+    let another_peer = make_peer(2020);
+
+    let config = PeerManagerConfig {
+        our_id: manager_id,
+        pubkey: manager_pubkey,
+        bootstraps: Default::default(),
+        whitelist_by_chain_addrs: vec![test_chain_addr.clone()],
+        whitelist_peers_only: true,
+        max_connections: 10,
+        routine_interval: Duration::from_secs(10),
+        peer_dat_file,
+    };
+
+    let (conn_tx, _conn_rx) = unbounded();
+    let (mgr_tx, mgr_rx) = unbounded();
+    let manager = PeerManager::new(config, mgr_rx, conn_tx);
+
+    let inner = manager.inner();
+    inner.add_peer(test_peer.clone());
+    inner.add_peer(another_peer.clone());
+    assert!(
+        inner.whitelisted_by_chain_addr(&test_chain_addr),
+        "should be whitelisted"
+    );
+
+    let mut manager = MockManager::new(manager, mgr_tx);
+    assert_eq!(inner.connected(), 0, "should have zero connections");
+
+    // First no whitelisted one
+    let sess_ctx = SessionContext::make(
+        SessionId::new(233),
+        another_peer
+            .multiaddrs
+            .all_raw()
+            .pop()
+            .expect("peer multiaddr"),
+        SessionType::Inbound,
+        another_peer.owned_pubkey().expect("pubkey"),
+    );
+    let new_session = PeerManagerEvent::NewSession {
+        pid:    another_peer.owned_id(),
+        pubkey: another_peer.owned_pubkey().expect("pubkey"),
+        ctx:    sess_ctx.arced(),
+    };
+    manager.poll_event(new_session).await;
+
+    assert_eq!(inner.connected(), 0, "should remain 0 connections");
+
+    // Now whitelistd one
+    let sess_ctx = SessionContext::make(
+        SessionId::new(666),
+        test_peer
+            .multiaddrs
+            .all_raw()
+            .pop()
+            .expect("peer multiaddr"),
+        SessionType::Inbound,
+        test_peer.owned_pubkey().expect("whitelist pubkey"),
+    );
+    let new_session = PeerManagerEvent::NewSession {
+        pid:    test_peer.owned_id(),
+        pubkey: test_peer.owned_pubkey().expect("whitelist pubkey"),
+        ctx:    sess_ctx.arced(),
+    };
+    manager.poll_event(new_session).await;
+
+    assert_eq!(inner.connected(), 1, "should have 1 connection");
 }

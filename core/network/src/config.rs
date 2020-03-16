@@ -106,10 +106,11 @@ pub struct NetworkConfig {
     pub write_timeout:    u64,
 
     // peer manager
-    pub bootstraps:          Vec<ArcPeer>,
-    pub whitelist:           Vec<Address>,
-    pub enable_save_restore: bool,
-    pub peer_dat_file:       PathBuf,
+    pub bootstraps:           Vec<ArcPeer>,
+    pub whitelist:            Vec<Address>,
+    pub whitelist_peers_only: bool,
+    pub enable_save_restore:  bool,
+    pub peer_dat_file:        PathBuf,
 
     // identity and encryption
     pub secio_keypair: SecioKeyPair,
@@ -147,10 +148,11 @@ impl NetworkConfig {
             max_wait_streams: DEFAULT_MAX_WAIT_STREAMS,
             write_timeout:    DEFAULT_WRITE_TIMEOUT,
 
-            bootstraps:          Default::default(),
-            whitelist:           Default::default(),
-            enable_save_restore: false,
-            peer_dat_file:       PathBuf::from(DEFAULT_PEER_DAT_FILE.to_owned()),
+            bootstraps:           Default::default(),
+            whitelist:            Default::default(),
+            whitelist_peers_only: false,
+            enable_save_restore:  false,
+            peer_dat_file:        PathBuf::from(DEFAULT_PEER_DAT_FILE.to_owned()),
 
             secio_keypair: SecioKeyPair::secp256k1_generated(),
 
@@ -261,6 +263,13 @@ impl NetworkConfig {
         Ok(self)
     }
 
+    pub fn whitelist_peers_only(mut self, flag: Option<bool>) -> Self {
+        if let Some(flag) = flag {
+            self.whitelist_peers_only = flag;
+        }
+        self
+    }
+
     pub fn peer_dat_file<P: AsRef<Path>>(mut self, path: P) -> Self {
         let mut path = path.as_ref().to_owned();
         path.push(DEFAULT_PEER_FILE_NAME);
@@ -366,6 +375,7 @@ impl From<&NetworkConfig> for PeerManagerConfig {
             pubkey:                   config.secio_keypair.public_key(),
             bootstraps:               config.bootstraps.clone(),
             whitelist_by_chain_addrs: config.whitelist.clone(),
+            whitelist_peers_only:     config.whitelist_peers_only,
             max_connections:          config.max_connections,
             routine_interval:         config.peer_manager_heart_beat_interval,
             peer_dat_file:            config.peer_dat_file.clone(),

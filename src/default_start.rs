@@ -139,6 +139,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     // Init network
     let network_config = NetworkConfig::new()
         .max_connections(config.network.max_connected_peers.clone())
+        .whitelist_peers_only(config.network.whitelist_peers_only.clone())
         .rpc_timeout(config.network.rpc_timeout.clone())
         .selfcheck_interval(config.network.selfcheck_interval.clone())
         .max_wait_streams(config.network.max_wait_streams)

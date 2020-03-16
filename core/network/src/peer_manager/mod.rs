@@ -494,6 +494,16 @@ impl Inner {
         self.whitelist.read().contains(chain_addr)
     }
 
+    pub fn whitelisted(&self, peer: &ArcPeer) -> bool {
+        match peer.owned_chain_addr() {
+            Some(ca) => self.whitelisted_by_chain_addr(&ca),
+            None => {
+                warn!("call whitelisted on peer {:?} without chain addr", peer.id);
+                false
+            }
+        }
+    }
+
     #[cfg(test)]
     pub fn whitelist(&self) -> HashSet<ArcWhitelistedPeer> {
         self.whitelist.read().iter().cloned().collect()
@@ -531,6 +541,8 @@ pub struct PeerManagerConfig {
 
     /// Never expired whitelist peers by chain address
     pub whitelist_by_chain_addrs: Vec<Address>,
+    /// Only allow peers in whitelist
+    pub whitelist_peers_only:     bool,
 
     /// Max connections
     pub max_connections: usize,
@@ -710,6 +722,14 @@ impl PeerManager {
                     remote_peer.multiaddrs.insert(vec![remote_multiaddr]);
                 }
             }
+        }
+
+        if self.config.whitelist_peers_only && !self.inner.whitelisted(&remote_peer) {
+            debug!("reject peer {:?} not in whitelist", remote_peer.id);
+
+            remote_peer.mark_disconnected();
+            self.disconnect_session(ctx.id);
+            return;
         }
 
         if self.inner.connected() >= self.config.max_connections {
@@ -941,6 +961,11 @@ impl PeerManager {
 
     fn connect_peers(&mut self, peers: Vec<ArcPeer>) {
         let connectable = |p: ArcPeer| -> Option<ArcPeer> {
+            if self.config.whitelist_peers_only && !self.inner.whitelisted(&p) {
+                debug!("filter peer {:?} not in whitelist", p.id);
+                return None;
+            }
+
             let connectedness = p.connectedness();
             if connectedness != Connectedness::CanConnect
                 && connectedness != Connectedness::NotConnected
@@ -1121,7 +1146,7 @@ impl Future for PeerManager {
             );
 
             if !connectable_peers.is_empty() {
-                self.connect_peers_now(connectable_peers);
+                self.connect_peers(connectable_peers);
             }
         }
 
