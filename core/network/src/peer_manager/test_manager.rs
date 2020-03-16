@@ -130,6 +130,7 @@ fn make_manager(
         our_id: manager_id,
         pubkey: manager_pubkey,
         bootstraps,
+        whitelist_by_chain_addrs: Default::default(),
         max_connections,
         routine_interval: Duration::from_secs(10),
         peer_dat_file,
@@ -1796,8 +1797,8 @@ async fn should_refresh_whitelist_on_whitelist_peers_by_chain_addrs() {
         .expect("should have one whitelist peer")
         .clone();
 
-    // Set authorized_at to older timestamp
-    peer_in_list.set_authorized_at(time::now() - WHITELIST_TIMEOUT + 20);
+    // Set expire_time_at to older timestamp
+    peer_in_list.set_expire_time_at(time::now() + WHITELIST_TIMEOUT - 20);
     assert!(!peer_in_list.is_expired(), "should not be expired");
 
     let whitelist_peers_by_chain_addrs = PeerManagerEvent::WhitelistPeersByChainAddr {
@@ -1806,8 +1807,8 @@ async fn should_refresh_whitelist_on_whitelist_peers_by_chain_addrs() {
     mgr.poll_event(whitelist_peers_by_chain_addrs).await;
 
     assert_eq!(
-        peer_in_list.authorized_at(),
-        time::now(),
+        peer_in_list.expire_time_at(),
+        time::now() + WHITELIST_TIMEOUT,
         "should be refreshed"
     );
 }
@@ -1827,8 +1828,8 @@ async fn should_remove_expired_peers_in_whitelist() {
         .next()
         .expect("should have one whitelist peer")
         .clone();
-    // Set authorized_at to older timestamp
-    peer_in_list.set_authorized_at(time::now() - WHITELIST_TIMEOUT - 1);
+    // Set expire_time_at to older timestamp
+    peer_in_list.set_expire_time_at(time::now() - WHITELIST_TIMEOUT - 1);
     assert!(peer_in_list.is_expired(), "should be expired");
 
     mgr.poll().await;

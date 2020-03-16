@@ -76,7 +76,7 @@ const BACKOFF_BASE: u64 = 2;
 const MAX_RETRY_INTERVAL: u64 = 512; // seconds
 const MAX_RETRY_COUNT: u8 = 30;
 const SHORT_ALIVE_SESSION: u64 = 3; // seconds
-const WHITELIST_TIMEOUT: u64 = 2 * 60 * 60; // 1 hour
+const WHITELIST_TIMEOUT: u64 = 2 * 60 * 60; // 2 hour
 const MAX_CONNECTING_MARGIN: usize = 10;
 
 #[derive(Debug, Clone, Display, Serialize, Deserialize)]
@@ -197,9 +197,15 @@ impl Hash for ConnectingAttempt {
 }
 
 #[derive(Debug)]
+enum ExpireTime {
+    At(AtomicU64), // Duration
+    Never,
+}
+
+#[derive(Debug)]
 struct WhitelistedPeer {
-    chain_addr:    Address,
-    authorized_at: AtomicU64,
+    chain_addr: Address,
+    expire:     ExpireTime,
 }
 
 #[derive(Debug, Clone)]
@@ -207,9 +213,20 @@ struct ArcWhitelistedPeer(Arc<WhitelistedPeer>);
 
 impl ArcWhitelistedPeer {
     pub fn new(chain_addr: Address) -> Self {
+        let expire_at = AtomicU64::new(time::now() + WHITELIST_TIMEOUT);
+
         let peer = WhitelistedPeer {
             chain_addr,
-            authorized_at: AtomicU64::new(time::now()),
+            expire: ExpireTime::At(expire_at),
+        };
+
+        ArcWhitelistedPeer(Arc::new(peer))
+    }
+
+    pub fn new_never(chain_addr: Address) -> Self {
+        let peer = WhitelistedPeer {
+            chain_addr,
+            expire: ExpireTime::Never,
         };
 
         ArcWhitelistedPeer(Arc::new(peer))
@@ -219,27 +236,44 @@ impl ArcWhitelistedPeer {
         self.chain_addr.to_owned()
     }
 
-    pub fn refresh_authorized(&self) {
-        self.authorized_at.store(time::now(), Ordering::SeqCst);
+    pub fn refresh_expire_time(&self) {
+        match &self.expire {
+            ExpireTime::At(at) => at.store(time::now() + WHITELIST_TIMEOUT, Ordering::SeqCst),
+            ExpireTime::Never => (),
+        }
     }
 
     #[cfg(test)]
-    pub fn set_authorized_at(&self, at: u64) {
-        self.authorized_at.store(at, Ordering::SeqCst);
+    pub fn set_expire_time_at(&self, new_at: u64) {
+        match &self.expire {
+            ExpireTime::At(at) => at.store(new_at, Ordering::SeqCst),
+            ExpireTime::Never => {
+                panic!(
+                    "set expire time on never expired whitelist peer {:?}",
+                    self.chain_addr
+                );
+            }
+        }
     }
 
     #[cfg(test)]
-    pub fn authorized_at(&self) -> u64 {
-        self.authorized_at.load(Ordering::SeqCst)
+    pub fn expire_time_at(&self) -> u64 {
+        match &self.expire {
+            ExpireTime::At(at) => at.load(Ordering::SeqCst),
+            ExpireTime::Never => {
+                panic!(
+                    "fetch expire time on Never expired whitelist peer {:?}",
+                    self.chain_addr
+                );
+            }
+        }
     }
 
     pub fn is_expired(&self) -> bool {
-        let expired_at = self
-            .authorized_at
-            .load(Ordering::SeqCst)
-            .saturating_add(WHITELIST_TIMEOUT);
-
-        time::now() > expired_at
+        match &self.expire {
+            ExpireTime::At(at) => time::now() > at.load(Ordering::SeqCst),
+            ExpireTime::Never => false,
+        }
     }
 }
 
@@ -435,7 +469,7 @@ impl Inner {
             let whitelist = self.whitelist.read();
             for ca in chain_addrs.into_iter() {
                 if let Some(peer) = whitelist.get(&ca) {
-                    peer.refresh_authorized();
+                    peer.refresh_expire_time();
                 } else {
                     addition_whitelist.push(ArcWhitelistedPeer::new(ca))
                 }
@@ -443,6 +477,15 @@ impl Inner {
         }
 
         self.whitelist.write().extend(addition_whitelist);
+    }
+
+    pub fn whitelist_never_expired_peers_by_chain_addr(&self, chain_addrs: Vec<Address>) {
+        let whitelisted = chain_addrs
+            .into_iter()
+            .map(ArcWhitelistedPeer::new_never)
+            .collect::<Vec<_>>();
+
+        self.whitelist.write().extend(whitelisted);
     }
 
     pub fn whitelisted_by_chain_addr(&self, chain_addr: &Address) -> bool {
@@ -483,6 +526,9 @@ pub struct PeerManagerConfig {
 
     /// Bootstrap peers
     pub bootstraps: Vec<ArcPeer>,
+
+    /// Never expired whitelist peers by chain address
+    pub whitelist_by_chain_addrs: Vec<Address>,
 
     /// Max connections
     pub max_connections: usize,
@@ -558,6 +604,8 @@ impl PeerManager {
         let waker = Arc::new(AtomicWaker::new());
         let heart_beat = HeartBeat::new(Arc::clone(&waker), config.routine_interval);
         let peer_dat_file = Box::new(NoPeerDatFile);
+
+        inner.whitelist_never_expired_peers_by_chain_addr(config.whitelist_by_chain_addrs.clone());
 
         PeerManager {
             inner,
