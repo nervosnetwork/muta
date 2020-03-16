@@ -202,6 +202,13 @@ enum ExpireTime {
     Never,
 }
 
+#[cfg(test)]
+#[derive(Debug, PartialEq, Eq)]
+enum TestExpireTime {
+    At(u64),
+    Never,
+}
+
 #[derive(Debug)]
 struct WhitelistedPeer {
     chain_addr: Address,
@@ -257,15 +264,10 @@ impl ArcWhitelistedPeer {
     }
 
     #[cfg(test)]
-    pub fn expire_time_at(&self) -> u64 {
+    pub fn expire_time(&self) -> TestExpireTime {
         match &self.expire {
-            ExpireTime::At(at) => at.load(Ordering::SeqCst),
-            ExpireTime::Never => {
-                panic!(
-                    "fetch expire time on Never expired whitelist peer {:?}",
-                    self.chain_addr
-                );
-            }
+            ExpireTime::At(at) => TestExpireTime::At(at.load(Ordering::SeqCst)),
+            ExpireTime::Never => TestExpireTime::Never,
         }
     }
 

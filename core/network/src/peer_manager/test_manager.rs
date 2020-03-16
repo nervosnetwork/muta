@@ -1,6 +1,6 @@
 use super::{
     time, ArcPeer, Connectedness, ConnectingAttempt, Inner, MisbehaviorKind, PeerManager,
-    PeerManagerConfig, PeerMultiaddr, MAX_RETRY_COUNT, REPEATED_CONNECTION_TIMEOUT,
+    PeerManagerConfig, PeerMultiaddr, TestExpireTime, MAX_RETRY_COUNT, REPEATED_CONNECTION_TIMEOUT,
     SHORT_ALIVE_SESSION, WHITELIST_TIMEOUT,
 };
 use crate::{
@@ -1807,8 +1807,8 @@ async fn should_refresh_whitelist_on_whitelist_peers_by_chain_addrs() {
     mgr.poll_event(whitelist_peers_by_chain_addrs).await;
 
     assert_eq!(
-        peer_in_list.expire_time_at(),
-        time::now() + WHITELIST_TIMEOUT,
+        peer_in_list.expire_time(),
+        TestExpireTime::At(time::now() + WHITELIST_TIMEOUT),
         "should be refreshed"
     );
 }
@@ -1837,5 +1837,109 @@ async fn should_remove_expired_peers_in_whitelist() {
         inner.whitelist().len(),
         0,
         "should remove expired peers in whitelist"
+    );
+}
+
+#[tokio::test]
+async fn should_never_expire_peers_from_config_whitelist() {
+    let manager_pubkey = make_pubkey();
+    let manager_id = manager_pubkey.peer_id();
+    let bootstraps = make_bootstraps(10);
+    let mut peer_dat_file = std::env::temp_dir();
+    peer_dat_file.push("peer.dat");
+
+    let test_peer = make_peer(2077);
+    let test_chain_addr = test_peer
+        .owned_chain_addr()
+        .expect("test whitelist chain addr");
+
+    let config = PeerManagerConfig {
+        our_id: manager_id,
+        pubkey: manager_pubkey,
+        bootstraps,
+        whitelist_by_chain_addrs: vec![test_chain_addr.clone()],
+        max_connections: 10,
+        routine_interval: Duration::from_secs(10),
+        peer_dat_file,
+    };
+
+    let (conn_tx, _conn_rx) = unbounded();
+    let (_mgr_tx, mgr_rx) = unbounded();
+    let manager = PeerManager::new(config, mgr_rx, conn_tx);
+
+    let inner = manager.inner();
+    assert!(
+        inner.whitelisted_by_chain_addr(&test_chain_addr),
+        "should be whitelisted"
+    );
+
+    let peer_in_list = inner
+        .whitelist()
+        .iter()
+        .next()
+        .expect("should have one whitelist peer")
+        .clone();
+
+    assert_eq!(
+        peer_in_list.expire_time(),
+        TestExpireTime::Never,
+        "should be refreshed"
+    );
+}
+
+#[tokio::test]
+async fn should_not_refresh_never_expired_peers_from_config_whitelist() {
+    let manager_pubkey = make_pubkey();
+    let manager_id = manager_pubkey.peer_id();
+    let bootstraps = make_bootstraps(10);
+    let mut peer_dat_file = std::env::temp_dir();
+    peer_dat_file.push("peer.dat");
+
+    let test_peer = make_peer(2077);
+    let test_chain_addr = test_peer
+        .owned_chain_addr()
+        .expect("test whitelist chain addr");
+
+    let config = PeerManagerConfig {
+        our_id: manager_id,
+        pubkey: manager_pubkey,
+        bootstraps,
+        whitelist_by_chain_addrs: vec![test_chain_addr.clone()],
+        max_connections: 10,
+        routine_interval: Duration::from_secs(10),
+        peer_dat_file,
+    };
+
+    let (conn_tx, _conn_rx) = unbounded();
+    let (_mgr_tx, mgr_rx) = unbounded();
+    let manager = PeerManager::new(config, mgr_rx, conn_tx);
+
+    let inner = manager.inner();
+    assert!(
+        inner.whitelisted_by_chain_addr(&test_chain_addr),
+        "should be whitelisted"
+    );
+
+    let peer_in_list = inner
+        .whitelist()
+        .iter()
+        .next()
+        .expect("should have one whitelist peer")
+        .clone();
+
+    assert_eq!(
+        peer_in_list.expire_time(),
+        TestExpireTime::Never,
+        "should be refreshed"
+    );
+
+    // Set expire_time_at to older timestamp
+    peer_in_list.refresh_expire_time();
+    assert!(!peer_in_list.is_expired(), "should not be expired");
+
+    assert_eq!(
+        peer_in_list.expire_time(),
+        TestExpireTime::Never,
+        "should not be refreshed"
     );
 }
