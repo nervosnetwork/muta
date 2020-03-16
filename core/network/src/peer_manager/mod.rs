@@ -420,17 +420,6 @@ impl Inner {
         }
     }
 
-    pub(self) fn restore(&self, peers: Vec<ArcPeer>) {
-        let chain_peers: Vec<_> = peers
-            .clone()
-            .into_iter()
-            .filter_map(|p| p.owned_chain_addr().map(|a| (a, p)))
-            .collect();
-
-        self.peers.write().extend(peers);
-        self.chain.write().extend(chain_peers);
-    }
-
     pub fn peer(&self, peer_id: &PeerId) -> Option<ArcPeer> {
         self.peers.read().get(peer_id).cloned()
     }
@@ -524,6 +513,17 @@ impl Inner {
 
     pub fn package_peers(&self) -> Vec<ArcPeer> {
         self.peers.read().iter().cloned().collect()
+    }
+
+    fn restore(&self, peers: Vec<ArcPeer>) {
+        let chain_peers: Vec<_> = peers
+            .clone()
+            .into_iter()
+            .filter_map(|p| p.owned_chain_addr().map(|a| (a, p)))
+            .collect();
+
+        self.peers.write().extend(peers);
+        self.chain.write().extend(chain_peers);
     }
 }
 
@@ -653,11 +653,6 @@ impl PeerManager {
         }
     }
 
-    #[cfg(test)]
-    pub(self) fn inner(&self) -> Arc<Inner> {
-        Arc::clone(&self.inner)
-    }
-
     pub fn share_session_book(&self, config: SharedSessionsConfig) -> SharedSessions {
         SharedSessions::new(Arc::clone(&self.inner), config)
     }
@@ -695,6 +690,11 @@ impl PeerManager {
         if self.conn_tx.unbounded_send(disconnect_peer).is_err() {
             error!("network: connection service exit");
         }
+    }
+
+    #[cfg(test)]
+    fn inner(&self) -> Arc<Inner> {
+        Arc::clone(&self.inner)
     }
 
     fn new_session(&mut self, pubkey: PublicKey, ctx: Arc<SessionContext>) {
