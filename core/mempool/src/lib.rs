@@ -205,22 +205,7 @@ where
                 .into());
             }
 
-            /* any way to write async/await for_each() ?
-            txs.into_iter().for_each(|tx| {
-                // we do check first
-                self.adapter
-                    .check_signature(ctx.clone(), tx.clone())
-                    .await?;
-                self.adapter
-                    .check_transaction(ctx.clone(), tx.clone())
-                    .await?;
-                self.adapter
-                    .check_storage_exist(ctx.clone(), tx.tx_hash.clone())
-                    .await?;
-                self.callback_cache.insert(tx.tx_hash.clone(), tx);
-            });*/
-
-            for signed_tx in txs.into_iter(){
+            for signed_tx in txs.into_iter() {
                 self.adapter
                     .check_signature(ctx.clone(), signed_tx.clone())
                     .await?;
@@ -230,7 +215,8 @@ where
                 self.adapter
                     .check_storage_exist(ctx.clone(), signed_tx.tx_hash.clone())
                     .await?;
-                self.callback_cache.insert(signed_tx.tx_hash.clone(), signed_tx);
+                self.callback_cache
+                    .insert(signed_tx.tx_hash.clone(), signed_tx);
             }
         }
 

@@ -14,10 +14,6 @@ use protocol::ProtocolResult;
 
 use crate::status::{ExecutedInfo, StatusAgent};
 
-use crate::util::OverlordCrypto;
-
-use std::marker::PhantomData;
-
 const POLLING_BROADCAST: u64 = 2000;
 const WAIT_EXECUTION: u64 = 1000;
 
@@ -27,23 +23,16 @@ pub struct RichBlock {
     pub txs:   Vec<SignedTransaction>,
 }
 
-pub struct OverlordSynchronization<
-    Adapter: SynchronizationAdapter,
-    C: common_crypto::Crypto + Sync + Send,
-> {
+pub struct OverlordSynchronization<Adapter: SynchronizationAdapter> {
     adapter:             Arc<Adapter>,
     status:              StatusAgent,
     lock:                Arc<Mutex<()>>,
     syncing:             Mutex<()>,
-    _overlord_crypto:    Arc<OverlordCrypto>,
-    pin_c:               PhantomData<C>,
     sync_txs_chunk_size: usize,
 }
 
 #[async_trait]
-impl<Adapter: SynchronizationAdapter, C: common_crypto::Crypto + Sync + Send> Synchronization
-    for OverlordSynchronization<Adapter, C>
-{
+impl<Adapter: SynchronizationAdapter> Synchronization for OverlordSynchronization<Adapter> {
     async fn receive_remote_block(&self, ctx: Context, remote_height: u64) -> ProtocolResult<()> {
         let syncing_lock = self.syncing.try_lock();
         if syncing_lock.is_none() {
@@ -124,15 +113,12 @@ impl<Adapter: SynchronizationAdapter, C: common_crypto::Crypto + Sync + Send> Sy
     }
 }
 
-impl<Adapter: SynchronizationAdapter, C: common_crypto::Crypto + Sync + Send>
-    OverlordSynchronization<Adapter, C>
-{
+impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
     pub fn new(
         sync_txs_chunk_size: usize,
         adapter: Arc<Adapter>,
         status: StatusAgent,
         lock: Arc<Mutex<()>>,
-        overlord_crypto: Arc<OverlordCrypto>,
     ) -> Self {
         let syncing = Mutex::new(());
 
@@ -141,8 +127,6 @@ impl<Adapter: SynchronizationAdapter, C: common_crypto::Crypto + Sync + Send>
             status,
             lock,
             syncing,
-            _overlord_crypto: overlord_crypto,
-            pin_c: PhantomData,
             sync_txs_chunk_size,
         }
     }

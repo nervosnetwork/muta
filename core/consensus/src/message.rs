@@ -15,6 +15,7 @@ use protocol::traits::{
 use protocol::ProtocolError;
 
 use crate::fixed_types::{FixedBlock, FixedHeight, FixedProof, FixedSignedTxs, PullTxsRequest};
+use core_storage::StorageError;
 
 pub const END_GOSSIP_SIGNED_PROPOSAL: &str = "/gossip/consensus/signed_proposal";
 pub const END_GOSSIP_SIGNED_VOTE: &str = "/gossip/consensus/signed_vote";
@@ -25,8 +26,8 @@ pub const RPC_RESP_SYNC_PULL_BLOCK: &str = "/rpc_resp/consensus/sync_pull_block"
 pub const RPC_SYNC_PULL_TXS: &str = "/rpc_call/consensus/sync_pull_txs";
 pub const RPC_RESP_SYNC_PULL_TXS: &str = "/rpc_resp/consensus/sync_pull_txs";
 pub const BROADCAST_HEIGHT: &str = "/gossip/consensus/broadcast_height";
-pub const RPC_SYNC_PULL_LATEST_PROOF: &str = "/rpc_call/consensus/sync_pull_latest_proof";
-pub const RPC_RESP_SYNC_PULL_LATEST_PROOF: &str = "/rpc_resp/consensus/sync_pull_latest_proof";
+pub const RPC_SYNC_PULL_PROOF: &str = "/rpc_call/consensus/sync_pull_proof";
+pub const RPC_RESP_SYNC_PULL_PROOF: &str = "/rpc_resp/consensus/sync_pull_proof";
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Proposal(pub Vec<u8>);
@@ -232,11 +233,30 @@ where
 impl<R: Rpc + 'static, S: Storage + 'static> MessageHandler for PullProofRpcHandler<R, S> {
     type Message = FixedHeight;
 
-    async fn process(&self, ctx: Context, _: FixedHeight) {
-        let ret = self.storage.get_latest_proof().await.map(FixedProof::new);
+    async fn process(&self, ctx: Context, height: FixedHeight) {
+        let height = height.inner;
+        let latest_proof = self.storage.get_latest_proof().await;
 
+        let ret = match latest_proof {
+            Ok(latest_proof) => match height {
+                height if height < latest_proof.height => {
+                    match self.storage.get_block_by_height(height + 1).await {
+                        Ok(next_block) => Ok(next_block.header.proof),
+                        Err(_) => Err(StorageError::GetNone.into()),
+                    }
+                }
+                h if h == latest_proof.height => Ok(latest_proof),
+                _ => Err(StorageError::GetNone.into()),
+            },
+            Err(_) => Err(StorageError::GetNone.into()),
+        };
         self.rpc
-            .response(ctx, RPC_RESP_SYNC_PULL_LATEST_PROOF, ret, Priority::High)
+            .response(
+                ctx,
+                RPC_RESP_SYNC_PULL_PROOF,
+                ret.map(FixedProof::new),
+                Priority::High,
+            )
             .unwrap_or_else(move |e: ProtocolError| warn!("[core_consensus] push proof {}", e))
             .await;
     }

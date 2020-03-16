@@ -17,8 +17,8 @@ use core_consensus::message::{
     PullTxsRpcHandler, QCMessageHandler, RemoteHeightMessageHandler, VoteMessageHandler,
     BROADCAST_HEIGHT, END_GOSSIP_AGGREGATED_VOTE, END_GOSSIP_SIGNED_CHOKE,
     END_GOSSIP_SIGNED_PROPOSAL, END_GOSSIP_SIGNED_VOTE, RPC_RESP_SYNC_PULL_BLOCK,
-    RPC_RESP_SYNC_PULL_LATEST_PROOF, RPC_RESP_SYNC_PULL_TXS, RPC_SYNC_PULL_BLOCK,
-    RPC_SYNC_PULL_LATEST_PROOF, RPC_SYNC_PULL_TXS,
+    RPC_RESP_SYNC_PULL_PROOF, RPC_RESP_SYNC_PULL_TXS, RPC_SYNC_PULL_BLOCK, RPC_SYNC_PULL_PROOF,
+    RPC_SYNC_PULL_TXS,
 };
 use core_consensus::status::{CurrentConsensusStatus, StatusAgent};
 use core_consensus::{
@@ -342,12 +342,11 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
 
     consensus_adapter.set_overlord_handler(overlord_consensus.get_overlord_handler());
 
-    let synchronization = Arc::new(OverlordSynchronization::<_, Secp256k1>::new(
+    let synchronization = Arc::new(OverlordSynchronization::<_>::new(
         config.consensus.sync_txs_chunk_size,
         consensus_adapter,
         status_agent.clone(),
         lock,
-        Arc::clone(&crypto),
     ));
 
     // Re-execute block from exec_height + 1 to current_height, so that init the
@@ -396,7 +395,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     )?;
 
     network_service.register_endpoint_handler(
-        RPC_SYNC_PULL_LATEST_PROOF,
+        RPC_SYNC_PULL_PROOF,
         Box::new(PullProofRpcHandler::new(
             Arc::new(network_service.handle()),
             Arc::clone(&storage),
@@ -411,7 +410,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         )),
     )?;
     network_service.register_rpc_response::<FixedBlock>(RPC_RESP_SYNC_PULL_BLOCK)?;
-    network_service.register_rpc_response::<FixedProof>(RPC_RESP_SYNC_PULL_LATEST_PROOF)?;
+    network_service.register_rpc_response::<FixedProof>(RPC_RESP_SYNC_PULL_PROOF)?;
     network_service.register_rpc_response::<FixedSignedTxs>(RPC_RESP_SYNC_PULL_TXS)?;
 
     // Run network

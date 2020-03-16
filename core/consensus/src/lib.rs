@@ -100,35 +100,35 @@ pub enum ConsensusError {
 
     /// The synchronous block does not pass the checks.
     #[display(fmt = "Synchronization {} block error", _0)]
-    VerifyBlockHeaderPreBlockHashErr(u64),
+    VerifyBlockHeaderPreBlockHash(u64),
 
     /// The synchronous block does not pass the checks.
     #[display(fmt = "Synchronization {} block prehash error", _0)]
-    VerifyBlockHeaderPreHashErr(u64),
+    VerifyBlockHeaderPreHash(u64),
 
     #[display(
         fmt = "Synchronization {} block error, proposer is not in verify list",
         _0
     )]
-    VerifyBlockHeaderProposerErr(u64),
+    VerifyBlockHeaderProposer(u64),
 
     /// the validator is not in the verify list
     #[display(
         fmt = "Synchronization {} block error, proposer is not in verify list",
         _0
     )]
-    VerifyBlockHeaderValidatorErr(u64),
+    VerifyBlockHeaderValidator(u64),
 
     /// the validator is in the verify list, but weight is not match
     #[display(
         fmt = "Synchronization {} block error, proposer is not in verify list",
         _0
     )]
-    VerifyBlockHeaderValidatorWeightErr(u64),
+    VerifyBlockHeaderValidatorWeight(u64),
 
     /// The Aggregated Signature doesn't match
     #[display(fmt = "Verify block {} block error, proof doesn't match", _0)]
-    VerifyBlockProofErr(u64),
+    VerifyBlockProof(u64),
 
     /// the block and proof is mismatch, you may pass it wrong
     #[display(
@@ -136,27 +136,27 @@ pub enum ConsensusError {
         _0,
         _1
     )]
-    VerifyBlockProofAndBlockHeightMismatchErr(u64, u64),
+    VerifyBlockProofAndBlockHeightMismatch(u64, u64),
 
     /// the block and proof is mismatch, you may pass it wrong
     #[display(
         fmt = "Consensus verify block error, block {}, block hash and proof hash doesn't match",
         _0
     )]
-    VerifyBlockHashMismatchErr(u64),
+    VerifyBlockHashMismatch(u64),
 
     #[display(
         fmt = "Consensus verify block {} block error, signed voter is not in verifier list",
         _0
     )]
-    VerifyBlockProofVoterErr(u64),
+    VerifyBlockProofVoter(u64),
 
     /// The block vote weight is less or equal than 1/3
     #[display(
         fmt = "Consensus verify block {} block error, weight doesn't exceed 2/3",
         _0
     )]
-    VerifyBlockProofVoteWeightErr(u64),
+    VerifyBlockProofVoteWeight(u64),
 
     /// The Rpc response mismatch the request.
     #[display(fmt = "Synchronization Rpc {:?} message mismatch", _0)]

@@ -6,6 +6,7 @@ use crate::types::{
     Address, Block, Bytes, Hash, MerkleRoot, Metadata, Proof, Receipt, SignedTransaction, Validator,
 };
 use crate::{traits::mempool::MixedTxHashes, ProtocolResult};
+use std::collections::HashMap;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum MessageTarget {
@@ -129,6 +130,21 @@ pub trait CommonConsensusAdapter: Send + Sync {
     ) -> ProtocolResult<()>;
 
     async fn verify_block_header(&self, ctx: Context, block: &Block) -> ProtocolResult<()>;
+
+    fn verify_proof_signature(
+        &self,
+        block_height: u64,
+        vote_hash: Bytes,
+        aggregated_signature_bytes: Bytes,
+        signed_voters: Vec<Bytes>,
+    ) -> ProtocolResult<()>;
+
+    fn verity_proof_weight(
+        &self,
+        block_height: u64,
+        weight_map: &HashMap<Bytes, u32>,
+        signed_voters: Vec<Bytes>,
+    ) -> ProtocolResult<()>;
 }
 
 #[async_trait]

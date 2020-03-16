@@ -22,7 +22,7 @@ use crate::util::OverlordCrypto;
 use crate::ConsensusError;
 use bit_vec::BitVec;
 use common_crypto::{
-    BlsCommonReference, BlsPrivateKey, BlsPublicKey, HashValue, PrivateKey, PublicKey, Secp256k1,
+    BlsCommonReference, BlsPrivateKey, BlsPublicKey, HashValue, PrivateKey, PublicKey,
     Secp256k1PrivateKey, Secp256k1PublicKey, Signature, ToPublicKey,
 };
 use overlord::types::{AggregatedSignature, AggregatedVote, Node, SignedVote, Vote, VoteType};
@@ -30,10 +30,10 @@ use overlord::{extract_voters, Crypto};
 use rlp::encode;
 use std::convert::TryFrom;
 
-// Test the blocks gap from 1 to 3.
+// Test the blocks gap from 1 to 4.
 #[test]
 fn sync_gap_test() {
-    for gap in [1, 2, 3].iter() {
+    for gap in [1, 2, 3, 4].iter() {
         let key_tool = get_mock_key_tool();
 
         let max_height = 10 * *gap;
@@ -86,12 +86,11 @@ fn sync_gap_test() {
         };
         let status_agent = StatusAgent::new(status);
         let lock = Arc::new(Mutex::new(()));
-        let sync = OverlordSynchronization::<_, Secp256k1>::new(
+        let sync = OverlordSynchronization::<_>::new(
             5000,
             Arc::clone(&adapter),
             status_agent.clone(),
             lock,
-            Arc::clone(&key_tool.overlord_crypto),
         );
 
         // simulate to get a block
@@ -315,15 +314,13 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
         let previous_block_hash = Hash::digest(previous_block.encode_fixed()?);
 
         if previous_block_hash != block.header.pre_hash {
-            return Err(
-                ConsensusError::VerifyBlockHeaderPreBlockHashErr(block.header.height).into(),
-            );
+            return Err(ConsensusError::VerifyBlockHeaderPreBlockHash(block.header.height).into());
         }
 
         // the block 0 and 1 's proof is consensus-ed by community
-        if block.header.pre_hash != block.header.proof.block_hash && block.header.height > 1 {
+        if block.header.height > 1u64 && block.header.pre_hash != block.header.proof.block_hash {
             log::error!("verifying_block : {:?}", block);
-            return Err(ConsensusError::VerifyBlockHeaderPreHashErr(block.header.height).into());
+            return Err(ConsensusError::VerifyBlockHeaderPreHash(block.header.height).into());
         }
 
         // verify proposer and validators
@@ -334,40 +331,38 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
             previous_block.header.timestamp,
         )?;
 
-        let previous_authority_list = previous_metadata
+        let authority_map = previous_metadata
             .verifier_list
-            .iter()
-            .map(|v| Node {
-                address:        v.address.as_bytes(),
-                propose_weight: v.propose_weight,
-                vote_weight:    v.vote_weight,
+            .into_iter()
+            .map(|v| {
+                let address = v.address.as_bytes();
+                let node = Node {
+                    address:        v.address.as_bytes(),
+                    propose_weight: v.propose_weight,
+                    vote_weight:    v.vote_weight,
+                };
+                (address, node)
             })
-            .collect::<Vec<Node>>();
+            .collect::<HashMap<_, _>>();
 
-        let mut authority_map = HashMap::new();
-        for node in previous_authority_list.iter() {
-            authority_map.insert(node.address.clone(), node.clone());
-        }
         // check proposer
-        if !authority_map.contains_key(&block.header.proposer.as_bytes())
-            && block.header.height != 0
+        if block.header.height != 0
+            && !authority_map.contains_key(&block.header.proposer.as_bytes())
         {
-            return Err(ConsensusError::VerifyBlockHeaderProposerErr(block.header.height).into());
+            return Err(ConsensusError::VerifyBlockHeaderProposer(block.header.height).into());
         }
 
         // check validators
         for validator in block.header.validators.iter() {
             if !authority_map.contains_key(&validator.address.as_bytes()) {
-                return Err(
-                    ConsensusError::VerifyBlockHeaderValidatorErr(block.header.height).into(),
-                );
+                return Err(ConsensusError::VerifyBlockHeaderValidator(block.header.height).into());
             } else {
                 let node = authority_map.get(&validator.address.as_bytes()).unwrap();
 
                 if node.vote_weight != validator.vote_weight
                     || node.propose_weight != validator.vote_weight
                 {
-                    return Err(ConsensusError::VerifyBlockHeaderValidatorWeightErr(
+                    return Err(ConsensusError::VerifyBlockHeaderValidatorWeight(
                         block.header.height,
                     )
                     .into());
@@ -391,7 +386,7 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
         };
 
         if block.header.height != proof.height {
-            return Err(ConsensusError::VerifyBlockProofAndBlockHeightMismatchErr(
+            return Err(ConsensusError::VerifyBlockProofAndBlockHeightMismatch(
                 block.header.height,
                 proof.height,
             )
@@ -401,7 +396,7 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
         let blockhash = Hash::digest(block.clone().encode_fixed()?);
 
         if blockhash != proof.block_hash {
-            return Err(ConsensusError::VerifyBlockHashMismatchErr(block.header.height).into());
+            return Err(ConsensusError::VerifyBlockHashMismatch(block.header.height).into());
         }
 
         let metadata = self.get_metadata(
@@ -421,55 +416,70 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
             })
             .collect::<Vec<Node>>();
 
-        let vote = Vote {
+        let signed_voters = extract_voters(&mut authority_list, &proof.bitmap).unwrap();
+
+        let vote_hash = self.crypto.hash(protocol::Bytes::from(rlp::encode(&Vote {
             height:     proof.height,
             round:      proof.round,
             vote_type:  VoteType::Precommit,
             block_hash: proof.block_hash.as_bytes(),
-        };
+        })));
 
-        let vote_hash = self.crypto.hash(protocol::Bytes::from(rlp::encode(&vote)));
-
-        let aggregated_signature = proof.signature.clone();
-
-        let signed_voters = extract_voters(&mut authority_list, &proof.bitmap).unwrap();
-
-        // check sig
-        match self.crypto.verify_aggregated_signature(
-            aggregated_signature,
+        self.verify_proof_signature(
+            block.header.height,
             vote_hash,
+            proof.signature.clone(),
             signed_voters.clone(),
-        ) {
-            Ok(()) => {}
-            Err(_) => {
-                return Err(ConsensusError::VerifyBlockProofErr(block.header.height).into());
-            }
-        };
+        )?;
 
-        // check weight
-        let total_validator_weight: u64 = authority_list
+        let weight_map = authority_list
             .iter()
-            .map(|node| u64::from(node.vote_weight))
-            .sum();
+            .map(|node| (node.address.clone(), node.vote_weight))
+            .collect::<HashMap<overlord::types::Address, u32>>();
 
-        let mut weight_map: HashMap<overlord::types::Address, u32> = HashMap::new();
-        for node in authority_list {
-            weight_map.insert(node.address, node.vote_weight.clone());
+        self.verity_proof_weight(block.header.height, &weight_map, signed_voters)?;
+
+        Ok(())
+    }
+
+    fn verify_proof_signature(
+        &self,
+        block_height: u64,
+        vote_hash: Bytes,
+        aggregated_signature_bytes: Bytes,
+        signed_voters: Vec<Bytes>,
+    ) -> ProtocolResult<()> {
+        // check sig
+        if self
+            .crypto
+            .verify_aggregated_signature(aggregated_signature_bytes, vote_hash, signed_voters)
+            .is_err()
+        {
+            return Err(ConsensusError::VerifyBlockProof(block_height).into());
         }
+        Ok(())
+    }
+
+    fn verity_proof_weight(
+        &self,
+        block_height: u64,
+        weight_map: &HashMap<Bytes, u32>,
+        signed_voters: Vec<Bytes>,
+    ) -> ProtocolResult<()> {
+        let total_validator_weight: u64 = weight_map.iter().map(|pair| u64::from(*pair.1)).sum();
 
         let mut accumulator = 0u64;
         for signed_voter_address in signed_voters {
             if weight_map.contains_key(signed_voter_address.as_ref()) {
                 accumulator += u64::from(*(weight_map.get(signed_voter_address.as_ref()).unwrap()));
             } else {
-                return Err(ConsensusError::VerifyBlockProofVoterErr(block.header.height).into());
+                return Err(ConsensusError::VerifyBlockProofVoter(block_height).into());
             }
         }
 
         if 3 * accumulator <= 2 * total_validator_weight {
-            return Err(ConsensusError::VerifyBlockProofVoteWeightErr(block.header.height).into());
+            return Err(ConsensusError::VerifyBlockProofVoteWeight(block_height).into());
         }
-
         Ok(())
     }
 }
