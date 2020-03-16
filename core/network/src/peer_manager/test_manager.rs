@@ -1850,6 +1850,7 @@ async fn should_never_expire_peers_from_config_whitelist() {
     let bootstraps = make_bootstraps(10);
     let mut peer_dat_file = std::env::temp_dir();
     peer_dat_file.push("peer.dat");
+    let peer_trust_config = Arc::new(TrustMetricConfig::default());
 
     let test_peer = make_peer(2077);
     let test_chain_addr = test_peer
@@ -1862,6 +1863,7 @@ async fn should_never_expire_peers_from_config_whitelist() {
         bootstraps,
         whitelist_by_chain_addrs: vec![test_chain_addr.clone()],
         whitelist_peers_only: false,
+        peer_trust_config,
         max_connections: 10,
         routine_interval: Duration::from_secs(10),
         peer_dat_file,
@@ -1898,6 +1900,7 @@ async fn should_not_refresh_never_expired_peers_from_config_whitelist() {
     let bootstraps = make_bootstraps(10);
     let mut peer_dat_file = std::env::temp_dir();
     peer_dat_file.push("peer.dat");
+    let peer_trust_config = Arc::new(TrustMetricConfig::default());
 
     let test_peer = make_peer(2077);
     let test_chain_addr = test_peer
@@ -1910,6 +1913,7 @@ async fn should_not_refresh_never_expired_peers_from_config_whitelist() {
         bootstraps,
         whitelist_by_chain_addrs: vec![test_chain_addr.clone()],
         whitelist_peers_only: false,
+        peer_trust_config,
         max_connections: 10,
         routine_interval: Duration::from_secs(10),
         peer_dat_file,
@@ -1955,6 +1959,7 @@ async fn should_only_connect_peers_in_whitelist_if_whitelist_only_enabled() {
     let manager_id = manager_pubkey.peer_id();
     let mut peer_dat_file = std::env::temp_dir();
     peer_dat_file.push("peer.dat");
+    let peer_trust_config = Arc::new(TrustMetricConfig::default());
 
     let test_peer = make_peer(2077);
     let test_chain_addr = test_peer
@@ -1969,6 +1974,7 @@ async fn should_only_connect_peers_in_whitelist_if_whitelist_only_enabled() {
         bootstraps: Default::default(),
         whitelist_by_chain_addrs: vec![test_chain_addr.clone()],
         whitelist_peers_only: true,
+        peer_trust_config,
         max_connections: 10,
         routine_interval: Duration::from_secs(10),
         peer_dat_file,
@@ -2014,6 +2020,7 @@ async fn should_only_allow_incoming_peers_in_whitelist_if_whitelist_only_enabled
     let manager_id = manager_pubkey.peer_id();
     let mut peer_dat_file = std::env::temp_dir();
     peer_dat_file.push("peer.dat");
+    let peer_trust_config = Arc::new(TrustMetricConfig::default());
 
     let test_peer = make_peer(2077);
     let test_chain_addr = test_peer
@@ -2028,6 +2035,7 @@ async fn should_only_allow_incoming_peers_in_whitelist_if_whitelist_only_enabled
         bootstraps: Default::default(),
         whitelist_by_chain_addrs: vec![test_chain_addr.clone()],
         whitelist_peers_only: true,
+        peer_trust_config,
         max_connections: 10,
         routine_interval: Duration::from_secs(10),
         peer_dat_file,
