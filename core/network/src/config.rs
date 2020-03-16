@@ -7,7 +7,7 @@ use std::{
 };
 
 use log::error;
-use protocol::ProtocolResult;
+use protocol::{types::Address, ProtocolResult};
 use tentacle::{
     multiaddr::{multiaddr, Multiaddr, Protocol},
     secio::{PublicKey, SecioKeyPair},
@@ -107,6 +107,7 @@ pub struct NetworkConfig {
 
     // peer manager
     pub bootstraps:          Vec<ArcPeer>,
+    pub whitelist:           Vec<Address>,
     pub enable_save_restore: bool,
     pub peer_dat_file:       PathBuf,
 
@@ -147,6 +148,7 @@ impl NetworkConfig {
             write_timeout:    DEFAULT_WRITE_TIMEOUT,
 
             bootstraps:          Default::default(),
+            whitelist:           Default::default(),
             enable_save_restore: false,
             peer_dat_file:       PathBuf::from(DEFAULT_PEER_DAT_FILE.to_owned()),
 
@@ -246,6 +248,16 @@ impl NetworkConfig {
             .collect::<ProtocolResult<Vec<_>>>()?;
 
         self.bootstraps = bootstrap_peers;
+        Ok(self)
+    }
+
+    pub fn whitelist(mut self, chain_addr_strs: Vec<String>) -> ProtocolResult<Self> {
+        let chain_addrs = chain_addr_strs
+            .into_iter()
+            .map(|s| Address::from_hex(&s))
+            .collect::<ProtocolResult<Vec<_>>>()?;
+
+        self.whitelist = chain_addrs;
         Ok(self)
     }
 
@@ -350,12 +362,13 @@ impl From<&NetworkConfig> for ConnectionConfig {
 impl From<&NetworkConfig> for PeerManagerConfig {
     fn from(config: &NetworkConfig) -> PeerManagerConfig {
         PeerManagerConfig {
-            our_id:           config.secio_keypair.peer_id(),
-            pubkey:           config.secio_keypair.public_key(),
-            bootstraps:       config.bootstraps.clone(),
-            max_connections:  config.max_connections,
-            routine_interval: config.peer_manager_heart_beat_interval,
-            peer_dat_file:    config.peer_dat_file.clone(),
+            our_id:                   config.secio_keypair.peer_id(),
+            pubkey:                   config.secio_keypair.public_key(),
+            bootstraps:               config.bootstraps.clone(),
+            whitelist_by_chain_addrs: config.whitelist.clone(),
+            max_connections:          config.max_connections,
+            routine_interval:         config.peer_manager_heart_beat_interval,
+            peer_dat_file:            config.peer_dat_file.clone(),
         }
     }
 }

@@ -159,8 +159,11 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         }
     }
 
+    let whitelist = config.network.whitelist.clone().unwrap_or_default();
+
     let network_config = network_config
         .bootstraps(bootstrap_pairs)?
+        .whitelist(whitelist)?
         .secio_keypair(network_privkey)?;
     let mut network_service = NetworkService::new(network_config);
     network_service

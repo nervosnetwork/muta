@@ -23,6 +23,7 @@ pub struct ConfigGraphQL {
 #[derive(Debug, Deserialize)]
 pub struct ConfigNetwork {
     pub bootstraps:          Option<Vec<ConfigNetworkBootstrap>>,
+    pub whitelist:           Option<Vec<String>>,
     pub max_connected_peers: Option<usize>,
     pub listening_address:   SocketAddr,
     pub rpc_timeout:         Option<u64>,
