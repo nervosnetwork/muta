@@ -6,7 +6,8 @@ use async_trait::async_trait;
 use overlord::types::OverlordMsg;
 use overlord::OverlordHandler;
 use parking_lot::RwLock;
-use tokio::sync::mpsc::{channel, error, Receiver, Sender};
+use tokio::sync::mpsc::{channel, Receiver, Sender};
+use tokio::sync::mpsc::error::TrySendError;
 
 use common_merkle::Merkle;
 use protocol::traits::{
@@ -136,7 +137,7 @@ where
 
         let mut tx = self.exec_queue.clone();
         tx.try_send(exec_info).map_err(|e| match e {
-            error::TrySendError::Closed(_) => panic!("exec queue dropped"),
+            TrySendError::Closed(_) => panic!("exec queue dropped!"),
             _ => ConsensusError::ExecuteErr(e.to_string()),
         })?;
         Ok(())
