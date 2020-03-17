@@ -3,7 +3,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use futures::future::{try_join_all, TryFutureExt};
 use protocol::{
-    traits::{Context, MemPool, MessageHandler, Priority, Rpc},
+    traits::{Context, MemPool, MessageHandler, Priority, Rpc, Storage},
     types::{Hash, SignedTransaction},
 };
 use serde_derive::{Deserialize, Serialize};
@@ -13,6 +13,8 @@ use crate::context::TxContext;
 pub const END_GOSSIP_NEW_TXS: &str = "/gossip/mempool/new_txs";
 pub const RPC_PULL_TXS: &str = "/rpc_call/mempool/pull_txs";
 pub const RPC_RESP_PULL_TXS: &str = "/rpc_resp/mempool/pull_txs";
+pub const RPC_PULL_TXS_SYNC: &str = "/rpc_call/mempool/pull_txs_sync";
+pub const RPC_RESP_PULL_TXS_SYNC: &str = "/rpc_resp/mempool/pull_txs_sync";
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct MsgNewTxs {
@@ -116,6 +118,46 @@ where
 
         push_txs
             .unwrap_or_else(move |err| log::warn!("[core_mempool] push txs {}", err))
+            .await;
+    }
+}
+
+pub struct PullTxsSyncHandler<N, M> {
+    network: Arc<N>,
+    storage: Arc<M>,
+}
+
+impl<N, M> PullTxsSyncHandler<N, M>
+where
+    N: Rpc + 'static,
+    M: Storage + 'static,
+{
+    pub fn new(network: Arc<N>, storage: Arc<M>) -> Self {
+        PullTxsSyncHandler { network, storage }
+    }
+}
+
+#[async_trait]
+impl<N, M> MessageHandler for PullTxsSyncHandler<N, M>
+where
+    N: Rpc + 'static,
+    M: Storage + 'static,
+{
+    type Message = MsgPullTxs;
+
+    async fn process(&self, ctx: Context, msg: Self::Message) {
+        let futs = msg
+            .hashes
+            .into_iter()
+            .map(|tx_hash| self.storage.get_transaction_by_hash(tx_hash))
+            .collect::<Vec<_>>();
+        let ret = try_join_all(futs)
+            .await
+            .map(|sig_txs| MsgPushTxs { sig_txs });
+
+        self.network
+            .response(ctx, RPC_RESP_PULL_TXS_SYNC, ret, Priority::High)
+            .unwrap_or_else(move |e| log::warn!("[core_mempool] push txs {}", e))
             .await;
     }
 }

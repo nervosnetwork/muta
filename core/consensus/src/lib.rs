@@ -126,6 +126,12 @@ pub enum ConsensusError {
     )]
     VerifyBlockHeaderValidatorWeight(u64),
 
+    #[display(
+        fmt = "Verify block {} block error, bitmap error, fail to extract voters",
+        _0
+    )]
+    VerifyBlockBitMap(u64),
+
     /// The Aggregated Signature doesn't match
     #[display(fmt = "Verify block {} block error, proof doesn't match", _0)]
     VerifyBlockProof(u64),

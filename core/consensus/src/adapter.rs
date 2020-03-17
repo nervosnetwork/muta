@@ -410,7 +410,12 @@ where
 
     /// make sure that the mempool is in the same height!
     async fn verify_txs(&self, ctx: Context, txs: Vec<Hash>) -> ProtocolResult<()> {
-        self.mempool.ensure_order_txs(ctx.clone(), txs).await
+        if let Err(e) = self.mempool.ensure_order_txs_sync(ctx.clone(), txs).await {
+            log::error!("muta-consensus: executor demons error {:?}", e);
+            return Err(e);
+        }
+
+        Ok(())
     }
 
     /// this function verify all info in header except proof and roots
@@ -524,7 +529,10 @@ where
             })
             .collect::<Vec<Node>>();
 
-        let signed_voters = extract_voters(&mut authority_list, &proof.bitmap).unwrap();
+        let signed_voters = extract_voters(&mut authority_list, &proof.bitmap).map_err(|_| {
+            log::error!("[consensus] extract_voters fails, bitmap error");
+            ConsensusError::VerifyBlockBitMap(block.header.height)
+        })?;
 
         let vote_hash = self.crypto.hash(protocol::Bytes::from(rlp::encode(&Vote {
             height:     proof.height,
