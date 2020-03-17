@@ -1,6 +1,7 @@
 use std::boxed::Box;
 use std::marker::PhantomData;
 use std::sync::Arc;
+use std::time::Instant;
 
 use async_trait::async_trait;
 use futures::channel::mpsc::{channel, Receiver, Sender};
@@ -705,6 +706,7 @@ where
             let order_root = info.order_root.clone();
             let state_root = self.status.to_inner().get_latest_state_root();
 
+            let now = Instant::now();
             let mut executor = EF::from_root(
                 state_root.clone(),
                 Arc::clone(&self.trie_db),
@@ -718,7 +720,19 @@ where
                 cycles_limit: info.cycles_limit,
             };
             let resp = executor.exec(&exec_params, &txs)?;
+            log::info!(
+                "[consensus-adapter]: exec transactions cost {:?} transactions len {:?}",
+                now.elapsed(),
+                txs.len(),
+            );
+
+            let now = Instant::now();
             self.save_receipts(resp.receipts.clone()).await?;
+            log::info!(
+                "[consensus-adapter]: save receipts cost {:?} receipts len {:?}",
+                now.elapsed(),
+                resp.receipts.len(),
+            );
             self.status
                 .update_by_executed(gen_executed_info(resp.clone(), height, order_root));
         } else {
