@@ -229,15 +229,22 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         };
 
         // Execute transactions
-        self.exec(
-            pill.block.header.order_root.clone(),
-            current_height,
-            pill.block.header.proposer.clone(),
-            pill.block.header.timestamp,
-            Hash::digest(pill.block.encode_fixed()?),
-            signed_txs.clone(),
-        )
-        .await?;
+        loop {
+            if self
+                .exec(
+                    pill.block.header.order_root.clone(),
+                    current_height,
+                    pill.block.header.proposer.clone(),
+                    pill.block.header.timestamp,
+                    Hash::digest(pill.block.encode_fixed()?),
+                    signed_txs.clone(),
+                )
+                .await
+                .is_ok()
+            {
+                break;
+            }
+        }
 
         trace_block(&pill.block);
         let block_exec_height = pill.block.header.exec_height;
