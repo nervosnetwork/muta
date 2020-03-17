@@ -136,7 +136,7 @@ where
 
         let mut tx = self.exec_queue.clone();
         tx.try_send(exec_info).map_err(|e| match e {
-            error::TrySendError::Full(_) => panic!("exec queue dropped"),
+            error::TrySendError::Closed(_) => panic!("exec queue dropped"),
             _ => ConsensusError::ExecuteErr(e.to_string()),
         })?;
         Ok(())
