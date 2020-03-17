@@ -6,8 +6,8 @@ use async_trait::async_trait;
 use overlord::types::OverlordMsg;
 use overlord::OverlordHandler;
 use parking_lot::RwLock;
-use tokio::sync::mpsc::{channel, Receiver, Sender};
 use tokio::sync::mpsc::error::TrySendError;
+use tokio::sync::mpsc::{channel, Receiver, Sender};
 
 use common_merkle::Merkle;
 use protocol::traits::{
