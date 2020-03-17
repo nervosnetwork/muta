@@ -4,6 +4,8 @@ use std::sync::Arc;
 
 use bytes::Bytes;
 use futures::{future, lock::Mutex};
+#[cfg(unix)]
+use tokio::signal::unix::{self as os_impl};
 
 use common_crypto::{
     BlsCommonReference, BlsPrivateKey, BlsPublicKey, PublicKey, Secp256k1, Secp256k1PrivateKey,
@@ -460,8 +462,18 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         core_api::start_graphql(graphql_config, api_adapter).await;
     });
 
-    // Io error, just process shutdown
+    #[cfg(windows)]
     let _ = tokio::signal::ctrl_c().await;
+    #[cfg(unix)]
+    {
+        let mut sigtun_int = os_impl::signal(os_impl::SignalKind::interrupt()).unwrap();
+        let mut sigtun_term = os_impl::signal(os_impl::SignalKind::terminate()).unwrap();
+        tokio::select! {
+            _ = sigtun_int.recv() => {}
+            _ = sigtun_term.recv() => {}
+        }
+    }
+
     // Abort consensus
     abort_handle.abort();
 
