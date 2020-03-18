@@ -125,6 +125,10 @@ impl History {
         }
     }
 
+    fn latest_trust_value(&self) -> f64 {
+        self.memorys.first().map(|v| **v).unwrap_or_else(|| 0f64)
+    }
+
     fn remember_interval(&mut self, trust_value: f64) {
         if self.intervals < self.max_intervals {
             self.intervals += 1;
@@ -248,7 +252,7 @@ impl Inner {
     fn trust_value(&self) -> f64 {
         let proportional_value = match self.proportional_value() {
             Some(v) => v,
-            None => return self.history.read().aggregate_trust,
+            None => return self.history.read().latest_trust_value(),
         };
 
         let intergral_value = self.intergral_value();
@@ -414,18 +418,46 @@ mod tests {
             metric.good_events(1);
             metric.enter_new_interval();
         }
-        assert!(metric.trust_score() > 90);
+        assert!(metric.trust_score() >= 95);
 
-        for _ in 0..5 {
+        for _ in 0..4 {
             metric.bad_events(1);
             metric.enter_new_interval();
         }
-        assert!(metric.trust_score() < 70);
+        assert!(metric.trust_score() < 40);
 
+        // For S
         for _ in 0..20 {
             metric.good_events(1);
             metric.enter_new_interval();
         }
-        assert!(metric.trust_score() > 80 && metric.trust_score() < 90);
+        assert!(metric.trust_score() > 90 && metric.trust_score() < 95);
+
+        for i in 0..17 {
+            metric.bad_events(10);
+            metric.good_events(1);
+            metric.enter_new_interval();
+
+            if i != 16 {
+                metric.good_events(1);
+                metric.enter_new_interval();
+            }
+        }
+        assert!(metric.trust_score() < 40);
+
+        // For Z
+        for _ in 0..20 {
+            metric.good_events(1);
+            metric.enter_new_interval();
+        }
+        assert!(metric.trust_score() >= 90 && metric.trust_score() < 95);
+
+        for _ in 0..200 {
+            metric.bad_events(1);
+            metric.good_events(1);
+            metric.enter_new_interval();
+        }
+
+        assert!(metric.trust_score() > 40);
     }
 }
