@@ -17,10 +17,11 @@ pub struct RocksAdapter {
 }
 
 impl RocksAdapter {
-    pub fn new<P: AsRef<Path>>(path: P) -> ProtocolResult<Self> {
+    pub fn new<P: AsRef<Path>>(path: P, max_open_files: i32) -> ProtocolResult<Self> {
         let mut opts = Options::default();
         opts.create_if_missing(true);
         opts.create_missing_column_families(true);
+        opts.set_max_open_files(max_open_files);
 
         let categories = [
             map_category(StorageCategory::Block),

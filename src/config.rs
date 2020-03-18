@@ -75,6 +75,16 @@ pub struct ConfigExecutor {
     pub light: bool,
 }
 
+fn default_max_open_files() -> i32 {
+    64
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ConfigRocksDB {
+    #[serde(default = "default_max_open_files")]
+    pub max_open_files: i32,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct ConfigLogger {
     pub filter:                     String,
@@ -116,6 +126,7 @@ pub struct Config {
     pub consensus: ConfigConsensus,
     #[serde(default)]
     pub logger:    ConfigLogger,
+    pub rocksdb:   ConfigRocksDB,
 }
 
 impl Config {
