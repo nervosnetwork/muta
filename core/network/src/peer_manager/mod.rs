@@ -81,8 +81,6 @@ const SHORT_ALIVE_SESSION: u64 = 3; // seconds
 const WHITELIST_TIMEOUT: u64 = 2 * 60 * 60; // 2 hour
 const MAX_CONNECTING_MARGIN: usize = 10;
 
-const FATAL_BAN_TIMEOUT: Duration = Duration::from_secs(60 * 60); // 1 hour
-const SOFT_BAN_TIMEOUT: Duration = Duration::from_secs(60 * 10); // 10 minutes
 const GOOD_TRUST_SCORE: u8 = 80u8;
 
 #[derive(Debug, Clone, Display, Serialize, Deserialize)]
@@ -556,6 +554,8 @@ pub struct PeerManagerConfig {
 
     /// Trust metric config
     pub peer_trust_config: Arc<TrustMetricConfig>,
+    pub peer_fatal_ban:    Duration,
+    pub peer_soft_ban:     Duration,
 
     /// Max connections
     pub max_connections: usize,
@@ -1029,9 +1029,10 @@ impl PeerManager {
                     return;
                 }
 
-                info!("peer {:?} ban {} seconds", pid, FATAL_BAN_TIMEOUT.as_secs());
+                let fatal_ban = self.config.peer_fatal_ban;
+                info!("peer {:?} ban {} seconds", pid, fatal_ban.as_secs());
                 peer_trust_metric.pause();
-                peer.ban(FATAL_BAN_TIMEOUT);
+                peer.ban(fatal_ban);
 
                 if let Some(session) = self.inner.remove_session(peer.session_id()) {
                     self.disconnect_session(session.id);
@@ -1052,11 +1053,11 @@ impl PeerManager {
                 };
 
                 if peer_trust_metric.knock_out() && !self.inner.whitelisted(&peer) {
-                    let soft_ban = SOFT_BAN_TIMEOUT.as_secs();
+                    let soft_ban = self.config.peer_soft_ban.as_secs();
                     info!("peer {:?} knocked out, soft ban {} seconds", pid, soft_ban);
 
                     peer_trust_metric.pause();
-                    peer.ban(SOFT_BAN_TIMEOUT);
+                    peer.ban(Duration::from_secs(soft_ban));
 
                     if let Some(session) = self.inner.remove_session(peer.session_id()) {
                         self.disconnect_session(session.id);
