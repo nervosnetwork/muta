@@ -17,7 +17,6 @@ impl RocksTrieDB {
         let mut opts = Options::default();
         opts.create_if_missing(true);
         opts.create_missing_column_families(true);
-        opts.set_target_file_size_base(1_073_741_824);
         opts.set_max_open_files(max_open_files);
 
         let db = DB::open(&opts, path).map_err(RocksTrieDBError::from)?;
