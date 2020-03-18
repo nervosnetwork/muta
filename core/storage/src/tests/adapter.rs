@@ -9,21 +9,21 @@ use crate::TransactionSchema;
 #[test]
 fn test_adapter_insert() {
     adapter_insert_test(MemoryAdapter::new());
-    adapter_insert_test(RocksAdapter::new("rocksdb/test_adapter_insert".to_string()).unwrap())
+    adapter_insert_test(RocksAdapter::new("rocksdb/test_adapter_insert".to_string(), 64).unwrap())
 }
 
 #[test]
 fn test_adapter_batch_modify() {
     adapter_batch_modify_test(MemoryAdapter::new());
     adapter_batch_modify_test(
-        RocksAdapter::new("rocksdb/test_adapter_batch_modify".to_string()).unwrap(),
+        RocksAdapter::new("rocksdb/test_adapter_batch_modify".to_string(), 64).unwrap(),
     )
 }
 
 #[test]
 fn test_adapter_remove() {
     adapter_remove_test(MemoryAdapter::new());
-    adapter_remove_test(RocksAdapter::new("rocksdb/test_adapter_remove".to_string()).unwrap())
+    adapter_remove_test(RocksAdapter::new("rocksdb/test_adapter_remove".to_string(), 64).unwrap())
 }
 
 fn adapter_insert_test(db: impl StorageAdapter) {

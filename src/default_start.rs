@@ -64,7 +64,10 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
 
     // Init Block db
     let path_block = config.data_path_for_block();
-    let rocks_adapter = Arc::new(RocksAdapter::new(path_block)?);
+    let rocks_adapter = Arc::new(RocksAdapter::new(
+        path_block,
+        config.rocksdb.max_open_files,
+    )?);
     let storage = Arc::new(ImplStorage::new(Arc::clone(&rocks_adapter)));
 
     match storage.get_latest_block().await {
@@ -81,7 +84,11 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
 
     // Init trie db
     let path_state = config.data_path_for_state();
-    let trie_db = Arc::new(RocksTrieDB::new(path_state, config.executor.light)?);
+    let trie_db = Arc::new(RocksTrieDB::new(
+        path_state,
+        config.executor.light,
+        config.rocksdb.max_open_files,
+    )?);
 
     // Init genesis
     let genesis_state_root = ServiceExecutor::create_genesis(
@@ -135,7 +142,10 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     let path_block = config.data_path_for_block();
     log::info!("Data path for block: {:?}", path_block);
 
-    let rocks_adapter = Arc::new(RocksAdapter::new(path_block.clone())?);
+    let rocks_adapter = Arc::new(RocksAdapter::new(
+        path_block.clone(),
+        config.rocksdb.max_open_files,
+    )?);
     let storage = Arc::new(ImplStorage::new(Arc::clone(&rocks_adapter)));
 
     // Init network
@@ -183,7 +193,11 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
 
     // Init trie db
     let path_state = config.data_path_for_state();
-    let trie_db = Arc::new(RocksTrieDB::new(path_state, config.executor.light)?);
+    let trie_db = Arc::new(RocksTrieDB::new(
+        path_state,
+        config.executor.light,
+        config.rocksdb.max_open_files,
+    )?);
 
     // self private key
     let hex_privkey = hex::decode(config.privkey.as_string_trim0x()).map_err(MainError::FromHex)?;
