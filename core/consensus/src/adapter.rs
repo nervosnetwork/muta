@@ -488,7 +488,6 @@ where
     }
 
     async fn process(&mut self) -> ProtocolResult<()> {
-        // futures_timer::Delay::new(std::time::Duration::from_secs(60)).await;
         if let Some(info) = self.queue.recv().await {
             let height = info.height;
             let txs = info.signed_txs.clone();
