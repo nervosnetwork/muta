@@ -81,7 +81,7 @@ const SHORT_ALIVE_SESSION: u64 = 3; // seconds
 const WHITELIST_TIMEOUT: u64 = 2 * 60 * 60; // 2 hour
 const MAX_CONNECTING_MARGIN: usize = 10;
 
-const HARD_BAN_TIMEOUT: Duration = Duration::from_secs(60 * 60); // 1 hour
+const FATAL_BAN_TIMEOUT: Duration = Duration::from_secs(60 * 60); // 1 hour
 const SOFT_BAN_TIMEOUT: Duration = Duration::from_secs(60 * 10); // 10 minutes
 const GOOD_TRUST_SCORE: u8 = 80u8;
 
@@ -1022,25 +1022,34 @@ impl PeerManager {
             }
         };
 
-        match feedback {
+        match &feedback {
             Fatal(reason) => {
                 warn!("peer {:?} trust feedback fatal {}", pid, reason);
                 if self.inner.whitelisted(&peer) {
                     return;
                 }
 
-                info!("peer {:?} ban {} seconds", pid, HARD_BAN_TIMEOUT.as_secs());
+                info!("peer {:?} ban {} seconds", pid, FATAL_BAN_TIMEOUT.as_secs());
                 peer_trust_metric.pause();
-                peer.ban(HARD_BAN_TIMEOUT);
+                peer.ban(FATAL_BAN_TIMEOUT);
 
                 if let Some(session) = self.inner.remove_session(peer.session_id()) {
                     self.disconnect_session(session.id);
                 }
                 peer.mark_disconnected();
             }
-            Bad(reason) => {
-                info!("peer {:?} trust feedback bad {}", pid, reason);
-                peer_trust_metric.bad_events(1);
+            Bad(_) | Worse(_) => {
+                match &feedback {
+                    Bad(reason) => {
+                        info!("peer {:?} trust feedback bad {}", pid, reason);
+                        peer_trust_metric.bad_events(1);
+                    }
+                    Worse(reason) => {
+                        warn!("peer {:?} trust feedback worse {}", pid, reason);
+                        peer_trust_metric.bad_events(10);
+                    }
+                    _ => unreachable!(),
+                };
 
                 if peer_trust_metric.knock_out() && !self.inner.whitelisted(&peer) {
                     let soft_ban = SOFT_BAN_TIMEOUT.as_secs();
