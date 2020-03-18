@@ -226,8 +226,16 @@ impl Peer {
     }
 
     pub fn banned(&self) -> bool {
-        if time::now() > self.ban_expired_at.load(Ordering::SeqCst) {
-            self.ban_expired_at.store(0, Ordering::SeqCst);
+        let expired_at = self.ban_expired_at.load(Ordering::SeqCst);
+        if time::now() > expired_at {
+            if expired_at > 0 {
+                self.ban_expired_at.store(0, Ordering::SeqCst);
+                if let Some(trust_metric) = self.trust_metric() {
+                    // TODO: Reset just in case, may remove in
+                    // the future.
+                    trust_metric.reset_history();
+                }
+            }
             false
         } else {
             true
