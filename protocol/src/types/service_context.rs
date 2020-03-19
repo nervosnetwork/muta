@@ -3,10 +3,9 @@ use std::rc::Rc;
 
 use bytes::Bytes;
 use derive_more::{Display, From};
-use serde::{Deserialize, Serialize};
 
 use crate::types::{Address, Event, Hash};
-use crate::{ProtocolError, ProtocolErrorKind, ProtocolResult};
+use crate::{ProtocolError, ProtocolErrorKind};
 
 #[derive(Debug, Clone)]
 pub struct ServiceContextParams {
@@ -194,7 +193,7 @@ mod tests {
         };
         let ctx = ServiceContext::new(params);
 
-        ctx.sub_cycles(8).unwrap();
+        ctx.sub_cycles(8);
         assert_eq!(ctx.get_cycles_used(), 18);
 
         assert_eq!(ctx.get_cycles_limit(), 100);

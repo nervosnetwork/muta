@@ -4,7 +4,6 @@ mod tests;
 use binding_macro::{cycles, genesis, service};
 use protocol::traits::{ExecutorParams, ServiceResponse, ServiceSDK};
 use protocol::types::{Metadata, ServiceContext, METADATA_KEY};
-use protocol::ProtocolResult;
 
 pub struct MetadataService<SDK> {
     sdk: SDK,

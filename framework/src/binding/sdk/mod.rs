@@ -14,7 +14,7 @@ use protocol::traits::{
     StoreMap, StoreString, StoreUint64,
 };
 use protocol::types::{Address, Block, Hash, Receipt, ServiceContext, SignedTransaction};
-use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
+use protocol::{ProtocolError, ProtocolErrorKind};
 
 use crate::binding::store::{
     DefaultStoreArray, DefaultStoreBool, DefaultStoreMap, DefaultStoreString, DefaultStoreUint64,

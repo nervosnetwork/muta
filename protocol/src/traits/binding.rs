@@ -1,12 +1,11 @@
 use std::iter::Iterator;
 
 use bytes::Bytes;
-use derive_more::{Display, From};
 
 use crate::fixed_codec::FixedCodec;
 use crate::traits::{ExecutorParams, ServiceResponse};
 use crate::types::{Address, Block, Hash, MerkleRoot, Receipt, ServiceContext, SignedTransaction};
-use crate::{ProtocolError, ProtocolErrorKind, ProtocolResult};
+use crate::ProtocolResult;
 
 pub trait ServiceMapping: Send + Sync {
     fn get_service<SDK: 'static + ServiceSDK>(

@@ -4,11 +4,13 @@ use bytes::{Bytes, BytesMut};
 use cita_trie::MemoryDB;
 
 use asset::types::{Asset, CreateAssetPayload};
-use asset::{AssetService, ServiceError};
+use asset::AssetService;
 use binding_macro::{cycles, service};
 use metadata::MetadataService;
 
-use protocol::traits::{Executor, ExecutorParams, Service, ServiceMapping, ServiceSDK};
+use protocol::traits::{
+    Executor, ExecutorParams, Service, ServiceMapping, ServiceResponse, ServiceSDK,
+};
 use protocol::types::{
     Genesis, Hash, RawTransaction, ServiceContext, SignedTransaction, TransactionRequest,
 };
@@ -82,8 +84,8 @@ fn test_service_call_service() {
         (event.service.as_str(), event.data.as_str())
     );
 
-    assert_eq!(receipt.response.is_error, false);
-    let asset: Asset = serde_json::from_str(&receipt.response.ret).unwrap();
+    assert_eq!(receipt.response.response.code, 0);
+    let asset: Asset = serde_json::from_str(&receipt.response.response.data).unwrap();
     assert_eq!(asset.name, "TestCallAsset");
     assert_eq!(asset.symbol, "TCA");
     assert_eq!(asset.supply, 320_000_011);
@@ -95,8 +97,8 @@ pub struct MockService<SDK> {
 
 #[service]
 impl<SDK: ServiceSDK> MockService<SDK> {
-    pub fn new(sdk: SDK) -> ProtocolResult<Self> {
-        Ok(Self { sdk })
+    pub fn new(sdk: SDK) -> Self {
+        Self { sdk }
     }
 
     #[cycles(290_00)]
@@ -105,18 +107,17 @@ impl<SDK: ServiceSDK> MockService<SDK> {
         &mut self,
         ctx: ServiceContext,
         payload: CreateAssetPayload,
-    ) -> ProtocolResult<Asset> {
-        let payload_str = serde_json::to_string(&payload).map_err(ServiceError::JsonParse)?;
+    ) -> ServiceResponse<Asset> {
+        let payload_str = serde_json::to_string(&payload).unwrap();
 
         let ret = self
             .sdk
-            .write(&ctx, None, "asset", "create_asset", &payload_str)?;
+            .write(&ctx, None, "asset", "create_asset", &payload_str);
 
-        let asset: Asset = serde_json::from_str(&ret).unwrap();
+        let asset: Asset = serde_json::from_str(&ret.data).unwrap();
 
-        ctx.emit_event("call create asset succeed".to_owned())
-            .unwrap();
-        Ok(asset)
+        ctx.emit_event("call create asset succeed".to_owned());
+        ServiceResponse::<Asset>::from_data(asset)
     }
 }
 
@@ -129,9 +130,9 @@ impl ServiceMapping for MockServiceMapping {
         sdk: SDK,
     ) -> ProtocolResult<Box<dyn Service>> {
         let service = match name {
-            "mock" => Box::new(MockService::new(sdk)?) as Box<dyn Service>,
-            "asset" => Box::new(AssetService::new(sdk)?) as Box<dyn Service>,
-            "metadata" => Box::new(MetadataService::new(sdk)?) as Box<dyn Service>,
+            "mock" => Box::new(MockService::new(sdk)) as Box<dyn Service>,
+            "asset" => Box::new(AssetService::new(sdk)) as Box<dyn Service>,
+            "metadata" => Box::new(MetadataService::new(sdk)) as Box<dyn Service>,
             _ => panic!("not found service"),
         };
 

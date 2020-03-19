@@ -1,11 +1,9 @@
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::punctuated::Punctuated;
-use syn::{parse_macro_input, FnArg, ImplItemMethod, ReturnType, Token, Type, Visibility};
+use syn::{parse_macro_input, FnArg, ImplItemMethod, ReturnType, Token, Visibility};
 
-use crate::common::{
-    arg_is_immutable_receiver, arg_is_mutable_receiver, assert_type, get_protocol_result_args,
-};
+use crate::common::{arg_is_immutable_receiver, arg_is_mutable_receiver, assert_type};
 
 pub fn verify_read_or_write(item: TokenStream, mutable: bool) -> TokenStream {
     let method_item = parse_macro_input!(item as ImplItemMethod);

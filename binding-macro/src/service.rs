@@ -117,8 +117,10 @@ pub fn gen_service_code(_: TokenStream, item: TokenStream) -> TokenStream {
                                 .unwrap_or_else(|e| panic!("service macro decode payload failed: {:?}", e));
                         let res = self.#list_read_ident(ctx, payload);
                         if res.code == 0 {
-                            let data_json = serde_json::to_string(&res.data).unwrap_or_else(|e| panic!("service macro encode payload failed: {:?}", e));
-
+                            let mut data_json = serde_json::to_string(&res.data).unwrap_or_else(|e| panic!("service macro encode payload failed: {:?}", e));
+                            if data_json == "null" {
+                                data_json = "".to_owned();
+                            }
                             ServiceResponse::<String>::from_data(data_json)
                         } else {
                             ServiceResponse::<String>::from_error(res.code, res.error.clone())
@@ -127,8 +129,10 @@ pub fn gen_service_code(_: TokenStream, item: TokenStream) -> TokenStream {
                     #(#list_read_name_nonepayload => {
                         let res = self.#list_read_ident_nonepayload(ctx);
                         if res.code == 0 {
-                            let data_json = serde_json::to_string(&res.data).unwrap_or_else(|e| panic!("service macro encode payload failed: {:?}", e));
-
+                            let mut data_json = serde_json::to_string(&res.data).unwrap_or_else(|e| panic!("service macro encode payload failed: {:?}", e));
+                            if data_json == "null" {
+                                data_json = "".to_owned();
+                            }
                             ServiceResponse::<String>::from_data(data_json)
                         } else {
                             ServiceResponse::<String>::from_error(res.code, res.error.clone())
@@ -148,8 +152,10 @@ pub fn gen_service_code(_: TokenStream, item: TokenStream) -> TokenStream {
                                 .unwrap_or_else(|e| panic!("service macro decode payload failed: {:?}", e));
                         let res = self.#list_write_ident(ctx, payload);
                         if res.code == 0 {
-                            let data_json = serde_json::to_string(&res.data).unwrap_or_else(|e| panic!("service macro encode payload failed: {:?}", e));
-
+                            let mut data_json = serde_json::to_string(&res.data).unwrap_or_else(|e| panic!("service macro encode payload failed: {:?}", e));
+                            if data_json == "null" {
+                                data_json = "".to_owned();
+                            }
                             ServiceResponse::<String>::from_data(data_json)
                         } else {
                             ServiceResponse::<String>::from_error(res.code, res.error.clone())
@@ -158,8 +164,10 @@ pub fn gen_service_code(_: TokenStream, item: TokenStream) -> TokenStream {
                     #(#list_write_name_nonepayload => {
                         let res = self.#list_write_ident_nonepayload(ctx);
                         if res.code == 0 {
-                            let data_json = serde_json::to_string(&res.data).unwrap_or_else(|e| panic!("service macro encode payload failed: {:?}", e));
-
+                            let mut data_json = serde_json::to_string(&res.data).unwrap_or_else(|e| panic!("service macro encode payload failed: {:?}", e));
+                            if data_json == "null" {
+                                data_json = "".to_owned();
+                            }
                             ServiceResponse::<String>::from_data(data_json)
                         } else {
                             ServiceResponse::<String>::from_error(res.code, res.error.clone())

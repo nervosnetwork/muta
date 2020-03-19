@@ -60,7 +60,7 @@ fn test_create_genesis() {
                 .to_owned(),
     };
     let res = executor.read(&params, &caller, 1, &request).unwrap();
-    let resp: GetBalanceResponse = serde_json::from_str(&res.ret).unwrap();
+    let resp: GetBalanceResponse = serde_json::from_str(&res.data).unwrap();
 
     assert_eq!(resp.balance, 320_000_011);
 }
@@ -100,8 +100,8 @@ fn test_exec() {
     let executor_resp = executor.exec(&params, &txs).unwrap();
     let receipt = &executor_resp.receipts[0];
 
-    assert_eq!(receipt.response.is_error, false);
-    let asset: Asset = serde_json::from_str(&receipt.response.ret).unwrap();
+    assert_eq!(receipt.response.response.code, 0);
+    let asset: Asset = serde_json::from_str(&receipt.response.response.data).unwrap();
     assert_eq!(asset.name, "MutaToken2");
     assert_eq!(asset.symbol, "MT2");
     assert_eq!(asset.supply, 320_000_011);
@@ -150,7 +150,7 @@ fn test_tx_hook() {
     let txs = vec![stx.clone()];
     let executor_resp = executor.exec(&params, &txs).unwrap();
     let receipt = &executor_resp.receipts[0];
-    assert_eq!(receipt.response.is_error, false);
+    assert_eq!(receipt.response.response.code, 0);
     assert_eq!(receipt.events.len(), 0);
 
     // tx hook
@@ -163,7 +163,7 @@ fn test_tx_hook() {
     let txs = vec![stx.clone()];
     let executor_resp = executor.exec(&params, &txs).unwrap();
     let receipt = &executor_resp.receipts[0];
-    assert_eq!(receipt.response.is_error, false);
+    assert_eq!(receipt.response.response.code, 0);
     assert_eq!(receipt.events.len(), 2);
     assert_eq!(&receipt.events[0].data, "test_tx_hook_before invoked");
     assert_eq!(&receipt.events[1].data, "test_tx_hook_after invoked");
@@ -179,7 +179,7 @@ fn test_tx_hook() {
     let txs = vec![stx];
     let executor_resp = executor.exec(&params, &txs).unwrap();
     let receipt = &executor_resp.receipts[0];
-    assert_eq!(receipt.response.is_error, false);
+    assert_eq!(receipt.response.response.code, 0);
     assert_eq!(receipt.events.len(), 2);
     assert_eq!(&receipt.events[0].data, "test_tx_hook_before invoked");
     assert_eq!(&receipt.events[1].data, "test_tx_hook_after invoked");
@@ -257,9 +257,9 @@ impl ServiceMapping for MockServiceMapping {
         sdk: SDK,
     ) -> ProtocolResult<Box<dyn Service>> {
         let service = match name {
-            "asset" => Box::new(AssetService::new(sdk)?) as Box<dyn Service>,
-            "metadata" => Box::new(MetadataService::new(sdk)?) as Box<dyn Service>,
-            "test" => Box::new(TestService::new(sdk)?) as Box<dyn Service>,
+            "asset" => Box::new(AssetService::new(sdk)) as Box<dyn Service>,
+            "metadata" => Box::new(MetadataService::new(sdk)) as Box<dyn Service>,
+            "test" => Box::new(TestService::new(sdk)) as Box<dyn Service>,
             _ => panic!("not found service"),
         };
 

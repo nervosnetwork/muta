@@ -94,7 +94,7 @@ impl<S: 'static + ServiceState, K: 'static + FixedCodec + PartialEq, V: 'static 
 
             self.state
                 .borrow_mut()
-                .insert(self.get_map_key(key)?, Bytes::new());
+                .insert(self.get_map_key(key)?, Bytes::new())?;
 
             Ok(Some(value))
         } else {

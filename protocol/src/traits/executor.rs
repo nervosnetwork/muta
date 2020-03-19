@@ -1,7 +1,5 @@
 use std::sync::Arc;
 
-use serde::{Deserialize, Serialize};
-
 use crate::traits::{ServiceMapping, Storage};
 use crate::types::{
     Address, Bloom, MerkleRoot, Receipt, ServiceContext, SignedTransaction, TransactionRequest,

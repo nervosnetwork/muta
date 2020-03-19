@@ -87,9 +87,7 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
             panic::catch_unwind(AssertUnwindSafe(|| {
                 service.genesis_(params.payload.clone())
             }))
-            .map_err(|e| {
-                ProtocolError::from(ExecutorError::InitService(format!("{:?}", e).to_owned()))
-            })?;
+            .map_err(|e| ProtocolError::from(ExecutorError::InitService(format!("{:?}", e))))?;
 
             state.borrow_mut().stash()?;
         }
@@ -255,7 +253,7 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
                         continue;
                     } else {
                         log::error!("inner chain error occurred when calling service: {:?}", e);
-                        let s = format!("{:?}", e).to_owned();
+                        let s = format!("{:?}", e);
                         return Err(ExecutorError::CallService(s).into());
                     }
                 }
@@ -403,9 +401,8 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
             params,
             request,
         )?;
-        panic::catch_unwind(AssertUnwindSafe(|| self.call(context, ExecType::Read))).map_err(|e| {
-            ProtocolError::from(ExecutorError::QueryService(format!("{:?}", e).to_owned()))
-        })
+        panic::catch_unwind(AssertUnwindSafe(|| self.call(context, ExecType::Read)))
+            .map_err(|e| ProtocolError::from(ExecutorError::QueryService(format!("{:?}", e))))
     }
 }
 

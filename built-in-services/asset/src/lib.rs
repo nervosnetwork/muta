@@ -5,12 +5,10 @@ pub mod types;
 use std::collections::BTreeMap;
 
 use bytes::Bytes;
-use derive_more::{Display, From};
 
-use binding_macro::{cycles, genesis, service, write};
+use binding_macro::{cycles, genesis, service};
 use protocol::traits::{ExecutorParams, ServiceResponse, ServiceSDK, StoreMap};
 use protocol::types::{Address, Hash, ServiceContext};
-use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
 use crate::types::{
     ApproveEvent, ApprovePayload, Asset, AssetBalance, CreateAssetPayload, GetAllowancePayload,
@@ -143,7 +141,7 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
         let payload_res = serde_json::to_string(&payload);
 
         if let Err(e) = payload_res {
-            return ServiceResponse::<Asset>::from_error(3, format!("{:?}", e).to_owned());
+            return ServiceResponse::<Asset>::from_error(3, format!("{:?}", e));
         }
         let payload_str = payload_res.unwrap();
 
@@ -172,7 +170,7 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
         let event_res = serde_json::to_string(&asset);
 
         if let Err(e) = event_res {
-            return ServiceResponse::<Asset>::from_error(3, format!("{:?}", e).to_owned());
+            return ServiceResponse::<Asset>::from_error(3, format!("{:?}", e));
         }
         let event_str = event_res.unwrap();
         ctx.emit_event(event_str);
@@ -193,7 +191,7 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
         }
 
         if let Err(e) = self._transfer(caller.clone(), to.clone(), asset_id.clone(), value) {
-            return ServiceResponse::<()>::from_error(6, format!("{:?}", e).to_owned());
+            return ServiceResponse::<()>::from_error(6, format!("{:?}", e));
         };
 
         let event = TransferEvent {
@@ -205,7 +203,7 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
         let event_res = serde_json::to_string(&event);
 
         if let Err(e) = event_res {
-            return ServiceResponse::<()>::from_error(3, format!("{:?}", e).to_owned());
+            return ServiceResponse::<()>::from_error(3, format!("{:?}", e));
         };
         let event_str = event_res.unwrap();
         ctx.emit_event(event_str);
@@ -254,7 +252,7 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
         let event_res = serde_json::to_string(&event);
 
         if let Err(e) = event_res {
-            return ServiceResponse::<()>::from_error(3, format!("{:?}", e).to_owned());
+            return ServiceResponse::<()>::from_error(3, format!("{:?}", e));
         };
         let event_str = event_res.unwrap();
         ctx.emit_event(event_str);
@@ -303,7 +301,7 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
             .set_account_value(&sender, asset_id.clone(), sender_asset_balance);
 
         if let Err(e) = self._transfer(sender.clone(), recipient.clone(), asset_id.clone(), value) {
-            return ServiceResponse::<()>::from_error(6, format!("{:?}", e).to_owned());
+            return ServiceResponse::<()>::from_error(6, format!("{:?}", e));
         };
 
         let event = TransferFromEvent {
@@ -316,7 +314,7 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
         let event_res = serde_json::to_string(&event);
 
         if let Err(e) = event_res {
-            return ServiceResponse::<()>::from_error(3, format!("{:?}", e).to_owned());
+            return ServiceResponse::<()>::from_error(3, format!("{:?}", e));
         };
         let event_str = event_res.unwrap();
         ctx.emit_event(event_str);
@@ -374,41 +372,5 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
             .set_account_value(&sender, asset_id, sender_asset_balance);
 
         Ok(())
-    }
-}
-
-#[derive(Debug, Display, From)]
-pub enum ServiceError {
-    #[display(fmt = "Parsing payload to json failed {:?}", _0)]
-    JsonParse(serde_json::Error),
-
-    #[display(fmt = "Asset {:?} already exists", id)]
-    Exists {
-        id: Hash,
-    },
-
-    #[display(fmt = "Not found asset, id {:?}", id)]
-    NotFoundAsset {
-        id: Hash,
-    },
-
-    #[display(fmt = "Not found asset, expect {:?} real {:?}", expect, real)]
-    LackOfBalance {
-        expect: u64,
-        real:   u64,
-    },
-
-    U64Overflow,
-
-    RecipientIsSender,
-
-    ApproveToYourself,
-}
-
-impl std::error::Error for ServiceError {}
-
-impl From<ServiceError> for ProtocolError {
-    fn from(err: ServiceError) -> ProtocolError {
-        ProtocolError::new(ProtocolErrorKind::Service, Box::new(err))
     }
 }
