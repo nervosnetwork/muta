@@ -74,6 +74,13 @@ pub trait SynchronizationAdapter: CommonConsensusAdapter + Send + Sync {
 
     async fn get_proof_from_remote(self: &Self, ctx: Context, height: u64)
         -> ProtocolResult<Proof>;
+
+    async fn verify_txs_sync(
+        &self,
+        ctx: Context,
+        height: u64,
+        txs: Vec<Hash>,
+    ) -> ProtocolResult<()>;
 }
 
 #[async_trait]
@@ -119,8 +126,6 @@ pub trait CommonConsensusAdapter: Send + Sync {
     ) -> ProtocolResult<Metadata>;
 
     fn set_args(&self, context: Context, timeout_gap: u64, cycles_limit: u64, max_tx_size: u64);
-
-    async fn verify_txs(&self, ctx: Context, txs: Vec<Hash>) -> ProtocolResult<()>;
 
     async fn verify_proof(
         self: &Self,
@@ -224,4 +229,6 @@ pub trait ConsensusAdapter: CommonConsensusAdapter + Send + Sync {
 
     /// Load latest overlord wal info.
     async fn load_overlord_wal(&self, ctx: Context) -> ProtocolResult<Bytes>;
+
+    async fn verify_txs(&self, ctx: Context, height: u64, txs: Vec<Hash>) -> ProtocolResult<()>;
 }

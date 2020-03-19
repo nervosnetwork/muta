@@ -199,6 +199,10 @@ impl SynchronizationAdapter for MockCommonConsensusAdapter {
     async fn get_proof_from_remote(self: &Self, _: Context, height: u64) -> ProtocolResult<Proof> {
         Ok(self.remote_proofs.read().get(&height).unwrap().clone())
     }
+
+    async fn verify_txs_sync(&self, _: Context, _: u64, _: Vec<Hash>) -> ProtocolResult<()> {
+        Ok(())
+    }
 }
 
 #[async_trait]
@@ -298,11 +302,6 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
         _cycles_limit: u64,
         _max_tx_size: u64,
     ) {
-    }
-
-    /// make sure that the mempool is in the same height!
-    async fn verify_txs(&self, _: Context, _: Vec<Hash>) -> ProtocolResult<()> {
-        Ok(())
     }
 
     /// this function verify all info in header except proof and roots

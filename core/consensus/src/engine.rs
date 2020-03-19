@@ -179,7 +179,11 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
                 .await?;
 
             self.adapter
-                .verify_txs(ctx.clone(), block.inner.block.ordered_tx_hashes.clone())
+                .verify_txs(
+                    ctx.clone(),
+                    block.inner.block.header.height,
+                    block.inner.block.ordered_tx_hashes.clone(),
+                )
                 .await?;
 
             let adapter = Arc::clone(&self.adapter);

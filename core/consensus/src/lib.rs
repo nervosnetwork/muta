@@ -98,47 +98,53 @@ pub enum ConsensusError {
     #[display(fmt = "Crypto error {:?}", _0)]
     CryptoErr(Box<CryptoError>),
 
-    /// The synchronous block does not pass the checks.
     #[display(fmt = "Synchronization {} block error", _0)]
+    VerifyTransaction(u64),
+
+    /// The synchronous block does not pass the checks.
+    #[display(fmt = "Synchronization/Consensus {} block error", _0)]
     VerifyBlockHeaderPreBlockHash(u64),
 
     /// The synchronous block does not pass the checks.
-    #[display(fmt = "Synchronization {} block prehash error", _0)]
+    #[display(fmt = "Synchronization/Consensus {} block prehash error", _0)]
     VerifyBlockHeaderPreHash(u64),
 
     #[display(
-        fmt = "Synchronization {} block error, proposer is not in verify list",
+        fmt = "Synchronization/Consensus {} block error, proposer is not in verify list",
         _0
     )]
     VerifyBlockHeaderProposer(u64),
 
     /// the validator is not in the verify list
     #[display(
-        fmt = "Synchronization {} block error, proposer is not in verify list",
+        fmt = "Synchronization/Consensus {} block error, proposer is not in verify list",
         _0
     )]
     VerifyBlockHeaderValidator(u64),
 
     /// the validator is in the verify list, but weight is not match
     #[display(
-        fmt = "Synchronization {} block error, proposer is not in verify list",
+        fmt = "Synchronization/Consensus {} block error, proposer is not in verify list",
         _0
     )]
     VerifyBlockHeaderValidatorWeight(u64),
 
     #[display(
-        fmt = "Verify block {} block error, bitmap error, fail to extract voters",
+        fmt = "Synchronization/Consensus {} block error, verify block bitmap error, fail to extract voters",
         _0
     )]
     VerifyBlockBitMap(u64),
 
     /// The Aggregated Signature doesn't match
-    #[display(fmt = "Verify block {} block error, proof doesn't match", _0)]
+    #[display(
+        fmt = "Synchronization/Consensus {} block error, verify block proof doesn't match",
+        _0
+    )]
     VerifyBlockProof(u64),
 
     /// the block and proof is mismatch, you may pass it wrong
     #[display(
-        fmt = "Consensus verify block error, block height {} and proof height {} doesn't match",
+        fmt = "Synchronization/Consensus verify block error, block height {} and proof height {} doesn't match",
         _0,
         _1
     )]
@@ -146,20 +152,20 @@ pub enum ConsensusError {
 
     /// the block and proof is mismatch, you may pass it wrong
     #[display(
-        fmt = "Consensus verify block error, block {}, block hash and proof hash doesn't match",
+        fmt = "Synchronization/Consensus verify block error, block {}, block hash and proof hash doesn't match",
         _0
     )]
     VerifyBlockHashMismatch(u64),
 
     #[display(
-        fmt = "Consensus verify block {} block error, signed voter is not in verifier list",
+        fmt = "Synchronization/Consensus verify block {} block error, signed voter is not in verifier list",
         _0
     )]
     VerifyBlockProofVoter(u64),
 
     /// The block vote weight is less or equal than 1/3
     #[display(
-        fmt = "Consensus verify block {} block error, weight doesn't exceed 2/3",
+        fmt = "Synchronization/Consensus verify block {} block error, weight doesn't exceed 2/3",
         _0
     )]
     VerifyBlockProofVoteWeight(u64),

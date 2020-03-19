@@ -194,6 +194,15 @@ where
         let res = self.storage.get_latest_block().await?;
         Ok(res.header.height)
     }
+
+    async fn verify_txs(&self, ctx: Context, height: u64, txs: Vec<Hash>) -> ProtocolResult<()> {
+        if let Err(e) = self.mempool.ensure_order_txs(ctx.clone(), txs).await {
+            log::error!("verify_txs error {:?}", e);
+            return Err(ConsensusError::VerifyTransaction(height).into());
+        }
+
+        Ok(())
+    }
 }
 
 #[async_trait]
@@ -306,6 +315,20 @@ where
             .await?;
         Ok(ret.inner)
     }
+
+    async fn verify_txs_sync(
+        &self,
+        ctx: Context,
+        height: u64,
+        txs: Vec<Hash>,
+    ) -> ProtocolResult<()> {
+        if let Err(e) = self.mempool.ensure_order_txs_sync(ctx.clone(), txs).await {
+            log::error!("verify_txs error {:?}", e);
+            return Err(ConsensusError::VerifyTransaction(height).into());
+        }
+
+        Ok(())
+    }
 }
 
 #[async_trait]
@@ -407,16 +430,6 @@ where
     fn set_args(&self, _context: Context, timeout_gap: u64, cycles_limit: u64, max_tx_size: u64) {
         self.mempool
             .set_args(timeout_gap, cycles_limit, max_tx_size);
-    }
-
-    /// make sure that the mempool is in the same height!
-    async fn verify_txs(&self, ctx: Context, txs: Vec<Hash>) -> ProtocolResult<()> {
-        if let Err(e) = self.mempool.ensure_order_txs_sync(ctx.clone(), txs).await {
-            log::error!("muta-consensus: executor demons error {:?}", e);
-            return Err(e);
-        }
-
-        Ok(())
     }
 
     /// this function verify all info in header except proof and roots

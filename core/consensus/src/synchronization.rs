@@ -208,8 +208,9 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
                 .await?;
 
             self.adapter
-                .verify_txs(
+                .verify_txs_sync(
                     ctx.clone(),
+                    consenting_height,
                     consenting_rich_block
                         .txs
                         .iter()
