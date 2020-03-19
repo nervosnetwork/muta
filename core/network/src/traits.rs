@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use async_trait::async_trait;
 use protocol::{
     traits::{Context, Priority},
@@ -18,7 +20,6 @@ use crate::{
 };
 
 pub trait NetworkProtocol {
-    // TODO: change to TargetProtocol after tentacle 0.3
     fn target() -> TargetProtocol;
 
     fn metas(self) -> Vec<ProtocolMeta>;
@@ -56,10 +57,22 @@ pub trait ListenExchangeManager {
     fn misbehave(&mut self, sid: SessionId);
 }
 
-pub trait PeerQuerier {
-    fn connected_addr(&self, pid: &PeerId) -> Option<ConnectedAddr>;
-    fn connected_peers(&self) -> Vec<PeerId>;
-    fn pending_data_size(&self, pid: &PeerId) -> usize;
+pub trait SessionBook {
+    fn all_sendable(&self) -> Vec<SessionId>;
+    fn all_blocked(&self) -> Vec<SessionId>;
+    fn refresh_blocked(&self);
+    fn by_chain(&self, addrs: Vec<Address>) -> (Vec<SessionId>, Vec<Address>);
+    fn peers_by_chain(&self, addrs: Vec<Address>) -> (Vec<PeerId>, Vec<Address>);
+    fn all(&self) -> Vec<SessionId>;
+    fn connected_addr(&self, sid: SessionId) -> Option<ConnectedAddr>;
+    fn pending_data_size(&self, sid: SessionId) -> usize;
+    fn whitelist(&self) -> Vec<Address>;
+}
+
+pub trait MultiaddrExt {
+    fn id_bytes(&self) -> Option<Cow<'_, [u8]>>;
+    fn has_id(&self) -> bool;
+    fn push_id(&mut self, peer_id: PeerId);
 }
 
 #[derive(Debug, Clone)]

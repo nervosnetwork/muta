@@ -1,9 +1,13 @@
 use std::{error::Error, num::ParseIntError};
 
 use derive_more::Display;
-use tentacle::{ProtocolId, SessionId};
+use tentacle::{
+    multiaddr::Multiaddr,
+    secio::{PeerId, PublicKey},
+    ProtocolId, SessionId,
+};
 
-use protocol::{types::Address, ProtocolError, ProtocolErrorKind};
+use protocol::{types::Address, Bytes, ProtocolError, ProtocolErrorKind};
 
 use crate::common::ConnectedAddr;
 
@@ -20,9 +24,6 @@ pub enum ErrorKind {
         proto_id: ProtocolId,
         cause:    Box<dyn Error + Send>,
     },
-
-    #[display(fmt = "kind: session blocked, may be bad protocol code")]
-    SessionBlocked,
 
     #[display(fmt = "kind: given string isn't an id: {}", _0)]
     NotIdString(ParseIntError),
@@ -56,9 +57,28 @@ pub enum ErrorKind {
 
     #[display(fmt = "kind: not reactor register for {}", _0)]
     NoReactor(String),
+
+    #[display(
+        fmt = "kind: cannot create chain address from bytes {:?} {}",
+        pubkey,
+        cause
+    )]
+    NoChainAddress {
+        pubkey: Bytes,
+        cause:  Box<dyn Error + Send>,
+    },
+
+    #[display(fmt = "kind: public key {:?} not match {:?}", pubkey, id)]
+    PublicKeyNotMatchId { pubkey: PublicKey, id: PeerId },
 }
 
 impl Error for ErrorKind {}
+
+#[derive(Debug, Display)]
+#[display(fmt = "peer id not found in {}", _0)]
+pub struct PeerIdNotFound(pub(crate) Multiaddr);
+
+impl Error for PeerIdNotFound {}
 
 #[derive(Debug, Display)]
 pub enum NetworkError {
@@ -67,6 +87,24 @@ pub enum NetworkError {
 
     #[display(fmt = "temporary unavailable, try again later")]
     Busy,
+
+    #[display(fmt = "send incompletely, blocked {:?}, other {:?}", blocked, other)]
+    Send {
+        blocked: Option<Vec<SessionId>>,
+        other:   Option<Box<dyn Error + Send>>,
+    },
+
+    #[display(
+        fmt = "send incompletely, unconnected {:?} unknown {:?}, other {:?}",
+        unconnected,
+        unknown,
+        other
+    )]
+    UserSend {
+        unconnected: Option<Vec<Address>>,
+        unknown:     Option<Vec<Address>>,
+        other:       Option<Box<dyn Error + Send>>,
+    },
 
     #[display(fmt = "shutdown")]
     Shutdown,
@@ -104,6 +142,12 @@ pub enum NetworkError {
 
 impl Error for NetworkError {}
 
+impl From<PeerIdNotFound> for NetworkError {
+    fn from(err: PeerIdNotFound) -> NetworkError {
+        NetworkError::Internal(Box::new(err))
+    }
+}
+
 impl From<ErrorKind> for NetworkError {
     fn from(kind: ErrorKind) -> NetworkError {
         NetworkError::Internal(Box::new(kind))
@@ -125,5 +169,11 @@ impl From<NetworkError> for ProtocolError {
 impl From<std::io::Error> for NetworkError {
     fn from(err: std::io::Error) -> NetworkError {
         NetworkError::IoError(err)
+    }
+}
+
+impl NetworkError {
+    pub fn boxed(self) -> Box<dyn Error + Send> {
+        Box::new(self) as Box<dyn Error + Send>
     }
 }

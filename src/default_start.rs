@@ -150,6 +150,8 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
 
     // Init network
     let network_config = NetworkConfig::new()
+        .max_connections(config.network.max_connected_peers.clone())
+        .whitelist_peers_only(config.network.whitelist_peers_only.clone())
         .rpc_timeout(config.network.rpc_timeout.clone())
         .selfcheck_interval(config.network.selfcheck_interval.clone())
         .max_wait_streams(config.network.max_wait_streams)
@@ -170,8 +172,11 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         }
     }
 
+    let whitelist = config.network.whitelist.clone().unwrap_or_default();
+
     let network_config = network_config
         .bootstraps(bootstrap_pairs)?
+        .whitelist(whitelist)?
         .secio_keypair(network_privkey)?;
     let mut network_service = NetworkService::new(network_config);
     network_service

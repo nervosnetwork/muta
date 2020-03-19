@@ -9,42 +9,49 @@ use std::{
 use futures::task::AtomicWaker;
 use log::info;
 
-use crate::{common::HeartBeat, traits::PeerQuerier};
+use crate::{common::HeartBeat, traits::SessionBook};
 
 pub struct SelfCheckConfig {
     pub interval: Duration,
 }
 
-pub(crate) struct SelfCheck<PQ> {
-    peer_querier: PQ,
-    heart_beat:   Option<HeartBeat>,
-    hb_waker:     Arc<AtomicWaker>,
+pub(crate) struct SelfCheck<S> {
+    sessions:   S,
+    heart_beat: Option<HeartBeat>,
+    hb_waker:   Arc<AtomicWaker>,
 }
 
-impl<PQ> SelfCheck<PQ>
+impl<S> SelfCheck<S>
 where
-    PQ: PeerQuerier + Send + Unpin + 'static,
+    S: SessionBook + Send + Unpin + 'static,
 {
-    pub fn new(peer_querier: PQ, config: SelfCheckConfig) -> Self {
+    pub fn new(sessions: S, config: SelfCheckConfig) -> Self {
         let waker = Arc::new(AtomicWaker::new());
         let heart_beat = HeartBeat::new(Arc::clone(&waker), config.interval);
 
         SelfCheck {
-            peer_querier,
+            sessions,
             heart_beat: Some(heart_beat),
             hb_waker: waker,
         }
     }
 
+    fn report_whitelist(&self) {
+        info!(
+            "whitelist peers by chain address: {:?}",
+            self.sessions.whitelist()
+        );
+    }
+
     fn report_pending_data(&self) {
-        let peers = self.peer_querier.connected_peers();
+        let sids = self.sessions.all();
         let mut total_size = 0;
 
-        let peer_report = peers
+        let peer_reports = sids
             .into_iter()
-            .map(|peer| {
-                let connected_addr = self.peer_querier.connected_addr(&peer);
-                let data_size = self.peer_querier.pending_data_size(&peer) / (1000 * 1000); // MB not MiB
+            .map(|sid| {
+                let connected_addr = self.sessions.connected_addr(sid);
+                let data_size = self.sessions.pending_data_size(sid) / (1000 * 1000); // MB not MiB
 
                 total_size += data_size;
                 (connected_addr, data_size)
@@ -52,15 +59,17 @@ where
             .collect::<Vec<_>>();
 
         info!(
-            "total pending size {} MB, peer(s) {:?}",
-            total_size, peer_report
+            "total connected peers: {}, pending size {} MB, session(s) {:?}",
+            peer_reports.len(),
+            total_size,
+            peer_reports
         );
     }
 }
 
-impl<PQ> Future for SelfCheck<PQ>
+impl<S> Future for SelfCheck<S>
 where
-    PQ: PeerQuerier + Send + Unpin + 'static,
+    S: SessionBook + Send + Unpin + 'static,
 {
     type Output = ();
 
@@ -76,6 +85,7 @@ where
         }
 
         self.as_ref().report_pending_data();
+        self.as_ref().report_whitelist();
 
         Poll::Pending
     }

@@ -1,252 +1,275 @@
+use super::{time, PeerAddrSet, Retry, MAX_RETRY_COUNT};
+
 use std::{
-    collections::HashSet,
-    default::Default,
-    sync::Arc,
-    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
+    borrow::Borrow,
+    fmt,
+    hash::{Hash, Hasher},
+    ops::Deref,
+    sync::{
+        atomic::{AtomicU64, AtomicUsize, Ordering},
+        Arc,
+    },
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 use derive_more::Display;
+use parking_lot::RwLock;
 use protocol::{types::Address, Bytes};
-use serde_derive::{Deserialize, Serialize};
 use tentacle::{
-    context::SessionContext,
-    multiaddr::Multiaddr,
     secio::{PeerId, PublicKey},
+    SessionId,
 };
 
-use crate::common::ConnectedAddr;
+use crate::error::ErrorKind;
 
-pub const BACKOFF_BASE: usize = 2;
-pub const MAX_RETRY_INTERVAL: u64 = 512; // seconds
-pub const VALID_ATTEMPT_INTERVAL: u64 = 4;
+const CONNECTEDNESS_MASK: usize = 0b1110;
 
-// TODO: display next_retry
-#[derive(Debug, Clone, Serialize, Deserialize, Display)]
-#[display(
-    fmt = "connected_addr: {:?}, retry: {}, last_connect: {}, alive: {}",
-    connected_addr,
-    retry_count,
-    connect_at,
-    alive
-)]
-pub(super) struct PeerState {
-    // Current connection address
-    connected_addr: Option<ConnectedAddr>,
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Clone, Copy, Display)]
+#[repr(usize)]
+pub enum Connectedness {
+    #[display(fmt = "not connected")]
+    NotConnected = 0 << 1,
 
-    // Session for debug write pending data size
-    #[serde(skip)]
-    session: Option<SessionContext>,
+    #[display(fmt = "can connect")]
+    CanConnect = 1 << 1,
 
-    // Peer address set (Multiple format, p2p, quic etc)
-    addr_set: HashSet<Multiaddr>,
+    #[display(fmt = "connected")]
+    Connected = 2 << 1,
 
-    #[serde(skip)]
-    retry_count: u32,
+    #[display(fmt = "unconnectable")]
+    Unconnectable = 3 << 1,
 
-    #[serde(skip, default = "Instant::now")]
-    next_retry: Instant,
-
-    // Connect at (timestamp)
-    connect_at: u64,
-
-    // Disconnect as (timestamp)
-    disconnect_at: u64,
-
-    // Attempt at (timestamp)
-    #[serde(skip)]
-    attempt_at: u64,
-
-    // Alive (seconds)
-    alive: u64,
+    #[display(fmt = "connecting")]
+    Connecting = 4 << 1,
 }
 
-#[derive(Debug, Clone, Display)]
-#[display(
-    fmt = "peer id: {:?}, user addr: {:?}, state: {}",
-    id,
-    user_addr,
-    state
-)]
+impl From<usize> for Connectedness {
+    fn from(src: usize) -> Connectedness {
+        use self::Connectedness::*;
+
+        debug_assert!(
+            src == NotConnected as usize
+                || src == CanConnect as usize
+                || src == Connected as usize
+                || src == Unconnectable as usize
+                || src == Connecting as usize
+        );
+
+        unsafe { ::std::mem::transmute(src) }
+    }
+}
+
+impl From<Connectedness> for usize {
+    fn from(src: Connectedness) -> usize {
+        let v = src as usize;
+        debug_assert!(v & CONNECTEDNESS_MASK == v);
+        v
+    }
+}
+
+#[derive(Debug)]
 pub struct Peer {
-    id:        Arc<PeerId>,
-    user_addr: Arc<Address>,
-    pubkey:    Arc<PublicKey>,
-    state:     PeerState,
-}
-
-impl PeerState {
-    pub fn new() -> Self {
-        PeerState {
-            connected_addr: None,
-            session:        None,
-            addr_set:       Default::default(),
-            retry_count:    0,
-            next_retry:     Instant::now(),
-            connect_at:     0,
-            disconnect_at:  0,
-            attempt_at:     0,
-            alive:          0,
-        }
-    }
-
-    pub fn from_addrs(addrs: Vec<Multiaddr>) -> Self {
-        let mut state = PeerState::new();
-
-        if addrs.is_empty() {
-            return state;
-        }
-
-        state.addr_set.extend(addrs.into_iter());
-
-        state
-    }
-
-    pub(super) fn addrs(&self) -> Vec<&Multiaddr> {
-        self.addr_set.iter().collect()
-    }
+    pub id:          PeerId,
+    pub multiaddrs:  PeerAddrSet,
+    pub retry:       Retry,
+    pubkey:          RwLock<Option<PublicKey>>,
+    chain_addr:      RwLock<Option<Address>>,
+    connectedness:   AtomicUsize,
+    session_id:      AtomicUsize,
+    connected_at:    AtomicU64,
+    disconnected_at: AtomicU64,
+    alive:           AtomicU64,
 }
 
 impl Peer {
-    pub fn new(pid: PeerId, pubkey: PublicKey) -> Self {
+    pub fn new(peer_id: PeerId) -> Self {
         Peer {
-            id:        Arc::new(pid),
-            user_addr: Arc::new(Peer::pubkey_to_addr(&pubkey)),
-            pubkey:    Arc::new(pubkey),
-            state:     PeerState::new(),
+            id:              peer_id.clone(),
+            multiaddrs:      PeerAddrSet::new(peer_id),
+            retry:           Retry::new(MAX_RETRY_COUNT),
+            pubkey:          RwLock::new(None),
+            chain_addr:      RwLock::new(None),
+            connectedness:   AtomicUsize::new(Connectedness::NotConnected as usize),
+            session_id:      AtomicUsize::new(0),
+            connected_at:    AtomicU64::new(0),
+            disconnected_at: AtomicU64::new(0),
+            alive:           AtomicU64::new(0),
         }
     }
 
-    pub fn from_pair(pk_addr: (PublicKey, Multiaddr)) -> Self {
-        Peer {
-            id:        Arc::new(pk_addr.0.peer_id()),
-            user_addr: Arc::new(Peer::pubkey_to_addr(&pk_addr.0)),
-            pubkey:    Arc::new(pk_addr.0),
-            state:     PeerState::from_addrs(vec![pk_addr.1]),
-        }
+    pub fn from_pubkey(pubkey: PublicKey) -> Result<Self, ErrorKind> {
+        let peer = Peer::new(pubkey.peer_id());
+        peer.set_pubkey(pubkey)?;
+
+        Ok(peer)
     }
 
-    pub fn id(&self) -> &PeerId {
-        &self.id
+    pub fn owned_id(&self) -> PeerId {
+        self.id.to_owned()
     }
 
-    pub fn pubkey(&self) -> &PublicKey {
-        &self.pubkey
+    pub fn has_pubkey(&self) -> bool {
+        self.pubkey.read().is_some()
     }
 
-    pub fn connected_addr(&self) -> Option<ConnectedAddr> {
-        self.state.connected_addr.clone()
+    pub fn owned_pubkey(&self) -> Option<PublicKey> {
+        self.pubkey.read().clone()
     }
 
-    // Pending data size in write buffer
-    pub fn pending_data_size(&self) -> usize {
-        if let Some(ref session) = self.state.session {
-            session.pending_data_size()
+    pub fn owned_chain_addr(&self) -> Option<Address> {
+        self.chain_addr.read().clone()
+    }
+
+    pub fn set_pubkey(&self, pubkey: PublicKey) -> Result<(), ErrorKind> {
+        if pubkey.peer_id() != self.id {
+            Err(ErrorKind::PublicKeyNotMatchId {
+                pubkey,
+                id: self.id.clone(),
+            })
         } else {
-            0
+            let chain_addr = Peer::pubkey_to_chain_addr(&pubkey)?;
+
+            *self.pubkey.write() = Some(pubkey);
+            *self.chain_addr.write() = Some(chain_addr);
+            Ok(())
         }
     }
 
-    pub fn user_addr(&self) -> &Address {
-        &self.user_addr
+    pub fn connectedness(&self) -> Connectedness {
+        Connectedness::from(self.connectedness.load(Ordering::SeqCst))
     }
 
-    pub(super) fn state(&self) -> &PeerState {
-        &self.state
+    pub fn set_connectedness(&self, flag: Connectedness) {
+        self.connectedness
+            .store(usize::from(flag), Ordering::SeqCst);
     }
 
-    pub fn addrs(&self) -> Vec<&Multiaddr> {
-        let addr_set = &self.state.addr_set;
-
-        addr_set.iter().collect()
+    pub fn set_session_id(&self, sid: SessionId) {
+        self.session_id.store(sid.value(), Ordering::SeqCst);
     }
 
-    pub fn owned_addrs(&self) -> Vec<Multiaddr> {
-        let addr_set = &self.state.addr_set;
-
-        addr_set.iter().map(Multiaddr::clone).collect()
+    pub fn session_id(&self) -> SessionId {
+        self.session_id.load(Ordering::SeqCst).into()
     }
 
-    pub(super) fn set_state(&mut self, state: PeerState) {
-        self.state = state
+    pub fn connected_at(&self) -> u64 {
+        self.connected_at.load(Ordering::SeqCst)
     }
 
-    pub fn set_connected_addr(&mut self, addr: Option<ConnectedAddr>) {
-        self.state.connected_addr = addr;
+    pub(super) fn set_connected_at(&self, at: u64) {
+        self.connected_at.store(at, Ordering::SeqCst);
     }
 
-    pub fn set_session(&mut self, session: SessionContext) {
-        self.state.session = Some(session);
+    pub fn disconnected_at(&self) -> u64 {
+        self.disconnected_at.load(Ordering::SeqCst)
     }
 
-    pub fn add_addr(&mut self, addr: Multiaddr) {
-        self.state.addr_set.insert(addr);
-    }
-
-    pub fn remove_addr(&mut self, addr: &Multiaddr) {
-        self.state.addr_set.remove(addr);
-    }
-
-    pub fn update_connect(&mut self) {
-        self.state.connect_at = duration_since(SystemTime::now(), UNIX_EPOCH).as_secs();
-    }
-
-    pub fn update_disconnect(&mut self) {
-        self.state.disconnect_at = duration_since(SystemTime::now(), UNIX_EPOCH).as_secs();
-    }
-
-    pub fn update_alive(&mut self) {
-        let connect_at = UNIX_EPOCH + Duration::from_secs(self.state.connect_at);
-
-        self.state.alive = duration_since(SystemTime::now(), connect_at).as_secs();
+    pub(super) fn set_disconnected_at(&self, at: u64) {
+        self.disconnected_at.store(at, Ordering::SeqCst);
     }
 
     pub fn alive(&self) -> u64 {
-        self.state.alive
+        self.alive.load(Ordering::SeqCst)
     }
 
-    pub fn retry_ready(&self) -> bool {
-        Instant::now() > self.state.next_retry
+    pub fn update_alive(&self) {
+        let connected_at =
+            UNIX_EPOCH + Duration::from_secs(self.connected_at.load(Ordering::SeqCst));
+        let alive = time::duration_since(SystemTime::now(), connected_at).as_secs();
+
+        self.alive.store(alive, Ordering::SeqCst);
     }
 
-    pub fn retry_count(&self) -> usize {
-        self.state.retry_count as usize
+    pub(super) fn set_alive(&self, live: u64) {
+        self.alive.store(live, Ordering::SeqCst);
     }
 
-    pub fn increase_retry(&mut self) {
-        let last_attempt = UNIX_EPOCH + Duration::from_secs(self.state.attempt_at);
-
-        // Every time we try connect to a peer, we use all addresses. If
-        // fail, we should only increase once.
-        if duration_since(SystemTime::now(), last_attempt).as_secs() < VALID_ATTEMPT_INTERVAL {
-            return;
-        }
-
-        self.state.retry_count += 1;
-        self.state.attempt_at = duration_since(SystemTime::now(), UNIX_EPOCH).as_secs();
-
-        let mut secs = BACKOFF_BASE.pow(self.state.retry_count) as u64;
-        if secs > MAX_RETRY_INTERVAL {
-            secs = MAX_RETRY_INTERVAL;
-        }
-        self.state.next_retry = Instant::now() + Duration::from_secs(secs);
-    }
-
-    pub fn reset_retry(&mut self) {
-        self.state.retry_count = 0
-    }
-
-    // # Panic
-    pub(super) fn pubkey_to_addr(pubkey: &PublicKey) -> Address {
+    pub fn pubkey_to_chain_addr(pubkey: &PublicKey) -> Result<Address, ErrorKind> {
         let pubkey_bytes = Bytes::from(pubkey.inner_ref().clone());
 
-        Address::from_pubkey_bytes(pubkey_bytes)
-            .expect("convert from secp256k1 public key should always success")
+        Address::from_pubkey_bytes(pubkey_bytes.clone()).map_err(|e| ErrorKind::NoChainAddress {
+            pubkey: pubkey_bytes,
+            cause:  Box::new(e),
+        })
+    }
+
+    pub fn mark_connected(&self, sid: SessionId) {
+        self.set_connectedness(Connectedness::Connected);
+        self.set_session_id(sid);
+        self.retry.reset();
+        self.update_connected();
+    }
+
+    pub fn mark_disconnected(&self) {
+        self.set_connectedness(Connectedness::CanConnect);
+        self.set_session_id(0.into());
+        self.update_disconnected();
+        self.update_alive();
+    }
+
+    fn update_connected(&self) {
+        self.connected_at.store(time::now(), Ordering::SeqCst);
+    }
+
+    fn update_disconnected(&self) {
+        self.disconnected_at.store(time::now(), Ordering::SeqCst);
     }
 }
 
-fn duration_since(now: SystemTime, early: SystemTime) -> Duration {
-    match now.duration_since(early) {
-        Ok(duration) => duration,
-        Err(e) => e.duration(),
+impl fmt::Display for Peer {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{:?} chain addr {:?} multiaddr {:?} last connected at {} alive {} retry {} current {}",
+            self.id,
+            self.chain_addr,
+            self.multiaddrs.all(),
+            self.connected_at.load(Ordering::SeqCst),
+            self.alive.load(Ordering::SeqCst),
+            self.retry.count(),
+            Connectedness::from(self.connectedness.load(Ordering::SeqCst))
+        )
+    }
+}
+
+#[derive(Debug, Display, Clone)]
+#[display(fmt = "{}", _0)]
+pub struct ArcPeer(Arc<Peer>);
+
+impl ArcPeer {
+    pub fn new(peer_id: PeerId) -> Self {
+        ArcPeer(Arc::new(Peer::new(peer_id)))
+    }
+
+    pub fn from_pubkey(pubkey: PublicKey) -> Result<Self, ErrorKind> {
+        Ok(ArcPeer(Arc::new(Peer::from_pubkey(pubkey)?)))
+    }
+}
+
+impl Deref for ArcPeer {
+    type Target = Peer;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl Borrow<PeerId> for ArcPeer {
+    fn borrow(&self) -> &PeerId {
+        &self.id
+    }
+}
+
+impl PartialEq for ArcPeer {
+    fn eq(&self, other: &ArcPeer) -> bool {
+        self.id == other.id
+    }
+}
+
+impl Eq for ArcPeer {}
+
+impl Hash for ArcPeer {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.id.hash(state)
     }
 }
