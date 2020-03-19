@@ -34,7 +34,7 @@ Muta 的核心理念是使一个区块链状态转换的开发尽可能的灵活
 快速搭建一条简单的链并尝试简单的交互，请参考[快速开始](https://nervosnetwork.github.io/muta-docs/#/getting_started.md)。
 
 ## Muta 提供哪些基础核心组件？
- 
+
 Muta 框架提供了搭建一个分布式区块链网络所需的全部核心组件：
 
 * [交易池](https://nervosnetwork.github.io/muta-docs/#/transaction_pool.md)
