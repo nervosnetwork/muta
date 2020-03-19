@@ -3,6 +3,7 @@ use std::rc::Rc;
 
 use bytes::Bytes;
 use derive_more::{Display, From};
+use serde::{Deserialize, Serialize};
 
 use crate::types::{Address, Event, Hash};
 use crate::{ProtocolError, ProtocolErrorKind, ProtocolResult};
@@ -96,12 +97,11 @@ impl ServiceContext {
         self.events.borrow().clone()
     }
 
-    pub fn sub_cycles(&self, cycles: u64) -> ProtocolResult<()> {
+    pub fn sub_cycles(&self, cycles: u64) {
         if self.get_cycles_used() + cycles <= self.cycles_limit {
             *self.cycles_used.borrow_mut() = self.get_cycles_used() + cycles;
-            Ok(())
         } else {
-            Err(ServiceContextError::OutOfCycles.into())
+            panic!("out of cycles");
         }
     }
 
@@ -145,13 +145,11 @@ impl ServiceContext {
         self.timestamp
     }
 
-    pub fn emit_event(&self, message: String) -> ProtocolResult<()> {
+    pub fn emit_event(&self, message: String) {
         self.events.borrow_mut().push(Event {
             service: self.service_name.clone(),
             data:    message,
-        });
-
-        Ok(())
+        })
     }
 }
 

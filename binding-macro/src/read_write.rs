@@ -58,12 +58,5 @@ fn verify_ret_type(ret_type: &ReturnType) {
         _ => panic!("The return type of read/write method must be protocol::ProtocolResult"),
     };
 
-    match real_ret_type {
-        Type::Path(type_path) => {
-            let path = &type_path.path;
-            get_protocol_result_args(&path)
-                .expect("The return type of read/write method must be protocol::ProtocolResult");
-        }
-        _ => panic!("The return type of read/write method must be protocol::ProtocolResult"),
-    }
+    assert_type(&real_ret_type, "ServiceResponse");
 }

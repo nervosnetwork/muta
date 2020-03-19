@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use serde::{Deserialize, Serialize};
+
 use crate::traits::{ServiceMapping, Storage};
 use crate::types::{
     Address, Bloom, MerkleRoot, Receipt, ServiceContext, SignedTransaction, TransactionRequest,
@@ -22,11 +24,38 @@ pub struct ExecutorParams {
     pub cycles_limit: u64,
 }
 
-#[derive(Debug, Clone)]
-pub struct ExecResp {
-    pub ret:      String,
-    pub is_error: bool,
+#[derive(Debug, Clone, Default)]
+pub struct ServiceResponse<T: Default> {
+    pub code:  u64,
+    pub data:  T,
+    pub error: String,
 }
+
+impl<T: Default> ServiceResponse<T> {
+    pub fn from_error(code: u64, error: String) -> Self {
+        Self {
+            code,
+            data: T::default(),
+            error,
+        }
+    }
+
+    pub fn from_data(data: T) -> Self {
+        Self {
+            code: 0,
+            data,
+            error: "".to_owned(),
+        }
+    }
+}
+
+impl<T: Default + PartialEq> PartialEq for ServiceResponse<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.code == other.code && self.data == other.data && self.error == other.error
+    }
+}
+
+impl<T: Default + Eq> Eq for ServiceResponse<T> {}
 
 pub trait ExecutorFactory<DB: cita_trie::DB, S: Storage, Mapping: ServiceMapping>:
     Send + Sync
@@ -52,24 +81,24 @@ pub trait Executor {
         caller: &Address,
         cycles_price: u64,
         request: &TransactionRequest,
-    ) -> ProtocolResult<ExecResp>;
+    ) -> ProtocolResult<ServiceResponse<String>>;
 }
 
 // `Dispatcher` provides ability to send a call message to other services
 pub trait Dispatcher {
-    fn read(&self, context: ServiceContext) -> ProtocolResult<ExecResp>;
+    fn read(&self, context: ServiceContext) -> ServiceResponse<String>;
 
-    fn write(&self, context: ServiceContext) -> ProtocolResult<ExecResp>;
+    fn write(&self, context: ServiceContext) -> ServiceResponse<String>;
 }
 
 pub struct NoopDispatcher;
 
 impl Dispatcher for NoopDispatcher {
-    fn read(&self, _context: ServiceContext) -> ProtocolResult<ExecResp> {
+    fn read(&self, _context: ServiceContext) -> ServiceResponse<String> {
         unimplemented!()
     }
 
-    fn write(&self, _context: ServiceContext) -> ProtocolResult<ExecResp> {
+    fn write(&self, _context: ServiceContext) -> ServiceResponse<String> {
         unimplemented!()
     }
 }

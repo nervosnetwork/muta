@@ -6,6 +6,7 @@ use prost::Message;
 use crate::{
     codec::{primitive::Hash, CodecError, ProtocolCodecSync},
     field, impl_default_bytes_codec_for,
+    traits::ServiceResponse,
     types::primitive as protocol_primitive,
     types::receipt as protocol_receipt,
     ProtocolError, ProtocolResult,
@@ -44,11 +45,14 @@ pub struct ReceiptResponse {
     #[prost(bytes, tag = "2")]
     pub method: Vec<u8>,
 
-    #[prost(bytes, tag = "3")]
-    pub ret: Vec<u8>,
+    #[prost(uint64, tag = "3")]
+    pub code: u64,
 
-    #[prost(bool, tag = "4")]
-    pub is_error: bool,
+    #[prost(bytes, tag = "4")]
+    pub data: Vec<u8>,
+
+    #[prost(bytes, tag = "5")]
+    pub error: Vec<u8>,
 }
 
 #[derive(Clone, Message)]
@@ -71,8 +75,9 @@ impl From<receipt::ReceiptResponse> for ReceiptResponse {
         ReceiptResponse {
             service_name: response.service_name.as_bytes().to_vec(),
             method:       response.method.as_bytes().to_vec(),
-            ret:          response.ret.as_bytes().to_vec(),
-            is_error:     response.is_error,
+            code:         response.response.code,
+            data:         response.response.data.as_bytes().to_vec(),
+            error:        response.response.error.as_bytes().to_vec(),
         }
     }
 }
@@ -85,8 +90,11 @@ impl TryFrom<ReceiptResponse> for receipt::ReceiptResponse {
             service_name: String::from_utf8(response.service_name)
                 .map_err(CodecError::FromStringUtf8)?,
             method:       String::from_utf8(response.method).map_err(CodecError::FromStringUtf8)?,
-            ret:          String::from_utf8(response.ret).map_err(CodecError::FromStringUtf8)?,
-            is_error:     response.is_error,
+            response:     ServiceResponse {
+                code:  response.code,
+                data:  String::from_utf8(response.data).map_err(CodecError::FromStringUtf8)?,
+                error: String::from_utf8(response.error).map_err(CodecError::FromStringUtf8)?,
+            },
         })
     }
 }

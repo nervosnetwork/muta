@@ -8,7 +8,7 @@ use bytes::Bytes;
 use protocol::fixed_codec::FixedCodec;
 use protocol::traits::{ServiceState, StoreMap};
 use protocol::types::Hash;
-use protocol::ProtocolResult;
+use protocol::{ProtocolError, ProtocolResult};
 
 use crate::binding::store::{FixedKeys, StoreError};
 
@@ -19,7 +19,9 @@ pub struct DefaultStoreMap<S: ServiceState, K: FixedCodec + PartialEq, V: FixedC
     phantom:  PhantomData<V>,
 }
 
-impl<S: ServiceState, K: FixedCodec + PartialEq, V: FixedCodec> DefaultStoreMap<S, K, V> {
+impl<S: 'static + ServiceState, K: 'static + FixedCodec + PartialEq, V: 'static + FixedCodec>
+    DefaultStoreMap<S, K, V>
+{
     pub fn new(state: Rc<RefCell<S>>, name: &str) -> Self {
         let var_name = Hash::digest(Bytes::from(name.to_owned() + "map"));
 
@@ -48,33 +50,29 @@ impl<S: ServiceState, K: FixedCodec + PartialEq, V: FixedCodec> DefaultStoreMap<
 
         Ok(Hash::digest(Bytes::from(name_bytes)))
     }
-}
 
-impl<S: 'static + ServiceState, K: 'static + FixedCodec + PartialEq, V: 'static + FixedCodec>
-    StoreMap<K, V> for DefaultStoreMap<S, K, V>
-{
-    fn get(&self, key: &K) -> ProtocolResult<V> {
+    fn get_(&self, key: &K) -> ProtocolResult<Option<V>> {
         if self.keys.inner.contains(key) {
             let mk = self.get_map_key(key)?;
             self.state.borrow().get(&mk)?.map_or_else(
-                || <_>::decode_fixed(Bytes::new()).map_err(|_| StoreError::DecodeError.into()),
-                Ok,
+                || {
+                    Ok(Some(<_>::decode_fixed(Bytes::new()).map_err(|_| {
+                        ProtocolError::from(StoreError::DecodeError)
+                    })?))
+                },
+                |v| Ok(Some(v)),
             )
         } else {
-            Err(StoreError::GetNone.into())
+            Ok(None)
         }
-    }
-
-    fn contains(&self, key: &K) -> ProtocolResult<bool> {
-        Ok(self.keys.inner.contains(key))
     }
 
     // TODO(@zhounan): Atomicity of insert(k, v) and insert self.keys to
     // ServiceState is not guaranteed for now That must be settled soon after.
-    fn insert(&mut self, key: K, value: V) -> ProtocolResult<()> {
+    fn insert_(&mut self, key: K, value: V) -> ProtocolResult<()> {
         let mk = self.get_map_key(&key)?;
 
-        if !self.contains(&key)? {
+        if !self.contains(&key) {
             self.keys.inner.push(key);
             self.state
                 .borrow_mut()
@@ -86,8 +84,9 @@ impl<S: 'static + ServiceState, K: 'static + FixedCodec + PartialEq, V: 'static 
 
     // TODO(@zhounan): Atomicity of insert(k, v) and insert self.keys to
     // ServiceState is not guaranteed for now That must be settled soon after.
-    fn remove(&mut self, key: &K) -> ProtocolResult<()> {
-        if self.contains(key)? {
+    fn remove_(&mut self, key: &K) -> ProtocolResult<Option<V>> {
+        if self.contains(key) {
+            let value: V = self.get_(key)?.expect("value should be existed");
             self.keys.inner.remove_item(key);
             self.state
                 .borrow_mut()
@@ -95,21 +94,46 @@ impl<S: 'static + ServiceState, K: 'static + FixedCodec + PartialEq, V: 'static 
 
             self.state
                 .borrow_mut()
-                .insert(self.get_map_key(key)?, Bytes::new())
+                .insert(self.get_map_key(key)?, Bytes::new());
+
+            Ok(Some(value))
         } else {
-            Err(StoreError::GetNone.into())
+            Ok(None)
         }
     }
+}
 
-    fn len(&self) -> ProtocolResult<u32> {
-        Ok(self.keys.inner.len() as u32)
+impl<S: 'static + ServiceState, K: 'static + FixedCodec + PartialEq, V: 'static + FixedCodec>
+    StoreMap<K, V> for DefaultStoreMap<S, K, V>
+{
+    fn get(&self, key: &K) -> Option<V> {
+        self.get_(key)
+            .unwrap_or_else(|e| panic!("StoreMap get failed: {}", e))
     }
 
-    fn is_empty(&self) -> ProtocolResult<bool> {
-        if let 0 = self.len()? {
-            Ok(true)
+    fn insert(&mut self, key: K, value: V) {
+        self.insert_(key, value)
+            .unwrap_or_else(|e| panic!("StoreMap insert failed: {}", e));
+    }
+
+    fn remove(&mut self, key: &K) -> Option<V> {
+        self.remove_(key)
+            .unwrap_or_else(|e| panic!("StoreMap remove failed: {}", e))
+    }
+
+    fn contains(&self, key: &K) -> bool {
+        self.keys.inner.contains(key)
+    }
+
+    fn len(&self) -> u32 {
+        self.keys.inner.len() as u32
+    }
+
+    fn is_empty(&self) -> bool {
+        if let 0 = self.len() {
+            true
         } else {
-            Ok(false)
+            false
         }
     }
 
@@ -150,7 +174,7 @@ impl<
     type Item = (&'a K, V);
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.idx < self.map.len().expect("get len should not fail") {
+        if self.idx < self.map.len() {
             let key = self
                 .map
                 .keys

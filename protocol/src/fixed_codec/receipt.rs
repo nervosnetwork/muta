@@ -1,7 +1,7 @@
 use crate::fixed_codec::{FixedCodec, FixedCodecError};
+use crate::traits::ServiceResponse;
 use crate::types::receipt::{Event, Receipt, ReceiptResponse};
 use crate::{impl_default_fixed_codec_for, ProtocolResult};
-
 // Impl FixedCodec trait for types
 impl_default_fixed_codec_for!(receipt, [Receipt, ReceiptResponse]);
 
@@ -47,29 +47,30 @@ impl rlp::Decodable for Receipt {
 impl rlp::Encodable for ReceiptResponse {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
         s.begin_list(5)
-            .append(&self.is_error)
+            .append(&self.response.code)
+            .append(&self.response.data)
+            .append(&self.response.error)
             .append(&self.method)
-            .append(&self.ret)
             .append(&self.service_name);
     }
 }
 
 impl rlp::Decodable for ReceiptResponse {
     fn decode(r: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
-        if !r.is_list() && r.size() != 4 {
+        if !r.is_list() && r.size() != 5 {
             return Err(rlp::DecoderError::RlpIncorrectListLen);
         }
 
-        let is_error = r.at(0)?.as_val()?;
-        let method = r.at(1)?.as_val()?;
-        let ret = r.at(2)?.as_val()?;
-        let service_name = r.at(3)?.as_val()?;
+        let code = r.at(0)?.as_val()?;
+        let data = r.at(1)?.as_val()?;
+        let error = r.at(2)?.as_val()?;
+        let method = r.at(3)?.as_val()?;
+        let service_name = r.at(4)?.as_val()?;
 
         Ok(ReceiptResponse {
-            is_error,
-            method,
-            ret,
             service_name,
+            method,
+            response: ServiceResponse { code, data, error },
         })
     }
 }

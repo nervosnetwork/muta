@@ -19,8 +19,8 @@ use protocol::traits::{APIAdapter, Context};
 
 use crate::config::GraphQLConfig;
 use crate::schema::{
-    to_signed_transaction, to_transaction, Address, Block, Bytes, ExecResp, Hash,
-    InputRawTransaction, InputTransactionEncryption, Receipt, SignedTransaction, Uint64,
+    to_signed_transaction, to_transaction, Address, Block, Bytes, Hash, InputRawTransaction,
+    InputTransactionEncryption, Receipt, ServiceResponse, SignedTransaction, Uint64,
 };
 
 lazy_static! {
@@ -94,7 +94,7 @@ impl Query {
         service_name: String,
         method: String,
         payload: String,
-    ) -> FieldResult<ExecResp> {
+    ) -> FieldResult<ServiceResponse> {
         let height = match height {
             Some(id) => id.try_into_u64()?,
             None => {
@@ -128,7 +128,7 @@ impl Query {
                 payload,
             )
             .await?;
-        Ok(ExecResp::from(exec_resp))
+        Ok(ServiceResponse::from(exec_resp))
     }
 }
 

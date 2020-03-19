@@ -27,10 +27,8 @@ use crate::service::gen_service_code;
 ///     #[genesis]
 ///     fn init_genesis(
 ///         &mut self,
-///     ) -> ProtocolResult<()> {
+///     ) {
 ///         do_work();
-///
-///         Ok(()))
 ///     }
 /// }
 /// ```
@@ -45,10 +43,8 @@ use crate::service::gen_service_code;
 ///     fn init_genesis(
 ///         &mut self,
 ///         payload: PayloadType,
-///     ) -> ProtocolResult<()> {
+///     ) {
 ///         do_work(payload);
-///
-///         Ok(()))
 ///     }
 /// }
 /// ```
@@ -77,7 +73,7 @@ pub fn tx_hook_after(_: TokenStream, item: TokenStream) -> TokenStream {
 ///  1. Is it a struct method marked with #[service]?
 ///  2. Is visibility private?
 ///  3. Parameter signature contains `&self and ctx: ServiceContext`?
-///  4. Is the return value `ProtocolResult <T: Deserialize + Serialize>` or `ProtocolResult <()>`?
+///  4. Is the return value `ServiceResponse<T>`?
 ///
 /// # Example:
 ///
@@ -89,8 +85,8 @@ pub fn tx_hook_after(_: TokenStream, item: TokenStream) -> TokenStream {
 ///     fn test_read_fn(
 ///         &self,
 ///         _ctx: ServiceContext,
-///     ) -> ProtocolResult<String> {
-///         Ok("test read".to_owend())
+///     ) -> ServiceResponse<String> {
+///         ServiceResponse::<String>::from_data("ok".to_owned())
 ///     }
 /// }
 /// ```
@@ -110,7 +106,7 @@ pub fn read(_: TokenStream, item: TokenStream) -> TokenStream {
 ///  1. Is it a struct method marked with #[service]?
 ///  2. Is visibility private?
 ///  3. Parameter signature contains `&self and ctx: ServiceContext`?
-///  4. Is the return value `ProtocolResult <T: Deserialize + Serialize>` or `ProtocolResult <()>`?
+///  4. Is the return value `ServiceResponse<T>`?
 ///
 /// # Example:
 ///
@@ -122,8 +118,8 @@ pub fn read(_: TokenStream, item: TokenStream) -> TokenStream {
 ///     fn test_write_fn(
 ///         &mut self,
 ///         _ctx: ServiceContext,
-///     ) -> ProtocolResult<String> {
-///         Ok("test write".to_owned())
+///     ) -> ServiceResponse<String> {
+///         ServiceResponse::<String>::from_data("ok".to_owned())
 ///     }
 /// }
 /// ```

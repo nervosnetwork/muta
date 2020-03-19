@@ -40,10 +40,8 @@ impl<S: ServiceState, E: FixedCodec> DefaultStoreArray<S, E> {
             phantom: PhantomData,
         }
     }
-}
 
-impl<S: ServiceState, E: FixedCodec> StoreArray<E> for DefaultStoreArray<S, E> {
-    fn get(&self, index: u32) -> ProtocolResult<E> {
+    fn get_(&self, index: u32) -> ProtocolResult<E> {
         if let Some(k) = self.keys.inner.get(index as usize) {
             self.state.borrow().get(k)?.map_or_else(
                 || <_>::decode_fixed(Bytes::new()).map_err(|_| StoreError::DecodeError.into()),
@@ -56,7 +54,7 @@ impl<S: ServiceState, E: FixedCodec> StoreArray<E> for DefaultStoreArray<S, E> {
 
     // TODO(@zhounan): Atomicity of insert(k, v) and insert self.keys to
     // ServiceState is not guaranteed for now That must be settled soon after.
-    fn push(&mut self, elm: E) -> ProtocolResult<()> {
+    fn push_(&mut self, elm: E) -> ProtocolResult<()> {
         let key = Hash::digest(elm.encode_fixed()?);
 
         self.keys.inner.push(key.clone());
@@ -69,7 +67,7 @@ impl<S: ServiceState, E: FixedCodec> StoreArray<E> for DefaultStoreArray<S, E> {
 
     // TODO(@zhounan): Atomicity of insert(k, v) and insert self.keys to
     // ServiceState is not guaranteed for now That must be settled soon after.
-    fn remove(&mut self, index: u32) -> ProtocolResult<()> {
+    fn remove_(&mut self, index: u32) -> ProtocolResult<()> {
         let key = self.keys.inner.remove(index as usize);
         self.state
             .borrow_mut()
@@ -77,16 +75,33 @@ impl<S: ServiceState, E: FixedCodec> StoreArray<E> for DefaultStoreArray<S, E> {
 
         self.state.borrow_mut().insert(key, Bytes::new())
     }
+}
 
-    fn len(&self) -> ProtocolResult<u32> {
-        Ok(self.keys.inner.len() as u32)
+impl<S: ServiceState, E: FixedCodec> StoreArray<E> for DefaultStoreArray<S, E> {
+    fn get(&self, index: u32) -> E {
+        self.get_(index)
+            .unwrap_or_else(|e| panic!("StoreArray get value failed: {}", e))
     }
 
-    fn is_empty(&self) -> ProtocolResult<bool> {
-        if let 0 = self.len()? {
-            Ok(true)
+    fn push(&mut self, elm: E) {
+        self.push_(elm)
+            .unwrap_or_else(|e| panic!("StoreArray push value failed: {}", e));
+    }
+
+    fn remove(&mut self, index: u32) {
+        self.remove_(index)
+            .unwrap_or_else(|e| panic!("StoreArray remove value failed: {}", e));
+    }
+
+    fn len(&self) -> u32 {
+        self.keys.inner.len() as u32
+    }
+
+    fn is_empty(&self) -> bool {
+        if let 0 = self.len() {
+            true
         } else {
-            Ok(false)
+            false
         }
     }
 
@@ -115,11 +130,8 @@ impl<'a, E: FixedCodec, A: StoreArray<E>> Iterator for ArrayIter<'a, E, A> {
     type Item = (u32, E);
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.idx < self.array.len().expect("get len should not fail") {
-            let ele = self
-                .array
-                .get(self.idx)
-                .expect("iter get element should not fail");
+        if self.idx < self.array.len() {
+            let ele = self.array.get(self.idx);
             self.idx += 1;
             Some((self.idx - 1, ele))
         } else {

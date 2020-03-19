@@ -236,7 +236,8 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         )
         .await?;
 
-    let metadata: Metadata = serde_json::from_str(&exec_resp.ret).expect("Decode metadata failed!");
+    let metadata: Metadata =
+        serde_json::from_str(&exec_resp.data).expect("Decode metadata failed!");
 
     // set args in mempool
     mempool.set_args(
