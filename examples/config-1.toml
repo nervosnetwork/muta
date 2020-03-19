@@ -28,3 +28,6 @@ log_to_console = true
 filter = "info"
 log_to_file = true
 console_show_file_and_line = false
+
+[rocksdb]
+max_open_files = 64
