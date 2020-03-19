@@ -31,3 +31,6 @@ console_show_file_and_line = false
 log_path = "/app/devtools/chain/data/logs"
 log_to_file = true
 metrics = true
+
+[rocksdb]
+max_open_files = 64

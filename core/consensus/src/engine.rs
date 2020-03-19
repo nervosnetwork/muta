@@ -2,10 +2,11 @@ use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
 use std::error::Error;
 use std::sync::Arc;
-use std::time::{Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use async_trait::async_trait;
 use futures::lock::Mutex;
+use futures_timer::Delay;
 use log::error;
 use moodyblues_sdk::trace;
 use overlord::types::{Commit, Node, OverlordMsg, Status};
@@ -34,6 +35,8 @@ use crate::status::StatusAgent;
 use crate::util::{check_list_roots, OverlordCrypto};
 use crate::wal::SignedTxsWAL;
 use crate::ConsensusError;
+
+const RETRY_COMMIT_INTERVAL: u64 = 1000;
 
 /// validator is for create new block, and authority is for build overlord
 /// status.
@@ -279,15 +282,24 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         };
 
         // Execute transactions
-        self.exec(
-            pill.block.header.order_root.clone(),
-            current_height,
-            pill.block.header.proposer.clone(),
-            pill.block.header.timestamp,
-            Hash::digest(pill.block.encode_fixed()?),
-            signed_txs.clone(),
-        )
-        .await?;
+        loop {
+            if self
+                .exec(
+                    pill.block.header.order_root.clone(),
+                    current_height,
+                    pill.block.header.proposer.clone(),
+                    pill.block.header.timestamp,
+                    Hash::digest(pill.block.encode_fixed()?),
+                    signed_txs.clone(),
+                )
+                .await
+                .is_ok()
+            {
+                break;
+            } else {
+                Delay::new(Duration::from_millis(RETRY_COMMIT_INTERVAL)).await;
+            }
+        }
 
         trace_block(&pill.block);
         let block_exec_height = pill.block.header.exec_height;

@@ -4,11 +4,11 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use async_trait::async_trait;
-use futures::channel::mpsc::{channel, Receiver, Sender};
-use futures::stream::StreamExt;
 use overlord::types::{Node, OverlordMsg, Vote, VoteType};
 use overlord::{extract_voters, Crypto, OverlordHandler};
 use parking_lot::RwLock;
+use tokio::sync::mpsc::error::TrySendError;
+use tokio::sync::mpsc::{channel, Receiver, Sender};
 
 use common_merkle::Merkle;
 use protocol::traits::{
@@ -139,8 +139,10 @@ where
         };
 
         let mut tx = self.exec_queue.clone();
-        tx.try_send(exec_info)
-            .map_err(|e| ConsensusError::ExecuteErr(e.to_string()))?;
+        tx.try_send(exec_info).map_err(|e| match e {
+            TrySendError::Closed(_) => panic!("exec queue dropped!"),
+            _ => ConsensusError::ExecuteErr(e.to_string()),
+        })?;
         Ok(())
     }
 
@@ -713,7 +715,7 @@ where
     }
 
     async fn process(&mut self) -> ProtocolResult<()> {
-        if let Some(info) = self.queue.next().await {
+        if let Some(info) = self.queue.recv().await {
             let height = info.height;
             let txs = info.signed_txs.clone();
             let order_root = info.order_root.clone();
