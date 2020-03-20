@@ -16,7 +16,6 @@ use futures::{
     channel::mpsc::UnboundedReceiver, channel::mpsc::UnboundedSender, pin_mut, stream::Stream,
 };
 use log::{debug, error};
-use protocol::traits::Priority;
 use tentacle::{
     builder::ServiceBuilder, error::Error as TentacleError, multiaddr::Multiaddr,
     secio::SecioKeyPair, service::Service,
@@ -25,7 +24,7 @@ use tentacle::{
 use crate::{
     error::NetworkError,
     event::{ConnectionEvent, PeerManagerEvent},
-    traits::NetworkProtocol,
+    traits::{NetworkProtocol, SessionBook},
 };
 
 pub struct ConnectionConfig {
@@ -115,13 +114,14 @@ impl<P: NetworkProtocol> ConnectionService<P> {
         Ok(())
     }
 
-    pub fn control(
+    pub fn control<B: SessionBook>(
         &self,
         mgr_tx: UnboundedSender<PeerManagerEvent>,
-    ) -> ConnectionServiceControl<P> {
+        book: B,
+    ) -> ConnectionServiceControl<P, B> {
         let control_ref = self.inner.control();
 
-        ConnectionServiceControl::new(control_ref.clone(), mgr_tx)
+        ConnectionServiceControl::new(control_ref.clone(), mgr_tx, book)
     }
 
     // NOTE: control.dial() and control.disconnect() both return same two
@@ -193,21 +193,6 @@ impl<P: NetworkProtocol> ConnectionService<P> {
                     let pending_disconnect = ConnectionEvent::Disconnect(sid);
 
                     self.pending_events.push_back(pending_disconnect);
-                }
-            }
-
-            ConnectionEvent::SendMsg { tar, msg, pri } => {
-                let proto_id = P::message_proto_id();
-                let tar2 = tar.clone();
-                let msg2 = msg.clone();
-
-                if let Err(()) = match pri {
-                    Priority::High => try_do!(control.quick_filter_broadcast(tar2, proto_id, msg2)),
-                    Priority::Normal => try_do!(control.filter_broadcast(tar2, proto_id, msg2)),
-                } {
-                    let pending_send_msg = ConnectionEvent::SendMsg { tar, msg, pri };
-
-                    self.pending_events.push_back(pending_send_msg);
                 }
             }
         }

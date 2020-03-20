@@ -1,18 +1,25 @@
 use std::{
+    borrow::Cow,
     future::Future,
-    net::SocketAddr,
+    net::{IpAddr, SocketAddr, ToSocketAddrs},
     ops::Add,
     pin::Pin,
     sync::Arc,
     task::{Context, Poll},
     time::{Duration, Instant},
+    vec::IntoIter,
 };
 
 use derive_more::Display;
 use futures::{pin_mut, task::AtomicWaker};
 use futures_timer::Delay;
 use serde_derive::{Deserialize, Serialize};
-use tentacle::multiaddr::{Multiaddr, Protocol};
+use tentacle::{
+    multiaddr::{Multiaddr, Protocol},
+    secio::PeerId,
+};
+
+use crate::traits::MultiaddrExt;
 
 #[macro_export]
 macro_rules! loop_ready {
@@ -42,6 +49,86 @@ pub fn socket_to_multi_addr(socket_addr: SocketAddr) -> Multiaddr {
     multi_addr.push(Protocol::TCP(socket_addr.port()));
 
     multi_addr
+}
+
+pub fn multiaddr_to_socket(multiaddr: &Multiaddr) -> Option<SocketAddr> {
+    let mut extract_ip = None;
+    let mut extract_port = 0u16;
+
+    for proto in multiaddr.iter() {
+        match proto {
+            Protocol::IP4(ip) => extract_ip = Some(IpAddr::V4(ip)),
+            Protocol::IP6(ip) => extract_ip = Some(IpAddr::V6(ip)),
+            Protocol::TCP(port) => extract_port = port,
+            _ => (),
+        }
+    }
+
+    if let Some(ip) = extract_ip {
+        Some(SocketAddr::new(ip, extract_port))
+    } else {
+        None
+    }
+}
+
+pub fn resolve_if_unspecified(multiaddr: &Multiaddr) -> Result<Multiaddr, ()> {
+    let match_socket = |iter: IntoIter<SocketAddr>, be_v4: bool| -> Option<SocketAddr> {
+        for socket in iter {
+            match socket {
+                SocketAddr::V4(_) if be_v4 => {
+                    return Some(socket);
+                }
+                SocketAddr::V6(_) if !be_v4 => {
+                    return Some(socket);
+                }
+                _ => (),
+            }
+        }
+        None
+    };
+
+    let sock = multiaddr_to_socket(&multiaddr).ok_or(())?;
+    if !sock.ip().is_unspecified() {
+        return Err(());
+    }
+
+    let peer_id = multiaddr.id_bytes().clone().ok_or(())?;
+    let hs = hostname::get().map_err(|_| ())?;
+
+    let hostname_port = hs
+        .to_str()
+        .map(|s| format!("{}:{}", s, sock.port()))
+        .ok_or(())?;
+
+    let socks_iter = hostname_port.to_socket_addrs().map_err(|_| ())?;
+    let socket = match_socket(socks_iter, sock.ip().is_ipv4()).ok_or_else(|| ())?;
+
+    let mut resolved_addr = socket_to_multi_addr(socket);
+    resolved_addr.push(Protocol::P2P(peer_id));
+    Ok(resolved_addr)
+}
+
+impl MultiaddrExt for Multiaddr {
+    fn id_bytes(&self) -> Option<Cow<'_, [u8]>> {
+        for proto in self.iter() {
+            if let Protocol::P2P(bytes) = proto {
+                return Some(bytes);
+            }
+        }
+
+        None
+    }
+
+    fn has_id(&self) -> bool {
+        self.iter().any(|proto| match proto {
+            Protocol::P2P(_) => true,
+            _ => false,
+        })
+    }
+
+    fn push_id(&mut self, peer_id: PeerId) {
+        self.push(Protocol::P2P(Cow::Owned(peer_id.as_bytes().to_vec())))
+    }
 }
 
 pub struct HeartBeat {

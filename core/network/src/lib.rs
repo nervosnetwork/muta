@@ -14,6 +14,8 @@ mod rpc;
 mod rpc_map;
 mod selfcheck;
 mod service;
+#[cfg(test)]
+mod test;
 mod traits;
 
 pub use config::NetworkConfig;

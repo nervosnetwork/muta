@@ -6,7 +6,8 @@ use std::{
     time::Duration,
 };
 
-use protocol::ProtocolResult;
+use log::error;
+use protocol::{types::Address, ProtocolResult};
 use tentacle::{
     multiaddr::{multiaddr, Multiaddr, Protocol},
     secio::{PublicKey, SecioKeyPair},
@@ -16,8 +17,9 @@ use crate::{
     common::socket_to_multi_addr,
     connection::ConnectionConfig,
     error::NetworkError,
-    peer_manager::{Peer, PeerManagerConfig},
+    peer_manager::{ArcPeer, PeerManagerConfig, SharedSessionsConfig},
     selfcheck::SelfCheckConfig,
+    traits::MultiaddrExt,
 };
 
 // TODO: 0.0.0.0 expose? 127.0.0.1 doesn't work because of tentacle-discovery.
@@ -38,7 +40,7 @@ pub const DEFAULT_WRITE_TIMEOUT: u64 = 10; // seconds
 // Default peer data persistent path
 pub const DEFAULT_PEER_FILE_NAME: &str = "peers";
 pub const DEFAULT_PEER_FILE_EXT: &str = "dat";
-pub const DEFAULT_PEER_PERSISTENCE_PATH: &str = "./peers.dat";
+pub const DEFAULT_PEER_DAT_FILE: &str = "./peers.dat";
 
 pub const DEFAULT_PING_INTERVAL: u64 = 15;
 pub const DEFAULT_PING_TIMEOUT: u64 = 30;
@@ -50,7 +52,7 @@ pub const DEFAULT_SELF_HEART_BEAT_INTERVAL: u64 = 35;
 pub const DEFAULT_RPC_TIMEOUT: u64 = 10;
 
 // Selfcheck
-pub const DEFAULT_SELF_CHECK_INTERVAL: u64 = 10;
+pub const DEFAULT_SELF_CHECK_INTERVAL: u64 = 30;
 
 pub type PublicKeyHexStr = String;
 pub type PrivateKeyHexStr = String;
@@ -104,9 +106,11 @@ pub struct NetworkConfig {
     pub write_timeout:    u64,
 
     // peer manager
-    pub bootstraps:         Vec<Peer>,
-    pub enable_persistence: bool,
-    pub persistence_path:   PathBuf,
+    pub bootstraps:           Vec<ArcPeer>,
+    pub whitelist:            Vec<Address>,
+    pub whitelist_peers_only: bool,
+    pub enable_save_restore:  bool,
+    pub peer_dat_file:        PathBuf,
 
     // identity and encryption
     pub secio_keypair: SecioKeyPair,
@@ -144,9 +148,11 @@ impl NetworkConfig {
             max_wait_streams: DEFAULT_MAX_WAIT_STREAMS,
             write_timeout:    DEFAULT_WRITE_TIMEOUT,
 
-            bootstraps:         Default::default(),
-            enable_persistence: false,
-            persistence_path:   PathBuf::from(DEFAULT_PEER_PERSISTENCE_PATH.to_owned()),
+            bootstraps:           Default::default(),
+            whitelist:            Default::default(),
+            whitelist_peers_only: false,
+            enable_save_restore:  false,
+            peer_dat_file:        PathBuf::from(DEFAULT_PEER_DAT_FILE.to_owned()),
 
             secio_keypair: SecioKeyPair::secp256k1_generated(),
 
@@ -163,8 +169,10 @@ impl NetworkConfig {
         }
     }
 
-    pub fn max_connections(mut self, max: usize) -> Self {
-        self.max_connections = max;
+    pub fn max_connections(mut self, max: Option<usize>) -> Self {
+        if let Some(max) = max {
+            self.max_connections = max;
+        }
 
         self
     }
@@ -209,7 +217,6 @@ impl NetworkConfig {
         self
     }
 
-    // TODO: Remove explicit secp256k1
     pub fn bootstraps(
         mut self,
         pairs: Vec<(PublicKeyHexStr, PeerAddrStr)>,
@@ -218,10 +225,23 @@ impl NetworkConfig {
             let pk = hex::decode(pk_hex)
                 .map(PublicKey::Secp256k1)
                 .map_err(|_| NetworkError::InvalidPublicKey)?;
+            let peer_id = pk.peer_id();
 
-            let multi_addr = Self::parse_peer_addr(peer_addr)?;
+            let mut multiaddr = Self::parse_peer_addr(peer_addr)?;
+            let peer = ArcPeer::from_pubkey(pk).map_err(NetworkError::from)?;
 
-            Ok(Peer::from_pair((pk, multi_addr)))
+            if let Some(id_bytes) = multiaddr.id_bytes() {
+                if id_bytes != peer_id.as_bytes() {
+                    error!("network: pubkey doesn't match peer id in {}", multiaddr);
+                    return Ok(peer);
+                }
+            }
+            if !multiaddr.has_id() {
+                multiaddr.push_id(peer_id);
+            }
+
+            peer.multiaddrs.insert_raw(multiaddr);
+            Ok(peer)
         };
 
         let bootstrap_peers = pairs
@@ -233,12 +253,29 @@ impl NetworkConfig {
         Ok(self)
     }
 
-    pub fn persistence_path<P: AsRef<Path>>(mut self, path: P) -> Self {
+    pub fn whitelist(mut self, chain_addr_strs: Vec<String>) -> ProtocolResult<Self> {
+        let chain_addrs = chain_addr_strs
+            .into_iter()
+            .map(|s| Address::from_hex(&s))
+            .collect::<ProtocolResult<Vec<_>>>()?;
+
+        self.whitelist = chain_addrs;
+        Ok(self)
+    }
+
+    pub fn whitelist_peers_only(mut self, flag: Option<bool>) -> Self {
+        if let Some(flag) = flag {
+            self.whitelist_peers_only = flag;
+        }
+        self
+    }
+
+    pub fn peer_dat_file<P: AsRef<Path>>(mut self, path: P) -> Self {
         let mut path = path.as_ref().to_owned();
         path.push(DEFAULT_PEER_FILE_NAME);
         path.set_extension(DEFAULT_PEER_FILE_EXT);
 
-        self.persistence_path = path;
+        self.peer_dat_file = path;
 
         self
     }
@@ -334,12 +371,14 @@ impl From<&NetworkConfig> for ConnectionConfig {
 impl From<&NetworkConfig> for PeerManagerConfig {
     fn from(config: &NetworkConfig) -> PeerManagerConfig {
         PeerManagerConfig {
-            our_id:           config.secio_keypair.peer_id(),
-            pubkey:           config.secio_keypair.public_key(),
-            bootstraps:       config.bootstraps.clone(),
-            max_connections:  config.max_connections,
-            routine_interval: config.peer_manager_heart_beat_interval,
-            persistence_path: config.persistence_path.clone(),
+            our_id:                   config.secio_keypair.peer_id(),
+            pubkey:                   config.secio_keypair.public_key(),
+            bootstraps:               config.bootstraps.clone(),
+            whitelist_by_chain_addrs: config.whitelist.clone(),
+            whitelist_peers_only:     config.whitelist_peers_only,
+            max_connections:          config.max_connections,
+            routine_interval:         config.peer_manager_heart_beat_interval,
+            peer_dat_file:            config.peer_dat_file.clone(),
         }
     }
 }
@@ -361,6 +400,16 @@ impl From<&NetworkConfig> for SelfCheckConfig {
     fn from(config: &NetworkConfig) -> SelfCheckConfig {
         SelfCheckConfig {
             interval: config.selfcheck_interval,
+        }
+    }
+}
+
+// TODO: checkout max_frame_length
+impl From<&NetworkConfig> for SharedSessionsConfig {
+    fn from(config: &NetworkConfig) -> Self {
+        SharedSessionsConfig {
+            write_timeout:          config.write_timeout,
+            max_stream_window_size: config.max_frame_length,
         }
     }
 }

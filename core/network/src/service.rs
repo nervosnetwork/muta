@@ -32,7 +32,7 @@ use crate::{
     message::RawSessionMessage,
     outbound::{NetworkGossip, NetworkRpc},
     peer_manager::{
-        DiscoveryAddrManager, IdentifyCallback, PeerManager, PeerManagerConfig, PeerManagerHandle,
+        DiscoveryAddrManager, IdentifyCallback, PeerManager, PeerManagerConfig, SharedSessions,
     },
     protocols::CoreProtocol,
     reactor::{MessageRouter, Reactor},
@@ -43,8 +43,8 @@ use crate::{
 
 #[derive(Clone)]
 pub struct NetworkServiceHandle {
-    gossip: NetworkGossip<ConnectionServiceControl<CoreProtocol>, Snappy>,
-    rpc:    NetworkRpc<ConnectionServiceControl<CoreProtocol>, Snappy>,
+    gossip: NetworkGossip<ConnectionServiceControl<CoreProtocol, SharedSessions>, Snappy>,
+    rpc:    NetworkRpc<ConnectionServiceControl<CoreProtocol, SharedSessions>, Snappy>,
 }
 
 #[async_trait]
@@ -114,17 +114,17 @@ pub struct NetworkService {
     config: NetworkConfig,
 
     // Public service components
-    gossip:  NetworkGossip<ConnectionServiceControl<CoreProtocol>, Snappy>,
-    rpc:     NetworkRpc<ConnectionServiceControl<CoreProtocol>, Snappy>,
+    gossip:  NetworkGossip<ConnectionServiceControl<CoreProtocol, SharedSessions>, Snappy>,
+    rpc:     NetworkRpc<ConnectionServiceControl<CoreProtocol, SharedSessions>, Snappy>,
     rpc_map: Arc<RpcMap>,
 
     // Core service
     net_conn_srv: Option<NetworkConnectionService>,
     peer_mgr:     Option<PeerManager>,
-    router:       Option<MessageRouter<Snappy, PeerManagerHandle>>,
+    router:       Option<MessageRouter<Snappy, SharedSessions>>,
 
     // Self check
-    selfcheck: Option<SelfCheck<PeerManagerHandle>>,
+    selfcheck: Option<SelfCheck<SharedSessions>>,
 }
 
 impl NetworkService {
@@ -143,12 +143,13 @@ impl NetworkService {
         // Build peer manager
         let mut peer_mgr = PeerManager::new(mgr_config, mgr_rx, conn_tx.clone());
         let peer_mgr_handle = peer_mgr.handle();
+        let session_book = peer_mgr.share_session_book((&config).into());
 
-        if config.enable_persistence {
-            peer_mgr.enable_persistence();
+        if config.enable_save_restore {
+            peer_mgr.enable_save_restore();
         }
 
-        if let Err(err) = peer_mgr.load_peers() {
+        if let Err(err) = peer_mgr.restore_peers() {
             error!("network: peer manager: load peers failure: {}", err);
         }
 
@@ -159,7 +160,7 @@ impl NetworkService {
         // Build service protocol
         let disc_sync_interval = config.discovery_sync_interval;
         let disc_addr_mgr = DiscoveryAddrManager::new(peer_mgr_handle.clone(), mgr_tx.clone());
-        let ident_callback = IdentifyCallback::new(peer_mgr_handle.clone(), mgr_tx.clone());
+        let ident_callback = IdentifyCallback::new(peer_mgr_handle, mgr_tx.clone());
         let proto = CoreProtocol::build()
             .ping(config.ping_interval, config.ping_timeout, mgr_tx.clone())
             .identify(ident_callback)
@@ -170,17 +171,17 @@ impl NetworkService {
         // Build connection service
         let keeper = ConnectionServiceKeeper::new(mgr_tx.clone(), sys_tx.clone());
         let conn_srv = ConnectionService::<CoreProtocol>::new(proto, conn_config, keeper, conn_rx);
-        let conn_ctrl = conn_srv.control(mgr_tx.clone());
+        let conn_ctrl = conn_srv.control(mgr_tx.clone(), session_book.clone());
 
         // Build public service components
         let rpc_map = Arc::new(RpcMap::new());
         let gossip = NetworkGossip::new(conn_ctrl.clone(), Snappy);
         let rpc_map_clone = Arc::clone(&rpc_map);
         let rpc = NetworkRpc::new(conn_ctrl, Snappy, rpc_map_clone, (&config).into());
-        let router = MessageRouter::new(raw_msg_rx, Snappy, peer_mgr_handle.clone(), sys_tx);
+        let router = MessageRouter::new(raw_msg_rx, Snappy, session_book.clone(), sys_tx);
 
         // Build selfcheck service
-        let selfcheck = SelfCheck::new(peer_mgr_handle, (&config).into());
+        let selfcheck = SelfCheck::new(session_book, (&config).into());
 
         NetworkService {
             sys_rx,
@@ -270,13 +271,6 @@ impl NetworkService {
 
             conn_srv.listen(addr.clone()).await?;
 
-            // Update peer manager listen
-            if let Some(peer_mgr) = self.peer_mgr.take() {
-                peer_mgr.set_listen(addr);
-
-                self.peer_mgr = Some(peer_mgr);
-            }
-
             // Update service state
             if let Some(NetworkConnectionService::NoListen(conn_srv)) = self.net_conn_srv.take() {
                 self.net_conn_srv = Some(NetworkConnectionService::Ready(conn_srv));
@@ -331,10 +325,6 @@ impl Future for NetworkService {
         }
 
         if let Some(peer_mgr) = self.peer_mgr.take() {
-            if peer_mgr.listen().is_none() {
-                peer_mgr.set_listen(self.config.default_listen.clone());
-            }
-
             tokio::spawn(peer_mgr);
         }
 
