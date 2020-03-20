@@ -46,7 +46,7 @@ impl StatusAgent {
         let mut status = self.status.write();
         status.cycles_price = new_status.cycles_price;
         status.cycles_limit = new_status.cycles_limit;
-        status.current_height = new_status.current_height;
+        status.latest_committed_height = new_status.latest_committed_height;
         status.exec_height = new_status.exec_height;
         status.current_hash = new_status.current_hash;
         status.latest_committed_state_root = new_status.latest_committed_state_root;
@@ -67,8 +67,8 @@ impl StatusAgent {
 
 #[derive(Serialize, Deserialize, Clone, Debug, Display)]
 #[display(
-    fmt = "current_height {}, exec height {}, current_hash {:?}, latest_committed_state_root {:?} list state root {:?}, list receipt root {:?}, list confirm root {:?}, list cycle used {:?}, logs bloom {:?}",
-    current_height,
+    fmt = "latest_committed_height {}, exec height {}, current_hash {:?}, latest_committed_state_root {:?} list state root {:?}, list receipt root {:?}, list confirm root {:?}, list cycle used {:?}, logs bloom {:?}",
+    latest_committed_height,
     exec_height,
     current_hash,
     latest_committed_state_root,
@@ -81,7 +81,7 @@ impl StatusAgent {
 pub struct CurrentConsensusStatus {
     pub cycles_price:                u64, // metadata
     pub cycles_limit:                u64, // metadata
-    pub current_height:              u64, // latest consented height
+    pub latest_committed_height:     u64, // latest consented height
     pub exec_height:                 u64,
     pub current_hash:                Hash, // as same as block of current height
     pub latest_committed_state_root: MerkleRoot, // latest consented height
@@ -135,9 +135,9 @@ impl CurrentConsensusStatus {
     ) {
         self.set_metadata(metadata);
 
-        assert!(block.header.height == self.current_height + 1);
+        assert!(block.header.height == self.latest_committed_height + 1);
 
-        self.current_height = block.header.height;
+        self.latest_committed_height = block.header.height;
         self.current_hash = block_hash;
         self.current_proof = current_proof;
         self.latest_committed_state_root = block.header.state_root.clone();

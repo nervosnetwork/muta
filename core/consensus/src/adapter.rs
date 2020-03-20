@@ -1,4 +1,5 @@
 use std::boxed::Box;
+use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::sync::Arc;
 use std::time::Instant;
@@ -11,6 +12,7 @@ use tokio::sync::mpsc::error::TrySendError;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 
 use common_merkle::Merkle;
+
 use protocol::traits::{
     CommonConsensusAdapter, ConsensusAdapter, Context, ExecutorFactory, ExecutorParams,
     ExecutorResp, Gossip, MemPool, MessageTarget, MixedTxHashes, Priority, Rpc, ServiceMapping,
@@ -31,8 +33,9 @@ use crate::message::{
 };
 use crate::status::{ExecutedInfo, StatusAgent};
 use crate::util::{ExecuteInfo, OverlordCrypto};
-use crate::ConsensusError;
-use std::collections::HashMap;
+use crate::BlockHeaderField::{PreviousBlockHash, ProofHash, Proposer};
+use crate::BlockProofField::{BitMap, HashMismatch, HeightMismatch, Signature, WeightNotFound};
+use crate::{BlockHeaderField, BlockProofField, ConsensusError};
 
 const OVERLORD_GAP: usize = 10;
 
@@ -435,7 +438,7 @@ where
     }
 
     /// this function verify all info in header except proof and roots
-    async fn verify_block_header(&self, ctx: Context, block: &Block) -> ProtocolResult<()> {
+    async fn verify_block_header(&self, ctx: Context, block: Block) -> ProtocolResult<()> {
         let previous_block = self
             .get_block_by_height(ctx.clone(), block.header.height - 1)
             .await?;
@@ -443,13 +446,15 @@ where
         let previous_block_hash = Hash::digest(previous_block.encode_fixed()?);
 
         if previous_block_hash != block.header.pre_hash {
-            return Err(ConsensusError::VerifyBlockHeaderPreBlockHash(block.header.height).into());
+            return Err(
+                ConsensusError::VerifyBlockHeader(block.header.height, PreviousBlockHash).into(),
+            );
         }
 
         // the block 0 and 1 's proof is consensus-ed by community
         if block.header.height > 1u64 && block.header.pre_hash != block.header.proof.block_hash {
             log::error!("verifying_block : {:?}", block);
-            return Err(ConsensusError::VerifyBlockHeaderPreHash(block.header.height).into());
+            return Err(ConsensusError::VerifyBlockHeader(block.header.height, ProofHash).into());
         }
 
         // verify proposer and validators
@@ -478,21 +483,26 @@ where
         if block.header.height != 0
             && !authority_map.contains_key(&block.header.proposer.as_bytes())
         {
-            return Err(ConsensusError::VerifyBlockHeaderProposer(block.header.height).into());
+            return Err(ConsensusError::VerifyBlockHeader(block.header.height, Proposer).into());
         }
 
         // check validators
         for validator in block.header.validators.iter() {
             if !authority_map.contains_key(&validator.address.as_bytes()) {
-                return Err(ConsensusError::VerifyBlockHeaderValidator(block.header.height).into());
+                return Err(ConsensusError::VerifyBlockHeader(
+                    block.header.height,
+                    BlockHeaderField::Validator,
+                )
+                .into());
             } else {
                 let node = authority_map.get(&validator.address.as_bytes()).unwrap();
 
                 if node.vote_weight != validator.vote_weight
                     || node.propose_weight != validator.vote_weight
                 {
-                    return Err(ConsensusError::VerifyBlockHeaderValidatorWeight(
+                    return Err(ConsensusError::VerifyBlockHeader(
                         block.header.height,
+                        BlockHeaderField::Weight,
                     )
                     .into());
                 }
@@ -505,8 +515,8 @@ where
     async fn verify_proof(
         self: &Self,
         ctx: Context,
-        block: &Block,
-        proof: &Proof,
+        block: Block,
+        proof: Proof,
     ) -> ProtocolResult<()> {
         // the block 0 has no proof, which is consensus-ed by community, not by chain
 
@@ -515,9 +525,9 @@ where
         };
 
         if block.header.height != proof.height {
-            return Err(ConsensusError::VerifyBlockProofAndBlockHeightMismatch(
+            return Err(ConsensusError::VerifyProof(
                 block.header.height,
-                proof.height,
+                HeightMismatch(block.header.height, proof.height),
             )
             .into());
         }
@@ -525,7 +535,7 @@ where
         let blockhash = Hash::digest(block.clone().encode_fixed()?);
 
         if blockhash != proof.block_hash {
-            return Err(ConsensusError::VerifyBlockHashMismatch(block.header.height).into());
+            return Err(ConsensusError::VerifyProof(block.header.height, HashMismatch).into());
         }
 
         let metadata = self.get_metadata(
@@ -547,7 +557,7 @@ where
 
         let signed_voters = extract_voters(&mut authority_list, &proof.bitmap).map_err(|_| {
             log::error!("[consensus] extract_voters fails, bitmap error");
-            ConsensusError::VerifyBlockBitMap(block.header.height)
+            ConsensusError::VerifyProof(block.header.height, BitMap)
         })?;
 
         let vote_hash = self.crypto.hash(protocol::Bytes::from(rlp::encode(&Vote {
@@ -560,7 +570,7 @@ where
         self.verify_proof_signature(
             block.header.height,
             vote_hash,
-            proof.signature.clone(),
+            proof.signature,
             signed_voters.clone(),
         )?;
 
@@ -569,7 +579,7 @@ where
             .map(|node| (node.address.clone(), node.vote_weight))
             .collect::<HashMap<overlord::types::Address, u32>>();
 
-        self.verity_proof_weight(block.header.height, &weight_map, signed_voters)?;
+        self.verity_proof_weight(block.header.height, weight_map, signed_voters)?;
 
         Ok(())
     }
@@ -587,7 +597,7 @@ where
             .verify_aggregated_signature(aggregated_signature_bytes, vote_hash, signed_voters)
             .is_err()
         {
-            return Err(ConsensusError::VerifyBlockProof(block_height).into());
+            return Err(ConsensusError::VerifyProof(block_height, Signature).into());
         }
         Ok(())
     }
@@ -595,7 +605,7 @@ where
     fn verity_proof_weight(
         &self,
         block_height: u64,
-        weight_map: &HashMap<Bytes, u32>,
+        weight_map: HashMap<Bytes, u32>,
         signed_voters: Vec<Bytes>,
     ) -> ProtocolResult<()> {
         let total_validator_weight: u64 = weight_map.iter().map(|pair| u64::from(*pair.1)).sum();
@@ -603,14 +613,19 @@ where
         let mut accumulator = 0u64;
         for signed_voter_address in signed_voters {
             if weight_map.contains_key(signed_voter_address.as_ref()) {
-                accumulator += u64::from(*(weight_map.get(signed_voter_address.as_ref()).unwrap()));
+                let weight = weight_map
+                    .get(signed_voter_address.as_ref())
+                    .ok_or(ConsensusError::VerifyProof(block_height, WeightNotFound))?;
+                accumulator += u64::from(*(weight));
             } else {
-                return Err(ConsensusError::VerifyBlockProofVoter(block_height).into());
+                return Err(
+                    ConsensusError::VerifyProof(block_height, BlockProofField::Validator).into(),
+                );
             }
         }
 
         if 3 * accumulator <= 2 * total_validator_weight {
-            return Err(ConsensusError::VerifyBlockProofVoteWeight(block_height).into());
+            return Err(ConsensusError::VerifyProof(block_height, BlockProofField::Weight).into());
         }
         Ok(())
     }

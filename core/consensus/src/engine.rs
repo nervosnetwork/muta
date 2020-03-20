@@ -60,10 +60,11 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
     ) -> Result<(FixedPill, Bytes), Box<dyn Error + Send>> {
         let current_consensus_status = self.status_agent.to_inner();
 
-        if current_consensus_status.current_height != current_consensus_status.current_proof.height
+        if current_consensus_status.latest_committed_height
+            != current_consensus_status.current_proof.height
         {
             log::error!("[consensus] get_block for {}, error, current_consensus_status.current_height {} != current_consensus_status.current_proof.height, proof :{:?}",
-            current_consensus_status.current_height,
+            current_consensus_status.latest_committed_height,
              current_consensus_status.current_proof.height,
             current_consensus_status.current_proof)
         }
@@ -79,9 +80,9 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             .await?
             .clap();
 
-        if current_consensus_status.current_height != next_height - 1 {
+        if current_consensus_status.latest_committed_height != next_height - 1 {
             return Err(ProtocolError::from(ConsensusError::MissingBlockHeader(
-                current_consensus_status.current_height,
+                current_consensus_status.latest_committed_height,
             ))
             .into());
         }
@@ -114,11 +115,6 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
                 header.height,
                 header.clone(),
             );
-            log::error!(
-                "[consensus] get_block for {}, proof error, proof height mismatch, current_consensus_status : {:?}",
-                header.height,
-                self.status_agent.to_inner()
-            )
         }
 
         let block = Block {
@@ -164,7 +160,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             self.check_block_roots(&block.inner.block.header)?;
 
             self.adapter
-                .verify_block_header(ctx.clone(), &block.inner.block);
+                .verify_block_header(ctx.clone(), block.inner.block.clone());
 
             // verify the proof in the block for previous block
             // skip to get previous proof to compare because the node may just comes from
@@ -174,11 +170,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
                 .get_block_by_height(ctx.clone(), block.inner.block.header.height - 1)
                 .await?;
             self.adapter
-                .verify_proof(
-                    ctx.clone(),
-                    &previous_block,
-                    &block.inner.block.header.proof,
-                )
+                .verify_proof(ctx.clone(), previous_block, block.inner.block.header.proof)
                 .await?;
 
             self.adapter
@@ -660,9 +652,11 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
 
         let committed_status_agent = self.status_agent.to_inner();
 
-        if committed_status_agent.current_height != committed_status_agent.current_proof.height {
+        if committed_status_agent.latest_committed_height
+            != committed_status_agent.current_proof.height
+        {
             log::error!("[consensus] update_status for handle_commit, error, current_height {} != current_proof.height {}, proof :{:?}",
-            committed_status_agent.current_height,
+            committed_status_agent.latest_committed_height,
             committed_status_agent.current_proof.height,
             committed_status_agent.current_proof)
         }

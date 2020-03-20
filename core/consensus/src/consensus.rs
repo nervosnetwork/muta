@@ -95,12 +95,12 @@ impl<Adapter: ConsensusAdapter + 'static> OverlordConsensus<Adapter> {
         let overlord_handler = overlord.get_handler();
         let status = status_agent.to_inner();
 
-        if status.current_height == 0 {
+        if status.latest_committed_height == 0 {
             overlord_handler
                 .send_msg(
                     Context::new(),
                     OverlordMsg::RichStatus(gen_overlord_status(
-                        status.current_height + 1,
+                        status.latest_committed_height + 1,
                         status.consensus_interval,
                         status.propose_ratio,
                         status.prevote_ratio,

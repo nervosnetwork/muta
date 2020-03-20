@@ -292,7 +292,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     let current_consensus_status = CurrentConsensusStatus {
         cycles_price:                metadata.cycles_price,
         cycles_limit:                metadata.cycles_limit,
-        current_height:              current_block.header.height,
+        latest_committed_height:     current_block.header.height,
         exec_height:                 current_block.header.exec_height,
         current_hash:                block_hash,
         latest_committed_state_root: current_header.state_root.clone(),

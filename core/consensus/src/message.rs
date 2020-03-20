@@ -14,8 +14,9 @@ use protocol::traits::{
 };
 use protocol::ProtocolError;
 
-use crate::fixed_types::{FixedBlock, FixedHeight, FixedProof, FixedSignedTxs, PullTxsRequest};
 use core_storage::StorageError;
+
+use crate::fixed_types::{FixedBlock, FixedHeight, FixedProof, FixedSignedTxs, PullTxsRequest};
 
 pub const END_GOSSIP_SIGNED_PROPOSAL: &str = "/gossip/consensus/signed_proposal";
 pub const END_GOSSIP_SIGNED_VOTE: &str = "/gossip/consensus/signed_vote";
@@ -245,7 +246,7 @@ impl<R: Rpc + 'static, S: Storage + 'static> MessageHandler for PullProofRpcHand
                         Err(_) => Err(StorageError::GetNone.into()),
                     }
                 }
-                h if h == latest_proof.height => Ok(latest_proof),
+                height if height == latest_proof.height => Ok(latest_proof),
                 _ => Err(StorageError::GetNone.into()),
             },
             Err(_) => Err(StorageError::GetNone.into()),

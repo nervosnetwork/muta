@@ -49,7 +49,7 @@ impl<Adapter: SynchronizationAdapter> Synchronization for OverlordSynchronizatio
             return Ok(());
         }
 
-        let current_height = self.status.to_inner().current_height;
+        let current_height = self.status.to_inner().latest_committed_height;
 
         if remote_height <= current_height {
             return Ok(());
@@ -81,7 +81,7 @@ impl<Adapter: SynchronizationAdapter> Synchronization for OverlordSynchronizatio
         if let Err(e) = sync_resp {
             log::error!(
                 "[synchronization]: err, current_height {:?} err_msg: {:?}",
-                sync_status.current_height,
+                sync_status.latest_committed_height,
                 e
             );
         }
@@ -89,7 +89,7 @@ impl<Adapter: SynchronizationAdapter> Synchronization for OverlordSynchronizatio
         self.status.replace(sync_status.clone());
         self.adapter.update_status(
             ctx.clone(),
-            sync_status.current_height,
+            sync_status.latest_committed_height,
             sync_status.consensus_interval,
             sync_status.propose_ratio,
             sync_status.prevote_ratio,
@@ -98,12 +98,13 @@ impl<Adapter: SynchronizationAdapter> Synchronization for OverlordSynchronizatio
             sync_status.validators,
         )?;
 
+        let tmp_status = self.status.to_inner();
         log::info!(
             "[synchronization]: sync end, remote block height {:?} current block height {:?} current exec height {:?} current proof height {:?}",
             remote_height,
-            self.status.to_inner().current_height,
-            self.status.to_inner().exec_height,
-            self.status.to_inner().current_proof.height,
+            tmp_status.latest_committed_height,
+            tmp_status.exec_height,
+            tmp_status.current_proof.height,
         );
         log::info!(
             "[synchronization]: sync end, current consented status :{:?}",
@@ -133,7 +134,7 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
 
     pub async fn polling_broadcast(&self) -> ProtocolResult<()> {
         loop {
-            let current_height = self.status.to_inner().current_height;
+            let current_height = self.status.to_inner().latest_committed_height;
             if current_height != 0 {
                 self.adapter
                     .broadcast_height(Context::new(), current_height)
@@ -185,12 +186,16 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
             };
 
             self.adapter
-                .verify_block_header(ctx.clone(), &consenting_rich_block.block)
+                .verify_block_header(ctx.clone(), consenting_rich_block.block.clone())
                 .await?;
 
             // verify syncing proof
             self.adapter
-                .verify_proof(ctx.clone(), &consenting_rich_block.block, &consenting_proof)
+                .verify_proof(
+                    ctx.clone(),
+                    consenting_rich_block.block.clone(),
+                    consenting_proof.clone(),
+                )
                 .await?;
 
             // verify previous proof
@@ -202,8 +207,8 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
             self.adapter
                 .verify_proof(
                     ctx.clone(),
-                    &previous_block,
-                    &consenting_rich_block.block.header.proof,
+                    previous_block,
+                    consenting_rich_block.block.header.proof.clone(),
                 )
                 .await?;
 
@@ -227,11 +232,12 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
             )
             .await?;
 
+            let tmp_status = sync_status_agent.to_inner().clone();
             log::info!(
                 "[synchronization]: try synced block, temp status: height:{}, exec_height:{}, proof_height:{}",
-                sync_status_agent.to_inner().current_height,
-                sync_status_agent.to_inner().exec_height,
-                sync_status_agent.to_inner().current_proof.height
+                tmp_status.latest_committed_height,
+                tmp_status.exec_height,
+                tmp_status.current_proof.height
             );
 
             current_consented_height += 1;
@@ -365,7 +371,7 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
         loop {
             let current_status = self.status.to_inner();
 
-            if current_status.exec_height != current_status.current_height {
+            if current_status.exec_height != current_status.latest_committed_height {
                 Delay::new(Duration::from_millis(WAIT_EXECUTION)).await;
             } else {
                 break;
@@ -376,7 +382,7 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
     }
 
     async fn need_sync(&self, ctx: Context, remote_height: u64) -> ProtocolResult<bool> {
-        let mut current_height = self.status.to_inner().current_height;
+        let mut current_height = self.status.to_inner().latest_committed_height;
         if remote_height == 0 {
             return Ok(false);
         }
@@ -389,7 +395,7 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
             let status = self.status.to_inner();
             Delay::new(Duration::from_millis(status.consensus_interval)).await;
 
-            current_height = self.status.to_inner().current_height;
+            current_height = self.status.to_inner().latest_committed_height;
             if current_height == remote_height {
                 return Ok(false);
             }

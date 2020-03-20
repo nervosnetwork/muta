@@ -1,12 +1,19 @@
 use std::collections::{HashMap, HashSet};
+use std::convert::TryFrom;
 use std::sync::Arc;
 
 use async_trait::async_trait;
 use futures::executor::block_on;
 use futures::lock::Mutex;
 use parking_lot::RwLock;
+use rlp::encode;
 
+use common_crypto::{
+    BlsCommonReference, BlsPrivateKey, BlsPublicKey, HashValue, PrivateKey, PublicKey,
+    Secp256k1PrivateKey, Secp256k1PublicKey, Signature, ToPublicKey,
+};
 use common_merkle::Merkle;
+
 use protocol::fixed_codec::FixedCodec;
 use protocol::traits::{CommonConsensusAdapter, Synchronization, SynchronizationAdapter};
 use protocol::traits::{Context, ExecutorParams, ExecutorResp};
@@ -19,16 +26,12 @@ use protocol::ProtocolResult;
 use crate::status::{CurrentConsensusStatus, StatusAgent};
 use crate::synchronization::{OverlordSynchronization, RichBlock};
 use crate::util::OverlordCrypto;
-use crate::ConsensusError;
+use crate::BlockHeaderField::{PreviousBlockHash, ProofHash, Proposer};
+use crate::BlockProofField::{BitMap, HashMismatch, HeightMismatch};
+use crate::{BlockHeaderField, BlockProofField, ConsensusError};
 use bit_vec::BitVec;
-use common_crypto::{
-    BlsCommonReference, BlsPrivateKey, BlsPublicKey, HashValue, PrivateKey, PublicKey,
-    Secp256k1PrivateKey, Secp256k1PublicKey, Signature, ToPublicKey,
-};
 use overlord::types::{AggregatedSignature, AggregatedVote, Node, SignedVote, Vote, VoteType};
 use overlord::{extract_voters, Crypto};
-use rlp::encode;
-use std::convert::TryFrom;
 
 // Test the blocks gap from 1 to 4.
 #[test]
@@ -65,7 +68,7 @@ fn sync_gap_test() {
         let status = CurrentConsensusStatus {
             cycles_price:                1,
             cycles_limit:                300_000_000,
-            current_height:              genesis_block.header.height,
+            latest_committed_height:     genesis_block.header.height,
             exec_height:                 genesis_block.header.exec_height,
             current_hash:                block_hash,
             list_logs_bloom:             vec![],
@@ -99,18 +102,20 @@ fn sync_gap_test() {
         // get the current consensus status to check if the test works fine
         let status = status_agent.to_inner();
         let block =
-            block_on(adapter.get_block_by_height(Context::new(), status.current_height)).unwrap();
+            block_on(adapter.get_block_by_height(Context::new(), status.latest_committed_height))
+                .unwrap();
         assert_sync(status, block);
 
         block_on(sync.receive_remote_block(Context::new(), max_height)).unwrap();
         let status = status_agent.to_inner();
         let block =
-            block_on(adapter.get_block_by_height(Context::new(), status.current_height)).unwrap();
+            block_on(adapter.get_block_by_height(Context::new(), status.latest_committed_height))
+                .unwrap();
         assert_sync(status, block);
 
         let status = status_agent.to_inner();
         // status.current_height is consensus-ed height
-        assert_eq!(status.current_height, max_height);
+        assert_eq!(status.latest_committed_height, max_height);
     }
 }
 
@@ -305,7 +310,7 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
     }
 
     /// this function verify all info in header except proof and roots
-    async fn verify_block_header(&self, ctx: Context, block: &Block) -> ProtocolResult<()> {
+    async fn verify_block_header(&self, ctx: Context, block: Block) -> ProtocolResult<()> {
         let previous_block = self
             .get_block_by_height(ctx.clone(), block.header.height - 1)
             .await?;
@@ -313,13 +318,15 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
         let previous_block_hash = Hash::digest(previous_block.encode_fixed()?);
 
         if previous_block_hash != block.header.pre_hash {
-            return Err(ConsensusError::VerifyBlockHeaderPreBlockHash(block.header.height).into());
+            return Err(
+                ConsensusError::VerifyBlockHeader(block.header.height, PreviousBlockHash).into(),
+            );
         }
 
         // the block 0 and 1 's proof is consensus-ed by community
         if block.header.height > 1u64 && block.header.pre_hash != block.header.proof.block_hash {
             log::error!("verifying_block : {:?}", block);
-            return Err(ConsensusError::VerifyBlockHeaderPreHash(block.header.height).into());
+            return Err(ConsensusError::VerifyBlockHeader(block.header.height, ProofHash).into());
         }
 
         // verify proposer and validators
@@ -348,21 +355,26 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
         if block.header.height != 0
             && !authority_map.contains_key(&block.header.proposer.as_bytes())
         {
-            return Err(ConsensusError::VerifyBlockHeaderProposer(block.header.height).into());
+            return Err(ConsensusError::VerifyBlockHeader(block.header.height, Proposer).into());
         }
 
         // check validators
         for validator in block.header.validators.iter() {
             if !authority_map.contains_key(&validator.address.as_bytes()) {
-                return Err(ConsensusError::VerifyBlockHeaderValidator(block.header.height).into());
+                return Err(ConsensusError::VerifyBlockHeader(
+                    block.header.height,
+                    BlockHeaderField::Validator,
+                )
+                .into());
             } else {
                 let node = authority_map.get(&validator.address.as_bytes()).unwrap();
 
                 if node.vote_weight != validator.vote_weight
                     || node.propose_weight != validator.vote_weight
                 {
-                    return Err(ConsensusError::VerifyBlockHeaderValidatorWeight(
+                    return Err(ConsensusError::VerifyBlockHeader(
                         block.header.height,
+                        BlockHeaderField::Weight,
                     )
                     .into());
                 }
@@ -375,8 +387,8 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
     async fn verify_proof(
         self: &Self,
         ctx: Context,
-        block: &Block,
-        proof: &Proof,
+        block: Block,
+        proof: Proof,
     ) -> ProtocolResult<()> {
         // the block 0 has no proof, which is consensus-ed by community, not by chain
 
@@ -385,9 +397,9 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
         };
 
         if block.header.height != proof.height {
-            return Err(ConsensusError::VerifyBlockProofAndBlockHeightMismatch(
+            return Err(ConsensusError::VerifyProof(
                 block.header.height,
-                proof.height,
+                HeightMismatch(block.header.height, proof.height),
             )
             .into());
         }
@@ -395,7 +407,7 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
         let blockhash = Hash::digest(block.clone().encode_fixed()?);
 
         if blockhash != proof.block_hash {
-            return Err(ConsensusError::VerifyBlockHashMismatch(block.header.height).into());
+            return Err(ConsensusError::VerifyProof(block.header.height, HashMismatch).into());
         }
 
         let metadata = self.get_metadata(
@@ -415,7 +427,10 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
             })
             .collect::<Vec<Node>>();
 
-        let signed_voters = extract_voters(&mut authority_list, &proof.bitmap).unwrap();
+        let signed_voters = extract_voters(&mut authority_list, &proof.bitmap).map_err(|_| {
+            log::error!("[consensus] extract_voters fails, bitmap error");
+            ConsensusError::VerifyProof(block.header.height, BitMap)
+        })?;
 
         let vote_hash = self.crypto.hash(protocol::Bytes::from(rlp::encode(&Vote {
             height:     proof.height,
@@ -427,7 +442,7 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
         self.verify_proof_signature(
             block.header.height,
             vote_hash,
-            proof.signature.clone(),
+            proof.signature,
             signed_voters.clone(),
         )?;
 
@@ -436,7 +451,7 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
             .map(|node| (node.address.clone(), node.vote_weight))
             .collect::<HashMap<overlord::types::Address, u32>>();
 
-        self.verity_proof_weight(block.header.height, &weight_map, signed_voters)?;
+        self.verity_proof_weight(block.header.height, weight_map, signed_voters)?;
 
         Ok(())
     }
@@ -454,7 +469,9 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
             .verify_aggregated_signature(aggregated_signature_bytes, vote_hash, signed_voters)
             .is_err()
         {
-            return Err(ConsensusError::VerifyBlockProof(block_height).into());
+            return Err(
+                ConsensusError::VerifyProof(block_height, BlockProofField::Signature).into(),
+            );
         }
         Ok(())
     }
@@ -462,7 +479,7 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
     fn verity_proof_weight(
         &self,
         block_height: u64,
-        weight_map: &HashMap<Bytes, u32>,
+        weight_map: HashMap<Bytes, u32>,
         signed_voters: Vec<Bytes>,
     ) -> ProtocolResult<()> {
         let total_validator_weight: u64 = weight_map.iter().map(|pair| u64::from(*pair.1)).sum();
@@ -472,12 +489,14 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
             if weight_map.contains_key(signed_voter_address.as_ref()) {
                 accumulator += u64::from(*(weight_map.get(signed_voter_address.as_ref()).unwrap()));
             } else {
-                return Err(ConsensusError::VerifyBlockProofVoter(block_height).into());
+                return Err(
+                    ConsensusError::VerifyProof(block_height, BlockProofField::Validator).into(),
+                );
             }
         }
 
         if 3 * accumulator <= 2 * total_validator_weight {
-            return Err(ConsensusError::VerifyBlockProofVoteWeight(block_height).into());
+            return Err(ConsensusError::VerifyProof(block_height, BlockProofField::Weight).into());
         }
         Ok(())
     }
@@ -665,7 +684,6 @@ fn mock_genesis_rich_block() -> RichBlock {
     }
 }
 
-// 通过SingedTx获得对应的TxReceipt, 对应Tx的state_root为empty
 fn get_receipt(tx: &SignedTransaction, height: u64) -> Receipt {
     Receipt {
         state_root: MerkleRoot::from_empty(),
@@ -1025,9 +1043,9 @@ fn mock_verifier_list() -> Vec<ValidatorExtend> {
 fn assert_sync(status: CurrentConsensusStatus, latest_block: Block) {
     let exec_gap = latest_block.header.height - latest_block.header.exec_height;
 
-    assert_eq!(status.current_height, latest_block.header.height);
+    assert_eq!(status.latest_committed_height, latest_block.header.height);
     assert_eq!(status.exec_height, latest_block.header.height);
-    assert_eq!(status.current_proof.height, status.current_height);
+    assert_eq!(status.current_proof.height, status.latest_committed_height);
     assert_eq!(status.list_confirm_root.len(), exec_gap as usize);
     assert_eq!(status.list_cycles_used.len(), exec_gap as usize);
     assert_eq!(status.list_logs_bloom.len(), exec_gap as usize);

@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use async_trait::async_trait;
 use creep::Context;
 
@@ -6,7 +8,6 @@ use crate::types::{
     Address, Block, Bytes, Hash, MerkleRoot, Metadata, Proof, Receipt, SignedTransaction, Validator,
 };
 use crate::{traits::mempool::MixedTxHashes, ProtocolResult};
-use std::collections::HashMap;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum MessageTarget {
@@ -130,11 +131,11 @@ pub trait CommonConsensusAdapter: Send + Sync {
     async fn verify_proof(
         self: &Self,
         ctx: Context,
-        block: &Block,
-        proof: &Proof,
+        block: Block,
+        proof: Proof,
     ) -> ProtocolResult<()>;
 
-    async fn verify_block_header(&self, ctx: Context, block: &Block) -> ProtocolResult<()>;
+    async fn verify_block_header(&self, ctx: Context, block: Block) -> ProtocolResult<()>;
 
     fn verify_proof_signature(
         &self,
@@ -147,7 +148,7 @@ pub trait CommonConsensusAdapter: Send + Sync {
     fn verity_proof_weight(
         &self,
         block_height: u64,
-        weight_map: &HashMap<Bytes, u32>,
+        weight_map: HashMap<Bytes, u32>,
         signed_voters: Vec<Bytes>,
     ) -> ProtocolResult<()>;
 }
@@ -164,10 +165,6 @@ pub trait ConsensusAdapter: CommonConsensusAdapter + Send + Sync {
         cycle_limit: u64,
         tx_num_limit: u64,
     ) -> ProtocolResult<MixedTxHashes>;
-
-    // /// Check the correctness of the given transactions.
-    // async fn check_txs(&self, ctx: Context, order_txs: Vec<Hash>) ->
-    // ProtocolResult<()>;
 
     /// Synchronous signed transactions.
     async fn sync_txs(&self, ctx: Context, propose_txs: Vec<Hash>) -> ProtocolResult<()>;
