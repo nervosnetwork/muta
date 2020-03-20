@@ -126,6 +126,8 @@ fn make_manager(
     let mut peer_dat_file = std::env::temp_dir();
     peer_dat_file.push("peer.dat");
     let peer_trust_config = Arc::new(TrustMetricConfig::default());
+    let peer_fatal_ban = Duration::from_secs(50);
+    let peer_soft_ban = Duration::from_secs(10);
 
     let config = PeerManagerConfig {
         our_id: manager_id,
@@ -134,6 +136,8 @@ fn make_manager(
         whitelist_by_chain_addrs: Default::default(),
         whitelist_peers_only: false,
         peer_trust_config,
+        peer_fatal_ban,
+        peer_soft_ban,
         max_connections,
         routine_interval: Duration::from_secs(10),
         peer_dat_file,
@@ -1851,6 +1855,8 @@ async fn should_never_expire_peers_from_config_whitelist() {
     let mut peer_dat_file = std::env::temp_dir();
     peer_dat_file.push("peer.dat");
     let peer_trust_config = Arc::new(TrustMetricConfig::default());
+    let peer_fatal_ban = Duration::from_secs(50);
+    let peer_soft_ban = Duration::from_secs(10);
 
     let test_peer = make_peer(2077);
     let test_chain_addr = test_peer
@@ -1864,6 +1870,8 @@ async fn should_never_expire_peers_from_config_whitelist() {
         whitelist_by_chain_addrs: vec![test_chain_addr.clone()],
         whitelist_peers_only: false,
         peer_trust_config,
+        peer_fatal_ban,
+        peer_soft_ban,
         max_connections: 10,
         routine_interval: Duration::from_secs(10),
         peer_dat_file,
@@ -1901,6 +1909,8 @@ async fn should_not_refresh_never_expired_peers_from_config_whitelist() {
     let mut peer_dat_file = std::env::temp_dir();
     peer_dat_file.push("peer.dat");
     let peer_trust_config = Arc::new(TrustMetricConfig::default());
+    let peer_fatal_ban = Duration::from_secs(50);
+    let peer_soft_ban = Duration::from_secs(10);
 
     let test_peer = make_peer(2077);
     let test_chain_addr = test_peer
@@ -1914,6 +1924,8 @@ async fn should_not_refresh_never_expired_peers_from_config_whitelist() {
         whitelist_by_chain_addrs: vec![test_chain_addr.clone()],
         whitelist_peers_only: false,
         peer_trust_config,
+        peer_fatal_ban,
+        peer_soft_ban,
         max_connections: 10,
         routine_interval: Duration::from_secs(10),
         peer_dat_file,
@@ -1960,6 +1972,8 @@ async fn should_only_connect_peers_in_whitelist_if_whitelist_only_enabled() {
     let mut peer_dat_file = std::env::temp_dir();
     peer_dat_file.push("peer.dat");
     let peer_trust_config = Arc::new(TrustMetricConfig::default());
+    let peer_fatal_ban = Duration::from_secs(50);
+    let peer_soft_ban = Duration::from_secs(10);
 
     let test_peer = make_peer(2077);
     let test_chain_addr = test_peer
@@ -1975,6 +1989,8 @@ async fn should_only_connect_peers_in_whitelist_if_whitelist_only_enabled() {
         whitelist_by_chain_addrs: vec![test_chain_addr.clone()],
         whitelist_peers_only: true,
         peer_trust_config,
+        peer_fatal_ban,
+        peer_soft_ban,
         max_connections: 10,
         routine_interval: Duration::from_secs(10),
         peer_dat_file,
@@ -2021,6 +2037,8 @@ async fn should_only_allow_incoming_peers_in_whitelist_if_whitelist_only_enabled
     let mut peer_dat_file = std::env::temp_dir();
     peer_dat_file.push("peer.dat");
     let peer_trust_config = Arc::new(TrustMetricConfig::default());
+    let peer_fatal_ban = Duration::from_secs(50);
+    let peer_soft_ban = Duration::from_secs(10);
 
     let test_peer = make_peer(2077);
     let test_chain_addr = test_peer
@@ -2036,6 +2054,8 @@ async fn should_only_allow_incoming_peers_in_whitelist_if_whitelist_only_enabled
         whitelist_by_chain_addrs: vec![test_chain_addr.clone()],
         whitelist_peers_only: true,
         peer_trust_config,
+        peer_fatal_ban,
+        peer_soft_ban,
         max_connections: 10,
         routine_interval: Duration::from_secs(10),
         peer_dat_file,
