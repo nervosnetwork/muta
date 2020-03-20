@@ -40,9 +40,9 @@ pub fn mock_receipt_response() -> ReceiptResponse {
         service_name: "mock-service".to_owned(),
         method:       "mock-method".to_owned(),
         response:     ServiceResponse::<String> {
-            code:  0,
-            data:  "ok".to_owned(),
-            error: "".to_owned(),
+            code:          0,
+            succeed_data:  "ok".to_owned(),
+            error_message: "".to_owned(),
         },
     }
 }

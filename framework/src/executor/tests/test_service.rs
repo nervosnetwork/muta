@@ -43,7 +43,7 @@ impl<SDK: ServiceSDK> TestService<SDK> {
     ) -> ServiceResponse<TestReadResponse> {
         let value: String = self.sdk.get_value(&payload.key).unwrap_or_default();
         let res = TestReadResponse { value };
-        ServiceResponse::<TestReadResponse>::from_data(res)
+        ServiceResponse::<TestReadResponse>::from_succeed(res)
     }
 
     #[cycles(210_00)]
@@ -54,7 +54,7 @@ impl<SDK: ServiceSDK> TestService<SDK> {
         payload: TestWritePayload,
     ) -> ServiceResponse<TestWriteResponse> {
         self.sdk.set_value(payload.key, payload.value);
-        ServiceResponse::<TestWriteResponse>::from_data(TestWriteResponse {})
+        ServiceResponse::<TestWriteResponse>::from_succeed(TestWriteResponse {})
     }
 
     #[cycles(210_00)]
@@ -67,7 +67,7 @@ impl<SDK: ServiceSDK> TestService<SDK> {
         let payload_str = serde_json::to_string(&payload).unwrap();
         self.sdk
             .write(&ctx, None, "test", "test_write", &payload_str);
-        ServiceResponse::<TestWriteResponse>::from_data(TestWriteResponse {})
+        ServiceResponse::<TestWriteResponse>::from_succeed(TestWriteResponse {})
     }
 
     #[tx_hook_before]

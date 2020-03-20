@@ -49,10 +49,10 @@ pub struct ReceiptResponse {
     pub code: u64,
 
     #[prost(bytes, tag = "4")]
-    pub data: Vec<u8>,
+    pub succeed_data: Vec<u8>,
 
     #[prost(bytes, tag = "5")]
-    pub error: Vec<u8>,
+    pub error_message: Vec<u8>,
 }
 
 #[derive(Clone, Message)]
@@ -73,11 +73,11 @@ pub struct Event {
 impl From<receipt::ReceiptResponse> for ReceiptResponse {
     fn from(response: receipt::ReceiptResponse) -> ReceiptResponse {
         ReceiptResponse {
-            service_name: response.service_name.as_bytes().to_vec(),
-            method:       response.method.as_bytes().to_vec(),
-            code:         response.response.code,
-            data:         response.response.data.as_bytes().to_vec(),
-            error:        response.response.error.as_bytes().to_vec(),
+            service_name:  response.service_name.as_bytes().to_vec(),
+            method:        response.method.as_bytes().to_vec(),
+            code:          response.response.code,
+            succeed_data:  response.response.succeed_data.as_bytes().to_vec(),
+            error_message: response.response.error_message.as_bytes().to_vec(),
         }
     }
 }
@@ -91,9 +91,11 @@ impl TryFrom<ReceiptResponse> for receipt::ReceiptResponse {
                 .map_err(CodecError::FromStringUtf8)?,
             method:       String::from_utf8(response.method).map_err(CodecError::FromStringUtf8)?,
             response:     ServiceResponse {
-                code:  response.code,
-                data:  String::from_utf8(response.data).map_err(CodecError::FromStringUtf8)?,
-                error: String::from_utf8(response.error).map_err(CodecError::FromStringUtf8)?,
+                code:          response.code,
+                succeed_data:  String::from_utf8(response.succeed_data)
+                    .map_err(CodecError::FromStringUtf8)?,
+                error_message: String::from_utf8(response.error_message)
+                    .map_err(CodecError::FromStringUtf8)?,
             },
         })
     }

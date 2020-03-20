@@ -85,7 +85,7 @@ fn test_service_call_service() {
     );
 
     assert_eq!(receipt.response.response.code, 0);
-    let asset: Asset = serde_json::from_str(&receipt.response.response.data).unwrap();
+    let asset: Asset = serde_json::from_str(&receipt.response.response.succeed_data).unwrap();
     assert_eq!(asset.name, "TestCallAsset");
     assert_eq!(asset.symbol, "TCA");
     assert_eq!(asset.supply, 320_000_011);
@@ -114,10 +114,10 @@ impl<SDK: ServiceSDK> MockService<SDK> {
             .sdk
             .write(&ctx, None, "asset", "create_asset", &payload_str);
 
-        let asset: Asset = serde_json::from_str(&ret.data).unwrap();
+        let asset: Asset = serde_json::from_str(&ret.succeed_data).unwrap();
 
         ctx.emit_event("call create asset succeed".to_owned());
-        ServiceResponse::<Asset>::from_data(asset)
+        ServiceResponse::<Asset>::from_succeed(asset)
     }
 }
 

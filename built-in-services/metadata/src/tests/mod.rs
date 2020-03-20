@@ -25,7 +25,7 @@ fn test_get_metadata() {
     let init_metadata = mock_metadata();
 
     let service = new_metadata_service_with_metadata(init_metadata.clone());
-    let metadata = service.get_metadata(context).data;
+    let metadata = service.get_metadata(context).succeed_data;
 
     assert_eq!(metadata, init_metadata);
 }

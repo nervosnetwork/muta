@@ -25,12 +25,12 @@ fn test_read_and_write() {
     impl Tests {
         #[read]
         fn test_read_fn(&self, _ctx: ServiceContext, _s: &str) -> ServiceResponse<String> {
-            ServiceResponse::<String>::from_data("read".to_owned())
+            ServiceResponse::<String>::from_succeed("read".to_owned())
         }
 
         #[write]
         fn test_write_fn(&mut self, _ctx: ServiceContext, _s: &str) -> ServiceResponse<String> {
-            ServiceResponse::<String>::from_data("write".to_owned())
+            ServiceResponse::<String>::from_succeed("write".to_owned())
         }
     }
 
@@ -38,10 +38,13 @@ fn test_read_and_write() {
 
     let mut t = Tests {};
     assert_eq!(
-        t.test_read_fn(context.clone(), "read").data,
+        t.test_read_fn(context.clone(), "read").succeed_data,
         "read".to_owned()
     );
-    assert_eq!(t.test_write_fn(context, "write").data, "write".to_owned());
+    assert_eq!(
+        t.test_write_fn(context, "write").succeed_data,
+        "write".to_owned()
+    );
 }
 
 #[test]
@@ -54,13 +57,13 @@ fn test_hooks() {
         #[hook_after]
         fn hook_after(&mut self, params: &ExecutorParams) -> ServiceResponse<()> {
             self.height = params.height;
-            ServiceResponse::<()>::from_data(())
+            ServiceResponse::<()>::from_succeed(())
         }
 
         #[hook_before]
         fn hook_before(&mut self, params: &ExecutorParams) -> ServiceResponse<()> {
             self.height = params.height;
-            ServiceResponse::<()>::from_data(())
+            ServiceResponse::<()>::from_succeed(())
         }
     }
 
@@ -78,20 +81,20 @@ fn test_read_and_write_with_noneparams() {
     impl Tests {
         #[read]
         fn test_read_fn(&self, _ctx: ServiceContext) -> ServiceResponse<()> {
-            ServiceResponse::<()>::from_data(())
+            ServiceResponse::<()>::from_succeed(())
         }
 
         #[write]
         fn test_write_fn(&mut self, _ctx: ServiceContext) -> ServiceResponse<()> {
-            ServiceResponse::<()>::from_data(())
+            ServiceResponse::<()>::from_succeed(())
         }
     }
 
     let context = get_context(1000, "", "", "");
 
     let mut t = Tests {};
-    assert_eq!(t.test_read_fn(context.clone()).data, ());
-    assert_eq!(t.test_write_fn(context).data, ());
+    assert_eq!(t.test_read_fn(context.clone()).succeed_data, ());
+    assert_eq!(t.test_write_fn(context).succeed_data, ());
 }
 
 #[test]
@@ -101,23 +104,23 @@ fn test_cycles() {
     impl Tests {
         #[cycles(100)]
         fn test_cycles(&self, ctx: ServiceContext) -> ServiceResponse<()> {
-            ServiceResponse::<()>::from_data(())
+            ServiceResponse::<()>::from_succeed(())
         }
 
         #[cycles(500)]
         fn test_cycles2(&self, ctx: ServiceContext) -> ServiceResponse<()> {
-            ServiceResponse::<()>::from_data(())
+            ServiceResponse::<()>::from_succeed(())
         }
     }
 
     #[cycles(200)]
     fn test_sub_cycles_fn1(ctx: ServiceContext) -> ServiceResponse<()> {
-        ServiceResponse::<()>::from_data(())
+        ServiceResponse::<()>::from_succeed(())
     }
 
     #[cycles(200)]
     fn test_sub_cycles_fn2(_foo: u64, ctx: ServiceContext) -> ServiceResponse<()> {
-        ServiceResponse::<()>::from_data(())
+        ServiceResponse::<()>::from_succeed(())
     }
 
     let t = Tests {};
@@ -182,7 +185,7 @@ fn test_service() {
                 message: "read ok".to_owned(),
             };
 
-            ServiceResponse::<TestServiceResponse>::from_data(res)
+            ServiceResponse::<TestServiceResponse>::from_succeed(res)
         }
 
         #[write]
@@ -195,7 +198,7 @@ fn test_service() {
                 message: "write ok".to_owned(),
             };
 
-            ServiceResponse::<TestServiceResponse>::from_data(res)
+            ServiceResponse::<TestServiceResponse>::from_succeed(res)
         }
     }
 
@@ -218,11 +221,11 @@ fn test_service() {
     assert_eq!(test_service.genesis_data, "genesis");
 
     let context = get_context(1024 * 1024, "", "test_write", &payload_str);
-    let write_res = test_service.write_(context).data;
+    let write_res = test_service.write_(context).succeed_data;
     assert_eq!(write_res, r#"{"message":"write ok"}"#);
 
     let context = get_context(1024 * 1024, "", "test_read", &payload_str);
-    let read_res = test_service.read_(context).data;
+    let read_res = test_service.read_(context).succeed_data;
     assert_eq!(read_res, r#"{"message":"read ok"}"#);
 
     let context = get_context(1024 * 1024, "", "test_notfound", &payload_str);
@@ -275,7 +278,7 @@ fn test_service_none_payload() {
                 message: "read ok".to_owned(),
             };
 
-            ServiceResponse::<TestServiceResponse>::from_data(res)
+            ServiceResponse::<TestServiceResponse>::from_succeed(res)
         }
 
         #[write]
@@ -284,7 +287,7 @@ fn test_service_none_payload() {
                 message: "write ok".to_owned(),
             };
 
-            ServiceResponse::<TestServiceResponse>::from_data(res)
+            ServiceResponse::<TestServiceResponse>::from_succeed(res)
         }
     }
 
@@ -300,11 +303,11 @@ fn test_service_none_payload() {
     assert_eq!(test_service.genesis_data, "genesis");
 
     let context = get_context(1024 * 1024, "", "test_write", "");
-    let write_res = test_service.write_(context).data;
+    let write_res = test_service.write_(context).succeed_data;
     assert_eq!(write_res, r#"{"message":"write ok"}"#);
 
     let context = get_context(1024 * 1024, "", "test_read", "");
-    let read_res = test_service.read_(context).data;
+    let read_res = test_service.read_(context).succeed_data;
     assert_eq!(read_res, r#"{"message":"read ok"}"#);
 
     let context = get_context(1024 * 1024, "", "test_notfound", "");
@@ -348,12 +351,12 @@ fn test_service_none_response() {
 
         #[read]
         fn test_read(&self, _ctx: ServiceContext) -> ServiceResponse<()> {
-            ServiceResponse::<()>::from_data(())
+            ServiceResponse::<()>::from_succeed(())
         }
 
         #[write]
         fn test_write(&mut self, _ctx: ServiceContext) -> ServiceResponse<()> {
-            ServiceResponse::<()>::from_data(())
+            ServiceResponse::<()>::from_succeed(())
         }
     }
 
@@ -369,11 +372,11 @@ fn test_service_none_response() {
     assert_eq!(test_service.genesis_data, "genesis");
 
     let context = get_context(1024 * 1024, "", "test_write", "");
-    let write_res = test_service.write_(context).data;
+    let write_res = test_service.write_(context).succeed_data;
     assert_eq!(write_res, "");
 
     let context = get_context(1024 * 1024, "", "test_read", "");
-    let read_res = test_service.read_(context).data;
+    let read_res = test_service.read_(context).succeed_data;
     assert_eq!(read_res, "");
 
     let context = get_context(1024 * 1024, "", "test_notfound", "");

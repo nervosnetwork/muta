@@ -27,6 +27,6 @@ impl<SDK: ServiceSDK> MetadataService<SDK> {
             .sdk
             .get_value(&METADATA_KEY.to_owned())
             .expect("metadata should not be none");
-        ServiceResponse::<Metadata>::from_data(metadata)
+        ServiceResponse::<Metadata>::from_succeed(metadata)
     }
 }

@@ -54,7 +54,7 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
     #[read]
     fn get_asset(&self, ctx: ServiceContext, payload: GetAssetPayload) -> ServiceResponse<Asset> {
         if let Some(asset) = self.assets.get(&payload.id) {
-            ServiceResponse::<Asset>::from_data(asset)
+            ServiceResponse::<Asset>::from_succeed(asset)
         } else {
             ServiceResponse::<Asset>::from_error(1, "asset id not existed".to_owned())
         }
@@ -88,7 +88,7 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
             balance:  asset_balance.value,
         };
 
-        ServiceResponse::<GetBalanceResponse>::from_data(res)
+        ServiceResponse::<GetBalanceResponse>::from_succeed(res)
     }
 
     #[cycles(100_00)]
@@ -118,7 +118,7 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
                 grantee:  payload.grantee,
                 value:    *allowance,
             };
-            ServiceResponse::<GetAllowanceResponse>::from_data(res)
+            ServiceResponse::<GetAllowanceResponse>::from_succeed(res)
         } else {
             let res = GetAllowanceResponse {
                 asset_id: payload.asset_id,
@@ -126,7 +126,7 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
                 grantee:  payload.grantee,
                 value:    0,
             };
-            ServiceResponse::<GetAllowanceResponse>::from_data(res)
+            ServiceResponse::<GetAllowanceResponse>::from_succeed(res)
         }
     }
 
@@ -175,7 +175,7 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
         let event_str = event_res.unwrap();
         ctx.emit_event(event_str);
 
-        ServiceResponse::<Asset>::from_data(asset)
+        ServiceResponse::<Asset>::from_succeed(asset)
     }
 
     #[cycles(210_00)]
@@ -208,7 +208,7 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
         let event_str = event_res.unwrap();
         ctx.emit_event(event_str);
 
-        ServiceResponse::<()>::from_data(())
+        ServiceResponse::<()>::from_succeed(())
     }
 
     #[cycles(210_00)]
@@ -257,7 +257,7 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
         let event_str = event_res.unwrap();
         ctx.emit_event(event_str);
 
-        ServiceResponse::<()>::from_data(())
+        ServiceResponse::<()>::from_succeed(())
     }
 
     #[cycles(210_00)]
@@ -319,7 +319,7 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
         let event_str = event_res.unwrap();
         ctx.emit_event(event_str);
 
-        ServiceResponse::<()>::from_data(())
+        ServiceResponse::<()>::from_succeed(())
     }
 
     fn _transfer(

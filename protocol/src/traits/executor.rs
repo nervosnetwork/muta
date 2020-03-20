@@ -24,32 +24,34 @@ pub struct ExecutorParams {
 
 #[derive(Debug, Clone, Default)]
 pub struct ServiceResponse<T: Default> {
-    pub code:  u64,
-    pub data:  T,
-    pub error: String,
+    pub code:          u64,
+    pub succeed_data:  T,
+    pub error_message: String,
 }
 
 impl<T: Default> ServiceResponse<T> {
-    pub fn from_error(code: u64, error: String) -> Self {
+    pub fn from_error(code: u64, error_message: String) -> Self {
         Self {
             code,
-            data: T::default(),
-            error,
+            succeed_data: T::default(),
+            error_message,
         }
     }
 
-    pub fn from_data(data: T) -> Self {
+    pub fn from_succeed(succeed_data: T) -> Self {
         Self {
             code: 0,
-            data,
-            error: "".to_owned(),
+            succeed_data,
+            error_message: "".to_owned(),
         }
     }
 }
 
 impl<T: Default + PartialEq> PartialEq for ServiceResponse<T> {
     fn eq(&self, other: &Self) -> bool {
-        self.code == other.code && self.data == other.data && self.error == other.error
+        self.code == other.code
+            && self.succeed_data == other.succeed_data
+            && self.error_message == other.error_message
     }
 }
 

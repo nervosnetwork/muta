@@ -86,7 +86,7 @@ pub fn tx_hook_after(_: TokenStream, item: TokenStream) -> TokenStream {
 ///         &self,
 ///         _ctx: ServiceContext,
 ///     ) -> ServiceResponse<String> {
-///         ServiceResponse::<String>::from_data("ok".to_owned())
+///         ServiceResponse::<String>::from_succeed("ok".to_owned())
 ///     }
 /// }
 /// ```
@@ -119,7 +119,7 @@ pub fn read(_: TokenStream, item: TokenStream) -> TokenStream {
 ///         &mut self,
 ///         _ctx: ServiceContext,
 ///     ) -> ServiceResponse<String> {
-///         ServiceResponse::<String>::from_data("ok".to_owned())
+///         ServiceResponse::<String>::from_succeed("ok".to_owned())
 ///     }
 /// }
 /// ```

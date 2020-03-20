@@ -433,9 +433,9 @@ fn get_receipt(tx: &SignedTransaction, height: u64) -> Receipt {
             service_name: "sync".to_owned(),
             method:       "sync_exec".to_owned(),
             response:     ServiceResponse::<String> {
-                code:  0,
-                data:  "ok".to_owned(),
-                error: "".to_owned(),
+                code:          0,
+                succeed_data:  "ok".to_owned(),
+                error_message: "".to_owned(),
             },
         },
     }

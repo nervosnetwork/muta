@@ -35,13 +35,13 @@ fn test_create_asset() {
             symbol: "test".to_owned(),
             supply,
         })
-        .data;
+        .succeed_data;
 
     let new_asset = service
         .get_asset(context.clone(), GetAssetPayload {
             id: asset.id.clone(),
         })
-        .data;
+        .succeed_data;
     assert_eq!(asset, new_asset);
 
     let balance_res = service
@@ -49,7 +49,7 @@ fn test_create_asset() {
             asset_id: asset.id.clone(),
             user:     caller,
         })
-        .data;
+        .succeed_data;
     assert_eq!(balance_res.balance, supply);
     assert_eq!(balance_res.asset_id, asset.id);
 }
@@ -70,7 +70,7 @@ fn test_transfer() {
             symbol: "test".to_owned(),
             supply,
         })
-        .data;
+        .succeed_data;
 
     let to_address = Address::from_hex("0x666cdba6ae4f479f7164792b318b2a06c759833b").unwrap();
     service.transfer(context.clone(), TransferPayload {
@@ -84,7 +84,7 @@ fn test_transfer() {
             asset_id: asset.id.clone(),
             user:     caller,
         })
-        .data;
+        .succeed_data;
     assert_eq!(balance_res.balance, supply - 1024);
 
     let context = mock_context(cycles_limit, to_address.clone());
@@ -93,7 +93,7 @@ fn test_transfer() {
             asset_id: asset.id,
             user:     to_address,
         })
-        .data;
+        .succeed_data;
     assert_eq!(balance_res.balance, 1024);
 }
 
@@ -112,7 +112,7 @@ fn test_approve() {
             symbol: "test".to_owned(),
             supply,
         })
-        .data;
+        .succeed_data;
 
     let to_address = Address::from_hex("0x666cdba6ae4f479f7164792b318b2a06c759833b").unwrap();
     service.approve(context.clone(), ApprovePayload {
@@ -127,7 +127,7 @@ fn test_approve() {
             grantor:  caller,
             grantee:  to_address.clone(),
         })
-        .data;
+        .succeed_data;
     assert_eq!(allowance_res.asset_id, asset.id);
     assert_eq!(allowance_res.grantee, to_address);
     assert_eq!(allowance_res.value, 1024);
@@ -148,7 +148,7 @@ fn test_transfer_from() {
             symbol: "test".to_owned(),
             supply,
         })
-        .data;
+        .succeed_data;
 
     let to_address = Address::from_hex("0x666cdba6ae4f479f7164792b318b2a06c759833b").unwrap();
     service.approve(context.clone(), ApprovePayload {
@@ -172,7 +172,7 @@ fn test_transfer_from() {
             grantor:  caller.clone(),
             grantee:  to_address.clone(),
         })
-        .data;
+        .succeed_data;
     assert_eq!(allowance_res.asset_id, asset.id.clone());
     assert_eq!(allowance_res.grantee, to_address.clone());
     assert_eq!(allowance_res.value, 1000);
@@ -182,7 +182,7 @@ fn test_transfer_from() {
             asset_id: asset.id.clone(),
             user:     caller,
         })
-        .data;
+        .succeed_data;
     assert_eq!(balance_res.balance, supply - 24);
 
     let balance_res = service
@@ -190,7 +190,7 @@ fn test_transfer_from() {
             asset_id: asset.id,
             user:     to_address,
         })
-        .data;
+        .succeed_data;
     assert_eq!(balance_res.balance, 24);
 }
 

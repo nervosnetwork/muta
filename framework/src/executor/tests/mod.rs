@@ -60,7 +60,7 @@ fn test_create_genesis() {
                 .to_owned(),
     };
     let res = executor.read(&params, &caller, 1, &request).unwrap();
-    let resp: GetBalanceResponse = serde_json::from_str(&res.data).unwrap();
+    let resp: GetBalanceResponse = serde_json::from_str(&res.succeed_data).unwrap();
 
     assert_eq!(resp.balance, 320_000_011);
 }
@@ -101,7 +101,7 @@ fn test_exec() {
     let receipt = &executor_resp.receipts[0];
 
     assert_eq!(receipt.response.response.code, 0);
-    let asset: Asset = serde_json::from_str(&receipt.response.response.data).unwrap();
+    let asset: Asset = serde_json::from_str(&receipt.response.response.succeed_data).unwrap();
     assert_eq!(asset.name, "MutaToken2");
     assert_eq!(asset.symbol, "MT2");
     assert_eq!(asset.supply, 320_000_011);

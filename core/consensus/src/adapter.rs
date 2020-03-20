@@ -383,7 +383,7 @@ where
             payload:      "".to_string(),
         })?;
 
-        Ok(serde_json::from_str(&exec_resp.data).expect("Decode metadata failed!"))
+        Ok(serde_json::from_str(&exec_resp.succeed_data).expect("Decode metadata failed!"))
     }
 
     fn set_args(&self, _context: Context, timeout_gap: u64, cycles_limit: u64, max_tx_size: u64) {

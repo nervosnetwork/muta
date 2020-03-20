@@ -51,9 +51,9 @@ fn mock_receipt(tx_hash: Hash) -> Receipt {
         service_name: "test".to_owned(),
         method:       "test".to_owned(),
         response:     ServiceResponse::<String> {
-            code:  0,
-            data:  "ok".to_owned(),
-            error: "".to_owned(),
+            code:          0,
+            succeed_data:  "ok".to_owned(),
+            error_message: "".to_owned(),
         },
     };
     Receipt {

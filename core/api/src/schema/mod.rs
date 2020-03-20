@@ -18,17 +18,17 @@ pub use transaction::{
 
 #[derive(juniper::GraphQLObject, Clone)]
 pub struct ServiceResponse {
-    pub code:  Uint64,
-    pub data:  String,
-    pub error: String,
+    pub code:          Uint64,
+    pub succeed_data:  String,
+    pub error_message: String,
 }
 
 impl From<protocol::traits::ServiceResponse<String>> for ServiceResponse {
     fn from(resp: protocol::traits::ServiceResponse<String>) -> Self {
         Self {
-            code:  Uint64::from(resp.code),
-            data:  resp.data,
-            error: resp.error,
+            code:          Uint64::from(resp.code),
+            succeed_data:  resp.succeed_data,
+            error_message: resp.error_message,
         }
     }
 }
