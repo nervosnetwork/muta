@@ -187,7 +187,14 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
 
             self.adapter
                 .verify_block_header(ctx.clone(), consenting_rich_block.block.clone())
-                .await?;
+                .await
+                .map_err(|e| {
+                    log::error!(
+                        "[synchronization]: verify_block_header error, block: {:?}",
+                        consenting_rich_block.block
+                    );
+                    e
+                })?;
 
             // verify syncing proof
             self.adapter
@@ -196,7 +203,15 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
                     consenting_rich_block.block.clone(),
                     consenting_proof.clone(),
                 )
-                .await?;
+                .await
+                .map_err(|e| {
+                    log::error!(
+                        "[synchronization]: verify_proof error, syncing block: {:?}, proof: {:?}",
+                        consenting_rich_block.block,
+                        consenting_proof.clone(),
+                    );
+                    e
+                })?;
 
             // verify previous proof
             let previous_block = self
@@ -207,10 +222,18 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
             self.adapter
                 .verify_proof(
                     ctx.clone(),
-                    previous_block,
+                    previous_block.clone(),
                     consenting_rich_block.block.header.proof.clone(),
                 )
-                .await?;
+                .await
+                .map_err(|e| {
+                    log::error!(
+                        "[synchronization]: verify_proof error, previous block: {:?}, proof: {:?}",
+                        previous_block,
+                        consenting_rich_block.block.header.proof
+                    );
+                    e
+                })?;
 
             self.adapter
                 .verify_txs_sync(
@@ -222,7 +245,11 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
                         .map(|signed_tx| signed_tx.tx_hash.clone())
                         .collect(),
                 )
-                .await?;
+                .await
+                .map_err(|e| {
+                    log::error!("[synchronization]:  verify_txs_sync error",);
+                    e
+                })?;
 
             self.commit_block(
                 ctx.clone(),

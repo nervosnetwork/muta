@@ -160,7 +160,15 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             self.check_block_roots(&block.inner.block.header)?;
 
             self.adapter
-                .verify_block_header(ctx.clone(), block.inner.block.clone());
+                .verify_block_header(ctx.clone(), block.inner.block.clone())
+                .await
+                .map_err(|e| {
+                    log::error!(
+                        "[consensus] check_block, verify_block_header error, block: {:?}",
+                        block.inner.block
+                    );
+                    e
+                })?;
 
             // verify the proof in the block for previous block
             // skip to get previous proof to compare because the node may just comes from
@@ -169,9 +177,22 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
                 .adapter
                 .get_block_by_height(ctx.clone(), block.inner.block.header.height - 1)
                 .await?;
+
             self.adapter
-                .verify_proof(ctx.clone(), previous_block, block.inner.block.header.proof)
-                .await?;
+                .verify_proof(
+                    ctx.clone(),
+                    previous_block.clone(),
+                    block.inner.block.header.proof.clone(),
+                )
+                .await
+                .map_err(|e| {
+                    log::error!(
+                        "[consensus] check_block, verify_proof error, previous block: {:?}, proof: {:?}",
+                        previous_block,
+                        block.inner.block.header.proof
+                    );
+                    e
+                })?;
 
             self.adapter
                 .verify_txs(
@@ -179,7 +200,11 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
                     block.inner.block.header.height,
                     block.inner.block.ordered_tx_hashes.clone(),
                 )
-                .await?;
+                .await
+                .map_err(|e| {
+                    log::error!("[consensus] check_block, verify_txs error",);
+                    e
+                })?;
 
             let adapter = Arc::clone(&self.adapter);
             let ctx_clone = ctx.clone();
