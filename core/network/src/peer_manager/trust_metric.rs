@@ -386,10 +386,25 @@ impl TrustMetric {
         tokio::spawn(heart_beat);
     }
 
+    #[cfg(test)]
+    pub fn is_started(&self) -> bool {
+        self.hb_handle.read().is_some()
+    }
+
     pub fn pause(&self) {
         if let Some(abort_handle) = self.hb_handle.write().take() {
             abort_handle.abort();
         }
+    }
+
+    #[cfg(test)]
+    pub fn bad_events_count(&self) -> usize {
+        self.inner.bad_events.load(SeqCst)
+    }
+
+    #[cfg(test)]
+    pub fn good_events_count(&self) -> usize {
+        self.inner.good_events.load(SeqCst)
     }
 }
 
