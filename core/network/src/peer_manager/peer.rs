@@ -225,6 +225,11 @@ impl Peer {
             .store(expired_at.as_secs(), Ordering::SeqCst);
     }
 
+    #[cfg(test)]
+    pub fn ban_expired_at(&self) -> u64 {
+        self.ban_expired_at.load(Ordering::SeqCst)
+    }
+
     pub fn banned(&self) -> bool {
         let expired_at = self.ban_expired_at.load(Ordering::SeqCst);
         if time::now() > expired_at {

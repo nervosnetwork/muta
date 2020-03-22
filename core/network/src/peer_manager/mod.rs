@@ -536,7 +536,7 @@ impl Inner {
 }
 
 // TODO: Store our secret key?
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PeerManagerConfig {
     /// Our Peer ID
     pub our_id: PeerId,
@@ -710,6 +710,18 @@ impl PeerManager {
         Arc::clone(&self.inner)
     }
 
+    #[cfg(test)]
+    fn config(&self) -> PeerManagerConfig {
+        self.config.clone()
+    }
+
+    #[cfg(test)]
+    fn set_connecting(&mut self, peers: Vec<ArcPeer>) {
+        for peer in peers.into_iter() {
+            self.connecting.insert(ConnectingAttempt::new(peer));
+        }
+    }
+
     fn new_session(&mut self, pubkey: PublicKey, ctx: Arc<SessionContext>) {
         let remote_peer_id = pubkey.peer_id();
         let remote_multiaddr = PeerMultiaddr::new(ctx.address.to_owned(), &remote_peer_id);
@@ -738,7 +750,7 @@ impl PeerManager {
         }
 
         if self.config.whitelist_peers_only && !self.inner.whitelisted(&remote_peer) {
-            debug!("reject peer {:?} not in whitelist", remote_peer.id);
+            debug!("whitelist only enabled, reject peer {:?}", remote_peer.id);
             remote_peer.mark_disconnected();
             self.disconnect_session(ctx.id);
             return;
@@ -1079,6 +1091,11 @@ impl PeerManager {
 
         if let Some(session) = self.inner.session(ctx.id) {
             session.block();
+
+            match session.peer.trust_metric() {
+                Some(trust_metric) => trust_metric.bad_events(1),
+                None => error!("session peer {:?} trust metric not found", session.peer.id),
+            };
         }
     }
 
