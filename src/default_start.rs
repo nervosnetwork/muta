@@ -155,7 +155,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         .peer_trust_metric(
             config.network.trust_interval_duration,
             config.network.trust_max_history_duration,
-        )
+        )?
         .peer_soft_ban(config.network.soft_ban_duration)
         .peer_fatal_ban(config.network.fatal_ban_duration)
         .rpc_timeout(config.network.rpc_timeout.clone())
