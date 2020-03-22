@@ -164,10 +164,16 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
             );
 
             let consenting_rich_block: RichBlock = match prepared_rich_block.as_ref() {
-                None => {
-                    self.get_rich_block_from_remote(ctx.clone(), consenting_height)
-                        .await?
-                }
+                None => self
+                    .get_rich_block_from_remote(ctx.clone(), consenting_height)
+                    .await
+                    .map_err(|e| {
+                        log::error!(
+                            "[synchronization]: get_rich_block_from_remote error, height: {:?}",
+                            consenting_height
+                        );
+                        e
+                    })?,
 
                 Some(_) => prepared_rich_block.take().unwrap(),
             };
@@ -175,14 +181,28 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
             let consenting_proof: Proof = if consenting_height < remote_height {
                 let proof_block = self
                     .get_rich_block_from_remote(ctx.clone(), consenting_height + 1)
-                    .await?;
+                    .await
+                    .map_err(|e| {
+                        log::error!(
+                            "[synchronization]: get_rich_block_from_remote error, height: {:?}",
+                            consenting_height + 1
+                        );
+                        e
+                    })?;
 
                 prepared_rich_block = Some(proof_block.clone());
                 proof_block.block.header.proof
             } else {
                 self.adapter
                     .get_proof_from_remote(ctx.clone(), consenting_height)
-                    .await?
+                    .await
+                    .map_err(|e| {
+                        log::error!(
+                            "[synchronization]: get_proof_from_remote error, height: {:?}",
+                            consenting_height
+                        );
+                        e
+                    })?
             };
 
             self.adapter
