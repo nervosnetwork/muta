@@ -56,7 +56,7 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
         if let Some(asset) = self.assets.get(&payload.id) {
             ServiceResponse::<Asset>::from_succeed(asset)
         } else {
-            ServiceResponse::<Asset>::from_error(1, "asset id not existed".to_owned())
+            ServiceResponse::<Asset>::from_error(101, "asset id not existed".to_owned())
         }
     }
 
@@ -69,7 +69,7 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
     ) -> ServiceResponse<GetBalanceResponse> {
         if !self.assets.contains(&payload.asset_id) {
             return ServiceResponse::<GetBalanceResponse>::from_error(
-                1,
+                101,
                 "asset id not existed".to_owned(),
             );
         }
@@ -100,7 +100,7 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
     ) -> ServiceResponse<GetAllowanceResponse> {
         if !self.assets.contains(&payload.asset_id) {
             return ServiceResponse::<GetAllowanceResponse>::from_error(
-                1,
+                101,
                 "asset id not existed".to_owned(),
             );
         }
@@ -141,14 +141,14 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
         let payload_res = serde_json::to_string(&payload);
 
         if let Err(e) = payload_res {
-            return ServiceResponse::<Asset>::from_error(3, format!("{:?}", e));
+            return ServiceResponse::<Asset>::from_error(103, format!("{:?}", e));
         }
         let payload_str = payload_res.unwrap();
 
         let id = Hash::digest(Bytes::from(payload_str + &caller.as_hex()));
 
         if self.assets.contains(&id) {
-            return ServiceResponse::<Asset>::from_error(2, "asset id existed".to_owned());
+            return ServiceResponse::<Asset>::from_error(102, "asset id existed".to_owned());
         }
         let asset = Asset {
             id:     id.clone(),
@@ -170,7 +170,7 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
         let event_res = serde_json::to_string(&asset);
 
         if let Err(e) = event_res {
-            return ServiceResponse::<Asset>::from_error(3, format!("{:?}", e));
+            return ServiceResponse::<Asset>::from_error(103, format!("{:?}", e));
         }
         let event_str = event_res.unwrap();
         ctx.emit_event(event_str);
@@ -187,11 +187,11 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
         let to = payload.to;
 
         if !self.assets.contains(&payload.asset_id) {
-            return ServiceResponse::<()>::from_error(1, "asset id not existed".to_owned());
+            return ServiceResponse::<()>::from_error(101, "asset id not existed".to_owned());
         }
 
         if let Err(e) = self._transfer(caller.clone(), to.clone(), asset_id.clone(), value) {
-            return ServiceResponse::<()>::from_error(6, format!("{:?}", e));
+            return ServiceResponse::<()>::from_error(106, format!("{:?}", e));
         };
 
         let event = TransferEvent {
@@ -203,7 +203,7 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
         let event_res = serde_json::to_string(&event);
 
         if let Err(e) = event_res {
-            return ServiceResponse::<()>::from_error(3, format!("{:?}", e));
+            return ServiceResponse::<()>::from_error(103, format!("{:?}", e));
         };
         let event_str = event_res.unwrap();
         ctx.emit_event(event_str);
@@ -220,11 +220,11 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
         let to = payload.to;
 
         if caller == to {
-            return ServiceResponse::<()>::from_error(4, "cann't approve to yourself".to_owned());
+            return ServiceResponse::<()>::from_error(104, "cann't approve to yourself".to_owned());
         }
 
         if !self.assets.contains(&payload.asset_id) {
-            return ServiceResponse::<()>::from_error(1, "asset id not existed".to_owned());
+            return ServiceResponse::<()>::from_error(101, "asset id not existed".to_owned());
         }
 
         let mut caller_asset_balance: AssetBalance = self
@@ -252,7 +252,7 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
         let event_res = serde_json::to_string(&event);
 
         if let Err(e) = event_res {
-            return ServiceResponse::<()>::from_error(3, format!("{:?}", e));
+            return ServiceResponse::<()>::from_error(103, format!("{:?}", e));
         };
         let event_str = event_res.unwrap();
         ctx.emit_event(event_str);
@@ -274,7 +274,7 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
         let value = payload.value;
 
         if !self.assets.contains(&asset_id) {
-            return ServiceResponse::<()>::from_error(1, "asset id not existed".to_owned());
+            return ServiceResponse::<()>::from_error(101, "asset id not existed".to_owned());
         }
 
         let mut sender_asset_balance: AssetBalance = self
@@ -289,7 +289,7 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
             .entry(caller.clone())
             .or_insert(0);
         if *sender_allowance < value {
-            return ServiceResponse::<()>::from_error(5, "insufficient balance".to_owned());
+            return ServiceResponse::<()>::from_error(105, "insufficient balance".to_owned());
         }
         let after_sender_allowance = *sender_allowance - value;
         sender_asset_balance
@@ -301,7 +301,7 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
             .set_account_value(&sender, asset_id.clone(), sender_asset_balance);
 
         if let Err(e) = self._transfer(sender.clone(), recipient.clone(), asset_id.clone(), value) {
-            return ServiceResponse::<()>::from_error(6, format!("{:?}", e));
+            return ServiceResponse::<()>::from_error(106, format!("{:?}", e));
         };
 
         let event = TransferFromEvent {
@@ -314,7 +314,7 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
         let event_res = serde_json::to_string(&event);
 
         if let Err(e) = event_res {
-            return ServiceResponse::<()>::from_error(3, format!("{:?}", e));
+            return ServiceResponse::<()>::from_error(103, format!("{:?}", e));
         };
         let event_str = event_res.unwrap();
         ctx.emit_event(event_str);

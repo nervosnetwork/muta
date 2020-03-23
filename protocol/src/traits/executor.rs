@@ -45,6 +45,10 @@ impl<T: Default> ServiceResponse<T> {
             error_message: "".to_owned(),
         }
     }
+
+    pub fn is_error(&self) -> bool {
+        self.code != 0
+    }
 }
 
 impl<T: Default + PartialEq> PartialEq for ServiceResponse<T> {
