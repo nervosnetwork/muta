@@ -1,26 +1,25 @@
 import gql from "graphql-tag";
-import { muta, CHAIN_CONFIG, delay, client } from "./utils";
+import { mutaClient, delay, client } from "./utils";
 
 async function main() {
   let q = `
         query {
-            getLatestBlock {
+            getBlock {
                 header {
                     height
                 }
             }
         }
         `;
-  const muta_client = muta.client;
   for (let i = 0; i < 10; i++) {
     await delay(100);
     const res = await client.query({ query: gql(q) });
     console.log(res.data.getLatestBlock.header);
 
-    const height = await muta_client.getBlockHeight();
+    const height = await mutaClient.getLatestBlockHeight();
     console.log(height);
 
-    const height2 = await muta.client.getBlockHeight();
+    const height2 = await mutaClient.getLatestBlockHeight();
     console.log(height2);
   }
 }

@@ -43,7 +43,7 @@ struct Query;
 #[juniper::graphql_object(Context = State)]
 impl Query {
     #[graphql(name = "getBlock", description = "Get the block")]
-    async fn get_latest_block(state_ctx: &State, height: Option<Uint64>) -> FieldResult<Block> {
+    async fn get_block(state_ctx: &State, height: Option<Uint64>) -> FieldResult<Block> {
         let height = match height {
             Some(id) => Some(id.try_into_u64()?),
             None => None,
