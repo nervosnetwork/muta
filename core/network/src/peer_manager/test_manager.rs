@@ -2684,6 +2684,38 @@ async fn should_disconnect_and_soft_ban_peer_if_below_fourty_score_on_worse_feed
 }
 
 #[tokio::test]
+async fn should_not_knock_out_peer_just_set_up_trust_metric_on_worse_feedback_on_trust_metric() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+    let test_peer = remote_peers.first().expect("get first peer");
+    let trust_metric = test_peer.trust_metric().expect("trust metric");
+
+    assert_eq!(
+        trust_metric.good_events_count(),
+        0,
+        "should not have any good events"
+    );
+    assert_eq!(
+        trust_metric.bad_events_count(),
+        0,
+        "should not have any bad events"
+    );
+    assert_eq!(trust_metric.intervals(), 0, "should not have any intervals");
+
+    let feedback = PeerManagerEvent::TrustMetric {
+        pid:      test_peer.owned_id(),
+        feedback: TrustFeedback::Worse("worse".to_owned()),
+    };
+    mgr.poll_event(feedback).await;
+
+    let inner = mgr.core_inner();
+    assert!(!test_peer.banned(), "should not ban");
+    let trust_metric = test_peer.trust_metric().expect("get trust metric");
+    assert!(trust_metric.is_started(), "should continue trust metric");
+    assert_eq!(inner.connected(), 1, "should still connected");
+}
+
+#[tokio::test]
 async fn should_exclude_whitelisted_peer_if_below_fourty_score_on_worse_feedback_on_trust_metric() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
     let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
