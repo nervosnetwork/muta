@@ -24,7 +24,6 @@ services:
       - chain
     working_dir: /app
     volumes:
-      - ../../devtools/chain/config.toml:/app/config.toml
       - .:/app
       - ../../target/tests/e2e/node_modules:/app/node_modules
     links:
