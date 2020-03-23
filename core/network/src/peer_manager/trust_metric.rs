@@ -21,7 +21,8 @@ pub const OPTIMISTIC_HISTORY_WEIGHT: f64 = 0.8;
 pub const DERIVATIVE_POSITIVE_WEIGHT: f64 = 0.0;
 pub const DERIVATIVE_NEGATIVE_WEIGHT: f64 = 0.1;
 
-pub const KNOCK_OUT_SCORE: u8 = 30;
+pub const INITIAL_HISTORY_VALUE: f64 = 0.8f64;
+pub const KNOCK_OUT_SCORE: u8 = 40;
 
 pub const DEFAULT_INTERVAL_DURATION: Duration = Duration::from_secs(60);
 pub const DEFAULT_MAX_HISTORY_DURATION: Duration = Duration::from_secs(24 * 60 * 60 * 10); // 10 day
@@ -120,9 +121,14 @@ impl History {
             max_memorys,
             intervals: 0,
             memorys: Vec::new(),
-            aggregate_trust: 0f64,
+            aggregate_trust: INITIAL_HISTORY_VALUE,
             weights_sum: 0f64,
         }
+    }
+
+    #[cfg(test)]
+    fn intervals(&self) -> u64 {
+        self.intervals
     }
 
     fn latest_trust_value(&self) -> f64 {
@@ -405,6 +411,11 @@ impl TrustMetric {
     #[cfg(test)]
     pub fn good_events_count(&self) -> usize {
         self.inner.good_events.load(SeqCst)
+    }
+
+    #[cfg(test)]
+    pub fn intervals(&self) -> u64 {
+        self.inner.history.read().intervals()
     }
 }
 
