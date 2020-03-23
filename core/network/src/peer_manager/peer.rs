@@ -247,6 +247,11 @@ impl Peer {
         }
     }
 
+    #[cfg(test)]
+    fn set_ban_expired_at(&self, at: u64) {
+        self.ban_expired_at.store(at, Ordering::SeqCst);
+    }
+
     fn update_connected(&self) {
         self.connected_at.store(time::now(), Ordering::SeqCst);
     }
@@ -311,5 +316,40 @@ impl Eq for ArcPeer {}
 impl Hash for ArcPeer {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.id.hash(state)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ArcPeer;
+    use crate::peer_manager::{time, TrustMetric, TrustMetricConfig};
+
+    use tentacle::secio::SecioKeyPair;
+
+    use std::sync::Arc;
+
+    #[test]
+    fn should_reset_trust_metric_history_after_unban() {
+        let keypair = SecioKeyPair::secp256k1_generated();
+        let pubkey = keypair.public_key();
+        let peer = ArcPeer::from_pubkey(pubkey).expect("make peer");
+        let peer_trust_config = Arc::new(TrustMetricConfig::default());
+
+        let trust_metric = TrustMetric::new(Arc::clone(&peer_trust_config));
+        peer.set_trust_metric(trust_metric.clone());
+        for _ in 0..2 {
+            trust_metric.bad_events(10);
+            trust_metric.enter_new_interval();
+        }
+        assert!(trust_metric.trust_score() < 40, "should lower score");
+
+        peer.set_ban_expired_at(time::now() - 20);
+        assert!(!peer.banned(), "should unban");
+
+        assert_eq!(
+            trust_metric.intervals(),
+            0,
+            "should reset peer trust history"
+        );
     }
 }
