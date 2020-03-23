@@ -9,12 +9,12 @@ describe("API test via muta-sdk-js", () => {
   });
 
   test("transfer work", async () => {
-    const from_addr = "0x103e9b982b443592ffc3d4c2a484c220fb3e29e2e4";
+    const from_addr = "0xf8389d774afdad8755ef8e629e5a154fddc6325a";
     const from_pk =
-      "0x1ab5dfb50a38643ad8bbcbb27145825ddba65e67c72ec9bb643b72e190a27509";
-    const to_addr = "0x100000000000000000000000000000000000000001";
+      "0x45c56be699dca666191ad3446897e0f480da234da896270202514a0e1a587c3f";
+    const to_addr = "0x0000000000000000000000000000000000000001";
     const asset_id =
-      "0xfee0decb4f6a76d402f200b5642a9236ba455c22aa80ef82d69fc70ea5ba20b5";
+      "0xf56924db538e77bb5951eb5ff0d02b88983c49c45eea30e8ae3e7234b311436c";
 
     const account = Account.fromPrivateKey(from_pk);
     const assetService = new AssetService(mutaClient, account);
@@ -41,7 +41,7 @@ describe("API test via muta-sdk-js", () => {
     })
 
     // check result
-    const retry_times = 3;
+    const retry_times = 10;
     let i: number;
     for (i = 0; i < retry_times; i++) {
       // wait at least 2 blocks. Change to confirm after impl
