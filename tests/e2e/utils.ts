@@ -40,5 +40,3 @@ export function getNonce() {
 export function delay(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
-
-export const CHAIN_CONFIG = toml.parse(readFileSync("./config.toml", "utf-8"));

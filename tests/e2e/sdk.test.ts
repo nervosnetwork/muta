@@ -1,4 +1,4 @@
-import { muta, mutaClient, CHAIN_CONFIG, delay } from "./utils";
+import { muta, mutaClient, delay } from "./utils";
 import { AssetService, Account } from "muta-sdk";
 
 describe("API test via muta-sdk-js", () => {
@@ -19,16 +19,14 @@ describe("API test via muta-sdk-js", () => {
     const account = Account.fromPrivateKey(from_pk);
     const assetService = new AssetService(mutaClient, account);
 
-    const from_balance_before = await assetService.get_balance(
-      {
-        user: from_addr,
-        asset_id: asset_id
-      }
-    );
+    const from_balance_before = await assetService.get_balance({
+      user: from_addr,
+      asset_id: asset_id
+    })!;
     const to_balance_before = await assetService.get_balance({
       user: to_addr,
       asset_id: asset_id,
-    });
+    })!;
     const height_before = await mutaClient.getLatestBlockHeight();
 
     // transfer
@@ -41,26 +39,28 @@ describe("API test via muta-sdk-js", () => {
     })
 
     // check result
-    const retry_times = 10;
+    const retry_times = 5;
     let i: number;
     for (i = 0; i < retry_times; i++) {
       // wait at least 2 blocks. Change to confirm after impl
-      await delay(CHAIN_CONFIG.consensus.interval * 2 + 100);
+      await delay(3000 * 2 + 100);
       let height_after = await mutaClient.getLatestBlockHeight();
       if (height_after <= height_before) {
         continue;
       }
-      let from_balance_after = await assetService.get_balance( {
+      let from_balance_after = await assetService.get_balance({
         user: from_addr,
         asset_id: asset_id,
-      });
+      })!;
       const to_balance_after = await assetService.get_balance({
         user: to_addr,
         asset_id: asset_id,
-      });
-      console.log(from_balance_after.ret.balance, from_balance_before.ret.balance)
-      // expect(from_balance_after.ret.balance).toBe(from_balance_before.ret.balance - 1);
-      // expect(to_balance_after.ret.balance).toBe(to_balance_before.ret.balance + 1);
+      })!;
+
+      const c1 = from_balance_before.ret.balance as number;
+      expect(from_balance_after.ret.balance).toBe(c1 - 1);
+      const c2 = to_balance_before.ret.balance as number
+      expect(to_balance_after.ret.balance).toBe(c2 + 1);
       break;
     }
     expect(i).toBeLessThan(retry_times);

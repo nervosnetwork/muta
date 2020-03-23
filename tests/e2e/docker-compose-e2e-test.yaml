@@ -5,10 +5,10 @@ services:
     image: nervos/muta:dev
     environment:
       - RUST_BACKTRACE
-      - RUST_LOG=info,overlord=warn
+      - RUST_LOG=info
     working_dir: /app
     volumes:
-      - ./config.toml:/app/devtools/chain/config.toml
+      - ../../devtools/chain/config.toml:/app/devtools/chain/config.toml
       - ../..:/app
       - ../../target/docker_target:/app/target
       - ../../target/cargo_cache:/usr/local/cargo/registry
@@ -17,20 +17,21 @@ services:
       - -c
       - |
         rm -rf ./target/tests/e2e/data
-        cargo run
+        cargo run --example muta-chain
   e2e-test:
     image: node:10.15
     depends_on:
       - chain
     working_dir: /app
     volumes:
+      - ../../devtools/chain/config.toml:/app/config.toml
       - .:/app
       - ../../target/tests/e2e/node_modules:/app/node_modules
     links:
       - chain
     environment:
       - API_URL=http://chain:8000/graphql
-    command: 
+    command:
       - /bin/sh
       - -c
       - |
