@@ -114,8 +114,8 @@ pub fn gen_service_code(_: TokenStream, item: TokenStream) -> TokenStream {
                 match method {
                     #(#list_read_name => {
                         let payload_res: Result<#list_read_payload, _> = serde_json::from_str(ctx.get_payload());
-                        if let Err(e) = payload_res {
-                            return ServiceResponse::<String>::from_error(1, format!("service macro decode payload failed: {:?}", e));
+                        if payload_res.is_err() {
+                            return ServiceResponse::<String>::from_error(1, "service macro decode payload failed".to_owned());
                         };
                         let payload = payload_res.unwrap();
                         let res = self.#list_read_ident(ctx, payload);
@@ -152,8 +152,8 @@ pub fn gen_service_code(_: TokenStream, item: TokenStream) -> TokenStream {
                 match method {
                     #(#list_write_name => {
                         let payload_res: Result<#list_write_payload, _> = serde_json::from_str(ctx.get_payload());
-                        if let Err(e) = payload_res {
-                            return ServiceResponse::<String>::from_error(1, format!("service macro decode payload failed: {:?}", e));
+                        if payload_res.is_err() {
+                            return ServiceResponse::<String>::from_error(1, "service macro decode payload failed".to_owned());
                         };
                         let payload = payload_res.unwrap();
                         let res = self.#list_write_ident(ctx, payload);
