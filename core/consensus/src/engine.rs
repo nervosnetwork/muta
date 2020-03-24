@@ -164,8 +164,8 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
                 .await
                 .map_err(|e| {
                     log::error!(
-                        "[consensus] check_block, verify_block_header error, block: {:?}",
-                        block.inner.block
+                        "[consensus] check_block, verify_block_header error, block header: {:?}",
+                        block.inner.block.header
                     );
                     e
                 })?;
@@ -187,8 +187,8 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
                 .await
                 .map_err(|e| {
                     log::error!(
-                        "[consensus] check_block, verify_proof error, previous block: {:?}, proof: {:?}",
-                        previous_block,
+                        "[consensus] check_block, verify_proof error, previous block header: {:?}, proof: {:?}",
+                        previous_block.header,
                         block.inner.block.header.proof
                     );
                     e
