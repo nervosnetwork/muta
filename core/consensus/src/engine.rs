@@ -326,6 +326,11 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             pill.block.header.height,
             pill.block.header.timestamp,
         )?;
+        log::info!(
+            "[consensus]: validator of height {} is {:?}",
+            current_height + 1,
+            metadata.verifier_list
+        );
 
         self.update_status(metadata, pill.block, proof, signed_txs)
             .await?;

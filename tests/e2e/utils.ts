@@ -3,7 +3,7 @@ import { createHttpLink } from "apollo-link-http";
 import { InMemoryCache } from "apollo-cache-inmemory";
 import ApolloClient from "apollo-client";
 import { readFileSync } from "fs";
-import { Muta } from "muta-sdk";
+import { AssetService, Muta } from "muta-sdk";
 const toml = require("toml");
 
 export const CHAIN_ID =
@@ -21,6 +21,7 @@ export const muta = new Muta({
   endpoint: API_URL,
   chainId: CHAIN_ID
 });
+export const mutaClient = muta.client();
 
 export function makeid(length: number) {
   var result = "";
@@ -39,5 +40,3 @@ export function getNonce() {
 export function delay(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
-
-export const CHAIN_CONFIG = toml.parse(readFileSync("./config.toml", "utf-8"));
