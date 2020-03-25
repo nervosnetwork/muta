@@ -1,4 +1,4 @@
-use crate::schema::{Hash, MerkleRoot, Uint64};
+use crate::schema::{Hash, MerkleRoot, ServiceResponse, Uint64};
 
 #[derive(juniper::GraphQLObject, Clone)]
 pub struct Receipt {
@@ -20,8 +20,7 @@ pub struct Event {
 pub struct ReceiptResponse {
     pub service_name: String,
     pub method:       String,
-    pub ret:          String,
-    pub is_error:     bool,
+    pub response:     ServiceResponse,
 }
 
 impl From<protocol::types::Receipt> for Receipt {
@@ -51,8 +50,7 @@ impl From<protocol::types::ReceiptResponse> for ReceiptResponse {
         Self {
             service_name: response.service_name,
             method:       response.method,
-            ret:          response.ret,
-            is_error:     response.is_error,
+            response:     ServiceResponse::from(response.response),
         }
     }
 }

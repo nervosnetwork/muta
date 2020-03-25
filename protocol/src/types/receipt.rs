@@ -1,3 +1,4 @@
+use crate::traits::ServiceResponse;
 use crate::types::{Hash, MerkleRoot};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -20,6 +21,5 @@ pub struct Receipt {
 pub struct ReceiptResponse {
     pub service_name: String,
     pub method:       String,
-    pub ret:          String,
-    pub is_error:     bool,
+    pub response:     ServiceResponse<String>,
 }

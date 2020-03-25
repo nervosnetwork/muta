@@ -78,7 +78,7 @@ pub struct GetBalancePayload {
     pub user:     Address,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
+#[derive(Deserialize, Serialize, Clone, Debug, Default)]
 pub struct GetBalanceResponse {
     pub asset_id: Hash,
     pub user:     Address,
@@ -92,7 +92,7 @@ pub struct GetAllowancePayload {
     pub grantee:  Address,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
+#[derive(Deserialize, Serialize, Clone, Debug, Default)]
 pub struct GetAllowanceResponse {
     pub asset_id: Hash,
     pub grantor:  Address,
@@ -100,7 +100,7 @@ pub struct GetAllowanceResponse {
     pub value:    u64,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Default)]
 pub struct Asset {
     pub id:     Hash,
     pub name:   String,

@@ -48,29 +48,29 @@ pub fn gen_service_code(_: TokenStream, item: TokenStream) -> TokenStream {
     let genesis_method = find_genesis(items);
     let genesis_body = match genesis_method {
         Some(genesis_method) => get_genesis_body(&genesis_method),
-        None => quote! {Ok(())},
+        None => quote! {()},
     };
 
     let hooks = extract_hooks(items);
     let hook_before = &hooks.before;
     let hook_before_body = match hook_before {
         Some(hook_before) => quote! { self.#hook_before(_params) },
-        None => quote! {Ok(())},
+        None => quote! {()},
     };
     let hook_after = &hooks.after;
     let hook_after_body = match hook_after {
         Some(hook_after) => quote! { self.#hook_after(_params) },
-        None => quote! {Ok(())},
+        None => quote! {()},
     };
     let tx_hook_before = &hooks.tx_before;
     let tx_hook_before_body = match tx_hook_before {
         Some(tx_hook_before) => quote! { self.#tx_hook_before(_ctx) },
-        None => quote! {Ok(())},
+        None => quote! {()},
     };
     let tx_hook_after = &hooks.tx_after;
     let tx_hook_after_body = match tx_hook_after {
         Some(tx_hook_after) => quote! { self.#tx_hook_after(_ctx) },
-        None => quote! {Ok(())},
+        None => quote! {()},
     };
 
     let list_method_meta: Vec<MethodMeta> = methods.into_iter().map(extract_method_meta).collect();
@@ -87,81 +87,99 @@ pub fn gen_service_code(_: TokenStream, item: TokenStream) -> TokenStream {
 
     TokenStream::from(quote! {
         impl #impl_generics protocol::traits::Service for #service_ident #ty_generics #where_clause {
-            fn genesis_(&mut self, _payload: String) -> protocol::ProtocolResult<()> {
+            fn genesis_(&mut self, _payload: String) {
                 #genesis_body
             }
 
-            fn hook_before_(&mut self, _params: &ExecutorParams) -> protocol::ProtocolResult<()> {
+            fn hook_before_(&mut self, _params: &ExecutorParams) {
                 #hook_before_body
             }
 
-            fn hook_after_(&mut self, _params: &ExecutorParams) -> protocol::ProtocolResult<()> {
+            fn hook_after_(&mut self, _params: &ExecutorParams) {
                 #hook_after_body
             }
 
-            fn tx_hook_before_(&mut self, _ctx: ServiceContext) -> ProtocolResult<()> {
+            fn tx_hook_before_(&mut self, _ctx: ServiceContext) {
                 #tx_hook_before_body
             }
 
-            fn tx_hook_after_(&mut self, _ctx: ServiceContext) -> ProtocolResult<()> {
+            fn tx_hook_after_(&mut self, _ctx: ServiceContext) {
                 #tx_hook_after_body
             }
 
-            fn read_(&self, ctx: protocol::types::ServiceContext) -> protocol::ProtocolResult<String> {
+            fn read_(&self, ctx: protocol::types::ServiceContext) -> ServiceResponse<String> {
                 let service = ctx.get_service_name();
                 let method = ctx.get_service_method();
 
                 match method {
                     #(#list_read_name => {
-                        let payload: #list_read_payload = serde_json::from_str(ctx.get_payload())
-                                .map_err(|e| protocol::traits::BindingMacroError::JsonParse(e))?;
-                        let res = self.#list_read_ident(ctx, payload)?;
-                        let res_str = serde_json::to_string(&res).map_err(|e| protocol::traits::BindingMacroError::JsonParse(e))?;
-                        if res_str.as_str() == "null" {
-                            Ok("".to_owned())
+                        let payload_res: Result<#list_read_payload, _> = serde_json::from_str(ctx.get_payload());
+                        if payload_res.is_err() {
+                            return ServiceResponse::<String>::from_error(1, "decode service payload failed".to_owned());
+                        };
+                        let payload = payload_res.unwrap();
+                        let res = self.#list_read_ident(ctx, payload);
+                        if !res.is_error() {
+                            let mut data_json = serde_json::to_string(&res.succeed_data).unwrap_or_else(|e| panic!("encode succeed_data of ServiceResponse failed: {:?}", e));
+                            if data_json == "null" {
+                                data_json = "".to_owned();
+                            }
+                            ServiceResponse::<String>::from_succeed(data_json)
                         } else {
-                            Ok(res_str)
+                            ServiceResponse::<String>::from_error(res.code, res.error_message.clone())
                         }
                     },)*
                     #(#list_read_name_nonepayload => {
-                        let res = self.#list_read_ident_nonepayload(ctx)?;
-                        let res_str = serde_json::to_string(&res).map_err(|e| protocol::traits::BindingMacroError::JsonParse(e))?;
-                        if res_str.as_str() == "null" {
-                            Ok("".to_owned())
+                        let res = self.#list_read_ident_nonepayload(ctx);
+                        if !res.is_error() {
+                            let mut data_json = serde_json::to_string(&res.succeed_data).unwrap_or_else(|e| panic!("encode succeed_data of ServiceResponse failed: {:?}", e));
+                            if data_json == "null" {
+                                data_json = "".to_owned();
+                            }
+                            ServiceResponse::<String>::from_succeed(data_json)
                         } else {
-                            Ok(res_str)
+                            ServiceResponse::<String>::from_error(res.code, res.error_message.clone())
                         }
                     },)*
-                    _ => Err(protocol::traits::BindingMacroError::NotFoundMethod{ service: service.to_owned(), method: method.to_owned() }.into())
+                    _ => ServiceResponse::<String>::from_error(2, format!("not found method:{:?} of service:{:?}", method, service))
                 }
             }
 
-            fn write_(&mut self, ctx: protocol::types::ServiceContext) -> protocol::ProtocolResult<String> {
+            fn write_(&mut self, ctx: protocol::types::ServiceContext) -> ServiceResponse<String> {
                 let service = ctx.get_service_name();
                 let method = ctx.get_service_method();
 
                 match method {
                     #(#list_write_name => {
-                        let payload: #list_write_payload = serde_json::from_str(ctx.get_payload())
-                                .map_err(|e| protocol::traits::BindingMacroError::JsonParse(e))?;
-                        let res = self.#list_write_ident(ctx, payload)?;
-                        let res_str = serde_json::to_string(&res).map_err(|e| protocol::traits::BindingMacroError::JsonParse(e))?;
-                        if res_str.as_str() == "null" {
-                            Ok("".to_owned())
+                        let payload_res: Result<#list_write_payload, _> = serde_json::from_str(ctx.get_payload());
+                        if payload_res.is_err() {
+                            return ServiceResponse::<String>::from_error(1, "decode service payload failed".to_owned());
+                        };
+                        let payload = payload_res.unwrap();
+                        let res = self.#list_write_ident(ctx, payload);
+                        if !res.is_error() {
+                            let mut data_json = serde_json::to_string(&res.succeed_data).unwrap_or_else(|e| panic!("encode succeed_data of ServiceResponse failed: {:?}", e));
+                            if data_json == "null" {
+                                data_json = "".to_owned();
+                            }
+                            ServiceResponse::<String>::from_succeed(data_json)
                         } else {
-                            Ok(res_str)
+                            ServiceResponse::<String>::from_error(res.code, res.error_message.clone())
                         }
                     },)*
                     #(#list_write_name_nonepayload => {
-                        let res = self.#list_write_ident_nonepayload(ctx)?;
-                        let res_str = serde_json::to_string(&res).map_err(|e| protocol::traits::BindingMacroError::JsonParse(e))?;
-                        if res_str.as_str() == "null" {
-                            Ok("".to_owned())
+                        let res = self.#list_write_ident_nonepayload(ctx);
+                        if !res.is_error() {
+                            let mut data_json = serde_json::to_string(&res.succeed_data).unwrap_or_else(|e| panic!("encode succeed_data of ServiceResponse failed: {:?}", e));
+                            if data_json == "null" {
+                                data_json = "".to_owned();
+                            }
+                            ServiceResponse::<String>::from_succeed(data_json)
                         } else {
-                            Ok(res_str)
+                            ServiceResponse::<String>::from_error(res.code, res.error_message.clone())
                         }
                     },)*
-                    _ => Err(protocol::traits::BindingMacroError::NotFoundMethod{ service: service.to_owned(), method: method.to_owned() }.into())
+                    _ => ServiceResponse::<String>::from_error(2, format!("not found method:{:?} of service:{:?}", method, service))
                 }
             }
         }
@@ -275,7 +293,7 @@ fn get_genesis_body(item: &ImplItemMethod) -> proc_macro2::TokenStream {
 
                 quote!{
                     let payload: #payload_ident = serde_json::from_str(&_payload)
-                                    .map_err(|e| protocol::traits::BindingMacroError::JsonParse(e))?;
+                    .unwrap_or_else(|e| panic!("decode genesis payload failed: {:?}", e));
                     self.#method_name(payload)
                 }
         },

@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use cita_trie::MemoryDB;
 
-use protocol::traits::{NoopDispatcher, ServiceSDK, Storage};
+use protocol::traits::{NoopDispatcher, ServiceResponse, ServiceSDK, Storage};
 use protocol::types::{
     Address, Block, BlockHeader, Event, Hash, MerkleRoot, Proof, RawTransaction, Receipt,
     ReceiptResponse, SignedTransaction, TransactionRequest, Validator,
@@ -29,27 +29,25 @@ fn test_service_sdk() {
     let mut sdk = DefalutServiceSDK::new(Rc::clone(&rs), Rc::new(cq), NoopDispatcher {});
 
     // test sdk store bool
-    let mut sdk_bool = sdk.alloc_or_recover_bool("test_bool").unwrap();
-    sdk_bool.set(true).unwrap();
-    assert_eq!(sdk_bool.get().unwrap(), true);
+    let mut sdk_bool = sdk.alloc_or_recover_bool("test_bool");
+    sdk_bool.set(true);
+    assert_eq!(sdk_bool.get(), true);
 
     // test sdk store string
-    let mut sdk_string = sdk.alloc_or_recover_string("test_string").unwrap();
-    sdk_string.set("hello").unwrap();
-    assert_eq!(sdk_string.get().unwrap(), "hello".to_owned());
+    let mut sdk_string = sdk.alloc_or_recover_string("test_string");
+    sdk_string.set("hello");
+    assert_eq!(sdk_string.get(), "hello".to_owned());
 
     // test sdk store uint64
-    let mut sdk_uint64 = sdk.alloc_or_recover_uint64("test_uint64").unwrap();
-    sdk_uint64.set(99).unwrap();
-    assert_eq!(sdk_uint64.get().unwrap(), 99);
+    let mut sdk_uint64 = sdk.alloc_or_recover_uint64("test_uint64");
+    sdk_uint64.set(99);
+    assert_eq!(sdk_uint64.get(), 99);
 
     // test sdk map
-    let mut sdk_map = sdk.alloc_or_recover_map::<Hash, Bytes>("test_map").unwrap();
-    assert_eq!(sdk_map.is_empty().unwrap(), true);
+    let mut sdk_map = sdk.alloc_or_recover_map::<Hash, Bytes>("test_map");
+    assert_eq!(sdk_map.is_empty(), true);
 
-    sdk_map
-        .insert(Hash::digest(Bytes::from("key_1")), Bytes::from("val_1"))
-        .unwrap();
+    sdk_map.insert(Hash::digest(Bytes::from("key_1")), Bytes::from("val_1"));
 
     assert_eq!(
         sdk_map.get(&Hash::digest(Bytes::from("key_1"))).unwrap(),
@@ -64,48 +62,41 @@ fn test_service_sdk() {
     assert_eq!(it.next().is_none(), true);
 
     // test sdk array
-    let mut sdk_array = sdk.alloc_or_recover_array::<Hash>("test_array").unwrap();
-    assert_eq!(sdk_array.is_empty().unwrap(), true);
+    let mut sdk_array = sdk.alloc_or_recover_array::<Hash>("test_array");
+    assert_eq!(sdk_array.is_empty(), true);
 
-    sdk_array.push(Hash::digest(Bytes::from("key_1"))).unwrap();
+    sdk_array.push(Hash::digest(Bytes::from("key_1")));
 
-    assert_eq!(
-        sdk_array.get(0).unwrap(),
-        Hash::digest(Bytes::from("key_1"))
-    );
+    assert_eq!(sdk_array.get(0), Hash::digest(Bytes::from("key_1")));
 
     let mut it = sdk_array.iter();
     assert_eq!(it.next().unwrap(), (0, Hash::digest(Bytes::from("key_1"))));
     assert_eq!(it.next().is_none(), true);
 
     // test get/set account value
-    sdk.set_account_value(&mock_address(), Bytes::from("ak"), Bytes::from("av"))
-        .unwrap();
+    sdk.set_account_value(&mock_address(), Bytes::from("ak"), Bytes::from("av"));
     let account_value: Bytes = sdk
         .get_account_value(&mock_address(), &Bytes::from("ak"))
-        .unwrap()
         .unwrap();
     assert_eq!(Bytes::from("av"), account_value);
 
     // test get/set value
-    sdk.set_value(Bytes::from("ak"), Bytes::from("av")).unwrap();
-    let value: Bytes = sdk.get_value(&Bytes::from("ak")).unwrap().unwrap();
+    sdk.set_value(Bytes::from("ak"), Bytes::from("av"));
+    let value: Bytes = sdk.get_value(&Bytes::from("ak")).unwrap();
     assert_eq!(Bytes::from("av"), value);
 
     // test query chain
     let tx_data = sdk
         .get_transaction_by_hash(&Hash::digest(Bytes::from("param")))
-        .unwrap()
         .unwrap();
     assert_eq!(mock_signed_tx(), tx_data);
 
     let receipt_data = sdk
         .get_receipt_by_hash(&Hash::digest(Bytes::from("param")))
-        .unwrap()
         .unwrap();
     assert_eq!(mock_receipt(), receipt_data);
 
-    let block_data = sdk.get_block_by_height(Some(1)).unwrap().unwrap();
+    let block_data = sdk.get_block_by_height(Some(1)).unwrap();
     assert_eq!(mock_block(1), block_data);
 }
 
@@ -238,8 +229,11 @@ pub fn mock_receipt_response() -> ReceiptResponse {
     ReceiptResponse {
         service_name: "mock-service".to_owned(),
         method:       "mock-method".to_owned(),
-        ret:          "mock-ret".to_owned(),
-        is_error:     false,
+        response:     ServiceResponse::<String> {
+            code:          0,
+            succeed_data:  "ok".to_owned(),
+            error_message: "".to_owned(),
+        },
     }
 }
 

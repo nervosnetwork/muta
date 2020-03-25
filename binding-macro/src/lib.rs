@@ -27,10 +27,8 @@ use crate::service::gen_service_code;
 ///     #[genesis]
 ///     fn init_genesis(
 ///         &mut self,
-///     ) -> ProtocolResult<()> {
+///     ) {
 ///         do_work();
-///
-///         Ok(()))
 ///     }
 /// }
 /// ```
@@ -45,10 +43,8 @@ use crate::service::gen_service_code;
 ///     fn init_genesis(
 ///         &mut self,
 ///         payload: PayloadType,
-///     ) -> ProtocolResult<()> {
+///     ) {
 ///         do_work(payload);
-///
-///         Ok(()))
 ///     }
 /// }
 /// ```
@@ -77,7 +73,7 @@ pub fn tx_hook_after(_: TokenStream, item: TokenStream) -> TokenStream {
 ///  1. Is it a struct method marked with #[service]?
 ///  2. Is visibility private?
 ///  3. Parameter signature contains `&self and ctx: ServiceContext`?
-///  4. Is the return value `ProtocolResult <T: Deserialize + Serialize>` or `ProtocolResult <()>`?
+///  4. Is the return value `ServiceResponse<T>`?
 ///
 /// # Example:
 ///
@@ -89,8 +85,8 @@ pub fn tx_hook_after(_: TokenStream, item: TokenStream) -> TokenStream {
 ///     fn test_read_fn(
 ///         &self,
 ///         _ctx: ServiceContext,
-///     ) -> ProtocolResult<String> {
-///         Ok("test read".to_owend())
+///     ) -> ServiceResponse<String> {
+///         ServiceResponse::<String>::from_succeed("ok".to_owned())
 ///     }
 /// }
 /// ```
@@ -110,7 +106,7 @@ pub fn read(_: TokenStream, item: TokenStream) -> TokenStream {
 ///  1. Is it a struct method marked with #[service]?
 ///  2. Is visibility private?
 ///  3. Parameter signature contains `&self and ctx: ServiceContext`?
-///  4. Is the return value `ProtocolResult <T: Deserialize + Serialize>` or `ProtocolResult <()>`?
+///  4. Is the return value `ServiceResponse<T>`?
 ///
 /// # Example:
 ///
@@ -122,8 +118,8 @@ pub fn read(_: TokenStream, item: TokenStream) -> TokenStream {
 ///     fn test_write_fn(
 ///         &mut self,
 ///         _ctx: ServiceContext,
-///     ) -> ProtocolResult<String> {
-///         Ok("test write".to_owned())
+///     ) -> ServiceResponse<String> {
+///         ServiceResponse::<String>::from_succeed("ok".to_owned())
 ///     }
 /// }
 /// ```
@@ -140,16 +136,16 @@ pub fn write(_: TokenStream, item: TokenStream) -> TokenStream {
 /// // Source Code
 /// impl Tests {
 ///     #[cycles(100)]
-///     fn test_cycles(&self, ctx: ServiceContext) -> ProtocolResult<()> {
-///         Ok(())
+///     fn test_cycles(&self, ctx: ServiceContext) -> ServiceResponse<()> {
+///         ServiceResponse::<()>::from_succeed(())
 ///     }
 /// }
 ///
 /// // Generated code.
 /// impl Tests {
-///     fn test_cycles(&self, ctx: ServiceContext) -> ProtocolResult<()> {
-///         ctx.sub_cycles(100)?;
-///         Ok(())
+///     fn test_cycles(&self, ctx: ServiceContext) -> ServiceResponse<()> {
+///         ctx.sub_cycles(100);
+///         ServiceResponse::<()>::from_succeed(())
 ///     }
 /// }
 /// ```
@@ -201,12 +197,12 @@ pub fn hook_before(_: TokenStream, item: TokenStream) -> TokenStream {
 /// #[service]
 /// impl<SDK: ServiceSDK> KittyService<SDK> {
 ///     #[hook_before]
-///     fn custom_hook_before(&mut self) -> ProtoResult<()> {
+///     fn custom_hook_before(&mut self) {
 ///         // Do something
 ///     }
 ///
 ///     #[hook_after]
-///     fn custom_hook_after(&mut self) -> ProtoResult<()> {
+///     fn custom_hook_after(&mut self) {
 ///         // Do something
 ///     }
 ///
@@ -215,7 +211,7 @@ pub fn hook_before(_: TokenStream, item: TokenStream) -> TokenStream {
 ///         &self,
 ///         ctx: ServiceContext,
 ///         payload: GetKittyPayload,
-///     ) -> ProtoResult<&str> {
+///     ) -> ServiceResponse<String> {
 ///         // Do something
 ///     }
 ///
@@ -224,32 +220,42 @@ pub fn hook_before(_: TokenStream, item: TokenStream) -> TokenStream {
 ///         &mut self,
 ///         ctx: ServiceContext,
 ///         payload: CreateKittyPayload,
-///     ) -> ProtoResult<&str> {
+///     ) -> ServiceResponse<String> {
 ///         // Do something
 ///     }
 /// }
 ///
 /// // Generated code.
 /// impl<SDK: ServiceSDK> Service<SDK> for KittyService<SDK> {
-///     fn hook_before_(&mut self) -> ProtocolResult<()> {
+///     fn hook_before_(&mut self) {
 ///         self.custom_hook_before()
 ///     }
 ///
-///     fn hook_after(&mut self) -> ProtocolResult<()> {
+///     fn hook_after(&mut self) {
 ///         self.custom_hook_after()
 ///     }
 ///
-///     fn write(&mut self, ctx: ServiceContext) -> ProtocolResult<&str> {
+///     fn write(&mut self, ctx: ServiceContext) -> ServiceResponse<String> {
 ///         let method = ctx.get_service_method();
 ///
 ///         match ctx.get_service_method() {
 ///             "create_kitty" => {
-///                 let payload: CreateKittyPayload = serde_json::from_str(ctx.get_payload())
-///                     .map_err(|e| core_binding::ServiceError::JsonParse(e))?;
-///                 let res = self.create_kitty(ctx, payload)?;
-///                 serde_json::to_string(&res).map_err(|e| framework::ServiceError::JsonParse(e).into())
+///                 let payload_res: Result<CreateKittyPayload, _> = serde_json::from_str(ctx.get_payload());
+///                 if payload_res.is_error() {
+///                      return ServiceResponse::<String>::from_error(1, "service macro decode payload failed".to_owned());
+///                 };
+///                 let payload = payload_res.unwrap();
+///                 let res = self.#list_read_ident(ctx, payload);
+///                 if !res.is_error() {
+///                     let mut data_json = serde_json::to_string(&res.succeed_data).unwrap_or_else(|e| panic!("service macro encode payload failed: {:?}", e));
+///                     if data_json == "null" {
+///                         data_json = "".to_owned();
+///                     }
+///                     ServiceResponse::<String>::from_succeed(data_json)
+///                 } else {
+///                     ServiceResponse::<String>::from_error(res.code, res.error_message.clone())
 ///             }
-///             _ => Err(core_binding::ServiceError::NotFoundMethod(method.to_owned()).into()),
+///             _ => panic!("service macro not found method:{:?} of service:{:?}", method, service),
 ///         }
 ///     }
 ///
@@ -258,12 +264,22 @@ pub fn hook_before(_: TokenStream, item: TokenStream) -> TokenStream {
 ///
 ///         match ctx.get_service_method() {
 ///             "get_kitty" => {
-///                 let payload: GetKittyPayload = serde_json::from_str(ctx.get_payload())
-///                     .map_err(|e| core_binding::ServiceError::JsonParse(e))?;
-///                 let res = self.get_kitty(ctx, payload)?;
-///                 serde_json::to_string(&res).map_err(|e| framework::ServiceError::JsonParse(e).into())
+///                 let payload_res: Result<GetKittyPayload, _> = serde_json::from_str(ctx.get_payload());
+///                 if payload_res.is_error() {
+///                      return ServiceResponse::<String>::from_error(1, "service macro decode payload failed".to_owned());
+///                 };
+///                 let payload = payload_res.unwrap();
+///                 let res = self.#list_read_ident(ctx, payload);
+///                 if !res.is_error() {
+///                     let mut data_json = serde_json::to_string(&res.succeed_data).unwrap_or_else(|e| panic!("service macro encode payload failed: {:?}", e));
+///                     if data_json == "null" {
+///                         data_json = "".to_owned();
+///                     }
+///                     ServiceResponse::<String>::from_succeed(data_json)
+///                 } else {
+///                     ServiceResponse::<String>::from_error(res.code, res.error_message.clone())
 ///             }
-///             _ => Err(core_binding::ServiceError::NotFoundMethod(method.to_owned()).into()),
+///             _ => panic!("service macro not found method:{:?} of service:{:?}", method, service),
 ///         }
 ///     }
 /// }

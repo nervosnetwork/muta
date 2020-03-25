@@ -22,11 +22,44 @@ pub struct ExecutorParams {
     pub cycles_limit: u64,
 }
 
-#[derive(Debug, Clone)]
-pub struct ExecResp {
-    pub ret:      String,
-    pub is_error: bool,
+#[derive(Debug, Clone, Default)]
+pub struct ServiceResponse<T: Default> {
+    pub code:          u64,
+    pub succeed_data:  T,
+    pub error_message: String,
 }
+
+impl<T: Default> ServiceResponse<T> {
+    pub fn from_error(code: u64, error_message: String) -> Self {
+        Self {
+            code,
+            succeed_data: T::default(),
+            error_message,
+        }
+    }
+
+    pub fn from_succeed(succeed_data: T) -> Self {
+        Self {
+            code: 0,
+            succeed_data,
+            error_message: "".to_owned(),
+        }
+    }
+
+    pub fn is_error(&self) -> bool {
+        self.code != 0
+    }
+}
+
+impl<T: Default + PartialEq> PartialEq for ServiceResponse<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.code == other.code
+            && self.succeed_data == other.succeed_data
+            && self.error_message == other.error_message
+    }
+}
+
+impl<T: Default + Eq> Eq for ServiceResponse<T> {}
 
 pub trait ExecutorFactory<DB: cita_trie::DB, S: Storage, Mapping: ServiceMapping>:
     Send + Sync
@@ -52,24 +85,24 @@ pub trait Executor {
         caller: &Address,
         cycles_price: u64,
         request: &TransactionRequest,
-    ) -> ProtocolResult<ExecResp>;
+    ) -> ProtocolResult<ServiceResponse<String>>;
 }
 
 // `Dispatcher` provides ability to send a call message to other services
 pub trait Dispatcher {
-    fn read(&self, context: ServiceContext) -> ProtocolResult<ExecResp>;
+    fn read(&self, context: ServiceContext) -> ServiceResponse<String>;
 
-    fn write(&self, context: ServiceContext) -> ProtocolResult<ExecResp>;
+    fn write(&self, context: ServiceContext) -> ServiceResponse<String>;
 }
 
 pub struct NoopDispatcher;
 
 impl Dispatcher for NoopDispatcher {
-    fn read(&self, _context: ServiceContext) -> ProtocolResult<ExecResp> {
+    fn read(&self, _context: ServiceContext) -> ServiceResponse<String> {
         unimplemented!()
     }
 
-    fn write(&self, _context: ServiceContext) -> ProtocolResult<ExecResp> {
+    fn write(&self, _context: ServiceContext) -> ServiceResponse<String> {
         unimplemented!()
     }
 }
