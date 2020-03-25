@@ -96,11 +96,12 @@ impl ServiceContext {
         self.events.borrow().clone()
     }
 
-    pub fn sub_cycles(&self, cycles: u64) {
+    pub fn sub_cycles(&self, cycles: u64) -> bool {
         if self.get_cycles_used() + cycles <= self.cycles_limit {
             *self.cycles_used.borrow_mut() = self.get_cycles_used() + cycles;
+            true
         } else {
-            panic!("out of cycles");
+            false
         }
     }
 
