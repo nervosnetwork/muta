@@ -22,6 +22,7 @@ use core_consensus::message::{
     RPC_SYNC_PULL_TXS,
 };
 use core_consensus::status::{CurrentConsensusStatus, StatusAgent};
+use core_consensus::util::OverlordCrypto;
 use core_consensus::{
     DurationConfig, Node, OverlordConsensus, OverlordConsensusAdapter, OverlordSynchronization,
     RichBlock, SignedTxsWAL,
@@ -327,6 +328,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     let common_ref: BlsCommonReference = std::str::from_utf8(hex_common_ref.as_ref())
         .map_err(MainError::Utf8)?
         .into();
+    let crypto = Arc::new(OverlordCrypto::new(bls_priv_key, bls_pub_keys, common_ref));
 
     core_consensus::trace::init_tracer(my_address.as_hex())?;
 
@@ -348,9 +350,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     let overlord_consensus = Arc::new(OverlordConsensus::new(
         status_agent.clone(),
         node_info,
-        bls_pub_keys,
-        bls_priv_key,
-        common_ref,
+        Arc::clone(&crypto),
         Arc::clone(&txs_wal),
         Arc::clone(&consensus_adapter),
         Arc::clone(&lock),
@@ -362,6 +362,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         config.consensus.sync_txs_chunk_size,
         consensus_adapter,
         status_agent.clone(),
+        crypto,
         lock,
     ));
 

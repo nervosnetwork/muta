@@ -609,21 +609,23 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
     }
 
     fn update_overlord_crypto(&self, metadata: Metadata) -> ProtocolResult<()> {
-        let mut new_addr_pubkey_map = HashMap::new();
-        for validator in metadata.verifier_list.into_iter() {
-            let addr = validator.address.as_bytes();
-            let hex_pubkey =
-                hex::decode(validator.bls_pub_key.as_string_trim0x()).map_err(|err| {
-                    ConsensusError::Other(format!("hex decode metadata bls pubkey error {:?}", err))
-                })?;
-            let pubkey = BlsPublicKey::try_from(hex_pubkey.as_ref()).map_err(|err| {
-                ConsensusError::Other(format!("try from bls pubkey error {:?}", err))
-            })?;
-            new_addr_pubkey_map.insert(addr, pubkey);
-        }
-        self.crypto.update(new_addr_pubkey_map);
+        self.crypto.update(generate_new_crypto_map(metadata)?);
         Ok(())
     }
+}
+
+pub fn generate_new_crypto_map(metadata: Metadata) -> ProtocolResult<HashMap<Bytes, BlsPublicKey>> {
+    let mut new_addr_pubkey_map = HashMap::new();
+    for validator in metadata.verifier_list.into_iter() {
+        let addr = validator.address.as_bytes();
+        let hex_pubkey = hex::decode(validator.bls_pub_key.as_string_trim0x()).map_err(|err| {
+            ConsensusError::Other(format!("hex decode metadata bls pubkey error {:?}", err))
+        })?;
+        let pubkey = BlsPublicKey::try_from(hex_pubkey.as_ref())
+            .map_err(|err| ConsensusError::Other(format!("try from bls pubkey error {:?}", err)))?;
+        new_addr_pubkey_map.insert(addr, pubkey);
+    }
+    Ok(new_addr_pubkey_map)
 }
 
 fn covert_to_overlord_authority(validators: &[Validator]) -> Vec<Node> {

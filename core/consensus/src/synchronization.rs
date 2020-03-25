@@ -12,7 +12,9 @@ use protocol::traits::{
 use protocol::types::{Block, Hash, Receipt, SignedTransaction};
 use protocol::ProtocolResult;
 
+use crate::engine::generate_new_crypto_map;
 use crate::status::{ExecutedInfo, StatusAgent};
+use crate::util::OverlordCrypto;
 use crate::ConsensusError;
 
 const POLLING_BROADCAST: u64 = 2000;
@@ -27,6 +29,7 @@ pub struct RichBlock {
 pub struct OverlordSynchronization<Adapter: SynchronizationAdapter> {
     adapter: Arc<Adapter>,
     status:  StatusAgent,
+    crypto:  Arc<OverlordCrypto>,
     lock:    Arc<Mutex<()>>,
     syncing: Mutex<()>,
 
@@ -108,6 +111,7 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
         sync_txs_chunk_size: usize,
         adapter: Arc<Adapter>,
         status: StatusAgent,
+        crypto: Arc<OverlordCrypto>,
         lock: Arc<Mutex<()>>,
     ) -> Self {
         let syncing = Mutex::new(());
@@ -115,6 +119,7 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
         Self {
             adapter,
             status,
+            crypto,
             lock,
             syncing,
 
@@ -200,6 +205,9 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
             block.header.height,
             block.header.timestamp,
         )?;
+
+        self.crypto
+            .update(generate_new_crypto_map(metadata.clone())?);
 
         self.adapter.set_args(
             ctx.clone(),
