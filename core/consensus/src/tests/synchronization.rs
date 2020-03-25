@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::convert::TryFrom;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -6,7 +7,9 @@ use futures::executor::block_on;
 use futures::lock::Mutex;
 use parking_lot::RwLock;
 
+use common_crypto::BlsPrivateKey;
 use common_merkle::Merkle;
+
 use protocol::fixed_codec::FixedCodec;
 use protocol::traits::{CommonConsensusAdapter, Synchronization, SynchronizationAdapter};
 use protocol::traits::{Context, ExecutorParams, ExecutorResp};
@@ -18,6 +21,7 @@ use protocol::ProtocolResult;
 
 use crate::status::{CurrentConsensusStatus, StatusAgent};
 use crate::synchronization::{OverlordSynchronization, RichBlock};
+use crate::util::OverlordCrypto;
 
 // Test the blocks gap from 1 to 10.
 #[test]
@@ -70,8 +74,13 @@ fn sync_gap_test() {
         };
         let status_agent = StatusAgent::new(status);
         let lock = Arc::new(Mutex::new(()));
-        let sync =
-            OverlordSynchronization::new(5000, Arc::clone(&adapter), status_agent.clone(), lock);
+        let sync = OverlordSynchronization::new(
+            5000,
+            Arc::clone(&adapter),
+            status_agent.clone(),
+            Arc::new(mock_crypto()),
+            lock,
+        );
         block_on(sync.receive_remote_block(Context::new(), max_height / 2)).unwrap();
 
         let status = status_agent.to_inner();
@@ -267,6 +276,15 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
         _cycles_limit: u64,
         _max_tx_size: u64,
     ) {
+    }
+}
+
+fn mock_crypto() -> OverlordCrypto {
+    let priv_key = BlsPrivateKey::try_from(hex::decode("000000000000000000000000000000001abd6ffdb44427d9e1fcb6f84e7fe7d98f2b5b205b30a94992ec24d94bb0c970").unwrap().as_ref());
+    OverlordCrypto {
+        private_key: priv_key,
+        addr_pubkey: RwLock::new(HashMap::new()),
+        common_ref:  "muta".into(),
     }
 }
 
