@@ -280,12 +280,8 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
 }
 
 fn mock_crypto() -> OverlordCrypto {
-    let priv_key = BlsPrivateKey::try_from(hex::decode("000000000000000000000000000000001abd6ffdb44427d9e1fcb6f84e7fe7d98f2b5b205b30a94992ec24d94bb0c970").unwrap().as_ref());
-    OverlordCrypto {
-        private_key: priv_key,
-        addr_pubkey: RwLock::new(HashMap::new()),
-        common_ref:  "muta".into(),
-    }
+    let priv_key = BlsPrivateKey::try_from(hex::decode("000000000000000000000000000000001abd6ffdb44427d9e1fcb6f84e7fe7d98f2b5b205b30a94992ec24d94bb0c970").unwrap().as_ref()).unwrap();
+    OverlordCrypto::new(priv_key, HashMap::new(), "muta".into())
 }
 
 fn gen_remote_tx_hashmap(list: Vec<RichBlock>) -> SafeHashMap<Hash, SignedTransaction> {
