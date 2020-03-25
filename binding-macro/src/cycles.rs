@@ -82,7 +82,7 @@ pub fn gen_cycles_code(attr: TokenStream, item: TokenStream) -> TokenStream {
     TokenStream::from(quote! {
         #func_vis fn #func_name#generics(#inputs) #ret {
             if !#request_ident.sub_cycles(#cycles_value) {
-                return ServiceResponse::<_>::from_error(2, "cycles macro consume cycles fialed: out of cycles".to_owned());
+                return ServiceResponse::<_>::from_error(3, "cycles macro consume cycles fialed: out of cycles".to_owned());
             }
             #body
         }

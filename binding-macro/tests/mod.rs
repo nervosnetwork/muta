@@ -230,9 +230,9 @@ fn test_service() {
 
     let context = get_context(1024 * 1024, "", "test_notfound", &payload_str);
     let read_res = panic::catch_unwind(AssertUnwindSafe(|| test_service.read_(context.clone())));
-    assert_eq!(read_res.is_err(), true);
+    assert_eq!(read_res.unwrap().is_error(), true);
     let write_res = panic::catch_unwind(AssertUnwindSafe(|| test_service.write_(context)));
-    assert_eq!(write_res.is_err(), true);
+    assert_eq!(write_res.unwrap().is_error(), true);
 
     test_service.hook_before_(&mock_executor_params());
     assert_eq!(test_service.hook_before, true);
@@ -312,9 +312,9 @@ fn test_service_none_payload() {
 
     let context = get_context(1024 * 1024, "", "test_notfound", "");
     let read_res = panic::catch_unwind(AssertUnwindSafe(|| test_service.read_(context.clone())));
-    assert_eq!(read_res.is_err(), true);
+    assert_eq!(read_res.unwrap().is_error(), true);
     let write_res = panic::catch_unwind(AssertUnwindSafe(|| test_service.write_(context)));
-    assert_eq!(write_res.is_err(), true);
+    assert_eq!(write_res.unwrap().is_error(), true);
 
     test_service.hook_before_(&mock_executor_params());
     assert_eq!(test_service.hook_before, true);
@@ -381,9 +381,9 @@ fn test_service_none_response() {
 
     let context = get_context(1024 * 1024, "", "test_notfound", "");
     let read_res = panic::catch_unwind(AssertUnwindSafe(|| test_service.read_(context.clone())));
-    assert_eq!(read_res.is_err(), true);
+    assert_eq!(read_res.unwrap().is_error(), true);
     let write_res = panic::catch_unwind(AssertUnwindSafe(|| test_service.write_(context)));
-    assert_eq!(write_res.is_err(), true);
+    assert_eq!(write_res.unwrap().is_error(), true);
 
     test_service.hook_before_(&mock_executor_params());
     assert_eq!(test_service.hook_before, true);

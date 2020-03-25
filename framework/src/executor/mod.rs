@@ -231,32 +231,23 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
         context: ServiceContext,
         exec_type: ExecType,
     ) -> ProtocolResult<ServiceResponse<String>> {
-        let mut retry_count = 0;
-        loop {
-            retry_count += 1;
-            let result = match exec_type {
-                ExecType::Read => panic::catch_unwind(AssertUnwindSafe(|| {
-                    self.call(context.clone(), exec_type.clone())
-                })),
-                ExecType::Write => panic::catch_unwind(AssertUnwindSafe(|| {
-                    self.call_with_tx_hooks(context.clone(), exec_type.clone())
-                })),
-            };
-            match result {
-                Ok(r) => {
-                    self.stash()?;
-                    return Ok(r);
-                }
-                Err(e) => {
-                    self.revert_cache()?;
-                    if retry_count < 2 {
-                        continue;
-                    } else {
-                        log::error!("inner chain error occurred when calling service: {:?}", e);
-                        let s = format!("{:?}", e);
-                        return Err(ExecutorError::CallService(s).into());
-                    }
-                }
+        let result = match exec_type {
+            ExecType::Read => panic::catch_unwind(AssertUnwindSafe(|| {
+                self.call(context.clone(), exec_type.clone())
+            })),
+            ExecType::Write => panic::catch_unwind(AssertUnwindSafe(|| {
+                self.call_with_tx_hooks(context.clone(), exec_type.clone())
+            })),
+        };
+        match result {
+            Ok(r) => {
+                self.stash()?;
+                Ok(r)
+            }
+            Err(e) => {
+                self.revert_cache()?;
+                log::error!("inner chain error occurred when calling service: {:?}", e);
+                Err(ExecutorError::CallService(format!("{:?}", e)).into())
             }
         }
     }
