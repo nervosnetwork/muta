@@ -39,6 +39,7 @@ env:
     - FMT: true
     - CHECK: true
     - TEST: true
+    - E2E: true
 
 before_cache:
   - rm -rf "$TRAVIS_HOME"/.cargo/registry"

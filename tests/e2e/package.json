@@ -14,7 +14,7 @@
     "apollo-boost": "^0.4.4",
     "graphql": "^14.5.8",
     "graphql-tag": "^2.10.1",
-    "muta-sdk": "^0.7.0-alpha.6",
+    "muta-sdk": "^0.10.0",
     "node-fetch": "^2.6.0",
     "toml": "^3.0.0",
     "ts-node": "^8.3.0",
