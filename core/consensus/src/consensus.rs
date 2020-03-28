@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -9,11 +8,9 @@ use overlord::types::{
 };
 use overlord::{DurationConfig, Overlord, OverlordHandler};
 
-use common_crypto::{BlsCommonReference, BlsPrivateKey, BlsPublicKey};
-
 use protocol::traits::{Consensus, ConsensusAdapter, NodeInfo};
 use protocol::types::Validator;
-use protocol::{Bytes, ProtocolResult};
+use protocol::ProtocolResult;
 
 use crate::engine::ConsensusEngine;
 use crate::fixed_types::FixedPill;
@@ -75,15 +72,11 @@ impl<Adapter: ConsensusAdapter + 'static> OverlordConsensus<Adapter> {
     pub fn new(
         status_agent: StatusAgent,
         node_info: NodeInfo,
-        addr_pubkey_map: HashMap<Bytes, BlsPublicKey>,
-        priv_key: BlsPrivateKey,
-        common_ref: BlsCommonReference,
+        crypto: Arc<OverlordCrypto>,
         txs_wal: Arc<SignedTxsWAL>,
         adapter: Arc<Adapter>,
         lock: Arc<Mutex<()>>,
     ) -> Self {
-        let crypto = Arc::new(OverlordCrypto::new(priv_key, addr_pubkey_map, common_ref));
-
         let engine = Arc::new(ConsensusEngine::new(
             status_agent.clone(),
             node_info.clone(),
