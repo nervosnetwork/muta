@@ -6,6 +6,7 @@ pub use factory::ServiceExecutorFactory;
 
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::panic::{self, AssertUnwindSafe};
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -14,8 +15,8 @@ use derive_more::{Display, From};
 
 use bytes::BytesMut;
 use protocol::traits::{
-    Dispatcher, ExecResp, Executor, ExecutorParams, ExecutorResp, NoopDispatcher, ServiceMapping,
-    ServiceState, Storage,
+    Dispatcher, Executor, ExecutorParams, ExecutorResp, NoopDispatcher, ServiceMapping,
+    ServiceResponse, ServiceState, Storage,
 };
 use protocol::types::{
     Address, Bloom, BloomInput, Hash, MerkleRoot, Receipt, ReceiptResponse, ServiceContext,
@@ -31,6 +32,7 @@ enum HookType {
     After,
 }
 
+#[derive(Clone)]
 enum ExecType {
     Read,
     Write,
@@ -82,7 +84,10 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
                 DefalutServiceSDK::new(Rc::clone(state), Rc::clone(&querier), NoopDispatcher {});
 
             let mut service = mapping.get_service(&params.name, sdk)?;
-            service.genesis_(params.payload.clone())?;
+            panic::catch_unwind(AssertUnwindSafe(|| {
+                service.genesis_(params.payload.clone())
+            }))
+            .map_err(|e| ProtocolError::from(ExecutorError::InitService(format!("{:?}", e))))?;
 
             state.borrow_mut().stash()?;
         }
@@ -156,8 +161,12 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
             let mut service = self.service_mapping.get_service(name.as_str(), sdk)?;
 
             let hook_ret = match hook {
-                HookType::Before => service.hook_before_(exec_params),
-                HookType::After => service.hook_after_(exec_params),
+                HookType::Before => {
+                    panic::catch_unwind(AssertUnwindSafe(|| service.hook_before_(exec_params)))
+                }
+                HookType::After => {
+                    panic::catch_unwind(AssertUnwindSafe(|| service.hook_after_(exec_params)))
+                }
             };
 
             if hook_ret.is_err() {
@@ -217,17 +226,29 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
         Ok(ServiceContext::new(ctx_params))
     }
 
-    fn catch_call(&self, context: ServiceContext, exec_type: ExecType) -> ExecResp {
-        let res = match exec_type {
-            ExecType::Read => self.call(context, exec_type),
-            ExecType::Write => self.call_with_tx_hooks(context, exec_type),
+    fn catch_call(
+        &mut self,
+        context: ServiceContext,
+        exec_type: ExecType,
+    ) -> ProtocolResult<ServiceResponse<String>> {
+        let result = match exec_type {
+            ExecType::Read => panic::catch_unwind(AssertUnwindSafe(|| {
+                self.call(context.clone(), exec_type.clone())
+            })),
+            ExecType::Write => panic::catch_unwind(AssertUnwindSafe(|| {
+                self.call_with_tx_hooks(context.clone(), exec_type.clone())
+            })),
         };
-        match res {
-            Ok(resp) => resp,
-            Err(e) => ExecResp {
-                ret:      e.to_string(),
-                is_error: true,
-            },
+        match result {
+            Ok(r) => {
+                self.stash()?;
+                Ok(r)
+            }
+            Err(e) => {
+                self.revert_cache()?;
+                log::error!("inner chain error occurred when calling service: {:?}", e);
+                Err(ExecutorError::CallService(format!("{:?}", e)).into())
+            }
         }
     }
 
@@ -235,44 +256,47 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
         &self,
         context: ServiceContext,
         exec_type: ExecType,
-    ) -> ProtocolResult<ExecResp> {
+    ) -> ServiceResponse<String> {
         let mut tx_hook_services = vec![];
         for name in self.service_mapping.list_service_name().into_iter() {
-            let sdk = self.get_sdk(&name)?;
-            let tx_hook_service = self.service_mapping.get_service(name.as_str(), sdk)?;
+            let sdk = self
+                .get_sdk(&name)
+                .unwrap_or_else(|e| panic!("get target service sdk failed: {}", e));
+            let tx_hook_service = self
+                .service_mapping
+                .get_service(name.as_str(), sdk)
+                .unwrap_or_else(|e| panic!("get target service sdk failed: {}", e));
             tx_hook_services.push(tx_hook_service);
         }
+        // TODO: If tx_hook_before_ failed, we should not exec the tx.
+        // Need a mechanism for this.
         for tx_hook_service in tx_hook_services.iter_mut() {
-            tx_hook_service.tx_hook_before_(context.clone())?;
+            tx_hook_service.tx_hook_before_(context.clone());
         }
         let original_res = self.call(context.clone(), exec_type);
         // TODO: If the tx fails, status tx_hook_after_ changes will also be reverted.
         // It may not be what the developer want.
         // Need a new mechanism for this.
         for tx_hook_service in tx_hook_services.iter_mut() {
-            tx_hook_service.tx_hook_after_(context.clone())?;
+            tx_hook_service.tx_hook_after_(context.clone());
         }
         original_res
     }
 
-    fn call(&self, context: ServiceContext, exec_type: ExecType) -> ProtocolResult<ExecResp> {
-        let sdk = self.get_sdk(context.get_service_name())?;
+    fn call(&self, context: ServiceContext, exec_type: ExecType) -> ServiceResponse<String> {
+        let sdk = self
+            .get_sdk(context.get_service_name())
+            .unwrap_or_else(|e| panic!("get target service sdk failed: {}", e));
 
         let mut service = self
             .service_mapping
-            .get_service(context.get_service_name(), sdk)?;
+            .get_service(context.get_service_name(), sdk)
+            .unwrap_or_else(|e| panic!("get target service failed: {}", e));
 
-        let result = match exec_type {
+        match exec_type {
             ExecType::Read => service.read_(context),
             ExecType::Write => service.write_(context),
-        };
-
-        let (ret, is_error) = match result {
-            Ok(ret) => (ret, false),
-            Err(e) => (e.to_string(), true),
-        };
-
-        Ok(ExecResp { ret, is_error })
+        }
     }
 
     fn logs_bloom(&self, receipts: &[Receipt]) -> Bloom {
@@ -316,13 +340,7 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
                     &stx.raw.request,
                 )?;
 
-                let exec_resp = self.catch_call(context.clone(), ExecType::Write);
-
-                if exec_resp.is_error {
-                    self.revert_cache()?;
-                } else {
-                    self.stash()?;
-                };
+                let exec_resp = self.catch_call(context.clone(), ExecType::Write)?;
 
                 Ok(Receipt {
                     state_root:  MerkleRoot::from_empty(),
@@ -333,8 +351,7 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
                     response:    ReceiptResponse {
                         service_name: context.get_service_name().to_owned(),
                         method:       context.get_service_method().to_owned(),
-                        ret:          exec_resp.ret,
-                        is_error:     exec_resp.is_error,
+                        response:     exec_resp,
                     },
                 })
             })
@@ -365,7 +382,7 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
         caller: &Address,
         cycles_price: u64,
         request: &TransactionRequest,
-    ) -> ProtocolResult<ExecResp> {
+    ) -> ProtocolResult<ServiceResponse<String>> {
         let context = self.get_context(
             None,
             None,
@@ -375,18 +392,19 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
             params,
             request,
         )?;
-        self.call(context, ExecType::Read)
+        panic::catch_unwind(AssertUnwindSafe(|| self.call(context, ExecType::Read)))
+            .map_err(|e| ProtocolError::from(ExecutorError::QueryService(format!("{:?}", e))))
     }
 }
 
 impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMapping> Dispatcher
     for ServiceExecutor<S, DB, Mapping>
 {
-    fn read(&self, context: ServiceContext) -> ProtocolResult<ExecResp> {
+    fn read(&self, context: ServiceContext) -> ServiceResponse<String> {
         self.call(context, ExecType::Read)
     }
 
-    fn write(&self, context: ServiceContext) -> ProtocolResult<ExecResp> {
+    fn write(&self, context: ServiceContext) -> ServiceResponse<String> {
         self.call(context, ExecType::Write)
     }
 }
@@ -395,13 +413,19 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
 pub enum ExecutorError {
     #[display(fmt = "service {:?} was not found", service)]
     NotFoundService { service: String },
-
     #[display(fmt = "service {:?} method {:?} was not found", service, method)]
     NotFoundMethod { service: String, method: String },
-
     #[display(fmt = "Parsing payload to json failed {:?}", _0)]
     JsonParse(serde_json::Error),
+
+    #[display(fmt = "Init service genesis failed: {:?}", _0)]
+    InitService(String),
+    #[display(fmt = "Query service failed: {:?}", _0)]
+    QueryService(String),
+    #[display(fmt = "Call service failed: {:?}", _0)]
+    CallService(String),
 }
+
 impl std::error::Error for ExecutorError {}
 
 impl From<ExecutorError> for ProtocolError {

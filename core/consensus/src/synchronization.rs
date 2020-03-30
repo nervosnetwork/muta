@@ -12,7 +12,9 @@ use protocol::traits::{
 use protocol::types::{Block, Hash, Proof, Receipt, SignedTransaction};
 use protocol::ProtocolResult;
 
+use crate::engine::generate_new_crypto_map;
 use crate::status::{ExecutedInfo, StatusAgent};
+use crate::util::OverlordCrypto;
 
 const POLLING_BROADCAST: u64 = 2000;
 const WAIT_EXECUTION: u64 = 1000;
@@ -24,10 +26,12 @@ pub struct RichBlock {
 }
 
 pub struct OverlordSynchronization<Adapter: SynchronizationAdapter> {
-    adapter:             Arc<Adapter>,
-    status:              StatusAgent,
-    lock:                Arc<Mutex<()>>,
-    syncing:             Mutex<()>,
+    adapter: Arc<Adapter>,
+    status:  StatusAgent,
+    crypto:  Arc<OverlordCrypto>,
+    lock:    Arc<Mutex<()>>,
+    syncing: Mutex<()>,
+
     sync_txs_chunk_size: usize,
 }
 
@@ -61,13 +65,7 @@ impl<Adapter: SynchronizationAdapter> Synchronization for OverlordSynchronizatio
             current_height,
         );
 
-        log::info!(
-            "[synchronization]: sync start, current consented status :{:?}",
-            self.status.to_inner()
-        );
-
         let sync_status_agent = self.init_status_agent().await?;
-
         let sync_resp = self
             .start_sync(
                 ctx.clone(),
@@ -106,10 +104,6 @@ impl<Adapter: SynchronizationAdapter> Synchronization for OverlordSynchronizatio
             tmp_status.exec_height,
             tmp_status.current_proof.height,
         );
-        log::info!(
-            "[synchronization]: sync end, current consented status :{:?}",
-            self.status.to_inner()
-        );
         Ok(())
     }
 }
@@ -119,6 +113,7 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
         sync_txs_chunk_size: usize,
         adapter: Arc<Adapter>,
         status: StatusAgent,
+        crypto: Arc<OverlordCrypto>,
         lock: Arc<Mutex<()>>,
     ) -> Self {
         let syncing = Mutex::new(());
@@ -126,8 +121,10 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
         Self {
             adapter,
             status,
+            crypto,
             lock,
             syncing,
+
             sync_txs_chunk_size,
         }
     }
@@ -237,7 +234,14 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
             let previous_block = self
                 .adapter
                 .get_block_by_height(ctx.clone(), consenting_rich_block.block.header.height - 1)
-                .await?;
+                .await
+                .map_err(|e| {
+                    log::error!(
+                        "[synchronization] get previous block {} error",
+                        consenting_rich_block.block.header.height - 1
+                    );
+                    e
+                })?;
 
             self.adapter
                 .verify_proof(
@@ -267,17 +271,24 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
                 )
                 .await
                 .map_err(|e| {
-                    log::error!("[synchronization]:  verify_txs_sync error",);
+                    log::error!("[synchronization]: verify_txs_sync error",);
                     e
                 })?;
 
             self.commit_block(
                 ctx.clone(),
-                consenting_rich_block,
+                consenting_rich_block.clone(),
                 consenting_proof,
                 sync_status_agent.clone(),
             )
-            .await?;
+            .await
+            .map_err(|e| {
+                log::error!(
+                    "[synchronization]: commit block {} error",
+                    consenting_rich_block.block.header.height
+                );
+                e
+            })?;
 
             let tmp_status = sync_status_agent.to_inner().clone();
             log::info!(
@@ -312,6 +323,9 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
             block.header.height,
             block.header.timestamp,
         )?;
+
+        self.crypto
+            .update(generate_new_crypto_map(metadata.clone())?);
 
         self.adapter.set_args(
             ctx.clone(),

@@ -4,6 +4,7 @@ use bytes::Bytes;
 use num_traits::FromPrimitive;
 use rand::random;
 
+use crate::traits::ServiceResponse;
 use crate::types::block::{Block, BlockHeader, Pill, Proof, Validator};
 use crate::types::primitive::{Address, Balance, Hash, MerkleRoot};
 use crate::types::receipt::{Event, Receipt, ReceiptResponse};
@@ -38,8 +39,11 @@ pub fn mock_receipt_response() -> ReceiptResponse {
     ReceiptResponse {
         service_name: "mock-service".to_owned(),
         method:       "mock-method".to_owned(),
-        ret:          "mock-ret".to_owned(),
-        is_error:     false,
+        response:     ServiceResponse::<String> {
+            code:          0,
+            succeed_data:  "ok".to_owned(),
+            error_message: "".to_owned(),
+        },
     }
 }
 

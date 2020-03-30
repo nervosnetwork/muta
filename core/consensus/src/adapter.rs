@@ -425,7 +425,7 @@ where
             payload:      "".to_string(),
         })?;
 
-        Ok(serde_json::from_str(&exec_resp.ret).expect("Decode metadata failed!"))
+        Ok(serde_json::from_str(&exec_resp.succeed_data).expect("Decode metadata failed!"))
     }
 
     fn set_args(&self, _context: Context, timeout_gap: u64, cycles_limit: u64, max_tx_size: u64) {
@@ -437,7 +437,14 @@ where
     async fn verify_block_header(&self, ctx: Context, block: Block) -> ProtocolResult<()> {
         let previous_block = self
             .get_block_by_height(ctx.clone(), block.header.height - 1)
-            .await?;
+            .await
+            .map_err(|e| {
+                log::error!(
+                    "[consensus] verify_block_header, previous_block {} fails",
+                    block.header.height - 1,
+                );
+                e
+            })?;
 
         let previous_block_hash = Hash::digest(previous_block.encode_fixed()?);
 
@@ -564,7 +571,14 @@ where
 
         let previous_block = self
             .get_block_by_height(ctx.clone(), block.header.height - 1)
-            .await?;
+            .await
+            .map_err(|e| {
+                log::error!(
+                    "[consensus] verify_proof, previous_block {} fails",
+                    block.header.height - 1,
+                );
+                e
+            })?;
         // the auth_list for the target should comes from previous height
         let metadata = self.get_metadata(
             ctx,
@@ -663,7 +677,7 @@ where
                 accumulator += u64::from(*(weight));
             } else {
                 log::error!(
-                    "[consensus] verity_proof_weight,signed_voter_address: {:?}",
+                    "[consensus] verity_proof_weight, weight not found, signed_voter_address: {:?}",
                     signed_voter_address
                 );
                 return Err(

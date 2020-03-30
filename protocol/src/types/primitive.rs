@@ -23,7 +23,7 @@ pub const GENESIS_HEIGHT: u64 = 0;
 const HASH_LEN: usize = 32;
 
 // Should started with 0x
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub struct Hex(String);
 
 impl Hex {
@@ -198,7 +198,7 @@ impl fmt::Debug for Hash {
 /// Address length.
 const ADDRESS_LEN: usize = 20;
 
-#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
 pub struct Address([u8; ADDRESS_LEN]);
 
 impl Serialize for Address {
@@ -288,7 +288,7 @@ impl fmt::Debug for Address {
     }
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Deserialize, Default, Serialize, Clone, Debug, PartialEq, Eq)]
 pub struct Metadata {
     pub chain_id:        Hash,
     pub common_ref:      Hex,
@@ -305,7 +305,7 @@ pub struct Metadata {
     pub max_tx_size:     u64,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Default)]
 pub struct ValidatorExtend {
     pub bls_pub_key:    Hex,
     pub address:        Address,

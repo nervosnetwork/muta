@@ -23,6 +23,7 @@ use core_consensus::message::{
     RPC_SYNC_PULL_TXS,
 };
 use core_consensus::status::{CurrentConsensusStatus, StatusAgent};
+use core_consensus::util::OverlordCrypto;
 use core_consensus::{
     DurationConfig, Node, OverlordConsensus, OverlordConsensusAdapter, OverlordSynchronization,
     RichBlock, SignedTxsWAL,
@@ -42,7 +43,6 @@ use protocol::{fixed_codec::FixedCodec, ProtocolResult};
 
 use crate::config::Config;
 use crate::MainError;
-use core_consensus::util::OverlordCrypto;
 
 pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
     config: &Config,
@@ -240,7 +240,8 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         )
         .await?;
 
-    let metadata: Metadata = serde_json::from_str(&exec_resp.ret).expect("Decode metadata failed!");
+    let metadata: Metadata =
+        serde_json::from_str(&exec_resp.succeed_data).expect("Decode metadata failed!");
 
     // set args in mempool
     mempool.set_args(
@@ -377,6 +378,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         config.consensus.sync_txs_chunk_size,
         consensus_adapter,
         status_agent.clone(),
+        crypto,
         lock,
     ));
 

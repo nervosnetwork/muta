@@ -8,15 +8,16 @@ mod storage;
 
 pub use api::APIAdapter;
 pub use binding::{
-    AdmissionControl, BindingMacroError, ChainQuerier, Service, ServiceMapping, ServiceSDK,
-    ServiceState, StoreArray, StoreBool, StoreMap, StoreString, StoreUint64,
+    AdmissionControl, ChainQuerier, Service, ServiceMapping, ServiceSDK, ServiceState, StoreArray,
+    StoreBool, StoreMap, StoreString, StoreUint64,
 };
 pub use consensus::{
     CommonConsensusAdapter, Consensus, ConsensusAdapter, MessageTarget, NodeInfo, Synchronization,
     SynchronizationAdapter,
 };
 pub use executor::{
-    Dispatcher, ExecResp, Executor, ExecutorFactory, ExecutorParams, ExecutorResp, NoopDispatcher,
+    Dispatcher, Executor, ExecutorFactory, ExecutorParams, ExecutorResp, NoopDispatcher,
+    ServiceResponse,
 };
 pub use mempool::{MemPool, MemPoolAdapter, MixedTxHashes};
 pub use network::{Gossip, MessageCodec, MessageHandler, Priority, Rpc};

@@ -16,7 +16,7 @@ use common_merkle::Merkle;
 
 use protocol::fixed_codec::FixedCodec;
 use protocol::traits::{CommonConsensusAdapter, Synchronization, SynchronizationAdapter};
-use protocol::traits::{Context, ExecutorParams, ExecutorResp};
+use protocol::traits::{Context, ExecutorParams, ExecutorResp, ServiceResponse};
 use protocol::types::{
     Address, Block, BlockHeader, Bytes, Hash, Hex, MerkleRoot, Metadata, Proof, RawTransaction,
     Receipt, ReceiptResponse, SignedTransaction, TransactionRequest, Validator, ValidatorExtend,
@@ -93,6 +93,7 @@ fn sync_gap_test() {
             5000,
             Arc::clone(&adapter),
             status_agent.clone(),
+            Arc::new(mock_crypto()),
             lock,
         );
 
@@ -558,6 +559,11 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
     }
 }
 
+fn mock_crypto() -> OverlordCrypto {
+    let priv_key = BlsPrivateKey::try_from(hex::decode("00000000000000000000000000000000d654c7a6747fc2e34808c1ebb1510bfb19b443d639f2fab6dc41fce9f634de37").unwrap().as_ref()).unwrap();
+    OverlordCrypto::new(priv_key, HashMap::new(), "muta".into())
+}
+
 fn gen_remote_tx_hashmap(list: Vec<RichBlock>) -> SafeHashMap<Hash, SignedTransaction> {
     let mut remote_txs = HashMap::new();
 
@@ -750,8 +756,11 @@ fn get_receipt(tx: &SignedTransaction, height: u64) -> Receipt {
         response: ReceiptResponse {
             service_name: "sync".to_owned(),
             method:       "sync_exec".to_owned(),
-            ret:          "".to_owned(),
-            is_error:     false,
+            response:     ServiceResponse::<String> {
+                code:          0,
+                succeed_data:  "ok".to_owned(),
+                error_message: "".to_owned(),
+            },
         },
     }
 }

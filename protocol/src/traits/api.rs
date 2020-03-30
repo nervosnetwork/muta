@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use crate::traits::{Context, ExecResp};
+use crate::traits::{Context, ServiceResponse};
 use crate::types::{Address, Block, Hash, Receipt, SignedTransaction};
 use crate::ProtocolResult;
 
@@ -33,5 +33,5 @@ pub trait APIAdapter: Send + Sync {
         service_name: String,
         method: String,
         payload: String,
-    ) -> ProtocolResult<ExecResp>;
+    ) -> ProtocolResult<ServiceResponse<String>>;
 }
