@@ -214,7 +214,7 @@ pub trait StoreMap<K: FixedCodec + PartialEq, V: FixedCodec> {
 }
 
 pub trait StoreArray<E: FixedCodec> {
-    fn get(&self, index: u32) -> E;
+    fn get(&self, index: u32) -> Option<E>;
 
     fn push(&mut self, element: E);
 

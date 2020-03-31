@@ -20,6 +20,7 @@ fn test_default_store_bool() {
 
     let mut sb = DefaultStoreBool::new(Rc::new(RefCell::new(state)), "test");
 
+    assert_eq!(sb.get(), false);
     sb.set(true);
     assert_eq!(sb.get(), true);
     sb.set(false);
@@ -33,6 +34,7 @@ fn test_default_store_uint64() {
 
     let mut su = DefaultStoreUint64::new(Rc::new(RefCell::new(state)), "test");
 
+    assert_eq!(su.get(), 0u64);
     su.set(8u64);
     assert_eq!(su.get(), 8u64);
 
@@ -63,6 +65,8 @@ fn test_default_store_string() {
     let rs = Rc::new(RefCell::new(state));
     let mut ss = DefaultStoreString::new(Rc::clone(&rs), "test");
 
+    assert_eq!(ss.get(), "");
+
     ss.set("");
     assert_eq!(ss.get(), "");
     assert_eq!(ss.is_empty(), true);
@@ -80,6 +84,7 @@ fn test_default_store_map() {
 
     let mut sm = DefaultStoreMap::<_, Hash, Bytes>::new(Rc::clone(&rs), "test");
 
+    assert_eq!(sm.get(&Hash::digest(Bytes::from("key_1"))).is_none(), true);
     sm.insert(Hash::digest(Bytes::from("key_1")), Bytes::from("val_1"));
     sm.insert(Hash::digest(Bytes::from("key_2")), Bytes::from("val_2"));
 
@@ -120,9 +125,12 @@ fn test_default_store_array() {
     let mut sa = DefaultStoreArray::<_, Bytes>::new(Rc::clone(&rs), "test");
 
     assert_eq!(sa.len(), 0u32);
+    assert_eq!(sa.get(0u32).is_none(), true);
 
     sa.push(Bytes::from("111"));
     sa.push(Bytes::from("222"));
+
+    assert_eq!(sa.get(3u32).is_none(), true);
 
     {
         let mut it = sa.iter();
@@ -131,11 +139,11 @@ fn test_default_store_array() {
         assert_eq!(it.next().is_none(), true);
     }
 
-    assert_eq!(sa.get(0u32), Bytes::from("111"));
-    assert_eq!(sa.get(1u32), Bytes::from("222"));
+    assert_eq!(sa.get(0u32).unwrap(), Bytes::from("111"));
+    assert_eq!(sa.get(1u32).unwrap(), Bytes::from("222"));
 
     sa.remove(0u32);
 
     assert_eq!(sa.len(), 1u32);
-    assert_eq!(sa.get(0u32), Bytes::from("222"));
+    assert_eq!(sa.get(0u32).unwrap(), Bytes::from("222"));
 }

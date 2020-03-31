@@ -7,7 +7,7 @@ use bytes::Bytes;
 use protocol::fixed_codec::FixedCodec;
 use protocol::traits::{ServiceState, StoreArray};
 use protocol::types::Hash;
-use protocol::ProtocolResult;
+use protocol::{ProtocolError, ProtocolResult};
 
 use crate::binding::store::{FixedKeys, StoreError};
 
@@ -41,14 +41,18 @@ impl<S: ServiceState, E: FixedCodec> DefaultStoreArray<S, E> {
         }
     }
 
-    fn get_(&self, index: u32) -> ProtocolResult<E> {
+    fn get_(&self, index: u32) -> ProtocolResult<Option<E>> {
         if let Some(k) = self.keys.inner.get(index as usize) {
             self.state.borrow().get(k)?.map_or_else(
-                || <_>::decode_fixed(Bytes::new()).map_err(|_| StoreError::DecodeError.into()),
-                Ok,
+                || {
+                    let e: E = <_>::decode_fixed(Bytes::new())
+                        .map_err(|_| ProtocolError::from(StoreError::DecodeError))?;
+                    Ok(Some(e))
+                },
+                |e| Ok(Some(e)),
             )
         } else {
-            Err(StoreError::OutRange.into())
+            Ok(None)
         }
     }
 
@@ -78,7 +82,7 @@ impl<S: ServiceState, E: FixedCodec> DefaultStoreArray<S, E> {
 }
 
 impl<S: ServiceState, E: FixedCodec> StoreArray<E> for DefaultStoreArray<S, E> {
-    fn get(&self, index: u32) -> E {
+    fn get(&self, index: u32) -> Option<E> {
         self.get_(index)
             .unwrap_or_else(|e| panic!("StoreArray get value failed: {}", e))
     }
@@ -131,7 +135,10 @@ impl<'a, E: FixedCodec, A: StoreArray<E>> Iterator for ArrayIter<'a, E, A> {
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.idx < self.array.len() {
-            let ele = self.array.get(self.idx);
+            let ele = self
+                .array
+                .get(self.idx)
+                .expect("StoreArray should get Some when index inbound");
             self.idx += 1;
             Some((self.idx - 1, ele))
         } else {

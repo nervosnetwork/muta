@@ -67,7 +67,10 @@ fn test_service_sdk() {
 
     sdk_array.push(Hash::digest(Bytes::from("key_1")));
 
-    assert_eq!(sdk_array.get(0), Hash::digest(Bytes::from("key_1")));
+    assert_eq!(
+        sdk_array.get(0).unwrap(),
+        Hash::digest(Bytes::from("key_1"))
+    );
 
     let mut it = sdk_array.iter();
     assert_eq!(it.next().unwrap(), (0, Hash::digest(Bytes::from("key_1"))));
