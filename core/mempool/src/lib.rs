@@ -107,6 +107,8 @@ where
 
         if !ctx.is_network_origin_txs() {
             self.adapter.broadcast_tx(ctx, tx).await?;
+        } else {
+            self.adapter.report_good(ctx);
         }
 
         Ok(())
@@ -156,7 +158,6 @@ where
             current_height + self.timeout_gap.load(Ordering::Relaxed),
         );
         self.callback_cache.clear();
-
         Ok(())
     }
 
@@ -204,6 +205,8 @@ where
                 }
                 .into());
             }
+            self.adapter.report_good(ctx);
+
             txs.into_iter().for_each(|tx| {
                 self.callback_cache.insert(tx.tx_hash.clone(), tx);
             });

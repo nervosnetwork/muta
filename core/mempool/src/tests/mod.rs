@@ -83,6 +83,8 @@ impl MemPoolAdapter for HashMemPoolAdapter {
         Ok(CURRENT_HEIGHT)
     }
 
+    fn report_good(&self, _ctx: Context) {}
+
     fn set_args(&self, _timeout_gap: u64, _cycles_limit: u64, _max_tx_size: u64) {}
 }
 
