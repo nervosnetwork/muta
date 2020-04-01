@@ -25,7 +25,13 @@ impl<S: ServiceState> DefaultStoreBool<S> {
     fn get_(&self) -> ProtocolResult<bool> {
         let b: Option<bool> = self.state.borrow().get(&self.key)?;
 
-        b.ok_or_else(|| StoreError::GetNone.into())
+        match b {
+            Some(v) => Ok(v),
+            None => {
+                self.state.borrow_mut().insert(self.key.clone(), false)?;
+                Ok(false)
+            }
+        }
     }
 
     fn set_(&mut self, b: bool) -> ProtocolResult<()> {
@@ -62,7 +68,13 @@ impl<S: ServiceState> DefaultStoreUint64<S> {
     fn get_(&self) -> ProtocolResult<u64> {
         let u: Option<u64> = self.state.borrow().get(&self.key)?;
 
-        u.ok_or_else(|| StoreError::GetNone.into())
+        match u {
+            Some(v) => Ok(v),
+            None => {
+                self.state.borrow_mut().insert(self.key.clone(), 0u64)?;
+                Ok(0)
+            }
+        }
     }
 
     fn set_(&mut self, val: u64) -> ProtocolResult<()> {
@@ -217,7 +229,15 @@ impl<S: ServiceState> DefaultStoreString<S> {
     fn get_(&self) -> ProtocolResult<String> {
         let s: Option<String> = self.state.borrow().get(&self.key)?;
 
-        s.ok_or_else(|| StoreError::GetNone.into())
+        match s {
+            Some(v) => Ok(v),
+            None => {
+                self.state
+                    .borrow_mut()
+                    .insert(self.key.clone(), "".to_string())?;
+                Ok("".to_string())
+            }
+        }
     }
 
     fn len_(&self) -> ProtocolResult<u32> {
