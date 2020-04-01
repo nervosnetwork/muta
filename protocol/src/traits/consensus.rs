@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use async_trait::async_trait;
 use creep::Context;
 
@@ -70,6 +72,15 @@ pub trait SynchronizationAdapter: CommonConsensusAdapter + Send + Sync {
         ctx: Context,
         hashes: &[Hash],
     ) -> ProtocolResult<Vec<SignedTransaction>>;
+
+    async fn get_proof_from_remote(&self, ctx: Context, height: u64) -> ProtocolResult<Proof>;
+
+    async fn verify_txs_sync(
+        &self,
+        ctx: Context,
+        height: u64,
+        txs: Vec<Hash>,
+    ) -> ProtocolResult<()>;
 }
 
 #[async_trait]
@@ -115,6 +126,25 @@ pub trait CommonConsensusAdapter: Send + Sync {
     ) -> ProtocolResult<Metadata>;
 
     fn set_args(&self, context: Context, timeout_gap: u64, cycles_limit: u64, max_tx_size: u64);
+
+    async fn verify_proof(&self, ctx: Context, block: Block, proof: Proof) -> ProtocolResult<()>;
+
+    async fn verify_block_header(&self, ctx: Context, block: Block) -> ProtocolResult<()>;
+
+    fn verify_proof_signature(
+        &self,
+        block_height: u64,
+        vote_hash: Bytes,
+        aggregated_signature_bytes: Bytes,
+        signed_voters: Vec<Bytes>,
+    ) -> ProtocolResult<()>;
+
+    fn verity_proof_weight(
+        &self,
+        block_height: u64,
+        weight_map: HashMap<Bytes, u32>,
+        signed_voters: Vec<Bytes>,
+    ) -> ProtocolResult<()>;
 }
 
 #[async_trait]
@@ -129,9 +159,6 @@ pub trait ConsensusAdapter: CommonConsensusAdapter + Send + Sync {
         cycle_limit: u64,
         tx_num_limit: u64,
     ) -> ProtocolResult<MixedTxHashes>;
-
-    /// Check the correctness of the given transactions.
-    async fn check_txs(&self, ctx: Context, order_txs: Vec<Hash>) -> ProtocolResult<()>;
 
     /// Synchronous signed transactions.
     async fn sync_txs(&self, ctx: Context, propose_txs: Vec<Hash>) -> ProtocolResult<()>;
@@ -193,4 +220,6 @@ pub trait ConsensusAdapter: CommonConsensusAdapter + Send + Sync {
 
     /// Load latest overlord wal info.
     async fn load_overlord_wal(&self, ctx: Context) -> ProtocolResult<Bytes>;
+
+    async fn verify_txs(&self, ctx: Context, height: u64, txs: Vec<Hash>) -> ProtocolResult<()>;
 }

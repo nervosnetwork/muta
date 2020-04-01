@@ -1,16 +1,18 @@
 use std::boxed::Box;
+use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::sync::Arc;
 use std::time::Instant;
 
 use async_trait::async_trait;
-use overlord::types::OverlordMsg;
-use overlord::OverlordHandler;
+use overlord::types::{Node, OverlordMsg, Vote, VoteType};
+use overlord::{extract_voters, Crypto, OverlordHandler};
 use parking_lot::RwLock;
 use tokio::sync::mpsc::error::TrySendError;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 
 use common_merkle::Merkle;
+
 use protocol::traits::{
     CommonConsensusAdapter, ConsensusAdapter, Context, ExecutorFactory, ExecutorParams,
     ExecutorResp, Gossip, MemPool, MessageTarget, MixedTxHashes, Priority, Rpc, ServiceMapping,
@@ -23,11 +25,17 @@ use protocol::types::{
 use protocol::{fixed_codec::FixedCodec, ProtocolResult};
 
 use crate::consensus::gen_overlord_status;
-use crate::fixed_types::{FixedBlock, FixedHeight, FixedPill, FixedSignedTxs, PullTxsRequest};
-use crate::message::{BROADCAST_HEIGHT, RPC_SYNC_PULL_BLOCK, RPC_SYNC_PULL_TXS};
+use crate::fixed_types::{
+    FixedBlock, FixedHeight, FixedPill, FixedProof, FixedSignedTxs, PullTxsRequest,
+};
+use crate::message::{
+    BROADCAST_HEIGHT, RPC_SYNC_PULL_BLOCK, RPC_SYNC_PULL_PROOF, RPC_SYNC_PULL_TXS,
+};
 use crate::status::{ExecutedInfo, StatusAgent};
-use crate::util::ExecuteInfo;
-use crate::ConsensusError;
+use crate::util::{ExecuteInfo, OverlordCrypto};
+use crate::BlockHeaderField::{PreviousBlockHash, ProofHash, Proposer};
+use crate::BlockProofField::{BitMap, HashMismatch, HeightMismatch, Signature, WeightNotFound};
+use crate::{BlockHeaderField, BlockProofField, ConsensusError};
 
 const OVERLORD_GAP: usize = 10;
 
@@ -50,6 +58,7 @@ pub struct OverlordConsensusAdapter<
 
     exec_queue:  Sender<ExecuteInfo>,
     exec_demons: Option<ExecDemons<S, DB, EF, Mapping>>,
+    crypto:      Arc<OverlordCrypto>,
 }
 
 #[async_trait]
@@ -72,10 +81,6 @@ where
         tx_num_limit: u64,
     ) -> ProtocolResult<MixedTxHashes> {
         self.mempool.package(ctx, cycle_limit, tx_num_limit).await
-    }
-
-    async fn check_txs(&self, ctx: Context, check_txs: Vec<Hash>) -> ProtocolResult<()> {
-        self.mempool.ensure_order_txs(ctx, check_txs).await
     }
 
     async fn sync_txs(&self, ctx: Context, txs: Vec<Hash>) -> ProtocolResult<()> {
@@ -194,6 +199,15 @@ where
         let res = self.storage.get_latest_block().await?;
         Ok(res.header.height)
     }
+
+    async fn verify_txs(&self, ctx: Context, height: u64, txs: Vec<Hash>) -> ProtocolResult<()> {
+        if let Err(e) = self.mempool.ensure_order_txs(ctx.clone(), txs).await {
+            log::error!("verify_txs error {:?}", e);
+            return Err(ConsensusError::VerifyTransaction(height).into());
+        }
+
+        Ok(())
+    }
 }
 
 #[async_trait]
@@ -287,6 +301,34 @@ where
             )
             .await?;
         Ok(res.inner)
+    }
+
+    /// Pull a proof of certain block from other nodes
+    async fn get_proof_from_remote(&self, ctx: Context, height: u64) -> ProtocolResult<Proof> {
+        let ret = self
+            .rpc
+            .call::<FixedHeight, FixedProof>(
+                ctx.clone(),
+                RPC_SYNC_PULL_PROOF,
+                FixedHeight::new(height),
+                Priority::High,
+            )
+            .await?;
+        Ok(ret.inner)
+    }
+
+    async fn verify_txs_sync(
+        &self,
+        ctx: Context,
+        height: u64,
+        txs: Vec<Hash>,
+    ) -> ProtocolResult<()> {
+        if let Err(e) = self.mempool.ensure_order_txs_sync(ctx.clone(), txs).await {
+            log::error!("verify_txs error {:?}", e);
+            return Err(ConsensusError::VerifyTransaction(height).into());
+        }
+
+        Ok(())
     }
 }
 
@@ -390,6 +432,271 @@ where
         self.mempool
             .set_args(timeout_gap, cycles_limit, max_tx_size);
     }
+
+    /// this function verify all info in header except proof and roots
+    async fn verify_block_header(&self, ctx: Context, block: Block) -> ProtocolResult<()> {
+        let previous_block = self
+            .get_block_by_height(ctx.clone(), block.header.height - 1)
+            .await
+            .map_err(|e| {
+                log::error!(
+                    "[consensus] verify_block_header, previous_block {} fails",
+                    block.header.height - 1,
+                );
+                e
+            })?;
+
+        let previous_block_hash = Hash::digest(previous_block.encode_fixed()?);
+
+        if previous_block_hash != block.header.pre_hash {
+            log::error!(
+                "[consensus] verify_block_header, previous_block_hash: {:?}, block.header.pre_hash: {:?}",
+                previous_block_hash,
+                block.header.pre_hash
+            );
+            return Err(
+                ConsensusError::VerifyBlockHeader(block.header.height, PreviousBlockHash).into(),
+            );
+        }
+
+        // the block 0 and 1 's proof is consensus-ed by community
+        if block.header.height > 1u64 && block.header.pre_hash != block.header.proof.block_hash {
+            log::error!(
+                "[consensus] verify_block_header, verifying_block header : {:?}",
+                block.header
+            );
+            return Err(ConsensusError::VerifyBlockHeader(block.header.height, ProofHash).into());
+        }
+
+        // verify proposer and validators
+        let previous_metadata = self.get_metadata(
+            ctx,
+            previous_block.header.state_root.clone(),
+            previous_block.header.height,
+            previous_block.header.timestamp,
+        )?;
+
+        let authority_map = previous_metadata
+            .verifier_list
+            .into_iter()
+            .map(|v| {
+                let address = v.address.as_bytes();
+                let node = Node {
+                    address:        v.address.as_bytes(),
+                    propose_weight: v.propose_weight,
+                    vote_weight:    v.vote_weight,
+                };
+                (address, node)
+            })
+            .collect::<HashMap<_, _>>();
+
+        // check proposer
+        if block.header.height != 0
+            && !authority_map.contains_key(&block.header.proposer.as_bytes())
+        {
+            log::error!(
+                "[consensus] verify_block_header, block.header.proposer: {:?}, authority_map: {:?}",
+                block.header.proposer,
+                authority_map
+            );
+            return Err(ConsensusError::VerifyBlockHeader(block.header.height, Proposer).into());
+        }
+
+        // check validators
+        for validator in block.header.validators.iter() {
+            if !authority_map.contains_key(&validator.address.as_bytes()) {
+                log::error!(
+                    "[consensus] verify_block_header, validator.address: {:?}, authority_map: {:?}",
+                    validator.address,
+                    authority_map
+                );
+                return Err(ConsensusError::VerifyBlockHeader(
+                    block.header.height,
+                    BlockHeaderField::Validator,
+                )
+                .into());
+            } else {
+                let node = authority_map.get(&validator.address.as_bytes()).unwrap();
+
+                if node.vote_weight != validator.vote_weight
+                    || node.propose_weight != validator.vote_weight
+                {
+                    log::error!(
+                        "[consensus] verify_block_header, validator.address: {:?}, authority_map: {:?}",
+                        validator.address,
+                        authority_map
+                    );
+                    return Err(ConsensusError::VerifyBlockHeader(
+                        block.header.height,
+                        BlockHeaderField::Weight,
+                    )
+                    .into());
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn verify_proof(&self, ctx: Context, block: Block, proof: Proof) -> ProtocolResult<()> {
+        // the block 0 has no proof, which is consensus-ed by community, not by chain
+
+        if block.header.height == 0 {
+            return Ok(());
+        };
+
+        if block.header.height != proof.height {
+            log::error!(
+                "[consensus] verify_proof, block.header.height: {}, proof.height: {}",
+                block.header.height,
+                proof.height
+            );
+            return Err(ConsensusError::VerifyProof(
+                block.header.height,
+                HeightMismatch(block.header.height, proof.height),
+            )
+            .into());
+        }
+
+        let blockhash = Hash::digest(block.clone().encode_fixed()?);
+
+        if blockhash != proof.block_hash {
+            log::error!(
+                "[consensus] verify_proof, blockhash: {:?}, proof.block_hash: {:?}",
+                blockhash,
+                proof.block_hash
+            );
+            return Err(ConsensusError::VerifyProof(block.header.height, HashMismatch).into());
+        }
+
+        let previous_block = self
+            .get_block_by_height(ctx.clone(), block.header.height - 1)
+            .await
+            .map_err(|e| {
+                log::error!(
+                    "[consensus] verify_proof, previous_block {} fails",
+                    block.header.height - 1,
+                );
+                e
+            })?;
+        // the auth_list for the target should comes from previous height
+        let metadata = self.get_metadata(
+            ctx,
+            previous_block.header.state_root.clone(),
+            previous_block.header.height,
+            previous_block.header.timestamp,
+        )?;
+
+        let mut authority_list = metadata
+            .verifier_list
+            .iter()
+            .map(|v| Node {
+                address:        v.address.as_bytes(),
+                propose_weight: v.propose_weight,
+                vote_weight:    v.vote_weight,
+            })
+            .collect::<Vec<Node>>();
+
+        let signed_voters = extract_voters(&mut authority_list, &proof.bitmap).map_err(|_| {
+            log::error!("[consensus] extract_voters fails, bitmap error");
+            ConsensusError::VerifyProof(block.header.height, BitMap)
+        })?;
+
+        let vote = Vote {
+            height:     proof.height,
+            round:      proof.round,
+            vote_type:  VoteType::Precommit,
+            block_hash: proof.block_hash.as_bytes(),
+        };
+
+        let vote_hash = self.crypto.hash(protocol::Bytes::from(rlp::encode(&vote)));
+
+        self.verify_proof_signature(
+            block.header.height,
+            vote_hash.clone(),
+            proof.signature.clone(),
+            signed_voters.clone(),
+        ).map_err(|e| {
+            log::error!("[consensus] verify_proof_signature error, height {}, vote: {:?}, vote_hash:{:?}, sig:{:?}, signed_voter:{:?}",
+            block.header.height,
+            vote,
+            vote_hash,
+            proof.signature,
+            signed_voters,
+            );
+            e
+        })?;
+
+        let weight_map = authority_list
+            .iter()
+            .map(|node| (node.address.clone(), node.vote_weight))
+            .collect::<HashMap<overlord::types::Address, u32>>();
+
+        self.verity_proof_weight(block.header.height, weight_map, signed_voters)?;
+
+        Ok(())
+    }
+
+    fn verify_proof_signature(
+        &self,
+        block_height: u64,
+        vote_hash: Bytes,
+        aggregated_signature_bytes: Bytes,
+        signed_voters: Vec<Bytes>,
+    ) -> ProtocolResult<()> {
+        // check sig
+        self.crypto
+            .verify_aggregated_signature(aggregated_signature_bytes, vote_hash, signed_voters)
+            .map_err(|e| {
+                log::error!("[consensus] verify_proof_signature error: {}", e);
+                ConsensusError::VerifyProof(block_height, Signature).into()
+            })
+    }
+
+    fn verity_proof_weight(
+        &self,
+        block_height: u64,
+        weight_map: HashMap<Bytes, u32>,
+        signed_voters: Vec<Bytes>,
+    ) -> ProtocolResult<()> {
+        let total_validator_weight: u64 = weight_map.iter().map(|pair| u64::from(*pair.1)).sum();
+
+        let mut accumulator = 0u64;
+        for signed_voter_address in signed_voters {
+            if weight_map.contains_key(signed_voter_address.as_ref()) {
+                let weight = weight_map
+                    .get(signed_voter_address.as_ref())
+                    .ok_or({ ConsensusError::VerifyProof(block_height, WeightNotFound) })
+                    .map_err(|e| {
+                        log::error!(
+                            "[consensus] verity_proof_weight,signed_voter_address: {:?}",
+                            signed_voter_address
+                        );
+                        e
+                    })?;
+                accumulator += u64::from(*(weight));
+            } else {
+                log::error!(
+                    "[consensus] verity_proof_weight, weight not found, signed_voter_address: {:?}",
+                    signed_voter_address
+                );
+                return Err(
+                    ConsensusError::VerifyProof(block_height, BlockProofField::Validator).into(),
+                );
+            }
+        }
+
+        if 3 * accumulator <= 2 * total_validator_weight {
+            log::error!(
+                "[consensus] verity_proof_weight, accumulator: {}, total: {}",
+                accumulator,
+                total_validator_weight
+            );
+
+            return Err(ConsensusError::VerifyProof(block_height, BlockProofField::Weight).into());
+        }
+        Ok(())
+    }
 }
 
 impl<EF, G, M, R, S, DB, Mapping> OverlordConsensusAdapter<EF, G, M, R, S, DB, Mapping>
@@ -410,6 +717,7 @@ where
         trie_db: Arc<DB>,
         service_mapping: Arc<Mapping>,
         status_agent: StatusAgent,
+        crypto: Arc<OverlordCrypto>,
     ) -> ProtocolResult<Self> {
         let (exec_queue, rx) = channel(OVERLORD_GAP);
         let exec_demons = Some(ExecDemons::new(
@@ -430,6 +738,7 @@ where
             overlord_handler: RwLock::new(None),
             exec_queue,
             exec_demons,
+            crypto,
         };
 
         Ok(adapter)

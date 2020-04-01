@@ -14,12 +14,6 @@ pub mod util;
 pub mod wal;
 mod wal_proto;
 
-pub use crate::adapter::OverlordConsensusAdapter;
-pub use crate::consensus::OverlordConsensus;
-pub use crate::synchronization::{OverlordSynchronization, RichBlock};
-pub use crate::wal::SignedTxsWAL;
-pub use overlord::{types::Node, DurationConfig};
-
 use std::error::Error;
 
 use derive_more::Display;
@@ -28,6 +22,12 @@ use common_crypto::Error as CryptoError;
 
 use protocol::types::Hash;
 use protocol::{ProtocolError, ProtocolErrorKind};
+
+pub use crate::adapter::OverlordConsensusAdapter;
+pub use crate::consensus::OverlordConsensus;
+pub use crate::synchronization::{OverlordSynchronization, RichBlock};
+pub use crate::wal::SignedTxsWAL;
+pub use overlord::{types::Node, DurationConfig};
 
 #[derive(Clone, Debug, Display, PartialEq, Eq)]
 pub enum ConsensusType {
@@ -98,9 +98,14 @@ pub enum ConsensusError {
     #[display(fmt = "Crypto error {:?}", _0)]
     CryptoErr(Box<CryptoError>),
 
-    /// The synchronous block does not pass the checks.
     #[display(fmt = "Synchronization {} block error", _0)]
-    SyncBlockHashErr(u64),
+    VerifyTransaction(u64),
+
+    #[display(fmt = "Synchronization/Consensus {} block error : {}", _0, _1)]
+    VerifyBlockHeader(u64, BlockHeaderField),
+
+    #[display(fmt = "Synchronization/Consensus {} block error : {}", _0, _1)]
+    VerifyProof(u64, BlockProofField),
 
     /// The Rpc response mismatch the request.
     #[display(fmt = "Synchronization Rpc {:?} message mismatch", _0)]
@@ -120,6 +125,48 @@ pub enum ConsensusError {
     /// Other error used for very few errors.
     #[display(fmt = "{:?}", _0)]
     Other(String),
+}
+
+#[derive(Debug, Display)]
+pub enum BlockHeaderField {
+    #[display(fmt = "The pre_hash mismatch the previous block")]
+    PreviousBlockHash,
+
+    #[display(fmt = "The pre_hash mismatch the hash in the proof field")]
+    ProofHash,
+
+    #[display(fmt = "The proposer is not in the committee")]
+    Proposer,
+
+    #[display(fmt = "There is at least one validator not in the committee")]
+    Validator,
+
+    #[display(fmt = "There is at least one validator's weight mismatch")]
+    Weight,
+}
+
+#[derive(Debug, Display)]
+pub enum BlockProofField {
+    #[display(fmt = "The bit_map has error with committer, can't get signed voters")]
+    BitMap,
+
+    #[display(fmt = "The proof signature is fraud or error")]
+    Signature,
+
+    #[display(fmt = "Heights of block and proof diverse, block {}, proof {}", _0, _1)]
+    HeightMismatch(u64, u64),
+
+    #[display(fmt = "Hash of block and proof diverse")]
+    HashMismatch,
+
+    #[display(fmt = "There is at least one validator not in the committee")]
+    Validator,
+
+    #[display(fmt = "There is at least one validator's weight mismatch")]
+    Weight,
+
+    #[display(fmt = "There is at least one validator's weight missing")]
+    WeightNotFound,
 }
 
 impl Error for ConsensusError {}

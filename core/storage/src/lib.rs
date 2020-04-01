@@ -5,6 +5,7 @@ mod tests;
 
 pub mod adapter;
 
+use std::convert::From;
 use std::error::Error;
 use std::sync::Arc;
 
