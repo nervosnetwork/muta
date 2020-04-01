@@ -25,7 +25,13 @@ use crate::{ConsensusError, ConsensusType};
 pub struct OverlordConsensus<Adapter: ConsensusAdapter + 'static> {
     /// Overlord consensus protocol instance.
     inner: Arc<
-        Overlord<FixedPill, ConsensusEngine<Adapter>, OverlordCrypto, ConsensusEngine<Adapter>, ConsensusEngine<Adapter>>,
+        Overlord<
+            FixedPill,
+            ConsensusEngine<Adapter>,
+            OverlordCrypto,
+            ConsensusEngine<Adapter>,
+            ConsensusEngine<Adapter>,
+        >,
     >,
     /// An overlord consensus protocol handler.
     handler: OverlordHandler<FixedPill>,
