@@ -419,7 +419,7 @@ impl<Adapter: ConsensusAdapter + 'static> Report for ConsensusEngine<Adapter> {
         match err {
             OverlordError::CryptoErr(_) | OverlordError::AggregatedSignatureErr(_) => self
                 .adapter
-                .report_bad(ctx, TrustFeedback::Bad(err.to_string())),
+                .report_bad(ctx, TrustFeedback::Worse(err.to_string())),
             _ => (),
         }
     }

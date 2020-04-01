@@ -91,7 +91,7 @@ impl<C: Consensus + 'static> MessageHandler for ProposalMessageHandler<C> {
             return TrustFeedback::Bad(e.to_string());
         }
 
-        TrustFeedback::Neutral
+        TrustFeedback::Good
     }
 }
 
@@ -115,7 +115,7 @@ impl<C: Consensus + 'static> MessageHandler for VoteMessageHandler<C> {
             return TrustFeedback::Bad(e.to_string());
         }
 
-        TrustFeedback::Neutral
+        TrustFeedback::Good
     }
 }
 
@@ -139,7 +139,7 @@ impl<C: Consensus + 'static> MessageHandler for QCMessageHandler<C> {
             return TrustFeedback::Bad(e.to_string());
         }
 
-        TrustFeedback::Neutral
+        TrustFeedback::Good
     }
 }
 
@@ -163,7 +163,7 @@ impl<C: Consensus + 'static> MessageHandler for ChokeMessageHandler<C> {
             return TrustFeedback::Bad(e.to_string());
         }
 
-        TrustFeedback::Neutral
+        TrustFeedback::Good
     }
 }
 
@@ -189,7 +189,7 @@ impl<Sy: Synchronization + 'static> MessageHandler for RemoteHeightMessageHandle
             }
         }
         // FIXME
-        TrustFeedback::Neutral
+        TrustFeedback::Good
     }
 }
 
@@ -227,7 +227,7 @@ impl<R: Rpc + 'static, S: Storage + 'static> MessageHandler for PullBlockRpcHand
             .await;
 
         // FIXME
-        TrustFeedback::Neutral
+        TrustFeedback::Good
     }
 }
 
@@ -265,6 +265,6 @@ impl<R: Rpc + 'static, S: Storage + 'static> MessageHandler for PullTxsRpcHandle
             .await;
 
         // FIXME
-        TrustFeedback::Neutral
+        TrustFeedback::Good
     }
 }
