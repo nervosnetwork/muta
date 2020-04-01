@@ -12,7 +12,7 @@ use common_merkle::Merkle;
 
 use protocol::fixed_codec::FixedCodec;
 use protocol::traits::{CommonConsensusAdapter, Synchronization, SynchronizationAdapter};
-use protocol::traits::{Context, ExecutorParams, ExecutorResp, ServiceResponse};
+use protocol::traits::{Context, ExecutorParams, ExecutorResp, ServiceResponse, TrustFeedback};
 use protocol::types::{
     Address, Block, BlockHeader, Bytes, Hash, Hex, MerkleRoot, Metadata, Proof, RawTransaction,
     Receipt, ReceiptResponse, SignedTransaction, TransactionRequest, Validator, ValidatorExtend,
@@ -268,6 +268,8 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
             max_tx_size: 1_073_741_824,
         })
     }
+
+    fn report_bad(&self, _ctx: Context, _feedback: TrustFeedback) {}
 
     fn set_args(
         &self,
