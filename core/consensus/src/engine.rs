@@ -11,7 +11,7 @@ use log::error;
 use moodyblues_sdk::trace;
 use overlord::error::ConsensusError as OverlordError;
 use overlord::types::{Commit, Node, OverlordMsg, Status};
-use overlord::{Consensus as Engine, DurationConfig, Report, Wal};
+use overlord::{Consensus as Engine, DurationConfig, Wal};
 use parking_lot::RwLock;
 use rlp::Encodable;
 use serde_json::json;
@@ -396,6 +396,15 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         old_validators.sort();
         Ok(old_validators)
     }
+
+    fn report_error(&self, ctx: Context, err: OverlordError) {
+        match err {
+            OverlordError::CryptoErr(_) | OverlordError::AggregatedSignatureErr(_) => self
+                .adapter
+                .report_bad(ctx, TrustFeedback::Worse(err.to_string())),
+            _ => (),
+        }
+    }
 }
 
 #[async_trait]
@@ -411,17 +420,6 @@ impl<Adapter: ConsensusAdapter + 'static> Wal for ConsensusEngine<Adapter> {
     async fn load(&self) -> Result<Option<Bytes>, Box<dyn Error + Send>> {
         let res = self.adapter.load_overlord_wal(Context::new()).await.ok();
         Ok(res)
-    }
-}
-
-impl<Adapter: ConsensusAdapter + 'static> Report for ConsensusEngine<Adapter> {
-    fn report_error(&self, ctx: Context, err: OverlordError) {
-        match err {
-            OverlordError::CryptoErr(_) | OverlordError::AggregatedSignatureErr(_) => self
-                .adapter
-                .report_bad(ctx, TrustFeedback::Worse(err.to_string())),
-            _ => (),
-        }
     }
 }
 
