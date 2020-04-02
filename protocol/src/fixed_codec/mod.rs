@@ -1,11 +1,7 @@
-#[macro_use]
-mod r#macro;
-pub mod block;
 pub mod primitive;
 pub mod receipt;
 #[cfg(test)]
 pub mod tests;
-pub mod transaction;
 
 use std::error::Error;
 

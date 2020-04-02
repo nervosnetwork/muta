@@ -1,15 +1,18 @@
 use bytes::Bytes;
+use fixed_codec_derive::RlpFixedCodec;
 use serde::{Deserialize, Serialize};
 
+use crate::fixed_codec::{FixedCodec, FixedCodecError};
 use crate::types::{Address, Bloom, Hash, MerkleRoot};
+use crate::ProtocolResult;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(RlpFixedCodec, Clone, Debug, PartialEq, Eq)]
 pub struct Block {
     pub header:            BlockHeader,
     pub ordered_tx_hashes: Vec<Hash>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(RlpFixedCodec, Clone, Debug, PartialEq, Eq)]
 pub struct BlockHeader {
     pub chain_id:          Hash,
     pub height:            u64,
@@ -28,7 +31,7 @@ pub struct BlockHeader {
     pub validators:        Vec<Validator>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, Hash, PartialEq, Eq)]
+#[derive(RlpFixedCodec, Serialize, Deserialize, Clone, Debug, Hash, PartialEq, Eq)]
 pub struct Proof {
     pub height:     u64,
     pub round:      u64,
@@ -37,14 +40,14 @@ pub struct Proof {
     pub bitmap:     Bytes,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(RlpFixedCodec, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Validator {
     pub address:        Address,
     pub propose_weight: u32,
     pub vote_weight:    u32,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(RlpFixedCodec, Clone, Debug, PartialEq, Eq)]
 pub struct Pill {
     pub block:          Block,
     pub propose_hashes: Vec<Hash>,

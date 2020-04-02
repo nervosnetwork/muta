@@ -1,8 +1,11 @@
+use bytes::Bytes;
+use fixed_codec_derive::RlpFixedCodec;
 use serde::Deserialize;
 
-use crate::types::primitive::Hex;
+use crate::fixed_codec::{FixedCodec, FixedCodecError};
+use crate::{types::primitive::Hex, ProtocolResult};
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[derive(RlpFixedCodec, Clone, Debug, Deserialize, PartialEq, Eq)]
 pub struct Genesis {
     pub timestamp: u64,
     pub prevhash:  Hex,
@@ -20,7 +23,7 @@ impl Genesis {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[derive(RlpFixedCodec, Clone, Debug, Deserialize, PartialEq, Eq)]
 pub struct ServiceParam {
     pub name:    String,
     pub payload: String,

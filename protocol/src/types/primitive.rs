@@ -1,12 +1,14 @@
 use std::fmt;
 
 use bytes::{Bytes, BytesMut};
+use fixed_codec_derive::RlpFixedCodec;
 use hasher::{Hasher, HasherKeccak};
 use lazy_static::lazy_static;
 use num_bigint::BigUint;
 use serde::de;
 use serde::{Deserialize, Serialize};
 
+use crate::fixed_codec::{FixedCodec, FixedCodecError};
 use crate::types::TypesError;
 use crate::ProtocolResult;
 
@@ -23,7 +25,7 @@ pub const GENESIS_HEIGHT: u64 = 0;
 const HASH_LEN: usize = 32;
 
 // Should started with 0x
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Default)]
+#[derive(RlpFixedCodec, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub struct Hex(String);
 
 impl Hex {
@@ -86,7 +88,7 @@ impl<'de> Deserialize<'de> for Hex {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(RlpFixedCodec, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Hash([u8; HASH_LEN]);
 /// Balance
 pub type Balance = BigUint;
@@ -198,7 +200,7 @@ impl fmt::Debug for Hash {
 /// Address length.
 const ADDRESS_LEN: usize = 20;
 
-#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
+#[derive(RlpFixedCodec, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
 pub struct Address([u8; ADDRESS_LEN]);
 
 impl Serialize for Address {
@@ -288,7 +290,7 @@ impl fmt::Debug for Address {
     }
 }
 
-#[derive(Deserialize, Default, Serialize, Clone, Debug, PartialEq, Eq)]
+#[derive(RlpFixedCodec, Deserialize, Default, Serialize, Clone, Debug, PartialEq, Eq)]
 pub struct Metadata {
     pub chain_id:        Hash,
     pub common_ref:      Hex,
@@ -305,7 +307,7 @@ pub struct Metadata {
     pub max_tx_size:     u64,
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Default)]
+#[derive(RlpFixedCodec, Serialize, Deserialize, Clone, PartialEq, Eq, Default)]
 pub struct ValidatorExtend {
     pub bls_pub_key:    Hex,
     pub address:        Address,
