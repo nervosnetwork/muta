@@ -1,5 +1,3 @@
-#![allow(clippy::type_complexity)]
-
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -25,13 +23,7 @@ use crate::{ConsensusError, ConsensusType};
 pub struct OverlordConsensus<Adapter: ConsensusAdapter + 'static> {
     /// Overlord consensus protocol instance.
     inner: Arc<
-        Overlord<
-            FixedPill,
-            ConsensusEngine<Adapter>,
-            OverlordCrypto,
-            ConsensusEngine<Adapter>,
-            ConsensusEngine<Adapter>,
-        >,
+        Overlord<FixedPill, ConsensusEngine<Adapter>, OverlordCrypto, ConsensusEngine<Adapter>>,
     >,
     /// An overlord consensus protocol handler.
     handler: OverlordHandler<FixedPill>,
@@ -98,7 +90,6 @@ impl<Adapter: ConsensusAdapter + 'static> OverlordConsensus<Adapter> {
             node_info.self_address.as_bytes(),
             Arc::clone(&engine),
             crypto,
-            Arc::clone(&engine),
             engine,
         );
         let overlord_handler = overlord.get_handler();
