@@ -39,6 +39,19 @@ impl FixedCodec for u8 {
     }
 }
 
+impl FixedCodec for u16 {
+    fn encode_fixed(&self) -> ProtocolResult<Bytes> {
+        let mut buf = [0u8; mem::size_of::<u16>()];
+        LittleEndian::write_u16(&mut buf, *self);
+
+        Ok(BytesMut::from(buf.as_ref()).freeze())
+    }
+
+    fn decode_fixed(bytes: Bytes) -> ProtocolResult<Self> {
+        Ok(LittleEndian::read_u16(bytes.as_ref()))
+    }
+}
+
 impl FixedCodec for u32 {
     fn encode_fixed(&self) -> ProtocolResult<Bytes> {
         let mut buf = [0u8; mem::size_of::<u32>()];
@@ -65,6 +78,32 @@ impl FixedCodec for u64 {
     }
 }
 
+impl FixedCodec for u128 {
+    fn encode_fixed(&self) -> ProtocolResult<Bytes> {
+        let mut buf = [0u8; mem::size_of::<u128>()];
+        LittleEndian::write_u128(&mut buf, *self);
+
+        Ok(BytesMut::from(buf.as_ref()).freeze())
+    }
+
+    fn decode_fixed(bytes: Bytes) -> ProtocolResult<Self> {
+        Ok(LittleEndian::read_u128(bytes.as_ref()))
+    }
+}
+
+impl FixedCodec for usize {
+    fn encode_fixed(&self) -> ProtocolResult<Bytes> {
+        let mut buf = [0u8; mem::size_of::<usize>()];
+        LittleEndian::write_uint(&mut buf, *self);
+
+        Ok(BytesMut::from(buf.as_ref()).freeze())
+    }
+
+    fn decode_fixed(bytes: Bytes) -> ProtocolResult<Self> {
+        Ok(LittleEndian::read_uint(bytes.as_ref()))
+    }
+}
+
 impl FixedCodec for String {
     fn encode_fixed(&self) -> ProtocolResult<Bytes> {
         Ok(Bytes::from(self.clone()))
@@ -82,5 +121,15 @@ impl FixedCodec for Bytes {
 
     fn decode_fixed(bytes: Bytes) -> ProtocolResult<Self> {
         Ok(bytes)
+    }
+}
+
+impl FixedCodec for Vec<u8> {
+    fn encode_fixed(&self) -> ProtocolResult<Bytes> {
+        Ok(Bytes::from(self.clone()))
+    }
+
+    fn decode_fixed(bytes: Bytes) -> ProtocolResult<Self> {
+        Ok(bytes.to_vec())
     }
 }
