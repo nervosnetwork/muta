@@ -10,7 +10,7 @@ mod tx_cache;
 
 pub use adapter::message::{
     MsgPushTxs, NewTxsHandler, PullTxsHandler, END_GOSSIP_NEW_TXS, RPC_PULL_TXS, RPC_RESP_PULL_TXS,
-    RPC_RESP_PULL_TXS_SYNC,
+    RPC_RESP_PULL_TXS_SYNC, MsgNewTxs
 };
 pub use adapter::DefaultMemPoolAdapter;
 pub use adapter::{DEFAULT_BROADCAST_TXS_INTERVAL, DEFAULT_BROADCAST_TXS_SIZE};
