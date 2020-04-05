@@ -38,6 +38,7 @@ pub struct ConfigNetwork {
     pub recv_buffer_size:           Option<usize>,
     pub max_frame_length:           Option<usize>,
     pub max_wait_streams:           Option<usize>,
+    pub ping_interval:              Option<u64>,
 }
 
 #[derive(Debug, Deserialize)]

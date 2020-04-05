@@ -162,6 +162,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         .peer_soft_ban(config.network.soft_ban_duration)
         .peer_fatal_ban(config.network.fatal_ban_duration)
         .rpc_timeout(config.network.rpc_timeout.clone())
+        .ping_interval(config.network.ping_interval.clone())
         .selfcheck_interval(config.network.selfcheck_interval.clone())
         .max_wait_streams(config.network.max_wait_streams)
         .max_frame_length(config.network.max_frame_length.clone())
