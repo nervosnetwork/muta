@@ -21,6 +21,7 @@ pub struct FullNode {
 
 pub async fn make(full_node: FullNode, listen_port: u16) -> NetworkServiceHandle {
     let config = NetworkConfig::new()
+        .ping_interval(Some(99999)) // disable ping interval to remove trust feedback good fromm it
         .bootstraps(vec![(full_node.pubkey, full_node.addr)])
         .expect("test node config");
 
