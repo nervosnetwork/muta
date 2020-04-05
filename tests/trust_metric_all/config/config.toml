@@ -1,0 +1,41 @@
+# crypto
+privkey = "0x45c56be699dca666191ad3446897e0f480da234da896270202514a0e1a587c3f"
+
+# db config
+data_path = "/tmp/chain/data"
+
+[graphql]
+listening_address = "0.0.0.0:8000"
+graphql_uri = "/graphql"
+graphiql_uri = "/graphiql"
+workers = 0 # if 0, uses number of available logical cpu as threads count.
+maxconn = 25000
+max_payload_size = 1048576
+
+[network]
+listening_address = "0.0.0.0:1337"
+rpc_timeout = 10
+
+[consensus]
+sync_txs_chunk_size = 5000
+
+[mempool]
+pool_size = 20000
+broadcast_txs_size = 200
+broadcast_txs_interval = 200
+
+[executor]
+light = false
+
+[logger]
+filter = "error"
+log_to_console = true
+console_show_file_and_line = false
+log_path = "logs/"
+log_to_file = true
+metrics = true
+# you can specify log level for modules with config below
+modules_level = { "overlord" = "error", core_consensus = "error", "core_network" = "debug" }
+
+[rocksdb]
+max_open_files = 64
