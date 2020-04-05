@@ -16,7 +16,7 @@ use protocol::ProtocolError;
 
 use core_storage::StorageError;
 
-use crate::fixed_types::{FixedBlock, FixedHeight, FixedProof, FixedSignedTxs, PullTxsRequest};
+pub use crate::fixed_types::{FixedBlock, FixedHeight, FixedProof, FixedSignedTxs, PullTxsRequest};
 
 pub const END_GOSSIP_SIGNED_PROPOSAL: &str = "/gossip/consensus/signed_proposal";
 pub const END_GOSSIP_SIGNED_VOTE: &str = "/gossip/consensus/signed_vote";
