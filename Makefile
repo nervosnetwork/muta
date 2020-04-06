@@ -64,13 +64,11 @@ docker-push:
 	docker push mutadev/muta:${COMMIT}
 
 e2e-test:
-	@echo "-----------------------------------------------------------------"
-	@echo "run the commands below in another window first:                  "
-	@echo "                                                                 "
-	@echo "rm -rf ./target/tests/e2e/data && \                              "
-	@echo "RUST_LOG=info,overlord=warn cargo run -- -c tests/e2e/config.toml"
-	@echo "-----------------------------------------------------------------"
+	cargo build --release --example muta-chain
+	rm -rf ./devtools/chain/data
+	./target/release/examples/muta-chain > /tmp/log 2>&1 &
 	cd tests/e2e && yarn && ./wait-for-it.sh -t 300 localhost:8000 -- yarn run test
+	killall -2 muta-chain
 
 e2e-test-via-docker:
 	docker-compose -f tests/e2e/docker-compose-e2e-test.yaml up --exit-code-from e2e-test --force-recreate

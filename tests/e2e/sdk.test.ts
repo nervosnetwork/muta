@@ -57,10 +57,10 @@ describe("API test via muta-sdk-js", () => {
         asset_id: asset_id,
       })!;
 
-      const c1 = from_balance_before.ret.balance as number;
-      expect(from_balance_after.ret.balance).toBe(c1 - 1);
-      const c2 = to_balance_before.ret.balance as number
-      expect(to_balance_after.ret.balance).toBe(c2 + 1);
+      const c1 = from_balance_before.succeedData.balance as number;
+      expect(from_balance_after.succeedData.balance).toBe(c1 - 1);
+      const c2 = to_balance_before.succeedData.balance as number
+      expect(to_balance_after.succeedData.balance).toBe(c2 + 1);
       break;
     }
     expect(i).toBeLessThan(retry_times);
