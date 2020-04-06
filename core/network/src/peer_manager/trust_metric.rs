@@ -305,15 +305,9 @@ impl HeartBeat {
         pause_save: Arc<RwLock<Option<Duration>>>,
     ) -> Self {
         let delay = match resume {
-            Some(resume) => {
-                let remain = interval - resume;
-                if remain.as_secs() > 0 {
-                    Delay::new(remain)
-                } else {
-                    Delay::new(interval)
-                }
-            }
-            None => Delay::new(interval),
+            Some(resume) if interval > resume => Delay::new(interval - resume),
+            // None or resume > interval
+            _ => Delay::new(interval),
         };
 
         HeartBeat {
