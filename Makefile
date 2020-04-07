@@ -64,9 +64,9 @@ docker-push:
 	docker push mutadev/muta:${COMMIT}
 
 e2e-test:
-	cargo build --release --example muta-chain
+	cargo build --example muta-chain
 	rm -rf ./devtools/chain/data
-	./target/release/examples/muta-chain > /tmp/log 2>&1 &
+	./target/debug/examples/muta-chain > /tmp/log 2>&1 &
 	cd tests/e2e && yarn && ./wait-for-it.sh -t 300 localhost:8000 -- yarn run test
 	killall -2 muta-chain
 
