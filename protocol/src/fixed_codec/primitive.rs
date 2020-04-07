@@ -94,13 +94,13 @@ impl FixedCodec for u128 {
 impl FixedCodec for usize {
     fn encode_fixed(&self) -> ProtocolResult<Bytes> {
         let mut buf = [0u8; mem::size_of::<usize>()];
-        LittleEndian::write_uint(&mut buf, *self);
+        LittleEndian::write_uint(&mut buf, *self as u64, 64);
 
         Ok(BytesMut::from(buf.as_ref()).freeze())
     }
 
     fn decode_fixed(bytes: Bytes) -> ProtocolResult<Self> {
-        Ok(LittleEndian::read_uint(bytes.as_ref()))
+        Ok(LittleEndian::read_uint(bytes.as_ref(), 64) as usize)
     }
 }
 
