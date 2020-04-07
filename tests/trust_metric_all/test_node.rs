@@ -4,7 +4,7 @@ use core_network::{NetworkConfig, NetworkService, NetworkServiceHandle};
 use common_crypto::{PrivateKey, Secp256k1PrivateKey};
 use protocol::{
     async_trait,
-    traits::{Context, Priority, Rpc, Gossip},
+    traits::{Context, Priority, Rpc, Gossip, MessageCodec},
     types::{Block, Address},
     ProtocolResult,
 };
@@ -17,6 +17,7 @@ use std::net::{SocketAddr, IpAddr, Ipv4Addr};
 pub trait TestNodeRPC {
     async fn genesis_block(&self) -> ProtocolResult<Block>;
     async fn disconnected(&self) -> bool;
+    async fn broadcast<M: MessageCodec>(&self, end: &str, msg: M) -> ProtocolResult<()>;
 }
 
 pub struct FullNode {
@@ -26,9 +27,9 @@ pub struct FullNode {
 }
 
 pub struct TestNode {
-    network: NetworkServiceHandle,
-    remote_chain_addr: Address,
-    priv_key: Secp256k1PrivateKey,
+    pub network: NetworkServiceHandle,
+    pub remote_chain_addr: Address,
+    pub priv_key: Secp256k1PrivateKey,
 }
 
 pub async fn make(full_node: FullNode, listen_port: u16) -> TestNode {
@@ -79,5 +80,10 @@ impl TestNodeRPC for TestNode {
                 true
             }
         }
+    }
+
+    async fn broadcast<M: MessageCodec>(&self, endpoint: &str, msg: M) -> ProtocolResult<()> {
+        let ctx = Context::new().with_value::<usize>("session_id", 1);
+        self.network.users_cast::<M>(ctx, endpoint, vec![self.remote_chain_addr.clone()], msg, Priority::High).await
     }
 }

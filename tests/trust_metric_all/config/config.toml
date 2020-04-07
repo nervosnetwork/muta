@@ -16,7 +16,7 @@ max_payload_size = 1048576
 listening_address = "0.0.0.0:1337"
 rpc_timeout = 10
 ping_interval = 9999 # disable ping so no trust feedback good from it
-trust_interval_duration = 5
+trust_interval_duration = 3
 
 [consensus]
 sync_txs_chunk_size = 5000

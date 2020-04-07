@@ -2,7 +2,6 @@ use super::{common, full_node, test_node};
 use test_node::TestNodeRPC;
 
 use core_mempool::{MsgNewTxs, END_GOSSIP_NEW_TXS};
-use protocol::traits::{Context, Priority, Gossip};
 
 const FULL_NODE_PUBKEY: &str = "031288a6788678c25952eba8693b2f278f66e2187004b64ac09416d07f83f96d5b";
 const FULL_NODE_CHAIN_ADDR: &str = "0xf8389d774afdad8755ef8e629e5a154fddc6325a";
@@ -25,9 +24,23 @@ fn should_be_disconnected_for_invalid_signature_within_four_intervals() {
     let mut runtime = tokio::runtime::Runtime::new().expect("create runtime");
     runtime.block_on(async move {
         let test_node = test_node::make(full_node, 9527u16).await;
-
         std::thread::sleep(std::time::Duration::from_secs(10));
-
+        // Add api to fetch current latest block to check whether
         assert!(!test_node.disconnected().await);
+
+        for i in 0..4u8 {
+            let stx = common::gen_signed_tx(&test_node.priv_key, 199, false);
+            let msg_stxs = MsgNewTxs {
+                batch_stxs: vec![stx]
+            };
+
+            let ret = test_node.broadcast(END_GOSSIP_NEW_TXS, msg_stxs).await;
+            if i == 4 {
+                match ret {
+                    Ok(_) => panic!("should disconnect"),
+                    Err(e) => assert!(e.to_string().contains("unconnected Some(")),
+                }
+            }
+        }
     });
 }
