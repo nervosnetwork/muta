@@ -2,6 +2,7 @@ mod builder;
 mod config;
 mod default_start;
 mod error;
+mod memory_db;
 
 use builder::MutaBuilder;
 

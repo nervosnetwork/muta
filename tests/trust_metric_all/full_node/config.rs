@@ -126,20 +126,6 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn data_path_for_state(&self) -> PathBuf {
-        let mut path_state = self.data_path.clone();
-        path_state.push("rocksdb");
-        path_state.push("state_data");
-        path_state
-    }
-
-    pub fn data_path_for_block(&self) -> PathBuf {
-        let mut path_state = self.data_path.clone();
-        path_state.push("rocksdb");
-        path_state.push("block_data");
-        path_state
-    }
-
     pub fn data_path_for_txs_wal(&self) -> PathBuf {
         let mut path_state = self.data_path.clone();
         path_state.push("txs_wal");

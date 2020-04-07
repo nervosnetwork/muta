@@ -4,6 +4,7 @@
 use super::{
     config::Config,
     error::MainError,
+    memory_db::MemoryDB,
 };
 
 use std::collections::HashMap;
@@ -41,17 +42,16 @@ use core_mempool::{
     RPC_RESP_PULL_TXS_SYNC,
 };
 use core_network::{NetworkConfig, NetworkService};
-use core_storage::{adapter::rocks::RocksAdapter, ImplStorage};
-use framework::binding::state::RocksTrieDB;
+use core_storage::ImplStorage;
 use framework::executor::{ServiceExecutor, ServiceExecutorFactory};
 use protocol::traits::{APIAdapter, Context, MemPool, NodeInfo, ServiceMapping, Storage};
 use protocol::types::{Address, Block, BlockHeader, Genesis, Hash, Metadata, Proof, Validator};
 use protocol::{fixed_codec::FixedCodec, ProtocolResult};
 
 pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
-    config: &Config,
     genesis: &Genesis,
     servive_mapping: Arc<Mapping>,
+    db: MemoryDB,
 ) -> ProtocolResult<Block> {
     let metadata: Metadata =
         serde_json::from_str(genesis.get_payload("metadata")).expect("Decode metadata failed!");
@@ -70,12 +70,7 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
     log::info!("Genesis data: {:?}", genesis);
 
     // Init Block db
-    let path_block = config.data_path_for_block();
-    let rocks_adapter = Arc::new(RocksAdapter::new(
-        path_block,
-        config.rocksdb.max_open_files,
-    )?);
-    let storage = Arc::new(ImplStorage::new(Arc::clone(&rocks_adapter)));
+    let storage = Arc::new(ImplStorage::new(Arc::new(db.clone())));
 
     match storage.get_latest_block().await {
         Ok(genesis_block) => {
@@ -89,18 +84,10 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
         }
     };
 
-    // Init trie db
-    let path_state = config.data_path_for_state();
-    let trie_db = Arc::new(RocksTrieDB::new(
-        path_state,
-        config.executor.light,
-        config.rocksdb.max_open_files,
-    )?);
-
     // Init genesis
     let genesis_state_root = ServiceExecutor::create_genesis(
         genesis.services.clone(),
-        Arc::clone(&trie_db),
+        Arc::new(db),
         Arc::clone(&storage),
         servive_mapping,
     )?;
@@ -144,17 +131,11 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
 pub async fn start<Mapping: 'static + ServiceMapping>(
     config: Config,
     service_mapping: Arc<Mapping>,
+    db: MemoryDB,
 ) -> ProtocolResult<()> {
     log::info!("node starts");
     // Init Block db
-    let path_block = config.data_path_for_block();
-    log::info!("Data path for block: {:?}", path_block);
-
-    let rocks_adapter = Arc::new(RocksAdapter::new(
-        path_block.clone(),
-        config.rocksdb.max_open_files,
-    )?);
-    let storage = Arc::new(ImplStorage::new(Arc::clone(&rocks_adapter)));
+    let storage = Arc::new(ImplStorage::new(Arc::new(db.clone())));
 
     // Init network
     let network_config = NetworkConfig::new()
@@ -211,14 +192,6 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         mempool_adapter,
     ));
 
-    // Init trie db
-    let path_state = config.data_path_for_state();
-    let trie_db = Arc::new(RocksTrieDB::new(
-        path_state,
-        config.executor.light,
-        config.rocksdb.max_open_files,
-    )?);
-
     // self private key
     let hex_privkey = hex::decode(config.privkey.as_string_trim0x()).map_err(MainError::FromHex)?;
     let my_privkey =
@@ -230,7 +203,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     let api_adapter = DefaultAPIAdapter::<ServiceExecutorFactory, _, _, _, _>::new(
         Arc::clone(&mempool),
         Arc::clone(&storage),
-        Arc::clone(&trie_db),
+        Arc::new(db.clone()),
         Arc::clone(&service_mapping),
     );
 
@@ -362,7 +335,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
             Arc::new(network_service.handle()),
             Arc::clone(&mempool),
             Arc::clone(&storage),
-            Arc::clone(&trie_db),
+            Arc::new(db),
             Arc::clone(&service_mapping),
             status_agent.clone(),
             Arc::clone(&crypto),

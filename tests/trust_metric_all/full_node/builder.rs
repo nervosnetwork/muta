@@ -1,18 +1,16 @@
-#![feature(async_closure)]
 use super::{
     config::Config,
     default_start::{create_genesis, start},
     error::MainError,
+    memory_db::MemoryDB,
 };
 
 use std::fs;
 use std::sync::Arc;
 
-use derive_more::{Display, From};
-
 use protocol::traits::ServiceMapping;
 use protocol::types::{Block, Genesis};
-use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
+use protocol::ProtocolResult;
 
 #[derive(Default)]
 pub struct MutaBuilder<Mapping: ServiceMapping> {
@@ -92,20 +90,22 @@ impl<Mapping: 'static + ServiceMapping> Muta<Mapping> {
         // run muta
         let mut rt = tokio::runtime::Runtime::new().expect("new tokio runtime");
         let local = tokio::task::LocalSet::new();
-        local.block_on(&mut rt, async move {
-            self.create_genesis().await?;
+        let memory_db = MemoryDB::default();
 
-            start(self.config, Arc::clone(&self.service_mapping)).await
+        local.block_on(&mut rt, async move {
+            self.create_genesis(memory_db.clone()).await?;
+
+            start(self.config, Arc::clone(&self.service_mapping), memory_db).await
         })?;
 
         Ok(())
     }
 
-    async fn create_genesis(&self) -> ProtocolResult<Block> {
+    async fn create_genesis(&self, db: MemoryDB) -> ProtocolResult<Block> {
         create_genesis(
-            &self.config,
             &self.genesis,
             Arc::clone(&self.service_mapping),
+            db
         )
         .await
     }
