@@ -1,3 +1,5 @@
+#![allow(clippy::type_complexity)]
+
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -23,7 +25,7 @@ use crate::{ConsensusError, ConsensusType};
 pub struct OverlordConsensus<Adapter: ConsensusAdapter + 'static> {
     /// Overlord consensus protocol instance.
     inner: Arc<
-        Overlord<FixedPill, ConsensusEngine<Adapter>, OverlordCrypto, ConsensusEngine<Adapter>>,
+        Overlord<FixedPill, ConsensusEngine<Adapter>, OverlordCrypto, ConsensusEngine<Adapter>, ConsensusEngine<Adapter>>,
     >,
     /// An overlord consensus protocol handler.
     handler: OverlordHandler<FixedPill>,
@@ -36,7 +38,7 @@ impl<Adapter: ConsensusAdapter + 'static> Consensus for OverlordConsensus<Adapte
             .map_err(|_| ConsensusError::DecodeErr(ConsensusType::SignedProposal))?;
         self.handler
             .send_msg(ctx, OverlordMsg::SignedProposal(signed_proposal))
-            .map_err(|e| ConsensusError::OverlordErr(Box::new(e)))?;
+            .expect("Overlord handler disconnect");
         Ok(())
     }
 
@@ -45,7 +47,7 @@ impl<Adapter: ConsensusAdapter + 'static> Consensus for OverlordConsensus<Adapte
             rlp::decode(&vote).map_err(|_| ConsensusError::DecodeErr(ConsensusType::SignedVote))?;
         self.handler
             .send_msg(ctx, OverlordMsg::SignedVote(signed_vote))
-            .map_err(|e| ConsensusError::OverlordErr(Box::new(e)))?;
+            .expect("Overlord handler disconnect");
         Ok(())
     }
 
@@ -54,7 +56,7 @@ impl<Adapter: ConsensusAdapter + 'static> Consensus for OverlordConsensus<Adapte
             .map_err(|_| ConsensusError::DecodeErr(ConsensusType::AggregateVote))?;
         self.handler
             .send_msg(ctx, OverlordMsg::AggregatedVote(aggregated_vote))
-            .map_err(|e| ConsensusError::OverlordErr(Box::new(e)))?;
+            .expect("Overlord handler disconnect");
         Ok(())
     }
 
@@ -63,7 +65,7 @@ impl<Adapter: ConsensusAdapter + 'static> Consensus for OverlordConsensus<Adapte
             .map_err(|_| ConsensusError::DecodeErr(ConsensusType::SignedChoke))?;
         self.handler
             .send_msg(ctx, OverlordMsg::SignedChoke(signed_choke))
-            .map_err(|e| ConsensusError::OverlordErr(Box::new(e)))?;
+            .expect("Overlord handler disconnect");
         Ok(())
     }
 }
@@ -91,6 +93,7 @@ impl<Adapter: ConsensusAdapter + 'static> OverlordConsensus<Adapter> {
             Arc::clone(&engine),
             crypto,
             Arc::clone(&engine),
+            engine,
         );
         let overlord_handler = overlord.get_handler();
         let status = status_agent.to_inner();

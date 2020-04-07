@@ -92,8 +92,9 @@ impl<C: Consensus + 'static> MessageHandler for ProposalMessageHandler<C> {
     async fn process(&self, ctx: Context, msg: Self::Message) -> TrustFeedback {
         if let Err(e) = self.consensus.set_proposal(ctx, msg.0).await {
             warn!("set proposal {}", e);
+            return TrustFeedback::Bad(e.to_string());
         }
-        // FIXME
+
         TrustFeedback::Neutral
     }
 }
@@ -115,8 +116,9 @@ impl<C: Consensus + 'static> MessageHandler for VoteMessageHandler<C> {
     async fn process(&self, ctx: Context, msg: Self::Message) -> TrustFeedback {
         if let Err(e) = self.consensus.set_vote(ctx, msg.0).await {
             warn!("set vote {}", e);
+            return TrustFeedback::Bad(e.to_string());
         }
-        // FIXME
+
         TrustFeedback::Neutral
     }
 }
@@ -138,8 +140,9 @@ impl<C: Consensus + 'static> MessageHandler for QCMessageHandler<C> {
     async fn process(&self, ctx: Context, msg: Self::Message) -> TrustFeedback {
         if let Err(e) = self.consensus.set_qc(ctx, msg.0).await {
             warn!("set qc {}", e);
+            return TrustFeedback::Bad(e.to_string());
         }
-        // FIXME
+
         TrustFeedback::Neutral
     }
 }
@@ -161,8 +164,9 @@ impl<C: Consensus + 'static> MessageHandler for ChokeMessageHandler<C> {
     async fn process(&self, ctx: Context, msg: Self::Message) -> TrustFeedback {
         if let Err(e) = self.consensus.set_choke(ctx, msg.0).await {
             warn!("set choke {}", e);
+            return TrustFeedback::Bad(e.to_string());
         }
-        // FIXME
+
         TrustFeedback::Neutral
     }
 }
@@ -267,6 +271,7 @@ impl<R: Rpc + 'static, S: Storage + 'static> MessageHandler for PullProofRpcHand
             },
             Err(_) => Err(StorageError::GetNone.into()),
         };
+
         self.rpc
             .response(
                 ctx,
@@ -277,7 +282,7 @@ impl<R: Rpc + 'static, S: Storage + 'static> MessageHandler for PullProofRpcHand
             .unwrap_or_else(move |e: ProtocolError| warn!("[core_consensus] push proof {}", e))
             .await;
 
-        TrustFeedback::Neutral
+        TrustFeedback::Good
     }
 }
 
