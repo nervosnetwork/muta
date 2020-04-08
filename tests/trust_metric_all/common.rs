@@ -9,7 +9,14 @@ use protocol::{
 };
 use rand::{rngs::OsRng, RngCore};
 
-use std::{convert::TryFrom, path::PathBuf};
+use std::{
+    convert::TryFrom,
+    net::TcpListener,
+    path::PathBuf,
+    sync::atomic::{AtomicU16, Ordering},
+};
+
+static AVAILABLE_PORT: AtomicU16 = AtomicU16::new(2000);
 
 const TX_CYCLE: u64 = 1;
 
@@ -65,5 +72,20 @@ pub fn gen_signed_tx(
         tx_hash,
         pubkey: priv_key.pub_key().to_bytes(),
         signature: signature.to_bytes(),
+    }
+}
+
+pub fn available_port_pair() -> (u16, u16) {
+    (available_port(), available_port())
+}
+
+fn available_port() -> u16 {
+    let is_available = |port| -> bool { TcpListener::bind(("127.0.0.1", port)).is_ok() };
+
+    loop {
+        let port = AVAILABLE_PORT.fetch_add(1, Ordering::SeqCst);
+        if is_available(port) {
+            return port;
+        }
     }
 }

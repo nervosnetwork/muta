@@ -7,15 +7,16 @@ use core_mempool::{MsgNewTxs, END_GOSSIP_NEW_TXS};
 
 #[test]
 fn should_be_disconnected_for_invalid_signature_within_four_intervals() {
+    let (full_port, client_port) = common::available_port_pair();
     let _handle = std::thread::spawn(move || {
-        node::full_node::run(1338);
+        node::full_node::run(full_port);
     });
 
     std::thread::sleep(std::time::Duration::from_secs(10));
 
     let mut runtime = tokio::runtime::Runtime::new().expect("create runtime");
     runtime.block_on(async move {
-        let client_node = node::client_node::make(1338, 9528u16).await;
+        let client_node = node::client_node::make(full_port, client_port).await;
         std::thread::sleep(std::time::Duration::from_secs(10));
         // Add api to fetch current latest block to check whether
         assert!(!client_node.disconnected().await);
