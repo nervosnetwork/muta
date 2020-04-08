@@ -110,9 +110,7 @@ impl Default for ConfigLogger {
 #[derive(Debug, Deserialize)]
 pub struct Config {
     // crypto
-    pub privkey:   Hex,
-    // db config
-    pub data_path: PathBuf,
+    pub privkey: Hex,
 
     pub network:   ConfigNetwork,
     pub mempool:   ConfigMempool,
@@ -123,12 +121,4 @@ pub struct Config {
     pub logger:    ConfigLogger,
     #[serde(default)]
     pub rocksdb:   ConfigRocksDB,
-}
-
-impl Config {
-    pub fn data_path_for_txs_wal(&self) -> PathBuf {
-        let mut path_state = self.data_path.clone();
-        path_state.push("txs_wal");
-        path_state
-    }
 }

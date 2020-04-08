@@ -7,19 +7,34 @@ use protocol::{
     types::{Hash, RawTransaction, SignedTransaction, TransactionRequest},
     BytesMut,
 };
-use rand::random;
+use rand::{rngs::OsRng, RngCore};
 
-use std::convert::TryFrom;
+use std::{convert::TryFrom, path::PathBuf};
 
 const TX_CYCLE: u64 = 1;
+
+pub fn tmp_dir() -> PathBuf {
+    let mut tmp_dir = std::env::temp_dir();
+    let sub_dir = {
+        let mut random_bytes = [0u8; 32];
+        OsRng.fill_bytes(&mut random_bytes);
+        Hash::digest(BytesMut::from(random_bytes.as_ref()).freeze()).as_hex()
+    };
+
+    tmp_dir.push(sub_dir + "/");
+    tmp_dir
+}
 
 pub fn gen_signed_tx(
     priv_key: &Secp256k1PrivateKey,
     timeout: u64,
     valid: bool,
 ) -> SignedTransaction {
-    let random_bytes = random::<usize>().to_le_bytes();
-    let nonce = Hash::digest(BytesMut::from(random_bytes.as_ref()).freeze());
+    let nonce = {
+        let mut random_bytes = [0u8; 32];
+        OsRng.fill_bytes(&mut random_bytes);
+        Hash::digest(BytesMut::from(random_bytes.as_ref()).freeze())
+    };
 
     let request = TransactionRequest {
         service_name: "test".to_owned(),

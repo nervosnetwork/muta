@@ -5,6 +5,7 @@ use super::{
     config::Config,
     error::MainError,
     memory_db::MemoryDB,
+    common,
 };
 
 use std::collections::HashMap;
@@ -208,7 +209,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     );
 
     // Create full transactions wal
-    let wal_path = config.data_path_for_txs_wal().to_str().unwrap().to_string();
+    let wal_path = common::tmp_dir().to_str().expect("wal path string").to_string();
     let txs_wal = Arc::new(SignedTxsWAL::new(wal_path));
 
     let exec_resp = api_adapter
