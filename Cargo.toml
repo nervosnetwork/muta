@@ -37,6 +37,7 @@ tokio = { version = "0.2", features = ["macros", "rt-core", "rt-util", "signal",
 [dev-dependencies]
 asset = { path = "built-in-services/asset"}
 metadata = { path = "built-in-services/metadata"}
+util = { path = "built-in-services/util"}
 
 [workspace]
 members = [
