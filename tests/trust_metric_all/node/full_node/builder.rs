@@ -84,16 +84,6 @@ impl<Mapping: 'static + ServiceMapping> Muta<Mapping> {
     }
 
     pub fn run(self) -> ProtocolResult<()> {
-        common_logger::init(
-            self.config.logger.filter.clone(),
-            self.config.logger.log_to_console,
-            self.config.logger.console_show_file_and_line,
-            self.config.logger.log_to_file,
-            self.config.logger.metrics,
-            self.config.logger.log_path.clone(),
-            self.config.logger.modules_level.clone(),
-        );
-
         // run muta
         let mut rt = tokio::runtime::Runtime::new().expect("new tokio runtime");
         let local = tokio::task::LocalSet::new();

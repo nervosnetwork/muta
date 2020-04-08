@@ -1,5 +1,6 @@
 mod common;
 mod consensus;
+mod logger;
 mod mempool;
 mod node;
 
