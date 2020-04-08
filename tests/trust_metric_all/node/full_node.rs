@@ -3,7 +3,7 @@ mod default_start;
 mod error;
 mod memory_db;
 
-use super::{common, config, consts};
+use super::{common, config, consts, diagnostic};
 use builder::MutaBuilder;
 
 use asset::AssetService;

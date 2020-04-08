@@ -1,5 +1,5 @@
 /// Almost same as src/default_start.rs, only remove graphql service.
-use super::{common, config::Config, consts, error::MainError, memory_db::MemoryDB};
+use super::{common, config::Config, consts, diagnostic, error::MainError, memory_db::MemoryDB};
 
 use std::collections::HashMap;
 use std::convert::TryFrom;
@@ -172,6 +172,12 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     network_service
         .listen(config.network.listening_address)
         .await?;
+
+    // Register diagnostic
+    network_service.register_endpoint_handler(
+        diagnostic::GOSSIP_BLACKHOLE,
+        Box::new(diagnostic::BlackHoleHandler {}),
+    )?;
 
     // Init mempool
     let current_block = storage.get_latest_block().await?;

@@ -1,10 +1,9 @@
-use super::{common, config::Config, consts};
+use super::{config::Config, consts, diagnostic};
 
 use common_crypto::{PrivateKey, Secp256k1PrivateKey};
 use core_consensus::message::{
     FixedBlock, FixedHeight, RPC_RESP_SYNC_PULL_BLOCK, RPC_SYNC_PULL_BLOCK,
 };
-use core_mempool::{MsgNewTxs, END_GOSSIP_NEW_TXS};
 use core_network::{NetworkConfig, NetworkService, NetworkServiceHandle};
 use protocol::{
     async_trait,
@@ -18,7 +17,7 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 #[async_trait]
 pub trait ClientNodeRPC {
     async fn genesis_block(&self) -> ProtocolResult<Block>;
-    async fn disconnected(&self) -> bool;
+    async fn connected(&self) -> bool;
     async fn broadcast<M: MessageCodec>(&self, end: &str, msg: M) -> ProtocolResult<()>;
 }
 
@@ -28,7 +27,7 @@ pub struct ClientNode {
     pub priv_key:          Secp256k1PrivateKey,
 }
 
-pub async fn make(full_node_port: u16, listen_port: u16) -> ClientNode {
+pub async fn connect(full_node_port: u16, listen_port: u16) -> ClientNode {
     let full_node_hex_pubkey = full_node_hex_pubkey();
     let full_node_chain_addr = full_node_chain_addr(&full_node_hex_pubkey);
     let full_node_addr = format!("127.0.0.1:{}", full_node_port);
@@ -58,6 +57,18 @@ pub async fn make(full_node_port: u16, listen_port: u16) -> ClientNode {
 
     tokio::spawn(network);
 
+    let mut count = 60u8;
+    while count > 0 {
+        count -= 1;
+        if is_connected(handle.clone(), full_node_chain_addr.clone()).await {
+            break;
+        }
+        tokio::time::delay_for(std::time::Duration::from_secs(1)).await;
+    }
+    if count == 0 {
+        panic!("failed to connect full node");
+    }
+
     ClientNode {
         network: handle,
         remote_chain_addr: full_node_chain_addr,
@@ -81,33 +92,8 @@ impl ClientNodeRPC for ClientNode {
         Ok(fixed_block.inner)
     }
 
-    async fn disconnected(&self) -> bool {
-        let ctx = Context::new().with_value::<usize>("session_id", 1);
-        let stx = common::gen_signed_tx(&self.priv_key, 199, true);
-        let msg_stxs = MsgNewTxs {
-            batch_stxs: vec![stx],
-        };
-
-        match self
-            .network
-            .users_cast::<MsgNewTxs>(
-                ctx,
-                END_GOSSIP_NEW_TXS,
-                vec![self.remote_chain_addr.clone()],
-                msg_stxs,
-                Priority::High,
-            )
-            .await
-        {
-            Ok(_) => false,
-            Err(e) => {
-                if e.to_string().contains("unconnected None") {
-                    false
-                } else {
-                    true
-                }
-            }
-        }
+    async fn connected(&self) -> bool {
+        is_connected(self.network.clone(), self.remote_chain_addr.clone()).await
     }
 
     async fn broadcast<M: MessageCodec>(&self, endpoint: &str, msg: M) -> ProtocolResult<()> {
@@ -121,6 +107,28 @@ impl ClientNodeRPC for ClientNode {
                 Priority::High,
             )
             .await
+    }
+}
+
+async fn is_connected(network: NetworkServiceHandle, full_node_chain_addr: Address) -> bool {
+    let ctx = Context::new().with_value::<usize>("session_id", 1);
+    let probe = diagnostic::BlackHoleMsg(0);
+    let endpoint = diagnostic::GOSSIP_BLACKHOLE;
+    let priority = Priority::High;
+    let users = vec![full_node_chain_addr];
+
+    match network
+        .users_cast(ctx, endpoint, users, probe, priority)
+        .await
+    {
+        Ok(_) => true,
+        Err(e) => {
+            if e.to_string().contains("unconnected None") {
+                true
+            } else {
+                false
+            }
+        }
     }
 }
 
