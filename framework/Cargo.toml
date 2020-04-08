@@ -11,6 +11,7 @@ repository = "https://github.com/nervosnetwork/muta"
 protocol = { path = "../protocol", package = "muta-protocol" }
 asset = { path = "../built-in-services/asset"}
 metadata = { path = "../built-in-services/metadata"}
+util = { path = "../built-in-services/util"}
 
 hasher = { version = "0.1", features = ['hash-keccak'] }
 cita_trie = "2.0"
