@@ -1,9 +1,9 @@
 use std::mem;
 
 use byteorder::{ByteOrder, LittleEndian};
-use bytes::{Bytes, BytesMut};
 
 use crate::fixed_codec::{FixedCodec, FixedCodecError};
+use crate::types::{Bloom, Bytes, BytesMut};
 use crate::ProtocolResult;
 
 impl FixedCodec for bool {
@@ -91,19 +91,6 @@ impl FixedCodec for u128 {
     }
 }
 
-impl FixedCodec for usize {
-    fn encode_fixed(&self) -> ProtocolResult<Bytes> {
-        let mut buf = [0u8; mem::size_of::<usize>()];
-        LittleEndian::write_uint(&mut buf, *self as u64, 64);
-
-        Ok(BytesMut::from(buf.as_ref()).freeze())
-    }
-
-    fn decode_fixed(bytes: Bytes) -> ProtocolResult<Self> {
-        Ok(LittleEndian::read_uint(bytes.as_ref(), 64) as usize)
-    }
-}
-
 impl FixedCodec for String {
     fn encode_fixed(&self) -> ProtocolResult<Bytes> {
         Ok(Bytes::from(self.clone()))
@@ -131,5 +118,15 @@ impl FixedCodec for Vec<u8> {
 
     fn decode_fixed(bytes: Bytes) -> ProtocolResult<Self> {
         Ok(bytes.to_vec())
+    }
+}
+
+impl FixedCodec for Bloom {
+    fn encode_fixed(&self) -> ProtocolResult<Bytes> {
+        self.to_low_u64_le().encode_fixed()
+    }
+
+    fn decode_fixed(bytes: Bytes) -> ProtocolResult<Self> {
+        Ok(Bloom::from_low_u64_le(u64::decode_fixed(bytes)?))
     }
 }

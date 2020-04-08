@@ -18,6 +18,8 @@ macro_rules! test_eq {
 
 #[test]
 fn test_fixed_codec_primitive() {
+    use crate::types::Bloom;
+
     let bs = true.encode_fixed().unwrap();
     assert_eq!(<bool as FixedCodec>::decode_fixed(bs).unwrap(), true);
 
@@ -36,10 +38,19 @@ fn test_fixed_codec_primitive() {
     let bs = 8u64.encode_fixed().unwrap();
     assert_eq!(<u64 as FixedCodec>::decode_fixed(bs).unwrap(), 8u64);
 
+    let bs = 8u128.encode_fixed().unwrap();
+    assert_eq!(<u64 as FixedCodec>::decode_fixed(bs).unwrap(), 8u64);
+
     let bs = "test".to_owned().encode_fixed().unwrap();
     assert_eq!(
         <String as FixedCodec>::decode_fixed(bs).unwrap(),
         "test".to_owned()
+    );
+
+    let bs = Bloom::from_low_u64_le(8u64).encode_fixed().unwrap();
+    assert_eq!(
+        <Bloom as FixedCodec>::decode_fixed(bs).unwrap(),
+        Bloom::from_low_u64_le(8u64)
     );
 }
 
