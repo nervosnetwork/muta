@@ -25,7 +25,7 @@ pub const GENESIS_HEIGHT: u64 = 0;
 const HASH_LEN: usize = 32;
 
 // Should started with 0x
-#[derive(RlpFixedCodec, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Default)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub struct Hex(String);
 
 impl Hex {
