@@ -1,40 +1,32 @@
-use super::{common, full_node, test_node};
-use test_node::TestNodeRPC;
+use super::{
+    common,
+    node::{self, client_node::ClientNodeRPC},
+};
 
 use core_mempool::{MsgNewTxs, END_GOSSIP_NEW_TXS};
-
-const FULL_NODE_PUBKEY: &str = "031288a6788678c25952eba8693b2f278f66e2187004b64ac09416d07f83f96d5b";
-const FULL_NODE_CHAIN_ADDR: &str = "0xf8389d774afdad8755ef8e629e5a154fddc6325a";
-const FULL_NODE_ADDR: &str = "127.0.0.1:1337";
 
 #[test]
 fn should_be_disconnected_for_invalid_signature_within_four_intervals() {
     let _handle = std::thread::spawn(move || {
-        full_node::run();
+        node::full_node::run(1338);
     });
 
     std::thread::sleep(std::time::Duration::from_secs(10));
 
-    let full_node = test_node::FullNode {
-        pubkey:     FULL_NODE_PUBKEY.to_owned(),
-        chain_addr: FULL_NODE_CHAIN_ADDR.to_owned(),
-        addr:       FULL_NODE_ADDR.to_owned(),
-    };
-
     let mut runtime = tokio::runtime::Runtime::new().expect("create runtime");
     runtime.block_on(async move {
-        let test_node = test_node::make(full_node, 9527u16).await;
+        let client_node = node::client_node::make(1338, 9528u16).await;
         std::thread::sleep(std::time::Duration::from_secs(10));
         // Add api to fetch current latest block to check whether
-        assert!(!test_node.disconnected().await);
+        assert!(!client_node.disconnected().await);
 
         for i in 0..4u8 {
-            let stx = common::gen_signed_tx(&test_node.priv_key, 199, false);
+            let stx = common::gen_signed_tx(&client_node.priv_key, 199, false);
             let msg_stxs = MsgNewTxs {
                 batch_stxs: vec![stx],
             };
 
-            let ret = test_node.broadcast(END_GOSSIP_NEW_TXS, msg_stxs).await;
+            let ret = client_node.broadcast(END_GOSSIP_NEW_TXS, msg_stxs).await;
             if i == 4 {
                 match ret {
                     Ok(_) => panic!("should disconnect"),

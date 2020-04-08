@@ -1,10 +1,9 @@
 mod builder;
-mod config;
 mod default_start;
 mod error;
 mod memory_db;
 
-use super::common;
+use super::{common, config, consts};
 use builder::MutaBuilder;
 
 use asset::AssetService;
@@ -54,12 +53,12 @@ impl From<MappingError> for ProtocolError {
     }
 }
 
-pub fn run() {
+pub fn run(listen_port: u16) {
     let builder = MutaBuilder::new()
-        .config_path("tests/trust_metric_all/config/config.toml")
-        .genesis_path("tests/trust_metric_all/config/genesis.toml")
+        .config_path(consts::CHAIN_CONFIG_PATH)
+        .genesis_path(consts::CHAIN_GENESIS_PATH)
         .service_mapping(DefaultServiceMapping {});
 
-    let muta = builder.build().expect("build");
+    let muta = builder.build(listen_port).expect("build");
     muta.run().expect("run");
 }

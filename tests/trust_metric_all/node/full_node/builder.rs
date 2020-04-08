@@ -5,8 +5,11 @@ use super::{
     memory_db::MemoryDB,
 };
 
-use std::fs;
-use std::sync::Arc;
+use std::{
+    fs,
+    net::{IpAddr, Ipv4Addr, SocketAddr},
+    sync::Arc,
+};
 
 use protocol::traits::ServiceMapping;
 use protocol::types::{Block, Genesis};
@@ -43,10 +46,14 @@ impl<Mapping: 'static + ServiceMapping> MutaBuilder<Mapping> {
         self
     }
 
-    pub fn build(self) -> ProtocolResult<Muta<Mapping>> {
-        let config: Config =
+    pub fn build(self, listen_port: u16) -> ProtocolResult<Muta<Mapping>> {
+        let mut config: Config =
             common_config_parser::parse(&self.config_path.expect("config path is not set"))
                 .map_err(MainError::ConfigParse)?;
+
+        // Override listening address
+        let listen_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), listen_port);
+        config.network.listening_address = listen_addr;
 
         let genesis_toml = fs::read_to_string(&self.genesis_path.expect("genesis path is not set"))
             .map_err(MainError::Io)?;

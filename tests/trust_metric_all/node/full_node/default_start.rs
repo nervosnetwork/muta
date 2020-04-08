@@ -1,5 +1,5 @@
 /// Almost same as src/default_start.rs, only remove graphql service.
-use super::{common, config::Config, error::MainError, memory_db::MemoryDB};
+use super::{common, config::Config, consts, error::MainError, memory_db::MemoryDB};
 
 use std::collections::HashMap;
 use std::convert::TryFrom;
@@ -136,13 +136,13 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         .max_connections(config.network.max_connected_peers.clone())
         .whitelist_peers_only(config.network.whitelist_peers_only.clone())
         .peer_trust_metric(
-            config.network.trust_interval_duration,
+            consts::NETWORK_TRUST_METRIC_INTERVAL,
             config.network.trust_max_history_duration,
         )?
         .peer_soft_ban(config.network.soft_ban_duration)
         .peer_fatal_ban(config.network.fatal_ban_duration)
         .rpc_timeout(config.network.rpc_timeout.clone())
-        .ping_interval(config.network.ping_interval.clone())
+        .ping_interval(consts::NETWORK_PING_INTERVAL)
         .selfcheck_interval(config.network.selfcheck_interval.clone())
         .max_wait_streams(config.network.max_wait_streams)
         .max_frame_length(config.network.max_frame_length.clone())

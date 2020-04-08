@@ -1,36 +1,25 @@
 mod common;
 mod consensus;
-mod full_node;
 mod mempool;
-mod test_node;
+mod node;
 
-use test_node::TestNodeRPC;
-
-const FULL_NODE_PUBKEY: &str = "031288a6788678c25952eba8693b2f278f66e2187004b64ac09416d07f83f96d5b";
-const FULL_NODE_CHAIN_ADDR: &str = "0xf8389d774afdad8755ef8e629e5a154fddc6325a";
-const FULL_NODE_ADDR: &str = "127.0.0.1:1337";
+use node::client_node::ClientNodeRPC;
 
 #[test]
 fn trust_metric_basic_setup_test() {
     let _handle = std::thread::spawn(move || {
-        full_node::run();
+        node::full_node::run(1337);
     });
 
-    std::thread::sleep(std::time::Duration::from_secs(10));
-
-    let full_node = test_node::FullNode {
-        pubkey:     FULL_NODE_PUBKEY.to_owned(),
-        chain_addr: FULL_NODE_CHAIN_ADDR.to_owned(),
-        addr:       FULL_NODE_ADDR.to_owned(),
-    };
+    std::thread::sleep(std::time::Duration::from_secs(5));
 
     let mut runtime = tokio::runtime::Runtime::new().expect("create runtime");
     runtime.block_on(async move {
-        let test_node = test_node::make(full_node, 9527u16).await;
+        let client_node = node::client_node::make(1337u16, 9527u16).await;
 
-        std::thread::sleep(std::time::Duration::from_secs(10));
+        std::thread::sleep(std::time::Duration::from_secs(5));
 
-        let block = test_node.genesis_block().await.expect("get genesis");
+        let block = client_node.genesis_block().await.expect("get genesis");
         assert_eq!(block.header.height, 0);
     });
 }
