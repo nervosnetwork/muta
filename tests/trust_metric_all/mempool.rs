@@ -16,9 +16,9 @@ fn should_be_disconnected_for_invalid_signature_within_four_intervals() {
     std::thread::sleep(std::time::Duration::from_secs(10));
 
     let full_node = test_node::FullNode {
-        pubkey: FULL_NODE_PUBKEY.to_owned(),
+        pubkey:     FULL_NODE_PUBKEY.to_owned(),
         chain_addr: FULL_NODE_CHAIN_ADDR.to_owned(),
-        addr:   FULL_NODE_ADDR.to_owned(),
+        addr:       FULL_NODE_ADDR.to_owned(),
     };
 
     let mut runtime = tokio::runtime::Runtime::new().expect("create runtime");
@@ -31,7 +31,7 @@ fn should_be_disconnected_for_invalid_signature_within_four_intervals() {
         for i in 0..4u8 {
             let stx = common::gen_signed_tx(&test_node.priv_key, 199, false);
             let msg_stxs = MsgNewTxs {
-                batch_stxs: vec![stx]
+                batch_stxs: vec![stx],
             };
 
             let ret = test_node.broadcast(END_GOSSIP_NEW_TXS, msg_stxs).await;

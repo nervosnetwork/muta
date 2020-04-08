@@ -102,11 +102,6 @@ impl<Mapping: 'static + ServiceMapping> Muta<Mapping> {
     }
 
     async fn create_genesis(&self, db: MemoryDB) -> ProtocolResult<Block> {
-        create_genesis(
-            &self.genesis,
-            Arc::clone(&self.service_mapping),
-            db
-        )
-        .await
+        create_genesis(&self.genesis, Arc::clone(&self.service_mapping), db).await
     }
 }

@@ -3,13 +3,12 @@ use protocol::{
     async_trait,
     codec::ProtocolCodecSync,
     traits::{StorageAdapter, StorageBatchModify, StorageSchema},
-    ProtocolResult, ProtocolErrorKind, ProtocolError,
-    Bytes,
+    Bytes, ProtocolError, ProtocolErrorKind, ProtocolResult,
 };
 
 use std::{
-    ops::Deref,
     collections::HashMap,
+    ops::Deref,
     sync::{Arc, RwLock},
 };
 
@@ -118,10 +117,7 @@ impl StorageAdapter for MemoryDB {
         }
     }
 
-    async fn remove<S: StorageSchema>(
-        &self,
-        key: <S as StorageSchema>::Key,
-    ) -> ProtocolResult<()> {
+    async fn remove<S: StorageSchema>(&self, key: <S as StorageSchema>::Key) -> ProtocolResult<()> {
         let key = key.encode_sync()?.to_vec();
 
         self.write().unwrap().remove(&key);

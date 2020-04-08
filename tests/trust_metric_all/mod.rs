@@ -1,8 +1,8 @@
+mod common;
 mod consensus;
 mod full_node;
 mod mempool;
 mod test_node;
-mod common;
 
 use test_node::TestNodeRPC;
 
@@ -19,9 +19,9 @@ fn trust_metric_basic_setup_test() {
     std::thread::sleep(std::time::Duration::from_secs(10));
 
     let full_node = test_node::FullNode {
-        pubkey: FULL_NODE_PUBKEY.to_owned(),
+        pubkey:     FULL_NODE_PUBKEY.to_owned(),
         chain_addr: FULL_NODE_CHAIN_ADDR.to_owned(),
-        addr:   FULL_NODE_ADDR.to_owned(),
+        addr:       FULL_NODE_ADDR.to_owned(),
     };
 
     let mut runtime = tokio::runtime::Runtime::new().expect("create runtime");
