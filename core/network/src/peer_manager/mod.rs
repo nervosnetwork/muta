@@ -8,6 +8,9 @@ mod shared;
 mod time;
 mod trust_metric;
 
+#[cfg(feature = "diagnostic")]
+pub mod diagnostic;
+
 use addr_set::PeerAddrSet;
 use peer::Peer;
 use retry::Retry;
@@ -668,6 +671,11 @@ impl PeerManager {
 
     pub fn share_session_book(&self, config: SharedSessionsConfig) -> SharedSessions {
         SharedSessions::new(Arc::clone(&self.inner), config)
+    }
+
+    #[cfg(feature = "diagnostic")]
+    pub fn diagnostic(&self) -> diagnostic::Diagnostic {
+        diagnostic::Diagnostic::new(Arc::clone(&self.inner))
     }
 
     pub fn enable_save_restore(&mut self) {
