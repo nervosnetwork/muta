@@ -43,7 +43,7 @@ describe("API test via muta-sdk-js", () => {
     let i: number;
     for (i = 0; i < retry_times; i++) {
       // wait at least 2 blocks. Change to confirm after impl
-      await delay(3000 * 2 + 100);
+      await delay(3000 * 10 + 100);
       let height_after = await mutaClient.getLatestBlockHeight();
       if (height_after <= height_before) {
         continue;
