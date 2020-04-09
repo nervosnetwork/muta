@@ -19,6 +19,7 @@ derive_more = "0.15"
 byteorder = "1.3"
 common-crypto = { path = "../../common/crypto" }
 hex = "0.4"
+rand = "0.7"
 
 [dev-dependencies]
 cita_trie = "2.0"

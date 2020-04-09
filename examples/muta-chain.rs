@@ -1,10 +1,10 @@
 use asset::AssetService;
 use derive_more::{Display, From};
 use metadata::MetadataService;
-use util::UtilService;
 use muta::MutaBuilder;
 use protocol::traits::{Service, ServiceMapping, ServiceSDK};
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
+use util::UtilService;
 
 struct DefaultServiceMapping;
 

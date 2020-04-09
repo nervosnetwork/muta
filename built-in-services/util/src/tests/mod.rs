@@ -1,25 +1,27 @@
 use std::cell::RefCell;
+use std::convert::TryFrom;
 use std::rc::Rc;
 use std::sync::Arc;
 
 use cita_trie::MemoryDB;
 use hasher::{Hasher, HasherKeccak};
+use rand::rngs::OsRng;
 
 use async_trait::async_trait;
 use common_crypto::{
-    Secp256k1PublicKey, Secp256k1Signature,
+    Crypto, PrivateKey, PublicKey, Secp256k1, Secp256k1PrivateKey, Secp256k1PublicKey,
+    Secp256k1Signature, Signature, ToPublicKey,
 };
 use framework::binding::sdk::{DefalutServiceSDK, DefaultChainQuerier};
 use framework::binding::state::{GeneralServiceState, MPTTrie};
-use protocol::{ProtocolResult, types::Bytes};
 use protocol::traits::{NoopDispatcher, Storage};
 use protocol::types::{
-    Address, Block, Hash, Proof, Receipt, ServiceContext, ServiceContextParams, SignedTransaction,Hex
+    Address, Block, Hash, Hex, Proof, Receipt, ServiceContext, ServiceContextParams,
+    SignedTransaction,
 };
+use protocol::{types::Bytes, ProtocolResult};
 
-use crate::types::{
-    KeccakPayload, KeccakResponse,
-};
+use crate::types::{KeccakPayload, KeccakResponse, SigVerifyPayload, SigVerifyResponse};
 use crate::UtilService;
 
 #[test]
@@ -30,15 +32,57 @@ fn test_hash() {
 
     let mut service = new_util_service();
 
-
-    let res = service.keccak256(context.clone(), KeccakPayload {
-        hex_str: Hex::from_string("0x1234".to_string()).unwrap(),
-    })
+    let res = service
+        .keccak256(context.clone(), KeccakPayload {
+            hex_str: Hex::from_string("0x1234".to_string()).unwrap(),
+        })
         .succeed_data;
 
-    assert_eq!(res.result.as_hex(), "0x56570de287d73cd1cb6092bb8fdee6173974955fdef345ae579ee9f475ea7432".to_string())
+    assert_eq!(
+        res.result.as_hex(),
+        "0x56570de287d73cd1cb6092bb8fdee6173974955fdef345ae579ee9f475ea7432".to_string()
+    )
 }
 
+#[test]
+fn test_verify() {
+    let cycles_limit = 1024 * 1024 * 1024; // 1073741824
+    let caller = Address::from_hex("0x755cdba6ae4f479f7164792b318b2a06c759833b").unwrap();
+    let context = mock_context(cycles_limit, caller.clone());
+
+    let mut service = new_util_service();
+
+    let priv_key = Secp256k1PrivateKey::generate(&mut OsRng);
+    let pub_key = priv_key.pub_key();
+
+    let mut input_pk: String = "0x".to_string();
+    input_pk.push_str(hex::encode(pub_key.to_bytes()).as_str());
+
+    let pub_key_data = Hex::from_string(input_pk).unwrap();
+    let hash = Hash::from_hex("0x56570de287d73cd1cb6092bb8fdee6173974955fdef345ae579ee9f475ea7432")
+        .unwrap();
+
+    let sig = Secp256k1::sign_message(&hash.as_bytes(), &priv_key.to_bytes()).unwrap();
+    let mut input_sig: String = "0x".to_string();
+    input_sig.push_str(hex::encode(sig.to_bytes()).as_str());
+    let sig_data = Hex::from_string(input_sig).unwrap();
+
+    println!(
+        "pubkey: {}\r\nsig: {}",
+        pub_key_data.as_string(),
+        sig_data.as_string()
+    );
+
+    let res = service
+        .verify(context.clone(), SigVerifyPayload {
+            hash,
+            sig: sig_data,
+            pub_key: pub_key_data,
+        })
+        .succeed_data;
+
+    assert_eq!(res.is_ok, true)
+}
 
 fn new_util_service() -> UtilService<
     DefalutServiceSDK<
