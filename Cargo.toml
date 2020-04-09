@@ -40,6 +40,7 @@ metadata = { path = "built-in-services/metadata"}
 util = { path = "built-in-services/util"}
 rand = "0.7"
 cita_trie = "2.0"
+core-network = { path = "./core/network", features = ["diagnostic"] }
 
 [workspace]
 members = [
@@ -70,3 +71,8 @@ members = [
 [[example]]
 name = "muta-chain"
 crate-type = ["bin"]
+
+[[test]]
+name = "trust_metric"
+path = "tests/trust_metric.rs"
+required-features = [ "core-network/diagnostic" ]

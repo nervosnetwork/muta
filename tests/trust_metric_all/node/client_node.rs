@@ -1,4 +1,4 @@
-use super::{config::Config, consts, diagnostic};
+use super::{config::Config, consts};
 
 use common_crypto::{PrivateKey, Secp256k1PrivateKey};
 use core_consensus::message::{
@@ -57,10 +57,14 @@ pub async fn connect(full_node_port: u16, listen_port: u16) -> ClientNode {
 
     tokio::spawn(network);
 
-    let mut count = 60u8;
+    let mut count = 100u8;
     while count > 0 {
         count -= 1;
-        if is_connected(handle.clone(), full_node_chain_addr.clone()).await {
+        if handle
+            .diagnostic
+            .session_by_chain(&full_node_chain_addr)
+            .is_some()
+        {
             break;
         }
         tokio::time::delay_for(std::time::Duration::from_secs(1)).await;
@@ -93,7 +97,10 @@ impl ClientNodeRPC for ClientNode {
     }
 
     async fn connected(&self) -> bool {
-        is_connected(self.network.clone(), self.remote_chain_addr.clone()).await
+        self.network
+            .diagnostic
+            .session_by_chain(&self.remote_chain_addr)
+            .is_some()
     }
 
     async fn broadcast<M: MessageCodec>(&self, endpoint: &str, msg: M) -> ProtocolResult<()> {
@@ -107,28 +114,6 @@ impl ClientNodeRPC for ClientNode {
                 Priority::High,
             )
             .await
-    }
-}
-
-async fn is_connected(network: NetworkServiceHandle, full_node_chain_addr: Address) -> bool {
-    let ctx = Context::new().with_value::<usize>("session_id", 1);
-    let probe = diagnostic::BlackHoleMsg(0);
-    let endpoint = diagnostic::GOSSIP_BLACKHOLE;
-    let priority = Priority::High;
-    let users = vec![full_node_chain_addr];
-
-    match network
-        .users_cast(ctx, endpoint, users, probe, priority)
-        .await
-    {
-        Ok(_) => true,
-        Err(e) => {
-            if e.to_string().contains("unconnected None") {
-                true
-            } else {
-                false
-            }
-        }
     }
 }
 
