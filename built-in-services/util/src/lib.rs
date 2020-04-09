@@ -13,13 +13,13 @@ mod tests;
 pub mod types;
 
 pub struct UtilService<SDK> {
-    sdk: SDK,
+    _sdk: SDK,
 }
 
 #[service]
 impl<SDK: ServiceSDK> UtilService<SDK> {
-    pub fn new(sdk: SDK) -> Self {
-        Self { sdk }
+    pub fn new(_sdk: SDK) -> Self {
+        Self { _sdk }
     }
 
     #[cycles(100_00)]
