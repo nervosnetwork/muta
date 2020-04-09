@@ -85,6 +85,7 @@ const WHITELIST_TIMEOUT: u64 = 2 * 60 * 60; // 2 hour
 const MAX_CONNECTING_MARGIN: usize = 10;
 
 const GOOD_TRUST_SCORE: u8 = 80u8;
+const WORSE_TRUST_SCALAR_RATIO: usize = 10;
 
 #[derive(Debug, Clone, Display, Serialize, Deserialize)]
 #[display(fmt = "{}", _0)]
@@ -1092,7 +1093,7 @@ impl PeerManager {
                     }
                     Worse(reason) => {
                         warn!("peer {:?} trust feedback worse {}", pid, reason);
-                        peer_trust_metric.bad_events(10);
+                        peer_trust_metric.bad_events(1 * WORSE_TRUST_SCALAR_RATIO);
                     }
                     _ => unreachable!(),
                 };
