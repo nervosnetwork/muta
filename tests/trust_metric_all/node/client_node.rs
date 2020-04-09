@@ -1,3 +1,8 @@
+use super::diagnostic::{
+    TrustNewIntervalReq, TrustNewIntervalResp, TrustReport, TrustReportReq, TrustTwinEventReq,
+    TrustTwinEventResp, RPC_RESP_TRUST_NEW_INTERVAL, RPC_RESP_TRUST_REPORT,
+    RPC_RESP_TRUST_TWIN_EVENT, RPC_TRUST_NEW_INTERVAL, RPC_TRUST_REPORT, RPC_TRUST_TWIN_EVENT,
+};
 use super::{config::Config, consts};
 
 use common_crypto::{PrivateKey, Secp256k1PrivateKey};
@@ -5,20 +10,26 @@ use core_consensus::message::{
     FixedBlock, FixedHeight, RPC_RESP_SYNC_PULL_BLOCK, RPC_SYNC_PULL_BLOCK,
 };
 use core_network::{NetworkConfig, NetworkService, NetworkServiceHandle};
+use derive_more::Display;
 use protocol::{
-    async_trait,
     traits::{Context, Gossip, MessageCodec, Priority, Rpc},
     types::{Address, Block},
-    ProtocolResult,
+    ProtocolError, ProtocolErrorKind, ProtocolResult,
 };
 
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
-#[async_trait]
-pub trait ClientNodeRPC {
-    async fn genesis_block(&self) -> ProtocolResult<Block>;
-    async fn connected(&self) -> bool;
-    async fn broadcast<M: MessageCodec>(&self, end: &str, msg: M) -> ProtocolResult<()>;
+#[derive(Debug, Display)]
+pub enum ClientNodeError {
+    #[display(fmt = "disconnected")]
+    Disconnected,
+}
+
+impl std::error::Error for ClientNodeError {}
+impl From<ClientNodeError> for ProtocolError {
+    fn from(err: ClientNodeError) -> ProtocolError {
+        ProtocolError::new(ProtocolErrorKind::Network, Box::new(err))
+    }
 }
 
 pub struct ClientNode {
@@ -46,6 +57,15 @@ pub async fn connect(full_node_port: u16, listen_port: u16) -> ClientNode {
     network
         .register_rpc_response::<FixedBlock>(RPC_RESP_SYNC_PULL_BLOCK)
         .expect("register consensus rpc pull block");
+    network
+        .register_rpc_response::<TrustReport>(RPC_RESP_TRUST_REPORT)
+        .expect("register trust report rpc response");
+    network
+        .register_rpc_response::<TrustNewIntervalResp>(RPC_RESP_TRUST_NEW_INTERVAL)
+        .expect("register trigger trust new interval");
+    network
+        .register_rpc_response::<TrustTwinEventResp>(RPC_RESP_TRUST_TWIN_EVENT)
+        .expect("register trigger basic trust test");
 
     network
         .listen(SocketAddr::new(
@@ -80,9 +100,12 @@ pub async fn connect(full_node_port: u16, listen_port: u16) -> ClientNode {
     }
 }
 
-#[async_trait]
-impl ClientNodeRPC for ClientNode {
-    async fn genesis_block(&self) -> ProtocolResult<Block> {
+impl ClientNode {
+    pub async fn genesis_block(&self) -> ProtocolResult<Block> {
+        if !self.connected() {
+            return Err(ClientNodeError::Disconnected.into());
+        }
+
         let ctx = Context::new().with_value::<usize>("session_id", 1);
         let fixed_block = self
             .network
@@ -96,14 +119,14 @@ impl ClientNodeRPC for ClientNode {
         Ok(fixed_block.inner)
     }
 
-    async fn connected(&self) -> bool {
+    pub fn connected(&self) -> bool {
         self.network
             .diagnostic
             .session_by_chain(&self.remote_chain_addr)
             .is_some()
     }
 
-    async fn broadcast<M: MessageCodec>(&self, endpoint: &str, msg: M) -> ProtocolResult<()> {
+    pub async fn broadcast<M: MessageCodec>(&self, endpoint: &str, msg: M) -> ProtocolResult<()> {
         let ctx = Context::new().with_value::<usize>("session_id", 1);
         self.network
             .users_cast::<M>(
@@ -114,6 +137,57 @@ impl ClientNodeRPC for ClientNode {
                 Priority::High,
             )
             .await
+    }
+
+    pub async fn trust_report(&self) -> ProtocolResult<TrustReport> {
+        if !self.connected() {
+            return Err(ClientNodeError::Disconnected.into());
+        }
+
+        let ctx = Context::new().with_value::<usize>("session_id", 1);
+        let req = TrustReportReq(0);
+        self.network
+            .call::<TrustReportReq, TrustReport>(ctx, RPC_TRUST_REPORT, req, Priority::High)
+            .await
+    }
+
+    pub async fn trust_new_interval(&self) -> ProtocolResult<()> {
+        if !self.connected() {
+            return Err(ClientNodeError::Disconnected.into());
+        }
+
+        let ctx = Context::new().with_value::<usize>("session_id", 1);
+        let req = TrustNewIntervalReq(0);
+        let _resp = self
+            .network
+            .call::<TrustNewIntervalReq, TrustNewIntervalResp>(
+                ctx,
+                RPC_TRUST_NEW_INTERVAL,
+                req,
+                Priority::High,
+            )
+            .await?;
+        Ok(())
+    }
+
+    pub async fn trust_twin_event(&self) -> ProtocolResult<()> {
+        if !self.connected() {
+            return Err(ClientNodeError::Disconnected.into());
+        }
+
+        let ctx = Context::new().with_value::<usize>("session_id", 1);
+        let req = TrustTwinEventReq(0);
+        let _resp = self
+            .network
+            .call::<TrustTwinEventReq, TrustTwinEventResp>(
+                ctx,
+                RPC_TRUST_TWIN_EVENT,
+                req,
+                Priority::High,
+            )
+            .await?;
+
+        Ok(())
     }
 }
 

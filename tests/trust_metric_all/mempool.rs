@@ -1,7 +1,4 @@
-use super::{
-    common,
-    node::{self, client_node::ClientNodeRPC},
-};
+use super::{common, node};
 
 use core_mempool::{MsgNewTxs, END_GOSSIP_NEW_TXS};
 
