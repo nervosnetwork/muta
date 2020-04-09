@@ -10,9 +10,7 @@ use std::convert::TryFrom;
 use std::sync::Arc;
 
 use bytes::Bytes;
-use futures::{future, lock::Mutex};
-#[cfg(unix)]
-use tokio::signal::unix::{self as os_impl};
+use futures::lock::Mutex;
 
 use common_crypto::{
     BlsCommonReference, BlsPrivateKey, BlsPublicKey, PublicKey, Secp256k1, Secp256k1PrivateKey,
@@ -480,23 +478,6 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         }
     });
 
-    let (abortable_demon, abort_handle) = future::abortable(exec_demon.run());
-    tokio::task::spawn_local(abortable_demon);
-
-    #[cfg(windows)]
-    let _ = tokio::signal::ctrl_c().await;
-    #[cfg(unix)]
-    {
-        let mut sigtun_int = os_impl::signal(os_impl::SignalKind::interrupt()).unwrap();
-        let mut sigtun_term = os_impl::signal(os_impl::SignalKind::terminate()).unwrap();
-        tokio::select! {
-            _ = sigtun_int.recv() => {}
-            _ = sigtun_term.recv() => {}
-        }
-    }
-
-    // Abort consensus
-    abort_handle.abort();
-
+    exec_demon.run().await;
     Ok(())
 }
