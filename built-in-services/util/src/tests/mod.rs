@@ -1,16 +1,13 @@
 use std::cell::RefCell;
-use std::convert::TryFrom;
 use std::rc::Rc;
 use std::sync::Arc;
 
 use cita_trie::MemoryDB;
-use hasher::{Hasher, HasherKeccak};
 use rand::rngs::OsRng;
 
 use async_trait::async_trait;
 use common_crypto::{
-    Crypto, PrivateKey, PublicKey, Secp256k1, Secp256k1PrivateKey, Secp256k1PublicKey,
-    Secp256k1Signature, Signature, ToPublicKey,
+    Crypto, PrivateKey, PublicKey, Secp256k1, Secp256k1PrivateKey, Signature, ToPublicKey,
 };
 use framework::binding::sdk::{DefalutServiceSDK, DefaultChainQuerier};
 use framework::binding::state::{GeneralServiceState, MPTTrie};
@@ -21,19 +18,19 @@ use protocol::types::{
 };
 use protocol::{types::Bytes, ProtocolResult};
 
-use crate::types::{KeccakPayload, KeccakResponse, SigVerifyPayload, SigVerifyResponse};
+use crate::types::{KeccakPayload, SigVerifyPayload};
 use crate::UtilService;
 
 #[test]
 fn test_hash() {
     let cycles_limit = 1024 * 1024 * 1024; // 1073741824
     let caller = Address::from_hex("0x755cdba6ae4f479f7164792b318b2a06c759833b").unwrap();
-    let context = mock_context(cycles_limit, caller.clone());
+    let context = mock_context(cycles_limit, caller);
 
-    let mut service = new_util_service();
+    let service = new_util_service();
 
     let res = service
-        .keccak256(context.clone(), KeccakPayload {
+        .keccak256(context, KeccakPayload {
             hex_str: Hex::from_string("0x1234".to_string()).unwrap(),
         })
         .succeed_data;
@@ -48,9 +45,9 @@ fn test_hash() {
 fn test_verify() {
     let cycles_limit = 1024 * 1024 * 1024; // 1073741824
     let caller = Address::from_hex("0x755cdba6ae4f479f7164792b318b2a06c759833b").unwrap();
-    let context = mock_context(cycles_limit, caller.clone());
+    let context = mock_context(cycles_limit, caller);
 
-    let mut service = new_util_service();
+    let service = new_util_service();
 
     let priv_key = Secp256k1PrivateKey::generate(&mut OsRng);
     let pub_key = priv_key.pub_key();
@@ -74,7 +71,7 @@ fn test_verify() {
     );
 
     let res = service
-        .verify(context.clone(), SigVerifyPayload {
+        .verify(context, SigVerifyPayload {
             hash,
             sig: sig_data,
             pub_key: pub_key_data,
