@@ -1,24 +1,22 @@
+use super::node::consts;
+
 use common_crypto::{
-    Crypto, PrivateKey, PublicKey, Secp256k1, Secp256k1PrivateKey, Secp256k1Signature, Signature,
-    ToPublicKey,
+    Crypto, PrivateKey, PublicKey, Secp256k1, Secp256k1PrivateKey, Signature, ToPublicKey,
 };
 use protocol::{
     codec::ProtocolCodecSync,
-    types::{Hash, RawTransaction, SignedTransaction, TransactionRequest},
-    BytesMut,
+    types::{Hash, JsonString, RawTransaction, SignedTransaction, TransactionRequest},
+    Bytes, BytesMut,
 };
 use rand::{rngs::OsRng, RngCore};
 
 use std::{
-    convert::TryFrom,
     net::TcpListener,
     path::PathBuf,
     sync::atomic::{AtomicU16, Ordering},
 };
 
 static AVAILABLE_PORT: AtomicU16 = AtomicU16::new(2000);
-
-const TX_CYCLE: u64 = 1;
 
 pub fn tmp_dir() -> PathBuf {
     let mut tmp_dir = std::env::temp_dir();
@@ -32,47 +30,88 @@ pub fn tmp_dir() -> PathBuf {
     tmp_dir
 }
 
-pub fn gen_signed_tx(
-    priv_key: &Secp256k1PrivateKey,
-    timeout: u64,
-    valid: bool,
-) -> SignedTransaction {
-    let nonce = {
-        let mut random_bytes = [0u8; 32];
-        OsRng.fill_bytes(&mut random_bytes);
-        Hash::digest(BytesMut::from(random_bytes.as_ref()).freeze())
-    };
+pub struct SignedTransactionBuilder {
+    chain_id:     Hash,
+    timeout:      u64,
+    cycles_limit: u64,
+    payload:      JsonString,
+}
 
-    let request = TransactionRequest {
-        service_name: "test".to_owned(),
-        method:       "test".to_owned(),
-        payload:      "test".to_owned(),
-    };
+impl Default for SignedTransactionBuilder {
+    fn default() -> Self {
+        let chain_id = Hash::from_hex(consts::CHAIN_ID).expect("chain id");
+        let timeout = 19;
+        let cycles_limit = 314159;
+        let payload = "test".to_owned();
 
-    let raw = RawTransaction {
-        chain_id: nonce.clone(),
-        nonce,
-        timeout,
-        cycles_limit: TX_CYCLE,
-        cycles_price: 1,
-        request,
-    };
-
-    let raw_bytes = raw.encode_sync().expect("encode raw tx");
-    let tx_hash = Hash::digest(raw_bytes);
-
-    let signature = if valid {
-        Secp256k1::sign_message(&tx_hash.as_bytes(), &priv_key.to_bytes()).expect("sign tx")
-    } else {
-        Secp256k1Signature::try_from([0u8; 64].as_ref()).expect("make invalid tx signature")
-    };
-
-    SignedTransaction {
-        raw,
-        tx_hash,
-        pubkey: priv_key.pub_key().to_bytes(),
-        signature: signature.to_bytes(),
+        SignedTransactionBuilder {
+            chain_id,
+            timeout,
+            cycles_limit,
+            payload,
+        }
     }
+}
+
+impl SignedTransactionBuilder {
+    pub fn chain_id(mut self, chain_id_bytes: Bytes) -> Self {
+        self.chain_id = Hash::digest(chain_id_bytes);
+        self
+    }
+
+    pub fn timeout(mut self, timeout: u64) -> Self {
+        self.timeout = timeout;
+        self
+    }
+
+    pub fn cycles_limit(mut self, cycles_limit: u64) -> Self {
+        self.cycles_limit = cycles_limit;
+        self
+    }
+
+    pub fn payload(mut self, payload: JsonString) -> Self {
+        self.payload = payload;
+        self
+    }
+
+    pub fn build(self, pk: &Secp256k1PrivateKey) -> SignedTransaction {
+        let nonce = {
+            let mut random_bytes = [0u8; 32];
+            OsRng.fill_bytes(&mut random_bytes);
+            Hash::digest(BytesMut::from(random_bytes.as_ref()).freeze())
+        };
+
+        let request = TransactionRequest {
+            service_name: "test".to_owned(),
+            method:       "test".to_owned(),
+            payload:      self.payload,
+        };
+
+        let raw = RawTransaction {
+            chain_id: self.chain_id,
+            nonce,
+            timeout: self.timeout,
+            cycles_limit: self.cycles_limit,
+            cycles_price: 1,
+            request,
+        };
+
+        let raw_bytes = raw.encode_sync().expect("encode raw tx");
+        let tx_hash = Hash::digest(raw_bytes);
+
+        let sig = Secp256k1::sign_message(&tx_hash.as_bytes(), &pk.to_bytes()).expect("sign tx");
+
+        SignedTransaction {
+            raw,
+            tx_hash,
+            pubkey: pk.pub_key().to_bytes(),
+            signature: sig.to_bytes(),
+        }
+    }
+}
+
+pub fn stx_builder() -> SignedTransactionBuilder {
+    SignedTransactionBuilder::default()
 }
 
 pub fn available_port_pair() -> (u16, u16) {
