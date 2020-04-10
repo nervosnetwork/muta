@@ -131,27 +131,14 @@ impl FixedCodec for Bloom {
     }
 }
 
-impl rlp::Encodable for Hex {
-    fn rlp_append(&self, s: &mut rlp::RlpStream) {
-        s.begin_list(1).append(&self.as_string_trim0x());
-    }
-}
-
-impl rlp::Decodable for Hex {
-    fn decode(r: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
-        let s: String = r.at(0)?.as_val()?;
-
-        Hex::from_string("0x".to_owned() + s.as_str())
-            .map_err(|_| rlp::DecoderError::Custom("decode hex from string error"))
-    }
-}
-
 impl FixedCodec for Hex {
     fn encode_fixed(&self) -> ProtocolResult<bytes::Bytes> {
-        Ok(bytes::Bytes::from(rlp::encode(self)))
+        let bytes = self.as_string_trim0x().as_bytes().to_vec();
+        Ok(bytes::Bytes::from(bytes))
     }
 
     fn decode_fixed(bytes: bytes::Bytes) -> ProtocolResult<Self> {
-        Ok(rlp::decode(bytes.as_ref()).map_err(FixedCodecError::from)?)
+        let s = String::from_utf8(bytes.to_vec()).map_err(|e| FixedCodecError::StringUTF8(e))?;
+        Ok(Hex::from_string("0x".to_owned() + s.as_str())?)
     }
 }
