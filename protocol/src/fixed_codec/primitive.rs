@@ -8,73 +8,51 @@ use crate::ProtocolResult;
 
 impl FixedCodec for bool {
     fn encode_fixed(&self) -> ProtocolResult<Bytes> {
-        let bs = if *self {
-            [1u8; mem::size_of::<u8>()]
-        } else {
-            [0u8; mem::size_of::<u8>()]
-        };
-
-        Ok(BytesMut::from(bs.as_ref()).freeze())
+        Ok(Bytes::from(rlp::encode::<bool>(self)))
     }
 
     fn decode_fixed(bytes: Bytes) -> ProtocolResult<Self> {
-        let u = *bytes.to_vec().get(0).ok_or(FixedCodecError::DecodeBool)?;
-
-        match u {
-            0 => Ok(false),
-            1 => Ok(true),
-            _ => Err(FixedCodecError::DecodeBool.into()),
-        }
+        Ok(rlp::decode::<bool>(&bytes).map_err(FixedCodecError::Decoder)?)
     }
 }
 
 impl FixedCodec for u8 {
     fn encode_fixed(&self) -> ProtocolResult<Bytes> {
-        Ok(BytesMut::from([*self].as_ref()).freeze())
+        Ok(Bytes::from(rlp::encode::<u8>(self)))
     }
 
     fn decode_fixed(bytes: Bytes) -> ProtocolResult<Self> {
-        let u = *bytes.to_vec().get(0).ok_or(FixedCodecError::DecodeUint8)?;
-        Ok(u)
+        Ok(rlp::decode::<u8>(&bytes).map_err(FixedCodecError::Decoder)?)
     }
 }
 
 impl FixedCodec for u16 {
     fn encode_fixed(&self) -> ProtocolResult<Bytes> {
-        let mut buf = [0u8; mem::size_of::<u16>()];
-        LittleEndian::write_u16(&mut buf, *self);
-
-        Ok(BytesMut::from(buf.as_ref()).freeze())
+        Ok(Bytes::from(rlp::encode::<u16>(self)))
     }
 
     fn decode_fixed(bytes: Bytes) -> ProtocolResult<Self> {
-        Ok(LittleEndian::read_u16(bytes.as_ref()))
+        Ok(rlp::decode::<u16>(&bytes).map_err(FixedCodecError::Decoder)?)
     }
 }
 
 impl FixedCodec for u32 {
     fn encode_fixed(&self) -> ProtocolResult<Bytes> {
-        let mut buf = [0u8; mem::size_of::<u32>()];
-        LittleEndian::write_u32(&mut buf, *self);
-
-        Ok(BytesMut::from(buf.as_ref()).freeze())
+        Ok(Bytes::from(rlp::encode::<u32>(self)))
     }
 
     fn decode_fixed(bytes: Bytes) -> ProtocolResult<Self> {
-        Ok(LittleEndian::read_u32(bytes.as_ref()))
+        Ok(rlp::decode::<u32>(&bytes).map_err(FixedCodecError::Decoder)?)
     }
 }
 
 impl FixedCodec for u64 {
     fn encode_fixed(&self) -> ProtocolResult<Bytes> {
-        let mut buf = [0u8; mem::size_of::<u64>()];
-        LittleEndian::write_u64(&mut buf, *self);
-
-        Ok(BytesMut::from(buf.as_ref()).freeze())
+        Ok(Bytes::from(rlp::encode::<u64>(self)))
     }
 
     fn decode_fixed(bytes: Bytes) -> ProtocolResult<Self> {
-        Ok(LittleEndian::read_u64(bytes.as_ref()))
+        Ok(rlp::decode::<u64>(&bytes).map_err(FixedCodecError::Decoder)?)
     }
 }
 
@@ -93,11 +71,11 @@ impl FixedCodec for u128 {
 
 impl FixedCodec for String {
     fn encode_fixed(&self) -> ProtocolResult<Bytes> {
-        Ok(Bytes::from(self.clone()))
+        Ok(Bytes::from(rlp::encode::<String>(self)))
     }
 
     fn decode_fixed(bytes: Bytes) -> ProtocolResult<Self> {
-        String::from_utf8(bytes.to_vec()).map_err(|e| FixedCodecError::StringUTF8(e).into())
+        Ok(rlp::decode::<String>(&bytes).map_err(FixedCodecError::Decoder)?)
     }
 }
 
