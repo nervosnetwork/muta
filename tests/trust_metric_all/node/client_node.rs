@@ -12,8 +12,10 @@ use core_consensus::message::{
 use core_network::{NetworkConfig, NetworkService, NetworkServiceHandle};
 use derive_more::Display;
 use protocol::{
-    traits::{Context, Gossip, MessageCodec, Priority, Rpc},
-    types::{Address, Block},
+    async_trait,
+    traits::{Context, Gossip, MessageCodec, MessageHandler, Priority, Rpc, TrustFeedback},
+    types::{Address, Block, BlockHeader, Hash, Proof},
+    Bytes,
 };
 
 use std::{
@@ -32,6 +34,23 @@ pub enum ClientNodeError {
 impl std::error::Error for ClientNodeError {}
 
 type ClientResult<T> = Result<T, ClientNodeError>;
+
+struct DummyPullBlockRpcHandler(NetworkServiceHandle);
+
+#[async_trait]
+impl MessageHandler for DummyPullBlockRpcHandler {
+    type Message = FixedHeight;
+
+    async fn process(&self, ctx: Context, msg: FixedHeight) -> TrustFeedback {
+        let block = FixedBlock::new(mock_block(msg.inner));
+        self.0
+            .response(ctx, RPC_RESP_SYNC_PULL_BLOCK, Ok(block), Priority::High)
+            .await
+            .expect("dummy response pull block");
+
+        TrustFeedback::Neutral
+    }
+}
 
 pub struct ClientNode {
     pub network:           NetworkServiceHandle,
@@ -56,8 +75,14 @@ pub async fn connect(full_node_port: u16, listen_port: u16) -> ClientNode {
     let handle = network.handle();
 
     network
-        .register_rpc_response::<FixedBlock>(RPC_RESP_SYNC_PULL_BLOCK)
+        .register_endpoint_handler(
+            RPC_SYNC_PULL_BLOCK,
+            Box::new(DummyPullBlockRpcHandler(handle.clone())),
+        )
         .expect("register consensus rpc pull block");
+    network
+        .register_rpc_response::<FixedBlock>(RPC_RESP_SYNC_PULL_BLOCK)
+        .expect("register consensus rpc response pull block");
     network
         .register_rpc_response::<TrustReport>(RPC_RESP_TRUST_REPORT)
         .expect("register trust report rpc response");
@@ -232,4 +257,41 @@ fn full_node_hex_pubkey() -> String {
 fn full_node_chain_addr(hex_pubkey: &str) -> Address {
     let pubkey = hex::decode(hex_pubkey).expect("decode hex full node pubkey");
     Address::from_pubkey_bytes(pubkey.into()).expect("full node chain address")
+}
+
+fn mock_block(height: u64) -> Block {
+    let block_hash = Hash::digest(Bytes::from("22"));
+    let nonce = Hash::digest(Bytes::from("33"));
+    let addr_str = "0xCAB8EEA4799C21379C20EF5BAA2CC8AF1BEC475B";
+
+    let proof = Proof {
+        height: 0,
+        round: 0,
+        block_hash,
+        signature: Default::default(),
+        bitmap: Default::default(),
+    };
+
+    let header = BlockHeader {
+        chain_id: nonce.clone(),
+        height,
+        exec_height: height - 1,
+        pre_hash: nonce.clone(),
+        timestamp: 1000,
+        logs_bloom: Default::default(),
+        order_root: nonce.clone(),
+        confirm_root: Vec::new(),
+        state_root: nonce,
+        receipt_root: Vec::new(),
+        cycles_used: vec![999_999],
+        proposer: Address::from_hex(addr_str).unwrap(),
+        proof,
+        validator_version: 1,
+        validators: Vec::new(),
+    };
+
+    Block {
+        header,
+        ordered_tx_hashes: Vec::new(),
+    }
 }
