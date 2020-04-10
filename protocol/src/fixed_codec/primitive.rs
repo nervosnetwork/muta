@@ -138,7 +138,7 @@ impl FixedCodec for Hex {
     }
 
     fn decode_fixed(bytes: bytes::Bytes) -> ProtocolResult<Self> {
-        let s = String::from_utf8(bytes.to_vec()).map_err(|e| FixedCodecError::StringUTF8(e))?;
+        let s = String::from_utf8(bytes.to_vec()).map_err(FixedCodecError::StringUTF8)?;
         Ok(Hex::from_string("0x".to_owned() + s.as_str())?)
     }
 }
