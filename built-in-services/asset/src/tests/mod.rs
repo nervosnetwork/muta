@@ -130,6 +130,7 @@ fn test_approve() {
         .succeed_data;
     assert_eq!(allowance_res.asset_id, asset.id);
     assert_eq!(allowance_res.grantee, to_address);
+    assert_eq!(allowance_res.value, 1024);
 }
 
 #[test]
