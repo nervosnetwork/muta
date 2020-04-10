@@ -14,23 +14,24 @@ use derive_more::Display;
 use protocol::{
     traits::{Context, Gossip, MessageCodec, Priority, Rpc},
     types::{Address, Block},
-    ProtocolError, ProtocolErrorKind, ProtocolResult,
 };
 
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::{
+    net::{IpAddr, Ipv4Addr, SocketAddr},
+    ops::Deref,
+};
 
 #[derive(Debug, Display)]
 pub enum ClientNodeError {
-    #[display(fmt = "disconnected")]
-    Disconnected,
-}
+    #[display(fmt = "not connected")]
+    NotConnected,
 
-impl std::error::Error for ClientNodeError {}
-impl From<ClientNodeError> for ProtocolError {
-    fn from(err: ClientNodeError) -> ProtocolError {
-        ProtocolError::new(ProtocolErrorKind::Network, Box::new(err))
-    }
+    #[display(fmt = "unexpected {}", _0)]
+    Unexpected(String),
 }
+impl std::error::Error for ClientNodeError {}
+
+type ClientResult<T> = Result<T, ClientNodeError>;
 
 pub struct ClientNode {
     pub network:           NetworkServiceHandle,
@@ -101,24 +102,6 @@ pub async fn connect(full_node_port: u16, listen_port: u16) -> ClientNode {
 }
 
 impl ClientNode {
-    pub async fn genesis_block(&self) -> ProtocolResult<Block> {
-        if !self.connected() {
-            return Err(ClientNodeError::Disconnected.into());
-        }
-
-        let ctx = Context::new().with_value::<usize>("session_id", 1);
-        let fixed_block = self
-            .network
-            .call::<FixedHeight, FixedBlock>(
-                ctx,
-                RPC_SYNC_PULL_BLOCK,
-                FixedHeight::new(0),
-                Priority::High,
-            )
-            .await?;
-        Ok(fixed_block.inner)
-    }
-
     pub fn connected(&self) -> bool {
         self.network
             .diagnostic
@@ -126,80 +109,122 @@ impl ClientNode {
             .is_some()
     }
 
-    pub async fn broadcast<M: MessageCodec>(&self, endpoint: &str, msg: M) -> ProtocolResult<()> {
-        let ctx = Context::new().with_value::<usize>("session_id", 1);
-        self.network
-            .users_cast::<M>(
-                ctx,
-                endpoint,
-                vec![self.remote_chain_addr.clone()],
-                msg,
-                Priority::High,
-            )
+    pub async fn broadcast<M: MessageCodec>(&self, endpoint: &str, msg: M) -> ClientResult<()> {
+        let diagnostic = &self.network.diagnostic;
+        let sid = match diagnostic.session_by_chain(&self.remote_chain_addr) {
+            Some(sid) => sid,
+            None => return Err(ClientNodeError::NotConnected),
+        };
+
+        let ctx = Context::new().with_value::<usize>("session_id", sid.value());
+        let users = vec![self.remote_chain_addr.clone()];
+        if let Err(e) = self
+            .users_cast::<M>(ctx, endpoint, users, msg, Priority::High)
+            .await
+        {
+            if !self.connected() {
+                Err(ClientNodeError::NotConnected)
+            } else {
+                Err(ClientNodeError::Unexpected(format!(
+                    "broadcast to {} {}",
+                    endpoint, e
+                )))
+            }
+        } else {
+            Ok(())
+        }
+    }
+
+    pub async fn rpc<M: MessageCodec, R: MessageCodec>(
+        &self,
+        endpoint: &str,
+        msg: M,
+    ) -> ClientResult<R> {
+        let diagnostic = &self.network.diagnostic;
+        let sid = match diagnostic.session_by_chain(&self.remote_chain_addr) {
+            Some(sid) => sid,
+            None => return Err(ClientNodeError::NotConnected),
+        };
+
+        let ctx = Context::new().with_value::<usize>("session_id", sid.value());
+        match self.call::<M, R>(ctx, endpoint, msg, Priority::High).await {
+            Ok(resp) => Ok(resp),
+            Err(e)
+                if e.to_string().contains("RpcTimeout")
+                    || e.to_string().contains("rpc timeout") =>
+            {
+                if !self.connected() {
+                    Err(ClientNodeError::NotConnected)
+                } else {
+                    Err(ClientNodeError::Unexpected(format!(
+                        "rpc to {} {}",
+                        endpoint, e
+                    )))
+                }
+            }
+            Err(e) => Err(ClientNodeError::Unexpected(format!(
+                "rpc to {} {}",
+                endpoint, e
+            ))),
+        }
+    }
+
+    pub async fn genesis_block(&self) -> ClientResult<Block> {
+        let resp = self
+            .rpc::<_, FixedBlock>(RPC_SYNC_PULL_BLOCK, FixedHeight::new(0))
+            .await?;
+        Ok(resp.inner)
+    }
+
+    pub async fn trust_report(&self) -> ClientResult<TrustReport> {
+        self.rpc(RPC_TRUST_REPORT, TrustReportReq(0)).await
+    }
+
+    pub async fn trust_new_interval(&self) -> ClientResult<()> {
+        self.rpc(RPC_TRUST_NEW_INTERVAL, TrustNewIntervalReq(0))
             .await
     }
 
-    pub async fn trust_report(&self) -> ProtocolResult<TrustReport> {
-        if !self.connected() {
-            return Err(ClientNodeError::Disconnected.into());
-        }
-
-        let ctx = Context::new().with_value::<usize>("session_id", 1);
-        let req = TrustReportReq(0);
-        self.network
-            .call::<TrustReportReq, TrustReport>(ctx, RPC_TRUST_REPORT, req, Priority::High)
-            .await
-    }
-
-    pub async fn trust_new_interval(&self) -> ProtocolResult<()> {
-        if !self.connected() {
-            return Err(ClientNodeError::Disconnected.into());
-        }
-
-        let ctx = Context::new().with_value::<usize>("session_id", 1);
-        let req = TrustNewIntervalReq(0);
-        let _resp = self
-            .network
-            .call::<TrustNewIntervalReq, TrustNewIntervalResp>(
-                ctx,
-                RPC_TRUST_NEW_INTERVAL,
-                req,
-                Priority::High,
-            )
+    pub async fn trust_twin_event(&self) -> ClientResult<()> {
+        self.rpc::<_, TrustTwinEventResp>(RPC_TRUST_TWIN_EVENT, TrustTwinEventReq(0))
             .await?;
         Ok(())
     }
 
-    pub async fn trust_twin_event(&self) -> ProtocolResult<()> {
-        if !self.connected() {
-            return Err(ClientNodeError::Disconnected.into());
+    pub async fn until_trust_report_changed(
+        &self,
+        last_report: &TrustReport,
+    ) -> ClientResult<TrustReport> {
+        let mut count = 30u8;
+        while count > 0 {
+            count -= 1;
+            let report = self.trust_report().await?;
+            if report.good_events != last_report.good_events
+                || report.bad_events != last_report.bad_events
+            {
+                return Ok(report);
+            }
+            tokio::time::delay_for(std::time::Duration::from_millis(500)).await;
         }
 
-        let ctx = Context::new().with_value::<usize>("session_id", 1);
-        let req = TrustTwinEventReq(0);
-        let _resp = self
-            .network
-            .call::<TrustTwinEventReq, TrustTwinEventResp>(
-                ctx,
-                RPC_TRUST_TWIN_EVENT,
-                req,
-                Priority::High,
-            )
-            .await?;
+        panic!("until trust report timeout");
+    }
+}
 
-        Ok(())
+impl Deref for ClientNode {
+    type Target = NetworkServiceHandle;
+
+    fn deref(&self) -> &Self::Target {
+        &self.network
     }
 }
 
 fn full_node_hex_pubkey() -> String {
     let config: Config =
         common_config_parser::parse(&consts::CHAIN_CONFIG_PATH).expect("parse chain config.toml");
-    let full_node = config
-        .network
-        .bootstraps
-        .expect("config.toml full node")
-        .pop()
-        .expect("full node should be bootstrap");
+
+    let mut bootstraps = config.network.bootstraps.expect("config.toml full node");
+    let full_node = bootstraps.pop().expect("there should be one bootstrap");
 
     full_node.pubkey.as_string_trim0x()
 }
