@@ -5,5 +5,5 @@ module.exports = {
     "^.+\\.ts?$": "ts-jest"
   },
   moduleFileExtensions: ["ts", "js", "json"],
-  testTimeout: 75000
+  testTimeout: 30000
 };

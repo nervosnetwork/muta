@@ -1,5 +1,5 @@
-import { muta, mutaClient, delay } from "./utils";
-import { AssetService, Account } from "muta-sdk";
+import {delay, mutaClient} from "./utils";
+import {Account, AssetService} from "muta-sdk";
 
 describe("API test via muta-sdk-js", () => {
   test("getLatestBlock", async () => {
@@ -27,42 +27,29 @@ describe("API test via muta-sdk-js", () => {
       user: to_addr,
       asset_id: asset_id,
     })!;
-    const height_before = await mutaClient.getLatestBlockHeight();
 
     // transfer
     expect(account.address).toBe(from_addr);
 
-    assetService.transfer({
+    await assetService.transfer({
       asset_id: asset_id,
       to: to_addr,
       value: 0x01,
     })
 
     // check result
-    const retry_times = 5;
-    let i: number;
-    for (i = 0; i < retry_times; i++) {
-      // wait at least 2 blocks. Change to confirm after impl
-      await delay(3000 * 5 + 100);
-      let height_after = await mutaClient.getLatestBlockHeight();
-      if (height_after <= height_before) {
-        continue;
-      }
-      let from_balance_after = await assetService.get_balance({
-        user: from_addr,
-        asset_id: asset_id,
-      })!;
-      const to_balance_after = await assetService.get_balance({
-        user: to_addr,
-        asset_id: asset_id,
-      })!;
+    let from_balance_after = await assetService.get_balance({
+      user: from_addr,
+      asset_id: asset_id,
+    })!;
+    const to_balance_after = await assetService.get_balance({
+      user: to_addr,
+      asset_id: asset_id,
+    })!;
 
-      const c1 = from_balance_before.succeedData.balance as number;
-      expect(from_balance_after.succeedData.balance).toBe(c1 - 1);
-      const c2 = to_balance_before.succeedData.balance as number
-      expect(to_balance_after.succeedData.balance).toBe(c2 + 1);
-      break;
-    }
-    expect(i).toBeLessThan(retry_times);
+    const c1 = from_balance_before.succeedData.balance as number;
+    expect(from_balance_after.succeedData.balance).toBe(c1 - 1);
+    const c2 = to_balance_before.succeedData.balance as number;
+    expect(to_balance_after.succeedData.balance).toBe(c2 + 1);
   });
 });
