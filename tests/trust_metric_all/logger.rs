@@ -1,6 +1,6 @@
 use std::{collections::HashMap, path::PathBuf};
 
-const LOGGER_FILTER: &str = "info";
+const LOGGER_FILTER: &str = "warn";
 const LOGGER_LOG_TO_CONSOLE: bool = true;
 const LOGGER_CONSOLE_SHOW_FILE_AND_LINE: bool = false;
 const LOGGER_LOG_TO_FILE: bool = false;

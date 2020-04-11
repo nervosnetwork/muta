@@ -83,17 +83,12 @@ impl<Mapping: 'static + ServiceMapping> Muta<Mapping> {
         }
     }
 
-    pub fn run(self) -> ProtocolResult<()> {
+    pub async fn run(self) -> ProtocolResult<()> {
         // run muta
-        let mut rt = tokio::runtime::Runtime::new().expect("new tokio runtime");
-        let local = tokio::task::LocalSet::new();
         let memory_db = MemoryDB::default();
 
-        local.block_on(&mut rt, async move {
-            self.create_genesis(memory_db.clone()).await?;
-
-            start(self.config, Arc::clone(&self.service_mapping), memory_db).await
-        })?;
+        self.create_genesis(memory_db.clone()).await?;
+        start(self.config, Arc::clone(&self.service_mapping), memory_db).await?;
 
         Ok(())
     }

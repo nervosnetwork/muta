@@ -147,6 +147,9 @@ impl ClientNode {
             .users_cast::<M>(ctx, endpoint, users, msg, Priority::High)
             .await
         {
+            // Sleep a while to ensure our peer manager to process disconnect event
+            tokio::time::delay_for(std::time::Duration::from_secs(2)).await;
+
             if !self.connected() {
                 Err(ClientNodeError::NotConnected)
             } else {
@@ -178,6 +181,9 @@ impl ClientNode {
                 if e.to_string().contains("RpcTimeout")
                     || e.to_string().contains("rpc timeout") =>
             {
+                // Sleep a while to ensure our peer manager to process disconnect event
+                tokio::time::delay_for(std::time::Duration::from_secs(10)).await;
+
                 if !self.connected() {
                     Err(ClientNodeError::NotConnected)
                 } else {
