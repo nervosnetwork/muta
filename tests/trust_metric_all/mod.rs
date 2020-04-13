@@ -264,3 +264,49 @@ fn should_keep_connected_for_z_strategy_but_have_lower_score() {
         })
     });
 }
+
+#[test]
+fn should_able_to_reconnect_after_trust_metric_soft_ban() {
+    trust_test(move |client_node| {
+        Box::pin(async move {
+            let mut count = 30u8;
+
+            while count > 0 {
+                count -= 1;
+
+                if let Err(ClientNodeError::Unexpected(e)) =
+                    client_node.trust_twin_event(node::TwinEvent::Bad).await
+                {
+                    panic!("unexpected {}", e);
+                }
+
+                match client_node.trust_new_interval().await {
+                    Ok(report) => report,
+                    Err(ClientNodeError::NotConnected) => return,
+                    Err(e) => panic!("unexpected error {}", e),
+                };
+
+                if !client_node.connected() {
+                    break;
+                }
+            }
+
+            assert!(!client_node.connected(), "should be disconnected");
+
+            // Ensure we we dont sleep longer than back-off time
+            let soft_ban_duration = node::consts::NETWORK_SOFT_BAND_DURATION.expect("soft ban") * 2u64;
+            tokio::time::delay_for(std::time::Duration::from_secs(soft_ban_duration)).await;
+
+            count = 30u8;
+            while count > 0 {
+                count -= 1;
+
+                if client_node.connected() {
+                    return;
+                }
+            }
+
+            panic!("should be reconnected");
+        })
+    });
+}

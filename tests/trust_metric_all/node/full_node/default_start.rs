@@ -141,7 +141,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
             consts::NETWORK_TRUST_METRIC_INTERVAL,
             config.network.trust_max_history_duration,
         )?
-        .peer_soft_ban(config.network.soft_ban_duration)
+        .peer_soft_ban(consts::NETWORK_SOFT_BAND_DURATION)
         .peer_fatal_ban(config.network.fatal_ban_duration)
         .rpc_timeout(config.network.rpc_timeout.clone())
         .ping_interval(consts::NETWORK_PING_INTERVAL)
