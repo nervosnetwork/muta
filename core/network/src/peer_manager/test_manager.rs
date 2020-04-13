@@ -2842,3 +2842,113 @@ async fn should_pick_good_peer_first_on_finding_connectable_peers() {
         "should be peer with better score"
     );
 }
+
+#[tokio::test]
+async fn should_setup_trust_metric_if_none_on_session_closed() {
+    let (mut mgr, _conn_rx) = make_manager(2, 20);
+    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+
+    let test_peer = remote_peers.first().expect("get first peer");
+    test_peer.remove_trust_metric();
+
+    let session_closed = PeerManagerEvent::SessionClosed {
+        pid: test_peer.owned_id(),
+        sid: test_peer.session_id(),
+    };
+    mgr.poll_event(session_closed).await;
+
+    assert!(
+        test_peer.trust_metric().is_some(),
+        "should set up trust metric"
+    );
+}
+
+#[tokio::test]
+async fn should_setup_trust_metric_if_none_on_session_failed() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+
+    let test_peer = remote_peers.first().expect("get first peer");
+    test_peer.remove_trust_metric();
+
+    let expect_sid = test_peer.session_id();
+    let session_failed = PeerManagerEvent::SessionFailed {
+        sid:  expect_sid,
+        kind: SessionErrorKind::Io(std::io::ErrorKind::Other.into()),
+    };
+    mgr.poll_event(session_failed).await;
+
+    assert!(
+        test_peer.trust_metric().is_some(),
+        "should set up trust metric"
+    );
+
+    let trust_metric = test_peer.trust_metric().expect("trust metric");
+    assert!(!trust_metric.is_started(), "should not start");
+    assert_eq!(
+        trust_metric.bad_events_count(),
+        1,
+        "should have 1 bad event"
+    );
+}
+
+#[tokio::test]
+async fn should_setup_trust_metric_if_none_on_peer_misbehave() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+
+    let test_peer = remote_peers.first().expect("get first peer");
+    test_peer.remove_trust_metric();
+
+    let peer_misbehave = PeerManagerEvent::Misbehave {
+        pid:  test_peer.owned_id(),
+        kind: MisbehaviorKind::PingTimeout,
+    };
+    mgr.poll_event(peer_misbehave).await;
+
+    assert!(
+        test_peer.trust_metric().is_some(),
+        "should set up trust metric"
+    );
+
+    let trust_metric = test_peer.trust_metric().expect("trust metric");
+    assert!(trust_metric.is_started(), "should be started");
+    assert_eq!(
+        trust_metric.bad_events_count(),
+        1,
+        "should have 1 bad event"
+    );
+}
+
+#[tokio::test]
+async fn should_setup_trust_metric_if_none_on_session_blocked() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+
+    let test_peer = remote_peers.first().expect("get first peer");
+    test_peer.remove_trust_metric();
+
+    let sess_ctx = SessionContext::make(
+        test_peer.session_id(),
+        test_peer.multiaddrs.all_raw().pop().expect("get multiaddr"),
+        SessionType::Outbound,
+        test_peer.owned_pubkey().expect("pubkey"),
+    );
+    let session_blocked = PeerManagerEvent::SessionBlocked {
+        ctx: sess_ctx.arced(),
+    };
+    mgr.poll_event(session_blocked).await;
+
+    assert!(
+        test_peer.trust_metric().is_some(),
+        "should set up trust metric"
+    );
+
+    let trust_metric = test_peer.trust_metric().expect("trust metric");
+    assert!(trust_metric.is_started(), "should be started");
+    assert_eq!(
+        trust_metric.bad_events_count(),
+        1,
+        "should have 1 bad event"
+    );
+}

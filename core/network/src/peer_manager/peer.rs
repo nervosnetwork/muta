@@ -147,6 +147,11 @@ impl Peer {
         *self.trust_metric.write() = Some(metric);
     }
 
+    #[cfg(test)]
+    pub fn remove_trust_metric(&self) {
+        *self.trust_metric.write() = None;
+    }
+
     pub fn connectedness(&self) -> Connectedness {
         Connectedness::from(self.connectedness.load(Ordering::SeqCst))
     }

@@ -864,7 +864,12 @@ impl PeerManager {
 
         match session.peer.trust_metric() {
             Some(trust_metric) => trust_metric.pause(),
-            None => error!("session peer {:?} trust metric not found", session.peer.id),
+            None => {
+                warn!("session peer {:?} trust metric not found", session.peer.id);
+
+                let trust_metric = TrustMetric::new(Arc::clone(&self.config.peer_trust_config));
+                session.peer.set_trust_metric(trust_metric);
+            }
         }
 
         if session.peer.alive() < SHORT_ALIVE_SESSION {
@@ -959,7 +964,14 @@ impl PeerManager {
 
         match session.peer.trust_metric() {
             Some(trust_metric) => trust_metric.bad_events(1),
-            None => error!("session peer {:?} trust metric not found", session.peer.id),
+            None => {
+                warn!("session peer {:?} trust metric not found", session.peer.id);
+
+                let trust_metric = TrustMetric::new(Arc::clone(&self.config.peer_trust_config));
+                trust_metric.bad_events(1);
+
+                session.peer.set_trust_metric(trust_metric);
+            }
         }
 
         match error_kind {
@@ -994,7 +1006,15 @@ impl PeerManager {
 
         match peer.trust_metric() {
             Some(trust_metric) => trust_metric.bad_events(1),
-            None => error!("session peer {:?} trust metric not found", peer.id),
+            None => {
+                warn!("session peer {:?} trust metric not found", peer.id);
+
+                let trust_metric = TrustMetric::new(Arc::clone(&self.config.peer_trust_config));
+                trust_metric.start();
+                trust_metric.bad_events(1);
+
+                peer.set_trust_metric(trust_metric);
+            }
         }
 
         let sid = peer.session_id();
@@ -1029,8 +1049,13 @@ impl PeerManager {
         let peer_trust_metric = match peer.trust_metric() {
             Some(t) => t,
             None => {
-                error!("fatal peer {:?} trust metric not found", pid);
-                return;
+                warn!("session peer {:?} trust metric not found", peer.id);
+
+                let trust_metric = TrustMetric::new(Arc::clone(&self.config.peer_trust_config));
+                trust_metric.start();
+
+                peer.set_trust_metric(trust_metric.clone());
+                trust_metric
             }
         };
 
@@ -1094,7 +1119,15 @@ impl PeerManager {
 
             match session.peer.trust_metric() {
                 Some(trust_metric) => trust_metric.bad_events(1),
-                None => error!("session peer {:?} trust metric not found", session.peer.id),
+                None => {
+                    warn!("session peer {:?} trust metric not found", session.peer.id);
+
+                    let trust_metric = TrustMetric::new(Arc::clone(&self.config.peer_trust_config));
+                    trust_metric.start();
+                    trust_metric.bad_events(1);
+
+                    session.peer.set_trust_metric(trust_metric);
+                }
             };
         }
     }
