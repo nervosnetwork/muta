@@ -250,7 +250,7 @@ where
 impl<R: Rpc + 'static, S: Storage + 'static> MessageHandler for PullProofRpcHandler<R, S> {
     type Message = FixedHeight;
 
-    async fn process(&self, ctx: Context, height: FixedHeight) {
+    async fn process(&self, ctx: Context, height: FixedHeight) -> TrustFeedback {
         let height = height.inner;
         let latest_proof = self.storage.get_latest_proof().await;
 
@@ -276,6 +276,8 @@ impl<R: Rpc + 'static, S: Storage + 'static> MessageHandler for PullProofRpcHand
             )
             .unwrap_or_else(move |e: ProtocolError| warn!("[core_consensus] push proof {}", e))
             .await;
+
+        TrustFeedback::Neutral
     }
 }
 
