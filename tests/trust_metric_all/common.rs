@@ -82,8 +82,8 @@ impl SignedTransactionBuilder {
         };
 
         let request = TransactionRequest {
-            service_name: "test".to_owned(),
-            method:       "test".to_owned(),
+            service_name: "metadata".to_owned(),
+            method:       "get_metadata".to_owned(),
             payload:      self.payload,
         };
 

@@ -111,7 +111,7 @@ fn should_be_disconnected_for_repeated_exceed_mempool_size_within_four_intervals
         Box::pin(async move {
             let mut latest_report = client_node.trust_report().await.expect("get report");
 
-            let stxs = (0..consts::MEMPOOL_POOL_SIZE + 1)
+            let stxs = (0..consts::MEMPOOL_POOL_SIZE + 2)
                 .map(|_| common::stx_builder().build(&client_node.priv_key))
                 .collect::<Vec<_>>();
             for _ in 0..4u8 {
