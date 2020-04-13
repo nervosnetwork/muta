@@ -32,6 +32,8 @@ fn should_be_disconnected_for_repeated_undecodeable_proposal_within_four_interva
                     Err(e) => panic!("unexpected error {}", e),
                 }
             }
+
+            assert!(!client_node.connected());
         })
     });
 }
@@ -63,6 +65,8 @@ fn should_be_disconnected_for_repeated_undecodeable_vote_within_four_intervals()
                     Err(e) => panic!("unexpected error {}", e),
                 }
             }
+
+            assert!(!client_node.connected());
         })
     });
 }
@@ -94,6 +98,8 @@ fn should_be_disconnected_for_repeated_undecodeable_qc_within_four_intervals() {
                     Err(e) => panic!("unexpected error {}", e),
                 }
             }
+
+            assert!(!client_node.connected());
         })
     });
 }
@@ -125,6 +131,8 @@ fn should_be_disconnected_for_repeated_undecodeable_choke_within_four_intervals(
                     Err(e) => panic!("unexpected error {}", e),
                 }
             }
+
+            assert!(!client_node.connected());
         })
     });
 }
@@ -154,6 +162,8 @@ fn should_be_disconnected_for_repeated_malicious_new_height_broadcast_within_fou
                     Err(e) => panic!("unexpected error {}", e),
                 }
             }
+
+            assert!(!client_node.connected());
         })
     });
 }

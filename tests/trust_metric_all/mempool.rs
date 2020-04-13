@@ -68,6 +68,8 @@ fn should_be_disconnected_for_repeated_wrong_signature_only_within_four_interval
                     Err(e) => panic!("unexpected error {}", e),
                 }
             }
+
+            assert!(!client_node.connected());
         })
     });
 }
@@ -109,6 +111,8 @@ fn should_be_disconnected_for_repeated_wrong_tx_hash_only_within_four_intervals(
                     Err(e) => panic!("unexpected error {}", e),
                 }
             }
+
+            assert!(!client_node.connected());
         })
     });
 }
@@ -150,6 +154,8 @@ fn should_be_disconnected_for_repeated_exceed_tx_size_limit_only_within_four_int
                     Err(e) => panic!("unexpected error {}", e),
                 }
             }
+
+            assert!(!client_node.connected());
         })
     });
 }
@@ -191,6 +197,8 @@ fn should_be_disconnected_for_repeated_exceed_cycles_limit_only_within_four_inte
                     Err(e) => panic!("unexpected error {}", e),
                 }
             }
+
+            assert!(!client_node.connected());
         })
     });
 }
@@ -233,6 +241,8 @@ fn should_be_disconnected_for_repeated_wrong_chain_id_only_within_four_intervals
                     Err(e) => panic!("unexpected error {}", e),
                 }
             }
+
+            assert!(!client_node.connected());
         })
     });
 }
@@ -274,6 +284,8 @@ fn should_be_disconnected_for_repeated_timeout_larger_than_gap_only_within_four_
                     Err(e) => panic!("unexpected error {}", e),
                 }
             }
+
+            assert!(!client_node.connected());
         })
     });
 }
@@ -316,6 +328,8 @@ fn should_be_disconnected_for_repeated_timeout_smaller_than_latest_height_only_w
                     Err(e) => panic!("unexpected error {}", e),
                 }
             }
+
+            assert!(!client_node.connected());
         })
     });
 }
