@@ -26,6 +26,11 @@ fn should_be_disconnected_for_repeated_undecodeable_proposal_within_four_interva
                     Err(e) => panic!("unexpected {}", e),
                 };
 
+                assert_eq!(
+                    latest_report.bad_events, 1,
+                    "undecodeable proposal should give bad feedback"
+                );
+
                 latest_report = match client_node.trust_new_interval().await {
                     Ok(report) => report,
                     Err(ClientNodeError::NotConnected) => return,
@@ -58,6 +63,11 @@ fn should_be_disconnected_for_repeated_undecodeable_vote_within_four_intervals()
                     Err(ClientNodeError::NotConnected) => return,
                     Err(e) => panic!("unexpected {}", e),
                 };
+
+                assert_eq!(
+                    latest_report.bad_events, 1,
+                    "undecodeable vote should give bad feedback"
+                );
 
                 latest_report = match client_node.trust_new_interval().await {
                     Ok(report) => report,
@@ -92,6 +102,11 @@ fn should_be_disconnected_for_repeated_undecodeable_qc_within_four_intervals() {
                     Err(e) => panic!("unexpected {}", e),
                 };
 
+                assert_eq!(
+                    latest_report.bad_events, 1,
+                    "undecodeable qc should give bad feedback"
+                );
+
                 latest_report = match client_node.trust_new_interval().await {
                     Ok(report) => report,
                     Err(ClientNodeError::NotConnected) => return,
@@ -125,6 +140,11 @@ fn should_be_disconnected_for_repeated_undecodeable_choke_within_four_intervals(
                     Err(e) => panic!("unexpected {}", e),
                 };
 
+                assert_eq!(
+                    latest_report.bad_events, 1,
+                    "undecodeable choke should give bad feedback"
+                );
+
                 latest_report = match client_node.trust_new_interval().await {
                     Ok(report) => report,
                     Err(ClientNodeError::NotConnected) => return,
@@ -155,6 +175,11 @@ fn should_be_disconnected_for_repeated_malicious_new_height_broadcast_within_fou
                     Err(ClientNodeError::NotConnected) => return,
                     Err(e) => panic!("unexpected {}", e),
                 };
+
+                assert_eq!(
+                    latest_report.bad_events, 1,
+                    "malicious new height broadcast should give bad feedback"
+                );
 
                 latest_report = match client_node.trust_new_interval().await {
                     Ok(report) => report,
