@@ -1,6 +1,6 @@
 use super::{
     common,
-    node::{client_node::ClientNodeError, consts},
+    node::client_node::ClientNodeError,
     trust_test,
 };
 
@@ -81,42 +81,6 @@ fn should_be_disconnected_for_repeated_wrong_tx_hash_within_four_intervals() {
             for _ in 0..4u8 {
                 let msg_stxs = MsgNewTxs {
                     batch_stxs: vec![stx.clone()],
-                };
-
-                if let Err(ClientNodeError::Unexpected(e)) =
-                    client_node.broadcast(END_GOSSIP_NEW_TXS, msg_stxs).await
-                {
-                    panic!("unexpected {}", e);
-                }
-
-                latest_report = match client_node.until_trust_report_changed(&latest_report).await {
-                    Ok(report) => report,
-                    Err(ClientNodeError::NotConnected) => return,
-                    Err(e) => panic!("unexpected {}", e),
-                };
-
-                match client_node.trust_new_interval().await {
-                    Ok(()) => (),
-                    Err(ClientNodeError::NotConnected) => return,
-                    Err(e) => panic!("unexpected error {}", e),
-                }
-            }
-        })
-    });
-}
-
-#[test]
-fn should_be_disconnected_for_repeated_exceed_mempool_size_within_four_intervals() {
-    trust_test(move |client_node| {
-        Box::pin(async move {
-            let mut latest_report = client_node.trust_report().await.expect("get report");
-
-            let stxs = (0..consts::MEMPOOL_POOL_SIZE + 2)
-                .map(|_| common::stx_builder().build(&client_node.priv_key))
-                .collect::<Vec<_>>();
-            for _ in 0..4u8 {
-                let msg_stxs = MsgNewTxs {
-                    batch_stxs: stxs.clone(),
                 };
 
                 if let Err(ClientNodeError::Unexpected(e)) =
