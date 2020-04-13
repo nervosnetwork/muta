@@ -4,7 +4,7 @@ use common_crypto::{
     Crypto, PrivateKey, PublicKey, Secp256k1, Secp256k1PrivateKey, Signature, ToPublicKey,
 };
 use protocol::{
-    codec::ProtocolCodecSync,
+    fixed_codec::FixedCodec,
     types::{Hash, JsonString, RawTransaction, SignedTransaction, TransactionRequest},
     Bytes, BytesMut,
 };
@@ -96,7 +96,7 @@ impl SignedTransactionBuilder {
             request,
         };
 
-        let raw_bytes = raw.encode_sync().expect("encode raw tx");
+        let raw_bytes = raw.encode_fixed().expect("encode raw tx");
         let tx_hash = Hash::digest(raw_bytes);
 
         let sig = Secp256k1::sign_message(&tx_hash.as_bytes(), &pk.to_bytes()).expect("sign tx");

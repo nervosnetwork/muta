@@ -7,7 +7,7 @@ mod node;
 use futures::future::BoxFuture;
 use node::client_node::ClientNode;
 
-const FULL_NODE_SETUP_WAIT_TIME: u64 = 3;
+const FULL_NODE_SETUP_WAIT_TIME: u64 = 5;
 
 fn trust_test(test: impl FnOnce(ClientNode) -> BoxFuture<'static, ()> + Send + 'static) {
     let (full_port, client_port) = common::available_port_pair();
