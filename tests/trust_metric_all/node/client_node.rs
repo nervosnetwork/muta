@@ -1,6 +1,6 @@
 use super::diagnostic::{
     TrustNewIntervalReq, TrustNewIntervalResp, TrustReport, TrustReportReq, TrustTwinEventReq,
-    TrustTwinEventResp, RPC_RESP_TRUST_NEW_INTERVAL, RPC_RESP_TRUST_REPORT,
+    TrustTwinEventResp, TwinEvent, RPC_RESP_TRUST_NEW_INTERVAL, RPC_RESP_TRUST_REPORT,
     RPC_RESP_TRUST_TWIN_EVENT, RPC_TRUST_NEW_INTERVAL, RPC_TRUST_REPORT, RPC_TRUST_TWIN_EVENT,
 };
 use super::{config::Config, consts};
@@ -218,8 +218,8 @@ impl ClientNode {
         self.until_new_interval_report().await
     }
 
-    pub async fn trust_twin_event(&self) -> ClientResult<()> {
-        self.rpc::<_, TrustTwinEventResp>(RPC_TRUST_TWIN_EVENT, TrustTwinEventReq(0))
+    pub async fn trust_twin_event(&self, event: TwinEvent) -> ClientResult<()> {
+        self.rpc::<_, TrustTwinEventResp>(RPC_TRUST_TWIN_EVENT, TrustTwinEventReq(event))
             .await?;
         Ok(())
     }

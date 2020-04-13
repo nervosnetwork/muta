@@ -99,11 +99,19 @@ impl MessageHandler for TrustNewIntervalHandler {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct TrustTwinEventReq(pub u8);
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum TwinEvent {
+    Good = 0,
+    Bad = 1,
+    Both = 2,
+}
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct TrustTwinEventResp(pub u8);
+pub struct TrustTwinEventReq(pub TwinEvent);
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TrustTwinEventResp(pub TwinEvent);
 
 pub struct TrustTwinEventHandler(pub NetworkServiceHandle);
 
@@ -112,16 +120,23 @@ impl MessageHandler for TrustTwinEventHandler {
     type Message = TrustTwinEventReq;
 
     async fn process(&self, ctx: Context, msg: Self::Message) -> TrustFeedback {
-        let echo_c0de: u8 = msg.0;
-        self.0.report(ctx.clone(), TrustFeedback::Good);
-        self.0
-            .report(ctx.clone(), TrustFeedback::Bad("simple test".to_owned()));
+        match msg.0 {
+            TwinEvent::Good => self.0.report(ctx.clone(), TrustFeedback::Good),
+            TwinEvent::Bad => self
+                .0
+                .report(ctx.clone(), TrustFeedback::Bad("twin bad".to_owned())),
+            TwinEvent::Both => {
+                self.0.report(ctx.clone(), TrustFeedback::Good);
+                self.0
+                    .report(ctx.clone(), TrustFeedback::Bad("twin bad".to_owned()));
+            }
+        }
 
         self.0
             .response(
                 ctx,
                 RPC_RESP_TRUST_TWIN_EVENT,
-                Ok(TrustTwinEventResp(echo_c0de)),
+                Ok(TrustTwinEventResp(msg.0)),
                 Priority::High,
             )
             .await

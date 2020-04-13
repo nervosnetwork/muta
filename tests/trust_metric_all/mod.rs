@@ -5,7 +5,7 @@ mod mempool;
 mod node;
 
 use futures::future::BoxFuture;
-use node::client_node::ClientNode;
+use node::client_node::{ClientNode, ClientNodeError};
 
 const FULL_NODE_SETUP_WAIT_TIME: u64 = 5;
 
@@ -45,7 +45,7 @@ fn should_have_working_trust_diagnostic() {
     trust_test(move |client_node| {
         Box::pin(async move {
             client_node
-                .trust_twin_event()
+                .trust_twin_event(node::TwinEvent::Both)
                 .await
                 .expect("test trust twin event");
 
@@ -66,6 +66,60 @@ fn should_have_working_trust_diagnostic() {
                 .expect("fetch trust report");
             assert_eq!(report.good_events, 0, "should have 0 good event");
             assert_eq!(report.bad_events, 0, "should have 0 bad event");
+        })
+    });
+}
+
+#[test]
+fn should_be_disconnected_for_repeated_bad_only_within_four_intervals_from_max_score() {
+    trust_test(move |client_node| {
+        Box::pin(async move {
+            let mut report = client_node
+                .trust_report()
+                .await
+                .expect("fetch trust report");
+
+            // Repeat at least 30 interval
+            let mut count = 30u8;
+            while count > 0 {
+                count -= 1;
+
+                client_node
+                    .trust_twin_event(node::TwinEvent::Good)
+                    .await
+                    .expect("test trust twin event");
+
+                report = client_node
+                    .trust_new_interval()
+                    .await
+                    .expect("test trust new interval");
+
+                if report.score >= 95 {
+                    break;
+                }
+            }
+
+            for _ in 0..4u8 {
+                if let Err(ClientNodeError::Unexpected(e)) =
+                    client_node.trust_twin_event(node::TwinEvent::Bad).await
+                {
+                    panic!("unexpected {}", e);
+                }
+
+                match client_node.until_trust_report_changed(&report).await {
+                    Ok(report) => report,
+                    Err(ClientNodeError::NotConnected) => return,
+                    Err(e) => panic!("unexpected {}", e),
+                };
+
+                report = match client_node.trust_new_interval().await {
+                    Ok(report) => report,
+                    Err(ClientNodeError::NotConnected) => return,
+                    Err(e) => panic!("unexpected error {}", e),
+                }
+            }
+
+            assert!(!client_node.connected());
         })
     });
 }
