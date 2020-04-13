@@ -1,3 +1,5 @@
+use super::TxContext;
+
 pub mod message;
 
 use std::{
@@ -227,13 +229,20 @@ where
         Ok(())
     }
 
-    async fn check_signature(&self, _ctx: Context, tx: SignedTransaction) -> ProtocolResult<()> {
+    async fn check_signature(&self, ctx: Context, tx: SignedTransaction) -> ProtocolResult<()> {
         let blocking_res = tokio::task::spawn_blocking(move || {
             // Verify transaction hash
             let fixed_bytes = tx.raw.encode_fixed()?;
             let tx_hash = Hash::digest(fixed_bytes);
 
             if tx_hash != tx.tx_hash {
+                if ctx.is_network_origin_txs() {
+                    self.network.report(
+                        ctx,
+                        TrustFeedback::Worse(format!("Mempool wrong tx_hash of tx {:?}", tx.tx_hash)),
+                    );
+                }
+
                 let wrong_hash = MemPoolError::CheckHash {
                     expect: tx.tx_hash,
                     actual: tx_hash,
@@ -247,6 +256,13 @@ where
             let sig = tx.signature.as_ref();
 
             C::verify_signature(hash.as_ref(), sig, pub_key).map_err(|_| {
+                if ctx.is_network_origin_txs() {
+                    self.network.report(
+                        ctx,
+                        TrustFeedback::Worse(format!("Mempool wrong signature of tx {:?}", tx.tx_hash)),
+                    );
+                }
+
                 MemPoolError::CheckSig {
                     tx_hash: tx.tx_hash,
                 }
@@ -267,18 +283,22 @@ where
     // TODO: Verify Fee?
     // TODO: Verify Nonce?
     // TODO: Cycle limit?
-    async fn check_transaction(&self, _ctx: Context, stx: SignedTransaction) -> ProtocolResult<()> {
-        let fixed_bytes = stx.raw.encode_fixed()?;
+    async fn check_transaction(&self, ctx: Context, stx: SignedTransaction) -> ProtocolResult<()> { let fixed_bytes = stx.raw.encode_fixed()?;
         let size = fixed_bytes.len() as u64;
         let tx_hash = stx.tx_hash.clone();
 
         // check tx size
         let max_tx_size = self.max_tx_size.load(Ordering::SeqCst);
         if size > max_tx_size {
-            self.network.report(
-                ctx,
-                TrustFeedback::Bad(format!("Mempool exceed size limit of tx {:?}", stx.tx_hash)),
-            );
+            if ctx.is_network_origin_txs() {
+                self.network.report(
+                    ctx,
+                    TrustFeedback::Bad(format!(
+                        "Mempool exceed size limit of tx {:?}",
+                        stx.tx_hash
+                    )),
+                );
+            }
             return Err(MemPoolError::ExceedSizeLimit {
                 tx_hash,
                 max_tx_size,
@@ -291,13 +311,15 @@ where
         let cycles_limit_config = self.cycles_limit.load(Ordering::SeqCst);
         let cycles_limit_tx = stx.raw.cycles_limit;
         if cycles_limit_tx > cycles_limit_config {
-            self.network.report(
-                ctx,
-                TrustFeedback::Bad(format!(
-                    "Mempool exceed cycle limit of tx {:?}",
-                    stx.tx_hash
-                )),
-            );
+            if ctx.is_network_origin_txs() {
+                self.network.report(
+                    ctx,
+                    TrustFeedback::Bad(format!(
+                        "Mempool exceed cycle limit of tx {:?}",
+                        stx.tx_hash
+                    )),
+                );
+            }
             return Err(MemPoolError::ExceedCyclesLimit {
                 tx_hash,
                 cycles_limit_tx,
@@ -309,10 +331,12 @@ where
         // Verify chain id
         let latest_block = self.storage.get_latest_block().await?;
         if latest_block.header.chain_id != stx.raw.chain_id {
-            self.network.report(
-                ctx,
-                TrustFeedback::Worse(format!("Mempool wrong chain of tx {:?}", stx.tx_hash)),
-            );
+            if ctx.is_network_origin_txs() {
+                self.network.report(
+                    ctx,
+                    TrustFeedback::Worse(format!("Mempool wrong chain of tx {:?}", stx.tx_hash)),
+                );
+            }
             let wrong_chain_id = MemPoolError::WrongChain {
                 tx_hash: stx.tx_hash,
             };
@@ -325,10 +349,12 @@ where
         let timeout_gap = self.timeout_gap.load(Ordering::SeqCst);
 
         if stx.raw.timeout > latest_height + timeout_gap {
-            self.network.report(
-                ctx,
-                TrustFeedback::Bad(format!("Mempool invalid timeout of tx {:?}", stx.tx_hash)),
-            );
+            if ctx.is_network_origin_txs() {
+                self.network.report(
+                    ctx,
+                    TrustFeedback::Bad(format!("Mempool invalid timeout of tx {:?}", stx.tx_hash)),
+                );
+            }
             let invalid_timeout = MemPoolError::InvalidTimeout {
                 tx_hash: stx.tx_hash,
             };
@@ -337,10 +363,12 @@ where
         }
 
         if stx.raw.timeout < latest_height {
-            self.network.report(
-                ctx,
-                TrustFeedback::Bad(format!("Mempool timeout of tx {:?}", stx.tx_hash)),
-            );
+            if ctx.is_network_origin_txs() {
+                self.network.report(
+                    ctx,
+                    TrustFeedback::Bad(format!("Mempool timeout of tx {:?}", stx.tx_hash)),
+                );
+            }
             let timeout = MemPoolError::Timeout {
                 tx_hash: stx.tx_hash,
                 timeout: stx.raw.timeout,
@@ -372,7 +400,9 @@ where
     }
 
     fn report_good(&self, ctx: Context) {
-        self.network.report(ctx, TrustFeedback::Good);
+        if ctx.is_network_origin_txs() {
+            self.network.report(ctx, TrustFeedback::Good);
+        }
     }
 
     fn set_args(&self, timeout_gap: u64, cycles_limit: u64, max_tx_size: u64) {
