@@ -1,8 +1,4 @@
-use super::{
-    common,
-    node::client_node::ClientNodeError,
-    trust_test,
-};
+use super::{common, node::client_node::ClientNodeError, trust_test};
 
 use core_mempool::{MsgNewTxs, END_GOSSIP_NEW_TXS};
 use protocol::{types::Hash, Bytes};
@@ -36,7 +32,7 @@ fn should_report_good_on_valid_transaction() {
 }
 
 #[test]
-fn should_be_disconnected_for_repeated_wrong_signature_within_four_intervals() {
+fn should_be_disconnected_for_repeated_wrong_signature_only_within_four_intervals() {
     trust_test(move |client_node| {
         Box::pin(async move {
             let mut latest_report = client_node.trust_report().await.expect("get report");
@@ -60,8 +56,14 @@ fn should_be_disconnected_for_repeated_wrong_signature_within_four_intervals() {
                     Err(e) => panic!("unexpected {}", e),
                 };
 
-                match client_node.trust_new_interval().await {
-                    Ok(()) => (),
+                assert_eq!(
+                    latest_report.bad_events,
+                    1 * latest_report.worse_scalar_ratio,
+                    "wrong signature should give worse feedback"
+                );
+
+                latest_report = match client_node.trust_new_interval().await {
+                    Ok(report) => report,
                     Err(ClientNodeError::NotConnected) => return,
                     Err(e) => panic!("unexpected error {}", e),
                 }
@@ -71,7 +73,7 @@ fn should_be_disconnected_for_repeated_wrong_signature_within_four_intervals() {
 }
 
 #[test]
-fn should_be_disconnected_for_repeated_wrong_tx_hash_within_four_intervals() {
+fn should_be_disconnected_for_repeated_wrong_tx_hash_only_within_four_intervals() {
     trust_test(move |client_node| {
         Box::pin(async move {
             let mut latest_report = client_node.trust_report().await.expect("get report");
@@ -95,8 +97,14 @@ fn should_be_disconnected_for_repeated_wrong_tx_hash_within_four_intervals() {
                     Err(e) => panic!("unexpected {}", e),
                 };
 
-                match client_node.trust_new_interval().await {
-                    Ok(()) => (),
+                assert_eq!(
+                    latest_report.bad_events,
+                    1 * latest_report.worse_scalar_ratio,
+                    "wrong tx hash should give worse feedback"
+                );
+
+                latest_report = match client_node.trust_new_interval().await {
+                    Ok(report) => report,
                     Err(ClientNodeError::NotConnected) => return,
                     Err(e) => panic!("unexpected error {}", e),
                 }
@@ -106,7 +114,7 @@ fn should_be_disconnected_for_repeated_wrong_tx_hash_within_four_intervals() {
 }
 
 #[test]
-fn should_be_disconnected_for_repeated_exceed_tx_size_limit_within_four_intervals() {
+fn should_be_disconnected_for_repeated_exceed_tx_size_limit_only_within_four_intervals() {
     trust_test(move |client_node| {
         Box::pin(async move {
             let mut latest_report = client_node.trust_report().await.expect("get report");
@@ -131,8 +139,13 @@ fn should_be_disconnected_for_repeated_exceed_tx_size_limit_within_four_interval
                     Err(e) => panic!("unexpected {}", e),
                 };
 
-                match client_node.trust_new_interval().await {
-                    Ok(()) => (),
+                assert_eq!(
+                    latest_report.bad_events, 1,
+                    "exceed tx size limit should give bad feedback"
+                );
+
+                latest_report = match client_node.trust_new_interval().await {
+                    Ok(report) => report,
                     Err(ClientNodeError::NotConnected) => return,
                     Err(e) => panic!("unexpected error {}", e),
                 }
@@ -142,7 +155,7 @@ fn should_be_disconnected_for_repeated_exceed_tx_size_limit_within_four_interval
 }
 
 #[test]
-fn should_be_disconnected_for_repeated_exceed_cycles_limit_within_four_intervals() {
+fn should_be_disconnected_for_repeated_exceed_cycles_limit_only_within_four_intervals() {
     trust_test(move |client_node| {
         Box::pin(async move {
             let mut latest_report = client_node.trust_report().await.expect("get report");
@@ -167,8 +180,13 @@ fn should_be_disconnected_for_repeated_exceed_cycles_limit_within_four_intervals
                     Err(e) => panic!("unexpected {}", e),
                 };
 
-                match client_node.trust_new_interval().await {
-                    Ok(()) => (),
+                assert_eq!(
+                    latest_report.bad_events, 1,
+                    "exceed cycles limit should give bad feedback"
+                );
+
+                latest_report = match client_node.trust_new_interval().await {
+                    Ok(report) => report,
                     Err(ClientNodeError::NotConnected) => return,
                     Err(e) => panic!("unexpected error {}", e),
                 }
@@ -178,7 +196,7 @@ fn should_be_disconnected_for_repeated_exceed_cycles_limit_within_four_intervals
 }
 
 #[test]
-fn should_be_disconnected_for_repeated_wrong_chain_id_within_four_intervals() {
+fn should_be_disconnected_for_repeated_wrong_chain_id_only_within_four_intervals() {
     trust_test(move |client_node| {
         Box::pin(async move {
             let mut latest_report = client_node.trust_report().await.expect("get report");
@@ -203,8 +221,14 @@ fn should_be_disconnected_for_repeated_wrong_chain_id_within_four_intervals() {
                     Err(e) => panic!("unexpected {}", e),
                 };
 
-                match client_node.trust_new_interval().await {
-                    Ok(()) => (),
+                assert_eq!(
+                    latest_report.bad_events,
+                    1 * latest_report.worse_scalar_ratio,
+                    "wrong chain id should give worse feedback"
+                );
+
+                latest_report = match client_node.trust_new_interval().await {
+                    Ok(report) => report,
                     Err(ClientNodeError::NotConnected) => return,
                     Err(e) => panic!("unexpected error {}", e),
                 }
@@ -214,7 +238,7 @@ fn should_be_disconnected_for_repeated_wrong_chain_id_within_four_intervals() {
 }
 
 #[test]
-fn should_be_disconnected_for_repeated_timeout_larger_than_gap_within_four_intervals() {
+fn should_be_disconnected_for_repeated_timeout_larger_than_gap_only_within_four_intervals() {
     trust_test(move |client_node| {
         Box::pin(async move {
             let mut latest_report = client_node.trust_report().await.expect("get report");
@@ -239,8 +263,13 @@ fn should_be_disconnected_for_repeated_timeout_larger_than_gap_within_four_inter
                     Err(e) => panic!("unexpected {}", e),
                 };
 
-                match client_node.trust_new_interval().await {
-                    Ok(()) => (),
+                assert_eq!(
+                    latest_report.bad_events, 1,
+                    "larger timeout should give bad feedback"
+                );
+
+                latest_report = match client_node.trust_new_interval().await {
+                    Ok(report) => report,
                     Err(ClientNodeError::NotConnected) => return,
                     Err(e) => panic!("unexpected error {}", e),
                 }
@@ -250,7 +279,8 @@ fn should_be_disconnected_for_repeated_timeout_larger_than_gap_within_four_inter
 }
 
 #[test]
-fn should_be_disconnected_for_repeated_timeout_smaller_than_latest_height_within_four_intervals() {
+fn should_be_disconnected_for_repeated_timeout_smaller_than_latest_height_only_within_four_intervals(
+) {
     trust_test(move |client_node| {
         Box::pin(async move {
             let mut latest_report = client_node.trust_report().await.expect("get report");
@@ -275,8 +305,13 @@ fn should_be_disconnected_for_repeated_timeout_smaller_than_latest_height_within
                     Err(e) => panic!("unexpected {}", e),
                 };
 
-                match client_node.trust_new_interval().await {
-                    Ok(()) => (),
+                assert_eq!(
+                    latest_report.bad_events, 1,
+                    "smaller timeout should give bad feedback"
+                );
+
+                latest_report = match client_node.trust_new_interval().await {
+                    Ok(report) => report,
                     Err(ClientNodeError::NotConnected) => return,
                     Err(e) => panic!("unexpected error {}", e),
                 }

@@ -211,9 +211,11 @@ impl ClientNode {
         self.rpc(RPC_TRUST_REPORT, TrustReportReq(0)).await
     }
 
-    pub async fn trust_new_interval(&self) -> ClientResult<()> {
+    pub async fn trust_new_interval(&self) -> ClientResult<TrustReport> {
         self.rpc(RPC_TRUST_NEW_INTERVAL, TrustNewIntervalReq(0))
-            .await
+            .await?;
+
+        self.until_new_interval_report().await
     }
 
     pub async fn trust_twin_event(&self) -> ClientResult<()> {
@@ -239,6 +241,20 @@ impl ClientNode {
         }
 
         panic!("until trust report timeout");
+    }
+
+    async fn until_new_interval_report(&self) -> ClientResult<TrustReport> {
+        let mut count = 30u8;
+        while count > 0 {
+            count -= 1;
+            let report = self.trust_report().await?;
+            if report.good_events == 0 && report.bad_events == 0 {
+                return Ok(report);
+            }
+            tokio::time::delay_for(std::time::Duration::from_millis(500)).await;
+        }
+
+        panic!("until trust new interval timeout");
     }
 }
 

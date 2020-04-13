@@ -1,7 +1,4 @@
-use super::{
-    node::client_node::ClientNodeError,
-    trust_test,
-};
+use super::{node::client_node::ClientNodeError, trust_test};
 
 use core_consensus::message::{
     Choke, Proposal, Vote, BROADCAST_HEIGHT, END_GOSSIP_AGGREGATED_VOTE, END_GOSSIP_SIGNED_CHOKE,
@@ -29,8 +26,8 @@ fn should_be_disconnected_for_repeated_undecodeable_proposal_within_four_interva
                     Err(e) => panic!("unexpected {}", e),
                 };
 
-                match client_node.trust_new_interval().await {
-                    Ok(()) => (),
+                latest_report = match client_node.trust_new_interval().await {
+                    Ok(report) => report,
                     Err(ClientNodeError::NotConnected) => return,
                     Err(e) => panic!("unexpected error {}", e),
                 }
@@ -60,8 +57,8 @@ fn should_be_disconnected_for_repeated_undecodeable_vote_within_four_intervals()
                     Err(e) => panic!("unexpected {}", e),
                 };
 
-                match client_node.trust_new_interval().await {
-                    Ok(()) => (),
+                latest_report = match client_node.trust_new_interval().await {
+                    Ok(report) => report,
                     Err(ClientNodeError::NotConnected) => return,
                     Err(e) => panic!("unexpected error {}", e),
                 }
@@ -91,8 +88,8 @@ fn should_be_disconnected_for_repeated_undecodeable_qc_within_four_intervals() {
                     Err(e) => panic!("unexpected {}", e),
                 };
 
-                match client_node.trust_new_interval().await {
-                    Ok(()) => (),
+                latest_report = match client_node.trust_new_interval().await {
+                    Ok(report) => report,
                     Err(ClientNodeError::NotConnected) => return,
                     Err(e) => panic!("unexpected error {}", e),
                 }
@@ -122,8 +119,8 @@ fn should_be_disconnected_for_repeated_undecodeable_choke_within_four_intervals(
                     Err(e) => panic!("unexpected {}", e),
                 };
 
-                match client_node.trust_new_interval().await {
-                    Ok(()) => (),
+                latest_report = match client_node.trust_new_interval().await {
+                    Ok(report) => report,
                     Err(ClientNodeError::NotConnected) => return,
                     Err(e) => panic!("unexpected error {}", e),
                 }
@@ -151,8 +148,8 @@ fn should_be_disconnected_for_repeated_malicious_new_height_broadcast_within_fou
                     Err(e) => panic!("unexpected {}", e),
                 };
 
-                match client_node.trust_new_interval().await {
-                    Ok(()) => (),
+                latest_report = match client_node.trust_new_interval().await {
+                    Ok(report) => report,
                     Err(ClientNodeError::NotConnected) => return,
                     Err(e) => panic!("unexpected error {}", e),
                 }
