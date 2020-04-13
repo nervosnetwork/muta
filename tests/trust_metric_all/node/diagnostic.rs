@@ -5,6 +5,8 @@ use protocol::{
 };
 use serde_derive::{Deserialize, Serialize};
 
+use std::ops::Deref;
+
 pub const RPC_TRUST_REPORT: &str = "/rpc_call/diagnostic/trust_report";
 pub const RPC_RESP_TRUST_REPORT: &str = "/rpc_resp/diagnostic/trust_report";
 pub const RPC_TRUST_NEW_INTERVAL: &str = "/rpc_call/diagnostic/trust_new_interval";
@@ -104,7 +106,8 @@ impl MessageHandler for TrustNewIntervalHandler {
 pub enum TwinEvent {
     Good = 0,
     Bad = 1,
-    Both = 2,
+    Worse = 2,
+    Both = 3,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -121,27 +124,34 @@ impl MessageHandler for TrustTwinEventHandler {
 
     async fn process(&self, ctx: Context, msg: Self::Message) -> TrustFeedback {
         match msg.0 {
-            TwinEvent::Good => self.0.report(ctx.clone(), TrustFeedback::Good),
-            TwinEvent::Bad => self
-                .0
-                .report(ctx.clone(), TrustFeedback::Bad("twin bad".to_owned())),
+            TwinEvent::Good => self.report(ctx.clone(), TrustFeedback::Good),
+            TwinEvent::Bad => self.report(ctx.clone(), TrustFeedback::Bad("twin bad".to_owned())),
+            TwinEvent::Worse => {
+                self.report(ctx.clone(), TrustFeedback::Worse("twin worse".to_owned()))
+            }
             TwinEvent::Both => {
-                self.0.report(ctx.clone(), TrustFeedback::Good);
-                self.0
-                    .report(ctx.clone(), TrustFeedback::Bad("twin bad".to_owned()));
+                self.report(ctx.clone(), TrustFeedback::Good);
+                self.report(ctx.clone(), TrustFeedback::Bad("twin bad".to_owned()));
             }
         }
 
-        self.0
-            .response(
-                ctx,
-                RPC_RESP_TRUST_TWIN_EVENT,
-                Ok(TrustTwinEventResp(msg.0)),
-                Priority::High,
-            )
-            .await
-            .expect("failed to response trust new interval");
+        self.response(
+            ctx,
+            RPC_RESP_TRUST_TWIN_EVENT,
+            Ok(TrustTwinEventResp(msg.0)),
+            Priority::High,
+        )
+        .await
+        .expect("failed to response trust new interval");
 
         TrustFeedback::Neutral
+    }
+}
+
+impl Deref for TrustTwinEventHandler {
+    type Target = NetworkServiceHandle;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
