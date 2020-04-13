@@ -192,7 +192,7 @@ impl<Sy: Synchronization + 'static> MessageHandler for RemoteHeightMessageHandle
                 return TrustFeedback::Bad("sync block timeout".to_owned());
             }
         }
-        // FIXME
+
         TrustFeedback::Good
     }
 }
@@ -229,7 +229,6 @@ impl<R: Rpc + 'static, S: Storage + 'static> MessageHandler for PullBlockRpcHand
             .unwrap_or_else(move |e: ProtocolError| warn!("[core_consensus] push block {}", e))
             .await;
 
-        // FIXME
         TrustFeedback::Good
     }
 }
@@ -319,7 +318,6 @@ impl<R: Rpc + 'static, S: Storage + 'static> MessageHandler for PullTxsRpcHandle
             .unwrap_or_else(move |e: ProtocolError| warn!("[core_consensus] push txs {}", e))
             .await;
 
-        // FIXME
         TrustFeedback::Good
     }
 }
