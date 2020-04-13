@@ -201,3 +201,66 @@ fn should_be_disconnected_for_repeated_s_strategy_within_17_intervals_from_max_s
         })
     });
 }
+
+#[test]
+fn should_keep_connected_for_z_strategy_but_have_lower_score() {
+    trust_test(move |client_node| {
+        Box::pin(async move {
+            let mut report = client_node
+                .trust_report()
+                .await
+                .expect("fetch trust report");
+
+            // Repeat at least 30 interval
+            let mut count = 30u8;
+            while count > 0 {
+                count -= 1;
+
+                client_node
+                    .trust_twin_event(node::TwinEvent::Good)
+                    .await
+                    .expect("test trust twin event");
+
+                report = client_node
+                    .trust_new_interval()
+                    .await
+                    .expect("test trust new interval");
+
+                if report.score >= 95 {
+                    break;
+                }
+            }
+
+            for _ in 0..100u8 {
+                if let Err(ClientNodeError::Unexpected(e)) =
+                    client_node.trust_twin_event(node::TwinEvent::Bad).await
+                {
+                    panic!("unexpected {}", e);
+                }
+
+                if let Err(ClientNodeError::Unexpected(e)) =
+                    client_node.trust_twin_event(node::TwinEvent::Good).await
+                {
+                    panic!("unexpected {}", e);
+                }
+
+                match client_node.until_trust_report_changed(&report).await {
+                    Ok(report) => report,
+                    Err(ClientNodeError::NotConnected) => return,
+                    Err(e) => panic!("unexpected {}", e),
+                };
+
+                let latest_report = match client_node.trust_new_interval().await {
+                    Ok(report) => report,
+                    Err(ClientNodeError::NotConnected) => return,
+                    Err(e) => panic!("unexpected error {}", e),
+                };
+
+                assert!(latest_report.score <= report.score);
+                report = latest_report;
+            }
+
+            assert!(client_node.connected(), "should be connected");
+        })
+    });
+}
