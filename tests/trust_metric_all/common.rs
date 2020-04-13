@@ -41,7 +41,7 @@ impl Default for SignedTransactionBuilder {
     fn default() -> Self {
         let chain_id = Hash::from_hex(consts::CHAIN_ID).expect("chain id");
         let timeout = 19;
-        let cycles_limit = 314159;
+        let cycles_limit = 314_159;
         let payload = "test".to_owned();
 
         SignedTransactionBuilder {

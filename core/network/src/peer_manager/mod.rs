@@ -1093,7 +1093,7 @@ impl PeerManager {
                     }
                     Worse(reason) => {
                         warn!("peer {:?} trust feedback worse {}", pid, reason);
-                        peer_trust_metric.bad_events(1 * WORSE_TRUST_SCALAR_RATIO);
+                        peer_trust_metric.bad_events(WORSE_TRUST_SCALAR_RATIO);
                     }
                     _ => unreachable!(),
                 };

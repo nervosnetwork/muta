@@ -57,8 +57,7 @@ fn should_be_disconnected_for_repeated_wrong_signature_only_within_four_interval
                 };
 
                 assert_eq!(
-                    latest_report.bad_events,
-                    1 * latest_report.worse_scalar_ratio,
+                    latest_report.bad_events, latest_report.worse_scalar_ratio,
                     "wrong signature should give worse feedback"
                 );
 
@@ -100,8 +99,7 @@ fn should_be_disconnected_for_repeated_wrong_tx_hash_only_within_four_intervals(
                 };
 
                 assert_eq!(
-                    latest_report.bad_events,
-                    1 * latest_report.worse_scalar_ratio,
+                    latest_report.bad_events, latest_report.worse_scalar_ratio,
                     "wrong tx hash should give worse feedback"
                 );
 
@@ -124,7 +122,7 @@ fn should_be_disconnected_for_repeated_exceed_tx_size_limit_only_within_four_int
             let mut latest_report = client_node.trust_report().await.expect("get report");
 
             let stx = common::stx_builder()
-                .payload("trust-metric".repeat(1000000))
+                .payload("trust-metric".repeat(1_000_000))
                 .build(&client_node.priv_key);
             for _ in 0..4u8 {
                 let msg_stxs = MsgNewTxs {
@@ -167,7 +165,7 @@ fn should_be_disconnected_for_repeated_exceed_cycles_limit_only_within_four_inte
             let mut latest_report = client_node.trust_report().await.expect("get report");
 
             let stx = common::stx_builder()
-                .cycles_limit(999999999999)
+                .cycles_limit(999_999_999_999)
                 .build(&client_node.priv_key);
             for _ in 0..4u8 {
                 let msg_stxs = MsgNewTxs {
@@ -230,8 +228,7 @@ fn should_be_disconnected_for_repeated_wrong_chain_id_only_within_four_intervals
                 };
 
                 assert_eq!(
-                    latest_report.bad_events,
-                    1 * latest_report.worse_scalar_ratio,
+                    latest_report.bad_events, latest_report.worse_scalar_ratio,
                     "wrong chain id should give worse feedback"
                 );
 
@@ -254,7 +251,7 @@ fn should_be_disconnected_for_repeated_timeout_larger_than_gap_only_within_four_
             let mut latest_report = client_node.trust_report().await.expect("get report");
 
             let stx = common::stx_builder()
-                .timeout(9999999)
+                .timeout(9_999_999)
                 .build(&client_node.priv_key);
             for _ in 0..4u8 {
                 let msg_stxs = MsgNewTxs {
