@@ -294,7 +294,8 @@ fn should_able_to_reconnect_after_trust_metric_soft_ban() {
             assert!(!client_node.connected(), "should be disconnected");
 
             // Ensure we we dont sleep longer than back-off time
-            let soft_ban_duration = node::consts::NETWORK_SOFT_BAND_DURATION.expect("soft ban") * 2u64;
+            let soft_ban_duration =
+                node::consts::NETWORK_SOFT_BAND_DURATION.expect("soft ban") * 2u64;
             tokio::time::delay_for(std::time::Duration::from_secs(soft_ban_duration)).await;
 
             count = 30u8;

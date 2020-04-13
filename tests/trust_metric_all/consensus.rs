@@ -27,8 +27,9 @@ fn should_be_disconnected_for_repeated_undecodeable_proposal_within_four_interva
                 };
 
                 assert_eq!(
-                    latest_report.bad_events, 1,
-                    "undecodeable proposal should give bad feedback"
+                    latest_report.bad_events,
+                    1 * latest_report.worse_scalar_ratio,
+                    "undecodeable proposal should give worse feedback"
                 );
 
                 latest_report = match client_node.trust_new_interval().await {
@@ -65,8 +66,9 @@ fn should_be_disconnected_for_repeated_undecodeable_vote_within_four_intervals()
                 };
 
                 assert_eq!(
-                    latest_report.bad_events, 1,
-                    "undecodeable vote should give bad feedback"
+                    latest_report.bad_events,
+                    1 * latest_report.worse_scalar_ratio,
+                    "undecodeable vote should give worse feedback"
                 );
 
                 latest_report = match client_node.trust_new_interval().await {
@@ -103,8 +105,9 @@ fn should_be_disconnected_for_repeated_undecodeable_qc_within_four_intervals() {
                 };
 
                 assert_eq!(
-                    latest_report.bad_events, 1,
-                    "undecodeable qc should give bad feedback"
+                    latest_report.bad_events,
+                    1 * latest_report.worse_scalar_ratio,
+                    "undecodeable qc should give worse feedback"
                 );
 
                 latest_report = match client_node.trust_new_interval().await {
@@ -141,8 +144,9 @@ fn should_be_disconnected_for_repeated_undecodeable_choke_within_four_intervals(
                 };
 
                 assert_eq!(
-                    latest_report.bad_events, 1,
-                    "undecodeable choke should give bad feedback"
+                    latest_report.bad_events,
+                    1 * latest_report.worse_scalar_ratio,
+                    "undecodeable choke should give worse feedback"
                 );
 
                 latest_report = match client_node.trust_new_interval().await {
