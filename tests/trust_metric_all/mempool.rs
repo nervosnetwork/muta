@@ -122,7 +122,7 @@ fn should_be_disconnected_for_repeated_exceed_tx_size_limit_only_within_four_int
             let mut latest_report = client_node.trust_report().await.expect("get report");
 
             let stx = common::stx_builder()
-                .payload("trust-metric".repeat(1_000_000))
+                .payload("trust-metric".repeat(1_000))
                 .build(&client_node.priv_key);
             for _ in 0..4u8 {
                 let msg_stxs = MsgNewTxs {
