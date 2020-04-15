@@ -23,7 +23,7 @@ pub const DERIVATIVE_NEGATIVE_WEIGHT: f64 = 0.1;
 
 pub const INITIAL_HISTORY_VALUE: f64 = 0.8f64;
 pub const KNOCK_OUT_SCORE: u8 = 40;
-pub const GOOD_INTERVAL_CAP: usize = 50;
+pub const GOOD_INTERVAL_CAP: usize = 30;
 
 pub const DEFAULT_INTERVAL_DURATION: Duration = Duration::from_secs(60);
 pub const DEFAULT_MAX_HISTORY_DURATION: Duration = Duration::from_secs(24 * 60 * 60 * 10); // 10 day
