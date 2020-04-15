@@ -17,6 +17,7 @@ rlp = "0.4"
 bytes = "0.5"
 derive_more = "0.15"
 byteorder = "1.3"
+fixed-codec-derive = { git = "https://github.com/nervosnetwork/muta-utils.git", rev = "d9146fb" }
 
 [dev-dependencies]
 cita_trie = "2.0"

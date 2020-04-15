@@ -1,6 +1,3 @@
-#[macro_use]
-mod r#macro;
-pub mod block;
 pub mod primitive;
 pub mod receipt;
 #[cfg(test)]

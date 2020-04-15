@@ -1,13 +1,17 @@
-use crate::traits::ServiceResponse;
-use crate::types::{Hash, MerkleRoot};
+use bytes::Bytes;
+use fixed_codec_derive::RlpFixedCodec;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+use crate::fixed_codec::{FixedCodec, FixedCodecError};
+use crate::types::{Hash, MerkleRoot};
+use crate::{traits::ServiceResponse, ProtocolResult};
+
+#[derive(RlpFixedCodec, Debug, Clone, PartialEq, Eq)]
 pub struct Event {
     pub service: String,
     pub data:    String,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(RlpFixedCodec, Clone, Debug, PartialEq, Eq)]
 pub struct Receipt {
     pub state_root:  MerkleRoot,
     pub height:      u64,
