@@ -23,6 +23,7 @@ pub const DERIVATIVE_NEGATIVE_WEIGHT: f64 = 0.1;
 
 pub const INITIAL_HISTORY_VALUE: f64 = 0.8f64;
 pub const KNOCK_OUT_SCORE: u8 = 40;
+pub const GOOD_INTERVAL_CAP: usize = 50;
 
 pub const DEFAULT_INTERVAL_DURATION: Duration = Duration::from_secs(60);
 pub const DEFAULT_MAX_HISTORY_DURATION: Duration = Duration::from_secs(24 * 60 * 60 * 10); // 10 day
@@ -223,7 +224,13 @@ impl Inner {
     }
 
     pub fn good_events(&self, num: usize) {
-        self.good_events.fetch_add(num, SeqCst);
+        let curr_good_events = self.good_events.load(SeqCst);
+
+        if curr_good_events + num <= GOOD_INTERVAL_CAP {
+            self.good_events.fetch_add(num, SeqCst);
+        } else if curr_good_events < GOOD_INTERVAL_CAP {
+            self.good_events.store(GOOD_INTERVAL_CAP, SeqCst);
+        }
     }
 
     pub fn bad_events(&self, num: usize) {
@@ -423,9 +430,9 @@ impl Deref for TrustMetric {
 
 #[cfg(test)]
 mod tests {
-    use super::{Inner, TrustMetricConfig};
+    use super::{Inner, TrustMetricConfig, GOOD_INTERVAL_CAP};
 
-    use std::sync::Arc;
+    use std::sync::{atomic::Ordering::SeqCst, Arc};
 
     #[test]
     fn basic_metric_test() {
@@ -479,5 +486,17 @@ mod tests {
         }
 
         assert!(metric.trust_score() > 40);
+    }
+
+    #[test]
+    fn good_interval_cap_test() {
+        let config = Arc::new(TrustMetricConfig::default());
+        let metric = Inner::new(config);
+
+        metric.good_events(GOOD_INTERVAL_CAP - 1);
+        assert_eq!(metric.good_events.load(SeqCst), GOOD_INTERVAL_CAP - 1);
+
+        metric.good_events(20);
+        assert_eq!(metric.good_events.load(SeqCst), GOOD_INTERVAL_CAP);
     }
 }
