@@ -5,7 +5,7 @@ use crate::fixed_codec::{FixedCodec, FixedCodecError};
 use crate::types::primitive::{Hash, JsonString};
 use crate::ProtocolResult;
 
-#[derive(RlpFixedCodec, Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RawTransaction {
     pub chain_id:     Hash,
     pub cycles_price: u64,

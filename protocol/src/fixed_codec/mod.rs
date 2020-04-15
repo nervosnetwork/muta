@@ -2,6 +2,7 @@ pub mod primitive;
 pub mod receipt;
 #[cfg(test)]
 pub mod tests;
+pub mod transaction;
 
 use std::error::Error;
 
