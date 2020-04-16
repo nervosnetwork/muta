@@ -95,12 +95,7 @@ where
     V: Send + Sync + Clone,
 {
     fn insert(&self, hash: Hash, value: V) -> Option<V> {
-        let mut lock_data = self.store.write();
-        if lock_data.contains_key(&hash) {
-            Some(value)
-        } else {
-            lock_data.insert(hash, value)
-        }
+        self.store.write().insert(hash, value)
     }
 
     fn contains_key(&self, tx_hash: &Hash) -> bool {
