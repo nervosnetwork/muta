@@ -82,7 +82,7 @@ where
 }
 
 fn get_index(hash: &Hash) -> usize {
-    (hash.0[0] >> 4) as usize
+    (hash.as_bytes()[0] >> 4) as usize
 }
 
 struct Bucket<V> {
