@@ -1,5 +1,5 @@
 use bytes::Bytes;
-use fixed_codec_derive::RlpFixedCodec;
+use muta_codec_derive::RlpFixedCodec;
 
 use crate::fixed_codec::{FixedCodec, FixedCodecError};
 use crate::types::{Hash, MerkleRoot};

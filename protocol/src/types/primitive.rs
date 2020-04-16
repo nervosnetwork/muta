@@ -1,9 +1,9 @@
 use std::fmt;
 
 use bytes::{Bytes, BytesMut};
-use fixed_codec_derive::RlpFixedCodec;
 use hasher::{Hasher, HasherKeccak};
 use lazy_static::lazy_static;
+use muta_codec_derive::RlpFixedCodec;
 use num_bigint::BigUint;
 use serde::de;
 use serde::{Deserialize, Serialize};
