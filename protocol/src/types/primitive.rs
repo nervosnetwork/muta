@@ -343,7 +343,6 @@ fn ensure_len(real: usize, expect: usize) -> ProtocolResult<()> {
 #[cfg(test)]
 mod tests {
     use bytes::Bytes;
-    use test::Bencher;
 
     use super::{Address, Hash};
 
