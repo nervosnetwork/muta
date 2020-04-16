@@ -16,7 +16,7 @@ pub use bytes::{Bytes, BytesMut};
 pub use ethbloom::{Bloom, BloomRef, Input as BloomInput};
 pub use genesis::{Genesis, ServiceParam};
 pub use primitive::{
-    Address, Balance, Hash, Hex, JsonString, MerkleRoot, Metadata, ValidatorExtend, GENESIS_HEIGHT,
+    Address, Hash, Hex, JsonString, MerkleRoot, Metadata, ValidatorExtend, GENESIS_HEIGHT,
     METADATA_KEY,
 };
 pub use receipt::{Event, Receipt, ReceiptResponse};

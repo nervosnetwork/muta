@@ -1,22 +1,17 @@
 mod fixed_codec;
 
 use bytes::Bytes;
-use num_traits::FromPrimitive;
 use rand::random;
 
 use crate::traits::ServiceResponse;
 use crate::types::block::{Block, BlockHeader, Pill, Proof, Validator};
-use crate::types::primitive::{Address, Balance, Hash, MerkleRoot};
+use crate::types::primitive::{Address, Hash, MerkleRoot};
 use crate::types::receipt::{Event, Receipt, ReceiptResponse};
 use crate::types::transaction::{RawTransaction, SignedTransaction, TransactionRequest};
 
 // #####################
 // Mock Primitive
 // #####################
-
-pub fn mock_balance() -> Balance {
-    FromPrimitive::from_i32(100).unwrap()
-}
 
 pub fn mock_hash() -> Hash {
     Hash::digest(get_random_bytes(10))

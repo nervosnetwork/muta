@@ -25,7 +25,6 @@ macro_rules! test {
 
 #[test]
 fn test_codec() {
-    test!(primitive, Balance, mock_balance);
     test!(primitive, Hash, mock_hash);
     test!(primitive, MerkleRoot, mock_merkle_root);
 
