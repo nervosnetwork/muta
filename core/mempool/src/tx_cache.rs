@@ -173,7 +173,7 @@ impl TxCache {
             }
         }
         // Dividing set removed and remove into two loops is to avoid lock competition.
-        self.map.deletes(tx_hashes);
+        self.map.remove_batch(tx_hashes);
         self.flush_incumbent_queue(current_height, timeout);
     }
 
@@ -242,7 +242,7 @@ impl TxCache {
             }
         }
         // Remove timeout tx in map
-        self.map.deletes(&timeout_tx_hashes);
+        self.map.remove_batch(&timeout_tx_hashes);
 
         Ok(MixedTxHashes {
             order_tx_hashes,
@@ -376,7 +376,7 @@ impl TxCache {
             }
         }
         // Remove timeout tx in map
-        self.map.deletes(&timeout_tx_hashes);
+        self.map.remove_batch(&timeout_tx_hashes);
     }
 
     fn switch_queue_role(&self) -> QueueRole {

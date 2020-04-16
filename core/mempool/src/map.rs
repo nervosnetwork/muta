@@ -28,38 +28,37 @@ where
         Self { buckets }
     }
 
-    pub fn insert(&self, tx_hash: Hash, value: V) -> Option<V> {
-        let bucket = self.get_bucket(&tx_hash);
-        bucket.insert(tx_hash, value)
+    pub fn insert(&self, hash: Hash, value: V) -> Option<V> {
+        let bucket = self.get_bucket(&hash);
+        bucket.insert(hash, value)
     }
 
-    pub fn contains_key(&self, tx_hash: &Hash) -> bool {
-        let bucket = self.get_bucket(tx_hash);
-        bucket.contains_key(tx_hash)
+    pub fn contains_key(&self, hash: &Hash) -> bool {
+        let bucket = self.get_bucket(hash);
+        bucket.contains_key(hash)
     }
 
-    pub fn get(&self, tx_hash: &Hash) -> Option<V> {
-        let bucket = self.get_bucket(tx_hash);
-        bucket.get(tx_hash)
+    pub fn get(&self, hash: &Hash) -> Option<V> {
+        let bucket = self.get_bucket(hash);
+        bucket.get(hash)
     }
 
-    // TODO: concurrently delete
-    pub fn deletes(&self, tx_hashes: &[Hash]) {
+    pub fn remove(&self, hash: &Hash) {
+        let bucket = self.get_bucket(hash);
+        bucket.remove(hash);
+    }
+
+    pub fn remove_batch(&self, hashes: &[Hash]) {
         let mut h: HashMap<usize, Vec<Hash>> = HashMap::new();
 
-        for hash in tx_hashes.iter() {
+        for hash in hashes.iter() {
             let index = get_index(hash);
             h.entry(index).or_insert_with(|| vec![]).push(hash.clone());
         }
 
         h.into_par_iter().for_each(|(index, hashes)| {
-            self.buckets[index].deletes(&hashes);
+            self.buckets[index].remove_batch(&hashes);
         });
-    }
-
-    pub fn remove(&self, tx_hash: &Hash) {
-        let index = get_index(tx_hash);
-        self.buckets[index].remove(tx_hash);
     }
 
     pub fn len(&self) -> usize {
@@ -83,7 +82,7 @@ where
 }
 
 fn get_index(hash: &Hash) -> usize {
-    (hash.as_bytes()[0] >> 4) as usize
+    (hash.0[0] >> 4) as usize
 }
 
 struct Bucket<V> {
@@ -98,24 +97,24 @@ where
         self.store.write().insert(hash, value)
     }
 
-    fn contains_key(&self, tx_hash: &Hash) -> bool {
-        self.store.read().contains_key(tx_hash)
+    fn contains_key(&self, hash: &Hash) -> bool {
+        self.store.read().contains_key(hash)
     }
 
-    fn get(&self, tx_hash: &Hash) -> Option<V> {
-        self.store.read().get(tx_hash).map(Clone::clone)
+    fn get(&self, hash: &Hash) -> Option<V> {
+        self.store.read().get(hash).map(Clone::clone)
     }
 
-    fn deletes(&self, tx_hashes: &[Hash]) {
+    fn remove(&self, hash: &Hash) {
         let mut store = self.store.write();
-        for hash in tx_hashes {
+        store.remove(hash);
+    }
+
+    fn remove_batch(&self, hashes: &[Hash]) {
+        let mut store = self.store.write();
+        for hash in hashes {
             store.remove(hash);
         }
-    }
-
-    fn remove(&self, tx_hash: &Hash) {
-        let mut store = self.store.write();
-        store.remove(tx_hash);
     }
 
     fn len(&self) -> usize {
