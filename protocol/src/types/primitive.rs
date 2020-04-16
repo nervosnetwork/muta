@@ -342,7 +342,10 @@ fn ensure_len(real: usize, expect: usize) -> ProtocolResult<()> {
 
 #[cfg(test)]
 mod tests {
-    use bytes::Bytes;
+    extern crate test;
+
+    use bytes::{Bytes, BytesMut};
+    use test::Bencher;
 
     use super::{Address, Hash};
 
@@ -372,5 +375,25 @@ mod tests {
 
         let address = Address::from_bytes(bytes).unwrap();
         assert_eq!(add_str, &address.as_hex().to_uppercase().as_str()[2..]);
+    }
+
+    #[bench]
+    fn bench_as_bytes_with_zero_cost(b: &mut Bencher) {
+        let out = "helle world".as_bytes().to_vec();
+
+        let bytes = Bytes::from(out);
+
+        b.iter(|| {
+            let _ = bytes.clone();
+        });
+    }
+
+    #[bench]
+    fn bench_as_bytes_with_freeze(b: &mut Bencher) {
+        let out = "helle world".as_bytes();
+
+        b.iter(|| {
+            let _ = BytesMut::from(out).freeze();
+        });
     }
 }
