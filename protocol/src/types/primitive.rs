@@ -1,10 +1,9 @@
 use std::fmt;
 
-use bytes::{Bytes, BytesMut};
+use bytes::Bytes;
 use hasher::{Hasher, HasherKeccak};
 use lazy_static::lazy_static;
 use muta_codec_derive::RlpFixedCodec;
-use num_bigint::BigUint;
 use serde::de;
 use serde::{Deserialize, Serialize};
 
@@ -89,9 +88,7 @@ impl<'de> Deserialize<'de> for Hex {
 }
 
 #[derive(RlpFixedCodec, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct Hash([u8; HASH_LEN]);
-/// Balance
-pub type Balance = BigUint;
+pub struct Hash(Bytes);
 /// Merkel root hash
 pub type MerkleRoot = Hash;
 /// Json string
@@ -144,17 +141,13 @@ impl Hash {
     /// Note: sha3 is used for the time being and may be replaced with other
     /// hashing algorithms later.
     pub fn digest(bytes: Bytes) -> Self {
-        let mut out = [0u8; HASH_LEN];
-        out.copy_from_slice(&HASHER_INST.digest(&bytes));
-
-        Self(out)
+        let out = HASHER_INST.digest(&bytes);
+        Self(Bytes::from(out))
     }
 
     pub fn from_empty() -> Self {
-        let mut out = [0u8; HASH_LEN];
-        out.copy_from_slice(&HASHER_INST.digest(&rlp::NULL_RLP));
-
-        Self(out)
+        let out = HASHER_INST.digest(&rlp::NULL_RLP);
+        Self(Bytes::from(out))
     }
 
     /// Converts the byte array to a Hash type.
@@ -163,9 +156,7 @@ impl Hash {
     pub fn from_bytes(bytes: Bytes) -> ProtocolResult<Self> {
         ensure_len(bytes.len(), HASH_LEN)?;
 
-        let mut out = [0u8; HASH_LEN];
-        out.copy_from_slice(&bytes);
-        Ok(Self(out))
+        Ok(Self(bytes))
     }
 
     pub fn from_hex(s: &str) -> ProtocolResult<Self> {
@@ -177,11 +168,11 @@ impl Hash {
     }
 
     pub fn as_bytes(&self) -> Bytes {
-        BytesMut::from(self.0.as_ref()).freeze()
+        self.0.clone()
     }
 
     pub fn as_hex(&self) -> String {
-        "0x".to_owned() + &hex::encode(self.0)
+        "0x".to_owned() + &hex::encode(self.0.clone())
     }
 }
 
@@ -201,7 +192,7 @@ impl fmt::Debug for Hash {
 const ADDRESS_LEN: usize = 20;
 
 #[derive(RlpFixedCodec, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
-pub struct Address([u8; ADDRESS_LEN]);
+pub struct Address(Bytes);
 
 impl Serialize for Address {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -262,9 +253,7 @@ impl Address {
     pub fn from_bytes(bytes: Bytes) -> ProtocolResult<Self> {
         ensure_len(bytes.len(), ADDRESS_LEN)?;
 
-        let mut out = [0u8; ADDRESS_LEN];
-        out.copy_from_slice(&bytes);
-        Ok(Self(out))
+        Ok(Self(bytes))
     }
 
     pub fn from_hex(s: &str) -> ProtocolResult<Self> {
@@ -276,11 +265,11 @@ impl Address {
     }
 
     pub fn as_bytes(&self) -> Bytes {
-        BytesMut::from(self.0.as_ref()).freeze()
+        self.0.clone()
     }
 
     pub fn as_hex(&self) -> String {
-        "0x".to_owned() + &hex::encode(self.0)
+        "0x".to_owned() + &hex::encode(self.0.clone())
     }
 }
 

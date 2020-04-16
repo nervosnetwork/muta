@@ -16,13 +16,6 @@ use crate::{
 // Protobuf
 // #####################
 
-// TODO: change to Amount?
-#[derive(Clone, Message)]
-pub struct Balance {
-    #[prost(bytes, tag = "1")]
-    pub value: Vec<u8>,
-}
-
 #[derive(Clone, Message, From)]
 pub struct Hash {
     #[prost(bytes, tag = "1")]
@@ -44,25 +37,6 @@ pub struct Address {
 // #####################
 // Conversion
 // #####################
-
-// Balance
-
-impl From<protocol_primitive::Balance> for Balance {
-    fn from(balance: protocol_primitive::Balance) -> Balance {
-        let value = balance.to_bytes_be();
-        Balance { value }
-    }
-}
-
-impl TryFrom<Balance> for protocol_primitive::Balance {
-    type Error = ProtocolError;
-
-    fn try_from(ser_balance: Balance) -> Result<protocol_primitive::Balance, Self::Error> {
-        Ok(protocol_primitive::Balance::from_bytes_be(
-            &ser_balance.value,
-        ))
-    }
-}
 
 // Hash
 
@@ -128,7 +102,7 @@ impl TryFrom<MerkleRoot> for protocol_primitive::MerkleRoot {
 // #####################
 
 // MerkleRoot and AssetID are just Hash aliases
-impl_default_bytes_codec_for!(primitive, [Balance, Hash]);
+impl_default_bytes_codec_for!(primitive, [Hash, Address]);
 
 impl ProtocolCodecSync for u64 {
     fn encode_sync(&self) -> ProtocolResult<Bytes> {
