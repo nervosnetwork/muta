@@ -234,27 +234,27 @@ pub trait StoreUint64 {
 
     // Add val with self
     // And set the result back to self
-    fn add(&mut self, val: u64);
+    fn add(&mut self, val: u64) -> bool;
 
     // Self minus val
     // And set the result back to self
-    fn sub(&mut self, val: u64);
+    fn sub(&mut self, val: u64) -> bool;
 
     // Multiply val with self
     // And set the result back to self
-    fn mul(&mut self, val: u64);
+    fn mul(&mut self, val: u64) -> bool;
 
     // Power of self
     // And set the result back to self
-    fn pow(&mut self, val: u32);
+    fn pow(&mut self, val: u32) -> bool;
 
     // Self divided by val
     // And set the result back to self
-    fn div(&mut self, val: u64);
+    fn div(&mut self, val: u64) -> bool;
 
     // Remainder of self
     // And set the result back to self
-    fn rem(&mut self, val: u64);
+    fn rem(&mut self, val: u64) -> bool;
 }
 
 pub trait StoreString {

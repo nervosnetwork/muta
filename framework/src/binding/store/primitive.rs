@@ -65,7 +65,7 @@ impl<S: ServiceState> DefaultStoreUint64<S> {
         }
     }
 
-    fn get_(&self) -> ProtocolResult<u64> {
+    fn inner_get(&self) -> ProtocolResult<u64> {
         let u: Option<u64> = self.state.borrow().get(&self.key)?;
 
         match u {
@@ -77,29 +77,29 @@ impl<S: ServiceState> DefaultStoreUint64<S> {
         }
     }
 
-    fn set_(&mut self, val: u64) -> ProtocolResult<()> {
+    fn inner_set(&mut self, val: u64) -> ProtocolResult<()> {
         self.state.borrow_mut().insert(self.key.clone(), val)?;
         Ok(())
     }
 
     // Add val with self
     // And set the result back to self
-    fn add_(&mut self, val: u64) -> ProtocolResult<()> {
-        let sv = self.get_()?;
+    fn inner_add(&mut self, val: u64) -> ProtocolResult<()> {
+        let sv = self.inner_get()?;
 
         match val.overflowing_add(sv) {
-            (sum, false) => self.set_(sum),
+            (sum, false) => self.inner_set(sum),
             _ => Err(StoreError::Overflow.into()),
         }
     }
 
     // Self minus val
     // And set the result back to self
-    fn sub_(&mut self, val: u64) -> ProtocolResult<()> {
-        let sv = self.get_()?;
+    fn inner_sub(&mut self, val: u64) -> ProtocolResult<()> {
+        let sv = self.inner_get()?;
 
         if sv >= val {
-            self.set_(sv - val)
+            self.inner_set(sv - val)
         } else {
             Err(StoreError::Overflow.into())
         }
@@ -107,102 +107,114 @@ impl<S: ServiceState> DefaultStoreUint64<S> {
 
     // Multiply val with self
     // And set the result back to self
-    fn mul_(&mut self, val: u64) -> ProtocolResult<()> {
-        let sv = self.get_()?;
+    fn inner_mul(&mut self, val: u64) -> ProtocolResult<()> {
+        let sv = self.inner_get()?;
 
         match val.overflowing_mul(sv) {
-            (mul, false) => self.set_(mul),
+            (mul, false) => self.inner_set(mul),
             _ => Err(StoreError::Overflow.into()),
         }
     }
 
     // Power of self
     // And set the result back to self
-    fn pow_(&mut self, val: u32) -> ProtocolResult<()> {
-        let sv = self.get_()?;
+    fn inner_pow(&mut self, val: u32) -> ProtocolResult<()> {
+        let sv = self.inner_get()?;
 
         match sv.overflowing_pow(val) {
-            (pow, false) => self.set_(pow),
+            (pow, false) => self.inner_set(pow),
             _ => Err(StoreError::Overflow.into()),
         }
     }
 
     // Self divided by val
     // And set the result back to self
-    fn div_(&mut self, val: u64) -> ProtocolResult<()> {
-        let sv = self.get_()?;
+    fn inner_div(&mut self, val: u64) -> ProtocolResult<()> {
+        let sv = self.inner_get()?;
 
         if let 0 = val {
             Err(StoreError::Overflow.into())
         } else {
-            self.set_(sv / val)
+            self.inner_set(sv / val)
         }
     }
 
     // Remainder of self
     // And set the result back to self
-    fn rem_(&mut self, val: u64) -> ProtocolResult<()> {
-        let sv = self.get_()?;
+    fn inner_rem(&mut self, val: u64) -> ProtocolResult<()> {
+        let sv = self.inner_get()?;
 
         if let 0 = val {
             Err(StoreError::Overflow.into())
         } else {
-            self.set_(sv % val)
+            self.inner_set(sv % val)
         }
     }
 }
 
 impl<S: ServiceState> StoreUint64 for DefaultStoreUint64<S> {
     fn get(&self) -> u64 {
-        self.get_()
+        self.inner_get()
             .unwrap_or_else(|e| panic!("StoreUint64 get failed: {}", e))
     }
 
     fn set(&mut self, val: u64) {
-        self.set_(val)
+        self.inner_set(val)
             .unwrap_or_else(|e| panic!("StoreUint64 set failed: {}", e));
     }
 
     // Add val with self
     // And set the result back to self
-    fn add(&mut self, val: u64) {
-        self.add_(val)
-            .unwrap_or_else(|e| panic!("StoreUint64 add value failed: {}", e));
+    fn add(&mut self, val: u64) -> bool {
+        let mut overflow = false;
+        self.inner_add(val)
+            .unwrap_or_else(|_| overflow=true );
+        overflow
     }
 
     // Self minus val
     // And set the result back to self
-    fn sub(&mut self, val: u64) {
-        self.sub_(val)
-            .unwrap_or_else(|e| panic!("StoreUint64 sub value failed: {}", e));
+    fn sub(&mut self, val: u64) -> bool {
+        let mut overflow = false;
+        self.inner_sub(val)
+            .unwrap_or_else(|_| overflow=true);
+        overflow
     }
 
     // Multiply val with self
     // And set the result back to self
-    fn mul(&mut self, val: u64) {
-        self.mul_(val)
-            .unwrap_or_else(|e| panic!("StoreUint64 mul value failed: {}", e));
+    fn mul(&mut self, val: u64) -> bool {
+        let mut overflow = false;
+        self.inner_mul(val)
+            .unwrap_or_else(|_| overflow=true);
+        overflow
     }
 
     // Power of self
     // And set the result back to self
-    fn pow(&mut self, val: u32) {
-        self.pow_(val)
-            .unwrap_or_else(|e| panic!("StoreUint64 pow value failed: {}", e));
+    fn pow(&mut self, val: u32) -> bool {
+        let mut overflow = false;
+        self.inner_pow(val)
+            .unwrap_or_else(|_| overflow=true);
+        overflow
     }
 
     // Self divided by val
     // And set the result back to self
-    fn div(&mut self, val: u64) {
-        self.div_(val)
-            .unwrap_or_else(|e| panic!("StoreUint64 div value failed: {}", e));
+    fn div(&mut self, val: u64)  -> bool{
+        let mut overflow = false;
+        self.inner_div(val)
+            .unwrap_or_else(|_| overflow=true);
+        overflow
     }
 
     // Remainder of self
     // And set the result back to self
-    fn rem(&mut self, val: u64) {
-        self.rem_(val)
-            .unwrap_or_else(|e| panic!("StoreUint64 rem value failed: {}", e));
+    fn rem(&mut self, val: u64) -> bool {
+        let mut overflow = false;
+        self.inner_rem(val)
+            .unwrap_or_else(|_| overflow=true);
+        overflow
     }
 }
 

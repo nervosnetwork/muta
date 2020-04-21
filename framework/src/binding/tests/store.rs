@@ -38,22 +38,22 @@ fn test_default_store_uint64() {
     su.set(8u64);
     assert_eq!(su.get(), 8u64);
 
-    su.add(12u64);
+    assert_eq!(su.add(12u64), false);
     assert_eq!(su.get(), 20u64);
 
-    su.sub(10u64);
+    assert_eq!(su.sub(10u64), false);
     assert_eq!(su.get(), 10u64);
 
-    su.mul(8u64);
+    assert_eq!(su.mul(8u64), false);
     assert_eq!(su.get(), 80u64);
 
-    su.div(10u64);
+    assert_eq!(su.div(10u64), false);
     assert_eq!(su.get(), 8u64);
 
-    su.pow(2u32);
+    assert_eq!(su.pow(2u32), false);
     assert_eq!(su.get(), 64u64);
 
-    su.rem(5u64);
+    assert_eq!(su.rem(5u64), false);
     assert_eq!(su.get(), 4u64);
 }
 
