@@ -123,11 +123,11 @@ impl FixedCodec for Vec<u8> {
 
 impl FixedCodec for Bloom {
     fn encode_fixed(&self) -> ProtocolResult<Bytes> {
-        self.to_low_u64_le().encode_fixed()
+        Ok(Bytes::from(self.as_ref().to_vec()))
     }
 
     fn decode_fixed(bytes: Bytes) -> ProtocolResult<Self> {
-        Ok(Bloom::from_low_u64_le(u64::decode_fixed(bytes)?))
+        Ok(Bloom::from_slice(bytes.to_vec().as_ref()))
     }
 }
 
