@@ -167,8 +167,7 @@ impl<S: ServiceState> StoreUint64 for DefaultStoreUint64<S> {
     // And set the result back to self
     fn add(&mut self, val: u64) -> bool {
         let mut overflow = false;
-        self.inner_add(val)
-            .unwrap_or_else(|_| overflow=true );
+        self.inner_add(val).unwrap_or_else(|_| overflow = true);
         overflow
     }
 
@@ -176,8 +175,7 @@ impl<S: ServiceState> StoreUint64 for DefaultStoreUint64<S> {
     // And set the result back to self
     fn sub(&mut self, val: u64) -> bool {
         let mut overflow = false;
-        self.inner_sub(val)
-            .unwrap_or_else(|_| overflow=true);
+        self.inner_sub(val).unwrap_or_else(|_| overflow = true);
         overflow
     }
 
@@ -185,8 +183,7 @@ impl<S: ServiceState> StoreUint64 for DefaultStoreUint64<S> {
     // And set the result back to self
     fn mul(&mut self, val: u64) -> bool {
         let mut overflow = false;
-        self.inner_mul(val)
-            .unwrap_or_else(|_| overflow=true);
+        self.inner_mul(val).unwrap_or_else(|_| overflow = true);
         overflow
     }
 
@@ -194,17 +191,15 @@ impl<S: ServiceState> StoreUint64 for DefaultStoreUint64<S> {
     // And set the result back to self
     fn pow(&mut self, val: u32) -> bool {
         let mut overflow = false;
-        self.inner_pow(val)
-            .unwrap_or_else(|_| overflow=true);
+        self.inner_pow(val).unwrap_or_else(|_| overflow = true);
         overflow
     }
 
     // Self divided by val
     // And set the result back to self
-    fn div(&mut self, val: u64)  -> bool{
+    fn div(&mut self, val: u64) -> bool {
         let mut overflow = false;
-        self.inner_div(val)
-            .unwrap_or_else(|_| overflow=true);
+        self.inner_div(val).unwrap_or_else(|_| overflow = true);
         overflow
     }
 
@@ -212,8 +207,7 @@ impl<S: ServiceState> StoreUint64 for DefaultStoreUint64<S> {
     // And set the result back to self
     fn rem(&mut self, val: u64) -> bool {
         let mut overflow = false;
-        self.inner_rem(val)
-            .unwrap_or_else(|_| overflow=true);
+        self.inner_rem(val).unwrap_or_else(|_| overflow = true);
         overflow
     }
 }
