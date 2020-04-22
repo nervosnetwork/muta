@@ -51,7 +51,7 @@ impl<S: 'static + ServiceState, K: 'static + FixedCodec + PartialEq, V: 'static 
         Ok(Hash::digest(Bytes::from(name_bytes)))
     }
 
-    fn get_(&self, key: &K) -> ProtocolResult<Option<V>> {
+    fn inner_get(&self, key: &K) -> ProtocolResult<Option<V>> {
         if self.keys.inner.contains(key) {
             let mk = self.get_map_key(key)?;
             self.state.borrow().get(&mk)?.map_or_else(
@@ -69,7 +69,7 @@ impl<S: 'static + ServiceState, K: 'static + FixedCodec + PartialEq, V: 'static 
 
     // TODO(@zhounan): Atomicity of insert(k, v) and insert self.keys to
     // ServiceState is not guaranteed for now That must be settled soon after.
-    fn insert_(&mut self, key: K, value: V) -> ProtocolResult<()> {
+    fn inner_insert(&mut self, key: K, value: V) -> ProtocolResult<()> {
         let mk = self.get_map_key(&key)?;
 
         if !self.contains(&key) {
@@ -84,9 +84,9 @@ impl<S: 'static + ServiceState, K: 'static + FixedCodec + PartialEq, V: 'static 
 
     // TODO(@zhounan): Atomicity of insert(k, v) and insert self.keys to
     // ServiceState is not guaranteed for now That must be settled soon after.
-    fn remove_(&mut self, key: &K) -> ProtocolResult<Option<V>> {
+    fn inner_remove(&mut self, key: &K) -> ProtocolResult<Option<V>> {
         if self.contains(key) {
-            let value: V = self.get_(key)?.expect("value should be existed");
+            let value: V = self.inner_get(key)?.expect("value should be existed");
             self.keys.inner.remove_item(key);
             self.state
                 .borrow_mut()
@@ -107,17 +107,17 @@ impl<S: 'static + ServiceState, K: 'static + FixedCodec + PartialEq, V: 'static 
     StoreMap<K, V> for DefaultStoreMap<S, K, V>
 {
     fn get(&self, key: &K) -> Option<V> {
-        self.get_(key)
+        self.inner_get(key)
             .unwrap_or_else(|e| panic!("StoreMap get failed: {}", e))
     }
 
     fn insert(&mut self, key: K, value: V) {
-        self.insert_(key, value)
+        self.inner_insert(key, value)
             .unwrap_or_else(|e| panic!("StoreMap insert failed: {}", e));
     }
 
     fn remove(&mut self, key: &K) -> Option<V> {
-        self.remove_(key)
+        self.inner_remove(key)
             .unwrap_or_else(|e| panic!("StoreMap remove failed: {}", e))
     }
 

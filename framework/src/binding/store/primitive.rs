@@ -20,7 +20,7 @@ impl<S: ServiceState> DefaultStoreBool<S> {
         }
     }
 
-    fn get_(&self) -> ProtocolResult<bool> {
+    fn inner_get(&self) -> ProtocolResult<bool> {
         let b: Option<bool> = self.state.borrow().get(&self.key)?;
 
         match b {
@@ -32,7 +32,7 @@ impl<S: ServiceState> DefaultStoreBool<S> {
         }
     }
 
-    fn set_(&mut self, b: bool) -> ProtocolResult<()> {
+    fn inner_set(&mut self, b: bool) -> ProtocolResult<()> {
         self.state.borrow_mut().insert(self.key.clone(), b)?;
         Ok(())
     }
@@ -40,12 +40,12 @@ impl<S: ServiceState> DefaultStoreBool<S> {
 
 impl<S: ServiceState> StoreBool for DefaultStoreBool<S> {
     fn get(&self) -> bool {
-        self.get_()
+        self.inner_get()
             .unwrap_or_else(|e| panic!("StoreBool get failed: {}", e))
     }
 
     fn set(&mut self, b: bool) {
-        self.set_(b)
+        self.inner_set(b)
             .unwrap_or_else(|e| panic!("StoreBool set failed: {}", e));
     }
 }
@@ -230,14 +230,14 @@ impl<S: ServiceState> DefaultStoreString<S> {
         }
     }
 
-    fn set_(&mut self, val: &str) -> ProtocolResult<()> {
+    fn inner_set(&mut self, val: &str) -> ProtocolResult<()> {
         self.state
             .borrow_mut()
             .insert(self.key.clone(), val.to_string())?;
         Ok(())
     }
 
-    fn get_(&self) -> ProtocolResult<String> {
+    fn inner_get(&self) -> ProtocolResult<String> {
         let s: Option<String> = self.state.borrow().get(&self.key)?;
 
         match s {
@@ -251,28 +251,28 @@ impl<S: ServiceState> DefaultStoreString<S> {
         }
     }
 
-    fn len_(&self) -> ProtocolResult<u32> {
-        self.get_().map(|s| s.len() as u32)
+    fn inner_len(&self) -> ProtocolResult<u32> {
+        self.inner_get().map(|s| s.len() as u32)
     }
 
     fn is_empty_(&self) -> ProtocolResult<bool> {
-        self.get_().map(|s| s.is_empty())
+        self.inner_get().map(|s| s.is_empty())
     }
 }
 
 impl<S: ServiceState> StoreString for DefaultStoreString<S> {
     fn get(&self) -> String {
-        self.get_()
+        self.inner_get()
             .unwrap_or_else(|e| panic!("StoreString get failed: {}", e))
     }
 
     fn set(&mut self, val: &str) {
-        self.set_(val)
+        self.inner_set(val)
             .unwrap_or_else(|e| panic!("StoreString set failed: {}", e));
     }
 
     fn len(&self) -> u32 {
-        self.len_()
+        self.inner_len()
             .unwrap_or_else(|e| panic!("StoreString get length failed: {}", e))
     }
 
