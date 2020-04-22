@@ -31,6 +31,8 @@ tentacle-identify = { git = "https://github.com/zeroqn/p2p", branch = "muta-disc
 tokio = { version = "0.2", features = ["macros", "rt-core"]}
 hostname = "0.3"
 
+probe = { git = "https://github.com/cuviper/rust-libprobe.git" , optional = true }
+
 [dev-dependencies]
 env_logger = "0.6"
 quickcheck = "0.9"
@@ -39,7 +41,9 @@ lazy_static = "1.4"
 tokio = { version = "0.2", features = ["macros", "rt-core"]}
 
 [features]
+default = [ "enable_probe" ]
 allow_global_ip = []
+enable_probe = [ "probe" ]
 
 [[test]]
 name = "broadcast"
