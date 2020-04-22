@@ -182,37 +182,37 @@ impl<S: ServiceState> StoreUint64 for DefaultStoreUint64<S> {
 
     // Add val with self
     // And set the result back to self
-    fn add(&mut self, val: u64) -> bool {
+    fn safe_add(&mut self, val: u64) -> bool {
         self.inner_add(val)
     }
 
     // Self minus val
     // And set the result back to self
-    fn sub(&mut self, val: u64) -> bool {
+    fn safe_sub(&mut self, val: u64) -> bool {
         self.inner_sub(val)
     }
 
     // Multiply val with self
     // And set the result back to self
-    fn mul(&mut self, val: u64) -> bool {
+    fn safe_mul(&mut self, val: u64) -> bool {
         self.inner_mul(val)
     }
 
     // Power of self
     // And set the result back to self
-    fn pow(&mut self, val: u32) -> bool {
+    fn safe_pow(&mut self, val: u32) -> bool {
         self.inner_pow(val)
     }
 
     // Self divided by val
     // And set the result back to self
-    fn div(&mut self, val: u64) -> bool {
+    fn safe_div(&mut self, val: u64) -> bool {
         self.inner_div(val)
     }
 
     // Remainder of self
     // And set the result back to self
-    fn rem(&mut self, val: u64) -> bool {
+    fn safe_rem(&mut self, val: u64) -> bool {
         self.inner_rem(val)
     }
 }
