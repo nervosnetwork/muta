@@ -7,30 +7,26 @@ use crate::fixed_codec::{FixedCodec, FixedCodecError};
 use crate::types::{Address, Bloom, Hash, MerkleRoot};
 use crate::ProtocolResult;
 
-#[derive(RlpFixedCodec, Clone, Debug, PartialEq, Eq)]
+#[derive(RlpFixedCodec, Clone, Debug, Default, Display, PartialEq, Eq)]
+#[display(
+    fmt = "{{ header: {}, tx_len: {} }}",
+    header,
+    "ordered_tx_hashes.len()"
+)]
 pub struct Block {
     pub header:            BlockHeader,
     pub ordered_tx_hashes: Vec<Hash>,
 }
 
-#[derive(RlpFixedCodec, Clone, Debug, Display, PartialEq, Eq)]
+#[derive(RlpFixedCodec, Clone, Debug, Default, Display, PartialEq, Eq)]
 #[display(
-    fmt = "chain id {:?}, height {}, exec height {}, previous hash {:?}, logs bloom {:?},
-    ordered root {:?}, confirm root {:?}, state root {:?},
-    receipt root {:?},cycles_used {:?}, proposer {:?}, proof {:?}, validators {:?}",
-    chain_id,
+    fmt = "{{ chan_id: {}, height: {}, exec_height: {}, pre_hash: {}, timestamp: {:?}, validator_version: {} }}",
+    "chain_id.as_hex()",
     height,
     exec_height,
-    pre_hash,
-    "logs_bloom.iter().map(|bloom| bloom.to_low_u64_be()).collect::<Vec<_>>()",
-    order_root,
-    confirm_root,
-    state_root,
-    receipt_root,
-    cycles_used,
-    proposer,
-    proof,
-    validators
+    "pre_hash.as_hex()",
+    timestamp,
+    validator_version
 )]
 pub struct BlockHeader {
     pub chain_id:          Hash,
@@ -50,7 +46,7 @@ pub struct BlockHeader {
     pub validators:        Vec<Validator>,
 }
 
-#[derive(RlpFixedCodec, Serialize, Deserialize, Clone, Debug, Hash, PartialEq, Eq)]
+#[derive(RlpFixedCodec, Serialize, Deserialize, Clone, Debug, Default, Hash, PartialEq, Eq)]
 pub struct Proof {
     pub height:     u64,
     pub round:      u64,
@@ -59,7 +55,7 @@ pub struct Proof {
     pub bitmap:     Bytes,
 }
 
-#[derive(RlpFixedCodec, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(RlpFixedCodec, Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq)]
 pub struct Validator {
     pub address:        Address,
     pub propose_weight: u32,

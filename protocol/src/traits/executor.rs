@@ -1,12 +1,15 @@
 use std::sync::Arc;
 
+use derive_more::Display;
+
 use crate::traits::{ServiceMapping, Storage};
 use crate::types::{
     Address, Bloom, MerkleRoot, Receipt, ServiceContext, SignedTransaction, TransactionRequest,
 };
 use crate::ProtocolResult;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default, Display)]
+#[display(fmt = "{{ {:?}, {:?} }}", logs_bloom, state_root)]
 pub struct ExecutorResp {
     pub receipts:        Vec<Receipt>,
     pub all_cycles_used: u64,
