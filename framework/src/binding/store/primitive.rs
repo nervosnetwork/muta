@@ -172,6 +172,7 @@ impl<S: ServiceState> DefaultStoreUint64<S> {
 }
 
 impl<S: ServiceState> StoreUint64 for DefaultStoreUint64<S> {
+
     fn get(&self) -> u64 {
         self.inner_get()
     }
