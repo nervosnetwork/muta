@@ -336,7 +336,7 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
 
         log::info!(
             "[synchronization]: commit_block, committing block:{:?}, committing proof:{:?}",
-            block.clone(),
+            block.clone().header,
             proof.clone()
         );
 

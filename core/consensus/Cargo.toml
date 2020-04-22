@@ -18,7 +18,7 @@ futures-timer = "3.0"
 hex = "0.4"
 log = "0.4"
 moodyblues-sdk = "0.3"
-overlord = "0.2.0-alpha.10"
+overlord = { git = "https://github.com/nervosnetwork/overlord.git", rev = "89d48306" }
 parking_lot = "0.10"
 prost = "0.6"
 rlp = "0.4"
