@@ -30,13 +30,7 @@ use protocol::{fixed_codec::FixedCodec, ProtocolResult};
 struct Status {
     chain_id: ProtoHash,
     address: ProtoAddress,
-
-    // update in every commit
-    last_state_root: MerkleRoot,
-    cycles_limit:    u64,
-    tx_num_limit:    u64,
-    max_tx_size:     u64,
-    validators: Vec<Validator>,
+    last_commit_exec_resp: RwLock<ExecResp>,
 
     exemption_hash: HashSet<Bytes>,
 }
@@ -62,7 +56,7 @@ pub struct OverlordAdapter<
 }
 
 #[async_trait]
-impl<EF, G, M, R, S, DB, Mapping> Adapter<WrappedBlock, WrappedExecResp> for OverlordAdapter<EF, G, M, R, S, DB, Mapping>
+impl<EF, G, M, R, S, DB, Mapping> Adapter<WrappedPill, ExecResp> for OverlordAdapter<EF, G, M, R, S, DB, Mapping>
 where
     EF: ExecutorFactory<DB, S, Mapping> + 'static,
     G: Gossip + Sync + Send + 'static,
@@ -81,23 +75,24 @@ where
         exec_height: Height,
         pre_hash: Hash,
         pre_proof: Proof,
-        block_states: Vec<BlockState<WrappedExecResp>>,
-    ) -> Result<WrappedBlock, Box<dyn Error + Send>> {
+        block_states: Vec<BlockState<ExecResp>>,
+    ) -> Result<WrappedPill, Box<dyn Error + Send>> {
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_millis() as u64;
 
-        let (ordered_tx_hashes, propose_hashes) = self.mem_pool.package(ctx, self.status.cycles_limit, self.status.tx_num_limit).await?.clap();
+        let last_exec_resp = self.status.last_commit_exec_resp.read().clone();
+        let (ordered_tx_hashes, propose_hashes) = self.mem_pool.package(ctx, last_exec_resp.cycles_limit, last_exec_resp.tx_num_limit).await?.clap();
         let order_root = Merkle::from_hashes(ordered_tx_hashes.clone()).get_root_hash();
 
         let mut block_states = block_states;
         block_states.sort_by(|a, b| a.height.partial_cmp(&b.height).unwrap());
 
-        let state_root = if block_states.is_empty() {
-            self.status.last_state_root.clone()
+        let exec_resp = if block_states.is_empty() {
+            last_exec_resp.clone()
         } else {
-            block_states.last().unwrap().state.state_root.clone()
+            block_states.last().unwrap().state.clone()
         };
 
         let header = BlockHeader {
@@ -109,13 +104,13 @@ where
             logs_bloom: block_states.iter().map(|stat| stat.state.log_bloom.clone()).collect(),
             order_root: order_root.unwrap_or_else(ProtoHash::from_empty),
             confirm_root: block_states.iter().map(|stat| stat.state.order_root.clone()).collect(),
-            state_root,
+            state_root: exec_resp.state_root,
             receipt_root: block_states.iter().map(|stat| stat.state.receipt_root.clone()).collect(),
             cycles_used: block_states.iter().map(|stat| stat.state.cycles_used).collect(),
             proposer: self.status.address.clone(),
             proof: into_proto_proof(pre_proof)?,
             validator_version: 0u64,
-            validators: self.status.validators.clone(),
+            validators: last_exec_resp.validators.clone(),
         };
 
         let block = Block {
@@ -128,14 +123,14 @@ where
             propose_hashes,
         };
 
-        Ok(WrappedBlock(pill))
+        Ok(WrappedPill(pill))
     }
 
     async fn check_block(
         &self,
         ctx: Context,
-        block: &WrappedBlock,
-        block_states: &[BlockState<WrappedExecResp>],
+        block: &WrappedPill,
+        block_states: &[BlockState<ExecResp>],
     ) -> Result<(), Box<dyn Error + Send>> {
         Ok(())
     }
@@ -143,7 +138,7 @@ where
     async fn fetch_full_block(
         &self,
         ctx: Context,
-        block: WrappedBlock,
+        block: WrappedPill,
     ) -> Result<Bytes, Box<dyn Error + Send>> {
         Ok(Bytes::default())
     }
@@ -154,21 +149,26 @@ where
         height: Height,
         full_block: Bytes,
         proof: Proof,
-    ) -> Result<ExecResult<WrappedExecResp>, Box<dyn Error + Send>> {
+    ) -> Result<ExecResult<ExecResp>, Box<dyn Error + Send>> {
         Ok(ExecResult::default())
+    }
+
+    async fn commit(&self, _ctx: Context, commit_state: ExecResult<ExecResp>){
+        let mut last_exec_resp = self.status.last_commit_exec_resp.write();
+        *last_exec_resp = commit_state.block_states.state;
     }
 
     async fn register_network(
         &self,
         _ctx: Context,
-        sender: UnboundedSender<(Context, OverlordMsg<WrappedBlock>)>,
+        sender: UnboundedSender<(Context, OverlordMsg<WrappedPill>)>,
     ) {
     }
 
     async fn broadcast(
         &self,
         ctx: Context,
-        msg: OverlordMsg<WrappedBlock>,
+        msg: OverlordMsg<WrappedPill>,
     ) -> Result<(), Box<dyn Error + Send>> {
         Ok(())
     }
@@ -177,7 +177,7 @@ where
         &self,
         ctx: Context,
         to: Address,
-        msg: OverlordMsg<WrappedBlock>,
+        msg: OverlordMsg<WrappedPill>,
     ) -> Result<(), Box<dyn Error + Send>> {
         Ok(())
     }
@@ -187,7 +187,7 @@ where
         &self,
         ctx: Context,
         height_range: HeightRange,
-    ) -> Result<Vec<(WrappedBlock, Proof)>, Box<dyn Error + Send>> {
+    ) -> Result<Vec<(WrappedPill, Proof)>, Box<dyn Error + Send>> {
         Ok(vec![])
     }
 
@@ -214,9 +214,9 @@ where
 "_0.block.header.proposer.as_bytes().tiny_hex()",
 "_0.block.header.validator_version",
 "_0.block.header.validators.iter().map(|v| format!(\"{{ address: {}, propose_w: {}, vote_w: {} }}\", v.address.as_bytes().tiny_hex(), v.propose_weight, v.vote_weight))",)]
-struct WrappedBlock(Pill);
+struct WrappedPill(Pill);
 
-impl Blk for WrappedBlock {
+impl Blk for WrappedPill {
     fn fixed_encode(&self) -> Result<Bytes, Box<dyn Error + Send>>{
         let encode = self.0.encode_fixed()?;
         Ok(encode)
@@ -224,12 +224,11 @@ impl Blk for WrappedBlock {
 
     fn fixed_decode(data: &Bytes) -> Result<Self, Box<dyn Error + Send>>{
         let pill = FixedCodec::decode_fixed(data.clone())?;
-        Ok(WrappedBlock(pill))
+        Ok(WrappedPill(pill))
     }
 
-    fn get_block_hash(&self) -> Hash{
-        // Todo: change return to Result<Hash, Err>
-        ProtoHash::digest(self.fixed_encode().expect("fixed encode block failed")).as_bytes()
+    fn get_block_hash(&self) -> Result<Hash, Box<dyn Error + Send>>{
+        Ok(ProtoHash::digest(self.fixed_encode()?).as_bytes())
     }
 
     fn get_pre_hash(&self) -> Hash{
@@ -255,15 +254,19 @@ impl Blk for WrappedBlock {
 "state_root.as_bytes().tiny_hex()",
 "receipt_root.as_bytes().tiny_hex()",
 cycles_used)]
-struct WrappedExecResp {
+struct ExecResp {
     order_root: MerkleRoot,
     state_root: MerkleRoot,
     receipt_root: MerkleRoot,
     cycles_used: u64,
     log_bloom: Bloom,
+    cycles_limit: u64,
+    tx_num_limit:  u64,
+    max_tx_size:  u64,
+    validators: Vec<Validator>,
 }
 
-impl St for WrappedExecResp {}
+impl St for ExecResp {}
 
 fn into_proof(proof: ProtoProof) -> Proof {
     let vote = Vote::new(proof.height, proof.round, proof.block_hash.as_bytes());
