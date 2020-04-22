@@ -25,14 +25,14 @@ use protocol::types::{
     Address as ProtoAddress, Block, BlockHeader, Bloom, Bytes, MerkleRoot, Metadata, Proof as ProtoProof, Receipt, SignedTransaction,
     TransactionRequest, Validator, Hash as ProtoHash, Pill
 };
-use protocol::{fixed_codec::FixedCodec, ProtocolResult};
+use protocol::{fixed_codec::FixedCodec, ProtocolResult, ProtocolErrorKind, ProtocolError};
 
 struct Status {
     chain_id: ProtoHash,
     address: ProtoAddress,
     last_commit_exec_resp: RwLock<ExecResp>,
 
-    exemption_hash: HashSet<Bytes>,
+    from_myself: RwLock<HashSet<Bytes>>,
 }
 
 pub struct OverlordAdapter<
@@ -101,7 +101,7 @@ where
             height,
             exec_height,
             timestamp,
-            logs_bloom: block_states.iter().map(|stat| stat.state.log_bloom.clone()).collect(),
+            logs_bloom: block_states.iter().map(|stat| stat.state.logs_bloom.clone()).collect(),
             order_root: order_root.unwrap_or_else(ProtoHash::from_empty),
             confirm_root: block_states.iter().map(|stat| stat.state.order_root.clone()).collect(),
             state_root: exec_resp.state_root,
@@ -123,22 +123,64 @@ where
             propose_hashes,
         };
 
-        Ok(WrappedPill(pill))
+        let wrapped_pill = WrappedPill(pill);
+
+        let mut set = self.status.from_myself.write();
+        set.insert(wrapped_pill.get_block_hash()?);
+
+        Ok(wrapped_pill)
     }
 
     async fn check_block(
         &self,
-        ctx: Context,
-        block: &WrappedPill,
+        _ctx: Context,
+        pill: &WrappedPill,
         block_states: &[BlockState<ExecResp>],
     ) -> Result<(), Box<dyn Error + Send>> {
+        let mut block_states = block_states.to_vec();
+        block_states.sort_by(|a, b| a.height.partial_cmp(&b.height).unwrap());
+
+        let last_exec_resp = self.status.last_commit_exec_resp.read().clone();
+        let exec_resp = if block_states.is_empty() {
+            last_exec_resp.clone()
+        } else {
+            block_states.last().unwrap().state.clone()
+        };
+
+        let header = &pill.0.block.header;
+
+        if header.chain_id != self.status.chain_id {
+            return Err(Box::new(ConsensusError::CheckBlock("block.chain_id != self.chain_id".to_owned())));
+        }
+
+        if header.state_root != exec_resp.state_root {
+            return Err(Box::new(ConsensusError::CheckBlock("block.state_root != expect.state_root".to_owned())));
+        }
+
+        if header.validators != exec_resp.validators {
+            return Err(Box::new(ConsensusError::CheckBlock("block.validators != expect.validators".to_owned())));
+        }
+
+        if header.logs_bloom.iter().zip(block_states.iter()).all(|(a, b)| a == &b.state.logs_bloom){
+            return Err(Box::new(ConsensusError::CheckBlock("block.log_bloom != expect.log_bloom".to_owned())));
+        }
+        if header.receipt_root.iter().zip(block_states.iter()).all(|(a, b)| a == &b.state.receipt_root){
+            return Err(Box::new(ConsensusError::CheckBlock("block.receipt_root != expect.receipt_root".to_owned())));
+        }
+        if header.cycles_used.iter().zip(block_states.iter()).all(|(a, b)| a == &b.state.cycles_used){
+            return Err(Box::new(ConsensusError::CheckBlock("block.cycles_used != expect.cycles_used".to_owned())));
+        }
+        if header.confirm_root.iter().zip(block_states.iter()).all(|(a, b)| a == &b.state.order_root){
+            return Err(Box::new(ConsensusError::CheckBlock("block.confirm_root != expect.confirm_root".to_owned())));
+        }
+
         Ok(())
     }
 
     async fn fetch_full_block(
         &self,
         ctx: Context,
-        block: WrappedPill,
+        pill: WrappedPill,
     ) -> Result<Bytes, Box<dyn Error + Send>> {
         Ok(Bytes::default())
     }
@@ -228,7 +270,7 @@ impl Blk for WrappedPill {
     }
 
     fn get_block_hash(&self) -> Result<Hash, Box<dyn Error + Send>>{
-        Ok(ProtoHash::digest(self.fixed_encode()?).as_bytes())
+        Ok(ProtoHash::digest(self.0.block.encode_fixed()?).as_bytes())
     }
 
     fn get_pre_hash(&self) -> Hash{
@@ -259,7 +301,7 @@ struct ExecResp {
     state_root: MerkleRoot,
     receipt_root: MerkleRoot,
     cycles_used: u64,
-    log_bloom: Bloom,
+    logs_bloom: Bloom,
     cycles_limit: u64,
     tx_num_limit:  u64,
     max_tx_size:  u64,
@@ -283,4 +325,18 @@ fn into_proto_proof(proof: Proof) -> ProtocolResult<ProtoProof> {
         bitmap: proof.aggregates.address_bitmap,
     };
     Ok(proof)
+}
+
+#[derive(Debug, Display)]
+pub enum ConsensusError {
+    #[display(fmt = "check block failed, {}", _0)]
+    CheckBlock(String),
+}
+
+impl Error for ConsensusError {}
+
+impl From<ConsensusError> for ProtocolError {
+    fn from(err: ConsensusError) -> ProtocolError {
+        ProtocolError::new(ProtocolErrorKind::Consensus, Box::new(err))
+    }
 }
