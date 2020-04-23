@@ -31,6 +31,20 @@ use protocol::types::{
 };
 use protocol::{fixed_codec::FixedCodec, ProtocolError, ProtocolErrorKind, ProtocolResult};
 
+pub const END_GOSSIP_SIGNED_PROPOSAL: &str = "/gossip/consensus/signed_proposal";
+pub const END_GOSSIP_SIGNED_VOTE: &str = "/gossip/consensus/signed_vote";
+pub const END_GOSSIP_PRE_VOTE_QC: &str = "/gossip/consensus/pre_vote_qc";
+pub const END_GOSSIP_PRE_COMMIT_QC: &str = "/gossip/consensus/pre_commit_qc";
+pub const END_GOSSIP_SIGNED_CHOKE: &str = "/gossip/consensus/signed_choke";
+pub const END_GOSSIP_SIGNED_HEIGHT: &str = "/gossip/consensus/signed_height";
+
+pub const RPC_SYNC_PULL_BLOCK: &str = "/rpc_call/consensus/sync_pull_block";
+pub const RPC_RESP_SYNC_PULL_BLOCK: &str = "/rpc_resp/consensus/sync_pull_block";
+pub const RPC_SYNC_PULL_TXS: &str = "/rpc_call/consensus/sync_pull_txs";
+pub const RPC_RESP_SYNC_PULL_TXS: &str = "/rpc_resp/consensus/sync_pull_txs";
+pub const RPC_SYNC_PULL_PROOF: &str = "/rpc_call/consensus/sync_pull_proof";
+pub const RPC_RESP_SYNC_PULL_PROOF: &str = "/rpc_resp/consensus/sync_pull_proof";
+
 struct Status {
     chain_id:              ProtoHash,
     address:               ProtoAddress,
@@ -78,7 +92,7 @@ where
         height: Height,
     ) -> Result<ExecResult<ExecResp>, Box<dyn Error + Send>>{
         // Todo: this can be removed to promote performance if muta test stable for a long time
-        let latest_height = self.storage.get_latest_block().await?.header.height;
+        let latest_height = self.get_latest_height(ctx.clone()).await?;
         if latest_height < height {
             panic!("save_and_exec_block_with_proof, latest_height != height - 1, {} != {} - 1", latest_height, height);
         }
@@ -316,7 +330,7 @@ where
         last_commit_exec_resp: ExecResp,
     ) -> Result<ExecResult<ExecResp>, Box<dyn Error + Send>> {
         // Todo: this can be removed to promote performance if muta test stable for a long time
-        let latest_height = self.storage.get_latest_block().await?.header.height;
+        let latest_height = self.get_latest_height(ctx.clone()).await?;
         if latest_height != height - 1 {
             panic!("save_and_exec_block_with_proof, latest_height != height - 1, {} != {} - 1", latest_height, height);
         }
@@ -360,6 +374,36 @@ where
         ctx: Context,
         msg: OverlordMsg<WrappedPill>,
     ) -> Result<(), Box<dyn Error + Send>> {
+        let (end, msg) = match msg {
+            OverlordMsg::SignedProposal(sp) => {
+                let bytes = rlp::encode(&sp);
+                (END_GOSSIP_SIGNED_PROPOSAL, bytes)
+            }
+
+            OverlordMsg::PreVoteQC(qc) => {
+                let bytes = rlp::encode(&qc);
+                (END_GOSSIP_PRE_VOTE_QC, bytes)
+            }
+
+            OverlordMsg::PreCommitQC(qc) => {
+                let bytes = rlp::encode(&qc);
+                (END_GOSSIP_PRE_COMMIT_QC, bytes)
+            }
+
+            OverlordMsg::SignedChoke(sc) => {
+                let bytes = rlp::encode(&sc);
+                (END_GOSSIP_SIGNED_CHOKE, bytes)
+            }
+
+            OverlordMsg::SignedHeight(sh) => {
+                let bytes = rlp::encode(&sh);
+                (END_GOSSIP_SIGNED_HEIGHT, bytes)
+            }
+
+            _ => unreachable!(),
+        };
+
+        self.network.broadcast(ctx.clone(), end, msg, Priority::High).await?;
         Ok(())
     }
 
@@ -382,7 +426,7 @@ where
     }
 
     async fn get_latest_height(&self, ctx: Context) -> Result<Height, Box<dyn Error + Send>> {
-        Ok(0)
+        Ok(self.storage.get_latest_block().await?.header.height)
     }
 
     async fn handle_error(&self, ctx: Context, err: OverlordError) {}
