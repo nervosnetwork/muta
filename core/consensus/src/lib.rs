@@ -447,11 +447,39 @@ where
         ctx: Context,
         height_range: HeightRange,
     ) -> Result<Vec<(WrappedPill, Proof)>, Box<dyn Error + Send>> {
-        Ok(vec![])
+        let latest_block = self.storage.get_latest_block().await?;
+        let latest_height = latest_block.header.height;
+
+        let end_height = if latest_height >= height_range.to {
+            if height_range.to - height_range.from > 50 {
+                height_range.from + 50
+            } else {
+                height_range.to
+            }
+        } else {
+            latest_height
+        };
+
+        let mut vec = vec![];
+        let mut base_block = self.storage.get_block_by_height(height_range.from).await?;
+        for h in height_range.from + 1..=end_height {
+            let block = self.storage.get_block_by_height(h).await?;
+            let proof = block.header.proof.clone();
+            vec.push((WrappedPill::from_block(base_block.clone()), into_proof(proof)));
+            base_block = block;
+        }
+
+        if end_height == latest_height {
+            let latest_proof = self.storage.get_latest_proof().await?;
+            vec.push((WrappedPill::from_block(base_block), into_proof(latest_proof)));
+        }
+
+        Ok(vec)
     }
 
     async fn sync_full_block(&self, ctx: Context, from: &Address, block: WrappedPill)
                              -> Result<Bytes, Box<dyn Error + Send>>{
+
         Ok(Bytes::default())
     }
 
@@ -613,6 +641,15 @@ fn calculate_root<T: FixedCodec>(vec: &[T]) -> MerkleRoot {
 "_0.block.header.validator_version",
 "_0.block.header.validators.iter().map(|v| format!(\"{{ address: {}, propose_w: {}, vote_w: {} }}\", v.address.as_bytes().tiny_hex(), v.propose_weight, v.vote_weight))",)]
 struct WrappedPill(Pill);
+
+impl WrappedPill {
+    fn from_block(block: Block) -> WrappedPill {
+        WrappedPill(Pill{
+            block,
+            propose_hashes: vec![],
+        })
+    }
+}
 
 impl Blk for WrappedPill {
     fn fixed_encode(&self) -> Result<Bytes, Box<dyn Error + Send>> {
