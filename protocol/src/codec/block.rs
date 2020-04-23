@@ -7,9 +7,11 @@ use crate::{
     codec::{
         primitive::{Address, Hash},
         CodecError, ProtocolCodecSync,
+        transaction::SignedTransaction,
     },
     field, impl_default_bytes_codec_for,
     types::primitive as protocol_primitive,
+    types::transaction as protocol_transaction,
     types::Bloom,
     ProtocolError, ProtocolResult,
 };
@@ -112,6 +114,15 @@ pub struct Pill {
 
     #[prost(message, repeated, tag = "2")]
     pub propose_hashes: Vec<Hash>,
+}
+
+#[derive(Clone, Message)]
+pub struct FullBlock {
+    #[prost(message, tag = "1")]
+    pub block: Option<Block>,
+
+    #[prost(message, repeated, tag = "2")]
+    pub ordered_txs: Vec<SignedTransaction>,
 }
 
 // #################
@@ -363,11 +374,47 @@ impl TryFrom<Pill> for block::Pill {
     }
 }
 
+impl From<block::FullBlock> for FullBlock {
+    fn from(full_block: block::FullBlock) -> FullBlock {
+        let block = Some(Block::from(full_block.block));
+        let ordered_txs = full_block
+            .ordered_txs
+            .into_iter()
+            .map(SignedTransaction::from)
+            .collect::<Vec<_>>();
+
+        FullBlock {
+            block,
+            ordered_txs,
+        }
+    }
+}
+
+impl TryFrom<FullBlock> for block::FullBlock {
+    type Error = ProtocolError;
+
+    fn try_from(full_block: FullBlock) -> Result<block::FullBlock, Self::Error> {
+        let block = field!(full_block.block, "FullBlock", "block")?;
+
+        let mut ordered_txs = Vec::new();
+        for tx in full_block.ordered_txs {
+            ordered_txs.push(protocol_transaction::SignedTransaction::try_from(tx)?);
+        }
+
+        let full_block = block::FullBlock {
+            block: block::Block::try_from(block)?,
+            ordered_txs,
+        };
+
+        Ok(full_block)
+    }
+}
+
 // #################
 // Codec
 // #################
 
-impl_default_bytes_codec_for!(block, [Block, BlockHeader, Proof, Validator, Pill]);
+impl_default_bytes_codec_for!(block, [Block, BlockHeader, Proof, Validator, Pill, FullBlock]);
 
 #[cfg(test)]
 mod test {

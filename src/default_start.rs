@@ -169,7 +169,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         .write_timeout(config.network.write_timeout)
         .recv_buffer_size(config.network.recv_buffer_size.clone());
 
-    let network_privkey = config.privkey.as_string_trim0x();
+    let network_pri_key = config.privkey.as_string_trim0x();
 
     let mut bootstrap_pairs = vec![];
     if let Some(bootstrap) = &config.network.bootstraps {
@@ -186,7 +186,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     let network_config = network_config
         .bootstraps(bootstrap_pairs)?
         .whitelist(whitelist)?
-        .secio_keypair(network_privkey)?;
+        .secio_keypair(network_pri_key)?;
     let mut network_service = NetworkService::new(network_config);
     network_service
         .listen(config.network.listening_address)

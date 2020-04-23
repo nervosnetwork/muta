@@ -1,33 +1,18 @@
 use bytes::Bytes;
-use derive_more::Display;
 use muta_codec_derive::RlpFixedCodec;
 use serde::{Deserialize, Serialize};
 
 use crate::fixed_codec::{FixedCodec, FixedCodecError};
-use crate::types::{Address, Bloom, Hash, MerkleRoot};
+use crate::types::{Address, Bloom, Hash, MerkleRoot, SignedTransaction};
 use crate::ProtocolResult;
 
-#[derive(RlpFixedCodec, Clone, Debug, Default, Display, PartialEq, Eq)]
-#[display(
-    fmt = "{{ header: {}, tx_len: {} }}",
-    header,
-    "ordered_tx_hashes.len()"
-)]
+#[derive(RlpFixedCodec, Clone, Debug, Default, PartialEq, Eq)]
 pub struct Block {
     pub header:            BlockHeader,
     pub ordered_tx_hashes: Vec<Hash>,
 }
 
-#[derive(RlpFixedCodec, Clone, Debug, Default, Display, PartialEq, Eq)]
-#[display(
-    fmt = "{{ chan_id: {}, height: {}, exec_height: {}, pre_hash: {}, timestamp: {:?}, validator_version: {} }}",
-    "chain_id.as_hex()",
-    height,
-    exec_height,
-    "pre_hash.as_hex()",
-    timestamp,
-    validator_version
-)]
+#[derive(RlpFixedCodec, Clone, Debug, Default, PartialEq, Eq)]
 pub struct BlockHeader {
     pub chain_id:          Hash,
     pub height:            u64,
@@ -62,8 +47,14 @@ pub struct Validator {
     pub vote_weight:    u32,
 }
 
-#[derive(RlpFixedCodec, Clone, Debug, PartialEq, Eq)]
+#[derive(RlpFixedCodec, Clone, Debug, Default, PartialEq, Eq)]
 pub struct Pill {
     pub block:          Block,
     pub propose_hashes: Vec<Hash>,
+}
+
+#[derive(RlpFixedCodec, Clone, Debug)]
+pub struct FullBlock {
+    pub block:          Block,
+    pub ordered_txs: Vec<SignedTransaction>,
 }

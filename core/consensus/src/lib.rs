@@ -23,7 +23,7 @@ use protocol::traits::{
 };
 use protocol::types::{
     Address as ProtoAddress, Block, BlockHeader, Bloom, Bytes, MerkleRoot, Metadata, Proof as ProtoProof, Receipt, SignedTransaction,
-    TransactionRequest, Validator, Hash as ProtoHash, Pill
+    TransactionRequest, Validator, Hash as ProtoHash, Pill, FullBlock
 };
 use protocol::{fixed_codec::FixedCodec, ProtocolResult, ProtocolErrorKind, ProtocolError};
 
@@ -137,6 +137,11 @@ where
         pill: &WrappedPill,
         block_states: &[BlockState<ExecResp>],
     ) -> Result<(), Box<dyn Error + Send>> {
+        let block_hash = pill.get_block_hash()?;
+        if self.status.from_myself.read().contains(&block_hash) {
+            return Ok(());
+        }
+
         let mut block_states = block_states.to_vec();
         block_states.sort_by(|a, b| a.height.partial_cmp(&b.height).unwrap());
 
@@ -145,6 +150,8 @@ where
             last_exec_resp.clone()
         } else {
             block_states.last().unwrap().state.clone()
+            // todo: check order_root equals to merkle root of order_tx_hashes
+
         };
 
         let header = &pill.0.block.header;
@@ -161,16 +168,19 @@ where
             return Err(Box::new(ConsensusError::CheckBlock("block.validators != expect.validators".to_owned())));
         }
 
-        if header.logs_bloom.iter().zip(block_states.iter()).all(|(a, b)| a == &b.state.logs_bloom){
+        if header.logs_bloom.len() != block_states.len() || !header.logs_bloom.iter().zip(block_states.iter()).all(|(a, b)| a == &b.state.logs_bloom){
             return Err(Box::new(ConsensusError::CheckBlock("block.log_bloom != expect.log_bloom".to_owned())));
         }
-        if header.receipt_root.iter().zip(block_states.iter()).all(|(a, b)| a == &b.state.receipt_root){
+
+        if header.receipt_root.len() != block_states.len() || !header.receipt_root.iter().zip(block_states.iter()).all(|(a, b)| a == &b.state.receipt_root){
             return Err(Box::new(ConsensusError::CheckBlock("block.receipt_root != expect.receipt_root".to_owned())));
         }
-        if header.cycles_used.iter().zip(block_states.iter()).all(|(a, b)| a == &b.state.cycles_used){
+
+        if header.cycles_used.len() != block_states.len() || !header.cycles_used.iter().zip(block_states.iter()).all(|(a, b)| a == &b.state.cycles_used){
             return Err(Box::new(ConsensusError::CheckBlock("block.cycles_used != expect.cycles_used".to_owned())));
         }
-        if header.confirm_root.iter().zip(block_states.iter()).all(|(a, b)| a == &b.state.order_root){
+
+        if header.confirm_root.len() != block_states.len() || !header.confirm_root.iter().zip(block_states.iter()).all(|(a, b)| a == &b.state.order_root){
             return Err(Box::new(ConsensusError::CheckBlock("block.confirm_root != expect.confirm_root".to_owned())));
         }
 
@@ -182,7 +192,17 @@ where
         ctx: Context,
         pill: WrappedPill,
     ) -> Result<Bytes, Box<dyn Error + Send>> {
-        Ok(Bytes::default())
+        let block_hash = pill.get_block_hash()?;
+        let ordered_tx_hashes = pill.0.block.ordered_tx_hashes.clone();
+        if !self.status.from_myself.read().contains(&block_hash) {
+            self.mem_pool.ensure_order_txs(ctx.clone(), ordered_tx_hashes.clone()).await?
+        }
+        let txs = self.mem_pool.get_full_txs(ctx, ordered_tx_hashes).await?;
+        let full_block = FullBlock {
+            block: pill.0.block,
+            ordered_txs: txs,
+        };
+        Ok(full_block.encode_fixed()?)
     }
 
     async fn save_and_exec_block_with_proof(
