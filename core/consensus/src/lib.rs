@@ -77,7 +77,31 @@ where
         ctx: Context,
         height: Height,
     ) -> Result<ExecResult<ExecResp>, Box<dyn Error + Send>>{
-        Ok(ExecResult::default())
+        // Todo: this can be removed to promote performance if muta test stable for a long time
+        let latest_height = self.storage.get_latest_block().await?.header.height;
+        if latest_height < height {
+            panic!("save_and_exec_block_with_proof, latest_height != height - 1, {} != {} - 1", latest_height, height);
+        }
+
+        let current_block = self.storage.get_block_by_height(height).await?;
+        let exec_height = current_block.header.exec_height;
+        let mut base_state_root = current_block.header.state_root;
+        let mut exec_result = ExecutorResp::default();
+        let metadata = self.get_metadata(ctx, base_state_root.clone(), height, current_block.header.timestamp)?;
+        let mut cycles_limit = metadata.cycles_limit;
+        for h in exec_height + 1..=height {
+            let block = self.storage.get_block_by_height(h).await?;
+            let txs = self.storage
+                .get_transactions(block.ordered_tx_hashes.clone())
+                .await?;
+            exec_result = self.exec(base_state_root, h, block.header.timestamp, cycles_limit, &txs)?;
+            base_state_root = exec_result.state_root;
+        }
+
+        let receipt_root = calculate_root(&exec_result.receipts);
+        let exec_result = create_exec_result(height, metadata, base_state_root, current_block.header.order_root, receipt_root, exec_result.logs_bloom, exec_result.all_cycles_used);
+
+        Ok(exec_result)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -105,7 +129,6 @@ where
             )
             .await?
             .clap();
-        let order_root = Merkle::from_hashes(ordered_tx_hashes.clone()).get_root_hash();
 
         let mut block_states = block_states;
         block_states.sort_by(|a, b| a.height.partial_cmp(&b.height).unwrap());
@@ -126,7 +149,7 @@ where
                 .iter()
                 .map(|stat| stat.state.logs_bloom.clone())
                 .collect(),
-            order_root: order_root.unwrap_or_else(ProtoHash::from_empty),
+            order_root: calculate_root(&ordered_tx_hashes),
             confirm_root: block_states
                 .iter()
                 .map(|stat| stat.state.order_root.clone())
@@ -176,15 +199,7 @@ where
             return Ok(());
         }
 
-        let expect_order_root = Merkle::from_hashes(
-            pill.0
-                .block.ordered_tx_hashes
-                .iter()
-                .map(|r| ProtoHash::digest(r.to_owned().encode_fixed().unwrap()))
-                .collect::<Vec<_>>(),
-        )
-            .get_root_hash()
-            .unwrap_or_else(ProtoHash::from_empty);
+        let expect_order_root = calculate_root(&pill.0.block.ordered_tx_hashes);
         if expect_order_root != pill.0.block.header.order_root {
             return Err(Box::new(ConsensusError::CheckBlock(
                 "block.order_root != expect.order_root".to_owned(),
@@ -313,19 +328,10 @@ where
         let timestamp = full_block.block.header.timestamp;
         let cycles_limit = last_commit_exec_resp.cycles_limit;
 
-        //todo
         let resp = self.exec(state_root.clone(), height, timestamp, cycles_limit, &full_block.ordered_txs)?;
         let metadata = self.get_metadata(ctx.clone(), resp.state_root.clone(), height, timestamp)?;
         let ordered_tx_hashes = full_block.block.ordered_tx_hashes.clone();
-        let receipt_root = Merkle::from_hashes(
-            resp
-                .receipts
-                .iter()
-                .map(|r| ProtoHash::digest(r.to_owned().encode_fixed().unwrap()))
-                .collect::<Vec<_>>(),
-        )
-            .get_root_hash()
-            .unwrap_or_else(ProtoHash::from_empty);
+        let receipt_root = calculate_root(&resp.receipts);
 
         self.storage.insert_receipts(resp.receipts.clone()).await?;
         self.storage.update_latest_proof(into_proto_proof(proof)?).await?;
@@ -346,6 +352,7 @@ where
         _ctx: Context,
         sender: UnboundedSender<(Context, OverlordMsg<WrappedPill>)>,
     ) {
+
     }
 
     async fn broadcast(
@@ -502,6 +509,17 @@ fn to_validator_list(validators: &[ValidatorExtend]) -> Vec<Validator> {
             vote_weight:    v.vote_weight,
         })
         .collect::<Vec<_>>()
+}
+
+fn calculate_root<T: FixedCodec>(vec: &[T]) -> MerkleRoot {
+    Merkle::from_hashes(
+        vec
+            .iter()
+            .map(|r| ProtoHash::digest(r.to_owned().encode_fixed().unwrap()))
+            .collect::<Vec<_>>(),
+    )
+        .get_root_hash()
+        .unwrap_or_else(ProtoHash::from_empty)
 }
 
 #[derive(Clone, Debug, Default, Display, PartialEq, Eq)]
