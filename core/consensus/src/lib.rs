@@ -32,18 +32,17 @@ use protocol::types::{
 use protocol::{fixed_codec::FixedCodec, ProtocolError, ProtocolErrorKind, ProtocolResult};
 
 pub const END_GOSSIP_SIGNED_PROPOSAL: &str = "/gossip/consensus/signed_proposal";
-pub const END_GOSSIP_SIGNED_VOTE: &str = "/gossip/consensus/signed_vote";
+pub const END_GOSSIP_SIGNED_PRE_VOTE: &str = "/gossip/consensus/signed_vote";
+pub const END_GOSSIP_SIGNED_PRE_COMMIT: &str = "/gossip/consensus/signed_vote";
 pub const END_GOSSIP_PRE_VOTE_QC: &str = "/gossip/consensus/pre_vote_qc";
 pub const END_GOSSIP_PRE_COMMIT_QC: &str = "/gossip/consensus/pre_commit_qc";
 pub const END_GOSSIP_SIGNED_CHOKE: &str = "/gossip/consensus/signed_choke";
 pub const END_GOSSIP_SIGNED_HEIGHT: &str = "/gossip/consensus/signed_height";
 
-pub const RPC_SYNC_PULL_BLOCK: &str = "/rpc_call/consensus/sync_pull_block";
-pub const RPC_RESP_SYNC_PULL_BLOCK: &str = "/rpc_resp/consensus/sync_pull_block";
+pub const RPC_SYNC_PULL_BLOCK_PROOF: &str = "/rpc_call/consensus/sync_pull_block";
+pub const RPC_SYNC_PUSH_BLOCK_PROOF: &str = "/rpc_resp/consensus/sync_pull_block";
 pub const RPC_SYNC_PULL_TXS: &str = "/rpc_call/consensus/sync_pull_txs";
-pub const RPC_RESP_SYNC_PULL_TXS: &str = "/rpc_resp/consensus/sync_pull_txs";
-pub const RPC_SYNC_PULL_PROOF: &str = "/rpc_call/consensus/sync_pull_proof";
-pub const RPC_RESP_SYNC_PULL_PROOF: &str = "/rpc_resp/consensus/sync_pull_proof";
+pub const RPC_SYNC_PUSH_TXS: &str = "/rpc_resp/consensus/sync_pull_txs";
 
 struct Status {
     chain_id:              ProtoHash,
@@ -413,6 +412,32 @@ where
         to: Address,
         msg: OverlordMsg<WrappedPill>,
     ) -> Result<(), Box<dyn Error + Send>> {
+        let (end, msg) = match msg {
+            OverlordMsg::SignedPreVote(sv) => {
+                let bytes = rlp::encode(&sv);
+                (END_GOSSIP_SIGNED_PRE_VOTE, bytes)
+            }
+
+            OverlordMsg::SignedPreCommit(sc) => {
+                let bytes = rlp::encode(&sc);
+                (END_GOSSIP_SIGNED_PRE_COMMIT, bytes)
+            }
+
+            OverlordMsg::SyncRequest(sq) => {
+                let bytes = rlp::encode(&sq);
+                (RPC_SYNC_PULL_BLOCK_PROOF, bytes)
+            }
+
+            OverlordMsg::SyncResponse(sr) => {
+                let bytes = rlp::encode(&sr);
+                (RPC_SYNC_PUSH_BLOCK_PROOF, bytes)
+            }
+
+            _ => unreachable!(),
+        };
+
+        self.network.users_cast(ctx.clone(), end, vec![ProtoAddress::from_bytes(to)?], msg, Priority::High).await?;
+
         Ok(())
     }
 
@@ -425,7 +450,12 @@ where
         Ok(vec![])
     }
 
-    async fn get_latest_height(&self, ctx: Context) -> Result<Height, Box<dyn Error + Send>> {
+    async fn sync_full_block(&self, ctx: Context, from: &Address, block: WrappedPill)
+                             -> Result<Bytes, Box<dyn Error + Send>>{
+        Ok(Bytes::default())
+    }
+
+    async fn get_latest_height(&self, _ctx: Context) -> Result<Height, Box<dyn Error + Send>> {
         Ok(self.storage.get_latest_block().await?.header.height)
     }
 
