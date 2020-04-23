@@ -7,8 +7,6 @@ use protocol::traits::{ServiceState, StoreBool, StoreString, StoreUint64};
 use protocol::types::Hash;
 use protocol::ProtocolResult;
 
-use crate::binding::store::StoreError;
-
 pub struct DefaultStoreBool<S: ServiceState> {
     state: Rc<RefCell<S>>,
     key:   Hash,
@@ -22,7 +20,7 @@ impl<S: ServiceState> DefaultStoreBool<S> {
         }
     }
 
-    fn get_(&self) -> ProtocolResult<bool> {
+    fn inner_get(&self) -> ProtocolResult<bool> {
         let b: Option<bool> = self.state.borrow().get(&self.key)?;
 
         match b {
@@ -34,7 +32,7 @@ impl<S: ServiceState> DefaultStoreBool<S> {
         }
     }
 
-    fn set_(&mut self, b: bool) -> ProtocolResult<()> {
+    fn inner_set(&mut self, b: bool) -> ProtocolResult<()> {
         self.state.borrow_mut().insert(self.key.clone(), b)?;
         Ok(())
     }
@@ -42,12 +40,12 @@ impl<S: ServiceState> DefaultStoreBool<S> {
 
 impl<S: ServiceState> StoreBool for DefaultStoreBool<S> {
     fn get(&self) -> bool {
-        self.get_()
+        self.inner_get()
             .unwrap_or_else(|e| panic!("StoreBool get failed: {}", e))
     }
 
     fn set(&mut self, b: bool) {
-        self.set_(b)
+        self.inner_set(b)
             .unwrap_or_else(|e| panic!("StoreBool set failed: {}", e));
     }
 }
@@ -65,144 +63,157 @@ impl<S: ServiceState> DefaultStoreUint64<S> {
         }
     }
 
-    fn get_(&self) -> ProtocolResult<u64> {
-        let u: Option<u64> = self.state.borrow().get(&self.key)?;
+    fn inner_get(&self) -> u64 {
+        let u: Option<u64> = self
+            .state
+            .borrow()
+            .get(&self.key)
+            .unwrap_or_else(|e| panic!("StoreUint64 get failed: {}", e));
 
         match u {
-            Some(v) => Ok(v),
+            Some(v) => v,
             None => {
-                self.state.borrow_mut().insert(self.key.clone(), 0u64)?;
-                Ok(0)
+                self.state
+                    .borrow_mut()
+                    .insert(self.key.clone(), 0u64)
+                    .unwrap_or_else(|e| panic!("StoreUint64 get failed: {}", e));
+                0
             }
         }
     }
 
-    fn set_(&mut self, val: u64) -> ProtocolResult<()> {
-        self.state.borrow_mut().insert(self.key.clone(), val)?;
-        Ok(())
+    fn inner_set(&mut self, val: u64) {
+        self.state
+            .borrow_mut()
+            .insert(self.key.clone(), val)
+            .unwrap_or_else(|e| panic!("StoreUint64 set failed: {}", e));
     }
 
     // Add val with self
     // And set the result back to self
-    fn add_(&mut self, val: u64) -> ProtocolResult<()> {
-        let sv = self.get_()?;
+    fn inner_add(&mut self, val: u64) -> bool {
+        let sv = self.inner_get();
 
         match val.overflowing_add(sv) {
-            (sum, false) => self.set_(sum),
-            _ => Err(StoreError::Overflow.into()),
+            (sum, false) => {
+                self.inner_set(sum);
+                false
+            }
+            _ => true,
         }
     }
 
     // Self minus val
     // And set the result back to self
-    fn sub_(&mut self, val: u64) -> ProtocolResult<()> {
-        let sv = self.get_()?;
+    fn inner_sub(&mut self, val: u64) -> bool {
+        let sv = self.inner_get();
 
         if sv >= val {
-            self.set_(sv - val)
+            self.inner_set(sv - val);
+            false
         } else {
-            Err(StoreError::Overflow.into())
+            true
         }
     }
 
     // Multiply val with self
     // And set the result back to self
-    fn mul_(&mut self, val: u64) -> ProtocolResult<()> {
-        let sv = self.get_()?;
+    fn inner_mul(&mut self, val: u64) -> bool {
+        let sv = self.inner_get();
 
         match val.overflowing_mul(sv) {
-            (mul, false) => self.set_(mul),
-            _ => Err(StoreError::Overflow.into()),
+            (mul, false) => {
+                self.inner_set(mul);
+                false
+            }
+            _ => true,
         }
     }
 
     // Power of self
     // And set the result back to self
-    fn pow_(&mut self, val: u32) -> ProtocolResult<()> {
-        let sv = self.get_()?;
+    fn inner_pow(&mut self, val: u32) -> bool {
+        let sv = self.inner_get();
 
         match sv.overflowing_pow(val) {
-            (pow, false) => self.set_(pow),
-            _ => Err(StoreError::Overflow.into()),
+            (pow, false) => {
+                self.inner_set(pow);
+                false
+            }
+            _ => true,
         }
     }
 
     // Self divided by val
     // And set the result back to self
-    fn div_(&mut self, val: u64) -> ProtocolResult<()> {
-        let sv = self.get_()?;
+    fn inner_div(&mut self, val: u64) -> bool {
+        let sv = self.inner_get();
 
         if let 0 = val {
-            Err(StoreError::Overflow.into())
+            true
         } else {
-            self.set_(sv / val)
+            self.inner_set(sv / val);
+            false
         }
     }
 
     // Remainder of self
     // And set the result back to self
-    fn rem_(&mut self, val: u64) -> ProtocolResult<()> {
-        let sv = self.get_()?;
+    fn inner_rem(&mut self, val: u64) -> bool {
+        let sv = self.inner_get();
 
         if let 0 = val {
-            Err(StoreError::Overflow.into())
+            true
         } else {
-            self.set_(sv % val)
+            self.inner_set(sv % val);
+            false
         }
     }
 }
 
 impl<S: ServiceState> StoreUint64 for DefaultStoreUint64<S> {
     fn get(&self) -> u64 {
-        self.get_()
-            .unwrap_or_else(|e| panic!("StoreUint64 get failed: {}", e))
+        self.inner_get()
     }
 
     fn set(&mut self, val: u64) {
-        self.set_(val)
-            .unwrap_or_else(|e| panic!("StoreUint64 set failed: {}", e));
+        self.inner_set(val);
     }
 
     // Add val with self
     // And set the result back to self
-    fn add(&mut self, val: u64) {
-        self.add_(val)
-            .unwrap_or_else(|e| panic!("StoreUint64 add value failed: {}", e));
+    fn safe_add(&mut self, val: u64) -> bool {
+        self.inner_add(val)
     }
 
     // Self minus val
     // And set the result back to self
-    fn sub(&mut self, val: u64) {
-        self.sub_(val)
-            .unwrap_or_else(|e| panic!("StoreUint64 sub value failed: {}", e));
+    fn safe_sub(&mut self, val: u64) -> bool {
+        self.inner_sub(val)
     }
 
     // Multiply val with self
     // And set the result back to self
-    fn mul(&mut self, val: u64) {
-        self.mul_(val)
-            .unwrap_or_else(|e| panic!("StoreUint64 mul value failed: {}", e));
+    fn safe_mul(&mut self, val: u64) -> bool {
+        self.inner_mul(val)
     }
 
     // Power of self
     // And set the result back to self
-    fn pow(&mut self, val: u32) {
-        self.pow_(val)
-            .unwrap_or_else(|e| panic!("StoreUint64 pow value failed: {}", e));
+    fn safe_pow(&mut self, val: u32) -> bool {
+        self.inner_pow(val)
     }
 
     // Self divided by val
     // And set the result back to self
-    fn div(&mut self, val: u64) {
-        self.div_(val)
-            .unwrap_or_else(|e| panic!("StoreUint64 div value failed: {}", e));
+    fn safe_div(&mut self, val: u64) -> bool {
+        self.inner_div(val)
     }
 
     // Remainder of self
     // And set the result back to self
-    fn rem(&mut self, val: u64) {
-        self.rem_(val)
-            .unwrap_or_else(|e| panic!("StoreUint64 rem value failed: {}", e));
+    fn safe_rem(&mut self, val: u64) -> bool {
+        self.inner_rem(val)
     }
 }
 
@@ -219,14 +230,14 @@ impl<S: ServiceState> DefaultStoreString<S> {
         }
     }
 
-    fn set_(&mut self, val: &str) -> ProtocolResult<()> {
+    fn inner_set(&mut self, val: &str) -> ProtocolResult<()> {
         self.state
             .borrow_mut()
             .insert(self.key.clone(), val.to_string())?;
         Ok(())
     }
 
-    fn get_(&self) -> ProtocolResult<String> {
+    fn inner_get(&self) -> ProtocolResult<String> {
         let s: Option<String> = self.state.borrow().get(&self.key)?;
 
         match s {
@@ -240,28 +251,28 @@ impl<S: ServiceState> DefaultStoreString<S> {
         }
     }
 
-    fn len_(&self) -> ProtocolResult<u32> {
-        self.get_().map(|s| s.len() as u32)
+    fn inner_len(&self) -> ProtocolResult<u32> {
+        self.inner_get().map(|s| s.len() as u32)
     }
 
     fn is_empty_(&self) -> ProtocolResult<bool> {
-        self.get_().map(|s| s.is_empty())
+        self.inner_get().map(|s| s.is_empty())
     }
 }
 
 impl<S: ServiceState> StoreString for DefaultStoreString<S> {
     fn get(&self) -> String {
-        self.get_()
+        self.inner_get()
             .unwrap_or_else(|e| panic!("StoreString get failed: {}", e))
     }
 
     fn set(&mut self, val: &str) {
-        self.set_(val)
+        self.inner_set(val)
             .unwrap_or_else(|e| panic!("StoreString set failed: {}", e));
     }
 
     fn len(&self) -> u32 {
-        self.len_()
+        self.inner_len()
             .unwrap_or_else(|e| panic!("StoreString get length failed: {}", e))
     }
 

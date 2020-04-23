@@ -41,7 +41,7 @@ impl<S: ServiceState, E: FixedCodec> DefaultStoreArray<S, E> {
         }
     }
 
-    fn get_(&self, index: u32) -> ProtocolResult<Option<E>> {
+    fn inner_get(&self, index: u32) -> ProtocolResult<Option<E>> {
         if let Some(k) = self.keys.inner.get(index as usize) {
             self.state.borrow().get(k)?.map_or_else(
                 || {
@@ -58,7 +58,7 @@ impl<S: ServiceState, E: FixedCodec> DefaultStoreArray<S, E> {
 
     // TODO(@zhounan): Atomicity of insert(k, v) and insert self.keys to
     // ServiceState is not guaranteed for now That must be settled soon after.
-    fn push_(&mut self, elm: E) -> ProtocolResult<()> {
+    fn inner_push(&mut self, elm: E) -> ProtocolResult<()> {
         let key = Hash::digest(elm.encode_fixed()?);
 
         self.keys.inner.push(key.clone());
@@ -71,7 +71,7 @@ impl<S: ServiceState, E: FixedCodec> DefaultStoreArray<S, E> {
 
     // TODO(@zhounan): Atomicity of insert(k, v) and insert self.keys to
     // ServiceState is not guaranteed for now That must be settled soon after.
-    fn remove_(&mut self, index: u32) -> ProtocolResult<()> {
+    fn inner_remove(&mut self, index: u32) -> ProtocolResult<()> {
         let key = self.keys.inner.remove(index as usize);
         self.state
             .borrow_mut()
@@ -83,17 +83,17 @@ impl<S: ServiceState, E: FixedCodec> DefaultStoreArray<S, E> {
 
 impl<S: ServiceState, E: FixedCodec> StoreArray<E> for DefaultStoreArray<S, E> {
     fn get(&self, index: u32) -> Option<E> {
-        self.get_(index)
+        self.inner_get(index)
             .unwrap_or_else(|e| panic!("StoreArray get value failed: {}", e))
     }
 
     fn push(&mut self, elm: E) {
-        self.push_(elm)
+        self.inner_push(elm)
             .unwrap_or_else(|e| panic!("StoreArray push value failed: {}", e));
     }
 
     fn remove(&mut self, index: u32) {
-        self.remove_(index)
+        self.inner_remove(index)
             .unwrap_or_else(|e| panic!("StoreArray remove value failed: {}", e));
     }
 
