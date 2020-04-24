@@ -88,6 +88,20 @@ where
             // Peer may disconnect when we try to fetch its connected address.
             // This connected addr is mainly for debug purpose, so no error.
             let connected_addr = sessions.connected_addr(raw_msg.sid);
+
+            let trace_endpoint = crate::probe::cstring(endpoint.full_url());
+            let trace_peer_addr = {
+                let addr = connected_addr.as_ref().map(|a| a.to_string());
+                crate::probe::cstring(&addr.unwrap_or_else(|| "".to_owned()))
+            };
+            crate::probe!(
+                muta,
+                network_route_msg,
+                trace_peer_addr,
+                trace_endpoint.as_ptr(),
+                net_msg.content.len()
+            );
+
             let smsg = SessionMessage {
                 sid: raw_msg.sid,
                 pid: raw_msg.pid,

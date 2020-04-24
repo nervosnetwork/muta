@@ -385,6 +385,11 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
                 (END_GOSSIP_SIGNED_CHOKE, bytes)
             }
 
+            OverlordMsg::SignedVote(sv) => {
+                let bytes = sv.rlp_bytes();
+                (END_GOSSIP_SIGNED_VOTE, bytes)
+            }
+
             _ => unreachable!(),
         };
 

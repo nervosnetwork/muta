@@ -1,3 +1,4 @@
+#![cfg_attr(feature = "nightly", feature(asm, enable_probe))]
 mod common;
 mod compression;
 mod config;
@@ -8,6 +9,7 @@ mod event;
 mod message;
 mod outbound;
 mod peer_manager;
+mod probe;
 mod protocols;
 mod reactor;
 mod rpc;
