@@ -289,6 +289,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     let hex_pub_key = hex::encode(my_pubkey.to_bytes());
     let hex_common_ref = metadata.common_ref.as_string();
     let overlord_adapter_clone = Arc::clone(&overlord_adapter);
+    let wal_path = config.data_path_for_wal().to_str().unwrap().to_string();
     tokio::spawn(async move {
         OverlordServer::run(
             hex_common_ref,
@@ -297,7 +298,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
             hex_bls_pub_key,
             my_address.as_bytes(),
             &overlord_adapter_clone,
-            &("wal/".to_owned()),
+            &wal_path,
         )
         .await;
     });
