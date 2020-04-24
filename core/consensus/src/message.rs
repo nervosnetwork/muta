@@ -21,8 +21,14 @@ pub const END_GOSSIP_SIGNED_HEIGHT: &str = "/gossip/consensus/signed_height";
 pub const END_GOSSIP_SYNC_REQUEST: &str = "/gossip/consensus/sync_request";
 pub const END_GOSSIP_SYNC_RESPONSE: &str = "/gossip/consensus/sync_response";
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct WrappedSignedProposal(SignedProposal<WrappedPill>);
+
+impl WrappedSignedProposal {
+    pub fn new(sp: SignedProposal<WrappedPill>) -> Self {
+        WrappedSignedProposal(sp)
+    }
+}
 
 #[async_trait]
 impl MessageCodec for WrappedSignedProposal {
@@ -60,6 +66,12 @@ impl<H: OverlordHandler + Sync + Send + 'static> MessageHandler for SignedPropos
 #[derive(Debug)]
 pub struct WrappedSignedPreVote(SignedPreVote);
 
+impl WrappedSignedPreVote {
+    pub fn new(vote: SignedPreVote) -> Self {
+        WrappedSignedPreVote(vote)
+    }
+}
+
 #[async_trait]
 impl MessageCodec for WrappedSignedPreVote {
     async fn encode(&mut self) -> ProtocolResult<Bytes> {
@@ -95,6 +107,12 @@ impl<H: OverlordHandler + Sync + Send + 'static> MessageHandler for SignedPreVot
 
 #[derive(Debug)]
 pub struct WrappedSignedPreCommit(SignedPreCommit);
+
+impl WrappedSignedPreCommit {
+    pub fn new(vote: SignedPreCommit) -> Self {
+        WrappedSignedPreCommit(vote)
+    }
+}
 
 #[async_trait]
 impl MessageCodec for WrappedSignedPreCommit {
@@ -132,6 +150,12 @@ impl<H: OverlordHandler + Sync + Send + 'static> MessageHandler for SignedPreCom
 #[derive(Debug)]
 pub struct WrappedSignedChoke(SignedChoke);
 
+impl WrappedSignedChoke {
+    pub fn new(choke: SignedChoke) -> Self {
+        WrappedSignedChoke(choke)
+    }
+}
+
 #[async_trait]
 impl MessageCodec for WrappedSignedChoke {
     async fn encode(&mut self) -> ProtocolResult<Bytes> {
@@ -166,6 +190,12 @@ impl<H: OverlordHandler + Sync + Send + 'static> MessageHandler for SignedChokeH
 
 #[derive(Debug)]
 pub struct WrappedPreVoteQC(PreVoteQC);
+
+impl WrappedPreVoteQC {
+    pub fn new(qc: PreVoteQC) -> Self {
+        WrappedPreVoteQC(qc)
+    }
+}
 
 #[async_trait]
 impl MessageCodec for WrappedPreVoteQC {
@@ -202,6 +232,12 @@ impl<H: OverlordHandler + Sync + Send + 'static> MessageHandler for PreVoteQCHan
 #[derive(Debug)]
 pub struct WrappedPreCommitQC(PreCommitQC);
 
+impl WrappedPreCommitQC {
+    pub fn new(qc: PreCommitQC) -> Self {
+        WrappedPreCommitQC(qc)
+    }
+}
+
 #[async_trait]
 impl MessageCodec for WrappedPreCommitQC {
     async fn encode(&mut self) -> ProtocolResult<Bytes> {
@@ -236,6 +272,12 @@ impl<H: OverlordHandler + Sync + Send + 'static> MessageHandler for PreCommitQCH
 
 #[derive(Debug)]
 pub struct WrappedSignedHeight(SignedHeight);
+
+impl WrappedSignedHeight {
+    pub fn new(signed_height: SignedHeight) -> Self {
+        WrappedSignedHeight(signed_height)
+    }
+}
 
 #[async_trait]
 impl MessageCodec for WrappedSignedHeight {
@@ -272,6 +314,12 @@ impl<H: OverlordHandler + Sync + Send + 'static> MessageHandler for SignedHeight
 #[derive(Debug)]
 pub struct WrappedSyncRequest(SyncRequest);
 
+impl WrappedSyncRequest {
+    pub fn new(request: SyncRequest) -> Self {
+        WrappedSyncRequest(request)
+    }
+}
+
 #[async_trait]
 impl MessageCodec for WrappedSyncRequest {
     async fn encode(&mut self) -> ProtocolResult<Bytes> {
@@ -305,6 +353,12 @@ impl<H: OverlordHandler + Sync + Send + 'static> MessageHandler for SyncRequestH
 }
 #[derive(Debug)]
 pub struct WrappedSyncResponse(SyncResponse<WrappedPill>);
+
+impl WrappedSyncResponse {
+    pub fn new(response: SyncResponse<WrappedPill>) -> Self {
+        WrappedSyncResponse(response)
+    }
+}
 
 #[async_trait]
 impl MessageCodec for WrappedSyncResponse {

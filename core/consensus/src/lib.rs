@@ -22,6 +22,7 @@ use parking_lot::RwLock;
 
 use common_merkle::Merkle;
 
+use protocol::traits::MessageCodec;
 use protocol::traits::{
     Context, ExecutorFactory, ExecutorParams, ExecutorResp, Gossip, MemPool, Priority, Rpc,
     ServiceMapping, Storage,
@@ -34,7 +35,9 @@ use protocol::types::{
 use protocol::{fixed_codec::FixedCodec, ProtocolError, ProtocolErrorKind, ProtocolResult};
 
 use crate::message::{
-    END_GOSSIP_PRE_COMMIT_QC, END_GOSSIP_PRE_VOTE_QC, END_GOSSIP_SIGNED_CHOKE,
+    WrappedPreCommitQC, WrappedPreVoteQC, WrappedSignedChoke, WrappedSignedHeight,
+    WrappedSignedPreCommit, WrappedSignedPreVote, WrappedSignedProposal, WrappedSyncRequest,
+    WrappedSyncResponse, END_GOSSIP_PRE_COMMIT_QC, END_GOSSIP_PRE_VOTE_QC, END_GOSSIP_SIGNED_CHOKE,
     END_GOSSIP_SIGNED_HEIGHT, END_GOSSIP_SIGNED_PRE_COMMIT, END_GOSSIP_SIGNED_PRE_VOTE,
     END_GOSSIP_SIGNED_PROPOSAL, END_GOSSIP_SYNC_REQUEST, END_GOSSIP_SYNC_RESPONSE,
 };
@@ -363,7 +366,7 @@ where
         last_commit_exec_resp: ExecResp,
     ) -> Result<ExecResult<ExecResp>, Box<dyn Error + Send>> {
         // Todo: this can be removed to promote performance if muta test stable for a
-        // long time 
+        // long time
         let latest_height = self.get_latest_height(ctx.clone()).await?;
         if latest_height != height - 1 {
             panic!(
@@ -430,30 +433,34 @@ where
         ctx: Context,
         msg: OverlordMsg<WrappedPill>,
     ) -> Result<(), Box<dyn Error + Send>> {
-        println!("BROADCAST ################# {}", msg);
         let (end, msg) = match msg {
             OverlordMsg::SignedProposal(sp) => {
-                let bytes = rlp::encode(&sp);
+                let mut wrapped = WrappedSignedProposal::new(sp);
+                let bytes = wrapped.encode().await?;
                 (END_GOSSIP_SIGNED_PROPOSAL, bytes)
             }
 
             OverlordMsg::PreVoteQC(qc) => {
-                let bytes = rlp::encode(&qc);
+                let mut wrapped = WrappedPreVoteQC::new(qc);
+                let bytes = wrapped.encode().await?;
                 (END_GOSSIP_PRE_VOTE_QC, bytes)
             }
 
             OverlordMsg::PreCommitQC(qc) => {
-                let bytes = rlp::encode(&qc);
+                let mut wrapped = WrappedPreCommitQC::new(qc);
+                let bytes = wrapped.encode().await?;
                 (END_GOSSIP_PRE_COMMIT_QC, bytes)
             }
 
             OverlordMsg::SignedChoke(sc) => {
-                let bytes = rlp::encode(&sc);
+                let mut wrapped = WrappedSignedChoke::new(sc);
+                let bytes = wrapped.encode().await?;
                 (END_GOSSIP_SIGNED_CHOKE, bytes)
             }
 
             OverlordMsg::SignedHeight(sh) => {
-                let bytes = rlp::encode(&sh);
+                let mut wrapped = WrappedSignedHeight::new(sh);
+                let bytes = wrapped.encode().await?;
                 (END_GOSSIP_SIGNED_HEIGHT, bytes)
             }
 
@@ -472,26 +479,28 @@ where
         to: Address,
         msg: OverlordMsg<WrappedPill>,
     ) -> Result<(), Box<dyn Error + Send>> {
-        println!("TRANSMIT ################# {}", msg);
-
         let (end, msg) = match msg {
             OverlordMsg::SignedPreVote(sv) => {
-                let bytes = rlp::encode(&sv);
+                let mut wrapped = WrappedSignedPreVote::new(sv);
+                let bytes = wrapped.encode().await?;
                 (END_GOSSIP_SIGNED_PRE_VOTE, bytes)
             }
 
             OverlordMsg::SignedPreCommit(sc) => {
-                let bytes = rlp::encode(&sc);
+                let mut wrapped = WrappedSignedPreCommit::new(sc);
+                let bytes = wrapped.encode().await?;
                 (END_GOSSIP_SIGNED_PRE_COMMIT, bytes)
             }
 
             OverlordMsg::SyncRequest(sq) => {
-                let bytes = rlp::encode(&sq);
+                let mut wrapped = WrappedSyncRequest::new(sq);
+                let bytes = wrapped.encode().await?;
                 (END_GOSSIP_SYNC_REQUEST, bytes)
             }
 
             OverlordMsg::SyncResponse(sr) => {
-                let bytes = rlp::encode(&sr);
+                let mut wrapped = WrappedSyncResponse::new(sr);
+                let bytes = wrapped.encode().await?;
                 (END_GOSSIP_SYNC_RESPONSE, bytes)
             }
 
@@ -677,8 +686,6 @@ where
     Mapping: ServiceMapping + 'static,
 {
     fn send_msg(&self, ctx: Context, msg: OverlordMsg<WrappedPill>) {
-        println!("RECEIVE ################# {}", msg);
-
         let handler = self
             .status
             .overlord_handler

@@ -31,10 +31,10 @@ payload = '''
             "vote_weight": 1
         }
     ],
-    "propose_ratio": 15,
-    "prevote_ratio": 10,
-    "precommit_ratio": 10,
-    "brake_ratio": 7,
+    "propose_ratio": 5,
+    "prevote_ratio": 15,
+    "precommit_ratio": 5,
+    "brake_ratio": 10,
     "tx_num_limit": 20000,
     "max_tx_size": 1024
 }
