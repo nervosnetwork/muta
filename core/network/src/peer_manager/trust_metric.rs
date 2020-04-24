@@ -260,6 +260,9 @@ impl Inner {
         let max_memorys = self.config.max_faded_memorys;
 
         *self.history.write() = History::new(max_intervals, max_memorys);
+
+        self.good_events.store(0, SeqCst);
+        self.bad_events.store(0, SeqCst);
     }
 
     fn trust_value(&self) -> f64 {
