@@ -1,3 +1,5 @@
+pub mod message;
+
 use std::boxed::Box;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
@@ -20,9 +22,9 @@ use tokio::sync::mpsc::{channel, Receiver, Sender};
 use common_merkle::Merkle;
 
 use protocol::traits::{
-    CommonConsensusAdapter, ConsensusAdapter, Context, ExecutorFactory, ExecutorParams,
-    ExecutorResp, Gossip, MemPool, MessageTarget, MixedTxHashes, Priority, Rpc, ServiceMapping,
-    Storage, SynchronizationAdapter,
+    Context, ExecutorFactory, ExecutorParams,
+    ExecutorResp, Gossip, MemPool, MixedTxHashes, Priority, Rpc, ServiceMapping,
+    Storage
 };
 use protocol::types::{
     Address as ProtoAddress, Block, BlockHeader, Bloom, Bytes, FullBlock, Hash as ProtoHash,
@@ -31,24 +33,18 @@ use protocol::types::{
 };
 use protocol::{fixed_codec::FixedCodec, ProtocolError, ProtocolErrorKind, ProtocolResult};
 
-pub const END_GOSSIP_SIGNED_PROPOSAL: &str = "/gossip/consensus/signed_proposal";
-pub const END_GOSSIP_SIGNED_PRE_VOTE: &str = "/gossip/consensus/signed_vote";
-pub const END_GOSSIP_SIGNED_PRE_COMMIT: &str = "/gossip/consensus/signed_vote";
-pub const END_GOSSIP_PRE_VOTE_QC: &str = "/gossip/consensus/pre_vote_qc";
-pub const END_GOSSIP_PRE_COMMIT_QC: &str = "/gossip/consensus/pre_commit_qc";
-pub const END_GOSSIP_SIGNED_CHOKE: &str = "/gossip/consensus/signed_choke";
-pub const END_GOSSIP_SIGNED_HEIGHT: &str = "/gossip/consensus/signed_height";
-
-pub const RPC_SYNC_PULL_BLOCK_PROOF: &str = "/rpc_call/consensus/sync_pull_block";
-pub const RPC_SYNC_PUSH_BLOCK_PROOF: &str = "/rpc_resp/consensus/sync_pull_block";
-pub const RPC_SYNC_PULL_TXS: &str = "/rpc_call/consensus/sync_pull_txs";
-pub const RPC_SYNC_PUSH_TXS: &str = "/rpc_resp/consensus/sync_pull_txs";
+use crate::message::{
+    END_GOSSIP_SIGNED_PROPOSAL, END_GOSSIP_SIGNED_PRE_VOTE, END_GOSSIP_SIGNED_PRE_COMMIT,
+    END_GOSSIP_PRE_VOTE_QC, END_GOSSIP_PRE_COMMIT_QC, END_GOSSIP_SIGNED_CHOKE, END_GOSSIP_SIGNED_HEIGHT,
+    RPC_SYNC_PULL_BLOCK_PROOF, RPC_SYNC_PUSH_BLOCK_PROOF, RPC_SYNC_PULL_TXS, RPC_SYNC_PUSH_TXS
+};
 
 struct Status {
     chain_id:              ProtoHash,
     address:               ProtoAddress,
 
     from_myself: RwLock<HashSet<Bytes>>,
+    overlord_handler:     RwLock<Option<UnboundedSender<(Context, OverlordMsg<WrappedPill>)>>>,
 }
 
 pub struct OverlordAdapter<
@@ -365,7 +361,7 @@ where
         _ctx: Context,
         sender: UnboundedSender<(Context, OverlordMsg<WrappedPill>)>,
     ) {
-
+        *self.status.overlord_handler.write() = Some(sender);
     }
 
     async fn broadcast(
@@ -451,11 +447,7 @@ where
         let latest_height = latest_block.header.height;
 
         let end_height = if latest_height >= height_range.to {
-            if height_range.to - height_range.from > 50 {
-                height_range.from + 50
-            } else {
-                height_range.to
-            }
+            height_range.to
         } else {
             latest_height
         };
@@ -545,6 +537,28 @@ impl<EF, G, M, R, S, DB, Mapping> OverlordAdapter<EF, G, M, R, S, DB, Mapping>
             cycles_limit,
         };
         executor.exec(&exec_params, ordered_txs)
+    }
+}
+
+pub trait OverlordHandler {
+    fn send_msg(&self, ctx: Context, msg: OverlordMsg<WrappedPill>);
+}
+
+impl<EF, G, M, R, S, DB, Mapping> OverlordHandler
+for OverlordAdapter<EF, G, M, R, S, DB, Mapping>
+    where
+        EF: ExecutorFactory<DB, S, Mapping> + 'static,
+        G: Gossip + Sync + Send + 'static,
+        R: Rpc + Sync + Send + 'static,
+        M: MemPool + 'static,
+        S: Storage + 'static,
+        DB: cita_trie::DB + 'static,
+        Mapping: ServiceMapping + 'static,
+{
+    fn send_msg(&self, ctx: Context, msg: OverlordMsg<WrappedPill>){
+        let handler = self.status.overlord_handler.read().clone().expect("Unreachable! Network should be registered before receive message");
+        handler
+            .unbounded_send((ctx, msg)).expect("Overlord Channel is down! It's meaningless to continue running");
     }
 }
 
@@ -640,7 +654,7 @@ fn calculate_root<T: FixedCodec>(vec: &[T]) -> MerkleRoot {
 "_0.block.header.proposer.as_bytes().tiny_hex()",
 "_0.block.header.validator_version",
 "_0.block.header.validators.iter().map(|v| format!(\"{{ address: {}, propose_w: {}, vote_w: {} }}\", v.address.as_bytes().tiny_hex(), v.propose_weight, v.vote_weight))",)]
-struct WrappedPill(Pill);
+pub struct WrappedPill(Pill);
 
 impl WrappedPill {
     fn from_block(block: Block) -> WrappedPill {
@@ -691,7 +705,7 @@ impl Blk for WrappedPill {
     "receipt_root.as_bytes().tiny_hex()",
     cycles_used
 )]
-struct ExecResp {
+pub struct ExecResp {
     order_root:   MerkleRoot,
     state_root:   MerkleRoot,
     receipt_root: MerkleRoot,
@@ -726,6 +740,8 @@ fn into_proto_proof(proof: Proof) -> ProtocolResult<ProtoProof> {
 pub enum ConsensusError {
     #[display(fmt = "check block failed, {}", _0)]
     CheckBlock(String),
+    #[display(fmt = "message decode failed")]
+    MsgDecode,
 }
 
 impl Error for ConsensusError {}
