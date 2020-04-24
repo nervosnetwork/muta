@@ -13,9 +13,10 @@ use core_api::adapter::DefaultAPIAdapter;
 use core_api::config::GraphQLConfig;
 use core_consensus::message::{
     PreCommitQCHandler, PreVoteQCHandler, SignedChokeHandler, SignedHeightHandler,
-    SignedPreCommitHandler, SignedPreVoteHandler, SignedProposalHandler, END_GOSSIP_PRE_COMMIT_QC,
-    END_GOSSIP_PRE_VOTE_QC, END_GOSSIP_SIGNED_CHOKE, END_GOSSIP_SIGNED_HEIGHT,
-    END_GOSSIP_SIGNED_PRE_COMMIT, END_GOSSIP_SIGNED_PRE_VOTE, END_GOSSIP_SIGNED_PROPOSAL,
+    SignedPreCommitHandler, SignedPreVoteHandler, SignedProposalHandler, SyncRequestHandler,
+    SyncResponseHandler, END_GOSSIP_PRE_COMMIT_QC, END_GOSSIP_PRE_VOTE_QC, END_GOSSIP_SIGNED_CHOKE,
+    END_GOSSIP_SIGNED_HEIGHT, END_GOSSIP_SIGNED_PRE_COMMIT, END_GOSSIP_SIGNED_PRE_VOTE,
+    END_GOSSIP_SIGNED_PROPOSAL, END_GOSSIP_SYNC_REQUEST, END_GOSSIP_SYNC_RESPONSE,
 };
 use core_consensus::OverlordAdapter;
 use core_mempool::{
@@ -331,6 +332,14 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     network_service.register_endpoint_handler(
         END_GOSSIP_SIGNED_HEIGHT,
         Box::new(SignedHeightHandler::new(Arc::clone(&overlord_adapter))),
+    )?;
+    network_service.register_endpoint_handler(
+        END_GOSSIP_SYNC_REQUEST,
+        Box::new(SyncRequestHandler::new(Arc::clone(&overlord_adapter))),
+    )?;
+    network_service.register_endpoint_handler(
+        END_GOSSIP_SYNC_RESPONSE,
+        Box::new(SyncResponseHandler::new(Arc::clone(&overlord_adapter))),
     )?;
 
     // Run network

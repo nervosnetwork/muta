@@ -11,7 +11,8 @@ use async_trait::async_trait;
 use derive_more::Display;
 use futures::channel::mpsc::UnboundedSender;
 use overlord::types::{
-    Aggregates, AuthConfig, ExecResult, HeightRange, Node, SelectMode, TinyHex, Vote,
+    Aggregates, AuthConfig, ExecResult, FullBlockWithProof, HeightRange, Node, SelectMode, TinyHex,
+    Vote,
 };
 use overlord::{
     Adapter, Address, Blk, BlockState, DefaultCrypto, Hash, Height, OverlordConfig, OverlordError,
@@ -35,7 +36,7 @@ use protocol::{fixed_codec::FixedCodec, ProtocolError, ProtocolErrorKind, Protoc
 use crate::message::{
     END_GOSSIP_PRE_COMMIT_QC, END_GOSSIP_PRE_VOTE_QC, END_GOSSIP_SIGNED_CHOKE,
     END_GOSSIP_SIGNED_HEIGHT, END_GOSSIP_SIGNED_PRE_COMMIT, END_GOSSIP_SIGNED_PRE_VOTE,
-    END_GOSSIP_SIGNED_PROPOSAL, RPC_SYNC_PULL_BLOCK_PROOF, RPC_SYNC_PUSH_BLOCK_PROOF,
+    END_GOSSIP_SIGNED_PROPOSAL, END_GOSSIP_SYNC_REQUEST, END_GOSSIP_SYNC_RESPONSE,
 };
 
 type OverlordSender = UnboundedSender<(Context, OverlordMsg<WrappedPill>)>;
@@ -362,7 +363,7 @@ where
         last_commit_exec_resp: ExecResp,
     ) -> Result<ExecResult<ExecResp>, Box<dyn Error + Send>> {
         // Todo: this can be removed to promote performance if muta test stable for a
-        // long time
+        // long time 
         let latest_height = self.get_latest_height(ctx.clone()).await?;
         if latest_height != height - 1 {
             panic!(
@@ -429,6 +430,7 @@ where
         ctx: Context,
         msg: OverlordMsg<WrappedPill>,
     ) -> Result<(), Box<dyn Error + Send>> {
+        println!("BROADCAST ################# {}", msg);
         let (end, msg) = match msg {
             OverlordMsg::SignedProposal(sp) => {
                 let bytes = rlp::encode(&sp);
@@ -470,6 +472,8 @@ where
         to: Address,
         msg: OverlordMsg<WrappedPill>,
     ) -> Result<(), Box<dyn Error + Send>> {
+        println!("TRANSMIT ################# {}", msg);
+
         let (end, msg) = match msg {
             OverlordMsg::SignedPreVote(sv) => {
                 let bytes = rlp::encode(&sv);
@@ -483,12 +487,12 @@ where
 
             OverlordMsg::SyncRequest(sq) => {
                 let bytes = rlp::encode(&sq);
-                (RPC_SYNC_PULL_BLOCK_PROOF, bytes)
+                (END_GOSSIP_SYNC_REQUEST, bytes)
             }
 
             OverlordMsg::SyncResponse(sr) => {
                 let bytes = rlp::encode(&sr);
-                (RPC_SYNC_PUSH_BLOCK_PROOF, bytes)
+                (END_GOSSIP_SYNC_RESPONSE, bytes)
             }
 
             _ => unreachable!(),
@@ -512,7 +516,7 @@ where
         &self,
         _ctx: Context,
         height_range: HeightRange,
-    ) -> Result<Vec<(WrappedPill, Proof)>, Box<dyn Error + Send>> {
+    ) -> Result<Vec<FullBlockWithProof<WrappedPill>>, Box<dyn Error + Send>> {
         let latest_block = self.storage.get_latest_block().await?;
         let latest_height = latest_block.header.height;
 
@@ -524,34 +528,31 @@ where
 
         let mut vec = vec![];
         let mut base_block = self.storage.get_block_by_height(height_range.from).await?;
+        let mut base_bytes = self.get_full_block_bytes(&base_block).await?;
         for h in height_range.from + 1..=end_height {
             let block = self.storage.get_block_by_height(h).await?;
             let proof = block.header.proof.clone();
-            vec.push((
+            let bytes = self.get_full_block_bytes(&block).await?;
+
+            vec.push(FullBlockWithProof::new(
                 WrappedPill::from_block(base_block.clone()),
                 into_proof(proof),
+                bytes.clone(),
             ));
             base_block = block;
+            base_bytes = bytes;
         }
 
         if end_height == latest_height {
             let latest_proof = self.storage.get_latest_proof().await?;
-            vec.push((
+            vec.push(FullBlockWithProof::new(
                 WrappedPill::from_block(base_block),
                 into_proof(latest_proof),
+                base_bytes,
             ));
         }
 
         Ok(vec)
-    }
-
-    async fn sync_full_block(
-        &self,
-        _ctx: Context,
-        _from: &Address,
-        _block: WrappedPill,
-    ) -> Result<Bytes, Box<dyn Error + Send>> {
-        Ok(Bytes::default())
     }
 
     async fn get_latest_height(&self, _ctx: Context) -> Result<Height, Box<dyn Error + Send>> {
@@ -646,6 +647,19 @@ where
         };
         executor.exec(&exec_params, ordered_txs)
     }
+
+    async fn get_full_block_bytes(&self, block: &Block) -> ProtocolResult<Bytes> {
+        let txs = self
+            .storage
+            .get_transactions(block.ordered_tx_hashes.clone())
+            .await?;
+        let full_block = FullBlock {
+            block:       block.clone(),
+            ordered_txs: txs,
+        };
+        let full_block_bytes = full_block.encode_fixed()?;
+        Ok(full_block_bytes)
+    }
 }
 
 pub trait OverlordHandler {
@@ -663,6 +677,8 @@ where
     Mapping: ServiceMapping + 'static,
 {
     fn send_msg(&self, ctx: Context, msg: OverlordMsg<WrappedPill>) {
+        println!("RECEIVE ################# {}", msg);
+
         let handler = self
             .status
             .overlord_handler

@@ -18,11 +18,8 @@ pub const END_GOSSIP_PRE_VOTE_QC: &str = "/gossip/consensus/pre_vote_qc";
 pub const END_GOSSIP_PRE_COMMIT_QC: &str = "/gossip/consensus/pre_commit_qc";
 pub const END_GOSSIP_SIGNED_CHOKE: &str = "/gossip/consensus/signed_choke";
 pub const END_GOSSIP_SIGNED_HEIGHT: &str = "/gossip/consensus/signed_height";
-
-pub const RPC_SYNC_PULL_BLOCK_PROOF: &str = "/rpc_call/consensus/sync_pull_block";
-pub const RPC_SYNC_PUSH_BLOCK_PROOF: &str = "/rpc_resp/consensus/sync_pull_block";
-pub const RPC_SYNC_PULL_TXS: &str = "/rpc_call/consensus/sync_pull_txs";
-pub const RPC_SYNC_PUSH_TXS: &str = "/rpc_resp/consensus/sync_pull_txs";
+pub const END_GOSSIP_SYNC_REQUEST: &str = "/gossip/consensus/sync_request";
+pub const END_GOSSIP_SYNC_RESPONSE: &str = "/gossip/consensus/sync_response";
 
 #[derive(Debug)]
 pub struct WrappedSignedProposal(SignedProposal<WrappedPill>);
