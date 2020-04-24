@@ -1,33 +1,23 @@
-use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::sync::Arc;
 
 use bytes::Bytes;
-use futures::{future, lock::Mutex};
 #[cfg(unix)]
 use tokio::signal::unix::{self as os_impl};
 
 use common_crypto::{
-    BlsCommonReference, BlsPrivateKey, BlsPublicKey, PublicKey, Secp256k1, Secp256k1PrivateKey,
+    BlsPrivateKey, PrivateKey, PublicKey, Secp256k1, Secp256k1PrivateKey, ToBlsPublicKey,
     ToPublicKey,
 };
 use core_api::adapter::DefaultAPIAdapter;
 use core_api::config::GraphQLConfig;
-use core_consensus::fixed_types::{FixedBlock, FixedProof, FixedSignedTxs};
 use core_consensus::message::{
-    ChokeMessageHandler, ProposalMessageHandler, PullBlockRpcHandler, PullProofRpcHandler,
-    PullTxsRpcHandler, QCMessageHandler, RemoteHeightMessageHandler, VoteMessageHandler,
-    BROADCAST_HEIGHT, END_GOSSIP_AGGREGATED_VOTE, END_GOSSIP_SIGNED_CHOKE,
-    END_GOSSIP_SIGNED_PROPOSAL, END_GOSSIP_SIGNED_VOTE, RPC_RESP_SYNC_PULL_BLOCK,
-    RPC_RESP_SYNC_PULL_PROOF, RPC_RESP_SYNC_PULL_TXS, RPC_SYNC_PULL_BLOCK, RPC_SYNC_PULL_PROOF,
-    RPC_SYNC_PULL_TXS,
+    PreCommitQCHandler, PreVoteQCHandler, SignedChokeHandler, SignedHeightHandler,
+    SignedPreCommitHandler, SignedPreVoteHandler, SignedProposalHandler, END_GOSSIP_PRE_COMMIT_QC,
+    END_GOSSIP_PRE_VOTE_QC, END_GOSSIP_SIGNED_CHOKE, END_GOSSIP_SIGNED_HEIGHT,
+    END_GOSSIP_SIGNED_PRE_COMMIT, END_GOSSIP_SIGNED_PRE_VOTE, END_GOSSIP_SIGNED_PROPOSAL,
 };
-use core_consensus::status::{CurrentConsensusStatus, StatusAgent};
-use core_consensus::util::OverlordCrypto;
-use core_consensus::{
-    DurationConfig, Node, OverlordConsensus, OverlordConsensusAdapter, OverlordSynchronization,
-    RichBlock, SignedTxsWAL,
-};
+use core_consensus::OverlordAdapter;
 use core_mempool::{
     DefaultMemPoolAdapter, HashMemPool, MsgPushTxs, NewTxsHandler, PullTxsHandler,
     END_GOSSIP_NEW_TXS, RPC_PULL_TXS, RPC_RESP_PULL_TXS, RPC_RESP_PULL_TXS_SYNC,
@@ -36,9 +26,11 @@ use core_network::{NetworkConfig, NetworkService};
 use core_storage::{adapter::rocks::RocksAdapter, ImplStorage};
 use framework::binding::state::RocksTrieDB;
 use framework::executor::{ServiceExecutor, ServiceExecutorFactory};
-use protocol::traits::{APIAdapter, Context, MemPool, NodeInfo, ServiceMapping, Storage};
+use overlord::crypto::hex_to_common_ref;
+use overlord::OverlordServer;
+use protocol::traits::{APIAdapter, Context, MemPool, ServiceMapping, Storage};
 use protocol::types::{Address, Block, BlockHeader, Genesis, Hash, Metadata, Proof, Validator};
-use protocol::{fixed_codec::FixedCodec, ProtocolResult};
+use protocol::ProtocolResult;
 
 use crate::config::Config;
 use crate::MainError;
@@ -228,10 +220,6 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         Arc::clone(&service_mapping),
     );
 
-    // Create full transactions wal
-    let wal_path = config.data_path_for_txs_wal().to_str().unwrap().to_string();
-    let txs_wal = Arc::new(SignedTxsWAL::new(wal_path));
-
     let exec_resp = api_adapter
         .query_service(
             Context::new(),
@@ -274,219 +262,78 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     network_service.register_rpc_response::<MsgPushTxs>(RPC_RESP_PULL_TXS_SYNC)?;
 
     // Init Consensus
-    let validators: Vec<Validator> = metadata
-        .verifier_list
-        .iter()
-        .map(|v| Validator {
-            address:        v.address.clone(),
-            propose_weight: v.propose_weight,
-            vote_weight:    v.vote_weight,
-        })
-        .collect();
-
-    let node_info = NodeInfo {
-        chain_id:     metadata.chain_id.clone(),
-        self_address: my_address.clone(),
-    };
-    let current_header = &current_block.header;
-    let block_hash = Hash::digest(current_block.encode_fixed()?);
-    let current_height = current_block.header.height;
-    let exec_height = current_block.header.exec_height;
-    let proof = if let Ok(temp) = storage.get_latest_proof().await {
-        temp
-    } else {
-        current_header.proof.clone()
-    };
-
-    let current_consensus_status = CurrentConsensusStatus {
-        cycles_price:                metadata.cycles_price,
-        cycles_limit:                metadata.cycles_limit,
-        latest_committed_height:     current_block.header.height,
-        exec_height:                 current_block.header.exec_height,
-        current_hash:                block_hash,
-        latest_committed_state_root: current_header.state_root.clone(),
-        list_logs_bloom:             vec![],
-        list_confirm_root:           vec![],
-        list_state_root:             vec![],
-        list_receipt_root:           vec![],
-        list_cycles_used:            vec![],
-        current_proof:               proof,
-        validators:                  validators.clone(),
-        consensus_interval:          metadata.interval,
-        propose_ratio:               metadata.propose_ratio,
-        prevote_ratio:               metadata.prevote_ratio,
-        precommit_ratio:             metadata.precommit_ratio,
-        brake_ratio:                 metadata.brake_ratio,
-        max_tx_size:                 metadata.max_tx_size,
-        tx_num_limit:                metadata.tx_num_limit,
-    };
-
-    let consensus_interval = current_consensus_status.consensus_interval;
-    let status_agent = StatusAgent::new(current_consensus_status);
-
-    let mut bls_pub_keys = HashMap::new();
-    for validator_extend in metadata.verifier_list.iter() {
-        let address = validator_extend.address.as_bytes();
-        let hex_pubkey = hex::decode(validator_extend.bls_pub_key.as_string_trim0x())
-            .map_err(MainError::FromHex)?;
-        let pub_key = BlsPublicKey::try_from(hex_pubkey.as_ref()).map_err(MainError::Crypto)?;
-        bls_pub_keys.insert(address, pub_key);
-    }
-
-    let mut priv_key = Vec::new();
-    priv_key.extend_from_slice(&[0u8; 16]);
-    let mut tmp = hex::decode(config.privkey.as_string_trim0x()).unwrap();
-    priv_key.append(&mut tmp);
-    let bls_priv_key = BlsPrivateKey::try_from(priv_key.as_ref()).map_err(MainError::Crypto)?;
-
-    let hex_common_ref =
-        hex::decode(metadata.common_ref.as_string_trim0x()).map_err(MainError::FromHex)?;
-    let common_ref: BlsCommonReference = std::str::from_utf8(hex_common_ref.as_ref())
-        .map_err(MainError::Utf8)?
-        .into();
-
-    core_consensus::trace::init_tracer(my_address.as_hex())?;
-
-    let crypto = Arc::new(OverlordCrypto::new(bls_priv_key, bls_pub_keys, common_ref));
-
-    let mut consensus_adapter =
-        OverlordConsensusAdapter::<ServiceExecutorFactory, _, _, _, _, _, _>::new(
+    let overlord_adapter = Arc::new(
+        OverlordAdapter::<ServiceExecutorFactory, _, _, _, _, _, _>::new(
+            &metadata.chain_id,
+            &my_address,
             Arc::new(network_service.handle()),
             Arc::new(network_service.handle()),
-            Arc::clone(&mempool),
-            Arc::clone(&storage),
-            Arc::clone(&trie_db),
-            Arc::clone(&service_mapping),
-            status_agent.clone(),
-            Arc::clone(&crypto),
-        )?;
+            &mempool,
+            &storage,
+            &trie_db,
+            &service_mapping,
+        ),
+    );
 
-    let exec_demon = consensus_adapter.take_exec_demon();
-    let consensus_adapter = Arc::new(consensus_adapter);
-
-    let lock = Arc::new(Mutex::new(()));
-
-    let overlord_consensus = Arc::new(OverlordConsensus::new(
-        status_agent.clone(),
-        node_info,
-        Arc::clone(&crypto),
-        Arc::clone(&txs_wal),
-        Arc::clone(&consensus_adapter),
-        Arc::clone(&lock),
-    ));
-
-    consensus_adapter.set_overlord_handler(overlord_consensus.get_overlord_handler());
-
-    let synchronization = Arc::new(OverlordSynchronization::<_>::new(
-        config.consensus.sync_txs_chunk_size,
-        consensus_adapter,
-        status_agent.clone(),
-        crypto,
-        lock,
-    ));
-
-    // Re-execute block from exec_height + 1 to current_height, so that init the
-    // lost current status.
-    log::info!("Re-execute from {} to {}", exec_height + 1, current_height);
-    for height in exec_height + 1..=current_height {
-        let block = storage.get_block_by_height(height).await?;
-        let txs = storage
-            .get_transactions(block.ordered_tx_hashes.clone())
-            .await?;
-        let rich_block = RichBlock { block, txs };
-        let _ = synchronization
-            .exec_block(Context::new(), rich_block, status_agent.clone())
-            .await?;
-    }
+    let common_ref =
+        hex_to_common_ref(&metadata.common_ref.as_string()).expect("hex common ref failed");
+    let bls_pri_key = BlsPrivateKey::try_from(
+        [&[0u8; 16], my_privkey.to_bytes().as_ref()]
+            .concat()
+            .as_ref(),
+    )
+    .unwrap();
+    let bls_pub_key = bls_pri_key.pub_key(&common_ref);
+    let hex_pri_key = config.privkey.clone();
+    let hex_bls_pub_key = hex::encode(bls_pub_key.to_bytes());
+    let hex_pub_key = hex::encode(my_pubkey.to_bytes());
+    let hex_common_ref = metadata.common_ref.as_string();
+    let overlord_adapter_clone = Arc::clone(&overlord_adapter);
+    tokio::spawn(async move {
+        OverlordServer::run(
+            hex_common_ref,
+            hex_pri_key.as_string(),
+            hex_pub_key,
+            hex_bls_pub_key,
+            my_address.as_bytes(),
+            &overlord_adapter_clone,
+            &("wal/".to_owned()),
+        )
+        .await;
+    });
 
     // register consensus
     network_service.register_endpoint_handler(
         END_GOSSIP_SIGNED_PROPOSAL,
-        Box::new(ProposalMessageHandler::new(Arc::clone(&overlord_consensus))),
+        Box::new(SignedProposalHandler::new(Arc::clone(&overlord_adapter))),
     )?;
     network_service.register_endpoint_handler(
-        END_GOSSIP_AGGREGATED_VOTE,
-        Box::new(QCMessageHandler::new(Arc::clone(&overlord_consensus))),
+        END_GOSSIP_SIGNED_PRE_VOTE,
+        Box::new(SignedPreVoteHandler::new(Arc::clone(&overlord_adapter))),
     )?;
     network_service.register_endpoint_handler(
-        END_GOSSIP_SIGNED_VOTE,
-        Box::new(VoteMessageHandler::new(Arc::clone(&overlord_consensus))),
+        END_GOSSIP_SIGNED_PRE_COMMIT,
+        Box::new(SignedPreCommitHandler::new(Arc::clone(&overlord_adapter))),
+    )?;
+    network_service.register_endpoint_handler(
+        END_GOSSIP_PRE_VOTE_QC,
+        Box::new(PreVoteQCHandler::new(Arc::clone(&overlord_adapter))),
+    )?;
+    network_service.register_endpoint_handler(
+        END_GOSSIP_PRE_COMMIT_QC,
+        Box::new(PreCommitQCHandler::new(Arc::clone(&overlord_adapter))),
     )?;
     network_service.register_endpoint_handler(
         END_GOSSIP_SIGNED_CHOKE,
-        Box::new(ChokeMessageHandler::new(Arc::clone(&overlord_consensus))),
+        Box::new(SignedChokeHandler::new(Arc::clone(&overlord_adapter))),
     )?;
     network_service.register_endpoint_handler(
-        BROADCAST_HEIGHT,
-        Box::new(RemoteHeightMessageHandler::new(Arc::clone(
-            &synchronization,
-        ))),
+        END_GOSSIP_SIGNED_HEIGHT,
+        Box::new(SignedHeightHandler::new(Arc::clone(&overlord_adapter))),
     )?;
-    network_service.register_endpoint_handler(
-        RPC_SYNC_PULL_BLOCK,
-        Box::new(PullBlockRpcHandler::new(
-            Arc::new(network_service.handle()),
-            Arc::clone(&storage),
-        )),
-    )?;
-
-    network_service.register_endpoint_handler(
-        RPC_SYNC_PULL_PROOF,
-        Box::new(PullProofRpcHandler::new(
-            Arc::new(network_service.handle()),
-            Arc::clone(&storage),
-        )),
-    )?;
-
-    network_service.register_endpoint_handler(
-        RPC_SYNC_PULL_TXS,
-        Box::new(PullTxsRpcHandler::new(
-            Arc::new(network_service.handle()),
-            Arc::clone(&storage),
-        )),
-    )?;
-    network_service.register_rpc_response::<FixedBlock>(RPC_RESP_SYNC_PULL_BLOCK)?;
-    network_service.register_rpc_response::<FixedProof>(RPC_RESP_SYNC_PULL_PROOF)?;
-    network_service.register_rpc_response::<FixedSignedTxs>(RPC_RESP_SYNC_PULL_TXS)?;
 
     // Run network
     tokio::spawn(network_service);
-
-    // Run sync
-    tokio::spawn(async move {
-        if let Err(e) = synchronization.polling_broadcast().await {
-            log::error!("synchronization: {:?}", e);
-        }
-    });
-
-    // Run consensus
-    let authority_list = validators
-        .iter()
-        .map(|v| Node {
-            address:        v.address.as_bytes(),
-            propose_weight: v.propose_weight,
-            vote_weight:    v.vote_weight,
-        })
-        .collect::<Vec<_>>();
-
-    let timer_config = DurationConfig {
-        propose_ratio:   metadata.propose_ratio,
-        prevote_ratio:   metadata.prevote_ratio,
-        precommit_ratio: metadata.precommit_ratio,
-        brake_ratio:     metadata.brake_ratio,
-    };
-
-    tokio::spawn(async move {
-        if let Err(e) = overlord_consensus
-            .run(consensus_interval, authority_list, Some(timer_config))
-            .await
-        {
-            log::error!("muta-consensus: {:?} error", e);
-        }
-    });
-
-    let (abortable_demon, abort_handle) = future::abortable(exec_demon.run());
-    tokio::task::spawn_local(abortable_demon);
 
     // Init graphql
     let mut graphql_config = GraphQLConfig::default();
@@ -522,9 +369,6 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
             _ = sigtun_term.recv() => {}
         }
     }
-
-    // Abort consensus
-    abort_handle.abort();
 
     Ok(())
 }

@@ -6,7 +6,7 @@ use crate::types::{
 };
 use crate::ProtocolResult;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct ExecutorResp {
     pub receipts:        Vec<Receipt>,
     pub all_cycles_used: u64,

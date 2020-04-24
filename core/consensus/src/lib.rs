@@ -1,50 +1,62 @@
 pub mod message;
 
 use std::boxed::Box;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::error::Error;
 use std::marker::PhantomData;
 use std::sync::Arc;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use async_trait::async_trait;
 use derive_more::Display;
 use futures::channel::mpsc::UnboundedSender;
-use overlord::types::{Aggregates, ExecResult, HeightRange, TinyHex, Vote, SelectMode, Node, AuthConfig};
+use overlord::types::{
+    Aggregates, AuthConfig, ExecResult, HeightRange, Node, SelectMode, TinyHex, Vote,
+};
 use overlord::{
-    Adapter, Address, Blk, BlockState, DefaultCrypto, Hash, Height, OverlordError, OverlordMsg,
-    Proof, St, TimeConfig, OverlordConfig,
+    Adapter, Address, Blk, BlockState, DefaultCrypto, Hash, Height, OverlordConfig, OverlordError,
+    OverlordMsg, Proof, St, TimeConfig,
 };
 use parking_lot::RwLock;
-use tokio::sync::mpsc::error::TrySendError;
-use tokio::sync::mpsc::{channel, Receiver, Sender};
 
 use common_merkle::Merkle;
 
 use protocol::traits::{
-    Context, ExecutorFactory, ExecutorParams,
-    ExecutorResp, Gossip, MemPool, MixedTxHashes, Priority, Rpc, ServiceMapping,
-    Storage
+    Context, ExecutorFactory, ExecutorParams, ExecutorResp, Gossip, MemPool, Priority, Rpc,
+    ServiceMapping, Storage,
 };
 use protocol::types::{
     Address as ProtoAddress, Block, BlockHeader, Bloom, Bytes, FullBlock, Hash as ProtoHash,
-    MerkleRoot, Metadata, Pill, Proof as ProtoProof, Receipt, SignedTransaction,
-    TransactionRequest, Validator, ValidatorExtend
+    MerkleRoot, Metadata, Pill, Proof as ProtoProof, SignedTransaction, TransactionRequest,
+    Validator, ValidatorExtend,
 };
 use protocol::{fixed_codec::FixedCodec, ProtocolError, ProtocolErrorKind, ProtocolResult};
 
 use crate::message::{
-    END_GOSSIP_SIGNED_PROPOSAL, END_GOSSIP_SIGNED_PRE_VOTE, END_GOSSIP_SIGNED_PRE_COMMIT,
-    END_GOSSIP_PRE_VOTE_QC, END_GOSSIP_PRE_COMMIT_QC, END_GOSSIP_SIGNED_CHOKE, END_GOSSIP_SIGNED_HEIGHT,
-    RPC_SYNC_PULL_BLOCK_PROOF, RPC_SYNC_PUSH_BLOCK_PROOF, RPC_SYNC_PULL_TXS, RPC_SYNC_PUSH_TXS
+    END_GOSSIP_PRE_COMMIT_QC, END_GOSSIP_PRE_VOTE_QC, END_GOSSIP_SIGNED_CHOKE,
+    END_GOSSIP_SIGNED_HEIGHT, END_GOSSIP_SIGNED_PRE_COMMIT, END_GOSSIP_SIGNED_PRE_VOTE,
+    END_GOSSIP_SIGNED_PROPOSAL, RPC_SYNC_PULL_BLOCK_PROOF, RPC_SYNC_PUSH_BLOCK_PROOF,
 };
 
-struct Status {
-    chain_id:              ProtoHash,
-    address:               ProtoAddress,
+type OverlordSender = UnboundedSender<(Context, OverlordMsg<WrappedPill>)>;
 
-    from_myself: RwLock<HashSet<Bytes>>,
-    overlord_handler:     RwLock<Option<UnboundedSender<(Context, OverlordMsg<WrappedPill>)>>>,
+pub struct Status {
+    chain_id: ProtoHash,
+    address:  ProtoAddress,
+
+    from_myself:      RwLock<HashSet<Bytes>>,
+    overlord_handler: RwLock<Option<OverlordSender>>,
+}
+
+impl Status {
+    pub fn new(chain_id: ProtoHash, address: ProtoAddress) -> Self {
+        Status {
+            chain_id,
+            address,
+            from_myself: RwLock::new(HashSet::new()),
+            overlord_handler: RwLock::new(None),
+        }
+    }
 }
 
 pub struct OverlordAdapter<
@@ -57,6 +69,7 @@ pub struct OverlordAdapter<
     Mapping: ServiceMapping,
 > {
     status:          Status,
+    #[allow(dead_code)]
     rpc:             Arc<R>,
     network:         Arc<G>,
     mem_pool:        Arc<M>,
@@ -85,30 +98,54 @@ where
         &self,
         ctx: Context,
         height: Height,
-    ) -> Result<ExecResult<ExecResp>, Box<dyn Error + Send>>{
-        // Todo: this can be removed to promote performance if muta test stable for a long time
+    ) -> Result<ExecResult<ExecResp>, Box<dyn Error + Send>> {
+        // Todo: this can be removed to promote performance if muta test stable for a
+        // long time
         let latest_height = self.get_latest_height(ctx.clone()).await?;
         if latest_height < height {
-            panic!("save_and_exec_block_with_proof, latest_height != height - 1, {} != {} - 1", latest_height, height);
+            panic!(
+                "save_and_exec_block_with_proof, latest_height != height - 1, {} != {} - 1",
+                latest_height, height
+            );
         }
 
         let current_block = self.storage.get_block_by_height(height).await?;
         let exec_height = current_block.header.exec_height;
         let mut base_state_root = current_block.header.state_root;
         let mut exec_result = ExecutorResp::default();
-        let metadata = self.get_metadata(ctx, base_state_root.clone(), height, current_block.header.timestamp)?;
-        let mut cycles_limit = metadata.cycles_limit;
+        let metadata = self.get_metadata(
+            ctx,
+            base_state_root.clone(),
+            height,
+            current_block.header.timestamp,
+        )?;
+        let cycles_limit = metadata.cycles_limit;
         for h in exec_height + 1..=height {
             let block = self.storage.get_block_by_height(h).await?;
-            let txs = self.storage
+            let txs = self
+                .storage
                 .get_transactions(block.ordered_tx_hashes.clone())
                 .await?;
-            exec_result = self.exec(base_state_root, h, block.header.timestamp, cycles_limit, &txs)?;
+            exec_result = self.exec(
+                base_state_root,
+                h,
+                block.header.timestamp,
+                cycles_limit,
+                &txs,
+            )?;
             base_state_root = exec_result.state_root;
         }
 
         let receipt_root = calculate_root(&exec_result.receipts);
-        let exec_result = create_exec_result(height, metadata, base_state_root, current_block.header.order_root, receipt_root, exec_result.logs_bloom, exec_result.all_cycles_used);
+        let exec_result = create_exec_result(
+            height,
+            metadata,
+            base_state_root,
+            current_block.header.order_root,
+            receipt_root,
+            exec_result.logs_bloom,
+            exec_result.all_cycles_used,
+        );
 
         Ok(exec_result)
     }
@@ -156,7 +193,7 @@ where
             timestamp,
             logs_bloom: block_states
                 .iter()
-                .map(|stat| stat.state.logs_bloom.clone())
+                .map(|stat| stat.state.logs_bloom)
                 .collect(),
             order_root: calculate_root(&ordered_tx_hashes),
             confirm_root: block_states
@@ -324,10 +361,14 @@ where
         last_exec_resp: ExecResp,
         last_commit_exec_resp: ExecResp,
     ) -> Result<ExecResult<ExecResp>, Box<dyn Error + Send>> {
-        // Todo: this can be removed to promote performance if muta test stable for a long time
+        // Todo: this can be removed to promote performance if muta test stable for a
+        // long time
         let latest_height = self.get_latest_height(ctx.clone()).await?;
         if latest_height != height - 1 {
-            panic!("save_and_exec_block_with_proof, latest_height != height - 1, {} != {} - 1", latest_height, height);
+            panic!(
+                "save_and_exec_block_with_proof, latest_height != height - 1, {} != {} - 1",
+                latest_height, height
+            );
         }
 
         let full_block: FullBlock = FixedCodec::decode_fixed(full_block)?;
@@ -337,19 +378,38 @@ where
         let timestamp = full_block.block.header.timestamp;
         let cycles_limit = last_commit_exec_resp.cycles_limit;
 
-        let resp = self.exec(state_root.clone(), height, timestamp, cycles_limit, &full_block.ordered_txs)?;
-        let metadata = self.get_metadata(ctx.clone(), resp.state_root.clone(), height, timestamp)?;
+        let resp = self.exec(
+            state_root.clone(),
+            height,
+            timestamp,
+            cycles_limit,
+            &full_block.ordered_txs,
+        )?;
+        let metadata =
+            self.get_metadata(ctx.clone(), resp.state_root.clone(), height, timestamp)?;
         let ordered_tx_hashes = full_block.block.ordered_tx_hashes.clone();
         let receipt_root = calculate_root(&resp.receipts);
 
         self.storage.insert_receipts(resp.receipts.clone()).await?;
-        self.storage.update_latest_proof(into_proto_proof(proof)?).await?;
+        self.storage
+            .update_latest_proof(into_proto_proof(proof)?)
+            .await?;
         self.storage.insert_block(full_block.block).await?;
-        self.storage.insert_transactions(full_block.ordered_txs).await?;
+        self.storage
+            .insert_transactions(full_block.ordered_txs)
+            .await?;
         self.mem_pool.flush(ctx, ordered_tx_hashes).await?;
 
-        let exec_result = create_exec_result(height, metadata, state_root, order_root, receipt_root, resp.logs_bloom, resp.all_cycles_used);
-        Ok(exec_result.clone())
+        let exec_result = create_exec_result(
+            height,
+            metadata,
+            state_root,
+            order_root,
+            receipt_root,
+            resp.logs_bloom,
+            resp.all_cycles_used,
+        );
+        Ok(exec_result)
     }
 
     async fn commit(&self, _ctx: Context, _commit_state: ExecResult<ExecResp>) {
@@ -398,7 +458,9 @@ where
             _ => unreachable!(),
         };
 
-        self.network.broadcast(ctx.clone(), end, msg, Priority::High).await?;
+        self.network
+            .broadcast(ctx.clone(), end, msg, Priority::High)
+            .await?;
         Ok(())
     }
 
@@ -432,7 +494,15 @@ where
             _ => unreachable!(),
         };
 
-        self.network.users_cast(ctx.clone(), end, vec![ProtoAddress::from_bytes(to)?], msg, Priority::High).await?;
+        self.network
+            .users_cast(
+                ctx.clone(),
+                end,
+                vec![ProtoAddress::from_bytes(to)?],
+                msg,
+                Priority::High,
+            )
+            .await?;
 
         Ok(())
     }
@@ -440,7 +510,7 @@ where
     /// should return empty vec if the required blocks are not exist
     async fn get_block_with_proofs(
         &self,
-        ctx: Context,
+        _ctx: Context,
         height_range: HeightRange,
     ) -> Result<Vec<(WrappedPill, Proof)>, Box<dyn Error + Send>> {
         let latest_block = self.storage.get_latest_block().await?;
@@ -457,21 +527,30 @@ where
         for h in height_range.from + 1..=end_height {
             let block = self.storage.get_block_by_height(h).await?;
             let proof = block.header.proof.clone();
-            vec.push((WrappedPill::from_block(base_block.clone()), into_proof(proof)));
+            vec.push((
+                WrappedPill::from_block(base_block.clone()),
+                into_proof(proof),
+            ));
             base_block = block;
         }
 
         if end_height == latest_height {
             let latest_proof = self.storage.get_latest_proof().await?;
-            vec.push((WrappedPill::from_block(base_block), into_proof(latest_proof)));
+            vec.push((
+                WrappedPill::from_block(base_block),
+                into_proof(latest_proof),
+            ));
         }
 
         Ok(vec)
     }
 
-    async fn sync_full_block(&self, ctx: Context, from: &Address, block: WrappedPill)
-                             -> Result<Bytes, Box<dyn Error + Send>>{
-
+    async fn sync_full_block(
+        &self,
+        _ctx: Context,
+        _from: &Address,
+        _block: WrappedPill,
+    ) -> Result<Bytes, Box<dyn Error + Send>> {
         Ok(Bytes::default())
     }
 
@@ -479,18 +558,40 @@ where
         Ok(self.storage.get_latest_block().await?.header.height)
     }
 
-    async fn handle_error(&self, ctx: Context, err: OverlordError) {}
+    async fn handle_error(&self, _ctx: Context, _err: OverlordError) {}
 }
 
 impl<EF, G, M, R, S, DB, Mapping> OverlordAdapter<EF, G, M, R, S, DB, Mapping>
-    where
-        EF: ExecutorFactory<DB, S, Mapping>,
-        G: Gossip + Sync + Send + 'static,
-        R: Rpc + Sync + Send + 'static,
-        M: MemPool + 'static,
-        S: Storage + 'static,
-        DB: cita_trie::DB + 'static,
-        Mapping: ServiceMapping + 'static,{
+where
+    EF: ExecutorFactory<DB, S, Mapping>,
+    G: Gossip + Sync + Send + 'static,
+    R: Rpc + Sync + Send + 'static,
+    M: MemPool + 'static,
+    S: Storage + 'static,
+    DB: cita_trie::DB + 'static,
+    Mapping: ServiceMapping + 'static,
+{
+    pub fn new(
+        chain_id: &ProtoHash,
+        my_address: &ProtoAddress,
+        rpc: Arc<R>,
+        network: Arc<G>,
+        mem_pool: &Arc<M>,
+        storage: &Arc<S>,
+        trie_db: &Arc<DB>,
+        service_mapping: &Arc<Mapping>,
+    ) -> Self {
+        OverlordAdapter {
+            status: Status::new(chain_id.clone(), my_address.clone()),
+            rpc,
+            network,
+            mem_pool: Arc::clone(&mem_pool),
+            storage: Arc::clone(&storage),
+            trie_db: Arc::clone(&trie_db),
+            service_mapping: Arc::clone(&service_mapping),
+            phantom: PhantomData,
+        }
+    }
 
     fn get_metadata(
         &self,
@@ -523,7 +624,14 @@ impl<EF, G, M, R, S, DB, Mapping> OverlordAdapter<EF, G, M, R, S, DB, Mapping>
         Ok(serde_json::from_str(&exec_resp.succeed_data).expect("Decode metadata failed!"))
     }
 
-    fn exec(&self, state_root: MerkleRoot, height: Height, timestamp: u64, cycles_limit: u64, ordered_txs: &[SignedTransaction]) -> ProtocolResult<ExecutorResp> {
+    fn exec(
+        &self,
+        state_root: MerkleRoot,
+        height: Height,
+        timestamp: u64,
+        cycles_limit: u64,
+        ordered_txs: &[SignedTransaction],
+    ) -> ProtocolResult<ExecutorResp> {
         let mut executor = EF::from_root(
             state_root.clone(),
             Arc::clone(&self.trie_db),
@@ -544,25 +652,38 @@ pub trait OverlordHandler {
     fn send_msg(&self, ctx: Context, msg: OverlordMsg<WrappedPill>);
 }
 
-impl<EF, G, M, R, S, DB, Mapping> OverlordHandler
-for OverlordAdapter<EF, G, M, R, S, DB, Mapping>
-    where
-        EF: ExecutorFactory<DB, S, Mapping> + 'static,
-        G: Gossip + Sync + Send + 'static,
-        R: Rpc + Sync + Send + 'static,
-        M: MemPool + 'static,
-        S: Storage + 'static,
-        DB: cita_trie::DB + 'static,
-        Mapping: ServiceMapping + 'static,
+impl<EF, G, M, R, S, DB, Mapping> OverlordHandler for OverlordAdapter<EF, G, M, R, S, DB, Mapping>
+where
+    EF: ExecutorFactory<DB, S, Mapping> + 'static,
+    G: Gossip + Sync + Send + 'static,
+    R: Rpc + Sync + Send + 'static,
+    M: MemPool + 'static,
+    S: Storage + 'static,
+    DB: cita_trie::DB + 'static,
+    Mapping: ServiceMapping + 'static,
 {
-    fn send_msg(&self, ctx: Context, msg: OverlordMsg<WrappedPill>){
-        let handler = self.status.overlord_handler.read().clone().expect("Unreachable! Network should be registered before receive message");
+    fn send_msg(&self, ctx: Context, msg: OverlordMsg<WrappedPill>) {
+        let handler = self
+            .status
+            .overlord_handler
+            .read()
+            .clone()
+            .expect("Unreachable! Network should be registered before receive message");
         handler
-            .unbounded_send((ctx, msg)).expect("Overlord Channel is down! It's meaningless to continue running");
+            .unbounded_send((ctx, msg))
+            .expect("Overlord Channel is down! It's meaningless to continue running");
     }
 }
 
-fn create_exec_result(height: Height, metadata: Metadata, state_root: MerkleRoot, order_root: MerkleRoot, receipt_root: MerkleRoot, logs_bloom: Bloom, cycles_used: u64) -> ExecResult<ExecResp> {
+fn create_exec_result(
+    height: Height,
+    metadata: Metadata,
+    state_root: MerkleRoot,
+    order_root: MerkleRoot,
+    receipt_root: MerkleRoot,
+    logs_bloom: Bloom,
+    cycles_used: u64,
+) -> ExecResult<ExecResp> {
     let time_config = TimeConfig {
         interval:         metadata.interval,
         propose_ratio:    metadata.propose_ratio,
@@ -571,7 +692,7 @@ fn create_exec_result(height: Height, metadata: Metadata, state_root: MerkleRoot
         brake_ratio:      metadata.brake_ratio,
     };
 
-   let auth_config = AuthConfig {
+    let auth_config = AuthConfig {
         common_ref: metadata.common_ref.as_string(),
         mode:       SelectMode::InTurn,
         auth_list:  to_overlord_auth_list(&metadata.verifier_list),
@@ -591,16 +712,16 @@ fn create_exec_result(height: Height, metadata: Metadata, state_root: MerkleRoot
         logs_bloom,
         cycles_limit: metadata.cycles_limit,
         tx_num_limit: metadata.tx_num_limit,
-        max_tx_size:  metadata.max_tx_size,
-        validators:   to_validator_list(&metadata.verifier_list),
+        max_tx_size: metadata.max_tx_size,
+        validators: to_validator_list(&metadata.verifier_list),
     };
 
     ExecResult {
         consensus_config,
-        block_states: BlockState{
+        block_states: BlockState {
             height,
             state: exec_resp,
-        }
+        },
     }
 }
 
@@ -629,13 +750,12 @@ fn to_validator_list(validators: &[ValidatorExtend]) -> Vec<Validator> {
 
 fn calculate_root<T: FixedCodec>(vec: &[T]) -> MerkleRoot {
     Merkle::from_hashes(
-        vec
-            .iter()
+        vec.iter()
             .map(|r| ProtoHash::digest(r.to_owned().encode_fixed().unwrap()))
             .collect::<Vec<_>>(),
     )
-        .get_root_hash()
-        .unwrap_or_else(ProtoHash::from_empty)
+    .get_root_hash()
+    .unwrap_or_else(ProtoHash::from_empty)
 }
 
 #[derive(Clone, Debug, Default, Display, PartialEq, Eq)]
@@ -658,7 +778,7 @@ pub struct WrappedPill(Pill);
 
 impl WrappedPill {
     fn from_block(block: Block) -> WrappedPill {
-        WrappedPill(Pill{
+        WrappedPill(Pill {
             block,
             propose_hashes: vec![],
         })

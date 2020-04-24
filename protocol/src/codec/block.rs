@@ -6,8 +6,8 @@ use prost::Message;
 use crate::{
     codec::{
         primitive::{Address, Hash},
-        CodecError, ProtocolCodecSync,
         transaction::SignedTransaction,
+        CodecError, ProtocolCodecSync,
     },
     field, impl_default_bytes_codec_for,
     types::primitive as protocol_primitive,
@@ -383,10 +383,7 @@ impl From<block::FullBlock> for FullBlock {
             .map(SignedTransaction::from)
             .collect::<Vec<_>>();
 
-        FullBlock {
-            block,
-            ordered_txs,
-        }
+        FullBlock { block, ordered_txs }
     }
 }
 
@@ -414,7 +411,14 @@ impl TryFrom<FullBlock> for block::FullBlock {
 // Codec
 // #################
 
-impl_default_bytes_codec_for!(block, [Block, BlockHeader, Proof, Validator, Pill, FullBlock]);
+impl_default_bytes_codec_for!(block, [
+    Block,
+    BlockHeader,
+    Proof,
+    Validator,
+    Pill,
+    FullBlock
+]);
 
 #[cfg(test)]
 mod test {

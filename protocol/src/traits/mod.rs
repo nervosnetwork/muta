@@ -1,6 +1,5 @@
 mod api;
 mod binding;
-mod consensus;
 mod executor;
 mod mempool;
 mod network;
@@ -10,10 +9,6 @@ pub use api::APIAdapter;
 pub use binding::{
     AdmissionControl, ChainQuerier, Service, ServiceMapping, ServiceSDK, ServiceState, StoreArray,
     StoreBool, StoreMap, StoreString, StoreUint64,
-};
-pub use consensus::{
-    CommonConsensusAdapter, Consensus, ConsensusAdapter, MessageTarget, NodeInfo, Synchronization,
-    SynchronizationAdapter,
 };
 pub use executor::{
     Dispatcher, Executor, ExecutorFactory, ExecutorParams, ExecutorResp, NoopDispatcher,

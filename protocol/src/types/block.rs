@@ -55,6 +55,6 @@ pub struct Pill {
 
 #[derive(RlpFixedCodec, Clone, Debug)]
 pub struct FullBlock {
-    pub block:          Block,
+    pub block:       Block,
     pub ordered_txs: Vec<SignedTransaction>,
 }
