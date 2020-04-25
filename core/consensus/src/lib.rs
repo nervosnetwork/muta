@@ -22,7 +22,6 @@ use parking_lot::RwLock;
 
 use common_merkle::Merkle;
 
-use protocol::traits::MessageCodec;
 use protocol::traits::{
     Context, ExecutorFactory, ExecutorParams, ExecutorResp, Gossip, MemPool, Priority, Rpc,
     ServiceMapping, Storage,
@@ -356,6 +355,7 @@ where
         Ok(full_block.encode_fixed()?)
     }
 
+    // Todo: if from sync, should check signedTransactions in full block
     async fn save_and_exec_block_with_proof(
         &self,
         ctx: Context,
@@ -433,43 +433,64 @@ where
         ctx: Context,
         msg: OverlordMsg<WrappedPill>,
     ) -> Result<(), Box<dyn Error + Send>> {
-        let (end, msg) = match msg {
+        match msg {
             OverlordMsg::SignedProposal(sp) => {
-                let mut wrapped = WrappedSignedProposal::new(sp);
-                let bytes = wrapped.encode().await?;
-                (END_GOSSIP_SIGNED_PROPOSAL, bytes)
+                let wrapped = WrappedSignedProposal::new(sp);
+                self.network
+                    .broadcast(
+                        ctx.clone(),
+                        END_GOSSIP_SIGNED_PROPOSAL,
+                        wrapped,
+                        Priority::High,
+                    )
+                    .await?;
             }
 
             OverlordMsg::PreVoteQC(qc) => {
-                let mut wrapped = WrappedPreVoteQC::new(qc);
-                let bytes = wrapped.encode().await?;
-                (END_GOSSIP_PRE_VOTE_QC, bytes)
+                let wrapped = WrappedPreVoteQC::new(qc);
+                self.network
+                    .broadcast(ctx.clone(), END_GOSSIP_PRE_VOTE_QC, wrapped, Priority::High)
+                    .await?;
             }
 
             OverlordMsg::PreCommitQC(qc) => {
-                let mut wrapped = WrappedPreCommitQC::new(qc);
-                let bytes = wrapped.encode().await?;
-                (END_GOSSIP_PRE_COMMIT_QC, bytes)
+                let wrapped = WrappedPreCommitQC::new(qc);
+                self.network
+                    .broadcast(
+                        ctx.clone(),
+                        END_GOSSIP_PRE_COMMIT_QC,
+                        wrapped,
+                        Priority::High,
+                    )
+                    .await?;
             }
 
             OverlordMsg::SignedChoke(sc) => {
-                let mut wrapped = WrappedSignedChoke::new(sc);
-                let bytes = wrapped.encode().await?;
-                (END_GOSSIP_SIGNED_CHOKE, bytes)
+                let wrapped = WrappedSignedChoke::new(sc);
+                self.network
+                    .broadcast(
+                        ctx.clone(),
+                        END_GOSSIP_SIGNED_CHOKE,
+                        wrapped,
+                        Priority::High,
+                    )
+                    .await?;
             }
 
             OverlordMsg::SignedHeight(sh) => {
-                let mut wrapped = WrappedSignedHeight::new(sh);
-                let bytes = wrapped.encode().await?;
-                (END_GOSSIP_SIGNED_HEIGHT, bytes)
+                let wrapped = WrappedSignedHeight::new(sh);
+                self.network
+                    .broadcast(
+                        ctx.clone(),
+                        END_GOSSIP_SIGNED_HEIGHT,
+                        wrapped,
+                        Priority::High,
+                    )
+                    .await?;
             }
 
             _ => unreachable!(),
         };
-
-        self.network
-            .broadcast(ctx.clone(), end, msg, Priority::High)
-            .await?;
         Ok(())
     }
 
@@ -479,43 +500,62 @@ where
         to: Address,
         msg: OverlordMsg<WrappedPill>,
     ) -> Result<(), Box<dyn Error + Send>> {
-        let (end, msg) = match msg {
+        let to = vec![ProtoAddress::from_bytes(to)?];
+        match msg {
             OverlordMsg::SignedPreVote(sv) => {
-                let mut wrapped = WrappedSignedPreVote::new(sv);
-                let bytes = wrapped.encode().await?;
-                (END_GOSSIP_SIGNED_PRE_VOTE, bytes)
+                let wrapped = WrappedSignedPreVote::new(sv);
+                self.network
+                    .users_cast(
+                        ctx.clone(),
+                        END_GOSSIP_SIGNED_PRE_VOTE,
+                        to,
+                        wrapped,
+                        Priority::High,
+                    )
+                    .await?;
             }
 
             OverlordMsg::SignedPreCommit(sc) => {
-                let mut wrapped = WrappedSignedPreCommit::new(sc);
-                let bytes = wrapped.encode().await?;
-                (END_GOSSIP_SIGNED_PRE_COMMIT, bytes)
+                let wrapped = WrappedSignedPreCommit::new(sc);
+                self.network
+                    .users_cast(
+                        ctx.clone(),
+                        END_GOSSIP_SIGNED_PRE_COMMIT,
+                        to,
+                        wrapped,
+                        Priority::High,
+                    )
+                    .await?;
             }
 
             OverlordMsg::SyncRequest(sq) => {
-                let mut wrapped = WrappedSyncRequest::new(sq);
-                let bytes = wrapped.encode().await?;
-                (END_GOSSIP_SYNC_REQUEST, bytes)
+                let wrapped = WrappedSyncRequest::new(sq);
+                self.network
+                    .users_cast(
+                        ctx.clone(),
+                        END_GOSSIP_SYNC_REQUEST,
+                        to,
+                        wrapped,
+                        Priority::High,
+                    )
+                    .await?;
             }
 
             OverlordMsg::SyncResponse(sr) => {
-                let mut wrapped = WrappedSyncResponse::new(sr);
-                let bytes = wrapped.encode().await?;
-                (END_GOSSIP_SYNC_RESPONSE, bytes)
+                let wrapped = WrappedSyncResponse::new(sr);
+                self.network
+                    .users_cast(
+                        ctx.clone(),
+                        END_GOSSIP_SYNC_RESPONSE,
+                        to,
+                        wrapped,
+                        Priority::High,
+                    )
+                    .await?;
             }
 
             _ => unreachable!(),
         };
-
-        self.network
-            .users_cast(
-                ctx.clone(),
-                end,
-                vec![ProtoAddress::from_bytes(to)?],
-                msg,
-                Priority::High,
-            )
-            .await?;
 
         Ok(())
     }
