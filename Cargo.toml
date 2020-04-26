@@ -33,7 +33,7 @@ hex = "0.4"
 rlp = "0.4"
 toml = "0.5"
 tokio = { version = "0.2", features = ["macros", "rt-core", "rt-util", "signal", "time"]}
-overlord = { git = "https://github.com/rev-chaos/overlord", branch = "refactor_overlord" }
+overlord = { git = "https://github.com/rev-chaos/overlord", rev = "2c4b7bd1" }
 
 [dev-dependencies]
 asset = { path = "built-in-services/asset"}
