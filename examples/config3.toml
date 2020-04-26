@@ -34,13 +34,13 @@ light = false
 [logger]
 filter = "info"
 log_to_console = true
-console_show_file_and_line = false
+console_show_file_and_line = true
 log_path = "logs/"
 log_to_file = true
 metrics = true
 # you can specify log level for modules with config below
 # modules_level = { "overlord::state::process" = "debug", core_consensus = "error" }
-# modules_level = { "core_network" = "debug" }
+modules_level = { "core_network" = "debug", "overlord" = "debug" }
 
 [rocksdb]
 max_open_files = 64

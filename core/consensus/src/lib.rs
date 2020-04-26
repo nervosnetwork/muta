@@ -107,7 +107,7 @@ where
         let latest_height = self.get_latest_height(ctx.clone()).await?;
         if latest_height < height {
             panic!(
-                "save_and_exec_block_with_proof, latest_height != height - 1, {} != {} - 1",
+                "save_and_exec_block_with_proof, latest_height < height, {} < {}",
                 latest_height, height
             );
         }
@@ -365,14 +365,15 @@ where
         last_commit_exec_resp: ExecResp,
         is_sync: bool,
     ) -> Result<ExecResult<ExecResp>, Box<dyn Error + Send>> {
-        // Todo: this can be removed to promote performance if muta test stable for a
-        // long time
         let latest_height = self.get_latest_height(ctx.clone()).await?;
-        if latest_height != height - 1 {
+
+        if latest_height < height - 1 {
             panic!(
-                "save_and_exec_block_with_proof, latest_height != height - 1, {} != {} - 1",
+                "save_and_exec_block_with_proof, latest_height < height - 1, {} < {} - 1",
                 latest_height, height
             );
+        } else if latest_height >= height {
+            return self.get_block_exec_result(ctx.clone(), height).await;
         }
 
         let full_block: FullBlock = FixedCodec::decode_fixed(full_block)?;
@@ -607,7 +608,7 @@ where
             vec.push(FullBlockWithProof::new(
                 WrappedPill::from_block(base_block.clone()),
                 into_proof(proof),
-                bytes.clone(),
+                base_bytes.clone(),
             ));
             base_block = block;
             base_bytes = bytes;
