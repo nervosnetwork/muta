@@ -1,0 +1,46 @@
+# crypto
+privkey = "0xb4d89c3cc6fe10dcf36a07abad95e855f055e271da6bf25a328a384c4ec5a1df"
+
+# db config
+data_path = "./devtools/chain/data3"
+
+[graphql]
+listening_address = "0.0.0.0:8003"
+graphql_uri = "/graphql"
+graphiql_uri = "/graphiql"
+workers = 0 # if 0, uses number of available logical cpu as threads count.
+maxconn = 25000
+max_payload_size = 1048576
+
+[network]
+listening_address = "0.0.0.0:1340"
+rpc_timeout = 10
+
+[consensus]
+sync_txs_chunk_size = 5000
+
+[[network.bootstraps]]
+pubkey = "0x035653c6f91f198fd24b0a7e90fd9486d7c98e77bb2161608faf4e220921be8814"
+address = "0.0.0.0:1337"
+
+[mempool]
+pool_size = 20000
+broadcast_txs_size = 200
+broadcast_txs_interval = 200
+
+[executor]
+light = false
+
+[logger]
+filter = "info"
+log_to_console = true
+console_show_file_and_line = false
+log_path = "logs/"
+log_to_file = true
+metrics = true
+# you can specify log level for modules with config below
+# modules_level = { "overlord::state::process" = "debug", core_consensus = "error" }
+# modules_level = { "core_network" = "debug" }
+
+[rocksdb]
+max_open_files = 64
