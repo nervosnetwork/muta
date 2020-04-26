@@ -1,3 +1,4 @@
+use account::AccountService;
 use asset::AssetService;
 use derive_more::{Display, From};
 use metadata::MetadataService;
@@ -18,6 +19,7 @@ impl ServiceMapping for DefaultServiceMapping {
             "asset" => Box::new(AssetService::new(sdk)) as Box<dyn Service>,
             "metadata" => Box::new(MetadataService::new(sdk)) as Box<dyn Service>,
             "util" => Box::new(UtilService::new(sdk)) as Box<dyn Service>,
+            "account" => Box::new(AccountService::new(sdk)) as Box<dyn Service>,
             _ => {
                 return Err(MappingError::NotFoundService {
                     service: name.to_owned(),
@@ -30,7 +32,12 @@ impl ServiceMapping for DefaultServiceMapping {
     }
 
     fn list_service_name(&self) -> Vec<String> {
-        vec!["asset".to_owned(), "metadata".to_owned(), "util".to_owned()]
+        vec![
+            "asset".to_owned(),
+            "metadata".to_owned(),
+            "util".to_owned(),
+            "account".to_owned(),
+        ]
     }
 }
 
