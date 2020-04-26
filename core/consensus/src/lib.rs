@@ -355,7 +355,6 @@ where
         Ok(full_block.encode_fixed()?)
     }
 
-    // Todo: if from sync, should check signedTransactions in full block
     async fn save_and_exec_block_with_proof(
         &self,
         ctx: Context,
@@ -364,6 +363,7 @@ where
         proof: Proof,
         last_exec_resp: ExecResp,
         last_commit_exec_resp: ExecResp,
+        is_sync: bool,
     ) -> Result<ExecResult<ExecResp>, Box<dyn Error + Send>> {
         // Todo: this can be removed to promote performance if muta test stable for a
         // long time
@@ -376,6 +376,27 @@ where
         }
 
         let full_block: FullBlock = FixedCodec::decode_fixed(full_block)?;
+
+        if is_sync {
+            let ordered_txs = &full_block.ordered_txs;
+            let ordered_tx_hashes = &full_block.block.ordered_tx_hashes;
+            if ordered_txs.len() != ordered_tx_hashes.len() {
+                return Err(Box::new(ConsensusError::CheckFullBlock(
+                    "full_block.ordered_txs.len != block.ordered_tx_hashes.len".to_owned(),
+                )));
+            }
+            for i in 0..ordered_tx_hashes.len() {
+                if ordered_tx_hashes[i] != ordered_txs[i].tx_hash {
+                    return Err(Box::new(ConsensusError::CheckFullBlock(
+                        "transaction_hash mismatch".to_owned(),
+                    )));
+                }
+                // check signature and transaction
+                self.mem_pool
+                    .insert(ctx.clone(), ordered_txs[i].clone())
+                    .await?;
+            }
+        }
 
         let order_root = full_block.block.header.order_root.clone();
         let state_root = last_exec_resp.state_root;
@@ -925,6 +946,8 @@ pub enum ConsensusError {
     CheckBlock(String),
     #[display(fmt = "message decode failed")]
     MsgDecode,
+    #[display(fmt = "check full block failed, {}", _0)]
+    CheckFullBlock(String),
 }
 
 impl Error for ConsensusError {}
