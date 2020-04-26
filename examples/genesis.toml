@@ -18,27 +18,27 @@ name = "metadata"
 payload = '''
 {
     "chain_id": "0xb6a4d7da21443f5e816e8700eea87610e6d769657d6b8ec73028457bf2ca4036",
-    "common_ref": "0x703873635a6b51513451",
+    "common_ref": "0x6e6f573042615a355954",
     "timeout_gap": 20,
     "cycles_limit": 1000000,
     "cycles_price": 1,
     "interval": 3000,
     "verifier_list": [
         {
-            "bls_pub_key": "0x040b571719774054b9b8fe221cd28f536b22d38565ab22b57d085003aa1ea4aa3d87fa519df455a680cc751c63724749de0cb93aea098b6ba4f3bba2fd2e100cefc89732f089b77e58d2d89584477f49ef7b6416b99d3015b7a57d336b968bc89d",
-            "address": "0xa0803a5ec67da83f2f686bbecbf6ba095b7ec83a",
+            "bls_pub_key": "0x0414f022971f27c6352399d6d77192ce474f05898fdb213cd47ae7e94afc3b49cf7eb64b1b096b8d4972ee6d703d64588012ef77d0c95090971b53d28a162abb867076f9c8d8c8bb1244b89c6aac5450914b67c44063bfa937483a2edb7789e16d",
+            "address": "0xab7adc6495a91cbd4bc05f02eba31807c71b853a",
             "propose_weight": 1,
             "vote_weight": 1
         },
         {
-            "bls_pub_key": "0x04156aad91cc40b6b5869fc5a57fabc50e3fbe0705dd5f838234bf3bbbb1ea818e53ac2aeff5eed0a204f0f8f960570e1a197147c16dc3bc874578af4b47a4896f06c17bdb376319bb3505b49cc7a584e16014542e5e00df7a5173593394ff7ae5",
-            "address": "0x90824dc2cd0a7797f233c20b1d2e1ed7a6d68f53",
+            "bls_pub_key": "0x0403773ce1dd1cabf02122fb01a860f12e59e2f32cc4805120f3c6fee555fcab4be12d794e0443e4db26311a1c27c030780999ae658f7a2e972826c0065d197cd676f1c2f454e5473b5f0f05df1293ee30f8d9ffad7cdfea9880637c91f85680be",
+            "address": "0x69bc63b4c63a1c2973d16244555b2b88a32ad177",
             "propose_weight": 1,
             "vote_weight": 1
         },
         {
-            "bls_pub_key": "0x0409462ddfc9147535fb1f60dd203dcebcd3046cd6b70222e366693557d1f9997a1698d79c0bc870284b5c276e5c9494ad0b97754cfa19350301b5ebe0c0bbdcea57d3ddc61e5103db8899949bf64a51b6e3bfae06ae1e3c87ea858d1c238a0162",
-            "address": "0x83bd681e43ae6b7a3633ade1903ad1ee8d4f6d07",
+            "bls_pub_key": "0x040f41e6bf728c34d803016703f923f35a37ea489744b6a36ba77eb71b4d9768b94da6fef71d2fd6d7a4b8b52ba3717b0c0cd37a906604b381b789674099d7bde4cfebf98d6793e55d976c3fab2170e0cfb50016426b6fe6dc13eba138b96634b1",
+            "address": "0x3a4b0acea748344f8dea9c6f12974b40571ff21f",
             "propose_weight": 1,
             "vote_weight": 1
         }

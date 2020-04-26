@@ -12,8 +12,8 @@ use protocol::ProtocolResult;
 use crate::{ConsensusError, OverlordHandler, WrappedPill};
 
 pub const END_GOSSIP_SIGNED_PROPOSAL: &str = "/gossip/consensus/signed_proposal";
-pub const END_GOSSIP_SIGNED_PRE_VOTE: &str = "/gossip/consensus/signed_vote";
-pub const END_GOSSIP_SIGNED_PRE_COMMIT: &str = "/gossip/consensus/signed_vote";
+pub const END_GOSSIP_SIGNED_PRE_VOTE: &str = "/gossip/consensus/signed_pre_vote";
+pub const END_GOSSIP_SIGNED_PRE_COMMIT: &str = "/gossip/consensus/signed_pre_commit";
 pub const END_GOSSIP_PRE_VOTE_QC: &str = "/gossip/consensus/pre_vote_qc";
 pub const END_GOSSIP_PRE_COMMIT_QC: &str = "/gossip/consensus/pre_commit_qc";
 pub const END_GOSSIP_SIGNED_CHOKE: &str = "/gossip/consensus/signed_choke";

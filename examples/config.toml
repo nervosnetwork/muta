@@ -1,5 +1,5 @@
 # crypto
-privkey = "0x651eb82c8c52258417af393556afe91c7cd24e9f535ba8c0c71fd0e2667770d0"
+privkey = "0xa6dedb1e2604a5deaa465bbd8fe13bc6c71a23a7837afaf22242334860f9b565"
 
 # db config
 data_path = "./devtools/chain/data"
@@ -20,7 +20,7 @@ rpc_timeout = 10
 sync_txs_chunk_size = 5000
 
 [[network.bootstraps]]
-pubkey = "0x02b9462fa064cd86483df342cb0e350b08f09bbdcf28d9ca5c25ce616314c23d97"
+pubkey = "0x035653c6f91f198fd24b0a7e90fd9486d7c98e77bb2161608faf4e220921be8814"
 address = "0.0.0.0:1888"
 
 [mempool]
@@ -40,7 +40,7 @@ log_to_file = true
 metrics = true
 # you can specify log level for modules with config below
 # modules_level = { "overlord::state::process" = "debug", core_consensus = "error" }
-modules_level = { "core_network" = "debug" }
+# modules_level = { "core_network" = "debug" }
 
 [rocksdb]
 max_open_files = 64

@@ -5,10 +5,7 @@ use bytes::Bytes;
 #[cfg(unix)]
 use tokio::signal::unix::{self as os_impl};
 
-use common_crypto::{
-    BlsPrivateKey, PrivateKey, PublicKey, Secp256k1, Secp256k1PrivateKey, ToBlsPublicKey,
-    ToPublicKey,
-};
+use common_crypto::{PublicKey, Secp256k1, Secp256k1PrivateKey, ToPublicKey};
 use core_api::adapter::DefaultAPIAdapter;
 use core_api::config::GraphQLConfig;
 use core_consensus::message::{
@@ -27,7 +24,7 @@ use core_network::{NetworkConfig, NetworkService};
 use core_storage::{adapter::rocks::RocksAdapter, ImplStorage};
 use framework::binding::state::RocksTrieDB;
 use framework::executor::{ServiceExecutor, ServiceExecutorFactory};
-use overlord::crypto::hex_to_common_ref;
+use overlord::crypto::gen_keypair;
 use overlord::OverlordServer;
 use protocol::traits::{APIAdapter, Context, MemPool, ServiceMapping, Storage};
 use protocol::types::{Address, Block, BlockHeader, Genesis, Hash, Metadata, Proof, Validator};
@@ -276,27 +273,16 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         ),
     );
 
-    let common_ref =
-        hex_to_common_ref(&metadata.common_ref.as_string()).expect("hex common ref failed");
-    let bls_pri_key = BlsPrivateKey::try_from(
-        [&[0u8; 16], my_privkey.to_bytes().as_ref()]
-            .concat()
-            .as_ref(),
-    )
-    .unwrap();
-    let bls_pub_key = bls_pri_key.pub_key(&common_ref);
-    let hex_pri_key = config.privkey.clone();
-    let hex_bls_pub_key = hex::encode(bls_pub_key.to_bytes());
-    let hex_pub_key = hex::encode(my_pubkey.to_bytes());
-    let hex_common_ref = metadata.common_ref.as_string();
-    let overlord_adapter_clone = Arc::clone(&overlord_adapter);
+    let common_ref = metadata.common_ref.as_string();
+    let key_pair = gen_keypair(Some(&config.privkey.as_string()), common_ref.clone());
     let wal_path = config.data_path_for_wal().to_str().unwrap().to_string();
+    let overlord_adapter_clone = Arc::clone(&overlord_adapter);
     tokio::spawn(async move {
         OverlordServer::run(
-            hex_common_ref,
-            hex_pri_key.as_string(),
-            hex_pub_key,
-            hex_bls_pub_key,
+            common_ref,
+            key_pair.private_key,
+            key_pair.public_key,
+            key_pair.bls_public_key,
             my_address.as_bytes(),
             &overlord_adapter_clone,
             &wal_path,
