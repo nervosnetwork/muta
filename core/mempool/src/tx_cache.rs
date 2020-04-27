@@ -526,7 +526,7 @@ mod tests {
         let tx_wrapper_1 = TxWrapper::new(tx.clone());
         map.insert(tx.tx_hash.clone(), Arc::new(tx_wrapper_1));
         let shared_tx_1 = map.get(&tx.tx_hash).unwrap();
-        assert!(!shared_tx_1.is_removed());
+        assert!(shared_tx_1.is_removed());
     }
 
     #[bench]
