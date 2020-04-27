@@ -93,8 +93,16 @@ impl<V> Bucket<V>
 where
     V: Send + Sync + Clone,
 {
+    /// Before inserting a transaction into the bucket, you must
+    /// check whether the transaction is in the bucket first. Never use the
+    /// insert function to check this.
     fn insert(&self, hash: Hash, value: V) -> Option<V> {
-        self.store.write().insert(hash, value)
+        let mut lock_data = self.store.write();
+        if lock_data.contains_key(&hash) {
+            Some(value)
+        } else {
+            lock_data.insert(hash, value)
+        }
     }
 
     fn contains_key(&self, hash: &Hash) -> bool {
