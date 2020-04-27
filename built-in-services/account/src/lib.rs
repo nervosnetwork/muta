@@ -1,12 +1,14 @@
 use crate::types::{
     Account, GenerateAccountPayload, GenerateAccountResponse, GetAccountPayload, PayloadAccount,
-    Permission, VerifyPayload, VerifyResponse, ACCOUNT_TYPE_PUBLIC_KEY, MAX_PERMISSION_ACCOUNTS,
+    Permission, VerifyPayload, VerifyResponse, Witness, ACCOUNT_TYPE_MULTI_SIG,
+    ACCOUNT_TYPE_PUBLIC_KEY, MAX_PERMISSION_ACCOUNTS,
 };
 use binding_macro::{cycles, service};
 use bytes::Bytes;
+use common_crypto::{Crypto, Secp256k1};
 use hasher::{Hasher, HasherKeccak};
 use protocol::traits::{ExecutorParams, ServiceResponse, ServiceSDK};
-use protocol::types::{Address, Hash, ServiceContext};
+use protocol::types::{Address, Hash, Hex, ServiceContext};
 
 #[cfg(test)]
 mod tests;
@@ -18,20 +20,98 @@ pub struct AccountService<SDK> {
 
 #[service]
 impl<SDK: ServiceSDK> AccountService<SDK> {
-    pub fn new(mut sdk: SDK) -> Self {
+    pub fn new(sdk: SDK) -> Self {
         Self { sdk }
     }
 
     #[cycles(100_00)]
     #[read]
-    fn verify(
+    fn verify_signature(
         &self,
         ctx: ServiceContext,
         payload: VerifyPayload,
     ) -> ServiceResponse<VerifyResponse> {
+        let wit_str = String::from_utf8(payload.witness.to_vec());
+        if wit_str.is_err() {
+            return ServiceResponse::<VerifyResponse>::from_error(
+                112,
+                "witness from utf8 bytes to string failed".to_owned(),
+            );
+        }
+
+        let wit_res: Result<Witness, _> = serde_json::from_str(wit_str.unwrap().as_str());
+        if wit_res.is_err() {
+            return ServiceResponse::<VerifyResponse>::from_error(
+                112,
+                "witness not valid".to_owned(),
+            );
+        }
+
+        let wit = wit_res.unwrap();
+        if wit.signature_type == ACCOUNT_TYPE_PUBLIC_KEY {
+            if wit.signatures.len() != 1 || wit.pubkeys.len() != 1 {
+                return ServiceResponse::<VerifyResponse>::from_error(
+                    113,
+                    "len of signatures or pubkeys must be 1".to_owned(),
+                );
+            }
+            return verify_single_sig(&payload.tx_hash, &wit.signatures[0], &wit.pubkeys[0]);
+        }
+
+        // multi sig
+        if wit.signature_type != ACCOUNT_TYPE_MULTI_SIG {
+            return ServiceResponse::<VerifyResponse>::from_error(
+                114,
+                "signature_type not valid".to_owned(),
+            );
+        }
+
+        let permission = self
+            .sdk
+            .get_account_value(&wit.sender, &0u8)
+            .unwrap_or(Permission {
+                accounts:  Vec::<Account>::new(),
+                threshold: 0,
+            });
+
+        if permission.threshold == 0 {
+            return ServiceResponse::<VerifyResponse>::from_error(
+                110,
+                "account not existed".to_owned(),
+            );
+        }
+
+        let mut weight_sum = 0;
+        let size = permission.accounts.len();
+        let mut hash_account = [false; MAX_PERMISSION_ACCOUNTS as usize];
+
+        for i in 0..wit.signatures.len() {
+            let res = verify_single_sig(&payload.tx_hash, &wit.signatures[i], &wit.pubkeys[i]);
+            if res.is_error() {
+                continue;
+            }
+
+            for (k, item) in permission.accounts.iter().enumerate().take(size) {
+                if hash_account[k] {
+                    continue;
+                }
+                if item.address.eq(&res.succeed_data.address) {
+                    hash_account[k] = true;
+                    weight_sum += item.weight;
+                    break;
+                }
+            }
+
+            if weight_sum >= permission.threshold {
+                return ServiceResponse::<VerifyResponse>::from_succeed(VerifyResponse {
+                    address: wit.sender,
+                });
+            }
+        }
+
         ServiceResponse::<VerifyResponse>::from_error(
-            110,
-            "accounts length must be [1,16]".to_owned(),
+            111,
+            "multi signature not verified".to_owned(),
         )
     }
 
@@ -68,7 +148,7 @@ impl<SDK: ServiceSDK> AccountService<SDK> {
         let response = GenerateAccountResponse {
             accounts,
             threshold: permission.threshold,
-            address: payload.user.clone(),
+            address: payload.user,
         };
 
         ServiceResponse::<GenerateAccountResponse>::from_succeed(response)
@@ -81,7 +161,7 @@ impl<SDK: ServiceSDK> AccountService<SDK> {
         ctx: ServiceContext,
         payload: GenerateAccountPayload,
     ) -> ServiceResponse<GenerateAccountResponse> {
-        if payload.accounts.len() == 0 || payload.accounts.len() > MAX_PERMISSION_ACCOUNTS as usize
+        if payload.accounts.is_empty() || payload.accounts.len() > MAX_PERMISSION_ACCOUNTS as usize
         {
             return ServiceResponse::<GenerateAccountResponse>::from_error(
                 110,
@@ -136,11 +216,46 @@ impl<SDK: ServiceSDK> AccountService<SDK> {
         self.sdk.set_account_value(&address, 0u8, permission);
 
         let response = GenerateAccountResponse {
-            address:   address.clone(),
-            accounts:  payload.accounts,
+            address,
+            accounts: payload.accounts,
             threshold: payload.threshold,
         };
 
         ServiceResponse::<GenerateAccountResponse>::from_succeed(response)
     }
+}
+
+fn verify_single_sig(tx_hash: &Hash, sig: &Hex, pubkey: &Hex) -> ServiceResponse<VerifyResponse> {
+    let data_hash = tx_hash.as_bytes();
+
+    let data_sig = hex::decode(sig.as_string_trim0x());
+    if data_sig.is_err() {
+        return ServiceResponse::<VerifyResponse>::from_error(
+            112,
+            "signature not valid".to_owned(),
+        );
+    };
+
+    let data_pk = hex::decode(pubkey.as_string_trim0x());
+    if data_pk.is_err() {
+        return ServiceResponse::<VerifyResponse>::from_error(
+            113,
+            "public key not valid".to_owned(),
+        );
+    };
+
+    let pk = data_pk.unwrap();
+    if Secp256k1::verify_signature(
+        data_hash.as_ref(),
+        data_sig.unwrap().as_slice(),
+        pk.as_slice(),
+    )
+    .is_ok()
+    {
+        return ServiceResponse::<VerifyResponse>::from_succeed(VerifyResponse {
+            address: Address::from_pubkey_bytes(Bytes::from(pk)).unwrap(),
+        });
+    }
+
+    ServiceResponse::<VerifyResponse>::from_error(110, "signature not verified".to_owned())
 }

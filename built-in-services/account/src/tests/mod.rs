@@ -21,7 +21,8 @@ use protocol::types::{
 use protocol::{types::Bytes, ProtocolResult};
 
 use crate::types::{
-    Account, GenerateAccountPayload, GenerateAccountResponse, GetAccountPayload, PayloadAccount,
+    GenerateAccountPayload, GetAccountPayload, PayloadAccount, VerifyPayload, Witness,
+    ACCOUNT_TYPE_MULTI_SIG, ACCOUNT_TYPE_PUBLIC_KEY,
 };
 use crate::AccountService;
 
@@ -29,35 +30,195 @@ use crate::AccountService;
 fn test_generate() {
     let cycles_limit = 1024 * 1024 * 1024; // 1073741824
     let caller = Address::from_hex("0x755cdba6ae4f479f7164792b318b2a06c759833b").unwrap();
-    let context = mock_context(cycles_limit, caller.clone());
+    let context = mock_context(cycles_limit, caller);
     let mut service = new_account_service();
+
+    let priv_key1 = Secp256k1PrivateKey::generate(&mut OsRng);
+    let pub_key1 = priv_key1.pub_key();
+    let addr1 = Address::from_pubkey_bytes(pub_key1.to_bytes()).unwrap();
+
+    let priv_key2 = Secp256k1PrivateKey::generate(&mut OsRng);
+    let pub_key2 = priv_key2.pub_key();
+    let addr2 = Address::from_pubkey_bytes(pub_key2.to_bytes()).unwrap();
+
+    let priv_key3 = Secp256k1PrivateKey::generate(&mut OsRng);
+    let pub_key3 = priv_key3.pub_key();
+    let addr3 = Address::from_pubkey_bytes(pub_key3.to_bytes()).unwrap();
+
+    let multi_addr = Address::from_hex("0x6fcd3e8e97da273711ccefb79abdd246c5663c7d").unwrap();
+
+    println!(
+        "{}\r\n{}\r\n{}\r\n",
+        addr1.clone().as_hex(),
+        addr2.as_hex(),
+        addr3.as_hex()
+    );
 
     let mut accounts = Vec::<PayloadAccount>::new();
     accounts.push(PayloadAccount {
-        address: caller.clone(),
+        address: addr1.clone(),
+        weight:  2,
+    });
+
+    accounts.push(PayloadAccount {
+        address: addr2,
         weight:  1,
     });
 
     accounts.push(PayloadAccount {
-        address: caller.clone(),
-        weight:  1,
-    });
-
-    accounts.push(PayloadAccount {
-        address: caller.clone(),
+        address: addr3,
         weight:  1,
     });
 
     let res = service.generate_account(context.clone(), GenerateAccountPayload {
         accounts,
-        threshold: 2,
+        threshold: 3,
     });
 
     let addr = res.succeed_data.address.clone();
-    let res_get = service.get_account_from_address(context, GetAccountPayload { user: addr });
+    let res_get =
+        service.get_account_from_address(context.clone(), GetAccountPayload { user: addr });
 
     println!("{:#?}", res);
     println!("{:#?}", res_get);
+
+    let tx_hash = Hash::from_empty();
+    let sig1 = Secp256k1::sign_message(&tx_hash.as_bytes(), &priv_key1.to_bytes()).unwrap();
+    let mut input_sig: String = "0x".to_string() + hex::encode(sig1.to_bytes()).as_str();
+    let sig_data1 = Hex::from_string(input_sig).unwrap();
+    let pk_1 =
+        Hex::from_string("0x".to_string() + hex::encode(pub_key1.to_bytes()).as_str()).unwrap();
+
+    let sig2 = Secp256k1::sign_message(&tx_hash.as_bytes(), &priv_key2.to_bytes()).unwrap();
+    input_sig = "0x".to_string() + hex::encode(sig2.to_bytes()).as_str();
+    let sig_data2 = Hex::from_string(input_sig).unwrap();
+    let pk_2 =
+        Hex::from_string("0x".to_string() + hex::encode(pub_key2.to_bytes()).as_str()).unwrap();
+
+    let sig3 = Secp256k1::sign_message(&tx_hash.as_bytes(), &priv_key3.to_bytes()).unwrap();
+    input_sig = "0x".to_string() + hex::encode(sig3.to_bytes()).as_str();
+    let sig_data3 = Hex::from_string(input_sig).unwrap();
+    let pk_3 =
+        Hex::from_string("0x".to_string() + hex::encode(pub_key3.to_bytes()).as_str()).unwrap();
+
+    // verify single sig, sig1, signature_type error, expected not verified
+    let mut wit_single = Witness {
+        pubkeys:        vec![pk_1.clone()],
+        signatures:     vec![sig_data1.clone()],
+        signature_type: ACCOUNT_TYPE_MULTI_SIG,
+        sender:         addr1.clone(),
+    };
+
+    let mut wit_str = serde_json::to_string(&wit_single).unwrap();
+
+    let mut res_single = service.verify_signature(context.clone(), VerifyPayload {
+        tx_hash: tx_hash.clone(),
+        witness: Bytes::from(wit_str),
+    });
+    assert_eq!(res_single.is_error(), true);
+    println!("single sig1, expected not verified\r\n {:#?}", res_single);
+
+    // verify single sig, sig1,  expected  verified
+    wit_single = Witness {
+        pubkeys:        vec![pk_1.clone()],
+        signatures:     vec![sig_data1.clone()],
+        signature_type: ACCOUNT_TYPE_PUBLIC_KEY,
+        sender:         addr1.clone(),
+    };
+
+    wit_str = serde_json::to_string(&wit_single).unwrap();
+
+    res_single = service.verify_signature(context.clone(), VerifyPayload {
+        tx_hash: tx_hash.clone(),
+        witness: Bytes::from(wit_str),
+    });
+    assert_eq!(res_single.is_error(), false);
+    println!("single sig1, expect verified\r\n {:#?}", res_single);
+
+    // verify single sig, sig1,  expected not verified
+    wit_single = Witness {
+        pubkeys:        vec![pk_2.clone()],
+        signatures:     vec![sig_data1.clone()],
+        signature_type: ACCOUNT_TYPE_PUBLIC_KEY,
+        sender:         addr1,
+    };
+
+    wit_str = serde_json::to_string(&wit_single).unwrap();
+
+    res_single = service.verify_signature(context.clone(), VerifyPayload {
+        tx_hash: tx_hash.clone(),
+        witness: Bytes::from(wit_str),
+    });
+    assert_eq!(res_single.is_error(), true);
+    println!("single sig1-pk2, expect not verified\r\n {:#?}", res_single);
+
+    // verify multiSig, sig1+sig2, expected verified
+    let wit1 = Witness {
+        pubkeys:        vec![pk_1.clone(), pk_2.clone()],
+        signatures:     vec![sig_data1.clone(), sig_data2.clone()],
+        signature_type: ACCOUNT_TYPE_MULTI_SIG,
+        sender:         multi_addr.clone(),
+    };
+
+    let wit1_str = serde_json::to_string(&wit1).unwrap();
+
+    let res_multi_1 = service.verify_signature(context.clone(), VerifyPayload {
+        tx_hash: tx_hash.clone(),
+        witness: Bytes::from(wit1_str),
+    });
+    assert_eq!(res_multi_1.is_error(), false);
+    println!("{:#?}", res_multi_1);
+
+    // verify multiSig, sig2+sig3, expected not verified
+    let wit2 = Witness {
+        pubkeys:        vec![pk_2.clone(), pk_3.clone()],
+        signatures:     vec![sig_data2.clone(), sig_data3.clone()],
+        signature_type: ACCOUNT_TYPE_MULTI_SIG,
+        sender:         multi_addr.clone(),
+    };
+
+    let wit2_str = serde_json::to_string(&wit2).unwrap();
+
+    let res_multi_2 = service.verify_signature(context.clone(), VerifyPayload {
+        tx_hash: tx_hash.clone(),
+        witness: Bytes::from(wit2_str),
+    });
+    assert_eq!(res_multi_2.is_error(), true);
+    println!("{:#?}", res_multi_2);
+
+    // verify multiSig, sig1+ sig2 + sig3, expected verified
+    let wit3 = Witness {
+        pubkeys:        vec![pk_1.clone(), pk_2, pk_3],
+        signatures:     vec![sig_data1.clone(), sig_data2, sig_data3],
+        signature_type: ACCOUNT_TYPE_MULTI_SIG,
+        sender:         multi_addr.clone(),
+    };
+
+    let wit3_str = serde_json::to_string(&wit3).unwrap();
+
+    let res_multi_3 = service.verify_signature(context.clone(), VerifyPayload {
+        tx_hash: tx_hash.clone(),
+        witness: Bytes::from(wit3_str),
+    });
+    assert_eq!(res_multi_3.is_error(), false);
+    println!("{:#?}", res_multi_3);
+
+    // verify multiSig, sig1, expected not verified
+    let wit4 = Witness {
+        pubkeys:        vec![pk_1],
+        signatures:     vec![sig_data1],
+        signature_type: ACCOUNT_TYPE_MULTI_SIG,
+        sender:         multi_addr,
+    };
+
+    let wit4_str = serde_json::to_string(&wit4).unwrap();
+
+    let res_multi_4 = service.verify_signature(context, VerifyPayload {
+        tx_hash,
+        witness: Bytes::from(wit4_str),
+    });
+    assert_eq!(res_multi_4.is_error(), true);
+    println!("{:#?}", res_multi_4);
 }
 
 fn new_account_service() -> AccountService<
@@ -76,7 +237,6 @@ fn new_account_service() -> AccountService<
         Rc::new(chain_db),
         NoopDispatcher {},
     );
-
     AccountService::new(sdk)
 }
 
