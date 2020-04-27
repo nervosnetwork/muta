@@ -42,7 +42,7 @@ impl<SDK: ServiceSDK> AccountService<SDK> {
         let wit_res: Result<Witness, _> = serde_json::from_str(wit_str.unwrap().as_str());
         if wit_res.is_err() {
             return ServiceResponse::<VerifyResponse>::from_error(
-                112,
+                113,
                 "witness not valid".to_owned(),
             );
         }
@@ -51,7 +51,7 @@ impl<SDK: ServiceSDK> AccountService<SDK> {
         if wit.signature_type == ACCOUNT_TYPE_PUBLIC_KEY {
             if wit.signatures.len() != 1 || wit.pubkeys.len() != 1 {
                 return ServiceResponse::<VerifyResponse>::from_error(
-                    113,
+                    114,
                     "len of signatures or pubkeys must be 1".to_owned(),
                 );
             }
@@ -61,26 +61,35 @@ impl<SDK: ServiceSDK> AccountService<SDK> {
         // multi sig
         if wit.signature_type != ACCOUNT_TYPE_MULTI_SIG {
             return ServiceResponse::<VerifyResponse>::from_error(
-                114,
+                115,
                 "signature_type not valid".to_owned(),
             );
         }
 
-        let permission = self
-            .sdk
-            .get_account_value(&wit.sender, &0u8)
-            .unwrap_or(Permission {
-                accounts:  Vec::<Account>::new(),
-                threshold: 0,
-            });
-
-        if permission.threshold == 0 {
+        if wit.signatures.len() != wit.pubkeys.len() {
             return ServiceResponse::<VerifyResponse>::from_error(
-                110,
+                116,
+                "len of signatures and pubkeys must be equal".to_owned(),
+            );
+        }
+
+        if wit.signatures.len() > MAX_PERMISSION_ACCOUNTS as usize {
+            return ServiceResponse::<VerifyResponse>::from_error(
+                117,
+                "len of signatures must be [1,16]".to_owned(),
+            );
+        }
+
+        let permission_res: Option<Permission> = self.sdk.get_account_value(&wit.sender, &0u8);
+
+        if permission_res.is_none() {
+            return ServiceResponse::<VerifyResponse>::from_error(
+                117,
                 "account not existed".to_owned(),
             );
         }
 
+        let permission = permission_res.unwrap();
         let mut weight_sum = 0;
         let size = permission.accounts.len();
         let mut hash_account = [false; MAX_PERMISSION_ACCOUNTS as usize];
