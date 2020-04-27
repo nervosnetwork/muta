@@ -1,7 +1,10 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, FnArg, Ident, ImplItem, ImplItemMethod, ItemImpl, Type};
-
+use syn::parse::{Parse, ParseStream, Result};
+use syn::{
+    parse_macro_input, FnArg, GenericArgument, Ident, ImplItem, ImplItemMethod, ItemImpl,
+    PathArguments, ReturnType, Type,
+};
 const READ_ATTRIBUTE: &str = "read";
 const WRITE_ATTRIBUTE: &str = "write";
 const GENESIS_ATTRIBUTE: &str = "genesis";
@@ -26,9 +29,123 @@ struct MethodMeta {
     method_ident:  Ident,
     payload_ident: Option<Ident>,
     readonly:      bool,
+    res_ident:     Option<Ident>,
 }
 
-pub fn gen_service_code(_: TokenStream, item: TokenStream) -> TokenStream {
+struct EventIdent {
+    event: Option<Ident>,
+}
+
+impl Parse for EventIdent {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let event: Option<Ident> = input.parse().map_or_else(|_| None, |v| Some(v));
+        Ok(Self { event })
+    }
+}
+
+fn gen_schema_code(methods: &Vec<MethodMeta>) -> proc_macro2::TokenStream {
+    let mut mutation = format!("type Mutation {}\n", "{");
+    let mut query = format!("type Query {}\n", "{");
+
+    let mut tokens = quote! {
+        let mut register = BTreeMap::<String, String>::new();
+    };
+
+    let scalar_none = "scalar Null";
+    let scalar_none_token = quote! {
+        register.insert("scalar_none_key".to_owned(), #scalar_none.to_owned());
+    };
+
+    for m in methods.iter() {
+        let method_str;
+        let token;
+        match (m.payload_ident.clone(), m.res_ident.clone()) {
+            (None, None) => {
+                method_str = format!("  {}: Null\n", &m.method_ident);
+                token = quote! {
+                    #scalar_none_token
+                };
+            }
+            (Some(payload_ident), None) => {
+                method_str = format!(
+                    "  {}(\n    payload: {}!\n  ): Null\n",
+                    &m.method_ident, &payload_ident
+                );
+                token = quote! {
+                    #payload_ident::schema(&mut register);
+                    #scalar_none_token
+                };
+            }
+            (None, Some(res_ident)) => {
+                method_str = format!("  {}: {}!\n", &m.method_ident, &res_ident);
+                token = quote! {
+                    #res_ident::schema(&mut register);
+                };
+            }
+            (Some(payload_ident), Some(res_ident)) => {
+                method_str = format!(
+                    "  {}(\n    payload: {}!\n  ): {}!\n",
+                    &m.method_ident, &payload_ident, &res_ident
+                );
+                token = quote! {
+                    #payload_ident::schema(&mut register);
+                    #res_ident::schema(&mut register);
+                };
+            }
+        }
+        if m.readonly {
+            query.push_str(method_str.as_str());
+        } else {
+            mutation.push_str(method_str.as_str());
+        }
+
+        tokens = quote! {
+            #tokens
+            #token
+        };
+    }
+
+    if format!("type Mutation {}\n", "{") == mutation {
+        mutation = "".to_owned();
+    } else {
+        mutation = mutation + "}\n\n";
+    }
+    if format!("type Query {}\n", "{") == query {
+        query = "".to_owned();
+    } else {
+        query = query + "}\n\n";
+    }
+
+    let mq = mutation + query.as_str();
+    let token = quote! {
+        let mut obj = "".to_owned();
+
+        for v in register.values() {
+            obj.push_str(v.as_str());
+            obj.push_str("\n\n");
+        }
+
+        let schema = #mq.to_owned() + obj.as_str();
+    };
+    quote! {
+        #tokens
+        #token
+    }
+}
+
+pub fn gen_service_code(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let event_ident = parse_macro_input!(attr as EventIdent);
+    let event_code = if let Some(ident) = event_ident.event {
+        quote! {
+        let event = #ident::schema();
+        (schema, event)
+        }
+    } else {
+        quote! {
+            (schema, "".to_owned())
+        }
+    };
+
     let impl_item = parse_macro_input!(item as ItemImpl);
 
     let service_ident = get_service_ident(&impl_item);
@@ -74,6 +191,8 @@ pub fn gen_service_code(_: TokenStream, item: TokenStream) -> TokenStream {
     };
 
     let list_method_meta: Vec<MethodMeta> = methods.into_iter().map(extract_method_meta).collect();
+
+    let schema_code = gen_schema_code(&list_method_meta);
 
     let (list_read_name, list_read_ident, list_read_payload) =
         split_list_for_metadata(&list_method_meta, true);
@@ -181,6 +300,11 @@ pub fn gen_service_code(_: TokenStream, item: TokenStream) -> TokenStream {
                     },)*
                     _ => ServiceResponse::<String>::from_error(2, format!("not found method:{:?} of service:{:?}", method, service))
                 }
+            }
+
+            fn schema_(&self) -> (String, String) {
+                #schema_code
+                #event_code
             }
         }
 
@@ -384,10 +508,12 @@ fn extract_method_meta(method: ServiceMethod) -> MethodMeta {
     match &impl_method.sig.inputs.len() {
         // Method input params: `(&self/&mut self, ctx: ServiceContext)`
         2 => {
+            let res_ident = extract_res_ident(&impl_method.sig.output);
             MethodMeta {
                 method_ident: impl_method.sig.ident,
                 payload_ident: None,
                 readonly,
+                res_ident
             }
         },
         // Method input params: `(&self/&mut self, ctx: ServiceContext, payload: PayloadType)`
@@ -404,12 +530,59 @@ fn extract_method_meta(method: ServiceMethod) -> MethodMeta {
                 panic!("No payload type found.")
             };
 
+            let res_ident = extract_res_ident(&impl_method.sig.output);
             MethodMeta {
                 method_ident: impl_method.sig.ident,
                 payload_ident,
                 readonly,
+                res_ident
             }
         },
         _ => panic!("Method input params should be `(&self/&mut self, ctx: ServiceContext)` or `(&self/&mut self, ctx: ServiceContext, payload: PayloadType)`")
+    }
+}
+
+fn extract_res_ident(output: &ReturnType) -> Option<Ident> {
+    match output {
+        ReturnType::Type(_, ty) => match &**ty {
+            Type::Path(ty_path) => {
+                let arg = &ty_path
+                    .path
+                    .segments
+                    .first()
+                    .expect("ServiceResponse<T> should contain T")
+                    .arguments;
+                match &arg {
+                    PathArguments::AngleBracketed(angle_arg) => {
+                        let arg_enum = angle_arg
+                            .args
+                            .first()
+                            .expect("ServiceResponse<T> should contain T");
+                        if let GenericArgument::Type(arg_ty) = arg_enum {
+                            match arg_ty {
+                                Type::Path(ret_ty) => Some(
+                                    ret_ty
+                                        .path
+                                        .segments
+                                        .first()
+                                        .expect(
+                                            "ServiceResponse<T>: T should be a generic type or ()",
+                                        )
+                                        .ident
+                                        .clone(),
+                                ),
+                                Type::Tuple(_) => None,
+                                _ => panic!("ServiceResponse<T>: T should be a generic type or ()"),
+                            }
+                        } else {
+                            panic!("return type of read/write method should be ServiceResponse<T>")
+                        }
+                    }
+                    _ => panic!("return type of read/write method should be ServiceResponse<T>"),
+                }
+            }
+            _ => panic!("return type of read/write method should be ServiceResponse<T>"),
+        },
+        _ => panic!("return type of read/write method should be ServiceResponse<T>"),
     }
 }

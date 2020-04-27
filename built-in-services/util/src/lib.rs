@@ -1,9 +1,11 @@
+use std::collections::BTreeMap;
+
 use bytes::Bytes;
 use hasher::{Hasher, HasherKeccak};
 
 use binding_macro::{cycles, service};
 use common_crypto::{Crypto, Secp256k1};
-use protocol::traits::{ExecutorParams, ServiceResponse, ServiceSDK};
+use protocol::traits::{ExecutorParams, ServiceResponse, ServiceSDK, ServiceSchema};
 use protocol::types::{Hash, ServiceContext};
 
 use crate::types::{KeccakPayload, KeccakResponse, SigVerifyPayload, SigVerifyResponse};

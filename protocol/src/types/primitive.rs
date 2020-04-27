@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::fmt;
 
 use bytes::Bytes;
@@ -8,6 +9,7 @@ use serde::de;
 use serde::{Deserialize, Serialize};
 
 use crate::fixed_codec::{FixedCodec, FixedCodecError};
+use crate::traits::ServiceSchema;
 use crate::types::TypesError;
 use crate::ProtocolResult;
 
@@ -302,6 +304,47 @@ pub struct ValidatorExtend {
     pub address:        Address,
     pub propose_weight: u32,
     pub vote_weight:    u32,
+}
+
+impl ServiceSchema for Metadata {
+    fn name() -> String {
+        "Metadata".to_owned()
+    }
+
+    fn schema(register: &mut BTreeMap<String, String>) {
+        let meta_schema = r#"type Metadata {
+  chain_id: Hash!
+  common_ref: Hex!
+  timeout_gap: Uint64!
+  cycles_limit: Uint64!
+  cycles_price: Uint64!
+  interval: Uint64!
+  verifier_list: [ValidatorExtend!]!
+  prevote_ratio: Uint64!
+  precommit_ratio: Uint64!
+  propose_ratio: Uint64!
+  brake_ratio: Uint64!
+  tx_num_limit: Uint64!
+  max_tx_size: Uint64!
+}"#;
+
+        let ve_schema = r#"type ValidatorExtend {
+  bls_pub_key: Hex!
+  address: Address!
+  propose_weight: Uint32!
+  vote_weight: Uint32!
+}"#;
+        register.insert("Metadata".to_owned(), meta_schema.to_owned());
+        register.insert("ValidatorExtend".to_owned(), ve_schema.to_owned());
+        u32::schema(register);
+        u64::schema(register);
+        Hash::schema(register);
+        Address::schema(register);
+        Hex::schema(register);
+        // register.insert("u32".to_owned(), "scalar Uint32".to_owned());
+        // register.insert("Address".to_owned(), "scalar Uint32".to_owned());
+        // register.insert("Hex".to_owned(), "scalar Hex".to_owned());
+    }
 }
 
 impl fmt::Debug for ValidatorExtend {

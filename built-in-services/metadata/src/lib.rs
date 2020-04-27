@@ -1,8 +1,10 @@
 #[cfg(test)]
 mod tests;
 
+use std::collections::BTreeMap;
+
 use binding_macro::{cycles, genesis, service};
-use protocol::traits::{ExecutorParams, ServiceResponse, ServiceSDK};
+use protocol::traits::{ExecutorParams, ServiceResponse, ServiceSDK, ServiceSchema};
 use protocol::types::{Metadata, ServiceContext, METADATA_KEY};
 
 pub struct MetadataService<SDK> {

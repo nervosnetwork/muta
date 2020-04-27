@@ -7,13 +7,14 @@ use std::collections::BTreeMap;
 use bytes::Bytes;
 
 use binding_macro::{cycles, genesis, service};
-use protocol::traits::{ExecutorParams, ServiceResponse, ServiceSDK, StoreMap};
+use protocol::traits::{ExecutorParams, ServiceResponse, ServiceSDK, ServiceSchema, StoreMap};
 use protocol::types::{Address, Hash, ServiceContext};
 
 use crate::types::{
-    ApproveEvent, ApprovePayload, Asset, AssetBalance, CreateAssetPayload, GetAllowancePayload,
-    GetAllowanceResponse, GetAssetPayload, GetBalancePayload, GetBalanceResponse,
-    InitGenesisPayload, TransferEvent, TransferFromEvent, TransferFromPayload, TransferPayload,
+    ApproveEvent, ApprovePayload, Asset, AssetBalance, CreateAssetPayload, Event,
+    GetAllowancePayload, GetAllowanceResponse, GetAssetPayload, GetBalancePayload,
+    GetBalanceResponse, InitGenesisPayload, TransferEvent, TransferFromEvent, TransferFromPayload,
+    TransferPayload,
 };
 
 pub struct AssetService<SDK> {
@@ -21,7 +22,7 @@ pub struct AssetService<SDK> {
     assets: Box<dyn StoreMap<Hash, Asset>>,
 }
 
-#[service]
+#[service(Event)]
 impl<SDK: ServiceSDK> AssetService<SDK> {
     pub fn new(mut sdk: SDK) -> Self {
         let assets: Box<dyn StoreMap<Hash, Asset>> = sdk.alloc_or_recover_map("assets");

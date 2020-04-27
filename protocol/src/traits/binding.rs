@@ -1,10 +1,13 @@
+use std::collections::BTreeMap;
 use std::iter::Iterator;
 
 use bytes::Bytes;
 
 use crate::fixed_codec::FixedCodec;
 use crate::traits::{ExecutorParams, ServiceResponse};
-use crate::types::{Address, Block, Hash, MerkleRoot, Receipt, ServiceContext, SignedTransaction};
+use crate::types::{
+    Address, Block, Hash, Hex, MerkleRoot, Receipt, ServiceContext, SignedTransaction,
+};
 use crate::ProtocolResult;
 
 pub trait ServiceMapping: Send + Sync {
@@ -99,6 +102,9 @@ pub trait Service {
     fn write_(&mut self, ctx: ServiceContext) -> ServiceResponse<String>;
 
     fn read_(&self, ctx: ServiceContext) -> ServiceResponse<String>;
+
+    // Return service schema: (MethodSchema, EventSchema)
+    fn schema_(&self) -> (String, String);
 }
 
 // `ServiceSDK` provides multiple rich interfaces for `service` developers
@@ -272,3 +278,31 @@ pub trait StoreBool {
 
     fn set(&mut self, b: bool);
 }
+
+pub trait ServiceSchema {
+    fn name() -> String;
+    fn schema(register: &mut BTreeMap<String, String>);
+}
+
+macro_rules! impl_scalar_schema {
+    ($t: ident, $s: expr) => {
+        impl ServiceSchema for $t {
+            fn name() -> String {
+                $s.to_owned()
+            }
+
+            fn schema(register: &mut BTreeMap<String, String>) {
+                register.insert($s.to_owned(), format!("scalar {}", $s));
+            }
+        }
+    };
+}
+
+impl_scalar_schema![u8, "Uint8"];
+impl_scalar_schema![u32, "Uint32"];
+impl_scalar_schema![u64, "Uint64"];
+impl_scalar_schema![bool, "Boolean"];
+impl_scalar_schema![String, "String"];
+impl_scalar_schema![Address, "Address"];
+impl_scalar_schema![Hash, "Hash"];
+impl_scalar_schema![Hex, "Hex"];

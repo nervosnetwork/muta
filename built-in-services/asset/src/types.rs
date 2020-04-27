@@ -3,7 +3,9 @@ use std::collections::BTreeMap;
 use muta_codec_derive::RlpFixedCodec;
 use serde::{Deserialize, Serialize};
 
+use binding_macro::{SchemaEvent, SchemaObject};
 use protocol::fixed_codec::{FixedCodec, FixedCodecError};
+use protocol::traits::ServiceSchema;
 use protocol::types::{Address, Bytes, Hash};
 use protocol::ProtocolResult;
 
@@ -17,26 +19,26 @@ pub struct InitGenesisPayload {
     pub issuer: Address,
 }
 
-#[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug)]
+#[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug, SchemaObject)]
 pub struct CreateAssetPayload {
     pub name:   String,
     pub symbol: String,
     pub supply: u64,
 }
 
-#[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug)]
+#[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug, SchemaObject)]
 pub struct GetAssetPayload {
     pub id: Hash,
 }
 
-#[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug)]
+#[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug, SchemaObject)]
 pub struct TransferPayload {
     pub asset_id: Hash,
     pub to:       Address,
     pub value:    u64,
 }
 
-#[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug)]
+#[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug, SchemaObject)]
 pub struct TransferEvent {
     pub asset_id: Hash,
     pub from:     Address,
@@ -44,9 +46,14 @@ pub struct TransferEvent {
     pub value:    u64,
 }
 
-pub type ApprovePayload = TransferPayload;
+#[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug, SchemaObject)]
+pub struct ApprovePayload {
+    pub asset_id: Hash,
+    pub to:       Address,
+    pub value:    u64,
+}
 
-#[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug)]
+#[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug, SchemaObject)]
 pub struct ApproveEvent {
     pub asset_id: Hash,
     pub grantor:  Address,
@@ -54,7 +61,7 @@ pub struct ApproveEvent {
     pub value:    u64,
 }
 
-#[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug)]
+#[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug, SchemaObject)]
 pub struct TransferFromPayload {
     pub asset_id:  Hash,
     pub sender:    Address,
@@ -62,7 +69,7 @@ pub struct TransferFromPayload {
     pub value:     u64,
 }
 
-#[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug)]
+#[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug, SchemaObject)]
 pub struct TransferFromEvent {
     pub asset_id:  Hash,
     pub caller:    Address,
@@ -71,27 +78,27 @@ pub struct TransferFromEvent {
     pub value:     u64,
 }
 
-#[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug)]
+#[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug, SchemaObject)]
 pub struct GetBalancePayload {
     pub asset_id: Hash,
     pub user:     Address,
 }
 
-#[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug, Default)]
+#[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug, Default, SchemaObject)]
 pub struct GetBalanceResponse {
     pub asset_id: Hash,
     pub user:     Address,
     pub balance:  u64,
 }
 
-#[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug)]
+#[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug, SchemaObject)]
 pub struct GetAllowancePayload {
     pub asset_id: Hash,
     pub grantor:  Address,
     pub grantee:  Address,
 }
 
-#[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug, Default)]
+#[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug, Default, SchemaObject)]
 pub struct GetAllowanceResponse {
     pub asset_id: Hash,
     pub grantor:  Address,
@@ -99,7 +106,7 @@ pub struct GetAllowanceResponse {
     pub value:    u64,
 }
 
-#[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug, PartialEq, Default)]
+#[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug, PartialEq, Default, SchemaObject)]
 pub struct Asset {
     pub id:     Hash,
     pub name:   String,
@@ -117,6 +124,13 @@ pub struct AssetBalance {
 struct AllowanceCodec {
     pub addr:  Address,
     pub total: u64,
+}
+
+#[derive(SchemaEvent)]
+pub enum Event {
+    Transfer(TransferEvent),
+    Approve(ApproveEvent),
+    TransferFrom(TransferFromEvent),
 }
 
 impl rlp::Decodable for AssetBalance {
