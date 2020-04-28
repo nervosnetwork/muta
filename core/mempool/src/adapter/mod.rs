@@ -228,35 +228,49 @@ where
     }
 
     async fn check_signature(&self, _ctx: Context, tx: SignedTransaction) -> ProtocolResult<()> {
-        let hash = tx.tx_hash.as_bytes();
-        let pub_key = tx.pubkey.as_ref();
-        let sig = tx.signature.as_ref();
+        let blocking_res = tokio::task::spawn_blocking(move || {
+            // Verify transaction hash
+            let fixed_bytes = tx.raw.encode_fixed()?;
+            let tx_hash = Hash::digest(fixed_bytes);
 
-        C::verify_signature(hash.as_ref(), sig, pub_key).map_err(|_| {
-            MemPoolError::CheckSig {
-                tx_hash: tx.tx_hash,
+            if tx_hash != tx.tx_hash {
+                let wrong_hash = MemPoolError::CheckHash {
+                    expect: tx.tx_hash,
+                    actual: tx_hash,
+                };
+
+                return Err(wrong_hash.into());
             }
-            .into()
+
+            let hash = tx.tx_hash.as_bytes();
+            let pub_key = tx.pubkey.as_ref();
+            let sig = tx.signature.as_ref();
+
+            C::verify_signature(hash.as_ref(), sig, pub_key).map_err(|_| {
+                MemPoolError::CheckSig {
+                    tx_hash: tx.tx_hash,
+                }
+                .into()
+            })
         })
+        .await;
+
+        match blocking_res {
+            Ok(res) => res,
+            Err(_) => {
+                log::error!("[mempool] check_signature failed");
+                Err(AdapterError::Internal.into())
+            }
+        }
     }
 
     // TODO: Verify Fee?
     // TODO: Verify Nonce?
     // TODO: Cycle limit?
     async fn check_transaction(&self, _ctx: Context, stx: SignedTransaction) -> ProtocolResult<()> {
-        // Verify transaction hash
         let fixed_bytes = stx.raw.encode_fixed()?;
         let size = fixed_bytes.len() as u64;
-        let tx_hash = Hash::digest(fixed_bytes);
-
-        if tx_hash != stx.tx_hash {
-            let wrong_hash = MemPoolError::CheckHash {
-                expect: stx.tx_hash,
-                actual: tx_hash,
-            };
-
-            return Err(wrong_hash.into());
-        }
+        let tx_hash = stx.tx_hash.clone();
 
         // check tx size
         let max_tx_size = self.max_tx_size.load(Ordering::SeqCst);
@@ -345,6 +359,9 @@ where
 pub enum AdapterError {
     #[display(fmt = "adapter: interval broadcaster drop")]
     IntervalBroadcasterDrop,
+
+    #[display(fmt = "adapter: internal error")]
+    Internal,
 }
 
 impl Error for AdapterError {}

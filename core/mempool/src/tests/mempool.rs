@@ -232,6 +232,50 @@ fn bench_flush(b: &mut Bencher) {
     });
 }
 
+#[tokio::test(core_threads = 4)]
+async fn bench_sign_with_spawn_list() {
+    let adapter = Arc::new(HashMemPoolAdapter::new());
+    let txs = default_mock_txs(30000);
+    let len = txs.len();
+    let now = std::time::Instant::now();
+
+    let futs = txs
+        .into_iter()
+        .map(|tx| {
+            let adapter = Arc::clone(&adapter);
+            tokio::spawn(async move {
+                adapter
+                    .check_signature(Context::new(), tx.clone())
+                    .await
+                    .unwrap();
+            })
+        })
+        .collect::<Vec<_>>();
+    futures::future::try_join_all(futs).await.unwrap();
+
+    println!(
+        "bench_sign_with_spawn_list size {:?} cost {:?}",
+        len,
+        now.elapsed()
+    );
+}
+
+#[tokio::test(core_threads = 4)]
+async fn bench_sign() {
+    let adapter = HashMemPoolAdapter::new();
+    let txs = default_mock_txs(30000);
+    let now = std::time::Instant::now();
+
+    for tx in txs.iter() {
+        adapter
+            .check_signature(Context::new(), tx.clone())
+            .await
+            .unwrap();
+    }
+
+    println!("bench_sign size {:?} cost {:?}", txs.len(), now.elapsed());
+}
+
 #[bench]
 fn bench_mock_txs(b: &mut Bencher) {
     b.iter(|| {
