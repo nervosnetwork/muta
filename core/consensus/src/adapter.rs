@@ -321,7 +321,7 @@ where
         &self,
         ctx: Context,
         height: u64,
-        txs: Vec<Hash>,
+        txs: Vec<SignedTransaction>,
     ) -> ProtocolResult<()> {
         if let Err(e) = self.mempool.ensure_order_txs_sync(ctx.clone(), txs).await {
             log::error!("verify_txs error {:?}", e);

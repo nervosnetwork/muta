@@ -61,14 +61,6 @@ impl MemPoolAdapter for HashMemPoolAdapter {
         Ok(vec)
     }
 
-    async fn pull_txs_sync(
-        &self,
-        _: Context,
-        _: Vec<Hash>,
-    ) -> ProtocolResult<Vec<SignedTransaction>> {
-        Ok(Vec::new())
-    }
-
     async fn broadcast_tx(&self, _ctx: Context, tx: SignedTransaction) -> ProtocolResult<()> {
         self.network_txs.insert(tx.tx_hash.clone(), tx);
         Ok(())

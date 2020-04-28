@@ -79,7 +79,7 @@ pub trait SynchronizationAdapter: CommonConsensusAdapter + Send + Sync {
         &self,
         ctx: Context,
         height: u64,
-        txs: Vec<Hash>,
+        txs: Vec<SignedTransaction>,
     ) -> ProtocolResult<()>;
 }
 

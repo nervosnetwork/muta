@@ -206,7 +206,12 @@ impl SynchronizationAdapter for MockCommonConsensusAdapter {
         Ok(self.remote_proofs.read().get(&height).unwrap().clone())
     }
 
-    async fn verify_txs_sync(&self, _: Context, _: u64, _: Vec<Hash>) -> ProtocolResult<()> {
+    async fn verify_txs_sync(
+        &self,
+        _: Context,
+        _: u64,
+        _: Vec<SignedTransaction>,
+    ) -> ProtocolResult<()> {
         Ok(())
     }
 }

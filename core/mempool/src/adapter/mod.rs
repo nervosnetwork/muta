@@ -30,7 +30,7 @@ use protocol::{
 };
 
 use crate::adapter::message::{
-    MsgNewTxs, MsgPullTxs, MsgPushTxs, END_GOSSIP_NEW_TXS, RPC_PULL_TXS, RPC_PULL_TXS_SYNC,
+    MsgNewTxs, MsgPullTxs, MsgPushTxs, END_GOSSIP_NEW_TXS, RPC_PULL_TXS,
 };
 use crate::MemPoolError;
 
@@ -206,21 +206,6 @@ where
         let resp_msg = self
             .network
             .call::<MsgPullTxs, MsgPushTxs>(ctx, RPC_PULL_TXS, pull_msg, Priority::High)
-            .await?;
-
-        Ok(resp_msg.sig_txs)
-    }
-
-    async fn pull_txs_sync(
-        &self,
-        ctx: Context,
-        tx_hashes: Vec<Hash>,
-    ) -> ProtocolResult<Vec<SignedTransaction>> {
-        let pull_msg = MsgPullTxs { hashes: tx_hashes };
-
-        let resp_msg = self
-            .network
-            .call::<MsgPullTxs, MsgPushTxs>(ctx, RPC_PULL_TXS_SYNC, pull_msg, Priority::High)
             .await?;
 
         Ok(resp_msg.sig_txs)
