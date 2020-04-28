@@ -6,7 +6,6 @@ use crate::types::{
 use binding_macro::{cycles, service};
 use bytes::Bytes;
 use common_crypto::{Crypto, Secp256k1};
-use hasher::{Hasher, HasherKeccak};
 use protocol::traits::{ExecutorParams, ServiceResponse, ServiceSDK};
 use protocol::types::{Address, Hash, Hex, ServiceContext};
 
@@ -31,15 +30,7 @@ impl<SDK: ServiceSDK> AccountService<SDK> {
         ctx: ServiceContext,
         payload: VerifyPayload,
     ) -> ServiceResponse<VerifyResponse> {
-        let wit_str = String::from_utf8(payload.witness.to_vec());
-        if wit_str.is_err() {
-            return ServiceResponse::<VerifyResponse>::from_error(
-                112,
-                "witness from utf8 bytes to string failed".to_owned(),
-            );
-        }
-
-        let wit_res: Result<Witness, _> = serde_json::from_str(wit_str.unwrap().as_str());
+        let wit_res: Result<Witness, _> = serde_json::from_str(&payload.witness);
         if wit_res.is_err() {
             return ServiceResponse::<VerifyResponse>::from_error(
                 113,
@@ -155,8 +146,6 @@ impl<SDK: ServiceSDK> AccountService<SDK> {
         }
 
         let response = GenerateAccountResponse {
-            accounts,
-            threshold: permission.threshold,
             address: payload.user,
         };
 
@@ -199,16 +188,7 @@ impl<SDK: ServiceSDK> AccountService<SDK> {
 
         let tx_hash = ctx.get_tx_hash().unwrap();
 
-        let keccak = HasherKeccak::new();
-        let addr_hash = Hash::from_bytes(Bytes::from(keccak.digest(&tx_hash.as_bytes())));
-        if addr_hash.is_err() {
-            return ServiceResponse::<GenerateAccountResponse>::from_error(
-                111,
-                "generate addr_hash from tx_hash failed".to_owned(),
-            );
-        }
-
-        let addr = Address::from_hash(addr_hash.unwrap());
+        let addr = Address::from_hash(Hash::digest(tx_hash.as_bytes()));
         if addr.is_err() {
             return ServiceResponse::<GenerateAccountResponse>::from_error(
                 111,
@@ -224,11 +204,7 @@ impl<SDK: ServiceSDK> AccountService<SDK> {
 
         self.sdk.set_account_value(&address, 0u8, permission);
 
-        let response = GenerateAccountResponse {
-            address,
-            accounts: payload.accounts,
-            threshold: payload.threshold,
-        };
+        let response = GenerateAccountResponse { address };
 
         ServiceResponse::<GenerateAccountResponse>::from_succeed(response)
     }

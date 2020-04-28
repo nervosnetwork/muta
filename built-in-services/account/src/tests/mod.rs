@@ -113,7 +113,7 @@ fn test_generate() {
 
     let mut res_single = service.verify_signature(context.clone(), VerifyPayload {
         tx_hash: tx_hash.clone(),
-        witness: Bytes::from(wit_str),
+        witness: wit_str.clone(),
     });
     assert_eq!(res_single.is_error(), true);
     println!("single sig1, expected not verified\r\n {:#?}", res_single);
@@ -130,7 +130,7 @@ fn test_generate() {
 
     res_single = service.verify_signature(context.clone(), VerifyPayload {
         tx_hash: tx_hash.clone(),
-        witness: Bytes::from(wit_str),
+        witness: wit_str.clone(),
     });
     assert_eq!(res_single.is_error(), false);
     println!("single sig1, expect verified\r\n {:#?}", res_single);
@@ -147,7 +147,7 @@ fn test_generate() {
 
     res_single = service.verify_signature(context.clone(), VerifyPayload {
         tx_hash: tx_hash.clone(),
-        witness: Bytes::from(wit_str),
+        witness: wit_str,
     });
     assert_eq!(res_single.is_error(), true);
     println!("single sig1-pk2, expect not verified\r\n {:#?}", res_single);
@@ -164,7 +164,7 @@ fn test_generate() {
 
     let res_multi_1 = service.verify_signature(context.clone(), VerifyPayload {
         tx_hash: tx_hash.clone(),
-        witness: Bytes::from(wit1_str),
+        witness: wit1_str,
     });
     assert_eq!(res_multi_1.is_error(), false);
     println!("{:#?}", res_multi_1);
@@ -181,7 +181,7 @@ fn test_generate() {
 
     let res_multi_2 = service.verify_signature(context.clone(), VerifyPayload {
         tx_hash: tx_hash.clone(),
-        witness: Bytes::from(wit2_str),
+        witness: wit2_str,
     });
     assert_eq!(res_multi_2.is_error(), true);
     println!("{:#?}", res_multi_2);
@@ -198,7 +198,7 @@ fn test_generate() {
 
     let res_multi_3 = service.verify_signature(context.clone(), VerifyPayload {
         tx_hash: tx_hash.clone(),
-        witness: Bytes::from(wit3_str),
+        witness: wit3_str,
     });
     assert_eq!(res_multi_3.is_error(), false);
     println!("{:#?}", res_multi_3);
@@ -215,7 +215,7 @@ fn test_generate() {
 
     let res_multi_4 = service.verify_signature(context, VerifyPayload {
         tx_hash,
-        witness: Bytes::from(wit4_str),
+        witness: wit4_str,
     });
     assert_eq!(res_multi_4.is_error(), true);
     println!("{:#?}", res_multi_4);

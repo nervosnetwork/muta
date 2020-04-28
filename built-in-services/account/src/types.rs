@@ -12,7 +12,7 @@ pub const MAX_PERMISSION_ACCOUNTS: u8 = 16;
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct VerifyPayload {
     pub tx_hash: Hash,
-    pub witness: Bytes,
+    pub witness: String,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, Default)]
@@ -33,9 +33,7 @@ pub struct GenerateAccountPayload {
 
 #[derive(Deserialize, Serialize, Clone, Debug, Default)]
 pub struct GenerateAccountResponse {
-    pub accounts:  Vec<PayloadAccount>,
-    pub threshold: u8,
-    pub address:   Address,
+    pub address: Address,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
