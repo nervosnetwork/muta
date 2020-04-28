@@ -98,6 +98,20 @@ where
     ) -> ProtocolResult<()> {
         let _lock = self.flush_lock.read().await;
 
+        self.check_tx(ctx.clone(), tx.clone()).await?;
+        match tx_type {
+            TxType::NewTx => self.tx_cache.insert_new_tx(tx.clone())?,
+            TxType::ProposeTx => self.tx_cache.insert_propose_tx(tx.clone())?,
+        }
+
+        if !ctx.is_network_origin_txs() {
+            self.adapter.broadcast_tx(ctx, tx).await?;
+        }
+
+        Ok(())
+    }
+
+    async fn check_tx(&self, ctx: Context, tx: SignedTransaction) -> ProtocolResult<()> {
         let tx_hash = &tx.tx_hash;
         self.tx_cache.check_reach_limit(self.pool_size).await?;
         self.tx_cache.check_exist(tx_hash).await?;
@@ -109,17 +123,7 @@ where
             .await?;
         self.adapter
             .check_storage_exist(ctx.clone(), tx_hash.clone())
-            .await?;
-        match tx_type {
-            TxType::NewTx => self.tx_cache.insert_new_tx(tx.clone()).await?,
-            TxType::ProposeTx => self.tx_cache.insert_propose_tx(tx.clone()).await?,
-        }
-
-        if !ctx.is_network_origin_txs() {
-            self.adapter.broadcast_tx(ctx, tx).await?;
-        }
-
-        Ok(())
+            .await
     }
 
     async fn verify_tx_in_parallel(
@@ -170,6 +174,10 @@ where
 {
     async fn insert(&self, ctx: Context, tx: SignedTransaction) -> ProtocolResult<()> {
         self.insert_tx(ctx, tx, TxType::NewTx).await
+    }
+
+    async fn check_tx(&self, ctx: Context, tx: SignedTransaction) -> ProtocolResult<()> {
+        self.check_tx(ctx, tx).await
     }
 
     async fn package(

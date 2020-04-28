@@ -394,7 +394,7 @@ where
                 }
                 // check signature and transaction
                 self.mem_pool
-                    .insert(ctx.clone(), ordered_txs[i].clone())
+                    .check_tx(ctx.clone(), ordered_txs[i].clone())
                     .await?;
             }
         }
