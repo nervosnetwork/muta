@@ -8,7 +8,9 @@ use protocol::traits::ExecutorFactory;
 use protocol::traits::{
     APIAdapter, Context, ExecutorParams, MemPool, ServiceMapping, ServiceResponse, Storage,
 };
-use protocol::types::{Address, Block, Hash, Receipt, SignedTransaction, TransactionRequest};
+use protocol::types::{
+    Address, Block, ChainSchema, Hash, Receipt, SignedTransaction, TransactionRequest,
+};
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
 #[derive(Debug, Display)]
@@ -145,5 +147,9 @@ impl<
             method,
             payload,
         })
+    }
+
+    async fn get_schema(&self, _ctx: Context) -> ProtocolResult<ChainSchema> {
+        self.storage.get_schema().await
     }
 }

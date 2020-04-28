@@ -19,8 +19,9 @@ use protocol::traits::{
     ServiceResponse, ServiceState, Storage,
 };
 use protocol::types::{
-    Address, Bloom, BloomInput, Hash, MerkleRoot, Receipt, ReceiptResponse, ServiceContext,
-    ServiceContextParams, ServiceParam, SignedTransaction, TransactionRequest,
+    Address, Bloom, BloomInput, ChainSchema, Hash, MerkleRoot, Receipt, ReceiptResponse,
+    ServiceContext, ServiceContextParams, ServiceParam, ServiceSchema, SignedTransaction,
+    TransactionRequest,
 };
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
@@ -59,7 +60,7 @@ impl<S: Storage, DB: TrieDB, Mapping: ServiceMapping> Clone for ServiceExecutor<
 impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMapping>
     ServiceExecutor<S, DB, Mapping>
 {
-    pub fn create_genesis(
+    pub async fn create_genesis(
         services: Vec<ServiceParam>,
         trie_db: Arc<DB>,
         storage: Arc<S>,
@@ -68,11 +69,26 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
         let querier = Rc::new(DefaultChainQuerier::new(Arc::clone(&storage)));
 
         let mut states = HashMap::new();
-        for name in mapping.list_service_name().into_iter() {
+        let mut schema = vec![];
+
+        for name in mapping.list_service_name().iter() {
             let trie = MPTTrie::new(Arc::clone(&trie_db));
 
-            states.insert(name, Rc::new(RefCell::new(GeneralServiceState::new(trie))));
+            let state = Rc::new(RefCell::new(GeneralServiceState::new(trie)));
+            let sdk =
+                DefalutServiceSDK::new(Rc::clone(&state), Rc::clone(&querier), NoopDispatcher {});
+            let service = mapping.get_service(&name, sdk)?;
+            let ret = service.schema_();
+            schema.push(ServiceSchema {
+                service: name.clone(),
+                method:  ret.0,
+                event:   ret.1,
+            });
+
+            states.insert(name.clone(), state);
         }
+
+        storage.insert_schema(ChainSchema { schema }).await?;
 
         for params in services.into_iter() {
             let state = states
@@ -88,7 +104,6 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
                 service.genesis_(params.payload.clone())
             }))
             .map_err(|e| ProtocolError::from(ExecutorError::InitService(format!("{:?}", e))))?;
-
             state.borrow_mut().stash()?;
         }
 

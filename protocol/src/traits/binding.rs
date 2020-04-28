@@ -279,20 +279,37 @@ pub trait StoreBool {
     fn set(&mut self, b: bool);
 }
 
-pub trait ServiceSchema {
+pub trait SchemaGenerator {
     fn name() -> String;
     fn schema(register: &mut BTreeMap<String, String>);
 }
 
 macro_rules! impl_scalar_schema {
     ($t: ident, $s: expr) => {
-        impl ServiceSchema for $t {
+        impl SchemaGenerator for $t {
             fn name() -> String {
                 $s.to_owned()
             }
 
             fn schema(register: &mut BTreeMap<String, String>) {
+                if "String" == $s || "Boolean" == $s {
+                    return;
+                }
                 register.insert($s.to_owned(), format!("scalar {}", $s));
+            }
+        }
+    };
+    ($t: ident, $s: expr, $d: expr) => {
+        impl SchemaGenerator for $t {
+            fn name() -> String {
+                $s.to_owned()
+            }
+
+            fn schema(register: &mut BTreeMap<String, String>) {
+                if "String" == $s || "Boolean" == $s {
+                    return;
+                }
+                register.insert($s.to_owned(), format!("# {}\nscalar {}", $d, $s));
             }
         }
     };
@@ -303,6 +320,6 @@ impl_scalar_schema![u32, "Uint32"];
 impl_scalar_schema![u64, "Uint64"];
 impl_scalar_schema![bool, "Boolean"];
 impl_scalar_schema![String, "String"];
-impl_scalar_schema![Address, "Address"];
-impl_scalar_schema![Hash, "Hash"];
-impl_scalar_schema![Hex, "Hex"];
+impl_scalar_schema![Address, "Address", "20 bytes of account address"];
+impl_scalar_schema![Hash, "Hash", "The output digest of Keccak hash function"];
+impl_scalar_schema![Hex, "Hex", "String started with 0x"];

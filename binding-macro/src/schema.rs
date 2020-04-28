@@ -80,9 +80,9 @@ pub fn impl_object(ast: &DeriveInput) -> TokenStream {
                     };
                 }
             }
-            _ => panic!("#[derive(ServiceSchema)]: struct fields should be named"),
+            _ => panic!("#[derive(SchemaObject)]: struct fields should be named"),
         },
-        _ => panic!("#[derive(ServiceSchema)] can only mark a struct"),
+        _ => panic!("#[derive(SchemaObject)] can only mark a struct"),
     }
 
     let token = quote! {
@@ -96,7 +96,7 @@ pub fn impl_object(ast: &DeriveInput) -> TokenStream {
     };
 
     let gen = quote! {
-        impl ServiceSchema for #ident {
+        impl SchemaGenerator for #ident {
             fn name() -> String {
                 #ident_str.to_owned()
             }
@@ -118,9 +118,9 @@ fn extract_comment(attrs: &Vec<Attribute>, is_field: bool) -> Option<String> {
                     .parse_args()
                     .expect("#[description]: comments should be string");
                 if is_field {
-                    return Some(format!("  // {}\n", comment.value));
+                    return Some(format!("  # {}\n", comment.value));
                 } else {
-                    return Some(format!("// {}\n", comment.value));
+                    return Some(format!("# {}\n", comment.value));
                 }
             }
         }
@@ -132,7 +132,7 @@ fn generate_field_token(f: &Field, ty: &Ident, is_vec: bool) -> proc_macro2::Tok
     let f_str = f
         .ident
         .as_ref()
-        .expect("#[derive(ServiceSchema)]: struct fields should be named")
+        .expect("#[derive(SchemaObject)]: struct fields should be named")
         .to_string();
 
     let mut field_str = "".to_owned();
@@ -159,10 +159,10 @@ fn extract_ident_from_path(ty: &Type) -> Ident {
             .path
             .segments
             .first()
-            .expect("#[derive(ServiceSchema)]: Vec should contain a type arg")
+            .expect("#[derive(SchemaObject)]: Vec should contain a type arg")
             .ident
             .clone(),
-        _ => panic!("#[derive(ServiceSchema)]: Vec arg should be a path type"),
+        _ => panic!("#[derive(SchemaObject)]: Vec arg should be a path type"),
     }
 }
 
@@ -177,28 +177,30 @@ fn extract_ident_from_ty(ty: &Type) -> (Ident, bool) {
                         let arg = g_ty
                             .args
                             .first()
-                            .expect("#[derive(ServiceSchema)]: Vec should contain a type arg");
+                            .expect("#[derive(SchemaObject)]: Vec should contain a type arg");
                         if let GenericArgument::Type(arg_ty) = arg {
                             let ident = extract_ident_from_path(&arg_ty);
                             (ident, true)
                         } else {
-                            panic!("#[derive(ServiceSchema)]: Vec arg should be a type")
+                            panic!("#[derive(SchemaObject)]: Vec arg should be a type")
                         }
                     } else {
-                        panic!("#[derive(ServiceSchema)]: Vec should be AngleBracketed")
+                        panic!("#[derive(SchemaObject)]: Vec should be AngleBracketed")
                     }
                 } else {
                     if let PathArguments::None = concrete_ty.arguments {
                         (concrete_ty.ident.clone(), false)
                     } else {
-                        panic!("#[derive(ServiceSchema)]: field type only supports T, Vec<T>, or [T;n]")
+                        panic!(
+                            "#[derive(SchemaObject)]: field type only supports T, Vec<T>, or [T;n]"
+                        )
                     }
                 }
             } else {
-                panic!("#[derive(ServiceSchema)]: length of field type should be 1")
+                panic!("#[derive(SchemaObject)]: length of field type should be 1")
             }
         }
-        _ => panic!("#[derive(ServiceSchema)]: field type only supports T, Vec<T>, or [T;n]"),
+        _ => panic!("#[derive(SchemaObject)]: field type only supports T, Vec<T>, or [T;n]"),
     }
 }
 

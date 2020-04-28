@@ -18,7 +18,7 @@ use protocol::fixed_codec::FixedCodec;
 use protocol::traits::{
     Storage, StorageAdapter, StorageBatchModify, StorageCategory, StorageSchema,
 };
-use protocol::types::{Block, Hash, Proof, Receipt, SignedTransaction};
+use protocol::types::{Block, ChainSchema, Hash, Proof, Receipt, SignedTransaction};
 use protocol::Bytes;
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
@@ -26,6 +26,7 @@ lazy_static! {
     pub static ref LATEST_BLOCK_KEY: Hash = Hash::digest(Bytes::from("latest_hash"));
     pub static ref LATEST_PROOF_KEY: Hash = Hash::digest(Bytes::from("latest_proof"));
     pub static ref OVERLORD_WAL_KEY: Hash = Hash::digest(Bytes::from("overlord_wal"));
+    pub static ref CHAIN_SCHEMA_KEY: Hash = Hash::digest(Bytes::from("chain_schema"));
 }
 
 #[derive(Debug)]
@@ -71,6 +72,7 @@ impl_storage_schema_for!(HashBlockSchema, Hash, u64, Block);
 impl_storage_schema_for!(LatestBlockSchema, Hash, Block, Block);
 impl_storage_schema_for!(LatestProofSchema, Hash, Proof, Block);
 impl_storage_schema_for!(OverlordWalSchema, Hash, Bytes, Wal);
+impl_storage_schema_for!(ChainSchemaSchema, Hash, ChainSchema, Schema);
 
 macro_rules! batch_insert {
     ($self_: ident,$vec: expr, $schema: ident) => {
@@ -200,6 +202,17 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
     async fn load_overlord_wal(&self) -> ProtocolResult<Bytes> {
         let wal_info = get!(self, OVERLORD_WAL_KEY.clone(), OverlordWalSchema);
         Ok(wal_info)
+    }
+
+    async fn insert_schema(&self, schema: ChainSchema) -> ProtocolResult<()> {
+        self.adapter
+            .insert::<ChainSchemaSchema>(CHAIN_SCHEMA_KEY.clone(), schema)
+            .await
+    }
+
+    async fn get_schema(&self) -> ProtocolResult<ChainSchema> {
+        let cs = get!(self, CHAIN_SCHEMA_KEY.clone(), ChainSchemaSchema);
+        Ok(cs)
     }
 }
 

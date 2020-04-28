@@ -98,7 +98,7 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
         Arc::clone(&trie_db),
         Arc::clone(&storage),
         servive_mapping,
-    )?;
+    ).await?;
 
     // Build genesis block.
     let genesis_block_header = BlockHeader {

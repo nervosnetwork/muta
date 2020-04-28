@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use binding_macro::SchemaObject;
 
-use protocol::traits::ServiceSchema;
+use protocol::traits::SchemaGenerator;
 use protocol::types::{Hash, Hex};
 
 #[derive(Deserialize, Serialize, Clone, Debug, SchemaObject)]

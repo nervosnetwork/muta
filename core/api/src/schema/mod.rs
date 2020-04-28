@@ -17,6 +17,41 @@ pub use transaction::{
 };
 
 #[derive(juniper::GraphQLObject, Clone)]
+#[graphql(description = "ChainSchema consists of all service schemas")]
+pub struct ChainSchema {
+    schema: Vec<ServiceSchema>,
+}
+
+#[graphql(description = "Description a service interface and events")]
+#[derive(juniper::GraphQLObject, Clone)]
+pub struct ServiceSchema {
+    #[graphql(description = "name of service")]
+    pub service: String,
+    #[graphql(description = "service methods, method payloads and response")]
+    pub method:  String,
+    #[graphql(description = "all events emitted by service")]
+    pub event:   String,
+}
+
+impl From<protocol::types::ChainSchema> for ChainSchema {
+    fn from(cs: protocol::types::ChainSchema) -> ChainSchema {
+        Self {
+            schema: cs.schema.into_iter().map(ServiceSchema::from).collect(),
+        }
+    }
+}
+
+impl From<protocol::types::ServiceSchema> for ServiceSchema {
+    fn from(ss: protocol::types::ServiceSchema) -> ServiceSchema {
+        Self {
+            service: ss.service,
+            method:  ss.method,
+            event:   ss.event,
+        }
+    }
+}
+
+#[derive(juniper::GraphQLObject, Clone)]
 pub struct ServiceResponse {
     pub code:          Uint64,
     pub succeed_data:  String,

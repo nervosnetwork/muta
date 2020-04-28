@@ -4,7 +4,7 @@ use derive_more::Display;
 use crate::codec::ProtocolCodec;
 use crate::types::block::{Block, Proof};
 use crate::types::receipt::Receipt;
-use crate::types::{Hash, SignedTransaction};
+use crate::types::{ChainSchema, Hash, SignedTransaction};
 use crate::{Bytes, ProtocolResult};
 
 #[derive(Debug, Copy, Clone, Display)]
@@ -13,6 +13,7 @@ pub enum StorageCategory {
     Receipt,
     SignedTransaction,
     Wal,
+    Schema,
 }
 
 pub trait StorageSchema {
@@ -51,6 +52,10 @@ pub trait Storage: Send + Sync {
     async fn update_overlord_wal(&self, info: Bytes) -> ProtocolResult<()>;
 
     async fn load_overlord_wal(&self) -> ProtocolResult<Bytes>;
+
+    async fn insert_schema(&self, schema: ChainSchema) -> ProtocolResult<()>;
+
+    async fn get_schema(&self) -> ProtocolResult<ChainSchema>;
 }
 
 pub enum StorageBatchModify<S: StorageSchema> {

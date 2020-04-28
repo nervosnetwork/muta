@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use binding_macro::{SchemaEvent, SchemaObject};
 use protocol::fixed_codec::{FixedCodec, FixedCodecError};
-use protocol::traits::ServiceSchema;
+use protocol::traits::SchemaGenerator;
 use protocol::types::{Address, Bytes, Hash};
 use protocol::ProtocolResult;
 

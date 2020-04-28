@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 use bytes::Bytes;
 
 use binding_macro::{cycles, genesis, service};
-use protocol::traits::{ExecutorParams, ServiceResponse, ServiceSDK, ServiceSchema, StoreMap};
+use protocol::traits::{ExecutorParams, ServiceResponse, ServiceSDK, SchemaGenerator, StoreMap};
 use protocol::types::{Address, Hash, ServiceContext};
 
 use crate::types::{

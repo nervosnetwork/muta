@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 
 use crate::traits::{Context, ServiceResponse};
-use crate::types::{Address, Block, Hash, Receipt, SignedTransaction};
+use crate::types::{Address, Block, ChainSchema, Hash, Receipt, SignedTransaction};
 use crate::ProtocolResult;
 
 #[async_trait]
@@ -34,4 +34,6 @@ pub trait APIAdapter: Send + Sync {
         method: String,
         payload: String,
     ) -> ProtocolResult<ServiceResponse<String>>;
+
+    async fn get_schema(&self, ctx: Context) -> ProtocolResult<ChainSchema>;
 }

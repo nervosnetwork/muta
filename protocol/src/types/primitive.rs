@@ -9,7 +9,7 @@ use serde::de;
 use serde::{Deserialize, Serialize};
 
 use crate::fixed_codec::{FixedCodec, FixedCodecError};
-use crate::traits::ServiceSchema;
+use crate::traits::SchemaGenerator;
 use crate::types::TypesError;
 use crate::ProtocolResult;
 
@@ -306,7 +306,7 @@ pub struct ValidatorExtend {
     pub vote_weight:    u32,
 }
 
-impl ServiceSchema for Metadata {
+impl SchemaGenerator for Metadata {
     fn name() -> String {
         "Metadata".to_owned()
     }
@@ -341,9 +341,6 @@ impl ServiceSchema for Metadata {
         Hash::schema(register);
         Address::schema(register);
         Hex::schema(register);
-        // register.insert("u32".to_owned(), "scalar Uint32".to_owned());
-        // register.insert("Address".to_owned(), "scalar Uint32".to_owned());
-        // register.insert("Hex".to_owned(), "scalar Hex".to_owned());
     }
 }
 
@@ -365,6 +362,18 @@ impl fmt::Debug for ValidatorExtend {
             self.vote_weight
         )
     }
+}
+
+#[derive(RlpFixedCodec, Clone, Debug, PartialEq, Eq)]
+pub struct ChainSchema {
+    pub schema: Vec<ServiceSchema>,
+}
+
+#[derive(RlpFixedCodec, Clone, Debug, PartialEq, Eq)]
+pub struct ServiceSchema {
+    pub service: String,
+    pub method:  String,
+    pub event:   String,
 }
 
 fn clean_0x(s: &str) -> ProtocolResult<&str> {

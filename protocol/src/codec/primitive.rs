@@ -97,12 +97,77 @@ impl TryFrom<MerkleRoot> for protocol_primitive::MerkleRoot {
     }
 }
 
+// Chain schema
+#[derive(Clone, Message)]
+pub struct ChainSchema {
+    #[prost(message, repeated, tag = "1")]
+    pub schema: Vec<ServiceSchema>,
+}
+
+#[derive(Clone, Message)]
+pub struct ServiceSchema {
+    #[prost(bytes, tag = "1")]
+    pub service: Vec<u8>,
+
+    #[prost(bytes, tag = "2")]
+    pub method: Vec<u8>,
+
+    #[prost(bytes, tag = "3")]
+    pub event: Vec<u8>,
+}
+
+impl From<protocol_primitive::ChainSchema> for ChainSchema {
+    fn from(cs: protocol_primitive::ChainSchema) -> ChainSchema {
+        let schema = cs.schema.into_iter().map(ServiceSchema::from).collect();
+
+        ChainSchema { schema }
+    }
+}
+
+impl TryFrom<ChainSchema> for protocol_primitive::ChainSchema {
+    type Error = ProtocolError;
+
+    fn try_from(cs: ChainSchema) -> Result<protocol_primitive::ChainSchema, Self::Error> {
+        let schema = cs
+            .schema
+            .into_iter()
+            .map(protocol_primitive::ServiceSchema::try_from)
+            .collect::<Result<Vec<protocol_primitive::ServiceSchema>, ProtocolError>>()?;
+
+        let cs = protocol_primitive::ChainSchema { schema };
+
+        Ok(cs)
+    }
+}
+
+impl From<protocol_primitive::ServiceSchema> for ServiceSchema {
+    fn from(ss: protocol_primitive::ServiceSchema) -> ServiceSchema {
+        ServiceSchema {
+            service: ss.service.as_bytes().to_vec(),
+            method:  ss.method.as_bytes().to_vec(),
+            event:   ss.event.as_bytes().to_vec(),
+        }
+    }
+}
+
+impl TryFrom<ServiceSchema> for protocol_primitive::ServiceSchema {
+    type Error = ProtocolError;
+
+    fn try_from(ss: ServiceSchema) -> Result<protocol_primitive::ServiceSchema, Self::Error> {
+        Ok(protocol_primitive::ServiceSchema {
+            service: String::from_utf8(ss.service).map_err(CodecError::FromStringUtf8)?,
+            method:  String::from_utf8(ss.method).map_err(CodecError::FromStringUtf8)?,
+            event:   String::from_utf8(ss.event).map_err(CodecError::FromStringUtf8)?,
+        })
+    }
+}
+
 // #####################
 // Codec
 // #####################
 
 // MerkleRoot and AssetID are just Hash aliases
-impl_default_bytes_codec_for!(primitive, [Hash, Address]);
+impl_default_bytes_codec_for!(primitive, [Hash, Address, ChainSchema]);
 
 impl ProtocolCodecSync for u64 {
     fn encode_sync(&self) -> ProtocolResult<Bytes> {

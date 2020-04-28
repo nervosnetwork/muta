@@ -19,8 +19,9 @@ use protocol::traits::{APIAdapter, Context};
 
 use crate::config::GraphQLConfig;
 use crate::schema::{
-    to_signed_transaction, to_transaction, Address, Block, Bytes, Hash, InputRawTransaction,
-    InputTransactionEncryption, Receipt, ServiceResponse, SignedTransaction, Uint64,
+    to_signed_transaction, to_transaction, Address, Block, Bytes, ChainSchema, Hash,
+    InputRawTransaction, InputTransactionEncryption, Receipt, ServiceResponse, SignedTransaction,
+    Uint64,
 };
 
 lazy_static! {
@@ -129,6 +130,16 @@ impl Query {
             )
             .await?;
         Ok(ServiceResponse::from(exec_resp))
+    }
+
+    #[graphql(
+        name = "getSchema",
+        description = "Get all services schema, including service methods and events"
+    )]
+    async fn get_schema(state_ctx: &State) -> FieldResult<ChainSchema> {
+        let schema = state_ctx.adapter.get_schema(Context::new()).await?;
+
+        Ok(ChainSchema::from(schema))
     }
 }
 
