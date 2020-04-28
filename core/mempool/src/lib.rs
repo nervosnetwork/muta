@@ -98,7 +98,10 @@ where
     ) -> ProtocolResult<()> {
         let _lock = self.flush_lock.read().await;
 
+        self.tx_cache.check_reach_limit(self.pool_size)?;
+        self.tx_cache.check_exist(&tx.tx_hash)?;
         self.check_tx(ctx.clone(), tx.clone()).await?;
+
         match tx_type {
             TxType::NewTx => self.tx_cache.insert_new_tx(tx.clone())?,
             TxType::ProposeTx => self.tx_cache.insert_propose_tx(tx.clone())?,
@@ -112,9 +115,6 @@ where
     }
 
     async fn check_tx(&self, ctx: Context, tx: SignedTransaction) -> ProtocolResult<()> {
-        let tx_hash = &tx.tx_hash;
-        self.tx_cache.check_reach_limit(self.pool_size).await?;
-        self.tx_cache.check_exist(tx_hash).await?;
         self.adapter
             .check_signature(ctx.clone(), tx.clone())
             .await?;
@@ -122,7 +122,7 @@ where
             .check_transaction(ctx.clone(), tx.clone())
             .await?;
         self.adapter
-            .check_storage_exist(ctx.clone(), tx_hash.clone())
+            .check_storage_exist(ctx.clone(), tx.tx_hash.clone())
             .await
     }
 

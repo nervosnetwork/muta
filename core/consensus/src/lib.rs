@@ -355,12 +355,43 @@ where
         Ok(full_block.encode_fixed()?)
     }
 
-    async fn save_and_exec_block_with_proof(
+    async fn save_full_block_with_proof(
         &self,
         ctx: Context,
         height: Height,
         full_block: Bytes,
         proof: Proof,
+    ) -> Result<(), Box<dyn Error + Send>> {
+        let latest_height = self.get_latest_height(ctx.clone()).await?;
+
+        if latest_height < height - 1 {
+            panic!(
+                "save_and_exec_block_with_proof, latest_height < height - 1, {} < {} - 1",
+                latest_height, height
+            );
+        } else if latest_height >= height {
+            return Ok(());
+        }
+
+        let full_block: FullBlock = FixedCodec::decode_fixed(full_block)?;
+
+        self.storage
+            .update_latest_proof(into_proto_proof(proof)?)
+            .await?;
+        self.storage.insert_block(full_block.block.clone()).await?;
+        self.storage
+            .insert_transactions(full_block.ordered_txs)
+            .await?;
+        let ordered_tx_hashes = full_block.block.ordered_tx_hashes.clone();
+        self.mem_pool.flush(ctx, ordered_tx_hashes).await?;
+        Ok(())
+    }
+
+    async fn exec_full_block(
+        &self,
+        ctx: Context,
+        height: Height,
+        full_block: Bytes,
         last_exec_resp: ExecResp,
         last_commit_exec_resp: ExecResp,
         is_sync: bool,
@@ -413,18 +444,8 @@ where
         )?;
         let metadata =
             self.get_metadata(ctx.clone(), resp.state_root.clone(), height, timestamp)?;
-        let ordered_tx_hashes = full_block.block.ordered_tx_hashes.clone();
         let receipt_root = calculate_root(&resp.receipts);
-
         self.storage.insert_receipts(resp.receipts.clone()).await?;
-        self.storage
-            .update_latest_proof(into_proto_proof(proof)?)
-            .await?;
-        self.storage.insert_block(full_block.block).await?;
-        self.storage
-            .insert_transactions(full_block.ordered_txs)
-            .await?;
-        self.mem_pool.flush(ctx, ordered_tx_hashes).await?;
 
         let exec_result = create_exec_result(
             height,
@@ -583,7 +604,7 @@ where
     }
 
     /// should return empty vec if the required blocks are not exist
-    async fn get_block_with_proofs(
+    async fn get_full_block_with_proofs(
         &self,
         _ctx: Context,
         height_range: HeightRange,

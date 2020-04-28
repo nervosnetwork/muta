@@ -24,7 +24,7 @@ moodyblues-sdk = "0.3"
 serde = { version = "1.0", features = ["derive"] }
 futures = { version = "0.3", features = ["async-await"] }
 tokio = { version = "0.2", features = ["macros", "sync", "rt-core"] }
-overlord = { git = "https://github.com/rev-chaos/overlord", rev = "5fcf919" }
+overlord = { git = "https://github.com/rev-chaos/overlord", rev = "0269ab9" }
 
 core-mempool = { path = "../../core/mempool" }
 core-storage = { path = "../../core/storage" }
