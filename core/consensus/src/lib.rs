@@ -459,8 +459,14 @@ where
         Ok(exec_result)
     }
 
-    async fn commit(&self, _ctx: Context, _commit_state: ExecResult<ExecResp>) {
+    async fn commit(&self, _ctx: Context, commit_state: ExecResult<ExecResp>) {
         self.status.from_myself.write().clear();
+
+        let timeout_gap = commit_state.block_states.state.timeout_gap;
+        let cycles_limit = commit_state.block_states.state.cycles_limit;
+        let max_tx_size = commit_state.block_states.state.max_tx_size;
+        self.mem_pool
+            .set_args(timeout_gap, cycles_limit, max_tx_size);
     }
 
     async fn register_network(
@@ -816,6 +822,7 @@ fn create_exec_result(
         receipt_root,
         cycles_used,
         logs_bloom,
+        timeout_gap: metadata.timeout_gap,
         cycles_limit: metadata.cycles_limit,
         tx_num_limit: metadata.tx_num_limit,
         max_tx_size: metadata.max_tx_size,
@@ -925,16 +932,22 @@ impl Blk for WrappedPill {
 
 #[derive(Clone, Debug, Default, Display)]
 #[display(
-    fmt = "{{ order_root: {}, state_root: {}, receipt_root: {}, cycle_used: {} }}",
+    fmt = "{{ order_root: {}, state_root: {}, receipt_root: {}, timeout_gap: {}, cycle_used: {}, cycles_limit: {}, tx_num_limit: {}, max_tx_size: {}, validators: {:?} }}",
     "order_root.as_bytes().tiny_hex()",
     "state_root.as_bytes().tiny_hex()",
     "receipt_root.as_bytes().tiny_hex()",
-    cycles_used
+    timeout_gap,
+    cycles_used,
+    cycles_limit,
+    tx_num_limit,
+    max_tx_size,
+    "validators.iter().map(|v| format!(\"{{ address: {}, propose_w: {}, vote_w: {} }}\", v.address.as_bytes().tiny_hex(), v.propose_weight, v.vote_weight))"
 )]
 pub struct ExecResp {
     order_root:   MerkleRoot,
     state_root:   MerkleRoot,
     receipt_root: MerkleRoot,
+    timeout_gap:  u64,
     cycles_used:  u64,
     logs_bloom:   Bloom,
     cycles_limit: u64,
