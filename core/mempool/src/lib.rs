@@ -239,8 +239,6 @@ where
             self.adapter
                 .check_storage_exist(ctx.clone(), signed_tx.tx_hash.clone())
                 .await?;
-            self.callback_cache
-                .insert(signed_tx.tx_hash.clone(), signed_tx);
         }
 
         Ok(())
