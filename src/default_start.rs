@@ -92,13 +92,21 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
         config.rocksdb.max_open_files,
     )?);
 
+    // Create chain schema
+    ServiceExecutor::create_schema(
+        Arc::clone(&trie_db),
+        Arc::clone(&storage),
+        Arc::clone(&servive_mapping),
+    )
+    .await?;
+
     // Init genesis
     let genesis_state_root = ServiceExecutor::create_genesis(
         genesis.services.clone(),
         Arc::clone(&trie_db),
         Arc::clone(&storage),
         servive_mapping,
-    ).await?;
+    )?;
 
     // Build genesis block.
     let genesis_block_header = BlockHeader {
@@ -107,7 +115,6 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
         exec_height: 0,
         pre_hash: Hash::from_empty(),
         timestamp: genesis.timestamp,
-        logs_bloom: vec![],
         order_root: Hash::from_empty(),
         confirm_root: vec![],
         state_root: genesis_state_root,
@@ -306,7 +313,6 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         exec_height:                 current_block.header.exec_height,
         current_hash:                block_hash,
         latest_committed_state_root: current_header.state_root.clone(),
-        list_logs_bloom:             vec![],
         list_confirm_root:           vec![],
         list_state_root:             vec![],
         list_receipt_root:           vec![],

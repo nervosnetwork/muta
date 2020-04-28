@@ -8,8 +8,8 @@ use cita_trie::MemoryDB;
 
 use protocol::traits::{NoopDispatcher, ServiceResponse, ServiceSDK, Storage};
 use protocol::types::{
-    Address, Block, BlockHeader, Event, Hash, MerkleRoot, Proof, RawTransaction, Receipt,
-    ReceiptResponse, SignedTransaction, TransactionRequest, Validator,
+    Address, Block, BlockHeader, ChainSchema, Event, Hash, MerkleRoot, Proof, RawTransaction,
+    Receipt, ReceiptResponse, SignedTransaction, TransactionRequest, Validator,
 };
 use protocol::ProtocolResult;
 
@@ -162,6 +162,14 @@ impl Storage for MockStorage {
     async fn load_overlord_wal(&self) -> ProtocolResult<Bytes> {
         Err(StoreError::GetNone.into())
     }
+
+    async fn insert_schema(&self, _cs: ChainSchema) -> ProtocolResult<()> {
+        unimplemented!()
+    }
+
+    async fn get_schema(&self) -> ProtocolResult<ChainSchema> {
+        unimplemented!()
+    }
 }
 
 // #####################
@@ -243,6 +251,7 @@ pub fn mock_receipt_response() -> ReceiptResponse {
 pub fn mock_event() -> Event {
     Event {
         service: "mock-event".to_owned(),
+        topic:   "mock-topic".to_owned(),
         data:    "mock-data".to_owned(),
     }
 }
@@ -276,7 +285,6 @@ pub fn mock_block_header() -> BlockHeader {
         exec_height:       41,
         pre_hash:          mock_hash(),
         timestamp:         420_000_000,
-        logs_bloom:        Default::default(),
         order_root:        mock_merkle_root(),
         confirm_root:      vec![mock_hash(), mock_hash()],
         state_root:        mock_merkle_root(),

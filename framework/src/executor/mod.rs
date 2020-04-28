@@ -13,15 +13,13 @@ use std::sync::Arc;
 use cita_trie::DB as TrieDB;
 use derive_more::{Display, From};
 
-use bytes::BytesMut;
 use protocol::traits::{
     Dispatcher, Executor, ExecutorParams, ExecutorResp, NoopDispatcher, ServiceMapping,
     ServiceResponse, ServiceState, Storage,
 };
 use protocol::types::{
-    Address, Bloom, BloomInput, ChainSchema, Hash, MerkleRoot, Receipt, ReceiptResponse,
-    ServiceContext, ServiceContextParams, ServiceParam, ServiceSchema, SignedTransaction,
-    TransactionRequest,
+    Address, ChainSchema, Hash, MerkleRoot, Receipt, ReceiptResponse, ServiceContext,
+    ServiceContextParams, ServiceParam, ServiceSchema, SignedTransaction, TransactionRequest,
 };
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
@@ -60,7 +58,32 @@ impl<S: Storage, DB: TrieDB, Mapping: ServiceMapping> Clone for ServiceExecutor<
 impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMapping>
     ServiceExecutor<S, DB, Mapping>
 {
-    pub async fn create_genesis(
+    pub async fn create_schema(
+        trie_db: Arc<DB>,
+        storage: Arc<S>,
+        mapping: Arc<Mapping>,
+    ) -> ProtocolResult<()> {
+        let querier = Rc::new(DefaultChainQuerier::new(Arc::clone(&storage)));
+        let mut schema = vec![];
+        for name in mapping.list_service_name().iter() {
+            let trie = MPTTrie::new(Arc::clone(&trie_db));
+            let sdk = DefalutServiceSDK::new(
+                Rc::new(RefCell::new(GeneralServiceState::new(trie))),
+                Rc::clone(&querier),
+                NoopDispatcher {},
+            );
+            let service = mapping.get_service(&name, sdk)?;
+            let ret = service.schema_();
+            schema.push(ServiceSchema {
+                service: name.clone(),
+                method:  ret.0,
+                event:   ret.1,
+            });
+        }
+        storage.insert_schema(ChainSchema { schema }).await
+    }
+
+    pub fn create_genesis(
         services: Vec<ServiceParam>,
         trie_db: Arc<DB>,
         storage: Arc<S>,
@@ -69,26 +92,11 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
         let querier = Rc::new(DefaultChainQuerier::new(Arc::clone(&storage)));
 
         let mut states = HashMap::new();
-        let mut schema = vec![];
-
-        for name in mapping.list_service_name().iter() {
+        for name in mapping.list_service_name().into_iter() {
             let trie = MPTTrie::new(Arc::clone(&trie_db));
 
-            let state = Rc::new(RefCell::new(GeneralServiceState::new(trie)));
-            let sdk =
-                DefalutServiceSDK::new(Rc::clone(&state), Rc::clone(&querier), NoopDispatcher {});
-            let service = mapping.get_service(&name, sdk)?;
-            let ret = service.schema_();
-            schema.push(ServiceSchema {
-                service: name.clone(),
-                method:  ret.0,
-                event:   ret.1,
-            });
-
-            states.insert(name.clone(), state);
+            states.insert(name, Rc::new(RefCell::new(GeneralServiceState::new(trie))));
         }
-
-        storage.insert_schema(ChainSchema { schema }).await?;
 
         for params in services.into_iter() {
             let state = states
@@ -313,22 +321,6 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
             ExecType::Write => service.write_(context),
         }
     }
-
-    fn logs_bloom(&self, receipts: &[Receipt]) -> Bloom {
-        let mut bloom = Bloom::default();
-        for receipt in receipts {
-            for event in receipt.events.iter() {
-                let bytes =
-                    BytesMut::from((event.service.clone() + &event.data).as_bytes()).freeze();
-                let hash = Hash::digest(bytes).as_bytes();
-
-                let input = BloomInput::Raw(hash.as_ref());
-                bloom.accrue(input)
-            }
-        }
-
-        bloom
-    }
 }
 
 impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMapping> Executor
@@ -381,13 +373,11 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
             receipt.state_root = state_root.clone();
             all_cycles_used += receipt.cycles_used;
         }
-        let logs_bloom = self.logs_bloom(&receipts);
 
         Ok(ExecutorResp {
             receipts,
             all_cycles_used,
             state_root,
-            logs_bloom,
         })
     }
 

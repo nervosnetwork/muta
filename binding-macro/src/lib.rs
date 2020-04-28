@@ -1,3 +1,5 @@
+#![feature(str_strip)]
+
 extern crate proc_macro;
 
 mod common;
@@ -333,38 +335,23 @@ pub fn schema_derive(input: TokenStream) -> TokenStream {
 }
 
 #[rustfmt::skip]
-/// `#[derive(SchemaObject)]` marks a `struct`, which is payload or response of service interface method, to generate GraphQL schema.
+/// `#[derive(SchemaEvent)]` marks a `enum`, which is collection of all events, to generate GraphQL schema.
 /// 
 /// GraphQL schema can be used by toolchain to generate ts-sdk or others.
 /// 
 /// # Example
 /// 
 /// ```rust
-/// #[derive(SchemaObject)]
-/// #[description("Transfer method payload")]
-/// pub struct TransferPayload {
-///     #[description("Asset id to be transfered")]
-///     pub asset_id: Hash,
-///     #[description("Receiver of transfer action")]
-///     pub to:       Address,
-///     #[description("Amount of transfer action")]
-///     pub value:    u64,
+/// #[derive(SchemaEvent)]
+/// pub enum Event {
+///     Asset,
+///     TransferEvent,
+///     ApproveEvent,
+///     TransferFromEvent,
 /// }
 /// ```
-/// 
-/// This will generate GraphQL schema:
-/// 
-/// ```graphql
-/// // Transfer method payload
-/// type TransferPayload {
-///   // Asset id to be transfered
-///   asset_id: Hash!
-///   // Receiver of transfer action
-///   to: Address!
-///   // Amount of transfer action
-///   value: Uint64!
-/// }
-/// ```
+/// And remember to add `Event` to `#[service(Event)]`, 
+/// which informs the framework that the service will emit events
 #[proc_macro_derive(SchemaEvent)]
 pub fn event_derive(input: TokenStream) -> TokenStream {
     let ast = syn::parse(input).unwrap();

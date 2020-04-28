@@ -15,7 +15,7 @@ use asset::AssetService;
 use metadata::MetadataService;
 use protocol::traits::{Executor, ExecutorParams, Service, ServiceMapping, ServiceSDK, Storage};
 use protocol::types::{
-    Address, Block, Genesis, Hash, Proof, RawTransaction, Receipt, SignedTransaction,
+    Address, Block, ChainSchema, Genesis, Hash, Proof, RawTransaction, Receipt, SignedTransaction,
     TransactionRequest,
 };
 use protocol::ProtocolResult;
@@ -105,6 +105,10 @@ fn test_exec() {
     assert_eq!(asset.name, "MutaToken2");
     assert_eq!(asset.symbol, "MT2");
     assert_eq!(asset.supply, 320_000_011);
+    assert_eq!(receipt.events[0].service, "asset");
+    assert_eq!(receipt.events[0].topic, "Asset");
+    let event_data_expected = "{\"id\":\"0xfdc5eaf65dc38696c3fc0ee13e5f0ec491813dbd9178acaa582f788600246d52\",\"name\":\"MutaToken2\",\"symbol\":\"MT2\",\"supply\":320000011,\"issuer\":\"0xf8389d774afdad8755ef8e629e5a154fddc6325a\"}";
+    assert_eq!(receipt.events[0].data, event_data_expected);
 }
 
 #[test]
@@ -328,6 +332,14 @@ impl Storage for MockStorage {
     }
 
     async fn load_overlord_wal(&self) -> ProtocolResult<Bytes> {
+        unimplemented!()
+    }
+
+    async fn insert_schema(&self, _cs: ChainSchema) -> ProtocolResult<()> {
+        unimplemented!()
+    }
+
+    async fn get_schema(&self) -> ProtocolResult<ChainSchema> {
         unimplemented!()
     }
 }

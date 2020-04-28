@@ -197,7 +197,6 @@ mod test {
             exec_height: height - 1,
             pre_hash: nonce.clone(),
             timestamp: 1000,
-            logs_bloom: Default::default(),
             order_root: nonce.clone(),
             confirm_root: Vec::new(),
             state_root: nonce,

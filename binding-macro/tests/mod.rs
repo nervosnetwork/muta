@@ -3,6 +3,7 @@
 extern crate binding_macro;
 
 use std::cell::RefCell;
+use std::collections::BTreeMap;
 use std::panic::{self, AssertUnwindSafe};
 use std::rc::Rc;
 
@@ -11,12 +12,14 @@ use serde::{Deserialize, Serialize};
 
 use protocol::fixed_codec::FixedCodec;
 use protocol::traits::{
-    ExecutorParams, Service, ServiceResponse, ServiceSDK, StoreArray, StoreBool, StoreMap,
-    StoreString, StoreUint64,
+    ExecutorParams, SchemaGenerator, Service, ServiceResponse, ServiceSDK, StoreArray, StoreBool,
+    StoreMap, StoreString, StoreUint64,
 };
 use protocol::types::{
     Address, Block, Hash, Receipt, ServiceContext, ServiceContextParams, SignedTransaction,
 };
+
+// use binding_macro::SchemaObject;
 
 #[test]
 fn test_read_and_write() {
@@ -24,12 +27,12 @@ fn test_read_and_write() {
 
     impl Tests {
         #[read]
-        fn test_read_fn(&self, _ctx: ServiceContext, _s: &str) -> ServiceResponse<String> {
+        fn test_read_fn(&self, _ctx: ServiceContext) -> ServiceResponse<String> {
             ServiceResponse::<String>::from_succeed("read".to_owned())
         }
 
         #[write]
-        fn test_write_fn(&mut self, _ctx: ServiceContext, _s: &str) -> ServiceResponse<String> {
+        fn test_write_fn(&mut self, _ctx: ServiceContext) -> ServiceResponse<String> {
             ServiceResponse::<String>::from_succeed("write".to_owned())
         }
     }
@@ -38,13 +41,10 @@ fn test_read_and_write() {
 
     let mut t = Tests {};
     assert_eq!(
-        t.test_read_fn(context.clone(), "read").succeed_data,
+        t.test_read_fn(context.clone()).succeed_data,
         "read".to_owned()
     );
-    assert_eq!(
-        t.test_write_fn(context, "write").succeed_data,
-        "write".to_owned()
-    );
+    assert_eq!(t.test_write_fn(context).succeed_data, "write".to_owned());
 }
 
 #[test]
@@ -140,13 +140,13 @@ fn test_cycles() {
 
 #[test]
 fn test_service() {
-    #[derive(Serialize, Deserialize, Debug)]
+    #[derive(Serialize, Deserialize, Debug, SchemaObject)]
     struct TestServicePayload {
         name: String,
         age:  u64,
         sex:  bool,
     }
-    #[derive(Serialize, Deserialize, Debug, Default)]
+    #[derive(Serialize, Deserialize, Debug, Default, SchemaObject)]
     struct TestServiceResponse {
         pub message: String,
     }
@@ -243,7 +243,7 @@ fn test_service() {
 
 #[test]
 fn test_service_none_payload() {
-    #[derive(Serialize, Deserialize, Debug, Default)]
+    #[derive(Serialize, Deserialize, Debug, Default, SchemaObject)]
     struct TestServiceResponse {
         pub message: String,
     }
@@ -390,6 +390,74 @@ fn test_service_none_response() {
 
     test_service.hook_after_(&mock_executor_params());
     assert_eq!(test_service.hook_after, true);
+}
+
+#[test]
+fn test_schema() {
+    #[derive(SchemaObject, Default, Serialize, Deserialize)]
+    #[description("This is TestA")]
+    struct TestA {
+        #[description("This is String a")]
+        a: String,
+        #[description("This is TestB b")]
+        b: TestB,
+        #[description("This is bool c")]
+        c: bool,
+        #[description("This is u64 d")]
+        d: u64,
+    }
+    #[derive(SchemaObject, Default, Serialize, Deserialize)]
+    #[description("This is TestB")]
+    struct TestB {
+        #[description("This is Vec<u8> e")]
+        e: Vec<u8>,
+    }
+    #[derive(SchemaObject, Default, Serialize, Deserialize)]
+    #[description("This is TestEvent")]
+    struct TestEvent {
+        #[description("This is TestA f")]
+        f: TestA,
+    }
+
+    #[derive(SchemaEvent)]
+    enum Event {
+        TestEvent,
+    }
+
+    struct TestService<SDK: ServiceSDK> {
+        _sdk:         SDK,
+        genesis_data: String,
+    }
+
+    #[service(Event)]
+    impl<SDK: ServiceSDK> TestService<SDK> {
+        #[genesis]
+        fn init_genesis(&mut self) {
+            self.genesis_data = "genesis".to_owned();
+        }
+
+        #[read]
+        fn test_read(&self, _ctx: ServiceContext) -> ServiceResponse<TestA> {
+            ServiceResponse::<TestA>::from_error(1, "error".to_owned())
+        }
+
+        #[write]
+        fn test_write(&mut self, _ctx: ServiceContext, _payload: TestB) -> ServiceResponse<()> {
+            let _place_holder = Event::TestEvent;
+            ServiceResponse::<()>::from_succeed(())
+        }
+    }
+
+    let sdk = MockServiceSDK {};
+    let test_service = TestService {
+        _sdk:         sdk,
+        genesis_data: "".to_owned(),
+    };
+
+    let method_schema_expected = "type Mutation {\n  test_write(\n    payload: TestB!\n  ): Null\n}\n\ntype Query {\n  test_read: TestA!\n}\n\n# This is TestA\ntype TestA {\n  # This is String a\n  a: String!\n  # This is TestB b\n  b: TestB!\n  # This is bool c\n  c: Boolean!\n  # This is u64 d\n  d: Uint64!\n}\n\n# This is TestB\ntype TestB {\n  # This is Vec<u8> e\n  e: [Uint8!]!\n}\n\nscalar Uint64\n\nscalar Uint8\n\nscalar Null\n\n";
+    let event_schema_expected = "# This is TestA\ntype TestA {\n  # This is String a\n  a: String!\n  # This is TestB b\n  b: TestB!\n  # This is bool c\n  c: Boolean!\n  # This is u64 d\n  d: Uint64!\n}\n\n# This is TestB\ntype TestB {\n  # This is Vec<u8> e\n  e: [Uint8!]!\n}\n\n# This is TestEvent\ntype TestEvent {\n  # This is TestA f\n  f: TestA!\n}\n\nscalar Uint64\n\nscalar Uint8\n\nunion Event = TestEvent\n\n";
+    assert_eq!(test_service.schema_().0, method_schema_expected);
+    assert_eq!(test_service.schema_().1, event_schema_expected);
 }
 
 fn get_context(cycles_limit: u64, service: &str, method: &str, payload: &str) -> ServiceContext {

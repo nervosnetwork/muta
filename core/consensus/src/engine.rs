@@ -98,7 +98,6 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             height: next_height,
             exec_height: current_consensus_status.exec_height,
             timestamp: time_now(),
-            logs_bloom: current_consensus_status.list_logs_bloom,
             order_root: order_root.unwrap_or_else(Hash::from_empty),
             confirm_root: current_consensus_status.list_confirm_root,
             state_root,
@@ -617,31 +616,6 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
             error!(
                 "current list cycles used {:?}, block cycles used {:?}",
                 status.list_cycles_used, block.cycles_used
-            );
-            return Err(ConsensusError::InvalidStatusVec.into());
-        }
-
-        // check logs bloom
-        if !check_list_roots(&status.list_logs_bloom, &block.logs_bloom) {
-            trace::error(
-                "check_block_logs_bloom_diff".to_string(),
-                Some(json!({
-                    "block_state_root": block.logs_bloom,
-                    "current_list_cycles_root": status.list_logs_bloom,
-                })),
-            );
-            error!(
-                "cache logs bloom {:?}, block logs bloom {:?}",
-                status
-                    .list_logs_bloom
-                    .iter()
-                    .map(|bloom| bloom.to_low_u64_be())
-                    .collect::<Vec<_>>(),
-                block
-                    .logs_bloom
-                    .iter()
-                    .map(|bloom| bloom.to_low_u64_be())
-                    .collect::<Vec<_>>()
             );
             return Err(ConsensusError::InvalidStatusVec.into());
         }

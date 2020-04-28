@@ -60,7 +60,7 @@ pub struct Event {
     #[prost(bytes, tag = "1")]
     pub service: Vec<u8>,
     #[prost(bytes, tag = "2")]
-    pub topic: Vec<u8>,
+    pub topic:   Vec<u8>,
 
     #[prost(bytes, tag = "3")]
     pub data: Vec<u8>,

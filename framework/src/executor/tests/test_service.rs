@@ -1,32 +1,31 @@
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 
-use binding_macro::{cycles, service, tx_hook_after, tx_hook_before};
-use protocol::traits::{ExecutorParams, ServiceResponse, ServiceSDK};
+use binding_macro::{cycles, service, tx_hook_after, tx_hook_before, SchemaObject};
+use protocol::traits::{ExecutorParams, SchemaGenerator, ServiceResponse, ServiceSDK};
 use protocol::types::ServiceContext;
 
 pub struct TestService<SDK> {
     sdk: SDK,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
+#[derive(Deserialize, Serialize, Clone, Debug, SchemaObject)]
 pub struct TestReadPayload {
     pub key: String,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, Default)]
+#[derive(Deserialize, Serialize, Clone, Debug, Default, SchemaObject)]
 pub struct TestReadResponse {
     pub value: String,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
+#[derive(Deserialize, Serialize, Clone, Debug, SchemaObject)]
 pub struct TestWritePayload {
     pub key:   String,
     pub value: String,
     pub extra: String,
 }
-
-#[derive(Deserialize, Serialize, Clone, Debug, Default)]
-pub struct TestWriteResponse {}
 
 #[service]
 impl<SDK: ServiceSDK> TestService<SDK> {
@@ -52,9 +51,9 @@ impl<SDK: ServiceSDK> TestService<SDK> {
         &mut self,
         ctx: ServiceContext,
         payload: TestWritePayload,
-    ) -> ServiceResponse<TestWriteResponse> {
+    ) -> ServiceResponse<()> {
         self.sdk.set_value(payload.key, payload.value);
-        ServiceResponse::<TestWriteResponse>::from_succeed(TestWriteResponse {})
+        ServiceResponse::<()>::from_succeed(())
     }
 
     #[cycles(210_00)]
@@ -63,11 +62,11 @@ impl<SDK: ServiceSDK> TestService<SDK> {
         &mut self,
         ctx: ServiceContext,
         payload: TestWritePayload,
-    ) -> ServiceResponse<TestWriteResponse> {
+    ) -> ServiceResponse<()> {
         let payload_str = serde_json::to_string(&payload).unwrap();
         self.sdk
             .write(&ctx, None, "test", "test_write", &payload_str);
-        ServiceResponse::<TestWriteResponse>::from_succeed(TestWriteResponse {})
+        ServiceResponse::<()>::from_succeed(())
     }
 
     #[tx_hook_before]
@@ -75,7 +74,10 @@ impl<SDK: ServiceSDK> TestService<SDK> {
         if ctx.get_service_name() == "test"
             && ctx.get_payload().to_owned().contains("test_hook_before")
         {
-            ctx.emit_event("test_tx_hook_before invoked".to_owned());
+            ctx.emit_event(
+                "hook before".to_owned(),
+                "test_tx_hook_before invoked".to_owned(),
+            );
         }
     }
 
@@ -84,7 +86,10 @@ impl<SDK: ServiceSDK> TestService<SDK> {
         if ctx.get_service_name() == "test"
             && ctx.get_payload().to_owned().contains("test_hook_after")
         {
-            ctx.emit_event("test_tx_hook_after invoked".to_owned());
+            ctx.emit_event(
+                "hook after".to_owned(),
+                "test_tx_hook_after invoked".to_owned(),
+            );
         }
     }
 }

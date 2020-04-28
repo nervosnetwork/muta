@@ -14,40 +14,39 @@ pub fn impl_event(ast: &DeriveInput) -> TokenStream {
     };
 
     let mut topic_tokens = quote! {};
+    let mut event_schema = "union Event = ".to_owned();
 
     match &ast.data {
         Data::Enum(data) => {
             for vp in data.variants.iter() {
-                let topic = vp.ident.to_string();
-                if let Fields::Unnamed(fs) = &vp.fields {
-                    let f_ty = &fs
-                        .unnamed
-                        .first()
-                        .expect("#[derive(Event)]: Enum variant should have a field")
-                        .ty;
-                    let ident_ty = extract_ident_from_path(&f_ty);
-                    let token = quote! {
-                        #ident_ty::schema(&mut r);
-                    };
-                    schema_tokens = quote! {
-                        #schema_tokens
-                        #token
-                    };
-                    let topic_token = quote! {
-                        impl #ident_ty {
-                            pub fn topic(&self) -> String {
-                                #topic.to_owned()
-                            }
+                let ident = vp.ident.clone();
+                let ident_str = ident.clone().to_string();
+                let topic = ident_str.clone() + " | ";
+                event_schema.push_str(topic.as_str());
+
+                let schema_token = quote! {
+                    #ident::schema(&mut r);
+                };
+                schema_tokens = quote! {
+                    #schema_tokens
+                    #schema_token
+                };
+                let topic_token = quote! {
+                    impl #ident {
+                        pub fn topic(&self) -> String {
+                            #ident_str.to_owned()
                         }
-                    };
-                    topic_tokens = quote! {
-                        #topic_tokens
-                        #topic_token
-                    };
-                } else {
-                    panic!("#[derive(Event)]: Variant should be unnamed type")
-                }
+                    }
+                };
+                topic_tokens = quote! {
+                    #topic_tokens
+                    #topic_token
+                };
             }
+            event_schema = event_schema
+                .strip_suffix(" | ")
+                .expect("strip suffix should succeed")
+                .to_owned();
         }
         _ => panic!("#[derive(Event)] can only mark a Enum"),
     }
@@ -56,6 +55,7 @@ pub fn impl_event(ast: &DeriveInput) -> TokenStream {
         impl #ident {
             pub fn schema() -> String {
                 #schema_tokens
+                r.insert("_union_event_".to_owned(), #event_schema.to_owned());
                 let mut s = "".to_owned();
                 for v in r.values() {
                     s.push_str(v.as_str());
@@ -125,18 +125,18 @@ pub fn impl_object(ast: &DeriveInput) -> TokenStream {
     gen.into()
 }
 
-fn extract_comment(attrs: &Vec<Attribute>, is_field: bool) -> Option<String> {
+fn extract_comment(attrs: &[Attribute], is_field: bool) -> Option<String> {
     for attr in attrs.iter() {
-        if attr.path.segments.first().is_some() {
-            if "description".to_owned() == attr.path.segments.first().unwrap().ident.to_string() {
-                let comment: Comment = attr
-                    .parse_args()
-                    .expect("#[description]: comments should be string");
-                if is_field {
-                    return Some(format!("  # {}\n", comment.value));
-                } else {
-                    return Some(format!("# {}\n", comment.value));
-                }
+        if attr.path.segments.first().is_some()
+            && "description" == &attr.path.segments.first().unwrap().ident.to_string()
+        {
+            let comment: Comment = attr
+                .parse_args()
+                .expect("#[description]: comments should be string");
+            if is_field {
+                return Some(format!("  # {}\n", comment.value));
+            } else {
+                return Some(format!("# {}\n", comment.value));
             }
         }
     }
@@ -187,7 +187,7 @@ fn extract_ident_from_ty(ty: &Type) -> (Ident, bool) {
             let segs = &ty.path.segments;
             if 1 == segs.len() {
                 let concrete_ty = segs.first().unwrap();
-                if "Vec".to_owned() == concrete_ty.ident.clone().to_string() {
+                if "Vec" == &concrete_ty.ident.clone().to_string() {
                     if let PathArguments::AngleBracketed(g_ty) = &concrete_ty.arguments {
                         let arg = g_ty
                             .args
@@ -202,14 +202,10 @@ fn extract_ident_from_ty(ty: &Type) -> (Ident, bool) {
                     } else {
                         panic!("#[derive(SchemaObject)]: Vec should be AngleBracketed")
                     }
+                } else if let PathArguments::None = concrete_ty.arguments {
+                    (concrete_ty.ident.clone(), false)
                 } else {
-                    if let PathArguments::None = concrete_ty.arguments {
-                        (concrete_ty.ident.clone(), false)
-                    } else {
-                        panic!(
-                            "#[derive(SchemaObject)]: field type only supports T, Vec<T>, or [T;n]"
-                        )
-                    }
+                    panic!("#[derive(SchemaObject)]: field type only supports T, Vec<T>, or [T;n]")
                 }
             } else {
                 panic!("#[derive(SchemaObject)]: length of field type should be 1")

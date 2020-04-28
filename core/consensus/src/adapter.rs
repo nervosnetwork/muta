@@ -858,7 +858,6 @@ fn gen_executed_info(exec_resp: ExecutorResp, height: u64, order_root: MerkleRoo
         cycles_used:  cycles,
         receipt_root: receipt,
         confirm_root: order_root,
-        state_root:   exec_resp.state_root.clone(),
-        logs_bloom:   exec_resp.logs_bloom,
+        state_root:   exec_resp.state_root,
     }
 }

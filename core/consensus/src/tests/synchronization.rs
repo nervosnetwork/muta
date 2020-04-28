@@ -71,7 +71,6 @@ fn sync_gap_test() {
             latest_committed_height:     genesis_block.header.height,
             exec_height:                 genesis_block.header.exec_height,
             current_hash:                block_hash,
-            list_logs_bloom:             vec![],
             list_confirm_root:           vec![],
             latest_committed_state_root: genesis_block.header.state_root.clone(),
             list_state_root:             vec![],
@@ -648,7 +647,6 @@ fn mock_chained_rich_block(len: u64, gap: u64, key_tool: &KeyTool) -> (Vec<RichB
             pre_hash: last_block_hash.clone(),
             timestamp: 0,
             order_root,
-            logs_bloom: vec![],
             confirm_root: vec![],
             state_root: Hash::from_empty(),
             receipt_root: vec![],
@@ -671,7 +669,6 @@ fn mock_chained_rich_block(len: u64, gap: u64, key_tool: &KeyTool) -> (Vec<RichB
                 let (exec_resp, receipt_root) = exec_txs(height, &rich_block.txs);
 
                 header.exec_height = height;
-                header.logs_bloom.push(exec_resp.logs_bloom);
                 header.confirm_root.push(confirm_root);
                 header.state_root = exec_resp.state_root;
                 header.receipt_root.push(receipt_root);
@@ -720,7 +717,6 @@ fn mock_genesis_rich_block() -> RichBlock {
         exec_height:       0,
         pre_hash:          Hash::from_empty(),
         timestamp:         0,
-        logs_bloom:        vec![],
         order_root:        Hash::from_empty(),
         confirm_root:      vec![],
         state_root:        Hash::from_empty(),
@@ -927,7 +923,6 @@ fn exec_txs(height: u64, txs: &[SignedTransaction]) -> (ExecutorResp, MerkleRoot
         ExecutorResp {
             receipts,
             all_cycles_used,
-            logs_bloom: Default::default(),
             state_root: MerkleRoot::from_empty(),
         },
         receipt_root,
@@ -1120,6 +1115,5 @@ fn assert_sync(status: CurrentConsensusStatus, latest_block: Block) {
     assert_eq!(status.current_proof.height, status.latest_committed_height);
     assert_eq!(status.list_confirm_root.len(), exec_gap as usize);
     assert_eq!(status.list_cycles_used.len(), exec_gap as usize);
-    assert_eq!(status.list_logs_bloom.len(), exec_gap as usize);
     assert_eq!(status.list_receipt_root.len(), exec_gap as usize);
 }

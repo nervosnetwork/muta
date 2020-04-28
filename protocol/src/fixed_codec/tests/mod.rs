@@ -56,6 +56,7 @@ pub fn mock_receipt() -> Receipt {
 pub fn mock_event() -> Event {
     Event {
         service: "mock-event".to_owned(),
+        topic:   "mock-topic".to_owned(),
         data:    "mock-data".to_owned(),
     }
 }
@@ -121,7 +122,6 @@ pub fn mock_block_header() -> BlockHeader {
         exec_height:       41,
         pre_hash:          mock_hash(),
         timestamp:         420_000_000,
-        logs_bloom:        Default::default(),
         order_root:        mock_merkle_root(),
         confirm_root:      vec![mock_hash(), mock_hash()],
         state_root:        mock_merkle_root(),

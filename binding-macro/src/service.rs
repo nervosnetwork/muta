@@ -38,12 +38,12 @@ struct EventIdent {
 
 impl Parse for EventIdent {
     fn parse(input: ParseStream) -> Result<Self> {
-        let event: Option<Ident> = input.parse().map_or_else(|_| None, |v| Some(v));
+        let event: Option<Ident> = input.parse().map_or_else(|_| None, Some);
         Ok(Self { event })
     }
 }
 
-fn gen_schema_code(methods: &Vec<MethodMeta>) -> proc_macro2::TokenStream {
+fn gen_schema_code(methods: &[MethodMeta]) -> proc_macro2::TokenStream {
     let mut mutation = format!("type Mutation {}\n", "{");
     let mut query = format!("type Query {}\n", "{");
 
@@ -108,12 +108,12 @@ fn gen_schema_code(methods: &Vec<MethodMeta>) -> proc_macro2::TokenStream {
     if format!("type Mutation {}\n", "{") == mutation {
         mutation = "".to_owned();
     } else {
-        mutation = mutation + "}\n\n";
+        mutation += "}\n\n";
     }
     if format!("type Query {}\n", "{") == query {
         query = "".to_owned();
     } else {
-        query = query + "}\n\n";
+        query += "}\n\n";
     }
 
     let mq = mutation + query.as_str();

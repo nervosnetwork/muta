@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use bytes::{Bytes, BytesMut};
@@ -9,7 +10,7 @@ use binding_macro::{cycles, service};
 use metadata::MetadataService;
 
 use protocol::traits::{
-    Executor, ExecutorParams, Service, ServiceMapping, ServiceResponse, ServiceSDK,
+    Executor, ExecutorParams, SchemaGenerator, Service, ServiceMapping, ServiceResponse, ServiceSDK,
 };
 use protocol::types::{
     Genesis, Hash, RawTransaction, ServiceContext, SignedTransaction, TransactionRequest,
@@ -116,7 +117,7 @@ impl<SDK: ServiceSDK> MockService<SDK> {
 
         let asset: Asset = serde_json::from_str(&ret.succeed_data).unwrap();
 
-        ctx.emit_event("call create asset succeed".to_owned());
+        ctx.emit_event("topic".to_owned(), "call create asset succeed".to_owned());
         ServiceResponse::<Asset>::from_succeed(asset)
     }
 }
