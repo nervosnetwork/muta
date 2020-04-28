@@ -150,8 +150,6 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
     ) -> ProtocolResult<()> {
         let mut current_consented_height = current_height;
 
-        let mut prepared_rich_block: Option<RichBlock> = None;
-
         while current_consented_height < remote_height {
             let consenting_height = current_consented_height + 1;
             log::info!(
@@ -160,47 +158,28 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
                 consenting_height
             );
 
-            let consenting_rich_block: RichBlock = match prepared_rich_block.as_ref() {
-                None => self
-                    .get_rich_block_from_remote(ctx.clone(), consenting_height)
-                    .await
-                    .map_err(|e| {
-                        log::error!(
-                            "[synchronization]: get_rich_block_from_remote error, height: {:?}",
-                            consenting_height
-                        );
-                        e
-                    })?,
+            let consenting_rich_block: RichBlock = self
+                .get_rich_block_from_remote(ctx.clone(), consenting_height)
+                .await
+                .map_err(|e| {
+                    log::error!(
+                        "[synchronization]: get_rich_block_from_remote error, height: {:?}",
+                        consenting_height
+                    );
+                    e
+                })?;
 
-                Some(_) => prepared_rich_block.take().unwrap(),
-            };
-
-            let consenting_proof: Proof = if consenting_height < remote_height {
-                let proof_block = self
-                    .get_rich_block_from_remote(ctx.clone(), consenting_height + 1)
-                    .await
-                    .map_err(|e| {
-                        log::error!(
-                            "[synchronization]: get_rich_block_from_remote error, height: {:?}",
-                            consenting_height + 1
-                        );
-                        e
-                    })?;
-
-                prepared_rich_block = Some(proof_block.clone());
-                proof_block.block.header.proof
-            } else {
-                self.adapter
-                    .get_proof_from_remote(ctx.clone(), consenting_height)
-                    .await
-                    .map_err(|e| {
-                        log::error!(
-                            "[synchronization]: get_proof_from_remote error, height: {:?}",
-                            consenting_height
-                        );
-                        e
-                    })?
-            };
+            let consenting_proof: Proof = self
+                .adapter
+                .get_proof_from_remote(ctx.clone(), consenting_height)
+                .await
+                .map_err(|e| {
+                    log::error!(
+                        "[synchronization]: get_proof_from_remote error, height: {:?}",
+                        consenting_height
+                    );
+                    e
+                })?;
 
             self.adapter
                 .verify_block_header(ctx.clone(), consenting_rich_block.block.clone())
@@ -263,11 +242,7 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
                 .verify_txs_sync(
                     ctx.clone(),
                     consenting_height,
-                    consenting_rich_block
-                        .txs
-                        .iter()
-                        .map(|signed_tx| signed_tx.tx_hash.clone())
-                        .collect(),
+                    consenting_rich_block.txs.clone(),
                 )
                 .await
                 .map_err(|e| {

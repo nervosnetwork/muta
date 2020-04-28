@@ -8,8 +8,8 @@ mod tests;
 mod tx_cache;
 
 pub use adapter::message::{
-    MsgPushTxs, NewTxsHandler, PullTxsHandler, PullTxsSyncHandler, END_GOSSIP_NEW_TXS,
-    RPC_PULL_TXS, RPC_PULL_TXS_SYNC, RPC_RESP_PULL_TXS, RPC_RESP_PULL_TXS_SYNC,
+    MsgPushTxs, NewTxsHandler, PullTxsHandler, END_GOSSIP_NEW_TXS, RPC_PULL_TXS, RPC_RESP_PULL_TXS,
+    RPC_RESP_PULL_TXS_SYNC,
 };
 pub use adapter::DefaultMemPoolAdapter;
 pub use adapter::{DEFAULT_BROADCAST_TXS_INTERVAL, DEFAULT_BROADCAST_TXS_SIZE};
@@ -227,37 +227,18 @@ where
     async fn ensure_order_txs_sync(
         &self,
         ctx: Context,
-        order_tx_hashes: Vec<Hash>,
+        order_txs: Vec<SignedTransaction>,
     ) -> ProtocolResult<()> {
-        let unknown_hashes = self.show_unknown_txs(order_tx_hashes);
-        if !unknown_hashes.is_empty() {
-            let unknown_len = unknown_hashes.len();
-            let txs = self
-                .adapter
-                .pull_txs_sync(ctx.clone(), unknown_hashes)
+        for signed_tx in order_txs.into_iter() {
+            self.adapter
+                .check_signature(ctx.clone(), signed_tx.clone())
                 .await?;
-            // Make sure response signed_txs is the same size of request hashes.
-            if txs.len() != unknown_len {
-                return Err(MemPoolError::EnsureBreak {
-                    require:  unknown_len,
-                    response: txs.len(),
-                }
-                .into());
-            }
-
-            for signed_tx in txs.into_iter() {
-                self.adapter
-                    .check_signature(ctx.clone(), signed_tx.clone())
-                    .await?;
-                self.adapter
-                    .check_transaction(ctx.clone(), signed_tx.clone())
-                    .await?;
-                self.adapter
-                    .check_storage_exist(ctx.clone(), signed_tx.tx_hash.clone())
-                    .await?;
-                self.callback_cache
-                    .insert(signed_tx.tx_hash.clone(), signed_tx);
-            }
+            self.adapter
+                .check_transaction(ctx.clone(), signed_tx.clone())
+                .await?;
+            self.adapter
+                .check_storage_exist(ctx.clone(), signed_tx.tx_hash.clone())
+                .await?;
         }
 
         Ok(())
