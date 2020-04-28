@@ -9,13 +9,16 @@ use syn::{
 pub fn impl_event(ast: &DeriveInput) -> TokenStream {
     let ident = &ast.ident;
 
-    let mut tokens = quote! {
+    let mut schema_tokens = quote! {
         let mut r = BTreeMap::<String, String>::new();
     };
+
+    let mut topic_tokens = quote! {};
 
     match &ast.data {
         Data::Enum(data) => {
             for vp in data.variants.iter() {
+                let topic = vp.ident.to_string();
                 if let Fields::Unnamed(fs) = &vp.fields {
                     let f_ty = &fs
                         .unnamed
@@ -26,9 +29,20 @@ pub fn impl_event(ast: &DeriveInput) -> TokenStream {
                     let token = quote! {
                         #ident_ty::schema(&mut r);
                     };
-                    tokens = quote! {
-                        #tokens
+                    schema_tokens = quote! {
+                        #schema_tokens
                         #token
+                    };
+                    let topic_token = quote! {
+                        impl #ident_ty {
+                            pub fn topic(&self) -> String {
+                                #topic.to_owned()
+                            }
+                        }
+                    };
+                    topic_tokens = quote! {
+                        #topic_tokens
+                        #topic_token
                     };
                 } else {
                     panic!("#[derive(Event)]: Variant should be unnamed type")
@@ -41,7 +55,7 @@ pub fn impl_event(ast: &DeriveInput) -> TokenStream {
     let gen = quote! {
         impl #ident {
             pub fn schema() -> String {
-                #tokens
+                #schema_tokens
                 let mut s = "".to_owned();
                 for v in r.values() {
                     s.push_str(v.as_str());
@@ -50,6 +64,7 @@ pub fn impl_event(ast: &DeriveInput) -> TokenStream {
                 s
             }
         }
+        #topic_tokens
     };
 
     gen.into()

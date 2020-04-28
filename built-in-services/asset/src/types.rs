@@ -128,6 +128,7 @@ struct AllowanceCodec {
 
 #[derive(SchemaEvent)]
 pub enum Event {
+    CreateAsset(Asset),
     Transfer(TransferEvent),
     Approve(ApproveEvent),
     TransferFrom(TransferFromEvent),

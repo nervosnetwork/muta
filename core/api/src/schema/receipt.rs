@@ -13,6 +13,7 @@ pub struct Receipt {
 #[derive(juniper::GraphQLObject, Clone)]
 pub struct Event {
     pub service: String,
+    pub topic:   String,
     pub data:    String,
 }
 
@@ -40,6 +41,7 @@ impl From<protocol::types::Event> for Event {
     fn from(event: protocol::types::Event) -> Self {
         Self {
             service: event.service,
+            topic:   event.topic,
             data:    event.data,
         }
     }

@@ -145,12 +145,24 @@ impl ServiceContext {
         self.timestamp
     }
 
-    pub fn emit_event(&self, message: String) {
+    pub fn emit_event(&self, topic: String, data: String) {
         self.events.borrow_mut().push(Event {
             service: self.service_name.clone(),
-            data:    message,
+            topic,
+            data,
         })
     }
+}
+
+#[macro_export]
+macro_rules! emit_event {
+    ($ctx: ident, $event: expr) => {
+        let event_res = serde_json::to_string(&$event);
+        if let Err(e) = event_res {
+            return ServiceResponse::<_>::from_error(103, format!("{:?}", e));
+        }
+        $ctx.emit_event($event.topic(), event_res.unwrap());
+    };
 }
 
 #[derive(Debug, Display, From)]

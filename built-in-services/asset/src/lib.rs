@@ -7,7 +7,8 @@ use std::collections::BTreeMap;
 use bytes::Bytes;
 
 use binding_macro::{cycles, genesis, service};
-use protocol::traits::{ExecutorParams, ServiceResponse, ServiceSDK, SchemaGenerator, StoreMap};
+use protocol::emit_event;
+use protocol::traits::{ExecutorParams, SchemaGenerator, ServiceResponse, ServiceSDK, StoreMap};
 use protocol::types::{Address, Hash, ServiceContext};
 
 use crate::types::{
@@ -168,13 +169,15 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
         self.sdk
             .set_account_value(&asset.issuer, asset.id.clone(), asset_balance);
 
-        let event_res = serde_json::to_string(&asset);
+        // let event_res = serde_json::to_string(&asset);
 
-        if let Err(e) = event_res {
-            return ServiceResponse::<Asset>::from_error(103, format!("{:?}", e));
-        }
-        let event_str = event_res.unwrap();
-        ctx.emit_event(event_str);
+        // if let Err(e) = event_res {
+        //     return ServiceResponse::<Asset>::from_error(103, format!("{:?}", e));
+        // }
+        // let event_str = event_res.unwrap();
+        // ctx.emit_event(event_str);
+
+        emit_event!(ctx, asset);
 
         ServiceResponse::<Asset>::from_succeed(asset)
     }
@@ -201,13 +204,15 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
             to,
             value,
         };
-        let event_res = serde_json::to_string(&event);
+        // let event_res = serde_json::to_string(&event);
 
-        if let Err(e) = event_res {
-            return ServiceResponse::<()>::from_error(103, format!("{:?}", e));
-        };
-        let event_str = event_res.unwrap();
-        ctx.emit_event(event_str);
+        // if let Err(e) = event_res {
+        //     return ServiceResponse::<()>::from_error(103, format!("{:?}", e));
+        // };
+        // let event_str = event_res.unwrap();
+        // ctx.emit_event(event_str);
+
+        emit_event!(ctx, event);
 
         ServiceResponse::<()>::from_succeed(())
     }
@@ -250,13 +255,15 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
             grantee: to,
             value,
         };
-        let event_res = serde_json::to_string(&event);
+        // let event_res = serde_json::to_string(&event);
 
-        if let Err(e) = event_res {
-            return ServiceResponse::<()>::from_error(103, format!("{:?}", e));
-        };
-        let event_str = event_res.unwrap();
-        ctx.emit_event(event_str);
+        // if let Err(e) = event_res {
+        //     return ServiceResponse::<()>::from_error(103, format!("{:?}", e));
+        // };
+        // let event_str = event_res.unwrap();
+        // ctx.emit_event(event_str);
+
+        emit_event!(ctx, event);
 
         ServiceResponse::<()>::from_succeed(())
     }
@@ -312,13 +319,15 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
             recipient,
             value,
         };
-        let event_res = serde_json::to_string(&event);
+        // let event_res = serde_json::to_string(&event);
 
-        if let Err(e) = event_res {
-            return ServiceResponse::<()>::from_error(103, format!("{:?}", e));
-        };
-        let event_str = event_res.unwrap();
-        ctx.emit_event(event_str);
+        // if let Err(e) = event_res {
+        //     return ServiceResponse::<()>::from_error(103, format!("{:?}", e));
+        // };
+        // let event_str = event_res.unwrap();
+        // ctx.emit_event(event_str);
+
+        emit_event!(ctx, event);
 
         ServiceResponse::<()>::from_succeed(())
     }

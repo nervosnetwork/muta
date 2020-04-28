@@ -59,8 +59,10 @@ pub struct ReceiptResponse {
 pub struct Event {
     #[prost(bytes, tag = "1")]
     pub service: Vec<u8>,
-
     #[prost(bytes, tag = "2")]
+    pub topic: Vec<u8>,
+
+    #[prost(bytes, tag = "3")]
     pub data: Vec<u8>,
 }
 
@@ -152,6 +154,7 @@ impl From<receipt::Event> for Event {
     fn from(event: receipt::Event) -> Event {
         Event {
             service: event.service.as_bytes().to_vec(),
+            topic:   event.topic.as_bytes().to_vec(),
             data:    event.data.as_bytes().to_vec(),
         }
     }
@@ -163,6 +166,7 @@ impl TryFrom<Event> for receipt::Event {
     fn try_from(event: Event) -> Result<receipt::Event, Self::Error> {
         Ok(receipt::Event {
             service: String::from_utf8(event.service).map_err(CodecError::FromStringUtf8)?,
+            topic:   String::from_utf8(event.topic).map_err(CodecError::FromStringUtf8)?,
             data:    String::from_utf8(event.data).map_err(CodecError::FromStringUtf8)?,
         })
     }
