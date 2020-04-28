@@ -398,12 +398,13 @@ where
     ) -> Result<ExecResult<ExecResp>, Box<dyn Error + Send>> {
         let latest_height = self.get_latest_height(ctx.clone()).await?;
 
-        if latest_height < height - 1 {
+        if latest_height < height {
             panic!(
-                "save_and_exec_block_with_proof, latest_height < height - 1, {} < {} - 1",
+                "exec_full_block, latest_height < height, {} < {}",
                 latest_height, height
             );
-        } else if latest_height >= height {
+        }
+        if latest_height > height {
             return self.get_block_exec_result(ctx.clone(), height).await;
         }
 
@@ -445,12 +446,13 @@ where
         let metadata =
             self.get_metadata(ctx.clone(), resp.state_root.clone(), height, timestamp)?;
         let receipt_root = calculate_root(&resp.receipts);
+
         self.storage.insert_receipts(resp.receipts.clone()).await?;
 
         let exec_result = create_exec_result(
             height,
             metadata,
-            state_root,
+            resp.state_root,
             order_root,
             receipt_root,
             resp.logs_bloom,
@@ -872,7 +874,7 @@ fn calculate_root<T: FixedCodec>(vec: &[T]) -> MerkleRoot {
 }
 
 #[derive(Clone, Debug, Default, Display, PartialEq, Eq)]
-#[display(fmt = "{{ chain_id: {}, height: {}, exec_height: {}, order_tx_len: {}, propose_tx_len: {}, pre_hash: {}, timestamp: {}, state_root: {}, order_root: {}, confirm_root: {:?}, cycle_used: {:?}, proposer: {}, validator_version: {}, validators: {:?} }}",
+#[display(fmt = "{{ chain_id: {}, height: {}, exec_height: {}, order_tx_len: {}, propose_tx_len: {}, pre_hash: {}, timestamp: {}, state_root: {}, order_root: {}, confirm_root: {:?}, receipt_root: {:?}, cycle_used: {:?}, proposer: {}, validator_version: {}, validators: {:?} }}",
 "_0.block.header.chain_id.as_bytes().tiny_hex()", 
 "_0.block.header.height",
 "_0.block.header.exec_height",
@@ -883,6 +885,7 @@ fn calculate_root<T: FixedCodec>(vec: &[T]) -> MerkleRoot {
 "_0.block.header.state_root.as_bytes().tiny_hex()",
 "_0.block.header.order_root.as_bytes().tiny_hex()",
 "_0.block.header.confirm_root.iter().map(|root| root.as_bytes().tiny_hex()).collect::<Vec<String>>()",
+"_0.block.header.receipt_root.iter().map(|root| root.as_bytes().tiny_hex()).collect::<Vec<String>>()",
 "_0.block.header.cycles_used",
 "_0.block.header.proposer.as_bytes().tiny_hex()",
 "_0.block.header.validator_version",

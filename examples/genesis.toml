@@ -42,12 +42,12 @@ payload = '''
             "propose_weight": 1,
             "vote_weight": 1
         },
-            {
-             "bls_pub_key": "0x040eacee87dceb2610950c22d9c072e829d4a4c9be15f91184a488cdb88f8e291242d0ff1e379968c6f828149fa2c500350a267717536837bfac7220327783c74b4aead3a5178bebcbb0a09c43563cf4c8ba31e89991494b45f1ba0a3311cd818f",
-             "address": "0x1963134f5b14962a2474f31ce2ab4776fa841a6b",
-             "propose_weight": 1,
-             "vote_weight": 1
-            }
+        {
+         "bls_pub_key": "0x040eacee87dceb2610950c22d9c072e829d4a4c9be15f91184a488cdb88f8e291242d0ff1e379968c6f828149fa2c500350a267717536837bfac7220327783c74b4aead3a5178bebcbb0a09c43563cf4c8ba31e89991494b45f1ba0a3311cd818f",
+         "address": "0x1963134f5b14962a2474f31ce2ab4776fa841a6b",
+         "propose_weight": 1,
+         "vote_weight": 1
+        }
     ],
     "propose_ratio": 3,
     "prevote_ratio": 5,
