@@ -1,4 +1,5 @@
 use bytes::Bytes;
+use derive_more::Display;
 use muta_codec_derive::RlpFixedCodec;
 use serde::{Deserialize, Serialize};
 
@@ -12,7 +13,25 @@ pub struct Block {
     pub ordered_tx_hashes: Vec<Hash>,
 }
 
-#[derive(RlpFixedCodec, Clone, Debug, PartialEq, Eq)]
+#[derive(RlpFixedCodec, Clone, Debug, Display, PartialEq, Eq)]
+#[display(
+    fmt = "chain id {:?}, height {}, exec height {}, previous hash {:?}, logs bloom {:?},
+    ordered root {:?}, confirm root {:?}, state root {:?},
+    receipt root {:?},cycles_used {:?}, proposer {:?}, proof {:?}, validators {:?}",
+    chain_id,
+    height,
+    exec_height,
+    pre_hash,
+    "logs_bloom.iter().map(|bloom| bloom.to_low_u64_be()).collect::<Vec<_>>()",
+    order_root,
+    confirm_root,
+    state_root,
+    receipt_root,
+    cycles_used,
+    proposer,
+    proof,
+    validators
+)]
 pub struct BlockHeader {
     pub chain_id:          Hash,
     pub height:            u64,
