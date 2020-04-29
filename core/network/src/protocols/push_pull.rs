@@ -897,7 +897,7 @@ impl SessionProtocol for PushPull {
                 let chunk_tx = chunk_sender!();
                 let ret = self.handle_chunk_push(data).map_err(PullError::from);
 
-                if let Err(e) = chunk_tx.unbounded_send(ret.into()) {
+                if let Err(e) = chunk_tx.unbounded_send(ret) {
                     log::warn!("chunk tx fail {}", e);
                 }
             }
