@@ -30,6 +30,8 @@ tentacle-discovery = { git = "https://github.com/zeroqn/p2p", rev = "77b9f391", 
 tentacle-identify = { git = "https://github.com/zeroqn/p2p", rev = "77b9f391", features = [ "flatc" ]}
 tokio = { version = "0.2", features = ["macros", "rt-core"]}
 hostname = "0.3"
+ophelia-hasher = "0.2"
+ophelia-hasher-blake2b = "0.2"
 
 [dev-dependencies]
 env_logger = "0.6"
