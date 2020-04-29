@@ -608,6 +608,14 @@ impl<S: RawSender + Unpin + 'static> Future for PullData<S> {
                 chunk.data.len()
             );
 
+            if chunk.start >= self.data_len
+                || chunk.data.len() as u64 > self.data_len
+                || chunk.start + chunk.data.len() as u64 > self.data_len
+            {
+                log::warn!("got malformat chunk from session {}", self.sid);
+                continue;
+            }
+
             let chunk_range = ChunkRange::new(chunk.start, chunk.start + chunk.data.len() as u64);
             self.missings.complete_range(chunk_range);
             self.data_chunks.push(chunk);
@@ -626,7 +634,6 @@ impl<S: RawSender + Unpin + 'static> Future for PullData<S> {
             data_buf[start..end].copy_from_slice(chunk.data.as_slice())
         }
 
-        // TODO: start and end security check
         let data = Bytes::copy_from_slice(data_buf.as_slice());
         if DataHash::new(&data) != self.data_hash {
             let err = PullError::Internal(Some("corrupted data".to_owned()));
