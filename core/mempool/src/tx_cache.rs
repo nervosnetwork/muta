@@ -96,9 +96,9 @@ impl Stage {
 }
 
 /// Queue role. Incumbent is for insertion and package.
-struct QueueRole<'a> {
-    incumbent: &'a ArrayQueue<SharedTx>,
-    candidate: &'a ArrayQueue<SharedTx>,
+struct QueueRole {
+    incumbent: Arc<ArrayQueue<SharedTx>>,
+    candidate: Arc<ArrayQueue<SharedTx>>,
 }
 
 /// This is the core structure for caching new transactions and
@@ -114,9 +114,9 @@ struct QueueRole<'a> {
 /// out, `queue_1` switch to insertion queue.
 pub struct TxCache {
     /// One queue.
-    queue_0:          ArrayQueue<SharedTx>,
+    queue_0:          Arc<ArrayQueue<SharedTx>>,
     /// Another queue.
-    queue_1:          ArrayQueue<SharedTx>,
+    queue_1:          Arc<ArrayQueue<SharedTx>>,
     /// A map for randomly search and removal.
     map:              Map<SharedTx>,
     /// This is used to pick a queue for insertion,
@@ -132,52 +132,57 @@ pub struct TxCache {
 impl TxCache {
     pub fn new(pool_size: usize) -> Self {
         TxCache {
-            queue_0:          ArrayQueue::new(pool_size * 2),
-            queue_1:          ArrayQueue::new(pool_size * 2),
+            queue_0:          Arc::new(ArrayQueue::new(pool_size * 2)),
+            queue_1:          Arc::new(ArrayQueue::new(pool_size * 2)),
             map:              Map::new(pool_size * 2),
             is_zero:          AtomicBool::new(true),
             concurrent_count: AtomicUsize::new(0),
         }
     }
 
-    pub fn len(&self) -> usize {
-        self.map.len()
+    pub async fn len(&self) -> usize {
+        self.map.len().await
     }
 
-    pub fn insert_new_tx(&self, signed_tx: SignedTransaction) -> ProtocolResult<()> {
+    pub async fn insert_new_tx(&self, signed_tx: SignedTransaction) -> ProtocolResult<()> {
         let tx_hash = signed_tx.tx_hash.clone();
         let tx_wrapper = TxWrapper::new(signed_tx);
         let shared_tx = Arc::new(tx_wrapper);
-        self.insert(tx_hash, shared_tx)
+        self.insert(tx_hash, shared_tx).await
     }
 
-    pub fn insert_propose_tx(&self, signed_tx: SignedTransaction) -> ProtocolResult<()> {
+    pub async fn insert_propose_tx(&self, signed_tx: SignedTransaction) -> ProtocolResult<()> {
         let tx_hash = signed_tx.tx_hash.clone();
         let tx_wrapper = TxWrapper::propose(signed_tx);
         let shared_tx = Arc::new(tx_wrapper);
-        self.insert(tx_hash, shared_tx)
+        self.insert(tx_hash, shared_tx).await
     }
 
-    pub fn show_unknown(&self, tx_hashes: Vec<Hash>) -> Vec<Hash> {
-        tx_hashes
-            .into_iter()
-            .filter(|tx_hash| !self.contain(tx_hash))
-            .collect()
+    pub async fn show_unknown(&self, tx_hashes: Vec<Hash>) -> Vec<Hash> {
+        let mut unknow_hashes = vec![];
+
+        for tx_hash in tx_hashes.into_iter() {
+            if !self.contain(&tx_hash).await {
+                unknow_hashes.push(tx_hash);
+            }
+        }
+
+        unknow_hashes
     }
 
-    pub fn flush(&self, tx_hashes: &[Hash], current_height: u64, timeout: u64) {
+    pub async fn flush(&self, tx_hashes: &[Hash], current_height: u64, timeout: u64) {
         for tx_hash in tx_hashes {
-            let opt = self.map.get(tx_hash);
+            let opt = self.map.get(tx_hash).await;
             if let Some(shared_tx) = opt {
                 shared_tx.set_removed();
             }
         }
         // Dividing set removed and remove into two loops is to avoid lock competition.
-        self.map.remove_batch(tx_hashes);
-        self.flush_incumbent_queue(current_height, timeout);
+        self.map.remove_batch(tx_hashes).await;
+        self.flush_incumbent_queue(current_height, timeout).await;
     }
 
-    pub fn package(
+    pub async fn package(
         &self,
         _cycles_limit: u64,
         tx_num_limit: u64,
@@ -214,7 +219,7 @@ impl TxCache {
                         "[core_mempool]: candidate queue is full while package, delete {:?}",
                         &shared_tx.tx.tx_hash
                     );
-                    self.map.remove(&shared_tx.tx.tx_hash);
+                    self.map.remove(&shared_tx.tx.tx_hash).await;
                 }
 
                 if stage == Stage::Finished
@@ -237,12 +242,12 @@ impl TxCache {
                 // Switch queue_roles
                 let new_role = self.switch_queue_role();
                 // Transactions may insert into previous incumbent queue during role switch.
-                self.process_omission_txs(new_role);
+                self.process_omission_txs(new_role).await;
                 break;
             }
         }
         // Remove timeout tx in map
-        self.map.remove_batch(&timeout_tx_hashes);
+        self.map.remove_batch(&timeout_tx_hashes).await;
 
         Ok(MixedTxHashes {
             order_tx_hashes,
@@ -250,9 +255,8 @@ impl TxCache {
         })
     }
 
-    #[inline]
-    pub fn check_exist(&self, tx_hash: &Hash) -> ProtocolResult<()> {
-        if self.contain(tx_hash) {
+    pub async fn check_exist(&self, tx_hash: &Hash) -> ProtocolResult<()> {
+        if self.contain(tx_hash).await {
             return Err(MemPoolError::Dup {
                 tx_hash: tx_hash.clone(),
             }
@@ -261,25 +265,24 @@ impl TxCache {
         Ok(())
     }
 
-    #[inline]
-    pub fn check_reach_limit(&self, pool_size: usize) -> ProtocolResult<()> {
-        if self.len() >= pool_size {
+    pub async fn check_reach_limit(&self, pool_size: usize) -> ProtocolResult<()> {
+        if self.len().await >= pool_size {
             return Err(MemPoolError::ReachLimit { pool_size }.into());
         }
         Ok(())
     }
 
-    #[inline]
-    pub fn contain(&self, tx_hash: &Hash) -> bool {
-        self.map.contains_key(tx_hash)
+    pub async fn contain(&self, tx_hash: &Hash) -> bool {
+        self.map.contains_key(tx_hash).await
     }
 
-    #[inline]
-    pub fn get(&self, tx_hash: &Hash) -> Option<SignedTransaction> {
-        self.map.get(tx_hash).map(|shared_tx| shared_tx.tx.clone())
+    pub async fn get(&self, tx_hash: &Hash) -> Option<SignedTransaction> {
+        self.map
+            .get(tx_hash)
+            .await
+            .map(|shared_tx| shared_tx.tx.clone())
     }
 
-    #[allow(dead_code)]
     pub fn queue_len(&self) -> usize {
         if self.is_zero.load(Ordering::Relaxed) {
             self.queue_0.len()
@@ -288,12 +291,13 @@ impl TxCache {
         }
     }
 
-    fn insert(&self, tx_hash: Hash, shared_tx: SharedTx) -> ProtocolResult<()> {
+    async fn insert(&self, tx_hash: Hash, shared_tx: SharedTx) -> ProtocolResult<()> {
         // If multiple transactions exactly the same insert concurrently,
         // this will prevent them to be both insert successfully into queue.
         if self
             .map
             .insert(tx_hash.clone(), Arc::<TxWrapper>::clone(&shared_tx))
+            .await
             .is_some()
         {
             return Err(MemPoolError::Dup { tx_hash }.into());
@@ -309,7 +313,7 @@ impl TxCache {
         // If queue inserts into queue failed, removes from map.
         if rst.is_err() {
             // If tx_hash exists, it will panic. So repeat check must do before insertion.
-            self.map.remove(&tx_hash);
+            self.map.remove(&tx_hash).await;
             Err(MemPoolError::Insert { tx_hash }.into())
         } else {
             Ok(())
@@ -317,7 +321,7 @@ impl TxCache {
     }
 
     // Process transactions insert into previous incumbent queue during role switch.
-    fn process_omission_txs(&self, queue_role: QueueRole) {
+    async fn process_omission_txs(&self, queue_role: QueueRole) {
         'outer: loop {
             // When there are no transaction insertions processing,
             // pop off previous incumbent queue and push them into current incumbent queue.
@@ -332,7 +336,7 @@ impl TxCache {
                             "[core_mempool]: incumbent queue is full while process_omission_txs, delete {:?}",
                             &shared_tx.tx.tx_hash
                         );
-                        self.map.remove(&shared_tx.tx.tx_hash);
+                        self.map.remove(&shared_tx.tx.tx_hash).await;
                     }
                 }
                 break 'outer;
@@ -340,7 +344,7 @@ impl TxCache {
         }
     }
 
-    fn flush_incumbent_queue(&self, current_height: u64, timeout: u64) {
+    async fn flush_incumbent_queue(&self, current_height: u64, timeout: u64) {
         let queue_role = self.get_queue_role();
         let mut timeout_tx_hashes = Vec::new();
 
@@ -365,18 +369,18 @@ impl TxCache {
                         "[core_mempool]: candidate queue is full while flush_incumbent_queue, delete {:?}",
                         &shared_tx.tx.tx_hash
                     );
-                    self.map.remove(&shared_tx.tx.tx_hash);
+                    self.map.remove(&shared_tx.tx.tx_hash).await;
                 }
             } else {
                 // Switch queue_roles
                 let new_role = self.switch_queue_role();
                 // Transactions may insert into previous incumbent queue during role switch.
-                self.process_omission_txs(new_role);
+                self.process_omission_txs(new_role).await;
                 break;
             }
         }
         // Remove timeout tx in map
-        self.map.remove_batch(&timeout_tx_hashes);
+        self.map.remove_batch(&timeout_tx_hashes).await;
     }
 
     fn switch_queue_role(&self) -> QueueRole {
@@ -384,7 +388,6 @@ impl TxCache {
         self.get_queue_role()
     }
 
-    #[inline]
     fn get_queue_role(&self) -> QueueRole {
         let (incumbent, candidate) = if self.is_zero.load(Ordering::SeqCst) {
             (&self.queue_0, &self.queue_1)
@@ -392,8 +395,8 @@ impl TxCache {
             (&self.queue_1, &self.queue_0)
         };
         QueueRole {
-            incumbent,
-            candidate,
+            incumbent: Arc::clone(incumbent),
+            candidate: Arc::clone(candidate),
         }
     }
 }
@@ -403,11 +406,8 @@ mod tests {
     extern crate test;
 
     use std::sync::Arc;
-    use std::thread;
 
     use rand::random;
-    use rayon::iter::IntoParallelRefIterator;
-    use rayon::prelude::*;
     use test::Bencher;
 
     use protocol::types::{Hash, RawTransaction, SignedTransaction, TransactionRequest};
@@ -415,7 +415,6 @@ mod tests {
 
     use crate::map::Map;
     use crate::tx_cache::{TxCache, TxWrapper};
-    use std::thread::JoinHandle;
 
     const POOL_SIZE: usize = 1000;
     const BYTES_LEN: usize = 10;
@@ -468,35 +467,39 @@ mod tests {
         }
     }
 
-    fn concurrent_insert(txs: Vec<SignedTransaction>, tx_cache: &TxCache) {
-        txs.par_iter().for_each(|signed_tx| {
-            let _ = tx_cache.insert_new_tx(signed_tx.clone());
-        });
+    async fn concurrent_insert(txs: Vec<SignedTransaction>, tx_cache: Arc<TxCache>) {
+        let futs = txs
+            .into_iter()
+            .map(|tx| {
+                let tx_cache = Arc::clone(&tx_cache);
+                tokio::spawn(async move { tx_cache.insert_new_tx(tx.clone()).await })
+            })
+            .collect::<Vec<_>>();
+
+        futures::future::try_join_all(futs).await.unwrap();
     }
 
-    fn concurrent_flush(
-        tx_cache: &Arc<TxCache>,
-        tx_hashes: Vec<Hash>,
-        height: u64,
-    ) -> JoinHandle<()> {
-        let tx_cache_clone = Arc::<TxCache>::clone(tx_cache);
-
-        thread::spawn(move || {
-            tx_cache_clone.flush(&tx_hashes, height, height + TIMEOUT);
+    async fn concurrent_flush(tx_cache: Arc<TxCache>, tx_hashes: Vec<Hash>, height: u64) {
+        tokio::spawn(async move {
+            tx_cache.flush(&tx_hashes, height, height + TIMEOUT).await;
         })
+        .await
+        .unwrap();
     }
 
-    fn concurrent_package(tx_cache: &Arc<TxCache>) -> JoinHandle<()> {
-        let tx_cache_clone = Arc::<TxCache>::clone(tx_cache);
-        thread::spawn(move || {
-            tx_cache_clone
+    async fn concurrent_package(tx_cache: Arc<TxCache>) {
+        tokio::spawn(async move {
+            tx_cache
                 .package(CYCLE_LIMIT, TX_NUM_LIMIT, CURRENT_H, TIMEOUT)
+                .await
                 .unwrap();
         })
+        .await
+        .unwrap();
     }
 
-    #[test]
-    fn test_concurrent_insert() {
+    #[tokio::test]
+    async fn test_concurrent_insert() {
         let txs = gen_signed_txs(POOL_SIZE / 2);
         let txs: Vec<SignedTransaction> = txs
             .iter()
@@ -506,26 +509,26 @@ mod tests {
                     .collect::<Vec<SignedTransaction>>()
             })
             .collect();
-        let tx_cache = TxCache::new(POOL_SIZE);
-        concurrent_insert(txs, &tx_cache);
-        assert_eq!(tx_cache.len(), POOL_SIZE / 2);
+        let tx_cache = Arc::new(TxCache::new(POOL_SIZE));
+        concurrent_insert(txs, Arc::clone(&tx_cache)).await;
+        assert_eq!(tx_cache.len().await, POOL_SIZE / 2);
     }
 
-    #[test]
-    fn test_insert_overlap() {
+    #[tokio::test]
+    async fn test_insert_overlap() {
         let txs = gen_signed_txs(1);
         let tx = txs.get(0).unwrap();
         let map = Map::new(POOL_SIZE);
 
         let tx_wrapper_0 = TxWrapper::new(tx.clone());
         tx_wrapper_0.set_removed();
-        map.insert(tx.tx_hash.clone(), Arc::new(tx_wrapper_0));
-        let shared_tx_0 = map.get(&tx.tx_hash).unwrap();
+        map.insert(tx.tx_hash.clone(), Arc::new(tx_wrapper_0)).await;
+        let shared_tx_0 = map.get(&tx.tx_hash).await.unwrap();
         assert!(shared_tx_0.is_removed());
 
         let tx_wrapper_1 = TxWrapper::new(tx.clone());
-        map.insert(tx.tx_hash.clone(), Arc::new(tx_wrapper_1));
-        let shared_tx_1 = map.get(&tx.tx_hash).unwrap();
+        map.insert(tx.tx_hash.clone(), Arc::new(tx_wrapper_1)).await;
+        let shared_tx_1 = map.get(&tx.tx_hash).await.unwrap();
         assert!(shared_tx_1.is_removed());
     }
 
@@ -538,35 +541,41 @@ mod tests {
 
     #[bench]
     fn bench_insert(b: &mut Bencher) {
+        let mut runtime = tokio::runtime::Runtime::new().unwrap();
+
         let txs = gen_signed_txs(TX_NUM);
         b.iter(|| {
-            let tx_cache = TxCache::new(POOL_SIZE);
-            concurrent_insert(txs.clone(), &tx_cache);
-            assert_eq!(tx_cache.len(), TX_NUM);
+            let tx_cache = Arc::new(TxCache::new(POOL_SIZE));
+            runtime.block_on(concurrent_insert(txs.clone(), Arc::clone(&tx_cache)));
+            assert_eq!(runtime.block_on(tx_cache.len()), TX_NUM);
             assert_eq!(tx_cache.queue_len(), TX_NUM);
         });
     }
 
     #[bench]
     fn bench_flush(b: &mut Bencher) {
+        let mut runtime = tokio::runtime::Runtime::new().unwrap();
+
         let txs = gen_signed_txs(TX_NUM);
         let tx_hashes: Vec<Hash> = txs
             .iter()
             .map(|signed_tx| signed_tx.tx_hash.clone())
             .collect();
         b.iter(|| {
-            let tx_cache = TxCache::new(POOL_SIZE);
-            concurrent_insert(txs.clone(), &tx_cache);
-            assert_eq!(tx_cache.len(), TX_NUM);
+            let tx_cache = Arc::new(TxCache::new(POOL_SIZE));
+            runtime.block_on(concurrent_insert(txs.clone(), Arc::clone(&tx_cache)));
+            assert_eq!(runtime.block_on(tx_cache.len()), TX_NUM);
             assert_eq!(tx_cache.queue_len(), TX_NUM);
-            tx_cache.flush(tx_hashes.as_slice(), CURRENT_H, CURRENT_H + TIMEOUT);
-            assert_eq!(tx_cache.len(), 0);
+            runtime.block_on(tx_cache.flush(tx_hashes.as_slice(), CURRENT_H, CURRENT_H + TIMEOUT));
+            assert_eq!(runtime.block_on(tx_cache.len()), 0);
             assert_eq!(tx_cache.queue_len(), 0);
         });
     }
 
     #[bench]
     fn bench_flush_insert(b: &mut Bencher) {
+        let mut runtime = tokio::runtime::Runtime::new().unwrap();
+
         let txs_base = gen_signed_txs(TX_NUM / 2);
         let txs_insert = gen_signed_txs(TX_NUM / 2);
         let txs_flush: Vec<Hash> = txs_base
@@ -575,23 +584,28 @@ mod tests {
             .collect();
         b.iter(|| {
             let tx_cache = Arc::new(TxCache::new(POOL_SIZE));
-            concurrent_insert(txs_base.clone(), &tx_cache);
-            let handle = concurrent_flush(&tx_cache, txs_flush.clone(), CURRENT_H);
-            concurrent_insert(txs_insert.clone(), &tx_cache);
-            handle.join().unwrap();
-            assert_eq!(tx_cache.len(), TX_NUM / 2);
+            runtime.block_on(concurrent_insert(txs_base.clone(), Arc::clone(&tx_cache)));
+            runtime.block_on(concurrent_flush(
+                Arc::clone(&tx_cache),
+                txs_flush.clone(),
+                CURRENT_H,
+            ));
+            runtime.block_on(concurrent_insert(txs_insert.clone(), Arc::clone(&tx_cache)));
+            assert_eq!(runtime.block_on(tx_cache.len()), TX_NUM / 2);
             assert_eq!(tx_cache.queue_len(), TX_NUM / 2);
         });
     }
 
     #[bench]
     fn bench_package(b: &mut Bencher) {
+        let mut runtime = tokio::runtime::Runtime::new().unwrap();
+
         let txs = gen_signed_txs(TX_NUM);
-        let tx_cache = TxCache::new(POOL_SIZE);
-        concurrent_insert(txs, &tx_cache);
+        let tx_cache = Arc::new(TxCache::new(POOL_SIZE));
+        runtime.block_on(concurrent_insert(txs, Arc::clone(&tx_cache)));
         b.iter(|| {
-            let mixed_tx_hashes = tx_cache
-                .package(TX_NUM_LIMIT, CYCLE_LIMIT, CURRENT_H, TIMEOUT)
+            let mixed_tx_hashes = runtime
+                .block_on(tx_cache.package(TX_NUM_LIMIT, CYCLE_LIMIT, CURRENT_H, TIMEOUT))
                 .unwrap();
             assert_eq!(
                 mixed_tx_hashes.order_tx_hashes.len(),
@@ -602,15 +616,16 @@ mod tests {
 
     #[bench]
     fn bench_package_insert(b: &mut Bencher) {
+        let mut runtime = tokio::runtime::Runtime::new().unwrap();
+
         let txs = gen_signed_txs(TX_NUM / 2);
         let txs_insert = gen_signed_txs(TX_NUM / 2);
         b.iter(|| {
             let tx_cache = Arc::new(TxCache::new(POOL_SIZE));
-            concurrent_insert(txs.clone(), &tx_cache);
-            let handle = concurrent_package(&tx_cache);
-            concurrent_insert(txs_insert.clone(), &tx_cache);
-            handle.join().unwrap();
-            assert_eq!(tx_cache.len(), TX_NUM);
+            runtime.block_on(concurrent_insert(txs.clone(), Arc::clone(&tx_cache)));
+            runtime.block_on(concurrent_package(Arc::clone(&tx_cache)));
+            runtime.block_on(concurrent_insert(txs_insert.clone(), Arc::clone(&tx_cache)));
+            assert_eq!(runtime.block_on(tx_cache.len()), TX_NUM);
             assert_eq!(tx_cache.queue_len(), TX_NUM);
         });
     }
