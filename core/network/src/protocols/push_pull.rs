@@ -496,7 +496,7 @@ impl MissingChunks {
         self.0 = self
             .iter()
             .map(|r| {
-                let middle = r.end - r.start;
+                let middle = (r.end - r.start) / 2;
                 vec![
                     ChunkRange::new(r.start, middle),
                     ChunkRange::new(middle, r.end),
