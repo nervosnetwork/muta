@@ -27,7 +27,12 @@ matrix:
   - rust: nightly
 
 install: ./devtools/ci/install.sh
-script: ./devtools/ci/script.sh
+script: 
+  # Output something every 10 minutes or Travis kills the job
+  - while sleep 5m; do echo "=====[ $SECONDS seconds still running ]====="; done &
+  - ./devtools/ci/script.sh
+  # Killing background sleep loop
+  - kill %1
 
 # use sccache and limit cache size to 2G, so travis cache command dont timeout
 env:
