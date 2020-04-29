@@ -433,9 +433,6 @@ where
         let timestamp = full_block.block.header.timestamp;
         let cycles_limit = last_commit_exec_resp.cycles_limit;
 
-        println!("#### block: {}", WrappedPill::from_block(full_block.block.clone()));
-        println!("#### full_block.ordered_txs.len() = {}", full_block.ordered_txs.len());
-        println!("#### state_root: {}, height: {}, timestamp: {}, cycles_limit: {}", state_root.as_bytes().tiny_hex(), height, timestamp, cycles_limit);
         let resp = self.exec(
             state_root.clone(),
             height,
@@ -458,7 +455,6 @@ where
             resp.logs_bloom,
             resp.all_cycles_used,
         );
-        println!("#### exec_result: {:?}", exec_result);
         Ok(exec_result)
     }
 
