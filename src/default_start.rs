@@ -279,6 +279,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     let overlord_adapter_clone = Arc::clone(&overlord_adapter);
     tokio::spawn(async move {
         OverlordServer::run(
+            Context::new(),
             common_ref,
             key_pair.private_key,
             key_pair.public_key,

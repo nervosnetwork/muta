@@ -361,6 +361,7 @@ where
         height: Height,
         full_block: Bytes,
         proof: Proof,
+        is_sync: bool,
     ) -> Result<(), Box<dyn Error + Send>> {
         let latest_height = self.get_latest_height(ctx.clone()).await?;
 
@@ -371,41 +372,6 @@ where
             );
         } else if latest_height >= height {
             return Ok(());
-        }
-
-        let full_block: FullBlock = FixedCodec::decode_fixed(full_block)?;
-
-        self.storage
-            .update_latest_proof(into_proto_proof(proof)?)
-            .await?;
-        self.storage.insert_block(full_block.block.clone()).await?;
-        self.storage
-            .insert_transactions(full_block.ordered_txs)
-            .await?;
-        let ordered_tx_hashes = full_block.block.ordered_tx_hashes.clone();
-        self.mem_pool.flush(ctx, ordered_tx_hashes).await?;
-        Ok(())
-    }
-
-    async fn exec_full_block(
-        &self,
-        ctx: Context,
-        height: Height,
-        full_block: Bytes,
-        last_exec_resp: ExecResp,
-        last_commit_exec_resp: ExecResp,
-        is_sync: bool,
-    ) -> Result<ExecResult<ExecResp>, Box<dyn Error + Send>> {
-        let latest_height = self.get_latest_height(ctx.clone()).await?;
-
-        if latest_height < height {
-            panic!(
-                "exec_full_block, latest_height < height, {} < {}",
-                latest_height, height
-            );
-        }
-        if latest_height > height {
-            return self.get_block_exec_result(ctx.clone(), height).await;
         }
 
         let full_block: FullBlock = FixedCodec::decode_fixed(full_block)?;
@@ -431,11 +397,45 @@ where
             }
         }
 
+        self.storage
+            .update_latest_proof(into_proto_proof(proof)?)
+            .await?;
+        self.storage.insert_block(full_block.block.clone()).await?;
+        self.storage
+            .insert_transactions(full_block.ordered_txs)
+            .await?;
+        let ordered_tx_hashes = full_block.block.ordered_tx_hashes.clone();
+        self.mem_pool.flush(ctx, ordered_tx_hashes).await?;
+        Ok(())
+    }
+
+    async fn exec_full_block(
+        &self,
+        ctx: Context,
+        height: Height,
+        full_block: Bytes,
+        last_exec_resp: ExecResp,
+        last_commit_exec_resp: ExecResp,
+    ) -> Result<ExecResult<ExecResp>, Box<dyn Error + Send>> {
+        let latest_height = self.get_latest_height(ctx.clone()).await?;
+
+        if latest_height < height {
+            panic!(
+                "exec_full_block, latest_height < height, {} < {}",
+                latest_height, height
+            );
+        }
+
+        let full_block: FullBlock = FixedCodec::decode_fixed(full_block)?;
+
         let order_root = full_block.block.header.order_root.clone();
         let state_root = last_exec_resp.state_root;
         let timestamp = full_block.block.header.timestamp;
         let cycles_limit = last_commit_exec_resp.cycles_limit;
 
+        println!("#### block: {}", WrappedPill::from_block(full_block.block.clone()));
+        println!("#### full_block.ordered_txs.len() = {}", full_block.ordered_txs.len());
+        println!("#### state_root: {}, height: {}, timestamp: {}, cycles_limit: {}", state_root.as_bytes().tiny_hex(), height, timestamp, cycles_limit);
         let resp = self.exec(
             state_root.clone(),
             height,
@@ -458,6 +458,7 @@ where
             resp.logs_bloom,
             resp.all_cycles_used,
         );
+        println!("#### exec_result: {:?}", exec_result);
         Ok(exec_result)
     }
 
