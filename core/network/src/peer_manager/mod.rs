@@ -424,8 +424,16 @@ impl Inner {
         }
     }
 
+    pub fn add_chain_addr(&self, chain_addr: Address, peer: ArcPeer) {
+        self.chain.write().insert(chain_addr, peer);
+    }
+
     pub fn peer(&self, peer_id: &PeerId) -> Option<ArcPeer> {
         self.peers.read().get(peer_id).cloned()
+    }
+
+    pub fn peer_by_chain(&self, chain_addr: &Address) -> Option<ArcPeer> {
+        self.chain.read().get(chain_addr).cloned()
     }
 
     pub fn contains(&self, peer_id: &PeerId) -> bool {
@@ -734,6 +742,14 @@ impl PeerManager {
         if !remote_peer.has_pubkey() {
             if let Err(e) = remote_peer.set_pubkey(pubkey.clone()) {
                 error!("impossible, set public key failed {}", e);
+                error!("new session without peer pubkey, chain book will not be updated");
+            }
+        }
+
+        // Update chain book
+        if let Some(chain_addr) = remote_peer.owned_chain_addr() {
+            if self.inner.peer_by_chain(&chain_addr).is_none() {
+                self.inner.add_chain_addr(chain_addr, remote_peer.clone());
             }
         }
 
