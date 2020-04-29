@@ -24,10 +24,10 @@ rand = "0.7"
 serde = "1.0"
 serde_derive = "1.0"
 snap = "0.2"
-tentacle = { git = "https://github.com/zeroqn/p2p", branch = "muta-disc", features = [ "flatc" ]}
-tentacle-ping = { git = "https://github.com/zeroqn/p2p", branch = "muta-disc", features = [ "flatc" ]}
-tentacle-discovery = { git = "https://github.com/zeroqn/p2p", branch = "muta-disc", features = [ "flatc" ]}
-tentacle-identify = { git = "https://github.com/zeroqn/p2p", branch = "muta-disc", features = [ "flatc" ]}
+tentacle = { git = "https://github.com/zeroqn/p2p", rev = "77b9f391", features = [ "flatc" ]}
+tentacle-ping = { git = "https://github.com/zeroqn/p2p", rev = "77b9f391", features = [ "flatc" ]}
+tentacle-discovery = { git = "https://github.com/zeroqn/p2p", rev = "77b9f391", features = [ "flatc" ]}
+tentacle-identify = { git = "https://github.com/zeroqn/p2p", rev = "77b9f391", features = [ "flatc" ]}
 tokio = { version = "0.2", features = ["macros", "rt-core"]}
 hostname = "0.3"
 
