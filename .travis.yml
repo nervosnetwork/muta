@@ -29,7 +29,7 @@ matrix:
 install: ./devtools/ci/install.sh
 script: 
   # Output something every 10 minutes or Travis kills the job
-  - while sleep 30m; do echo "=====[ $SECONDS seconds still running ]====="; done &
+  - while sleep 5m; do echo "=====[ $SECONDS seconds still running ]====="; done &
   - ./devtools/ci/script.sh
   # Killing background sleep loop
   - kill %1
