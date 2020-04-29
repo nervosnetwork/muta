@@ -61,8 +61,11 @@ enum BadRequestError {
     #[display(fmt = "request no origin hash")]
     NoOriginHash,
 
-    #[display(fmt = "data not found")]
+    #[display(fmt = "request data not found")]
     NotFound,
+
+    #[display(fmt = "request out of bound")]
+    OutOfBound,
 }
 
 #[derive(Debug, Display)]
@@ -368,19 +371,32 @@ impl Deref for CachedData {
 pub struct Cache(Arc<RwLock<HashSet<CachedData>>>);
 
 impl Cache {
-    pub fn insert(&self, data: Bytes) -> DataHash {
+    fn insert(&self, data: Bytes) -> DataHash {
         let cached_data = CachedData::new(data);
         let hash = cached_data.hash.clone();
         self.0.write().insert(cached_data);
         hash
     }
 
-    pub fn get(&self, hash: &DataHash, start: usize, end: usize) -> Option<Bytes> {
+    fn get(
+        &self,
+        hash: &DataHash,
+        start: usize,
+        end: usize,
+    ) -> Result<Option<Bytes>, BadRequestError> {
+        let checked_slice = |data: &CachedData| -> _ {
+            if start >= data.len() || end > data.len() {
+                Err(BadRequestError::OutOfBound)
+            } else {
+                Ok(data.slice(start..end))
+            }
+        };
+
         let cache = self.0.read();
-        cache.get(hash).map(|data| data.slice(start..end))
+        cache.get(hash).map(checked_slice).transpose()
     }
 
-    pub fn remove(&self, hash: &DataHash) {
+    fn remove(&self, hash: &DataHash) {
         self.0.write().remove(hash);
     }
 }
@@ -794,7 +810,7 @@ impl PushPull {
         log::debug!("pull request for {:?} start {} end {}", origin, start, end);
 
         let origin = origin.ok_or_else(|| BadRequestError::NoOriginHash)?;
-        let chunk = match self.cache.get(&origin, start as usize, end as usize) {
+        let chunk = match self.cache.get(&origin, start as usize, end as usize)? {
             Some(chunk) => DataChunkResp::new(origin.clone(), start, chunk),
             None => return Err(BadRequestError::NotFound),
         };
