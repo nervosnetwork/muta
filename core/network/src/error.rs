@@ -70,6 +70,9 @@ pub enum ErrorKind {
 
     #[display(fmt = "kind: public key {:?} not match {:?}", pubkey, id)]
     PublicKeyNotMatchId { pubkey: PublicKey, id: PeerId },
+
+    #[display(fmt = "kind: no data hash in pull data meta from {:?}", _0)]
+    PullDataMetaNoHash(Option<ConnectedAddr>),
 }
 
 impl Error for ErrorKind {}

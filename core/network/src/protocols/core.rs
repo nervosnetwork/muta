@@ -11,7 +11,10 @@ use tentacle_identify::Callback;
 use crate::{
     event::PeerManagerEvent,
     message::RawSessionMessage,
-    protocols::{discovery::Discovery, identify::Identify, ping::Ping, transmitter::Transmitter},
+    protocols::{
+        discovery::Discovery, identify::Identify, ping::Ping, push_pull::PushPull,
+        transmitter::Transmitter,
+    },
     traits::NetworkProtocol,
 };
 
@@ -19,6 +22,7 @@ pub const PING_PROTOCOL_ID: usize = 1;
 pub const IDENTIFY_PROTOCOL_ID: usize = 2;
 pub const DISCOVERY_PROTOCOL_ID: usize = 3;
 pub const TRANSMITTER_PROTOCOL_ID: usize = 4;
+pub const PUSH_PULL_PROTOCOL_ID: usize = 5;
 
 #[derive(Default)]
 pub struct CoreProtocolBuilder<M, C> {
@@ -29,7 +33,8 @@ pub struct CoreProtocolBuilder<M, C> {
 }
 
 pub struct CoreProtocol {
-    metas: Vec<ProtocolMeta>,
+    metas:     Vec<ProtocolMeta>,
+    push_pull: PushPull,
 }
 
 impl CoreProtocol {
@@ -40,6 +45,10 @@ impl CoreProtocol {
     {
         CoreProtocolBuilder::new()
     }
+
+    pub fn push_pull(&self) -> PushPull {
+        self.push_pull.clone()
+    }
 }
 
 impl NetworkProtocol for CoreProtocol {
@@ -49,6 +58,7 @@ impl NetworkProtocol for CoreProtocol {
             ProtocolId::new(IDENTIFY_PROTOCOL_ID),
             ProtocolId::new(DISCOVERY_PROTOCOL_ID),
             ProtocolId::new(TRANSMITTER_PROTOCOL_ID),
+            ProtocolId::new(PUSH_PULL_PROTOCOL_ID),
         ])
     }
 
@@ -109,7 +119,7 @@ where
     }
 
     pub fn build(self) -> CoreProtocol {
-        let mut metas = Vec::with_capacity(4);
+        let mut metas = Vec::with_capacity(5);
 
         let CoreProtocolBuilder {
             ping,
@@ -140,6 +150,9 @@ where
             metas.push(transmitter.build_meta(TRANSMITTER_PROTOCOL_ID.into()));
         }
 
-        CoreProtocol { metas }
+        let push_pull = PushPull::default();
+        metas.push(push_pull.clone().build_meta(PUSH_PULL_PROTOCOL_ID.into()));
+
+        CoreProtocol { metas, push_pull }
     }
 }

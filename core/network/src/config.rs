@@ -49,7 +49,9 @@ pub const DEFAULT_DISCOVERY_SYNC_INTERVAL: u64 = 60 * 60; // 1 hour
 pub const DEFAULT_PEER_MANAGER_HEART_BEAT_INTERVAL: u64 = 30;
 pub const DEFAULT_SELF_HEART_BEAT_INTERVAL: u64 = 35;
 
-pub const DEFAULT_RPC_TIMEOUT: u64 = 10;
+pub const DEFAULT_RPC_TIMEOUT: u64 = 10; // seconds
+pub const DEFAULT_PULL_CHUNK_TIMEOUT: u64 = 10; // seconds
+pub const DEFAULT_PULL_MAX_TIMEOUT: u64 = 10; // seconds
 
 // Selfcheck
 pub const DEFAULT_SELF_CHECK_INTERVAL: u64 = 30;
@@ -125,7 +127,9 @@ pub struct NetworkConfig {
     pub heart_beat_interval:              Duration,
 
     // rpc
-    pub rpc_timeout: Duration,
+    pub rpc_timeout:        Duration,
+    pub pull_chunk_timeout: Duration,
+    pub pull_max_timeout:   Duration,
 
     // self check
     pub selfcheck_interval: Duration,
@@ -163,7 +167,9 @@ impl NetworkConfig {
             peer_manager_heart_beat_interval: peer_manager_hb_interval,
             heart_beat_interval:              Duration::from_secs(DEFAULT_SELF_HEART_BEAT_INTERVAL),
 
-            rpc_timeout: Duration::from_secs(DEFAULT_RPC_TIMEOUT),
+            rpc_timeout:        Duration::from_secs(DEFAULT_RPC_TIMEOUT),
+            pull_chunk_timeout: Duration::from_secs(DEFAULT_PULL_CHUNK_TIMEOUT),
+            pull_max_timeout:   Duration::from_secs(DEFAULT_PULL_MAX_TIMEOUT),
 
             selfcheck_interval: Duration::from_secs(DEFAULT_SELF_CHECK_INTERVAL),
         }
@@ -385,13 +391,17 @@ impl From<&NetworkConfig> for PeerManagerConfig {
 
 #[derive(Debug, Clone, Copy)]
 pub struct TimeoutConfig {
-    pub rpc: Duration,
+    pub rpc:        Duration,
+    pub pull_chunk: Duration,
+    pub pull_max:   Duration,
 }
 
 impl From<&NetworkConfig> for TimeoutConfig {
     fn from(config: &NetworkConfig) -> TimeoutConfig {
         TimeoutConfig {
-            rpc: config.rpc_timeout,
+            rpc:        config.rpc_timeout,
+            pull_chunk: config.pull_chunk_timeout,
+            pull_max:   config.pull_max_timeout,
         }
     }
 }

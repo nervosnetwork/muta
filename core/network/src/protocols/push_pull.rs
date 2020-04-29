@@ -1,4 +1,4 @@
-use crate::traits::MessageSender;
+use crate::{error::NetworkError, traits::MessageSender};
 
 use bytes::{Bytes, BytesMut};
 use derive_more::{Constructor, Display};
@@ -24,7 +24,7 @@ use std::{
     fmt,
     future::Future,
     hash::{Hash, Hasher},
-    ops::{Deref, Add},
+    ops::{Add, Deref},
     pin::Pin,
     sync::atomic::{AtomicU32, Ordering::SeqCst},
     sync::Arc,
@@ -113,6 +113,12 @@ impl From<BadResponseError> for PullError {
 impl From<InternalError> for PullError {
     fn from(err: InternalError) -> PullError {
         PullError::Internal(Some(err.to_string()))
+    }
+}
+
+impl From<PullError> for NetworkError {
+    fn from(err: PullError) -> NetworkError {
+        NetworkError::Internal(Box::new(err))
     }
 }
 
@@ -518,11 +524,11 @@ pub struct PullData<S: MessageSender + Unpin + 'static> {
     chunk_timeout: Duration,
     missings:      MissingChunks,
 
-    net_tx:    S,
-    timeout:   Delay,
+    net_tx:      S,
+    timeout:     Delay,
     max_timeout: Delay,
-    chunk_rx:  UnboundedReceiver<Result<DataChunkResp, PullError>>,
-    chunk_txs: ChunkTxs,
+    chunk_rx:    UnboundedReceiver<Result<DataChunkResp, PullError>>,
+    chunk_txs:   ChunkTxs,
 }
 
 impl<S: MessageSender + Unpin + 'static> PullData<S> {
@@ -596,6 +602,7 @@ impl<S: MessageSender + Unpin + 'static> Future for PullData<S> {
             data_buf[chunk.start as usize..].copy_from_slice(chunk.data.as_slice())
         }
 
+        // TODO: start and end security check
         let data = data_buf.freeze();
         if DataHash::new(&data) != self.data_hash {
             let err = PullError::Internal(Some("corrupted data".to_owned()));
@@ -615,8 +622,8 @@ impl<S: MessageSender + Unpin + 'static> Drop for PullData<S> {
 
 struct CacheCleaner {
     data_hash: DataHash,
-    timeout: Delay,
-    cache: Cache,
+    timeout:   Delay,
+    cache:     Cache,
 }
 
 impl Future for CacheCleaner {
@@ -661,16 +668,23 @@ impl PushPull {
             .build()
     }
 
-    pub fn cache_data(&self, data: Bytes) {
+    pub fn cache_data(&self, data: Bytes) -> DataMeta {
+        let length = data.len() as u64;
         let hash = self.cache.insert(data);
+
         tokio::spawn(CacheCleaner {
-            data_hash: hash,
-            timeout: Delay::new(MAX_CACHE_LIFETIME),
-            cache: self.cache.clone(),
+            data_hash: hash.clone(),
+            timeout:   Delay::new(MAX_CACHE_LIFETIME),
+            cache:     self.cache.clone(),
         });
+
+        DataMeta {
+            hash: Some(hash),
+            length,
+        }
     }
 
-    pub async fn pull<S: MessageSender + Unpin + 'static>(
+    pub fn pull<S: MessageSender + Unpin + 'static>(
         &self,
         net_tx: S,
         sid: SessionId,

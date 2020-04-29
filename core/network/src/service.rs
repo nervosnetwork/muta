@@ -167,6 +167,7 @@ impl NetworkService {
             .discovery(disc_addr_mgr, disc_sync_interval)
             .transmitter(raw_msg_tx.clone())
             .build();
+        let push_pull = proto.push_pull();
 
         // Build connection service
         let keeper = ConnectionServiceKeeper::new(mgr_tx.clone(), sys_tx.clone());
@@ -177,7 +178,13 @@ impl NetworkService {
         let rpc_map = Arc::new(RpcMap::new());
         let gossip = NetworkGossip::new(conn_ctrl.clone(), Snappy);
         let rpc_map_clone = Arc::clone(&rpc_map);
-        let rpc = NetworkRpc::new(conn_ctrl, Snappy, rpc_map_clone, (&config).into());
+        let rpc = NetworkRpc::new(
+            conn_ctrl,
+            push_pull,
+            Snappy,
+            rpc_map_clone,
+            (&config).into(),
+        );
         let router = MessageRouter::new(raw_msg_rx, Snappy, session_book.clone(), sys_tx);
 
         // Build selfcheck service
