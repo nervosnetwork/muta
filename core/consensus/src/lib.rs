@@ -913,7 +913,7 @@ impl Blk for WrappedPill {
     }
 
     fn get_block_hash(&self) -> Result<Hash, Box<dyn Error + Send>> {
-        Ok(ProtoHash::digest(self.0.block.encode_fixed()?).as_bytes())
+        Ok(ProtoHash::digest(self.0.block.header.encode_fixed()?).as_bytes())
     }
 
     fn get_pre_hash(&self) -> Hash {
