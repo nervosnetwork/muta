@@ -317,13 +317,13 @@ pub fn service(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// This will generate GraphQL schema:
 /// 
 /// ```graphql
-/// // Transfer method payload
+/// # Transfer method payload
 /// type TransferPayload {
-///   // Asset id to be transfered
+///   # Asset id to be transfered
 ///   asset_id: Hash!
-///   // Receiver of transfer action
+///   # Receiver of transfer action
 ///   to: Address!
-///   // Amount of transfer action
+///   # Amount of transfer action
 ///   value: Uint64!
 /// }
 /// ```

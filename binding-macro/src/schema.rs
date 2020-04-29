@@ -48,7 +48,7 @@ pub fn impl_event(ast: &DeriveInput) -> TokenStream {
                 .expect("strip suffix should succeed")
                 .to_owned();
         }
-        _ => panic!("#[derive(Event)] can only mark a Enum"),
+        _ => panic!("#[derive(SchemaEvent)] can only mark a Enum"),
     }
 
     let gen = quote! {
@@ -205,13 +205,13 @@ fn extract_ident_from_ty(ty: &Type) -> (Ident, bool) {
                 } else if let PathArguments::None = concrete_ty.arguments {
                     (concrete_ty.ident.clone(), false)
                 } else {
-                    panic!("#[derive(SchemaObject)]: field type only supports T, Vec<T>, or [T;n]")
+                    panic!("#[derive(SchemaObject)]: field type only supports T, Vec<T>")
                 }
             } else {
                 panic!("#[derive(SchemaObject)]: length of field type should be 1")
             }
         }
-        _ => panic!("#[derive(SchemaObject)]: field type only supports T, Vec<T>, or [T;n]"),
+        _ => panic!("#[derive(SchemaObject)]: field type only supports T, Vec<T>"),
     }
 }
 
