@@ -493,18 +493,21 @@ impl MissingChunks {
     }
 
     pub fn split_half(&mut self) -> Vec<ChunkRange> {
-        self.0 = self
-            .iter()
-            .map(|r| {
-                let middle = (r.end - r.start) / 2;
+        let do_split = |r: &ChunkRange| -> _ {
+            let chunk_len = r.end - r.start;
+
+            if chunk_len > MIN_CHUNK_SIZE {
+                let middle = chunk_len / 2;
                 vec![
                     ChunkRange::new(r.start, middle),
                     ChunkRange::new(middle, r.end),
                 ]
-            })
-            .flatten()
-            .collect::<Vec<_>>();
+            } else {
+                vec![r.to_owned()]
+            }
+        };
 
+        self.0 = self.iter().map(do_split).flatten().collect::<Vec<_>>();
         self.0.clone()
     }
 
@@ -585,7 +588,7 @@ impl<S: RawSender + Unpin + 'static> Future for PullData<S> {
 
         // Pull chunk timeout, split chunk size into half, then try pull again.
         if let Poll::Ready(_) = chunk_timeout.poll(ctx) {
-            log::info!("pull {} chunk timeout, split half", self.data_hash);
+            log::info!("pull {} chunk timeout, may split half", self.data_hash);
 
             let chunk_ranges = self.missings.split_half();
             for range in chunk_ranges {
