@@ -72,10 +72,34 @@ pub enum ErrorKind {
     PublicKeyNotMatchId { pubkey: PublicKey, id: PeerId },
 
     #[display(fmt = "kind: no data hash in pull data meta from {:?}", _0)]
-    PullDataMetaNoHash(Option<ConnectedAddr>),
+    PullNoDataHash(Option<ConnectedAddr>),
+
+    #[display(fmt = "kind: pull {} from {:?} timeout", data_hash, remote)]
+    PullTimeout {
+        data_hash: String,
+        remote:    Option<ConnectedAddr>,
+    },
+
+    #[display(fmt = "kind: pull {} from {:?} not found", data_hash, remote)]
+    PullNotFound {
+        data_hash: String,
+        remote:    Option<ConnectedAddr>,
+    },
+
+    #[display(fmt = "kind: pull internal {:?} from {:?}", remote, cause)]
+    PullInternal {
+        remote: Option<ConnectedAddr>,
+        cause:  Box<dyn Error + Send>,
+    },
 }
 
 impl Error for ErrorKind {}
+
+impl From<ErrorKind> for ProtocolError {
+    fn from(err: ErrorKind) -> ProtocolError {
+        NetworkError::from(err).into()
+    }
+}
 
 #[derive(Debug, Display)]
 #[display(fmt = "peer id not found in {}", _0)]

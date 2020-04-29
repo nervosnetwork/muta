@@ -27,9 +27,20 @@ pub trait NetworkProtocol {
     fn message_proto_id() -> ProtocolId;
 }
 
+#[derive(Debug)]
+pub struct MessageMeta {
+    pub sessions: TargetSession,
+    pub protocol: ProtocolId,
+    pub priority: Priority,
+}
+
+pub trait RawSender {
+    fn raw_send(&self, meta: MessageMeta, msg: Bytes) -> Result<(), NetworkError>;
+}
+
 #[rustfmt::skip]
 #[async_trait]
-pub trait MessageSender {
+pub trait MessageSender: RawSender {
     fn send(&self, tar: TargetSession, msg: Bytes, pri: Priority) -> Result<(), NetworkError>;
     async fn users_send(&self, users: Vec<Address>, msg: Bytes, pri: Priority) -> Result<(), NetworkError>;
 }

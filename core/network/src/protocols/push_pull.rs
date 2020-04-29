@@ -1,4 +1,5 @@
-use crate::{error::NetworkError, traits::MessageSender};
+use super::core::PUSH_PULL_PROTOCOL_ID;
+use crate::traits::{MessageMeta, RawSender};
 
 use bytes::{Bytes, BytesMut};
 use derive_more::{Constructor, Display};
@@ -42,34 +43,34 @@ static NEXT_PULL_ID: AtomicU32 = AtomicU32::new(0);
 
 #[derive(Debug, Display)]
 enum WiredError {
-    #[display(fmt = "malformat, should at least contains 5 bytes")]
+    #[display(fmt = "wired malformat, should at least contains 5 bytes")]
     Malformat,
 
-    #[display(fmt = "unknown code {}", _0)]
+    #[display(fmt = "wired unknown code {}", _0)]
     UnknownCode(u8),
 }
 
 #[derive(Debug, Display)]
 enum BadRequestError {
-    #[display(fmt = "decode failed {}", _0)]
+    #[display(fmt = "request decode failed {}", _0)]
     Decode(prost::DecodeError),
 
-    #[display(fmt = "empty")]
+    #[display(fmt = "request empty")]
     Empty,
 
-    #[display(fmt = "no origin hash")]
+    #[display(fmt = "request no origin hash")]
     NoOriginHash,
 
-    #[display(fmt = "not found")]
+    #[display(fmt = "data not found")]
     NotFound,
 }
 
 #[derive(Debug, Display)]
 enum BadResponseError {
-    #[display(fmt = "empty")]
+    #[display(fmt = "response empty")]
     Empty,
 
-    #[display(fmt = "decode failed {}", _0)]
+    #[display(fmt = "response decode failed {}", _0)]
     Decode(prost::DecodeError),
 }
 
@@ -113,12 +114,6 @@ impl From<BadResponseError> for PullError {
 impl From<InternalError> for PullError {
     fn from(err: InternalError) -> PullError {
         PullError::Internal(Some(err.to_string()))
-    }
-}
-
-impl From<PullError> for NetworkError {
-    fn from(err: PullError) -> NetworkError {
-        NetworkError::Internal(Box::new(err))
     }
 }
 
@@ -501,7 +496,7 @@ impl MissingChunks {
     pub fn complete_range(&mut self, range: ChunkRange) {
         self.0 = self
             .iter()
-            .filter(|r| r.start >= range.start && r.end <= range.end)
+            .filter(|r| r.start < range.start && r.end > range.end)
             .cloned()
             .collect()
     }
@@ -515,35 +510,49 @@ impl Deref for MissingChunks {
     }
 }
 
-pub struct PullData<S: MessageSender + Unpin + 'static> {
-    sid:           SessionId,
-    pull_id:       u32,
-    data_hash:     DataHash,
-    data_len:      u64,
-    data_chunks:   Vec<DataChunkResp>,
-    chunk_timeout: Duration,
-    missings:      MissingChunks,
+#[derive(Debug, Clone, Copy)]
+pub struct PullTimeout {
+    pub chunk: Duration,
+    pub max:   Duration,
+}
 
-    net_tx:      S,
+pub struct PullData<S: RawSender + Unpin + 'static> {
+    sid:          SessionId,
+    pull_id:      u32,
+    data_hash:    DataHash,
+    data_len:     u64,
+    data_chunks:  Vec<DataChunkResp>,
+    timeout_conf: PullTimeout,
+    missings:     MissingChunks,
+
+    network:     S,
     timeout:     Delay,
     max_timeout: Delay,
     chunk_rx:    UnboundedReceiver<Result<DataChunkResp, PullError>>,
     chunk_txs:   ChunkTxs,
 }
 
-impl<S: MessageSender + Unpin + 'static> PullData<S> {
+impl<S: RawSender + Unpin + 'static> PullData<S> {
     fn send_chunk_req(&self, range: ChunkRange) -> Result<(), PullError> {
         let req = DataChunkReq::new(self.data_hash.clone(), range.start, range.end);
         let msg = WiredMessage::new_req(req, self.pull_id)?.to_bytes();
 
-        self.net_tx
-            .send(TargetSession::Single(self.sid), msg, Priority::High)
+        let meta = MessageMeta {
+            sessions: TargetSession::Single(self.sid),
+            protocol: PUSH_PULL_PROTOCOL_ID.into(),
+            priority: Priority::High,
+        };
+        log::debug!("protocol id {}", PUSH_PULL_PROTOCOL_ID);
+
+        self.network
+            .raw_send(meta, msg)
             .map_err(|e| PullError::Internal(Some(e.to_string())))?;
+
         Ok(())
     }
 }
 
-impl<S: MessageSender + Unpin + 'static> Future for PullData<S> {
+impl<S: RawSender + Unpin + 'static> Future for PullData<S> {
     type Output = Result<Bytes, PullError>;
 
     fn poll(mut self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -551,6 +560,7 @@ impl<S: MessageSender + Unpin + 'static> Future for PullData<S> {
         pin_mut!(max_timeout);
 
         if let Poll::Ready(_) = max_timeout.poll(ctx) {
+            log::info!("pull {} reach max timeout", self.data_hash);
             return Poll::Ready(Err(PullError::Timeout));
         }
 
@@ -559,14 +569,17 @@ impl<S: MessageSender + Unpin + 'static> Future for PullData<S> {
 
         // Pull chunk timeout, split chunk size into half, then try pull again.
         if let Poll::Ready(_) = chunk_timeout.poll(ctx) {
+            log::info!("pull {} chunk timeout, split half", self.data_hash);
+
             let chunk_ranges = self.missings.split_half();
             for range in chunk_ranges {
                 if let Err(e) = self.send_chunk_req(range) {
                     return Poll::Ready(Err(e));
                 }
             }
+            log::debug!("{} chunk missings {:?}", self.data_hash, self.missings);
 
-            let next_time = Instant::now().add(self.chunk_timeout);
+            let next_time = Instant::now().add(self.timeout_conf.chunk);
             self.timeout.reset(next_time);
         }
 
@@ -588,22 +601,33 @@ impl<S: MessageSender + Unpin + 'static> Future for PullData<S> {
                 Err(err) => return Poll::Ready(Err(err)),
             };
 
+            log::debug!(
+                "receive {:?} chunk start {} len {}",
+                chunk.origin,
+                chunk.start,
+                chunk.data.len()
+            );
+
             let chunk_range = ChunkRange::new(chunk.start, chunk.start + chunk.data.len() as u64);
             self.missings.complete_range(chunk_range);
             self.data_chunks.push(chunk);
 
+            log::debug!("check complete, missing {:?}", self.missings);
             if self.missings.is_complete() {
+                log::debug!("{} pull complete", self.data_hash);
                 break;
             }
         }
 
-        let mut data_buf = BytesMut::with_capacity(self.data_len as usize);
+        let mut data_buf = vec![0u8; self.data_len as usize];
         for chunk in self.data_chunks.iter() {
-            data_buf[chunk.start as usize..].copy_from_slice(chunk.data.as_slice())
+            let start = chunk.start as usize;
+            let end = start + chunk.data.len();
+            data_buf[start..end].copy_from_slice(chunk.data.as_slice())
         }
 
         // TODO: start and end security check
-        let data = data_buf.freeze();
+        let data = Bytes::copy_from_slice(data_buf.as_slice());
         if DataHash::new(&data) != self.data_hash {
             let err = PullError::Internal(Some("corrupted data".to_owned()));
             Poll::Ready(Err(err))
@@ -613,7 +637,7 @@ impl<S: MessageSender + Unpin + 'static> Future for PullData<S> {
     }
 }
 
-impl<S: MessageSender + Unpin + 'static> Drop for PullData<S> {
+impl<S: RawSender + Unpin + 'static> Drop for PullData<S> {
     fn drop(&mut self) {
         let tx_id = SenderId::new(self.sid, self.pull_id);
         self.chunk_txs.remove(tx_id);
@@ -684,12 +708,11 @@ impl PushPull {
         }
     }
 
-    pub fn pull<S: MessageSender + Unpin + 'static>(
+    pub fn pull<S: RawSender + Unpin + 'static>(
         &self,
-        net_tx: S,
+        network: S,
         sid: SessionId,
-        chunk_timeout: Duration,
-        max_timeout: Duration,
+        timeout: PullTimeout,
         data_hash: DataHash,
         data_len: u64,
     ) -> Result<PullData<S>, PullError> {
@@ -714,11 +737,19 @@ impl PushPull {
         };
 
         for req in reqs {
+            let meta = MessageMeta {
+                sessions: TargetSession::Single(sid),
+                protocol: PUSH_PULL_PROTOCOL_ID.into(),
+                priority: Priority::High,
+            };
+
             let msg = WiredMessage::new_req(req, pull_id)?.to_bytes();
-            net_tx
-                .send(TargetSession::Single(sid), msg, Priority::High)
+            network
+                .raw_send(meta, msg)
                 .map_err(|e| PullError::Internal(Some(e.to_string())))?;
         }
+
+        log::debug!("send all pull request");
 
         let (tx, rx) = unbounded();
         let tx_id = SenderId::new(sid, pull_id);
@@ -731,12 +762,12 @@ impl PushPull {
             data_hash,
             data_len,
             data_chunks: Vec::new(),
-            chunk_timeout,
+            timeout_conf: timeout,
             missings,
 
-            net_tx,
-            timeout: Delay::new(chunk_timeout),
-            max_timeout: Delay::new(max_timeout),
+            network,
+            timeout: Delay::new(timeout.chunk),
+            max_timeout: Delay::new(timeout.max),
             chunk_rx: rx,
             chunk_txs: self.txs.clone(),
         };
@@ -753,6 +784,7 @@ impl PushPull {
 
         let DataChunkReq { origin, start, end } =
             DataChunkReq::decode(data).map_err(BadRequestError::Decode)?;
+        log::debug!("pull request for {:?} start {} end {}", origin, start, end);
 
         let origin = origin.ok_or_else(|| BadRequestError::NoOriginHash)?;
         let chunk = match self.cache.get(&origin, start as usize, end as usize) {
@@ -770,9 +802,16 @@ impl PushPull {
             return Err(BadResponseError::Empty);
         }
 
-        let chunk_resp = DataChunkResp::decode(data).map_err(BadResponseError::Decode)?;
+        let chunk = DataChunkResp::decode(data).map_err(BadResponseError::Decode)?;
 
-        Ok(chunk_resp)
+        log::debug!(
+            "push for {:?} start {} len {}",
+            chunk.origin,
+            chunk.start,
+            chunk.data.len()
+        );
+
+        Ok(chunk)
     }
 }
 
@@ -799,7 +838,7 @@ impl SessionProtocol for PushPull {
                 match self.txs.get(tx_id) {
                     Some(tx) => tx,
                     None => {
-                        log::info!(
+                        log::warn!(
                             "chunk sender not found, may be wrong, timeout or already completed"
                         );
                         return;

@@ -13,7 +13,7 @@ use tentacle::{
 use crate::{
     error::NetworkError,
     event::PeerManagerEvent,
-    traits::{MessageSender, NetworkProtocol, SessionBook},
+    traits::{MessageMeta, MessageSender, NetworkProtocol, RawSender, SessionBook},
 };
 
 pub struct ConnectionServiceControl<P: NetworkProtocol, B: SessionBook> {
@@ -94,16 +94,19 @@ impl<P: NetworkProtocol, B: SessionBook + Clone> Clone for ConnectionServiceCont
     }
 }
 
-#[async_trait]
-impl<P, B> MessageSender for ConnectionServiceControl<P, B>
+impl<P, B> RawSender for ConnectionServiceControl<P, B>
 where
     P: NetworkProtocol,
-    B: SessionBook + Send + Sync + Unpin + 'static,
+    B: SessionBook,
 {
-    fn send(&self, tar: TargetSession, msg: Bytes, pri: Priority) -> Result<(), NetworkError> {
-        let proto_id = P::message_proto_id();
+    fn raw_send(&self, meta: MessageMeta, msg: Bytes) -> Result<(), NetworkError> {
+        let MessageMeta {
+            sessions,
+            protocol,
+            priority,
+        } = meta;
 
-        let (tar, opt_blocked) = match self.filter_blocked(tar) {
+        let (tar, opt_blocked) = match self.filter_blocked(sessions) {
             (None, None) => unreachable!(),
             (None, blocked) => {
                 return Err(NetworkError::Send {
@@ -114,9 +117,9 @@ where
             (Some(tar), opt_blocked) => (tar, opt_blocked),
         };
 
-        let ret = match pri {
-            Priority::High => self.inner.quick_filter_broadcast(tar, proto_id, msg),
-            Priority::Normal => self.inner.filter_broadcast(tar, proto_id, msg),
+        let ret = match priority {
+            Priority::High => self.inner.quick_filter_broadcast(tar, protocol, msg),
+            Priority::Normal => self.inner.filter_broadcast(tar, protocol, msg),
         };
 
         let ret = ret.map_err(|err| match &err {
@@ -137,6 +140,23 @@ where
         }
 
         Ok(())
+    }
+}
+
+#[async_trait]
+impl<P, B> MessageSender for ConnectionServiceControl<P, B>
+where
+    P: NetworkProtocol,
+    B: SessionBook + Send + Sync,
+{
+    fn send(&self, tar: TargetSession, msg: Bytes, pri: Priority) -> Result<(), NetworkError> {
+        let meta = MessageMeta {
+            sessions: tar,
+            protocol: P::message_proto_id(),
+            priority: pri,
+        };
+
+        self.raw_send(meta, msg)
     }
 
     async fn users_send(

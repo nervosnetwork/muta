@@ -51,7 +51,7 @@ pub const DEFAULT_SELF_HEART_BEAT_INTERVAL: u64 = 35;
 
 pub const DEFAULT_RPC_TIMEOUT: u64 = 10; // seconds
 pub const DEFAULT_PULL_CHUNK_TIMEOUT: u64 = 10; // seconds
-pub const DEFAULT_PULL_MAX_TIMEOUT: u64 = 10; // seconds
+pub const DEFAULT_PULL_MAX_TIMEOUT: u64 = 60; // seconds
 
 // Selfcheck
 pub const DEFAULT_SELF_CHECK_INTERVAL: u64 = 30;

@@ -14,7 +14,7 @@ use crate::{
     endpoint::Endpoint,
     error::{ErrorKind, NetworkError},
     message::NetworkMessage,
-    protocols::{DataMeta, PushPull},
+    protocols::{DataMeta, PullError, PullTimeout, PushPull},
     rpc::{RpcErrorMessage, RpcResponse, RpcResponseCode},
     rpc_map::RpcMap,
     traits::{Compression, MessageSender, NetworkContext},
@@ -107,10 +107,10 @@ where
         let timeout = Delay::new(self.timeout.rpc);
         let ret = match future::select(done_rx, timeout).await {
             Either::Left((ret, _timeout)) => {
-                ret.map_err(|_| NetworkError::from(ErrorKind::RpcDropped(connected_addr.clone())))?
+                ret.map_err(|_| ErrorKind::RpcDropped(connected_addr.clone()))?
             }
             Either::Right((_unresolved, _timeout)) => {
-                return Err(NetworkError::from(ErrorKind::RpcTimeout(connected_addr)).into());
+                return Err(ErrorKind::RpcTimeout(connected_addr).into());
             }
         };
 
@@ -120,24 +120,40 @@ where
             }
             RpcResponse::Error(e) => return Err(NetworkError::RemoteResponse(Box::new(e)).into()),
         };
+        log::debug!("got rpc response data_meta {:?}", data_meta);
 
         let data_hash = data_meta
             .hash
-            .ok_or_else(|| NetworkError::from(ErrorKind::PullDataMetaNoHash(connected_addr)))?;
+            .ok_or_else(|| ErrorKind::PullNoDataHash(connected_addr.clone()))?;
+        let data_len = data_meta.length;
 
-        let data = self
+        let net = self.sender.clone();
+        let timeout = PullTimeout {
+            chunk: self.timeout.pull_chunk,
+            max:   self.timeout.pull_max,
+        };
+
+        let fut_pull = self
             .push_pull
-            .pull(
-                self.sender.clone(),
-                sid,
-                self.timeout.pull_chunk,
-                self.timeout.pull_max,
-                data_hash,
-                data_meta.length,
-            )
-            .map_err(NetworkError::from)?
-            .await
-            .map_err(NetworkError::from)?;
+            .pull(net, sid, timeout, data_hash.clone(), data_len)
+            .map_err(|e| ErrorKind::PullInternal {
+                remote: connected_addr.clone(),
+                cause:  Box::new(e),
+            })?;
+
+        let data = fut_pull.await.map_err(|e| {
+            let data_hash = data_hash.to_string();
+            let remote = connected_addr;
+
+            match &e {
+                PullError::Timeout => ErrorKind::PullTimeout { data_hash, remote },
+                PullError::NotFound => ErrorKind::PullNotFound { data_hash, remote },
+                PullError::Internal(_) => ErrorKind::PullInternal {
+                    remote,
+                    cause: Box::new(e),
+                },
+            }
+        })?;
 
         Ok(R::decode(data).await?)
     }
@@ -162,6 +178,7 @@ where
             Ok(mut m) => {
                 let data = m.encode().await?;
                 let data_meta = self.push_pull.cache_data(data);
+                log::debug!("cache rpc response, data_meta {:?}", data_meta);
 
                 let mut buf = BytesMut::with_capacity(data_meta.encoded_len());
                 data_meta
