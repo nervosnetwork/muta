@@ -265,6 +265,9 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
         match result {
             Ok(r) => {
                 self.stash()?;
+                if r.is_error() {
+                    context.clear_events();
+                }
                 Ok(r)
             }
             Err(e) => {

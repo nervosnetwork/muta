@@ -152,6 +152,10 @@ impl ServiceContext {
             data,
         })
     }
+
+    pub fn clear_events(&self) {
+        self.events.borrow_mut().clear();
+    }
 }
 
 #[macro_export]

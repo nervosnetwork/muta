@@ -112,6 +112,46 @@ fn test_exec() {
 }
 
 #[test]
+fn test_exec_failed_tx() {
+    let toml_str = include_str!("./genesis_services.toml");
+    let genesis: Genesis = toml::from_str(toml_str).unwrap();
+
+    let db = Arc::new(MemoryDB::new(false));
+
+    let root = ServiceExecutor::create_genesis(
+        genesis.services,
+        Arc::clone(&db),
+        Arc::new(MockStorage {}),
+        Arc::new(MockServiceMapping {}),
+    )
+    .unwrap();
+
+    let mut executor = ServiceExecutor::with_root(
+        root.clone(),
+        Arc::clone(&db),
+        Arc::new(MockStorage {}),
+        Arc::new(MockServiceMapping {}),
+    )
+    .unwrap();
+
+    let params = ExecutorParams {
+        state_root:   root,
+        height:       1,
+        timestamp:    0,
+        cycles_limit: std::u64::MAX,
+    };
+
+    let mut stx = mock_signed_tx();
+    stx.raw.request.payload = "wrong payload".to_owned();
+    let txs = vec![stx];
+    let executor_resp = executor.exec(&params, &txs).unwrap();
+    let receipt = &executor_resp.receipts[0];
+
+    assert_eq!(receipt.response.response.code, 1);
+    assert_eq!(receipt.events.is_empty(), true);
+}
+
+#[test]
 fn test_tx_hook() {
     let toml_str = include_str!("./genesis_services.toml");
     let genesis: Genesis = toml::from_str(toml_str).unwrap();
