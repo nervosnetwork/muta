@@ -315,9 +315,9 @@ macro_rules! impl_scalar_schema {
     };
 }
 
-impl_scalar_schema![u8, "Uint8"];
-impl_scalar_schema![u32, "Uint32"];
-impl_scalar_schema![u64, "Uint64"];
+impl_scalar_schema![u8, "U8"];
+impl_scalar_schema![u32, "U32"];
+impl_scalar_schema![u64, "U64"];
 impl_scalar_schema![bool, "Boolean"];
 impl_scalar_schema![String, "String"];
 impl_scalar_schema![Address, "Address", "20 bytes of account address"];

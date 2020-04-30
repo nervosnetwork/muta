@@ -454,8 +454,8 @@ fn test_schema() {
         genesis_data: "".to_owned(),
     };
 
-    let method_schema_expected = "type Mutation {\n  test_write(\n    payload: TestB!\n  ): Null\n}\n\ntype Query {\n  test_read: TestA!\n}\n\n# This is TestA\ntype TestA {\n  # This is String a\n  a: String!\n  # This is TestB b\n  b: TestB!\n  # This is bool c\n  c: Boolean!\n  # This is u64 d\n  d: Uint64!\n}\n\n# This is TestB\ntype TestB {\n  # This is Vec<u8> e\n  e: [Uint8!]!\n}\n\nscalar Uint64\n\nscalar Uint8\n\nscalar Null\n\n";
-    let event_schema_expected = "# This is TestA\ntype TestA {\n  # This is String a\n  a: String!\n  # This is TestB b\n  b: TestB!\n  # This is bool c\n  c: Boolean!\n  # This is u64 d\n  d: Uint64!\n}\n\n# This is TestB\ntype TestB {\n  # This is Vec<u8> e\n  e: [Uint8!]!\n}\n\n# This is TestEvent\ntype TestEvent {\n  # This is TestA f\n  f: TestA!\n}\n\nscalar Uint64\n\nscalar Uint8\n\nunion Event = TestEvent\n\n";
+    let method_schema_expected = "type Mutation {\n  test_write(\n    payload: TestB!\n  ): Null\n}\n\ntype Query {\n  test_read: TestA!\n}\n\n# This is TestA\ntype TestA {\n  # This is String a\n  a: String!\n  # This is TestB b\n  b: TestB!\n  # This is bool c\n  c: Boolean!\n  # This is u64 d\n  d: U64!\n}\n\n# This is TestB\ntype TestB {\n  # This is Vec<u8> e\n  e: [U8!]!\n}\n\nscalar U64\n\nscalar U8\n\nscalar Null\n\n";
+    let event_schema_expected = "# This is TestA\ntype TestA {\n  # This is String a\n  a: String!\n  # This is TestB b\n  b: TestB!\n  # This is bool c\n  c: Boolean!\n  # This is u64 d\n  d: U64!\n}\n\n# This is TestB\ntype TestB {\n  # This is Vec<u8> e\n  e: [U8!]!\n}\n\n# This is TestEvent\ntype TestEvent {\n  # This is TestA f\n  f: TestA!\n}\n\nscalar U64\n\nscalar U8\n\nunion Event = TestEvent\n\n";
     assert_eq!(test_service.schema_().0, method_schema_expected);
     assert_eq!(test_service.schema_().1, event_schema_expected);
 }
@@ -508,7 +508,7 @@ impl ServiceSDK for MockServiceSDK {
         unimplemented!()
     }
 
-    // Alloc or recover a `Uint64` by` var_name`
+    // Alloc or recover a `U64` by` var_name`
     fn alloc_or_recover_uint64(&mut self, _var_name: &str) -> Box<dyn StoreUint64> {
         unimplemented!()
     }
