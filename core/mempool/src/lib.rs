@@ -98,13 +98,21 @@ where
     ) -> ProtocolResult<()> {
         let _lock = self.flush_lock.read().await;
 
-        self.tx_cache.check_reach_limit(self.pool_size)?;
-        self.tx_cache.check_exist(&tx.tx_hash)?;
-        self.check_tx(ctx.clone(), tx.clone()).await?;
-
+        let tx_hash = &tx.tx_hash;
+        self.tx_cache.check_reach_limit(self.pool_size).await?;
+        self.tx_cache.check_exist(tx_hash).await?;
+        self.adapter
+            .check_signature(ctx.clone(), tx.clone())
+            .await?;
+        self.adapter
+            .check_transaction(ctx.clone(), tx.clone())
+            .await?;
+        self.adapter
+            .check_storage_exist(ctx.clone(), tx_hash.clone())
+            .await?;
         match tx_type {
-            TxType::NewTx => self.tx_cache.insert_new_tx(tx.clone())?,
-            TxType::ProposeTx => self.tx_cache.insert_propose_tx(tx.clone())?,
+            TxType::NewTx => self.tx_cache.insert_new_tx(tx.clone()).await?,
+            TxType::ProposeTx => self.tx_cache.insert_propose_tx(tx.clone()).await?,
         }
 
         if !ctx.is_network_origin_txs() {
@@ -114,16 +122,44 @@ where
         Ok(())
     }
 
-    async fn check_tx(&self, ctx: Context, tx: SignedTransaction) -> ProtocolResult<()> {
-        self.adapter
-            .check_signature(ctx.clone(), tx.clone())
-            .await?;
-        self.adapter
-            .check_transaction(ctx.clone(), tx.clone())
-            .await?;
-        self.adapter
-            .check_storage_exist(ctx.clone(), tx.tx_hash.clone())
-            .await
+    async fn verify_tx_in_parallel(
+        &self,
+        ctx: Context,
+        txs: Vec<SignedTransaction>,
+    ) -> ProtocolResult<()> {
+        let now = Instant::now();
+        let len = txs.len();
+
+        let futs = txs
+            .into_iter()
+            .map(|signed_tx| {
+                let adapter = Arc::clone(&self.adapter);
+                let ctx = ctx.clone();
+
+                tokio::spawn(async move {
+                    adapter
+                        .check_signature(ctx.clone(), signed_tx.clone())
+                        .await?;
+                    adapter
+                        .check_transaction(ctx.clone(), signed_tx.clone())
+                        .await?;
+                    adapter
+                        .check_storage_exist(ctx.clone(), signed_tx.tx_hash.clone())
+                        .await
+                })
+            })
+            .collect::<Vec<_>>();
+        try_join_all(futs).await.map_err(|e| {
+            log::error!("[mempool] verify batch txs error {:?}", e);
+            MemPoolError::VerifyBatchTransactions
+        })?;
+
+        log::info!(
+            "[mempool] verify txs done, size {:?} cost {:?}",
+            len,
+            now.elapsed()
+        );
+        Ok(())
     }
 
     async fn verify_tx_in_parallel(
@@ -174,10 +210,6 @@ where
 {
     async fn insert(&self, ctx: Context, tx: SignedTransaction) -> ProtocolResult<()> {
         self.insert_tx(ctx, tx, TxType::NewTx).await
-    }
-
-    async fn check_tx(&self, ctx: Context, tx: SignedTransaction) -> ProtocolResult<()> {
-        self.check_tx(ctx, tx).await
     }
 
     async fn package(
@@ -231,9 +263,9 @@ where
         let mut full_txs = Vec::with_capacity(len);
 
         for tx_hash in &tx_hashes {
-            if let Some(tx) = self.tx_cache.get(tx_hash) {
+            if let Some(tx) = self.tx_cache.get(tx_hash).await {
                 full_txs.push(tx);
-            } else if let Some(tx) = self.callback_cache.get(tx_hash) {
+            } else if let Some(tx) = self.callback_cache.get(tx_hash).await {
                 full_txs.push(tx);
             }
         }

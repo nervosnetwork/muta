@@ -384,17 +384,17 @@ where
                     "full_block.ordered_txs.len != block.ordered_tx_hashes.len".to_owned(),
                 )));
             }
+
             for i in 0..ordered_tx_hashes.len() {
                 if ordered_tx_hashes[i] != ordered_txs[i].tx_hash {
                     return Err(Box::new(ConsensusError::CheckFullBlock(
                         "transaction_hash mismatch".to_owned(),
                     )));
                 }
-                // check signature and transaction
-                self.mem_pool
-                    .check_tx(ctx.clone(), ordered_txs[i].clone())
-                    .await?;
             }
+            self.mem_pool
+                .ensure_order_txs_sync(ctx.clone(), ordered_txs.clone())
+                .await?;
         }
 
         self.storage
