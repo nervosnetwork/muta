@@ -34,8 +34,7 @@ use core_consensus::{
 };
 use core_mempool::{
     DefaultMemPoolAdapter, HashMemPool, MsgPushTxs, NewTxsHandler, PullTxsHandler,
-    PullTxsSyncHandler, END_GOSSIP_NEW_TXS, RPC_PULL_TXS, RPC_PULL_TXS_SYNC, RPC_RESP_PULL_TXS,
-    RPC_RESP_PULL_TXS_SYNC,
+    END_GOSSIP_NEW_TXS, RPC_PULL_TXS, RPC_RESP_PULL_TXS,
 };
 use core_network::{NetworkConfig, NetworkService};
 use core_storage::ImplStorage;
@@ -259,15 +258,6 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         )),
     )?;
     network_service.register_rpc_response::<MsgPushTxs>(RPC_RESP_PULL_TXS)?;
-
-    network_service.register_endpoint_handler(
-        RPC_PULL_TXS_SYNC,
-        Box::new(PullTxsSyncHandler::new(
-            Arc::new(network_service.handle()),
-            Arc::clone(&storage),
-        )),
-    )?;
-    network_service.register_rpc_response::<MsgPushTxs>(RPC_RESP_PULL_TXS_SYNC)?;
 
     // Init Consensus
     let validators: Vec<Validator> = metadata
