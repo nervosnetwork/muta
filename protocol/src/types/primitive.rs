@@ -315,24 +315,24 @@ impl SchemaGenerator for Metadata {
         let meta_schema = r#"type Metadata {
   chain_id: Hash!
   common_ref: Hex!
-  timeout_gap: Uint64!
-  cycles_limit: Uint64!
-  cycles_price: Uint64!
-  interval: Uint64!
+  timeout_gap: U64!
+  cycles_limit: U64!
+  cycles_price: U64!
+  interval: U64!
   verifier_list: [ValidatorExtend!]!
-  prevote_ratio: Uint64!
-  precommit_ratio: Uint64!
-  propose_ratio: Uint64!
-  brake_ratio: Uint64!
-  tx_num_limit: Uint64!
-  max_tx_size: Uint64!
+  prevote_ratio: U64!
+  precommit_ratio: U64!
+  propose_ratio: U64!
+  brake_ratio: U64!
+  tx_num_limit: U64!
+  max_tx_size: U64!
 }"#;
 
         let ve_schema = r#"type ValidatorExtend {
   bls_pub_key: Hex!
   address: Address!
-  propose_weight: Uint32!
-  vote_weight: Uint32!
+  propose_weight: U32!
+  vote_weight: U32!
 }"#;
         register.insert("Metadata".to_owned(), meta_schema.to_owned());
         register.insert("ValidatorExtend".to_owned(), ve_schema.to_owned());
