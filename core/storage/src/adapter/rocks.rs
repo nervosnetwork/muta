@@ -12,8 +12,8 @@ use protocol::Bytes;
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
 pub struct Config {
-    options:             Options,
-    block_based_options: BlockBasedOptions,
+    pub options:             Options,
+    pub block_based_options: BlockBasedOptions,
 }
 
 impl Config {
@@ -21,11 +21,11 @@ impl Config {
         let mut opts = Options::default();
         opts.create_if_missing(true);
         opts.create_missing_column_families(true);
-        opts.set_max_open_files(64);
-        return Self {
-            options: opts,
+        opts.set_max_open_files(256);
+        Self {
+            options:             opts,
             block_based_options: BlockBasedOptions::default(),
-        };
+        }
     }
 
     pub fn suggest() -> Self {
@@ -33,16 +33,19 @@ impl Config {
         // https://github.com/facebook/rocksdb/wiki/Setup-Options-and-Basic-Tuning#other-general-options
         cfgs.options.set_max_background_compactions(4);
         cfgs.options.set_max_background_flushes(2);
-        cfgs.options.set_bytes_per_sync(1048576);
+        cfgs.options.set_bytes_per_sync(1_048_576);
         cfgs.block_based_options.set_block_size(16 * 1024);
         cfgs.block_based_options
             .set_cache_index_and_filter_blocks(true);
+
         // https://github.com/facebook/rocksdb/wiki/Setup-Options-and-Basic-Tuning#block-cache-size
         // We recommend that this should be about 1/3 of your total memory budget.
-        cfgs.block_based_options.set_lru_cache(512 << 20);
+        // cfgs.block_based_options.set_lru_cache(512 << 20);
+
         // [TODO] https://github.com/facebook/rocksdb/wiki/Setup-Options-and-Basic-Tuning#bloom-filters
         // Since did not make a good decision.
-        return cfgs;
+
+        cfgs
     }
 }
 

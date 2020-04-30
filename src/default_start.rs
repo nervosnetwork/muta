@@ -33,7 +33,9 @@ use core_mempool::{
     END_GOSSIP_NEW_TXS, RPC_PULL_TXS, RPC_RESP_PULL_TXS, RPC_RESP_PULL_TXS_SYNC,
 };
 use core_network::{NetworkConfig, NetworkService};
-use core_storage::{adapter::rocks::RocksAdapter, ImplStorage};
+use core_storage::{
+    adapter::rocks::Config as RocksConfig, adapter::rocks::RocksAdapter, ImplStorage,
+};
 use framework::binding::state::RocksTrieDB;
 use framework::executor::{ServiceExecutor, ServiceExecutorFactory};
 use protocol::traits::{APIAdapter, Context, MemPool, NodeInfo, ServiceMapping, Storage};
@@ -66,10 +68,11 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
 
     // Init Block db
     let path_block = config.data_path_for_block();
-    let rocks_adapter = Arc::new(RocksAdapter::new(
-        path_block,
-        config.rocksdb.max_open_files,
-    )?);
+    let mut rocks_config = RocksConfig::suggest();
+    rocks_config
+        .options
+        .set_max_open_files(config.rocksdb.max_open_files);
+    let rocks_adapter = Arc::new(RocksAdapter::new(path_block, rocks_config)?);
     let storage = Arc::new(ImplStorage::new(Arc::clone(&rocks_adapter)));
 
     match storage.get_latest_block().await {
@@ -144,11 +147,11 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     // Init Block db
     let path_block = config.data_path_for_block();
     log::info!("Data path for block: {:?}", path_block);
-
-    let rocks_adapter = Arc::new(RocksAdapter::new(
-        path_block.clone(),
-        config.rocksdb.max_open_files,
-    )?);
+    let mut rocks_config = RocksConfig::suggest();
+    rocks_config
+        .options
+        .set_max_open_files(config.rocksdb.max_open_files);
+    let rocks_adapter = Arc::new(RocksAdapter::new(path_block.clone(), rocks_config)?);
     let storage = Arc::new(ImplStorage::new(Arc::clone(&rocks_adapter)));
 
     // Init network

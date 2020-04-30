@@ -2,28 +2,36 @@ use protocol::traits::{StorageAdapter, StorageBatchModify};
 use protocol::types::Hash;
 
 use crate::adapter::memory::MemoryAdapter;
-use crate::adapter::rocks::{RocksAdapter, Config};
+use crate::adapter::rocks::{Config, RocksAdapter};
 use crate::tests::{get_random_bytes, mock_signed_tx};
 use crate::TransactionSchema;
 
 #[test]
 fn test_adapter_insert() {
     adapter_insert_test(MemoryAdapter::new());
-    adapter_insert_test(RocksAdapter::new("rocksdb/test_adapter_insert".to_string(), Config::default()).unwrap())
+    adapter_insert_test(
+        RocksAdapter::new("rocksdb/test_adapter_insert".to_string(), Config::default()).unwrap(),
+    )
 }
 
 #[test]
 fn test_adapter_batch_modify() {
     adapter_batch_modify_test(MemoryAdapter::new());
     adapter_batch_modify_test(
-        RocksAdapter::new("rocksdb/test_adapter_batch_modify".to_string(), Config::default()).unwrap(),
+        RocksAdapter::new(
+            "rocksdb/test_adapter_batch_modify".to_string(),
+            Config::default(),
+        )
+        .unwrap(),
     )
 }
 
 #[test]
 fn test_adapter_remove() {
     adapter_remove_test(MemoryAdapter::new());
-    adapter_remove_test(RocksAdapter::new("rocksdb/test_adapter_remove".to_string(), Config::default()).unwrap())
+    adapter_remove_test(
+        RocksAdapter::new("rocksdb/test_adapter_remove".to_string(), Config::default()).unwrap(),
+    )
 }
 
 fn adapter_insert_test(db: impl StorageAdapter) {
