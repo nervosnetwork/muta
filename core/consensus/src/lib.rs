@@ -871,7 +871,7 @@ fn calculate_root<T: FixedCodec>(vec: &[T]) -> MerkleRoot {
 }
 
 #[derive(Clone, Debug, Default, Display, PartialEq, Eq)]
-#[display(fmt = "{{ chain_id: {}, height: {}, exec_height: {}, order_tx_len: {}, propose_tx_len: {}, pre_hash: {}, timestamp: {}, state_root: {}, order_root: {}, confirm_root: {:?}, receipt_root: {:?}, cycle_used: {:?}, proposer: {}, validator_version: {}, validators: {:?} }}",
+#[display(fmt = "{{ chain_id: {}, height: {}, exec_height: {}, order_tx_len: {}, propose_tx_len: {}, pre_hash: {}, timestamp: {}, state_root: {}, order_root: {}, confirm_root: {:?}, receipt_root: {:?}, cycle_used: {:?}, proposer: {} }}",
 "_0.block.header.chain_id.as_bytes().tiny_hex()", 
 "_0.block.header.height",
 "_0.block.header.exec_height",
@@ -884,9 +884,8 @@ fn calculate_root<T: FixedCodec>(vec: &[T]) -> MerkleRoot {
 "_0.block.header.confirm_root.iter().map(|root| root.as_bytes().tiny_hex()).collect::<Vec<String>>()",
 "_0.block.header.receipt_root.iter().map(|root| root.as_bytes().tiny_hex()).collect::<Vec<String>>()",
 "_0.block.header.cycles_used",
-"_0.block.header.proposer.as_bytes().tiny_hex()",
-"_0.block.header.validator_version",
-"_0.block.header.validators.iter().map(|v| format!(\"{{ address: {}, propose_w: {}, vote_w: {} }}\", v.address.as_bytes().tiny_hex(), v.propose_weight, v.vote_weight))",)]
+"_0.block.header.proposer.as_bytes().tiny_hex()"
+)]
 pub struct WrappedPill(Pill);
 
 impl WrappedPill {
@@ -932,7 +931,7 @@ impl Blk for WrappedPill {
 
 #[derive(Clone, Debug, Default, Display)]
 #[display(
-    fmt = "{{ order_root: {}, state_root: {}, receipt_root: {}, timeout_gap: {}, cycle_used: {}, cycles_limit: {}, tx_num_limit: {}, max_tx_size: {}, validators: {:?} }}",
+    fmt = "{{ order_root: {}, state_root: {}, receipt_root: {}, timeout_gap: {}, cycle_used: {}, cycles_limit: {}, tx_num_limit: {}, max_tx_size: {} }}",
     "order_root.as_bytes().tiny_hex()",
     "state_root.as_bytes().tiny_hex()",
     "receipt_root.as_bytes().tiny_hex()",
@@ -940,8 +939,7 @@ impl Blk for WrappedPill {
     cycles_used,
     cycles_limit,
     tx_num_limit,
-    max_tx_size,
-    "validators.iter().map(|v| format!(\"{{ address: {}, propose_w: {}, vote_w: {} }}\", v.address.as_bytes().tiny_hex(), v.propose_weight, v.vote_weight))"
+    max_tx_size
 )]
 pub struct ExecResp {
     order_root:   MerkleRoot,

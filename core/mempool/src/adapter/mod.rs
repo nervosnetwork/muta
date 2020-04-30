@@ -348,6 +348,14 @@ where
         Ok(height)
     }
 
+    async fn get_transactions(
+        &self,
+        _ctx: Context,
+        tx_hashes: Vec<Hash>,
+    ) -> ProtocolResult<Vec<SignedTransaction>> {
+        self.storage.get_transactions(tx_hashes).await
+    }
+
     fn set_args(&self, timeout_gap: u64, cycles_limit: u64, max_tx_size: u64) {
         self.timeout_gap.store(timeout_gap, Ordering::Relaxed);
         self.cycles_limit.store(cycles_limit, Ordering::Relaxed);
