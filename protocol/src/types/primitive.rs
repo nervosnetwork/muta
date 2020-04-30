@@ -43,6 +43,17 @@ impl Hex {
     pub fn as_string_trim0x(&self) -> String {
         (&self.0[2..]).to_owned()
     }
+
+    pub fn from_bytes(bytes: Bytes) -> Self {
+        Self("0x".to_owned() + &hex::encode(bytes))
+    }
+
+    pub fn as_bytes(&self) -> ProtocolResult<Bytes> {
+        match hex::decode(self.as_string_trim0x()) {
+            Ok(b) => Ok(Bytes::from(b)),
+            Err(e) => Err(TypesError::FromHex { error: e }.into()),
+        }
+    }
 }
 
 impl Serialize for Hex {
@@ -344,7 +355,7 @@ fn ensure_len(real: usize, expect: usize) -> ProtocolResult<()> {
 mod tests {
     use bytes::Bytes;
 
-    use super::{Address, Hash};
+    use super::{Address, Hash, Hex};
 
     #[test]
     fn test_hash() {
@@ -372,5 +383,19 @@ mod tests {
 
         let address = Address::from_bytes(bytes).unwrap();
         assert_eq!(add_str, &address.as_hex().to_uppercase().as_str()[2..]);
+    }
+
+    #[test]
+    fn test_hex() {
+        let pubkey = "031313016e9670deb49779c1b0c646d6a25a545712658f9781995f623bcd0d0b3d";
+        let pubkey_bytes = Bytes::from(hex::decode(pubkey).unwrap());
+
+        assert_eq!(
+            Hex::from_bytes(pubkey_bytes.clone()).as_string_trim0x(),
+            pubkey.to_owned()
+        );
+
+        let res = Hex::from_bytes(pubkey_bytes.clone()).as_bytes().unwrap();
+        assert_eq!(res, pubkey_bytes);
     }
 }
