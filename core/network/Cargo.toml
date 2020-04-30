@@ -30,12 +30,12 @@ tentacle-discovery = { git = "https://github.com/zeroqn/p2p", rev = "77b9f391", 
 tentacle-identify = { git = "https://github.com/zeroqn/p2p", rev = "77b9f391", features = [ "flatc" ]}
 tokio = { version = "0.2", features = ["macros", "rt-core"]}
 hostname = "0.3"
+lazy_static = "1.4"
 
 [dev-dependencies]
 env_logger = "0.6"
 quickcheck = "0.9"
 quickcheck_macros = "0.8"
-lazy_static = "1.4"
 tokio = { version = "0.2", features = ["macros", "rt-core"]}
 
 [features]

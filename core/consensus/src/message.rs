@@ -10,7 +10,7 @@ use rlp::Encodable;
 use serde::{Deserialize, Serialize};
 
 use protocol::traits::{
-    Consensus, Context, MessageHandler, Priority, Rpc, Storage, Synchronization,
+    Consensus, Context, MessageHandler, Priority, Rpc, Storage, Synchronization, TrustFeedback,
 };
 use protocol::ProtocolError;
 
@@ -89,10 +89,12 @@ impl<C: Consensus + 'static> ProposalMessageHandler<C> {
 impl<C: Consensus + 'static> MessageHandler for ProposalMessageHandler<C> {
     type Message = Proposal;
 
-    async fn process(&self, ctx: Context, msg: Self::Message) {
+    async fn process(&self, ctx: Context, msg: Self::Message) -> TrustFeedback {
         if let Err(e) = self.consensus.set_proposal(ctx, msg.0).await {
             warn!("set proposal {}", e);
         }
+        // FIXME
+        TrustFeedback::Neutral
     }
 }
 
@@ -110,10 +112,12 @@ impl<C: Consensus + 'static> VoteMessageHandler<C> {
 impl<C: Consensus + 'static> MessageHandler for VoteMessageHandler<C> {
     type Message = Vote;
 
-    async fn process(&self, ctx: Context, msg: Self::Message) {
+    async fn process(&self, ctx: Context, msg: Self::Message) -> TrustFeedback {
         if let Err(e) = self.consensus.set_vote(ctx, msg.0).await {
             warn!("set vote {}", e);
         }
+        // FIXME
+        TrustFeedback::Neutral
     }
 }
 
@@ -131,10 +135,12 @@ impl<C: Consensus + 'static> QCMessageHandler<C> {
 impl<C: Consensus + 'static> MessageHandler for QCMessageHandler<C> {
     type Message = QC;
 
-    async fn process(&self, ctx: Context, msg: Self::Message) {
+    async fn process(&self, ctx: Context, msg: Self::Message) -> TrustFeedback {
         if let Err(e) = self.consensus.set_qc(ctx, msg.0).await {
             warn!("set qc {}", e);
         }
+        // FIXME
+        TrustFeedback::Neutral
     }
 }
 
@@ -152,10 +158,12 @@ impl<C: Consensus + 'static> ChokeMessageHandler<C> {
 impl<C: Consensus + 'static> MessageHandler for ChokeMessageHandler<C> {
     type Message = Choke;
 
-    async fn process(&self, ctx: Context, msg: Self::Message) {
+    async fn process(&self, ctx: Context, msg: Self::Message) -> TrustFeedback {
         if let Err(e) = self.consensus.set_choke(ctx, msg.0).await {
             warn!("set choke {}", e);
         }
+        // FIXME
+        TrustFeedback::Neutral
     }
 }
 
@@ -173,10 +181,15 @@ impl<Sy: Synchronization + 'static> RemoteHeightMessageHandler<Sy> {
 impl<Sy: Synchronization + 'static> MessageHandler for RemoteHeightMessageHandler<Sy> {
     type Message = u64;
 
-    async fn process(&self, ctx: Context, msg: Self::Message) {
+    async fn process(&self, ctx: Context, msg: Self::Message) -> TrustFeedback {
         if let Err(e) = self.synchronization.receive_remote_block(ctx, msg).await {
             warn!("sync: receive remote block {}", e);
+            if e.to_string().contains("timeout") {
+                return TrustFeedback::Bad("sync block timeout".to_owned());
+            }
         }
+        // FIXME
+        TrustFeedback::Neutral
     }
 }
 
@@ -200,7 +213,7 @@ where
 impl<R: Rpc + 'static, S: Storage + 'static> MessageHandler for PullBlockRpcHandler<R, S> {
     type Message = FixedHeight;
 
-    async fn process(&self, ctx: Context, msg: FixedHeight) {
+    async fn process(&self, ctx: Context, msg: FixedHeight) -> TrustFeedback {
         let id = msg.inner;
         let ret = self
             .storage
@@ -211,6 +224,9 @@ impl<R: Rpc + 'static, S: Storage + 'static> MessageHandler for PullBlockRpcHand
             .response(ctx, RPC_RESP_SYNC_PULL_BLOCK, ret, Priority::High)
             .unwrap_or_else(move |e: ProtocolError| warn!("[core_consensus] push block {}", e))
             .await;
+
+        // FIXME
+        TrustFeedback::Neutral
     }
 }
 
@@ -234,7 +250,7 @@ where
 impl<R: Rpc + 'static, S: Storage + 'static> MessageHandler for PullProofRpcHandler<R, S> {
     type Message = FixedHeight;
 
-    async fn process(&self, ctx: Context, height: FixedHeight) {
+    async fn process(&self, ctx: Context, height: FixedHeight) -> TrustFeedback {
         let height = height.inner;
         let latest_proof = self.storage.get_latest_proof().await;
 
@@ -260,6 +276,8 @@ impl<R: Rpc + 'static, S: Storage + 'static> MessageHandler for PullProofRpcHand
             )
             .unwrap_or_else(move |e: ProtocolError| warn!("[core_consensus] push proof {}", e))
             .await;
+
+        TrustFeedback::Neutral
     }
 }
 
@@ -283,7 +301,7 @@ where
 impl<R: Rpc + 'static, S: Storage + 'static> MessageHandler for PullTxsRpcHandler<R, S> {
     type Message = PullTxsRequest;
 
-    async fn process(&self, ctx: Context, msg: PullTxsRequest) {
+    async fn process(&self, ctx: Context, msg: PullTxsRequest) -> TrustFeedback {
         let futs = msg
             .inner
             .into_iter()
@@ -295,5 +313,8 @@ impl<R: Rpc + 'static, S: Storage + 'static> MessageHandler for PullTxsRpcHandle
             .response(ctx, RPC_RESP_SYNC_PULL_TXS, ret, Priority::High)
             .unwrap_or_else(move |e: ProtocolError| warn!("[core_consensus] push txs {}", e))
             .await;
+
+        // FIXME
+        TrustFeedback::Neutral
     }
 }
