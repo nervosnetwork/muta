@@ -232,7 +232,7 @@ fn bench_flush(b: &mut Bencher) {
     });
 }
 
-#[tokio::test(core_threads = 4)]
+#[tokio::test]
 async fn bench_sign_with_spawn_list() {
     let adapter = Arc::new(HashMemPoolAdapter::new());
     let txs = default_mock_txs(30000);
@@ -260,7 +260,7 @@ async fn bench_sign_with_spawn_list() {
     );
 }
 
-#[tokio::test(core_threads = 4)]
+#[tokio::test]
 async fn bench_sign() {
     let adapter = HashMemPoolAdapter::new();
     let txs = default_mock_txs(30000);
