@@ -114,7 +114,7 @@ fn test_storage_stat() {
     let storage = Arc::new(ImplStorage::new(Arc::clone(&adapter)));
 
     let loop_num = 10;
-    let size = 1000000;
+    let size = 1_000_000;
     let rand_size = 500; // 500 * 10 = 5000
 
     let mut head_5000_hashes = Vec::new();

@@ -68,7 +68,7 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
 
     // Init Block db
     let path_block = config.data_path_for_block();
-    let mut rocks_config = RocksConfig::suggest();
+    let mut rocks_config = RocksConfig::default();
     rocks_config
         .options
         .set_max_open_files(config.rocksdb.max_open_files);
