@@ -4,12 +4,47 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use derive_more::{Display, From};
-use rocksdb::{ColumnFamily, Options, WriteBatch, DB};
+use rocksdb::{BlockBasedOptions, ColumnFamily, Options, WriteBatch, DB};
 
 use protocol::codec::ProtocolCodec;
 use protocol::traits::{StorageAdapter, StorageBatchModify, StorageCategory, StorageSchema};
 use protocol::Bytes;
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
+
+pub struct Config {
+    options:             Options,
+    block_based_options: BlockBasedOptions,
+}
+
+impl Config {
+    pub fn default() -> Self {
+        let mut opts = Options::default();
+        opts.create_if_missing(true);
+        opts.create_missing_column_families(true);
+        opts.set_max_open_files(64);
+        return Self {
+            options: opts,
+            block_based_options: BlockBasedOptions::default(),
+        };
+    }
+
+    pub fn suggest() -> Self {
+        let mut cfgs = Config::default();
+        // https://github.com/facebook/rocksdb/wiki/Setup-Options-and-Basic-Tuning#other-general-options
+        cfgs.options.set_max_background_compactions(4);
+        cfgs.options.set_max_background_flushes(2);
+        cfgs.options.set_bytes_per_sync(1048576);
+        cfgs.block_based_options.set_block_size(16 * 1024);
+        cfgs.block_based_options
+            .set_cache_index_and_filter_blocks(true);
+        // https://github.com/facebook/rocksdb/wiki/Setup-Options-and-Basic-Tuning#block-cache-size
+        // We recommend that this should be about 1/3 of your total memory budget.
+        cfgs.block_based_options.set_lru_cache(512 << 20);
+        // [TODO] https://github.com/facebook/rocksdb/wiki/Setup-Options-and-Basic-Tuning#bloom-filters
+        // Since did not make a good decision.
+        return cfgs;
+    }
+}
 
 #[derive(Debug)]
 pub struct RocksAdapter {
@@ -17,11 +52,9 @@ pub struct RocksAdapter {
 }
 
 impl RocksAdapter {
-    pub fn new<P: AsRef<Path>>(path: P, max_open_files: i32) -> ProtocolResult<Self> {
-        let mut opts = Options::default();
-        opts.create_if_missing(true);
-        opts.create_missing_column_families(true);
-        opts.set_max_open_files(max_open_files);
+    pub fn new<P: AsRef<Path>>(path: P, cfgs: Config) -> ProtocolResult<Self> {
+        let mut opts = cfgs.options;
+        opts.set_block_based_table_factory(&cfgs.block_based_options);
 
         let categories = [
             map_category(StorageCategory::Block),
