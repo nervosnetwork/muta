@@ -42,4 +42,4 @@ metrics = true
 # modules_level = { "overlord::state::process" = "debug", core_consensus = "error" }
 
 [rocksdb]
-max_open_files = 64
+max_open_files = 256
