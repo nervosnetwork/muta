@@ -230,6 +230,8 @@ where
     }
 
     async fn check_signature(&self, ctx: Context, tx: SignedTransaction) -> ProtocolResult<()> {
+        let network = self.network.clone();
+
         let blocking_res = tokio::task::spawn_blocking(move || {
             // Verify transaction hash
             let fixed_bytes = tx.raw.encode_fixed()?;
@@ -237,9 +239,12 @@ where
 
             if tx_hash != tx.tx_hash {
                 if ctx.is_network_origin_txs() {
-                    self.network.report(
+                    network.report(
                         ctx,
-                        TrustFeedback::Worse(format!("Mempool wrong tx_hash of tx {:?}", tx.tx_hash)),
+                        TrustFeedback::Worse(format!(
+                            "Mempool wrong tx_hash of tx {:?}",
+                            tx.tx_hash
+                        )),
                     );
                 }
 
@@ -257,9 +262,12 @@ where
 
             C::verify_signature(hash.as_ref(), sig, pub_key).map_err(|_| {
                 if ctx.is_network_origin_txs() {
-                    self.network.report(
+                    network.report(
                         ctx,
-                        TrustFeedback::Worse(format!("Mempool wrong signature of tx {:?}", tx.tx_hash)),
+                        TrustFeedback::Worse(format!(
+                            "Mempool wrong signature of tx {:?}",
+                            tx.tx_hash
+                        )),
                     );
                 }
 
@@ -283,7 +291,8 @@ where
     // TODO: Verify Fee?
     // TODO: Verify Nonce?
     // TODO: Cycle limit?
-    async fn check_transaction(&self, ctx: Context, stx: SignedTransaction) -> ProtocolResult<()> { let fixed_bytes = stx.raw.encode_fixed()?;
+    async fn check_transaction(&self, ctx: Context, stx: SignedTransaction) -> ProtocolResult<()> {
+        let fixed_bytes = stx.raw.encode_fixed()?;
         let size = fixed_bytes.len() as u64;
         let tx_hash = stx.tx_hash.clone();
 
