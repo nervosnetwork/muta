@@ -1,4 +1,5 @@
 #![feature(test)]
+#![feature(async_closure)]
 
 mod adapter;
 mod context;
@@ -16,6 +17,7 @@ pub use adapter::{DEFAULT_BROADCAST_TXS_INTERVAL, DEFAULT_BROADCAST_TXS_SIZE};
 
 use std::error::Error;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use derive_more::Display;
@@ -39,7 +41,7 @@ pub struct HashMemPool<Adapter: MemPoolAdapter> {
     /// propose-sync.
     tx_cache:       TxCache,
     /// A structure for caching fresh transactions in order transaction hashes.
-    callback_cache: Map<SignedTransaction>,
+    callback_cache: Arc<Map<SignedTransaction>>,
     /// Supply necessary functions from outer modules.
     adapter:        Adapter,
     /// exclusive flush_memory and insert_tx to avoid repeat txs insertion.
@@ -55,7 +57,7 @@ where
             pool_size,
             timeout_gap: AtomicU64::new(0),
             tx_cache: TxCache::new(pool_size * 2),
-            callback_cache: Map::new(pool_size),
+            callback_cache: Arc::new(Map::new(pool_size)),
             adapter,
             flush_lock: RwLock::new(()),
         }
@@ -73,12 +75,17 @@ where
         &self.adapter
     }
 
-    fn show_unknown_txs(&self, tx_hashes: Vec<Hash>) -> Vec<Hash> {
-        self.tx_cache
-            .show_unknown(tx_hashes)
-            .into_iter()
-            .filter(|tx_hash| !self.callback_cache.contains_key(tx_hash))
-            .collect()
+    async fn show_unknown_txs(&self, tx_hashes: Vec<Hash>) -> Vec<Hash> {
+        let tx_hashes = self.tx_cache.show_unknown(tx_hashes).await;
+        let mut unknown_hashes = vec![];
+
+        for tx_hash in tx_hashes.into_iter() {
+            if !self.callback_cache.contains_key(&tx_hash).await {
+                unknown_hashes.push(tx_hash)
+            }
+        }
+
+        unknown_hashes
     }
 
     async fn insert_tx(
@@ -90,8 +97,8 @@ where
         let _lock = self.flush_lock.read().await;
 
         let tx_hash = &tx.tx_hash;
-        self.tx_cache.check_reach_limit(self.pool_size)?;
-        self.tx_cache.check_exist(tx_hash)?;
+        self.tx_cache.check_reach_limit(self.pool_size).await?;
+        self.tx_cache.check_exist(tx_hash).await?;
         self.adapter
             .check_signature(ctx.clone(), tx.clone())
             .await?;
@@ -102,8 +109,8 @@ where
             .check_storage_exist(ctx.clone(), tx_hash.clone())
             .await?;
         match tx_type {
-            TxType::NewTx => self.tx_cache.insert_new_tx(tx.clone())?,
-            TxType::ProposeTx => self.tx_cache.insert_propose_tx(tx.clone())?,
+            TxType::NewTx => self.tx_cache.insert_new_tx(tx.clone()).await?,
+            TxType::ProposeTx => self.tx_cache.insert_propose_tx(tx.clone()).await?,
         }
 
         if !ctx.is_network_origin_txs() {
@@ -132,15 +139,17 @@ where
         let current_height = self.adapter.get_latest_height(ctx.clone()).await?;
         log::info!(
             "[core_mempool]: {:?} txs in map and {:?} txs in queue while package",
-            self.tx_cache.len(),
+            self.tx_cache.len().await,
             self.tx_cache.queue_len(),
         );
-        self.tx_cache.package(
-            cycles_limit,
-            tx_num_limit,
-            current_height,
-            current_height + self.timeout_gap.load(Ordering::Relaxed),
-        )
+        self.tx_cache
+            .package(
+                cycles_limit,
+                tx_num_limit,
+                current_height,
+                current_height + self.timeout_gap.load(Ordering::Relaxed),
+            )
+            .await
     }
 
     async fn flush(&self, ctx: Context, tx_hashes: Vec<Hash>) -> ProtocolResult<()> {
@@ -151,12 +160,14 @@ where
             "[core_mempool]: flush mempool with {:?} tx_hashes",
             tx_hashes.len(),
         );
-        self.tx_cache.flush(
-            &tx_hashes,
-            current_height,
-            current_height + self.timeout_gap.load(Ordering::Relaxed),
-        );
-        self.callback_cache.clear();
+        self.tx_cache
+            .flush(
+                &tx_hashes,
+                current_height,
+                current_height + self.timeout_gap.load(Ordering::Relaxed),
+            )
+            .await;
+        self.callback_cache.clear().await;
 
         Ok(())
     }
@@ -170,9 +181,9 @@ where
         let mut full_txs = Vec::with_capacity(len);
 
         for tx_hash in tx_hashes {
-            if let Some(tx) = self.tx_cache.get(&tx_hash) {
+            if let Some(tx) = self.tx_cache.get(&tx_hash).await {
                 full_txs.push(tx);
-            } else if let Some(tx) = self.callback_cache.get(&tx_hash) {
+            } else if let Some(tx) = self.callback_cache.get(&tx_hash).await {
                 full_txs.push(tx);
             }
         }
@@ -193,7 +204,7 @@ where
         ctx: Context,
         order_tx_hashes: Vec<Hash>,
     ) -> ProtocolResult<()> {
-        let unknown_hashes = self.show_unknown_txs(order_tx_hashes);
+        let unknown_hashes = self.show_unknown_txs(order_tx_hashes).await;
         if !unknown_hashes.is_empty() {
             let unknown_len = unknown_hashes.len();
             let txs = self.adapter.pull_txs(ctx.clone(), unknown_hashes).await?;
@@ -217,7 +228,8 @@ where
                     .check_storage_exist(ctx.clone(), signed_tx.tx_hash.clone())
                     .await?;
                 self.callback_cache
-                    .insert(signed_tx.tx_hash.clone(), signed_tx);
+                    .insert(signed_tx.tx_hash.clone(), signed_tx)
+                    .await;
             }
         }
 
@@ -249,7 +261,7 @@ where
         ctx: Context,
         propose_tx_hashes: Vec<Hash>,
     ) -> ProtocolResult<()> {
-        let unknown_hashes = self.show_unknown_txs(propose_tx_hashes);
+        let unknown_hashes = self.show_unknown_txs(propose_tx_hashes).await;
         if !unknown_hashes.is_empty() {
             let txs = self.adapter.pull_txs(ctx.clone(), unknown_hashes).await?;
             // TODO: concurrently insert

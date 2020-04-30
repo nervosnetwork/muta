@@ -10,8 +10,6 @@ use chashmap::CHashMap;
 use futures::executor;
 use rand::random;
 use rand::rngs::OsRng;
-use rayon::iter::IntoParallelRefIterator;
-use rayon::prelude::*;
 
 use common_crypto::{
     Crypto, PrivateKey, PublicKey, Secp256k1, Secp256k1PrivateKey, Secp256k1PublicKey,
@@ -140,85 +138,98 @@ fn check_sig(tx: &SignedTransaction) -> ProtocolResult<()> {
     Ok(())
 }
 
-fn concurrent_check_sig(txs: Vec<SignedTransaction>) {
-    txs.par_iter().for_each(|signed_tx| {
-        check_sig(signed_tx).unwrap();
-    });
+async fn concurrent_check_sig(txs: Vec<SignedTransaction>) {
+    let futs = txs
+        .into_iter()
+        .map(|tx| tokio::task::spawn_blocking(move || check_sig(&tx).unwrap()))
+        .collect::<Vec<_>>();
+
+    futures::future::try_join_all(futs).await.unwrap();
 }
 
-fn concurrent_insert(txs: Vec<SignedTransaction>, mempool: Arc<HashMemPool<HashMemPoolAdapter>>) {
-    txs.par_iter()
-        .for_each(|signed_tx| exec_insert(signed_tx, Arc::clone(&mempool)));
-}
-
-fn concurrent_broadcast(
+async fn concurrent_insert(
     txs: Vec<SignedTransaction>,
     mempool: Arc<HashMemPool<HashMemPoolAdapter>>,
 ) {
-    txs.par_iter().for_each(|signed_tx| {
-        executor::block_on(async {
-            mempool
-                .get_adapter()
-                .broadcast_tx(Context::new(), signed_tx.clone())
-                .await
-                .unwrap();
+    let futs = txs
+        .into_iter()
+        .map(|tx| {
+            let mempool = Arc::clone(&mempool);
+            tokio::spawn(async { exec_insert(tx, mempool).await })
         })
-    });
+        .collect::<Vec<_>>();
+
+    futures::future::try_join_all(futs).await.unwrap();
 }
 
-fn exec_insert(signed_tx: &SignedTransaction, mempool: Arc<HashMemPool<HashMemPoolAdapter>>) {
-    executor::block_on(async {
-        let _ = mempool.insert(Context::new(), signed_tx.clone()).await;
-    });
+async fn concurrent_broadcast(
+    txs: Vec<SignedTransaction>,
+    mempool: Arc<HashMemPool<HashMemPoolAdapter>>,
+) {
+    let futs = txs
+        .into_iter()
+        .map(|tx| {
+            let mempool = Arc::clone(&mempool);
+            tokio::spawn(async move {
+                mempool
+                    .get_adapter()
+                    .broadcast_tx(Context::new(), tx)
+                    .await
+                    .unwrap()
+            })
+        })
+        .collect::<Vec<_>>();
+
+    futures::future::try_join_all(futs).await.unwrap();
 }
 
-fn exec_flush(remove_hashes: Vec<Hash>, mempool: Arc<HashMemPool<HashMemPoolAdapter>>) {
-    executor::block_on(async {
-        mempool.flush(Context::new(), remove_hashes).await.unwrap();
-    });
+async fn exec_insert(signed_tx: SignedTransaction, mempool: Arc<HashMemPool<HashMemPoolAdapter>>) {
+    let _ = mempool.insert(Context::new(), signed_tx).await.is_ok();
 }
 
-fn exec_package(
+async fn exec_flush(remove_hashes: Vec<Hash>, mempool: Arc<HashMemPool<HashMemPoolAdapter>>) {
+    mempool.flush(Context::new(), remove_hashes).await.unwrap()
+}
+
+async fn exec_package(
     mempool: Arc<HashMemPool<HashMemPoolAdapter>>,
     cycle_limit: u64,
     tx_num_limit: u64,
 ) -> MixedTxHashes {
-    executor::block_on(async {
-        mempool
-            .package(Context::new(), cycle_limit, tx_num_limit)
-            .await
-            .unwrap()
-    })
+    mempool
+        .package(Context::new(), cycle_limit, tx_num_limit)
+        .await
+        .unwrap()
 }
 
-fn exec_ensure_order_txs(require_hashes: Vec<Hash>, mempool: Arc<HashMemPool<HashMemPoolAdapter>>) {
-    executor::block_on(async {
-        mempool
-            .ensure_order_txs(Context::new(), require_hashes)
-            .await
-            .unwrap();
-    })
+async fn exec_ensure_order_txs(
+    require_hashes: Vec<Hash>,
+    mempool: Arc<HashMemPool<HashMemPoolAdapter>>,
+) {
+    mempool
+        .ensure_order_txs(Context::new(), require_hashes)
+        .await
+        .unwrap();
 }
 
-fn exec_sync_propose_txs(require_hashes: Vec<Hash>, mempool: Arc<HashMemPool<HashMemPoolAdapter>>) {
-    executor::block_on(async {
-        mempool
-            .sync_propose_txs(Context::new(), require_hashes)
-            .await
-            .unwrap();
-    })
+async fn exec_sync_propose_txs(
+    require_hashes: Vec<Hash>,
+    mempool: Arc<HashMemPool<HashMemPoolAdapter>>,
+) {
+    mempool
+        .sync_propose_txs(Context::new(), require_hashes)
+        .await
+        .unwrap();
 }
 
-fn exec_get_full_txs(
+async fn exec_get_full_txs(
     require_hashes: Vec<Hash>,
     mempool: Arc<HashMemPool<HashMemPoolAdapter>>,
 ) -> Vec<SignedTransaction> {
-    executor::block_on(async {
-        mempool
-            .get_full_txs(Context::new(), require_hashes)
-            .await
-            .unwrap()
-    })
+    mempool
+        .get_full_txs(Context::new(), require_hashes)
+        .await
+        .unwrap()
 }
 
 fn mock_signed_tx(
@@ -249,7 +260,7 @@ fn mock_signed_tx(
     let signature = if valid {
         Secp256k1::sign_message(&tx_hash.as_bytes(), &priv_key.to_bytes()).unwrap()
     } else {
-        Secp256k1Signature::try_from([0u8; 64].as_parallel_slice()).unwrap()
+        Secp256k1Signature::try_from([0u8; 64].as_ref()).unwrap()
     };
 
     SignedTransaction {

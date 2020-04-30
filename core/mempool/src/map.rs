@@ -1,7 +1,8 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 
-use parking_lot::RwLock;
-use rayon::prelude::{IntoParallelIterator, ParallelIterator};
+use futures::future::try_join_all;
+use tokio::sync::RwLock;
 
 use protocol::types::Hash;
 
@@ -10,45 +11,45 @@ use protocol::types::Hash;
 /// Why use 16 buckets? We take 0 bytes of each "tx_hash" and shift it 4 bits to
 /// the left to get a number in the range 0~15, which corresponds to 16 buckets.
 pub struct Map<V> {
-    buckets: Vec<Bucket<V>>,
+    buckets: Vec<Arc<Bucket<V>>>,
 }
 
 impl<V> Map<V>
 where
-    V: Send + Sync + Clone,
+    V: Send + Sync + Clone + 'static,
 {
     pub fn new(cache_size: usize) -> Self {
         let mut buckets = Vec::with_capacity(16);
         for _ in 0..16 {
-            buckets.push(Bucket {
+            buckets.push(Arc::new(Bucket {
                 // Allocate enough space to avoid triggering resize.
                 store: RwLock::new(HashMap::with_capacity(cache_size)),
-            });
+            }));
         }
         Self { buckets }
     }
 
-    pub fn insert(&self, hash: Hash, value: V) -> Option<V> {
+    pub async fn insert(&self, hash: Hash, value: V) -> Option<V> {
         let bucket = self.get_bucket(&hash);
-        bucket.insert(hash, value)
+        bucket.insert(hash, value).await
     }
 
-    pub fn contains_key(&self, hash: &Hash) -> bool {
+    pub async fn contains_key(&self, hash: &Hash) -> bool {
         let bucket = self.get_bucket(hash);
-        bucket.contains_key(hash)
+        bucket.contains_key(hash).await
     }
 
-    pub fn get(&self, hash: &Hash) -> Option<V> {
+    pub async fn get(&self, hash: &Hash) -> Option<V> {
         let bucket = self.get_bucket(hash);
-        bucket.get(hash)
+        bucket.get(hash).await
     }
 
-    pub fn remove(&self, hash: &Hash) {
+    pub async fn remove(&self, hash: &Hash) {
         let bucket = self.get_bucket(hash);
-        bucket.remove(hash);
+        bucket.remove(hash).await
     }
 
-    pub fn remove_batch(&self, hashes: &[Hash]) {
+    pub async fn remove_batch(&self, hashes: &[Hash]) {
         let mut h: HashMap<usize, Vec<Hash>> = HashMap::new();
 
         for hash in hashes.iter() {
@@ -56,24 +57,39 @@ where
             h.entry(index).or_insert_with(|| vec![]).push(hash.clone());
         }
 
-        h.into_par_iter().for_each(|(index, hashes)| {
-            self.buckets[index].remove_batch(&hashes);
-        });
+        let futs = h
+            .into_iter()
+            .map(|(index, hashes)| {
+                let bucket = Arc::clone(&self.buckets[index]);
+                tokio::spawn(async move { bucket.remove_batch(hashes).await })
+            })
+            .collect::<Vec<_>>();
+        try_join_all(futs)
+            .await
+            .expect("[mempool]: the runtime panics.");
     }
 
-    pub fn len(&self) -> usize {
+    pub async fn len(&self) -> usize {
         let mut len = 0;
         for bucket in self.buckets.iter() {
-            len += bucket.len();
+            len += bucket.len().await;
         }
         len
     }
 
-    // TODO: concurrently clear
-    pub fn clear(&self) {
-        for bucket in self.buckets.iter() {
-            bucket.clear()
-        }
+    pub async fn clear(&self) {
+        let futs = self
+            .buckets
+            .iter()
+            .map(|bucket| {
+                let bucket = Arc::clone(bucket);
+                tokio::spawn(async move { bucket.clear().await })
+            })
+            .collect::<Vec<_>>();
+
+        try_join_all(futs)
+            .await
+            .expect("[mempool]: the runtime panics.");
     }
 
     fn get_bucket(&self, hash: &Hash) -> &Bucket<V> {
@@ -96,8 +112,8 @@ where
     /// Before inserting a transaction into the bucket, you must check whether
     /// the transaction is in the bucket first. Never use the insert function to
     /// check this.
-    fn insert(&self, hash: Hash, value: V) -> Option<V> {
-        let mut lock_data = self.store.write();
+    async fn insert(&self, hash: Hash, value: V) -> Option<V> {
+        let mut lock_data = self.store.write().await;
         if lock_data.contains_key(&hash) {
             Some(value)
         } else {
@@ -105,32 +121,32 @@ where
         }
     }
 
-    fn contains_key(&self, hash: &Hash) -> bool {
-        self.store.read().contains_key(hash)
+    async fn contains_key(&self, hash: &Hash) -> bool {
+        self.store.read().await.contains_key(hash)
     }
 
-    fn get(&self, hash: &Hash) -> Option<V> {
-        self.store.read().get(hash).map(Clone::clone)
+    async fn get(&self, hash: &Hash) -> Option<V> {
+        self.store.read().await.get(hash).map(Clone::clone)
     }
 
-    fn remove(&self, hash: &Hash) {
-        let mut store = self.store.write();
+    async fn remove(&self, hash: &Hash) {
+        let mut store = self.store.write().await;
         store.remove(hash);
     }
 
-    fn remove_batch(&self, hashes: &[Hash]) {
-        let mut store = self.store.write();
+    async fn remove_batch(&self, hashes: Vec<Hash>) {
+        let mut store = self.store.write().await;
         for hash in hashes {
-            store.remove(hash);
+            store.remove(&hash);
         }
     }
 
-    fn len(&self) -> usize {
-        self.store.read().len()
+    async fn len(&self) -> usize {
+        self.store.read().await.len()
     }
 
-    fn clear(&self) {
-        self.store.write().clear();
+    async fn clear(&self) {
+        self.store.write().await.clear();
     }
 }
 
@@ -143,7 +159,6 @@ mod tests {
 
     use chashmap::CHashMap;
     use rand::random;
-    use rayon::prelude::*;
     use test::Bencher;
 
     use protocol::{types::Hash, Bytes};
@@ -154,12 +169,14 @@ mod tests {
 
     #[bench]
     fn bench_map_insert(b: &mut Bencher) {
+        let mut runtime = tokio::runtime::Runtime::new().unwrap();
+
         let txs = mock_txs(GEN_TX_SIZE);
 
         b.iter(move || {
             let cache = Map::new(GEN_TX_SIZE);
-            txs.par_iter().for_each(|(hash, tx)| {
-                cache.insert(hash.clone(), tx.clone());
+            txs.iter().for_each(|(hash, tx)| {
+                runtime.block_on(cache.insert(hash.clone(), tx.clone()));
             });
         });
     }
@@ -170,7 +187,7 @@ mod tests {
 
         b.iter(move || {
             let cache = Arc::new(RwLock::new(HashMap::new()));
-            txs.par_iter().for_each(|(hash, tx)| {
+            txs.iter().for_each(|(hash, tx)| {
                 cache.write().unwrap().insert(hash, tx);
             });
         });
@@ -182,7 +199,7 @@ mod tests {
 
         b.iter(move || {
             let cache = CHashMap::new();
-            txs.par_iter().for_each(|(hash, tx)| {
+            txs.iter().for_each(|(hash, tx)| {
                 cache.insert(hash, tx);
             });
         });
