@@ -105,6 +105,7 @@ fn test_storage_wal_insert() {
 }
 
 #[test]
+#[ignore]
 fn test_storage_stat() {
     fs::remove_dir_all("rocksdb/test_adapter_stat").unwrap();
     let adapter = Arc::new(
