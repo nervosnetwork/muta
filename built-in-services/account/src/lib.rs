@@ -1,7 +1,7 @@
 use crate::types::{
-    Account, GenerateAccountPayload, GenerateAccountResponse, GetAccountPayload, PayloadAccount,
-    Permission, VerifyPayload, VerifyResponse, Witness, ACCOUNT_TYPE_MULTI_SIG,
-    ACCOUNT_TYPE_PUBLIC_KEY, MAX_PERMISSION_ACCOUNTS,
+    Account, GenerateAccountPayload, GenerateAccountResponse, GetAccountPayload, Permission,
+    VerifyPayload, VerifyResponse, WitnessAdapter, ACCOUNT_TYPE_MULTI_SIG, ACCOUNT_TYPE_PUBLIC_KEY,
+    MAX_PERMISSION_ACCOUNTS,
 };
 use binding_macro::{cycles, service};
 use bytes::Bytes;
@@ -30,7 +30,7 @@ impl<SDK: ServiceSDK> AccountService<SDK> {
         ctx: ServiceContext,
         payload: VerifyPayload,
     ) -> ServiceResponse<VerifyResponse> {
-        let wit_res: Result<Witness, _> = serde_json::from_str(&payload.witness);
+        let wit_res: Result<WitnessAdapter, _> = serde_json::from_str(&payload.witness);
         if wit_res.is_err() {
             return ServiceResponse::<VerifyResponse>::from_error(
                 113,
@@ -137,14 +137,6 @@ impl<SDK: ServiceSDK> AccountService<SDK> {
             );
         }
 
-        let mut accounts = Vec::<PayloadAccount>::new();
-        for item in &permission.accounts {
-            accounts.push(PayloadAccount {
-                address: item.address.clone(),
-                weight:  item.weight,
-            });
-        }
-
         let response = GenerateAccountResponse {
             address: payload.user,
         };
@@ -201,11 +193,9 @@ impl<SDK: ServiceSDK> AccountService<SDK> {
             accounts,
             threshold: payload.threshold,
         };
-
         self.sdk.set_account_value(&address, 0u8, permission);
 
         let response = GenerateAccountResponse { address };
-
         ServiceResponse::<GenerateAccountResponse>::from_succeed(response)
     }
 }

@@ -12,7 +12,7 @@ use common_crypto::{
 
 use framework::binding::sdk::{DefalutServiceSDK, DefaultChainQuerier};
 use framework::binding::state::{GeneralServiceState, MPTTrie};
-use protocol::traits::{NoopDispatcher, Storage};
+use protocol::traits::{NoopDispatcher, Storage, Witness};
 use protocol::types::{
     Address, Block, Hash, Hex, Proof, Receipt, ServiceContext, ServiceContextParams,
     SignedTransaction,
@@ -21,8 +21,8 @@ use protocol::types::{
 use protocol::{types::Bytes, ProtocolResult};
 
 use crate::types::{
-    GenerateAccountPayload, GetAccountPayload, PayloadAccount, VerifyPayload, Witness,
-    ACCOUNT_TYPE_MULTI_SIG, ACCOUNT_TYPE_PUBLIC_KEY,
+    GenerateAccountPayload, GetAccountPayload, PayloadAccount, VerifyPayload, WitnessAdapter,
+    ACCOUNT_TYPE_MULTI_SIG,
 };
 use crate::AccountService;
 
@@ -102,11 +102,11 @@ fn test_generate() {
         Hex::from_string("0x".to_string() + hex::encode(pub_key3.to_bytes()).as_str()).unwrap();
 
     // verify single sig, sig1, signature_type error, expected not verified
-    let mut wit_single = Witness {
+    let mut wit_single = WitnessAdapter {
         pubkeys:        vec![pk_1.clone()],
         signatures:     vec![sig_data1.clone()],
         signature_type: ACCOUNT_TYPE_MULTI_SIG,
-        sender:         addr1.clone(),
+        sender:         addr1,
     };
 
     let mut wit_str = serde_json::to_string(&wit_single).unwrap();
@@ -119,14 +119,9 @@ fn test_generate() {
     println!("single sig1, expected not verified\r\n {:#?}", res_single);
 
     // verify single sig, sig1,  expected  verified
-    wit_single = Witness {
-        pubkeys:        vec![pk_1.clone()],
-        signatures:     vec![sig_data1.clone()],
-        signature_type: ACCOUNT_TYPE_PUBLIC_KEY,
-        sender:         addr1.clone(),
-    };
-
-    wit_str = serde_json::to_string(&wit_single).unwrap();
+    wit_single =
+        WitnessAdapter::from_single_sig_hex(pk_1.as_string(), sig_data1.as_string()).unwrap();
+    wit_str = wit_single.as_string().unwrap();
 
     res_single = service.verify_signature(context.clone(), VerifyPayload {
         tx_hash: tx_hash.clone(),
@@ -136,14 +131,9 @@ fn test_generate() {
     println!("single sig1, expect verified\r\n {:#?}", res_single);
 
     // verify single sig, sig1,  expected not verified
-    wit_single = Witness {
-        pubkeys:        vec![pk_2.clone()],
-        signatures:     vec![sig_data1.clone()],
-        signature_type: ACCOUNT_TYPE_PUBLIC_KEY,
-        sender:         addr1,
-    };
-
-    wit_str = serde_json::to_string(&wit_single).unwrap();
+    wit_single =
+        WitnessAdapter::from_single_sig_hex(pk_2.as_string(), sig_data1.as_string()).unwrap();
+    wit_str = wit_single.as_string().unwrap();
 
     res_single = service.verify_signature(context.clone(), VerifyPayload {
         tx_hash: tx_hash.clone(),
@@ -153,24 +143,24 @@ fn test_generate() {
     println!("single sig1-pk2, expect not verified\r\n {:#?}", res_single);
 
     // verify multiSig, sig1+sig2, expected verified
-    let wit1 = Witness {
-        pubkeys:        vec![pk_1.clone(), pk_2.clone()],
-        signatures:     vec![sig_data1.clone(), sig_data2.clone()],
-        signature_type: ACCOUNT_TYPE_MULTI_SIG,
-        sender:         multi_addr.clone(),
-    };
+    let wit1 = WitnessAdapter::from_multi_sig_hex(
+        multi_addr.clone(),
+        vec![pk_1.as_string(), pk_2.as_string()],
+        vec![sig_data1.as_string(), sig_data2.as_string()],
+    )
+    .unwrap();
 
-    let wit1_str = serde_json::to_string(&wit1).unwrap();
+    let wit1_str = wit1.as_string().unwrap();
 
     let res_multi_1 = service.verify_signature(context.clone(), VerifyPayload {
         tx_hash: tx_hash.clone(),
         witness: wit1_str,
     });
     assert_eq!(res_multi_1.is_error(), false);
-    println!("{:#?}", res_multi_1);
+    println!("multisig sig1+sig2, expect verified,\r\n{:#?}", res_multi_1);
 
     // verify multiSig, sig2+sig3, expected not verified
-    let wit2 = Witness {
+    let wit2 = WitnessAdapter {
         pubkeys:        vec![pk_2.clone(), pk_3.clone()],
         signatures:     vec![sig_data2.clone(), sig_data3.clone()],
         signature_type: ACCOUNT_TYPE_MULTI_SIG,
@@ -187,7 +177,7 @@ fn test_generate() {
     println!("{:#?}", res_multi_2);
 
     // verify multiSig, sig1+ sig2 + sig3, expected verified
-    let wit3 = Witness {
+    let wit3 = WitnessAdapter {
         pubkeys:        vec![pk_1.clone(), pk_2, pk_3],
         signatures:     vec![sig_data1.clone(), sig_data2, sig_data3],
         signature_type: ACCOUNT_TYPE_MULTI_SIG,
@@ -204,7 +194,7 @@ fn test_generate() {
     println!("{:#?}", res_multi_3);
 
     // verify multiSig, sig1, expected not verified
-    let wit4 = Witness {
+    let wit4 = WitnessAdapter {
         pubkeys:        vec![pk_1],
         signatures:     vec![sig_data1],
         signature_type: ACCOUNT_TYPE_MULTI_SIG,

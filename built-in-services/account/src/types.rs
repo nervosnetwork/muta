@@ -1,8 +1,9 @@
+use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 
-use bytes::Bytes;
 use protocol::fixed_codec::{FixedCodec, FixedCodecError};
-use protocol::types::{Address, Hash, Hex};
+use protocol::traits::Witness;
+use protocol::types::{Address, Hash, Hex, TypesError};
 use protocol::ProtocolResult;
 
 pub const ACCOUNT_TYPE_PUBLIC_KEY: u8 = 0;
@@ -55,11 +56,72 @@ pub struct Account {
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
-pub struct Witness {
+pub struct WitnessAdapter {
     pub pubkeys:        Vec<Hex>,
     pub signatures:     Vec<Hex>,
     pub signature_type: u8,
     pub sender:         Address,
+}
+
+impl Witness for WitnessAdapter {
+    fn as_bytes(&self) -> ProtocolResult<Bytes> {
+        match serde_json::to_vec(&self) {
+            Ok(b) => Ok(Bytes::from(b)),
+            Err(_) => Err(TypesError::InvalidWitness.into()),
+        }
+    }
+
+    fn from_bytes(bytes: Bytes) -> ProtocolResult<Self> {
+        serde_json::from_slice(bytes.as_ref()).map_err(|_| TypesError::InvalidWitness.into())
+    }
+
+    fn as_string(&self) -> ProtocolResult<String> {
+        serde_json::to_string(&self).map_err(|_| TypesError::InvalidWitness.into())
+    }
+
+    fn from_string(s: &str) -> ProtocolResult<Self> {
+        serde_json::from_str(s).map_err(|_| TypesError::InvalidWitness.into())
+    }
+
+    fn from_single_sig_hex(pub_key: String, sig: String) -> ProtocolResult<Self> {
+        Ok(Self {
+            pubkeys:        vec![Hex::from_string(pub_key)?],
+            signatures:     vec![Hex::from_string(sig)?],
+            signature_type: 0,
+            sender:         Address::from_hex("0x0000000000000000000000000000000000000000")?,
+        })
+    }
+
+    fn from_multi_sig_hex(
+        sender: Address,
+        pub_keys: Vec<String>,
+        sigs: Vec<String>,
+    ) -> ProtocolResult<Self> {
+        if pub_keys.is_empty()
+            || pub_keys.len() != sigs.len()
+            || pub_keys.len() > MAX_PERMISSION_ACCOUNTS as usize
+        {
+            return Err(TypesError::InvalidWitness.into());
+        }
+
+        let mut pubkeys = Vec::<Hex>::new();
+        let mut signatures = Vec::<Hex>::new();
+        let size = pub_keys.len();
+        pubkeys.reserve(size);
+        signatures.reserve(size);
+
+        for i in 0..size {
+            pubkeys.push(Hex::from_string(pub_keys[i].clone())?);
+            signatures.push(Hex::from_string(sigs[i].clone())?);
+        }
+
+        Ok(Self {
+            pubkeys,
+            signatures,
+            signature_type: ACCOUNT_TYPE_MULTI_SIG,
+            sender,
+        })
+    }
 }
 
 impl rlp::Encodable for Account {

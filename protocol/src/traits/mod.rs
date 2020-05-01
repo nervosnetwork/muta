@@ -5,6 +5,7 @@ mod executor;
 mod mempool;
 mod network;
 mod storage;
+mod witness;
 
 pub use api::APIAdapter;
 pub use binding::{
@@ -24,3 +25,4 @@ pub use network::{Gossip, MessageCodec, MessageHandler, PeerTrust, Priority, Rpc
 pub use storage::{Storage, StorageAdapter, StorageBatchModify, StorageCategory, StorageSchema};
 
 pub use creep::{Cloneable, Context};
+pub use witness::Witness;
