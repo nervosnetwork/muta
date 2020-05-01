@@ -83,7 +83,7 @@ impl<SDK: ServiceSDK> AccountService<SDK> {
         let permission = permission_res.unwrap();
         let mut weight_sum = 0;
         let size = permission.accounts.len();
-        let mut hash_account = [false; MAX_PERMISSION_ACCOUNTS as usize];
+        let mut has_account = [false; MAX_PERMISSION_ACCOUNTS as usize];
 
         for i in 0..wit.signatures.len() {
             let res = verify_single_sig(&payload.tx_hash, &wit.signatures[i], &wit.pubkeys[i]);
@@ -92,11 +92,11 @@ impl<SDK: ServiceSDK> AccountService<SDK> {
             }
 
             for (k, item) in permission.accounts.iter().enumerate().take(size) {
-                if hash_account[k] {
+                if has_account[k] {
                     continue;
                 }
                 if item.address.eq(&res.succeed_data.address) {
-                    hash_account[k] = true;
+                    has_account[k] = true;
                     weight_sum += item.weight;
                     break;
                 }
