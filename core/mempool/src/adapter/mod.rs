@@ -10,6 +10,7 @@ use std::{
 
 use async_trait::async_trait;
 use derive_more::Display;
+use futures::future::try_join_all;
 use futures::{
     channel::mpsc::{
         channel, unbounded, Receiver, Sender, TrySendError, UnboundedReceiver, UnboundedSender,
@@ -353,7 +354,11 @@ where
         _ctx: Context,
         tx_hashes: Vec<Hash>,
     ) -> ProtocolResult<Vec<SignedTransaction>> {
-        self.storage.get_transactions(tx_hashes).await
+        let futs = tx_hashes
+            .into_iter()
+            .map(|tx_hash| self.storage.get_transaction_by_hash(tx_hash))
+            .collect::<Vec<_>>();
+        try_join_all(futs).await
     }
 
     fn set_args(&self, timeout_gap: u64, cycles_limit: u64, max_tx_size: u64) {

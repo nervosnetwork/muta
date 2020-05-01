@@ -5,7 +5,7 @@ use overlord::types::{
     OverlordMsg, PreCommitQC, PreVoteQC, SignedChoke, SignedHeight, SignedPreCommit, SignedPreVote,
     SignedProposal, SyncRequest, SyncResponse,
 };
-use protocol::traits::{Context, MessageCodec, MessageHandler};
+use protocol::traits::{Context, MessageCodec, MessageHandler, TrustFeedback};
 use protocol::types::Bytes;
 use protocol::ProtocolResult;
 
@@ -57,9 +57,11 @@ impl<H: OverlordHandler + Sync + Send + 'static> SignedProposalHandler<H> {
 impl<H: OverlordHandler + Sync + Send + 'static> MessageHandler for SignedProposalHandler<H> {
     type Message = WrappedSignedProposal;
 
-    async fn process(&self, ctx: Context, msg: Self::Message) {
+    async fn process(&self, ctx: Context, msg: Self::Message) -> TrustFeedback {
         self.handler
             .send_msg(ctx, OverlordMsg::SignedProposal(msg.0));
+        // FIXME
+        TrustFeedback::Neutral
     }
 }
 
@@ -99,9 +101,11 @@ impl<H: OverlordHandler + Sync + Send + 'static> SignedPreVoteHandler<H> {
 impl<H: OverlordHandler + Sync + Send + 'static> MessageHandler for SignedPreVoteHandler<H> {
     type Message = WrappedSignedPreVote;
 
-    async fn process(&self, ctx: Context, msg: Self::Message) {
+    async fn process(&self, ctx: Context, msg: Self::Message) -> TrustFeedback {
         self.handler
             .send_msg(ctx, OverlordMsg::SignedPreVote(msg.0));
+        // FIXME
+        TrustFeedback::Neutral
     }
 }
 
@@ -141,9 +145,11 @@ impl<H: OverlordHandler + Sync + Send + 'static> SignedPreCommitHandler<H> {
 impl<H: OverlordHandler + Sync + Send + 'static> MessageHandler for SignedPreCommitHandler<H> {
     type Message = WrappedSignedPreCommit;
 
-    async fn process(&self, ctx: Context, msg: Self::Message) {
+    async fn process(&self, ctx: Context, msg: Self::Message) -> TrustFeedback {
         self.handler
             .send_msg(ctx, OverlordMsg::SignedPreCommit(msg.0));
+        // FIXME
+        TrustFeedback::Neutral
     }
 }
 
@@ -183,8 +189,10 @@ impl<H: OverlordHandler + Sync + Send + 'static> SignedChokeHandler<H> {
 impl<H: OverlordHandler + Sync + Send + 'static> MessageHandler for SignedChokeHandler<H> {
     type Message = WrappedSignedChoke;
 
-    async fn process(&self, ctx: Context, msg: Self::Message) {
+    async fn process(&self, ctx: Context, msg: Self::Message) -> TrustFeedback {
         self.handler.send_msg(ctx, OverlordMsg::SignedChoke(msg.0));
+        // FIXME
+        TrustFeedback::Neutral
     }
 }
 
@@ -224,8 +232,10 @@ impl<H: OverlordHandler + Sync + Send + 'static> PreVoteQCHandler<H> {
 impl<H: OverlordHandler + Sync + Send + 'static> MessageHandler for PreVoteQCHandler<H> {
     type Message = WrappedPreVoteQC;
 
-    async fn process(&self, ctx: Context, msg: Self::Message) {
+    async fn process(&self, ctx: Context, msg: Self::Message) -> TrustFeedback {
         self.handler.send_msg(ctx, OverlordMsg::PreVoteQC(msg.0));
+        // FIXME
+        TrustFeedback::Neutral
     }
 }
 
@@ -265,8 +275,10 @@ impl<H: OverlordHandler + Sync + Send + 'static> PreCommitQCHandler<H> {
 impl<H: OverlordHandler + Sync + Send + 'static> MessageHandler for PreCommitQCHandler<H> {
     type Message = WrappedPreCommitQC;
 
-    async fn process(&self, ctx: Context, msg: Self::Message) {
+    async fn process(&self, ctx: Context, msg: Self::Message) -> TrustFeedback {
         self.handler.send_msg(ctx, OverlordMsg::PreCommitQC(msg.0));
+        // FIXME
+        TrustFeedback::Neutral
     }
 }
 
@@ -306,8 +318,10 @@ impl<H: OverlordHandler + Sync + Send + 'static> SignedHeightHandler<H> {
 impl<H: OverlordHandler + Sync + Send + 'static> MessageHandler for SignedHeightHandler<H> {
     type Message = WrappedSignedHeight;
 
-    async fn process(&self, ctx: Context, msg: Self::Message) {
+    async fn process(&self, ctx: Context, msg: Self::Message) -> TrustFeedback {
         self.handler.send_msg(ctx, OverlordMsg::SignedHeight(msg.0));
+        // FIXME
+        TrustFeedback::Neutral
     }
 }
 
@@ -347,8 +361,10 @@ impl<H: OverlordHandler + Sync + Send + 'static> SyncRequestHandler<H> {
 impl<H: OverlordHandler + Sync + Send + 'static> MessageHandler for SyncRequestHandler<H> {
     type Message = WrappedSyncRequest;
 
-    async fn process(&self, ctx: Context, msg: Self::Message) {
+    async fn process(&self, ctx: Context, msg: Self::Message) -> TrustFeedback {
         self.handler.send_msg(ctx, OverlordMsg::SyncRequest(msg.0));
+        // FIXME
+        TrustFeedback::Neutral
     }
 }
 #[derive(Debug)]
@@ -387,7 +403,9 @@ impl<H: OverlordHandler + Sync + Send + 'static> SyncResponseHandler<H> {
 impl<H: OverlordHandler + Sync + Send + 'static> MessageHandler for SyncResponseHandler<H> {
     type Message = WrappedSyncResponse;
 
-    async fn process(&self, ctx: Context, msg: Self::Message) {
+    async fn process(&self, ctx: Context, msg: Self::Message) -> TrustFeedback {
         self.handler.send_msg(ctx, OverlordMsg::SyncResponse(msg.0));
+        // FIXME
+        TrustFeedback::Neutral
     }
 }

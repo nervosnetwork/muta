@@ -161,46 +161,6 @@ where
         );
         Ok(())
     }
-
-    async fn verify_tx_in_parallel(
-        &self,
-        ctx: Context,
-        txs: Vec<SignedTransaction>,
-    ) -> ProtocolResult<()> {
-        let now = Instant::now();
-        let len = txs.len();
-
-        let futs = txs
-            .into_iter()
-            .map(|signed_tx| {
-                let adapter = Arc::clone(&self.adapter);
-                let ctx = ctx.clone();
-
-                tokio::spawn(async move {
-                    adapter
-                        .check_signature(ctx.clone(), signed_tx.clone())
-                        .await?;
-                    adapter
-                        .check_transaction(ctx.clone(), signed_tx.clone())
-                        .await?;
-                    adapter
-                        .check_storage_exist(ctx.clone(), signed_tx.tx_hash.clone())
-                        .await
-                })
-            })
-            .collect::<Vec<_>>();
-        try_join_all(futs).await.map_err(|e| {
-            log::error!("[mempool] verify batch txs error {:?}", e);
-            MemPoolError::VerifyBatchTransactions
-        })?;
-
-        log::info!(
-            "[mempool] verify txs done, size {:?} cost {:?}",
-            len,
-            now.elapsed()
-        );
-        Ok(())
-    }
 }
 
 #[async_trait]

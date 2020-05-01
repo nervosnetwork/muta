@@ -10,6 +10,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use async_trait::async_trait;
 use derive_more::Display;
 use futures::channel::mpsc::UnboundedSender;
+use futures::future::try_join_all;
 use overlord::types::{
     Aggregates, AuthConfig, ExecResult, FullBlockWithProof, HeightRange, Node, SelectMode, TinyHex,
     Vote,
@@ -126,7 +127,6 @@ where
         for h in exec_height + 1..=height {
             let block = self.storage.get_block_by_height(h).await?;
             let txs = self
-                .storage
                 .get_transactions(block.ordered_tx_hashes.clone())
                 .await?;
             exec_result = self.exec(
@@ -747,7 +747,6 @@ where
 
     async fn get_full_block_bytes(&self, block: &Block) -> ProtocolResult<Bytes> {
         let txs = self
-            .storage
             .get_transactions(block.ordered_tx_hashes.clone())
             .await?;
         let full_block = FullBlock {
@@ -756,6 +755,17 @@ where
         };
         let full_block_bytes = full_block.encode_fixed()?;
         Ok(full_block_bytes)
+    }
+
+    async fn get_transactions(
+        &self,
+        tx_hashes: Vec<ProtoHash>,
+    ) -> ProtocolResult<Vec<SignedTransaction>> {
+        let futs = tx_hashes
+            .into_iter()
+            .map(|tx_hash| self.storage.get_transaction_by_hash(tx_hash))
+            .collect::<Vec<_>>();
+        try_join_all(futs).await
     }
 }
 
