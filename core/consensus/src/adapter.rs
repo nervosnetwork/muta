@@ -70,6 +70,7 @@ where
     DB: cita_trie::DB + 'static,
     Mapping: ServiceMapping + 'static,
 {
+    #[muta_apm::derive::tracing_span]
     async fn get_txs_from_mempool(
         &self,
         ctx: Context,
@@ -80,10 +81,12 @@ where
         self.mempool.package(ctx, cycle_limit, tx_num_limit).await
     }
 
+    #[muta_apm::derive::tracing_span]
     async fn sync_txs(&self, ctx: Context, txs: Vec<Hash>) -> ProtocolResult<()> {
         self.mempool.sync_propose_txs(ctx, txs).await
     }
 
+    #[muta_apm::derive::tracing_span]
     async fn get_full_txs(
         &self,
         ctx: Context,
@@ -92,6 +95,7 @@ where
         self.mempool.get_full_txs(ctx, txs).await
     }
 
+    #[muta_apm::derive::tracing_span]
     async fn transmit(
         &self,
         ctx: Context,
@@ -114,8 +118,10 @@ where
         }
     }
 
+    #[muta_apm::derive::tracing_span]
     async fn execute(
         &self,
+        ctx: Context,
         chain_id: Hash,
         order_root: MerkleRoot,
         height: u64,
@@ -127,6 +133,7 @@ where
         timestamp: u64,
     ) -> ProtocolResult<()> {
         let exec_info = ExecuteInfo {
+            ctx,
             height,
             chain_id,
             cycles_price,
@@ -146,23 +153,27 @@ where
         Ok(())
     }
 
+    #[muta_apm::derive::tracing_span]
     async fn get_last_validators(
         &self,
-        _ctx: Context,
+        ctx: Context,
         height: u64,
     ) -> ProtocolResult<Vec<Validator>> {
-        let block = self.storage.get_block_by_height(height).await?;
+        let block = self.storage.get_block_by_height(ctx, height).await?;
         Ok(block.header.validators)
     }
 
-    async fn save_overlord_wal(&self, _ctx: Context, info: Bytes) -> ProtocolResult<()> {
-        self.storage.update_overlord_wal(info).await
+    #[muta_apm::derive::tracing_span]
+    async fn save_overlord_wal(&self, ctx: Context, info: Bytes) -> ProtocolResult<()> {
+        self.storage.update_overlord_wal(ctx, info).await
     }
 
-    async fn load_overlord_wal(&self, _ctx: Context) -> ProtocolResult<Bytes> {
-        self.storage.load_overlord_wal().await
+    #[muta_apm::derive::tracing_span]
+    async fn load_overlord_wal(&self, ctx: Context) -> ProtocolResult<Bytes> {
+        self.storage.load_overlord_wal(ctx).await
     }
 
+    #[muta_apm::derive::tracing_span]
     async fn pull_block(&self, ctx: Context, height: u64, end: &str) -> ProtocolResult<Block> {
         log::debug!("consensus: send rpc pull block {}", height);
         let res = self
@@ -172,6 +183,7 @@ where
         Ok(res.inner)
     }
 
+    #[muta_apm::derive::tracing_span]
     async fn pull_txs(
         &self,
         ctx: Context,
@@ -192,11 +204,13 @@ where
     }
 
     /// Get the current height from storage.
-    async fn get_current_height(&self, _: Context) -> ProtocolResult<u64> {
-        let res = self.storage.get_latest_block().await?;
+    #[muta_apm::derive::tracing_span]
+    async fn get_current_height(&self, ctx: Context) -> ProtocolResult<u64> {
+        let res = self.storage.get_latest_block(ctx).await?;
         Ok(res.header.height)
     }
 
+    #[muta_apm::derive::tracing_span]
     async fn verify_txs(&self, ctx: Context, height: u64, txs: Vec<Hash>) -> ProtocolResult<()> {
         if let Err(e) = self.mempool.ensure_order_txs(ctx.clone(), txs).await {
             log::error!("verify_txs error {:?}", e);
@@ -340,25 +354,25 @@ where
     Mapping: ServiceMapping + 'static,
 {
     /// Save a block to the database.
-    async fn save_block(&self, _: Context, block: Block) -> ProtocolResult<()> {
-        self.storage.insert_block(block).await
+    async fn save_block(&self, ctx: Context, block: Block) -> ProtocolResult<()> {
+        self.storage.insert_block(ctx, block).await
     }
 
-    async fn save_proof(&self, _: Context, proof: Proof) -> ProtocolResult<()> {
-        self.storage.update_latest_proof(proof).await
+    async fn save_proof(&self, ctx: Context, proof: Proof) -> ProtocolResult<()> {
+        self.storage.update_latest_proof(ctx, proof).await
     }
 
     /// Save some signed transactions to the database.
     async fn save_signed_txs(
         &self,
-        _: Context,
+        ctx: Context,
         signed_txs: Vec<SignedTransaction>,
     ) -> ProtocolResult<()> {
-        self.storage.insert_transactions(signed_txs).await
+        self.storage.insert_transactions(ctx, signed_txs).await
     }
 
-    async fn save_receipts(&self, _: Context, receipts: Vec<Receipt>) -> ProtocolResult<()> {
-        self.storage.insert_receipts(receipts).await
+    async fn save_receipts(&self, ctx: Context, receipts: Vec<Receipt>) -> ProtocolResult<()> {
+        self.storage.insert_receipts(ctx, receipts).await
     }
 
     /// Flush the given transactions in the mempool.
@@ -367,22 +381,22 @@ where
     }
 
     /// Get a block corresponding to the given height.
-    async fn get_block_by_height(&self, _: Context, height: u64) -> ProtocolResult<Block> {
-        self.storage.get_block_by_height(height).await
+    async fn get_block_by_height(&self, ctx: Context, height: u64) -> ProtocolResult<Block> {
+        self.storage.get_block_by_height(ctx, height).await
     }
 
     /// Get the current height from storage.
-    async fn get_current_height(&self, _: Context) -> ProtocolResult<u64> {
-        let res = self.storage.get_latest_block().await?;
+    async fn get_current_height(&self, ctx: Context) -> ProtocolResult<u64> {
+        let res = self.storage.get_latest_block(ctx).await?;
         Ok(res.header.height)
     }
 
     async fn get_txs_from_storage(
         &self,
-        _: Context,
+        ctx: Context,
         tx_hashes: &[Hash],
     ) -> ProtocolResult<Vec<SignedTransaction>> {
-        self.storage.get_transactions(tx_hashes.to_vec()).await
+        self.storage.get_transactions(ctx, tx_hashes.to_vec()).await
     }
 
     async fn broadcast_height(&self, ctx: Context, height: u64) -> ProtocolResult<()> {
@@ -821,26 +835,36 @@ where
             );
 
             let now = Instant::now();
-            self.save_receipts(resp.receipts.clone()).await?;
+            self.save_receipts(info.ctx.clone(), resp.receipts.clone())
+                .await?;
             log::info!(
                 "[consensus-adapter]: save receipts cost {:?} receipts len {:?}",
                 now.elapsed(),
                 resp.receipts.len(),
             );
-            self.status
-                .update_by_executed(gen_executed_info(resp.clone(), height, order_root));
+            self.status.update_by_executed(gen_executed_info(
+                info.ctx.clone(),
+                resp.clone(),
+                height,
+                order_root,
+            ));
         } else {
             return Err(ConsensusError::Other("Queue disconnect".to_string()).into());
         }
         Ok(())
     }
 
-    async fn save_receipts(&self, receipts: Vec<Receipt>) -> ProtocolResult<()> {
-        self.storage.insert_receipts(receipts).await
+    async fn save_receipts(&self, ctx: Context, receipts: Vec<Receipt>) -> ProtocolResult<()> {
+        self.storage.insert_receipts(ctx, receipts).await
     }
 }
 
-fn gen_executed_info(exec_resp: ExecutorResp, height: u64, order_root: MerkleRoot) -> ExecutedInfo {
+fn gen_executed_info(
+    ctx: Context,
+    exec_resp: ExecutorResp,
+    height: u64,
+    order_root: MerkleRoot,
+) -> ExecutedInfo {
     let cycles = exec_resp.all_cycles_used;
 
     let receipt = Merkle::from_hashes(
@@ -854,11 +878,12 @@ fn gen_executed_info(exec_resp: ExecutorResp, height: u64, order_root: MerkleRoo
     .unwrap_or_else(Hash::from_empty);
 
     ExecutedInfo {
-        exec_height:  height,
-        cycles_used:  cycles,
+        ctx,
+        exec_height: height,
+        cycles_used: cycles,
         receipt_root: receipt,
         confirm_root: order_root,
-        state_root:   exec_resp.state_root.clone(),
-        logs_bloom:   exec_resp.logs_bloom,
+        state_root: exec_resp.state_root.clone(),
+        logs_bloom: exec_resp.logs_bloom,
     }
 }

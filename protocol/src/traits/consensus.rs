@@ -184,6 +184,7 @@ pub trait ConsensusAdapter: CommonConsensusAdapter + Send + Sync {
     /// Execute some transactions.
     async fn execute(
         &self,
+        ctx: Context,
         chain_id: Hash,
         order_root: MerkleRoot,
         height: u64,

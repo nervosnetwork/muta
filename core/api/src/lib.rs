@@ -2,14 +2,15 @@ pub mod adapter;
 pub mod config;
 mod schema;
 
+use std::cmp;
+use std::convert::TryFrom;
+use std::sync::Arc;
+
 use actix_web::{web, App, Error, FromRequest, HttpResponse, HttpServer};
 use futures::executor::block_on;
 use juniper::http::GraphQLRequest;
 use juniper::FieldResult;
 use lazy_static::lazy_static;
-use std::cmp;
-use std::convert::TryFrom;
-use std::sync::Arc;
 
 use common_crypto::{
     HashValue, PrivateKey, PublicKey, Secp256k1PrivateKey, Signature, ToPublicKey,
@@ -44,6 +45,14 @@ struct Query;
 impl Query {
     #[graphql(name = "getBlock", description = "Get the block")]
     async fn get_block(state_ctx: &State, height: Option<Uint64>) -> FieldResult<Block> {
+        let ctx = Context::new();
+        let ctx = match muta_apm::MUTA_TRACER.span("API.getBlock", vec![
+            muta_apm::rustracing::tag::Tag::new("kind", "API"),
+        ]) {
+            Some(span) => ctx.with_value("parent_span_ctx", span.context().map(|cx| cx.clone())),
+            None => ctx,
+        };
+
         let height = match height {
             Some(id) => Some(id.try_into_u64()?),
             None => None,
@@ -51,7 +60,7 @@ impl Query {
 
         let block = state_ctx
             .adapter
-            .get_block_by_height(Context::new(), height)
+            .get_block_by_height(ctx.clone(), height)
             .await?;
 
         Ok(Block::from(block))
@@ -59,11 +68,19 @@ impl Query {
 
     #[graphql(name = "getTransaction", description = "Get the transaction by hash")]
     async fn get_transaction(state_ctx: &State, tx_hash: Hash) -> FieldResult<SignedTransaction> {
+        let ctx = Context::new();
+        let ctx = match muta_apm::MUTA_TRACER.span("API.get_transaction", vec![
+            muta_apm::rustracing::tag::Tag::new("kind", "API"),
+        ]) {
+            Some(span) => ctx.with_value("parent_span_ctx", span.context().map(|cx| cx.clone())),
+            None => ctx,
+        };
+
         let hash = protocol::types::Hash::from_hex(&tx_hash.as_hex())?;
 
         let stx = state_ctx
             .adapter
-            .get_transaction_by_hash(Context::new(), hash)
+            .get_transaction_by_hash(ctx.clone(), hash)
             .await?;
 
         Ok(SignedTransaction::from(stx))
@@ -74,11 +91,19 @@ impl Query {
         description = "Get the receipt by transaction hash"
     )]
     async fn get_receipt(state_ctx: &State, tx_hash: Hash) -> FieldResult<Receipt> {
+        let ctx = Context::new();
+        let ctx = match muta_apm::MUTA_TRACER.span("API.get_receipt", vec![
+            muta_apm::rustracing::tag::Tag::new("kind", "API"),
+        ]) {
+            Some(span) => ctx.with_value("parent_span_ctx", span.context().map(|cx| cx.clone())),
+            None => ctx,
+        };
+
         let hash = protocol::types::Hash::from_hex(&tx_hash.as_hex())?;
 
         let receipt = state_ctx
             .adapter
-            .get_receipt_by_tx_hash(Context::new(), hash)
+            .get_receipt_by_tx_hash(ctx.clone(), hash)
             .await?;
 
         Ok(Receipt::from(receipt))
@@ -95,6 +120,14 @@ impl Query {
         method: String,
         payload: String,
     ) -> FieldResult<ServiceResponse> {
+        let ctx = Context::new();
+        let ctx = match muta_apm::MUTA_TRACER.span("API.query_service", vec![
+            muta_apm::rustracing::tag::Tag::new("kind", "API"),
+        ]) {
+            Some(span) => ctx.with_value("parent_span_ctx", span.context().map(|cx| cx.clone())),
+            None => ctx,
+        };
+
         let height = match height {
             Some(id) => id.try_into_u64()?,
             None => {
@@ -118,7 +151,7 @@ impl Query {
         let exec_resp = state_ctx
             .adapter
             .query_service(
-                Context::new(),
+                ctx.clone(),
                 height,
                 cycles_limit,
                 cycles_price,
@@ -142,12 +175,20 @@ impl Mutation {
         input_raw: InputRawTransaction,
         input_encryption: InputTransactionEncryption,
     ) -> FieldResult<Hash> {
+        let ctx = Context::new();
+        let ctx = match muta_apm::MUTA_TRACER.span("API.send_transaction", vec![
+            muta_apm::rustracing::tag::Tag::new("kind", "API"),
+        ]) {
+            Some(span) => ctx.with_value("parent_span_ctx", span.context().map(|cx| cx.clone())),
+            None => ctx,
+        };
+
         let stx = to_signed_transaction(input_raw, input_encryption)?;
         let tx_hash = stx.tx_hash.clone();
 
         state_ctx
             .adapter
-            .insert_signed_txs(Context::new(), stx)
+            .insert_signed_txs(ctx.clone(), stx)
             .await?;
 
         Ok(Hash::from(tx_hash))
@@ -162,6 +203,14 @@ impl Mutation {
         input_raw: InputRawTransaction,
         input_privkey: Bytes,
     ) -> FieldResult<Hash> {
+        let ctx = Context::new();
+        let ctx = match muta_apm::MUTA_TRACER.span("API.unsafe_send_transaction", vec![
+            muta_apm::rustracing::tag::Tag::new("kind", "API"),
+        ]) {
+            Some(span) => ctx.with_value("parent_span_ctx", span.context().map(|cx| cx.clone())),
+            None => ctx,
+        };
+
         let raw_tx = to_transaction(input_raw)?;
         let tx_hash = protocol::types::Hash::digest(raw_tx.encode_fixed()?);
 
@@ -178,7 +227,7 @@ impl Mutation {
         };
         state_ctx
             .adapter
-            .insert_signed_txs(Context::new(), stx)
+            .insert_signed_txs(ctx.clone(), stx)
             .await?;
 
         Ok(Hash::from(tx_hash))

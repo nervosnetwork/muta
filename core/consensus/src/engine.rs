@@ -54,6 +54,7 @@ pub struct ConsensusEngine<Adapter> {
 
 #[async_trait]
 impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<Adapter> {
+    #[muta_apm::derive::tracing_span(kind = "consensus", logs = "{'next_height': 'next_height'}")]
     async fn get_block(
         &self,
         ctx: Context,
@@ -137,6 +138,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         Ok((fixed_pill, hash))
     }
 
+    #[muta_apm::derive::tracing_span]
     async fn check_block(
         &self,
         ctx: Context,
@@ -242,6 +244,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
     /// **TODO:** the overlord interface and process needs to be changed.
     /// Get the `FixedSignedTxs` from the argument rather than get it from
     /// mempool.
+    #[muta_apm::derive::tracing_span]
     async fn commit(
         &self,
         ctx: Context,
@@ -303,6 +306,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         loop {
             if self
                 .exec(
+                    ctx.clone(),
                     pill.block.header.order_root.clone(),
                     current_height,
                     pill.block.header.proposer.clone(),
@@ -365,6 +369,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
     }
 
     /// Only signed proposal and aggregated vote will be broadcast to others.
+    #[muta_apm::derive::tracing_span]
     async fn broadcast_to_other(
         &self,
         ctx: Context,
@@ -396,6 +401,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
     }
 
     /// Only signed vote will be transmit to the relayer.
+    #[muta_apm::derive::tracing_span]
     async fn transmit_to_relayer(
         &self,
         ctx: Context,
@@ -432,6 +438,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
 
     /// This function is rarely used, so get the authority list from the
     /// RocksDB.
+    #[muta_apm::derive::tracing_span]
     async fn get_authority_list(
         &self,
         ctx: Context,
@@ -512,6 +519,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
 
     pub async fn exec(
         &self,
+        ctx: Context,
         order_root: MerkleRoot,
         height: u64,
         address: Address,
@@ -523,6 +531,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
 
         self.adapter
             .execute(
+                ctx,
                 self.node_info.chain_id.clone(),
                 order_root,
                 height,

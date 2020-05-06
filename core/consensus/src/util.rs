@@ -10,6 +10,7 @@ use common_crypto::{
     BlsCommonReference, BlsPrivateKey, BlsPublicKey, BlsSignature, BlsSignatureVerify, HashValue,
     PrivateKey, Signature,
 };
+use protocol::traits::Context;
 use protocol::types::{Address, Hash, MerkleRoot, SignedTransaction};
 use protocol::{Bytes, ProtocolError};
 
@@ -140,6 +141,7 @@ impl OverlordCrypto {
 
 #[derive(Clone, Debug)]
 pub struct ExecuteInfo {
+    pub ctx:          Context,
     pub height:       u64,
     pub chain_id:     Hash,
     pub block_hash:   Hash,

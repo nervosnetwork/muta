@@ -224,7 +224,7 @@ impl<R: Rpc + 'static, S: Storage + 'static> MessageHandler for PullBlockRpcHand
         let id = msg.inner;
         let ret = self
             .storage
-            .get_block_by_height(id)
+            .get_block_by_height(ctx.clone(), id)
             .await
             .map(FixedBlock::new);
         self.rpc
@@ -258,12 +258,16 @@ impl<R: Rpc + 'static, S: Storage + 'static> MessageHandler for PullProofRpcHand
 
     async fn process(&self, ctx: Context, height: FixedHeight) -> TrustFeedback {
         let height = height.inner;
-        let latest_proof = self.storage.get_latest_proof().await;
+        let latest_proof = self.storage.get_latest_proof(ctx.clone()).await;
 
         let ret = match latest_proof {
             Ok(latest_proof) => match height {
                 height if height < latest_proof.height => {
-                    match self.storage.get_block_by_height(height + 1).await {
+                    match self
+                        .storage
+                        .get_block_by_height(ctx.clone(), height + 1)
+                        .await
+                    {
                         Ok(next_block) => Ok(next_block.header.proof),
                         Err(_) => Err(StorageError::GetNone.into()),
                     }
@@ -312,7 +316,7 @@ impl<R: Rpc + 'static, S: Storage + 'static> MessageHandler for PullTxsRpcHandle
         let futs = msg
             .inner
             .into_iter()
-            .map(|tx_hash| self.storage.get_transaction_by_hash(tx_hash))
+            .map(|tx_hash| self.storage.get_transaction_by_hash(ctx.clone(), tx_hash))
             .collect::<Vec<_>>();
         let ret = try_join_all(futs).await.map(FixedSignedTxs::new);
 

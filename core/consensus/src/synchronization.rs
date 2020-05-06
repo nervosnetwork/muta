@@ -393,9 +393,12 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
             timestamp: rich_block.block.header.timestamp,
             cycles_limit,
         };
-        let resp = self.adapter.sync_exec(ctx, &exec_params, &rich_block.txs)?;
+        let resp = self
+            .adapter
+            .sync_exec(ctx.clone(), &exec_params, &rich_block.txs)?;
 
         status_agent.update_by_executed(ExecutedInfo::new(
+            ctx,
             rich_block.block.header.height,
             rich_block.block.header.order_root,
             resp.clone(),
