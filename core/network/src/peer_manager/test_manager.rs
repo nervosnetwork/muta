@@ -2952,3 +2952,36 @@ async fn should_setup_trust_metric_if_none_on_session_blocked() {
         "should have 1 bad event"
     );
 }
+
+#[tokio::test]
+async fn should_update_chain_book_on_new_session() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+
+    let remote_peer = make_peer(2077);
+    let remote_pubkey = remote_peer.owned_pubkey().expect("pubkey");
+    let remote_peer_id = remote_peer.owned_id();
+    let remote_addr = remote_peer.multiaddrs.all_raw().pop().expect("multiaddr");
+    let remote_chain_addr = remote_peer.owned_chain_addr().expect("chain addr");
+
+    let sess_ctx = SessionContext::make(
+        SessionId::new(1),
+        remote_addr.clone(),
+        SessionType::Inbound,
+        remote_pubkey.clone(),
+    );
+    let new_session = PeerManagerEvent::NewSession {
+        pid:    remote_peer_id.clone(),
+        pubkey: remote_pubkey.clone(),
+        ctx:    sess_ctx.arced(),
+    };
+    mgr.poll_event(new_session).await;
+
+    let inner = mgr.core_inner();
+    assert_eq!(inner.connected(), 1, "should have one without bootstrap");
+
+    let peer_by_chain = inner.peer_by_chain(&remote_chain_addr);
+    assert!(peer_by_chain.is_some(), "should insert peer to chain book");
+
+    let peer_id = peer_by_chain.map(|p| p.owned_id());
+    assert_eq!(peer_id, Some(remote_peer_id), "should be peer in session");
+}

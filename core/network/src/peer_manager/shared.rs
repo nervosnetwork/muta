@@ -79,12 +79,11 @@ impl SessionBook for SharedSessions {
         let mut connected = Vec::new();
         let mut unconnected = Vec::new();
         for addr in addrs {
-            if let Some(peer) = chain.get(&addr) {
-                if peer.connectedness() == Connectedness::Connected {
+            match chain.get(&addr) {
+                Some(peer) if peer.connectedness() == Connectedness::Connected => {
                     connected.push(peer.session_id());
-                } else {
-                    unconnected.push(addr);
                 }
+                _ => unconnected.push(addr),
             }
         }
 
@@ -133,5 +132,41 @@ impl SessionBook for SharedSessions {
             .iter()
             .map(|p| p.owned_chain_addr())
             .collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{SessionBook, SharedSessions, SharedSessionsConfig};
+    use crate::peer_manager::{Inner, Peer};
+
+    use tentacle::secio::SecioKeyPair;
+
+    use std::sync::Arc;
+
+    #[test]
+    fn should_push_not_found_chain_addr_to_unconneded_on_by_chain() {
+        let sess_conf = SharedSessionsConfig {
+            max_stream_window_size: 10,
+            write_timeout:          10,
+        };
+
+        let inner = Arc::new(Inner::new());
+        let sessions = SharedSessions::new(Arc::clone(&inner), sess_conf);
+
+        let keypair = SecioKeyPair::secp256k1_generated();
+        let pubkey = keypair.public_key();
+        let chain_addr = Peer::pubkey_to_chain_addr(&pubkey).expect("chain addr");
+
+        assert!(
+            inner.peer_by_chain(&chain_addr).is_none(),
+            "should not be registered"
+        );
+
+        let (_, unconnected) = sessions.by_chain(vec![chain_addr.clone()]);
+        assert!(
+            unconnected.contains(&chain_addr),
+            "should be inserted to unconnected"
+        );
     }
 }
