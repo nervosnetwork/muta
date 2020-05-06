@@ -65,7 +65,6 @@ where
             log::error!("[core_mempool] mempool batch insert error");
         }
 
-        // FIXME
         TrustFeedback::Neutral
     }
 }
@@ -122,7 +121,6 @@ where
             .unwrap_or_else(move |err| log::warn!("[core_mempool] push txs {}", err))
             .await;
 
-        // FIXME
         TrustFeedback::Neutral
     }
 }
