@@ -9,6 +9,7 @@ use futures::lock::Mutex;
 use futures_timer::Delay;
 use log::error;
 use moodyblues_sdk::trace;
+use overlord::error::ConsensusError as OverlordError;
 use overlord::types::{Commit, Node, OverlordMsg, Status};
 use overlord::{Consensus as Engine, DurationConfig, Wal};
 use parking_lot::RwLock;
@@ -19,7 +20,7 @@ use common_crypto::BlsPublicKey;
 use common_merkle::Merkle;
 
 use protocol::fixed_codec::FixedCodec;
-use protocol::traits::{ConsensusAdapter, Context, MessageTarget, NodeInfo};
+use protocol::traits::{ConsensusAdapter, Context, MessageTarget, NodeInfo, TrustFeedback};
 use protocol::types::{
     Address, Block, BlockHeader, Hash, MerkleRoot, Metadata, Pill, Proof, SignedTransaction,
     Validator,
@@ -461,6 +462,15 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             .collect::<Vec<_>>();
         old_validators.sort();
         Ok(old_validators)
+    }
+
+    fn report_error(&self, ctx: Context, err: OverlordError) {
+        match err {
+            OverlordError::CryptoErr(_) | OverlordError::AggregatedSignatureErr(_) => self
+                .adapter
+                .report_bad(ctx, TrustFeedback::Worse(err.to_string())),
+            _ => (),
+        }
     }
 }
 

@@ -15,8 +15,8 @@ use common_merkle::Merkle;
 
 use protocol::traits::{
     CommonConsensusAdapter, ConsensusAdapter, Context, ExecutorFactory, ExecutorParams,
-    ExecutorResp, Gossip, MemPool, MessageTarget, MixedTxHashes, Priority, Rpc, ServiceMapping,
-    Storage, SynchronizationAdapter,
+    ExecutorResp, Gossip, MemPool, MessageTarget, MixedTxHashes, PeerTrust, Priority, Rpc,
+    ServiceMapping, Storage, SynchronizationAdapter, TrustFeedback,
 };
 use protocol::types::{
     Address, Block, Bytes, Hash, MerkleRoot, Metadata, Proof, Receipt, SignedTransaction,
@@ -41,15 +41,13 @@ const OVERLORD_GAP: usize = 10;
 
 pub struct OverlordConsensusAdapter<
     EF: ExecutorFactory<DB, S, Mapping>,
-    G: Gossip,
     M: MemPool,
-    R: Rpc,
+    N: Rpc + PeerTrust + Gossip + 'static,
     S: Storage,
     DB: cita_trie::DB,
     Mapping: ServiceMapping,
 > {
-    rpc:              Arc<R>,
-    network:          Arc<G>,
+    network:          Arc<N>,
     mempool:          Arc<M>,
     storage:          Arc<S>,
     trie_db:          Arc<DB>,
@@ -62,13 +60,12 @@ pub struct OverlordConsensusAdapter<
 }
 
 #[async_trait]
-impl<EF, G, M, R, S, DB, Mapping> ConsensusAdapter
-    for OverlordConsensusAdapter<EF, G, M, R, S, DB, Mapping>
+impl<EF, M, N, S, DB, Mapping> ConsensusAdapter
+    for OverlordConsensusAdapter<EF, M, N, S, DB, Mapping>
 where
     EF: ExecutorFactory<DB, S, Mapping>,
-    G: Gossip + Sync + Send,
-    R: Rpc + Sync + Send,
     M: MemPool + 'static,
+    N: Rpc + PeerTrust + Gossip + 'static,
     S: Storage + 'static,
     DB: cita_trie::DB + 'static,
     Mapping: ServiceMapping + 'static,
@@ -169,7 +166,7 @@ where
     async fn pull_block(&self, ctx: Context, height: u64, end: &str) -> ProtocolResult<Block> {
         log::debug!("consensus: send rpc pull block {}", height);
         let res = self
-            .rpc
+            .network
             .call::<FixedHeight, FixedBlock>(ctx, end, FixedHeight::new(height), Priority::High)
             .await?;
         Ok(res.inner)
@@ -183,7 +180,7 @@ where
     ) -> ProtocolResult<Vec<SignedTransaction>> {
         log::debug!("consensus: send rpc pull txs");
         let res = self
-            .rpc
+            .network
             .call::<PullTxsRequest, FixedSignedTxs>(
                 ctx,
                 end,
@@ -211,13 +208,12 @@ where
 }
 
 #[async_trait]
-impl<EF, G, M, R, S, DB, Mapping> SynchronizationAdapter
-    for OverlordConsensusAdapter<EF, G, M, R, S, DB, Mapping>
+impl<EF, M, N, S, DB, Mapping> SynchronizationAdapter
+    for OverlordConsensusAdapter<EF, M, N, S, DB, Mapping>
 where
     EF: ExecutorFactory<DB, S, Mapping>,
-    G: Gossip + Sync + Send,
-    R: Rpc + Sync + Send,
     M: MemPool + 'static,
+    N: Rpc + PeerTrust + Gossip + 'static,
     S: Storage + 'static,
     DB: cita_trie::DB + 'static,
     Mapping: ServiceMapping + 'static,
@@ -273,7 +269,7 @@ where
     /// Pull some blocks from other nodes from `begin` to `end`.
     async fn get_block_from_remote(&self, ctx: Context, height: u64) -> ProtocolResult<Block> {
         let res = self
-            .rpc
+            .network
             .call::<FixedHeight, FixedBlock>(
                 ctx,
                 RPC_SYNC_PULL_BLOCK,
@@ -292,7 +288,7 @@ where
         hashes: &[Hash],
     ) -> ProtocolResult<Vec<SignedTransaction>> {
         let res = self
-            .rpc
+            .network
             .call::<PullTxsRequest, FixedSignedTxs>(
                 ctx,
                 RPC_SYNC_PULL_TXS,
@@ -306,7 +302,7 @@ where
     /// Pull a proof of certain block from other nodes
     async fn get_proof_from_remote(&self, ctx: Context, height: u64) -> ProtocolResult<Proof> {
         let ret = self
-            .rpc
+            .network
             .call::<FixedHeight, FixedProof>(
                 ctx.clone(),
                 RPC_SYNC_PULL_PROOF,
@@ -333,13 +329,12 @@ where
 }
 
 #[async_trait]
-impl<EF, G, M, R, S, DB, Mapping> CommonConsensusAdapter
-    for OverlordConsensusAdapter<EF, G, M, R, S, DB, Mapping>
+impl<EF, M, N, S, DB, Mapping> CommonConsensusAdapter
+    for OverlordConsensusAdapter<EF, M, N, S, DB, Mapping>
 where
     EF: ExecutorFactory<DB, S, Mapping>,
-    G: Gossip + Sync + Send,
-    R: Rpc + Sync + Send,
     M: MemPool + 'static,
+    N: Rpc + PeerTrust + Gossip + 'static,
     S: Storage + 'static,
     DB: cita_trie::DB + 'static,
     Mapping: ServiceMapping + 'static,
@@ -426,6 +421,10 @@ where
         })?;
 
         Ok(serde_json::from_str(&exec_resp.succeed_data).expect("Decode metadata failed!"))
+    }
+
+    fn report_bad(&self, ctx: Context, feedback: TrustFeedback) {
+        self.network.report(ctx, feedback);
     }
 
     fn set_args(&self, _context: Context, timeout_gap: u64, cycles_limit: u64, max_tx_size: u64) {
@@ -699,19 +698,17 @@ where
     }
 }
 
-impl<EF, G, M, R, S, DB, Mapping> OverlordConsensusAdapter<EF, G, M, R, S, DB, Mapping>
+impl<EF, M, N, S, DB, Mapping> OverlordConsensusAdapter<EF, M, N, S, DB, Mapping>
 where
     EF: ExecutorFactory<DB, S, Mapping>,
-    G: Gossip + Sync + Send,
-    R: Rpc + Sync + Send,
     M: MemPool + 'static,
+    N: Rpc + PeerTrust + Gossip + 'static,
     S: Storage + 'static,
     DB: cita_trie::DB + 'static,
     Mapping: ServiceMapping + 'static,
 {
     pub fn new(
-        rpc: Arc<R>,
-        network: Arc<G>,
+        network: Arc<N>,
         mempool: Arc<M>,
         storage: Arc<S>,
         trie_db: Arc<DB>,
@@ -729,7 +726,6 @@ where
         ));
 
         let adapter = OverlordConsensusAdapter {
-            rpc,
             network,
             mempool,
             storage,

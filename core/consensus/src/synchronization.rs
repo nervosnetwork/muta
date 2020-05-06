@@ -82,6 +82,7 @@ impl<Adapter: SynchronizationAdapter> Synchronization for OverlordSynchronizatio
                 sync_status.latest_committed_height,
                 e
             );
+            return Err(e);
         }
 
         self.status.replace(sync_status.clone());

@@ -350,8 +350,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     let crypto = Arc::new(OverlordCrypto::new(bls_priv_key, bls_pub_keys, common_ref));
 
     let mut consensus_adapter =
-        OverlordConsensusAdapter::<ServiceExecutorFactory, _, _, _, _, _, _>::new(
-            Arc::new(network_service.handle()),
+        OverlordConsensusAdapter::<ServiceExecutorFactory, _, _, _, _, _>::new(
             Arc::new(network_service.handle()),
             Arc::clone(&mempool),
             Arc::clone(&storage),

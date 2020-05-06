@@ -36,7 +36,7 @@ impl<Adapter: ConsensusAdapter + 'static> Consensus for OverlordConsensus<Adapte
             .map_err(|_| ConsensusError::DecodeErr(ConsensusType::SignedProposal))?;
         self.handler
             .send_msg(ctx, OverlordMsg::SignedProposal(signed_proposal))
-            .map_err(|e| ConsensusError::OverlordErr(Box::new(e)))?;
+            .expect("Overlord handler disconnect");
         Ok(())
     }
 
@@ -45,7 +45,7 @@ impl<Adapter: ConsensusAdapter + 'static> Consensus for OverlordConsensus<Adapte
             rlp::decode(&vote).map_err(|_| ConsensusError::DecodeErr(ConsensusType::SignedVote))?;
         self.handler
             .send_msg(ctx, OverlordMsg::SignedVote(signed_vote))
-            .map_err(|e| ConsensusError::OverlordErr(Box::new(e)))?;
+            .expect("Overlord handler disconnect");
         Ok(())
     }
 
@@ -54,7 +54,7 @@ impl<Adapter: ConsensusAdapter + 'static> Consensus for OverlordConsensus<Adapte
             .map_err(|_| ConsensusError::DecodeErr(ConsensusType::AggregateVote))?;
         self.handler
             .send_msg(ctx, OverlordMsg::AggregatedVote(aggregated_vote))
-            .map_err(|e| ConsensusError::OverlordErr(Box::new(e)))?;
+            .expect("Overlord handler disconnect");
         Ok(())
     }
 
@@ -63,7 +63,7 @@ impl<Adapter: ConsensusAdapter + 'static> Consensus for OverlordConsensus<Adapte
             .map_err(|_| ConsensusError::DecodeErr(ConsensusType::SignedChoke))?;
         self.handler
             .send_msg(ctx, OverlordMsg::SignedChoke(signed_choke))
-            .map_err(|e| ConsensusError::OverlordErr(Box::new(e)))?;
+            .expect("Overlord handler disconnect");
         Ok(())
     }
 }
@@ -90,7 +90,7 @@ impl<Adapter: ConsensusAdapter + 'static> OverlordConsensus<Adapter> {
             node_info.self_address.as_bytes(),
             Arc::clone(&engine),
             crypto,
-            Arc::clone(&engine),
+            engine,
         );
         let overlord_handler = overlord.get_handler();
         let status = status_agent.to_inner();
