@@ -195,7 +195,8 @@ impl Mutation {
         if let Err(err) = state_ctx
             .adapter
             .insert_signed_txs(ctx.clone(), stx)
-            .await {
+            .await
+        {
             if err.to_string().contains("already commit") {
                 common_metrics::api::REPEATED_TX_COUNT.inc();
             }
@@ -270,6 +271,17 @@ async fn graphql(
         .body(res))
 }
 
+async fn metrics() -> HttpResponse {
+    let metrics_data = match common_metrics::all_metrics() {
+        Ok(data) => data,
+        Err(e) => e.to_string().into_bytes(),
+    };
+
+    HttpResponse::Ok()
+        .content_type("text/plain; charset=utf-8")
+        .body(metrics_data)
+}
+
 pub async fn start_graphql<Adapter: APIAdapter + 'static>(cfg: GraphQLConfig, adapter: Adapter) {
     let schema = Schema::new(Query, Mutation);
 
@@ -297,6 +309,7 @@ pub async fn start_graphql<Adapter: APIAdapter + 'static>(cfg: GraphQLConfig, ad
                     .route(web::post().to(graphql)),
             )
             .service(web::resource(&path_graphiql_uri).route(web::get().to(graphiql)))
+            .service(web::resource("/metrics").route(web::get().to(metrics)))
     })
     .workers(workers)
     .maxconn(cmp::max(maxconn / workers, 1))
