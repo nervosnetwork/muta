@@ -12,3 +12,4 @@ protocol = { path = "../../protocol", package = "muta-protocol" }
 
 prometheus = "0.8"
 derive_more = "0.99"
+lazy_static = "1.4"

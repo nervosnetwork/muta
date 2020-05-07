@@ -1,3 +1,5 @@
+pub mod api;
+
 use derive_more::Display;
 use prometheus::{Encoder, TextEncoder};
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
@@ -34,7 +36,7 @@ pub fn all_metrics() -> ProtocolResult<Vec<u8>> {
 
     let mut encoded_metrics = vec![];
     encoder
-        .encode(metric_families, encoded_metrics)
+        .encode(&metric_families, &mut encoded_metrics)
         .map_err(Error::Prometheus)?;
 
     Ok(encoded_metrics)
