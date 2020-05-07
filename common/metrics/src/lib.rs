@@ -10,6 +10,8 @@ pub use prometheus::{
     IntGauge, IntGaugeVec,
 };
 
+use std::time::Duration;
+
 #[derive(Debug, Display)]
 enum Error {
     #[display(fmt = "promtheus {}", _0)]
@@ -29,6 +31,20 @@ impl From<Error> for ProtocolError {
 }
 
 impl std::error::Error for Error {}
+
+pub struct DurationHistogram(Histogram);
+
+impl DurationHistogram {
+    pub fn new(histogram: Histogram) -> DurationHistogram {
+        DurationHistogram(histogram)
+    }
+
+    pub fn observe_duration(&self, d: Duration) {
+        // Duration is full seconds + nanos elapsed from the previous full second
+        let v = d.as_secs_f64() + f64::from(d.subsec_nanos()) / 1e9;
+        self.0.observe(v);
+    }
+}
 
 pub fn all_metrics() -> ProtocolResult<Vec<u8>> {
     let metric_families = prometheus::gather();
