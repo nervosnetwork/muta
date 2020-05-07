@@ -241,6 +241,13 @@ impl Inner {
         self.trust_score() < KNOCK_OUT_SCORE
     }
 
+    pub fn events(&self) -> (usize, usize) {
+        let good_events = self.good_events.load(SeqCst);
+        let bad_events = self.bad_events.load(SeqCst);
+
+        (good_events, bad_events)
+    }
+
     pub fn enter_new_interval(&self) {
         let latest_trust_value = self.trust_value();
         log::debug!(target: "network-trust-metric", "enter new interval, lastest trust value {}", latest_trust_value);

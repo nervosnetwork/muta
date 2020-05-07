@@ -344,8 +344,10 @@ impl NetworkConfig {
         }
     }
 
-    pub fn ping_interval(mut self, interval: u64) -> Self {
-        self.ping_interval = Duration::from_secs(interval);
+    pub fn ping_interval(mut self, interval: Option<u64>) -> Self {
+        if let Some(interval) = interval {
+            self.ping_interval = Duration::from_secs(interval);
+        }
 
         self
     }

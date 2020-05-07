@@ -22,6 +22,8 @@ use protocol::{
     ProtocolResult,
 };
 
+#[cfg(feature = "diagnostic")]
+use crate::peer_manager::diagnostic::Diagnostic;
 use crate::{
     common::{socket_to_multi_addr, HeartBeat},
     compression::Snappy,
@@ -49,6 +51,9 @@ pub struct NetworkServiceHandle {
     gossip:     NetworkGossip<ConnectionServiceControl<CoreProtocol, SharedSessions>, Snappy>,
     rpc:        NetworkRpc<ConnectionServiceControl<CoreProtocol, SharedSessions>, Snappy>,
     peer_trust: UnboundedSender<PeerManagerEvent>,
+
+    #[cfg(feature = "diagnostic")]
+    pub diagnostic: Diagnostic,
 }
 
 #[async_trait]
@@ -153,6 +158,10 @@ pub struct NetworkService {
 
     // Self check
     selfcheck: Option<SelfCheck<SharedSessions>>,
+
+    // Diagnostic
+    #[cfg(feature = "diagnostic")]
+    diagnostic: Diagnostic,
 }
 
 impl NetworkService {
@@ -172,6 +181,8 @@ impl NetworkService {
         let mut peer_mgr = PeerManager::new(mgr_config, mgr_rx, conn_tx.clone());
         let peer_mgr_handle = peer_mgr.handle();
         let session_book = peer_mgr.share_session_book((&config).into());
+        #[cfg(feature = "diagnostic")]
+        let diagnostic = peer_mgr.diagnostic();
 
         if config.enable_save_restore {
             peer_mgr.enable_save_restore();
@@ -237,6 +248,9 @@ impl NetworkService {
             router: Some(router),
 
             selfcheck: Some(selfcheck),
+
+            #[cfg(feature = "diagnostic")]
+            diagnostic,
         }
     }
 
@@ -295,6 +309,9 @@ impl NetworkService {
             gossip:     self.gossip.clone(),
             rpc:        self.rpc.clone(),
             peer_trust: self.mgr_tx.clone(),
+
+            #[cfg(feature = "diagnostic")]
+            diagnostic:                                self.diagnostic.clone(),
         }
     }
 

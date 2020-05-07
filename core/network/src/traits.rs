@@ -76,21 +76,18 @@ pub trait MultiaddrExt {
 }
 
 #[derive(Debug, Clone)]
-struct CtxSessionId(SessionId);
-
-#[derive(Debug, Clone)]
 struct CtxRpcId(u64);
 
 impl NetworkContext for Context {
     fn session_id(&self) -> Result<SessionId, NetworkError> {
-        self.get::<CtxSessionId>("session_id")
-            .map(|ctx_sid| ctx_sid.0)
+        self.get::<usize>("session_id")
+            .map(|sid| SessionId::new(*sid))
             .ok_or_else(|| ErrorKind::NoSessionId.into())
     }
 
     #[must_use]
     fn set_session_id(&mut self, sid: SessionId) -> Self {
-        self.with_value::<CtxSessionId>("session_id", CtxSessionId(sid))
+        self.with_value::<usize>("session_id", sid.value())
     }
 
     fn remote_peer_id(&self) -> Result<PeerId, NetworkError> {

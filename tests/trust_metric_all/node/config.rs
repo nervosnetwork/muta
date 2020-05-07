@@ -8,19 +8,6 @@ use core_mempool::{DEFAULT_BROADCAST_TXS_INTERVAL, DEFAULT_BROADCAST_TXS_SIZE};
 use protocol::types::Hex;
 
 #[derive(Debug, Deserialize)]
-pub struct ConfigGraphQL {
-    pub listening_address: SocketAddr,
-    pub graphql_uri:       String,
-    pub graphiql_uri:      String,
-    #[serde(default)]
-    pub workers:           usize,
-    #[serde(default)]
-    pub maxconn:           usize,
-    #[serde(default)]
-    pub max_payload_size:  usize,
-}
-
-#[derive(Debug, Deserialize)]
 pub struct ConfigNetwork {
     pub bootstraps:                 Option<Vec<ConfigNetworkBootstrap>>,
     pub whitelist:                  Option<Vec<String>>,
@@ -84,17 +71,6 @@ pub struct ConfigExecutor {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct ConfigRocksDB {
-    pub max_open_files: i32,
-}
-
-impl Default for ConfigRocksDB {
-    fn default() -> Self {
-        Self { max_open_files: 64 }
-    }
-}
-
-#[derive(Debug, Deserialize)]
 pub struct ConfigLogger {
     pub filter:                     String,
     pub log_to_console:             bool,
@@ -123,11 +99,8 @@ impl Default for ConfigLogger {
 #[derive(Debug, Deserialize)]
 pub struct Config {
     // crypto
-    pub privkey:   Hex,
-    // db config
-    pub data_path: PathBuf,
+    pub privkey: Hex,
 
-    pub graphql:   ConfigGraphQL,
     pub network:   ConfigNetwork,
     pub mempool:   ConfigMempool,
     pub executor:  ConfigExecutor,
@@ -135,28 +108,4 @@ pub struct Config {
     pub consensus: ConfigConsensus,
     #[serde(default)]
     pub logger:    ConfigLogger,
-    #[serde(default)]
-    pub rocksdb:   ConfigRocksDB,
-}
-
-impl Config {
-    pub fn data_path_for_state(&self) -> PathBuf {
-        let mut path_state = self.data_path.clone();
-        path_state.push("rocksdb");
-        path_state.push("state_data");
-        path_state
-    }
-
-    pub fn data_path_for_block(&self) -> PathBuf {
-        let mut path_state = self.data_path.clone();
-        path_state.push("rocksdb");
-        path_state.push("block_data");
-        path_state
-    }
-
-    pub fn data_path_for_txs_wal(&self) -> PathBuf {
-        let mut path_state = self.data_path.clone();
-        path_state.push("txs_wal");
-        path_state
-    }
 }
