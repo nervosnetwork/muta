@@ -8,3 +8,7 @@ repository = "https://github.com/nervosnetwork/muta"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+protocol = { path = "../../protocol", package = "muta-protocol" }
+
+prometheus = "0.8"
+derive_more = "0.99"
