@@ -166,7 +166,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         // If the block is proposed by self, it does not need to check. Get full signed
         // transactions directly.
         if !exemption {
-            self.check_block_roots(&block.inner.block.header)?;
+            self.check_block_roots(ctx.clone(), &block.inner.block.header)?;
 
             self.adapter
                 .verify_block_header(ctx.clone(), block.inner.block.clone())
@@ -532,6 +532,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
         }
     }
 
+    #[muta_apm::derive::tracing_span(kind = "consensus.engine")]
     pub async fn exec(
         &self,
         ctx: Context,
@@ -560,7 +561,8 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
             .await
     }
 
-    fn check_block_roots(&self, block: &BlockHeader) -> ProtocolResult<()> {
+    #[muta_apm::derive::tracing_span(kind = "consensus.engine")]
+    fn check_block_roots(&self, ctx: Context, block: &BlockHeader) -> ProtocolResult<()> {
         let status = self.status_agent.to_inner();
 
         // check previous hash

@@ -184,6 +184,7 @@ pub trait ConsensusAdapter: CommonConsensusAdapter + Send + Sync {
     ) -> ProtocolResult<()>;
 
     /// Execute some transactions.
+    #[allow(clippy::too_many_arguments)]
     async fn execute(
         &self,
         ctx: Context,

@@ -839,7 +839,10 @@ where
         }
     }
 
-    #[muta_apm::derive::tracing_span(kind = "consensus.adapter", logs = "{'height': 'info.height', 'txs_len': 'info.signed_txs.len()'}")]
+    #[muta_apm::derive::tracing_span(
+        kind = "consensus.adapter",
+        logs = "{'height': 'info.height', 'txs_len': 'info.signed_txs.len()'}"
+    )]
     async fn exec(&self, ctx: Context, info: ExecuteInfo) -> ProtocolResult<()> {
         let height = info.height;
         let txs = info.signed_txs.clone();
@@ -884,7 +887,10 @@ where
         Ok(())
     }
 
-    #[muta_apm::derive::tracing_span(kind = "consensus.adapter", logs = "{'receipts_len': 'receipts.len()'}")]
+    #[muta_apm::derive::tracing_span(
+        kind = "consensus.adapter",
+        logs = "{'receipts_len': 'receipts.len()'}"
+    )]
     async fn save_receipts(&self, ctx: Context, receipts: Vec<Receipt>) -> ProtocolResult<()> {
         self.storage.insert_receipts(ctx, receipts).await
     }
