@@ -11,5 +11,6 @@ repository = "https://github.com/nervosnetwork/muta"
 protocol = { path = "../../protocol", package = "muta-protocol" }
 
 prometheus = "0.8"
+prometheus-static-metric = "0.2"
 derive_more = "0.99"
 lazy_static = "1.4"

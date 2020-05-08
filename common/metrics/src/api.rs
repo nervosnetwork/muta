@@ -1,4 +1,7 @@
-use super::{register_histogram, register_int_counter, DurationHistogram, IntCounter};
+use super::{
+    make_static_metric, register_static_histogram_vec, register_static_int_counter_vec,
+    DurationHistogram, IntCounter,
+};
 
 use lazy_static::lazy_static;
 

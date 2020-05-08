@@ -2,13 +2,14 @@ pub mod api;
 
 use derive_more::Display;
 use prometheus::{Encoder, TextEncoder};
+use prometheus_static_metric::make_static_metric;
+pub use prometheus_static_metric::{
+    register_static_counter_vec, register_static_gauge_vec, register_static_histogram_vec,
+    register_static_int_counter_vec, register_static_int_gauge_vec,
+};
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
-pub use prometheus::{
-    register_histogram, register_histogram_vec, register_int_counter, register_int_counter_vec,
-    register_int_gauge, register_int_gauge_vec, Histogram, HistogramVec, IntCounter, IntCounterVec,
-    IntGauge, IntGaugeVec,
-};
+pub use prometheus::{Histogram, HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec};
 
 use std::time::Duration;
 
