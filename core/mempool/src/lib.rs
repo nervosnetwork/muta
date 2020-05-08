@@ -94,7 +94,7 @@ where
     async fn insert_tx(
         &self,
         ctx: Context,
-        tx: SignedTransaction,
+        mut tx: SignedTransaction,
         tx_type: TxType,
     ) -> ProtocolResult<()> {
         let _lock = self.flush_lock.read().await;
@@ -102,9 +102,12 @@ where
         let tx_hash = &tx.tx_hash;
         self.tx_cache.check_reach_limit(self.pool_size).await?;
         self.tx_cache.check_exist(tx_hash).await?;
-        self.adapter
+        let sender = self
+            .adapter
             .check_signature(ctx.clone(), tx.clone())
             .await?;
+        tx.sender = Some(sender);
+
         self.adapter
             .check_transaction(ctx.clone(), tx.clone())
             .await?;

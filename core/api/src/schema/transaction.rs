@@ -1,6 +1,6 @@
 use protocol::ProtocolResult;
 
-use crate::schema::{Bytes, Hash, SchemaError, Uint64};
+use crate::schema::{Hash, Uint64};
 
 #[derive(juniper::GraphQLObject, Clone)]
 pub struct SignedTransaction {
@@ -13,12 +13,14 @@ pub struct SignedTransaction {
     pub method:       String,
     pub payload:      String,
     pub tx_hash:      Hash,
-    pub pubkey:       Bytes,
-    pub signature:    Bytes,
+    pub witness:      String,
 }
 
 impl From<protocol::types::SignedTransaction> for SignedTransaction {
     fn from(stx: protocol::types::SignedTransaction) -> Self {
+        let wit_str =
+            String::from_utf8(stx.witness.to_vec()).expect("tx witness from bytes to string error");
+
         Self {
             chain_id:     Hash::from(stx.raw.chain_id),
             cycles_limit: Uint64::from(stx.raw.cycles_limit),
@@ -29,8 +31,7 @@ impl From<protocol::types::SignedTransaction> for SignedTransaction {
             method:       stx.raw.request.method,
             payload:      stx.raw.request.payload,
             tx_hash:      Hash::from(stx.tx_hash),
-            pubkey:       Bytes::from(stx.pubkey),
-            signature:    Bytes::from(stx.signature),
+            witness:      wit_str,
         }
     }
 }
@@ -72,26 +73,20 @@ pub struct InputRawTransaction {
 #[graphql(description = "Signature of the transaction")]
 pub struct InputTransactionEncryption {
     #[graphql(description = "The digest of the transaction")]
-    pub tx_hash:   Hash,
-    #[graphql(description = "The public key of transfer")]
-    pub pubkey:    Bytes,
-    #[graphql(description = "The signature of the transaction")]
-    pub signature: Bytes,
+    pub tx_hash: Hash,
+    #[graphql(description = "The witness of transaction")]
+    pub witness: String,
 }
 
 pub fn to_signed_transaction(
     raw: InputRawTransaction,
     encryption: InputTransactionEncryption,
 ) -> ProtocolResult<protocol::types::SignedTransaction> {
-    let pubkey: &[u8] = &hex::decode(encryption.pubkey.as_hex()?).map_err(SchemaError::from)?;
-    let signature: &[u8] =
-        &hex::decode(encryption.signature.as_hex()?).map_err(SchemaError::from)?;
-
     Ok(protocol::types::SignedTransaction {
-        raw:       to_transaction(raw)?,
-        tx_hash:   protocol::types::Hash::from_hex(&encryption.tx_hash.as_hex())?,
-        pubkey:    bytes::BytesMut::from(pubkey).freeze(),
-        signature: bytes::BytesMut::from(signature).freeze(),
+        raw:     to_transaction(raw)?,
+        tx_hash: protocol::types::Hash::from_hex(&encryption.tx_hash.as_hex())?,
+        witness: bytes::Bytes::from(encryption.witness.to_uppercase()),
+        sender:  None,
     })
 }
 

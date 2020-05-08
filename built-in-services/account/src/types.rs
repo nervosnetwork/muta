@@ -3,23 +3,12 @@ use serde::{Deserialize, Serialize};
 
 use protocol::fixed_codec::{FixedCodec, FixedCodecError};
 use protocol::traits::Witness;
-use protocol::types::{Address, Hash, Hex, TypesError};
+use protocol::types::{Address, Hex, TypesError};
 use protocol::ProtocolResult;
 
 pub const ACCOUNT_TYPE_PUBLIC_KEY: u8 = 0;
 pub const ACCOUNT_TYPE_MULTI_SIG: u8 = 1;
 pub const MAX_PERMISSION_ACCOUNTS: u8 = 16;
-
-#[derive(Deserialize, Serialize, Clone, Debug)]
-pub struct VerifyPayload {
-    pub tx_hash: Hash,
-    pub witness: String,
-}
-
-#[derive(Deserialize, Serialize, Clone, Debug, Default)]
-pub struct VerifyResponse {
-    pub address: Address,
-}
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct GetAccountPayload {

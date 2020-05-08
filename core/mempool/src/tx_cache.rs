@@ -442,8 +442,8 @@ mod tests {
         let chain_id = rand_hash.clone();
         let nonce = rand_hash.clone();
         let tx_hash = rand_hash;
-        let add_str = "10CAB8EEA4799C21379C20EF5BAA2CC8AF1BEC475B";
-        let bytes = Bytes::from(hex::decode(add_str).unwrap());
+        // let add_str = "10CAB8EEA4799C21379C20EF5BAA2CC8AF1BEC475B";
+        // let bytes = Bytes::from(hex::decode(add_str).unwrap());
 
         let request = TransactionRequest {
             service_name: "test".to_owned(),
@@ -462,8 +462,8 @@ mod tests {
         SignedTransaction {
             raw,
             tx_hash,
-            pubkey: bytes.clone(),
-            signature: bytes,
+            witness: Default::default(),
+            sender: None,
         }
     }
 

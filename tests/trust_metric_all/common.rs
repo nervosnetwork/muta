@@ -1,20 +1,51 @@
 use super::node::consts;
-
 use common_crypto::{
     Crypto, PrivateKey, PublicKey, Secp256k1, Secp256k1PrivateKey, Signature, ToPublicKey,
 };
 use protocol::{
     fixed_codec::FixedCodec,
-    types::{Hash, JsonString, RawTransaction, SignedTransaction, TransactionRequest},
+    types::{
+        Address, Hash, Hex, JsonString, RawTransaction, SignedTransaction, TransactionRequest,
+        TypesError,
+    },
     Bytes, BytesMut,
 };
 use rand::{rngs::OsRng, RngCore};
+use serde::{Deserialize, Serialize};
 
 use std::{
     net::TcpListener,
     path::PathBuf,
     sync::atomic::{AtomicU16, Ordering},
 };
+
+use protocol::ProtocolResult;
+
+#[derive(Deserialize, Serialize, Clone, Debug)]
+pub struct WitnessAdapter {
+    pub pubkeys:        Vec<Hex>,
+    pub signatures:     Vec<Hex>,
+    pub signature_type: u8,
+    pub sender:         Address,
+}
+
+impl WitnessAdapter {
+    fn as_bytes(&self) -> ProtocolResult<Bytes> {
+        match serde_json::to_vec(&self) {
+            Ok(b) => Ok(Bytes::from(b)),
+            Err(_) => Err(TypesError::InvalidWitness.into()),
+        }
+    }
+
+    fn from_single_sig_hex(pub_key: String, sig: String) -> ProtocolResult<Self> {
+        Ok(Self {
+            pubkeys:        vec![Hex::from_string(pub_key)?],
+            signatures:     vec![Hex::from_string(sig)?],
+            signature_type: 0,
+            sender:         Address::from_hex("0x0000000000000000000000000000000000000000")?,
+        })
+    }
+}
 
 static AVAILABLE_PORT: AtomicU16 = AtomicU16::new(2000);
 
@@ -101,11 +132,17 @@ impl SignedTransactionBuilder {
 
         let sig = Secp256k1::sign_message(&tx_hash.as_bytes(), &pk.to_bytes()).expect("sign tx");
 
+        let pubkey = Hex::from_bytes(pk.pub_key().to_bytes());
+        let sig_hex = Hex::from_bytes(sig.to_bytes());
+
+        let wit = WitnessAdapter::from_single_sig_hex(pubkey.as_string(), sig_hex.as_string())
+            .expect("witness from_single_sig_hex");
+
         SignedTransaction {
             raw,
             tx_hash,
-            pubkey: pk.pub_key().to_bytes(),
-            signature: sig.to_bytes(),
+            witness: wit.as_bytes().expect("witness as_bytes"),
+            sender: None,
         }
     }
 }

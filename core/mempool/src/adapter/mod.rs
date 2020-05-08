@@ -27,8 +27,11 @@ use log::{debug, error};
 use common_crypto::Crypto;
 use protocol::{
     fixed_codec::FixedCodec,
-    traits::{Context, Gossip, MemPoolAdapter, PeerTrust, Priority, Rpc, Storage, TrustFeedback},
-    types::{Hash, SignedTransaction},
+    traits::{
+        Context, ExecutorFactory, ExecutorParams, Gossip, MemPoolAdapter, PeerTrust, Priority, Rpc,
+        ServiceMapping, Storage, TrustFeedback,
+    },
+    types::{Address, Hash, SignedTransaction, TransactionRequest, VerifyPayload, VerifyResponse},
     ProtocolError, ProtocolErrorKind, ProtocolResult,
 };
 
@@ -133,9 +136,11 @@ impl IntervalTxsBroadcaster {
     }
 }
 
-pub struct DefaultMemPoolAdapter<C, N, S> {
-    network: N,
-    storage: Arc<S>,
+pub struct DefaultMemPoolAdapter<EF, C, N, S, DB, Mapping> {
+    network:         N,
+    storage:         Arc<S>,
+    trie_db:         Arc<DB>,
+    service_mapping: Arc<Mapping>,
 
     timeout_gap:  AtomicU64,
     cycles_limit: AtomicU64,
@@ -144,18 +149,24 @@ pub struct DefaultMemPoolAdapter<C, N, S> {
     stx_tx: UnboundedSender<SignedTransaction>,
     err_rx: Mutex<UnboundedReceiver<ProtocolError>>,
 
-    pin_c: PhantomData<C>,
+    pin_c:  PhantomData<C>,
+    pin_ef: PhantomData<EF>,
 }
 
-impl<C, N, S> DefaultMemPoolAdapter<C, N, S>
+impl<EF, C, N, S, DB, Mapping> DefaultMemPoolAdapter<EF, C, N, S, DB, Mapping>
 where
+    EF: ExecutorFactory<DB, S, Mapping>,
     C: Crypto,
     N: Rpc + PeerTrust + Gossip + Clone + Unpin + 'static,
     S: Storage,
+    DB: cita_trie::DB + 'static,
+    Mapping: ServiceMapping + 'static,
 {
     pub fn new(
         network: N,
         storage: Arc<S>,
+        trie_db: Arc<DB>,
+        service_mapping: Arc<Mapping>,
         broadcast_txs_size: usize,
         broadcast_txs_interval: u64,
     ) -> Self {
@@ -179,6 +190,8 @@ where
         DefaultMemPoolAdapter {
             network,
             storage,
+            trie_db,
+            service_mapping,
 
             timeout_gap: AtomicU64::new(0),
             cycles_limit: AtomicU64::new(0),
@@ -188,16 +201,20 @@ where
             err_rx: Mutex::new(err_rx),
 
             pin_c: PhantomData,
+            pin_ef: PhantomData,
         }
     }
 }
 
 #[async_trait]
-impl<C, N, S> MemPoolAdapter for DefaultMemPoolAdapter<C, N, S>
+impl<EF, C, N, S, DB, Mapping> MemPoolAdapter for DefaultMemPoolAdapter<EF, C, N, S, DB, Mapping>
 where
+    EF: ExecutorFactory<DB, S, Mapping>,
     C: Crypto + Send + Sync + 'static,
     N: Rpc + PeerTrust + Gossip + Clone + Unpin + 'static,
     S: Storage + 'static,
+    DB: cita_trie::DB + 'static,
+    Mapping: ServiceMapping + 'static,
 {
     #[muta_apm::derive::tracing_span(
         kind = "mempool.adapter",
@@ -236,38 +253,88 @@ where
     }
 
     #[muta_apm::derive::tracing_span(kind = "mempool.adapter")]
-    async fn check_signature(&self, ctx: Context, tx: SignedTransaction) -> ProtocolResult<()> {
+    async fn check_signature(
+        &self,
+        ctx: Context,
+        tx: SignedTransaction,
+    ) -> ProtocolResult<Address> {
         let network = self.network.clone();
-
-        let blocking_res = tokio::task::spawn_blocking(move || {
+        let network_clone = network.clone();
+        let tx_clone = tx.clone();
+        let ctx_clone = ctx.clone();
+        let blocking_res: Result<ProtocolResult<()>, _> = tokio::task::spawn_blocking(move || {
             // Verify transaction hash
-            let fixed_bytes = tx.raw.encode_fixed()?;
+            let fixed_bytes = tx_clone.raw.encode_fixed()?;
             let tx_hash = Hash::digest(fixed_bytes);
 
-            if tx_hash != tx.tx_hash {
-                if ctx.is_network_origin_txs() {
-                    network.report(
-                        ctx,
+            println!(
+                "tx_hash:{},  tx.tx_hash:{}\r\n",
+                tx_hash.as_hex(),
+                tx_clone.tx_hash.as_hex()
+            );
+            if tx_hash != tx_clone.tx_hash {
+                println!(
+                    "is_network_origin_txs: {}",
+                    ctx_clone.is_network_origin_txs()
+                );
+                if ctx_clone.is_network_origin_txs() {
+                    network_clone.report(
+                        ctx_clone,
                         TrustFeedback::Worse(format!(
                             "Mempool wrong tx_hash of tx {:?}",
-                            tx.tx_hash
+                            tx_clone.tx_hash
                         )),
                     );
                 }
 
                 let wrong_hash = MemPoolError::CheckHash {
-                    expect: tx.tx_hash,
+                    expect: tx_clone.tx_hash,
                     actual: tx_hash,
                 };
 
                 return Err(wrong_hash.into());
             }
+            Ok(())
+        })
+        .await;
 
-            let hash = tx.tx_hash.as_bytes();
-            let pub_key = tx.pubkey.as_ref();
-            let sig = tx.signature.as_ref();
+        if blocking_res.is_err() || blocking_res.unwrap().is_err() {
+            log::error!("[mempool] check_signature failed");
+            return Err(AdapterError::Internal.into());
+        }
 
-            C::verify_signature(hash.as_ref(), sig, pub_key).map_err(|_| {
+        let block = self.storage.get_latest_block().await?;
+        let height = block.header.height;
+        let payload = serde_json::to_string(&VerifyPayload {
+            tx_hash: tx.tx_hash.clone(),
+            witness: String::from_utf8(tx.witness.to_vec())
+                .expect("tx.witness from Bytes to String error"),
+        })
+        .expect("check_signature payload to json string error");
+
+        let caller = Address::from_hex("0x0000000000000000000000000000000000000000")?;
+        let executor = EF::from_root(
+            block.header.state_root.clone(),
+            Arc::clone(&self.trie_db),
+            Arc::clone(&self.storage),
+            Arc::clone(&self.service_mapping),
+        )?;
+        let params = ExecutorParams {
+            state_root: block.header.state_root,
+            height,
+            timestamp: block.header.timestamp,
+            cycles_limit: 99999,
+        };
+        let exec_resp = executor.read(&params, &caller, 1, &TransactionRequest {
+            service_name: "account".to_string(),
+            method: "verify_signature".to_string(),
+            payload,
+        })?;
+
+        println!("tx_hash: {}\r\n", tx.tx_hash.as_hex());
+        println!("exec_resp: {:?}\r\n", exec_resp);
+        let res: Result<VerifyResponse, ProtocolError> =
+            serde_json::from_str(&exec_resp.succeed_data).map_err(|_| {
                 if ctx.is_network_origin_txs() {
                     network.report(
                         ctx,
@@ -277,22 +344,13 @@ where
                         )),
                     );
                 }
-
                 MemPoolError::CheckSig {
                     tx_hash: tx.tx_hash,
                 }
                 .into()
-            })
-        })
-        .await;
+            });
 
-        match blocking_res {
-            Ok(res) => res,
-            Err(_) => {
-                log::error!("[mempool] check_signature failed");
-                Err(AdapterError::Internal.into())
-            }
-        }
+        Ok(res?.address)
     }
 
     // TODO: Verify Fee?

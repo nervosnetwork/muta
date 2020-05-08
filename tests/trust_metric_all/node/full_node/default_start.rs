@@ -193,13 +193,17 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     )?;
 
     // Init mempool
+    let trie_db = Arc::new(db);
     let current_block = storage.get_latest_block(Context::new()).await?;
-    let mempool_adapter = DefaultMemPoolAdapter::<Secp256k1, _, _>::new(
-        network_service.handle(),
-        Arc::clone(&storage),
-        config.mempool.broadcast_txs_size,
-        config.mempool.broadcast_txs_interval,
-    );
+    let mempool_adapter =
+        DefaultMemPoolAdapter::<ServiceExecutorFactory, Secp256k1, _, _, _, _>::new(
+            network_service.handle(),
+            Arc::clone(&storage),
+            Arc::clone(&trie_db),
+            Arc::clone(&service_mapping),
+            config.mempool.broadcast_txs_size,
+            config.mempool.broadcast_txs_interval,
+        );
     let mempool = Arc::new(HashMemPool::new(consts::MEMPOOL_POOL_SIZE, mempool_adapter));
 
     // self private key
@@ -213,7 +217,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     let api_adapter = DefaultAPIAdapter::<ServiceExecutorFactory, _, _, _, _>::new(
         Arc::clone(&mempool),
         Arc::clone(&storage),
-        Arc::new(db.clone()),
+        Arc::clone(&trie_db),
         Arc::clone(&service_mapping),
     );
 
@@ -339,7 +343,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
             Arc::new(network_service.handle()),
             Arc::clone(&mempool),
             Arc::clone(&storage),
-            Arc::new(db),
+            Arc::clone(&trie_db),
             Arc::clone(&service_mapping),
             status_agent.clone(),
             Arc::clone(&crypto),

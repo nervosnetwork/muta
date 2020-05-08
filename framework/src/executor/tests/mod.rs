@@ -6,7 +6,7 @@ mod test_service;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use bytes::{Bytes, BytesMut};
+use bytes::Bytes;
 use cita_trie::MemoryDB;
 use test::Bencher;
 
@@ -23,7 +23,9 @@ use protocol::types::{
 use protocol::ProtocolResult;
 
 use crate::executor::ServiceExecutor;
+use account::AccountService;
 use test_service::TestService;
+use util::UtilService;
 
 #[test]
 fn test_create_genesis() {
@@ -242,11 +244,8 @@ fn mock_signed_tx() -> SignedTransaction {
     SignedTransaction {
         raw,
         tx_hash: Hash::from_empty(),
-        pubkey: Bytes::from(
-            hex::decode("031288a6788678c25952eba8693b2f278f66e2187004b64ac09416d07f83f96d5b")
-                .unwrap(),
-        ),
-        signature: BytesMut::from("").freeze(),
+        witness: Default::default(),
+        sender: Some(Address::from_hex("0x0000000000000000000000000000000000000000").unwrap()),
     }
 }
 
@@ -262,6 +261,8 @@ impl ServiceMapping for MockServiceMapping {
             "asset" => Box::new(AssetService::new(sdk)) as Box<dyn Service>,
             "metadata" => Box::new(MetadataService::new(sdk)) as Box<dyn Service>,
             "test" => Box::new(TestService::new(sdk)) as Box<dyn Service>,
+            "util" => Box::new(UtilService::new(sdk)) as Box<dyn Service>,
+            "account" => Box::new(AccountService::new(sdk)) as Box<dyn Service>,
             _ => panic!("not found service"),
         };
 
@@ -269,7 +270,13 @@ impl ServiceMapping for MockServiceMapping {
     }
 
     fn list_service_name(&self) -> Vec<String> {
-        vec!["asset".to_owned(), "metadata".to_owned(), "test".to_owned()]
+        vec![
+            "asset".to_owned(),
+            "metadata".to_owned(),
+            "test".to_owned(),
+            "util".to_owned(),
+            "account".to_owned(),
+        ]
     }
 }
 

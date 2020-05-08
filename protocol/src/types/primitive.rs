@@ -351,6 +351,17 @@ fn ensure_len(real: usize, expect: usize) -> ProtocolResult<()> {
     }
 }
 
+#[derive(Deserialize, Serialize, Clone, Debug)]
+pub struct VerifyPayload {
+    pub tx_hash: Hash,
+    pub witness: String,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, Default)]
+pub struct VerifyResponse {
+    pub address: Address,
+}
+
 #[cfg(test)]
 mod tests {
     use bytes::Bytes;

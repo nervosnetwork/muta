@@ -17,8 +17,11 @@ use common_crypto::{
 };
 use protocol::codec::ProtocolCodec;
 use protocol::traits::{Context, MemPool, MemPoolAdapter, MixedTxHashes};
-use protocol::types::{Hash, RawTransaction, SignedTransaction, TransactionRequest};
+use protocol::types::{
+    Address, Hash, Hex, RawTransaction, SignedTransaction, TransactionRequest, TypesError,
+};
 use protocol::{Bytes, ProtocolResult};
+use serde::{Deserialize, Serialize};
 
 use crate::{HashMemPool, MemPoolError};
 
@@ -30,6 +33,36 @@ const MAX_TX_SIZE: u64 = 1024; // 1KB
 const TIMEOUT: u64 = 1000;
 const TIMEOUT_GAP: u64 = 100;
 const TX_CYCLE: u64 = 1;
+
+#[derive(Deserialize, Serialize, Clone, Debug)]
+pub struct WitnessAdapter {
+    pub pubkeys:        Vec<Hex>,
+    pub signatures:     Vec<Hex>,
+    pub signature_type: u8,
+    pub sender:         Address,
+}
+
+impl WitnessAdapter {
+    fn as_bytes(&self) -> ProtocolResult<Bytes> {
+        match serde_json::to_vec(&self) {
+            Ok(b) => Ok(Bytes::from(b)),
+            Err(_) => Err(TypesError::InvalidWitness.into()),
+        }
+    }
+
+    fn from_bytes(bytes: Bytes) -> ProtocolResult<Self> {
+        serde_json::from_slice(bytes.as_ref()).map_err(|_| TypesError::InvalidWitness.into())
+    }
+
+    fn from_single_sig_hex(pub_key: String, sig: String) -> ProtocolResult<Self> {
+        Ok(Self {
+            pubkeys:        vec![Hex::from_string(pub_key)?],
+            signatures:     vec![Hex::from_string(sig)?],
+            signature_type: 0,
+            sender:         Address::from_hex("0x0000000000000000000000000000000000000000")?,
+        })
+    }
+}
 
 pub struct HashMemPoolAdapter {
     network_txs: CHashMap<Hash, SignedTransaction>,
@@ -64,7 +97,11 @@ impl MemPoolAdapter for HashMemPoolAdapter {
         Ok(())
     }
 
-    async fn check_signature(&self, _ctx: Context, tx: SignedTransaction) -> ProtocolResult<()> {
+    async fn check_signature(
+        &self,
+        _ctx: Context,
+        tx: SignedTransaction,
+    ) -> ProtocolResult<Address> {
         check_hash(tx.clone()).await?;
         check_sig(&tx)
     }
@@ -138,14 +175,23 @@ async fn check_hash(tx: SignedTransaction) -> ProtocolResult<()> {
     Ok(())
 }
 
-fn check_sig(tx: &SignedTransaction) -> ProtocolResult<()> {
-    if Secp256k1::verify_signature(&tx.tx_hash.as_bytes(), &tx.signature, &tx.pubkey).is_err() {
+fn check_sig(tx: &SignedTransaction) -> ProtocolResult<Address> {
+    let wit = WitnessAdapter::from_bytes(tx.clone().witness)?;
+
+    let signature = wit.signatures[0].as_bytes()?;
+    let pubkey = wit.pubkeys[0].as_bytes()?;
+    let addr = Address::from_pubkey_bytes(pubkey.clone());
+
+    if Secp256k1::verify_signature(&tx.tx_hash.as_bytes(), signature.as_ref(), pubkey.as_ref())
+        .is_err()
+    {
         return Err(MemPoolError::CheckSig {
             tx_hash: tx.tx_hash.clone(),
         }
         .into());
     }
-    Ok(())
+
+    addr
 }
 
 async fn concurrent_check_sig(txs: Vec<SignedTransaction>) {
@@ -273,11 +319,16 @@ fn mock_signed_tx(
         Secp256k1Signature::try_from([0u8; 64].as_ref()).unwrap()
     };
 
+    let pubkey = Hex::from_bytes(pub_key.to_bytes());
+    let signature = Hex::from_bytes(signature.to_bytes());
+
+    let wit =
+        WitnessAdapter::from_single_sig_hex(pubkey.as_string(), signature.as_string()).unwrap();
     SignedTransaction {
         raw,
         tx_hash,
-        pubkey: pub_key.to_bytes(),
-        signature: signature.to_bytes(),
+        witness: wit.as_bytes().unwrap(),
+        sender: None,
     }
 }
 

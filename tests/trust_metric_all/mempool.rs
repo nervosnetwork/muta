@@ -38,7 +38,9 @@ fn should_be_disconnected_for_repeated_wrong_signature_only_within_four_interval
             let mut latest_report = client_node.trust_report().await.expect("get report");
 
             let mut stx = common::stx_builder().build(&client_node.priv_key);
-            stx.signature = Bytes::from(vec![0]);
+            stx.witness = Bytes::from(vec![0]);
+            stx.sender = None;
+
             for _ in 0..4u8 {
                 let msg_stxs = MsgNewTxs {
                     batch_stxs: vec![stx.clone()],
@@ -81,7 +83,9 @@ fn should_be_disconnected_for_repeated_wrong_tx_hash_only_within_four_intervals(
 
             let mut stx = common::stx_builder().build(&client_node.priv_key);
             stx.tx_hash = Hash::digest(Bytes::from(vec![0]));
-            for _ in 0..4u8 {
+            for i in 0..4u8 {
+                println!("\r\n{}\r\n", i);
+
                 let msg_stxs = MsgNewTxs {
                     batch_stxs: vec![stx.clone()],
                 };

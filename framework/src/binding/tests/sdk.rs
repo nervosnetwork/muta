@@ -218,10 +218,10 @@ pub fn mock_raw_tx() -> RawTransaction {
 
 pub fn mock_signed_tx() -> SignedTransaction {
     SignedTransaction {
-        raw:       mock_raw_tx(),
-        tx_hash:   mock_hash(),
-        pubkey:    Default::default(),
-        signature: Default::default(),
+        raw:     mock_raw_tx(),
+        tx_hash: mock_hash(),
+        witness: Default::default(),
+        sender:  None,
     }
 }
 

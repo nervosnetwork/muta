@@ -21,6 +21,7 @@
 
 # dev
 devtools/chain/data
+**/devtools/chain/data
 
 tests/e2e/node_modules/
 
@@ -33,3 +34,4 @@ Cargo.lock
 
 # free space, you can store anything you want here
 free-space/
+

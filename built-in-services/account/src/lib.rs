@@ -1,13 +1,12 @@
 use crate::types::{
     Account, GenerateAccountPayload, GenerateAccountResponse, GetAccountPayload, Permission,
-    VerifyPayload, VerifyResponse, WitnessAdapter, ACCOUNT_TYPE_MULTI_SIG, ACCOUNT_TYPE_PUBLIC_KEY,
-    MAX_PERMISSION_ACCOUNTS,
+    WitnessAdapter, ACCOUNT_TYPE_MULTI_SIG, ACCOUNT_TYPE_PUBLIC_KEY, MAX_PERMISSION_ACCOUNTS,
 };
 use binding_macro::{cycles, service};
 use bytes::Bytes;
 use common_crypto::{Crypto, Secp256k1};
 use protocol::traits::{ExecutorParams, ServiceResponse, ServiceSDK};
-use protocol::types::{Address, Hash, Hex, ServiceContext};
+use protocol::types::{Address, Hash, Hex, ServiceContext, VerifyPayload, VerifyResponse};
 
 #[cfg(test)]
 mod tests;

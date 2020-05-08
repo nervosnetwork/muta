@@ -15,13 +15,13 @@ use framework::binding::state::{GeneralServiceState, MPTTrie};
 use protocol::traits::{NoopDispatcher, Storage, Witness};
 use protocol::types::{
     Address, Block, Hash, Hex, Proof, Receipt, ServiceContext, ServiceContextParams,
-    SignedTransaction,
+    SignedTransaction, VerifyPayload,
 };
 
 use protocol::{types::Bytes, ProtocolResult};
 
 use crate::types::{
-    GenerateAccountPayload, GetAccountPayload, PayloadAccount, VerifyPayload, WitnessAdapter,
+    GenerateAccountPayload, GetAccountPayload, PayloadAccount, WitnessAdapter,
     ACCOUNT_TYPE_MULTI_SIG,
 };
 use crate::AccountService;

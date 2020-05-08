@@ -19,7 +19,8 @@ use protocol::traits::{CommonConsensusAdapter, Synchronization, SynchronizationA
 use protocol::traits::{Context, ExecutorParams, ExecutorResp, ServiceResponse, TrustFeedback};
 use protocol::types::{
     Address, Block, BlockHeader, Bytes, Hash, Hex, MerkleRoot, Metadata, Proof, RawTransaction,
-    Receipt, ReceiptResponse, SignedTransaction, TransactionRequest, Validator, ValidatorExtend,
+    Receipt, ReceiptResponse, SignedTransaction, TransactionRequest, TypesError, Validator,
+    ValidatorExtend,
 };
 use protocol::ProtocolResult;
 
@@ -32,6 +33,33 @@ use crate::{BlockHeaderField, BlockProofField, ConsensusError};
 use bit_vec::BitVec;
 use overlord::types::{AggregatedSignature, AggregatedVote, Node, SignedVote, Vote, VoteType};
 use overlord::{extract_voters, Crypto};
+use serde::{Deserialize, Serialize};
+
+#[derive(Deserialize, Serialize, Clone, Debug)]
+pub struct WitnessAdapter {
+    pub pubkeys:        Vec<Hex>,
+    pub signatures:     Vec<Hex>,
+    pub signature_type: u8,
+    pub sender:         Address,
+}
+
+impl WitnessAdapter {
+    fn as_bytes(&self) -> ProtocolResult<Bytes> {
+        match serde_json::to_vec(&self) {
+            Ok(b) => Ok(Bytes::from(b)),
+            Err(_) => Err(TypesError::InvalidWitness.into()),
+        }
+    }
+
+    fn from_single_sig_hex(pub_key: String, sig: String) -> ProtocolResult<Self> {
+        Ok(Self {
+            pubkeys:        vec![Hex::from_string(pub_key)?],
+            signatures:     vec![Hex::from_string(sig)?],
+            signature_type: 0,
+            sender:         Address::from_hex("0x0000000000000000000000000000000000000000")?,
+        })
+    }
+}
 
 // Test the blocks gap from 1 to 4.
 #[test]
@@ -809,11 +837,17 @@ fn mock_tx_list(num: usize, height: u64) -> Vec<SignedTransaction> {
             .unwrap();
         let signature = test_privkey.sign_message(&hash_value);
 
+        let wit = WitnessAdapter::from_single_sig_hex(
+            Hex::from_bytes(test_pubkey.to_bytes()).as_string(),
+            Hex::from_bytes(signature.to_bytes()).as_string(),
+        )
+        .unwrap();
+
         let signed_tx = SignedTransaction {
             raw,
             tx_hash,
-            pubkey: test_pubkey.to_bytes(),
-            signature: signature.to_bytes(),
+            witness: wit.as_bytes().unwrap(),
+            sender: None,
         };
 
         txs.push(signed_tx)

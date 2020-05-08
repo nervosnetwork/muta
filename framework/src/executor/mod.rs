@@ -329,7 +329,11 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
         let mut receipts = txs
             .iter()
             .map(|stx| {
-                let caller = Address::from_pubkey_bytes(stx.pubkey.clone())?;
+                let caller = stx
+                    .sender
+                    .as_ref()
+                    .unwrap_or_else(|| panic!("tx sender is None"));
+
                 let context = self.get_context(
                     Some(stx.tx_hash.clone()),
                     Some(stx.raw.nonce.clone()),

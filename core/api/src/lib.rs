@@ -12,6 +12,10 @@ use futures::executor::block_on;
 use juniper::http::GraphQLRequest;
 use juniper::FieldResult;
 use lazy_static::lazy_static;
+use serde_json::json;
+use std::cmp;
+use std::convert::TryFrom;
+use std::sync::Arc;
 
 use common_apm::muta_apm;
 use common_crypto::{
@@ -20,6 +24,7 @@ use common_crypto::{
 
 use protocol::fixed_codec::FixedCodec;
 use protocol::traits::{APIAdapter, Context};
+use protocol::types::Hex;
 
 use crate::config::GraphQLConfig;
 use crate::schema::{
@@ -268,15 +273,23 @@ impl Mutation {
         let tx_hash = protocol::types::Hash::digest(raw_tx.encode_fixed()?);
 
         let privkey = Secp256k1PrivateKey::try_from(input_privkey.to_vec()?.as_ref())?;
-        let pubkey = privkey.pub_key();
+        let pubkey = Hex::from_bytes(privkey.pub_key().to_bytes());
+
         let hash_value = HashValue::try_from(tx_hash.as_bytes().as_ref())?;
-        let signature = privkey.sign_message(&hash_value);
+        let signature = Hex::from_bytes(privkey.sign_message(&hash_value).to_bytes());
+
+        let wit = json!({
+                    "pubkeys": [pubkey.as_string()],
+                    "signatures": [signature.as_string()],
+                    "signature_type": 0,
+                    "sender": "0x0000000000000000000000000000000000000000",
+        });
 
         let stx = protocol::types::SignedTransaction {
-            raw:       raw_tx,
-            tx_hash:   tx_hash.clone(),
-            signature: signature.to_bytes(),
-            pubkey:    pubkey.to_bytes(),
+            raw:     raw_tx,
+            tx_hash: tx_hash.clone(),
+            witness: protocol::Bytes::from(wit.to_string()),
+            sender:  None,
         };
         state_ctx
             .adapter

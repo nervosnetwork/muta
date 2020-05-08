@@ -39,8 +39,8 @@ fn mock_signed_tx(tx_hash: Hash) -> SignedTransaction {
     SignedTransaction {
         raw,
         tx_hash,
-        pubkey: Default::default(),
-        signature: Default::default(),
+        witness: Default::default(),
+        sender: None,
     }
 }
 

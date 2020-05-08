@@ -1,7 +1,7 @@
 use bytes::BytesMut;
 
 use crate::fixed_codec::{FixedCodec, FixedCodecError};
-use crate::types::{Hash, RawTransaction, TransactionRequest};
+use crate::types::{Hash, RawTransaction, SignedTransaction, TransactionRequest};
 use crate::ProtocolResult;
 
 impl rlp::Encodable for RawTransaction {
@@ -48,6 +48,39 @@ impl rlp::Decodable for RawTransaction {
 }
 
 impl FixedCodec for RawTransaction {
+    fn encode_fixed(&self) -> ProtocolResult<bytes::Bytes> {
+        Ok(bytes::Bytes::from(rlp::encode(self)))
+    }
+
+    fn decode_fixed(bytes: bytes::Bytes) -> ProtocolResult<Self> {
+        Ok(rlp::decode(bytes.as_ref()).map_err(FixedCodecError::from)?)
+    }
+}
+
+impl rlp::Encodable for SignedTransaction {
+    fn rlp_append(&self, s: &mut rlp::RlpStream) {
+        s.begin_list(3)
+            .append(&self.raw)
+            .append(&self.tx_hash.as_bytes().to_vec())
+            .append(&self.witness.to_vec());
+    }
+}
+
+impl rlp::Decodable for SignedTransaction {
+    fn decode(r: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
+        let tx_hash = Hash::from_bytes(BytesMut::from(r.at(1)?.data()?).freeze())
+            .map_err(|_| rlp::DecoderError::RlpInvalidLength)?;
+
+        Ok(SignedTransaction {
+            raw: r.at(0)?.as_val()?,
+            tx_hash,
+            witness: BytesMut::from(r.at(2)?.data()?).freeze(),
+            sender: None,
+        })
+    }
+}
+
+impl FixedCodec for SignedTransaction {
     fn encode_fixed(&self) -> ProtocolResult<bytes::Bytes> {
         Ok(bytes::Bytes::from(rlp::encode(self)))
     }

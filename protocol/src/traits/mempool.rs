@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use creep::Context;
 
-use crate::types::{Hash, SignedTransaction};
+use crate::types::{Address, Hash, SignedTransaction};
 use crate::ProtocolResult;
 
 #[allow(dead_code)]
@@ -18,7 +18,7 @@ impl MixedTxHashes {
 
 #[async_trait]
 pub trait MemPool: Send + Sync {
-    async fn insert(&self, ctx: Context, tx: SignedTransaction) -> ProtocolResult<()>;
+    async fn insert(&self, ctx: Context, mut tx: SignedTransaction) -> ProtocolResult<()>;
 
     async fn package(
         &self,
@@ -66,7 +66,8 @@ pub trait MemPoolAdapter: Send + Sync {
 
     async fn broadcast_tx(&self, ctx: Context, tx: SignedTransaction) -> ProtocolResult<()>;
 
-    async fn check_signature(&self, ctx: Context, tx: SignedTransaction) -> ProtocolResult<()>;
+    async fn check_signature(&self, ctx: Context, tx: SignedTransaction)
+        -> ProtocolResult<Address>;
 
     async fn check_transaction(&self, ctx: Context, tx: SignedTransaction) -> ProtocolResult<()>;
 
