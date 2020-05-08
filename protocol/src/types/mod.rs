@@ -36,6 +36,9 @@ pub enum TypesError {
 
     #[display(fmt = "Hex should start with 0x")]
     HexPrefix,
+
+    #[display(fmt = "Invalid Witness")]
+    InvalidWitness,
 }
 
 impl Error for TypesError {}
