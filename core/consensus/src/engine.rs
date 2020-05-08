@@ -54,7 +54,10 @@ pub struct ConsensusEngine<Adapter> {
 
 #[async_trait]
 impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<Adapter> {
-    #[muta_apm::derive::tracing_span(kind = "consensus", logs = "{'next_height': 'next_height'}")]
+    #[muta_apm::derive::tracing_span(
+        kind = "consensus.engine",
+        logs = "{'next_height': 'next_height'}"
+    )]
     async fn get_block(
         &self,
         ctx: Context,
@@ -138,7 +141,10 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         Ok((fixed_pill, hash))
     }
 
-    #[muta_apm::derive::tracing_span]
+    #[muta_apm::derive::tracing_span(
+        kind = "consensus.engine",
+        logs = "{'next_height': 'next_height', 'hash': 'Hash::from_bytes(hash.clone()).unwrap().as_hex()'}"
+    )]
     async fn check_block(
         &self,
         ctx: Context,
@@ -244,7 +250,10 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
     /// **TODO:** the overlord interface and process needs to be changed.
     /// Get the `FixedSignedTxs` from the argument rather than get it from
     /// mempool.
-    #[muta_apm::derive::tracing_span]
+    #[muta_apm::derive::tracing_span(
+        kind = "consensus.engine",
+        logs = "{'current_height': 'current_height'}"
+    )]
     async fn commit(
         &self,
         ctx: Context,
@@ -369,7 +378,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
     }
 
     /// Only signed proposal and aggregated vote will be broadcast to others.
-    #[muta_apm::derive::tracing_span]
+    #[muta_apm::derive::tracing_span(kind = "consensus.engine")]
     async fn broadcast_to_other(
         &self,
         ctx: Context,
@@ -401,7 +410,10 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
     }
 
     /// Only signed vote will be transmit to the relayer.
-    #[muta_apm::derive::tracing_span]
+    #[muta_apm::derive::tracing_span(
+        kind = "consensus.engine",
+        logs = "{'address': 'Address::from_bytes(addr.clone()).unwrap().as_hex()'}"
+    )]
     async fn transmit_to_relayer(
         &self,
         ctx: Context,
@@ -438,7 +450,10 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
 
     /// This function is rarely used, so get the authority list from the
     /// RocksDB.
-    #[muta_apm::derive::tracing_span]
+    #[muta_apm::derive::tracing_span(
+        kind = "consensus.engine",
+        logs = "{'next_height': 'next_height'}"
+    )]
     async fn get_authority_list(
         &self,
         ctx: Context,
@@ -453,7 +468,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             .get_block_by_height(ctx.clone(), next_height - 1)
             .await?;
         let old_metadata = self.adapter.get_metadata(
-            ctx,
+            ctx.clone(),
             old_block.header.state_root.clone(),
             old_block.header.timestamp,
             old_block.header.height,

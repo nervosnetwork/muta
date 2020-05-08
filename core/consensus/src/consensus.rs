@@ -31,6 +31,7 @@ pub struct OverlordConsensus<Adapter: ConsensusAdapter + 'static> {
 
 #[async_trait]
 impl<Adapter: ConsensusAdapter + 'static> Consensus for OverlordConsensus<Adapter> {
+    #[muta_apm::derive::tracing_span(kind = "consensus")]
     async fn set_proposal(&self, ctx: Context, proposal: Vec<u8>) -> ProtocolResult<()> {
         let signed_proposal: SignedProposal<FixedPill> = rlp::decode(&proposal)
             .map_err(|_| ConsensusError::DecodeErr(ConsensusType::SignedProposal))?;
@@ -40,6 +41,7 @@ impl<Adapter: ConsensusAdapter + 'static> Consensus for OverlordConsensus<Adapte
         Ok(())
     }
 
+    #[muta_apm::derive::tracing_span(kind = "consensus")]
     async fn set_vote(&self, ctx: Context, vote: Vec<u8>) -> ProtocolResult<()> {
         let signed_vote: SignedVote =
             rlp::decode(&vote).map_err(|_| ConsensusError::DecodeErr(ConsensusType::SignedVote))?;
@@ -49,6 +51,7 @@ impl<Adapter: ConsensusAdapter + 'static> Consensus for OverlordConsensus<Adapte
         Ok(())
     }
 
+    #[muta_apm::derive::tracing_span(kind = "consensus")]
     async fn set_qc(&self, ctx: Context, qc: Vec<u8>) -> ProtocolResult<()> {
         let aggregated_vote: AggregatedVote = rlp::decode(&qc)
             .map_err(|_| ConsensusError::DecodeErr(ConsensusType::AggregateVote))?;
@@ -58,6 +61,7 @@ impl<Adapter: ConsensusAdapter + 'static> Consensus for OverlordConsensus<Adapte
         Ok(())
     }
 
+    #[muta_apm::derive::tracing_span(kind = "consensus")]
     async fn set_choke(&self, ctx: Context, choke: Vec<u8>) -> ProtocolResult<()> {
         let signed_choke: SignedChoke = rlp::decode(&choke)
             .map_err(|_| ConsensusError::DecodeErr(ConsensusType::SignedChoke))?;

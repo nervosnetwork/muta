@@ -177,7 +177,10 @@ where
         self.insert_tx(ctx, tx, TxType::NewTx).await
     }
 
-    #[muta_apm::derive::tracing_span(kind = "mempool", logs = "{'cycles_limit': 'cycles_limit', 'tx_num_limit': 'tx_num_limit'}")]
+    #[muta_apm::derive::tracing_span(
+        kind = "mempool",
+        logs = "{'cycles_limit': 'cycles_limit', 'tx_num_limit': 'tx_num_limit'}"
+    )]
     async fn package(
         &self,
         ctx: Context,
@@ -249,7 +252,10 @@ where
         }
     }
 
-    #[muta_apm::derive::tracing_span(kind = "mempool", logs = "{'tx_len': 'order_tx_hashes.len()'}")]
+    #[muta_apm::derive::tracing_span(
+        kind = "mempool",
+        logs = "{'tx_len': 'order_tx_hashes.len()'}"
+    )]
     async fn ensure_order_txs(
         &self,
         ctx: Context,
@@ -290,7 +296,10 @@ where
         self.verify_tx_in_parallel(ctx, order_txs).await
     }
 
-    #[muta_apm::derive::tracing_span(kind = "mempool", logs = "{'tx_len': 'propose_tx_hashes.len()'}")]
+    #[muta_apm::derive::tracing_span(
+        kind = "mempool",
+        logs = "{'tx_len': 'propose_tx_hashes.len()'}"
+    )]
     async fn sync_propose_txs(
         &self,
         ctx: Context,
