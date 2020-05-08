@@ -100,9 +100,10 @@ impl ConnectionServiceKeeper {
             PeerIdNotMatch => ConnectionErrorKind::PeerIdNotMatch,
             DNSResolverError(e) => ConnectionErrorKind::DNSResolver(Box::new(e)),
             HandshakeError(e) => ConnectionErrorKind::SecioHandshake(Box::new(e)),
-            ProtoHandleBlock(_) | ProtoHandleAbnormallyClosed(_) => {
-                ConnectionErrorKind::ProtocolHandle
-            }
+            SessionProtoHandleBlock(_)
+            | ServiceProtoHandleBlock
+            | ServiceProtoHandleAbnormallyClosed
+            | SessionProtoHandleAbnormallyClosed(_) => ConnectionErrorKind::ProtocolHandle,
         };
 
         let connect_failed = PeerManagerEvent::ConnectFailed { addr, kind };
