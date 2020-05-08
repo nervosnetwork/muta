@@ -33,7 +33,7 @@ hex = "0.4"
 rlp = "0.4"
 toml = "0.5"
 tokio = { version = "0.2", features = ["macros", "rt-core", "rt-util", "signal", "time"]}
-muta-apm = "0.1.0-alpha.5"
+muta-apm = "0.1.0-alpha.7"
 
 [dev-dependencies]
 asset = { path = "built-in-services/asset"}
