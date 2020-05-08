@@ -94,6 +94,7 @@ impl<Mapping: 'static + ServiceMapping> Muta<Mapping> {
             muta_apm::global_tracer_register(
                 &apm_config.service_name,
                 apm_config.tracing_address.clone(),
+                apm_config.tracing_batch_size,
             );
 
             log::info!("muta_apm start");

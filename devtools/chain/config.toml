@@ -44,6 +44,7 @@ metrics = true
 [rocksdb]
 max_open_files = 64
 
-# [apm]
-# service_name = "muta"
-# tracing_address = "127.0.0.1:6831"
+[apm]
+service_name = "muta"
+tracing_address = "127.0.0.1:6831"
+tracing_batch_size = 50

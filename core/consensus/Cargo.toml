@@ -34,7 +34,7 @@ core-storage = { path = "../../core/storage" }
 core-network = { path = "../../core/network" }
 protocol = { path = "../../protocol", package = "muta-protocol" }
 
-muta-apm = "0.1.0-alpha.4"
+muta-apm = "0.1.0-alpha.5"
 
 [dev-dependencies]
 num-traits = "0.2"
