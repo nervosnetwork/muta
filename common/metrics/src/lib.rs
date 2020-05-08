@@ -1,15 +1,13 @@
 pub mod api;
 
-use derive_more::Display;
-use prometheus::{Encoder, TextEncoder};
-use prometheus_static_metric::make_static_metric;
-pub use prometheus_static_metric::{
-    register_static_counter_vec, register_static_gauge_vec, register_static_histogram_vec,
-    register_static_int_counter_vec, register_static_int_gauge_vec,
-};
-use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
-
 pub use prometheus::{Histogram, HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec};
+
+use derive_more::Display;
+use prometheus::{
+    exponential_buckets, register_histogram_vec, register_int_counter_vec, Encoder, TextEncoder,
+};
+use prometheus_static_metric::{auto_flush_from, make_auto_flush_static_metric};
+use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
 use std::time::Duration;
 
@@ -33,18 +31,8 @@ impl From<Error> for ProtocolError {
 
 impl std::error::Error for Error {}
 
-pub struct DurationHistogram(Histogram);
-
-impl DurationHistogram {
-    pub fn new(histogram: Histogram) -> DurationHistogram {
-        DurationHistogram(histogram)
-    }
-
-    pub fn observe_duration(&self, d: Duration) {
-        // Duration is full seconds + nanos elapsed from the previous full second
-        let v = d.as_secs_f64() + f64::from(d.subsec_nanos()) / 1e9;
-        self.0.observe(v);
-    }
+pub fn duration_to_sec(d: Duration) -> f64 {
+    d.as_secs_f64() + (f64::from(d.subsec_nanos()) / 1e9)
 }
 
 pub fn all_metrics() -> ProtocolResult<Vec<u8>> {

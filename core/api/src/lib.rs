@@ -187,7 +187,9 @@ impl Mutation {
         };
 
         let inst = Instant::now();
-        common_metrics::api::TX_COUNT.inc();
+        common_metrics::api::API_REQUEST_COUNTER_VEC_STATIC
+            .send_transaction
+            .inc();
 
         let stx = to_signed_transaction(input_raw, input_encryption)?;
         let tx_hash = stx.tx_hash.clone();
@@ -197,14 +199,20 @@ impl Mutation {
             .insert_signed_txs(ctx.clone(), stx)
             .await
         {
-            if err.to_string().contains("already commit") {
-                common_metrics::api::REPEATED_TX_COUNT.inc();
-            }
+            common_metrics::api::API_REQUEST_RESULT_COUNTER_VEC_STATIC
+                .send_transaction
+                .failure
+                .inc();
             return Err(err.into());
         }
 
-        common_metrics::api::SUCCESS_TX_COUNT.inc();
-        common_metrics::api::TX_SUCCESS_TIME_COST.observe_duration(inst.elapsed());
+        common_metrics::api::API_REQUEST_RESULT_COUNTER_VEC_STATIC
+            .send_transaction
+            .success
+            .inc();
+        common_metrics::api::API_REQUEST_TIME_HISTOGRAM_STATIC
+            .send_transaction
+            .observe(common_metrics::duration_to_sec(inst.elapsed()));
 
         Ok(Hash::from(tx_hash))
     }
