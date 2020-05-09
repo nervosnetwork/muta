@@ -191,12 +191,14 @@ impl<
                 )
             })?;
 
-            CHAIN_SCHEMA.as_ref().ok_or(ProtocolError::new(
-                ProtocolErrorKind::API,
-                Box::new(APIError::SchemaError(format!(
-                    "Api get schema error: get none"
-                ))),
-            ))
+            CHAIN_SCHEMA.as_ref().ok_or_else(|| {
+                ProtocolError::new(
+                    ProtocolErrorKind::API,
+                    Box::new(APIError::SchemaError(
+                        "Api get schema error: get none".to_owned(),
+                    )),
+                )
+            })
         }
     }
 }

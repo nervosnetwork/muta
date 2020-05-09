@@ -35,7 +35,7 @@ pub fn gen_schema(service: String, meta: ServiceMeta) -> ServiceSchema {
     }
 }
 
-pub fn gen_schema_events(events: &Vec<String>) -> String {
+pub fn gen_schema_events(events: &[String]) -> String {
     let mut events_schema = "union Event = ".to_owned();
     for e in events.iter() {
         let event = e.to_owned() + " | ";
@@ -45,7 +45,7 @@ pub fn gen_schema_events(events: &Vec<String>) -> String {
     events_schema + "\n\n"
 }
 
-pub fn gen_schema_methods(methods: &Vec<MethodMeta>) -> String {
+pub fn gen_schema_methods(methods: &[MethodMeta]) -> String {
     let mut mutation = format!("type Mutation {}\n", "{");
     let mut query = format!("type Query {}\n", "{");
     let mut need_null = false;
