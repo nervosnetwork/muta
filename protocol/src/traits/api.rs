@@ -35,5 +35,5 @@ pub trait APIAdapter: Send + Sync {
         payload: String,
     ) -> ProtocolResult<ServiceResponse<String>>;
 
-    async fn get_schema(&self, ctx: Context) -> ProtocolResult<ChainSchema>;
+    async fn get_schema(&self, ctx: Context) -> ProtocolResult<&ChainSchema>;
 }

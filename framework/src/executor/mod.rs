@@ -18,8 +18,8 @@ use protocol::traits::{
     ServiceResponse, ServiceState, Storage,
 };
 use protocol::types::{
-    Address, ChainSchema, Hash, MerkleRoot, Receipt, ReceiptResponse, ServiceContext,
-    ServiceContextParams, ServiceParam, ServiceSchema, SignedTransaction, TransactionRequest,
+    Address, Hash, MerkleRoot, Receipt, ReceiptResponse, ServiceContext, ServiceContextParams,
+    ServiceMeta, ServiceParam, SignedTransaction, TransactionRequest,
 };
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
@@ -58,31 +58,6 @@ impl<S: Storage, DB: TrieDB, Mapping: ServiceMapping> Clone for ServiceExecutor<
 impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMapping>
     ServiceExecutor<S, DB, Mapping>
 {
-    pub async fn create_schema(
-        trie_db: Arc<DB>,
-        storage: Arc<S>,
-        mapping: Arc<Mapping>,
-    ) -> ProtocolResult<()> {
-        let querier = Rc::new(DefaultChainQuerier::new(Arc::clone(&storage)));
-        let mut schema = vec![];
-        for name in mapping.list_service_name().iter() {
-            let trie = MPTTrie::new(Arc::clone(&trie_db));
-            let sdk = DefalutServiceSDK::new(
-                Rc::new(RefCell::new(GeneralServiceState::new(trie))),
-                Rc::clone(&querier),
-                NoopDispatcher {},
-            );
-            let service = mapping.get_service(&name, sdk)?;
-            let ret = service.schema_();
-            schema.push(ServiceSchema {
-                service: name.clone(),
-                method:  ret.0,
-                event:   ret.1,
-            });
-        }
-        storage.insert_schema(ChainSchema { schema }).await
-    }
-
     pub fn create_genesis(
         services: Vec<ServiceParam>,
         trie_db: Arc<DB>,
@@ -402,6 +377,16 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
         )?;
         panic::catch_unwind(AssertUnwindSafe(|| self.call(context, ExecType::Read)))
             .map_err(|e| ProtocolError::from(ExecutorError::QueryService(format!("{:?}", e))))
+    }
+
+    fn get_service_metas(&self) -> ProtocolResult<HashMap<String, ServiceMeta>> {
+        let mut metas = HashMap::<String, ServiceMeta>::new();
+        for name in self.service_mapping.list_service_name().into_iter() {
+            let sdk = self.get_sdk(&name)?;
+            let service = self.service_mapping.get_service(name.as_str(), sdk)?;
+            metas.insert(name, service.meta_());
+        }
+        Ok(metas)
     }
 }
 

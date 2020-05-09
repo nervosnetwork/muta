@@ -9,8 +9,7 @@ use framework::binding::sdk::{DefalutServiceSDK, DefaultChainQuerier};
 use framework::binding::state::{GeneralServiceState, MPTTrie};
 use protocol::traits::{NoopDispatcher, Storage};
 use protocol::types::{
-    Address, Block, ChainSchema, Hash, Proof, Receipt, ServiceContext, ServiceContextParams,
-    SignedTransaction,
+    Address, Block, Hash, Proof, Receipt, ServiceContext, ServiceContextParams, SignedTransaction,
 };
 use protocol::{types::Bytes, ProtocolResult};
 
@@ -292,14 +291,6 @@ impl Storage for MockStorage {
     }
 
     async fn load_overlord_wal(&self) -> ProtocolResult<Bytes> {
-        unimplemented!()
-    }
-
-    async fn insert_schema(&self, _cs: ChainSchema) -> ProtocolResult<()> {
-        unimplemented!()
-    }
-
-    async fn get_schema(&self) -> ProtocolResult<ChainSchema> {
         unimplemented!()
     }
 }

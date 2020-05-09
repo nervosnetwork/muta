@@ -5,8 +5,8 @@ use serde::{Deserialize, Serialize};
 
 use binding_macro::{SchemaEvent, SchemaObject};
 use protocol::fixed_codec::{FixedCodec, FixedCodecError};
-use protocol::traits::SchemaGenerator;
-use protocol::types::{Address, Bytes, Hash};
+use protocol::traits::MetaGenerator;
+use protocol::types::{Address, Bytes, DataMeta, FieldMeta, Hash, StructMeta};
 use protocol::ProtocolResult;
 
 /// Payload
@@ -28,6 +28,7 @@ pub struct CreateAssetPayload {
 
 #[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug, SchemaObject)]
 pub struct GetAssetPayload {
+    #[description("Asset id")]
     pub id: Hash,
 }
 

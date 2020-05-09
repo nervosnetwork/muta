@@ -15,7 +15,7 @@ use asset::AssetService;
 use metadata::MetadataService;
 use protocol::traits::{Executor, ExecutorParams, Service, ServiceMapping, ServiceSDK, Storage};
 use protocol::types::{
-    Address, Block, ChainSchema, Genesis, Hash, Proof, RawTransaction, Receipt, SignedTransaction,
+    Address, Block, Genesis, Hash, Proof, RawTransaction, Receipt, SignedTransaction,
     TransactionRequest,
 };
 use protocol::ProtocolResult;
@@ -372,14 +372,6 @@ impl Storage for MockStorage {
     }
 
     async fn load_overlord_wal(&self) -> ProtocolResult<Bytes> {
-        unimplemented!()
-    }
-
-    async fn insert_schema(&self, _cs: ChainSchema) -> ProtocolResult<()> {
-        unimplemented!()
-    }
-
-    async fn get_schema(&self) -> ProtocolResult<ChainSchema> {
         unimplemented!()
     }
 }

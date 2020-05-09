@@ -5,8 +5,8 @@ use hasher::{Hasher, HasherKeccak};
 
 use binding_macro::{cycles, service};
 use common_crypto::{Crypto, Secp256k1};
-use protocol::traits::{ExecutorParams, SchemaGenerator, ServiceResponse, ServiceSDK};
-use protocol::types::{Hash, ServiceContext};
+use protocol::traits::{ExecutorParams, MetaGenerator, ServiceResponse, ServiceSDK};
+use protocol::types::{DataMeta, Hash, MethodMeta, ServiceContext, ServiceMeta};
 
 use crate::types::{KeccakPayload, KeccakResponse, SigVerifyPayload, SigVerifyResponse};
 

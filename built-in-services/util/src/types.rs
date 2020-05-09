@@ -4,8 +4,8 @@ use serde::{Deserialize, Serialize};
 
 use binding_macro::SchemaObject;
 
-use protocol::traits::SchemaGenerator;
-use protocol::types::{Hash, Hex};
+use protocol::traits::MetaGenerator;
+use protocol::types::{DataMeta, FieldMeta, Hash, Hex, StructMeta};
 
 #[derive(Deserialize, Serialize, Clone, Debug, SchemaObject)]
 pub struct KeccakPayload {

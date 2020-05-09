@@ -9,8 +9,8 @@ use serde::de;
 use serde::{Deserialize, Serialize};
 
 use crate::fixed_codec::{FixedCodec, FixedCodecError};
-use crate::traits::SchemaGenerator;
-use crate::types::TypesError;
+use crate::traits::MetaGenerator;
+use crate::types::{DataMeta, FieldMeta, StructMeta, TypesError};
 use crate::ProtocolResult;
 
 pub const METADATA_KEY: &str = "metadata";
@@ -306,41 +306,134 @@ pub struct ValidatorExtend {
     pub vote_weight:    u32,
 }
 
-impl SchemaGenerator for Metadata {
+impl MetaGenerator for Metadata {
     fn name() -> String {
         "Metadata".to_owned()
     }
 
-    fn schema(register: &mut BTreeMap<String, String>) {
-        let meta_schema = r#"type Metadata {
-  chain_id: Hash!
-  common_ref: Hex!
-  timeout_gap: U64!
-  cycles_limit: U64!
-  cycles_price: U64!
-  interval: U64!
-  verifier_list: [ValidatorExtend!]!
-  prevote_ratio: U64!
-  precommit_ratio: U64!
-  propose_ratio: U64!
-  brake_ratio: U64!
-  tx_num_limit: U64!
-  max_tx_size: U64!
-}"#;
+    fn meta(register: &mut BTreeMap<String, DataMeta>) {
+        let mut m_fields = vec![];
+        m_fields.push(FieldMeta {
+            name:    "chain_id".to_owned(),
+            ty:      "Hash".to_owned(),
+            is_vec:  false,
+            comment: "".to_owned(),
+        });
+        m_fields.push(FieldMeta {
+            name:    "common_ref".to_owned(),
+            ty:      "Hex".to_owned(),
+            is_vec:  false,
+            comment: "# Common parameters of BLS signature algorithm\n".to_owned(),
+        });
+        m_fields.push(FieldMeta {
+            name:    "timeout_gap".to_owned(),
+            ty:      "U64".to_owned(),
+            is_vec:  false,
+            comment: "".to_owned(),
+        });
+        m_fields.push(FieldMeta {
+            name:    "cycles_limit".to_owned(),
+            ty:      "U64".to_owned(),
+            is_vec:  false,
+            comment: "".to_owned(),
+        });
+        m_fields.push(FieldMeta {
+            name:    "cycles_price".to_owned(),
+            ty:      "U64".to_owned(),
+            is_vec:  false,
+            comment: "".to_owned(),
+        });
+        m_fields.push(FieldMeta {
+            name:    "interval".to_owned(),
+            ty:      "U64".to_owned(),
+            is_vec:  false,
+            comment: "".to_owned(),
+        });
+        m_fields.push(FieldMeta {
+            name:    "verifier_list".to_owned(),
+            ty:      "ValidatorExtend".to_owned(),
+            is_vec:  true,
+            comment: "".to_owned(),
+        });
+        m_fields.push(FieldMeta {
+            name:    "prevote_ratio".to_owned(),
+            ty:      "U64".to_owned(),
+            is_vec:  false,
+            comment: "".to_owned(),
+        });
+        m_fields.push(FieldMeta {
+            name:    "precommit_ratio".to_owned(),
+            ty:      "U64".to_owned(),
+            is_vec:  false,
+            comment: "".to_owned(),
+        });
+        m_fields.push(FieldMeta {
+            name:    "propose_ratio".to_owned(),
+            ty:      "U64".to_owned(),
+            is_vec:  false,
+            comment: "".to_owned(),
+        });
+        m_fields.push(FieldMeta {
+            name:    "brake_ratio".to_owned(),
+            ty:      "U64".to_owned(),
+            is_vec:  false,
+            comment: "".to_owned(),
+        });
+        m_fields.push(FieldMeta {
+            name:    "tx_num_limit".to_owned(),
+            ty:      "U64".to_owned(),
+            is_vec:  false,
+            comment: "".to_owned(),
+        });
+        m_fields.push(FieldMeta {
+            name:    "max_tx_size".to_owned(),
+            ty:      "U64".to_owned(),
+            is_vec:  false,
+            comment: "".to_owned(),
+        });
+        let m_meta = StructMeta {
+            name:    "Metadata".to_owned(),
+            fields:  m_fields,
+            comment: "".to_owned(),
+        };
 
-        let ve_schema = r#"type ValidatorExtend {
-  bls_pub_key: Hex!
-  address: Address!
-  propose_weight: U32!
-  vote_weight: U32!
-}"#;
-        register.insert("Metadata".to_owned(), meta_schema.to_owned());
-        register.insert("ValidatorExtend".to_owned(), ve_schema.to_owned());
-        u32::schema(register);
-        u64::schema(register);
-        Hash::schema(register);
-        Address::schema(register);
-        Hex::schema(register);
+        let mut v_fields = vec![];
+        v_fields.push(FieldMeta {
+            name:    "bls_pub_key".to_owned(),
+            ty:      "Hex".to_owned(),
+            is_vec:  false,
+            comment: "".to_owned(),
+        });
+        v_fields.push(FieldMeta {
+            name:    "address".to_owned(),
+            ty:      "Address".to_owned(),
+            is_vec:  false,
+            comment: "".to_owned(),
+        });
+        v_fields.push(FieldMeta {
+            name:    "propose_weight".to_owned(),
+            ty:      "U32".to_owned(),
+            is_vec:  false,
+            comment: "".to_owned(),
+        });
+        v_fields.push(FieldMeta {
+            name:    "vote_weight".to_owned(),
+            ty:      "U32".to_owned(),
+            is_vec:  false,
+            comment: "".to_owned(),
+        });
+        let v_meta = StructMeta {
+            name:    "ValidatorExtend".to_owned(),
+            fields:  v_fields,
+            comment: "".to_owned(),
+        };
+        register.insert("Metadata".to_owned(), DataMeta::Struct(m_meta));
+        register.insert("ValidatorExtend".to_owned(), DataMeta::Struct(v_meta));
+        u32::meta(register);
+        u64::meta(register);
+        Hash::meta(register);
+        Address::meta(register);
+        Hex::meta(register);
     }
 }
 

@@ -8,8 +8,8 @@ use bytes::Bytes;
 
 use binding_macro::{cycles, genesis, service};
 use protocol::emit_event;
-use protocol::traits::{ExecutorParams, SchemaGenerator, ServiceResponse, ServiceSDK, StoreMap};
-use protocol::types::{Address, Hash, ServiceContext};
+use protocol::traits::{ExecutorParams, MetaGenerator, ServiceResponse, ServiceSDK, StoreMap};
+use protocol::types::{Address, DataMeta, Hash, MethodMeta, ServiceContext, ServiceMeta};
 
 use crate::types::{
     ApproveEvent, ApprovePayload, Asset, AssetBalance, CreateAssetPayload, Event,

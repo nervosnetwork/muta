@@ -92,14 +92,6 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
         config.rocksdb.max_open_files,
     )?);
 
-    // Create chain schema
-    ServiceExecutor::create_schema(
-        Arc::clone(&trie_db),
-        Arc::clone(&storage),
-        Arc::clone(&servive_mapping),
-    )
-    .await?;
-
     // Init genesis
     let genesis_state_root = ServiceExecutor::create_genesis(
         genesis.services.clone(),

@@ -3,6 +3,7 @@ pub(crate) mod genesis;
 pub(crate) mod primitive;
 pub(crate) mod receipt;
 pub(crate) mod service_context;
+pub(crate) mod service_meta;
 pub(crate) mod transaction;
 
 use std::error::Error;
@@ -20,6 +21,7 @@ pub use primitive::{
 };
 pub use receipt::{Event, Receipt, ReceiptResponse};
 pub use service_context::{ServiceContext, ServiceContextError, ServiceContextParams};
+pub use service_meta::{DataMeta, FieldMeta, MethodMeta, ScalarMeta, ServiceMeta, StructMeta};
 pub use transaction::{RawTransaction, SignedTransaction, TransactionRequest};
 
 #[derive(Debug, Display, From)]

@@ -12,11 +12,12 @@ use serde::{Deserialize, Serialize};
 
 use protocol::fixed_codec::FixedCodec;
 use protocol::traits::{
-    ExecutorParams, SchemaGenerator, Service, ServiceResponse, ServiceSDK, StoreArray, StoreBool,
+    ExecutorParams, MetaGenerator, Service, ServiceResponse, ServiceSDK, StoreArray, StoreBool,
     StoreMap, StoreString, StoreUint64,
 };
 use protocol::types::{
-    Address, Block, Hash, Receipt, ServiceContext, ServiceContextParams, SignedTransaction,
+    Address, Block, DataMeta, FieldMeta, Hash, MethodMeta, Receipt, ServiceContext,
+    ServiceContextParams, ServiceMeta, SignedTransaction, StructMeta,
 };
 
 // use binding_macro::SchemaObject;
@@ -393,7 +394,7 @@ fn test_service_none_response() {
 }
 
 #[test]
-fn test_schema() {
+fn test_meta() {
     #[derive(SchemaObject, Default, Serialize, Deserialize)]
     #[description("This is TestA")]
     struct TestA {
@@ -454,10 +455,32 @@ fn test_schema() {
         genesis_data: "".to_owned(),
     };
 
-    let method_schema_expected = "type Mutation {\n  test_write(\n    payload: TestB!\n  ): Null\n}\n\ntype Query {\n  test_read: TestA!\n}\n\n# This is TestA\ntype TestA {\n  # This is String a\n  a: String!\n  # This is TestB b\n  b: TestB!\n  # This is bool c\n  c: Boolean!\n  # This is u64 d\n  d: U64!\n}\n\n# This is TestB\ntype TestB {\n  # This is Vec<u8> e\n  e: [U8!]!\n}\n\nscalar U64\n\nscalar U8\n\nscalar Null\n\n";
-    let event_schema_expected = "# This is TestA\ntype TestA {\n  # This is String a\n  a: String!\n  # This is TestB b\n  b: TestB!\n  # This is bool c\n  c: Boolean!\n  # This is u64 d\n  d: U64!\n}\n\n# This is TestB\ntype TestB {\n  # This is Vec<u8> e\n  e: [U8!]!\n}\n\n# This is TestEvent\ntype TestEvent {\n  # This is TestA f\n  f: TestA!\n}\n\nscalar U64\n\nscalar U8\n\nunion Event = TestEvent\n\n";
-    assert_eq!(test_service.schema_().0, method_schema_expected);
-    assert_eq!(test_service.schema_().1, event_schema_expected);
+    let service_meta = test_service.meta_();
+    assert_eq!(service_meta.methods, vec![
+        MethodMeta {
+            method_name:  "test_read".to_owned(),
+            payload_type: "".to_owned(),
+            readonly:     true,
+            res_type:     "TestA".to_owned(),
+        },
+        MethodMeta {
+            method_name:  "test_write".to_owned(),
+            payload_type: "TestB".to_owned(),
+            readonly:     false,
+            res_type:     "".to_owned(),
+        }
+    ]);
+    let method_params_expect = "{\"TestA\": Struct(StructMeta { name: \"TestA\", fields: [FieldMeta { name: \"a\", ty: \"String\", is_vec: false, comment: \"  # This is String a\\n\" }, FieldMeta { name: \"b\", ty: \"TestB\", is_vec: false, comment: \"  # This is TestB b\\n\" }, FieldMeta { name: \"c\", ty: \"Boolean\", is_vec: false, comment: \"  # This is bool c\\n\" }, FieldMeta { name: \"d\", ty: \"U64\", is_vec: false, comment: \"  # This is u64 d\\n\" }], comment: \"# This is TestA\\n\" }), \"TestB\": Struct(StructMeta { name: \"TestB\", fields: [FieldMeta { name: \"e\", ty: \"U8\", is_vec: true, comment: \"  # This is Vec<u8> e\\n\" }], comment: \"# This is TestB\\n\" }), \"U64\": Scalar(ScalarMeta { name: \"U64\", comment: \"\" }), \"U8\": Scalar(ScalarMeta { name: \"U8\", comment: \"\" })}";
+    assert_eq!(
+        format!("{:?}", service_meta.method_params),
+        method_params_expect
+    );
+    assert_eq!(service_meta.events, vec!["TestEvent".to_owned()]);
+    let event_structs_expect = "{\"TestA\": Struct(StructMeta { name: \"TestA\", fields: [FieldMeta { name: \"a\", ty: \"String\", is_vec: false, comment: \"  # This is String a\\n\" }, FieldMeta { name: \"b\", ty: \"TestB\", is_vec: false, comment: \"  # This is TestB b\\n\" }, FieldMeta { name: \"c\", ty: \"Boolean\", is_vec: false, comment: \"  # This is bool c\\n\" }, FieldMeta { name: \"d\", ty: \"U64\", is_vec: false, comment: \"  # This is u64 d\\n\" }], comment: \"# This is TestA\\n\" }), \"TestB\": Struct(StructMeta { name: \"TestB\", fields: [FieldMeta { name: \"e\", ty: \"U8\", is_vec: true, comment: \"  # This is Vec<u8> e\\n\" }], comment: \"# This is TestB\\n\" }), \"TestEvent\": Struct(StructMeta { name: \"TestEvent\", fields: [FieldMeta { name: \"f\", ty: \"TestA\", is_vec: false, comment: \"  # This is TestA f\\n\" }], comment: \"# This is TestEvent\\n\" }), \"U64\": Scalar(ScalarMeta { name: \"U64\", comment: \"\" }), \"U8\": Scalar(ScalarMeta { name: \"U8\", comment: \"\" })}";
+    assert_eq!(
+        format!("{:?}", service_meta.event_structs),
+        event_structs_expect
+    );
 }
 
 fn get_context(cycles_limit: u64, service: &str, method: &str, payload: &str) -> ServiceContext {

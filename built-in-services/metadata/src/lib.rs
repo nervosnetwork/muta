@@ -4,8 +4,8 @@ mod tests;
 use std::collections::BTreeMap;
 
 use binding_macro::{cycles, genesis, service};
-use protocol::traits::{ExecutorParams, SchemaGenerator, ServiceResponse, ServiceSDK};
-use protocol::types::{Metadata, ServiceContext, METADATA_KEY};
+use protocol::traits::{ExecutorParams, MetaGenerator, ServiceResponse, ServiceSDK};
+use protocol::types::{DataMeta, Metadata, MethodMeta, ServiceContext, ServiceMeta, METADATA_KEY};
 
 pub struct MetadataService<SDK> {
     sdk: SDK,

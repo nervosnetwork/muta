@@ -5,6 +5,7 @@ use syn::{
     parse_macro_input, FnArg, GenericArgument, Ident, ImplItem, ImplItemMethod, ItemImpl,
     PathArguments, ReturnType, Type,
 };
+
 const READ_ATTRIBUTE: &str = "read";
 const WRITE_ATTRIBUTE: &str = "write";
 const GENESIS_ATTRIBUTE: &str = "genesis";
@@ -16,13 +17,6 @@ const TX_HOOK_AFTER_ATTRIBUTE: &str = "tx_hook_after";
 enum ServiceMethod {
     Read(ImplItemMethod),
     Write(ImplItemMethod),
-}
-
-struct Hooks {
-    before:    Option<Ident>,
-    after:     Option<Ident>,
-    tx_before: Option<Ident>,
-    tx_after:  Option<Ident>,
 }
 
 struct MethodMeta {
@@ -43,93 +37,60 @@ impl Parse for EventIdent {
     }
 }
 
-fn gen_schema_code(methods: &[MethodMeta]) -> proc_macro2::TokenStream {
-    let mut mutation = format!("type Mutation {}\n", "{");
-    let mut query = format!("type Query {}\n", "{");
+struct Hooks {
+    before:    Option<Ident>,
+    after:     Option<Ident>,
+    tx_before: Option<Ident>,
+    tx_after:  Option<Ident>,
+}
 
+fn gen_meta_code(methods: &[MethodMeta]) -> proc_macro2::TokenStream {
     let mut tokens = quote! {
-        let mut register = BTreeMap::<String, String>::new();
-    };
-
-    let scalar_none = "scalar Null";
-    let scalar_none_token = quote! {
-        register.insert("scalar_none_key".to_owned(), #scalar_none.to_owned());
+        let mut register = BTreeMap::<String, DataMeta>::new();
+        let mut method_metas = vec![];
     };
 
     for m in methods.iter() {
-        let method_str;
-        let token;
-        match (m.payload_ident.clone(), m.res_ident.clone()) {
-            (None, None) => {
-                method_str = format!("  {}: Null\n", &m.method_ident);
-                token = quote! {
-                    #scalar_none_token
-                };
-            }
-            (Some(payload_ident), None) => {
-                method_str = format!(
-                    "  {}(\n    payload: {}!\n  ): Null\n",
-                    &m.method_ident, &payload_ident
-                );
-                token = quote! {
-                    #payload_ident::schema(&mut register);
-                    #scalar_none_token
-                };
-            }
-            (None, Some(res_ident)) => {
-                method_str = format!("  {}: {}!\n", &m.method_ident, &res_ident);
-                token = quote! {
-                    #res_ident::schema(&mut register);
-                };
-            }
-            (Some(payload_ident), Some(res_ident)) => {
-                method_str = format!(
-                    "  {}(\n    payload: {}!\n  ): {}!\n",
-                    &m.method_ident, &payload_ident, &res_ident
-                );
-                token = quote! {
-                    #payload_ident::schema(&mut register);
-                    #res_ident::schema(&mut register);
-                };
-            }
-        }
-        if m.readonly {
-            query.push_str(method_str.as_str());
+        if let Some(ident) = m.payload_ident.clone() {
+            tokens = quote! {
+                #tokens
+                #ident::meta(&mut register);
+            };
+        };
+        if let Some(ident) = m.res_ident.clone() {
+            tokens = quote! {
+                #tokens
+                #ident::meta(&mut register);
+            };
+        };
+        let method_ident = m.method_ident.to_string();
+        let payload_ident = if let Some(ident) = &m.payload_ident {
+            ident.to_string()
         } else {
-            mutation.push_str(method_str.as_str());
-        }
-
+            "".to_owned()
+        };
+        let readonly = m.readonly;
+        let res_ident = if let Some(ident) = &m.res_ident {
+            ident.to_string()
+        } else {
+            "".to_owned()
+        };
         tokens = quote! {
             #tokens
-            #token
+            {
+                let method_meta = MethodMeta {
+                    method_name: #method_ident.to_owned(),
+                    payload_type: #payload_ident.to_owned(),
+                    readonly: #readonly,
+                    res_type: #res_ident.to_owned()
+                };
+                method_metas.push(method_meta);
+            }
         };
     }
 
-    if format!("type Mutation {}\n", "{") == mutation {
-        mutation = "".to_owned();
-    } else {
-        mutation += "}\n\n";
-    }
-    if format!("type Query {}\n", "{") == query {
-        query = "".to_owned();
-    } else {
-        query += "}\n\n";
-    }
-
-    let mq = mutation + query.as_str();
-    let token = quote! {
-        let mut obj = "".to_owned();
-
-        for v in register.values() {
-            obj.push_str(v.as_str());
-            obj.push_str("\n\n");
-        }
-
-        let schema = #mq.to_owned() + obj.as_str();
-    };
     quote! {
         #tokens
-        #token
     }
 }
 
@@ -137,12 +98,22 @@ pub fn gen_service_code(attr: TokenStream, item: TokenStream) -> TokenStream {
     let event_ident = parse_macro_input!(attr as EventIdent);
     let event_code = if let Some(ident) = event_ident.event {
         quote! {
-        let event = #ident::schema();
-        (schema, event)
+            let ret = #ident::meta();
+            ServiceMeta {
+                methods: method_metas,
+                events: ret.0,
+                method_params: register,
+                event_structs: ret.1
+            }
         }
     } else {
         quote! {
-            (schema, "".to_owned())
+            ServiceMeta {
+                methods: method_metas,
+                events: vec![],
+                method_params: register,
+                event_structs: BTreeMap::<String, DataMeta>::new()
+            }
         }
     };
 
@@ -192,7 +163,7 @@ pub fn gen_service_code(attr: TokenStream, item: TokenStream) -> TokenStream {
 
     let list_method_meta: Vec<MethodMeta> = methods.into_iter().map(extract_method_meta).collect();
 
-    let schema_code = gen_schema_code(&list_method_meta);
+    let meta_code = gen_meta_code(&list_method_meta);
 
     let (list_read_name, list_read_ident, list_read_payload) =
         split_list_for_metadata(&list_method_meta, true);
@@ -302,8 +273,8 @@ pub fn gen_service_code(attr: TokenStream, item: TokenStream) -> TokenStream {
                 }
             }
 
-            fn schema_(&self) -> (String, String) {
-                #schema_code
+            fn meta_(&self) -> ServiceMeta {
+                #meta_code
                 #event_code
             }
         }

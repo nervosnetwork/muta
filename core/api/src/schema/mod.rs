@@ -33,20 +33,20 @@ pub struct ServiceSchema {
     pub event:   String,
 }
 
-impl From<protocol::types::ChainSchema> for ChainSchema {
-    fn from(cs: protocol::types::ChainSchema) -> ChainSchema {
+impl From<&protocol::types::ChainSchema> for ChainSchema {
+    fn from(cs: &protocol::types::ChainSchema) -> ChainSchema {
         Self {
-            schema: cs.schema.into_iter().map(ServiceSchema::from).collect(),
+            schema: cs.schema.iter().map(ServiceSchema::from).collect(),
         }
     }
 }
 
-impl From<protocol::types::ServiceSchema> for ServiceSchema {
-    fn from(ss: protocol::types::ServiceSchema) -> ServiceSchema {
+impl From<&protocol::types::ServiceSchema> for ServiceSchema {
+    fn from(ss: &protocol::types::ServiceSchema) -> ServiceSchema {
         Self {
-            service: ss.service,
-            method:  ss.method,
-            event:   ss.event,
+            service: ss.service.to_owned(),
+            method:  ss.method.to_owned(),
+            event:   ss.event.to_owned(),
         }
     }
 }

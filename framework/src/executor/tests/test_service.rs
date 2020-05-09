@@ -3,8 +3,8 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 
 use binding_macro::{cycles, service, tx_hook_after, tx_hook_before, SchemaObject};
-use protocol::traits::{ExecutorParams, SchemaGenerator, ServiceResponse, ServiceSDK};
-use protocol::types::ServiceContext;
+use protocol::traits::{ExecutorParams, MetaGenerator, ServiceResponse, ServiceSDK};
+use protocol::types::{DataMeta, FieldMeta, MethodMeta, ServiceContext, ServiceMeta, StructMeta};
 
 pub struct TestService<SDK> {
     sdk: SDK,

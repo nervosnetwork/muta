@@ -1,8 +1,10 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::traits::{ServiceMapping, Storage};
 use crate::types::{
-    Address, MerkleRoot, Receipt, ServiceContext, SignedTransaction, TransactionRequest,
+    Address, MerkleRoot, Receipt, ServiceContext, ServiceMeta, SignedTransaction,
+    TransactionRequest,
 };
 use crate::ProtocolResult;
 
@@ -85,6 +87,8 @@ pub trait Executor {
         cycles_price: u64,
         request: &TransactionRequest,
     ) -> ProtocolResult<ServiceResponse<String>>;
+
+    fn get_service_metas(&self) -> ProtocolResult<HashMap<String, ServiceMeta>>;
 }
 
 // `Dispatcher` provides ability to send a call message to other services

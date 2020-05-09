@@ -28,7 +28,6 @@ impl RocksAdapter {
             map_category(StorageCategory::Receipt),
             map_category(StorageCategory::SignedTransaction),
             map_category(StorageCategory::Wal),
-            map_category(StorageCategory::Schema),
         ];
 
         let db = DB::open_cf(&opts, path, categories.iter()).map_err(RocksAdapterError::from)?;
@@ -168,7 +167,6 @@ const C_BLOCKS: &str = "c1";
 const C_SIGNED_TRANSACTIONS: &str = "c2";
 const C_RECEIPTS: &str = "c3";
 const C_WALS: &str = "c4";
-const C_SCHEMAS: &str = "c5";
 
 fn map_category(c: StorageCategory) -> &'static str {
     match c {
@@ -176,7 +174,6 @@ fn map_category(c: StorageCategory) -> &'static str {
         StorageCategory::Receipt => C_RECEIPTS,
         StorageCategory::SignedTransaction => C_SIGNED_TRANSACTIONS,
         StorageCategory::Wal => C_WALS,
-        StorageCategory::Schema => C_SCHEMAS,
     }
 }
 

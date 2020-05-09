@@ -6,7 +6,8 @@ use bytes::Bytes;
 use crate::fixed_codec::FixedCodec;
 use crate::traits::{ExecutorParams, ServiceResponse};
 use crate::types::{
-    Address, Block, Hash, Hex, MerkleRoot, Receipt, ServiceContext, SignedTransaction,
+    Address, Block, DataMeta, Hash, Hex, MerkleRoot, Receipt, ScalarMeta, ServiceContext,
+    ServiceMeta, SignedTransaction,
 };
 use crate::ProtocolResult;
 
@@ -104,7 +105,7 @@ pub trait Service {
     fn read_(&self, ctx: ServiceContext) -> ServiceResponse<String>;
 
     // Return service schema: (MethodSchema, EventSchema)
-    fn schema_(&self) -> (String, String);
+    fn meta_(&self) -> ServiceMeta;
 }
 
 // `ServiceSDK` provides multiple rich interfaces for `service` developers
@@ -279,47 +280,55 @@ pub trait StoreBool {
     fn set(&mut self, b: bool);
 }
 
-pub trait SchemaGenerator {
+pub trait MetaGenerator {
     fn name() -> String;
-    fn schema(register: &mut BTreeMap<String, String>);
+    fn meta(register: &mut BTreeMap<String, DataMeta>);
 }
 
-macro_rules! impl_scalar_schema {
+macro_rules! impl_scalar_meta {
     ($t: ident, $s: expr) => {
-        impl SchemaGenerator for $t {
+        impl MetaGenerator for $t {
             fn name() -> String {
                 $s.to_owned()
             }
 
-            fn schema(register: &mut BTreeMap<String, String>) {
+            fn meta(register: &mut BTreeMap<String, DataMeta>) {
                 if "String" == $s || "Boolean" == $s {
                     return;
                 }
-                register.insert($s.to_owned(), format!("scalar {}", $s));
+                let meta = ScalarMeta {
+                    name:    $s.to_owned(),
+                    comment: "".to_owned(),
+                };
+                register.insert($s.to_string(), DataMeta::Scalar(meta));
             }
         }
     };
     ($t: ident, $s: expr, $d: expr) => {
-        impl SchemaGenerator for $t {
+        impl MetaGenerator for $t {
             fn name() -> String {
                 $s.to_owned()
             }
 
-            fn schema(register: &mut BTreeMap<String, String>) {
+            fn meta(register: &mut BTreeMap<String, DataMeta>) {
                 if "String" == $s || "Boolean" == $s {
                     return;
                 }
-                register.insert($s.to_owned(), format!("# {}\nscalar {}", $d, $s));
+                let meta = ScalarMeta {
+                    name:    $s.to_owned(),
+                    comment: "# ".to_owned() + $d + "\n",
+                };
+                register.insert($s.to_string(), DataMeta::Scalar(meta));
             }
         }
     };
 }
 
-impl_scalar_schema![u8, "U8"];
-impl_scalar_schema![u32, "U32"];
-impl_scalar_schema![u64, "U64"];
-impl_scalar_schema![bool, "Boolean"];
-impl_scalar_schema![String, "String"];
-impl_scalar_schema![Address, "Address", "20 bytes of account address"];
-impl_scalar_schema![Hash, "Hash", "The output digest of Keccak hash function"];
-impl_scalar_schema![Hex, "Hex", "String started with 0x"];
+impl_scalar_meta![u8, "U8"];
+impl_scalar_meta![u32, "U32"];
+impl_scalar_meta![u64, "U64"];
+impl_scalar_meta![bool, "Boolean"];
+impl_scalar_meta![String, "String"];
+impl_scalar_meta![Address, "Address", "20 bytes of account address"];
+impl_scalar_meta![Hash, "Hash", "The output digest of Keccak hash function"];
+impl_scalar_meta![Hex, "Hex", "String started with 0x"];

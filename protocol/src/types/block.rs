@@ -15,14 +15,11 @@ pub struct Block {
 
 #[derive(RlpFixedCodec, Clone, Debug, Display, PartialEq, Eq)]
 #[display(
-    fmt = "chain id {:?}, height {}, exec height {}, previous hash {:?}, logs bloom {:?},
-    ordered root {:?}, confirm root {:?}, state root {:?},
-    receipt root {:?},cycles_used {:?}, proposer {:?}, proof {:?}, validators {:?}",
+    fmt = "chain id {:?}, height {}, exec height {}, previous hash {:?}, ordered root {:?}, confirm root {:?}, state root {:?}, receipt root {:?},cycles_used {:?}, proposer {:?}, proof {:?}, validators {:?}",
     chain_id,
     height,
     exec_height,
     pre_hash,
-    "logs_bloom.iter().map(|bloom| bloom.to_low_u64_be()).collect::<Vec<_>>()",
     order_root,
     confirm_root,
     state_root,

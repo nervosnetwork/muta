@@ -1,9 +1,12 @@
-use std::marker::PhantomData;
-use std::sync::Arc;
+mod schema;
 
-use derive_more::Display;
+use std::marker::PhantomData;
+use std::panic::{self, AssertUnwindSafe};
+use std::sync::{Arc, Once};
 
 use async_trait::async_trait;
+use derive_more::Display;
+
 use protocol::traits::ExecutorFactory;
 use protocol::traits::{
     APIAdapter, Context, ExecutorParams, MemPool, ServiceMapping, ServiceResponse, Storage,
@@ -13,6 +16,10 @@ use protocol::types::{
 };
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
+use schema::*;
+
+static SCHEMA_ONCE: Once = Once::new();
+
 #[derive(Debug, Display)]
 pub enum APIError {
     #[display(
@@ -20,7 +27,12 @@ pub enum APIError {
         real,
         expect
     )]
-    UnExecedError { expect: u64, real: u64 },
+    UnExecedError {
+        expect: u64,
+        real:   u64,
+    },
+
+    SchemaError(String),
 }
 
 impl std::error::Error for APIError {}
@@ -149,7 +161,42 @@ impl<
         })
     }
 
-    async fn get_schema(&self, _ctx: Context) -> ProtocolResult<ChainSchema> {
-        self.storage.get_schema().await
+    async fn get_schema(&self, ctx: Context) -> ProtocolResult<&ChainSchema> {
+        static mut CHAIN_SCHEMA: Option<ChainSchema> = None;
+        let block = self.get_block_by_height(ctx.clone(), None).await?;
+        unsafe {
+            panic::catch_unwind(AssertUnwindSafe(|| {
+                SCHEMA_ONCE.call_once(|| {
+                    let executor = EF::from_root(
+                        block.header.state_root.clone(),
+                        Arc::clone(&self.trie_db),
+                        Arc::clone(&self.storage),
+                        Arc::clone(&self.service_mapping),
+                    )
+                    .expect("Api get schema: executor from root error");
+                    CHAIN_SCHEMA = Some(lazy_schema(
+                        executor
+                            .get_service_metas()
+                            .expect("Api get schema: executor get service metas error"),
+                    ));
+                });
+            }))
+            .map_err(|e| {
+                ProtocolError::new(
+                    ProtocolErrorKind::API,
+                    Box::new(APIError::SchemaError(format!(
+                        "Api get schema error: {:?}",
+                        e
+                    ))),
+                )
+            })?;
+
+            CHAIN_SCHEMA.as_ref().ok_or(ProtocolError::new(
+                ProtocolErrorKind::API,
+                Box::new(APIError::SchemaError(format!(
+                    "Api get schema error: get none"
+                ))),
+            ))
+        }
     }
 }

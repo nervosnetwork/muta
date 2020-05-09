@@ -9,27 +9,21 @@ use syn::{
 pub fn impl_event(ast: &DeriveInput) -> TokenStream {
     let ident = &ast.ident;
 
-    let mut schema_tokens = quote! {
-        let mut r = BTreeMap::<String, String>::new();
+    let mut event_tokens = quote! {
+        let mut r = BTreeMap::<String, DataMeta>::new();
+        let mut events = vec![];
     };
-
     let mut topic_tokens = quote! {};
-    let mut event_schema = "union Event = ".to_owned();
 
     match &ast.data {
         Data::Enum(data) => {
             for vp in data.variants.iter() {
                 let ident = vp.ident.clone();
                 let ident_str = ident.clone().to_string();
-                let topic = ident_str.clone() + " | ";
-                event_schema.push_str(topic.as_str());
-
-                let schema_token = quote! {
-                    #ident::schema(&mut r);
-                };
-                schema_tokens = quote! {
-                    #schema_tokens
-                    #schema_token
+                event_tokens = quote! {
+                    #event_tokens
+                    events.push(#ident_str.to_owned());
+                    #ident::meta(&mut r);
                 };
                 let topic_token = quote! {
                     impl #ident {
@@ -43,25 +37,15 @@ pub fn impl_event(ast: &DeriveInput) -> TokenStream {
                     #topic_token
                 };
             }
-            event_schema = event_schema
-                .strip_suffix(" | ")
-                .expect("strip suffix should succeed")
-                .to_owned();
         }
         _ => panic!("#[derive(SchemaEvent)] can only mark a Enum"),
     }
 
     let gen = quote! {
         impl #ident {
-            pub fn schema() -> String {
-                #schema_tokens
-                r.insert("_union_event_".to_owned(), #event_schema.to_owned());
-                let mut s = "".to_owned();
-                for v in r.values() {
-                    s.push_str(v.as_str());
-                    s.push_str("\n\n")
-                }
-                s
+            pub fn meta() -> (Vec<String>, BTreeMap<String, DataMeta>) {
+                #event_tokens
+                (events, r)
             }
         }
         #topic_tokens
@@ -80,7 +64,7 @@ pub fn impl_object(ast: &DeriveInput) -> TokenStream {
         if register.contains_key(#ident_str) {
             return;
         }
-        let mut schema = format!("{}type {} {}\n", #comment, #ident_str, "{");
+        let mut fields_meta = vec![];
     };
 
     match &ast.data {
@@ -100,23 +84,23 @@ pub fn impl_object(ast: &DeriveInput) -> TokenStream {
         _ => panic!("#[derive(SchemaObject)] can only mark a struct"),
     }
 
-    let token = quote! {
-        schema.push_str("}");
-        register.insert(#ident_str.to_owned(), schema);
-    };
-
     tokens = quote! {
         #tokens
-        #token
+        let struct_meta = StructMeta {
+            name: #ident_str.to_owned(),
+            fields: fields_meta,
+            comment: #comment.to_owned()
+        };
+        register.insert(#ident_str.to_owned(), DataMeta::Struct(struct_meta));
     };
 
     let gen = quote! {
-        impl SchemaGenerator for #ident {
+        impl MetaGenerator for #ident {
             fn name() -> String {
                 #ident_str.to_owned()
             }
 
-            fn schema(register: &mut BTreeMap<String, String>) {
+            fn meta(register: &mut BTreeMap<String, DataMeta>) {
                 #tokens
             }
         }
@@ -150,21 +134,19 @@ fn generate_field_token(f: &Field, ty: &Ident, is_vec: bool) -> proc_macro2::Tok
         .expect("#[derive(SchemaObject)]: struct fields should be named")
         .to_string();
 
-    let mut field_str = "".to_owned();
     let comment = extract_comment(&f.attrs, true).unwrap_or_default();
-    field_str.push_str(comment.as_str());
-    let fmt_str = if is_vec {
-        "  {}: [{}!]!\n"
-    } else {
-        "  {}: {}!\n"
-    };
-    field_str.push_str(fmt_str);
 
     quote! {
-        let ty_name = #ty::name();
-        let field_str = format!(#field_str, #f_str, ty_name);
-        schema.push_str(field_str.as_str());
-        #ty::schema(register);
+        {
+            let field_meta = FieldMeta {
+                name: #f_str.to_owned(),
+                ty: #ty::name(),
+                is_vec: #is_vec,
+                comment: #comment.to_owned(),
+            };
+            fields_meta.push(field_meta);
+            #ty::meta(register);
+        }
     }
 }
 
@@ -182,36 +164,36 @@ fn extract_ident_from_path(ty: &Type) -> Ident {
 }
 
 fn extract_ident_from_ty(ty: &Type) -> (Ident, bool) {
-    match ty {
-        Type::Path(ty) => {
-            let segs = &ty.path.segments;
-            if 1 == segs.len() {
-                let concrete_ty = segs.first().unwrap();
-                if "Vec" == &concrete_ty.ident.clone().to_string() {
-                    if let PathArguments::AngleBracketed(g_ty) = &concrete_ty.arguments {
-                        let arg = g_ty
-                            .args
-                            .first()
-                            .expect("#[derive(SchemaObject)]: Vec should contain a type arg");
-                        if let GenericArgument::Type(arg_ty) = arg {
-                            let ident = extract_ident_from_path(&arg_ty);
-                            (ident, true)
-                        } else {
-                            panic!("#[derive(SchemaObject)]: Vec arg should be a type")
-                        }
-                    } else {
-                        panic!("#[derive(SchemaObject)]: Vec should be AngleBracketed")
-                    }
-                } else if let PathArguments::None = concrete_ty.arguments {
-                    (concrete_ty.ident.clone(), false)
-                } else {
-                    panic!("#[derive(SchemaObject)]: field type only supports T, Vec<T>")
-                }
+    let pty = if let Type::Path(ty) = ty {
+        ty
+    } else {
+        panic!("#[derive(SchemaObject)]: field type only supports T, Vec<T>");
+    };
+
+    let segs = &pty.path.segments;
+    if 1 != segs.len() {
+        panic!("#[derive(SchemaObject)]: length of field type should be 1");
+    }
+    let concrete_ty = segs.first().unwrap();
+    if "Vec" == &concrete_ty.ident.clone().to_string() {
+        if let PathArguments::AngleBracketed(g_ty) = &concrete_ty.arguments {
+            let arg = g_ty
+                .args
+                .first()
+                .expect("#[derive(SchemaObject)]: Vec should contain a type arg");
+            if let GenericArgument::Type(arg_ty) = arg {
+                let ident = extract_ident_from_path(&arg_ty);
+                (ident, true)
             } else {
-                panic!("#[derive(SchemaObject)]: length of field type should be 1")
+                panic!("#[derive(SchemaObject)]: Vec arg should be a type")
             }
+        } else {
+            panic!("#[derive(SchemaObject)]: Vec should be AngleBracketed")
         }
-        _ => panic!("#[derive(SchemaObject)]: field type only supports T, Vec<T>"),
+    } else if let PathArguments::None = concrete_ty.arguments {
+        (concrete_ty.ident.clone(), false)
+    } else {
+        panic!("#[derive(SchemaObject)]: field type only supports T, Vec<T>")
     }
 }
 

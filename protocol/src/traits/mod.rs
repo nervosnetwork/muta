@@ -8,7 +8,7 @@ mod storage;
 
 pub use api::APIAdapter;
 pub use binding::{
-    AdmissionControl, ChainQuerier, SchemaGenerator, Service, ServiceMapping, ServiceSDK,
+    AdmissionControl, ChainQuerier, MetaGenerator, Service, ServiceMapping, ServiceSDK,
     ServiceState, StoreArray, StoreBool, StoreMap, StoreString, StoreUint64,
 };
 pub use consensus::{

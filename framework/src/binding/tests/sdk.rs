@@ -8,8 +8,8 @@ use cita_trie::MemoryDB;
 
 use protocol::traits::{NoopDispatcher, ServiceResponse, ServiceSDK, Storage};
 use protocol::types::{
-    Address, Block, BlockHeader, ChainSchema, Event, Hash, MerkleRoot, Proof, RawTransaction,
-    Receipt, ReceiptResponse, SignedTransaction, TransactionRequest, Validator,
+    Address, Block, BlockHeader, Event, Hash, MerkleRoot, Proof, RawTransaction, Receipt,
+    ReceiptResponse, SignedTransaction, TransactionRequest, Validator,
 };
 use protocol::ProtocolResult;
 
@@ -161,14 +161,6 @@ impl Storage for MockStorage {
 
     async fn load_overlord_wal(&self) -> ProtocolResult<Bytes> {
         Err(StoreError::GetNone.into())
-    }
-
-    async fn insert_schema(&self, _cs: ChainSchema) -> ProtocolResult<()> {
-        unimplemented!()
-    }
-
-    async fn get_schema(&self) -> ProtocolResult<ChainSchema> {
-        unimplemented!()
     }
 }
 

@@ -10,10 +10,11 @@ use binding_macro::{cycles, service};
 use metadata::MetadataService;
 
 use protocol::traits::{
-    Executor, ExecutorParams, SchemaGenerator, Service, ServiceMapping, ServiceResponse, ServiceSDK,
+    Executor, ExecutorParams, MetaGenerator, Service, ServiceMapping, ServiceResponse, ServiceSDK,
 };
 use protocol::types::{
-    Genesis, Hash, RawTransaction, ServiceContext, SignedTransaction, TransactionRequest,
+    DataMeta, Genesis, Hash, MethodMeta, RawTransaction, ServiceContext, ServiceMeta,
+    SignedTransaction, TransactionRequest,
 };
 use protocol::ProtocolResult;
 
