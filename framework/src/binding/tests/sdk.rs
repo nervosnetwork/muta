@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use cita_trie::MemoryDB;
 
-use protocol::traits::{NoopDispatcher, ServiceResponse, ServiceSDK, Storage};
+use protocol::traits::{Context, NoopDispatcher, ServiceResponse, ServiceSDK, Storage};
 use protocol::types::{
     Address, Block, BlockHeader, Event, Hash, MerkleRoot, Proof, RawTransaction, Receipt,
     ReceiptResponse, SignedTransaction, TransactionRequest, Validator,
@@ -107,59 +107,71 @@ struct MockStorage;
 
 #[async_trait]
 impl Storage for MockStorage {
-    async fn insert_transactions(&self, _signed_txs: Vec<SignedTransaction>) -> ProtocolResult<()> {
+    async fn insert_transactions(
+        &self,
+        _ctx: Context,
+        _signed_txs: Vec<SignedTransaction>,
+    ) -> ProtocolResult<()> {
         Ok(())
     }
 
-    async fn insert_block(&self, _block: Block) -> ProtocolResult<()> {
+    async fn insert_block(&self, _ctx: Context, _block: Block) -> ProtocolResult<()> {
         Ok(())
     }
 
-    async fn insert_receipts(&self, _receipts: Vec<Receipt>) -> ProtocolResult<()> {
+    async fn insert_receipts(&self, _ctx: Context, _receipts: Vec<Receipt>) -> ProtocolResult<()> {
         Ok(())
     }
 
-    async fn update_latest_proof(&self, _proof: Proof) -> ProtocolResult<()> {
+    async fn update_latest_proof(&self, _ctx: Context, _proof: Proof) -> ProtocolResult<()> {
         Ok(())
     }
 
-    async fn get_transaction_by_hash(&self, _tx_hash: Hash) -> ProtocolResult<SignedTransaction> {
+    async fn get_transaction_by_hash(
+        &self,
+        _ctx: Context,
+        _tx_hash: Hash,
+    ) -> ProtocolResult<SignedTransaction> {
         Ok(mock_signed_tx())
     }
 
-    async fn get_transactions(&self, _hashes: Vec<Hash>) -> ProtocolResult<Vec<SignedTransaction>> {
+    async fn get_transactions(
+        &self,
+        _ctx: Context,
+        _hashes: Vec<Hash>,
+    ) -> ProtocolResult<Vec<SignedTransaction>> {
         Err(StoreError::GetNone.into())
     }
 
-    async fn get_latest_block(&self) -> ProtocolResult<Block> {
+    async fn get_latest_block(&self, _ctx: Context) -> ProtocolResult<Block> {
         Ok(mock_block(1))
     }
 
-    async fn get_block_by_height(&self, _height: u64) -> ProtocolResult<Block> {
+    async fn get_block_by_height(&self, _ctx: Context, _height: u64) -> ProtocolResult<Block> {
         Ok(mock_block(1))
     }
 
-    async fn get_block_by_hash(&self, _block_hash: Hash) -> ProtocolResult<Block> {
+    async fn get_block_by_hash(&self, _ctx: Context, _block_hash: Hash) -> ProtocolResult<Block> {
         Err(StoreError::GetNone.into())
     }
 
-    async fn get_receipt(&self, _hash: Hash) -> ProtocolResult<Receipt> {
+    async fn get_receipt(&self, _ctx: Context, _hash: Hash) -> ProtocolResult<Receipt> {
         Ok(mock_receipt())
     }
 
-    async fn get_receipts(&self, _hash: Vec<Hash>) -> ProtocolResult<Vec<Receipt>> {
+    async fn get_receipts(&self, _ctx: Context, _hash: Vec<Hash>) -> ProtocolResult<Vec<Receipt>> {
         Err(StoreError::GetNone.into())
     }
 
-    async fn get_latest_proof(&self) -> ProtocolResult<Proof> {
+    async fn get_latest_proof(&self, _ctx: Context) -> ProtocolResult<Proof> {
         Err(StoreError::GetNone.into())
     }
 
-    async fn update_overlord_wal(&self, _info: Bytes) -> ProtocolResult<()> {
+    async fn update_overlord_wal(&self, _ctx: Context, _info: Bytes) -> ProtocolResult<()> {
         Ok(())
     }
 
-    async fn load_overlord_wal(&self) -> ProtocolResult<Bytes> {
+    async fn load_overlord_wal(&self, _ctx: Context) -> ProtocolResult<Bytes> {
         Err(StoreError::GetNone.into())
     }
 }

@@ -510,7 +510,7 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
 
     fn verify_proof_signature(
         &self,
-        ctx: Context,
+        _ctx: Context,
         block_height: u64,
         vote_hash: Bytes,
         aggregated_signature_bytes: Bytes,
@@ -527,7 +527,7 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
 
     fn verity_proof_weight(
         &self,
-        ctx: Context,
+        _ctx: Context,
         block_height: u64,
         weight_map: HashMap<Bytes, u32>,
         signed_voters: Vec<Bytes>,

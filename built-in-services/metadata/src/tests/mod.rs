@@ -7,7 +7,7 @@ use cita_trie::MemoryDB;
 
 use framework::binding::sdk::{DefalutServiceSDK, DefaultChainQuerier};
 use framework::binding::state::{GeneralServiceState, MPTTrie};
-use protocol::traits::{NoopDispatcher, ServiceSDK, Storage};
+use protocol::traits::{Context, NoopDispatcher, ServiceSDK, Storage};
 use protocol::types::{
     Address, Block, Hash, Hex, Metadata, Proof, Receipt, ServiceContext, ServiceContextParams,
     SignedTransaction, ValidatorExtend, METADATA_KEY,

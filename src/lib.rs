@@ -93,7 +93,7 @@ impl<Mapping: 'static + ServiceMapping> Muta<Mapping> {
         if let Some(apm_config) = &self.config.apm {
             muta_apm::global_tracer_register(
                 &apm_config.service_name,
-                apm_config.tracing_address.clone(),
+                apm_config.tracing_address,
                 apm_config.tracing_batch_size,
             );
 

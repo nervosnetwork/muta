@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use protocol::fixed_codec::FixedCodec;
-use protocol::traits::Storage;
+use protocol::traits::{Context, Storage};
 use protocol::types::Hash;
 
 use crate::adapter::memory::MemoryAdapter;
@@ -16,15 +16,15 @@ fn test_storage_block_insert() {
     let block = mock_block(height, Hash::digest(get_random_bytes(10)));
     let block_hash = Hash::digest(block.encode_fixed().unwrap());
 
-    exec!(storage.insert_block(block));
+    exec!(storage.insert_block(Context::new(), block));
 
-    let block = exec!(storage.get_latest_block());
+    let block = exec!(storage.get_latest_block(Context::new()));
     assert_eq!(height, block.header.height);
 
-    let block = exec!(storage.get_block_by_height(height));
+    let block = exec!(storage.get_block_by_height(Context::new(), height));
     assert_eq!(height, block.header.height);
 
-    let block = exec!(storage.get_block_by_hash(block_hash));
+    let block = exec!(storage.get_block_by_hash(Context::new(), block_hash));
     assert_eq!(height, block.header.height);
 }
 
@@ -42,8 +42,8 @@ fn test_storage_receipts_insert() {
         receipts.push(receipt);
     }
 
-    exec!(storage.insert_receipts(receipts.clone()));
-    let receipts_2 = exec!(storage.get_receipts(hashes));
+    exec!(storage.insert_receipts(Context::new(), receipts.clone()));
+    let receipts_2 = exec!(storage.get_receipts(Context::new(), hashes));
 
     for i in 0..10 {
         assert_eq!(
@@ -67,8 +67,8 @@ fn test_storage_transactions_insert() {
         transactions.push(transaction);
     }
 
-    exec!(storage.insert_transactions(transactions.clone()));
-    let transactions_2 = exec!(storage.get_transactions(hashes));
+    exec!(storage.insert_transactions(Context::new(), transactions.clone()));
+    let transactions_2 = exec!(storage.get_transactions(Context::new(), hashes));
 
     for i in 0..10 {
         assert_eq!(
@@ -85,8 +85,8 @@ fn test_storage_latest_proof_insert() {
     let block_hash = Hash::digest(get_random_bytes(10));
     let proof = mock_proof(block_hash);
 
-    exec!(storage.update_latest_proof(proof.clone()));
-    let proof_2 = exec!(storage.get_latest_proof());
+    exec!(storage.update_latest_proof(Context::new(), proof.clone()));
+    let proof_2 = exec!(storage.get_latest_proof(Context::new(),));
 
     assert_eq!(proof.block_hash, proof_2.block_hash);
 }
@@ -96,7 +96,7 @@ fn test_storage_wal_insert() {
     let storage = ImplStorage::new(Arc::new(MemoryAdapter::new()));
 
     let info = get_random_bytes(64);
-    exec!(storage.update_overlord_wal(info.clone()));
-    let info_2 = exec!(storage.load_overlord_wal());
+    exec!(storage.update_overlord_wal(Context::new(), info.clone()));
+    let info_2 = exec!(storage.load_overlord_wal(Context::new(),));
     assert_eq!(info, info_2);
 }

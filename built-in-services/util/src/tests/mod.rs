@@ -11,7 +11,7 @@ use common_crypto::{
 };
 use framework::binding::sdk::{DefalutServiceSDK, DefaultChainQuerier};
 use framework::binding::state::{GeneralServiceState, MPTTrie};
-use protocol::traits::{NoopDispatcher, Storage};
+use protocol::traits::{Context, NoopDispatcher, Storage};
 use protocol::types::{
     Address, Block, Hash, Hex, Proof, Receipt, ServiceContext, ServiceContextParams,
     SignedTransaction,
