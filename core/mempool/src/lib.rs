@@ -1,5 +1,5 @@
-#![feature(test)]
-#![feature(async_closure)]
+#![feature(async_closure, test)]
+#![allow(clippy::suspicious_else_formatting)]
 
 mod adapter;
 mod context;

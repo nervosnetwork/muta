@@ -162,7 +162,7 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
         Ok(stx)
     }
 
-    #[muta_apm::derive::tracing_span(kind = "storage")]
+    #[muta_apm::derive::tracing_span(kind = "storage", logs = "{'txs_len': 'hashes.len()'}")]
     async fn get_transactions(
         &self,
         ctx: Context,
@@ -202,7 +202,7 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
         Ok(receipt)
     }
 
-    #[muta_apm::derive::tracing_span(kind = "storage")]
+    #[muta_apm::derive::tracing_span(kind = "storage", logs = "{'receipts_len': 'hashes.len()'}")]
     async fn get_receipts(&self, ctx: Context, hashes: Vec<Hash>) -> ProtocolResult<Vec<Receipt>> {
         let receipts = get_batch!(self, hashes, ReceiptSchema);
         Ok(receipts)

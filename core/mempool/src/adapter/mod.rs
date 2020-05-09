@@ -198,7 +198,10 @@ where
     N: Rpc + PeerTrust + Gossip + Clone + Unpin + 'static,
     S: Storage + 'static,
 {
-    #[muta_apm::derive::tracing_span(kind = "mempool.adapter")]
+    #[muta_apm::derive::tracing_span(
+        kind = "mempool.adapter",
+        logs = "{'txs_len': 'tx_hashes.len()'}"
+    )]
     async fn pull_txs(
         &self,
         ctx: Context,

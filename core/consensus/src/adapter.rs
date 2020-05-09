@@ -86,7 +86,7 @@ where
         self.mempool.sync_propose_txs(ctx, txs).await
     }
 
-    #[muta_apm::derive::tracing_span(kind = "consensus.adapter")]
+    #[muta_apm::derive::tracing_span(kind = "consensus.adapter", logs = "{'txs_len': 'txs.len()'}")]
     async fn get_full_txs(
         &self,
         ctx: Context,
@@ -183,7 +183,10 @@ where
         Ok(res.inner)
     }
 
-    #[muta_apm::derive::tracing_span(kind = "consensus.adapter")]
+    #[muta_apm::derive::tracing_span(
+        kind = "consensus.adapter",
+        logs = "{'txs_len': 'hashes.len()'}"
+    )]
     async fn pull_txs(
         &self,
         ctx: Context,
@@ -210,7 +213,7 @@ where
         Ok(res.header.height)
     }
 
-    #[muta_apm::derive::tracing_span(kind = "consensus.adapter")]
+    #[muta_apm::derive::tracing_span(kind = "consensus.adapter", logs = "{'txs_len': 'txs.len()'}")]
     async fn verify_txs(&self, ctx: Context, height: u64, txs: Vec<Hash>) -> ProtocolResult<()> {
         if let Err(e) = self.mempool.ensure_order_txs(ctx.clone(), txs).await {
             log::error!("verify_txs error {:?}", e);
@@ -264,7 +267,7 @@ where
         Ok(())
     }
 
-    #[muta_apm::derive::tracing_span(kind = "consensus.adapter")]
+    #[muta_apm::derive::tracing_span(kind = "consensus.adapter", logs = "{'txs_len': 'txs.len()'}")]
     fn sync_exec(
         &self,
         ctx: Context,
@@ -299,7 +302,10 @@ where
 
     /// Pull signed transactions corresponding to the given hashes from other
     /// nodes.
-    #[muta_apm::derive::tracing_span(kind = "consensus.adapter")]
+    #[muta_apm::derive::tracing_span(
+        kind = "consensus.adapter",
+        logs = "{'txs_len': 'hashes.len()'}"
+    )]
     async fn get_txs_from_remote(
         &self,
         ctx: Context,
@@ -332,7 +338,7 @@ where
         Ok(ret.inner)
     }
 
-    #[muta_apm::derive::tracing_span(kind = "consensus.adapter")]
+    #[muta_apm::derive::tracing_span(kind = "consensus.adapter", logs = "{'txs_len': 'txs.len()'}")]
     async fn verify_txs_sync(
         &self,
         ctx: Context,
@@ -360,7 +366,10 @@ where
     Mapping: ServiceMapping + 'static,
 {
     /// Save a block to the database.
-    #[muta_apm::derive::tracing_span(kind = "consensus.adapter")]
+    #[muta_apm::derive::tracing_span(
+        kind = "consensus.adapter",
+        logs = "{'txs_len': 'block.ordered_tx_hashes.len()'}"
+    )]
     async fn save_block(&self, ctx: Context, block: Block) -> ProtocolResult<()> {
         self.storage.insert_block(ctx, block).await
     }
@@ -371,7 +380,10 @@ where
     }
 
     /// Save some signed transactions to the database.
-    #[muta_apm::derive::tracing_span(kind = "consensus.adapter")]
+    #[muta_apm::derive::tracing_span(
+        kind = "consensus.adapter",
+        logs = "{'txs_len': 'signed_txs.len()'}"
+    )]
     async fn save_signed_txs(
         &self,
         ctx: Context,
@@ -380,13 +392,19 @@ where
         self.storage.insert_transactions(ctx, signed_txs).await
     }
 
-    #[muta_apm::derive::tracing_span(kind = "consensus.adapter")]
+    #[muta_apm::derive::tracing_span(
+        kind = "consensus.adapter",
+        logs = "{'receipts_len': 'receipts.len()'}"
+    )]
     async fn save_receipts(&self, ctx: Context, receipts: Vec<Receipt>) -> ProtocolResult<()> {
         self.storage.insert_receipts(ctx, receipts).await
     }
 
     /// Flush the given transactions in the mempool.
-    #[muta_apm::derive::tracing_span(kind = "consensus.adapter")]
+    #[muta_apm::derive::tracing_span(
+        kind = "consensus.adapter",
+        logs = "{'flush_txs_len': 'ordered_tx_hashes.len()'}"
+    )]
     async fn flush_mempool(&self, ctx: Context, ordered_tx_hashes: &[Hash]) -> ProtocolResult<()> {
         self.mempool.flush(ctx, ordered_tx_hashes.to_vec()).await
     }
@@ -404,7 +422,10 @@ where
         Ok(res.header.height)
     }
 
-    #[muta_apm::derive::tracing_span(kind = "consensus.adapter")]
+    #[muta_apm::derive::tracing_span(
+        kind = "consensus.adapter",
+        logs = "{'txs_len': 'tx_hashes.len()'}"
+    )]
     async fn get_txs_from_storage(
         &self,
         ctx: Context,
@@ -464,7 +485,10 @@ where
     }
 
     /// this function verify all info in header except proof and roots
-    #[muta_apm::derive::tracing_span(kind = "consensus.adapter")]
+    #[muta_apm::derive::tracing_span(
+        kind = "consensus.adapter",
+        logs = "{'txs_len': 'block.ordered_tx_hashes.len()'}"
+    )]
     async fn verify_block_header(&self, ctx: Context, block: Block) -> ProtocolResult<()> {
         let previous_block = self
             .get_block_by_height(ctx.clone(), block.header.height - 1)
@@ -833,9 +857,9 @@ where
 
     async fn process(&mut self) -> ProtocolResult<()> {
         if let Some(info) = self.queue.recv().await {
-            return self.exec(info.ctx.clone(), info).await;
+            self.exec(info.ctx.clone(), info).await
         } else {
-            return Err(ConsensusError::Other("Queue disconnect".to_string()).into());
+            Err(ConsensusError::Other("Queue disconnect".to_string()).into())
         }
     }
 

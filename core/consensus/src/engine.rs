@@ -143,7 +143,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
 
     #[muta_apm::derive::tracing_span(
         kind = "consensus.engine",
-        logs = "{'next_height': 'next_height', 'hash': 'Hash::from_bytes(hash.clone()).unwrap().as_hex()'}"
+        logs = "{'next_height': 'next_height', 'hash': 'Hash::from_bytes(hash.clone()).unwrap().as_hex()', 'txs_len': 'block.inner.block.ordered_tx_hashes.len()'}"
     )]
     async fn check_block(
         &self,
@@ -252,7 +252,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
     /// mempool.
     #[muta_apm::derive::tracing_span(
         kind = "consensus.engine",
-        logs = "{'current_height': 'current_height'}"
+        logs = "{'current_height': 'current_height', 'txs_len': 'commit.content.inner.block.ordered_tx_hashes.len()'}"
     )]
     async fn commit(
         &self,
