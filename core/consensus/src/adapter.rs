@@ -311,14 +311,14 @@ where
                     .sync
                     .success
                     .inc();
-                return Ok(data.inner);
+                Ok(data.inner)
             }
             Err(err) => {
                 common_apm::metrics::sync::SYNC_RESULT_COUNTER_VEC_STATIC
                     .sync
                     .failure
                     .inc();
-                return Err(err);
+                Err(err)
             }
         }
     }

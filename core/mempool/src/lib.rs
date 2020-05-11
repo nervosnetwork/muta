@@ -206,7 +206,7 @@ where
                 current_height + self.timeout_gap.load(Ordering::Relaxed),
             )
             .await;
-        if let Err(_) = result {
+        if result.is_err() {
             common_apm::metrics::mempool::MEMPOOL_RESULT_COUNTER_STATIC
                 .package
                 .failure
