@@ -1,4 +1,4 @@
-use super::{
+use crate::metrics::{
     auto_flush_from, exponential_buckets, make_auto_flush_static_metric, register_histogram_vec,
     register_int_counter_vec, register_int_gauge, register_int_gauge_vec, HistogramVec,
     IntCounterVec, IntGauge, IntGaugeVec,
