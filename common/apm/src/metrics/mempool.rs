@@ -53,21 +53,21 @@ lazy_static! {
         "muta_mempool_cost_seconds",
         "Time cost in mempool",
         &["type"],
-        exponential_buckets(1.0, 2.0, 10).expect("mempool time expontial")
+        exponential_buckets(0.05, 2.0, 10).expect("mempool time expontial")
     )
     .expect("mempool time cost");
     pub static ref MEMPOOL_PACKAGE_SIZE_VEC: HistogramVec = register_histogram_vec!(
         "muta_mempool_package_size_vec",
         "Package size",
         &["type"],
-        exponential_buckets(1.0, 2.0, 10).expect("mempool package size exponential")
+        exponential_buckets(0.05, 2.0, 10).expect("mempool package size exponential")
     )
     .expect("mempool package size");
     pub static ref MEMPOOL_CURRENT_SIZE_VEC: HistogramVec = register_histogram_vec!(
         "muta_mempool_current_size_vec",
         "Current size",
         &[],
-        exponential_buckets(1.0, 2.0, 10).expect("mempool current size exponential")
+        exponential_buckets(0.05, 2.0, 10).expect("mempool current size exponential")
     )
     .expect("mempool current size");
 }

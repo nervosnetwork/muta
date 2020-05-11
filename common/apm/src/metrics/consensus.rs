@@ -53,7 +53,7 @@ lazy_static! {
         "muta_consensus_time_cost_seconds",
         "Consensus process time cost",
         &["type"],
-        exponential_buckets(1.0, 2.0, 10).expect("consensus time expontial")
+        exponential_buckets(0.05, 2.0, 10).expect("consensus time expontial")
     )
     .expect("consensus time cost");
 
@@ -61,7 +61,7 @@ lazy_static! {
         "muta_consensus_info",
         "Consensus extra info",
         &["type"],
-        exponential_buckets(1.0, 2.0, 10).expect("consensus extra info expontial")
+        exponential_buckets(0.05, 2.0, 10).expect("consensus extra info expontial")
     )
     .expect("consensus time cost");
 }
