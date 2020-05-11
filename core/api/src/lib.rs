@@ -187,7 +187,7 @@ impl Mutation {
         };
 
         let inst = Instant::now();
-        common_metrics::api::API_REQUEST_COUNTER_VEC_STATIC
+        common_apm::metrics::api::API_REQUEST_COUNTER_VEC_STATIC
             .send_transaction
             .inc();
 
@@ -195,20 +195,20 @@ impl Mutation {
         let tx_hash = stx.tx_hash.clone();
 
         if let Err(err) = state_ctx.adapter.insert_signed_txs(ctx.clone(), stx).await {
-            common_metrics::api::API_REQUEST_RESULT_COUNTER_VEC_STATIC
+            common_apm::metrics::api::API_REQUEST_RESULT_COUNTER_VEC_STATIC
                 .send_transaction
                 .failure
                 .inc();
             return Err(err.into());
         }
 
-        common_metrics::api::API_REQUEST_RESULT_COUNTER_VEC_STATIC
+        common_apm::metrics::api::API_REQUEST_RESULT_COUNTER_VEC_STATIC
             .send_transaction
             .success
             .inc();
-        common_metrics::api::API_REQUEST_TIME_HISTOGRAM_STATIC
+        common_apm::metrics::api::API_REQUEST_TIME_HISTOGRAM_STATIC
             .send_transaction
-            .observe(common_metrics::duration_to_sec(inst.elapsed()));
+            .observe(common_apm::metrics::duration_to_sec(inst.elapsed()));
 
         Ok(Hash::from(tx_hash))
     }
@@ -276,7 +276,7 @@ async fn graphql(
 }
 
 async fn metrics() -> HttpResponse {
-    let metrics_data = match common_metrics::all_metrics() {
+    let metrics_data = match common_apm::metrics::all_metrics() {
         Ok(data) => data,
         Err(e) => e.to_string().into_bytes(),
     };
