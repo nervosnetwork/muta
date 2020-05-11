@@ -9,6 +9,8 @@ use overlord::Codec;
 use rlp::Encodable;
 use serde::{Deserialize, Serialize};
 
+use common_apm::muta_apm;
+
 use protocol::traits::{
     Consensus, Context, MessageHandler, Priority, Rpc, Storage, Synchronization, TrustFeedback,
 };

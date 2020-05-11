@@ -8,6 +8,8 @@ use overlord::types::{
 };
 use overlord::{DurationConfig, Overlord, OverlordHandler};
 
+use common_apm::muta_apm;
+
 use protocol::traits::{Consensus, ConsensusAdapter, NodeInfo};
 use protocol::types::Validator;
 use protocol::ProtocolResult;

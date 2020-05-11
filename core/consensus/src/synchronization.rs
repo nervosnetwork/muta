@@ -5,6 +5,8 @@ use async_trait::async_trait;
 use futures::lock::Mutex;
 use futures_timer::Delay;
 
+use common_apm::muta_apm;
+
 use protocol::fixed_codec::FixedCodec;
 use protocol::traits::{
     Context, ExecutorParams, ExecutorResp, Synchronization, SynchronizationAdapter,

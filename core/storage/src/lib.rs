@@ -14,6 +14,8 @@ use derive_more::{Display, From};
 use lazy_static::lazy_static;
 use tokio::sync::RwLock;
 
+use common_apm::muta_apm;
+
 use protocol::fixed_codec::FixedCodec;
 use protocol::traits::{
     Context, Storage, StorageAdapter, StorageBatchModify, StorageCategory, StorageSchema,

@@ -16,6 +16,7 @@ use parking_lot::RwLock;
 use rlp::Encodable;
 use serde_json::json;
 
+use common_apm::muta_apm;
 use common_crypto::BlsPublicKey;
 use common_merkle::Merkle;
 
