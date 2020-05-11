@@ -1,5 +1,5 @@
-#![feature(test)]
-#![feature(async_closure)]
+#![feature(async_closure, test)]
+#![allow(clippy::suspicious_else_formatting)]
 
 mod adapter;
 mod context;
@@ -90,6 +90,7 @@ where
         unknown_hashes
     }
 
+    #[muta_apm::derive::tracing_span(kind = "mempool")]
     async fn insert_tx(
         &self,
         ctx: Context,
@@ -124,6 +125,7 @@ where
         Ok(())
     }
 
+    #[muta_apm::derive::tracing_span(kind = "mempool", logs = "{'txs': 'txs.len()'}")]
     async fn verify_tx_in_parallel(
         &self,
         ctx: Context,
@@ -170,10 +172,15 @@ impl<Adapter: 'static> MemPool for HashMemPool<Adapter>
 where
     Adapter: MemPoolAdapter,
 {
+    #[muta_apm::derive::tracing_span(kind = "mempool")]
     async fn insert(&self, ctx: Context, tx: SignedTransaction) -> ProtocolResult<()> {
         self.insert_tx(ctx, tx, TxType::NewTx).await
     }
 
+    #[muta_apm::derive::tracing_span(
+        kind = "mempool",
+        logs = "{'cycles_limit': 'cycles_limit', 'tx_num_limit': 'tx_num_limit'}"
+    )]
     async fn package(
         &self,
         ctx: Context,
@@ -196,6 +203,7 @@ where
             .await
     }
 
+    #[muta_apm::derive::tracing_span(kind = "mempool", logs = "{'tx_len': 'tx_hashes.len()'}")]
     async fn flush(&self, ctx: Context, tx_hashes: Vec<Hash>) -> ProtocolResult<()> {
         let _lock = self.flush_lock.write().await;
 
@@ -216,9 +224,10 @@ where
         Ok(())
     }
 
+    #[muta_apm::derive::tracing_span(kind = "mempool", logs = "{'tx_len': 'tx_hashes.len()'}")]
     async fn get_full_txs(
         &self,
-        _ctx: Context,
+        ctx: Context,
         tx_hashes: Vec<Hash>,
     ) -> ProtocolResult<Vec<SignedTransaction>> {
         let len = tx_hashes.len();
@@ -243,6 +252,10 @@ where
         }
     }
 
+    #[muta_apm::derive::tracing_span(
+        kind = "mempool",
+        logs = "{'tx_len': 'order_tx_hashes.len()'}"
+    )]
     async fn ensure_order_txs(
         &self,
         ctx: Context,
@@ -274,6 +287,7 @@ where
         Ok(())
     }
 
+    #[muta_apm::derive::tracing_span(kind = "mempool", logs = "{'tx_len': 'order_txs.len()'}")]
     async fn ensure_order_txs_sync(
         &self,
         ctx: Context,
@@ -282,6 +296,10 @@ where
         self.verify_tx_in_parallel(ctx, order_txs).await
     }
 
+    #[muta_apm::derive::tracing_span(
+        kind = "mempool",
+        logs = "{'tx_len': 'propose_tx_hashes.len()'}"
+    )]
     async fn sync_propose_txs(
         &self,
         ctx: Context,

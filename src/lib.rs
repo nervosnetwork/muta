@@ -90,6 +90,16 @@ impl<Mapping: 'static + ServiceMapping> Muta<Mapping> {
             self.config.logger.modules_level.clone(),
         );
 
+        if let Some(apm_config) = &self.config.apm {
+            muta_apm::global_tracer_register(
+                &apm_config.service_name,
+                apm_config.tracing_address,
+                apm_config.tracing_batch_size,
+            );
+
+            log::info!("muta_apm start");
+        }
+
         // run muta
         let mut rt = tokio::runtime::Runtime::new().expect("new tokio runtime");
         let local = tokio::task::LocalSet::new();

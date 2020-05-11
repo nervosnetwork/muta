@@ -6,9 +6,10 @@ edition = "2018"
 repository = "https://github.com/nervosnetwork/muta"
 
 [dependencies]
-common-logger = { path = "./common/logger" }
+common-apm = { path = "./common/apm" }
 common-config-parser = { path = "./common/config-parser" }
 common-crypto = { path = "./common/crypto" }
+common-logger = { path = "./common/logger" }
 protocol = { path = "./protocol", package = "muta-protocol" }
 core-api = { path = "./core/api" }
 core-storage = { path = "./core/storage" }
@@ -33,6 +34,7 @@ hex = "0.4"
 rlp = "0.4"
 toml = "0.5"
 tokio = { version = "0.2", features = ["macros", "rt-core", "rt-util", "signal", "time"]}
+muta-apm = "0.1.0-alpha.7"
 
 [dev-dependencies]
 asset = { path = "built-in-services/asset"}

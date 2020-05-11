@@ -5,6 +5,8 @@ use async_trait::async_trait;
 use futures::lock::Mutex;
 use futures_timer::Delay;
 
+use common_apm::muta_apm;
+
 use protocol::fixed_codec::FixedCodec;
 use protocol::traits::{
     Context, ExecutorParams, ExecutorResp, Synchronization, SynchronizationAdapter,
@@ -37,6 +39,10 @@ pub struct OverlordSynchronization<Adapter: SynchronizationAdapter> {
 
 #[async_trait]
 impl<Adapter: SynchronizationAdapter> Synchronization for OverlordSynchronization<Adapter> {
+    #[muta_apm::derive::tracing_span(
+        kind = "consensus.sync",
+        logs = "{'remote_height': 'remote_height'}"
+    )]
     async fn receive_remote_block(&self, ctx: Context, remote_height: u64) -> ProtocolResult<()> {
         let syncing_lock = self.syncing.try_lock();
         if syncing_lock.is_none() {
@@ -142,6 +148,10 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
         }
     }
 
+    #[muta_apm::derive::tracing_span(
+        kind = "consensus.sync",
+        logs = "{'current_height': 'current_height', 'remote_height': 'remote_height'}"
+    )]
     async fn start_sync(
         &self,
         ctx: Context,
@@ -279,6 +289,7 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
         Ok(())
     }
 
+    #[muta_apm::derive::tracing_span(kind = "consensus.sync")]
     async fn commit_block(
         &self,
         ctx: Context,
@@ -335,6 +346,7 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
         Ok(())
     }
 
+    #[muta_apm::derive::tracing_span(kind = "consensus.sync", logs = "{'height': 'height'}")]
     async fn get_rich_block_from_remote(
         &self,
         ctx: Context,
@@ -356,12 +368,14 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
         Ok(RichBlock { block, txs })
     }
 
+    #[muta_apm::derive::tracing_span(kind = "consensus.sync", logs = "{'height': 'height'}")]
     async fn get_block_from_remote(&self, ctx: Context, height: u64) -> ProtocolResult<Block> {
         self.adapter
             .get_block_from_remote(ctx.clone(), height)
             .await
     }
 
+    #[muta_apm::derive::tracing_span(kind = "consensus.sync", logs = "{'txs_len': 'txs.len()'}")]
     async fn save_chain_data(
         &self,
         ctx: Context,
@@ -378,6 +392,7 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
         Ok(())
     }
 
+    #[muta_apm::derive::tracing_span(kind = "consensus.sync")]
     pub async fn exec_block(
         &self,
         ctx: Context,
@@ -393,9 +408,12 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
             timestamp: rich_block.block.header.timestamp,
             cycles_limit,
         };
-        let resp = self.adapter.sync_exec(ctx, &exec_params, &rich_block.txs)?;
+        let resp = self
+            .adapter
+            .sync_exec(ctx.clone(), &exec_params, &rich_block.txs)?;
 
         status_agent.update_by_executed(ExecutedInfo::new(
+            ctx,
             rich_block.block.header.height,
             rich_block.block.header.order_root,
             resp.clone(),
@@ -418,6 +436,10 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
         Ok(StatusAgent::new(current_status))
     }
 
+    #[muta_apm::derive::tracing_span(
+        kind = "consensus.sync",
+        logs = "{'remote_height': 'remote_height'}"
+    )]
     async fn need_sync(&self, ctx: Context, remote_height: u64) -> ProtocolResult<bool> {
         let mut current_height = self.status.to_inner().latest_committed_height;
         if remote_height == 0 {

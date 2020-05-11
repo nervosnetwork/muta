@@ -121,6 +121,13 @@ impl Default for ConfigLogger {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct ConfigAPM {
+    pub service_name:       String,
+    pub tracing_address:    SocketAddr,
+    pub tracing_batch_size: Option<usize>,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct Config {
     // crypto
     pub privkey:   Hex,
@@ -137,6 +144,7 @@ pub struct Config {
     pub logger:    ConfigLogger,
     #[serde(default)]
     pub rocksdb:   ConfigRocksDB,
+    pub apm:       Option<ConfigAPM>,
 }
 
 impl Config {

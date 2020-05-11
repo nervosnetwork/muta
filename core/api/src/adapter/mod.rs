@@ -1,9 +1,10 @@
 use std::marker::PhantomData;
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use derive_more::Display;
 
-use async_trait::async_trait;
+use common_apm::muta_apm;
 use protocol::traits::ExecutorFactory;
 use protocol::traits::{
     APIAdapter, Context, ExecutorParams, MemPool, ServiceMapping, ServiceResponse, Storage,
@@ -65,6 +66,7 @@ impl<
         Mapping: ServiceMapping,
     > APIAdapter for DefaultAPIAdapter<EF, M, S, DB, Mapping>
 {
+    #[muta_apm::derive::tracing_span(kind = "API.adapter")]
     async fn insert_signed_txs(
         &self,
         ctx: Context,
@@ -73,26 +75,24 @@ impl<
         self.mempool.insert(ctx, signed_tx).await
     }
 
+    #[muta_apm::derive::tracing_span(kind = "API.adapter")]
     async fn get_block_by_height(
         &self,
-        _ctx: Context,
+        ctx: Context,
         height: Option<u64>,
     ) -> ProtocolResult<Block> {
         let block = match height {
-            Some(id) => self.storage.get_block_by_height(id).await?,
-            None => self.storage.get_latest_block().await?,
+            Some(id) => self.storage.get_block_by_height(ctx.clone(), id).await?,
+            None => self.storage.get_latest_block(ctx).await?,
         };
 
         Ok(block)
     }
 
-    async fn get_receipt_by_tx_hash(
-        &self,
-        _ctx: Context,
-        tx_hash: Hash,
-    ) -> ProtocolResult<Receipt> {
-        let receipt = self.storage.get_receipt(tx_hash).await?;
-        let exec_height = self.storage.get_latest_block().await?.header.exec_height;
+    #[muta_apm::derive::tracing_span(kind = "API.adapter")]
+    async fn get_receipt_by_tx_hash(&self, ctx: Context, tx_hash: Hash) -> ProtocolResult<Receipt> {
+        let receipt = self.storage.get_receipt(ctx.clone(), tx_hash).await?;
+        let exec_height = self.storage.get_latest_block(ctx).await?.header.exec_height;
         let height = receipt.height;
         if exec_height >= height {
             return Ok(receipt);
@@ -106,14 +106,16 @@ impl<
         ))
     }
 
+    #[muta_apm::derive::tracing_span(kind = "API.adapter")]
     async fn get_transaction_by_hash(
         &self,
-        _: Context,
+        ctx: Context,
         tx_hash: Hash,
     ) -> ProtocolResult<SignedTransaction> {
-        self.storage.get_transaction_by_hash(tx_hash).await
+        self.storage.get_transaction_by_hash(ctx, tx_hash).await
     }
 
+    #[muta_apm::derive::tracing_span(kind = "API.adapter")]
     async fn query_service(
         &self,
         ctx: Context,

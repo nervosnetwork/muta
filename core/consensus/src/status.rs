@@ -8,7 +8,7 @@ use serde_json::json;
 
 use common_merkle::Merkle;
 use protocol::fixed_codec::FixedCodec;
-use protocol::traits::ExecutorResp;
+use protocol::traits::{Context, ExecutorResp};
 use protocol::types::{Block, Bloom, Hash, MerkleRoot, Metadata, Proof, Validator};
 
 use crate::util::check_list_roots;
@@ -217,6 +217,7 @@ impl CurrentConsensusStatus {
     "logs_bloom.to_low_u64_be()"
 )]
 pub struct ExecutedInfo {
+    pub ctx:          Context,
     pub exec_height:  u64,
     pub cycles_used:  u64,
     pub logs_bloom:   Bloom,
@@ -226,7 +227,7 @@ pub struct ExecutedInfo {
 }
 
 impl ExecutedInfo {
-    pub fn new(height: u64, order_root: MerkleRoot, resp: ExecutorResp) -> Self {
+    pub fn new(ctx: Context, height: u64, order_root: MerkleRoot, resp: ExecutorResp) -> Self {
         let cycles = resp.all_cycles_used;
 
         let receipt = Merkle::from_hashes(
@@ -239,12 +240,13 @@ impl ExecutedInfo {
         .unwrap_or_else(Hash::from_empty);
 
         Self {
-            exec_height:  height,
-            cycles_used:  cycles,
+            ctx,
+            exec_height: height,
+            cycles_used: cycles,
             receipt_root: receipt,
             confirm_root: order_root,
-            state_root:   resp.state_root.clone(),
-            logs_bloom:   resp.logs_bloom,
+            state_root: resp.state_root.clone(),
+            logs_bloom: resp.logs_bloom,
         }
     }
 }

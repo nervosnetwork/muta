@@ -16,6 +16,7 @@ use parking_lot::RwLock;
 use rlp::Encodable;
 use serde_json::json;
 
+use common_apm::muta_apm;
 use common_crypto::BlsPublicKey;
 use common_merkle::Merkle;
 
@@ -54,6 +55,10 @@ pub struct ConsensusEngine<Adapter> {
 
 #[async_trait]
 impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<Adapter> {
+    #[muta_apm::derive::tracing_span(
+        kind = "consensus.engine",
+        logs = "{'next_height': 'next_height'}"
+    )]
     async fn get_block(
         &self,
         ctx: Context,
@@ -137,6 +142,10 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         Ok((fixed_pill, hash))
     }
 
+    #[muta_apm::derive::tracing_span(
+        kind = "consensus.engine",
+        logs = "{'next_height': 'next_height', 'hash': 'Hash::from_bytes(hash.clone()).unwrap().as_hex()', 'txs_len': 'block.inner.block.ordered_tx_hashes.len()'}"
+    )]
     async fn check_block(
         &self,
         ctx: Context,
@@ -158,7 +167,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         // If the block is proposed by self, it does not need to check. Get full signed
         // transactions directly.
         if !exemption {
-            self.check_block_roots(&block.inner.block.header)?;
+            self.check_block_roots(ctx.clone(), &block.inner.block.header)?;
 
             self.adapter
                 .verify_block_header(ctx.clone(), block.inner.block.clone())
@@ -242,6 +251,10 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
     /// **TODO:** the overlord interface and process needs to be changed.
     /// Get the `FixedSignedTxs` from the argument rather than get it from
     /// mempool.
+    #[muta_apm::derive::tracing_span(
+        kind = "consensus.engine",
+        logs = "{'current_height': 'current_height', 'txs_len': 'commit.content.inner.block.ordered_tx_hashes.len()'}"
+    )]
     async fn commit(
         &self,
         ctx: Context,
@@ -303,6 +316,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         loop {
             if self
                 .exec(
+                    ctx.clone(),
                     pill.block.header.order_root.clone(),
                     current_height,
                     pill.block.header.proposer.clone(),
@@ -365,6 +379,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
     }
 
     /// Only signed proposal and aggregated vote will be broadcast to others.
+    #[muta_apm::derive::tracing_span(kind = "consensus.engine")]
     async fn broadcast_to_other(
         &self,
         ctx: Context,
@@ -396,6 +411,10 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
     }
 
     /// Only signed vote will be transmit to the relayer.
+    #[muta_apm::derive::tracing_span(
+        kind = "consensus.engine",
+        logs = "{'address': 'Address::from_bytes(addr.clone()).unwrap().as_hex()'}"
+    )]
     async fn transmit_to_relayer(
         &self,
         ctx: Context,
@@ -432,6 +451,10 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
 
     /// This function is rarely used, so get the authority list from the
     /// RocksDB.
+    #[muta_apm::derive::tracing_span(
+        kind = "consensus.engine",
+        logs = "{'next_height': 'next_height'}"
+    )]
     async fn get_authority_list(
         &self,
         ctx: Context,
@@ -446,7 +469,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             .get_block_by_height(ctx.clone(), next_height - 1)
             .await?;
         let old_metadata = self.adapter.get_metadata(
-            ctx,
+            ctx.clone(),
             old_block.header.state_root.clone(),
             old_block.header.timestamp,
             old_block.header.height,
@@ -510,8 +533,10 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
         }
     }
 
+    #[muta_apm::derive::tracing_span(kind = "consensus.engine")]
     pub async fn exec(
         &self,
+        ctx: Context,
         order_root: MerkleRoot,
         height: u64,
         address: Address,
@@ -523,6 +548,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
 
         self.adapter
             .execute(
+                ctx,
                 self.node_info.chain_id.clone(),
                 order_root,
                 height,
@@ -536,7 +562,8 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
             .await
     }
 
-    fn check_block_roots(&self, block: &BlockHeader) -> ProtocolResult<()> {
+    #[muta_apm::derive::tracing_span(kind = "consensus.engine")]
+    fn check_block_roots(&self, ctx: Context, block: &BlockHeader) -> ProtocolResult<()> {
         let status = self.status_agent.to_inner();
 
         // check previous hash

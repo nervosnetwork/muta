@@ -198,6 +198,10 @@ where
     N: Rpc + PeerTrust + Gossip + Clone + Unpin + 'static,
     S: Storage + 'static,
 {
+    #[muta_apm::derive::tracing_span(
+        kind = "mempool.adapter",
+        logs = "{'txs_len': 'tx_hashes.len()'}"
+    )]
     async fn pull_txs(
         &self,
         ctx: Context,
@@ -213,7 +217,8 @@ where
         Ok(resp_msg.sig_txs)
     }
 
-    async fn broadcast_tx(&self, _ctx: Context, stx: SignedTransaction) -> ProtocolResult<()> {
+    #[muta_apm::derive::tracing_span(kind = "mempool.adapter")]
+    async fn broadcast_tx(&self, ctx: Context, stx: SignedTransaction) -> ProtocolResult<()> {
         self.stx_tx
             .unbounded_send(stx)
             .map_err(AdapterError::from)?;
@@ -229,6 +234,7 @@ where
         Ok(())
     }
 
+    #[muta_apm::derive::tracing_span(kind = "mempool.adapter")]
     async fn check_signature(&self, ctx: Context, tx: SignedTransaction) -> ProtocolResult<()> {
         let network = self.network.clone();
 
@@ -291,6 +297,7 @@ where
     // TODO: Verify Fee?
     // TODO: Verify Nonce?
     // TODO: Cycle limit?
+    #[muta_apm::derive::tracing_span(kind = "mempool.adapter")]
     async fn check_transaction(&self, ctx: Context, stx: SignedTransaction) -> ProtocolResult<()> {
         let fixed_bytes = stx.raw.encode_fixed()?;
         let size = fixed_bytes.len() as u64;
@@ -301,7 +308,7 @@ where
         if size > max_tx_size {
             if ctx.is_network_origin_txs() {
                 self.network.report(
-                    ctx,
+                    ctx.clone(),
                     TrustFeedback::Bad(format!(
                         "Mempool exceed size limit of tx {:?}",
                         stx.tx_hash
@@ -322,7 +329,7 @@ where
         if cycles_limit_tx > cycles_limit_config {
             if ctx.is_network_origin_txs() {
                 self.network.report(
-                    ctx,
+                    ctx.clone(),
                     TrustFeedback::Bad(format!(
                         "Mempool exceed cycle limit of tx {:?}",
                         stx.tx_hash
@@ -338,11 +345,11 @@ where
         }
 
         // Verify chain id
-        let latest_block = self.storage.get_latest_block().await?;
+        let latest_block = self.storage.get_latest_block(ctx.clone()).await?;
         if latest_block.header.chain_id != stx.raw.chain_id {
             if ctx.is_network_origin_txs() {
                 self.network.report(
-                    ctx,
+                    ctx.clone(),
                     TrustFeedback::Worse(format!("Mempool wrong chain of tx {:?}", stx.tx_hash)),
                 );
             }
@@ -360,7 +367,7 @@ where
         if stx.raw.timeout > latest_height + timeout_gap {
             if ctx.is_network_origin_txs() {
                 self.network.report(
-                    ctx,
+                    ctx.clone(),
                     TrustFeedback::Bad(format!("Mempool invalid timeout of tx {:?}", stx.tx_hash)),
                 );
             }
@@ -389,8 +396,13 @@ where
         Ok(())
     }
 
-    async fn check_storage_exist(&self, _ctx: Context, tx_hash: Hash) -> ProtocolResult<()> {
-        match self.storage.get_transaction_by_hash(tx_hash.clone()).await {
+    #[muta_apm::derive::tracing_span(kind = "mempool.adapter")]
+    async fn check_storage_exist(&self, ctx: Context, tx_hash: Hash) -> ProtocolResult<()> {
+        match self
+            .storage
+            .get_transaction_by_hash(ctx, tx_hash.clone())
+            .await
+        {
             Ok(_) => Err(MemPoolError::CommittedTx { tx_hash }.into()),
             Err(err) => {
                 // TODO: downcast to StorageError
@@ -403,8 +415,9 @@ where
         }
     }
 
-    async fn get_latest_height(&self, _ctx: Context) -> ProtocolResult<u64> {
-        let height = self.storage.get_latest_block().await?.header.height;
+    #[muta_apm::derive::tracing_span(kind = "mempool.adapter")]
+    async fn get_latest_height(&self, ctx: Context) -> ProtocolResult<u64> {
+        let height = self.storage.get_latest_block(ctx).await?.header.height;
         Ok(height)
     }
 

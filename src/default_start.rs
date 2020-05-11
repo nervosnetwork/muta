@@ -72,7 +72,7 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
     )?);
     let storage = Arc::new(ImplStorage::new(Arc::clone(&rocks_adapter)));
 
-    match storage.get_latest_block().await {
+    match storage.get_latest_block(Context::new()).await {
         Ok(genesis_block) => {
             log::info!("The Genesis block has been initialized.");
             return Ok(genesis_block);
@@ -129,8 +129,12 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
         header:            genesis_block_header,
         ordered_tx_hashes: vec![],
     };
-    storage.insert_block(genesis_block.clone()).await?;
-    storage.update_latest_proof(latest_proof).await?;
+    storage
+        .insert_block(Context::new(), genesis_block.clone())
+        .await?;
+    storage
+        .update_latest_proof(Context::new(), latest_proof)
+        .await?;
 
     log::info!("The genesis block is created {:?}", genesis_block);
     Ok(genesis_block)
@@ -194,7 +198,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         .await?;
 
     // Init mempool
-    let current_block = storage.get_latest_block().await?;
+    let current_block = storage.get_latest_block(Context::new()).await?;
     let mempool_adapter = DefaultMemPoolAdapter::<Secp256k1, _, _>::new(
         network_service.handle(),
         Arc::clone(&storage),
@@ -293,7 +297,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     let block_hash = Hash::digest(current_block.encode_fixed()?);
     let current_height = current_block.header.height;
     let exec_height = current_block.header.exec_height;
-    let proof = if let Ok(temp) = storage.get_latest_proof().await {
+    let proof = if let Ok(temp) = storage.get_latest_proof(Context::new()).await {
         temp
     } else {
         current_header.proof.clone()
@@ -389,9 +393,9 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     // lost current status.
     log::info!("Re-execute from {} to {}", exec_height + 1, current_height);
     for height in exec_height + 1..=current_height {
-        let block = storage.get_block_by_height(height).await?;
+        let block = storage.get_block_by_height(Context::new(), height).await?;
         let txs = storage
-            .get_transactions(block.ordered_tx_hashes.clone())
+            .get_transactions(Context::new(), block.ordered_tx_hashes.clone())
             .await?;
         let rich_block = RichBlock { block, txs };
         let _ = synchronization

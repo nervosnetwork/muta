@@ -451,7 +451,7 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
             .await?;
         // the auth_list for the target should comes from previous height
         let metadata = self.get_metadata(
-            ctx,
+            ctx.clone(),
             previous_block.header.state_root.clone(),
             previous_block.header.height,
             previous_block.header.timestamp,
@@ -482,6 +482,7 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
         let vote_hash = self.crypto.hash(protocol::Bytes::from(rlp::encode(&vote)));
 
         self.verify_proof_signature(
+            ctx.clone(),
             block.header.height,
             vote_hash.clone(),
             proof.signature.clone(),
@@ -502,13 +503,14 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
             .map(|node| (node.address.clone(), node.vote_weight))
             .collect::<HashMap<overlord::types::Address, u32>>();
 
-        self.verity_proof_weight(block.header.height, weight_map, signed_voters)?;
+        self.verity_proof_weight(ctx.clone(), block.header.height, weight_map, signed_voters)?;
 
         Ok(())
     }
 
     fn verify_proof_signature(
         &self,
+        _ctx: Context,
         block_height: u64,
         vote_hash: Bytes,
         aggregated_signature_bytes: Bytes,
@@ -525,6 +527,7 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
 
     fn verity_proof_weight(
         &self,
+        _ctx: Context,
         block_height: u64,
         weight_map: HashMap<Bytes, u32>,
         signed_voters: Vec<Bytes>,

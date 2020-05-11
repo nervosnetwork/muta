@@ -1,4 +1,5 @@
 #![feature(test)]
+#![allow(clippy::type_complexity, clippy::suspicious_else_formatting)]
 
 pub mod adapter;
 pub mod consensus;

@@ -135,6 +135,7 @@ pub trait CommonConsensusAdapter: Send + Sync {
 
     fn verify_proof_signature(
         &self,
+        ctx: Context,
         block_height: u64,
         vote_hash: Bytes,
         aggregated_signature_bytes: Bytes,
@@ -143,6 +144,7 @@ pub trait CommonConsensusAdapter: Send + Sync {
 
     fn verity_proof_weight(
         &self,
+        ctx: Context,
         block_height: u64,
         weight_map: HashMap<Bytes, u32>,
         signed_voters: Vec<Bytes>,
@@ -182,8 +184,10 @@ pub trait ConsensusAdapter: CommonConsensusAdapter + Send + Sync {
     ) -> ProtocolResult<()>;
 
     /// Execute some transactions.
+    #[allow(clippy::too_many_arguments)]
     async fn execute(
         &self,
+        ctx: Context,
         chain_id: Hash,
         order_root: MerkleRoot,
         height: u64,

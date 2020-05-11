@@ -3,7 +3,7 @@ use std::sync::Arc;
 use derive_more::{Display, From};
 use futures::executor::block_on;
 
-use protocol::traits::{ChainQuerier, Storage};
+use protocol::traits::{ChainQuerier, Context, Storage};
 use protocol::types::{Block, Hash, Receipt, SignedTransaction};
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
@@ -19,20 +19,23 @@ impl<S: Storage> DefaultChainQuerier<S> {
 
 impl<S: Storage> ChainQuerier for DefaultChainQuerier<S> {
     fn get_transaction_by_hash(&self, tx_hash: &Hash) -> ProtocolResult<Option<SignedTransaction>> {
-        let ret = block_on(self.storage.get_transaction_by_hash(tx_hash.clone()))
-            .map_err(|_| ChainQueryError::AsyncStorage)?;
+        let ret = block_on(
+            self.storage
+                .get_transaction_by_hash(Context::new(), tx_hash.clone()),
+        )
+        .map_err(|_| ChainQueryError::AsyncStorage)?;
 
         Ok(Some(ret))
     }
 
     fn get_block_by_height(&self, height: Option<u64>) -> ProtocolResult<Option<Block>> {
         if let Some(u) = height {
-            let ret = block_on(self.storage.get_block_by_height(u))
+            let ret = block_on(self.storage.get_block_by_height(Context::new(), u))
                 .map_err(|_| ChainQueryError::AsyncStorage)?;
 
             Ok(Some(ret))
         } else {
-            let ret = block_on(self.storage.get_latest_block())
+            let ret = block_on(self.storage.get_latest_block(Context::new()))
                 .map_err(|_| ChainQueryError::AsyncStorage)?;
 
             Ok(Some(ret))
@@ -40,7 +43,7 @@ impl<S: Storage> ChainQuerier for DefaultChainQuerier<S> {
     }
 
     fn get_receipt_by_hash(&self, tx_hash: &Hash) -> ProtocolResult<Option<Receipt>> {
-        let ret = block_on(self.storage.get_receipt(tx_hash.clone()))
+        let ret = block_on(self.storage.get_receipt(Context::new(), tx_hash.clone()))
             .map_err(|_| ChainQueryError::AsyncStorage)?;
 
         Ok(Some(ret))
