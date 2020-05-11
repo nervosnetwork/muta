@@ -42,7 +42,7 @@ lazy_static! {
         "muta_api_request_time_cost_seconds",
         "Request process time cost",
         &["type"],
-        exponential_buckets(1024.0, 2.0, 8).expect("api req time expontial")
+        exponential_buckets(1.0, 2.0, 10).expect("api req time expontial")
     )
     .expect("request time cost");
 }
