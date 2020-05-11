@@ -5,7 +5,8 @@ pub use prometheus::{Histogram, HistogramVec, IntCounter, IntCounterVec, IntGaug
 
 use derive_more::Display;
 use prometheus::{
-    exponential_buckets, register_histogram_vec, register_int_counter_vec, Encoder, TextEncoder,
+    exponential_buckets, register_histogram_vec, register_int_counter_vec, register_int_gauge,
+    Encoder, TextEncoder,
 };
 use prometheus_static_metric::{auto_flush_from, make_auto_flush_static_metric};
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};

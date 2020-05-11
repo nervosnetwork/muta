@@ -34,6 +34,7 @@ use crate::{
     error::NetworkError,
     event::{ConnectionEvent, PeerManagerEvent},
     message::RawSessionMessage,
+    metrics::Metrics,
     outbound::{NetworkGossip, NetworkRpc},
     peer_manager::{
         DiscoveryAddrManager, IdentifyCallback, PeerManager, PeerManagerConfig, SharedSessions,
@@ -156,6 +157,9 @@ pub struct NetworkService {
     peer_mgr:     Option<PeerManager>,
     router:       Option<MessageRouter<Snappy, SharedSessions>>,
 
+    // Metrics
+    metrics: Option<Metrics<SharedSessions>>,
+
     // Self check
     selfcheck: Option<SelfCheck<SharedSessions>>,
 
@@ -225,6 +229,9 @@ impl NetworkService {
             sys_tx,
         );
 
+        // Build metrics service
+        let metrics = Metrics::new(session_book.clone());
+
         // Build selfcheck service
         let selfcheck = SelfCheck::new(session_book, (&config).into());
 
@@ -246,6 +253,8 @@ impl NetworkService {
             net_conn_srv: Some(NetworkConnectionService::NoListen(conn_srv)),
             peer_mgr: Some(peer_mgr),
             router: Some(router),
+
+            metrics: Some(metrics),
 
             selfcheck: Some(selfcheck),
 
@@ -382,6 +391,10 @@ impl Future for NetworkService {
 
         if let Some(router) = self.router.take() {
             tokio::spawn(router);
+        }
+
+        if let Some(metrics) = self.metrics.take() {
+            tokio::spawn(metrics);
         }
 
         if let Some(selfcheck) = self.selfcheck.take() {

@@ -9,7 +9,7 @@ repository = "https://github.com/nervosnetwork/muta"
 
 [dependencies]
 protocol = { path = "../../protocol", package = "muta-protocol" }
-common_apm = { apth = "../../common/apm" }
+common-apm = { path = "../../common/apm" }
 
 async-trait = "0.1"
 bincode = "1.2"

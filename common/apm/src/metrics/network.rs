@@ -1,6 +1,6 @@
 use super::{
     auto_flush_from, exponential_buckets, make_auto_flush_static_metric, register_histogram_vec,
-    register_int_counter_vec, HistogramVec, IntCounterVec,
+    register_int_counter_vec, register_int_gauge, HistogramVec, IntCounterVec, IntGauge,
 };
 
 use lazy_static::lazy_static;
@@ -64,4 +64,10 @@ lazy_static! {
         NETWORK_PROTOCOL_TIME_HISTOGRAM_VEC,
         ProtocolTimeHistogramVec
     );
+}
+
+lazy_static! {
+    pub static ref NETWORK_PENDING_DATA_SIZE: IntGauge =
+        register_int_gauge!("muta_network_pending_data_size", "Total pending data size")
+            .expect("network pending data size");
 }
