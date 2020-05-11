@@ -8,9 +8,11 @@ use overlord::types::{
 };
 use overlord::{DurationConfig, Overlord, OverlordHandler};
 
+use common_apm::muta_apm;
+
 use protocol::traits::{Consensus, ConsensusAdapter, NodeInfo};
 use protocol::types::Validator;
-use protocol::{muta_apm, ProtocolResult};
+use protocol::ProtocolResult;
 
 use crate::engine::ConsensusEngine;
 use crate::fixed_types::FixedPill;
