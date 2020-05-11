@@ -5,6 +5,7 @@ mod schema;
 use std::cmp;
 use std::convert::TryFrom;
 use std::sync::Arc;
+use std::time::Instant;
 
 use actix_web::{web, App, Error, FromRequest, HttpResponse, HttpServer};
 use futures::executor::block_on;
@@ -185,13 +186,24 @@ impl Mutation {
             None => ctx,
         };
 
+        let inst = Instant::now();
+        common_metrics::api::TX_COUNT.inc();
+
         let stx = to_signed_transaction(input_raw, input_encryption)?;
         let tx_hash = stx.tx_hash.clone();
 
-        state_ctx
+        if let Err(err) = state_ctx
             .adapter
             .insert_signed_txs(ctx.clone(), stx)
-            .await?;
+            .await {
+            if err.to_string().contains("already commit") {
+                common_metrics::api::REPEATED_TX_COUNT.inc();
+            }
+            return Err(err.into());
+        }
+
+        common_metrics::api::SUCCESS_TX_COUNT.inc();
+        common_metrics::api::TX_SUCCESS_TIME_COST.observe_duration(inst.elapsed());
 
         Ok(Hash::from(tx_hash))
     }

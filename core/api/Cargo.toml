@@ -11,6 +11,7 @@ repository = "https://github.com/nervosnetwork/muta"
 protocol = { path = "../../protocol", package = "muta-protocol" }
 common-apm = { path = "../../common/apm" }
 common-crypto = { path = "../../common/crypto" }
+common-metrics = { path = "../../common/metrics" }
 
 juniper = { git = "https://github.com/graphql-rust/juniper", rev = "eff086a", features = ["async"] }
 juniper_codegen = "0.14"
