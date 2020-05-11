@@ -16,6 +16,7 @@ use parking_lot::RwLock;
 use rlp::Encodable;
 use serde_json::json;
 
+use common_apm::muta_apm;
 use common_crypto::BlsPublicKey;
 use common_merkle::Merkle;
 
@@ -25,7 +26,7 @@ use protocol::types::{
     Address, Block, BlockHeader, Hash, MerkleRoot, Metadata, Pill, Proof, SignedTransaction,
     Validator,
 };
-use protocol::{muta_apm, Bytes, ProtocolError, ProtocolResult};
+use protocol::{Bytes, ProtocolError, ProtocolResult};
 
 use crate::fixed_types::FixedPill;
 use crate::message::{

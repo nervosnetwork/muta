@@ -5,12 +5,14 @@ use async_trait::async_trait;
 use futures::lock::Mutex;
 use futures_timer::Delay;
 
+use common_apm::muta_apm;
+
 use protocol::fixed_codec::FixedCodec;
 use protocol::traits::{
     Context, ExecutorParams, ExecutorResp, Synchronization, SynchronizationAdapter,
 };
 use protocol::types::{Block, Hash, Proof, Receipt, SignedTransaction};
-use protocol::{muta_apm, ProtocolResult};
+use protocol::ProtocolResult;
 
 use crate::engine::generate_new_crypto_map;
 use crate::status::{ExecutedInfo, StatusAgent};

@@ -8,6 +8,7 @@ repository = "https://github.com/nervosnetwork/muta"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+common-apm = { path = "../../common/apm" }
 protocol = { path = "../protocol", package = "muta-protocol" }
 asset = { path = "../built-in-services/asset"}
 metadata = { path = "../built-in-services/metadata"}
