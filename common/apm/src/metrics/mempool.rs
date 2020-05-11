@@ -1,4 +1,4 @@
-use super::{
+use crate::metrics::{
     auto_flush_from, exponential_buckets, make_auto_flush_static_metric, register_histogram_vec,
     register_int_counter_vec, HistogramVec, IntCounterVec,
 };
@@ -67,7 +67,7 @@ lazy_static! {
         "muta_mempool_current_size_vec",
         "Current size",
         &[],
-        exponential_buckets(1.0, 2.0, 8).expect("mempool current size exponential")
+        exponential_buckets(1.0, 2.0, 10).expect("mempool current size exponential")
     )
     .expect("mempool current size");
 }
