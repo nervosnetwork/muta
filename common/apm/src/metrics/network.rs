@@ -1,6 +1,7 @@
 use super::{
     auto_flush_from, exponential_buckets, make_auto_flush_static_metric, register_histogram_vec,
-    register_int_counter_vec, register_int_gauge, HistogramVec, IntCounterVec, IntGauge,
+    register_int_counter_vec, register_int_gauge, register_int_gauge_vec, HistogramVec,
+    IntCounterVec, IntGauge, IntGaugeVec,
 };
 
 use lazy_static::lazy_static;
@@ -67,7 +68,15 @@ lazy_static! {
 }
 
 lazy_static! {
-    pub static ref NETWORK_PENDING_DATA_SIZE: IntGauge =
-        register_int_gauge!("muta_network_pending_data_size", "Total pending data size")
-            .expect("network pending data size");
+    pub static ref NETWORK_TOTAL_PENDING_DATA_SIZE: IntGauge = register_int_gauge!(
+        "muta_network_total_pending_data_size",
+        "Total pending data size"
+    )
+    .expect("network total pending data size");
+    pub static ref NETWORK_IP_PENDING_DATA_SIZE_VEC: IntGaugeVec = register_int_gauge_vec!(
+        "muta_network_ip_pending_data_size",
+        "IP pending data size",
+        &["ip"]
+    )
+    .expect("network ip pending data size");
 }

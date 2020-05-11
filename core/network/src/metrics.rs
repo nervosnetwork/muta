@@ -8,7 +8,10 @@ use std::{
 
 use futures::task::AtomicWaker;
 
-use crate::{common::HeartBeat, traits::SessionBook};
+use crate::{
+    common::{ConnectedAddr, HeartBeat},
+    traits::SessionBook,
+};
 
 const METRICS_INTERVAL: Duration = Duration::from_secs(1);
 
@@ -38,10 +41,20 @@ where
 
         let total_size: usize = sids
             .iter()
-            .map(|sid| self.sessions.pending_data_size(*sid))
+            .map(|sid| {
+                let data_size = self.sessions.pending_data_size(*sid);
+
+                if let Some(ConnectedAddr { host, .. }) = self.sessions.connected_addr(*sid) {
+                    let guage = common_apm::metrics::network::NETWORK_IP_PENDING_DATA_SIZE_VEC
+                        .with_label_values(&[&host]);
+                    guage.set(data_size as i64);
+                }
+
+                data_size
+            })
             .sum();
 
-        common_apm::metrics::network::NETWORK_PENDING_DATA_SIZE.set(total_size as i64);
+        common_apm::metrics::network::NETWORK_TOTAL_PENDING_DATA_SIZE.set(total_size as i64);
     }
 }
 
