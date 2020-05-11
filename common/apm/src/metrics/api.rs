@@ -8,7 +8,7 @@ use lazy_static::lazy_static;
 make_auto_flush_static_metric! {
     pub label_enum RequestKind {
         send_transaction,
-        query,
+        get_block,
     }
 
     pub label_enum SendTransactionResult {

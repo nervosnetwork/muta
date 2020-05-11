@@ -56,15 +56,49 @@ impl Query {
             None => ctx,
         };
 
+        let inst = Instant::now();
+        common_apm::metrics::api::API_REQUEST_COUNTER_VEC_STATIC
+            .get_block
+            .inc();
+
         let height = match height {
-            Some(id) => Some(id.try_into_u64()?),
+            Some(id) => match id.try_into_u64() {
+                Ok(id) => Some(id),
+                Err(err) => {
+                    common_apm::metrics::api::API_REQUEST_RESULT_COUNTER_VEC_STATIC
+                        .get_block
+                        .failure
+                        .inc();
+
+                    return Err(err.into());
+                }
+            },
             None => None,
         };
 
-        let block = state_ctx
+        let block = match state_ctx
             .adapter
             .get_block_by_height(ctx.clone(), height)
-            .await?;
+            .await
+        {
+            Ok(block) => block,
+            Err(err) => {
+                common_apm::metrics::api::API_REQUEST_RESULT_COUNTER_VEC_STATIC
+                    .get_block
+                    .failure
+                    .inc();
+
+                return Err(err.into());
+            }
+        };
+
+        common_apm::metrics::api::API_REQUEST_RESULT_COUNTER_VEC_STATIC
+            .get_block
+            .success
+            .inc();
+        common_apm::metrics::api::API_REQUEST_TIME_HISTOGRAM_STATIC
+            .get_block
+            .observe(common_apm::metrics::duration_to_sec(inst.elapsed()));
 
         Ok(Block::from(block))
     }
