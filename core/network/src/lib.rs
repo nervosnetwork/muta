@@ -6,6 +6,7 @@ mod endpoint;
 mod error;
 mod event;
 mod message;
+mod metrics;
 mod outbound;
 mod peer_manager;
 mod protocols;

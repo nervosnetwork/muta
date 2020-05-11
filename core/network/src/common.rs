@@ -177,8 +177,8 @@ impl Future for HeartBeat {
 #[derive(Debug, Display, PartialEq, Eq, Serialize, Deserialize, Clone)]
 #[display(fmt = "{}:{}", host, port)]
 pub struct ConnectedAddr {
-    host: String,
-    port: u16,
+    pub host: String,
+    pub port: u16,
 }
 
 impl From<&Multiaddr> for ConnectedAddr {
