@@ -10,7 +10,7 @@ use overlord::{DurationConfig, Overlord, OverlordHandler};
 
 use protocol::traits::{Consensus, ConsensusAdapter, NodeInfo};
 use protocol::types::Validator;
-use protocol::ProtocolResult;
+use protocol::{muta_apm, ProtocolResult};
 
 use crate::engine::ConsensusEngine;
 use crate::fixed_types::FixedPill;

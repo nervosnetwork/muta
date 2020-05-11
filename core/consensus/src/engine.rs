@@ -25,7 +25,7 @@ use protocol::types::{
     Address, Block, BlockHeader, Hash, MerkleRoot, Metadata, Pill, Proof, SignedTransaction,
     Validator,
 };
-use protocol::{Bytes, ProtocolError, ProtocolResult};
+use protocol::{muta_apm, Bytes, ProtocolError, ProtocolResult};
 
 use crate::fixed_types::FixedPill;
 use crate::message::{

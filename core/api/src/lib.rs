@@ -16,6 +16,7 @@ use common_crypto::{
     HashValue, PrivateKey, PublicKey, Secp256k1PrivateKey, Signature, ToPublicKey,
 };
 use protocol::fixed_codec::FixedCodec;
+use protocol::muta_apm;
 use protocol::traits::{APIAdapter, Context};
 
 use crate::config::GraphQLConfig;
@@ -49,7 +50,7 @@ impl Query {
         let ctx = match muta_apm::MUTA_TRACER.span("API.getBlock", vec![
             muta_apm::rustracing::tag::Tag::new("kind", "API"),
         ]) {
-            Some(span) => ctx.with_value("parent_span_ctx", span.context().map(|cx| cx.clone())),
+            Some(span) => ctx.with_value("parent_span_ctx", span.context().cloned()),
             None => ctx,
         };
 
@@ -72,7 +73,7 @@ impl Query {
         let ctx = match muta_apm::MUTA_TRACER.span("API.get_transaction", vec![
             muta_apm::rustracing::tag::Tag::new("kind", "API"),
         ]) {
-            Some(span) => ctx.with_value("parent_span_ctx", span.context().map(|cx| cx.clone())),
+            Some(span) => ctx.with_value("parent_span_ctx", span.context().cloned()),
             None => ctx,
         };
 
@@ -95,7 +96,7 @@ impl Query {
         let ctx = match muta_apm::MUTA_TRACER.span("API.get_receipt", vec![
             muta_apm::rustracing::tag::Tag::new("kind", "API"),
         ]) {
-            Some(span) => ctx.with_value("parent_span_ctx", span.context().map(|cx| cx.clone())),
+            Some(span) => ctx.with_value("parent_span_ctx", span.context().cloned()),
             None => ctx,
         };
 
@@ -124,7 +125,7 @@ impl Query {
         let ctx = match muta_apm::MUTA_TRACER.span("API.query_service", vec![
             muta_apm::rustracing::tag::Tag::new("kind", "API"),
         ]) {
-            Some(span) => ctx.with_value("parent_span_ctx", span.context().map(|cx| cx.clone())),
+            Some(span) => ctx.with_value("parent_span_ctx", span.context().cloned()),
             None => ctx,
         };
 
@@ -179,7 +180,7 @@ impl Mutation {
         let ctx = match muta_apm::MUTA_TRACER.span("API.send_transaction", vec![
             muta_apm::rustracing::tag::Tag::new("kind", "API"),
         ]) {
-            Some(span) => ctx.with_value("parent_span_ctx", span.context().map(|cx| cx.clone())),
+            Some(span) => ctx.with_value("parent_span_ctx", span.context().cloned()),
             None => ctx,
         };
 
@@ -207,7 +208,7 @@ impl Mutation {
         let ctx = match muta_apm::MUTA_TRACER.span("API.unsafe_send_transaction", vec![
             muta_apm::rustracing::tag::Tag::new("kind", "API"),
         ]) {
-            Some(span) => ctx.with_value("parent_span_ctx", span.context().map(|cx| cx.clone())),
+            Some(span) => ctx.with_value("parent_span_ctx", span.context().cloned()),
             None => ctx,
         };
 

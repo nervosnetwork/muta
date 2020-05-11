@@ -28,6 +28,7 @@ cita_trie = "2.0"
 json = "0.12"
 byteorder = "1.3"
 muta-codec-derive = "0.2"
+muta-apm = "0.1.0-alpha.7"
 
 [dev-dependencies]
 rayon = "1.3"

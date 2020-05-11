@@ -10,7 +10,7 @@ use protocol::traits::{
     Context, ExecutorParams, ExecutorResp, Synchronization, SynchronizationAdapter,
 };
 use protocol::types::{Block, Hash, Proof, Receipt, SignedTransaction};
-use protocol::ProtocolResult;
+use protocol::{muta_apm, ProtocolResult};
 
 use crate::engine::generate_new_crypto_map;
 use crate::status::{ExecutedInfo, StatusAgent};

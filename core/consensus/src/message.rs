@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use protocol::traits::{
     Consensus, Context, MessageHandler, Priority, Rpc, Storage, Synchronization, TrustFeedback,
 };
-use protocol::ProtocolError;
+use protocol::{muta_apm, ProtocolError};
 
 use core_storage::StorageError;
 

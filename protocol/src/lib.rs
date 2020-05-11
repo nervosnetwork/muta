@@ -10,6 +10,7 @@ use std::error::Error;
 pub use async_trait::async_trait;
 pub use bytes::{Buf, BufMut, Bytes, BytesMut};
 use derive_more::{Constructor, Display};
+pub use muta_apm;
 
 #[derive(Debug, Clone)]
 pub enum ProtocolErrorKind {
