@@ -194,11 +194,7 @@ impl Mutation {
         let stx = to_signed_transaction(input_raw, input_encryption)?;
         let tx_hash = stx.tx_hash.clone();
 
-        if let Err(err) = state_ctx
-            .adapter
-            .insert_signed_txs(ctx.clone(), stx)
-            .await
-        {
+        if let Err(err) = state_ctx.adapter.insert_signed_txs(ctx.clone(), stx).await {
             common_metrics::api::API_REQUEST_RESULT_COUNTER_VEC_STATIC
                 .send_transaction
                 .failure
