@@ -1,4 +1,5 @@
 pub mod api;
+pub mod network;
 
 pub use prometheus::{Histogram, HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec};
 

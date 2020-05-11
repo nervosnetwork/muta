@@ -136,6 +136,10 @@ where
             });
         }
 
+        common_apm::metrics::network::NETWORK_MESSAGE_COUNT_VEC_STATIC
+            .sent
+            .inc();
+
         Ok(())
     }
 

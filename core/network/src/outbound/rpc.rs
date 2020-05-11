@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Instant};
 
 use async_trait::async_trait;
 use futures::future::{self, Either};
@@ -67,6 +67,7 @@ where
         let rid = self.map.next_rpc_id();
         let connected_addr = cx.remote_connected_addr();
         let done_rx = self.map.insert::<RpcResponse>(sid, rid);
+        let inst = Instant::now();
 
         struct _Guard {
             map: Arc<RpcMap>,
@@ -99,12 +100,25 @@ where
                 ret.map_err(|_| NetworkError::from(ErrorKind::RpcDropped(connected_addr)))?
             }
             Either::Right((_unresolved, _timeout)) => {
+                common_apm::metrics::network::NETWORK_RPC_RESULT_COUNT_VEC_STATIC
+                    .timeout
+                    .inc();
+
                 return Err(NetworkError::from(ErrorKind::RpcTimeout(connected_addr)).into());
             }
         };
 
         match ret {
-            RpcResponse::Success(v) => Ok(R::decode(v).await?),
+            RpcResponse::Success(v) => {
+                common_apm::metrics::network::NETWORK_RPC_RESULT_COUNT_VEC_STATIC
+                    .success
+                    .inc();
+                common_apm::metrics::network::NETWORK_PROTOCOL_TIME_HISTOGRAM_VEC_STATIC
+                    .rpc
+                    .observe(common_apm::metrics::duration_to_sec(inst.elapsed()));
+
+                Ok(R::decode(v).await?)
+            }
             RpcResponse::Error(e) => Err(NetworkError::RemoteResponse(Box::new(e)).into()),
         }
     }

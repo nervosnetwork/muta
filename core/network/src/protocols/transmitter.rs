@@ -38,6 +38,10 @@ impl ServiceProtocol for Transmitter {
     }
 
     fn received(&mut self, ctx: ProtocolContextMutRef, data: tentacle::bytes::Bytes) {
+        common_apm::metrics::network::NETWORK_MESSAGE_COUNT_VEC_STATIC
+            .received
+            .inc();
+
         let pubkey = ctx.session.remote_pubkey.as_ref();
         // Peers without encryption will not able to connect to us.
         let peer_id = pubkey.expect("impossible, no public key").peer_id();
