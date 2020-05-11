@@ -51,7 +51,7 @@ lazy_static! {
         "muta_network_protocol_time_cost_seconds",
         "Network protocol time cost",
         &["type"],
-        exponential_buckets(1.0, 2.0, 10).expect("network protocol time expontial")
+        exponential_buckets(0.01, 2.0, 20).expect("network protocol time expontial")
     )
     .expect("network protocol time cost");
 }
