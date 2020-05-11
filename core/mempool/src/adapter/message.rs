@@ -54,7 +54,7 @@ where
                 common_apm::metrics::mempool::MEMPOOL_COUNTER_STATIC
                     .insert_tx_from_p2p
                     .inc();
-                if let Err(_) = mem_pool.insert(ctx, stx).await {
+                if mem_pool.insert(ctx, stx).await.is_err() {
                     common_apm::metrics::mempool::MEMPOOL_RESULT_COUNTER_STATIC
                         .insert_tx_from_p2p
                         .failure
