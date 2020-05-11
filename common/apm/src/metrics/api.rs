@@ -42,12 +42,11 @@ lazy_static! {
         &["type", "result"]
     )
     .expect("request result total");
-    // TODO: appropriate exponential buckets number
     pub static ref API_REQUEST_TIME_HISTOGRAM_VEC: HistogramVec = register_histogram_vec!(
         "muta_api_request_time_cost_seconds",
         "Request process time cost",
         &["type"],
-        exponential_buckets(1.0, 2.0, 10).expect("api req time expontial")
+        exponential_buckets(0.001, 2.0, 20).expect("api req time expontial")
     )
     .expect("request time cost");
 }
