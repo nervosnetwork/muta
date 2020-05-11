@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::time::Instant;
 
 use async_trait::async_trait;
 use futures::future::{try_join_all, TryFutureExt};
@@ -48,7 +49,25 @@ where
             let mem_pool = Arc::clone(&self.mem_pool);
             let ctx = ctx.clone();
 
-            tokio::spawn(async move { mem_pool.insert(ctx, stx).await })
+            tokio::spawn(async move {
+                let inst = Instant::now();
+                common_apm::metrics::mempool::MEMPOOL_COUNTER_STATIC
+                    .insert_tx_from_p2p
+                    .inc();
+                if let Err(_) = mem_pool.insert(ctx, stx).await {
+                    common_apm::metrics::mempool::MEMPOOL_RESULT_COUNTER_STATIC
+                        .insert_tx_from_p2p
+                        .failure
+                        .inc();
+                }
+                common_apm::metrics::mempool::MEMPOOL_RESULT_COUNTER_STATIC
+                    .insert_tx_from_p2p
+                    .success
+                    .inc();
+                common_apm::metrics::mempool::MEMPOOL_TIME_STATIC
+                    .insert_tx_from_p2p
+                    .observe(common_apm::metrics::duration_to_sec(inst.elapsed()));
+            })
         };
 
         // Concurrently insert them

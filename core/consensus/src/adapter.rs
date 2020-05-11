@@ -289,6 +289,10 @@ where
     /// Pull some blocks from other nodes from `begin` to `end`.
     #[muta_apm::derive::tracing_span(kind = "consensus.adapter")]
     async fn get_block_from_remote(&self, ctx: Context, height: u64) -> ProtocolResult<Block> {
+        let inst = Instant::now();
+        common_apm::metrics::sync::SYNC_COUNTER_VEC_STATIC
+            .sync
+            .inc();
         let res = self
             .network
             .call::<FixedHeight, FixedBlock>(
@@ -297,8 +301,26 @@ where
                 FixedHeight::new(height),
                 Priority::High,
             )
-            .await?;
-        Ok(res.inner)
+            .await;
+        common_apm::metrics::sync::SYNC_TIME_HISTOGRAM_VEC_STATIC
+            .sync
+            .observe(common_apm::metrics::duration_to_sec(inst.elapsed()));
+        match res {
+            Ok(data) => {
+                common_apm::metrics::sync::SYNC_RESULT_COUNTER_VEC_STATIC
+                    .sync
+                    .success
+                    .inc();
+                return Ok(data.inner);
+            }
+            Err(err) => {
+                common_apm::metrics::sync::SYNC_RESULT_COUNTER_VEC_STATIC
+                    .sync
+                    .failure
+                    .inc();
+                return Err(err);
+            }
+        }
     }
 
     /// Pull signed transactions corresponding to the given hashes from other
@@ -850,9 +872,13 @@ where
 
     pub async fn run(mut self) {
         loop {
+            let inst = Instant::now();
             if let Err(e) = self.process().await {
                 log::error!("muta-consensus: executor demons error {:?}", e);
             }
+            common_apm::metrics::consensus::CONSENSUS_TIME_HISTOGRAM_VEC_STATIC
+                .block
+                .observe(common_apm::metrics::duration_to_sec(inst.elapsed()));
         }
     }
 
