@@ -43,8 +43,19 @@ impl<Adapter: ConsensusAdapter + 'static> Consensus for OverlordConsensus<Adapte
         Ok(())
     }
 
-    #[muta_apm::derive::tracing_span(kind = "consensus")]
     async fn set_vote(&self, ctx: Context, vote: Vec<u8>) -> ProtocolResult<()> {
+        let ctx = match muta_apm::MUTA_TRACER.span("consensus.set_vote", vec![
+            muta_apm::rustracing::tag::Tag::new("kind", "consensus"),
+        ]) {
+            Some(mut span) => {
+                span.log(|log| {
+                    log.time(std::time::SystemTime::now());
+                });
+                ctx.with_value("parent_span_ctx", span.context().cloned())
+            }
+            None => ctx,
+        };
+
         let signed_vote: SignedVote =
             rlp::decode(&vote).map_err(|_| ConsensusError::DecodeErr(ConsensusType::SignedVote))?;
         self.handler
