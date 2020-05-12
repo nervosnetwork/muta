@@ -149,7 +149,7 @@ where
         msg: Bytes,
         pri: Priority,
     ) -> Result<(), NetworkError> {
-        let (connected, unconnected) = self.sessions.by_chain(chain_addrs.clone());
+        let (connected, unconnected) = self.sessions.by_chain(chain_addrs);
         let send_ret = self.send(TargetSession::Multi(connected), msg, pri);
 
         if unconnected.is_empty() {
