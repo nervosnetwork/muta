@@ -149,6 +149,8 @@ pub trait CommonConsensusAdapter: Send + Sync {
         weight_map: HashMap<Bytes, u32>,
         signed_voters: Vec<Bytes>,
     ) -> ProtocolResult<()>;
+
+    fn whitelist_validators(&self, validator_addrs: Vec<Address>);
 }
 
 #[async_trait]

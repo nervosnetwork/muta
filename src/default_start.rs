@@ -36,7 +36,9 @@ use core_network::{NetworkConfig, NetworkService};
 use core_storage::{adapter::rocks::RocksAdapter, ImplStorage};
 use framework::binding::state::RocksTrieDB;
 use framework::executor::{ServiceExecutor, ServiceExecutorFactory};
-use protocol::traits::{APIAdapter, Context, MemPool, NodeInfo, ServiceMapping, Storage};
+use protocol::traits::{
+    APIAdapter, Context, MemPool, NodeInfo, ServiceMapping, Storage, Whitelist,
+};
 use protocol::types::{Address, Block, BlockHeader, Genesis, Hash, Metadata, Proof, Validator};
 use protocol::{fixed_codec::FixedCodec, ProtocolResult};
 
@@ -288,6 +290,13 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
             vote_weight:    v.vote_weight,
         })
         .collect();
+
+    // whitelist validators in network
+    let validator_addrs = validators
+        .iter()
+        .map(|v| v.address.clone())
+        .collect::<Vec<_>>();
+    network_service.handle().whitelist(validator_addrs);
 
     let node_info = NodeInfo {
         chain_id:     metadata.chain_id.clone(),

@@ -317,6 +317,8 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
     ) {
     }
 
+    fn whitelist_validators(&self, _addrs: Vec<Address>) {}
+
     /// this function verify all info in header except proof and roots
     async fn verify_block_header(&self, ctx: Context, block: Block) -> ProtocolResult<()> {
         let previous_block = self

@@ -321,6 +321,13 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
             metadata.max_tx_size,
         );
 
+        let validator_addrs = metadata
+            .verifier_list
+            .iter()
+            .map(|v| v.address.clone())
+            .collect::<Vec<_>>();
+        self.adapter.whitelist_validators(validator_addrs);
+
         log::info!(
             "[synchronization]: commit_block, committing block header: {}, committing proof:{:?}",
             block.header.clone(),
