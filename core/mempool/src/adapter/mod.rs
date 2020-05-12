@@ -218,7 +218,6 @@ where
         Ok(resp_msg.sig_txs)
     }
 
-    #[muta_apm::derive::tracing_span(kind = "mempool.adapter")]
     async fn broadcast_tx(&self, ctx: Context, stx: SignedTransaction) -> ProtocolResult<()> {
         self.stx_tx
             .unbounded_send(stx)
@@ -235,7 +234,6 @@ where
         Ok(())
     }
 
-    #[muta_apm::derive::tracing_span(kind = "mempool.adapter")]
     async fn check_signature(&self, ctx: Context, tx: SignedTransaction) -> ProtocolResult<()> {
         let network = self.network.clone();
 
@@ -295,10 +293,6 @@ where
         }
     }
 
-    // TODO: Verify Fee?
-    // TODO: Verify Nonce?
-    // TODO: Cycle limit?
-    #[muta_apm::derive::tracing_span(kind = "mempool.adapter")]
     async fn check_transaction(&self, ctx: Context, stx: SignedTransaction) -> ProtocolResult<()> {
         let fixed_bytes = stx.raw.encode_fixed()?;
         let size = fixed_bytes.len() as u64;
@@ -397,7 +391,6 @@ where
         Ok(())
     }
 
-    #[muta_apm::derive::tracing_span(kind = "mempool.adapter")]
     async fn check_storage_exist(&self, ctx: Context, tx_hash: Hash) -> ProtocolResult<()> {
         match self
             .storage
