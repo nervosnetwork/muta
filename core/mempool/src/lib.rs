@@ -111,6 +111,7 @@ where
         self.adapter
             .check_storage_exist(ctx.clone(), tx_hash.clone())
             .await?;
+
         match tx_type {
             TxType::NewTx => self.tx_cache.insert_new_tx(tx.clone()).await?,
             TxType::ProposeTx => self.tx_cache.insert_propose_tx(tx.clone()).await?,
