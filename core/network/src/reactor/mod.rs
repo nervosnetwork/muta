@@ -78,6 +78,8 @@ where
             ctx = ctx.set_remote_connected_addr(connected_addr.clone());
         }
 
+        ctx = common_apm::muta_apm::MutaTracer::deserialize_ctx(ctx, net_msg.trace.clone());
+
         let react = async move {
             let endpoint = net_msg.url.parse::<Endpoint>()?;
 

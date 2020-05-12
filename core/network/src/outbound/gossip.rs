@@ -31,18 +31,14 @@ where
         }
     }
 
-    async fn package_message<M>(
-        &self,
-        _ctx: Context,
-        end: &str,
-        mut msg: M,
-    ) -> ProtocolResult<Bytes>
+    async fn package_message<M>(&self, ctx: Context, end: &str, mut msg: M) -> ProtocolResult<Bytes>
     where
         M: MessageCodec,
     {
         let endpoint = end.parse::<Endpoint>()?;
         let data = msg.encode().await?;
-        let net_msg = NetworkMessage::new(endpoint, data).encode().await?;
+        let trace = common_apm::muta_apm::MutaTracer::serialize_ctx(ctx);
+        let net_msg = NetworkMessage::new(endpoint, data, trace).encode().await?;
         let msg = self.compression.compress(net_msg)?;
 
         Ok(msg)

@@ -90,7 +90,8 @@ where
 
         let data = msg.encode().await?;
         let endpoint = endpoint.extend(&rid.to_string())?;
-        let net_msg = NetworkMessage::new(endpoint, data).encode().await?;
+        let trace = common_apm::muta_apm::MutaTracer::serialize_ctx(cx.clone());
+        let net_msg = NetworkMessage::new(endpoint, data, trace).encode().await?;
 
         self.send(cx, sid, net_msg, p)?;
 
@@ -147,7 +148,10 @@ where
 
         let encoded_resp = resp.encode().await?;
         let endpoint = endpoint.extend(&rid.to_string())?;
-        let net_msg = NetworkMessage::new(endpoint, encoded_resp).encode().await?;
+        let trace = common_apm::muta_apm::MutaTracer::serialize_ctx(cx.clone());
+        let net_msg = NetworkMessage::new(endpoint, encoded_resp, trace)
+            .encode()
+            .await?;
 
         self.send(cx, sid, net_msg, p)?;
 

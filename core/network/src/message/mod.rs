@@ -29,13 +29,17 @@ pub struct NetworkMessage {
 
     #[prost(bytes, tag = "2")]
     pub content: Vec<u8>,
+
+    #[prost(bytes, tag = "3")]
+    pub trace: Vec<u8>,
 }
 
 impl NetworkMessage {
-    pub fn new(endpoint: Endpoint, content: Bytes) -> Self {
+    pub fn new(endpoint: Endpoint, content: Bytes, trace: Vec<u8>) -> Self {
         NetworkMessage {
-            url:     endpoint.full_url().to_owned(),
+            url: endpoint.full_url().to_owned(),
             content: content.to_vec(),
+            trace,
         }
     }
 
