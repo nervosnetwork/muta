@@ -9,6 +9,7 @@ repository = "https://github.com/nervosnetwork/muta"
 
 [dependencies]
 protocol = { path = "../../protocol", package = "muta-protocol" }
+common-apm = { path = "../../common/apm" }
 common-crypto = { path = "../../common/crypto" }
 core-network = { path = "../network" }
 
