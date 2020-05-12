@@ -156,7 +156,7 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
 
     async fn get_transaction_by_hash(
         &self,
-        ctx: Context,
+        _ctx: Context,
         tx_hash: Hash,
     ) -> ProtocolResult<SignedTransaction> {
         let stx = get!(self, tx_hash, TransactionSchema);
@@ -173,7 +173,7 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
         Ok(stxs)
     }
 
-    async fn get_latest_block(&self, ctx: Context) -> ProtocolResult<Block> {
+    async fn get_latest_block(&self, _ctx: Context) -> ProtocolResult<Block> {
         let opt_block = { self.latest_block.read().await.clone() };
 
         if let Some(block) = opt_block {
@@ -183,18 +183,18 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
         }
     }
 
-    async fn get_block_by_height(&self, ctx: Context, height: u64) -> ProtocolResult<Block> {
+    async fn get_block_by_height(&self, _ctx: Context, height: u64) -> ProtocolResult<Block> {
         let block = get!(self, height, BlockSchema);
         Ok(block)
     }
 
-    async fn get_block_by_hash(&self, ctx: Context, block_hash: Hash) -> ProtocolResult<Block> {
+    async fn get_block_by_hash(&self, _ctx: Context, block_hash: Hash) -> ProtocolResult<Block> {
         let height = get!(self, block_hash, HashBlockSchema);
         let block = get!(self, height, BlockSchema);
         Ok(block)
     }
 
-    async fn get_receipt(&self, ctx: Context, hash: Hash) -> ProtocolResult<Receipt> {
+    async fn get_receipt(&self, _ctx: Context, hash: Hash) -> ProtocolResult<Receipt> {
         let receipt = get!(self, hash, ReceiptSchema);
         Ok(receipt)
     }

@@ -217,7 +217,7 @@ where
         Ok(resp_msg.sig_txs)
     }
 
-    async fn broadcast_tx(&self, ctx: Context, stx: SignedTransaction) -> ProtocolResult<()> {
+    async fn broadcast_tx(&self, _ctx: Context, stx: SignedTransaction) -> ProtocolResult<()> {
         self.stx_tx
             .unbounded_send(stx)
             .map_err(AdapterError::from)?;
