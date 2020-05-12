@@ -39,12 +39,12 @@ lazy_static! {
         ])
         .expect("sync result total");
     pub static ref SYNC_TIME_HISTOGRAM_VEC: HistogramVec = register_histogram_vec!(
-        "muta_api_request_time_cost_seconds",
-        "Request process time cost",
+        "muta_sync_time_cost_seconds",
+        "Sync time cost",
         &["type"],
-        exponential_buckets(0.05, 2.0, 10).expect("api req time expontial")
+        exponential_buckets(0.05, 2.0, 10).expect("sync time expontial")
     )
-    .expect("request time cost");
+    .expect("sync time cost");
 }
 
 lazy_static! {
