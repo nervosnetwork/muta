@@ -17,6 +17,7 @@ use log::{debug, error, info};
 use protocol::{
     traits::{
         Context, Gossip, MessageCodec, MessageHandler, PeerTrust, Priority, Rpc, TrustFeedback,
+        Whitelist,
     },
     types::Address,
     ProtocolResult,
@@ -49,9 +50,9 @@ use crate::{
 
 #[derive(Clone)]
 pub struct NetworkServiceHandle {
-    gossip:     NetworkGossip<ConnectionServiceControl<CoreProtocol, SharedSessions>, Snappy>,
-    rpc:        NetworkRpc<ConnectionServiceControl<CoreProtocol, SharedSessions>, Snappy>,
-    peer_trust: UnboundedSender<PeerManagerEvent>,
+    gossip:   NetworkGossip<ConnectionServiceControl<CoreProtocol, SharedSessions>, Snappy>,
+    rpc:      NetworkRpc<ConnectionServiceControl<CoreProtocol, SharedSessions>, Snappy>,
+    peer_mgr: UnboundedSender<PeerManagerEvent>,
 
     #[cfg(feature = "diagnostic")]
     pub diagnostic: Diagnostic,
@@ -123,7 +124,16 @@ impl PeerTrust for NetworkServiceHandle {
             pid: remote_peer_id,
             feedback,
         };
-        if let Err(e) = self.peer_trust.unbounded_send(feedback) {
+        if let Err(e) = self.peer_mgr.unbounded_send(feedback) {
+            log::error!("peer manager offline {}", e);
+        }
+    }
+}
+
+impl Whitelist for NetworkServiceHandle {
+    fn whitelist(&self, chain_addrs: Vec<Address>) {
+        let whitelist_peers = PeerManagerEvent::WhitelistPeersByChainAddr { chain_addrs };
+        if let Err(e) = self.peer_mgr.unbounded_send(whitelist_peers) {
             log::error!("peer manager offline {}", e);
         }
     }
@@ -315,9 +325,9 @@ impl NetworkService {
 
     pub fn handle(&self) -> NetworkServiceHandle {
         NetworkServiceHandle {
-            gossip:     self.gossip.clone(),
-            rpc:        self.rpc.clone(),
-            peer_trust: self.mgr_tx.clone(),
+            gossip:   self.gossip.clone(),
+            rpc:      self.rpc.clone(),
+            peer_mgr: self.mgr_tx.clone(),
 
             #[cfg(feature = "diagnostic")]
             diagnostic:                                self.diagnostic.clone(),

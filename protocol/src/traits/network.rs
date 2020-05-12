@@ -102,6 +102,10 @@ pub trait PeerTrust: Send + Sync {
     fn report(&self, ctx: Context, feedback: TrustFeedback);
 }
 
+pub trait Whitelist: Send + Sync {
+    fn whitelist(&self, chain_addrs: Vec<Address>);
+}
+
 #[async_trait]
 pub trait MessageHandler: Sync + Send + 'static {
     type Message: MessageCodec;
