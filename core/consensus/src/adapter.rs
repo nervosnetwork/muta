@@ -568,6 +568,7 @@ where
             })
             .collect::<HashMap<_, _>>();
 
+        // TODO: useless check
         // check proposer
         if block.header.height != 0
             && !authority_map.contains_key(&block.header.proposer.as_bytes())
