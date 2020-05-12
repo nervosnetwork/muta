@@ -154,7 +154,6 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
         Ok(())
     }
 
-    #[muta_apm::derive::tracing_span(kind = "storage")]
     async fn get_transaction_by_hash(
         &self,
         ctx: Context,
@@ -174,7 +173,6 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
         Ok(stxs)
     }
 
-    #[muta_apm::derive::tracing_span(kind = "storage")]
     async fn get_latest_block(&self, ctx: Context) -> ProtocolResult<Block> {
         let opt_block = { self.latest_block.read().await.clone() };
 
@@ -185,20 +183,17 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
         }
     }
 
-    #[muta_apm::derive::tracing_span(kind = "storage")]
     async fn get_block_by_height(&self, ctx: Context, height: u64) -> ProtocolResult<Block> {
         let block = get!(self, height, BlockSchema);
         Ok(block)
     }
 
-    #[muta_apm::derive::tracing_span(kind = "storage")]
     async fn get_block_by_hash(&self, ctx: Context, block_hash: Hash) -> ProtocolResult<Block> {
         let height = get!(self, block_hash, HashBlockSchema);
         let block = get!(self, height, BlockSchema);
         Ok(block)
     }
 
-    #[muta_apm::derive::tracing_span(kind = "storage")]
     async fn get_receipt(&self, ctx: Context, hash: Hash) -> ProtocolResult<Receipt> {
         let receipt = get!(self, hash, ReceiptSchema);
         Ok(receipt)
