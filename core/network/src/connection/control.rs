@@ -152,11 +152,6 @@ where
         let (connected, unconnected) = self.sessions.by_chain(chain_addrs.clone());
         let send_ret = self.send(TargetSession::Multi(connected), msg, pri);
 
-        let whitelist_peers = PeerManagerEvent::WhitelistPeersByChainAddr { chain_addrs };
-        if self.mgr_srv.unbounded_send(whitelist_peers).is_err() {
-            error!("network: peer manager service exit");
-        }
-
         if unconnected.is_empty() {
             return send_ret;
         }
