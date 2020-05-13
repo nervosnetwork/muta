@@ -6,15 +6,17 @@ use crate::metrics::{
 use lazy_static::lazy_static;
 
 make_auto_flush_static_metric! {
-    pub label_enum ConsensusCounterKind {
-        round,
-        commit,
-        exec,
-        block
+    pub label_enum ConsensusHeightPlusPlusKind {
+        consensus,
+        sync,
     }
 
-    pub struct ConsensusCounterVec: LocalIntCounter {
-        "type" => ConsensusCounterKind,
+    pub struct ConsensusHeightPlusPlusVec: LocalIntCounter {
+        "type" => ConsensusHeightPlusPlusKind,
+    }
+
+    pub label_enum ConsensusResultKind {
+        get_block_from_remote,
     }
 
     pub label_enum ConsensusResult {
@@ -23,7 +25,7 @@ make_auto_flush_static_metric! {
     }
 
     pub struct ConsensusResultCounterVec: LocalIntCounter {
-        "type" => ConsensusCounterKind,
+        "type" => ConsensusResultKind,
         "result" => ConsensusResult,
     }
 
@@ -47,36 +49,37 @@ make_auto_flush_static_metric! {
 }
 
 lazy_static! {
-    pub static ref CONSENSUS_COUNTER_VEC: IntCounterVec =
-        register_int_counter_vec!("muta_concensus_total", "Total number of consensus", &[
-            "type"
-        ])
-        .expect("concensus total");
+    pub static ref CONSENSUS_HEIGHT_PLUS_PLUS_VEC: IntCounterVec = register_int_counter_vec!(
+        "muta_concensus_height_plus_plus",
+        "Height plus plus by consensus or sync",
+        &["type"]
+    )
+    .unwrap();
     pub static ref CONSENSUS_RESULT_COUNTER_VEC: IntCounterVec = register_int_counter_vec!(
-        "muta_concensus_result_total",
+        "muta_concensus_result",
         "Total number of consensus result",
         &["type", "result"]
     )
-    .expect("request result total");
+    .unwrap();
     pub static ref CONSENSUS_TIME_HISTOGRAM_VEC: HistogramVec = register_histogram_vec!(
         "muta_consensus_time_cost_seconds",
         "Consensus process time cost",
         &["type"],
-        exponential_buckets(0.05, 1.5, 20).expect("consensus time expontial")
+        exponential_buckets(0.05, 1.2, 30).unwrap()
     )
-    .expect("consensus time cost");
+    .unwrap();
     pub static ref CONSENSUS_ROUND_HISTOGRAM_VEC: HistogramVec = register_histogram_vec!(
         "muta_consensus_round",
         "Consensus round info",
         &["type"],
-        exponential_buckets(0.5, 1.5, 10).expect("consensus round info expontial")
+        exponential_buckets(0.5, 1.5, 10).unwrap()
     )
-    .expect("consensus time cost");
+    .unwrap();
 }
 
 lazy_static! {
-    pub static ref CONSENSUS_COUNTER_VEC_STATIC: ConsensusCounterVec =
-        auto_flush_from!(CONSENSUS_COUNTER_VEC, ConsensusCounterVec);
+    pub static ref CONSENSUS_HEIGHT_PLUS_PLUS_VEC_STATIC: ConsensusHeightPlusPlusVec =
+        auto_flush_from!(CONSENSUS_HEIGHT_PLUS_PLUS_VEC, ConsensusHeightPlusPlusVec);
     pub static ref CONSENSUS_RESULT_COUNTER_VEC_STATIC: ConsensusResultCounterVec =
         auto_flush_from!(CONSENSUS_RESULT_COUNTER_VEC, ConsensusResultCounterVec);
     pub static ref CONSENSUS_TIME_HISTOGRAM_VEC_STATIC: ConsensusTimeHistogramVec =
