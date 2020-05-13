@@ -91,8 +91,9 @@ where
         let data = msg.encode().await?;
         let endpoint = endpoint.extend(&rid.to_string())?;
         let mut headers = Headers::default();
-        if let Some(trace_id) = common_apm::muta_apm::MutaTracer::trace_id(&cx) {
-            headers.set_trace_id(trace_id);
+        if let Some(state) = common_apm::muta_apm::MutaTracer::span_state(&cx) {
+            headers.set_trace_id(state.trace_id());
+            headers.set_span_id(state.span_id())
         }
         let net_msg = NetworkMessage::new(endpoint, data, headers)
             .encode()
@@ -154,8 +155,9 @@ where
         let encoded_resp = resp.encode().await?;
         let endpoint = endpoint.extend(&rid.to_string())?;
         let mut headers = Headers::default();
-        if let Some(trace_id) = common_apm::muta_apm::MutaTracer::trace_id(&cx) {
-            headers.set_trace_id(trace_id);
+        if let Some(state) = common_apm::muta_apm::MutaTracer::span_state(&cx) {
+            headers.set_trace_id(state.trace_id());
+            headers.set_span_id(state.span_id())
         }
         let net_msg = NetworkMessage::new(endpoint, encoded_resp, headers)
             .encode()

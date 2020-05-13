@@ -26,7 +26,7 @@ pub struct RawSessionMessage {
     pub(crate) msg: Bytes,
 }
 
-pub struct Headers(HashMap<String, String>);
+pub struct Headers(HashMap<String, Vec<u8>>);
 
 impl Default for Headers {
     fn default() -> Self {
@@ -36,14 +36,20 @@ impl Default for Headers {
 
 impl Headers {
     pub fn set_trace_id(&mut self, id: TraceId) {
-        self.0.insert("trace_id".to_owned(), id.to_string());
+        self.0
+            .insert("trace_id".to_owned(), id.to_string().into_bytes());
+    }
+
+    pub fn set_span_id(&mut self, id: u64) {
+        self.0
+            .insert("span_id".to_owned(), id.to_be_bytes().to_vec());
     }
 }
 
 #[derive(Message)]
 pub struct NetworkMessage {
-    #[prost(map = "string, string", tag = "1")]
-    pub headers: HashMap<String, String>,
+    #[prost(map = "string, bytes", tag = "1")]
+    pub headers: HashMap<String, Vec<u8>>,
 
     #[prost(string, tag = "2")]
     pub url: String,
@@ -64,8 +70,21 @@ impl NetworkMessage {
     pub fn trace_id(&self) -> Option<TraceId> {
         self.headers
             .get("trace_id")
-            .map(|id| TraceId::from_str(id).ok())
+            .map(|id| {
+                String::from_utf8(id.to_owned())
+                    .ok()
+                    .map(|s| TraceId::from_str(&s).ok())
+                    .flatten()
+            })
             .flatten()
+    }
+
+    pub fn span_id(&self) -> Option<u64> {
+        self.headers.get("span_id").map(|id| {
+            let mut buf = [0u8; 8];
+            buf.copy_from_slice(&id[..8]);
+            u64::from_be_bytes(buf)
+        })
     }
 
     pub async fn encode(self) -> Result<Bytes, NetworkError> {

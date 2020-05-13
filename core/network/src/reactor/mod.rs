@@ -78,9 +78,12 @@ where
             ctx = ctx.set_remote_connected_addr(connected_addr.clone());
         }
 
-        let mut ctx = match net_msg.trace_id() {
-            Some(trace_id) => common_apm::muta_apm::MutaTracer::inject_trace_id(ctx, trace_id),
-            None => ctx,
+        let mut ctx = match (net_msg.trace_id(), net_msg.span_id()) {
+            (Some(trace_id), Some(span_id)) => {
+                let span_state = common_apm::muta_apm::MutaTracer::new_state(trace_id, span_id);
+                common_apm::muta_apm::MutaTracer::inject_span_state(ctx, span_state)
+            }
+            _ => ctx,
         };
 
         let react = async move {

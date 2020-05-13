@@ -38,8 +38,9 @@ where
         let endpoint = end.parse::<Endpoint>()?;
         let data = msg.encode().await?;
         let mut headers = Headers::default();
-        if let Some(trace_id) = common_apm::muta_apm::MutaTracer::trace_id(&ctx) {
-            headers.set_trace_id(trace_id);
+        if let Some(state) = common_apm::muta_apm::MutaTracer::span_state(&ctx) {
+            headers.set_trace_id(state.trace_id());
+            headers.set_span_id(state.span_id())
         }
         let net_msg = NetworkMessage::new(endpoint, data, headers)
             .encode()
