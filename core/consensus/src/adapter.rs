@@ -917,9 +917,6 @@ where
         common_apm::metrics::consensus::CONSENSUS_TIME_HISTOGRAM_VEC_STATIC
             .exec
             .observe(common_apm::metrics::duration_to_sec(now.elapsed()));
-        common_apm::metrics::consensus::CONSENSUS_HEIGHT_PLUS_PLUS_VEC_STATIC
-            .consensus
-            .inc();
         log::info!(
             "[consensus-adapter]: exec transactions cost {:?} transactions len {:?}",
             now.elapsed(),
