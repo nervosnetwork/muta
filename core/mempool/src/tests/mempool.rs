@@ -191,6 +191,25 @@ async fn test_sync_propose_txs() {
     assert_eq!(mempool.get_tx_cache().len().await, 50);
 }
 
+#[rustfmt::skip]
+/// Bench in Intel(R) Core(TM) i7-4770HQ CPU @ 2.20GHz (8 x 2200):
+/// test tests::mempool::bench_check_sig             ... bench:   2,881,140 ns/iter (+/- 907,215)
+/// test tests::mempool::bench_check_sig_serial_1000 ... bench:  96,204,225 ns/iter (+/- 8,852,631)
+/// test tests::mempool::bench_flush                 ... bench:   3,504,193 ns/iter (+/- 1,096,699)
+/// test tests::mempool::bench_get_10000_full_txs    ... bench:  14,997,762 ns/iter (+/- 2,697,725)
+/// test tests::mempool::bench_get_20000_full_txs    ... bench:  31,858,720 ns/iter (+/- 3,822,648)
+/// test tests::mempool::bench_get_40000_full_txs    ... bench:  65,027,639 ns/iter (+/- 3,926,768)
+/// test tests::mempool::bench_get_80000_full_txs    ... bench: 131,066,149 ns/iter (+/- 11,457,417)
+/// test tests::mempool::bench_insert                ... bench:   9,320,879 ns/iter (+/- 710,246)
+/// test tests::mempool::bench_mock_txs              ... bench:   5,890,752 ns/iter (+/- 583,029)
+/// test tests::mempool::bench_package               ... bench:   3,684,431 ns/iter (+/- 278,575)
+/// test tx_cache::tests::bench_flush                ... bench:   3,034,868 ns/iter (+/- 371,514)
+/// test tx_cache::tests::bench_flush_insert         ... bench:   2,954,223 ns/iter (+/- 389,002)
+/// test tx_cache::tests::bench_gen_txs              ... bench:   2,479,226 ns/iter (+/- 399,728)
+/// test tx_cache::tests::bench_insert               ... bench:   2,742,422 ns/iter (+/- 641,587)
+/// test tx_cache::tests::bench_package              ... bench:      70,563 ns/iter (+/- 16,723)
+/// test tx_cache::tests::bench_package_insert       ... bench:   2,654,196 ns/iter (+/- 285,460)
+
 #[bench]
 fn bench_insert(b: &mut Bencher) {
     let mut runtime = tokio::runtime::Runtime::new().unwrap();
@@ -215,6 +234,58 @@ fn bench_package(b: &mut Bencher) {
             CYCLE_LIMIT,
             TX_NUM_LIMIT,
         ));
+    });
+}
+
+#[bench]
+fn bench_get_10000_full_txs(b: &mut Bencher) {
+    let mut runtime = tokio::runtime::Runtime::new().unwrap();
+
+    let mempool = Arc::new(default_mempool());
+    let txs = default_mock_txs(10_000);
+    let tx_hashes = txs.iter().map(|tx| tx.tx_hash.clone()).collect::<Vec<_>>();
+    runtime.block_on(concurrent_insert(txs, Arc::clone(&mempool)));
+    b.iter(|| {
+        runtime.block_on(exec_get_full_txs(tx_hashes.clone(), Arc::clone(&mempool)));
+    });
+}
+
+#[bench]
+fn bench_get_20000_full_txs(b: &mut Bencher) {
+    let mut runtime = tokio::runtime::Runtime::new().unwrap();
+
+    let mempool = Arc::new(default_mempool());
+    let txs = default_mock_txs(20_000);
+    let tx_hashes = txs.iter().map(|tx| tx.tx_hash.clone()).collect::<Vec<_>>();
+    runtime.block_on(concurrent_insert(txs, Arc::clone(&mempool)));
+    b.iter(|| {
+        runtime.block_on(exec_get_full_txs(tx_hashes.clone(), Arc::clone(&mempool)));
+    });
+}
+
+#[bench]
+fn bench_get_40000_full_txs(b: &mut Bencher) {
+    let mut runtime = tokio::runtime::Runtime::new().unwrap();
+
+    let mempool = Arc::new(default_mempool());
+    let txs = default_mock_txs(40_000);
+    let tx_hashes = txs.iter().map(|tx| tx.tx_hash.clone()).collect::<Vec<_>>();
+    runtime.block_on(concurrent_insert(txs, Arc::clone(&mempool)));
+    b.iter(|| {
+        runtime.block_on(exec_get_full_txs(tx_hashes.clone(), Arc::clone(&mempool)));
+    });
+}
+
+#[bench]
+fn bench_get_80000_full_txs(b: &mut Bencher) {
+    let mut runtime = tokio::runtime::Runtime::new().unwrap();
+
+    let mempool = Arc::new(default_mempool());
+    let txs = default_mock_txs(80_000);
+    let tx_hashes = txs.iter().map(|tx| tx.tx_hash.clone()).collect::<Vec<_>>();
+    runtime.block_on(concurrent_insert(txs, Arc::clone(&mempool)));
+    b.iter(|| {
+        runtime.block_on(exec_get_full_txs(tx_hashes.clone(), Arc::clone(&mempool)));
     });
 }
 
@@ -292,4 +363,15 @@ fn bench_check_sig(b: &mut Bencher) {
     b.iter(|| {
         runtime.block_on(concurrent_check_sig(txs.clone()));
     });
+}
+
+#[bench]
+fn bench_check_sig_serial_1000(b: &mut Bencher) {
+    let txs = default_mock_txs(1000);
+
+    b.iter(|| {
+        for tx in txs.iter() {
+            let _ = check_sig(&tx);
+        }
+    })
 }
