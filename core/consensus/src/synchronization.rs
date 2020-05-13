@@ -301,16 +301,9 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
         common_apm::metrics::consensus::CONSENSUS_COUNTER_VEC_STATIC
             .commit
             .inc();
-        common_apm::metrics::consensus::CONSENSUS_INFO_HISTOGRAM_VEC_STATIC
-            .round
-            .observe(proof.round as f64);
         let executor_resp = self
             .exec_block(ctx.clone(), rich_block.clone(), status_agent.clone())
             .await?;
-        common_apm::metrics::consensus::CONSENSUS_TIME_HISTOGRAM_VEC_STATIC
-            .exec
-            .observe(common_apm::metrics::duration_to_sec(inst.elapsed()));
-
         let block = &rich_block.block;
         let block_hash = Hash::digest(block.encode_fixed()?);
 
