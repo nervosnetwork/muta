@@ -281,8 +281,11 @@ where
             Arc::clone(&self.storage),
             Arc::clone(&self.service_mapping),
         )?;
-
+        let inst = Instant::now();
         let resp = executor.exec(params, txs)?;
+        common_apm::metrics::consensus::CONSENSUS_TIME_HISTOGRAM_VEC_STATIC
+            .exec
+            .observe(common_apm::metrics::duration_to_sec(inst.elapsed()));
         Ok(resp)
     }
 
@@ -877,6 +880,9 @@ where
             if let Err(e) = self.process().await {
                 log::error!("muta-consensus: executor demons error {:?}", e);
             }
+            common_apm::metrics::consensus::CONSENSUS_COUNTER_VEC_STATIC
+                .block
+                .inc();
             common_apm::metrics::consensus::CONSENSUS_TIME_HISTOGRAM_VEC_STATIC
                 .block
                 .observe(common_apm::metrics::duration_to_sec(inst.elapsed()));
@@ -914,7 +920,11 @@ where
             timestamp: info.timestamp,
             cycles_limit: info.cycles_limit,
         };
+        let inst = Instant::now();
         let resp = executor.exec(&exec_params, &txs)?;
+        common_apm::metrics::consensus::CONSENSUS_TIME_HISTOGRAM_VEC_STATIC
+            .exec
+            .observe(common_apm::metrics::duration_to_sec(inst.elapsed()));
         log::info!(
             "[consensus-adapter]: exec transactions cost {:?} transactions len {:?}",
             now.elapsed(),
