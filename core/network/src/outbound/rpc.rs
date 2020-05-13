@@ -13,7 +13,7 @@ use crate::{
     config::TimeoutConfig,
     endpoint::Endpoint,
     error::{ErrorKind, NetworkError},
-    message::NetworkMessage,
+    message::{Headers, NetworkMessage},
     rpc::{RpcErrorMessage, RpcResponse, RpcResponseCode},
     rpc_map::RpcMap,
     traits::{Compression, MessageSender, NetworkContext},
@@ -90,8 +90,13 @@ where
 
         let data = msg.encode().await?;
         let endpoint = endpoint.extend(&rid.to_string())?;
-        let trace = common_apm::muta_apm::MutaTracer::serialize_ctx(cx.clone());
-        let net_msg = NetworkMessage::new(endpoint, data, trace).encode().await?;
+        let mut headers = Headers::default();
+        if let Some(trace_id) = common_apm::muta_apm::MutaTracer::trace_id(&cx) {
+            headers.set_trace_id(trace_id);
+        }
+        let net_msg = NetworkMessage::new(endpoint, data, headers)
+            .encode()
+            .await?;
 
         self.send(cx, sid, net_msg, p)?;
 
@@ -148,8 +153,11 @@ where
 
         let encoded_resp = resp.encode().await?;
         let endpoint = endpoint.extend(&rid.to_string())?;
-        let trace = common_apm::muta_apm::MutaTracer::serialize_ctx(cx.clone());
-        let net_msg = NetworkMessage::new(endpoint, encoded_resp, trace)
+        let mut headers = Headers::default();
+        if let Some(trace_id) = common_apm::muta_apm::MutaTracer::trace_id(&cx) {
+            headers.set_trace_id(trace_id);
+        }
+        let net_msg = NetworkMessage::new(endpoint, encoded_resp, headers)
             .encode()
             .await?;
 

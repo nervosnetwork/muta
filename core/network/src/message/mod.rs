@@ -1,6 +1,8 @@
 pub mod serde;
 pub mod serde_multi;
 
+use common_apm::muta_apm::rustracing_jaeger::span::TraceId;
+
 use derive_more::Constructor;
 use futures::channel::mpsc::UnboundedSender;
 use prost::Message;
@@ -14,6 +16,8 @@ use crate::{
     event::PeerManagerEvent,
 };
 
+use std::{collections::HashMap, str::FromStr};
+
 #[derive(Constructor)]
 #[non_exhaustive]
 pub struct RawSessionMessage {
@@ -22,25 +26,46 @@ pub struct RawSessionMessage {
     pub(crate) msg: Bytes,
 }
 
+pub struct Headers(HashMap<String, String>);
+
+impl Default for Headers {
+    fn default() -> Self {
+        Headers(Default::default())
+    }
+}
+
+impl Headers {
+    pub fn set_trace_id(&mut self, id: TraceId) {
+        self.0.insert("trace_id".to_owned(), id.to_string());
+    }
+}
+
 #[derive(Message)]
 pub struct NetworkMessage {
-    #[prost(string, tag = "1")]
+    #[prost(map = "string, string", tag = "1")]
+    pub headers: HashMap<String, String>,
+
+    #[prost(string, tag = "2")]
     pub url: String,
 
-    #[prost(bytes, tag = "2")]
-    pub content: Vec<u8>,
-
     #[prost(bytes, tag = "3")]
-    pub trace: Vec<u8>,
+    pub content: Vec<u8>,
 }
 
 impl NetworkMessage {
-    pub fn new(endpoint: Endpoint, content: Bytes, trace: Vec<u8>) -> Self {
+    pub fn new(endpoint: Endpoint, content: Bytes, headers: Headers) -> Self {
         NetworkMessage {
-            url: endpoint.full_url().to_owned(),
+            headers: headers.0,
+            url:     endpoint.full_url().to_owned(),
             content: content.to_vec(),
-            trace,
         }
+    }
+
+    pub fn trace_id(&self) -> Option<TraceId> {
+        self.headers
+            .get("trace_id")
+            .map(|id| TraceId::from_str(id).ok())
+            .flatten()
     }
 
     pub async fn encode(self) -> Result<Bytes, NetworkError> {

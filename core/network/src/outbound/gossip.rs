@@ -9,7 +9,7 @@ use tentacle::service::TargetSession;
 use crate::{
     endpoint::Endpoint,
     error::NetworkError,
-    message::NetworkMessage,
+    message::{Headers, NetworkMessage},
     traits::{Compression, MessageSender},
 };
 
@@ -37,8 +37,13 @@ where
     {
         let endpoint = end.parse::<Endpoint>()?;
         let data = msg.encode().await?;
-        let trace = common_apm::muta_apm::MutaTracer::serialize_ctx(ctx);
-        let net_msg = NetworkMessage::new(endpoint, data, trace).encode().await?;
+        let mut headers = Headers::default();
+        if let Some(trace_id) = common_apm::muta_apm::MutaTracer::trace_id(&ctx) {
+            headers.set_trace_id(trace_id);
+        }
+        let net_msg = NetworkMessage::new(endpoint, data, headers)
+            .encode()
+            .await?;
         let msg = self.compression.compress(net_msg)?;
 
         Ok(msg)
