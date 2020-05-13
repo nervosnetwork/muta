@@ -277,10 +277,6 @@ where
     /// Pull some blocks from other nodes from `begin` to `end`.
     #[muta_apm::derive::tracing_span(kind = "consensus.adapter")]
     async fn get_block_from_remote(&self, ctx: Context, height: u64) -> ProtocolResult<Block> {
-        let inst = Instant::now();
-        common_apm::metrics::sync::SYNC_COUNTER_VEC_STATIC
-            .sync
-            .inc();
         let res = self
             .network
             .call::<FixedHeight, FixedBlock>(
@@ -290,20 +286,17 @@ where
                 Priority::High,
             )
             .await;
-        common_apm::metrics::sync::SYNC_TIME_HISTOGRAM_VEC_STATIC
-            .sync
-            .observe(common_apm::metrics::duration_to_sec(inst.elapsed()));
         match res {
             Ok(data) => {
-                common_apm::metrics::sync::SYNC_RESULT_COUNTER_VEC_STATIC
-                    .sync
+                common_apm::metrics::consensus::CONSENSUS_RESULT_COUNTER_VEC_STATIC
+                    .get_block_from_remote
                     .success
                     .inc();
                 Ok(data.inner)
             }
             Err(err) => {
-                common_apm::metrics::sync::SYNC_RESULT_COUNTER_VEC_STATIC
-                    .sync
+                common_apm::metrics::consensus::CONSENSUS_RESULT_COUNTER_VEC_STATIC
+                    .get_block_from_remote
                     .failure
                     .inc();
                 Err(err)
@@ -888,9 +881,6 @@ where
             if let Err(e) = self.process().await {
                 log::error!("muta-consensus: executor demons error {:?}", e);
             }
-            common_apm::metrics::consensus::CONSENSUS_COUNTER_VEC_STATIC
-                .block
-                .inc();
             common_apm::metrics::consensus::CONSENSUS_TIME_HISTOGRAM_VEC_STATIC
                 .block
                 .observe(common_apm::metrics::duration_to_sec(inst.elapsed()));
@@ -928,11 +918,10 @@ where
             timestamp: info.timestamp,
             cycles_limit: info.cycles_limit,
         };
-        let inst = Instant::now();
         let resp = executor.exec(&exec_params, &txs)?;
         common_apm::metrics::consensus::CONSENSUS_TIME_HISTOGRAM_VEC_STATIC
             .exec
-            .observe(common_apm::metrics::duration_to_sec(inst.elapsed()));
+            .observe(common_apm::metrics::duration_to_sec(now.elapsed()));
         log::info!(
             "[consensus-adapter]: exec transactions cost {:?} transactions len {:?}",
             now.elapsed(),

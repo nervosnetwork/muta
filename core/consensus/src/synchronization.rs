@@ -262,6 +262,7 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
                     e
                 })?;
 
+            let inst = Instant::now();
             self.commit_block(
                 ctx.clone(),
                 consenting_rich_block.clone(),
@@ -276,6 +277,9 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
                 );
                 e
             })?;
+            common_apm::metrics::consensus::CONSENSUS_TIME_HISTOGRAM_VEC_STATIC
+                .commit
+                .observe(common_apm::metrics::duration_to_sec(inst.elapsed()));
 
             let tmp_status = sync_status_agent.to_inner().clone();
             log::info!(
@@ -298,10 +302,6 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
         proof: Proof,
         status_agent: StatusAgent,
     ) -> ProtocolResult<()> {
-        let inst = Instant::now();
-        common_apm::metrics::consensus::CONSENSUS_COUNTER_VEC_STATIC
-            .commit
-            .inc();
         let executor_resp = self
             .exec_block(ctx.clone(), rich_block.clone(), status_agent.clone())
             .await?;
@@ -347,9 +347,9 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
             .flush_mempool(ctx.clone(), &rich_block.block.ordered_tx_hashes)
             .await?;
 
-        common_apm::metrics::consensus::CONSENSUS_TIME_HISTOGRAM_VEC_STATIC
-            .commit
-            .observe(common_apm::metrics::duration_to_sec(inst.elapsed()));
+        common_apm::metrics::consensus::CONSENSUS_HEIGHT_PLUS_PLUS_VEC_STATIC
+            .sync
+            .inc();
 
         Ok(())
     }
