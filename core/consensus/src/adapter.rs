@@ -873,9 +873,6 @@ where
             if let Err(e) = self.process().await {
                 log::error!("muta-consensus: executor demons error {:?}", e);
             }
-            common_apm::metrics::consensus::CONSENSUS_HEIGHT_PLUS_PLUS_VEC_STATIC
-                .consensus
-                .inc();
             common_apm::metrics::consensus::CONSENSUS_TIME_HISTOGRAM_VEC_STATIC
                 .block
                 .observe(common_apm::metrics::duration_to_sec(inst.elapsed()));

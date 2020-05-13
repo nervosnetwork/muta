@@ -301,9 +301,6 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
         proof: Proof,
         status_agent: StatusAgent,
     ) -> ProtocolResult<()> {
-        common_apm::metrics::consensus::CONSENSUS_HEIGHT_PLUS_PLUS_VEC_STATIC
-            .sync
-            .inc();
         let executor_resp = self
             .exec_block(ctx.clone(), rich_block.clone(), status_agent.clone())
             .await?;
@@ -348,6 +345,10 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
         self.adapter
             .flush_mempool(ctx.clone(), &rich_block.block.ordered_tx_hashes)
             .await?;
+
+        common_apm::metrics::consensus::CONSENSUS_HEIGHT_PLUS_PLUS_VEC_STATIC
+            .sync
+            .inc();
 
         Ok(())
     }
