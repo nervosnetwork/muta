@@ -48,7 +48,6 @@ lazy_static! {
         &["type", "result"]
     )
     .expect("request result total");
-    // TODO: appropriate exponential buckets number
     pub static ref CONSENSUS_TIME_HISTOGRAM_VEC: HistogramVec = register_histogram_vec!(
         "muta_consensus_time_cost_seconds",
         "Consensus process time cost",
@@ -56,12 +55,11 @@ lazy_static! {
         exponential_buckets(0.05, 2.0, 10).expect("consensus time expontial")
     )
     .expect("consensus time cost");
-
     pub static ref CONSENSUS_INFO_HISTOGRAM_VEC: HistogramVec = register_histogram_vec!(
         "muta_consensus_info",
         "Consensus extra info",
         &["type"],
-        exponential_buckets(0.05, 2.0, 10).expect("consensus extra info expontial")
+        exponential_buckets(0.5, 1.5, 10).expect("consensus extra info expontial")
     )
     .expect("consensus time cost");
 }
