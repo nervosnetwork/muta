@@ -392,6 +392,9 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             authority_list: covert_to_overlord_authority(&current_consensus_status.validators),
         };
 
+        common_apm::metrics::consensus::CONSENSUS_HEIGHT_PLUS_PLUS_VEC_STATIC
+            .consensus
+            .inc();
         Ok(status)
     }
 
