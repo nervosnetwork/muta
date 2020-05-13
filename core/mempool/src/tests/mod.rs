@@ -81,7 +81,7 @@ impl MemPoolAdapter for HashMemPoolAdapter {
         Ok(CURRENT_HEIGHT)
     }
 
-    async fn get_transactions(
+    async fn get_transactions_from_storage(
         &self,
         _ctx: Context,
         _tx_hashes: Vec<Hash>,

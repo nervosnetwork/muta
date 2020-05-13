@@ -422,7 +422,7 @@ where
         Ok(height)
     }
 
-    async fn get_transactions(
+    async fn get_transactions_from_storage(
         &self,
         ctx: Context,
         tx_hashes: Vec<Hash>,

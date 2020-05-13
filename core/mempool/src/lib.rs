@@ -268,7 +268,10 @@ where
         // for push txs when local mempool is flushed, but the remote node still fetch
         // full block
         if len != 0 && full_txs.is_empty() {
-            full_txs = self.adapter.get_transactions(ctx, tx_hashes).await?;
+            full_txs = self
+                .adapter
+                .get_transactions_from_storage(ctx, tx_hashes)
+                .await?;
         }
 
         if full_txs.len() != len {

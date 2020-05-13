@@ -74,7 +74,7 @@ pub trait MemPoolAdapter: Send + Sync {
 
     async fn get_latest_height(&self, ctx: Context) -> ProtocolResult<u64>;
 
-    async fn get_transactions(
+    async fn get_transactions_from_storage(
         &self,
         ctx: Context,
         tx_hashes: Vec<Hash>,
