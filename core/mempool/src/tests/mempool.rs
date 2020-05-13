@@ -194,7 +194,10 @@ async fn test_sync_propose_txs() {
 #[rustfmt::skip]
 /// Bench in Intel(R) Core(TM) i7-4770HQ CPU @ 2.20GHz (8 x 2200):
 /// test tests::mempool::bench_check_sig             ... bench:   2,881,140 ns/iter (+/- 907,215)
-/// test tests::mempool::bench_check_sig_serial_1000 ... bench:  96,204,225 ns/iter (+/- 8,852,631)
+/// test tests::mempool::bench_check_sig_serial_1    ... bench:      94,666 ns/iter (+/- 11,070)
+/// test tests::mempool::bench_check_sig_serial_10   ... bench:     966,800 ns/iter (+/- 97,227)
+/// test tests::mempool::bench_check_sig_serial_100  ... bench:  10,098,216 ns/iter (+/- 1,289,584)
+/// test tests::mempool::bench_check_sig_serial_1000 ... bench: 100,396,727 ns/iter (+/- 10,665,143)
 /// test tests::mempool::bench_flush                 ... bench:   3,504,193 ns/iter (+/- 1,096,699)
 /// test tests::mempool::bench_get_10000_full_txs    ... bench:  14,997,762 ns/iter (+/- 2,697,725)
 /// test tests::mempool::bench_get_20000_full_txs    ... bench:  31,858,720 ns/iter (+/- 3,822,648)
@@ -363,6 +366,39 @@ fn bench_check_sig(b: &mut Bencher) {
     b.iter(|| {
         runtime.block_on(concurrent_check_sig(txs.clone()));
     });
+}
+
+#[bench]
+fn bench_check_sig_serial_1(b: &mut Bencher) {
+    let txs = default_mock_txs(1);
+
+    b.iter(|| {
+        for tx in txs.iter() {
+            let _ = check_sig(&tx);
+        }
+    })
+}
+
+#[bench]
+fn bench_check_sig_serial_10(b: &mut Bencher) {
+    let txs = default_mock_txs(10);
+
+    b.iter(|| {
+        for tx in txs.iter() {
+            let _ = check_sig(&tx);
+        }
+    })
+}
+
+#[bench]
+fn bench_check_sig_serial_100(b: &mut Bencher) {
+    let txs = default_mock_txs(100);
+
+    b.iter(|| {
+        for tx in txs.iter() {
+            let _ = check_sig(&tx);
+        }
+    })
 }
 
 #[bench]
