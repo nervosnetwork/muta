@@ -13,7 +13,7 @@ use crate::{
     config::TimeoutConfig,
     endpoint::Endpoint,
     error::{ErrorKind, NetworkError},
-    message::NetworkMessage,
+    message::{Headers, NetworkMessage},
     rpc::{RpcErrorMessage, RpcResponse, RpcResponseCode},
     rpc_map::RpcMap,
     traits::{Compression, MessageSender, NetworkContext},
@@ -90,7 +90,14 @@ where
 
         let data = msg.encode().await?;
         let endpoint = endpoint.extend(&rid.to_string())?;
-        let net_msg = NetworkMessage::new(endpoint, data).encode().await?;
+        let mut headers = Headers::default();
+        if let Some(state) = common_apm::muta_apm::MutaTracer::span_state(&cx) {
+            headers.set_trace_id(state.trace_id());
+            headers.set_span_id(state.span_id())
+        }
+        let net_msg = NetworkMessage::new(endpoint, data, headers)
+            .encode()
+            .await?;
 
         self.send(cx, sid, net_msg, p)?;
 
@@ -147,7 +154,14 @@ where
 
         let encoded_resp = resp.encode().await?;
         let endpoint = endpoint.extend(&rid.to_string())?;
-        let net_msg = NetworkMessage::new(endpoint, encoded_resp).encode().await?;
+        let mut headers = Headers::default();
+        if let Some(state) = common_apm::muta_apm::MutaTracer::span_state(&cx) {
+            headers.set_trace_id(state.trace_id());
+            headers.set_span_id(state.span_id())
+        }
+        let net_msg = NetworkMessage::new(endpoint, encoded_resp, headers)
+            .encode()
+            .await?;
 
         self.send(cx, sid, net_msg, p)?;
 
