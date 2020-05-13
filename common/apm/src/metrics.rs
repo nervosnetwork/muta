@@ -2,7 +2,6 @@ pub mod api;
 pub mod consensus;
 pub mod mempool;
 pub mod network;
-pub mod sync;
 
 pub use prometheus::{Histogram, HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec};
 
