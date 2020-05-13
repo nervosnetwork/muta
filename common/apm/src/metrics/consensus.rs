@@ -52,7 +52,7 @@ lazy_static! {
         "muta_consensus_time_cost_seconds",
         "Consensus process time cost",
         &["type"],
-        exponential_buckets(0.05, 2.0, 10).expect("consensus time expontial")
+        exponential_buckets(0.05, 1.5, 20).expect("consensus time expontial")
     )
     .expect("consensus time cost");
     pub static ref CONSENSUS_INFO_HISTOGRAM_VEC: HistogramVec = register_histogram_vec!(
