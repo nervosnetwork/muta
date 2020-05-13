@@ -12,6 +12,7 @@ use std::{
 
 use async_trait::async_trait;
 use derive_more::Display;
+use futures::future::try_join_all;
 use futures::{
     channel::mpsc::{
         channel, unbounded, Receiver, Sender, TrySendError, UnboundedReceiver, UnboundedSender,
@@ -419,6 +420,18 @@ where
     async fn get_latest_height(&self, ctx: Context) -> ProtocolResult<u64> {
         let height = self.storage.get_latest_block(ctx).await?.header.height;
         Ok(height)
+    }
+
+    async fn get_transactions(
+        &self,
+        ctx: Context,
+        tx_hashes: Vec<Hash>,
+    ) -> ProtocolResult<Vec<SignedTransaction>> {
+        let futs = tx_hashes
+            .into_iter()
+            .map(|tx_hash| self.storage.get_transaction_by_hash(ctx.clone(), tx_hash))
+            .collect::<Vec<_>>();
+        try_join_all(futs).await
     }
 
     fn report_good(&self, ctx: Context) {

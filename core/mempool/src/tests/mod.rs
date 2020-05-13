@@ -81,6 +81,14 @@ impl MemPoolAdapter for HashMemPoolAdapter {
         Ok(CURRENT_HEIGHT)
     }
 
+    async fn get_transactions(
+        &self,
+        _ctx: Context,
+        _tx_hashes: Vec<Hash>,
+    ) -> ProtocolResult<Vec<SignedTransaction>> {
+        Ok(vec![])
+    }
+
     fn report_good(&self, _ctx: Context) {}
 
     fn set_args(&self, _timeout_gap: u64, _cycles_limit: u64, _max_tx_size: u64) {}
