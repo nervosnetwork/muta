@@ -204,6 +204,10 @@ async fn test_sync_propose_txs() {
 /// test tests::mempool::bench_get_40000_full_txs    ... bench:  65,027,639 ns/iter (+/- 3,926,768)
 /// test tests::mempool::bench_get_80000_full_txs    ... bench: 131,066,149 ns/iter (+/- 11,457,417)
 /// test tests::mempool::bench_insert                ... bench:   9,320,879 ns/iter (+/- 710,246)
+/// test tests::mempool::bench_insert_serial_1       ... bench:       4,588 ns/iter (+/- 349)
+/// test tests::mempool::bench_insert_serial_10      ... bench:      44,027 ns/iter (+/- 4,168)
+/// test tests::mempool::bench_insert_serial_100     ... bench:     432,974 ns/iter (+/- 43,058)
+/// test tests::mempool::bench_insert_serial_1000    ... bench:   4,449,648 ns/iter (+/- 560,818)
 /// test tests::mempool::bench_mock_txs              ... bench:   5,890,752 ns/iter (+/- 583,029)
 /// test tests::mempool::bench_package               ... bench:   3,684,431 ns/iter (+/- 278,575)
 /// test tx_cache::tests::bench_flush                ... bench:   3,034,868 ns/iter (+/- 371,514)
@@ -222,6 +226,62 @@ fn bench_insert(b: &mut Bencher) {
         let txs = default_mock_txs(100);
         runtime.block_on(concurrent_insert(txs, Arc::clone(mempool)));
     });
+}
+
+#[bench]
+fn bench_insert_serial_1(b: &mut Bencher) {
+    let mempool = &Arc::new(default_mempool());
+    let txs = default_mock_txs(1);
+
+    b.iter(move || {
+        futures::executor::block_on(async {
+            for tx in txs.clone().into_iter() {
+                let _ = mempool.insert(Context::new(), tx).await;
+            }
+        });
+    })
+}
+
+#[bench]
+fn bench_insert_serial_10(b: &mut Bencher) {
+    let mempool = &Arc::new(default_mempool());
+    let txs = default_mock_txs(10);
+
+    b.iter(move || {
+        futures::executor::block_on(async {
+            for tx in txs.clone().into_iter() {
+                let _ = mempool.insert(Context::new(), tx).await;
+            }
+        });
+    })
+}
+
+#[bench]
+fn bench_insert_serial_100(b: &mut Bencher) {
+    let mempool = &Arc::new(default_mempool());
+    let txs = default_mock_txs(100);
+
+    b.iter(move || {
+        futures::executor::block_on(async {
+            for tx in txs.clone().into_iter() {
+                let _ = mempool.insert(Context::new(), tx).await;
+            }
+        });
+    })
+}
+
+#[bench]
+fn bench_insert_serial_1000(b: &mut Bencher) {
+    let mempool = &Arc::new(default_mempool());
+    let txs = default_mock_txs(1000);
+
+    b.iter(move || {
+        futures::executor::block_on(async {
+            for tx in txs.clone().into_iter() {
+                let _ = mempool.insert(Context::new(), tx).await;
+            }
+        });
+    })
 }
 
 #[bench]
