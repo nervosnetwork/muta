@@ -40,6 +40,10 @@ impl SignedTxsWAL {
         dir.push(block_hash.as_hex());
         dir.set_extension("txt");
 
+        if dir.exists() {
+            return Ok(());
+        }
+
         let mut wal_file = fs::OpenOptions::new()
             .read(true)
             .write(true)
