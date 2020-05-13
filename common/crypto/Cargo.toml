@@ -11,3 +11,9 @@ repository = "https://github.com/nervosnetwork/muta"
 ophelia-bls-amcl = "0.1"
 ophelia-secp256k1 = "0.2"
 ophelia = "0.2"
+
+[dev-dependencies]
+overlord = "0.2.0-alpha.11"
+protocol = { path = "../../protocol", package = "muta-protocol"}
+rand = "0.7"
+rlp = "0.4"
