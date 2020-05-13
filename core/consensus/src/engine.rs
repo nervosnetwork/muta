@@ -298,7 +298,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             signature,
             bitmap,
         };
-        common_apm::metrics::consensus::CONSENSUS_INFO_HISTOGRAM_VEC_STATIC
+        common_apm::metrics::consensus::CONSENSUS_ROUND_HISTOGRAM_VEC_STATIC
             .round
             .observe(proof.round as f64);
 
