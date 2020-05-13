@@ -37,8 +37,12 @@ impl<Adapter: ConsensusAdapter + 'static> Consensus for OverlordConsensus<Adapte
     async fn set_proposal(&self, ctx: Context, proposal: Vec<u8>) -> ProtocolResult<()> {
         let signed_proposal: SignedProposal<FixedPill> = rlp::decode(&proposal)
             .map_err(|_| ConsensusError::DecodeErr(ConsensusType::SignedProposal))?;
+
+        let msg = OverlordMsg::SignedProposal(signed_proposal);
+        tracing_overlord_message(ctx.clone(), &msg);
+
         self.handler
-            .send_msg(ctx, OverlordMsg::SignedProposal(signed_proposal))
+            .send_msg(ctx, msg)
             .expect("Overlord handler disconnect");
         Ok(())
     }
@@ -58,8 +62,12 @@ impl<Adapter: ConsensusAdapter + 'static> Consensus for OverlordConsensus<Adapte
 
         let signed_vote: SignedVote =
             rlp::decode(&vote).map_err(|_| ConsensusError::DecodeErr(ConsensusType::SignedVote))?;
+
+        let msg = OverlordMsg::SignedVote(signed_vote);
+        tracing_overlord_message(ctx.clone(), &msg);
+
         self.handler
-            .send_msg(ctx, OverlordMsg::SignedVote(signed_vote))
+            .send_msg(ctx, msg)
             .expect("Overlord handler disconnect");
         Ok(())
     }
@@ -68,8 +76,12 @@ impl<Adapter: ConsensusAdapter + 'static> Consensus for OverlordConsensus<Adapte
     async fn set_qc(&self, ctx: Context, qc: Vec<u8>) -> ProtocolResult<()> {
         let aggregated_vote: AggregatedVote = rlp::decode(&qc)
             .map_err(|_| ConsensusError::DecodeErr(ConsensusType::AggregateVote))?;
+
+        let msg = OverlordMsg::AggregatedVote(aggregated_vote);
+        tracing_overlord_message(ctx.clone(), &msg);
+
         self.handler
-            .send_msg(ctx, OverlordMsg::AggregatedVote(aggregated_vote))
+            .send_msg(ctx, msg)
             .expect("Overlord handler disconnect");
         Ok(())
     }
@@ -78,8 +90,12 @@ impl<Adapter: ConsensusAdapter + 'static> Consensus for OverlordConsensus<Adapte
     async fn set_choke(&self, ctx: Context, choke: Vec<u8>) -> ProtocolResult<()> {
         let signed_choke: SignedChoke = rlp::decode(&choke)
             .map_err(|_| ConsensusError::DecodeErr(ConsensusType::SignedChoke))?;
+
+        let msg = OverlordMsg::SignedChoke(signed_choke);
+        tracing_overlord_message(ctx.clone(), &msg);
+
         self.handler
-            .send_msg(ctx, OverlordMsg::SignedChoke(signed_choke))
+            .send_msg(ctx, msg)
             .expect("Overlord handler disconnect");
         Ok(())
     }
@@ -185,4 +201,44 @@ pub fn gen_overlord_status(
         }),
         authority_list,
     }
+}
+
+trait OverlordMsgExt {
+    fn get_height(&self) -> String;
+    fn get_round(&self) -> String;
+}
+
+impl<T: overlord::Codec> OverlordMsgExt for OverlordMsg<T> {
+    fn get_height(&self) -> String {
+        match self {
+            OverlordMsg::SignedProposal(sp) => sp.proposal.height.to_string(),
+            OverlordMsg::SignedVote(sv) => sv.get_height().to_string(),
+            OverlordMsg::AggregatedVote(av) => av.get_height().to_string(),
+            OverlordMsg::RichStatus(s) => s.height.to_string(),
+            OverlordMsg::SignedChoke(sc) => sc.choke.height.to_string(),
+            OverlordMsg::Stop => "".to_owned(),
+        }
+    }
+
+    fn get_round(&self) -> String {
+        match self {
+            OverlordMsg::SignedProposal(sp) => sp.proposal.round.to_string(),
+            OverlordMsg::SignedVote(sv) => sv.get_round().to_string(),
+            OverlordMsg::AggregatedVote(av) => av.get_round().to_string(),
+            OverlordMsg::RichStatus(_) => "".to_owned(),
+            OverlordMsg::SignedChoke(sc) => sc.choke.round.to_string(),
+            OverlordMsg::Stop => "".to_owned(),
+        }
+    }
+}
+
+#[muta_apm::derive::tracing_span(
+    kind = "consensus",
+    logs = "{
+    'height': 'msg.get_height()',
+    'round': 'msg.get_round()'
+}"
+)]
+pub fn tracing_overlord_message<T: overlord::Codec>(ctx: Context, msg: &OverlordMsg<T>) {
+    let _ = msg;
 }
