@@ -53,12 +53,14 @@ fn merge(left: &Hash, right: &Hash) -> Hash {
     Hash::digest(Bytes::from(root))
 }
 
-// The merkle from hashes benchmark result:
-// test benches::bench_merkle_1000_hashes  ... bench:   1,167,080 ns/iter (+/- 108,462)
-// test benches::bench_merkle_2000_hashes  ... bench:   2,338,504 ns/iter (+/- 137,184)
-// test benches::bench_merkle_4000_hashes  ... bench:   4,662,601 ns/iter (+/- 231,500)
-// test benches::bench_merkle_8000_hashes  ... bench:   9,336,278 ns/iter (+/- 900,731)
-// test benches::bench_merkle_16000_hashes ... bench:  18,697,547 ns/iter (+/- 1,103,828)
+#[rustfmt::skip]
+/// Bench in Intel(R) Core(TM) i7-4770HQ CPU @2.20GHz (8 x 2200):
+/// test benches::bench_merkle_1000_hashes  ... bench:   1,167,080 ns/iter (+/- 108,462)
+/// test benches::bench_merkle_2000_hashes  ... bench:   2,338,504 ns/iter (+/- 137,184)
+/// test benches::bench_merkle_4000_hashes  ... bench:   4,662,601 ns/iter (+/- 231,500)
+/// test benches::bench_merkle_8000_hashes  ... bench:   9,336,278 ns/iter (+/- 900,731)
+/// test benches::bench_merkle_16000_hashes ... bench:  18,697,547 ns/iter (+/- 1,103,828)
+
 #[cfg(test)]
 mod benches {
     extern crate test;
