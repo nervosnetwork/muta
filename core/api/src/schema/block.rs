@@ -118,7 +118,7 @@ impl From<protocol::types::Block> for Block {
                 .map(MerkleRoot::from)
                 .collect(),
             hash:              Hash::from(PHash::digest(
-                block.encode_fixed().expect("rlp encode never fail"),
+                block.header.encode_fixed().expect("rlp encode never fail"),
             )),
         }
     }

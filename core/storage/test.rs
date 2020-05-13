@@ -933,7 +933,7 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
                     block: Block,
                 ) -> ProtocolResult<()> {
                     let height = block.header.height;
-                    let block_hash = Hash::digest(block.encode_fixed()?);
+                    let block_hash = Hash::digest(block.header.encode_fixed()?);
                     _self
                         .adapter
                         .insert::<BlockSchema>(height.clone(), block.clone())

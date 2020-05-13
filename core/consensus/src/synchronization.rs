@@ -312,7 +312,7 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
             .observe(common_apm::metrics::duration_to_sec(inst.elapsed()));
 
         let block = &rich_block.block;
-        let block_hash = Hash::digest(block.encode_fixed()?);
+        let block_hash = Hash::digest(block.header.encode_fixed()?);
 
         let metadata = self.adapter.get_metadata(
             ctx.clone(),

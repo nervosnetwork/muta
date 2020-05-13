@@ -524,7 +524,7 @@ where
                 e
             })?;
 
-        let previous_block_hash = Hash::digest(previous_block.encode_fixed()?);
+        let previous_block_hash = Hash::digest(previous_block.header.encode_fixed()?);
 
         if previous_block_hash != block.header.pre_hash {
             log::error!(
@@ -637,7 +637,7 @@ where
             .into());
         }
 
-        let blockhash = Hash::digest(block.clone().encode_fixed()?);
+        let blockhash = Hash::digest(block.header.clone().encode_fixed()?);
 
         if blockhash != proof.block_hash {
             log::error!(

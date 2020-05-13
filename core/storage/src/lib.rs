@@ -123,7 +123,7 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
     #[muta_apm::derive::tracing_span(kind = "storage")]
     async fn insert_block(&self, ctx: Context, block: Block) -> ProtocolResult<()> {
         let height = block.header.height;
-        let block_hash = Hash::digest(block.encode_fixed()?);
+        let block_hash = Hash::digest(block.header.encode_fixed()?);
 
         self.adapter
             .insert::<BlockSchema>(height.clone(), block.clone())

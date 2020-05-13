@@ -279,7 +279,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         self_address: my_address.clone(),
     };
     let current_header = &current_block.header;
-    let block_hash = Hash::digest(current_block.encode_fixed()?);
+    let block_hash = Hash::digest(current_block.header.encode_fixed()?);
     let current_height = current_block.header.height;
     let exec_height = current_block.header.exec_height;
 

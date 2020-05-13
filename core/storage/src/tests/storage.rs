@@ -14,7 +14,7 @@ fn test_storage_block_insert() {
 
     let height = 100;
     let block = mock_block(height, Hash::digest(get_random_bytes(10)));
-    let block_hash = Hash::digest(block.encode_fixed().unwrap());
+    let block_hash = Hash::digest(block.header.encode_fixed().unwrap());
 
     exec!(storage.insert_block(Context::new(), block));
 
