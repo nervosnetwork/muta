@@ -101,7 +101,7 @@ impl MemPoolAdapter for HashMemPoolAdapter {
         &self,
         _ctx: Context,
         tx: SignedTransaction,
-    ) -> ProtocolResult<Address> {
+    ) -> ProtocolResult<SignedTransaction> {
         check_hash(tx.clone()).await?;
         check_sig(&tx)
     }
@@ -175,7 +175,7 @@ async fn check_hash(tx: SignedTransaction) -> ProtocolResult<()> {
     Ok(())
 }
 
-fn check_sig(tx: &SignedTransaction) -> ProtocolResult<Address> {
+fn check_sig(tx: &SignedTransaction) -> ProtocolResult<SignedTransaction> {
     let wit = WitnessAdapter::from_bytes(tx.clone().witness)?;
 
     let signature = wit.signatures[0].as_bytes()?;
@@ -191,7 +191,10 @@ fn check_sig(tx: &SignedTransaction) -> ProtocolResult<Address> {
         .into());
     }
 
-    addr
+    Ok(SignedTransaction {
+        sender: Some(addr.unwrap()),
+        ..tx.to_owned()
+    })
 }
 
 async fn concurrent_check_sig(txs: Vec<SignedTransaction>) {

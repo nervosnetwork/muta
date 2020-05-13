@@ -12,7 +12,7 @@ use common_crypto::{
 
 use framework::binding::sdk::{DefalutServiceSDK, DefaultChainQuerier};
 use framework::binding::state::{GeneralServiceState, MPTTrie};
-use protocol::traits::{NoopDispatcher, Storage, Witness};
+use protocol::traits::{Context, NoopDispatcher, Storage, Witness};
 use protocol::types::{
     Address, Block, Hash, Hex, Proof, Receipt, ServiceContext, ServiceContextParams,
     SignedTransaction, VerifyPayload,
@@ -254,59 +254,71 @@ struct MockStorage;
 
 #[async_trait]
 impl Storage for MockStorage {
-    async fn insert_transactions(&self, _: Vec<SignedTransaction>) -> ProtocolResult<()> {
+    async fn insert_transactions(
+        &self,
+        _: Context,
+        _: Vec<SignedTransaction>,
+    ) -> ProtocolResult<()> {
         unimplemented!()
     }
 
-    async fn insert_block(&self, _: Block) -> ProtocolResult<()> {
+    async fn insert_block(&self, _: Context, _: Block) -> ProtocolResult<()> {
         unimplemented!()
     }
 
-    async fn insert_receipts(&self, _: Vec<Receipt>) -> ProtocolResult<()> {
+    async fn insert_receipts(&self, _: Context, _: Vec<Receipt>) -> ProtocolResult<()> {
         unimplemented!()
     }
 
-    async fn update_latest_proof(&self, _: Proof) -> ProtocolResult<()> {
+    async fn update_latest_proof(&self, _: Context, _: Proof) -> ProtocolResult<()> {
         unimplemented!()
     }
 
-    async fn get_transaction_by_hash(&self, _: Hash) -> ProtocolResult<SignedTransaction> {
+    async fn get_transaction_by_hash(
+        &self,
+        _: Context,
+        _: Hash,
+    ) -> ProtocolResult<SignedTransaction> {
         unimplemented!()
     }
 
-    async fn get_transactions(&self, _: Vec<Hash>) -> ProtocolResult<Vec<SignedTransaction>> {
+    async fn get_transactions(
+        &self,
+        _: Context,
+        _: Vec<Hash>,
+    ) -> ProtocolResult<Vec<SignedTransaction>> {
         unimplemented!()
     }
 
-    async fn get_latest_block(&self) -> ProtocolResult<Block> {
+    async fn get_latest_block(&self, _: Context) -> ProtocolResult<Block> {
         unimplemented!()
     }
 
-    async fn get_block_by_height(&self, _: u64) -> ProtocolResult<Block> {
+    async fn get_block_by_height(&self, _: Context, _: u64) -> ProtocolResult<Block> {
         unimplemented!()
     }
 
-    async fn get_block_by_hash(&self, _: Hash) -> ProtocolResult<Block> {
+    async fn get_block_by_hash(&self, _: Context, _: Hash) -> ProtocolResult<Block> {
         unimplemented!()
     }
 
-    async fn get_receipt(&self, _: Hash) -> ProtocolResult<Receipt> {
+    async fn get_receipt(&self, _: Context, _: Hash) -> ProtocolResult<Receipt> {
         unimplemented!()
     }
 
-    async fn get_receipts(&self, _: Vec<Hash>) -> ProtocolResult<Vec<Receipt>> {
+    async fn get_receipts(&self, _: Context, _: Vec<Hash>) -> ProtocolResult<Vec<Receipt>> {
         unimplemented!()
     }
 
-    async fn get_latest_proof(&self) -> ProtocolResult<Proof> {
+    async fn get_latest_proof(&self, _: Context) -> ProtocolResult<Proof> {
         unimplemented!()
     }
 
-    async fn update_overlord_wal(&self, _info: Bytes) -> ProtocolResult<()> {
+    async fn update_overlord_wal(&self, _: Context, _info: Bytes) -> ProtocolResult<()> {
         unimplemented!()
     }
 
-    async fn load_overlord_wal(&self) -> ProtocolResult<Bytes> {
+    async fn load_overlord_wal(&self, _: Context) -> ProtocolResult<Bytes> {
         unimplemented!()
     }
 }

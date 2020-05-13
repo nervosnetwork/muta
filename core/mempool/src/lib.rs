@@ -27,7 +27,7 @@ use tokio::sync::RwLock;
 
 use protocol::traits::{Context, MemPool, MemPoolAdapter, MixedTxHashes};
 use protocol::types::{Hash, SignedTransaction};
-use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
+use protocol::{Bytes, ProtocolError, ProtocolErrorKind, ProtocolResult};
 
 use crate::context::TxContext;
 use crate::map::Map;
@@ -94,7 +94,7 @@ where
     async fn insert_tx(
         &self,
         ctx: Context,
-        mut tx: SignedTransaction,
+        tx: SignedTransaction,
         tx_type: TxType,
     ) -> ProtocolResult<()> {
         let _lock = self.flush_lock.read().await;
@@ -102,25 +102,25 @@ where
         let tx_hash = &tx.tx_hash;
         self.tx_cache.check_reach_limit(self.pool_size).await?;
         self.tx_cache.check_exist(tx_hash).await?;
-        let sender = self
+        let verified_tx = self
             .adapter
             .check_signature(ctx.clone(), tx.clone())
             .await?;
-        tx.sender = Some(sender);
 
         self.adapter
-            .check_transaction(ctx.clone(), tx.clone())
+            .check_transaction(ctx.clone(), verified_tx.clone())
             .await?;
         self.adapter
             .check_storage_exist(ctx.clone(), tx_hash.clone())
             .await?;
+
         match tx_type {
-            TxType::NewTx => self.tx_cache.insert_new_tx(tx.clone()).await?,
-            TxType::ProposeTx => self.tx_cache.insert_propose_tx(tx.clone()).await?,
+            TxType::NewTx => self.tx_cache.insert_new_tx(verified_tx.clone()).await?,
+            TxType::ProposeTx => self.tx_cache.insert_propose_tx(verified_tx.clone()).await?,
         }
 
         if !ctx.is_network_origin_txs() {
-            self.adapter.broadcast_tx(ctx, tx).await?;
+            self.adapter.broadcast_tx(ctx, verified_tx).await?;
         } else {
             self.adapter.report_good(ctx);
         }
@@ -133,7 +133,7 @@ where
         &self,
         ctx: Context,
         txs: Vec<SignedTransaction>,
-    ) -> ProtocolResult<()> {
+    ) -> ProtocolResult<Vec<SignedTransaction>> {
         let now = Instant::now();
         let len = txs.len();
 
@@ -142,31 +142,40 @@ where
             .map(|signed_tx| {
                 let adapter = Arc::clone(&self.adapter);
                 let ctx = ctx.clone();
-
                 tokio::spawn(async move {
-                    adapter
+                    let verified_tx = adapter
                         .check_signature(ctx.clone(), signed_tx.clone())
                         .await?;
+
                     adapter
                         .check_transaction(ctx.clone(), signed_tx.clone())
                         .await?;
                     adapter
                         .check_storage_exist(ctx.clone(), signed_tx.tx_hash.clone())
-                        .await
+                        .await?;
+                    Ok::<SignedTransaction, ProtocolError>(verified_tx)
                 })
             })
             .collect::<Vec<_>>();
-        try_join_all(futs).await.map_err(|e| {
+
+        let res_txs = try_join_all(futs).await.map_err(|e| {
             log::error!("[mempool] verify batch txs error {:?}", e);
             MemPoolError::VerifyBatchTransactions
         })?;
+
+        let mut verified_txs = Vec::<SignedTransaction>::new();
+        verified_txs.reserve(res_txs.len());
+        for res in res_txs.into_iter() {
+            verified_txs.push(res.map_err(|_| MemPoolError::VerifyBatchTransactions)?);
+        }
 
         log::info!(
             "[mempool] verify txs done, size {:?} cost {:?}",
             len,
             now.elapsed()
         );
-        Ok(())
+
+        Ok(verified_txs)
     }
 }
 
@@ -314,8 +323,8 @@ where
                 .into());
             }
 
-            self.verify_tx_in_parallel(ctx.clone(), txs.clone()).await?;
-            for signed_tx in txs.into_iter() {
+            let verified_txs = self.verify_tx_in_parallel(ctx.clone(), txs).await?;
+            for signed_tx in verified_txs.into_iter() {
                 self.callback_cache
                     .insert(signed_tx.tx_hash.clone(), signed_tx)
                     .await;
@@ -343,7 +352,9 @@ where
             }
         }
 
-        self.verify_tx_in_parallel(ctx, unknown_txs).await
+        self.verify_tx_in_parallel(ctx, unknown_txs)
+            .await
+            .map(|_| {})
     }
 
     #[muta_apm::derive::tracing_span(
@@ -444,6 +455,12 @@ pub enum MemPoolError {
 
     #[display(fmt = "Batch transaction validation failed")]
     VerifyBatchTransactions,
+
+    #[display(fmt = "Encode witness error {:?}", _0)]
+    EncodeWitness(Bytes),
+
+    #[display(fmt = "Encode payload error {:?}", _0)]
+    EncodePayload(String),
 }
 
 impl Error for MemPoolError {}

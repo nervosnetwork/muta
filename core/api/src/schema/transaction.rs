@@ -85,7 +85,7 @@ pub fn to_signed_transaction(
     Ok(protocol::types::SignedTransaction {
         raw:     to_transaction(raw)?,
         tx_hash: protocol::types::Hash::from_hex(&encryption.tx_hash.as_hex())?,
-        witness: bytes::Bytes::from(encryption.witness.to_uppercase()),
+        witness: bytes::Bytes::from(encryption.witness),
         sender:  None,
     })
 }

@@ -257,22 +257,23 @@ where
         &self,
         ctx: Context,
         tx: SignedTransaction,
-    ) -> ProtocolResult<Address> {
+    ) -> ProtocolResult<SignedTransaction> {
         let network = self.network.clone();
         let network_clone = network.clone();
-        let tx_clone = tx.clone();
+        let new_tx = &mut tx.clone();
         let ctx_clone = ctx.clone();
+
         let blocking_res: Result<ProtocolResult<()>, _> = tokio::task::spawn_blocking(move || {
             // Verify transaction hash
-            let fixed_bytes = tx_clone.raw.encode_fixed()?;
+            let fixed_bytes = tx.raw.encode_fixed()?;
             let tx_hash = Hash::digest(fixed_bytes);
 
             println!(
                 "tx_hash:{},  tx.tx_hash:{}\r\n",
                 tx_hash.as_hex(),
-                tx_clone.tx_hash.as_hex()
+                tx.tx_hash.as_hex()
             );
-            if tx_hash != tx_clone.tx_hash {
+            if tx_hash != tx.tx_hash {
                 println!(
                     "is_network_origin_txs: {}",
                     ctx_clone.is_network_origin_txs()
@@ -282,13 +283,13 @@ where
                         ctx_clone,
                         TrustFeedback::Worse(format!(
                             "Mempool wrong tx_hash of tx {:?}",
-                            tx_clone.tx_hash
+                            tx.tx_hash
                         )),
                     );
                 }
 
                 let wrong_hash = MemPoolError::CheckHash {
-                    expect: tx_clone.tx_hash,
+                    expect: tx.tx_hash,
                     actual: tx_hash,
                 };
 
@@ -303,14 +304,17 @@ where
             return Err(AdapterError::Internal.into());
         }
 
-        let block = self.storage.get_latest_block().await?;
+        let block = self.storage.get_latest_block(ctx.clone()).await?;
         let height = block.header.height;
+
+        let temp = String::from_utf8(new_tx.witness.to_vec())
+            .map_err(|_| MemPoolError::EncodeWitness(new_tx.witness.clone()))?;
+
         let payload = serde_json::to_string(&VerifyPayload {
-            tx_hash: tx.tx_hash.clone(),
-            witness: String::from_utf8(tx.witness.to_vec())
-                .expect("tx.witness from Bytes to String error"),
+            tx_hash: new_tx.tx_hash.clone(),
+            witness: temp,
         })
-        .expect("check_signature payload to json string error");
+        .map_err(|_| MemPoolError::EncodePayload("encode".to_string()))?;
 
         let caller = Address::from_hex("0x0000000000000000000000000000000000000000")?;
         let executor = EF::from_root(
@@ -331,7 +335,7 @@ where
             payload,
         })?;
 
-        println!("tx_hash: {}\r\n", tx.tx_hash.as_hex());
+        println!("tx_hash: {}\r\n", new_tx.tx_hash.as_hex());
         println!("exec_resp: {:?}\r\n", exec_resp);
         let res: Result<VerifyResponse, ProtocolError> =
             serde_json::from_str(&exec_resp.succeed_data).map_err(|_| {
@@ -340,17 +344,18 @@ where
                         ctx,
                         TrustFeedback::Worse(format!(
                             "Mempool wrong signature of tx {:?}",
-                            tx.tx_hash
+                            new_tx.tx_hash.clone()
                         )),
                     );
                 }
                 MemPoolError::CheckSig {
-                    tx_hash: tx.tx_hash,
+                    tx_hash: new_tx.tx_hash.clone(),
                 }
                 .into()
             });
 
-        Ok(res?.address)
+        new_tx.sender = Some(res?.address);
+        Ok(new_tx.to_owned())
     }
 
     // TODO: Verify Fee?
