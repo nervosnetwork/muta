@@ -214,12 +214,11 @@ where
             return result;
         }
         let r = result.unwrap();
-        common_apm::metrics::mempool::MEMPOOL_SIZE_VEC_STATIC
-            .package_size
-            .observe((r.order_tx_hashes.len() + r.propose_tx_hashes.len()) as f64);
-        common_apm::metrics::mempool::MEMPOOL_SIZE_VEC_STATIC
-            .current_size
-            .observe(self.tx_cache.len().await as f64);
+
+        common_apm::metrics::mempool::MEMPOOL_PACKAGE_SIZE_STATIC
+            .set((r.order_tx_hashes.len() + r.propose_tx_hashes.len()) as i64);
+        common_apm::metrics::mempool::MEMPOOL_CURRENT_SIZE_STATIC
+            .set(self.tx_cache.len().await as i64);
         common_apm::metrics::mempool::MEMPOOL_RESULT_COUNTER_STATIC
             .package
             .success
