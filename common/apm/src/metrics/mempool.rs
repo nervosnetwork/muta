@@ -59,6 +59,4 @@ lazy_static! {
         auto_flush_from!(MEMPOOL_RESULT_COUNTER_VEC, MempoolResultCounterVec);
     pub static ref MEMPOOL_TIME_STATIC: MempoolTimeHistogramVec =
         auto_flush_from!(MEMPOOL_TIME_HISTOGRAM_VEC, MempoolTimeHistogramVec);
-    // pub static ref MEMPOOL_SIZE_VEC_STATIC: MempoolSizeVec =
-    //     auto_flush_from!(MEMPOOL_SIZE_VEC, MempoolSizeVec);
 }
