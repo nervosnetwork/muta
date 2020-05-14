@@ -1013,6 +1013,13 @@ impl PeerManager {
 
     fn update_peer_alive(&self, pid: &PeerId) {
         if let Some(peer) = self.inner.peer(pid) {
+            let sid = peer.session_id();
+            if sid != 0.into() {
+                if let Some(session) = self.inner.session(sid) {
+                    info!("peer {:?} {} alive", pid, session.connected_addr);
+                }
+            }
+
             peer.retry.reset(); // Just in case
             peer.update_alive();
         }
