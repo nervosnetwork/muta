@@ -10,7 +10,6 @@ pub mod status;
 pub mod synchronization;
 #[cfg(test)]
 mod tests;
-pub mod trace;
 pub mod util;
 pub mod wal;
 mod wal_proto;
