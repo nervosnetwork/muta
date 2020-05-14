@@ -1,10 +1,8 @@
 use std::sync::Arc;
 
 use derive_more::Display;
-use moodyblues_sdk::trace;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 
 use common_merkle::Merkle;
 use protocol::fixed_codec::FixedCodec;
@@ -115,7 +113,6 @@ impl CurrentConsensusStatus {
         }
         log::info!("update_by_executed: info {}", info,);
         log::info!("update_by_executed: current status {}", self);
-        // trace_after_exec(&info);
 
         assert!(info.exec_height == self.exec_height + 1);
         self.exec_height += 1;
@@ -249,16 +246,4 @@ impl ExecutedInfo {
             logs_bloom: resp.logs_bloom,
         }
     }
-}
-
-pub fn trace_after_exec(info: &ExecutedInfo) {
-    trace::custom(
-        "update_by_executed".to_string(),
-        Some(json!({
-            "exec_height": info.exec_height,
-            "state_root": info.state_root.as_hex(),
-            "receipt_root": info.receipt_root.as_hex(),
-            "confirm_root": info.confirm_root.as_hex(),
-        })),
-    );
 }
