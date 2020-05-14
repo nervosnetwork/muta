@@ -93,7 +93,8 @@ where
         let mut headers = Headers::default();
         if let Some(state) = common_apm::muta_apm::MutaTracer::span_state(&cx) {
             headers.set_trace_id(state.trace_id());
-            headers.set_span_id(state.span_id())
+            headers.set_span_id(state.span_id());
+            log::info!("no trace id found for rpc {}", endpoint.full_url());
         }
         let net_msg = NetworkMessage::new(endpoint, data, headers)
             .encode()
@@ -157,7 +158,8 @@ where
         let mut headers = Headers::default();
         if let Some(state) = common_apm::muta_apm::MutaTracer::span_state(&cx) {
             headers.set_trace_id(state.trace_id());
-            headers.set_span_id(state.span_id())
+            headers.set_span_id(state.span_id());
+            log::info!("no trace id found for rpc {}", endpoint.full_url());
         }
         let net_msg = NetworkMessage::new(endpoint, encoded_resp, headers)
             .encode()
