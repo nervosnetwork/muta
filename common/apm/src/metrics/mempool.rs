@@ -6,10 +6,13 @@ use crate::metrics::{
 use lazy_static::lazy_static;
 
 make_auto_flush_static_metric! {
-    pub label_enum MempoolKind {
+    pub label_enum MempoolCounterKind {
         insert_tx_from_p2p,
         package,
-        current_size,
+    }
+
+    pub struct MempoolCounterVec: LocalIntCounter {
+        "type" => MempoolCounterKind,
     }
 
     pub label_enum MempoolOpResult {
@@ -17,59 +20,48 @@ make_auto_flush_static_metric! {
         failure,
     }
 
-    pub struct MempoolCounterVec: LocalIntCounter {
-        "type" => MempoolKind,
-    }
-
     pub struct MempoolResultCounterVec: LocalIntCounter {
-        "type" => MempoolKind,
+        "type" => MempoolCounterKind,
         "result" => MempoolOpResult,
     }
 
     pub struct MempoolTimeHistogramVec: LocalHistogram {
-        "type" => MempoolKind,
+        "type" => MempoolCounterKind,
     }
 
-    pub struct MempoolPackageSizeVec: LocalHistogram {
-        "type" => MempoolKind,
+    pub label_enum MempoolSizeKind {
+        package_size,
+        current_size,
     }
 
-    pub struct MempoolCurrentSizeVec: LocalHistogram {
-        "type" => MempoolKind,
+    pub struct MempoolSizeVec: LocalHistogram {
+        "type" => MempoolSizeKind,
     }
 }
 
 lazy_static! {
     pub static ref MEMPOOL_COUNTER_VEC: IntCounterVec =
-        register_int_counter_vec!("muta_mempool_counter", "Counter in mempool", &["type"])
-            .expect("failed init mempool counter vec");
+        register_int_counter_vec!("muta_mempool_counter", "Counter in mempool", &["type"]).unwrap();
     pub static ref MEMPOOL_RESULT_COUNTER_VEC: IntCounterVec = register_int_counter_vec!(
         "muta_mempool_result_counter",
         "Result counter in mempool",
         &["type", "result"]
     )
-    .expect("request result total");
+    .unwrap();
     pub static ref MEMPOOL_TIME_HISTOGRAM_VEC: HistogramVec = register_histogram_vec!(
         "muta_mempool_cost_seconds",
         "Time cost in mempool",
         &["type"],
-        exponential_buckets(0.05, 2.0, 10).expect("mempool time expontial")
+        exponential_buckets(0.05, 1.5, 10).unwrap()
     )
-    .expect("mempool time cost");
-    pub static ref MEMPOOL_PACKAGE_SIZE_VEC: HistogramVec = register_histogram_vec!(
-        "muta_mempool_package_size_vec",
-        "Package size",
+    .unwrap();
+    pub static ref MEMPOOL_SIZE_VEC: HistogramVec = register_histogram_vec!(
+        "muta_mempool_size_vec",
+        "Mempool package/current size",
         &["type"],
-        exponential_buckets(0.05, 2.0, 10).expect("mempool package size exponential")
+        exponential_buckets(1.0, 2.0, 16).unwrap()
     )
-    .expect("mempool package size");
-    pub static ref MEMPOOL_CURRENT_SIZE_VEC: HistogramVec = register_histogram_vec!(
-        "muta_mempool_current_size_vec",
-        "Current size",
-        &[],
-        exponential_buckets(0.05, 2.0, 10).expect("mempool current size exponential")
-    )
-    .expect("mempool current size");
+    .unwrap();
 }
 
 lazy_static! {
@@ -79,8 +71,6 @@ lazy_static! {
         auto_flush_from!(MEMPOOL_RESULT_COUNTER_VEC, MempoolResultCounterVec);
     pub static ref MEMPOOL_TIME_STATIC: MempoolTimeHistogramVec =
         auto_flush_from!(MEMPOOL_TIME_HISTOGRAM_VEC, MempoolTimeHistogramVec);
-    pub static ref MEMPOOL_PACKAGE_SIZE_VEC_STATIC: MempoolPackageSizeVec =
-        auto_flush_from!(MEMPOOL_PACKAGE_SIZE_VEC, MempoolPackageSizeVec);
-    pub static ref MEMPOOL_CURRENT_SIZE_VEC_STATIC: MempoolCurrentSizeVec =
-        auto_flush_from!(MEMPOOL_CURRENT_SIZE_VEC, MempoolCurrentSizeVec);
+    pub static ref MEMPOOL_SIZE_VEC_STATIC: MempoolSizeVec =
+        auto_flush_from!(MEMPOOL_SIZE_VEC, MempoolSizeVec);
 }
