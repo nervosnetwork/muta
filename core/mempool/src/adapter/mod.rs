@@ -268,11 +268,6 @@ where
             let fixed_bytes = tx.raw.encode_fixed()?;
             let tx_hash = Hash::digest(fixed_bytes);
 
-            println!(
-                "tx_hash:{},  tx.tx_hash:{}\r\n",
-                tx_hash.as_hex(),
-                tx.tx_hash.as_hex()
-            );
             if tx_hash != tx.tx_hash {
                 println!(
                     "is_network_origin_txs: {}",
@@ -335,8 +330,6 @@ where
             payload,
         })?;
 
-        println!("tx_hash: {}\r\n", new_tx.tx_hash.as_hex());
-        println!("exec_resp: {:?}\r\n", exec_resp);
         let res: Result<VerifyResponse, ProtocolError> =
             serde_json::from_str(&exec_resp.succeed_data).map_err(|_| {
                 if ctx.is_network_origin_txs() {

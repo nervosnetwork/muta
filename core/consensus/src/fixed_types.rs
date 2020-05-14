@@ -254,8 +254,6 @@ mod test {
         SignedTransaction {
             raw,
             tx_hash,
-            // pubkey: Bytes::from(gen_random_bytes(32)),
-            // signature: Bytes::from(gen_random_bytes(64)),
             witness: Default::default(),
             sender: None,
         }
