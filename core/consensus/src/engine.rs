@@ -8,13 +8,11 @@ use async_trait::async_trait;
 use futures::lock::Mutex;
 use futures_timer::Delay;
 use log::error;
-use moodyblues_sdk::trace;
 use overlord::error::ConsensusError as OverlordError;
 use overlord::types::{Commit, Node, OverlordMsg, Status};
 use overlord::{Consensus as Engine, DurationConfig, Wal};
 use parking_lot::RwLock;
 use rlp::Encodable;
-use serde_json::json;
 
 use common_apm::muta_apm;
 use common_crypto::BlsPublicKey;
@@ -339,7 +337,6 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             }
         }
 
-        trace_block(&pill.block);
         let block_exec_height = pill.block.header.exec_height;
         let metadata = self.adapter.get_metadata(
             ctx.clone(),
@@ -578,13 +575,6 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
 
         // check previous hash
         if status.current_hash != block.pre_hash {
-            trace::error(
-                "check_block_prev_hash_diff".to_string(),
-                Some(json!({
-                    "next block prev_hash": block.pre_hash.as_hex(),
-                    "status current hash": status.current_hash.as_hex(),
-                })),
-            );
             return Err(ConsensusError::InvalidPrevhash {
                 expect: status.current_hash,
                 actual: block.pre_hash.clone(),
@@ -596,13 +586,6 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
         if status.latest_committed_state_root != block.state_root
             && !status.list_state_root.contains(&block.state_root)
         {
-            trace::error(
-                "check_block_state_root_diff".to_string(),
-                Some(json!({
-                    "block_state_root": block.state_root.as_hex(),
-                    "current_list_state_root": status.list_state_root.iter().map(|root| root.as_hex()).collect::<Vec<_>>(),
-                })),
-            );
             error!(
                 "invalid status list_state_root, latest {:?}, current list {:?}, block {:?}",
                 status.latest_committed_state_root, status.list_state_root, block.state_root
@@ -612,13 +595,6 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
 
         // check confirm root
         if !check_list_roots(&status.list_confirm_root, &block.confirm_root) {
-            trace::error(
-                "check_block_confirm_root_diff".to_string(),
-                Some(json!({
-                    "block_state_root": block.confirm_root.iter().map(|root| root.as_hex()).collect::<Vec<_>>(),
-                    "current_list_confirm_root": status.list_confirm_root.iter().map(|root| root.as_hex()).collect::<Vec<_>>(),
-                })),
-            );
             error!(
                 "current list confirm root {:?}, block confirm root {:?}",
                 status.list_confirm_root, block.confirm_root
@@ -628,13 +604,6 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
 
         // check receipt root
         if !check_list_roots(&status.list_receipt_root, &block.receipt_root) {
-            trace::error(
-                "check_block_receipt_root_diff".to_string(),
-                Some(json!({
-                    "block_state_root": block.receipt_root.iter().map(|root| root.as_hex()).collect::<Vec<_>>(),
-                    "current_list_receipt_root": status.list_receipt_root.iter().map(|root| root.as_hex()).collect::<Vec<_>>(),
-                })),
-            );
             error!(
                 "current list receipt root {:?}, block receipt root {:?}",
                 status.list_receipt_root, block.receipt_root
@@ -644,13 +613,6 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
 
         // check cycles used
         if !check_list_roots(&status.list_cycles_used, &block.cycles_used) {
-            trace::error(
-                "check_block_cycle_used_diff".to_string(),
-                Some(json!({
-                    "block_state_root": block.cycles_used,
-                    "current_list_cycles_root": status.list_cycles_used,
-                })),
-            );
             error!(
                 "current list cycles used {:?}, block cycles used {:?}",
                 status.list_cycles_used, block.cycles_used
@@ -660,13 +622,6 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
 
         // check logs bloom
         if !check_list_roots(&status.list_logs_bloom, &block.logs_bloom) {
-            trace::error(
-                "check_block_logs_bloom_diff".to_string(),
-                Some(json!({
-                    "block_state_root": block.logs_bloom,
-                    "current_list_cycles_root": status.list_logs_bloom,
-                })),
-            );
             error!(
                 "cache logs bloom {:?}, block logs bloom {:?}",
                 status
@@ -775,34 +730,6 @@ fn covert_to_overlord_authority(validators: &[Validator]) -> Vec<Node> {
         .collect::<Vec<_>>();
     authority.sort();
     authority
-}
-
-pub fn trace_block(block: &Block) {
-    let confirm_roots = block
-        .header
-        .confirm_root
-        .iter()
-        .map(|root| root.as_hex())
-        .collect::<Vec<_>>();
-    let receipt_roots = block
-        .header
-        .receipt_root
-        .iter()
-        .map(|root| root.as_hex())
-        .collect::<Vec<_>>();
-
-    trace::custom(
-        "commit_block".to_string(),
-        Some(json!({
-            "height": block.header.height,
-            "pre_hash": block.header.pre_hash.as_hex(),
-            "order_root": block.header.order_root.as_hex(),
-            "state_root": block.header.state_root.as_hex(),
-            "proposer": block.header.proposer.as_hex(),
-            "confirm_roots": confirm_roots,
-            "receipt_roots": receipt_roots,
-        })),
-    );
 }
 
 fn time_now() -> u64 {

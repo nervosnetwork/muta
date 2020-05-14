@@ -350,8 +350,6 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         .map_err(MainError::Utf8)?
         .into();
 
-    core_consensus::trace::init_tracer(my_address.as_hex())?;
-
     let crypto = Arc::new(OverlordCrypto::new(bls_priv_key, bls_pub_keys, common_ref));
 
     let mut consensus_adapter =
