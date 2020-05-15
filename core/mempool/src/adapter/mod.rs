@@ -409,7 +409,6 @@ where
         }
     }
 
-    #[muta_apm::derive::tracing_span(kind = "mempool.adapter")]
     async fn get_latest_height(&self, ctx: Context) -> ProtocolResult<u64> {
         let height = self.storage.get_latest_block(ctx).await?.header.height;
         Ok(height)
