@@ -257,12 +257,21 @@ where
         let len = tx_hashes.len();
         let mut full_txs = Vec::with_capacity(len);
 
-        for tx_hash in tx_hashes {
-            if let Some(tx) = self.tx_cache.get(&tx_hash).await {
+        for tx_hash in &tx_hashes {
+            if let Some(tx) = self.tx_cache.get(tx_hash).await {
                 full_txs.push(tx);
-            } else if let Some(tx) = self.callback_cache.get(&tx_hash).await {
+            } else if let Some(tx) = self.callback_cache.get(tx_hash).await {
                 full_txs.push(tx);
             }
+        }
+
+        // for push txs when local mempool is flushed, but the remote node still fetch
+        // full block
+        if len != 0 && full_txs.is_empty() {
+            full_txs = self
+                .adapter
+                .get_transactions_from_storage(ctx, tx_hashes)
+                .await?;
         }
 
         if full_txs.len() != len {

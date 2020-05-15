@@ -135,7 +135,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         let fixed_pill = FixedPill {
             inner: pill.clone(),
         };
-        let hash = Hash::digest(pill.block.encode_fixed()?).as_bytes();
+        let hash = Hash::digest(pill.block.header.encode_fixed()?).as_bytes();
         let mut set = self.exemption_hash.write();
         set.insert(hash.clone());
 
@@ -321,7 +321,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
                     current_height,
                     pill.block.header.proposer.clone(),
                     pill.block.header.timestamp,
-                    Hash::digest(pill.block.encode_fixed()?),
+                    Hash::digest(pill.block.header.encode_fixed()?),
                     signed_txs.clone(),
                 )
                 .await
@@ -705,7 +705,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
             metadata.max_tx_size,
         );
 
-        let block_hash = Hash::digest(block.encode_fixed()?);
+        let block_hash = Hash::digest(block.header.encode_fixed()?);
 
         if block.header.height != proof.height {
             log::info!("[consensus] update_status for handle_commit, error, before update, block height {}, proof height:{}, proof : {:?}",

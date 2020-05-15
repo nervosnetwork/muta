@@ -48,6 +48,7 @@ pub struct BlockHeader {
     pub proof:             Proof,
     pub validator_version: u64,
     pub validators:        Vec<Validator>,
+    // FixMe: add `signed_transactions_hash` in the future
 }
 
 #[derive(RlpFixedCodec, Serialize, Deserialize, Clone, Debug, Hash, PartialEq, Eq)]

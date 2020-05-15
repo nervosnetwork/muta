@@ -64,7 +64,7 @@ fn sync_gap_test() {
             remote_transactions,
             Arc::clone(&key_tool.overlord_crypto),
         ));
-        let block_hash = Hash::digest(genesis_block.encode_fixed().unwrap());
+        let block_hash = Hash::digest(genesis_block.header.encode_fixed().unwrap());
         let status = CurrentConsensusStatus {
             cycles_price:                1,
             cycles_limit:                300_000_000,
@@ -323,7 +323,7 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
             .get_block_by_height(ctx.clone(), block.header.height - 1)
             .await?;
 
-        let previous_block_hash = Hash::digest(previous_block.encode_fixed()?);
+        let previous_block_hash = Hash::digest(previous_block.header.encode_fixed()?);
 
         if previous_block_hash != block.header.pre_hash {
             log::error!(
@@ -435,7 +435,7 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
             .into());
         }
 
-        let blockhash = Hash::digest(block.clone().encode_fixed()?);
+        let blockhash = Hash::digest(block.header.clone().encode_fixed()?);
 
         if blockhash != proof.block_hash {
             log::error!(
@@ -630,7 +630,7 @@ fn mock_chained_rich_block(len: u64, gap: u64, key_tool: &KeyTool) -> (Vec<RichB
     };
 
     loop {
-        let last_block_hash = Hash::digest(last_rich_block.block.encode_fixed().unwrap());
+        let last_block_hash = Hash::digest(last_rich_block.block.header.encode_fixed().unwrap());
         let last_header = &last_rich_block.block.header;
 
         let txs = mock_tx_list(3, current_height);
@@ -699,7 +699,7 @@ fn mock_chained_rich_block(len: u64, gap: u64, key_tool: &KeyTool) -> (Vec<RichB
         temp_rich_block.push(rich_block.clone());
         last_rich_block = rich_block.clone();
 
-        let current_block_hash = Hash::digest(rich_block.block.encode_fixed().unwrap());
+        let current_block_hash = Hash::digest(rich_block.block.header.encode_fixed().unwrap());
 
         // generate proof for current height and for next block use
         last_proof = mock_proof(current_block_hash.clone(), current_height, 0, &key_tool);
