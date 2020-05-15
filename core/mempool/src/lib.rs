@@ -255,23 +255,27 @@ where
         tx_hashes: Vec<Hash>,
     ) -> ProtocolResult<Vec<SignedTransaction>> {
         let len = tx_hashes.len();
+        let mut missing_hashes = vec![];
         let mut full_txs = Vec::with_capacity(len);
 
-        for tx_hash in &tx_hashes {
+        for tx_hash in tx_hashes.iter() {
             if let Some(tx) = self.tx_cache.get(tx_hash).await {
                 full_txs.push(tx);
             } else if let Some(tx) = self.callback_cache.get(tx_hash).await {
                 full_txs.push(tx);
+            } else {
+                missing_hashes.push(tx_hash.clone());
             }
         }
 
         // for push txs when local mempool is flushed, but the remote node still fetch
         // full block
-        if len != 0 && full_txs.is_empty() {
-            full_txs = self
+        if !missing_hashes.is_empty() {
+            let txs = self
                 .adapter
-                .get_transactions_from_storage(ctx, tx_hashes)
+                .get_transactions_from_storage(ctx, missing_hashes)
                 .await?;
+            full_txs.extend(txs);
         }
 
         if full_txs.len() != len {
@@ -326,7 +330,17 @@ where
         ctx: Context,
         order_txs: Vec<SignedTransaction>,
     ) -> ProtocolResult<()> {
-        self.verify_tx_in_parallel(ctx, order_txs).await
+        let mut unknown_txs = vec![];
+
+        for signed_tx in order_txs.into_iter() {
+            if !self.tx_cache.contain(&signed_tx.tx_hash).await
+                && !self.callback_cache.contains_key(&signed_tx.tx_hash).await
+            {
+                unknown_txs.push(signed_tx);
+            }
+        }
+
+        self.verify_tx_in_parallel(ctx, unknown_txs).await
     }
 
     #[muta_apm::derive::tracing_span(
