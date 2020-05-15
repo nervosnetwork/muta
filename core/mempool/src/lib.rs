@@ -90,7 +90,6 @@ where
         unknown_hashes
     }
 
-    #[muta_apm::derive::tracing_span(kind = "mempool")]
     async fn insert_tx(
         &self,
         ctx: Context,
@@ -177,7 +176,6 @@ impl<Adapter: 'static> MemPool for HashMemPool<Adapter>
 where
     Adapter: MemPoolAdapter,
 {
-    #[muta_apm::derive::tracing_span(kind = "mempool")]
     async fn insert(&self, ctx: Context, tx: SignedTransaction) -> ProtocolResult<()> {
         self.insert_tx(ctx, tx, TxType::NewTx).await
     }

@@ -49,13 +49,6 @@ impl Query {
     #[graphql(name = "getBlock", description = "Get the block")]
     async fn get_block(state_ctx: &State, height: Option<Uint64>) -> FieldResult<Block> {
         let ctx = Context::new();
-        let ctx = match muta_apm::MUTA_TRACER.span("API.getBlock", vec![
-            muta_apm::rustracing::tag::Tag::new("kind", "API"),
-        ]) {
-            Some(span) => ctx.with_value("parent_span_ctx", span.context().cloned()),
-            None => ctx,
-        };
-
         let inst = Instant::now();
         common_apm::metrics::api::API_REQUEST_COUNTER_VEC_STATIC
             .get_block
@@ -106,12 +99,6 @@ impl Query {
     #[graphql(name = "getTransaction", description = "Get the transaction by hash")]
     async fn get_transaction(state_ctx: &State, tx_hash: Hash) -> FieldResult<SignedTransaction> {
         let ctx = Context::new();
-        let ctx = match muta_apm::MUTA_TRACER.span("API.get_transaction", vec![
-            muta_apm::rustracing::tag::Tag::new("kind", "API"),
-        ]) {
-            Some(span) => ctx.with_value("parent_span_ctx", span.context().cloned()),
-            None => ctx,
-        };
 
         let hash = protocol::types::Hash::from_hex(&tx_hash.as_hex())?;
 
@@ -129,12 +116,6 @@ impl Query {
     )]
     async fn get_receipt(state_ctx: &State, tx_hash: Hash) -> FieldResult<Receipt> {
         let ctx = Context::new();
-        let ctx = match muta_apm::MUTA_TRACER.span("API.get_receipt", vec![
-            muta_apm::rustracing::tag::Tag::new("kind", "API"),
-        ]) {
-            Some(span) => ctx.with_value("parent_span_ctx", span.context().cloned()),
-            None => ctx,
-        };
 
         let hash = protocol::types::Hash::from_hex(&tx_hash.as_hex())?;
 
@@ -158,12 +139,6 @@ impl Query {
         payload: String,
     ) -> FieldResult<ServiceResponse> {
         let ctx = Context::new();
-        let ctx = match muta_apm::MUTA_TRACER.span("API.query_service", vec![
-            muta_apm::rustracing::tag::Tag::new("kind", "API"),
-        ]) {
-            Some(span) => ctx.with_value("parent_span_ctx", span.context().cloned()),
-            None => ctx,
-        };
 
         let height = match height {
             Some(id) => id.try_into_u64()?,
@@ -213,12 +188,6 @@ impl Mutation {
         input_encryption: InputTransactionEncryption,
     ) -> FieldResult<Hash> {
         let ctx = Context::new();
-        let ctx = match muta_apm::MUTA_TRACER.span("API.send_transaction", vec![
-            muta_apm::rustracing::tag::Tag::new("kind", "API"),
-        ]) {
-            Some(span) => ctx.with_value("parent_span_ctx", span.context().cloned()),
-            None => ctx,
-        };
 
         let inst = Instant::now();
         common_apm::metrics::api::API_REQUEST_COUNTER_VEC_STATIC
@@ -257,12 +226,6 @@ impl Mutation {
         input_privkey: Bytes,
     ) -> FieldResult<Hash> {
         let ctx = Context::new();
-        let ctx = match muta_apm::MUTA_TRACER.span("API.unsafe_send_transaction", vec![
-            muta_apm::rustracing::tag::Tag::new("kind", "API"),
-        ]) {
-            Some(span) => ctx.with_value("parent_span_ctx", span.context().cloned()),
-            None => ctx,
-        };
 
         let raw_tx = to_transaction(input_raw)?;
         let tx_hash = protocol::types::Hash::digest(raw_tx.encode_fixed()?);
