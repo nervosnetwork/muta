@@ -75,7 +75,6 @@ impl<
         Mapping: ServiceMapping,
     > APIAdapter for DefaultAPIAdapter<EF, M, S, DB, Mapping>
 {
-    #[muta_apm::derive::tracing_span(kind = "API.adapter")]
     async fn insert_signed_txs(
         &self,
         ctx: Context,
@@ -84,7 +83,6 @@ impl<
         self.mempool.insert(ctx, signed_tx).await
     }
 
-    #[muta_apm::derive::tracing_span(kind = "API.adapter")]
     async fn get_block_by_height(
         &self,
         ctx: Context,
@@ -102,7 +100,6 @@ impl<
         Ok(block)
     }
 
-    #[muta_apm::derive::tracing_span(kind = "API.adapter")]
     async fn get_receipt_by_tx_hash(&self, ctx: Context, tx_hash: Hash) -> ProtocolResult<Receipt> {
         let receipt = self
             .storage
@@ -121,7 +118,6 @@ impl<
         .into())
     }
 
-    #[muta_apm::derive::tracing_span(kind = "API.adapter")]
     async fn get_transaction_by_hash(
         &self,
         ctx: Context,
@@ -133,7 +129,6 @@ impl<
             .ok_or_else(|| APIError::NotFound.into())
     }
 
-    #[muta_apm::derive::tracing_span(kind = "API.adapter")]
     async fn query_service(
         &self,
         ctx: Context,
