@@ -13,7 +13,6 @@ use juniper::http::GraphQLRequest;
 use juniper::FieldResult;
 use lazy_static::lazy_static;
 
-use common_apm::muta_apm;
 use common_crypto::{
     HashValue, PrivateKey, PublicKey, Secp256k1PrivateKey, Signature, ToPublicKey,
 };
