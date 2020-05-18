@@ -37,7 +37,7 @@ use crate::wal::SignedTxsWAL;
 use crate::ConsensusError;
 
 const RETRY_COMMIT_INTERVAL: u64 = 1000; // 1s
-const RETRY_CHECK_ROOT_LIMIT:u8 = 15;
+const RETRY_CHECK_ROOT_LIMIT: u8 = 15;
 const RETRY_CHECK_ROOT_INTERVAL: u64 = 100; // 100ms
 
 /// validator is for create new block, and authority is for build overlord
@@ -220,15 +220,16 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
                     log::error!("[consensus] check_block, verify_txs error",);
                     e
                 })?;
-            
-            // If it is inconsistent with the state of the proposal, we will wait for a period of time.
+
+            // If it is inconsistent with the state of the proposal, we will wait for a
+            // period of time.
             let mut check_retry = 0;
             loop {
                 match self.check_block_roots(ctx.clone(), &block.inner.block.header) {
                     Ok(()) => break,
                     Err(e) => {
                         if check_retry >= RETRY_CHECK_ROOT_LIMIT {
-                            return Err(e.into())
+                            return Err(e.into());
                         }
 
                         check_retry += 1;
