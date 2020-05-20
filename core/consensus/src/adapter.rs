@@ -282,7 +282,7 @@ where
             Arc::clone(&self.service_mapping),
         )?;
         let inst = Instant::now();
-        let resp = executor.exec(ctx.clone(), params, txs)?;
+        let resp = executor.exec(ctx, params, txs)?;
         common_apm::metrics::consensus::CONSENSUS_TIME_HISTOGRAM_VEC_STATIC
             .exec
             .observe(common_apm::metrics::duration_to_sec(inst.elapsed()));
