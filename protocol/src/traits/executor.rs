@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use creep::Context;
+
 use crate::traits::{ServiceMapping, Storage};
 use crate::types::{
     Address, Bloom, MerkleRoot, Receipt, ServiceContext, SignedTransaction, TransactionRequest,
@@ -75,6 +77,7 @@ pub trait ExecutorFactory<DB: cita_trie::DB, S: Storage, Mapping: ServiceMapping
 pub trait Executor {
     fn exec(
         &mut self,
+        ctx: Context,
         params: &ExecutorParams,
         txs: &[SignedTransaction],
     ) -> ProtocolResult<ExecutorResp>;

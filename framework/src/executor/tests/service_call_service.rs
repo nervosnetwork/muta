@@ -9,7 +9,7 @@ use binding_macro::{cycles, service};
 use metadata::MetadataService;
 
 use protocol::traits::{
-    Executor, ExecutorParams, Service, ServiceMapping, ServiceResponse, ServiceSDK,
+    Context, Executor, ExecutorParams, Service, ServiceMapping, ServiceResponse, ServiceSDK,
 };
 use protocol::types::{
     Genesis, Hash, RawTransaction, ServiceContext, SignedTransaction, TransactionRequest,
@@ -74,7 +74,7 @@ fn test_service_call_service() {
     };
 
     let txs = vec![stx];
-    let executor_resp = executor.exec(&params, &txs).unwrap();
+    let executor_resp = executor.exec(Context::new(), &params, &txs).unwrap();
     let receipt = &executor_resp.receipts[0];
     let event = &receipt.events[1];
 
