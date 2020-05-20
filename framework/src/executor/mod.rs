@@ -10,12 +10,13 @@ use std::panic::{self, AssertUnwindSafe};
 use std::rc::Rc;
 use std::sync::Arc;
 
+use bytes::BytesMut;
 use cita_trie::DB as TrieDB;
 use derive_more::{Display, From};
 
-use bytes::BytesMut;
+use common_apm::muta_apm;
 use protocol::traits::{
-    Dispatcher, Executor, ExecutorParams, ExecutorResp, NoopDispatcher, ServiceMapping,
+    Context, Dispatcher, Executor, ExecutorParams, ExecutorResp, NoopDispatcher, ServiceMapping,
     ServiceResponse, ServiceState, Storage,
 };
 use protocol::types::{
@@ -130,7 +131,8 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
         })
     }
 
-    fn commit(&mut self) -> ProtocolResult<MerkleRoot> {
+    #[muta_apm::derive::tracing_span(kind = "executor.commit")]
+    fn commit(&mut self, ctx: Context) -> ProtocolResult<MerkleRoot> {
         for (name, state) in self.states.iter() {
             let root = state.borrow_mut().commit()?;
             self.root_state.borrow_mut().insert(name.to_owned(), root)?;
@@ -155,12 +157,13 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
         Ok(())
     }
 
-    fn hook(&mut self, hook: HookType, exec_params: &ExecutorParams) -> ProtocolResult<()> {
+    #[muta_apm::derive::tracing_span(kind = "executor.before_hook", tags = "{'hook_type': 'hook_type'}")]
+    fn hook(&mut self, ctx: Context, hook_type: HookType, exec_params: &ExecutorParams) -> ProtocolResult<()> {
         for name in self.service_mapping.list_service_name().into_iter() {
             let sdk = self.get_sdk(&name)?;
             let mut service = self.service_mapping.get_service(name.as_str(), sdk)?;
 
-            let hook_ret = match hook {
+            let hook_ret = match hook_type {
                 HookType::Before => {
                     panic::catch_unwind(AssertUnwindSafe(|| service.hook_before_(exec_params)))
                 }
@@ -299,7 +302,8 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
         }
     }
 
-    fn logs_bloom(&self, receipts: &[Receipt]) -> Bloom {
+    #[muta_apm::derive::tracing_span(kind = "executor.logs_bloom")]
+    fn logs_bloom(&self,ctx: Context, receipts: &[Receipt]) -> Bloom {
         let mut bloom = Bloom::default();
         for receipt in receipts {
             for event in receipt.events.iter() {
@@ -319,12 +323,14 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
 impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMapping> Executor
     for ServiceExecutor<S, DB, Mapping>
 {
+    #[muta_apm::derive::tracing_span(kind = "executor.exec", logs = "{'tx_len': 'txs.len()'}")]
     fn exec(
         &mut self,
+        ctx: Context,
         params: &ExecutorParams,
         txs: &[SignedTransaction],
     ) -> ProtocolResult<ExecutorResp> {
-        self.hook(HookType::Before, params)?;
+        self.hook(ctx.clone(), HookType::Before, params)?;
 
         let mut receipts = txs
             .iter()
@@ -357,16 +363,16 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
             })
             .collect::<Result<Vec<Receipt>, ProtocolError>>()?;
 
-        self.hook(HookType::After, params)?;
+        self.hook(ctx.clone(), HookType::After, params)?;
 
-        let state_root = self.commit()?;
+        let state_root = self.commit(ctx.clone())?;
         let mut all_cycles_used = 0;
 
         for receipt in receipts.iter_mut() {
             receipt.state_root = state_root.clone();
             all_cycles_used += receipt.cycles_used;
         }
-        let logs_bloom = self.logs_bloom(&receipts);
+        let logs_bloom = self.logs_bloom(ctx, &receipts);
 
         Ok(ExecutorResp {
             receipts,
