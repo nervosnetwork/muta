@@ -99,7 +99,7 @@ fn test_exec() {
 
     let stx = mock_signed_tx();
     let txs = vec![stx];
-    let executor_resp = executor.exec(&params, &txs).unwrap();
+    let executor_resp = executor.exec(Context::new(), &params, &txs).unwrap();
     let receipt = &executor_resp.receipts[0];
 
     assert_eq!(receipt.response.response.code, 0);
@@ -150,7 +150,7 @@ fn test_tx_hook() {
     }"#
     .to_owned();
     let txs = vec![stx.clone()];
-    let executor_resp = executor.exec(&params, &txs).unwrap();
+    let executor_resp = executor.exec(Context::new(), &params, &txs).unwrap();
     let receipt = &executor_resp.receipts[0];
     assert_eq!(receipt.response.response.code, 0);
     assert_eq!(receipt.events.len(), 0);
@@ -163,7 +163,7 @@ fn test_tx_hook() {
     }"#
     .to_owned();
     let txs = vec![stx.clone()];
-    let executor_resp = executor.exec(&params, &txs).unwrap();
+    let executor_resp = executor.exec(Context::new(), &params, &txs).unwrap();
     let receipt = &executor_resp.receipts[0];
     assert_eq!(receipt.response.response.code, 0);
     assert_eq!(receipt.events.len(), 2);
@@ -179,7 +179,7 @@ fn test_tx_hook() {
     }"#
     .to_owned();
     let txs = vec![stx];
-    let executor_resp = executor.exec(&params, &txs).unwrap();
+    let executor_resp = executor.exec(Context::new(), &params, &txs).unwrap();
     let receipt = &executor_resp.receipts[0];
     assert_eq!(receipt.response.response.code, 0);
     assert_eq!(receipt.events.len(), 2);
@@ -220,7 +220,7 @@ fn bench_execute(b: &mut Bencher) {
             cycles_limit: std::u64::MAX,
         };
         let txs = txs.clone();
-        executor.exec(&params, &txs).unwrap();
+        executor.exec(Context::new(), &params, &txs).unwrap();
     });
 }
 
