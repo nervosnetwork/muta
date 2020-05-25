@@ -94,6 +94,7 @@ pub trait CommonConsensusAdapter: Send + Sync {
     async fn save_signed_txs(
         &self,
         ctx: Context,
+        block_height: u64,
         signed_txs: Vec<SignedTransaction>,
     ) -> ProtocolResult<()>;
 

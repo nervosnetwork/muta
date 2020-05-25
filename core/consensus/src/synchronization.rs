@@ -397,7 +397,9 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
         receipts: Vec<Receipt>,
         block: Block,
     ) -> ProtocolResult<()> {
-        self.adapter.save_signed_txs(ctx.clone(), txs).await?;
+        self.adapter
+            .save_signed_txs(ctx.clone(), block.header.height, txs)
+            .await?;
         self.adapter.save_receipts(ctx.clone(), receipts).await?;
         self.adapter
             .save_proof(ctx.clone(), block.header.proof.clone())

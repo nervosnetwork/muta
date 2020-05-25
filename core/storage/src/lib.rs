@@ -16,6 +16,7 @@ use tokio::sync::RwLock;
 
 use common_apm::muta_apm;
 
+use protocol::codec::ProtocolCodecSync;
 use protocol::fixed_codec::FixedCodec;
 use protocol::traits::{
     Context, Storage, StorageAdapter, StorageBatchModify, StorageCategory, StorageSchema,
@@ -61,9 +62,85 @@ macro_rules! impl_storage_schema_for {
     };
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct CommonKeyPrefix {
+    block_height: u64,
+    idx_in_block: u64,
+}
+
+impl CommonKeyPrefix {
+    pub fn new(block_height: u64, idx_in_block: u64) -> Self {
+        CommonKeyPrefix {
+            block_height,
+            idx_in_block,
+        }
+    }
+
+    pub fn make_key(&self, hash: &Hash) -> [u8; 48] {
+        debug_assert!(hash.as_bytes().len() == 32);
+
+        let h_be = self.block_height.to_be_bytes();
+        let i_be = self.idx_in_block.to_be_bytes();
+
+        let mut key = [0u8; 48];
+        key[0..8].copy_from_slice(&h_be);
+        key[8..16].copy_from_slice(&i_be);
+        key[16..48].copy_from_slice(&hash.as_bytes()[..32]);
+
+        key
+    }
+}
+
+impl From<&[u8]> for CommonKeyPrefix {
+    fn from(bytes: &[u8]) -> CommonKeyPrefix {
+        debug_assert!(bytes.len() >= 16);
+
+        let mut h_buf = [0u8; 8];
+        let mut i_buf = [0u8; 8];
+
+        h_buf.copy_from_slice(&bytes[0..8]);
+        i_buf.copy_from_slice(&bytes[8..16]);
+
+        CommonKeyPrefix {
+            block_height: u64::from_be_bytes(h_buf),
+            idx_in_block: u64::from_be_bytes(i_buf),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct BlockTransactionIndex {
+    prefix:  CommonKeyPrefix,
+    tx_hash: Hash,
+}
+
+impl BlockTransactionIndex {
+    pub fn new(block_height: u64, idx_in_block: u64, tx_hash: Hash) -> Self {
+        BlockTransactionIndex {
+            prefix: CommonKeyPrefix::new(block_height, idx_in_block),
+            tx_hash,
+        }
+    }
+}
+
+impl ProtocolCodecSync for BlockTransactionIndex {
+    fn encode_sync(&self) -> ProtocolResult<Bytes> {
+        Ok(Bytes::copy_from_slice(&self.prefix.make_key(&self.tx_hash)))
+    }
+
+    fn decode_sync(mut bytes: Bytes) -> ProtocolResult<Self> {
+        debug_assert!(bytes.len() == 48);
+
+        let prefix = CommonKeyPrefix::from(&bytes[0..16]);
+        let tx_hash = Hash::from_bytes(bytes.split_off(16))?;
+
+        Ok(BlockTransactionIndex { prefix, tx_hash })
+    }
+}
+
 impl_storage_schema_for!(
     TransactionSchema,
-    Hash,
+    BlockTransactionIndex,
     SignedTransaction,
     SignedTransaction
 );
@@ -114,9 +191,26 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
     async fn insert_transactions(
         &self,
         ctx: Context,
+        block_height: u64,
         signed_txs: Vec<SignedTransaction>,
     ) -> ProtocolResult<()> {
-        batch_insert!(self, signed_txs, TransactionSchema);
+        let idxs = signed_txs
+            .iter()
+            .enumerate()
+            .map(|(idx, stx_ref)| {
+                BlockTransactionIndex::new(block_height, idx as u64, stx_ref.tx_hash.clone())
+            })
+            .collect::<Vec<_>>();
+
+        let batch_stxs = signed_txs
+            .into_iter()
+            .map(StorageBatchModify::Insert)
+            .collect::<Vec<_>>();
+
+        self.adapter
+            .batch_modify::<TransactionSchema>(idxs, batch_stxs)
+            .await?;
+
         Ok(())
     }
 
@@ -160,8 +254,9 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
         ctx: Context,
         tx_hash: Hash,
     ) -> ProtocolResult<SignedTransaction> {
-        let stx = get!(self, tx_hash, TransactionSchema);
-        Ok(stx)
+        todo!()
+        // let stx = get!(self, tx_hash, TransactionSchema);
+        // Ok(stx)
     }
 
     #[muta_apm::derive::tracing_span(kind = "storage", logs = "{'txs_len': 'hashes.len()'}")]
@@ -170,8 +265,9 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
         ctx: Context,
         hashes: Vec<Hash>,
     ) -> ProtocolResult<Vec<SignedTransaction>> {
-        let stxs = get_batch!(self, hashes, TransactionSchema);
-        Ok(stxs)
+        todo!();
+        // let stxs = get_batch!(self, hashes, TransactionSchema);
+        // Ok(stxs)
     }
 
     #[muta_apm::derive::tracing_span(kind = "storage")]

@@ -410,9 +410,12 @@ where
     async fn save_signed_txs(
         &self,
         ctx: Context,
+        block_height: u64,
         signed_txs: Vec<SignedTransaction>,
     ) -> ProtocolResult<()> {
-        self.storage.insert_transactions(ctx, signed_txs).await
+        self.storage
+            .insert_transactions(ctx, block_height, signed_txs)
+            .await
     }
 
     #[muta_apm::derive::tracing_span(

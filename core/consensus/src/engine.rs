@@ -690,7 +690,9 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
         txs: Vec<SignedTransaction>,
     ) -> ProtocolResult<()> {
         // Save signed transactions
-        self.adapter.save_signed_txs(Context::new(), txs).await?;
+        self.adapter
+            .save_signed_txs(Context::new(), block.header.height, txs)
+            .await?;
 
         // Save the block.
         self.adapter

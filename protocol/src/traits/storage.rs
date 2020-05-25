@@ -28,6 +28,7 @@ pub trait Storage: Send + Sync {
     async fn insert_transactions(
         &self,
         ctx: Context,
+        block_height: u64,
         signed_txs: Vec<SignedTransaction>,
     ) -> ProtocolResult<()>;
 

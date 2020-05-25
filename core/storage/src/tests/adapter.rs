@@ -4,7 +4,7 @@ use protocol::types::Hash;
 use crate::adapter::memory::MemoryAdapter;
 use crate::adapter::rocks::RocksAdapter;
 use crate::tests::{get_random_bytes, mock_signed_tx};
-use crate::TransactionSchema;
+use crate::{BlockTransactionIndex, TransactionSchema};
 
 #[test]
 fn test_adapter_insert() {
@@ -28,29 +28,30 @@ fn test_adapter_remove() {
 
 fn adapter_insert_test(db: impl StorageAdapter) {
     let tx_hash = Hash::digest(get_random_bytes(10));
+    let tx_index = BlockTransactionIndex::new(1, 0, tx_hash.clone());
     let stx = mock_signed_tx(tx_hash.clone());
 
-    exec!(db.insert::<TransactionSchema>(tx_hash.clone(), stx.clone()));
-    let stx = exec!(db.get::<TransactionSchema>(tx_hash.clone())).unwrap();
+    exec!(db.insert::<TransactionSchema>(tx_index.clone(), stx.clone()));
+    let stx = exec!(db.get::<TransactionSchema>(tx_index)).unwrap();
 
     assert_eq!(tx_hash, stx.tx_hash);
 }
 
 fn adapter_batch_modify_test(db: impl StorageAdapter) {
     let mut stxs = Vec::new();
-    let mut hashes = Vec::new();
+    let mut idxs = Vec::new();
     let mut inserts = Vec::new();
 
-    for _ in 0..10 {
+    for i in 0..10 {
         let tx_hash = Hash::digest(get_random_bytes(10));
-        hashes.push(tx_hash.clone());
+        idxs.push(BlockTransactionIndex::new(1, i, tx_hash.clone()));
         let stx = mock_signed_tx(tx_hash.clone());
         stxs.push(stx.clone());
         inserts.push(StorageBatchModify::Insert::<TransactionSchema>(stx));
     }
 
-    exec!(db.batch_modify::<TransactionSchema>(hashes.clone(), inserts));
-    let opt_stxs = exec!(db.get_batch::<TransactionSchema>(hashes));
+    exec!(db.batch_modify::<TransactionSchema>(idxs.clone(), inserts));
+    let opt_stxs = exec!(db.get_batch::<TransactionSchema>(idxs));
 
     for i in 0..10 {
         assert_eq!(
@@ -62,15 +63,16 @@ fn adapter_batch_modify_test(db: impl StorageAdapter) {
 
 fn adapter_remove_test(db: impl StorageAdapter) {
     let tx_hash = Hash::digest(get_random_bytes(10));
-    let is_exist = exec!(db.contains::<TransactionSchema>(tx_hash.clone()));
+    let tx_idx = BlockTransactionIndex::new(1, 0, tx_hash.clone());
+    let is_exist = exec!(db.contains::<TransactionSchema>(tx_idx.clone()));
     assert!(!is_exist);
 
     let stx = &mock_signed_tx(tx_hash.clone());
-    exec!(db.insert::<TransactionSchema>(tx_hash.clone(), stx.clone()));
-    let is_exist = exec!(db.contains::<TransactionSchema>(tx_hash.clone()));
+    exec!(db.insert::<TransactionSchema>(tx_idx.clone(), stx.clone()));
+    let is_exist = exec!(db.contains::<TransactionSchema>(tx_idx.clone()));
     assert!(is_exist);
 
-    exec!(db.remove::<TransactionSchema>(tx_hash.clone()));
-    let is_exist = exec!(db.contains::<TransactionSchema>(tx_hash.clone()));
+    exec!(db.remove::<TransactionSchema>(tx_idx.clone()));
+    let is_exist = exec!(db.contains::<TransactionSchema>(tx_idx));
     assert!(!is_exist);
 }

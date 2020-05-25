@@ -71,7 +71,7 @@ fn test_storage_transactions_insert() {
         transactions.push(transaction);
     }
 
-    exec!(storage.insert_transactions(Context::new(), transactions.clone()));
+    exec!(storage.insert_transactions(Context::new(), 1, transactions.clone()));
     let transactions_2 = exec!(storage.get_transactions(Context::new(), hashes));
 
     for i in 0..10 {
@@ -176,7 +176,7 @@ fn bench_insert_10000_txs(b: &mut Bencher) {
         .collect::<Vec<_>>();
 
     b.iter(move || {
-        exec!(storage.insert_transactions(Context::new(), txs.clone()));
+        exec!(storage.insert_transactions(Context::new(), 1, txs.clone()));
     })
 }
 
@@ -189,7 +189,7 @@ fn bench_insert_20000_txs(b: &mut Bencher) {
         .collect::<Vec<_>>();
 
     b.iter(move || {
-        exec!(storage.insert_transactions(Context::new(), txs.clone()));
+        exec!(storage.insert_transactions(Context::new(), 1, txs.clone()));
     })
 }
 
@@ -202,7 +202,7 @@ fn bench_insert_40000_txs(b: &mut Bencher) {
         .collect::<Vec<_>>();
 
     b.iter(move || {
-        exec!(storage.insert_transactions(Context::new(), txs.clone()));
+        exec!(storage.insert_transactions(Context::new(), 1, txs.clone()));
     })
 }
 
@@ -215,6 +215,6 @@ fn bench_insert_80000_txs(b: &mut Bencher) {
         .collect::<Vec<_>>();
 
     b.iter(move || {
-        exec!(storage.insert_transactions(Context::new(), txs.clone()));
+        exec!(storage.insert_transactions(Context::new(), 1, txs.clone()));
     })
 }

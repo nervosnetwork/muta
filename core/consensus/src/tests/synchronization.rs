@@ -234,6 +234,7 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
     async fn save_signed_txs(
         &self,
         _: Context,
+        _block_height: u64,
         signed_txs: Vec<SignedTransaction>,
     ) -> ProtocolResult<()> {
         let mut map = self.local_transactions.write();

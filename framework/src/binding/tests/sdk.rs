@@ -110,6 +110,7 @@ impl Storage for MockStorage {
     async fn insert_transactions(
         &self,
         _ctx: Context,
+        _: u64,
         _signed_txs: Vec<SignedTransaction>,
     ) -> ProtocolResult<()> {
         Ok(())
