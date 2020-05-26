@@ -23,46 +23,40 @@ pub trait StorageSchema {
     fn category() -> StorageCategory;
 }
 
-pub type Index = u64;
-
 #[async_trait]
 pub trait Storage: Send + Sync {
     async fn insert_transactions(
         &self,
         ctx: Context,
         block_height: u64,
-        indexed_signed_txs: Vec<(Index, SignedTransaction)>,
+        signed_txs: Vec<SignedTransaction>,
     ) -> ProtocolResult<()>;
-
-    async fn insert_block(&self, ctx: Context, block: Block) -> ProtocolResult<()>;
-
-    async fn insert_receipts(&self, ctx: Context, receipts: Vec<Receipt>) -> ProtocolResult<()>;
-
-    async fn update_latest_proof(&self, ctx: Context, proof: Proof) -> ProtocolResult<()>;
-
-    async fn get_transaction_by_hash(
-        &self,
-        ctx: Context,
-        tx_hash: Hash,
-    ) -> ProtocolResult<SignedTransaction>;
 
     async fn get_transactions(
         &self,
         ctx: Context,
+        block_height: u64,
         hashes: Vec<Hash>,
-    ) -> ProtocolResult<Vec<SignedTransaction>>;
+    ) -> ProtocolResult<Vec<Option<SignedTransaction>>>;
 
-    async fn get_latest_block(&self, ctx: Context) -> ProtocolResult<Block>;
+    async fn insert_block(&self, ctx: Context, block: Block) -> ProtocolResult<()>;
 
-    async fn get_block_by_height(&self, ctx: Context, height: u64) -> ProtocolResult<Block>;
+    async fn get_block(&self, ctx: Context, height: u64) -> ProtocolResult<Option<Block>>;
 
-    async fn get_block_by_hash(&self, ctx: Context, block_hash: Hash) -> ProtocolResult<Block>;
+    async fn insert_receipts(&self, ctx: Context, receipts: Vec<Receipt>) -> ProtocolResult<()>;
 
-    async fn get_receipt(&self, ctx: Context, hash: Hash) -> ProtocolResult<Receipt>;
+    async fn get_receipt(
+        &self,
+        ctx: Context,
+        block_height: u64,
+        hash: Hash,
+    ) -> ProtocolResult<Option<Receipt>>;
 
-    async fn get_receipts(&self, ctx: Context, hash: Vec<Hash>) -> ProtocolResult<Vec<Receipt>>;
+    async fn update_latest_proof(&self, ctx: Context, proof: Proof) -> ProtocolResult<()>;
 
     async fn get_latest_proof(&self, ctx: Context) -> ProtocolResult<Proof>;
+
+    async fn get_latest_block(&self, ctx: Context) -> ProtocolResult<Block>;
 
     async fn update_overlord_wal(&self, ctx: Context, info: Bytes) -> ProtocolResult<()>;
 
@@ -112,4 +106,8 @@ pub trait StorageAdapter: Send + Sync {
         keys: Vec<<S as StorageSchema>::Key>,
         vals: Vec<StorageBatchModify<S>>,
     ) -> ProtocolResult<()>;
+
+    async fn iter<I, S: StorageSchema, P: AsRef<[u8]>>(&self, prefix: P) -> I
+    where
+        I: Iterator<Item = (<S as StorageSchema>::Key, <S as StorageSchema>::Value)>;
 }

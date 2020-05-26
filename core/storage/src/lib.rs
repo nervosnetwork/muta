@@ -19,7 +19,7 @@ use tokio::sync::RwLock;
 use protocol::codec::ProtocolCodecSync;
 use protocol::fixed_codec::FixedCodec;
 use protocol::traits::{
-    Context, Index, Storage, StorageAdapter, StorageBatchModify, StorageCategory, StorageSchema,
+    Context, Storage, StorageAdapter, StorageBatchModify, StorageCategory, StorageSchema,
 };
 use protocol::types::{Block, Hash, Proof, Receipt, SignedTransaction};
 use protocol::Bytes;
@@ -76,15 +76,11 @@ macro_rules! impl_storage_schema_for {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct CommonKeyPrefix {
     block_height: u64,
-    idx_in_block: u64,
 }
 
 impl CommonKeyPrefix {
-    pub fn new(block_height: u64, idx_in_block: u64) -> Self {
-        CommonKeyPrefix {
-            block_height,
-            idx_in_block,
-        }
+    pub fn new(block_height: u64) -> Self {
+        CommonKeyPrefix { block_height }
     }
 
     pub fn make_key(&self, hash: &Hash) -> [u8; 48] {
@@ -203,7 +199,7 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
         &self,
         ctx: Context,
         block_height: u64,
-        indexed_signed_txs: Vec<(Index, SignedTransaction)>,
+        signed_txs: Vec<SignedTransaction>,
     ) -> ProtocolResult<()> {
         let (idx_keys, batch_stxs): (Vec<_>, Vec<_>) = indexed_signed_txs
             .into_iter()
@@ -267,7 +263,8 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
         // Ok(stx)
     }
 
-    // #[muta_apm::derive::tracing_span(kind = "storage", logs = "{'txs_len': 'hashes.len()'}")]
+    // #[muta_apm::derive::tracing_span(kind = "storage", logs = "{'txs_len':
+    // 'hashes.len()'}")]
     async fn get_transactions(
         &self,
         ctx: Context,
@@ -308,7 +305,8 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
         Ok(receipt)
     }
 
-    // #[muta_apm::derive::tracing_span(kind = "storage", logs = "{'receipts_len': 'hashes.len()'}")]
+    // #[muta_apm::derive::tracing_span(kind = "storage", logs = "{'receipts_len':
+    // 'hashes.len()'}")]
     async fn get_receipts(&self, ctx: Context, hashes: Vec<Hash>) -> ProtocolResult<Vec<Receipt>> {
         let receipts = get_batch!(self, hashes, ReceiptSchema);
         Ok(receipts)

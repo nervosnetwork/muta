@@ -21,8 +21,6 @@ pub use executor::{
 };
 pub use mempool::{MemPool, MemPoolAdapter, MixedTxHashes};
 pub use network::{Gossip, MessageCodec, MessageHandler, PeerTrust, Priority, Rpc, TrustFeedback};
-pub use storage::{
-    Index, Storage, StorageAdapter, StorageBatchModify, StorageCategory, StorageSchema,
-};
+pub use storage::{Storage, StorageAdapter, StorageBatchModify, StorageCategory, StorageSchema};
 
 pub use creep::{Cloneable, Context};
