@@ -14,7 +14,7 @@ use derive_more::{Display, From};
 use lazy_static::lazy_static;
 use tokio::sync::RwLock;
 
-use common_apm::muta_apm;
+// use common_apm::muta_apm;
 
 use protocol::codec::ProtocolCodecSync;
 use protocol::fixed_codec::FixedCodec;
@@ -187,7 +187,7 @@ macro_rules! get {
 
 #[async_trait]
 impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
-    #[muta_apm::derive::tracing_span(kind = "storage")]
+    // #[muta_apm::derive::tracing_span(kind = "storage")]
     async fn insert_transactions(
         &self,
         ctx: Context,
@@ -214,7 +214,7 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
         Ok(())
     }
 
-    #[muta_apm::derive::tracing_span(kind = "storage")]
+    // #[muta_apm::derive::tracing_span(kind = "storage")]
     async fn insert_block(&self, ctx: Context, block: Block) -> ProtocolResult<()> {
         let height = block.header.height;
         let block_hash = Hash::digest(block.header.encode_fixed()?);
@@ -234,13 +234,13 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
         Ok(())
     }
 
-    #[muta_apm::derive::tracing_span(kind = "storage")]
+    // #[muta_apm::derive::tracing_span(kind = "storage")]
     async fn insert_receipts(&self, ctx: Context, receipts: Vec<Receipt>) -> ProtocolResult<()> {
         batch_insert!(self, receipts, ReceiptSchema);
         Ok(())
     }
 
-    #[muta_apm::derive::tracing_span(kind = "storage")]
+    // #[muta_apm::derive::tracing_span(kind = "storage")]
     async fn update_latest_proof(&self, ctx: Context, proof: Proof) -> ProtocolResult<()> {
         self.adapter
             .insert::<LatestProofSchema>(LATEST_PROOF_KEY.clone(), proof)
@@ -248,7 +248,7 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
         Ok(())
     }
 
-    #[muta_apm::derive::tracing_span(kind = "storage")]
+    // #[muta_apm::derive::tracing_span(kind = "storage")]
     async fn get_transaction_by_hash(
         &self,
         ctx: Context,
@@ -259,7 +259,7 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
         // Ok(stx)
     }
 
-    #[muta_apm::derive::tracing_span(kind = "storage", logs = "{'txs_len': 'hashes.len()'}")]
+    // #[muta_apm::derive::tracing_span(kind = "storage", logs = "{'txs_len': 'hashes.len()'}")]
     async fn get_transactions(
         &self,
         ctx: Context,
@@ -270,7 +270,7 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
         // Ok(stxs)
     }
 
-    #[muta_apm::derive::tracing_span(kind = "storage")]
+    // #[muta_apm::derive::tracing_span(kind = "storage")]
     async fn get_latest_block(&self, ctx: Context) -> ProtocolResult<Block> {
         let opt_block = { self.latest_block.read().await.clone() };
 
@@ -281,38 +281,38 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
         }
     }
 
-    #[muta_apm::derive::tracing_span(kind = "storage")]
+    // #[muta_apm::derive::tracing_span(kind = "storage")]
     async fn get_block_by_height(&self, ctx: Context, height: u64) -> ProtocolResult<Block> {
         let block = get!(self, height, BlockSchema);
         Ok(block)
     }
 
-    #[muta_apm::derive::tracing_span(kind = "storage")]
+    // #[muta_apm::derive::tracing_span(kind = "storage")]
     async fn get_block_by_hash(&self, ctx: Context, block_hash: Hash) -> ProtocolResult<Block> {
         let height = get!(self, block_hash, HashBlockSchema);
         let block = get!(self, height, BlockSchema);
         Ok(block)
     }
 
-    #[muta_apm::derive::tracing_span(kind = "storage")]
+    // #[muta_apm::derive::tracing_span(kind = "storage")]
     async fn get_receipt(&self, ctx: Context, hash: Hash) -> ProtocolResult<Receipt> {
         let receipt = get!(self, hash, ReceiptSchema);
         Ok(receipt)
     }
 
-    #[muta_apm::derive::tracing_span(kind = "storage", logs = "{'receipts_len': 'hashes.len()'}")]
+    // #[muta_apm::derive::tracing_span(kind = "storage", logs = "{'receipts_len': 'hashes.len()'}")]
     async fn get_receipts(&self, ctx: Context, hashes: Vec<Hash>) -> ProtocolResult<Vec<Receipt>> {
         let receipts = get_batch!(self, hashes, ReceiptSchema);
         Ok(receipts)
     }
 
-    #[muta_apm::derive::tracing_span(kind = "storage")]
+    // #[muta_apm::derive::tracing_span(kind = "storage")]
     async fn get_latest_proof(&self, ctx: Context) -> ProtocolResult<Proof> {
         let proof = get!(self, LATEST_PROOF_KEY.clone(), LatestProofSchema);
         Ok(proof)
     }
 
-    #[muta_apm::derive::tracing_span(kind = "storage")]
+    // #[muta_apm::derive::tracing_span(kind = "storage")]
     async fn update_overlord_wal(&self, ctx: Context, info: Bytes) -> ProtocolResult<()> {
         self.adapter
             .insert::<OverlordWalSchema>(OVERLORD_WAL_KEY.clone(), info)
@@ -320,7 +320,7 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
         Ok(())
     }
 
-    #[muta_apm::derive::tracing_span(kind = "storage")]
+    // #[muta_apm::derive::tracing_span(kind = "storage")]
     async fn load_overlord_wal(&self, ctx: Context) -> ProtocolResult<Bytes> {
         let wal_info = get!(self, OVERLORD_WAL_KEY.clone(), OverlordWalSchema);
         Ok(wal_info)
