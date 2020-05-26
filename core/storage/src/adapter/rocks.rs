@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use derive_more::{Display, From};
 use rocksdb::{ColumnFamily, Options, WriteBatch, DB};
 
-use protocol::codec::ProtocolCodec;
+use protocol::codec::ProtocolCodecSync;
 use protocol::traits::{StorageAdapter, StorageBatchModify, StorageCategory, StorageSchema};
 use protocol::Bytes;
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
@@ -54,8 +54,8 @@ impl StorageAdapter for RocksAdapter {
         mut val: <S as StorageSchema>::Value,
     ) -> ProtocolResult<()> {
         let column = get_column::<S>(&self.db)?;
-        let key = key.encode().await?.to_vec();
-        let val = val.encode().await?.to_vec();
+        let key = key.encode_sync()?.to_vec();
+        let val = val.encode_sync()?.to_vec();
 
         db!(self.db, put_cf, column, key, val)?;
 
@@ -67,13 +67,13 @@ impl StorageAdapter for RocksAdapter {
         mut key: <S as StorageSchema>::Key,
     ) -> ProtocolResult<Option<<S as StorageSchema>::Value>> {
         let column = get_column::<S>(&self.db)?;
-        let key = key.encode().await?;
+        let key = key.encode_sync()?;
 
         let opt_bytes =
-            { db!(self.db, get_cf, column, key)?.map(|db_vec| Bytes::from(db_vec.to_vec())) };
+            { db!(self.db, get_cf, column, key)?.map(|db_vec| Bytes::copy_from_slice(&db_vec)) };
 
         if let Some(bytes) = opt_bytes {
-            let val = <_>::decode(bytes).await?;
+            let val = <_>::decode_sync(bytes)?;
 
             Ok(Some(val))
         } else {
@@ -86,7 +86,7 @@ impl StorageAdapter for RocksAdapter {
         mut key: <S as StorageSchema>::Key,
     ) -> ProtocolResult<()> {
         let column = get_column::<S>(&self.db)?;
-        let key = key.encode().await?.to_vec();
+        let key = key.encode_sync()?.to_vec();
 
         db!(self.db, delete_cf, column, key)?;
 
@@ -98,7 +98,7 @@ impl StorageAdapter for RocksAdapter {
         mut key: <S as StorageSchema>::Key,
     ) -> ProtocolResult<bool> {
         let column = get_column::<S>(&self.db)?;
-        let key = key.encode().await?.to_vec();
+        let key = key.encode_sync()?.to_vec();
         let val = db!(self.db, get_cf, column, key)?;
 
         Ok(val.is_some())
@@ -117,10 +117,10 @@ impl StorageAdapter for RocksAdapter {
         let mut pairs: Vec<(Bytes, Option<Bytes>)> = Vec::with_capacity(keys.len());
 
         for (mut key, value) in keys.into_iter().zip(vals.into_iter()) {
-            let key = key.encode().await?;
+            let key = key.encode_sync()?;
 
             let value = match value {
-                StorageBatchModify::Insert(mut value) => Some(value.encode().await?),
+                StorageBatchModify::Insert(mut value) => Some(value.encode_sync()?),
                 StorageBatchModify::Remove => None,
             };
 
@@ -130,8 +130,8 @@ impl StorageAdapter for RocksAdapter {
         let mut batch = WriteBatch::default();
         for (key, value) in pairs.into_iter() {
             match value {
-                Some(value) => db!(batch, put_cf, column, key, value)?,
-                None => db!(batch, delete_cf, column, key)?,
+                Some(value) => batch.put_cf(column, key, value),
+                None => batch.delete_cf(column, key),
             }
         }
 
@@ -177,7 +177,7 @@ fn map_category(c: StorageCategory) -> &'static str {
     }
 }
 
-fn get_column<S: StorageSchema>(db: &DB) -> Result<ColumnFamily, RocksAdapterError> {
+fn get_column<S: StorageSchema>(db: &DB) -> Result<&ColumnFamily, RocksAdapterError> {
     let category = map_category(S::category());
 
     let column = db
