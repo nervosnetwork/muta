@@ -23,13 +23,15 @@ pub trait StorageSchema {
     fn category() -> StorageCategory;
 }
 
+pub type Index = u64;
+
 #[async_trait]
 pub trait Storage: Send + Sync {
     async fn insert_transactions(
         &self,
         ctx: Context,
         block_height: u64,
-        signed_txs: Vec<SignedTransaction>,
+        indexed_signed_txs: Vec<(Index, SignedTransaction)>,
     ) -> ProtocolResult<()>;
 
     async fn insert_block(&self, ctx: Context, block: Block) -> ProtocolResult<()>;

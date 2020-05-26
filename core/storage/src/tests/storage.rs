@@ -10,7 +10,7 @@ use protocol::types::Hash;
 
 use crate::adapter::memory::MemoryAdapter;
 use crate::tests::{get_random_bytes, mock_block, mock_proof, mock_receipt, mock_signed_tx};
-use crate::ImplStorage;
+use crate::{ImplStorage, StorageKeyIndex};
 
 #[test]
 fn test_storage_block_insert() {
@@ -71,7 +71,7 @@ fn test_storage_transactions_insert() {
         transactions.push(transaction);
     }
 
-    exec!(storage.insert_transactions(Context::new(), 1, transactions.clone()));
+    exec!(storage.insert_transactions(Context::new(), 1, transactions.clone().indexed()));
     let transactions_2 = exec!(storage.get_transactions(Context::new(), hashes));
 
     for i in 0..10 {
@@ -176,7 +176,7 @@ fn bench_insert_10000_txs(b: &mut Bencher) {
         .collect::<Vec<_>>();
 
     b.iter(move || {
-        exec!(storage.insert_transactions(Context::new(), 1, txs.clone()));
+        exec!(storage.insert_transactions(Context::new(), 1, txs.clone().indexed()));
     })
 }
 
@@ -189,7 +189,7 @@ fn bench_insert_20000_txs(b: &mut Bencher) {
         .collect::<Vec<_>>();
 
     b.iter(move || {
-        exec!(storage.insert_transactions(Context::new(), 1, txs.clone()));
+        exec!(storage.insert_transactions(Context::new(), 1, txs.clone().indexed()));
     })
 }
 
@@ -202,7 +202,7 @@ fn bench_insert_40000_txs(b: &mut Bencher) {
         .collect::<Vec<_>>();
 
     b.iter(move || {
-        exec!(storage.insert_transactions(Context::new(), 1, txs.clone()));
+        exec!(storage.insert_transactions(Context::new(), 1, txs.clone().indexed()));
     })
 }
 
@@ -215,6 +215,6 @@ fn bench_insert_80000_txs(b: &mut Bencher) {
         .collect::<Vec<_>>();
 
     b.iter(move || {
-        exec!(storage.insert_transactions(Context::new(), 1, txs.clone()));
+        exec!(storage.insert_transactions(Context::new(), 1, txs.clone().indexed()));
     })
 }

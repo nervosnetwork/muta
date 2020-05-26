@@ -19,7 +19,7 @@ use tokio::sync::RwLock;
 use protocol::codec::ProtocolCodecSync;
 use protocol::fixed_codec::FixedCodec;
 use protocol::traits::{
-    Context, Storage, StorageAdapter, StorageBatchModify, StorageCategory, StorageSchema,
+    Context, Index, Storage, StorageAdapter, StorageBatchModify, StorageCategory, StorageSchema,
 };
 use protocol::types::{Block, Hash, Proof, Receipt, SignedTransaction};
 use protocol::Bytes;
@@ -30,6 +30,17 @@ lazy_static! {
     pub static ref LATEST_PROOF_KEY: Hash = Hash::digest(Bytes::from("latest_proof"));
     pub static ref OVERLORD_WAL_KEY: Hash = Hash::digest(Bytes::from("overlord_wal"));
 }
+
+pub trait StorageKeyIndex<T>: IntoIterator<Item = T> + Sized {
+    fn indexed(self) -> Vec<(Index, T)> {
+        self.into_iter()
+            .enumerate()
+            .map(|(idx, key)| (idx as u64, key))
+            .collect::<Vec<_>>()
+    }
+}
+
+impl<T> StorageKeyIndex<T> for Vec<T> {}
 
 #[derive(Debug)]
 pub struct ImplStorage<Adapter> {
@@ -192,23 +203,20 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
         &self,
         ctx: Context,
         block_height: u64,
-        signed_txs: Vec<SignedTransaction>,
+        indexed_signed_txs: Vec<(Index, SignedTransaction)>,
     ) -> ProtocolResult<()> {
-        let idxs = signed_txs
-            .iter()
-            .enumerate()
-            .map(|(idx, stx_ref)| {
-                BlockTransactionIndex::new(block_height, idx as u64, stx_ref.tx_hash.clone())
-            })
-            .collect::<Vec<_>>();
-
-        let batch_stxs = signed_txs
+        let (idx_keys, batch_stxs): (Vec<_>, Vec<_>) = indexed_signed_txs
             .into_iter()
-            .map(StorageBatchModify::Insert)
-            .collect::<Vec<_>>();
+            .map(|(idx, stx)| {
+                (
+                    BlockTransactionIndex::new(block_height, idx, stx.tx_hash.clone()),
+                    StorageBatchModify::Insert(stx),
+                )
+            })
+            .unzip();
 
         self.adapter
-            .batch_modify::<TransactionSchema>(idxs, batch_stxs)
+            .batch_modify::<TransactionSchema>(idx_keys, batch_stxs)
             .await?;
 
         Ok(())
