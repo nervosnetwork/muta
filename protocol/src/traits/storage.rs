@@ -106,8 +106,4 @@ pub trait StorageAdapter: Send + Sync {
         keys: Vec<<S as StorageSchema>::Key>,
         vals: Vec<StorageBatchModify<S>>,
     ) -> ProtocolResult<()>;
-
-    async fn iter<I, S: StorageSchema, P: AsRef<[u8]>>(&self, prefix: P) -> I
-    where
-        I: Iterator<Item = (<S as StorageSchema>::Key, <S as StorageSchema>::Value)>;
 }

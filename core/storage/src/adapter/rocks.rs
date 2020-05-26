@@ -1,10 +1,11 @@
 use std::error::Error;
+use std::marker::PhantomData;
 use std::path::Path;
 use std::sync::Arc;
 
 use async_trait::async_trait;
 use derive_more::{Display, From};
-use rocksdb::{ColumnFamily, Options, WriteBatch, DB};
+use rocksdb::{ColumnFamily, DBIterator, Options, WriteBatch, DB};
 
 use protocol::codec::ProtocolCodecSync;
 use protocol::traits::{StorageAdapter, StorageBatchModify, StorageCategory, StorageSchema};
@@ -44,6 +45,45 @@ macro_rules! db {
         $db.$op($column, $key, $val)
             .map_err(RocksAdapterError::from)
     };
+}
+
+pub struct RocksIterator<'a, S: StorageSchema> {
+    inner: DBIterator<'a>,
+    pin_s: PhantomData<S>,
+}
+
+impl<'a, S: StorageSchema> Iterator for RocksIterator<'a, S> {
+    type Item = ProtocolResult<(<S as StorageSchema>::Key, <S as StorageSchema>::Value)>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let kv_decode = |(k_bytes, v_bytes): (Box<[u8]>, Box<[u8]>)| -> ProtocolResult<_> {
+            let k_bytes = Bytes::copy_from_slice(k_bytes.as_ref());
+            let key = <_>::decode_sync(k_bytes)?;
+
+            let v_bytes = Bytes::copy_from_slice(&v_bytes.as_ref());
+            let val = <_>::decode_sync(v_bytes)?;
+
+            Ok((key, val))
+        };
+
+        self.inner.next().map(kv_decode)
+    }
+}
+
+impl RocksAdapter {
+    pub fn iter<S: StorageSchema, P: AsRef<[u8]>>(
+        &self,
+        prefix: P,
+    ) -> ProtocolResult<RocksIterator<'_, S>> {
+        let column = get_column::<S>(&self.db)?;
+        let iter: DBIterator<'_> = self.db.prefix_iterator_cf(column, prefix);
+
+        let rocks_iter = RocksIterator {
+            inner: iter,
+            pin_s: PhantomData::<S>,
+        };
+        Ok(rocks_iter)
+    }
 }
 
 #[async_trait]
