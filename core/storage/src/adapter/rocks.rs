@@ -8,7 +8,10 @@ use derive_more::{Display, From};
 use rocksdb::{ColumnFamily, DBIterator, Options, WriteBatch, DB};
 
 use protocol::codec::ProtocolCodecSync;
-use protocol::traits::{StorageAdapter, StorageBatchModify, StorageCategory, StorageSchema};
+use protocol::traits::{
+    IntoIteratorByRef, StorageAdapter, StorageBatchModify, StorageCategory, StorageIterator,
+    StorageSchema,
+};
 use protocol::Bytes;
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
@@ -70,19 +73,32 @@ impl<'a, S: StorageSchema> Iterator for RocksIterator<'a, S> {
     }
 }
 
-impl RocksAdapter {
-    pub fn iter<S: StorageSchema, P: AsRef<[u8]>>(
-        &self,
-        prefix: P,
-    ) -> ProtocolResult<RocksIterator<'_, S>> {
-        let column = get_column::<S>(&self.db)?;
-        let iter: DBIterator<'_> = self.db.prefix_iterator_cf(column, prefix);
+pub struct RocksIntoIterator<'a, S: StorageSchema, P: AsRef<[u8]>> {
+    db:     Arc<DB>,
+    column: &'a ColumnFamily,
+    prefix: &'a P,
+    pin_s:  PhantomData<S>,
+}
 
-        let rocks_iter = RocksIterator {
+impl<'a, 'b: 'a, S: StorageSchema, P: AsRef<[u8]>> IntoIterator
+    for &'b RocksIntoIterator<'a, S, P>
+{
+    type IntoIter = StorageIterator<'a, S>;
+    type Item = ProtocolResult<(<S as StorageSchema>::Key, <S as StorageSchema>::Value)>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        let iter: DBIterator<'_> = self.db.prefix_iterator_cf(self.column, self.prefix);
+
+        Box::new(RocksIterator {
             inner: iter,
             pin_s: PhantomData::<S>,
-        };
-        Ok(rocks_iter)
+        })
+    }
+}
+
+impl<'c, S: StorageSchema, P: AsRef<[u8]>> IntoIteratorByRef<S> for RocksIntoIterator<'c, S, P> {
+    fn ref_to_iter<'a, 'b: 'a>(&'b self) -> StorageIterator<'a, S> {
+        self.into_iter()
     }
 }
 
@@ -90,8 +106,8 @@ impl RocksAdapter {
 impl StorageAdapter for RocksAdapter {
     async fn insert<S: StorageSchema>(
         &self,
-        mut key: <S as StorageSchema>::Key,
-        mut val: <S as StorageSchema>::Value,
+        key: <S as StorageSchema>::Key,
+        val: <S as StorageSchema>::Value,
     ) -> ProtocolResult<()> {
         let column = get_column::<S>(&self.db)?;
         let key = key.encode_sync()?.to_vec();
@@ -104,7 +120,7 @@ impl StorageAdapter for RocksAdapter {
 
     async fn get<S: StorageSchema>(
         &self,
-        mut key: <S as StorageSchema>::Key,
+        key: <S as StorageSchema>::Key,
     ) -> ProtocolResult<Option<<S as StorageSchema>::Value>> {
         let column = get_column::<S>(&self.db)?;
         let key = key.encode_sync()?;
@@ -121,10 +137,7 @@ impl StorageAdapter for RocksAdapter {
         }
     }
 
-    async fn remove<S: StorageSchema>(
-        &self,
-        mut key: <S as StorageSchema>::Key,
-    ) -> ProtocolResult<()> {
+    async fn remove<S: StorageSchema>(&self, key: <S as StorageSchema>::Key) -> ProtocolResult<()> {
         let column = get_column::<S>(&self.db)?;
         let key = key.encode_sync()?.to_vec();
 
@@ -135,7 +148,7 @@ impl StorageAdapter for RocksAdapter {
 
     async fn contains<S: StorageSchema>(
         &self,
-        mut key: <S as StorageSchema>::Key,
+        key: <S as StorageSchema>::Key,
     ) -> ProtocolResult<bool> {
         let column = get_column::<S>(&self.db)?;
         let key = key.encode_sync()?.to_vec();
@@ -156,11 +169,11 @@ impl StorageAdapter for RocksAdapter {
         let column = get_column::<S>(&self.db)?;
         let mut pairs: Vec<(Bytes, Option<Bytes>)> = Vec::with_capacity(keys.len());
 
-        for (mut key, value) in keys.into_iter().zip(vals.into_iter()) {
+        for (key, value) in keys.into_iter().zip(vals.into_iter()) {
             let key = key.encode_sync()?;
 
             let value = match value {
-                StorageBatchModify::Insert(mut value) => Some(value.encode_sync()?),
+                StorageBatchModify::Insert(value) => Some(value.encode_sync()?),
                 StorageBatchModify::Remove => None,
             };
 
@@ -177,6 +190,21 @@ impl StorageAdapter for RocksAdapter {
 
         self.db.write(batch).map_err(RocksAdapterError::from)?;
         Ok(())
+    }
+
+    fn prepare_iter<'a, 'b: 'a, S: StorageSchema + 'static, P: AsRef<[u8]> + 'a>(
+        &'b self,
+        prefix: &'a P,
+    ) -> ProtocolResult<Box<dyn IntoIteratorByRef<S> + 'a>> {
+        let column = get_column::<S>(&self.db)?;
+
+        let rocks_iter = RocksIntoIterator {
+            db: Arc::clone(&self.db),
+            column,
+            prefix,
+            pin_s: PhantomData::<S>,
+        };
+        Ok(Box::new(rocks_iter))
     }
 }
 

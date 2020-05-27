@@ -1,13 +1,16 @@
-use std::collections::HashMap;
+use std::collections::{hash_map, HashMap};
 use std::error::Error;
+use std::marker::PhantomData;
 use std::sync::Arc;
 
 use async_trait::async_trait;
 use derive_more::{Display, From};
 use parking_lot::RwLock;
 
-use protocol::codec::ProtocolCodec;
-use protocol::traits::{StorageAdapter, StorageBatchModify, StorageSchema};
+use protocol::codec::ProtocolCodecSync;
+use protocol::traits::{
+    IntoIteratorByRef, StorageAdapter, StorageBatchModify, StorageIterator, StorageSchema,
+};
 use protocol::Bytes;
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
@@ -32,15 +35,61 @@ impl Default for MemoryAdapter {
     }
 }
 
+pub struct MemoryIterator<'a, S: StorageSchema> {
+    inner: hash_map::Iter<'a, Vec<u8>, Vec<u8>>,
+    pin_s: PhantomData<S>,
+}
+
+impl<'a, S: StorageSchema> Iterator for MemoryIterator<'a, S> {
+    type Item = ProtocolResult<(<S as StorageSchema>::Key, <S as StorageSchema>::Value)>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let kv_decode = |(k_bytes, v_bytes): (&Vec<u8>, &Vec<u8>)| -> ProtocolResult<_> {
+            let k_bytes = Bytes::copy_from_slice(k_bytes.as_ref());
+            let key = <_>::decode_sync(k_bytes)?;
+
+            let v_bytes = Bytes::copy_from_slice(&v_bytes.as_ref());
+            let val = <_>::decode_sync(v_bytes)?;
+
+            Ok((key, val))
+        };
+
+        self.inner.next().map(kv_decode)
+    }
+}
+
+pub struct MemoryIntoIterator<'a, S: StorageSchema> {
+    inner: parking_lot::RwLockReadGuard<'a, HashMap<Vec<u8>, Vec<u8>>>,
+    pin_s: PhantomData<S>,
+}
+
+impl<'a, 'b: 'a, S: StorageSchema> IntoIterator for &'b MemoryIntoIterator<'a, S> {
+    type IntoIter = StorageIterator<'a, S>;
+    type Item = ProtocolResult<(<S as StorageSchema>::Key, <S as StorageSchema>::Value)>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        Box::new(MemoryIterator {
+            inner: self.inner.iter(),
+            pin_s: PhantomData::<S>,
+        })
+    }
+}
+
+impl<'c, S: StorageSchema> IntoIteratorByRef<S> for MemoryIntoIterator<'c, S> {
+    fn ref_to_iter<'a, 'b: 'a>(&'b self) -> StorageIterator<'a, S> {
+        self.into_iter()
+    }
+}
+
 #[async_trait]
 impl StorageAdapter for MemoryAdapter {
     async fn insert<S: StorageSchema>(
         &self,
-        mut key: <S as StorageSchema>::Key,
-        mut val: <S as StorageSchema>::Value,
+        key: <S as StorageSchema>::Key,
+        val: <S as StorageSchema>::Value,
     ) -> ProtocolResult<()> {
-        let key = key.encode().await?.to_vec();
-        let val = val.encode().await?.to_vec();
+        let key = key.encode_sync()?.to_vec();
+        let val = val.encode_sync()?.to_vec();
 
         self.db.write().insert(key, val);
 
@@ -49,14 +98,14 @@ impl StorageAdapter for MemoryAdapter {
 
     async fn get<S: StorageSchema>(
         &self,
-        mut key: <S as StorageSchema>::Key,
+        key: <S as StorageSchema>::Key,
     ) -> ProtocolResult<Option<<S as StorageSchema>::Value>> {
-        let key = key.encode().await?;
+        let key = key.encode_sync()?;
 
         let opt_bytes = self.db.read().get(&key.to_vec()).cloned();
 
         if let Some(bytes) = opt_bytes {
-            let val = <_>::decode(bytes).await?;
+            let val = <_>::decode_sync(Bytes::copy_from_slice(&bytes))?;
 
             Ok(Some(val))
         } else {
@@ -64,11 +113,8 @@ impl StorageAdapter for MemoryAdapter {
         }
     }
 
-    async fn remove<S: StorageSchema>(
-        &self,
-        mut key: <S as StorageSchema>::Key,
-    ) -> ProtocolResult<()> {
-        let key = key.encode().await?.to_vec();
+    async fn remove<S: StorageSchema>(&self, key: <S as StorageSchema>::Key) -> ProtocolResult<()> {
+        let key = key.encode_sync()?.to_vec();
 
         self.db.write().remove(&key);
 
@@ -77,9 +123,9 @@ impl StorageAdapter for MemoryAdapter {
 
     async fn contains<S: StorageSchema>(
         &self,
-        mut key: <S as StorageSchema>::Key,
+        key: <S as StorageSchema>::Key,
     ) -> ProtocolResult<bool> {
-        let key = key.encode().await?.to_vec();
+        let key = key.encode_sync()?.to_vec();
 
         Ok(self.db.read().get(&key).is_some())
     }
@@ -95,11 +141,11 @@ impl StorageAdapter for MemoryAdapter {
 
         let mut pairs: Vec<(Bytes, Option<Bytes>)> = Vec::with_capacity(keys.len());
 
-        for (mut key, value) in keys.into_iter().zip(vals.into_iter()) {
-            let key = key.encode().await?;
+        for (key, value) in keys.into_iter().zip(vals.into_iter()) {
+            let key = key.encode_sync()?;
 
             let value = match value {
-                StorageBatchModify::Insert(mut value) => Some(value.encode().await?),
+                StorageBatchModify::Insert(value) => Some(value.encode_sync()?),
                 StorageBatchModify::Remove => None,
             };
 
@@ -114,6 +160,16 @@ impl StorageAdapter for MemoryAdapter {
         }
 
         Ok(())
+    }
+
+    fn prepare_iter<'a, 'b: 'a, S: StorageSchema + 'static, P: AsRef<[u8]> + 'a>(
+        &'b self,
+        _prefix: &P,
+    ) -> ProtocolResult<Box<dyn IntoIteratorByRef<S> + 'a>> {
+        Ok(Box::new(MemoryIntoIterator {
+            inner: self.db.read(),
+            pin_s: PhantomData::<S>,
+        }))
     }
 }
 

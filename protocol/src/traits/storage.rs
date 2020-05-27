@@ -16,11 +16,20 @@ pub enum StorageCategory {
     Wal,
 }
 
+pub type StorageIterator<'a, S> = Box<
+    dyn Iterator<Item = ProtocolResult<(<S as StorageSchema>::Key, <S as StorageSchema>::Value)>>
+        + 'a,
+>;
+
 pub trait StorageSchema {
     type Key: ProtocolCodec + Send;
     type Value: ProtocolCodec + Send;
 
     fn category() -> StorageCategory;
+}
+
+pub trait IntoIteratorByRef<S: StorageSchema> {
+    fn ref_to_iter<'a, 'b: 'a>(&'b self) -> StorageIterator<'a, S>;
 }
 
 #[async_trait]
@@ -43,7 +52,12 @@ pub trait Storage: Send + Sync {
 
     async fn get_block(&self, ctx: Context, height: u64) -> ProtocolResult<Option<Block>>;
 
-    async fn insert_receipts(&self, ctx: Context, receipts: Vec<Receipt>) -> ProtocolResult<()>;
+    async fn insert_receipts(
+        &self,
+        ctx: Context,
+        block_height: u64,
+        receipts: Vec<Receipt>,
+    ) -> ProtocolResult<()>;
 
     async fn get_receipt(
         &self,
@@ -106,4 +120,9 @@ pub trait StorageAdapter: Send + Sync {
         keys: Vec<<S as StorageSchema>::Key>,
         vals: Vec<StorageBatchModify<S>>,
     ) -> ProtocolResult<()>;
+
+    fn prepare_iter<'a, 'b: 'a, S: StorageSchema + 'static, P: AsRef<[u8]> + 'a>(
+        &'b self,
+        prefix: &'a P,
+    ) -> ProtocolResult<Box<dyn IntoIteratorByRef<S> + 'a>>;
 }
