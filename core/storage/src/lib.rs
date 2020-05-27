@@ -8,6 +8,7 @@ pub mod adapter;
 use std::collections::{HashMap, HashSet};
 use std::convert::From;
 use std::error::Error;
+use std::str::FromStr;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -156,27 +157,31 @@ impl ProtocolCodecSync for CommonPrefix {
 
 #[derive(Debug, Clone)]
 pub struct CommonHashKey {
-    prefix:  CommonPrefix,
-    tx_hash: Hash,
+    prefix: CommonPrefix,
+    hash:   Hash,
 }
 
 impl CommonHashKey {
-    pub fn new(block_height: u64, tx_hash: Hash) -> Self {
+    pub fn new(block_height: u64, hash: Hash) -> Self {
         CommonHashKey {
             prefix: CommonPrefix::new(block_height),
-            tx_hash,
+            hash,
         }
     }
 
     pub fn height(&self) -> u64 {
         self.prefix.height()
     }
+
+    pub fn hash(&self) -> &Hash {
+        &self.hash
+    }
 }
 
 impl ProtocolCodecSync for CommonHashKey {
     fn encode_sync(&self) -> ProtocolResult<Bytes> {
         Ok(Bytes::copy_from_slice(
-            &self.prefix.make_hash_key(&self.tx_hash),
+            &self.prefix.make_hash_key(&self.hash),
         ))
     }
 
@@ -184,9 +189,29 @@ impl ProtocolCodecSync for CommonHashKey {
         debug_assert!(bytes.len() >= CommonPrefix::len());
 
         let prefix = CommonPrefix::from(&bytes[0..CommonPrefix::len()]);
-        let tx_hash = Hash::from_bytes(bytes.split_off(CommonPrefix::len()))?;
+        let hash = Hash::from_bytes(bytes.split_off(CommonPrefix::len()))?;
 
-        Ok(CommonHashKey { prefix, tx_hash })
+        Ok(CommonHashKey { prefix, hash })
+    }
+}
+
+impl ToString for CommonHashKey {
+    fn to_string(&self) -> String {
+        format!("{}:{}", self.prefix.height(), self.hash.as_hex())
+    }
+}
+
+impl FromStr for CommonHashKey {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let parts = s.split(':').collect::<Vec<_>>();
+        debug_assert!(parts.len() == 2);
+
+        let height = parts[0].parse::<u64>().map_err(|_| ())?;
+        let hash = Hash::from_hex(parts[1]).map_err(|_| ())?;
+
+        Ok(CommonHashKey::new(height, hash))
     }
 }
 
