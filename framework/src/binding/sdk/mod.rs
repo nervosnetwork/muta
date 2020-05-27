@@ -40,7 +40,10 @@ impl<S: 'static + ServiceState, C: ChainQuerier, D: Dispatcher> ServiceSDK
     for DefalutServiceSDK<S, C, D>
 {
     // Alloc or recover a `Map` by` var_name`
-    fn alloc_or_recover_map<K: 'static + FixedCodec + PartialEq, V: 'static + FixedCodec>(
+    fn alloc_or_recover_map<
+        K: 'static + FixedCodec + Clone + PartialEq,
+        V: 'static + FixedCodec,
+    >(
         &mut self,
         var_name: &str,
     ) -> Box<dyn StoreMap<K, V>> {

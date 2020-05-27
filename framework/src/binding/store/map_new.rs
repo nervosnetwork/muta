@@ -16,7 +16,9 @@ use crate::binding::store::{get_bucket_index, Bucket, FixedBuckets, StoreError};
 pub struct NewStoreMap<S: ServiceState, K: FixedCodec + PartialEq, V: FixedCodec> {
     state:    Rc<RefCell<S>>,
     var_name: String,
-    keys:     FixedBuckets<K>,
+    keys:     RefCell<FixedBuckets<K>>,
+    len_key:  Hash,
+    len:      u32,
     phantom:  PhantomData<V>,
 }
 
@@ -27,32 +29,15 @@ where
     V: 'static + FixedCodec,
 {
     pub fn new(state: Rc<RefCell<S>>, name: &str) -> Self {
-        let var_name = name.to_string();
-        let prefix = name.to_string() + "map_";
+        let len_key = Hash::digest(Bytes::from(name.to_string() + "_map_len"));
+        let len = state.borrow().get(&len_key).expect("").unwrap_or(0u32);
 
-        let opt_bytes = (0..16)
-            .map(|idx| {
-                let hash = Hash::digest(Bytes::from(prefix.clone() + &idx.to_string()));
-                state.borrow().get(&hash).unwrap()
-            })
-            .collect::<Vec<_>>();
-
-        let buckets = opt_bytes
-            .into_par_iter()
-            .map(|bytes| {
-                if let Some(bs) = bytes {
-                    <_>::decode_fixed(bs).expect("")
-                } else {
-                    Bucket::new()
-                }
-            })
-            .collect::<Vec<_>>();
-
-        Self {
+        NewStoreMap {
             state,
-            var_name,
-            keys: FixedBuckets::new(buckets),
-
+            len_key,
+            len,
+            var_name: name.to_string(),
+            keys: RefCell::new(FixedBuckets::new()),
             phantom: PhantomData,
         }
     }
@@ -62,20 +47,23 @@ where
         let mk = self.get_map_key(&key_bytes);
         let bkt_idx = get_bucket_index(&key_bytes);
 
-        if !self.inner_contains(&key, &key_bytes) {
-            self.keys.insert(bkt_idx, key);
+        if !self.inner_contains(bkt_idx, &key)? {
+            self.keys.borrow_mut().insert(bkt_idx, key);
 
             self.state.borrow_mut().insert(
                 self.get_bucket_name(bkt_idx),
-                self.keys.get_bucket(bkt_idx).encode_fixed()?,
+                self.keys.borrow().get_bucket(bkt_idx).encode_fixed()?,
             )?;
+            self.len_add_one()?;
         }
         self.state.borrow_mut().insert(mk, value)
     }
 
     fn inner_get(&self, key: &K) -> ProtocolResult<Option<V>> {
         let key_bytes = key.encode_fixed()?;
-        if self.inner_contains(key, &key_bytes) {
+        let bkt_idx = get_bucket_index(&key_bytes);
+
+        if self.inner_contains(bkt_idx, &key)? {
             self.state
                 .borrow()
                 .get(&self.get_map_key(&key_bytes))?
@@ -94,26 +82,42 @@ where
 
     fn inner_remove(&mut self, key: &K) -> ProtocolResult<Option<V>> {
         let key_bytes = key.encode_fixed()?;
-        if self.inner_contains(key, &key_bytes) {
+        let bkt_idx = get_bucket_index(&key_bytes);
+
+        if self.inner_contains(bkt_idx, &key)? {
             let value = self.inner_get(key)?.expect("value should be existed");
             let bkt_idx = get_bucket_index(&key_bytes);
             let bkt_name = self.get_bucket_name(bkt_idx);
 
-            let _ = self.keys.remove_item(key, &key_bytes)?;
-            self.state
-                .borrow_mut()
-                .insert(bkt_name, self.keys.get_bucket(bkt_idx).encode_fixed()?)?;
+            let _ = self.keys.borrow_mut().remove_item(bkt_idx, key)?;
+            self.state.borrow_mut().insert(
+                bkt_name,
+                self.keys.borrow().get_bucket(bkt_idx).encode_fixed()?,
+            )?;
             self.state
                 .borrow_mut()
                 .insert(self.get_map_key(&key_bytes), Bytes::new())?;
+            self.len_sub_one()?;
             Ok(Some(value))
         } else {
             Ok(None)
         }
     }
 
-    fn inner_contains(&self, key: &K, key_bytes: &Bytes) -> bool {
-        self.keys.contains(key, key_bytes)
+    #[inline(always)]
+    fn inner_contains(&self, bkt_idx: usize, key: &K) -> ProtocolResult<bool> {
+        if self.keys.borrow().is_bucket_recovered(bkt_idx) {
+            return Ok(self.keys.borrow().contains(bkt_idx, key));
+        }
+
+        let bkt = if let Some(bytes) = self.state.borrow().get(&self.get_bucket_name(bkt_idx))? {
+            <_>::decode_fixed(bytes)?
+        } else {
+            Bucket::new()
+        };
+        let ret = bkt.contains(key);
+        self.keys.borrow_mut().recover_bucket(bkt_idx, bkt);
+        Ok(ret)
     }
 
     fn get_map_key(&self, key_bytes: &Bytes) -> Hash {
@@ -127,12 +131,26 @@ where
             self.var_name.clone() + "map_" + &index.to_string(),
         ))
     }
+
+    fn len_add_one(&mut self) -> ProtocolResult<()> {
+        self.len += 1;
+        self.state
+            .borrow_mut()
+            .insert(self.len_key.clone(), self.len.encode_fixed()?)
+    }
+
+    fn len_sub_one(&mut self) -> ProtocolResult<()> {
+        self.len -= 1;
+        self.state
+            .borrow_mut()
+            .insert(self.len_key.clone(), self.len.encode_fixed()?)
+    }
 }
 
 impl<S, K, V> StoreMap<K, V> for NewStoreMap<S, K, V>
 where
     S: 'static + ServiceState,
-    K: 'static + Send + FixedCodec + PartialEq,
+    K: 'static + Send + FixedCodec + Clone + PartialEq,
     V: 'static + FixedCodec,
 {
     fn get(&self, key: &K) -> Option<V> {
@@ -152,21 +170,22 @@ where
 
     fn contains(&self, key: &K) -> bool {
         if let Ok(bytes) = key.encode_fixed() {
-            self.inner_contains(key, &bytes)
+            self.inner_contains(get_bucket_index(&bytes), &key)
+                .unwrap_or(false)
         } else {
             false
         }
     }
 
     fn len(&self) -> u32 {
-        self.keys.len()
+        self.len
     }
 
     fn is_empty(&self) -> bool {
-        self.keys.is_empty()
+        self.len == 0
     }
 
-    fn iter<'a>(&'a self) -> Box<dyn Iterator<Item = (&K, V)> + 'a> {
+    fn iter<'a>(&'a self) -> Box<dyn Iterator<Item = (K, V)> + 'a> {
         Box::new(NewMapIter::<S, K, V>::new(0, self))
     }
 }
@@ -195,28 +214,32 @@ where
 impl<'a, S, K, V> Iterator for NewMapIter<'a, S, K, V>
 where
     S: 'static + ServiceState,
-    K: 'static + Send + FixedCodec + PartialEq,
+    K: 'static + Send + FixedCodec + Clone + PartialEq,
     V: 'static + FixedCodec,
 {
-    type Item = (&'a K, V);
+    type Item = (K, V);
 
     fn next(&mut self) -> Option<Self::Item> {
         let idx = self.idx;
-        if idx >= self.map.keys.len() {
+        if idx >= self.map.len {
             return None;
         }
 
         for i in 0..16 {
-            let (left, right) = self.map.keys.get_abs_index_interval(i);
+            let (left, right) = self.map.keys.borrow().get_abs_index_interval(i);
             if left <= idx && idx < right {
                 let index = idx - left;
-                let key = self.map.keys.keys_bucket[i]
+                let key = self.map.keys.borrow().keys_bucket[i]
                     .0
                     .get(index as usize)
+                    .cloned()
                     .expect("get key should not fail");
 
                 self.idx += 1;
-                return Some((key, self.map.get(key).expect("get value should not fail")));
+                return Some((
+                    key.clone(),
+                    self.map.get(&key).expect("get value should not fail"),
+                ));
             }
         }
         None
@@ -298,14 +321,14 @@ mod tests {
         let state_clone = Rc::clone(&state);
         let mut map = NewStoreMap::<_, Hash, Asset>::new(state, "asset");
 
-        for _i in 0..100000 {
+        for _i in 0..1000 {
             let id = rand::random::<u32>().to_string();
             let id_hash = Hash::digest(Bytes::from(id.into_bytes()));
             map.insert(id_hash, Asset::new());
         }
 
         b.iter(move || {
-            let _ = DefaultStoreMap::<_, Hash, Asset>::new(Rc::clone(&state_clone), "asset");
+            let _ = NewStoreMap::<_, Hash, Asset>::new(Rc::clone(&state_clone), "asset");
         })
     }
 

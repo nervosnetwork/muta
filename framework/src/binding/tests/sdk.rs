@@ -57,7 +57,7 @@ fn test_service_sdk() {
     let mut it = sdk_map.iter();
     assert_eq!(
         it.next().unwrap(),
-        (&Hash::digest(Bytes::from("key_1")), Bytes::from("val_1"))
+        (Hash::digest(Bytes::from("key_1")), Bytes::from("val_1"))
     );
     assert_eq!(it.next().is_none(), true);
 

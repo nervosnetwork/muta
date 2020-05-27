@@ -55,85 +55,90 @@ impl<K: FixedCodec> FixedCodec for FixedKeys<K> {
 }
 
 pub struct FixedBuckets<K: FixedCodec + PartialEq> {
-    pub keys_bucket: Vec<Bucket<K>>,
-    pub bucket_lens: Vec<u32>,
-    pub keys_len:    u32,
+    pub keys_bucket:  Vec<Bucket<K>>,
+    pub bucket_lens:  Vec<u32>,
+    pub is_recovered: Vec<bool>,
 }
 
 impl<K: FixedCodec + PartialEq> FixedBuckets<K> {
-    pub fn new(buckets: Vec<Bucket<K>>) -> Self {
+    fn new() -> Self {
+        let mut keys_bucket = Vec::new();
         let mut bucket_lens = vec![0];
-        let mut keys_len = 0;
+        let mut is_recovered = Vec::new();
 
-        for bkt in buckets.iter() {
-            keys_len += bkt.len() as u32;
-            bucket_lens.push(keys_len);
+        for _i in 0..16 {
+            keys_bucket.push(Bucket::new());
+            bucket_lens.push(0u32);
+            is_recovered.push(false);
         }
 
         FixedBuckets {
-            keys_bucket: buckets,
+            keys_bucket,
             bucket_lens,
-            keys_len,
+            is_recovered,
         }
     }
 
-    pub fn len(&self) -> u32 {
-        self.keys_len
+    fn recover_bucket(&mut self, index: usize, bucket: Bucket<K>) {
+        self.keys_bucket[index] = bucket;
+        self.is_recovered[index] = true;
+        self.update_index_interval(index);
     }
 
-    pub fn insert(&mut self, idx: usize, key: K) {
-        let bkt = self.keys_bucket.get_mut(idx).unwrap();
+    fn insert(&mut self, index: usize, key: K) {
+        let bkt = self.keys_bucket.get_mut(index).unwrap();
         bkt.push(key);
-
-        let idx = idx + 1;
-        for i in 1..=16 {
-            if i >= idx {
-                let tmp = self.bucket_lens[i];
-                self.bucket_lens[i] = tmp + 1;
-            }
-        }
-
-        self.keys_len += 1;
+        self.update_index_interval(index);
     }
 
-    pub fn contains(&self, key: &K, key_bytes: &Bytes) -> bool {
-        self.keys_bucket
-            .get(get_bucket_index(key_bytes))
-            .unwrap()
-            .contains(key)
+    fn contains(&self, index: usize, key: &K) -> bool {
+        self.keys_bucket[index].contains(key)
     }
 
-    pub fn is_empty(&self) -> bool {
-        self.keys_len == 0
-    }
-
-    pub fn remove_item(&mut self, key: &K, key_bytes: &Bytes) -> ProtocolResult<K> {
-        let idx = get_bucket_index(key_bytes);
-        let bkt = self.keys_bucket.get_mut(idx).unwrap();
+    fn remove_item(&mut self, index: usize, key: &K) -> ProtocolResult<K> {
+        let bkt = self.keys_bucket.get_mut(index).unwrap();
         if bkt.contains(key) {
-            let idx = idx + 1;
-            for i in 1..=16 {
-                if i >= idx {
-                    let tmp = self.bucket_lens[i];
-                    self.bucket_lens[i] = tmp - 1;
-                }
-            }
-            self.keys_len -= 1;
-            return bkt.remove_item(key);
+            let val = bkt.remove_item(key)?;
+            self.update_index_interval(index);
+            return Ok(val);
         } else {
             Err(StoreError::GetNone.into())
         }
     }
 
-    pub fn get_bucket(&self, index: usize) -> &Bucket<K> {
+    fn get_bucket(&self, index: usize) -> &Bucket<K> {
         self.keys_bucket
             .get(index)
             .expect("index must less than 16")
     }
 
     /// The function will panic when index is greater than or equal 16.
-    pub fn get_abs_index_interval(&self, index: usize) -> (u32, u32) {
+    fn get_abs_index_interval(&self, index: usize) -> (u32, u32) {
         (self.bucket_lens[index], self.bucket_lens[index + 1])
+    }
+
+    fn is_bucket_recovered(&self, index: usize) -> bool {
+        self.is_recovered[index]
+    }
+
+    fn update_index_interval(&mut self, index: usize) {
+        let start = index + 1;
+        let mut acc = self.bucket_lens[index];
+
+        for i in start..17 {
+            acc += self.keys_bucket[i - 1].len() as u32;
+            self.bucket_lens[i] = acc;
+        }
+    }
+
+    #[cfg(test)]
+    fn len(&self) -> u32 {
+        self.bucket_lens[15]
+    }
+
+    #[cfg(test)]
+    fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 }
 
@@ -241,14 +246,9 @@ impl From<StoreError> for ProtocolError {
 mod tests {
     use super::*;
 
-    fn init_empty_buckets() -> FixedBuckets<Bytes> {
-        let bkts = (0..16).map(|_| Bucket::<Bytes>::new()).collect::<Vec<_>>();
-        FixedBuckets::new(bkts)
-    }
-
     #[test]
     fn test_insert() {
-        let mut buckets = init_empty_buckets();
+        let mut buckets = FixedBuckets::new();
         assert!(buckets.is_empty());
 
         for i in 0..=255u8 {
@@ -258,20 +258,20 @@ mod tests {
 
         let intervals = (0u32..=16).map(|i| i * 16).collect::<Vec<_>>();
         assert!(intervals == buckets.bucket_lens);
-        assert!(buckets.keys_len == 256);
+        assert!(buckets.len() == 256);
 
         for i in 0..16 {
             assert!(buckets.get_bucket(i).len() == 16);
         }
 
-        let mut buckets = init_empty_buckets();
+        let mut buckets = FixedBuckets::new();
         for i in 0..8 {
             let key = Bytes::from(vec![i]);
             buckets.insert(get_bucket_index(&key), key);
         }
 
         assert!(buckets.get_bucket(0).len() == 8);
-        assert!(buckets.keys_len == 8);
+        assert!(buckets.len() == 8);
         for i in 1..16 {
             assert!(buckets.get_bucket(i).len() == 0);
         }
@@ -279,7 +279,7 @@ mod tests {
 
     #[test]
     fn test_remove() {
-        let mut buckets = init_empty_buckets();
+        let mut buckets = FixedBuckets::new();
 
         for i in 0..=255u8 {
             let key = Bytes::from(vec![i]);
@@ -288,18 +288,18 @@ mod tests {
 
         let key = Bytes::from(vec![0]);
         let _ = buckets
-            .remove_item(&key, &key.encode_fixed().unwrap())
+            .remove_item(get_bucket_index(&key.encode_fixed().unwrap()), &key)
             .unwrap();
         let intervals = (0u32..=16)
             .map(|i| if i == 0 { 0 } else { i * 16 - 1 })
             .collect::<Vec<_>>();
-        assert!(buckets.keys_len == 255);
+        assert!(buckets.len() == 255);
         assert!(intervals == buckets.bucket_lens);
     }
 
     #[test]
     fn test_contains() {
-        let mut buckets = init_empty_buckets();
+        let mut buckets = FixedBuckets::new();
 
         for i in 0..3u8 {
             let key = Bytes::from(vec![i]);
@@ -307,12 +307,12 @@ mod tests {
         }
 
         let key = Bytes::from(vec![0]);
-        assert!(buckets.contains(&key, &key.encode_fixed().unwrap()));
+        assert!(buckets.contains(get_bucket_index(&key.encode_fixed().unwrap()), &key));
 
         let key = Bytes::from(vec![5]);
-        assert!(!buckets.contains(&key, &key.encode_fixed().unwrap()));
+        assert!(!buckets.contains(get_bucket_index(&key.encode_fixed().unwrap()), &key));
 
         let key = Bytes::from(vec![20]);
-        assert!(!buckets.contains(&key, &key.encode_fixed().unwrap()));
+        assert!(!buckets.contains(get_bucket_index(&key.encode_fixed().unwrap()), &key));
     }
 }

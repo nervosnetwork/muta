@@ -19,8 +19,11 @@ pub struct DefaultStoreMap<S: ServiceState, K: FixedCodec + PartialEq, V: FixedC
     phantom:  PhantomData<V>,
 }
 
-impl<S: 'static + ServiceState, K: 'static + FixedCodec + PartialEq, V: 'static + FixedCodec>
-    DefaultStoreMap<S, K, V>
+impl<
+        S: 'static + ServiceState,
+        K: 'static + FixedCodec + Clone + PartialEq,
+        V: 'static + FixedCodec,
+    > DefaultStoreMap<S, K, V>
 {
     pub fn new(state: Rc<RefCell<S>>, name: &str) -> Self {
         let var_name = Hash::digest(Bytes::from(name.to_owned() + "map"));
@@ -103,8 +106,11 @@ impl<S: 'static + ServiceState, K: 'static + FixedCodec + PartialEq, V: 'static 
     }
 }
 
-impl<S: 'static + ServiceState, K: 'static + FixedCodec + PartialEq, V: 'static + FixedCodec>
-    StoreMap<K, V> for DefaultStoreMap<S, K, V>
+impl<
+        S: 'static + ServiceState,
+        K: 'static + FixedCodec + Clone + PartialEq,
+        V: 'static + FixedCodec,
+    > StoreMap<K, V> for DefaultStoreMap<S, K, V>
 {
     fn get(&self, key: &K) -> Option<V> {
         self.inner_get(key)
@@ -137,7 +143,7 @@ impl<S: 'static + ServiceState, K: 'static + FixedCodec + PartialEq, V: 'static 
         }
     }
 
-    fn iter<'a>(&'a self) -> Box<dyn Iterator<Item = (&K, V)> + 'a> {
+    fn iter<'a>(&'a self) -> Box<dyn Iterator<Item = (K, V)> + 'a> {
         Box::new(MapIter::<S, K, V>::new(0, self))
     }
 }
@@ -167,11 +173,11 @@ impl<
 impl<
         'a,
         S: 'static + ServiceState,
-        K: 'static + FixedCodec + PartialEq,
+        K: 'static + FixedCodec + Clone + PartialEq,
         V: 'static + FixedCodec,
     > Iterator for MapIter<'a, S, K, V>
 {
-    type Item = (&'a K, V);
+    type Item = (K, V);
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.idx < self.map.len() {
@@ -180,9 +186,13 @@ impl<
                 .keys
                 .inner
                 .get(self.idx as usize)
+                .cloned()
                 .expect("get key should not fail");
             self.idx += 1;
-            Some((key, self.map.get(key).expect("get value should not fail")))
+            Some((
+                key.clone(),
+                self.map.get(&key).expect("get value should not fail"),
+            ))
         } else {
             None
         }
