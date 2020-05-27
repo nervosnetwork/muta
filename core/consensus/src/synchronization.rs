@@ -15,7 +15,6 @@ use protocol::types::{Block, Hash, Proof, Receipt, SignedTransaction};
 use protocol::ProtocolResult;
 
 use crate::engine::generate_new_crypto_map;
-use crate::metrics::ENGINE_SYNC_BLOCK_COUNTER;
 use crate::status::{ExecutedInfo, StatusAgent};
 use crate::util::OverlordCrypto;
 
@@ -91,7 +90,8 @@ impl<Adapter: SynchronizationAdapter> Synchronization for OverlordSynchronizatio
             return Err(e);
         }
 
-        ENGINE_SYNC_BLOCK_COUNTER.inc_by((remote_height - current_height) as i64);
+        common_apm::metrics::consensus::ENGINE_SYNC_BLOCK_COUNTER
+            .inc_by((remote_height - current_height) as i64);
 
         self.status.replace(sync_status.clone());
         self.adapter.update_status(

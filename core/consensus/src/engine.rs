@@ -31,7 +31,6 @@ use crate::message::{
     END_GOSSIP_AGGREGATED_VOTE, END_GOSSIP_SIGNED_CHOKE, END_GOSSIP_SIGNED_PROPOSAL,
     END_GOSSIP_SIGNED_VOTE,
 };
-use crate::metrics::*;
 use crate::status::StatusAgent;
 use crate::util::{check_list_roots, OverlordCrypto};
 use crate::wal::SignedTxsWAL;
@@ -317,7 +316,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             signature,
             bitmap,
         };
-        ENGINE_ROUND_GAUGE.set(commit.proof.round as i64);
+        common_apm::metrics::consensus::ENGINE_ROUND_GAUGE.set(commit.proof.round as i64);
 
         self.adapter.save_proof(ctx.clone(), proof.clone()).await?;
 
@@ -394,11 +393,12 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             authority_list: covert_to_overlord_authority(&current_consensus_status.validators),
         };
 
-        ENGINE_HEIGHT_GAUGE.set((current_height + 1) as i64);
-        ENGINE_COMMITED_TX_COUNTER.inc_by(txs_len as i64);
+        common_apm::metrics::consensus::ENGINE_HEIGHT_GAUGE.set((current_height + 1) as i64);
+        common_apm::metrics::consensus::ENGINE_COMMITED_TX_COUNTER.inc_by(txs_len as i64);
 
         let now = time_now();
-        ENGINE_CONSENSUS_COST_TIME.observe((now - *(self.last_commit_time.read())) as f64);
+        common_apm::metrics::consensus::ENGINE_CONSENSUS_COST_TIME
+            .observe((now - *(self.last_commit_time.read())) as f64);
         let mut last_commit_time = self.last_commit_time.write();
         *last_commit_time = now;
         // pill.block.header.timestamp

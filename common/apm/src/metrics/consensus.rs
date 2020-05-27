@@ -1,6 +1,7 @@
 use crate::metrics::{
-    auto_flush_from, exponential_buckets, make_auto_flush_static_metric, register_histogram_vec,
-    register_int_counter_vec, HistogramVec, IntCounterVec,
+    auto_flush_from, exponential_buckets, make_auto_flush_static_metric, register_histogram,
+    register_histogram_vec, register_int_counter, register_int_counter_vec, register_int_gauge,
+    Histogram, HistogramVec, IntCounter, IntCounterVec, IntGauge,
 };
 
 use lazy_static::lazy_static;
@@ -66,4 +67,24 @@ lazy_static! {
         auto_flush_from!(CONSENSUS_RESULT_COUNTER_VEC, ConsensusResultCounterVec);
     pub static ref CONSENSUS_TIME_HISTOGRAM_VEC_STATIC: ConsensusTimeHistogramVec =
         auto_flush_from!(CONSENSUS_TIME_HISTOGRAM_VEC, ConsensusTimeHistogramVec);
+    pub static ref ENGINE_ROUND_GAUGE: IntGauge =
+        register_int_gauge!("muta_consensus_round", "Round count of consensus").unwrap();
+    pub static ref ENGINE_HEIGHT_GAUGE: IntGauge =
+        register_int_gauge!("muta_consensus_height", "Height of muta").unwrap();
+    pub static ref ENGINE_COMMITED_TX_COUNTER: IntCounter = register_int_counter!(
+        "muta_consensus_committed_tx_total",
+        "The committed transactions"
+    )
+    .unwrap();
+    pub static ref ENGINE_SYNC_BLOCK_COUNTER: IntCounter = register_int_counter!(
+        "muta_consensus_sync_block_total",
+        "The counter for sync blocks from remote"
+    )
+    .unwrap();
+    pub static ref ENGINE_CONSENSUS_COST_TIME: Histogram = register_histogram!(
+        "muta_consensus_duration_seconds",
+        "Consensus duration from last block",
+        exponential_buckets(1.0, 1.2, 15).expect("consensus duration time exponential")
+    )
+    .unwrap();
 }
