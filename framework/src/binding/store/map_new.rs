@@ -145,6 +145,41 @@ where
             .borrow_mut()
             .insert(self.len_key.clone(), self.len.encode_fixed()?)
     }
+
+    fn recover_all_buckets(&self) {
+        let idxs = self
+            .keys
+            .borrow()
+            .is_recovered
+            .iter()
+            .enumerate()
+            .filter_map(|(i, &res)| if res { Some(i) } else { None })
+            .collect::<Vec<_>>();
+
+        let prefix = self.var_name.clone() + "map_";
+        let opt_bytes = idxs
+            .iter()
+            .map(|idx| {
+                let hash = Hash::digest(Bytes::from(prefix.clone() + &idx.to_string()));
+                self.state.borrow().get(&hash).unwrap()
+            })
+            .collect::<Vec<_>>();
+
+        let buckets = opt_bytes
+            .into_par_iter()
+            .map(|bytes| {
+                if let Some(bs) = bytes {
+                    <_>::decode_fixed(bs).expect("")
+                } else {
+                    Bucket::new()
+                }
+            })
+            .collect::<Vec<_>>();
+
+        for (idx, bkt) in idxs.into_iter().zip(buckets.into_iter()) {
+            self.keys.borrow_mut().recover_bucket(idx, bkt);
+        }
+    }
 }
 
 impl<S, K, V> StoreMap<K, V> for NewStoreMap<S, K, V>
@@ -186,6 +221,7 @@ where
     }
 
     fn iter<'a>(&'a self) -> Box<dyn Iterator<Item = (K, V)> + 'a> {
+        self.recover_all_buckets();
         Box::new(NewMapIter::<S, K, V>::new(0, self))
     }
 }

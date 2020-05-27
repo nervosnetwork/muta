@@ -133,7 +133,7 @@ impl<K: FixedCodec + PartialEq> FixedBuckets<K> {
 
     #[cfg(test)]
     fn len(&self) -> u32 {
-        self.bucket_lens[15]
+        self.bucket_lens[16]
     }
 
     #[cfg(test)]
@@ -215,6 +215,7 @@ impl<K: FixedCodec + PartialEq> FixedCodec for Bucket<K> {
     }
 }
 
+#[inline(always)]
 fn get_bucket_index(bytes: &Bytes) -> usize {
     (bytes[0] >> 4) as usize
 }
@@ -255,6 +256,8 @@ mod tests {
             let key = Bytes::from(vec![i]);
             buckets.insert(get_bucket_index(&key), key);
         }
+
+        println!("{:?}", buckets.bucket_lens);
 
         let intervals = (0u32..=16).map(|i| i * 16).collect::<Vec<_>>();
         assert!(intervals == buckets.bucket_lens);
