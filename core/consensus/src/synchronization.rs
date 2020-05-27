@@ -15,6 +15,7 @@ use protocol::types::{Block, Hash, Proof, Receipt, SignedTransaction};
 use protocol::ProtocolResult;
 
 use crate::engine::generate_new_crypto_map;
+use crate::metrics::ENGINE_SYNC_BLOCK_COUNTER;
 use crate::status::{ExecutedInfo, StatusAgent};
 use crate::util::OverlordCrypto;
 
@@ -48,7 +49,6 @@ impl<Adapter: SynchronizationAdapter> Synchronization for OverlordSynchronizatio
         if syncing_lock.is_none() {
             return Ok(());
         }
-
         if !self.need_sync(ctx.clone(), remote_height).await? {
             return Ok(());
         }
@@ -90,6 +90,8 @@ impl<Adapter: SynchronizationAdapter> Synchronization for OverlordSynchronizatio
             );
             return Err(e);
         }
+
+        ENGINE_SYNC_BLOCK_COUNTER.inc_by((remote_height - current_height) as i64);
 
         self.status.replace(sync_status.clone());
         self.adapter.update_status(
@@ -345,10 +347,6 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
         self.adapter
             .flush_mempool(ctx.clone(), &rich_block.block.ordered_tx_hashes)
             .await?;
-
-        common_apm::metrics::consensus::CONSENSUS_HEIGHT_PLUS_PLUS_VEC_STATIC
-            .sync
-            .inc();
 
         Ok(())
     }

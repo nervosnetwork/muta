@@ -6,6 +6,7 @@ pub mod consensus;
 mod engine;
 pub mod fixed_types;
 pub mod message;
+mod metrics;
 pub mod status;
 pub mod synchronization;
 #[cfg(test)]

@@ -114,6 +114,13 @@ where
             (Some(tar), opt_blocked) => (tar, opt_blocked),
         };
 
+        // `filter_bocked` only return sendable session in the `tar`
+        if let TargetSession::Multi(sessions) = &tar {
+            common_apm::metrics::network::NETWORK_MESSAGE_COUNT_VEC_STATIC
+                .sent
+                .inc_by(sessions.len() as i64);
+        }
+
         let ret = match pri {
             Priority::High => self.inner.quick_filter_broadcast(tar, proto_id, msg),
             Priority::Normal => self.inner.filter_broadcast(tar, proto_id, msg),
@@ -135,10 +142,6 @@ where
                 other:   other.map(NetworkError::boxed),
             });
         }
-
-        common_apm::metrics::network::NETWORK_MESSAGE_COUNT_VEC_STATIC
-            .sent
-            .inc();
 
         Ok(())
     }

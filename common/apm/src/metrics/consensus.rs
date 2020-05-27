@@ -6,15 +6,6 @@ use crate::metrics::{
 use lazy_static::lazy_static;
 
 make_auto_flush_static_metric! {
-    pub label_enum ConsensusHeightPlusPlusKind {
-        consensus,
-        sync,
-    }
-
-    pub struct ConsensusHeightPlusPlusVec: LocalIntCounter {
-        "type" => ConsensusHeightPlusPlusKind,
-    }
-
     pub label_enum ConsensusResultKind {
         get_block_from_remote,
     }
@@ -68,22 +59,11 @@ lazy_static! {
         exponential_buckets(0.05, 1.2, 30).unwrap()
     )
     .unwrap();
-    pub static ref CONSENSUS_ROUND_HISTOGRAM_VEC: HistogramVec = register_histogram_vec!(
-        "muta_consensus_round",
-        "Consensus round info",
-        &["type"],
-        exponential_buckets(0.5, 1.5, 10).unwrap()
-    )
-    .unwrap();
 }
 
 lazy_static! {
-    pub static ref CONSENSUS_HEIGHT_PLUS_PLUS_VEC_STATIC: ConsensusHeightPlusPlusVec =
-        auto_flush_from!(CONSENSUS_HEIGHT_PLUS_PLUS_VEC, ConsensusHeightPlusPlusVec);
     pub static ref CONSENSUS_RESULT_COUNTER_VEC_STATIC: ConsensusResultCounterVec =
         auto_flush_from!(CONSENSUS_RESULT_COUNTER_VEC, ConsensusResultCounterVec);
     pub static ref CONSENSUS_TIME_HISTOGRAM_VEC_STATIC: ConsensusTimeHistogramVec =
         auto_flush_from!(CONSENSUS_TIME_HISTOGRAM_VEC, ConsensusTimeHistogramVec);
-    pub static ref CONSENSUS_ROUND_HISTOGRAM_VEC_STATIC: ConsensusRoundHistogramVec =
-        auto_flush_from!(CONSENSUS_ROUND_HISTOGRAM_VEC, ConsensusRoundHistogramVec);
 }
