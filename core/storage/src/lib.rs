@@ -181,7 +181,7 @@ impl ProtocolCodecSync for CommonHashKey {
     }
 
     fn decode_sync(mut bytes: Bytes) -> ProtocolResult<Self> {
-        debug_assert!(bytes.len() == CommonPrefix::len());
+        debug_assert!(bytes.len() >= CommonPrefix::len());
 
         let prefix = CommonPrefix::from(&bytes[0..CommonPrefix::len()]);
         let tx_hash = Hash::from_bytes(bytes.split_off(CommonPrefix::len()))?;
@@ -216,6 +216,16 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
         batch_insert!(self, block_height, signed_txs, TransactionSchema);
 
         Ok(())
+    }
+
+    async fn get_one_transaction(
+        &self,
+        _ctx: Context,
+        block_height: u64,
+        hash: Hash,
+    ) -> ProtocolResult<Option<SignedTransaction>> {
+        let tx_key = CommonHashKey::new(block_height, hash);
+        get!(self, tx_key, TransactionSchema)
     }
 
     // TODO: try use index in block
@@ -290,15 +300,51 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
     }
 
     // #[muta_apm::derive::tracing_span(kind = "storage")]
-    async fn get_receipt(
+    async fn get_one_receipt(
         &self,
         _ctx: Context,
         block_height: u64,
         hash: Hash,
     ) -> ProtocolResult<Option<Receipt>> {
-        self.adapter
-            .get::<ReceiptSchema>(CommonHashKey::new(block_height, hash.clone()))
-            .await
+        let recpt_key = CommonHashKey::new(block_height, hash);
+        get!(self, recpt_key, ReceiptSchema)
+    }
+
+    async fn get_receipts(
+        &self,
+        _ctx: Context,
+        block_height: u64,
+        hashes: Vec<Hash>,
+    ) -> ProtocolResult<Vec<Option<Receipt>>> {
+        let key_prefix = CommonPrefix::new(block_height);
+        let prepare_iter = self.adapter.prepare_iter::<ReceiptSchema, _>(&key_prefix)?;
+        let mut iter = prepare_iter.ref_to_iter();
+
+        let set = hashes.iter().collect::<HashSet<_>>();
+        let mut found = HashMap::with_capacity(hashes.len());
+        let mut count = hashes.len();
+
+        while count > 0 {
+            let (key, stx) = match iter.next() {
+                None => break,
+                Some(Ok(key_stx)) => key_stx,
+                Some(Err(err)) => return Err(err),
+            };
+
+            if key.height() != block_height {
+                break;
+            }
+
+            if set.contains(&stx.tx_hash) {
+                found.insert(stx.tx_hash.clone(), stx);
+                count -= 1;
+            }
+        }
+
+        Ok(hashes
+            .into_iter()
+            .map(|h| found.remove(&h))
+            .collect::<Vec<_>>())
     }
 
     // #[muta_apm::derive::tracing_span(kind = "storage")]

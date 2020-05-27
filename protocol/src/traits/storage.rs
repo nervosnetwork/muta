@@ -41,6 +41,13 @@ pub trait Storage: Send + Sync {
         signed_txs: Vec<SignedTransaction>,
     ) -> ProtocolResult<()>;
 
+    async fn get_one_transaction(
+        &self,
+        ctx: Context,
+        block_height: u64,
+        hash: Hash,
+    ) -> ProtocolResult<Option<SignedTransaction>>;
+
     async fn get_transactions(
         &self,
         ctx: Context,
@@ -59,12 +66,19 @@ pub trait Storage: Send + Sync {
         receipts: Vec<Receipt>,
     ) -> ProtocolResult<()>;
 
-    async fn get_receipt(
+    async fn get_one_receipt(
         &self,
         ctx: Context,
         block_height: u64,
         hash: Hash,
     ) -> ProtocolResult<Option<Receipt>>;
+
+    async fn get_receipts(
+        &self,
+        ctx: Context,
+        block_height: u64,
+        hashes: Vec<Hash>,
+    ) -> ProtocolResult<Vec<Option<Receipt>>>;
 
     async fn update_latest_proof(&self, ctx: Context, proof: Proof) -> ProtocolResult<()>;
 
