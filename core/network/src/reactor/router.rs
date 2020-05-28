@@ -85,6 +85,9 @@ where
         let route = async move {
             let des_msg = compression.decompress(raw_msg.msg)?;
             let net_msg = NetworkMessage::decode(des_msg).await?;
+            common_apm::metrics::network::NETWORK_MESSAGE_COUNT_VEC
+                .with_label_values(&["received", &net_msg.url])
+                .inc();
 
             let reactor_map = reactor_map.read();
             let endpoint = net_msg.url.parse::<Endpoint>()?;
