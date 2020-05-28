@@ -10,8 +10,7 @@ repository = "https://github.com/nervosnetwork/muta"
 [dependencies]
 protocol = { path = "../../protocol", package = "muta-protocol" }
 
-# muta-apm = "0.1.0-alpha.10"
-muta-apm = { path = "../../../muta-utils/muta-apm" }
+muta-apm = "0.1.0-alpha.10"
 prometheus = { git = "https://github.com/tikv/rust-prometheus.git", rev = "fd122caa03" }
 prometheus-static-metric = { git = "https://github.com/tikv/rust-prometheus.git", rev = "fd122caa03" }
 derive_more = "0.99"
