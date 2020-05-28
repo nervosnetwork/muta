@@ -1,14 +1,15 @@
 use std::{io, marker::PhantomData};
 
-use async_trait::async_trait;
 use futures::channel::mpsc::UnboundedSender;
 use log::error;
-use protocol::{traits::Priority, types::Address, Bytes};
 use tentacle::{
     error::Error as TentacleError,
     service::{ServiceControl, TargetSession},
     SessionId,
 };
+
+use async_trait::async_trait;
+use protocol::{traits::Priority, types::Address, Bytes};
 
 use crate::{
     error::NetworkError,
@@ -109,10 +110,26 @@ where
                 return Err(NetworkError::Send {
                     blocked,
                     other: None,
-                })
+                });
             }
             (Some(tar), opt_blocked) => (tar, opt_blocked),
         };
+
+        // `filter_bocked` only return sendable session in the `tar`
+        // TargetSession::All will parse to TargetSession::Multi(sendable_sessions)
+        match &tar {
+            TargetSession::Single(_) => {
+                common_apm::metrics::network::NETWORK_MESSAGE_COUNT_VEC_STATIC
+                    .sent
+                    .inc();
+            }
+            TargetSession::Multi(sessions) => {
+                common_apm::metrics::network::NETWORK_MESSAGE_COUNT_VEC_STATIC
+                    .sent
+                    .inc_by(sessions.len() as i64);
+            }
+            _ => {}
+        }
 
         let ret = match pri {
             Priority::High => self.inner.quick_filter_broadcast(tar, proto_id, msg),
@@ -135,10 +152,6 @@ where
                 other:   other.map(NetworkError::boxed),
             });
         }
-
-        common_apm::metrics::network::NETWORK_MESSAGE_COUNT_VEC_STATIC
-            .sent
-            .inc();
 
         Ok(())
     }

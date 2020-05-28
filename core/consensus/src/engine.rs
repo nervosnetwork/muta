@@ -51,6 +51,8 @@ pub struct ConsensusEngine<Adapter> {
     txs_wal: Arc<SignedTxsWAL>,
     crypto:  Arc<OverlordCrypto>,
     lock:    Arc<Mutex<()>>,
+
+    last_commit_time: RwLock<u64>,
 }
 
 #[async_trait]
@@ -304,6 +306,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         let block_hash = Hash::from_bytes(commit.proof.block_hash.clone())?;
         let signature = commit.proof.signature.signature.clone();
         let bitmap = commit.proof.signature.address_bitmap.clone();
+        let txs_len = pill.block.ordered_tx_hashes.len();
 
         // Storage save the latest proof.
         let proof = Proof {
@@ -313,9 +316,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             signature,
             bitmap,
         };
-        common_apm::metrics::consensus::CONSENSUS_ROUND_HISTOGRAM_VEC_STATIC
-            .round
-            .observe(proof.round as f64);
+        common_apm::metrics::consensus::ENGINE_ROUND_GAUGE.set(commit.proof.round as i64);
 
         self.adapter.save_proof(ctx.clone(), proof.clone()).await?;
 
@@ -392,9 +393,15 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             authority_list: covert_to_overlord_authority(&current_consensus_status.validators),
         };
 
-        common_apm::metrics::consensus::CONSENSUS_HEIGHT_PLUS_PLUS_VEC_STATIC
-            .consensus
-            .inc();
+        common_apm::metrics::consensus::ENGINE_HEIGHT_GAUGE.set((current_height + 1) as i64);
+        common_apm::metrics::consensus::ENGINE_COMMITED_TX_COUNTER.inc_by(txs_len as i64);
+
+        let now = time_now();
+        common_apm::metrics::consensus::ENGINE_CONSENSUS_COST_TIME
+            .observe((now - *(self.last_commit_time.read())) as f64);
+        let mut last_commit_time = self.last_commit_time.write();
+        *last_commit_time = now;
+        // pill.block.header.timestamp
         Ok(status)
     }
 
@@ -550,6 +557,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
             adapter,
             crypto,
             lock,
+            last_commit_time: RwLock::new(time_now()),
         }
     }
 
