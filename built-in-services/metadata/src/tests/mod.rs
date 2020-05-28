@@ -104,70 +104,72 @@ struct MockStorage;
 impl Storage for MockStorage {
     async fn insert_transactions(
         &self,
-        _: Context,
+        _ctx: Context,
         _: u64,
         _: Vec<SignedTransaction>,
     ) -> ProtocolResult<()> {
         unimplemented!()
     }
 
-    async fn insert_block(&self, _: Context, _: Block) -> ProtocolResult<()> {
+    async fn insert_block(&self, _ctx: Context, _: Block) -> ProtocolResult<()> {
         unimplemented!()
     }
 
-    async fn insert_receipts(&self, _: Context, _: Vec<Receipt>) -> ProtocolResult<()> {
+    async fn insert_receipts(&self, _ctx: Context, _: u64, _: Vec<Receipt>) -> ProtocolResult<()> {
         unimplemented!()
     }
 
-    async fn update_latest_proof(&self, _: Context, _: Proof) -> ProtocolResult<()> {
+    async fn update_latest_proof(&self, _ctx: Context, _: Proof) -> ProtocolResult<()> {
         unimplemented!()
     }
 
     async fn get_transaction_by_hash(
         &self,
-        _: Context,
+        _ctx: Context,
         _: Hash,
-    ) -> ProtocolResult<SignedTransaction> {
+    ) -> ProtocolResult<Option<SignedTransaction>> {
         unimplemented!()
     }
 
     async fn get_transactions(
         &self,
-        _: Context,
+        _ctx: Context,
+        _: u64,
         _: Vec<Hash>,
-    ) -> ProtocolResult<Vec<SignedTransaction>> {
+    ) -> ProtocolResult<Vec<Option<SignedTransaction>>> {
         unimplemented!()
     }
 
-    async fn get_latest_block(&self, _: Context) -> ProtocolResult<Block> {
+    async fn get_latest_block(&self, _ctx: Context) -> ProtocolResult<Block> {
         unimplemented!()
     }
 
-    async fn get_block_by_height(&self, _: Context, _: u64) -> ProtocolResult<Block> {
+    async fn get_block(&self, _ctx: Context, _: u64) -> ProtocolResult<Option<Block>> {
         unimplemented!()
     }
 
-    async fn get_block_by_hash(&self, _: Context, _: Hash) -> ProtocolResult<Block> {
+    async fn get_receipt_by_hash(&self, _ctx: Context, _: Hash) -> ProtocolResult<Option<Receipt>> {
         unimplemented!()
     }
 
-    async fn get_receipt(&self, _: Context, _: Hash) -> ProtocolResult<Receipt> {
+    async fn get_receipts(
+        &self,
+        _ctx: Context,
+        _: u64,
+        _: Vec<Hash>,
+    ) -> ProtocolResult<Vec<Option<Receipt>>> {
         unimplemented!()
     }
 
-    async fn get_receipts(&self, _: Context, _: Vec<Hash>) -> ProtocolResult<Vec<Receipt>> {
+    async fn get_latest_proof(&self, _ctx: Context) -> ProtocolResult<Proof> {
         unimplemented!()
     }
 
-    async fn get_latest_proof(&self, _: Context) -> ProtocolResult<Proof> {
+    async fn update_overlord_wal(&self, _ctx: Context, _info: Bytes) -> ProtocolResult<()> {
         unimplemented!()
     }
 
-    async fn update_overlord_wal(&self, _: Context, _info: Bytes) -> ProtocolResult<()> {
-        unimplemented!()
-    }
-
-    async fn load_overlord_wal(&self, _: Context) -> ProtocolResult<Bytes> {
+    async fn load_overlord_wal(&self, _ctx: Context) -> ProtocolResult<Bytes> {
         unimplemented!()
     }
 }
