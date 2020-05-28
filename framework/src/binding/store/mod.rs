@@ -100,7 +100,7 @@ impl<K: FixedCodec + PartialEq> FixedBuckets<K> {
         if bkt.contains(key) {
             let val = bkt.remove_item(key)?;
             self.update_index_interval(index);
-            return Ok(val);
+            Ok(val)
         } else {
             Err(StoreError::GetNone.into())
         }
@@ -142,26 +142,26 @@ impl<K: FixedCodec + PartialEq> FixedBuckets<K> {
     }
 }
 
-pub struct Bucket<K: FixedCodec + PartialEq>(pub Vec<K>);
+pub struct Bucket<K: FixedCodec + PartialEq>(Vec<K>);
 
 impl<K: FixedCodec + PartialEq> Bucket<K> {
-    pub fn new() -> Self {
+    fn new() -> Self {
         Bucket(Vec::new())
     }
 
-    pub fn len(&self) -> usize {
+    fn len(&self) -> usize {
         self.0.len()
     }
 
-    pub fn contains(&self, x: &K) -> bool {
+    fn contains(&self, x: &K) -> bool {
         self.0.contains(x)
     }
 
-    pub fn push(&mut self, value: K) {
+    fn push(&mut self, value: K) {
         self.0.push(value);
     }
 
-    pub fn remove_item(&mut self, key: &K) -> ProtocolResult<K> {
+    fn remove_item(&mut self, key: &K) -> ProtocolResult<K> {
         let mut idx = self.len();
         for (i, item) in self.0.iter().enumerate() {
             if item == key {
