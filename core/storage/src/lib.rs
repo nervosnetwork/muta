@@ -129,11 +129,11 @@ impl CommonPrefix {
         8
     }
 
-    pub fn height(&self) -> u64 {
+    pub fn height(self) -> u64 {
         u64::from_be_bytes(self.block_height)
     }
 
-    pub fn make_hash_key(&self, hash: &Hash) -> [u8; 40] {
+    pub fn make_hash_key(self, hash: &Hash) -> [u8; 40] {
         debug_assert!(hash.as_bytes().len() == 32);
 
         let mut key = [0u8; 40];

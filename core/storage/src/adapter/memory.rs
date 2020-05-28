@@ -14,9 +14,11 @@ use protocol::traits::{
 use protocol::Bytes;
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
+type Category = HashMap<Vec<u8>, Vec<u8>>;
+
 #[derive(Debug)]
 pub struct MemoryAdapter {
-    db: Arc<RwLock<HashMap<String, HashMap<Vec<u8>, Vec<u8>>>>>,
+    db: Arc<RwLock<HashMap<String, Category>>>,
 }
 
 impl MemoryAdapter {
@@ -59,7 +61,7 @@ impl<'a, S: StorageSchema> Iterator for MemoryIterator<'a, S> {
 }
 
 pub struct MemoryIntoIterator<'a, S: StorageSchema> {
-    inner: parking_lot::RwLockReadGuard<'a, HashMap<String, HashMap<Vec<u8>, Vec<u8>>>>,
+    inner: parking_lot::RwLockReadGuard<'a, HashMap<String, Category>>,
     pin_s: PhantomData<S>,
 }
 
@@ -98,7 +100,7 @@ impl StorageAdapter for MemoryAdapter {
         let mut db = self.db.write();
         let db = db
             .entry(S::category().to_string())
-            .or_insert(HashMap::new());
+            .or_insert_with(HashMap::new);
 
         db.insert(key, val);
 
@@ -114,7 +116,7 @@ impl StorageAdapter for MemoryAdapter {
         let mut db = self.db.write();
         let db = db
             .entry(S::category().to_string())
-            .or_insert(HashMap::new());
+            .or_insert_with(HashMap::new);
 
         let opt_bytes = db.get(&key.to_vec()).cloned();
 
@@ -133,7 +135,7 @@ impl StorageAdapter for MemoryAdapter {
         let mut db = self.db.write();
         let db = db
             .entry(S::category().to_string())
-            .or_insert(HashMap::new());
+            .or_insert_with(HashMap::new);
 
         db.remove(&key);
 
@@ -149,7 +151,7 @@ impl StorageAdapter for MemoryAdapter {
         let mut db = self.db.write();
         let db = db
             .entry(S::category().to_string())
-            .or_insert(HashMap::new());
+            .or_insert_with(HashMap::new);
 
         Ok(db.get(&key).is_some())
     }
@@ -179,7 +181,7 @@ impl StorageAdapter for MemoryAdapter {
         let mut db = self.db.write();
         let db = db
             .entry(S::category().to_string())
-            .or_insert(HashMap::new());
+            .or_insert_with(HashMap::new);
 
         for (key, value) in pairs.into_iter() {
             match value {
@@ -199,7 +201,7 @@ impl StorageAdapter for MemoryAdapter {
             self.db
                 .write()
                 .entry(S::category().to_string())
-                .or_insert(HashMap::new());
+                .or_insert_with(HashMap::new);
         }
 
         Ok(Box::new(MemoryIntoIterator {

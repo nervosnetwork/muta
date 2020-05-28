@@ -475,7 +475,7 @@ where
         tx_hashes: &[Hash],
     ) -> ProtocolResult<Vec<SignedTransaction>> {
         let futs = tx_hashes
-            .into_iter()
+            .iter()
             .map(|tx_hash| {
                 self.storage
                     .get_transaction_by_hash(ctx.clone(), tx_hash.to_owned())

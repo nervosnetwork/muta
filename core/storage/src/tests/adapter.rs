@@ -67,7 +67,7 @@ fn adapter_remove_test(db: impl StorageAdapter) {
     let is_exist = exec!(db.contains::<TransactionSchema>(tx_key.clone()));
     assert!(!is_exist);
 
-    let stx = &mock_signed_tx(tx_hash.clone());
+    let stx = &mock_signed_tx(tx_hash);
     exec!(db.insert::<TransactionSchema>(tx_key.clone(), stx.clone()));
     let is_exist = exec!(db.contains::<TransactionSchema>(tx_key.clone()));
     assert!(is_exist);

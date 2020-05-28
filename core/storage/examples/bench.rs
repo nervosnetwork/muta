@@ -143,8 +143,8 @@ pub async fn main() {
 
 fn get_random_bytes() -> Bytes {
     let mut buf = [0u8; 32];
-    for i in 0..32 {
-        buf[i] = rand::random::<u8>();
+    for u in &mut buf {
+        *u = rand::random::<u8>();
     }
 
     Bytes::copy_from_slice(&buf)
