@@ -41,7 +41,7 @@ impl<S: 'static + ServiceState, C: ChainQuerier, D: Dispatcher> ServiceSDK
 {
     // Alloc or recover a `Map` by` var_name`
     fn alloc_or_recover_map<
-        K: 'static + FixedCodec + Clone + PartialEq,
+        K: 'static + Send + FixedCodec + Clone + PartialEq,
         V: 'static + FixedCodec,
     >(
         &mut self,

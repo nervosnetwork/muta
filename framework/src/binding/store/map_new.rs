@@ -115,6 +115,7 @@ where
         } else {
             Bucket::new()
         };
+
         let ret = bkt.contains(key);
         self.keys.borrow_mut().recover_bucket(bkt_idx, bkt);
         Ok(ret)
@@ -153,7 +154,7 @@ where
             .is_recovered
             .iter()
             .enumerate()
-            .filter_map(|(i, &res)| if res { Some(i) } else { None })
+            .filter_map(|(i, &res)| if !res { Some(i) } else { None })
             .collect::<Vec<_>>();
 
         let prefix = self.var_name.clone() + "map_";
@@ -298,7 +299,7 @@ mod tests {
     use protocol::types::Address;
 
     use crate::binding::state::{GeneralServiceState, MPTTrie, RocksTrieDB};
-    use crate::binding::store::DefaultStoreMap;
+    use crate::binding::store::map::DefaultStoreMap;
 
     use super::*;
 
@@ -326,91 +327,49 @@ mod tests {
         }
     }
 
+    fn gen_bytes() -> Bytes {
+        Bytes::from((0..16).map(|_| random::<u8>()).collect::<Vec<_>>())
+    }
+
     #[bench]
-    fn bench_create_default_map(b: &mut Bencher) {
+    fn bench_default_map(b: &mut Bencher) {
         let path = PathBuf::from("./data/default/create");
 
         let state = Rc::new(RefCell::new(GeneralServiceState::new(MPTTrie::new(
             Arc::new(RocksTrieDB::new(path, false, 1024).unwrap()),
         ))));
-        let state_clone = Rc::clone(&state);
-        let mut map = DefaultStoreMap::<_, Hash, Asset>::new(state, "asset");
+        let mut map = DefaultStoreMap::<_, Hash, Asset>::new(Rc::clone(&state), "asset");
 
         for _i in 0..1000 {
-            let id = rand::random::<u32>().to_string();
-            let id_hash = Hash::digest(Bytes::from(id.into_bytes()));
-            map.insert(id_hash, Asset::new());
+            let hash = Hash::digest(gen_bytes());
+            map.insert(hash, Asset::new());
         }
 
+        let key = Hash::digest(gen_bytes());
         b.iter(move || {
-            let _ = DefaultStoreMap::<_, Hash, Asset>::new(Rc::clone(&state_clone), "asset");
+            let map = DefaultStoreMap::<_, Hash, Asset>::new(Rc::clone(&state), "asset");
+            map.contains(&key);
         })
     }
 
     #[bench]
-    fn bench_create_new_map(b: &mut Bencher) {
+    fn bench_new_map(b: &mut Bencher) {
         let path = PathBuf::from("./data/new/create");
 
         let state = Rc::new(RefCell::new(GeneralServiceState::new(MPTTrie::new(
             Arc::new(RocksTrieDB::new(path, false, 1024).unwrap()),
         ))));
-        let state_clone = Rc::clone(&state);
-        let mut map = NewStoreMap::<_, Hash, Asset>::new(state, "asset");
+        let mut map = NewStoreMap::<_, Hash, Asset>::new(Rc::clone(&state), "asset");
 
         for _i in 0..1000 {
-            let id = rand::random::<u32>().to_string();
-            let id_hash = Hash::digest(Bytes::from(id.into_bytes()));
+            let id_hash = Hash::digest(gen_bytes());
             map.insert(id_hash, Asset::new());
         }
 
+        let key = Hash::digest(gen_bytes());
         b.iter(move || {
-            let _ = NewStoreMap::<_, Hash, Asset>::new(Rc::clone(&state_clone), "asset");
-        })
-    }
-
-    #[bench]
-    fn bench_insert_default_map(b: &mut Bencher) {
-        let path = PathBuf::from("./data/default/insert");
-
-        let state = Rc::new(RefCell::new(GeneralServiceState::new(MPTTrie::new(
-            Arc::new(RocksTrieDB::new(path, false, 1024).unwrap()),
-        ))));
-        let mut map = DefaultStoreMap::<_, Hash, Asset>::new(state, "asset");
-
-        for _i in 0..1000 {
-            let id = rand::random::<u32>().to_string();
-            let id_hash = Hash::digest(Bytes::from(id.into_bytes()));
-            map.insert(id_hash, Asset::new());
-        }
-
-        let hash = Hash::digest(Bytes::from(rand::random::<u32>().to_string().into_bytes()));
-        let asset = Asset::new();
-
-        b.iter(move || {
-            map.insert(hash.clone(), asset.clone());
-        })
-    }
-
-    #[bench]
-    fn bench_insert_new_map(b: &mut Bencher) {
-        let path = PathBuf::from("./data/new/insert");
-
-        let state = Rc::new(RefCell::new(GeneralServiceState::new(MPTTrie::new(
-            Arc::new(RocksTrieDB::new(path, false, 1024).unwrap()),
-        ))));
-        let mut map = NewStoreMap::<_, Hash, Asset>::new(state, "asset");
-
-        for _i in 0..1000 {
-            let id = rand::random::<u32>().to_string();
-            let id_hash = Hash::digest(Bytes::from(id.into_bytes()));
-            map.insert(id_hash, Asset::new());
-        }
-
-        let hash = Hash::digest(Bytes::from(rand::random::<u32>().to_string().into_bytes()));
-        let asset = Asset::new();
-
-        b.iter(move || {
-            map.insert(hash.clone(), asset.clone());
+            let map = NewStoreMap::<_, Hash, Asset>::new(Rc::clone(&state), "asset");
+            map.contains(&key);
         })
     }
 
@@ -421,15 +380,17 @@ mod tests {
         let state = Rc::new(RefCell::new(GeneralServiceState::new(MPTTrie::new(
             Arc::new(RocksTrieDB::new(path, false, 1024).unwrap()),
         ))));
-        let mut map = DefaultStoreMap::<_, Hash, Asset>::new(state, "asset");
+        let mut map = DefaultStoreMap::<_, Hash, Asset>::new(Rc::clone(&state), "asset");
 
         for _i in 0..1000 {
-            let id = rand::random::<u32>().to_string();
-            let id_hash = Hash::digest(Bytes::from(id.into_bytes()));
-            map.insert(id_hash, Asset::new());
+            let hash = Hash::digest(gen_bytes());
+            map.insert(hash, Asset::new());
         }
 
-        b.iter(move || for _ in map.iter() {})
+        b.iter(move || {
+            let map = DefaultStoreMap::<_, Hash, Asset>::new(Rc::clone(&state), "asset");
+            for _ in map.iter() {}
+        })
     }
 
     #[bench]
@@ -439,14 +400,16 @@ mod tests {
         let state = Rc::new(RefCell::new(GeneralServiceState::new(MPTTrie::new(
             Arc::new(RocksTrieDB::new(path, false, 1024).unwrap()),
         ))));
-        let mut map = NewStoreMap::<_, Hash, Asset>::new(state, "asset");
+        let mut map = NewStoreMap::<_, Hash, Asset>::new(Rc::clone(&state), "asset");
 
         for _i in 0..1000 {
-            let id = rand::random::<u32>().to_string();
-            let id_hash = Hash::digest(Bytes::from(id.into_bytes()));
-            map.inner_insert(id_hash, Asset::new()).unwrap();
+            let hash = Hash::digest(gen_bytes());
+            map.insert(hash, Asset::new());
         }
 
-        b.iter(move || for _ in map.iter() {})
+        b.iter(move || {
+            let map = NewStoreMap::<_, Hash, Asset>::new(Rc::clone(&state), "asset");
+            for _ in map.iter() {}
+        })
     }
 }
