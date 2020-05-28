@@ -17,7 +17,7 @@ pub struct NewStoreMap<S: ServiceState, K: FixedCodec + PartialEq, V: FixedCodec
     state:    Rc<RefCell<S>>,
     var_name: String,
     keys:     RefCell<FixedBuckets<K>>,
-    len_key:  Hash,
+    len_key:  Bytes,
     len:      u32,
     phantom:  PhantomData<V>,
 }
@@ -29,7 +29,7 @@ where
     V: 'static + FixedCodec,
 {
     pub fn new(state: Rc<RefCell<S>>, name: &str) -> Self {
-        let len_key = Hash::digest(Bytes::from(name.to_string() + "_map_len"));
+        let len_key = Bytes::from(name.to_string() + "_map_len");
         let len = state.borrow().get(&len_key).expect("").unwrap_or(0u32);
 
         NewStoreMap {
@@ -121,10 +121,15 @@ where
         Ok(ret)
     }
 
-    fn get_map_key(&self, key_bytes: &Bytes) -> Hash {
+    fn get_map_key(&self, key_bytes: &Bytes) -> Bytes {
         let mut name_bytes = self.var_name.as_bytes().to_vec();
         name_bytes.extend_from_slice(key_bytes);
-        Hash::digest(Bytes::from(name_bytes))
+
+        if key_bytes.len() > 32 {
+            Hash::digest(Bytes::from(name_bytes)).as_bytes()
+        } else {
+            Bytes::from(name_bytes)
+        }
     }
 
     fn get_bucket_name(&self, index: usize) -> Hash {
@@ -180,6 +185,11 @@ where
         for (idx, bkt) in idxs.into_iter().zip(buckets.into_iter()) {
             self.keys.borrow_mut().recover_bucket(idx, bkt);
         }
+    }
+
+    #[cfg(test)]
+    fn get_buckets(self) -> FixedBuckets<K> {
+        self.keys.into_inner()
     }
 }
 
@@ -290,6 +300,7 @@ mod tests {
     use std::path::PathBuf;
     use std::sync::Arc;
 
+    use cita_trie::MemoryDB;
     use muta_codec_derive::RlpFixedCodec;
     use rand::random;
     use serde::{Deserialize, Serialize};
@@ -302,6 +313,49 @@ mod tests {
     use crate::binding::store::map::DefaultStoreMap;
 
     use super::*;
+
+    fn gen_bytes() -> Bytes {
+        Bytes::from((0..16).map(|_| random::<u8>()).collect::<Vec<_>>())
+    }
+
+    #[test]
+    fn test_map_and_bucket() {
+        let state = Rc::new(RefCell::new(GeneralServiceState::new(MPTTrie::new(
+            Arc::new(MemoryDB::new(false)),
+        ))));
+        let mut map = NewStoreMap::<_, Bytes, Bytes>::new(Rc::clone(&state), "test");
+        let key_1 = gen_bytes();
+        let val_1 = gen_bytes();
+        let key_2 = gen_bytes();
+        let val_2 = gen_bytes();
+        let key_idx_1 = get_bucket_index(&key_1.encode_fixed().unwrap());
+        let key_idx_2 = get_bucket_index(&key_2.encode_fixed().unwrap());
+
+        map.insert(key_1, val_1);
+        map.insert(key_2, val_2);
+
+        assert!(map.len() == 2);
+
+        let fbkt = map.get_buckets();
+        assert!(fbkt.is_recovered[key_idx_1]);
+        assert!(fbkt.is_recovered[key_idx_2]);
+        assert!(fbkt.len() == 2);
+
+        let max = key_idx_1.max(key_idx_2);
+        let min = key_idx_1.min(key_idx_2);
+        let res = (0..17)
+            .map(|i| {
+                if i > max {
+                    2u32
+                } else if i > min {
+                    1u32
+                } else {
+                    0u32
+                }
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(fbkt.bucket_lens, res);
+    }
 
     #[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug, PartialEq, Default)]
     pub struct Asset {
@@ -325,10 +379,6 @@ mod tests {
                 .unwrap(),
             }
         }
-    }
-
-    fn gen_bytes() -> Bytes {
-        Bytes::from((0..16).map(|_| random::<u8>()).collect::<Vec<_>>())
     }
 
     #[bench]
@@ -390,6 +440,7 @@ mod tests {
         b.iter(move || {
             let map = DefaultStoreMap::<_, Hash, Asset>::new(Rc::clone(&state), "asset");
             for _ in map.iter() {}
+            assert_eq!(map.len(), 1000);
         })
     }
 
@@ -410,6 +461,7 @@ mod tests {
         b.iter(move || {
             let map = NewStoreMap::<_, Hash, Asset>::new(Rc::clone(&state), "asset");
             for _ in map.iter() {}
+            assert_eq!(map.len(), 1000);
         })
     }
 }

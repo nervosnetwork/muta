@@ -120,7 +120,7 @@ pub trait Service {
 pub trait ServiceSDK {
     // Alloc or recover a `Map` by` var_name`
     fn alloc_or_recover_map<
-        Key: 'static + FixedCodec + Clone + PartialEq,
+        Key: 'static + Send + FixedCodec + Clone + PartialEq,
         Val: 'static + FixedCodec,
     >(
         &mut self,

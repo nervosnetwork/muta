@@ -10,7 +10,7 @@ use protocol::fixed_codec::{FixedCodec, FixedCodecError};
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
 pub use array::DefaultStoreArray;
-pub use map::DefaultStoreMap;
+pub use map_new::NewStoreMap as DefaultStoreMap;
 pub use primitive::{DefaultStoreBool, DefaultStoreString, DefaultStoreUint64};
 
 pub struct FixedKeys<K: FixedCodec> {
@@ -217,7 +217,8 @@ impl<K: FixedCodec + PartialEq> FixedCodec for Bucket<K> {
 
 #[inline(always)]
 fn get_bucket_index(bytes: &Bytes) -> usize {
-    (bytes[0] >> 4) as usize
+    let len = bytes.len() - 1;
+    (bytes[len] >> 4) as usize
 }
 
 #[derive(Debug, Display, From)]
