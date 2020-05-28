@@ -123,6 +123,9 @@ pub enum ConsensusError {
     ///
     WALErr(std::io::Error),
 
+    #[display(fmt = "Storage item not found")]
+    StorageItemNotFound,
+
     /// Other error used for very few errors.
     #[display(fmt = "{:?}", _0)]
     Other(String),

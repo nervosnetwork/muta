@@ -33,7 +33,7 @@ use core_mempool::{
     END_GOSSIP_NEW_TXS, RPC_PULL_TXS, RPC_RESP_PULL_TXS, RPC_RESP_PULL_TXS_SYNC,
 };
 use core_network::{NetworkConfig, NetworkService};
-use core_storage::{adapter::rocks::RocksAdapter, ImplStorage};
+use core_storage::{adapter::rocks::RocksAdapter, ImplStorage, StorageError};
 use framework::binding::state::RocksTrieDB;
 use framework::executor::{ServiceExecutor, ServiceExecutorFactory};
 use protocol::traits::{APIAdapter, Context, MemPool, NodeInfo, ServiceMapping, Storage};
@@ -393,10 +393,23 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     // lost current status.
     log::info!("Re-execute from {} to {}", exec_height + 1, current_height);
     for height in exec_height + 1..=current_height {
-        let block = storage.get_block_by_height(Context::new(), height).await?;
+        let block = storage
+            .get_block(Context::new(), height)
+            .await?
+            .ok_or_else(|| StorageError::GetNone)?;
         let txs = storage
-            .get_transactions(Context::new(), block.ordered_tx_hashes.clone())
-            .await?;
+            .get_transactions(
+                Context::new(),
+                block.header.height,
+                block.ordered_tx_hashes.clone(),
+            )
+            .await?
+            .into_iter()
+            .filter_map(|opt_stx| opt_stx)
+            .collect::<Vec<_>>();
+        if txs.len() != block.ordered_tx_hashes.len() {
+            return Err(StorageError::GetNone.into());
+        }
         let rich_block = RichBlock { block, txs };
         let _ = synchronization
             .exec_block(Context::new(), rich_block, status_agent.clone())

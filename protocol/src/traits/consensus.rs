@@ -70,6 +70,7 @@ pub trait SynchronizationAdapter: CommonConsensusAdapter + Send + Sync {
     async fn get_txs_from_remote(
         &self,
         ctx: Context,
+        height: u64,
         hashes: &[Hash],
     ) -> ProtocolResult<Vec<SignedTransaction>>;
 
@@ -98,7 +99,12 @@ pub trait CommonConsensusAdapter: Send + Sync {
         signed_txs: Vec<SignedTransaction>,
     ) -> ProtocolResult<()>;
 
-    async fn save_receipts(&self, ctx: Context, receipts: Vec<Receipt>) -> ProtocolResult<()>;
+    async fn save_receipts(
+        &self,
+        ctx: Context,
+        height: u64,
+        receipts: Vec<Receipt>,
+    ) -> ProtocolResult<()>;
 
     /// Flush the given transactions in the mempool.
     async fn flush_mempool(&self, ctx: Context, ordered_tx_hashes: &[Hash]) -> ProtocolResult<()>;

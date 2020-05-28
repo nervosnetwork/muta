@@ -230,11 +230,11 @@ impl<R: Rpc + 'static, S: Storage + 'static> MessageHandler for PullBlockRpcHand
     #[muta_apm::derive::tracing_span(name = "pull_block_rpc", kind = "consensus.message")]
     async fn process(&self, ctx: Context, msg: FixedHeight) -> TrustFeedback {
         let id = msg.inner;
-        let ret = self
-            .storage
-            .get_block_by_height(ctx.clone(), id)
-            .await
-            .map(FixedBlock::new);
+        let ret = match self.storage.get_block(ctx.clone(), id).await {
+            Ok(Some(block)) => Ok(FixedBlock::new(block)),
+            Ok(None) => Err(StorageError::GetNone.into()),
+            Err(e) => Err(e),
+        };
         self.rpc
             .response(ctx, RPC_RESP_SYNC_PULL_BLOCK, ret, Priority::High)
             .unwrap_or_else(move |e: ProtocolError| warn!("[core_consensus] push block {}", e))
@@ -272,12 +272,9 @@ impl<R: Rpc + 'static, S: Storage + 'static> MessageHandler for PullProofRpcHand
         let ret = match latest_proof {
             Ok(latest_proof) => match height {
                 height if height < latest_proof.height => {
-                    match self
-                        .storage
-                        .get_block_by_height(ctx.clone(), height + 1)
-                        .await
-                    {
-                        Ok(next_block) => Ok(next_block.header.proof),
+                    match self.storage.get_block(ctx.clone(), height + 1).await {
+                        Ok(Some(next_block)) => Ok(next_block.header.proof),
+                        Ok(None) => Err(StorageError::GetNone.into()),
                         Err(_) => Err(StorageError::GetNone.into()),
                     }
                 }
@@ -323,12 +320,32 @@ impl<R: Rpc + 'static, S: Storage + 'static> MessageHandler for PullTxsRpcHandle
 
     #[muta_apm::derive::tracing_span(name = "pull_txs_rpc", kind = "consensus.message")]
     async fn process(&self, ctx: Context, msg: PullTxsRequest) -> TrustFeedback {
-        let futs = msg
-            .inner
-            .into_iter()
-            .map(|tx_hash| self.storage.get_transaction_by_hash(ctx.clone(), tx_hash))
-            .collect::<Vec<_>>();
-        let ret = try_join_all(futs).await.map(FixedSignedTxs::new);
+        let PullTxsRequest { height, inner } = msg;
+
+        let ret = if let Some(height) = height {
+            self.storage
+                .get_transactions(ctx.clone(), height, inner)
+                .await
+                .map(|txs| {
+                    txs.into_iter()
+                        .filter_map(|opt_tx| opt_tx)
+                        .collect::<Vec<_>>()
+                })
+                .map(FixedSignedTxs::new)
+        } else {
+            let futs = inner
+                .into_iter()
+                .map(|tx_hash| self.storage.get_transaction_by_hash(ctx.clone(), tx_hash))
+                .collect::<Vec<_>>();
+            try_join_all(futs)
+                .await
+                .map(|txs| {
+                    txs.into_iter()
+                        .filter_map(|opt_tx| opt_tx)
+                        .collect::<Vec<_>>()
+                })
+                .map(FixedSignedTxs::new)
+        };
 
         self.rpc
             .response(ctx, RPC_RESP_SYNC_PULL_TXS, ret, Priority::High)

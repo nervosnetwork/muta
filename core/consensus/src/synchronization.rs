@@ -150,7 +150,8 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
 
     #[muta_apm::derive::tracing_span(
         kind = "consensus.sync",
-        logs = "{'current_height': 'current_height', 'remote_height': 'remote_height'}"
+        logs = "{'current_height': 'current_height', 'remote_height':
+    'remote_height'}"
     )]
     async fn start_sync(
         &self,
@@ -360,7 +361,11 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
         Ok(())
     }
 
-    #[muta_apm::derive::tracing_span(kind = "consensus.sync", logs = "{'height': 'height'}")]
+    #[muta_apm::derive::tracing_span(
+        kind = "consensus.sync",
+        logs = "{'height':
+    'height'}"
+    )]
     async fn get_rich_block_from_remote(
         &self,
         ctx: Context,
@@ -373,7 +378,7 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
         for tx_hashes in block.ordered_tx_hashes.chunks(self.sync_txs_chunk_size) {
             let remote_txs = self
                 .adapter
-                .get_txs_from_remote(ctx.clone(), &tx_hashes)
+                .get_txs_from_remote(ctx.clone(), height, &tx_hashes)
                 .await?;
 
             txs.extend(remote_txs);
@@ -382,14 +387,22 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
         Ok(RichBlock { block, txs })
     }
 
-    #[muta_apm::derive::tracing_span(kind = "consensus.sync", logs = "{'height': 'height'}")]
+    #[muta_apm::derive::tracing_span(
+        kind = "consensus.sync",
+        logs = "{'height':
+    'height'}"
+    )]
     async fn get_block_from_remote(&self, ctx: Context, height: u64) -> ProtocolResult<Block> {
         self.adapter
             .get_block_from_remote(ctx.clone(), height)
             .await
     }
 
-    #[muta_apm::derive::tracing_span(kind = "consensus.sync", logs = "{'txs_len': 'txs.len()'}")]
+    #[muta_apm::derive::tracing_span(
+        kind = "consensus.sync",
+        logs = "{'txs_len':
+    'txs.len()'}"
+    )]
     async fn save_chain_data(
         &self,
         ctx: Context,
@@ -400,7 +413,9 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
         self.adapter
             .save_signed_txs(ctx.clone(), block.header.height, txs)
             .await?;
-        self.adapter.save_receipts(ctx.clone(), receipts).await?;
+        self.adapter
+            .save_receipts(ctx.clone(), block.header.height, receipts)
+            .await?;
         self.adapter
             .save_proof(ctx.clone(), block.header.proof.clone())
             .await?;

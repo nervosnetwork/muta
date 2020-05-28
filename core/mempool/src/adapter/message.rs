@@ -90,6 +90,7 @@ where
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct MsgPullTxs {
+    pub height: Option<u64>,
     #[serde(with = "core_network::serde_multi")]
     pub hashes: Vec<Hash>,
 }
@@ -127,7 +128,7 @@ where
         let push_txs = async move {
             let ret = self
                 .mem_pool
-                .get_full_txs(ctx.clone(), msg.hashes)
+                .get_full_txs(ctx.clone(), msg.height, msg.hashes)
                 .await
                 .map(|sig_txs| MsgPushTxs { sig_txs });
 

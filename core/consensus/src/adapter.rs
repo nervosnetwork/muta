@@ -93,7 +93,7 @@ where
         ctx: Context,
         txs: Vec<Hash>,
     ) -> ProtocolResult<Vec<SignedTransaction>> {
-        self.mempool.get_full_txs(ctx, txs).await
+        self.mempool.get_full_txs(ctx, None, txs).await
     }
 
     #[muta_apm::derive::tracing_span(kind = "consensus.adapter")]
@@ -160,7 +160,11 @@ where
         ctx: Context,
         height: u64,
     ) -> ProtocolResult<Vec<Validator>> {
-        let block = self.storage.get_block_by_height(ctx, height).await?;
+        let block = self
+            .storage
+            .get_block(ctx, height)
+            .await?
+            .ok_or_else(|| ConsensusError::StorageItemNotFound)?;
         Ok(block.header.validators)
     }
 
@@ -200,7 +204,7 @@ where
             .call::<PullTxsRequest, FixedSignedTxs>(
                 ctx,
                 end,
-                PullTxsRequest::new(hashes),
+                PullTxsRequest::new(None, hashes),
                 Priority::High,
             )
             .await?;
@@ -216,7 +220,11 @@ where
 
     #[muta_apm::derive::tracing_span(kind = "consensus.adapter", logs = "{'txs_len': 'txs.len()'}")]
     async fn verify_txs(&self, ctx: Context, height: u64, txs: Vec<Hash>) -> ProtocolResult<()> {
-        if let Err(e) = self.mempool.ensure_order_txs(ctx.clone(), txs).await {
+        if let Err(e) = self
+            .mempool
+            .ensure_order_txs(ctx.clone(), Some(height), txs)
+            .await
+        {
             log::error!("verify_txs error {:?}", e);
             return Err(ConsensusError::VerifyTransaction(height).into());
         }
@@ -332,6 +340,7 @@ where
     async fn get_txs_from_remote(
         &self,
         ctx: Context,
+        height: u64,
         hashes: &[Hash],
     ) -> ProtocolResult<Vec<SignedTransaction>> {
         let res = self
@@ -339,7 +348,7 @@ where
             .call::<PullTxsRequest, FixedSignedTxs>(
                 ctx,
                 RPC_SYNC_PULL_TXS,
-                PullTxsRequest::new(hashes.to_vec()),
+                PullTxsRequest::new(Some(height), hashes.to_vec()),
                 Priority::High,
             )
             .await?;
@@ -422,8 +431,13 @@ where
         kind = "consensus.adapter",
         logs = "{'receipts_len': 'receipts.len()'}"
     )]
-    async fn save_receipts(&self, ctx: Context, receipts: Vec<Receipt>) -> ProtocolResult<()> {
-        self.storage.insert_receipts(ctx, receipts).await
+    async fn save_receipts(
+        &self,
+        ctx: Context,
+        height: u64,
+        receipts: Vec<Receipt>,
+    ) -> ProtocolResult<()> {
+        self.storage.insert_receipts(ctx, height, receipts).await
     }
 
     /// Flush the given transactions in the mempool.
@@ -438,7 +452,10 @@ where
     /// Get a block corresponding to the given height.
     #[muta_apm::derive::tracing_span(kind = "consensus.adapter")]
     async fn get_block_by_height(&self, ctx: Context, height: u64) -> ProtocolResult<Block> {
-        self.storage.get_block_by_height(ctx, height).await
+        self.storage
+            .get_block(ctx, height)
+            .await?
+            .ok_or_else(|| ConsensusError::StorageItemNotFound.into())
     }
 
     /// Get the current height from storage.
@@ -457,7 +474,18 @@ where
         ctx: Context,
         tx_hashes: &[Hash],
     ) -> ProtocolResult<Vec<SignedTransaction>> {
-        self.storage.get_transactions(ctx, tx_hashes.to_vec()).await
+        let futs = tx_hashes
+            .into_iter()
+            .map(|tx_hash| {
+                self.storage
+                    .get_transaction_by_hash(ctx.clone(), tx_hash.to_owned())
+            })
+            .collect::<Vec<_>>();
+        futures::future::try_join_all(futs).await.map(|txs| {
+            txs.into_iter()
+                .filter_map(|opt_tx| opt_tx)
+                .collect::<Vec<_>>()
+        })
     }
 
     #[muta_apm::derive::tracing_span(kind = "consensus.adapter")]
@@ -924,7 +952,7 @@ where
         );
 
         let now = Instant::now();
-        self.save_receipts(info.ctx.clone(), resp.receipts.clone())
+        self.save_receipts(info.ctx.clone(), height, resp.receipts.clone())
             .await?;
         log::info!(
             "[consensus-adapter]: save receipts cost {:?} receipts len {:?}",
@@ -945,8 +973,13 @@ where
         kind = "consensus.adapter",
         logs = "{'receipts_len': 'receipts.len()'}"
     )]
-    async fn save_receipts(&self, ctx: Context, receipts: Vec<Receipt>) -> ProtocolResult<()> {
-        self.storage.insert_receipts(ctx, receipts).await
+    async fn save_receipts(
+        &self,
+        ctx: Context,
+        height: u64,
+        receipts: Vec<Receipt>,
+    ) -> ProtocolResult<()> {
+        self.storage.insert_receipts(ctx, height, receipts).await
     }
 }
 
