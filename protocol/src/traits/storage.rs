@@ -14,6 +14,7 @@ pub enum StorageCategory {
     Receipt,
     SignedTransaction,
     Wal,
+    HashHeight,
 }
 
 pub type StorageIterator<'a, S> = Box<
@@ -41,19 +42,18 @@ pub trait Storage: Send + Sync {
         signed_txs: Vec<SignedTransaction>,
     ) -> ProtocolResult<()>;
 
-    async fn get_one_transaction(
-        &self,
-        ctx: Context,
-        block_height: u64,
-        hash: Hash,
-    ) -> ProtocolResult<Option<SignedTransaction>>;
-
     async fn get_transactions(
         &self,
         ctx: Context,
         block_height: u64,
         hashes: Vec<Hash>,
     ) -> ProtocolResult<Vec<Option<SignedTransaction>>>;
+
+    async fn get_transaction_by_hash(
+        &self,
+        ctx: Context,
+        hash: Hash,
+    ) -> ProtocolResult<Option<SignedTransaction>>;
 
     async fn insert_block(&self, ctx: Context, block: Block) -> ProtocolResult<()>;
 
@@ -66,10 +66,9 @@ pub trait Storage: Send + Sync {
         receipts: Vec<Receipt>,
     ) -> ProtocolResult<()>;
 
-    async fn get_one_receipt(
+    async fn get_receipt_by_hash(
         &self,
         ctx: Context,
-        block_height: u64,
         hash: Hash,
     ) -> ProtocolResult<Option<Receipt>>;
 

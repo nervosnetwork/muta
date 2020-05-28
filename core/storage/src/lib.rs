@@ -32,8 +32,19 @@ lazy_static! {
     pub static ref OVERLORD_WAL_KEY: Hash = Hash::digest(Bytes::from("overlord_wal"));
 }
 
+// FIXME: https://github.com/facebook/rocksdb/wiki/Transactions
 macro_rules! batch_insert {
     ($self_: ident, $block_height:expr, $vec: expr, $schema: ident) => {
+        let (hashes, heights) = $vec
+            .iter()
+            .map(|item| {
+                (
+                    item.tx_hash.clone(),
+                    StorageBatchModify::Insert($block_height),
+                )
+            })
+            .unzip();
+
         let (keys, batch_stxs): (Vec<_>, Vec<_>) = $vec
             .into_iter()
             .map(|item| {
@@ -47,6 +58,11 @@ macro_rules! batch_insert {
         $self_
             .adapter
             .batch_modify::<$schema>(keys, batch_stxs)
+            .await?;
+
+        $self_
+            .adapter
+            .batch_modify::<HashHeightSchema>(hashes, heights)
             .await?;
     };
 }
@@ -225,6 +241,7 @@ impl_storage_schema_for!(
 );
 impl_storage_schema_for!(BlockSchema, BlockKey, Block, Block);
 impl_storage_schema_for!(ReceiptSchema, CommonHashKey, Receipt, Receipt);
+impl_storage_schema_for!(HashHeightSchema, Hash, u64, HashHeight);
 impl_storage_schema_for!(LatestBlockSchema, Hash, Block, Block);
 impl_storage_schema_for!(LatestProofSchema, Hash, Proof, Block);
 impl_storage_schema_for!(OverlordWalSchema, Hash, Bytes, Wal);
@@ -243,17 +260,7 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
         Ok(())
     }
 
-    async fn get_one_transaction(
-        &self,
-        _ctx: Context,
-        block_height: u64,
-        hash: Hash,
-    ) -> ProtocolResult<Option<SignedTransaction>> {
-        let tx_key = CommonHashKey::new(block_height, hash);
-        get!(self, tx_key, TransactionSchema)
-    }
-
-    // TODO: try use index in block
+    // TODO: use TransactionBytesSchema
     async fn get_transactions(
         &self,
         _ctx: Context,
@@ -293,6 +300,22 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
             .collect::<Vec<_>>())
     }
 
+    async fn get_transaction_by_hash(
+        &self,
+        _ctx: Context,
+        hash: Hash,
+    ) -> ProtocolResult<Option<SignedTransaction>> {
+        if let Some(block_height) = get!(self, hash.clone(), HashHeightSchema)? {
+            get!(
+                self,
+                CommonHashKey::new(block_height, hash),
+                TransactionSchema
+            )
+        } else {
+            Ok(None)
+        }
+    }
+
     // #[muta_apm::derive::tracing_span(kind = "storage")]
     async fn insert_block(&self, _ctx: Context, block: Block) -> ProtocolResult<()> {
         self.adapter
@@ -325,16 +348,6 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
     }
 
     // #[muta_apm::derive::tracing_span(kind = "storage")]
-    async fn get_one_receipt(
-        &self,
-        _ctx: Context,
-        block_height: u64,
-        hash: Hash,
-    ) -> ProtocolResult<Option<Receipt>> {
-        let recpt_key = CommonHashKey::new(block_height, hash);
-        get!(self, recpt_key, ReceiptSchema)
-    }
-
     async fn get_receipts(
         &self,
         _ctx: Context,
@@ -370,6 +383,18 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
             .into_iter()
             .map(|h| found.remove(&h))
             .collect::<Vec<_>>())
+    }
+
+    async fn get_receipt_by_hash(
+        &self,
+        _ctx: Context,
+        hash: Hash,
+    ) -> ProtocolResult<Option<Receipt>> {
+        if let Some(block_height) = get!(self, hash.clone(), HashHeightSchema)? {
+            get!(self, CommonHashKey::new(block_height, hash), ReceiptSchema)
+        } else {
+            Ok(None)
+        }
     }
 
     // #[muta_apm::derive::tracing_span(kind = "storage")]

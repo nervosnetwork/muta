@@ -16,7 +16,7 @@ use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
 #[derive(Debug)]
 pub struct MemoryAdapter {
-    db: Arc<RwLock<HashMap<Vec<u8>, Vec<u8>>>>,
+    db: Arc<RwLock<HashMap<String, HashMap<Vec<u8>, Vec<u8>>>>>,
 }
 
 impl MemoryAdapter {
@@ -59,7 +59,7 @@ impl<'a, S: StorageSchema> Iterator for MemoryIterator<'a, S> {
 }
 
 pub struct MemoryIntoIterator<'a, S: StorageSchema> {
-    inner: parking_lot::RwLockReadGuard<'a, HashMap<Vec<u8>, Vec<u8>>>,
+    inner: parking_lot::RwLockReadGuard<'a, HashMap<String, HashMap<Vec<u8>, Vec<u8>>>>,
     pin_s: PhantomData<S>,
 }
 
@@ -69,7 +69,11 @@ impl<'a, 'b: 'a, S: StorageSchema> IntoIterator for &'b MemoryIntoIterator<'a, S
 
     fn into_iter(self) -> Self::IntoIter {
         Box::new(MemoryIterator {
-            inner: self.inner.iter(),
+            inner: self
+                .inner
+                .get(&S::category().to_string())
+                .expect("impossible, already ensure we have category in prepare_iter")
+                .iter(),
             pin_s: PhantomData::<S>,
         })
     }
@@ -91,7 +95,12 @@ impl StorageAdapter for MemoryAdapter {
         let key = key.encode_sync()?.to_vec();
         let val = val.encode_sync()?.to_vec();
 
-        self.db.write().insert(key, val);
+        let mut db = self.db.write();
+        let db = db
+            .entry(S::category().to_string())
+            .or_insert(HashMap::new());
+
+        db.insert(key, val);
 
         Ok(())
     }
@@ -102,7 +111,12 @@ impl StorageAdapter for MemoryAdapter {
     ) -> ProtocolResult<Option<<S as StorageSchema>::Value>> {
         let key = key.encode_sync()?;
 
-        let opt_bytes = self.db.read().get(&key.to_vec()).cloned();
+        let mut db = self.db.write();
+        let db = db
+            .entry(S::category().to_string())
+            .or_insert(HashMap::new());
+
+        let opt_bytes = db.get(&key.to_vec()).cloned();
 
         if let Some(bytes) = opt_bytes {
             let val = <_>::decode_sync(Bytes::copy_from_slice(&bytes))?;
@@ -116,7 +130,12 @@ impl StorageAdapter for MemoryAdapter {
     async fn remove<S: StorageSchema>(&self, key: <S as StorageSchema>::Key) -> ProtocolResult<()> {
         let key = key.encode_sync()?.to_vec();
 
-        self.db.write().remove(&key);
+        let mut db = self.db.write();
+        let db = db
+            .entry(S::category().to_string())
+            .or_insert(HashMap::new());
+
+        db.remove(&key);
 
         Ok(())
     }
@@ -127,7 +146,12 @@ impl StorageAdapter for MemoryAdapter {
     ) -> ProtocolResult<bool> {
         let key = key.encode_sync()?.to_vec();
 
-        Ok(self.db.read().get(&key).is_some())
+        let mut db = self.db.write();
+        let db = db
+            .entry(S::category().to_string())
+            .or_insert(HashMap::new());
+
+        Ok(db.get(&key).is_some())
     }
 
     async fn batch_modify<S: StorageSchema>(
@@ -152,10 +176,15 @@ impl StorageAdapter for MemoryAdapter {
             pairs.push((key, value))
         }
 
+        let mut db = self.db.write();
+        let db = db
+            .entry(S::category().to_string())
+            .or_insert(HashMap::new());
+
         for (key, value) in pairs.into_iter() {
             match value {
-                Some(value) => self.db.write().insert(key.to_vec(), value.to_vec()),
-                None => self.db.write().remove(&key.to_vec()),
+                Some(value) => db.insert(key.to_vec(), value.to_vec()),
+                None => db.remove(&key.to_vec()),
             };
         }
 
@@ -166,6 +195,13 @@ impl StorageAdapter for MemoryAdapter {
         &'b self,
         _prefix: &P,
     ) -> ProtocolResult<Box<dyn IntoIteratorByRef<S> + 'a>> {
+        {
+            self.db
+                .write()
+                .entry(S::category().to_string())
+                .or_insert(HashMap::new());
+        }
+
         Ok(Box::new(MemoryIntoIterator {
             inner: self.db.read(),
             pin_s: PhantomData::<S>,
