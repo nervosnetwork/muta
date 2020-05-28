@@ -30,7 +30,11 @@ where
 {
     pub fn new(state: Rc<RefCell<S>>, name: &str) -> Self {
         let len_key = Bytes::from(name.to_string() + "_map_len");
-        let len = state.borrow().get(&len_key).expect("").unwrap_or(0u32);
+        let len = state
+            .borrow()
+            .get(&len_key)
+            .expect("Get len failed")
+            .unwrap_or(0u32);
 
         DefaultStoreMap {
             state,
@@ -132,10 +136,10 @@ where
         }
     }
 
-    fn get_bucket_name(&self, index: usize) -> Hash {
-        Hash::digest(Bytes::from(
-            self.var_name.clone() + "map_" + &index.to_string(),
-        ))
+    fn get_bucket_name(&self, index: usize) -> Bytes {
+        let mut bytes = (self.var_name.clone() + "_bucket_").as_bytes().to_vec();
+        bytes.extend_from_slice(&index.to_le_bytes());
+        Bytes::from(bytes)
     }
 
     fn len_add_one(&mut self) -> ProtocolResult<()> {
@@ -162,12 +166,11 @@ where
             .filter_map(|(i, &res)| if !res { Some(i) } else { None })
             .collect::<Vec<_>>();
 
-        let prefix = self.var_name.clone() + "map_";
         let opt_bytes = idxs
             .iter()
             .map(|idx| {
-                let hash = Hash::digest(Bytes::from(prefix.clone() + &idx.to_string()));
-                self.state.borrow().get(&hash).unwrap()
+                let name = self.get_bucket_name(*idx);
+                self.state.borrow().get(&name).unwrap()
             })
             .collect::<Vec<_>>();
 
@@ -175,7 +178,7 @@ where
             .into_par_iter()
             .map(|bytes| {
                 if let Some(bs) = bytes {
-                    <_>::decode_fixed(bs).expect("")
+                    <_>::decode_fixed(bs).expect("Decode bucket failed")
                 } else {
                     Bucket::new()
                 }
@@ -325,12 +328,12 @@ mod tests {
         map.insert(key_1, val_1);
         map.insert(key_2, val_2);
 
-        assert!(map.len() == 2);
+        assert_eq!(map.len(), 2);
 
         let fbkt = map.get_buckets();
         assert!(fbkt.is_recovered[key_idx_1]);
         assert!(fbkt.is_recovered[key_idx_2]);
-        assert!(fbkt.len() == 2);
+        assert_eq!(fbkt.len(), 2);
 
         let max = key_idx_1.max(key_idx_2);
         let min = key_idx_1.min(key_idx_2);
