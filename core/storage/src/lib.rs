@@ -26,6 +26,8 @@ use protocol::types::{Block, Hash, Proof, Receipt, SignedTransaction};
 use protocol::Bytes;
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
+const BATCH_VALUE_DECODE_NUMBER: usize = 1000;
+
 lazy_static! {
     pub static ref LATEST_BLOCK_KEY: Hash = Hash::digest(Bytes::from("latest_hash"));
     pub static ref LATEST_PROOF_KEY: Hash = Hash::digest(Bytes::from("latest_proof"));
@@ -239,6 +241,12 @@ impl_storage_schema_for!(
     SignedTransaction,
     SignedTransaction
 );
+impl_storage_schema_for!(
+    TransactionBytesSchema,
+    CommonHashKey,
+    Bytes,
+    SignedTransaction
+);
 impl_storage_schema_for!(BlockSchema, BlockKey, Block, Block);
 impl_storage_schema_for!(ReceiptSchema, CommonHashKey, Receipt, Receipt);
 impl_storage_schema_for!(HashHeightSchema, Hash, u64, HashHeight);
@@ -260,7 +268,6 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
         Ok(())
     }
 
-    // TODO: use TransactionBytesSchema
     async fn get_transactions(
         &self,
         _ctx: Context,
@@ -268,31 +275,68 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
         hashes: Vec<Hash>,
     ) -> ProtocolResult<Vec<Option<SignedTransaction>>> {
         let key_prefix = CommonPrefix::new(block_height);
-        let prepare_iter = self
-            .adapter
-            .prepare_iter::<TransactionSchema, _>(&key_prefix)?;
-        let mut iter = prepare_iter.ref_to_iter();
+        let mut found = Vec::with_capacity(hashes.len());
 
-        let set = hashes.iter().collect::<HashSet<_>>();
-        let mut found = HashMap::with_capacity(hashes.len());
-        let mut count = hashes.len();
+        {
+            let prepare_iter = self
+                .adapter
+                .prepare_iter::<TransactionBytesSchema, _>(&key_prefix)?;
+            let mut iter = prepare_iter.ref_to_iter();
 
-        while count > 0 {
-            let (key, stx) = match iter.next() {
-                None => break,
-                Some(Ok(key_stx)) => key_stx,
-                Some(Err(err)) => return Err(err),
-            };
+            let set = hashes.iter().collect::<HashSet<_>>();
+            let mut count = hashes.len();
 
-            if key.height() != block_height {
-                break;
-            }
+            while count > 0 {
+                let (key, stx_bytes) = match iter.next() {
+                    None => break,
+                    Some(Ok(key_to_stx_bytes)) => key_to_stx_bytes,
+                    Some(Err(err)) => return Err(err),
+                };
 
-            if set.contains(&stx.tx_hash) {
-                found.insert(stx.tx_hash.clone(), stx);
-                count -= 1;
+                if key.height() != block_height {
+                    break;
+                }
+
+                if set.contains(&key.hash) {
+                    found.push((key.hash, stx_bytes));
+                    count -= 1;
+                }
             }
         }
+
+        let mut found = {
+            if found.len() <= BATCH_VALUE_DECODE_NUMBER {
+                found
+                    .drain(..)
+                    .map(|(k, v): (Hash, Bytes)| SignedTransaction::decode_sync(v).map(|v| (k, v)))
+                    .collect::<ProtocolResult<Vec<_>>>()?
+                    .into_iter()
+                    .collect::<HashMap<_, _>>()
+            } else {
+                let futs = found
+                    .chunks(BATCH_VALUE_DECODE_NUMBER)
+                    .map(|vals| {
+                        let vals = vals.to_owned();
+
+                        // FIXME: cancel decode
+                        tokio::spawn(async move {
+                            vals.into_iter()
+                                .map(|(k, v)| <_>::decode_sync(v).map(|v| (k, v)))
+                                .collect::<ProtocolResult<Vec<_>>>()
+                        })
+                    })
+                    .collect::<Vec<_>>();
+
+                futures::future::try_join_all(futs)
+                    .await
+                    .map_err(|_| StorageError::BatchDecode)?
+                    .into_iter()
+                    .collect::<ProtocolResult<Vec<Vec<_>>>>()?
+                    .into_iter()
+                    .flatten()
+                    .collect::<HashMap<_, _>>()
+            }
+        };
 
         Ok(hashes
             .into_iter()
@@ -365,7 +409,7 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
         while count > 0 {
             let (key, stx) = match iter.next() {
                 None => break,
-                Some(Ok(key_stx)) => key_stx,
+                Some(Ok(key_to_stx_bytes)) => key_to_stx_bytes,
                 Some(Err(err)) => return Err(err),
             };
 
@@ -442,6 +486,9 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
 pub enum StorageError {
     #[display(fmt = "get none")]
     GetNone,
+
+    #[display(fmt = "decode batch value")]
+    BatchDecode,
 }
 
 impl Error for StorageError {}
