@@ -15,19 +15,19 @@ use std::{
     time::Instant,
 };
 
-const NUMBER_OF_TXS_PER_ROUND: usize = 1000_000; // 100W, 172.8M
+const NUMBER_OF_TXS_PER_ROUND: usize = 15_000; // 1.5W, 2.5M
 
 #[tokio::main]
 pub async fn main() {
     if std::env::args().nth(1) == Some("generate".to_string()) {
-        println!("generate 100W txs");
+        println!("generate 1.5W txs");
 
         let mut height = 1u64;
         let mut count = std::env::args()
             .nth(2)
-            .expect("number of round(100W txs per round, 172.6M)")
+            .expect("number of round(1.5W txs per round, 2.5M)")
             .parse::<u64>()
-            .expect("number of round(100W txs per round, 172.6M)");
+            .expect("number of round(1.5W txs per round, 2.5M)");
 
         let db_path = std::env::args().nth(3).expect("db patch");
         let max_fd = std::env::args()
@@ -53,7 +53,7 @@ pub async fn main() {
         let adapter = RocksAdapter::new(db_path, max_fd).expect("create adapter");
         let storage = ImplStorage::new(Arc::new(adapter));
 
-        let mut hash_keys = Vec::with_capacity(1_000_000);
+        let mut hash_keys = Vec::with_capacity(NUMBER_OF_TXS_PER_ROUND);
 
         while count > 0 {
             let stxs = (0..NUMBER_OF_TXS_PER_ROUND)
