@@ -391,10 +391,11 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
         Ok(())
     }
 
-    #[muta_apm::derive::tracing_span(kind = "storage")]
+    // FIXME: clippy::suspicious_else_formatting
+    // #[muta_apm::derive::tracing_span(kind = "storage")]
     async fn get_receipts(
         &self,
-        ctx: Context,
+        _ctx: Context,
         block_height: u64,
         hashes: Vec<Hash>,
     ) -> ProtocolResult<Vec<Option<Receipt>>> {
