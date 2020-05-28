@@ -157,8 +157,16 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
         Ok(())
     }
 
-    #[muta_apm::derive::tracing_span(kind = "executor.before_hook", tags = "{'hook_type': 'hook_type'}")]
-    fn hook(&mut self, ctx: Context, hook_type: HookType, exec_params: &ExecutorParams) -> ProtocolResult<()> {
+    #[muta_apm::derive::tracing_span(
+        kind = "executor.before_hook",
+        tags = "{'hook_type': 'hook_type'}"
+    )]
+    fn hook(
+        &mut self,
+        ctx: Context,
+        hook_type: HookType,
+        exec_params: &ExecutorParams,
+    ) -> ProtocolResult<()> {
         for name in self.service_mapping.list_service_name().into_iter() {
             let sdk = self.get_sdk(&name)?;
             let mut service = self.service_mapping.get_service(name.as_str(), sdk)?;
@@ -303,7 +311,7 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
     }
 
     #[muta_apm::derive::tracing_span(kind = "executor.logs_bloom")]
-    fn logs_bloom(&self,ctx: Context, receipts: &[Receipt]) -> Bloom {
+    fn logs_bloom(&self, ctx: Context, receipts: &[Receipt]) -> Bloom {
         let mut bloom = Bloom::default();
         for receipt in receipts {
             for event in receipt.events.iter() {
