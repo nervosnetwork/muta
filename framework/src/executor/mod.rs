@@ -11,7 +11,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use cita_trie::DB as TrieDB;
-use derive_more::{Display, From};
+use derive_more::Display;
 
 use bytes::BytesMut;
 use protocol::traits::{
@@ -409,7 +409,7 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
     }
 }
 
-#[derive(Debug, Display, From)]
+#[derive(Debug, Display)]
 pub enum ExecutorError {
     #[display(fmt = "service {:?} was not found", service)]
     NotFoundService { service: String },

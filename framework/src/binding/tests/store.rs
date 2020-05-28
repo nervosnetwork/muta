@@ -92,11 +92,11 @@ fn test_default_store_map() {
         let mut it = sm.iter();
         assert_eq!(
             it.next().unwrap(),
-            (&Hash::digest(Bytes::from("key_1")), Bytes::from("val_1"))
+            (Hash::digest(Bytes::from("key_2")), Bytes::from("val_2"))
         );
         assert_eq!(
             it.next().unwrap(),
-            (&Hash::digest(Bytes::from("key_2")), Bytes::from("val_2"))
+            (Hash::digest(Bytes::from("key_1")), Bytes::from("val_1"))
         );
         assert_eq!(it.next().is_none(), true);
     }
@@ -113,7 +113,13 @@ fn test_default_store_map() {
     sm.remove(&Hash::digest(Bytes::from("key_1"))).unwrap();
 
     assert_eq!(sm.contains(&Hash::digest(Bytes::from("key_1"))), false);
-    assert_eq!(sm.len(), 1u32)
+    assert_eq!(sm.len(), 1u32);
+
+    let sm = DefaultStoreMap::<_, Hash, Bytes>::new(Rc::clone(&rs), "test");
+    assert_eq!(
+        sm.get(&Hash::digest(Bytes::from("key_2"))).unwrap(),
+        Bytes::from("val_2")
+    );
 }
 
 #[test]

@@ -119,7 +119,10 @@ pub trait Service {
 // - ServiceState
 pub trait ServiceSDK {
     // Alloc or recover a `Map` by` var_name`
-    fn alloc_or_recover_map<Key: 'static + FixedCodec + PartialEq, Val: 'static + FixedCodec>(
+    fn alloc_or_recover_map<
+        Key: 'static + Send + FixedCodec + Clone + PartialEq,
+        Val: 'static + FixedCodec,
+    >(
         &mut self,
         var_name: &str,
     ) -> Box<dyn StoreMap<Key, Val>>;
@@ -210,7 +213,7 @@ pub trait StoreMap<K: FixedCodec + PartialEq, V: FixedCodec> {
 
     fn is_empty(&self) -> bool;
 
-    fn iter<'a>(&'a self) -> Box<dyn Iterator<Item = (&K, V)> + 'a>;
+    fn iter<'a>(&'a self) -> Box<dyn Iterator<Item = (K, V)> + 'a>;
 }
 
 pub trait StoreArray<E: FixedCodec> {
