@@ -34,7 +34,7 @@ use crate::message::{
     END_GOSSIP_SIGNED_VOTE,
 };
 use crate::status::StatusAgent;
-use crate::util::{check_list_roots, OverlordCrypto};
+use crate::util::{check_list_roots, digest_signed_transactions, OverlordCrypto};
 use crate::wal::SignedTxsWAL;
 use crate::ConsensusError;
 
@@ -78,13 +78,18 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         let (ordered_tx_hashes, propose_hashes) = self
             .adapter
             .get_txs_from_mempool(
-                ctx,
+                ctx.clone(),
                 next_height,
                 current_consensus_status.cycles_limit,
                 current_consensus_status.tx_num_limit,
             )
             .await?
             .clap();
+        let signed_txs = self
+            .adapter
+            .get_full_txs(ctx.clone(), ordered_tx_hashes.clone())
+            .await?;
+        let order_signed_transactions_hash = digest_signed_transactions(&signed_txs)?;
 
         if current_consensus_status.latest_committed_height != next_height - 1 {
             return Err(ProtocolError::from(ConsensusError::MissingBlockHeader(
@@ -94,17 +99,17 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         }
 
         let order_root = Merkle::from_hashes(ordered_tx_hashes.clone()).get_root_hash();
-
         let state_root = current_consensus_status.get_latest_state_root();
 
         let header = BlockHeader {
             chain_id: self.node_info.chain_id.clone(),
-            pre_hash: current_consensus_status.current_hash,
+            prev_hash: current_consensus_status.current_hash,
             height: next_height,
             exec_height: current_consensus_status.exec_height,
             timestamp: time_now(),
             logs_bloom: current_consensus_status.list_logs_bloom,
             order_root: order_root.unwrap_or_else(Hash::from_empty),
+            order_signed_transactions_hash,
             confirm_root: current_consensus_status.list_confirm_root,
             state_root,
             receipt_root: current_consensus_status.list_receipt_root.clone(),
@@ -217,6 +222,12 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
                     log::error!("[consensus] check_block, verify_txs error",);
                     e
                 })?;
+
+            let signed_txs = self
+                .adapter
+                .get_full_txs(ctx.clone(), block.inner.block.ordered_tx_hashes.clone())
+                .await?;
+            self.check_order_transactions(ctx.clone(), &block.inner.block, &signed_txs)?;
 
             let adapter = Arc::clone(&self.adapter);
             let ctx_clone = ctx.clone();
@@ -571,17 +582,17 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
         let status = self.status_agent.to_inner();
 
         // check previous hash
-        if status.current_hash != block.pre_hash {
+        if status.current_hash != block.prev_hash {
             trace::error(
                 "check_block_prev_hash_diff".to_string(),
                 Some(json!({
-                    "next block prev_hash": block.pre_hash.as_hex(),
+                    "next block prev_hash": block.prev_hash.as_hex(),
                     "status current hash": status.current_hash.as_hex(),
                 })),
             );
             return Err(ConsensusError::InvalidPrevhash {
                 expect: status.current_hash,
-                actual: block.pre_hash.clone(),
+                actual: block.prev_hash.clone(),
             }
             .into());
         }
@@ -675,6 +686,39 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
                     .collect::<Vec<_>>()
             );
             return Err(ConsensusError::InvalidStatusVec.into());
+        }
+
+        Ok(())
+    }
+
+    #[muta_apm::derive::tracing_span(
+        kind = "consensus.engine",
+        logs = "{'txs_len': 'signed_txs.len()'}"
+    )]
+    fn check_order_transactions(
+        &self,
+        ctx: Context,
+        block: &Block,
+        signed_txs: &[SignedTransaction],
+    ) -> ProtocolResult<()> {
+        let order_root = Merkle::from_hashes(block.ordered_tx_hashes.clone())
+            .get_root_hash()
+            .unwrap_or_else(Hash::from_empty);
+        if order_root != block.header.order_root {
+            return Err(ConsensusError::InvalidOrderRoot {
+                expect: order_root,
+                actual: block.header.order_root.clone(),
+            }
+            .into());
+        }
+
+        let order_signed_transactions_hash = digest_signed_transactions(signed_txs)?;
+        if order_signed_transactions_hash != block.header.order_signed_transactions_hash {
+            return Err(ConsensusError::InvalidOrderSignedTransactionsHash {
+                expect: order_signed_transactions_hash,
+                actual: block.header.order_signed_transactions_hash.clone(),
+            }
+            .into());
         }
 
         Ok(())
@@ -789,7 +833,7 @@ pub fn trace_block(block: &Block) {
         "commit_block".to_string(),
         Some(json!({
             "height": block.header.height,
-            "pre_hash": block.header.pre_hash.as_hex(),
+            "prev_hash": block.header.prev_hash.as_hex(),
             "order_root": block.header.order_root.as_hex(),
             "state_root": block.header.state_root.as_hex(),
             "proposer": block.header.proposer.as_hex(),

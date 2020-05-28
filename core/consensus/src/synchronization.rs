@@ -16,7 +16,8 @@ use protocol::ProtocolResult;
 
 use crate::engine::generate_new_crypto_map;
 use crate::status::{ExecutedInfo, StatusAgent};
-use crate::util::OverlordCrypto;
+use crate::util::{digest_signed_transactions, OverlordCrypto};
+use crate::ConsensusError;
 
 const POLLING_BROADCAST: u64 = 2000;
 const WAIT_EXECUTION: u64 = 1000;
@@ -250,17 +251,24 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
                     e
                 })?;
 
-            self.adapter
-                .verify_txs_sync(
-                    ctx.clone(),
-                    consenting_height,
-                    consenting_rich_block.txs.clone(),
-                )
-                .await
-                .map_err(|e| {
-                    log::error!("[synchronization]: verify_txs_sync error",);
-                    e
-                })?;
+            let order_signed_transactions_hash =
+                digest_signed_transactions(&consenting_rich_block.txs)?;
+            if order_signed_transactions_hash
+                != consenting_rich_block
+                    .block
+                    .header
+                    .order_signed_transactions_hash
+            {
+                return Err(ConsensusError::InvalidOrderSignedTransactionsHash {
+                    expect: order_signed_transactions_hash,
+                    actual: consenting_rich_block
+                        .block
+                        .header
+                        .order_signed_transactions_hash
+                        .clone(),
+                }
+                .into());
+            }
 
             self.commit_block(
                 ctx.clone(),

@@ -36,7 +36,7 @@ pub struct BlockHeader {
     pub height: u64,
 
     #[prost(message, tag = "3")]
-    pub pre_hash: Option<Hash>,
+    pub prev_hash: Option<Hash>,
 
     #[prost(uint64, tag = "4")]
     pub timestamp: u64,
@@ -47,31 +47,34 @@ pub struct BlockHeader {
     #[prost(message, tag = "6")]
     pub order_root: Option<Hash>,
 
-    #[prost(message, repeated, tag = "7")]
+    #[prost(message, tag = "7")]
+    pub order_signed_transactions_hash: Option<Hash>,
+
+    #[prost(message, repeated, tag = "8")]
     pub confirm_root: Vec<Hash>,
 
-    #[prost(message, tag = "8")]
+    #[prost(message, tag = "9")]
     pub state_root: Option<Hash>,
 
-    #[prost(message, repeated, tag = "9")]
+    #[prost(message, repeated, tag = "10")]
     pub receipt_root: Vec<Hash>,
 
-    #[prost(message, repeated, tag = "10")]
+    #[prost(message, repeated, tag = "11")]
     pub cycles_used: Vec<u64>,
 
-    #[prost(message, tag = "11")]
+    #[prost(message, tag = "12")]
     pub proposer: Option<Address>,
 
-    #[prost(message, tag = "12")]
+    #[prost(message, tag = "13")]
     pub proof: Option<Proof>,
 
-    #[prost(uint64, tag = "13")]
+    #[prost(uint64, tag = "14")]
     pub validator_version: u64,
 
-    #[prost(message, repeated, tag = "14")]
+    #[prost(message, repeated, tag = "15")]
     pub validators: Vec<Validator>,
 
-    #[prost(uint64, tag = "15")]
+    #[prost(uint64, tag = "16")]
     pub exec_height: u64,
 }
 
@@ -161,8 +164,10 @@ impl TryFrom<Block> for block::Block {
 impl From<block::BlockHeader> for BlockHeader {
     fn from(block_header: block::BlockHeader) -> BlockHeader {
         let chain_id = Some(Hash::from(block_header.chain_id));
-        let pre_hash = Some(Hash::from(block_header.pre_hash));
+        let prev_hash = Some(Hash::from(block_header.prev_hash));
         let order_root = Some(Hash::from(block_header.order_root));
+        let order_signed_transactions_hash =
+            Some(Hash::from(block_header.order_signed_transactions_hash));
         let state_root = Some(Hash::from(block_header.state_root));
         let proposer = Some(Address::from(block_header.proposer));
         let proof = Some(Proof::from(block_header.proof));
@@ -192,10 +197,11 @@ impl From<block::BlockHeader> for BlockHeader {
             chain_id,
             height: block_header.height,
             exec_height: block_header.exec_height,
-            pre_hash,
+            prev_hash,
             timestamp: block_header.timestamp,
             logs_bloom,
             order_root,
+            order_signed_transactions_hash,
             confirm_root,
             state_root,
             receipt_root,
@@ -213,8 +219,13 @@ impl TryFrom<BlockHeader> for block::BlockHeader {
 
     fn try_from(block_header: BlockHeader) -> Result<block::BlockHeader, Self::Error> {
         let chain_id = field!(block_header.chain_id, "BlockHeader", "chain_id")?;
-        let pre_hash = field!(block_header.pre_hash, "BlockHeader", "pre_hash")?;
+        let prev_hash = field!(block_header.prev_hash, "BlockHeader", "prev_hash")?;
         let order_root = field!(block_header.order_root, "BlockHeader", "order_root")?;
+        let order_signed_transactions_hash = field!(
+            block_header.order_signed_transactions_hash,
+            "BlockHeader",
+            "order_signed_transactions_hash"
+        )?;
         let state_root = field!(block_header.state_root, "BlockHeader", "state_root")?;
         let proposer = field!(block_header.proposer, "BlockHeader", "proposer")?;
         let proof = field!(block_header.proof, "BlockHeader", "proof")?;
@@ -243,10 +254,13 @@ impl TryFrom<BlockHeader> for block::BlockHeader {
             chain_id: protocol_primitive::Hash::try_from(chain_id)?,
             height: block_header.height,
             exec_height: block_header.exec_height,
-            pre_hash: protocol_primitive::Hash::try_from(pre_hash)?,
+            prev_hash: protocol_primitive::Hash::try_from(prev_hash)?,
             timestamp: block_header.timestamp,
             logs_bloom,
             order_root: protocol_primitive::Hash::try_from(order_root)?,
+            order_signed_transactions_hash: protocol_primitive::Hash::try_from(
+                order_signed_transactions_hash,
+            )?,
             confirm_root,
             state_root: protocol_primitive::Hash::try_from(state_root)?,
             receipt_root,

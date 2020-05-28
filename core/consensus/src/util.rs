@@ -2,6 +2,8 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::error::Error;
 
+use bytes::buf::BufMut;
+use bytes::BytesMut;
 use overlord::Crypto;
 use parking_lot::RwLock;
 
@@ -10,9 +12,10 @@ use common_crypto::{
     BlsCommonReference, BlsPrivateKey, BlsPublicKey, BlsSignature, BlsSignatureVerify, HashValue,
     PrivateKey, Signature,
 };
+use protocol::fixed_codec::FixedCodec;
 use protocol::traits::Context;
 use protocol::types::{Address, Hash, MerkleRoot, SignedTransaction};
-use protocol::{Bytes, ProtocolError};
+use protocol::{Bytes, ProtocolError, ProtocolResult};
 
 pub struct OverlordCrypto {
     private_key: BlsPrivateKey,
@@ -159,6 +162,21 @@ pub fn check_list_roots<T: Eq>(cache_roots: &[T], block_roots: &[T]) -> bool {
             .iter()
             .zip(block_roots.iter())
             .all(|(c_root, e_root)| c_root == e_root)
+}
+
+pub fn digest_signed_transactions(signed_txs: &[SignedTransaction]) -> ProtocolResult<Hash> {
+    if signed_txs.is_empty() {
+        return Ok(Hash::from_empty());
+    }
+
+    let mut list_bytes = BytesMut::new();
+
+    for signed_tx in signed_txs.iter() {
+        let bytes = signed_tx.encode_fixed()?;
+        list_bytes.put(bytes);
+    }
+
+    Ok(Hash::digest(list_bytes.freeze()))
 }
 
 #[cfg(test)]
