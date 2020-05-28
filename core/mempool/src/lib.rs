@@ -197,9 +197,6 @@ where
             self.tx_cache.queue_len(),
         );
         let inst = Instant::now();
-        common_apm::metrics::mempool::MEMPOOL_COUNTER_STATIC
-            .package
-            .inc();
         let result = self
             .tx_cache
             .package(
@@ -209,25 +206,24 @@ where
                 current_height + self.timeout_gap.load(Ordering::Relaxed),
             )
             .await;
-        if result.is_err() {
-            common_apm::metrics::mempool::MEMPOOL_RESULT_COUNTER_STATIC
-                .package
-                .failure
-                .inc();
-            return result;
+        match result {
+            Ok(txs) => {
+                common_apm::metrics::mempool::MEMPOOL_PACKAGE_SIZE_VEC_STATIC
+                    .package
+                    .observe((txs.order_tx_hashes.len()) as f64);
+                common_apm::metrics::mempool::MEMPOOL_TIME_STATIC
+                    .package
+                    .observe(common_apm::metrics::duration_to_sec(inst.elapsed()));
+                Ok(txs)
+            }
+            Err(e) => {
+                common_apm::metrics::mempool::MEMPOOL_RESULT_COUNTER_STATIC
+                    .package
+                    .failure
+                    .inc();
+                Err(e)
+            }
         }
-        let r = result.unwrap();
-        common_apm::metrics::mempool::MEMPOOL_PACKAGE_SIZE_VEC_STATIC
-            .package
-            .observe((r.order_tx_hashes.len() + r.propose_tx_hashes.len()) as f64);
-        common_apm::metrics::mempool::MEMPOOL_RESULT_COUNTER_STATIC
-            .package
-            .success
-            .inc();
-        common_apm::metrics::mempool::MEMPOOL_TIME_STATIC
-            .package
-            .observe(common_apm::metrics::duration_to_sec(inst.elapsed()));
-        Ok(r)
     }
 
     #[muta_apm::derive::tracing_span(
