@@ -397,8 +397,9 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         common_apm::metrics::consensus::ENGINE_COMMITED_TX_COUNTER.inc_by(txs_len as i64);
 
         let now = time_now();
-        common_apm::metrics::consensus::ENGINE_CONSENSUS_COST_TIME
-            .observe((now - *(self.last_commit_time.read())) as f64);
+        let last_commit_time = *(self.last_commit_time.read());
+        let elapsed = (now - last_commit_time) as f64;
+        common_apm::metrics::consensus::ENGINE_CONSENSUS_COST_TIME.observe(elapsed / 1e3);
         let mut last_commit_time = self.last_commit_time.write();
         *last_commit_time = now;
         // pill.block.header.timestamp
