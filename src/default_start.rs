@@ -42,6 +42,8 @@ use protocol::{fixed_codec::FixedCodec, ProtocolResult};
 
 use crate::config::Config;
 use crate::MainError;
+use futures_timer::Delay;
+use std::time::Duration;
 
 pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
     config: &Config,
@@ -209,6 +211,16 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         config.mempool.pool_size as usize,
         mempool_adapter,
     ));
+
+    let monitor_mempool = Arc::clone(&mempool);
+    tokio::spawn(async move {
+        let interval = Duration::from_millis(1000);
+        loop {
+            Delay::new(interval).await;
+            common_apm::metrics::mempool::MEMPOOL_LEN_GAUGE
+                .set(monitor_mempool.get_tx_cache().len().await as i64);
+        }
+    });
 
     // Init trie db
     let path_state = config.data_path_for_state();
