@@ -708,28 +708,31 @@ fn mock_chained_rich_block(len: u64, gap: u64, key_tool: &KeyTool) -> (Vec<RichB
 
 fn mock_genesis_rich_block() -> RichBlock {
     let header = BlockHeader {
-        chain_id: Hash::from_empty(),
-        height: 0,
-        exec_height: 0,
-        prev_hash: Hash::from_empty(),
-        timestamp: 0,
-        logs_bloom: vec![],
-        order_root: Hash::from_empty(),
+        chain_id:                       Hash::from_empty(),
+        height:                         0,
+        exec_height:                    0,
+        prev_hash:                      Hash::from_empty(),
+        timestamp:                      0,
+        logs_bloom:                     vec![],
+        order_root:                     Hash::from_empty(),
         order_signed_transactions_hash: Hash::from_empty(),
-        confirm_root: vec![],
-        state_root: Hash::from_empty(),
-        receipt_root: vec![],
-        cycles_used: vec![],
-        proposer: Address::from_hex("0x82c67c421d208fb7015d2da79550212a50f2e773").unwrap(),
-        proof: Proof {
+        confirm_root:                   vec![],
+        state_root:                     Hash::from_empty(),
+        receipt_root:                   vec![],
+        cycles_used:                    vec![],
+        proposer:                       Address::from_hex(
+            "0x82c67c421d208fb7015d2da79550212a50f2e773",
+        )
+        .unwrap(),
+        proof:                          Proof {
             height:     0,
             round:      0,
             block_hash: Hash::from_empty(),
             signature:  Bytes::new(),
             bitmap:     Bytes::new(),
         },
-        validator_version: 0,
-        validators: vec![Validator {
+        validator_version:              0,
+        validators:                     vec![Validator {
             address:        Address::from_hex("0x82c67c421d208fb7015d2da79550212a50f2e773")
                 .unwrap(),
             propose_weight: 0,

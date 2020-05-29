@@ -34,22 +34,22 @@ pub struct Block {
     validators
 )]
 pub struct BlockHeader {
-    pub chain_id: Hash,
-    pub height: u64,
-    pub exec_height: u64,
-    pub prev_hash: Hash,
-    pub timestamp: u64,
-    pub logs_bloom: Vec<Bloom>,
-    pub order_root: MerkleRoot,
+    pub chain_id:                       Hash,
+    pub height:                         u64,
+    pub exec_height:                    u64,
+    pub prev_hash:                      Hash,
+    pub timestamp:                      u64,
+    pub logs_bloom:                     Vec<Bloom>,
+    pub order_root:                     MerkleRoot,
     pub order_signed_transactions_hash: Hash,
-    pub confirm_root: Vec<MerkleRoot>,
-    pub state_root: MerkleRoot,
-    pub receipt_root: Vec<MerkleRoot>,
-    pub cycles_used: Vec<u64>,
-    pub proposer: Address,
-    pub proof: Proof,
-    pub validator_version: u64,
-    pub validators: Vec<Validator>,
+    pub confirm_root:                   Vec<MerkleRoot>,
+    pub state_root:                     MerkleRoot,
+    pub receipt_root:                   Vec<MerkleRoot>,
+    pub cycles_used:                    Vec<u64>,
+    pub proposer:                       Address,
+    pub proof:                          Proof,
+    pub validator_version:              u64,
+    pub validators:                     Vec<Validator>,
 }
 
 #[derive(RlpFixedCodec, Serialize, Deserialize, Clone, Debug, Hash, PartialEq, Eq)]
