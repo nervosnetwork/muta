@@ -38,7 +38,7 @@ lazy_static! {
     pub static ref NETWORK_MESSAGE_COUNT_VEC: IntCounterVec = register_int_counter_vec!(
         "muta_network_message_total",
         "Total number of network message",
-        &["direction"]
+        &["direction", "url"]
     )
     .expect("network message total");
     pub static ref NETWORK_RPC_RESULT_COUNT_VEC: IntCounterVec = register_int_counter_vec!(
@@ -57,8 +57,6 @@ lazy_static! {
 }
 
 lazy_static! {
-    pub static ref NETWORK_MESSAGE_COUNT_VEC_STATIC: MessageCounterVec =
-        auto_flush_from!(NETWORK_MESSAGE_COUNT_VEC, MessageCounterVec);
     pub static ref NETWORK_RPC_RESULT_COUNT_VEC_STATIC: RPCResultCounterVec =
         auto_flush_from!(NETWORK_RPC_RESULT_COUNT_VEC, RPCResultCounterVec);
     pub static ref NETWORK_PROTOCOL_TIME_HISTOGRAM_VEC_STATIC: ProtocolTimeHistogramVec = auto_flush_from!(
