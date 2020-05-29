@@ -19,8 +19,6 @@ addons:
   apt:
     packages:
     - gcc
-    - librocksdb5.8
-    - librocksdb-dev
 
 matrix:
   include:
