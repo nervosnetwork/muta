@@ -346,21 +346,6 @@ where
             .await?;
         Ok(ret.inner)
     }
-
-    #[muta_apm::derive::tracing_span(kind = "consensus.adapter", logs = "{'txs_len': 'txs.len()'}")]
-    async fn verify_txs_sync(
-        &self,
-        ctx: Context,
-        height: u64,
-        txs: Vec<SignedTransaction>,
-    ) -> ProtocolResult<()> {
-        if let Err(e) = self.mempool.ensure_order_txs_sync(ctx.clone(), txs).await {
-            log::error!("verify_txs error {:?}", e);
-            return Err(ConsensusError::VerifyTransaction(height).into());
-        }
-
-        Ok(())
-    }
 }
 
 #[async_trait]
@@ -534,11 +519,11 @@ where
 
         let previous_block_hash = Hash::digest(previous_block.header.encode_fixed()?);
 
-        if previous_block_hash != block.header.pre_hash {
+        if previous_block_hash != block.header.prev_hash {
             log::error!(
-                "[consensus] verify_block_header, previous_block_hash: {:?}, block.header.pre_hash: {:?}",
+                "[consensus] verify_block_header, previous_block_hash: {:?}, block.header.prev_hash: {:?}",
                 previous_block_hash,
-                block.header.pre_hash
+                block.header.prev_hash
             );
             return Err(
                 ConsensusError::VerifyBlockHeader(block.header.height, PreviousBlockHash).into(),
@@ -546,7 +531,7 @@ where
         }
 
         // the block 0 and 1 's proof is consensus-ed by community
-        if block.header.height > 1u64 && block.header.pre_hash != block.header.proof.block_hash {
+        if block.header.height > 1u64 && block.header.prev_hash != block.header.proof.block_hash {
             log::error!(
                 "[consensus] verify_block_header, verifying_block header : {:?}",
                 block.header

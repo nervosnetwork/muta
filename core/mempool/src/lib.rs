@@ -348,29 +348,6 @@ where
 
     #[muta_apm::derive::tracing_span(
         kind = "mempool",
-        logs = "{'tx_len':
-     'order_txs.len()'}"
-    )]
-    async fn ensure_order_txs_sync(
-        &self,
-        ctx: Context,
-        order_txs: Vec<SignedTransaction>,
-    ) -> ProtocolResult<()> {
-        let mut unknown_txs = vec![];
-
-        for signed_tx in order_txs.into_iter() {
-            if !self.tx_cache.contain(&signed_tx.tx_hash).await
-                && !self.callback_cache.contains_key(&signed_tx.tx_hash).await
-            {
-                unknown_txs.push(signed_tx);
-            }
-        }
-
-        self.verify_tx_in_parallel(ctx, unknown_txs).await
-    }
-
-    #[muta_apm::derive::tracing_span(
-        kind = "mempool",
         logs = "{'tx_len': 'propose_tx_hashes.len()'}"
     )]
     async fn sync_propose_txs(

@@ -115,7 +115,7 @@ mod tests {
 
     use super::*;
 
-    static FULL_TXS_PATH: &str = "./devtools/chain/data";
+    static FULL_TXS_PATH: &str = "./free-space";
 
     pub fn mock_hash() -> Hash {
         Hash::digest(get_random_bytes(10))

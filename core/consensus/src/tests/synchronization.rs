@@ -25,7 +25,7 @@ use protocol::ProtocolResult;
 
 use crate::status::{CurrentConsensusStatus, StatusAgent};
 use crate::synchronization::{OverlordSynchronization, RichBlock};
-use crate::util::OverlordCrypto;
+use crate::util::{digest_signed_transactions, OverlordCrypto};
 use crate::BlockHeaderField::{PreviousBlockHash, ProofHash, Proposer};
 use crate::BlockProofField::{BitMap, HashMismatch, HeightMismatch, WeightNotFound};
 use crate::{BlockHeaderField, BlockProofField, ConsensusError};
@@ -206,15 +206,6 @@ impl SynchronizationAdapter for MockCommonConsensusAdapter {
     async fn get_proof_from_remote(&self, _: Context, height: u64) -> ProtocolResult<Proof> {
         Ok(self.remote_proofs.read().get(&height).unwrap().clone())
     }
-
-    async fn verify_txs_sync(
-        &self,
-        _: Context,
-        _: u64,
-        _: Vec<SignedTransaction>,
-    ) -> ProtocolResult<()> {
-        Ok(())
-    }
 }
 
 #[async_trait]
@@ -327,11 +318,11 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
 
         let previous_block_hash = Hash::digest(previous_block.header.encode_fixed()?);
 
-        if previous_block_hash != block.header.pre_hash {
+        if previous_block_hash != block.header.prev_hash {
             log::error!(
-                "[consensus] verify_block_header, previous_block_hash: {:?}, block.header.pre_hash: {:?}",
+                "[consensus] verify_block_header, previous_block_hash: {:?}, block.header.prev_hash: {:?}",
                 previous_block_hash,
-                block.header.pre_hash
+                block.header.prev_hash
             );
             return Err(
                 ConsensusError::VerifyBlockHeader(block.header.height, PreviousBlockHash).into(),
@@ -339,7 +330,7 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
         }
 
         // the block 0 and 1 's proof is consensus-ed by community
-        if block.header.height > 1u64 && block.header.pre_hash != block.header.proof.block_hash {
+        if block.header.height > 1u64 && block.header.prev_hash != block.header.proof.block_hash {
             log::error!(
                 "[consensus] verify_block_header, verifying_block : {:?}",
                 block
@@ -640,19 +631,16 @@ fn mock_chained_rich_block(len: u64, gap: u64, key_tool: &KeyTool) -> (Vec<RichB
         let order_root = Merkle::from_hashes(tx_hashes.clone())
             .get_root_hash()
             .unwrap();
-
-        // println!(
-        //     "mocked qc for height : {}, AggregatedVote : {:?}",
-        //     current_height, qc
-        // );
+        let order_signed_transactions_hash = digest_signed_transactions(&txs).unwrap();
 
         let mut header = BlockHeader {
             chain_id: last_header.chain_id.clone(),
             height: current_height,
             exec_height: current_height,
-            pre_hash: last_block_hash.clone(),
+            prev_hash: last_block_hash.clone(),
             timestamp: 0,
             order_root,
+            order_signed_transactions_hash,
             logs_bloom: vec![],
             confirm_root: vec![],
             state_root: Hash::from_empty(),
@@ -720,27 +708,31 @@ fn mock_chained_rich_block(len: u64, gap: u64, key_tool: &KeyTool) -> (Vec<RichB
 
 fn mock_genesis_rich_block() -> RichBlock {
     let header = BlockHeader {
-        chain_id:          Hash::from_empty(),
-        height:            0,
-        exec_height:       0,
-        pre_hash:          Hash::from_empty(),
-        timestamp:         0,
-        logs_bloom:        vec![],
-        order_root:        Hash::from_empty(),
-        confirm_root:      vec![],
-        state_root:        Hash::from_empty(),
-        receipt_root:      vec![],
-        cycles_used:       vec![],
-        proposer:          Address::from_hex("0x82c67c421d208fb7015d2da79550212a50f2e773").unwrap(),
-        proof:             Proof {
+        chain_id:                       Hash::from_empty(),
+        height:                         0,
+        exec_height:                    0,
+        prev_hash:                      Hash::from_empty(),
+        timestamp:                      0,
+        logs_bloom:                     vec![],
+        order_root:                     Hash::from_empty(),
+        order_signed_transactions_hash: Hash::from_empty(),
+        confirm_root:                   vec![],
+        state_root:                     Hash::from_empty(),
+        receipt_root:                   vec![],
+        cycles_used:                    vec![],
+        proposer:                       Address::from_hex(
+            "0x82c67c421d208fb7015d2da79550212a50f2e773",
+        )
+        .unwrap(),
+        proof:                          Proof {
             height:     0,
             round:      0,
             block_hash: Hash::from_empty(),
             signature:  Bytes::new(),
             bitmap:     Bytes::new(),
         },
-        validator_version: 0,
-        validators:        vec![Validator {
+        validator_version:              0,
+        validators:                     vec![Validator {
             address:        Address::from_hex("0x82c67c421d208fb7015d2da79550212a50f2e773")
                 .unwrap(),
             propose_weight: 0,

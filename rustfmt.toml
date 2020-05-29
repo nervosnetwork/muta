@@ -59,7 +59,7 @@ reorder_impl_items = true
 #     yy:  u32,
 #     zzz: u32,
 # }
-struct_field_align_threshold = 20
+struct_field_align_threshold = 25
 # Use field initialize shorthand if possible.
 #
 # Default value: false

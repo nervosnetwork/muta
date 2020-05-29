@@ -75,13 +75,6 @@ pub trait SynchronizationAdapter: CommonConsensusAdapter + Send + Sync {
     ) -> ProtocolResult<Vec<SignedTransaction>>;
 
     async fn get_proof_from_remote(&self, ctx: Context, height: u64) -> ProtocolResult<Proof>;
-
-    async fn verify_txs_sync(
-        &self,
-        ctx: Context,
-        height: u64,
-        txs: Vec<SignedTransaction>,
-    ) -> ProtocolResult<()>;
 }
 
 #[async_trait]

@@ -21,7 +21,7 @@ use derive_more::Display;
 
 use common_crypto::Error as CryptoError;
 
-use protocol::types::Hash;
+use protocol::types::{Hash, MerkleRoot};
 use protocol::{ProtocolError, ProtocolErrorKind};
 
 pub use crate::adapter::OverlordConsensusAdapter;
@@ -60,13 +60,22 @@ pub enum ConsensusType {
 /// Consensus errors defines here.
 #[derive(Debug, Display)]
 pub enum ConsensusError {
-    /// Send consensus message error.
-    #[display(fmt = "Send {:?} message failed", _0)]
-    SendMsgErr(ConsensusType),
-
     /// Check block error.
     #[display(fmt = "Check invalid prev_hash, expect {:?} get {:?}", expect, actual)]
     InvalidPrevhash { expect: Hash, actual: Hash },
+
+    #[display(fmt = "Check invalid order root, expect {:?} get {:?}", expect, actual)]
+    InvalidOrderRoot {
+        expect: MerkleRoot,
+        actual: MerkleRoot,
+    },
+
+    #[display(
+        fmt = "Check invalid order signed transactions hash, expect {:?} get {:?}",
+        expect,
+        actual
+    )]
+    InvalidOrderSignedTransactionsHash { expect: Hash, actual: Hash },
 
     #[display(fmt = "Check invalid status vec")]
     InvalidStatusVec,
@@ -108,14 +117,6 @@ pub enum ConsensusError {
     #[display(fmt = "Synchronization/Consensus {} block error : {}", _0, _1)]
     VerifyProof(u64, BlockProofField),
 
-    /// The Rpc response mismatch the request.
-    #[display(fmt = "Synchronization Rpc {:?} message mismatch", _0)]
-    RpcErr(ConsensusType),
-
-    ///
-    #[display(fmt = "Get merkle root failed {:?}", _0)]
-    MerkleErr(String),
-
     ///
     #[display(fmt = "Execute transactions error {:?}", _0)]
     ExecuteErr(String),
@@ -133,10 +134,10 @@ pub enum ConsensusError {
 
 #[derive(Debug, Display)]
 pub enum BlockHeaderField {
-    #[display(fmt = "The pre_hash mismatch the previous block")]
+    #[display(fmt = "The prev_hash mismatch the previous block")]
     PreviousBlockHash,
 
-    #[display(fmt = "The pre_hash mismatch the hash in the proof field")]
+    #[display(fmt = "The prev_hash mismatch the hash in the proof field")]
     ProofHash,
 
     #[display(fmt = "The proposer is not in the committee")]
