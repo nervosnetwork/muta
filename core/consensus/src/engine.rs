@@ -611,7 +611,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
         let status = self.status_agent.to_inner();
 
         // check previous hash
-        if status.current_hash != block.pre_hash {
+        if status.current_hash != block.prev_hash {
             return Err(ConsensusError::InvalidPrevhash {
                 expect: status.current_hash,
                 actual: block.prev_hash.clone(),
