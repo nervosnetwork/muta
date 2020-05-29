@@ -189,6 +189,7 @@ impl SynchronizationAdapter for MockCommonConsensusAdapter {
     async fn get_txs_from_remote(
         &self,
         _: Context,
+        _: u64,
         tx_hashes: &[Hash],
     ) -> ProtocolResult<Vec<SignedTransaction>> {
         let map = self.remote_transactions.read();
@@ -234,6 +235,7 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
     async fn save_signed_txs(
         &self,
         _: Context,
+        _block_height: u64,
         signed_txs: Vec<SignedTransaction>,
     ) -> ProtocolResult<()> {
         let mut map = self.local_transactions.write();
@@ -243,7 +245,7 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
         Ok(())
     }
 
-    async fn save_receipts(&self, _: Context, _: Vec<Receipt>) -> ProtocolResult<()> {
+    async fn save_receipts(&self, _: Context, _: u64, _: Vec<Receipt>) -> ProtocolResult<()> {
         Ok(())
     }
 

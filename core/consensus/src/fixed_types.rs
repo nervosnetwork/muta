@@ -151,13 +151,14 @@ impl FixedHeight {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PullTxsRequest {
+    pub height: u64,
     #[serde(with = "core_network::serde_multi")]
-    pub inner: Vec<Hash>,
+    pub inner:  Vec<Hash>,
 }
 
 impl PullTxsRequest {
-    pub fn new(inner: Vec<Hash>) -> Self {
-        PullTxsRequest { inner }
+    pub fn new(height: u64, inner: Vec<Hash>) -> Self {
+        PullTxsRequest { height, inner }
     }
 }
 

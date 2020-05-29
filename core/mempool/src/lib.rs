@@ -125,7 +125,11 @@ where
         Ok(())
     }
 
-    #[muta_apm::derive::tracing_span(kind = "mempool", logs = "{'txs': 'txs.len()'}")]
+    #[muta_apm::derive::tracing_span(
+        kind = "mempool",
+        logs = "{'txs':
+     'txs.len()'}"
+    )]
     async fn verify_tx_in_parallel(
         &self,
         ctx: Context,
@@ -227,7 +231,11 @@ where
         Ok(r)
     }
 
-    #[muta_apm::derive::tracing_span(kind = "mempool", logs = "{'tx_len': 'tx_hashes.len()'}")]
+    #[muta_apm::derive::tracing_span(
+        kind = "mempool",
+        logs = "{'tx_len':
+     'tx_hashes.len()'}"
+    )]
     async fn flush(&self, ctx: Context, tx_hashes: Vec<Hash>) -> ProtocolResult<()> {
         let _lock = self.flush_lock.write().await;
 
@@ -248,10 +256,15 @@ where
         Ok(())
     }
 
-    #[muta_apm::derive::tracing_span(kind = "mempool", logs = "{'tx_len': 'tx_hashes.len()'}")]
+    #[muta_apm::derive::tracing_span(
+        kind = "mempool",
+        logs = "{'tx_len':
+     'tx_hashes.len()'}"
+    )]
     async fn get_full_txs(
         &self,
         ctx: Context,
+        height: Option<u64>,
         tx_hashes: Vec<Hash>,
     ) -> ProtocolResult<Vec<SignedTransaction>> {
         let len = tx_hashes.len();
@@ -273,8 +286,13 @@ where
         if !missing_hashes.is_empty() {
             let txs = self
                 .adapter
-                .get_transactions_from_storage(ctx, missing_hashes)
+                .get_transactions_from_storage(ctx, height, missing_hashes)
                 .await?;
+            let txs = txs
+                .into_iter()
+                .filter_map(|opt_tx| opt_tx)
+                .collect::<Vec<_>>();
+
             full_txs.extend(txs);
         }
 
@@ -296,12 +314,16 @@ where
     async fn ensure_order_txs(
         &self,
         ctx: Context,
+        height: Option<u64>,
         order_tx_hashes: Vec<Hash>,
     ) -> ProtocolResult<()> {
         let unknown_hashes = self.show_unknown_txs(order_tx_hashes).await;
         if !unknown_hashes.is_empty() {
             let unknown_len = unknown_hashes.len();
-            let txs = self.adapter.pull_txs(ctx.clone(), unknown_hashes).await?;
+            let txs = self
+                .adapter
+                .pull_txs(ctx.clone(), height, unknown_hashes)
+                .await?;
             // Make sure response signed_txs is the same size of request hashes.
             if txs.len() != unknown_len {
                 return Err(MemPoolError::EnsureBreak {
@@ -324,7 +346,11 @@ where
         Ok(())
     }
 
-    #[muta_apm::derive::tracing_span(kind = "mempool", logs = "{'tx_len': 'order_txs.len()'}")]
+    #[muta_apm::derive::tracing_span(
+        kind = "mempool",
+        logs = "{'tx_len':
+     'order_txs.len()'}"
+    )]
     async fn ensure_order_txs_sync(
         &self,
         ctx: Context,
@@ -354,7 +380,10 @@ where
     ) -> ProtocolResult<()> {
         let unknown_hashes = self.show_unknown_txs(propose_tx_hashes).await;
         if !unknown_hashes.is_empty() {
-            let txs = self.adapter.pull_txs(ctx.clone(), unknown_hashes).await?;
+            let txs = self
+                .adapter
+                .pull_txs(ctx.clone(), None, unknown_hashes)
+                .await?;
             // TODO: concurrently insert
             for tx in txs.into_iter() {
                 // Should not handle error here, it is normal that transactions

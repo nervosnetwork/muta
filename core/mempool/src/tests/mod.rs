@@ -48,6 +48,7 @@ impl MemPoolAdapter for HashMemPoolAdapter {
     async fn pull_txs(
         &self,
         _ctx: Context,
+        _height: Option<u64>,
         tx_hashes: Vec<Hash>,
     ) -> ProtocolResult<Vec<SignedTransaction>> {
         let mut vec = Vec::new();
@@ -84,8 +85,9 @@ impl MemPoolAdapter for HashMemPoolAdapter {
     async fn get_transactions_from_storage(
         &self,
         _ctx: Context,
+        _height: Option<u64>,
         _tx_hashes: Vec<Hash>,
-    ) -> ProtocolResult<Vec<SignedTransaction>> {
+    ) -> ProtocolResult<Vec<Option<SignedTransaction>>> {
         Ok(vec![])
     }
 
@@ -217,7 +219,7 @@ async fn exec_ensure_order_txs(
     mempool: Arc<HashMemPool<HashMemPoolAdapter>>,
 ) {
     mempool
-        .ensure_order_txs(Context::new(), require_hashes)
+        .ensure_order_txs(Context::new(), None, require_hashes)
         .await
         .unwrap();
 }
@@ -237,7 +239,7 @@ async fn exec_get_full_txs(
     mempool: Arc<HashMemPool<HashMemPoolAdapter>>,
 ) -> Vec<SignedTransaction> {
     mempool
-        .get_full_txs(Context::new(), require_hashes)
+        .get_full_txs(Context::new(), None, require_hashes)
         .await
         .unwrap()
 }

@@ -144,7 +144,9 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
 
     #[muta_apm::derive::tracing_span(
         kind = "consensus.engine",
-        logs = "{'next_height': 'next_height', 'hash': 'Hash::from_bytes(hash.clone()).unwrap().as_hex()', 'txs_len': 'block.inner.block.ordered_tx_hashes.len()'}"
+        logs = "{'next_height': 'next_height', 'hash':
+    'Hash::from_bytes(hash.clone()).unwrap().as_hex()', 'txs_len':
+    'block.inner.block.ordered_tx_hashes.len()'}"
     )]
     async fn check_block(
         &self,
@@ -253,7 +255,8 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
     /// mempool.
     #[muta_apm::derive::tracing_span(
         kind = "consensus.engine",
-        logs = "{'current_height': 'current_height', 'txs_len': 'commit.content.inner.block.ordered_tx_hashes.len()'}"
+        logs = "{'current_height': 'current_height', 'txs_len':
+    'commit.content.inner.block.ordered_tx_hashes.len()'}"
     )]
     async fn commit(
         &self,
@@ -413,7 +416,8 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
     /// Only signed vote will be transmit to the relayer.
     #[muta_apm::derive::tracing_span(
         kind = "consensus.engine",
-        logs = "{'address': 'Address::from_bytes(addr.clone()).unwrap().as_hex()'}"
+        logs = "{'address':
+    'Address::from_bytes(addr.clone()).unwrap().as_hex()'}"
     )]
     async fn transmit_to_relayer(
         &self,
@@ -690,7 +694,9 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
         txs: Vec<SignedTransaction>,
     ) -> ProtocolResult<()> {
         // Save signed transactions
-        self.adapter.save_signed_txs(Context::new(), txs).await?;
+        self.adapter
+            .save_signed_txs(Context::new(), block.header.height, txs)
+            .await?;
 
         // Save the block.
         self.adapter

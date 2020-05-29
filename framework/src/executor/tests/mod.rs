@@ -280,6 +280,7 @@ impl Storage for MockStorage {
     async fn insert_transactions(
         &self,
         _ctx: Context,
+        _: u64,
         _: Vec<SignedTransaction>,
     ) -> ProtocolResult<()> {
         unimplemented!()
@@ -289,7 +290,7 @@ impl Storage for MockStorage {
         unimplemented!()
     }
 
-    async fn insert_receipts(&self, _ctx: Context, _: Vec<Receipt>) -> ProtocolResult<()> {
+    async fn insert_receipts(&self, _ctx: Context, _: u64, _: Vec<Receipt>) -> ProtocolResult<()> {
         unimplemented!()
     }
 
@@ -301,15 +302,16 @@ impl Storage for MockStorage {
         &self,
         _ctx: Context,
         _: Hash,
-    ) -> ProtocolResult<SignedTransaction> {
+    ) -> ProtocolResult<Option<SignedTransaction>> {
         unimplemented!()
     }
 
     async fn get_transactions(
         &self,
         _ctx: Context,
+        _: u64,
         _: Vec<Hash>,
-    ) -> ProtocolResult<Vec<SignedTransaction>> {
+    ) -> ProtocolResult<Vec<Option<SignedTransaction>>> {
         unimplemented!()
     }
 
@@ -317,19 +319,20 @@ impl Storage for MockStorage {
         unimplemented!()
     }
 
-    async fn get_block_by_height(&self, _ctx: Context, _: u64) -> ProtocolResult<Block> {
+    async fn get_block(&self, _ctx: Context, _: u64) -> ProtocolResult<Option<Block>> {
         unimplemented!()
     }
 
-    async fn get_block_by_hash(&self, _ctx: Context, _: Hash) -> ProtocolResult<Block> {
+    async fn get_receipt_by_hash(&self, _ctx: Context, _: Hash) -> ProtocolResult<Option<Receipt>> {
         unimplemented!()
     }
 
-    async fn get_receipt(&self, _ctx: Context, _: Hash) -> ProtocolResult<Receipt> {
-        unimplemented!()
-    }
-
-    async fn get_receipts(&self, _ctx: Context, _: Vec<Hash>) -> ProtocolResult<Vec<Receipt>> {
+    async fn get_receipts(
+        &self,
+        _ctx: Context,
+        _: u64,
+        _: Vec<Hash>,
+    ) -> ProtocolResult<Vec<Option<Receipt>>> {
         unimplemented!()
     }
 

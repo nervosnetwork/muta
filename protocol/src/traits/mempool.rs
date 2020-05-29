@@ -32,12 +32,14 @@ pub trait MemPool: Send + Sync {
     async fn get_full_txs(
         &self,
         ctx: Context,
+        height: Option<u64>,
         tx_hashes: Vec<Hash>,
     ) -> ProtocolResult<Vec<SignedTransaction>>;
 
     async fn ensure_order_txs(
         &self,
         ctx: Context,
+        height: Option<u64>,
         order_tx_hashes: Vec<Hash>,
     ) -> ProtocolResult<()>;
 
@@ -61,6 +63,7 @@ pub trait MemPoolAdapter: Send + Sync {
     async fn pull_txs(
         &self,
         ctx: Context,
+        height: Option<u64>,
         tx_hashes: Vec<Hash>,
     ) -> ProtocolResult<Vec<SignedTransaction>>;
 
@@ -77,8 +80,9 @@ pub trait MemPoolAdapter: Send + Sync {
     async fn get_transactions_from_storage(
         &self,
         ctx: Context,
+        block_height: Option<u64>,
         tx_hashes: Vec<Hash>,
-    ) -> ProtocolResult<Vec<SignedTransaction>>;
+    ) -> ProtocolResult<Vec<Option<SignedTransaction>>>;
 
     fn report_good(&self, ctx: Context);
 

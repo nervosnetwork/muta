@@ -12,7 +12,6 @@ use std::{
 
 use async_trait::async_trait;
 use derive_more::Display;
-use futures::future::try_join_all;
 use futures::{
     channel::mpsc::{
         channel, unbounded, Receiver, Sender, TrySendError, UnboundedReceiver, UnboundedSender,
@@ -206,9 +205,13 @@ where
     async fn pull_txs(
         &self,
         ctx: Context,
+        height: Option<u64>,
         tx_hashes: Vec<Hash>,
     ) -> ProtocolResult<Vec<SignedTransaction>> {
-        let pull_msg = MsgPullTxs { hashes: tx_hashes };
+        let pull_msg = MsgPullTxs {
+            height,
+            hashes: tx_hashes,
+        };
 
         let resp_msg = self
             .network
@@ -404,15 +407,9 @@ where
             .get_transaction_by_hash(ctx, tx_hash.clone())
             .await
         {
-            Ok(_) => Err(MemPoolError::CommittedTx { tx_hash }.into()),
-            Err(err) => {
-                // TODO: downcast to StorageError
-                if err.to_string().contains("GetNone") {
-                    Ok(())
-                } else {
-                    Err(err)
-                }
-            }
+            Ok(Some(_)) => Err(MemPoolError::CommittedTx { tx_hash }.into()),
+            Ok(None) => Ok(()),
+            Err(err) => Err(err),
         }
     }
 
@@ -425,13 +422,18 @@ where
     async fn get_transactions_from_storage(
         &self,
         ctx: Context,
+        block_height: Option<u64>,
         tx_hashes: Vec<Hash>,
-    ) -> ProtocolResult<Vec<SignedTransaction>> {
-        let futs = tx_hashes
-            .into_iter()
-            .map(|tx_hash| self.storage.get_transaction_by_hash(ctx.clone(), tx_hash))
-            .collect::<Vec<_>>();
-        try_join_all(futs).await
+    ) -> ProtocolResult<Vec<Option<SignedTransaction>>> {
+        if let Some(height) = block_height {
+            self.storage.get_transactions(ctx, height, tx_hashes).await
+        } else {
+            let futs = tx_hashes
+                .into_iter()
+                .map(|tx_hash| self.storage.get_transaction_by_hash(ctx.clone(), tx_hash))
+                .collect::<Vec<_>>();
+            futures::future::try_join_all(futs).await
+        }
     }
 
     fn report_good(&self, ctx: Context) {

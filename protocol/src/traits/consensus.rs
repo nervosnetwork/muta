@@ -70,6 +70,7 @@ pub trait SynchronizationAdapter: CommonConsensusAdapter + Send + Sync {
     async fn get_txs_from_remote(
         &self,
         ctx: Context,
+        height: u64,
         hashes: &[Hash],
     ) -> ProtocolResult<Vec<SignedTransaction>>;
 
@@ -94,10 +95,16 @@ pub trait CommonConsensusAdapter: Send + Sync {
     async fn save_signed_txs(
         &self,
         ctx: Context,
+        block_height: u64,
         signed_txs: Vec<SignedTransaction>,
     ) -> ProtocolResult<()>;
 
-    async fn save_receipts(&self, ctx: Context, receipts: Vec<Receipt>) -> ProtocolResult<()>;
+    async fn save_receipts(
+        &self,
+        ctx: Context,
+        height: u64,
+        receipts: Vec<Receipt>,
+    ) -> ProtocolResult<()>;
 
     /// Flush the given transactions in the mempool.
     async fn flush_mempool(&self, ctx: Context, ordered_tx_hashes: &[Hash]) -> ProtocolResult<()>;
@@ -211,15 +218,6 @@ pub trait ConsensusAdapter: CommonConsensusAdapter + Send + Sync {
 
     /// Pull some blocks from other nodes from `begin` to `end`.
     async fn pull_block(&self, ctx: Context, height: u64, end: &str) -> ProtocolResult<Block>;
-
-    /// Pull signed transactions corresponding to the given hashes from other
-    /// nodes.
-    async fn pull_txs(
-        &self,
-        ctx: Context,
-        hashes: Vec<Hash>,
-        end: &str,
-    ) -> ProtocolResult<Vec<SignedTransaction>>;
 
     /// Save overlord wal info.
     async fn save_overlord_wal(&self, ctx: Context, info: Bytes) -> ProtocolResult<()>;

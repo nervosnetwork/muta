@@ -20,9 +20,18 @@ pub enum APIError {
         expect
     )]
     UnExecedError { expect: u64, real: u64 },
+
+    #[display(fmt = "not found")]
+    NotFound,
 }
 
 impl std::error::Error for APIError {}
+
+impl From<APIError> for ProtocolError {
+    fn from(api_err: APIError) -> ProtocolError {
+        ProtocolError::new(ProtocolErrorKind::API, Box::new(api_err))
+    }
+}
 
 pub struct DefaultAPIAdapter<EF, M, S, DB, Mapping> {
     mempool:         Arc<M>,
@@ -82,7 +91,11 @@ impl<
         height: Option<u64>,
     ) -> ProtocolResult<Block> {
         let block = match height {
-            Some(id) => self.storage.get_block_by_height(ctx.clone(), id).await?,
+            Some(id) => self
+                .storage
+                .get_block(ctx.clone(), id)
+                .await?
+                .ok_or_else(|| APIError::NotFound)?,
             None => self.storage.get_latest_block(ctx).await?,
         };
 
@@ -91,19 +104,21 @@ impl<
 
     #[muta_apm::derive::tracing_span(kind = "API.adapter")]
     async fn get_receipt_by_tx_hash(&self, ctx: Context, tx_hash: Hash) -> ProtocolResult<Receipt> {
-        let receipt = self.storage.get_receipt(ctx.clone(), tx_hash).await?;
+        let receipt = self
+            .storage
+            .get_receipt_by_hash(ctx.clone(), tx_hash)
+            .await?
+            .ok_or_else(|| APIError::NotFound)?;
         let exec_height = self.storage.get_latest_block(ctx).await?.header.exec_height;
         let height = receipt.height;
         if exec_height >= height {
             return Ok(receipt);
         }
-        Err(ProtocolError::new(
-            ProtocolErrorKind::API,
-            Box::new(APIError::UnExecedError {
-                real:   exec_height,
-                expect: height,
-            }),
-        ))
+        Err(APIError::UnExecedError {
+            real:   exec_height,
+            expect: height,
+        }
+        .into())
     }
 
     #[muta_apm::derive::tracing_span(kind = "API.adapter")]
@@ -112,7 +127,10 @@ impl<
         ctx: Context,
         tx_hash: Hash,
     ) -> ProtocolResult<SignedTransaction> {
-        self.storage.get_transaction_by_hash(ctx, tx_hash).await
+        self.storage
+            .get_transaction_by_hash(ctx, tx_hash)
+            .await?
+            .ok_or_else(|| APIError::NotFound.into())
     }
 
     #[muta_apm::derive::tracing_span(kind = "API.adapter")]

@@ -110,6 +110,7 @@ impl Storage for MockStorage {
     async fn insert_transactions(
         &self,
         _ctx: Context,
+        _height: u64,
         _signed_txs: Vec<SignedTransaction>,
     ) -> ProtocolResult<()> {
         Ok(())
@@ -119,7 +120,12 @@ impl Storage for MockStorage {
         Ok(())
     }
 
-    async fn insert_receipts(&self, _ctx: Context, _receipts: Vec<Receipt>) -> ProtocolResult<()> {
+    async fn insert_receipts(
+        &self,
+        _ctx: Context,
+        _height: u64,
+        _receipts: Vec<Receipt>,
+    ) -> ProtocolResult<()> {
         Ok(())
     }
 
@@ -131,15 +137,16 @@ impl Storage for MockStorage {
         &self,
         _ctx: Context,
         _tx_hash: Hash,
-    ) -> ProtocolResult<SignedTransaction> {
-        Ok(mock_signed_tx())
+    ) -> ProtocolResult<Option<SignedTransaction>> {
+        Ok(Some(mock_signed_tx()))
     }
 
     async fn get_transactions(
         &self,
         _ctx: Context,
+        _height: u64,
         _hashes: Vec<Hash>,
-    ) -> ProtocolResult<Vec<SignedTransaction>> {
+    ) -> ProtocolResult<Vec<Option<SignedTransaction>>> {
         Err(StoreError::GetNone.into())
     }
 
@@ -147,19 +154,24 @@ impl Storage for MockStorage {
         Ok(mock_block(1))
     }
 
-    async fn get_block_by_height(&self, _ctx: Context, _height: u64) -> ProtocolResult<Block> {
-        Ok(mock_block(1))
+    async fn get_block(&self, _ctx: Context, _height: u64) -> ProtocolResult<Option<Block>> {
+        Ok(Some(mock_block(1)))
     }
 
-    async fn get_block_by_hash(&self, _ctx: Context, _block_hash: Hash) -> ProtocolResult<Block> {
-        Err(StoreError::GetNone.into())
+    async fn get_receipt_by_hash(
+        &self,
+        _ctx: Context,
+        _hash: Hash,
+    ) -> ProtocolResult<Option<Receipt>> {
+        Ok(Some(mock_receipt()))
     }
 
-    async fn get_receipt(&self, _ctx: Context, _hash: Hash) -> ProtocolResult<Receipt> {
-        Ok(mock_receipt())
-    }
-
-    async fn get_receipts(&self, _ctx: Context, _hash: Vec<Hash>) -> ProtocolResult<Vec<Receipt>> {
+    async fn get_receipts(
+        &self,
+        _ctx: Context,
+        _height: u64,
+        _hash: Vec<Hash>,
+    ) -> ProtocolResult<Vec<Option<Receipt>>> {
         Err(StoreError::GetNone.into())
     }
 
