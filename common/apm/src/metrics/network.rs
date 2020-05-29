@@ -38,7 +38,7 @@ lazy_static! {
     pub static ref NETWORK_MESSAGE_COUNT_VEC: IntCounterVec = register_int_counter_vec!(
         "muta_network_message_total",
         "Total number of network message",
-        &["direction", "url"]
+        &["direction", "type", "module", "action"]
     )
     .expect("network message total");
     pub static ref NETWORK_RPC_RESULT_COUNT_VEC: IntCounterVec = register_int_counter_vec!(
@@ -77,4 +77,23 @@ lazy_static! {
         &["ip"]
     )
     .expect("network ip pending data size");
+}
+
+fn on_network_message(direction: &str, url: &str) {
+    let spliced: Vec<&str> = url.split('/').collect();
+    if spliced.len() < 4 {
+        return;
+    }
+
+    NETWORK_MESSAGE_COUNT_VEC
+        .with_label_values(&[direction, spliced[1], spliced[2], spliced[3]])
+        .inc();
+}
+
+pub fn on_network_message_sent(url: &str) {
+    on_network_message("sent", url);
+}
+
+pub fn on_network_message_received(url: &str) {
+    on_network_message("received", url);
 }
