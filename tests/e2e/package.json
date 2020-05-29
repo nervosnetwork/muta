@@ -10,7 +10,7 @@
     "prettier": "prettier --write **/*.{js,ts,graphql}"
   },
   "dependencies": {
-    "@mutajs/service": "^0.11.0-alpha.2",
+    "@mutajs/service": "^0.11.0-dev.0",
     "@types/node": "^12.12.8",
     "apollo-boost": "^0.4.4",
     "graphql": "^14.5.8",
