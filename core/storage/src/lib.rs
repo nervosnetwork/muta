@@ -249,6 +249,7 @@ impl_storage_schema_for!(
 );
 impl_storage_schema_for!(BlockSchema, BlockKey, Block, Block);
 impl_storage_schema_for!(ReceiptSchema, CommonHashKey, Receipt, Receipt);
+impl_storage_schema_for!(ReceiptBytesSchema, CommonHashKey, Bytes, Receipt);
 impl_storage_schema_for!(HashHeightSchema, Hash, u64, HashHeight);
 impl_storage_schema_for!(LatestBlockSchema, Hash, Block, Block);
 impl_storage_schema_for!(LatestProofSchema, Hash, Proof, Block);
@@ -400,29 +401,68 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
         hashes: Vec<Hash>,
     ) -> ProtocolResult<Vec<Option<Receipt>>> {
         let key_prefix = CommonPrefix::new(block_height);
-        let prepare_iter = self.adapter.prepare_iter::<ReceiptSchema, _>(&key_prefix)?;
-        let mut iter = prepare_iter.ref_to_iter();
+        let mut found = Vec::with_capacity(hashes.len());
 
-        let set = hashes.iter().collect::<HashSet<_>>();
-        let mut found = HashMap::with_capacity(hashes.len());
-        let mut count = hashes.len();
+        {
+            let prepare_iter = self
+                .adapter
+                .prepare_iter::<ReceiptBytesSchema, _>(&key_prefix)?;
+            let mut iter = prepare_iter.ref_to_iter();
 
-        while count > 0 {
-            let (key, stx) = match iter.next() {
-                None => break,
-                Some(Ok(key_to_stx_bytes)) => key_to_stx_bytes,
-                Some(Err(err)) => return Err(err),
-            };
+            let set = hashes.iter().collect::<HashSet<_>>();
+            let mut count = hashes.len();
 
-            if key.height() != block_height {
-                break;
-            }
+            while count > 0 {
+                let (key, stx_bytes) = match iter.next() {
+                    None => break,
+                    Some(Ok(key_to_stx_bytes)) => key_to_stx_bytes,
+                    Some(Err(err)) => return Err(err),
+                };
 
-            if set.contains(&stx.tx_hash) {
-                found.insert(stx.tx_hash.clone(), stx);
-                count -= 1;
+                if key.height() != block_height {
+                    break;
+                }
+
+                if set.contains(&key.hash) {
+                    found.push((key.hash, stx_bytes));
+                    count -= 1;
+                }
             }
         }
+
+        let mut found = {
+            if found.len() <= BATCH_VALUE_DECODE_NUMBER {
+                found
+                    .drain(..)
+                    .map(|(k, v): (Hash, Bytes)| Receipt::decode_sync(v).map(|v| (k, v)))
+                    .collect::<ProtocolResult<Vec<_>>>()?
+                    .into_iter()
+                    .collect::<HashMap<_, _>>()
+            } else {
+                let futs = found
+                    .chunks(BATCH_VALUE_DECODE_NUMBER)
+                    .map(|vals| {
+                        let vals = vals.to_owned();
+
+                        // FIXME: cancel decode
+                        tokio::spawn(async move {
+                            vals.into_iter()
+                                .map(|(k, v)| <_>::decode_sync(v).map(|v| (k, v)))
+                                .collect::<ProtocolResult<Vec<_>>>()
+                        })
+                    })
+                    .collect::<Vec<_>>();
+
+                futures::future::try_join_all(futs)
+                    .await
+                    .map_err(|_| StorageError::BatchDecode)?
+                    .into_iter()
+                    .collect::<ProtocolResult<Vec<Vec<_>>>>()?
+                    .into_iter()
+                    .flatten()
+                    .collect::<HashMap<_, _>>()
+            }
+        };
 
         Ok(hashes
             .into_iter()
