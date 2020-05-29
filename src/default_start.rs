@@ -1,9 +1,11 @@
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::sync::Arc;
+use std::time::Duration;
 
 use bytes::Bytes;
 use futures::{future, lock::Mutex};
+use futures_timer::Delay;
 #[cfg(unix)]
 use tokio::signal::unix::{self as os_impl};
 
@@ -42,8 +44,6 @@ use protocol::{fixed_codec::FixedCodec, ProtocolResult};
 
 use crate::config::Config;
 use crate::MainError;
-use futures_timer::Delay;
-use std::time::Duration;
 
 pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
     config: &Config,
