@@ -1,5 +1,5 @@
 import {delay, mutaClient} from "./utils";
-import sdk from "muta-sdk";
+import * as sdk from "muta-sdk";
 import { AssetService }  from "@mutajs/service"
 
 describe("API test via muta-sdk-js", () => {
