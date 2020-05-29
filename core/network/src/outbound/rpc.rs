@@ -96,6 +96,9 @@ where
             headers.set_span_id(state.span_id());
             log::info!("no trace id found for rpc {}", endpoint.full_url());
         }
+        common_apm::metrics::network::NETWORK_MESSAGE_COUNT_VEC
+            .with_label_values(&["sent", endpoint.full_url()])
+            .inc();
         let net_msg = NetworkMessage::new(endpoint, data, headers)
             .encode()
             .await?;
@@ -161,6 +164,9 @@ where
             headers.set_span_id(state.span_id());
             log::info!("no trace id found for rpc {}", endpoint.full_url());
         }
+        common_apm::metrics::network::NETWORK_MESSAGE_COUNT_VEC
+            .with_label_values(&["sent", endpoint.full_url()])
+            .inc();
         let net_msg = NetworkMessage::new(endpoint, encoded_resp, headers)
             .encode()
             .await?;

@@ -1,6 +1,6 @@
 use crate::metrics::{
     auto_flush_from, exponential_buckets, make_auto_flush_static_metric, register_histogram_vec,
-    register_int_counter_vec, HistogramVec, IntCounterVec,
+    register_int_counter_vec, register_int_gauge, HistogramVec, IntCounterVec, IntGauge,
 };
 
 use lazy_static::lazy_static;
@@ -70,6 +70,8 @@ lazy_static! {
         exponential_buckets(0.05, 2.0, 10).expect("mempool current size exponential")
     )
     .expect("mempool current size");
+    pub static ref MEMPOOL_LEN_GAUGE: IntGauge =
+        register_int_gauge!("muta_mempool_tx_count", "Tx len in mempool").unwrap();
 }
 
 lazy_static! {
