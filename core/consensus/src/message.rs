@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use bincode::serialize;
-use futures::{future::try_join_all, TryFutureExt};
+use futures::TryFutureExt;
 use log::warn;
 use overlord::types::{AggregatedVote, SignedChoke, SignedProposal, SignedVote};
 use overlord::Codec;
@@ -322,30 +322,16 @@ impl<R: Rpc + 'static, S: Storage + 'static> MessageHandler for PullTxsRpcHandle
     async fn process(&self, ctx: Context, msg: PullTxsRequest) -> TrustFeedback {
         let PullTxsRequest { height, inner } = msg;
 
-        let ret = if let Some(height) = height {
-            self.storage
-                .get_transactions(ctx.clone(), height, inner)
-                .await
-                .map(|txs| {
-                    txs.into_iter()
-                        .filter_map(|opt_tx| opt_tx)
-                        .collect::<Vec<_>>()
-                })
-                .map(FixedSignedTxs::new)
-        } else {
-            let futs = inner
-                .into_iter()
-                .map(|tx_hash| self.storage.get_transaction_by_hash(ctx.clone(), tx_hash))
-                .collect::<Vec<_>>();
-            try_join_all(futs)
-                .await
-                .map(|txs| {
-                    txs.into_iter()
-                        .filter_map(|opt_tx| opt_tx)
-                        .collect::<Vec<_>>()
-                })
-                .map(FixedSignedTxs::new)
-        };
+        let ret = self
+            .storage
+            .get_transactions(ctx.clone(), height, inner)
+            .await
+            .map(|txs| {
+                txs.into_iter()
+                    .filter_map(|opt_tx| opt_tx)
+                    .collect::<Vec<_>>()
+            })
+            .map(FixedSignedTxs::new);
 
         self.rpc
             .response(ctx, RPC_RESP_SYNC_PULL_TXS, ret, Priority::High)

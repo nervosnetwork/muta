@@ -219,15 +219,6 @@ pub trait ConsensusAdapter: CommonConsensusAdapter + Send + Sync {
     /// Pull some blocks from other nodes from `begin` to `end`.
     async fn pull_block(&self, ctx: Context, height: u64, end: &str) -> ProtocolResult<Block>;
 
-    /// Pull signed transactions corresponding to the given hashes from other
-    /// nodes.
-    async fn pull_txs(
-        &self,
-        ctx: Context,
-        hashes: Vec<Hash>,
-        end: &str,
-    ) -> ProtocolResult<Vec<SignedTransaction>>;
-
     /// Save overlord wal info.
     async fn save_overlord_wal(&self, ctx: Context, info: Bytes) -> ProtocolResult<()>;
 

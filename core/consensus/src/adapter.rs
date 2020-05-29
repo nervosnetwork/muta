@@ -188,29 +188,6 @@ where
         Ok(res.inner)
     }
 
-    #[muta_apm::derive::tracing_span(
-        kind = "consensus.adapter",
-        logs = "{'txs_len': 'hashes.len()'}"
-    )]
-    async fn pull_txs(
-        &self,
-        ctx: Context,
-        hashes: Vec<Hash>,
-        end: &str,
-    ) -> ProtocolResult<Vec<SignedTransaction>> {
-        log::debug!("consensus: send rpc pull txs");
-        let res = self
-            .network
-            .call::<PullTxsRequest, FixedSignedTxs>(
-                ctx,
-                end,
-                PullTxsRequest::new(None, hashes),
-                Priority::High,
-            )
-            .await?;
-        Ok(res.inner)
-    }
-
     /// Get the current height from storage.
     #[muta_apm::derive::tracing_span(kind = "consensus.adapter")]
     async fn get_current_height(&self, ctx: Context) -> ProtocolResult<u64> {
@@ -348,7 +325,7 @@ where
             .call::<PullTxsRequest, FixedSignedTxs>(
                 ctx,
                 RPC_SYNC_PULL_TXS,
-                PullTxsRequest::new(Some(height), hashes.to_vec()),
+                PullTxsRequest::new(height, hashes.to_vec()),
                 Priority::High,
             )
             .await?;
