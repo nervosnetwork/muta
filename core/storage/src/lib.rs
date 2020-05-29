@@ -269,6 +269,7 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
         Ok(())
     }
 
+    #[muta_apm::derive::tracing_span(kind = "storage")]
     async fn get_transactions(
         &self,
         _ctx: Context,
@@ -376,7 +377,6 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
         Ok(())
     }
 
-    #[muta_apm::derive::tracing_span(kind = "storage")]
     async fn get_block(&self, ctx: Context, height: u64) -> ProtocolResult<Option<Block>> {
         self.adapter.get::<BlockSchema>(BlockKey::new(height)).await
     }
@@ -483,7 +483,6 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
         }
     }
 
-    #[muta_apm::derive::tracing_span(kind = "storage")]
     async fn update_latest_proof(&self, ctx: Context, proof: Proof) -> ProtocolResult<()> {
         self.adapter
             .insert::<LatestProofSchema>(LATEST_PROOF_KEY.clone(), proof)
@@ -491,13 +490,11 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
         Ok(())
     }
 
-    #[muta_apm::derive::tracing_span(kind = "storage")]
     async fn get_latest_proof(&self, ctx: Context) -> ProtocolResult<Proof> {
         let proof = ensure_get!(self, LATEST_PROOF_KEY.clone(), LatestProofSchema);
         Ok(proof)
     }
 
-    #[muta_apm::derive::tracing_span(kind = "storage")]
     async fn get_latest_block(&self, ctx: Context) -> ProtocolResult<Block> {
         let opt_block = { self.latest_block.read().await.clone() };
 
