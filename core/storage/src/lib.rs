@@ -272,7 +272,7 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
     #[muta_apm::derive::tracing_span(kind = "storage")]
     async fn get_transactions(
         &self,
-        _ctx: Context,
+        ctx: Context,
         block_height: u64,
         hashes: Vec<Hash>,
     ) -> ProtocolResult<Vec<Option<SignedTransaction>>> {
