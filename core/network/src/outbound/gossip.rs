@@ -43,9 +43,7 @@ where
             headers.set_span_id(state.span_id());
             log::info!("no trace id found for gossip {}", endpoint.full_url());
         }
-        common_apm::metrics::network::NETWORK_MESSAGE_COUNT_VEC
-            .with_label_values(&["sent", endpoint.full_url()])
-            .inc();
+        common_apm::metrics::network::on_network_message_sent(endpoint.full_url());
         let net_msg = NetworkMessage::new(endpoint, data, headers)
             .encode()
             .await?;
