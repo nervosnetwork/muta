@@ -80,7 +80,7 @@ lazy_static! {
 }
 
 fn on_network_message(direction: &str, url: &str) {
-    let spliced: Vec<&str> = url.split("/").collect();
+    let spliced: Vec<&str> = url.split('/').collect();
     if spliced.len() < 4 {
         return;
     }
