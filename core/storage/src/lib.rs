@@ -294,11 +294,12 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
                     Some(Err(err)) => return Err(err),
                 };
 
+                // Note: fix clippy::suspicious_else_formatting
                 if key.height() != block_height {
                     break;
-                }
-
-                if set.contains(&key.hash) {
+                } else if !set.contains(&key.hash) {
+                    continue;
+                } else {
                     found.push((key.hash, stx_bytes));
                     count -= 1;
                 }
@@ -392,11 +393,10 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
         Ok(())
     }
 
-    // FIXME: clippy::suspicious_else_formatting
-    // #[muta_apm::derive::tracing_span(kind = "storage")]
+    #[muta_apm::derive::tracing_span(kind = "storage")]
     async fn get_receipts(
         &self,
-        _ctx: Context,
+        ctx: Context,
         block_height: u64,
         hashes: Vec<Hash>,
     ) -> ProtocolResult<Vec<Option<Receipt>>> {
@@ -419,11 +419,12 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
                     Some(Err(err)) => return Err(err),
                 };
 
+                // Note: fix clippy::suspicious_else_formatting
                 if key.height() != block_height {
                     break;
-                }
-
-                if set.contains(&key.hash) {
+                } else if !set.contains(&key.hash) {
+                    continue;
+                } else {
                     found.push((key.hash, stx_bytes));
                     count -= 1;
                 }
