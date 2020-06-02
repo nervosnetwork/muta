@@ -1,0 +1,79 @@
+version: '2'
+services:
+  jaeger-collector:
+    image: jaegertracing/jaeger-collector
+    command:
+      - '--cassandra.keyspace=jaeger_v1_dc1'
+      - '--cassandra.servers=cassandra'
+      - '--collector.zipkin.http-port=9411'
+      - '--collector.queue-size=100000'
+    ports:
+      - '14269:14269'
+      - '14268:14268'
+      - '14250:14250'
+      - '9411:9411'
+    restart: on-failure
+    depends_on:
+      - cassandra-schema
+    networks:
+      - jaeger-collector
+  jaeger-query:
+    image: jaegertracing/jaeger-query
+    command:
+      - '--cassandra.keyspace=jaeger_v1_dc1'
+      - '--cassandra.servers=cassandra'
+    ports:
+      - '16686:16686'
+      - '16687:16687'
+    restart: on-failure
+    depends_on:
+      - cassandra-schema
+    networks:
+      - jaeger-collector
+  cassandra:
+    image: 'cassandra:3.9'
+    volumes:
+      - ~/.jaeger-cassandra:/var/cassandra
+    networks:
+      - jaeger-collector
+  cassandra-schema:
+    image: jaegertracing/jaeger-cassandra-schema
+    depends_on:
+      - cassandra
+    networks:
+      - jaeger-collector
+  prometheus:
+    image: prom/prometheus
+    ports:
+      - '9090:9090'
+    restart: on-failure
+    volumes:
+      - ${PROMETHEUS_CONFIG}:/etc/prometheus/prometheus.yml
+    networks:
+      - prometheus-net
+  grafana:
+    image: grafana/grafana:7.0.0
+    ports:
+      - '3000:3000'
+    restart: on-failure
+    volumes:
+      - ~/.grafana:/var/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - prometheus-net
+  node-exporter:
+    image: quay.io/prometheus/node-exporter
+    command:
+      - '--path.rootfs=/host'
+      - '--collector.tcpstat'
+    restart: on-failure
+    network_mode: 'host'
+    pid: 'host'
+    volumes:
+      - /:/host:ro,rslave
+networks:
+  jaeger-collector:
+    driver: bridge
+  prometheus-net:
+    driver: bridge
