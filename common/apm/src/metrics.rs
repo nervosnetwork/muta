@@ -2,13 +2,17 @@ pub mod api;
 pub mod consensus;
 pub mod mempool;
 pub mod network;
+pub mod storage;
 
-pub use prometheus::{Histogram, HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec};
+pub use prometheus::{
+    CounterVec, Histogram, HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec,
+};
 
 use derive_more::Display;
 use prometheus::{
-    exponential_buckets, register_histogram, register_histogram_vec, register_int_counter,
-    register_int_counter_vec, register_int_gauge, register_int_gauge_vec, Encoder, TextEncoder,
+    exponential_buckets, register_counter_vec, register_histogram, register_histogram_vec,
+    register_int_counter, register_int_counter_vec, register_int_gauge, register_int_gauge_vec,
+    Encoder, TextEncoder,
 };
 use prometheus_static_metric::{auto_flush_from, make_auto_flush_static_metric};
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};

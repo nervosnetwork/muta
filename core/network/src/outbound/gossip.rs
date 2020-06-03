@@ -43,7 +43,6 @@ where
             headers.set_span_id(state.span_id());
             log::info!("no trace id found for gossip {}", endpoint.full_url());
         }
-        common_apm::metrics::network::on_network_message_sent(endpoint.full_url());
         let net_msg = NetworkMessage::new(endpoint, data, headers)
             .encode()
             .await?;
@@ -85,7 +84,7 @@ where
     {
         let msg = self.package_message(cx.clone(), end, msg).await?;
         self.send(cx, TargetSession::All, msg, p)?;
-
+        common_apm::metrics::network::on_network_message_sent_all_target(end);
         Ok(())
     }
 
@@ -101,7 +100,9 @@ where
         M: MessageCodec,
     {
         let msg = self.package_message(cx.clone(), end, msg).await?;
+        let user_count = users.len();
         self.users_send(cx, users, msg, p).await?;
+        common_apm::metrics::network::on_network_message_sent_multi_target(end, user_count as i64);
 
         Ok(())
     }

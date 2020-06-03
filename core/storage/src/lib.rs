@@ -10,14 +10,15 @@ use std::convert::From;
 use std::error::Error;
 use std::str::FromStr;
 use std::sync::Arc;
+use std::time::Instant;
 
 use async_trait::async_trait;
 use derive_more::{Display, From};
 use lazy_static::lazy_static;
 use tokio::sync::RwLock;
 
+use common_apm::metrics::storage::on_storage_get_cf;
 use common_apm::muta_apm;
-
 use protocol::codec::ProtocolCodecSync;
 use protocol::traits::{
     Context, Storage, StorageAdapter, StorageBatchModify, StorageCategory, StorageSchema,
@@ -280,6 +281,7 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
         let mut found = Vec::with_capacity(hashes.len());
 
         {
+            let inst = Instant::now();
             let prepare_iter = self
                 .adapter
                 .prepare_iter::<TransactionBytesSchema, _>(&key_prefix)?;
@@ -287,6 +289,11 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
 
             let set = hashes.iter().collect::<HashSet<_>>();
             let mut count = hashes.len();
+            on_storage_get_cf(
+                StorageCategory::SignedTransaction,
+                inst.elapsed(),
+                count as i64,
+            );
 
             while count > 0 {
                 let (key, stx_bytes) = match iter.next() {
@@ -404,6 +411,7 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
         let mut found = Vec::with_capacity(hashes.len());
 
         {
+            let inst = Instant::now();
             let prepare_iter = self
                 .adapter
                 .prepare_iter::<ReceiptBytesSchema, _>(&key_prefix)?;
@@ -411,6 +419,7 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
 
             let set = hashes.iter().collect::<HashSet<_>>();
             let mut count = hashes.len();
+            on_storage_get_cf(StorageCategory::Receipt, inst.elapsed(), count as i64);
 
             while count > 0 {
                 let (key, stx_bytes) = match iter.next() {

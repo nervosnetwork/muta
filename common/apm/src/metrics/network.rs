@@ -1,10 +1,10 @@
+use lazy_static::lazy_static;
+
 use crate::metrics::{
     auto_flush_from, exponential_buckets, make_auto_flush_static_metric, register_histogram_vec,
     register_int_counter_vec, register_int_gauge, register_int_gauge_vec, HistogramVec,
     IntCounterVec, IntGauge, IntGaugeVec,
 };
-
-use lazy_static::lazy_static;
 
 make_auto_flush_static_metric! {
     pub label_enum MessageDirection {
@@ -19,6 +19,12 @@ make_auto_flush_static_metric! {
     pub label_enum RPCResult {
         success,
         timeout,
+    }
+
+    pub label_enum MessageTaret {
+      single,
+      multi,
+      all
     }
 
     pub struct MessageCounterVec: LocalIntCounter {
@@ -38,7 +44,7 @@ lazy_static! {
     pub static ref NETWORK_MESSAGE_COUNT_VEC: IntCounterVec = register_int_counter_vec!(
         "muta_network_message_total",
         "Total number of network message",
-        &["direction", "type", "module", "action"]
+        &["direction", "target", "type", "module", "action"]
     )
     .expect("network message total");
     pub static ref NETWORK_RPC_RESULT_COUNT_VEC: IntCounterVec = register_int_counter_vec!(
@@ -79,21 +85,33 @@ lazy_static! {
     .expect("network ip pending data size");
 }
 
-fn on_network_message(direction: &str, url: &str) {
+fn on_network_message(direction: &str, target: &str, url: &str, inc: i64) {
     let spliced: Vec<&str> = url.split('/').collect();
     if spliced.len() < 4 {
         return;
     }
 
+    let network_type = spliced[1];
+    let module = spliced[2];
+    let action = spliced[3];
+
     NETWORK_MESSAGE_COUNT_VEC
-        .with_label_values(&[direction, spliced[1], spliced[2], spliced[3]])
-        .inc();
+        .with_label_values(&[direction, target, network_type, module, action])
+        .inc_by(inc);
+}
+
+pub fn on_network_message_sent_all_target(url: &str) {
+    on_network_message("sent", "all", url, 1)
+}
+
+pub fn on_network_message_sent_multi_target(url: &str, target_count: i64) {
+    on_network_message("sent", "single", url, target_count);
 }
 
 pub fn on_network_message_sent(url: &str) {
-    on_network_message("sent", url);
+    on_network_message("sent", "single", url, 1);
 }
 
 pub fn on_network_message_received(url: &str) {
-    on_network_message("received", url);
+    on_network_message("received", "single", url, 1);
 }
