@@ -14,7 +14,7 @@ use common_crypto::{
 };
 use protocol::fixed_codec::FixedCodec;
 use protocol::traits::Context;
-use protocol::types::{Address, Hash, MerkleRoot, SignedTransaction};
+use protocol::types::{Address, Hash, Hex, MerkleRoot, SignedTransaction};
 use protocol::{Bytes, ProtocolError, ProtocolResult};
 
 pub struct OverlordCrypto {
@@ -103,21 +103,10 @@ impl Crypto for OverlordCrypto {
             let pub_key = map.get(addr).ok_or_else(|| {
                 ProtocolError::from(ConsensusError::Other("lose public key".to_string()))
             })?;
-            pub_keys.push(pub_key);
+            pub_keys.push(pub_key.clone());
         }
 
-        let aggregate_key = BlsPublicKey::aggregate(pub_keys);
-        let aggregated_signature = BlsSignature::try_from(aggregated_signature.as_ref())
-            .map_err(|e| ProtocolError::from(ConsensusError::CryptoErr(Box::new(e))))?;
-        let hash = HashValue::try_from(hash.as_ref()).map_err(|_| {
-            ProtocolError::from(ConsensusError::Other(
-                "failed to convert hash value".to_string(),
-            ))
-        })?;
-
-        aggregated_signature
-            .verify(&hash, &aggregate_key, &self.common_ref)
-            .map_err(|e| ProtocolError::from(ConsensusError::CryptoErr(Box::new(e))))?;
+        self.inner_verify_aggregated_signature(hash, pub_keys, aggregated_signature)?;
         Ok(())
     }
 }
@@ -139,6 +128,27 @@ impl OverlordCrypto {
         let mut map = self.addr_pubkey.write();
 
         *map = new_addr_pubkey;
+    }
+
+    pub fn inner_verify_aggregated_signature(
+        &self,
+        hash: Bytes,
+        pub_keys: Vec<BlsPublicKey>,
+        signature: Bytes,
+    ) -> ProtocolResult<()> {
+        let aggregate_key = BlsPublicKey::aggregate(pub_keys);
+        let aggregated_signature = BlsSignature::try_from(signature.as_ref())
+            .map_err(|e| ProtocolError::from(ConsensusError::CryptoErr(Box::new(e))))?;
+        let hash = HashValue::try_from(hash.as_ref()).map_err(|_| {
+            ProtocolError::from(ConsensusError::Other(
+                "failed to convert hash value".to_string(),
+            ))
+        })?;
+
+        aggregated_signature
+            .verify(&hash, &aggregate_key, &self.common_ref)
+            .map_err(|e| ProtocolError::from(ConsensusError::CryptoErr(Box::new(e))))?;
+        Ok(())
     }
 }
 
@@ -179,6 +189,14 @@ pub fn digest_signed_transactions(signed_txs: &[SignedTransaction]) -> ProtocolR
     Ok(Hash::digest(list_bytes.freeze()))
 }
 
+pub fn convert_hex_to_bls_pubkeys(hex: Hex) -> ProtocolResult<BlsPublicKey> {
+    let hex_pubkey = hex::decode(hex.as_string_trim0x())
+        .map_err(|e| ConsensusError::Other(format!("from hex error {:?}", e)))?;
+    let ret = BlsPublicKey::try_from(hex_pubkey.as_ref())
+        .map_err(|e| ConsensusError::CryptoErr(Box::new(e)))?;
+    Ok(ret)
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -211,8 +229,12 @@ mod test {
         }
 
         let signature = BlsSignature::combine(sigs_and_pub_keys.clone());
-        let aggregate_key =
-            BlsPublicKey::aggregate(sigs_and_pub_keys.iter().map(|s| &s.1).collect::<Vec<_>>());
+        let aggregate_key = BlsPublicKey::aggregate(
+            sigs_and_pub_keys
+                .iter()
+                .map(|s| s.1.clone())
+                .collect::<Vec<_>>(),
+        );
 
         let res = signature.verify(&hash, &aggregate_key, &"muta".into());
         println!("{:?}", res);
