@@ -1,5 +1,5 @@
 use std::fs;
-use std::io::{Read, Write};
+use std::io::{ErrorKind, Read, Write};
 use std::path::{Path, PathBuf};
 
 use protocol::codec::ProtocolCodecSync;
@@ -31,26 +31,31 @@ impl SignedTxsWAL {
         block_hash: Hash,
         txs: Vec<SignedTransaction>,
     ) -> ProtocolResult<()> {
-        let mut dir = self.path.clone();
-        dir.push(height.to_string());
-        if !Path::new(&dir).exists() {
-            fs::create_dir(&dir).map_err(ConsensusError::WALErr)?;
+        let mut wal_path = self.path.clone();
+        wal_path.push(height.to_string());
+        if !wal_path.exists() {
+            fs::create_dir(&wal_path).map_err(ConsensusError::WALErr)?;
         }
 
-        dir.push(block_hash.as_hex());
-        dir.set_extension("txt");
+        wal_path.push(block_hash.as_hex());
+        wal_path.set_extension("txt");
 
-        if dir.exists() {
-            return Ok(());
-        }
-
-        let mut wal_file = fs::OpenOptions::new()
+        let tmp = fs::OpenOptions::new()
             .read(true)
             .write(true)
             .create(true)
-            .open(dir)
-            .map_err(ConsensusError::WALErr)?;
+            .open(wal_path);
 
+        if tmp.is_err() {
+            let err = tmp.err().unwrap();
+            if err.kind() == ErrorKind::AlreadyExists {
+                return Ok(());
+            } else {
+                return Err(ConsensusError::WALErr(err).into());
+            }
+        }
+
+        let mut wal_file = tmp.unwrap();
         let data = FixedSignedTxs::new(txs).encode_sync()?;
         wal_file
             .write_all(data.as_ref())
