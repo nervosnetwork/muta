@@ -81,9 +81,15 @@ lazy_static! {
         "The counter for sync blocks from remote"
     )
     .unwrap();
+    pub static ref ENGINE_SYNC_BLOCK_HISTOGRAM: Histogram = register_histogram!(
+        "muta_consensus_sync_block_duration",
+        "Histogram of consensus sync duration",
+        exponential_buckets(0.5, 1.2, 20).expect("consensus duration time exponential")
+    )
+    .unwrap();
     pub static ref ENGINE_CONSENSUS_COST_TIME: Histogram = register_histogram!(
         "muta_consensus_duration_seconds",
-        "Consensus duration from last block",
+        "Histogram of consensus duration from last block",
         exponential_buckets(1.0, 1.2, 15).expect("consensus duration time exponential")
     )
     .unwrap();

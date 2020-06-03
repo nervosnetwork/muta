@@ -45,6 +45,7 @@ impl<Adapter: SynchronizationAdapter> Synchronization for OverlordSynchronizatio
         logs = "{'remote_height': 'remote_height'}"
     )]
     async fn receive_remote_block(&self, ctx: Context, remote_height: u64) -> ProtocolResult<()> {
+        let inst = Instant::now();
         let syncing_lock = self.syncing.try_lock();
         if syncing_lock.is_none() {
             return Ok(());
@@ -93,6 +94,8 @@ impl<Adapter: SynchronizationAdapter> Synchronization for OverlordSynchronizatio
 
         common_apm::metrics::consensus::ENGINE_SYNC_BLOCK_COUNTER
             .inc_by((remote_height - current_height) as i64);
+        common_apm::metrics::consensus::ENGINE_SYNC_BLOCK_HISTOGRAM
+            .observe(common_apm::metrics::duration_to_sec(inst.elapsed()));
 
         self.status.replace(sync_status.clone());
         self.adapter.update_status(

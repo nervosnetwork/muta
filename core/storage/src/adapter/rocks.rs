@@ -2,11 +2,14 @@ use std::error::Error;
 use std::marker::PhantomData;
 use std::path::Path;
 use std::sync::Arc;
+use std::time::Instant;
 
-use async_trait::async_trait;
 use derive_more::{Display, From};
 use rocksdb::{ColumnFamily, DBIterator, Options, WriteBatch, DB};
 
+use async_trait::async_trait;
+
+use common_apm::metrics::storage::on_storage_put_cf;
 use protocol::codec::ProtocolCodecSync;
 use protocol::traits::{
     IntoIteratorByRef, StorageAdapter, StorageBatchModify, StorageCategory, StorageIterator,
@@ -105,16 +108,16 @@ impl<'c, S: StorageSchema, P: AsRef<[u8]>> IntoIteratorByRef<S> for RocksIntoIte
 
 #[async_trait]
 impl StorageAdapter for RocksAdapter {
-    async fn insert<S: StorageSchema>(
-        &self,
-        key: <S as StorageSchema>::Key,
-        val: <S as StorageSchema>::Value,
-    ) -> ProtocolResult<()> {
+    async fn insert<S: StorageSchema>(&self, key: S::Key, val: S::Value) -> ProtocolResult<()> {
+        let inst = Instant::now();
+
         let column = get_column::<S>(&self.db)?;
         let key = key.encode_sync()?.to_vec();
         let val = val.encode_sync()?.to_vec();
+        let size = val.len() as i64;
 
         db!(self.db, put_cf, column, key, val)?;
+        on_storage_put_cf(S::category(), inst.elapsed(), size);
 
         Ok(())
     }
@@ -182,12 +185,19 @@ impl StorageAdapter for RocksAdapter {
         }
 
         let mut batch = WriteBatch::default();
+        let mut insert_size = 0usize;
+        let inst = Instant::now();
         for (key, value) in pairs.into_iter() {
             match value {
-                Some(value) => batch.put_cf(column, key, value),
+                Some(value) => {
+                    insert_size += value.len();
+                    batch.put_cf(column, key, value)
+                }
                 None => batch.delete_cf(column, key),
             }
         }
+
+        on_storage_put_cf(S::category(), inst.elapsed(), insert_size as i64);
 
         self.db.write(batch).map_err(RocksAdapterError::from)?;
         Ok(())
