@@ -40,22 +40,22 @@ impl SignedTxsWAL {
         wal_path.push(block_hash.as_hex());
         wal_path.set_extension("txt");
 
-        let tmp = fs::OpenOptions::new()
+        let mut wal_file = match fs::OpenOptions::new()
             .read(true)
             .write(true)
             .create(true)
-            .open(wal_path);
-
-        if tmp.is_err() {
-            let err = tmp.err().unwrap();
-            if err.kind() == ErrorKind::AlreadyExists {
-                return Ok(());
-            } else {
-                return Err(ConsensusError::WALErr(err).into());
+            .open(wal_path)
+        {
+            Ok(file) => file,
+            Err(err) => {
+                if err.kind() == ErrorKind::AlreadyExists {
+                    return Ok(());
+                } else {
+                    return Err(ConsensusError::WALErr(err).into());
+                }
             }
-        }
+        };
 
-        let mut wal_file = tmp.unwrap();
         let data = FixedSignedTxs::new(txs).encode_sync()?;
         wal_file
             .write_all(data.as_ref())
