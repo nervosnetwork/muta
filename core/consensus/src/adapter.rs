@@ -682,7 +682,12 @@ where
             .iter()
             .map(|node| (node.address.clone(), node.vote_weight))
             .collect::<HashMap<overlord::types::Address, u32>>();
-        self.verity_proof_weight(ctx.clone(), block.header.height, weight_map, signed_voters.clone())?;
+        self.verity_proof_weight(
+            ctx.clone(),
+            block.header.height,
+            weight_map,
+            signed_voters.clone(),
+        )?;
 
         let vote_hash = self.crypto.hash(Bytes::from(rlp::encode(&vote)));
         let hex_pubkeys = metadata
