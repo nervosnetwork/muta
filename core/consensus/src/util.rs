@@ -242,6 +242,24 @@ mod tests {
     }
 
     #[test]
+    fn test_aggregate_pubkeys_order() {
+        let public_keys = vec![
+            hex::decode("041054fe9a65be0891094ed37fb3655e3ffb12353bc0a1b4f8673b52ad65d1ca481780cf7e988eb8dcdc05d8352f03605b0d11afb2525b3f1b55ec694509248bcfead39cbb292725d710e2a509c77ed051d1d49e15e429cf6d12b9be7c02179612").unwrap(),
+            hex::decode("040c15c82ed07dc866ab7c3af3a070eb4340ac0439bf12bb49cbed5797d52707e009f7c17414777b0213b9a55c8a5c08290ce40c366d59322db418b7ff41277090bd25614174763c9fd725ede1f65f3e61ca9acdb35f59e33d556e738add14d536").unwrap(),
+            hex::decode("040b3118acefdfbb11ded262a7f3c90dfca4fbc0200a92b4f6bb80210ab85e39f79458f7d47f7cb06864df0571e7591a4e0858df0b52a4c3ae19ae3adc32e1da0ec4cbdca108365ee433becdb1ccebb1b339647788dfad94ebae1cbd770fcfa4e5").unwrap(),
+            hex::decode("040709f204e3ec5b8bdd9f2bb6edc9cb1704fc1e4952661ba7532ea8e37f3b159b8d41987ee6707d32bdf494e2deb00b7f049a4670a5ce1ad8e429fcacc5bbc69cb03b71a7f1d831d0b47dda5e62642d420ff0a545950cb1db19d42fe04e2c91d2").unwrap(),
+        ];
+        let mut pub_keys = public_keys
+            .into_iter()
+            .map(|pk| BlsPublicKey::try_from(pk.as_ref()).unwrap())
+            .collect::<Vec<_>>();
+        let pk_1 = BlsPublicKey::aggregate(pub_keys.clone());
+        pub_keys.reverse();
+        let pk_2 = BlsPublicKey::aggregate(pub_keys);
+        assert_eq!(pk_1, pk_2);
+    }
+
+    #[test]
     fn test_zip_roots() {
         let roots_1 = vec![1, 2, 3, 4, 5];
         let roots_2 = vec![1, 2, 3];
