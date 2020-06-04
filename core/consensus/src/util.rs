@@ -198,7 +198,7 @@ pub fn convert_hex_to_bls_pubkeys(hex: Hex) -> ProtocolResult<BlsPublicKey> {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
 
     #[test]
@@ -253,5 +253,13 @@ mod test {
         assert!(!check_list_roots(&roots_3, &roots_2));
         assert!(!check_list_roots(&roots_4, &roots_2));
         assert!(!check_list_roots(&roots_5, &roots_2));
+    }
+
+    #[test]
+    fn test_convert_from_hex() {
+        let hex_str = "0x04188ef9488c19458a963cc57b567adde7db8f8b6bec392d5cb7b67b0abc1ed6cd966edc451f6ac2ef38079460eb965e890d1f576e4039a20467820237cda753f07a8b8febae1ec052190973a1bcf00690ea8fc0168b3fbbccd1c4e402eda5ef22";
+        assert!(
+            convert_hex_to_bls_pubkeys(Hex::from_string(String::from(hex_str)).unwrap()).is_ok()
+        );
     }
 }
