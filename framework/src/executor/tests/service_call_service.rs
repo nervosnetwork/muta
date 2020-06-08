@@ -12,11 +12,11 @@ use protocol::traits::{
     Context, Executor, ExecutorParams, Service, ServiceMapping, ServiceResponse, ServiceSDK,
 };
 use protocol::types::{
-    Genesis, Hash, RawTransaction, ServiceContext, SignedTransaction, TransactionRequest,
+    Address, Genesis, Hash, RawTransaction, ServiceContext, SignedTransaction, TransactionRequest,
 };
 use protocol::ProtocolResult;
 
-use crate::executor::tests::MockStorage;
+use crate::executor::tests::{MockStorage, PUB_KEY_STR};
 use crate::executor::ServiceExecutor;
 
 #[test]
@@ -62,14 +62,13 @@ fn test_service_call_service() {
             payload:      r#"{ "name": "TestCallAsset", "symbol": "TCA", "supply": 320000011 }"#
                 .to_owned(),
         },
+        sender:       Address::from_pubkey_bytes(Bytes::from(hex::decode(PUB_KEY_STR).unwrap()))
+            .unwrap(),
     };
     let stx = SignedTransaction {
         raw,
         tx_hash: Hash::from_empty(),
-        pubkey: Bytes::from(
-            hex::decode("031288a6788678c25952eba8693b2f278f66e2187004b64ac09416d07f83f96d5b")
-                .unwrap(),
-        ),
+        pubkey: Bytes::from(hex::decode(PUB_KEY_STR).unwrap()),
         signature: BytesMut::from("").freeze(),
     };
 

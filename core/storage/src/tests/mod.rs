@@ -18,6 +18,8 @@ use protocol::types::{
 };
 use protocol::Bytes;
 
+const ADDRESS_STR: &str = "0xCAB8EEA4799C21379C20EF5BAA2CC8AF1BEC475B";
+
 fn mock_signed_tx(tx_hash: Hash) -> SignedTransaction {
     let nonce = Hash::digest(Bytes::from("XXXX"));
 
@@ -34,6 +36,7 @@ fn mock_signed_tx(tx_hash: Hash) -> SignedTransaction {
         cycles_limit: 10,
         cycles_price: 1,
         request,
+        sender: Address::from_hex(ADDRESS_STR).unwrap(),
     };
 
     SignedTransaction {
@@ -68,7 +71,6 @@ fn mock_receipt(tx_hash: Hash) -> Receipt {
 
 fn mock_block(height: u64, block_hash: Hash) -> Block {
     let nonce = Hash::digest(Bytes::from("XXXX"));
-    let addr_str = "0xCAB8EEA4799C21379C20EF5BAA2CC8AF1BEC475B";
     let header = BlockHeader {
         chain_id: nonce.clone(),
         height,
@@ -81,7 +83,7 @@ fn mock_block(height: u64, block_hash: Hash) -> Block {
         state_root: nonce,
         receipt_root: Vec::new(),
         cycles_used: vec![999_999],
-        proposer: Address::from_hex(addr_str).unwrap(),
+        proposer: Address::from_hex(ADDRESS_STR).unwrap(),
         proof: mock_proof(block_hash),
         validator_version: 1,
         validators: Vec::new(),

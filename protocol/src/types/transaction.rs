@@ -14,6 +14,7 @@ pub struct RawTransaction {
     pub nonce:        Hash,
     pub request:      TransactionRequest,
     pub timeout:      u64,
+    pub sender:       Address,
 }
 
 #[derive(RlpFixedCodec, Clone, Debug, PartialEq, Eq)]

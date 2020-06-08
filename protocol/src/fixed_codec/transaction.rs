@@ -6,7 +6,7 @@ use crate::ProtocolResult;
 
 impl rlp::Encodable for RawTransaction {
     fn rlp_append(&self, s: &mut rlp::RlpStream) {
-        s.begin_list(8);
+        s.begin_list(9);
         s.append(&self.chain_id.as_bytes().to_vec());
         s.append(&self.cycles_limit);
         s.append(&self.cycles_price);
@@ -15,6 +15,7 @@ impl rlp::Encodable for RawTransaction {
         s.append(&self.request.service_name);
         s.append(&self.request.payload);
         s.append(&self.timeout);
+        s.append(&self.sender);
     }
 }
 
@@ -35,6 +36,7 @@ impl rlp::Decodable for RawTransaction {
             payload:      r.at(6)?.as_val()?,
         };
         let timeout = r.at(7)?.as_val()?;
+        let sender = r.at(8)?.as_val()?;
 
         Ok(Self {
             chain_id,
@@ -43,6 +45,7 @@ impl rlp::Decodable for RawTransaction {
             nonce,
             request,
             timeout,
+            sender,
         })
     }
 }

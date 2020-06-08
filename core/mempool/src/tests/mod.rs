@@ -17,7 +17,7 @@ use common_crypto::{
 };
 use protocol::codec::ProtocolCodec;
 use protocol::traits::{Context, MemPool, MemPoolAdapter, MixedTxHashes};
-use protocol::types::{Hash, RawTransaction, SignedTransaction, TransactionRequest};
+use protocol::types::{Address, Hash, RawTransaction, SignedTransaction, TransactionRequest};
 use protocol::{Bytes, ProtocolResult};
 
 use crate::{HashMemPool, MemPoolError};
@@ -264,6 +264,7 @@ fn mock_signed_tx(
         cycles_limit: TX_CYCLE,
         cycles_price: 1,
         request,
+        sender: Address::from_pubkey_bytes(pub_key.to_bytes()).unwrap(),
     };
 
     let raw_bytes = executor::block_on(async { raw.encode().await.unwrap() });

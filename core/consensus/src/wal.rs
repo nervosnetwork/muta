@@ -119,18 +119,23 @@ mod tests {
     use rand::random;
     use test::Bencher;
 
-    use protocol::types::{Hash, RawTransaction, TransactionRequest};
+    use protocol::types::{Address, Hash, RawTransaction, TransactionRequest};
     use protocol::Bytes;
 
     use super::*;
 
     static FULL_TXS_PATH: &str = "./free-space";
 
-    pub fn mock_hash() -> Hash {
+    fn mock_hash() -> Hash {
         Hash::digest(get_random_bytes(10))
     }
 
-    pub fn mock_raw_tx() -> RawTransaction {
+    fn mock_address() -> Address {
+        let hash = mock_hash();
+        Address::from_hash(hash).unwrap()
+    }
+
+    fn mock_raw_tx() -> RawTransaction {
         RawTransaction {
             chain_id:     mock_hash(),
             nonce:        mock_hash(),
@@ -138,6 +143,7 @@ mod tests {
             cycles_price: 1,
             cycles_limit: 100,
             request:      mock_transaction_request(),
+            sender: mock_address(),
         }
     }
 

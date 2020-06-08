@@ -189,6 +189,8 @@ mod test {
 
     use super::{FixedBlock, FixedSignedTxs};
 
+    const PUB_KEY_STR: &str = "031288a6788678c25952eba8693b2f278f66e2187004b64ac09416d07f83f96d5b";
+
     fn gen_block(height: u64, block_hash: Hash) -> Block {
         let nonce = Hash::digest(Bytes::from("XXXX"));
         let addr_str = "0xCAB8EEA4799C21379C20EF5BAA2CC8AF1BEC475B";
@@ -247,6 +249,8 @@ mod test {
             cycles_price: 1,
             cycles_limit: random::<u64>(),
             request,
+            sender: Address::from_pubkey_bytes(Bytes::from(hex::decode(PUB_KEY_STR).unwrap()))
+                .unwrap(),
         };
 
         let raw_bytes = executor::block_on(async { raw.encode().await.unwrap() });
@@ -255,7 +259,7 @@ mod test {
         SignedTransaction {
             raw,
             tx_hash,
-            pubkey: Bytes::from(gen_random_bytes(32)),
+            pubkey: Bytes::from(hex::decode(PUB_KEY_STR).unwrap()),
             signature: Bytes::from(gen_random_bytes(64)),
         }
     }

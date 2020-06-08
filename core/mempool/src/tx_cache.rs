@@ -410,8 +410,9 @@ mod tests {
     use rand::random;
     use test::Bencher;
 
-    use protocol::types::{Hash, RawTransaction, SignedTransaction, TransactionRequest};
-    use protocol::Bytes;
+    use protocol::types::{
+        Address, Bytes, Hash, RawTransaction, SignedTransaction, TransactionRequest,
+    };
 
     use crate::map::Map;
     use crate::tx_cache::{TxCache, TxWrapper};
@@ -458,6 +459,7 @@ mod tests {
             cycles_limit: TX_CYCLE,
             cycles_price: 1,
             request,
+            sender: Address::from_pubkey_bytes(bytes.clone()).unwrap(),
         };
         SignedTransaction {
             raw,
