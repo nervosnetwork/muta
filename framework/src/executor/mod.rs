@@ -25,7 +25,7 @@ use protocol::types::{
 };
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
-use crate::binding::sdk::{DefaultServiceSDK, DefaultChainQuerier};
+use crate::binding::sdk::{DefaultChainQuerier, DefaultServiceSDK};
 use crate::binding::state::{GeneralServiceState, MPTTrie};
 
 enum HookType {

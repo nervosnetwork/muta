@@ -5,7 +5,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use cita_trie::MemoryDB;
 
-use framework::binding::sdk::{DefaultServiceSDK, DefaultChainQuerier};
+use framework::binding::sdk::{DefaultChainQuerier, DefaultServiceSDK};
 use framework::binding::state::{GeneralServiceState, MPTTrie};
 use protocol::traits::{Context, NoopDispatcher, ServiceSDK, Storage};
 use protocol::types::{

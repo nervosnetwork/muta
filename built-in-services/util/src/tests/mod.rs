@@ -9,7 +9,7 @@ use async_trait::async_trait;
 use common_crypto::{
     Crypto, PrivateKey, PublicKey, Secp256k1, Secp256k1PrivateKey, Signature, ToPublicKey,
 };
-use framework::binding::sdk::{DefaultServiceSDK, DefaultChainQuerier};
+use framework::binding::sdk::{DefaultChainQuerier, DefaultServiceSDK};
 use framework::binding::state::{GeneralServiceState, MPTTrie};
 use protocol::traits::{Context, NoopDispatcher, Storage};
 use protocol::types::{

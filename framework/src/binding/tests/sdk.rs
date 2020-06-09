@@ -13,7 +13,7 @@ use protocol::types::{
 };
 use protocol::ProtocolResult;
 
-use crate::binding::sdk::{DefaultServiceSDK, DefaultChainQuerier};
+use crate::binding::sdk::{DefaultChainQuerier, DefaultServiceSDK};
 use crate::binding::store::StoreError;
 use crate::binding::tests::state::new_state;
 
