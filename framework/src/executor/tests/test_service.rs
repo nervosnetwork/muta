@@ -59,6 +59,27 @@ impl<SDK: ServiceSDK> TestService<SDK> {
 
     #[cycles(210_00)]
     #[write]
+    fn test_revert_event(
+        &mut self,
+        ctx: ServiceContext,
+        _: TestWritePayload,
+    ) -> ServiceResponse<TestWriteResponse> {
+        ServiceResponse::from_error(111, "error".to_owned())
+    }
+
+    #[cycles(210_00)]
+    #[write]
+    fn test_event(
+        &mut self,
+        ctx: ServiceContext,
+        _: TestWritePayload,
+    ) -> ServiceResponse<TestWriteResponse> {
+        ctx.emit_event("test".to_owned());
+        ServiceResponse::from_succeed(TestWriteResponse::default())
+    }
+
+    #[cycles(210_00)]
+    #[write]
     fn test_service_call_invoke_hook_only_once(
         &mut self,
         ctx: ServiceContext,

@@ -110,6 +110,103 @@ fn test_exec() {
 }
 
 #[test]
+fn test_emit_event() {
+    let toml_str = include_str!("./genesis_services.toml");
+    let genesis: Genesis = toml::from_str(toml_str).unwrap();
+
+    let db = Arc::new(MemoryDB::new(false));
+
+    let root = ServiceExecutor::create_genesis(
+        genesis.services,
+        Arc::clone(&db),
+        Arc::new(MockStorage {}),
+        Arc::new(MockServiceMapping {}),
+    )
+    .unwrap();
+
+    let mut executor = ServiceExecutor::with_root(
+        root.clone(),
+        Arc::clone(&db),
+        Arc::new(MockStorage {}),
+        Arc::new(MockServiceMapping {}),
+    )
+    .unwrap();
+
+    let params = ExecutorParams {
+        state_root:   root,
+        height:       1,
+        timestamp:    0,
+        cycles_limit: std::u64::MAX,
+    };
+
+    let mut stx = mock_signed_tx();
+    stx.raw.request.service_name = "test".to_owned();
+    stx.raw.request.method = "test_event".to_owned();
+    stx.raw.request.payload = r#"{
+        "key": "",
+        "value": "",
+        "extra": ""
+    }"#
+    .to_owned();
+
+    let txs = vec![stx];
+    let executor_resp = executor.exec(Context::new(), &params, &txs).unwrap();
+    let receipt = &executor_resp.receipts[0];
+
+    assert_eq!(receipt.response.response.code, 0);
+    assert_eq!(receipt.events.len(), 1);
+    assert_eq!(&receipt.events[0].data, "test");
+}
+
+#[test]
+fn test_revert_event_on_exec_error() {
+    let toml_str = include_str!("./genesis_services.toml");
+    let genesis: Genesis = toml::from_str(toml_str).unwrap();
+
+    let db = Arc::new(MemoryDB::new(false));
+
+    let root = ServiceExecutor::create_genesis(
+        genesis.services,
+        Arc::clone(&db),
+        Arc::new(MockStorage {}),
+        Arc::new(MockServiceMapping {}),
+    )
+    .unwrap();
+
+    let mut executor = ServiceExecutor::with_root(
+        root.clone(),
+        Arc::clone(&db),
+        Arc::new(MockStorage {}),
+        Arc::new(MockServiceMapping {}),
+    )
+    .unwrap();
+
+    let params = ExecutorParams {
+        state_root:   root,
+        height:       1,
+        timestamp:    0,
+        cycles_limit: std::u64::MAX,
+    };
+
+    let mut stx = mock_signed_tx();
+    stx.raw.request.service_name = "test".to_owned();
+    stx.raw.request.method = "test_revert_event".to_owned();
+    stx.raw.request.payload = r#"{
+        "key": "",
+        "value": "",
+        "extra": ""
+    }"#
+    .to_owned();
+
+    let txs = vec![stx];
+    let executor_resp = executor.exec(Context::new(), &params, &txs).unwrap();
+    let receipt = &executor_resp.receipts[0];
+
+    assert_eq!(receipt.response.response.code, 111);
+    assert_eq!(receipt.events.len(), 0);
+}
+
+#[test]
 fn test_tx_hook() {
     let toml_str = include_str!("./genesis_services.toml");
     let genesis: Genesis = toml::from_str(toml_str).unwrap();
