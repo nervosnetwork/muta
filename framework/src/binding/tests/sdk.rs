@@ -300,7 +300,6 @@ pub fn mock_block_header() -> BlockHeader {
         exec_height:                    41,
         prev_hash:                      mock_hash(),
         timestamp:                      420_000_000,
-        logs_bloom:                     Default::default(),
         order_root:                     mock_merkle_root(),
         order_signed_transactions_hash: mock_hash(),
         confirm_root:                   vec![mock_hash(), mock_hash()],

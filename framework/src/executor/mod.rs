@@ -10,7 +10,6 @@ use std::panic::{self, AssertUnwindSafe};
 use std::rc::Rc;
 use std::sync::Arc;
 
-use bytes::BytesMut;
 use cita_trie::DB as TrieDB;
 use derive_more::Display;
 
@@ -20,8 +19,8 @@ use protocol::traits::{
     ServiceResponse, ServiceState, Storage,
 };
 use protocol::types::{
-    Address, Bloom, BloomInput, Hash, MerkleRoot, Receipt, ReceiptResponse, ServiceContext,
-    ServiceContextParams, ServiceParam, SignedTransaction, TransactionRequest,
+    Address, Hash, MerkleRoot, Receipt, ReceiptResponse, ServiceContext, ServiceContextParams,
+    ServiceParam, SignedTransaction, TransactionRequest,
 };
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
@@ -309,23 +308,6 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
             ExecType::Write => service.write_(context),
         }
     }
-
-    #[muta_apm::derive::tracing_span(kind = "executor.logs_bloom")]
-    fn logs_bloom(&self, ctx: Context, receipts: &[Receipt]) -> Bloom {
-        let mut bloom = Bloom::default();
-        for receipt in receipts {
-            for event in receipt.events.iter() {
-                let bytes =
-                    BytesMut::from((event.service.clone() + &event.data).as_bytes()).freeze();
-                let hash = Hash::digest(bytes).as_bytes();
-
-                let input = BloomInput::Raw(hash.as_ref());
-                bloom.accrue(input)
-            }
-        }
-
-        bloom
-    }
 }
 
 impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMapping> Executor
@@ -373,20 +355,18 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
 
         self.hook(ctx.clone(), HookType::After, params)?;
 
-        let state_root = self.commit(ctx.clone())?;
+        let state_root = self.commit(ctx)?;
         let mut all_cycles_used = 0;
 
         for receipt in receipts.iter_mut() {
             receipt.state_root = state_root.clone();
             all_cycles_used += receipt.cycles_used;
         }
-        let logs_bloom = self.logs_bloom(ctx, &receipts);
 
         Ok(ExecutorResp {
             receipts,
             all_cycles_used,
             state_root,
-            logs_bloom,
         })
     }
 

@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use common_merkle::Merkle;
 use protocol::fixed_codec::FixedCodec;
 use protocol::traits::{Context, ExecutorResp};
-use protocol::types::{Block, Bloom, Hash, MerkleRoot, Metadata, Proof, Validator};
+use protocol::types::{Block, Hash, MerkleRoot, Metadata, Proof, Validator};
 
 use crate::util::check_list_roots;
 
@@ -48,7 +48,6 @@ impl StatusAgent {
         status.exec_height = new_status.exec_height;
         status.current_hash = new_status.current_hash;
         status.latest_committed_state_root = new_status.latest_committed_state_root;
-        status.list_logs_bloom = new_status.list_logs_bloom;
         status.list_confirm_root = new_status.list_confirm_root;
         status.list_state_root = new_status.list_state_root;
         status.list_receipt_root = new_status.list_receipt_root;
@@ -65,7 +64,7 @@ impl StatusAgent {
 
 #[derive(Serialize, Deserialize, Clone, Debug, Display)]
 #[display(
-    fmt = "latest_committed_height {}, exec height {}, current_hash {:?}, latest_committed_state_root {:?} list state root {:?}, list receipt root {:?}, list confirm root {:?}, list cycle used {:?}, logs bloom {:?}",
+    fmt = "latest_committed_height {}, exec height {}, current_hash {:?}, latest_committed_state_root {:?} list state root {:?}, list receipt root {:?}, list confirm root {:?}, list cycle used {:?}",
     latest_committed_height,
     exec_height,
     current_hash,
@@ -73,8 +72,7 @@ impl StatusAgent {
     list_state_root,
     list_receipt_root,
     list_confirm_root,
-    list_cycles_used,
-    "list_logs_bloom.iter().map(|bloom| bloom.to_low_u64_be()).collect::<Vec<_>>()"
+    list_cycles_used
 )]
 pub struct CurrentConsensusStatus {
     pub cycles_price:                u64, // metadata
@@ -83,7 +81,6 @@ pub struct CurrentConsensusStatus {
     pub exec_height:                 u64,
     pub current_hash:                Hash, // as same as block of current height
     pub latest_committed_state_root: MerkleRoot, // latest consented height
-    pub list_logs_bloom:             Vec<Bloom>,
     pub list_confirm_root:           Vec<MerkleRoot>,
     pub list_state_root:             Vec<MerkleRoot>,
     pub list_receipt_root:           Vec<MerkleRoot>,
@@ -118,7 +115,6 @@ impl CurrentConsensusStatus {
         self.exec_height += 1;
         self.list_cycles_used.push(info.cycles_used);
         self.list_confirm_root.push(info.confirm_root.clone());
-        self.list_logs_bloom.push(info.logs_bloom.clone());
         self.list_receipt_root.push(info.receipt_root.clone());
         self.list_state_root.push(info.state_root);
     }
@@ -163,10 +159,7 @@ impl CurrentConsensusStatus {
 
     fn split_off(&mut self, block: &Block) {
         let len = block.header.confirm_root.len();
-        if len != block.header.cycles_used.len()
-            || len != block.header.logs_bloom.len()
-            || len != block.header.receipt_root.len()
-        {
+        if len != block.header.cycles_used.len() || len != block.header.receipt_root.len() {
             panic!("vec lengths do not match. {:?}", block);
         }
 
@@ -174,12 +167,6 @@ impl CurrentConsensusStatus {
             panic!(
                 "check list_cycles_used error current_roots: {:?}, committed_roots roots {:?}",
                 self.list_cycles_used, block.header.cycles_used
-            );
-        }
-        if !check_list_roots(&self.list_logs_bloom, &block.header.logs_bloom) {
-            panic!(
-                "check list_logs_bloom error current_roots: {:?}, committed_roots roots {:?}",
-                self.list_logs_bloom, block.header.logs_bloom
             );
         }
         if !check_list_roots(&self.list_confirm_root, &block.header.confirm_root) {
@@ -196,7 +183,6 @@ impl CurrentConsensusStatus {
         }
 
         self.list_cycles_used = self.list_cycles_used.split_off(len);
-        self.list_logs_bloom = self.list_logs_bloom.split_off(len);
         self.list_confirm_root = self.list_confirm_root.split_off(len);
         self.list_receipt_root = self.list_receipt_root.split_off(len);
         self.list_state_root = self.list_state_root.split_off(len);
@@ -205,19 +191,17 @@ impl CurrentConsensusStatus {
 
 #[derive(Clone, Debug, Display)]
 #[display(
-    fmt = "exec height {}, cycles used {}, state root {:?}, receipt root {:?}, confirm root {:?}, logs bloom {}",
+    fmt = "exec height {}, cycles used {}, state root {:?}, receipt root {:?}, confirm root {:?}",
     exec_height,
     cycles_used,
     state_root,
     receipt_root,
-    confirm_root,
-    "logs_bloom.to_low_u64_be()"
+    confirm_root
 )]
 pub struct ExecutedInfo {
     pub ctx:          Context,
     pub exec_height:  u64,
     pub cycles_used:  u64,
-    pub logs_bloom:   Bloom,
     pub state_root:   MerkleRoot,
     pub receipt_root: MerkleRoot,
     pub confirm_root: MerkleRoot,
@@ -242,8 +226,7 @@ impl ExecutedInfo {
             cycles_used: cycles,
             receipt_root: receipt,
             confirm_root: order_root,
-            state_root: resp.state_root.clone(),
-            logs_bloom: resp.logs_bloom,
+            state_root: resp.state_root,
         }
     }
 }

@@ -3,7 +3,7 @@ use std::mem;
 use byteorder::{ByteOrder, LittleEndian};
 
 use crate::fixed_codec::{FixedCodec, FixedCodecError};
-use crate::types::{Bloom, Bytes, BytesMut, Hex};
+use crate::types::{Bytes, BytesMut, Hex};
 use crate::ProtocolResult;
 
 impl FixedCodec for bool {
@@ -118,16 +118,6 @@ impl FixedCodec for Vec<u8> {
 
     fn decode_fixed(bytes: Bytes) -> ProtocolResult<Self> {
         Ok(bytes.to_vec())
-    }
-}
-
-impl FixedCodec for Bloom {
-    fn encode_fixed(&self) -> ProtocolResult<Bytes> {
-        Ok(Bytes::from(self.as_ref().to_vec()))
-    }
-
-    fn decode_fixed(bytes: Bytes) -> ProtocolResult<Self> {
-        Ok(Bloom::from_slice(bytes.to_vec().as_ref()))
     }
 }
 
