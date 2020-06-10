@@ -4,7 +4,7 @@ use muta_codec_derive::RlpFixedCodec;
 use serde::{Deserialize, Serialize};
 
 use crate::fixed_codec::{FixedCodec, FixedCodecError};
-use crate::types::{Address, Bloom, Hash, MerkleRoot};
+use crate::types::{Address, Hash, MerkleRoot};
 use crate::ProtocolResult;
 
 #[derive(RlpFixedCodec, Clone, Debug, PartialEq, Eq)]
@@ -15,14 +15,13 @@ pub struct Block {
 
 #[derive(RlpFixedCodec, Clone, Debug, Display, PartialEq, Eq)]
 #[display(
-    fmt = "chain id {:?}, height {}, exec height {}, previous hash {:?}, logs bloom {:?},
+    fmt = "chain id {:?}, height {}, exec height {}, previous hash {:?},
     ordered root {:?}, order_signed_transactions_hash {:?}, confirm root {:?}, state root {:?},
     receipt root {:?},cycles_used {:?}, proposer {:?}, proof {:?}, validators {:?}",
     chain_id,
     height,
     exec_height,
     prev_hash,
-    "logs_bloom.iter().map(|bloom| bloom.to_low_u64_be()).collect::<Vec<_>>()",
     order_root,
     order_signed_transactions_hash,
     confirm_root,
@@ -39,7 +38,6 @@ pub struct BlockHeader {
     pub exec_height:                    u64,
     pub prev_hash:                      Hash,
     pub timestamp:                      u64,
-    pub logs_bloom:                     Vec<Bloom>,
     pub order_root:                     MerkleRoot,
     pub order_signed_transactions_hash: Hash,
     pub confirm_root:                   Vec<MerkleRoot>,

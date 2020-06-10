@@ -10,7 +10,6 @@ use crate::{
     },
     field, impl_default_bytes_codec_for,
     types::primitive as protocol_primitive,
-    types::Bloom,
     ProtocolError, ProtocolResult,
 };
 
@@ -41,40 +40,37 @@ pub struct BlockHeader {
     #[prost(uint64, tag = "4")]
     pub timestamp: u64,
 
-    #[prost(message, repeated, tag = "5")]
-    pub logs_bloom: Vec<Vec<u8>>,
-
-    #[prost(message, tag = "6")]
+    #[prost(message, tag = "5")]
     pub order_root: Option<Hash>,
 
-    #[prost(message, tag = "7")]
+    #[prost(message, tag = "6")]
     pub order_signed_transactions_hash: Option<Hash>,
 
-    #[prost(message, repeated, tag = "8")]
+    #[prost(message, repeated, tag = "7")]
     pub confirm_root: Vec<Hash>,
 
-    #[prost(message, tag = "9")]
+    #[prost(message, tag = "8")]
     pub state_root: Option<Hash>,
 
-    #[prost(message, repeated, tag = "10")]
+    #[prost(message, repeated, tag = "9")]
     pub receipt_root: Vec<Hash>,
 
-    #[prost(message, repeated, tag = "11")]
+    #[prost(message, repeated, tag = "10")]
     pub cycles_used: Vec<u64>,
 
-    #[prost(message, tag = "12")]
+    #[prost(message, tag = "11")]
     pub proposer: Option<Address>,
 
-    #[prost(message, tag = "13")]
+    #[prost(message, tag = "12")]
     pub proof: Option<Proof>,
 
-    #[prost(uint64, tag = "14")]
+    #[prost(uint64, tag = "13")]
     pub validator_version: u64,
 
-    #[prost(message, repeated, tag = "15")]
+    #[prost(message, repeated, tag = "14")]
     pub validators: Vec<Validator>,
 
-    #[prost(uint64, tag = "16")]
+    #[prost(uint64, tag = "15")]
     pub exec_height: u64,
 }
 
@@ -172,11 +168,6 @@ impl From<block::BlockHeader> for BlockHeader {
         let proposer = Some(Address::from(block_header.proposer));
         let proof = Some(Proof::from(block_header.proof));
 
-        let logs_bloom = block_header
-            .logs_bloom
-            .into_iter()
-            .map(|bloom| bloom.as_bytes().to_vec())
-            .collect::<Vec<_>>();
         let confirm_root = block_header
             .confirm_root
             .into_iter()
@@ -199,7 +190,6 @@ impl From<block::BlockHeader> for BlockHeader {
             exec_height: block_header.exec_height,
             prev_hash,
             timestamp: block_header.timestamp,
-            logs_bloom,
             order_root,
             order_signed_transactions_hash,
             confirm_root,
@@ -230,11 +220,6 @@ impl TryFrom<BlockHeader> for block::BlockHeader {
         let proposer = field!(block_header.proposer, "BlockHeader", "proposer")?;
         let proof = field!(block_header.proof, "BlockHeader", "proof")?;
 
-        let mut logs_bloom = Vec::new();
-        for bloom in block_header.logs_bloom {
-            logs_bloom.push(Bloom::from_slice(&bloom));
-        }
-
         let mut confirm_root = Vec::new();
         for root in block_header.confirm_root {
             confirm_root.push(protocol_primitive::Hash::try_from(root)?);
@@ -256,7 +241,6 @@ impl TryFrom<BlockHeader> for block::BlockHeader {
             exec_height: block_header.exec_height,
             prev_hash: protocol_primitive::Hash::try_from(prev_hash)?,
             timestamp: block_header.timestamp,
-            logs_bloom,
             order_root: protocol_primitive::Hash::try_from(order_root)?,
             order_signed_transactions_hash: protocol_primitive::Hash::try_from(
                 order_signed_transactions_hash,

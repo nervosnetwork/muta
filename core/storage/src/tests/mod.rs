@@ -75,7 +75,6 @@ fn mock_block(height: u64, block_hash: Hash) -> Block {
         exec_height: height - 1,
         prev_hash: nonce.clone(),
         timestamp: 1000,
-        logs_bloom: Default::default(),
         order_root: nonce.clone(),
         order_signed_transactions_hash: nonce.clone(),
         confirm_root: Vec::new(),

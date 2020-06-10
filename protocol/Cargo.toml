@@ -14,7 +14,6 @@ futures = "0.3"
 derive_more = "0.99"
 async-trait = "0.1"
 lazy_static = "1.4"
-ethbloom = "0.8"
 hex = "0.4"
 prost = "0.6"
 bytes = { version = "0.5", features = ["serde"] }
