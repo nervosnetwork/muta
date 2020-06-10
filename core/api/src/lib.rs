@@ -46,7 +46,7 @@ struct Query;
 #[juniper::graphql_object(Context = State)]
 impl Query {
     #[graphql(name = "getBlock", description = "Get the block")]
-    async fn get_block(state_ctx: &State, height: Option<Uint64>) -> FieldResult<Block> {
+    async fn get_block(state_ctx: &State, height: Option<Uint64>) -> FieldResult<Option<Block>> {
         let ctx = Context::new();
         let inst = Instant::now();
         common_apm::metrics::api::API_REQUEST_COUNTER_VEC_STATIC
@@ -68,12 +68,12 @@ impl Query {
             None => None,
         };
 
-        let block = match state_ctx
+        let opt_block = match state_ctx
             .adapter
             .get_block_by_height(ctx.clone(), height)
             .await
         {
-            Ok(block) => block,
+            Ok(opt_block) => opt_block,
             Err(err) => {
                 common_apm::metrics::api::API_REQUEST_RESULT_COUNTER_VEC_STATIC
                     .get_block
@@ -92,38 +92,41 @@ impl Query {
             .get_block
             .observe(common_apm::metrics::duration_to_sec(inst.elapsed()));
 
-        Ok(Block::from(block))
+        Ok(opt_block.map(Block::from))
     }
 
     #[graphql(name = "getTransaction", description = "Get the transaction by hash")]
-    async fn get_transaction(state_ctx: &State, tx_hash: Hash) -> FieldResult<SignedTransaction> {
+    async fn get_transaction(
+        state_ctx: &State,
+        tx_hash: Hash,
+    ) -> FieldResult<Option<SignedTransaction>> {
         let ctx = Context::new();
 
         let hash = protocol::types::Hash::from_hex(&tx_hash.as_hex())?;
 
-        let stx = state_ctx
+        let opt_stx = state_ctx
             .adapter
             .get_transaction_by_hash(ctx.clone(), hash)
             .await?;
 
-        Ok(SignedTransaction::from(stx))
+        Ok(opt_stx.map(SignedTransaction::from))
     }
 
     #[graphql(
         name = "getReceipt",
         description = "Get the receipt by transaction hash"
     )]
-    async fn get_receipt(state_ctx: &State, tx_hash: Hash) -> FieldResult<Receipt> {
+    async fn get_receipt(state_ctx: &State, tx_hash: Hash) -> FieldResult<Option<Receipt>> {
         let ctx = Context::new();
 
         let hash = protocol::types::Hash::from_hex(&tx_hash.as_hex())?;
 
-        let receipt = state_ctx
+        let opt_receipt = state_ctx
             .adapter
             .get_receipt_by_tx_hash(ctx.clone(), hash)
             .await?;
 
-        Ok(Receipt::from(receipt))
+        Ok(opt_receipt.map(Receipt::from))
     }
 
     #[graphql(name = "queryService", description = "query service")]
@@ -143,6 +146,7 @@ impl Query {
             Some(id) => id.try_into_u64()?,
             None => {
                 block_on(state_ctx.adapter.get_block_by_height(Context::new(), None))?
+                    .expect("Always not none")
                     .header
                     .height
             }
