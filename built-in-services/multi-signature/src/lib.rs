@@ -6,13 +6,14 @@ use binding_macro::{cycles, service};
 
 use common_crypto::{Crypto, Secp256k1};
 use protocol::traits::{ExecutorParams, ServiceResponse, ServiceSDK};
-use protocol::types::{Address, Bytes, Hash, Hex, PubkeyWithSender, ServiceContext};
+use protocol::types::{Address, Bytes, Hash, PubkeyWithSender, ServiceContext};
 
 use crate::types::{
     AddAccountPayload, ChangeOwnerPayload, GenerateMultiSigAccountPayload,
     GenerateMultiSigAccountResponse, GetMultiSigAccountPayload, GetMultiSigAccountResponse,
-    MultiSigAccount, MultiSigPermission, RemoveAccountPayload, SetAccountWeightPayload,
-    SetThresholdPayload, VerifyMultiSigPayload, Witness, MAX_PERMISSION_ACCOUNTS,
+    MultiSigAccount, MultiSigPermission, RemoveAccountPayload, RemoveAccountResult,
+    SetAccountWeightPayload, SetThresholdPayload, SetWeightResult, VerifySignaturePayload, Witness,
+    MAX_PERMISSION_ACCOUNTS,
 };
 
 const MAX_MULTI_SIGNATURE_RECURSION_DEPTH: u8 = 16;
@@ -42,18 +43,11 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
             );
         }
 
-        let mut weight_sum = 0;
-        let accounts = payload
+        let weight_sum = payload
             .accounts
             .iter()
-            .map(|account| {
-                weight_sum += account.weight as u32;
-                MultiSigAccount {
-                    address: account.address.clone(),
-                    weight:  account.weight,
-                }
-            })
-            .collect::<Vec<_>>();
+            .map(|account| account.weight as u32)
+            .sum::<u32>();
 
         if payload.threshold == 0 || weight_sum < payload.threshold {
             return ServiceResponse::<GenerateMultiSigAccountResponse>::from_error(
@@ -66,8 +60,8 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
             ctx.get_tx_hash().expect("Can not get tx hash").as_bytes(),
         )) {
             let permission = MultiSigPermission {
-                accounts,
-                owner: payload.owner,
+                accounts:  payload.accounts,
+                owner:     payload.owner,
                 threshold: payload.threshold,
             };
             self.sdk.set_account_value(&address, 0u8, permission);
@@ -148,6 +142,13 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
                 return ServiceResponse::<()>::from_error(121, "invalid owner".to_owned());
             }
 
+            if permission.accounts.len() == MAX_PERMISSION_ACCOUNTS as usize {
+                return ServiceResponse::<()>::from_error(
+                    122,
+                    "the account count reach max value".to_owned(),
+                );
+            }
+
             if self.verify_signature(ctx, payload.witness).is_error() {
                 return ServiceResponse::<()>::from_error(
                     120,
@@ -190,10 +191,20 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
                 );
             }
 
-            if let Some(ret) = permission.remove_account(&payload.account_address) {
-                self.sdk
-                    .set_account_value(&payload.multi_sig_address, 0u8, permission);
-                return ServiceResponse::<MultiSigAccount>::from_succeed(ret);
+            match permission.remove_account(&payload.account_address) {
+                RemoveAccountResult::Success(ret) => {
+                    self.sdk
+                        .set_account_value(&payload.multi_sig_address, 0u8, permission);
+                    return ServiceResponse::<MultiSigAccount>::from_succeed(ret);
+                }
+                RemoveAccountResult::BelowThreshold => {
+                    return ServiceResponse::<MultiSigAccount>::from_error(
+                        124,
+                        "the sum of weight will below threshold after remove the account"
+                            .to_owned(),
+                    );
+                }
+                _ => (),
             }
         }
         ServiceResponse::<MultiSigAccount>::from_error(110, "account not existed".to_owned())
@@ -221,13 +232,19 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
                 );
             }
 
-            if permission
-                .set_account_weight(&payload.account_address, payload.new_weight)
-                .is_some()
-            {
-                self.sdk
-                    .set_account_value(&payload.multi_sig_address, 0u8, permission);
-                return ServiceResponse::<()>::from_succeed(());
+            match permission.set_account_weight(&payload.account_address, payload.new_weight) {
+                SetWeightResult::Success => {
+                    self.sdk
+                        .set_account_value(&payload.multi_sig_address, 0u8, permission);
+                    return ServiceResponse::<()>::from_succeed(());
+                }
+                SetWeightResult::InvalidNewWeight => {
+                    return ServiceResponse::<()>::from_error(
+                        120,
+                        "new weight is invalid".to_owned(),
+                    );
+                }
+                _ => (),
             }
         }
         ServiceResponse::<()>::from_error(110, "account not existed".to_owned())
@@ -246,6 +263,19 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
         {
             if permission.owner != payload.witness.sender {
                 return ServiceResponse::<()>::from_error(121, "invalid owner".to_owned());
+            }
+
+            if permission
+                .accounts
+                .iter()
+                .map(|account| account.weight as u32)
+                .sum::<u32>()
+                < payload.new_threshold
+            {
+                return ServiceResponse::<()>::from_error(
+                    123,
+                    "new threshold larger the sum of the weights".to_owned(),
+                );
             }
 
             if self.verify_signature(ctx, payload.witness).is_error() {
@@ -269,8 +299,28 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
     fn verify_signature(
         &self,
         ctx: ServiceContext,
-        payload: VerifyMultiSigPayload,
+        payload: VerifySignaturePayload,
     ) -> ServiceResponse<()> {
+        if payload.signatures.len() != payload.pubkeys.len() {
+            return ServiceResponse::<()>::from_error(
+                116,
+                "len of signatures and pubkeys must be equal".to_owned(),
+            );
+        }
+
+        if payload.pubkeys.len() == 1 {
+            if let Ok(addr) = Address::from_pubkey_bytes(payload.pubkeys[0].clone()) {
+                if addr == payload.sender {
+                    return self._verify_single_signature(
+                        &ctx.get_tx_hash().unwrap(),
+                        &payload.signatures[0],
+                        &payload.pubkeys[0],
+                    );
+                }
+            }
+            return ServiceResponse::<()>::from_error(111, "invalid sender".to_owned());
+        }
+
         let mut recursion_depth = 0u8;
         let mut weight_acc = 0u32;
         self._verify_multi_signature(
@@ -290,13 +340,6 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
         weight_acc: &mut u32,
         recursion_depth: &mut u8,
     ) -> ServiceResponse<()> {
-        if witness.signatures.len() != witness.pubkeys.len() {
-            return ServiceResponse::<()>::from_error(
-                116,
-                "len of signatures and pubkeys must be equal".to_owned(),
-            );
-        }
-
         if witness.signatures.len() > MAX_PERMISSION_ACCOUNTS as usize {
             return ServiceResponse::<()>::from_error(
                 117,
