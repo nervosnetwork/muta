@@ -13,7 +13,7 @@ use protocol::types::{
 };
 use protocol::ProtocolResult;
 
-use crate::binding::sdk::{DefalutServiceSDK, DefaultChainQuerier};
+use crate::binding::sdk::{DefaultChainQuerier, DefaultServiceSDK};
 use crate::binding::store::StoreError;
 use crate::binding::tests::state::new_state;
 
@@ -26,7 +26,7 @@ fn test_service_sdk() {
     let arcs = Arc::new(MockStorage {});
     let cq = DefaultChainQuerier::new(Arc::clone(&arcs));
 
-    let mut sdk = DefalutServiceSDK::new(Rc::clone(&rs), Rc::new(cq), NoopDispatcher {});
+    let mut sdk = DefaultServiceSDK::new(Rc::clone(&rs), Rc::new(cq), NoopDispatcher {});
 
     // test sdk store bool
     let mut sdk_bool = sdk.alloc_or_recover_bool("test_bool");

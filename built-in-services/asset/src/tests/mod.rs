@@ -5,7 +5,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use cita_trie::MemoryDB;
 
-use framework::binding::sdk::{DefalutServiceSDK, DefaultChainQuerier};
+use framework::binding::sdk::{DefaultChainQuerier, DefaultServiceSDK};
 use framework::binding::state::{GeneralServiceState, MPTTrie};
 use protocol::traits::{Context, NoopDispatcher, Storage};
 use protocol::types::{
@@ -195,7 +195,7 @@ fn test_transfer_from() {
 }
 
 fn new_asset_service() -> AssetService<
-    DefalutServiceSDK<
+    DefaultServiceSDK<
         GeneralServiceState<MemoryDB>,
         DefaultChainQuerier<MockStorage>,
         NoopDispatcher,
@@ -205,7 +205,7 @@ fn new_asset_service() -> AssetService<
     let trie = MPTTrie::new(Arc::new(MemoryDB::new(false)));
     let state = GeneralServiceState::new(trie);
 
-    let sdk = DefalutServiceSDK::new(
+    let sdk = DefaultServiceSDK::new(
         Rc::new(RefCell::new(state)),
         Rc::new(chain_db),
         NoopDispatcher {},

@@ -20,13 +20,13 @@ use crate::binding::store::{
     DefaultStoreArray, DefaultStoreBool, DefaultStoreMap, DefaultStoreString, DefaultStoreUint64,
 };
 
-pub struct DefalutServiceSDK<S: ServiceState, C: ChainQuerier, D: Dispatcher> {
+pub struct DefaultServiceSDK<S: ServiceState, C: ChainQuerier, D: Dispatcher> {
     state:         Rc<RefCell<S>>,
     chain_querier: Rc<C>,
     dispatcher:    D,
 }
 
-impl<S: ServiceState, C: ChainQuerier, D: Dispatcher> DefalutServiceSDK<S, C, D> {
+impl<S: ServiceState, C: ChainQuerier, D: Dispatcher> DefaultServiceSDK<S, C, D> {
     pub fn new(state: Rc<RefCell<S>>, chain_querier: Rc<C>, dispatcher: D) -> Self {
         Self {
             state,
@@ -37,7 +37,7 @@ impl<S: ServiceState, C: ChainQuerier, D: Dispatcher> DefalutServiceSDK<S, C, D>
 }
 
 impl<S: 'static + ServiceState, C: ChainQuerier, D: Dispatcher> ServiceSDK
-    for DefalutServiceSDK<S, C, D>
+    for DefaultServiceSDK<S, C, D>
 {
     // Alloc or recover a `Map` by` var_name`
     fn alloc_or_recover_map<

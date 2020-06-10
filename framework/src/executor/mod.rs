@@ -25,7 +25,7 @@ use protocol::types::{
 };
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
-use crate::binding::sdk::{DefalutServiceSDK, DefaultChainQuerier};
+use crate::binding::sdk::{DefaultChainQuerier, DefaultServiceSDK};
 use crate::binding::state::{GeneralServiceState, MPTTrie};
 
 enum HookType {
@@ -82,7 +82,7 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
                     service: params.name.to_owned(),
                 })?;
             let sdk =
-                DefalutServiceSDK::new(Rc::clone(state), Rc::clone(&querier), NoopDispatcher {});
+                DefaultServiceSDK::new(Rc::clone(state), Rc::clone(&querier), NoopDispatcher {});
 
             let mut service = mapping.get_service(&params.name, sdk)?;
             panic::catch_unwind(AssertUnwindSafe(|| {
@@ -192,7 +192,7 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
     fn get_sdk(
         &self,
         service: &str,
-    ) -> ProtocolResult<DefalutServiceSDK<GeneralServiceState<DB>, DefaultChainQuerier<S>, Self>>
+    ) -> ProtocolResult<DefaultServiceSDK<GeneralServiceState<DB>, DefaultChainQuerier<S>, Self>>
     {
         let state = self
             .states
@@ -201,7 +201,7 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
                 service: service.to_owned(),
             })?;
 
-        Ok(DefalutServiceSDK::new(
+        Ok(DefaultServiceSDK::new(
             Rc::clone(&state),
             Rc::clone(&self.querier),
             (*self).clone(),

@@ -5,7 +5,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use cita_trie::MemoryDB;
 
-use framework::binding::sdk::{DefalutServiceSDK, DefaultChainQuerier};
+use framework::binding::sdk::{DefaultChainQuerier, DefaultServiceSDK};
 use framework::binding::state::{GeneralServiceState, MPTTrie};
 use protocol::traits::{Context, NoopDispatcher, ServiceSDK, Storage};
 use protocol::types::{
@@ -33,7 +33,7 @@ fn test_get_metadata() {
 fn new_metadata_service_with_metadata(
     metadata: Metadata,
 ) -> MetadataService<
-    DefalutServiceSDK<
+    DefaultServiceSDK<
         GeneralServiceState<MemoryDB>,
         DefaultChainQuerier<MockStorage>,
         NoopDispatcher,
@@ -43,7 +43,7 @@ fn new_metadata_service_with_metadata(
     let trie = MPTTrie::new(Arc::new(MemoryDB::new(false)));
     let state = GeneralServiceState::new(trie);
 
-    let mut sdk = DefalutServiceSDK::new(
+    let mut sdk = DefaultServiceSDK::new(
         Rc::new(RefCell::new(state)),
         Rc::new(chain_db),
         NoopDispatcher {},
