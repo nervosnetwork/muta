@@ -20,7 +20,7 @@ pub use primitive::{
 };
 pub use receipt::{Event, Receipt, ReceiptResponse};
 pub use service_context::{ServiceContext, ServiceContextError, ServiceContextParams};
-pub use transaction::{RawTransaction, SignedTransaction, TransactionRequest};
+pub use transaction::{PubkeyWithSender, RawTransaction, SignedTransaction, TransactionRequest};
 
 #[derive(Debug, Display, From)]
 pub enum TypesError {

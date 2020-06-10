@@ -33,14 +33,15 @@ bytes = "0.5"
 hex = "0.4"
 rlp = "0.4"
 toml = "0.5"
-tokio = { version = "0.2", features = ["macros", "rt-core", "rt-util", "signal", "time"]}
+tokio = { version = "0.2", features = ["macros", "rt-core", "rt-util", "signal", "time"] }
 muta-apm = "0.1.0-alpha.7"
 futures-timer="3.0"
 
 [dev-dependencies]
-asset = { path = "built-in-services/asset"}
-metadata = { path = "built-in-services/metadata"}
-util = { path = "built-in-services/util"}
+asset = { path = "built-in-services/asset" }
+metadata = { path = "built-in-services/metadata" }
+util = { path = "built-in-services/util" }
+multi-signature = { path = "built-in-services/multi-signature" }
 rand = "0.7"
 cita_trie = "2.0"
 core-network = { path = "./core/network", features = ["diagnostic"] }

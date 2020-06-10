@@ -29,3 +29,9 @@ pub struct SignedTransaction {
     pub pubkey:    Bytes,
     pub signature: Bytes,
 }
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PubkeyWithSender {
+    pub pubkey: Bytes,
+    pub sender: Option<Address>,
+}
