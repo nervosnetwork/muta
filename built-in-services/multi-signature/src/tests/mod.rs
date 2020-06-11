@@ -13,7 +13,7 @@ use rand::{random, thread_rng};
 use common_crypto::{
     HashValue, PrivateKey, PublicKey, Secp256k1PrivateKey, Signature, ToPublicKey,
 };
-use framework::binding::sdk::{DefalutServiceSDK, DefaultChainQuerier};
+use framework::binding::sdk::{DefaultChainQuerier, DefaultServiceSDK};
 use framework::binding::state::{GeneralServiceState, MPTTrie};
 use protocol::traits::{Context, NoopDispatcher, Storage};
 use protocol::types::{
@@ -101,7 +101,7 @@ impl Storage for MockStorage {
 }
 
 fn new_multi_signature_service() -> MultiSignatureService<
-    DefalutServiceSDK<
+    DefaultServiceSDK<
         GeneralServiceState<MemoryDB>,
         DefaultChainQuerier<MockStorage>,
         NoopDispatcher,
@@ -111,7 +111,7 @@ fn new_multi_signature_service() -> MultiSignatureService<
     let trie = MPTTrie::new(Arc::new(MemoryDB::new(false)));
     let state = GeneralServiceState::new(trie);
 
-    let sdk = DefalutServiceSDK::new(
+    let sdk = DefaultServiceSDK::new(
         Rc::new(RefCell::new(state)),
         Rc::new(chain_db),
         NoopDispatcher {},
