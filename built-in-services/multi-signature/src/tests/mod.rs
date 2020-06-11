@@ -167,13 +167,6 @@ fn to_multi_sig_account(pk: Bytes) -> MultiSigAccount {
     }
 }
 
-fn gen_pubkey_with_sender_bytes(pk: Bytes) -> Bytes {
-    Bytes::from(rlp::encode(&PubkeyWithSender {
-        pubkey: pk,
-        sender: None,
-    }))
-}
-
 fn sign(privkey: &Bytes, hash: &Hash) -> Bytes {
     Secp256k1PrivateKey::try_from(privkey.as_ref())
         .unwrap()
@@ -188,9 +181,13 @@ fn gen_single_witness(privkey: &Bytes, hash: &Hash) -> VerifySignaturePayload {
         .sign_message(&HashValue::try_from(hash.as_bytes().as_ref()).unwrap())
         .to_bytes();
 
+    let pk_with_sender = PubkeyWithSender {
+        pubkey: pk.clone(),
+        sender: None,
+    };
+
     VerifySignaturePayload {
-        pubkeys:    vec![pk.clone()],
-        signatures: vec![sig],
-        sender:     Address::from_pubkey_bytes(pk).unwrap(),
+        pubkeys:    Bytes::from(rlp::encode(&pk_with_sender)),
+        signatures: sig,
     }
 }

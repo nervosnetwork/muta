@@ -1,7 +1,6 @@
 use crate::types::{
     AddAccountPayload, GenerateMultiSigAccountPayload, GetMultiSigAccountPayload,
     MultiSigPermission, RemoveAccountPayload, SetAccountWeightPayload, SetThresholdPayload,
-    VerifySignaturePayload,
 };
 
 use super::*;
@@ -65,93 +64,6 @@ fn test_generate_multi_signature() {
         accounts:  accounts.clone(),
         threshold: 3,
     });
-}
-
-#[test]
-fn test_verify_signature() {
-    let cycles_limit = 1024 * 1024 * 1024; // 1073741824
-    let caller = Address::from_hex("0x755cdba6ae4f479f7164792b318b2a06c759833b").unwrap();
-    let context = mock_context(cycles_limit, caller.clone());
-    let tx_hash = context.get_tx_hash().unwrap();
-
-    let mut service = new_multi_signature_service();
-    let owner = Address::from_pubkey_bytes(gen_one_keypair().1).unwrap();
-    let keypairs = gen_keypairs(4);
-    let account_pubkeys = keypairs
-        .iter()
-        .map(|pair| to_multi_sig_account(pair.1.clone()))
-        .collect::<Vec<_>>();
-    let multi_sig_address = service
-        .generate_account(context.clone(), GenerateMultiSigAccountPayload {
-            owner:     owner.clone(),
-            accounts:  account_pubkeys.clone(),
-            threshold: 3,
-        })
-        .succeed_data
-        .address;
-
-    // test multi-signature pubkey length is not equal to signature length
-    let res = service.verify_signature(context.clone(), VerifySignaturePayload {
-        pubkeys:    keypairs
-            .iter()
-            .take(2)
-            .map(|pair| gen_pubkey_with_sender_bytes(pair.1.clone()))
-            .collect::<Vec<_>>(),
-        signatures: keypairs
-            .iter()
-            .map(|pair| sign(&pair.0, &tx_hash))
-            .collect::<Vec<_>>(),
-        sender:     multi_sig_address.clone(),
-    });
-    assert_eq!(
-        res.error_message,
-        "len of signatures and pubkeys must be equal".to_owned()
-    );
-
-    // test multi-signature below threshold
-    let res = service.verify_signature(context.clone(), VerifySignaturePayload {
-        pubkeys:    keypairs
-            .iter()
-            .take(2)
-            .map(|pair| gen_pubkey_with_sender_bytes(pair.1.clone()))
-            .collect::<Vec<_>>(),
-        signatures: keypairs
-            .iter()
-            .take(2)
-            .map(|pair| sign(&pair.0, &tx_hash))
-            .collect::<Vec<_>>(),
-        sender:     multi_sig_address.clone(),
-    });
-    assert_eq!(res.error_message, "multi signature not verified".to_owned());
-
-    // test multi-signature verify error
-    let res = service.verify_signature(context.clone(), VerifySignaturePayload {
-        pubkeys:    keypairs
-            .iter()
-            .rev()
-            .map(|pair| gen_pubkey_with_sender_bytes(pair.1.clone()))
-            .collect::<Vec<_>>(),
-        signatures: keypairs
-            .iter()
-            .map(|pair| sign(&pair.0, &tx_hash))
-            .collect::<Vec<_>>(),
-        sender:     multi_sig_address.clone(),
-    });
-    assert_eq!(res.error_message, "multi signature not verified".to_owned());
-
-    // test verify multi-signature success
-    let res = service.verify_signature(context.clone(), VerifySignaturePayload {
-        pubkeys:    keypairs
-            .iter()
-            .map(|pair| gen_pubkey_with_sender_bytes(pair.1.clone()))
-            .collect::<Vec<_>>(),
-        signatures: keypairs
-            .iter()
-            .map(|pair| sign(&pair.0, &tx_hash))
-            .collect::<Vec<_>>(),
-        sender:     multi_sig_address.clone(),
-    });
-    assert_eq!(res.error_message, "".to_owned());
 }
 
 #[test]

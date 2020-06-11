@@ -1,9 +1,9 @@
 use bytes::Bytes;
 use muta_codec_derive::RlpFixedCodec;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use crate::fixed_codec::{FixedCodec, FixedCodecError};
-use crate::types::primitive::{Hash, JsonString};
+use crate::types::primitive::{Address, Hash, JsonString};
 use crate::ProtocolResult;
 
 #[derive(Clone, Debug, PartialEq, Eq)]

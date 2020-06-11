@@ -2,7 +2,7 @@ use muta_codec_derive::RlpFixedCodec;
 use serde::{Deserialize, Serialize};
 
 use protocol::fixed_codec::{FixedCodec, FixedCodecError};
-use protocol::types::{Address, Bytes};
+use protocol::types::{Address, Bytes, PubkeyWithSender};
 use protocol::ProtocolResult;
 
 pub const MAX_PERMISSION_ACCOUNTS: u8 = 16;
@@ -34,9 +34,23 @@ pub struct GenerateMultiSigAccountResponse {
 
 #[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug)]
 pub struct VerifySignaturePayload {
-    pub pubkeys:    Vec<Bytes>,
-    pub signatures: Vec<Bytes>,
-    pub sender:     Address,
+    pub pubkeys:    Bytes,
+    pub signatures: Bytes,
+}
+
+impl VerifySignaturePayload {
+    pub fn get_sender(&self) -> Option<Address> {
+        if let Ok(pk_with_sender) = rlp::decode::<PubkeyWithSender>(&self.pubkeys) {
+            if let Some(sender) = pk_with_sender.sender {
+                Some(sender)
+            } else {
+                Address::from_pubkey_bytes(pk_with_sender.pubkey)
+                    .map_or_else(|_| None, |addr| Some(addr))
+            }
+        } else {
+            None
+        }
+    }
 }
 
 #[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug)]
@@ -174,15 +188,18 @@ pub struct MultiSigAccount {
 
 #[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug)]
 pub struct Witness {
-    pub pubkeys:    Vec<Bytes>,
+    pub pubkeys:    Vec<PubkeyWithSender>,
     pub signatures: Vec<Bytes>,
 }
 
 impl Witness {
-    pub fn new(pubkeys: Vec<Bytes>, signatures: Vec<Bytes>) -> Self {
+    pub fn new(pubkeys: Vec<PubkeyWithSender>, signatures: Vec<Vec<u8>>) -> Self {
         Witness {
             pubkeys,
-            signatures,
+            signatures: signatures
+                .into_iter()
+                .map(|sig| Bytes::from(sig))
+                .collect::<Vec<_>>(),
         }
     }
 }

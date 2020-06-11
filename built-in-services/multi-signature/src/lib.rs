@@ -107,7 +107,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
             .sdk
             .get_account_value::<_, MultiSigPermission>(&payload.multi_sig_address, &0u8)
         {
-            if permission.owner != payload.witness.sender {
+            if Some(permission.owner.clone()) != payload.witness.get_sender() {
                 return ServiceResponse::<()>::from_error(121, "invalid owner".to_owned());
             }
 
@@ -138,7 +138,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
             .sdk
             .get_account_value::<_, MultiSigPermission>(&payload.multi_sig_address, &0u8)
         {
-            if permission.owner != payload.witness.sender {
+            if Some(permission.owner.clone()) != payload.witness.get_sender() {
                 return ServiceResponse::<()>::from_error(121, "invalid owner".to_owned());
             }
 
@@ -177,7 +177,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
             .sdk
             .get_account_value::<_, MultiSigPermission>(&payload.multi_sig_address, &0u8)
         {
-            if permission.owner != payload.witness.sender {
+            if Some(permission.owner.clone()) != payload.witness.get_sender() {
                 return ServiceResponse::<MultiSigAccount>::from_error(
                     121,
                     "invalid owner".to_owned(),
@@ -221,7 +221,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
             .sdk
             .get_account_value::<_, MultiSigPermission>(&payload.multi_sig_address, &0u8)
         {
-            if permission.owner != payload.witness.sender {
+            if Some(permission.owner.clone()) != payload.witness.get_sender() {
                 return ServiceResponse::<()>::from_error(121, "invalid owner".to_owned());
             }
 
@@ -261,7 +261,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
             .sdk
             .get_account_value::<_, MultiSigPermission>(&payload.multi_sig_address, &0u8)
         {
-            if permission.owner != payload.witness.sender {
+            if Some(permission.owner.clone()) != payload.witness.get_sender() {
                 return ServiceResponse::<()>::from_error(121, "invalid owner".to_owned());
             }
 
@@ -301,32 +301,34 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
         ctx: ServiceContext,
         payload: VerifySignaturePayload,
     ) -> ServiceResponse<()> {
-        if payload.signatures.len() != payload.pubkeys.len() {
+        let tmp = rlp::decode::<PubkeyWithSender>(payload.pubkeys.as_ref());
+        if tmp.is_err() {
             return ServiceResponse::<()>::from_error(
-                116,
-                "len of signatures and pubkeys must be equal".to_owned(),
+                111,
+                "decode pubkey_with_sender error".to_owned(),
+            );
+        }
+        let pk_with_sender = tmp.unwrap();
+
+        if pk_with_sender.sender.is_none() {
+            return self._verify_single_signature(
+                &ctx.get_tx_hash().unwrap(),
+                &payload.signatures,
+                &pk_with_sender.pubkey,
             );
         }
 
-        if payload.pubkeys.len() == 1 {
-            if let Ok(addr) = Address::from_pubkey_bytes(payload.pubkeys[0].clone()) {
-                if addr == payload.sender {
-                    return self._verify_single_signature(
-                        &ctx.get_tx_hash().unwrap(),
-                        &payload.signatures[0],
-                        &payload.pubkeys[0],
-                    );
-                }
-            }
-            return ServiceResponse::<()>::from_error(111, "invalid sender".to_owned());
-        }
+        let wit = Witness::new(
+            rlp::decode_list::<PubkeyWithSender>(pk_with_sender.pubkey.as_ref()),
+            rlp::decode_list::<Vec<u8>>(payload.signatures.as_ref()),
+        );
 
         let mut recursion_depth = 0u8;
         let mut weight_acc = 0u32;
         self._verify_multi_signature(
             &ctx.get_tx_hash().unwrap(),
-            &Witness::new(payload.pubkeys, payload.signatures),
-            &payload.sender,
+            &wit,
+            &pk_with_sender.sender.unwrap(),
             &mut weight_acc,
             &mut recursion_depth,
         )
@@ -356,13 +358,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
 
         let permission = permission.unwrap();
 
-        for (sig, pk) in witness.signatures.iter().zip(witness.pubkeys.iter()) {
-            let temp = rlp::decode::<PubkeyWithSender>(pk);
-            if temp.is_err() {
-                continue;
-            }
-            let pk_with_sender = temp.unwrap();
-
+        for (sig, pk_with_sender) in witness.signatures.iter().zip(witness.pubkeys.iter()) {
             if pk_with_sender.sender.is_none() {
                 if !self
                     ._verify_single_signature(tx_hash, sig, &pk_with_sender.pubkey)
@@ -391,7 +387,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
                     )
                     .is_error()
                 {
-                    add_weight_by_address(&permission, pk_with_sender.pubkey.clone(), weight_acc);
+                    add_weight_by_sender(&permission, &sub_sender, weight_acc);
                 }
             }
 
@@ -428,19 +424,18 @@ fn add_weight_by_address(permission: &MultiSigPermission, pubkey: Bytes, weight_
     });
 }
 
+fn add_weight_by_sender(permission: &MultiSigPermission, sender: &Address, weight_acc: &mut u32) {
+    *weight_acc += permission
+        .get_account(sender)
+        .map_or_else(|| 0u32, |account| account.weight as u32);
+}
+
 fn decode_multi_sigs_and_pubkeys(
     sig: &Bytes,
     pk_with_sender: &PubkeyWithSender,
-) -> (Vec<Bytes>, Vec<Bytes>, Address) {
-    let pks = rlp::decode_list::<Vec<u8>>(pk_with_sender.pubkey.as_ref())
-        .into_iter()
-        .map(Bytes::from)
-        .collect::<Vec<_>>();
-    let sigs = rlp::decode_list::<Vec<u8>>(sig)
-        .into_iter()
-        .map(Bytes::from)
-        .collect::<Vec<_>>();
+) -> (Vec<PubkeyWithSender>, Vec<Vec<u8>>, Address) {
+    let pks = rlp::decode_list::<PubkeyWithSender>(pk_with_sender.pubkey.as_ref());
+    let sigs = rlp::decode_list::<Vec<u8>>(sig);
     let sub_sender = pk_with_sender.sender.clone().unwrap();
-
     (pks, sigs, sub_sender)
 }
