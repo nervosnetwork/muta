@@ -21,10 +21,10 @@ fn test_generate_multi_signature() {
         .collect::<Vec<_>>();
     let multi_sig_address =
         service.generate_account(context.clone(), GenerateMultiSigAccountPayload {
-            owner: owner.clone(),
-            accounts,
-            threshold: 12,
-            memo: String::new(),
+            owner:            owner.clone(),
+            addr_with_weight: accounts,
+            threshold:        12,
+            memo:             String::new(),
         });
     assert!(multi_sig_address.is_error());
 
@@ -35,10 +35,10 @@ fn test_generate_multi_signature() {
         .collect::<Vec<_>>();
     let multi_sig_address =
         service.generate_account(context.clone(), GenerateMultiSigAccountPayload {
-            owner: owner.clone(),
-            accounts,
-            threshold: 12,
-            memo: String::new(),
+            owner:            owner.clone(),
+            addr_with_weight: accounts,
+            threshold:        12,
+            memo:             String::new(),
         });
     assert!(multi_sig_address.is_error());
 
@@ -49,10 +49,10 @@ fn test_generate_multi_signature() {
         .collect::<Vec<_>>();
     let multi_sig_address =
         service.generate_account(context.clone(), GenerateMultiSigAccountPayload {
-            owner:     owner.clone(),
-            accounts:  accounts.clone(),
-            threshold: 3,
-            memo:      String::new(),
+            owner:            owner.clone(),
+            addr_with_weight: accounts.clone(),
+            threshold:        3,
+            memo:             String::new(),
         });
     assert!(!multi_sig_address.is_error());
 
@@ -64,7 +64,7 @@ fn test_generate_multi_signature() {
     assert!(!permission.is_error());
     assert_eq!(permission.succeed_data.permission, MultiSigPermission {
         owner,
-        accounts,
+        accounts: to_accounts_list(accounts),
         threshold: 3,
         memo: String::new(),
     });
@@ -87,10 +87,10 @@ fn test_set_threshold() {
         .collect::<Vec<_>>();
     let multi_sig_address = service
         .generate_account(context.clone(), GenerateMultiSigAccountPayload {
-            owner:     owner_address,
-            accounts:  account_pubkeys,
-            threshold: 3,
-            memo:      String::new(),
+            owner:            owner_address,
+            addr_with_weight: account_pubkeys,
+            threshold:        3,
+            memo:             String::new(),
         })
         .succeed_data
         .address;
@@ -132,10 +132,10 @@ fn test_add_account() {
         .collect::<Vec<_>>();
     let multi_sig_address = service
         .generate_account(context.clone(), GenerateMultiSigAccountPayload {
-            owner:     owner_address.clone(),
-            accounts:  account_pubkeys.clone(),
-            threshold: 3,
-            memo:      String::new(),
+            owner:            owner_address.clone(),
+            addr_with_weight: account_pubkeys.clone(),
+            threshold:        3,
+            memo:             String::new(),
         })
         .succeed_data
         .address;
@@ -146,7 +146,7 @@ fn test_add_account() {
     let res = service.add_account(context.clone(), AddAccountPayload {
         witness:           gen_single_witness(&owner.0, &tx_hash),
         multi_sig_address: multi_sig_address.clone(),
-        new_account:       to_multi_sig_account(new_keypair.1),
+        new_account:       to_multi_sig_account(new_keypair.1).into_signle_account(),
     });
     assert_eq!(res.error_message, "".to_owned());
 
@@ -155,7 +155,7 @@ fn test_add_account() {
     let res = service.add_account(context.clone(), AddAccountPayload {
         witness:           gen_single_witness(&owner.0, &tx_hash),
         multi_sig_address: multi_sig_address.clone(),
-        new_account:       to_multi_sig_account(new_keypair.1),
+        new_account:       to_multi_sig_account(new_keypair.1).into_signle_account(),
     });
     assert_eq!(
         res.error_message,
@@ -167,7 +167,7 @@ fn test_add_account() {
         service.get_account_from_address(context, GetMultiSigAccountPayload { multi_sig_address });
     assert_eq!(permission.succeed_data.permission, MultiSigPermission {
         owner:     owner_address,
-        accounts:  account_pubkeys,
+        accounts:  to_accounts_list(account_pubkeys),
         threshold: 3,
         memo:      String::new(),
     });
@@ -190,10 +190,10 @@ fn test_set_weight() {
         .collect::<Vec<_>>();
     let multi_sig_address = service
         .generate_account(context.clone(), GenerateMultiSigAccountPayload {
-            owner:     owner_address.clone(),
-            accounts:  account_pubkeys.clone(),
-            threshold: 4,
-            memo:      String::new(),
+            owner:            owner_address.clone(),
+            addr_with_weight: account_pubkeys.clone(),
+            threshold:        4,
+            memo:             String::new(),
         })
         .succeed_data
         .address;
@@ -223,7 +223,7 @@ fn test_set_weight() {
     account_pubkeys[0].weight = 2;
     assert_eq!(permission.succeed_data.permission, MultiSigPermission {
         owner:     owner_address,
-        accounts:  account_pubkeys,
+        accounts:  to_accounts_list(account_pubkeys),
         threshold: 4,
         memo:      String::new(),
     });
@@ -246,10 +246,10 @@ fn test_remove_account() {
         .collect::<Vec<_>>();
     let multi_sig_address = service
         .generate_account(context.clone(), GenerateMultiSigAccountPayload {
-            owner:     owner_address.clone(),
-            accounts:  account_pubkeys.clone(),
-            threshold: 3,
-            memo:      String::new(),
+            owner:            owner_address.clone(),
+            addr_with_weight: account_pubkeys.clone(),
+            threshold:        3,
+            memo:             String::new(),
         })
         .succeed_data
         .address;
@@ -279,7 +279,7 @@ fn test_remove_account() {
         service.get_account_from_address(context, GetMultiSigAccountPayload { multi_sig_address });
     assert_eq!(permission.succeed_data.permission, MultiSigPermission {
         owner:     owner_address,
-        accounts:  account_pubkeys,
+        accounts:  to_accounts_list(account_pubkeys),
         threshold: 3,
         memo:      String::new(),
     });

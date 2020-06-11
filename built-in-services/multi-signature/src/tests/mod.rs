@@ -17,12 +17,11 @@ use framework::binding::sdk::{DefalutServiceSDK, DefaultChainQuerier};
 use framework::binding::state::{GeneralServiceState, MPTTrie};
 use protocol::traits::{Context, NoopDispatcher, Storage};
 use protocol::types::{
-    Address, Block, Hash, Proof, PubkeyWithSender, Receipt, ServiceContext, ServiceContextParams,
-    SignedTransaction,
+    Address, Block, Hash, Proof, Receipt, ServiceContext, ServiceContextParams, SignedTransaction,
 };
 use protocol::{types::Bytes, ProtocolResult};
 
-use crate::types::{MultiSigAccount, VerifySignaturePayload};
+use crate::types::{Account, AddressWithWeight, VerifySignaturePayload};
 use crate::MultiSignatureService;
 
 struct MockStorage;
@@ -160,8 +159,8 @@ fn gen_keypairs(num: usize) -> Vec<(Bytes, Bytes)> {
     (0..num).map(|_| gen_one_keypair()).collect::<Vec<_>>()
 }
 
-fn to_multi_sig_account(pk: Bytes) -> MultiSigAccount {
-    MultiSigAccount {
+fn to_multi_sig_account(pk: Bytes) -> AddressWithWeight {
+    AddressWithWeight {
         address: Address::from_pubkey_bytes(pk).unwrap(),
         weight:  1u8,
     }
@@ -181,13 +180,16 @@ fn gen_single_witness(privkey: &Bytes, hash: &Hash) -> VerifySignaturePayload {
         .sign_message(&HashValue::try_from(hash.as_bytes().as_ref()).unwrap())
         .to_bytes();
 
-    let pk_with_sender = PubkeyWithSender {
-        pubkey: pk,
-        sender: None,
-    };
-
     VerifySignaturePayload {
-        pubkeys:    Bytes::from(rlp::encode(&pk_with_sender)),
-        signatures: sig,
+        pubkeys:    vec![pk.clone()],
+        signatures: vec![sig],
+        sender:     Address::from_pubkey_bytes(pk).unwrap(),
     }
+}
+
+fn to_accounts_list(input: Vec<AddressWithWeight>) -> Vec<Account> {
+    input
+        .into_iter()
+        .map(|item| item.into_signle_account())
+        .collect::<Vec<_>>()
 }

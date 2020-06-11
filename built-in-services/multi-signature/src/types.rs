@@ -1,8 +1,10 @@
+use std::collections::HashMap;
+
 use muta_codec_derive::RlpFixedCodec;
 use serde::{Deserialize, Serialize};
 
 use protocol::fixed_codec::{FixedCodec, FixedCodecError};
-use protocol::types::{Address, Bytes, PubkeyWithSender};
+use protocol::types::{Address, Bytes};
 use protocol::ProtocolResult;
 
 pub const MAX_PERMISSION_ACCOUNTS: u8 = 16;
@@ -15,17 +17,17 @@ pub enum SetWeightResult {
 
 #[derive(Clone, Debug)]
 pub enum RemoveAccountResult {
-    Success(MultiSigAccount),
+    Success(Account),
     NoAccount,
     BelowThreshold,
 }
 
 #[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub struct GenerateMultiSigAccountPayload {
-    pub owner:     Address,
-    pub accounts:  Vec<MultiSigAccount>,
-    pub threshold: u32,
-    pub memo:      String,
+    pub owner:            Address,
+    pub addr_with_weight: Vec<AddressWithWeight>,
+    pub threshold:        u32,
+    pub memo:             String,
 }
 
 #[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug, Default)]
@@ -35,22 +37,9 @@ pub struct GenerateMultiSigAccountResponse {
 
 #[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug)]
 pub struct VerifySignaturePayload {
-    pub pubkeys:    Bytes,
-    pub signatures: Bytes,
-}
-
-impl VerifySignaturePayload {
-    pub fn get_sender(&self) -> Option<Address> {
-        if let Ok(pk_with_sender) = rlp::decode::<PubkeyWithSender>(&self.pubkeys) {
-            if let Some(sender) = pk_with_sender.sender {
-                Some(sender)
-            } else {
-                Address::from_pubkey_bytes(pk_with_sender.pubkey).map_or_else(|_| None, Some)
-            }
-        } else {
-            None
-        }
-    }
+    pub pubkeys:    Vec<Bytes>,
+    pub signatures: Vec<Bytes>,
+    pub sender:     Address,
 }
 
 #[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug)]
@@ -81,7 +70,7 @@ pub struct ChangeMemoPayload {
 pub struct AddAccountPayload {
     pub witness:           VerifySignaturePayload,
     pub multi_sig_address: Address,
-    pub new_account:       MultiSigAccount,
+    pub new_account:       Account,
 }
 
 #[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug)]
@@ -109,13 +98,13 @@ pub struct SetThresholdPayload {
 #[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug, Default, PartialEq, Eq)]
 pub struct MultiSigPermission {
     pub owner:     Address,
-    pub accounts:  Vec<MultiSigAccount>,
+    pub accounts:  Vec<Account>,
     pub threshold: u32,
     pub memo:      String,
 }
 
 impl MultiSigPermission {
-    pub fn get_account(&self, addr: &Address) -> Option<MultiSigAccount> {
+    pub fn get_account(&self, addr: &Address) -> Option<Account> {
         for account in self.accounts.iter() {
             if &account.address == addr {
                 return Some(account.clone());
@@ -132,7 +121,7 @@ impl MultiSigPermission {
         self.memo = new_memo;
     }
 
-    pub fn add_account(&mut self, new_account: MultiSigAccount) {
+    pub fn add_account(&mut self, new_account: Account) {
         self.accounts.push(new_account);
     }
 
@@ -193,22 +182,50 @@ impl MultiSigPermission {
 }
 
 #[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug, Default, PartialEq, Eq)]
-pub struct MultiSigAccount {
+pub struct Account {
+    pub address:     Address,
+    pub weight:      u8,
+    pub is_multiple: bool,
+}
+
+#[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
+pub struct AddressWithWeight {
     pub address: Address,
     pub weight:  u8,
 }
 
 #[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug)]
 pub struct Witness {
-    pub pubkeys:    Vec<PubkeyWithSender>,
+    pub pubkeys:    Vec<Bytes>,
     pub signatures: Vec<Bytes>,
 }
 
 impl Witness {
-    pub fn new(pubkeys: Vec<PubkeyWithSender>, signatures: Vec<Vec<u8>>) -> Self {
+    pub fn new(pubkeys: Vec<Bytes>, signatures: Vec<Bytes>) -> Self {
         Witness {
             pubkeys,
-            signatures: signatures.into_iter().map(Bytes::from).collect::<Vec<_>>(),
+            signatures,
+        }
+    }
+
+    pub fn to_addr_map(&self) -> HashMap<Address, (Bytes, Bytes)> {
+        let mut ret = HashMap::new();
+        for (pk, sig) in self.pubkeys.iter().zip(self.signatures.iter()) {
+            if let Ok(addr) = Address::from_pubkey_bytes(pk.clone()) {
+                ret.insert(addr, (pk.clone(), sig.clone()));
+            }
+        }
+        ret
+    }
+}
+
+#[cfg(test)]
+impl AddressWithWeight {
+    pub fn into_signle_account(self) -> Account {
+        Account {
+            address:     self.address,
+            weight:      self.weight,
+            is_multiple: false,
         }
     }
 }
