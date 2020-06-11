@@ -1,7 +1,7 @@
-use bytes::{Bytes, BytesMut};
+use bytes::BytesMut;
 
 use crate::fixed_codec::{FixedCodec, FixedCodecError};
-use crate::types::{Address, Hash, PubkeyWithSender, RawTransaction, TransactionRequest};
+use crate::types::{Hash, RawTransaction, TransactionRequest};
 use crate::ProtocolResult;
 
 impl rlp::Encodable for RawTransaction {
@@ -51,51 +51,6 @@ impl rlp::Decodable for RawTransaction {
 }
 
 impl FixedCodec for RawTransaction {
-    fn encode_fixed(&self) -> ProtocolResult<bytes::Bytes> {
-        Ok(bytes::Bytes::from(rlp::encode(self)))
-    }
-
-    fn decode_fixed(bytes: bytes::Bytes) -> ProtocolResult<Self> {
-        Ok(rlp::decode(bytes.as_ref()).map_err(FixedCodecError::from)?)
-    }
-}
-
-impl rlp::Encodable for PubkeyWithSender {
-    fn rlp_append(&self, s: &mut rlp::RlpStream) {
-        s.begin_list(3).append(&self.pubkey.to_vec());
-
-        if let Some(addr) = &self.sender {
-            s.append(&true).append(addr);
-        } else {
-            s.append(&false).append(&Address::default());
-        }
-    }
-}
-
-impl rlp::Decodable for PubkeyWithSender {
-    fn decode(r: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
-        match r.prototype()? {
-            rlp::Prototype::List(3) => {
-                let pubkey: Vec<u8> = r.val_at(0)?;
-                let flag: bool = r.val_at(1)?;
-                let sender = if flag {
-                    let addr: Address = r.val_at(2)?;
-                    Some(addr)
-                } else {
-                    None
-                };
-
-                Ok(PubkeyWithSender {
-                    pubkey: Bytes::from(pubkey),
-                    sender,
-                })
-            }
-            _ => Err(rlp::DecoderError::RlpInconsistentLengthAndData),
-        }
-    }
-}
-
-impl FixedCodec for PubkeyWithSender {
     fn encode_fixed(&self) -> ProtocolResult<bytes::Bytes> {
         Ok(bytes::Bytes::from(rlp::encode(self)))
     }
