@@ -9,7 +9,7 @@ use super::*;
 fn test_generate_multi_signature() {
     let cycles_limit = 1024 * 1024 * 1024; // 1073741824
     let caller = Address::from_hex("0x755cdba6ae4f479f7164792b318b2a06c759833b").unwrap();
-    let context = mock_context(cycles_limit, caller.clone());
+    let context = mock_context(cycles_limit, caller);
 
     let mut service = new_multi_signature_service();
     let owner = Address::from_pubkey_bytes(gen_one_keypair().1).unwrap();
@@ -24,6 +24,7 @@ fn test_generate_multi_signature() {
             owner: owner.clone(),
             accounts,
             threshold: 12,
+            memo: String::new(),
         });
     assert!(multi_sig_address.is_error());
 
@@ -37,6 +38,7 @@ fn test_generate_multi_signature() {
             owner: owner.clone(),
             accounts,
             threshold: 12,
+            memo: String::new(),
         });
     assert!(multi_sig_address.is_error());
 
@@ -50,19 +52,21 @@ fn test_generate_multi_signature() {
             owner:     owner.clone(),
             accounts:  accounts.clone(),
             threshold: 3,
+            memo:      String::new(),
         });
     assert!(!multi_sig_address.is_error());
 
     // test get permission by multi-signature address
     let addr = multi_sig_address.succeed_data.address;
-    let permission = service.get_account_from_address(context.clone(), GetMultiSigAccountPayload {
+    let permission = service.get_account_from_address(context, GetMultiSigAccountPayload {
         multi_sig_address: addr,
     });
     assert!(!permission.is_error());
     assert_eq!(permission.succeed_data.permission, MultiSigPermission {
-        owner:     owner.clone(),
-        accounts:  accounts.clone(),
+        owner,
+        accounts,
         threshold: 3,
+        memo: String::new(),
     });
 }
 
@@ -70,7 +74,7 @@ fn test_generate_multi_signature() {
 fn test_set_threshold() {
     let cycles_limit = 1024 * 1024 * 1024; // 1073741824
     let caller = Address::from_hex("0x755cdba6ae4f479f7164792b318b2a06c759833b").unwrap();
-    let context = mock_context(cycles_limit, caller.clone());
+    let context = mock_context(cycles_limit, caller);
     let tx_hash = context.get_tx_hash().unwrap();
 
     let mut service = new_multi_signature_service();
@@ -83,9 +87,10 @@ fn test_set_threshold() {
         .collect::<Vec<_>>();
     let multi_sig_address = service
         .generate_account(context.clone(), GenerateMultiSigAccountPayload {
-            owner:     owner_address.clone(),
-            accounts:  account_pubkeys.clone(),
+            owner:     owner_address,
+            accounts:  account_pubkeys,
             threshold: 3,
+            memo:      String::new(),
         })
         .succeed_data
         .address;
@@ -102,10 +107,10 @@ fn test_set_threshold() {
     );
 
     // test set new threshold success
-    let res = service.set_threshold(context.clone(), SetThresholdPayload {
-        witness:           gen_single_witness(&owner.0, &tx_hash),
-        multi_sig_address: multi_sig_address.clone(),
-        new_threshold:     2,
+    let res = service.set_threshold(context, SetThresholdPayload {
+        witness: gen_single_witness(&owner.0, &tx_hash),
+        multi_sig_address,
+        new_threshold: 2,
     });
     assert_eq!(res.error_message, "".to_owned());
 }
@@ -114,7 +119,7 @@ fn test_set_threshold() {
 fn test_add_account() {
     let cycles_limit = 1024 * 1024 * 1024; // 1073741824
     let caller = Address::from_hex("0x755cdba6ae4f479f7164792b318b2a06c759833b").unwrap();
-    let context = mock_context(cycles_limit, caller.clone());
+    let context = mock_context(cycles_limit, caller);
     let tx_hash = context.get_tx_hash().unwrap();
 
     let mut service = new_multi_signature_service();
@@ -130,6 +135,7 @@ fn test_add_account() {
             owner:     owner_address.clone(),
             accounts:  account_pubkeys.clone(),
             threshold: 3,
+            memo:      String::new(),
         })
         .succeed_data
         .address;
@@ -140,7 +146,7 @@ fn test_add_account() {
     let res = service.add_account(context.clone(), AddAccountPayload {
         witness:           gen_single_witness(&owner.0, &tx_hash),
         multi_sig_address: multi_sig_address.clone(),
-        new_account:       to_multi_sig_account(new_keypair.1.clone()),
+        new_account:       to_multi_sig_account(new_keypair.1),
     });
     assert_eq!(res.error_message, "".to_owned());
 
@@ -149,7 +155,7 @@ fn test_add_account() {
     let res = service.add_account(context.clone(), AddAccountPayload {
         witness:           gen_single_witness(&owner.0, &tx_hash),
         multi_sig_address: multi_sig_address.clone(),
-        new_account:       to_multi_sig_account(new_keypair.1.clone()),
+        new_account:       to_multi_sig_account(new_keypair.1),
     });
     assert_eq!(
         res.error_message,
@@ -157,13 +163,13 @@ fn test_add_account() {
     );
 
     // test get permission after add a new account
-    let permission = service.get_account_from_address(context.clone(), GetMultiSigAccountPayload {
-        multi_sig_address,
-    });
+    let permission =
+        service.get_account_from_address(context, GetMultiSigAccountPayload { multi_sig_address });
     assert_eq!(permission.succeed_data.permission, MultiSigPermission {
         owner:     owner_address,
-        accounts:  account_pubkeys.clone(),
+        accounts:  account_pubkeys,
         threshold: 3,
+        memo:      String::new(),
     });
 }
 
@@ -171,7 +177,7 @@ fn test_add_account() {
 fn test_set_weight() {
     let cycles_limit = 1024 * 1024 * 1024; // 1073741824
     let caller = Address::from_hex("0x755cdba6ae4f479f7164792b318b2a06c759833b").unwrap();
-    let context = mock_context(cycles_limit, caller.clone());
+    let context = mock_context(cycles_limit, caller);
     let tx_hash = context.get_tx_hash().unwrap();
 
     let mut service = new_multi_signature_service();
@@ -187,6 +193,7 @@ fn test_set_weight() {
             owner:     owner_address.clone(),
             accounts:  account_pubkeys.clone(),
             threshold: 4,
+            memo:      String::new(),
         })
         .succeed_data
         .address;
@@ -211,14 +218,14 @@ fn test_set_weight() {
     assert_eq!(res.error_message, "new weight is invalid".to_owned());
 
     // test get permission after add a new account
-    let permission = service.get_account_from_address(context.clone(), GetMultiSigAccountPayload {
-        multi_sig_address,
-    });
+    let permission =
+        service.get_account_from_address(context, GetMultiSigAccountPayload { multi_sig_address });
     account_pubkeys[0].weight = 2;
     assert_eq!(permission.succeed_data.permission, MultiSigPermission {
         owner:     owner_address,
-        accounts:  account_pubkeys.clone(),
+        accounts:  account_pubkeys,
         threshold: 4,
+        memo:      String::new(),
     });
 }
 
@@ -226,7 +233,7 @@ fn test_set_weight() {
 fn test_remove_account() {
     let cycles_limit = 1024 * 1024 * 1024; // 1073741824
     let caller = Address::from_hex("0x755cdba6ae4f479f7164792b318b2a06c759833b").unwrap();
-    let context = mock_context(cycles_limit, caller.clone());
+    let context = mock_context(cycles_limit, caller);
     let tx_hash = context.get_tx_hash().unwrap();
 
     let mut service = new_multi_signature_service();
@@ -242,6 +249,7 @@ fn test_remove_account() {
             owner:     owner_address.clone(),
             accounts:  account_pubkeys.clone(),
             threshold: 3,
+            memo:      String::new(),
         })
         .succeed_data
         .address;
@@ -250,7 +258,7 @@ fn test_remove_account() {
     let res = service.remove_account(context.clone(), RemoveAccountPayload {
         witness:           gen_single_witness(&owner.0, &tx_hash),
         multi_sig_address: multi_sig_address.clone(),
-        account_address:   to_be_removed_address.clone(),
+        account_address:   to_be_removed_address,
     });
     account_pubkeys.pop();
     assert!(!res.is_error());
@@ -259,7 +267,7 @@ fn test_remove_account() {
     let res = service.remove_account(context.clone(), RemoveAccountPayload {
         witness:           gen_single_witness(&owner.0, &tx_hash),
         multi_sig_address: multi_sig_address.clone(),
-        account_address:   to_be_removed_address.clone(),
+        account_address:   to_be_removed_address,
     });
 
     assert_eq!(
@@ -267,12 +275,12 @@ fn test_remove_account() {
         "the sum of weight will below threshold after remove the account".to_owned()
     );
 
-    let permission = service.get_account_from_address(context.clone(), GetMultiSigAccountPayload {
-        multi_sig_address,
-    });
+    let permission =
+        service.get_account_from_address(context, GetMultiSigAccountPayload { multi_sig_address });
     assert_eq!(permission.succeed_data.permission, MultiSigPermission {
         owner:     owner_address,
-        accounts:  account_pubkeys.clone(),
+        accounts:  account_pubkeys,
         threshold: 3,
+        memo:      String::new(),
     });
 }

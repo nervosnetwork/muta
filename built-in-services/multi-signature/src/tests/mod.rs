@@ -182,7 +182,7 @@ fn gen_single_witness(privkey: &Bytes, hash: &Hash) -> VerifySignaturePayload {
         .to_bytes();
 
     let pk_with_sender = PubkeyWithSender {
-        pubkey: pk.clone(),
+        pubkey: pk,
         sender: None,
     };
 

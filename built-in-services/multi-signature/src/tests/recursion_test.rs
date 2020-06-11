@@ -33,6 +33,7 @@ fn test_recursion_verify_signature() {
                 owner:     owner.clone(),
                 accounts:  init_multi_sig_account,
                 threshold: 4,
+                memo:      String::new(),
             },
         )
         .succeed_data
@@ -63,21 +64,22 @@ fn test_recursion_verify_signature() {
         .generate_account(
             mock_context(cycles_limit, caller.clone()),
             GenerateMultiSigAccountPayload {
-                owner:     owner.clone(),
-                accounts:  multi_sig_account,
+                owner,
+                accounts: multi_sig_account,
                 threshold: 4,
+                memo: String::new(),
             },
         )
         .succeed_data
         .address;
 
-    let ctx = mock_context(cycles_limit, caller.clone());
+    let ctx = mock_context(cycles_limit, caller);
     let tx_hash = ctx.get_tx_hash().unwrap();
     let mut pk_with_senders = Vec::new();
     let mut sigs = Vec::new();
     pk_with_senders.push(PubkeyWithSender {
         pubkey: Bytes::from(rlp::encode_list(&init_pub_keys)),
-        sender: Some(sender.clone()),
+        sender: Some(sender),
     });
     sigs.push(rlp::encode_list::<Vec<u8>, _>(&multi_sign_msg(
         &init_priv_keys,
@@ -92,7 +94,7 @@ fn test_recursion_verify_signature() {
     let verify_payload = VerifySignaturePayload {
         pubkeys:    Bytes::from(rlp::encode(&PubkeyWithSender {
             pubkey: Bytes::from(rlp::encode_list(&pk_with_senders)),
-            sender: Some(sender_new.clone()),
+            sender: Some(sender_new),
         })),
         signatures: Bytes::from(rlp::encode_list::<Vec<u8>, _>(&sigs)),
     };
@@ -101,9 +103,9 @@ fn test_recursion_verify_signature() {
     assert_eq!(res.is_error(), false);
 }
 
-fn multi_sign_msg(priv_keys: &Vec<Bytes>, hash: &Hash) -> Vec<Vec<u8>> {
+fn multi_sign_msg(priv_keys: &[Bytes], hash: &Hash) -> Vec<Vec<u8>> {
     priv_keys
-        .into_iter()
+        .iter()
         .map(|key| sign(key, hash).to_vec())
         .collect::<Vec<_>>()
 }

@@ -25,6 +25,7 @@ pub struct GenerateMultiSigAccountPayload {
     pub owner:     Address,
     pub accounts:  Vec<MultiSigAccount>,
     pub threshold: u32,
+    pub memo:      String,
 }
 
 #[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug, Default)]
@@ -44,8 +45,7 @@ impl VerifySignaturePayload {
             if let Some(sender) = pk_with_sender.sender {
                 Some(sender)
             } else {
-                Address::from_pubkey_bytes(pk_with_sender.pubkey)
-                    .map_or_else(|_| None, |addr| Some(addr))
+                Address::from_pubkey_bytes(pk_with_sender.pubkey).map_or_else(|_| None, Some)
             }
         } else {
             None
@@ -68,6 +68,13 @@ pub struct ChangeOwnerPayload {
     pub witness:           VerifySignaturePayload,
     pub multi_sig_address: Address,
     pub new_owner:         Address,
+}
+
+#[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug)]
+pub struct ChangeMemoPayload {
+    pub witness:           VerifySignaturePayload,
+    pub multi_sig_address: Address,
+    pub new_memo:          String,
 }
 
 #[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug)]
@@ -104,6 +111,7 @@ pub struct MultiSigPermission {
     pub owner:     Address,
     pub accounts:  Vec<MultiSigAccount>,
     pub threshold: u32,
+    pub memo:      String,
 }
 
 impl MultiSigPermission {
@@ -118,6 +126,10 @@ impl MultiSigPermission {
 
     pub fn set_owner(&mut self, new_owner: Address) {
         self.owner = new_owner;
+    }
+
+    pub fn set_memo(&mut self, new_memo: String) {
+        self.memo = new_memo;
     }
 
     pub fn add_account(&mut self, new_account: MultiSigAccount) {
@@ -196,10 +208,7 @@ impl Witness {
     pub fn new(pubkeys: Vec<PubkeyWithSender>, signatures: Vec<Vec<u8>>) -> Self {
         Witness {
             pubkeys,
-            signatures: signatures
-                .into_iter()
-                .map(|sig| Bytes::from(sig))
-                .collect::<Vec<_>>(),
+            signatures: signatures.into_iter().map(Bytes::from).collect::<Vec<_>>(),
         }
     }
 }

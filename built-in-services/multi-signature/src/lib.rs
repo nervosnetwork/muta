@@ -9,7 +9,7 @@ use protocol::traits::{ExecutorParams, ServiceResponse, ServiceSDK};
 use protocol::types::{Address, Bytes, Hash, PubkeyWithSender, ServiceContext};
 
 use crate::types::{
-    AddAccountPayload, ChangeOwnerPayload, GenerateMultiSigAccountPayload,
+    AddAccountPayload, ChangeMemoPayload, ChangeOwnerPayload, GenerateMultiSigAccountPayload,
     GenerateMultiSigAccountResponse, GetMultiSigAccountPayload, GetMultiSigAccountResponse,
     MultiSigAccount, MultiSigPermission, RemoveAccountPayload, RemoveAccountResult,
     SetAccountWeightPayload, SetThresholdPayload, SetWeightResult, VerifySignaturePayload, Witness,
@@ -63,6 +63,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
                 accounts:  payload.accounts,
                 owner:     payload.owner,
                 threshold: payload.threshold,
+                memo:      payload.memo,
             };
             self.sdk.set_account_value(&address, 0u8, permission);
 
@@ -223,7 +224,38 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
                 );
             }
 
-            permission.set_owner(payload.new_owner.clone());
+            permission.set_owner(payload.new_owner);
+            self.sdk
+                .set_account_value(&payload.multi_sig_address, 0u8, permission);
+            ServiceResponse::<()>::from_succeed(())
+        } else {
+            ServiceResponse::<()>::from_error(113, "account not existed".to_owned())
+        }
+    }
+
+    #[cycles(100_00)]
+    #[write]
+    fn change_memo(
+        &mut self,
+        ctx: ServiceContext,
+        payload: ChangeMemoPayload,
+    ) -> ServiceResponse<()> {
+        if let Some(mut permission) = self
+            .sdk
+            .get_account_value::<_, MultiSigPermission>(&payload.multi_sig_address, &0u8)
+        {
+            if Some(permission.owner.clone()) != payload.witness.get_sender() {
+                return ServiceResponse::<()>::from_error(118, "invalid owner".to_owned());
+            }
+
+            if self.verify_signature(ctx, payload.witness).is_error() {
+                return ServiceResponse::<()>::from_error(
+                    120,
+                    "owner signature verified failed".to_owned(),
+                );
+            }
+
+            permission.set_memo(payload.new_memo);
             self.sdk
                 .set_account_value(&payload.multi_sig_address, 0u8, permission);
             ServiceResponse::<()>::from_succeed(())
