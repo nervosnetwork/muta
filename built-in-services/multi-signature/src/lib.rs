@@ -51,7 +51,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
 
         if payload.threshold == 0 || weight_sum < payload.threshold {
             return ServiceResponse::<GenerateMultiSigAccountResponse>::from_error(
-                110,
+                111,
                 "accounts weight or threshold not valid".to_owned(),
             );
         }
@@ -71,7 +71,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
             )
         } else {
             ServiceResponse::<GenerateMultiSigAccountResponse>::from_error(
-                111,
+                112,
                 "generate address from tx_hash failed".to_owned(),
             )
         }
@@ -90,207 +90,9 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
             )
         } else {
             ServiceResponse::<GetMultiSigAccountResponse>::from_error(
-                110,
+                113,
                 "account not existed".to_owned(),
             )
-        }
-    }
-
-    #[cycles(100_00)]
-    #[write]
-    fn change_owner(
-        &mut self,
-        ctx: ServiceContext,
-        payload: ChangeOwnerPayload,
-    ) -> ServiceResponse<()> {
-        if let Some(mut permission) = self
-            .sdk
-            .get_account_value::<_, MultiSigPermission>(&payload.multi_sig_address, &0u8)
-        {
-            if Some(permission.owner.clone()) != payload.witness.get_sender() {
-                return ServiceResponse::<()>::from_error(121, "invalid owner".to_owned());
-            }
-
-            if self.verify_signature(ctx, payload.witness).is_error() {
-                return ServiceResponse::<()>::from_error(
-                    120,
-                    "owner signature verified failed".to_owned(),
-                );
-            }
-
-            permission.set_owner(payload.new_owner.clone());
-            self.sdk
-                .set_account_value(&payload.multi_sig_address, 0u8, permission);
-            ServiceResponse::<()>::from_succeed(())
-        } else {
-            ServiceResponse::<()>::from_error(110, "account not existed".to_owned())
-        }
-    }
-
-    #[cycles(210_00)]
-    #[write]
-    fn add_account(
-        &mut self,
-        ctx: ServiceContext,
-        payload: AddAccountPayload,
-    ) -> ServiceResponse<()> {
-        if let Some(mut permission) = self
-            .sdk
-            .get_account_value::<_, MultiSigPermission>(&payload.multi_sig_address, &0u8)
-        {
-            if Some(permission.owner.clone()) != payload.witness.get_sender() {
-                return ServiceResponse::<()>::from_error(121, "invalid owner".to_owned());
-            }
-
-            if permission.accounts.len() == MAX_PERMISSION_ACCOUNTS as usize {
-                return ServiceResponse::<()>::from_error(
-                    122,
-                    "the account count reach max value".to_owned(),
-                );
-            }
-
-            if self.verify_signature(ctx, payload.witness).is_error() {
-                return ServiceResponse::<()>::from_error(
-                    120,
-                    "owner signature verified failed".to_owned(),
-                );
-            }
-
-            permission.add_account(payload.new_account.clone());
-            self.sdk
-                .set_account_value(&payload.multi_sig_address, 0u8, permission);
-
-            ServiceResponse::<()>::from_succeed(())
-        } else {
-            ServiceResponse::<()>::from_error(110, "account not existed".to_owned())
-        }
-    }
-
-    #[cycles(210_00)]
-    #[write]
-    fn remove_account(
-        &mut self,
-        ctx: ServiceContext,
-        payload: RemoveAccountPayload,
-    ) -> ServiceResponse<MultiSigAccount> {
-        if let Some(mut permission) = self
-            .sdk
-            .get_account_value::<_, MultiSigPermission>(&payload.multi_sig_address, &0u8)
-        {
-            if Some(permission.owner.clone()) != payload.witness.get_sender() {
-                return ServiceResponse::<MultiSigAccount>::from_error(
-                    121,
-                    "invalid owner".to_owned(),
-                );
-            }
-
-            if self.verify_signature(ctx, payload.witness).is_error() {
-                return ServiceResponse::<MultiSigAccount>::from_error(
-                    120,
-                    "owner signature verified failed".to_owned(),
-                );
-            }
-
-            match permission.remove_account(&payload.account_address) {
-                RemoveAccountResult::Success(ret) => {
-                    self.sdk
-                        .set_account_value(&payload.multi_sig_address, 0u8, permission);
-                    return ServiceResponse::<MultiSigAccount>::from_succeed(ret);
-                }
-                RemoveAccountResult::BelowThreshold => {
-                    return ServiceResponse::<MultiSigAccount>::from_error(
-                        124,
-                        "the sum of weight will below threshold after remove the account"
-                            .to_owned(),
-                    );
-                }
-                _ => (),
-            }
-        }
-        ServiceResponse::<MultiSigAccount>::from_error(110, "account not existed".to_owned())
-    }
-
-    #[cycles(210_00)]
-    #[write]
-    fn set_account_weight(
-        &mut self,
-        ctx: ServiceContext,
-        payload: SetAccountWeightPayload,
-    ) -> ServiceResponse<()> {
-        if let Some(mut permission) = self
-            .sdk
-            .get_account_value::<_, MultiSigPermission>(&payload.multi_sig_address, &0u8)
-        {
-            if Some(permission.owner.clone()) != payload.witness.get_sender() {
-                return ServiceResponse::<()>::from_error(121, "invalid owner".to_owned());
-            }
-
-            if self.verify_signature(ctx, payload.witness).is_error() {
-                return ServiceResponse::<()>::from_error(
-                    120,
-                    "owner signature verified failed".to_owned(),
-                );
-            }
-
-            match permission.set_account_weight(&payload.account_address, payload.new_weight) {
-                SetWeightResult::Success => {
-                    self.sdk
-                        .set_account_value(&payload.multi_sig_address, 0u8, permission);
-                    return ServiceResponse::<()>::from_succeed(());
-                }
-                SetWeightResult::InvalidNewWeight => {
-                    return ServiceResponse::<()>::from_error(
-                        120,
-                        "new weight is invalid".to_owned(),
-                    );
-                }
-                _ => (),
-            }
-        }
-        ServiceResponse::<()>::from_error(110, "account not existed".to_owned())
-    }
-
-    #[cycles(210_00)]
-    #[write]
-    fn set_threshold(
-        &mut self,
-        ctx: ServiceContext,
-        payload: SetThresholdPayload,
-    ) -> ServiceResponse<()> {
-        if let Some(mut permission) = self
-            .sdk
-            .get_account_value::<_, MultiSigPermission>(&payload.multi_sig_address, &0u8)
-        {
-            if Some(permission.owner.clone()) != payload.witness.get_sender() {
-                return ServiceResponse::<()>::from_error(121, "invalid owner".to_owned());
-            }
-
-            if permission
-                .accounts
-                .iter()
-                .map(|account| account.weight as u32)
-                .sum::<u32>()
-                < payload.new_threshold
-            {
-                return ServiceResponse::<()>::from_error(
-                    123,
-                    "new threshold larger the sum of the weights".to_owned(),
-                );
-            }
-
-            if self.verify_signature(ctx, payload.witness).is_error() {
-                return ServiceResponse::<()>::from_error(
-                    120,
-                    "owner signature verified failed".to_owned(),
-                );
-            }
-
-            permission.set_threshold(payload.new_threshold);
-            self.sdk
-                .set_account_value(&payload.multi_sig_address, 0u8, permission);
-            ServiceResponse::<()>::from_succeed(())
-        } else {
-            ServiceResponse::<()>::from_error(110, "account not existed".to_owned())
         }
     }
 
@@ -304,7 +106,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
         let tmp = rlp::decode::<PubkeyWithSender>(payload.pubkeys.as_ref());
         if tmp.is_err() {
             return ServiceResponse::<()>::from_error(
-                111,
+                114,
                 "decode pubkey_with_sender error".to_owned(),
             );
         }
@@ -344,7 +146,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
     ) -> ServiceResponse<()> {
         if witness.signatures.len() > MAX_PERMISSION_ACCOUNTS as usize {
             return ServiceResponse::<()>::from_error(
-                117,
+                115,
                 "len of signatures must be [1,16]".to_owned(),
             );
         }
@@ -353,7 +155,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
             .sdk
             .get_account_value::<_, MultiSigPermission>(sender, &0u8);
         if permission.is_none() {
-            return ServiceResponse::<()>::from_error(117, "account not existed".to_owned());
+            return ServiceResponse::<()>::from_error(113, "account not existed".to_owned());
         }
 
         let permission = permission.unwrap();
@@ -370,7 +172,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
                 *recursion_depth += 1;
                 if *recursion_depth >= MAX_MULTI_SIGNATURE_RECURSION_DEPTH {
                     return ServiceResponse::<()>::from_error(
-                        119,
+                        116,
                         "the recursion of multiple signatures should be less than 16".to_owned(),
                     );
                 }
@@ -396,7 +198,205 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
             }
         }
 
-        ServiceResponse::<()>::from_error(111, "multi signature not verified".to_owned())
+        ServiceResponse::<()>::from_error(117, "multi signature not verified".to_owned())
+    }
+
+    #[cycles(100_00)]
+    #[write]
+    fn change_owner(
+        &mut self,
+        ctx: ServiceContext,
+        payload: ChangeOwnerPayload,
+    ) -> ServiceResponse<()> {
+        if let Some(mut permission) = self
+            .sdk
+            .get_account_value::<_, MultiSigPermission>(&payload.multi_sig_address, &0u8)
+        {
+            if Some(permission.owner.clone()) != payload.witness.get_sender() {
+                return ServiceResponse::<()>::from_error(118, "invalid owner".to_owned());
+            }
+
+            if self.verify_signature(ctx, payload.witness).is_error() {
+                return ServiceResponse::<()>::from_error(
+                    120,
+                    "owner signature verified failed".to_owned(),
+                );
+            }
+
+            permission.set_owner(payload.new_owner.clone());
+            self.sdk
+                .set_account_value(&payload.multi_sig_address, 0u8, permission);
+            ServiceResponse::<()>::from_succeed(())
+        } else {
+            ServiceResponse::<()>::from_error(113, "account not existed".to_owned())
+        }
+    }
+
+    #[cycles(210_00)]
+    #[write]
+    fn add_account(
+        &mut self,
+        ctx: ServiceContext,
+        payload: AddAccountPayload,
+    ) -> ServiceResponse<()> {
+        if let Some(mut permission) = self
+            .sdk
+            .get_account_value::<_, MultiSigPermission>(&payload.multi_sig_address, &0u8)
+        {
+            if Some(permission.owner.clone()) != payload.witness.get_sender() {
+                return ServiceResponse::<()>::from_error(118, "invalid owner".to_owned());
+            }
+
+            if permission.accounts.len() == MAX_PERMISSION_ACCOUNTS as usize {
+                return ServiceResponse::<()>::from_error(
+                    119,
+                    "the account count reach max value".to_owned(),
+                );
+            }
+
+            if self.verify_signature(ctx, payload.witness).is_error() {
+                return ServiceResponse::<()>::from_error(
+                    120,
+                    "owner signature verified failed".to_owned(),
+                );
+            }
+
+            permission.add_account(payload.new_account.clone());
+            self.sdk
+                .set_account_value(&payload.multi_sig_address, 0u8, permission);
+
+            ServiceResponse::<()>::from_succeed(())
+        } else {
+            ServiceResponse::<()>::from_error(113, "account not existed".to_owned())
+        }
+    }
+
+    #[cycles(210_00)]
+    #[write]
+    fn remove_account(
+        &mut self,
+        ctx: ServiceContext,
+        payload: RemoveAccountPayload,
+    ) -> ServiceResponse<MultiSigAccount> {
+        if let Some(mut permission) = self
+            .sdk
+            .get_account_value::<_, MultiSigPermission>(&payload.multi_sig_address, &0u8)
+        {
+            if Some(permission.owner.clone()) != payload.witness.get_sender() {
+                return ServiceResponse::<MultiSigAccount>::from_error(
+                    118,
+                    "invalid owner".to_owned(),
+                );
+            }
+
+            if self.verify_signature(ctx, payload.witness).is_error() {
+                return ServiceResponse::<MultiSigAccount>::from_error(
+                    120,
+                    "owner signature verified failed".to_owned(),
+                );
+            }
+
+            match permission.remove_account(&payload.account_address) {
+                RemoveAccountResult::Success(ret) => {
+                    self.sdk
+                        .set_account_value(&payload.multi_sig_address, 0u8, permission);
+                    return ServiceResponse::<MultiSigAccount>::from_succeed(ret);
+                }
+                RemoveAccountResult::BelowThreshold => {
+                    return ServiceResponse::<MultiSigAccount>::from_error(
+                        121,
+                        "the sum of weight will below threshold after remove the account"
+                            .to_owned(),
+                    );
+                }
+                _ => (),
+            }
+        }
+        ServiceResponse::<MultiSigAccount>::from_error(113, "account not existed".to_owned())
+    }
+
+    #[cycles(210_00)]
+    #[write]
+    fn set_account_weight(
+        &mut self,
+        ctx: ServiceContext,
+        payload: SetAccountWeightPayload,
+    ) -> ServiceResponse<()> {
+        if let Some(mut permission) = self
+            .sdk
+            .get_account_value::<_, MultiSigPermission>(&payload.multi_sig_address, &0u8)
+        {
+            if Some(permission.owner.clone()) != payload.witness.get_sender() {
+                return ServiceResponse::<()>::from_error(118, "invalid owner".to_owned());
+            }
+
+            if self.verify_signature(ctx, payload.witness).is_error() {
+                return ServiceResponse::<()>::from_error(
+                    120,
+                    "owner signature verified failed".to_owned(),
+                );
+            }
+
+            match permission.set_account_weight(&payload.account_address, payload.new_weight) {
+                SetWeightResult::Success => {
+                    self.sdk
+                        .set_account_value(&payload.multi_sig_address, 0u8, permission);
+                    return ServiceResponse::<()>::from_succeed(());
+                }
+                SetWeightResult::InvalidNewWeight => {
+                    return ServiceResponse::<()>::from_error(
+                        122,
+                        "new weight is invalid".to_owned(),
+                    );
+                }
+                _ => (),
+            }
+        }
+        ServiceResponse::<()>::from_error(113, "account not existed".to_owned())
+    }
+
+    #[cycles(210_00)]
+    #[write]
+    fn set_threshold(
+        &mut self,
+        ctx: ServiceContext,
+        payload: SetThresholdPayload,
+    ) -> ServiceResponse<()> {
+        if let Some(mut permission) = self
+            .sdk
+            .get_account_value::<_, MultiSigPermission>(&payload.multi_sig_address, &0u8)
+        {
+            if Some(permission.owner.clone()) != payload.witness.get_sender() {
+                return ServiceResponse::<()>::from_error(121, "invalid owner".to_owned());
+            }
+
+            if permission
+                .accounts
+                .iter()
+                .map(|account| account.weight as u32)
+                .sum::<u32>()
+                < payload.new_threshold
+            {
+                return ServiceResponse::<()>::from_error(
+                    122,
+                    "new threshold larger the sum of the weights".to_owned(),
+                );
+            }
+
+            if self.verify_signature(ctx, payload.witness).is_error() {
+                return ServiceResponse::<()>::from_error(
+                    120,
+                    "owner signature verified failed".to_owned(),
+                );
+            }
+
+            permission.set_threshold(payload.new_threshold);
+            self.sdk
+                .set_account_value(&payload.multi_sig_address, 0u8, permission);
+            ServiceResponse::<()>::from_succeed(())
+        } else {
+            ServiceResponse::<()>::from_error(113, "account not existed".to_owned())
+        }
     }
 
     fn _verify_single_signature(
@@ -410,7 +410,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
         {
             ServiceResponse::<()>::from_succeed(())
         } else {
-            ServiceResponse::<()>::from_error(110, "signature not verified".to_owned())
+            ServiceResponse::<()>::from_error(117, "signature not verified".to_owned())
         }
     }
 }
