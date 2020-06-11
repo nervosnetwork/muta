@@ -171,6 +171,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
         weight_acc: &mut u32,
         recursion_depth: &mut u8,
     ) -> ServiceResponse<()> {
+        // check recursion depth
         *recursion_depth += 1;
         if *recursion_depth > MAX_MULTI_SIGNATURE_RECURSION_DEPTH {
             return ServiceResponse::<()>::from_error(116, "above max recursion depth".to_owned());
@@ -292,6 +293,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
                 return ServiceResponse::<()>::from_error(118, "invalid owner".to_owned());
             }
 
+            // check whether reach the max count
             if permission.accounts.len() == MAX_PERMISSION_ACCOUNTS as usize {
                 return ServiceResponse::<()>::from_error(
                     119,
@@ -347,8 +349,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
                 RemoveAccountResult::BelowThreshold => {
                     return ServiceResponse::<Account>::from_error(
                         121,
-                        "the sum of weight will below threshold after remove the account"
-                            .to_owned(),
+                        "the sum of weight will below threshold".to_owned(),
                     );
                 }
                 _ => (),
@@ -387,8 +388,8 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
                 }
                 SetWeightResult::InvalidNewWeight => {
                     return ServiceResponse::<()>::from_error(
-                        122,
-                        "new weight is invalid".to_owned(),
+                        121,
+                        "the sum of weight will below threshold".to_owned(),
                     );
                 }
                 _ => (),
@@ -420,7 +421,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
                 < payload.new_threshold
             {
                 return ServiceResponse::<()>::from_error(
-                    122,
+                    121,
                     "new threshold larger the sum of the weights".to_owned(),
                 );
             }
@@ -452,7 +453,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
         {
             ServiceResponse::<()>::from_succeed(())
         } else {
-            ServiceResponse::<()>::from_error(117, "signature not verified".to_owned())
+            ServiceResponse::<()>::from_error(117, "signature verified failed".to_owned())
         }
     }
 }
