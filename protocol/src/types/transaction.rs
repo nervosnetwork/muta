@@ -1,5 +1,6 @@
 use bytes::Bytes;
 use muta_codec_derive::RlpFixedCodec;
+use serde::{Serialize, Deserialize};
 
 use crate::fixed_codec::{FixedCodec, FixedCodecError};
 use crate::types::primitive::{Hash, JsonString};
@@ -30,7 +31,7 @@ pub struct SignedTransaction {
     pub signature: Bytes,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct PubkeyWithSender {
     pub pubkey: Bytes,
     pub sender: Option<Address>,

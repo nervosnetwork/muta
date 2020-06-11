@@ -7,7 +7,9 @@ use crate::traits::ServiceResponse;
 use crate::types::block::{Block, BlockHeader, Pill, Proof, Validator};
 use crate::types::primitive::{Address, Hash, MerkleRoot};
 use crate::types::receipt::{Event, Receipt, ReceiptResponse};
-use crate::types::transaction::{RawTransaction, SignedTransaction, TransactionRequest};
+use crate::types::transaction::{
+    PubkeyWithSender, RawTransaction, SignedTransaction, TransactionRequest,
+};
 
 // #####################
 // Mock Primitive
@@ -89,6 +91,20 @@ pub fn mock_sign_tx() -> SignedTransaction {
         tx_hash:   mock_hash(),
         pubkey:    Default::default(),
         signature: Default::default(),
+    }
+}
+
+pub fn mock_pubkey_with_some_sender() -> PubkeyWithSender {
+    PubkeyWithSender {
+        pubkey: get_random_bytes(32),
+        sender: Some(mock_address()),
+    }
+}
+
+pub fn mock_pubkey_with_none_sender() -> PubkeyWithSender {
+    PubkeyWithSender {
+        pubkey: get_random_bytes(32),
+        sender: None,
     }
 }
 

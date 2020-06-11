@@ -64,7 +64,7 @@ impl rlp::Encodable for PubkeyWithSender {
         if let Some(addr) = &self.sender {
             s.append(&true).append(addr);
         } else {
-            s.append(&false).append_empty_data();
+            s.append(&false).append(&Address::default());
         }
     }
 }

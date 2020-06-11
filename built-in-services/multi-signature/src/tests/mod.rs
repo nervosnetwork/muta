@@ -22,12 +22,7 @@ use protocol::types::{
 };
 use protocol::{types::Bytes, ProtocolResult};
 
-use crate::types::{
-    AddAccountPayload, ChangeOwnerPayload, GenerateMultiSigAccountPayload,
-    GenerateMultiSigAccountResponse, GetMultiSigAccountPayload, GetMultiSigAccountResponse,
-    MultiSigAccount, MultiSigPermission, RemoveAccountPayload, SetAccountWeightPayload,
-    SetThresholdPayload, VerifySignaturePayload, Witness, MAX_PERMISSION_ACCOUNTS,
-};
+use crate::types::{MultiSigAccount, VerifySignaturePayload};
 use crate::MultiSignatureService;
 
 struct MockStorage;
