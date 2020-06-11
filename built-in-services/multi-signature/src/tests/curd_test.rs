@@ -215,7 +215,10 @@ fn test_set_weight() {
         account_address:   to_be_changed_address,
         new_weight:        0,
     });
-    assert_eq!(res.error_message, "new weight is invalid".to_owned());
+    assert_eq!(
+        res.error_message,
+        "the sum of weight will below threshold".to_owned()
+    );
 
     // test get permission after add a new account
     let permission =
@@ -272,7 +275,7 @@ fn test_remove_account() {
 
     assert_eq!(
         res.error_message,
-        "the sum of weight will below threshold after remove the account".to_owned()
+        "the sum of weight will below threshold".to_owned()
     );
 
     let permission =
