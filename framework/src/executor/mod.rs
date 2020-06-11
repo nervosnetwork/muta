@@ -115,11 +115,11 @@ impl<DB: TrieDB> CommitHooks<DB> {
         match panic::catch_unwind(AssertUnwindSafe(hook)) {
             Ok(_) if !context.canceled() => states.stash(),
             Ok(_) => {
+                states.stash()?;
+
                 // An reason must be passed to cancel
                 let reason = context.cancel_reason();
                 debug_assert!(reason.is_some());
-
-                states.revert_cache()?;
 
                 Err(ExecutorError::Canceled {
                     service: context.get_service_name().to_owned(),

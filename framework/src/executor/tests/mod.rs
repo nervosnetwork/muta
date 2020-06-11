@@ -494,7 +494,7 @@ fn test_tx_hook_before_cancel() {
     let caller = Address::from_hex("0xf8389d774afdad8755ef8e629e5a154fddc6325a").unwrap();
 
     let before = read!(executor, &params, &caller, r#""before""#);
-    assert_eq!(before.succeed_data, r#""""#);
+    assert_eq!(before.succeed_data, r#""before""#);
 
     let tx_hook_before_cancel = read!(executor, &params, &caller, r#""tx_hook_before_cancel""#);
     assert_eq!(tx_hook_before_cancel.succeed_data, r#""""#);
