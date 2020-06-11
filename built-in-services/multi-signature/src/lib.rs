@@ -1,4 +1,5 @@
-#[allow(clippy::suspicious_else_formatting)]
+#![allow(clippy::suspicious_else_formatting)]
+
 #[cfg(test)]
 mod tests;
 pub mod types;
