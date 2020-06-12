@@ -3,7 +3,6 @@ services:
   jaeger-agent:
     image: jaegertracing/jaeger-agent
     command:
-      # - '--reporter.grpc.host-port=47.114.157.77:14250'
       - '--reporter.grpc.host-port=${JAEGER_REPORTER_HOST}'
     ports:
       - '14271:14271'
