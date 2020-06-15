@@ -6,7 +6,7 @@ pub mod types;
 
 use std::collections::HashMap;
 
-use binding_macro::{cycles, service};
+use binding_macro::{cycles, genesis, service};
 
 use common_crypto::{Crypto, Secp256k1};
 use protocol::traits::{ExecutorParams, ServiceResponse, ServiceSDK};
@@ -15,9 +15,9 @@ use protocol::types::{Address, Bytes, Hash, ServiceContext};
 use crate::types::{
     Account, AddAccountPayload, ChangeMemoPayload, ChangeOwnerPayload,
     GenerateMultiSigAccountPayload, GenerateMultiSigAccountResponse, GetMultiSigAccountPayload,
-    GetMultiSigAccountResponse, MultiSigPermission, RemoveAccountPayload, RemoveAccountResult,
-    SetAccountWeightPayload, SetThresholdPayload, SetWeightResult, VerifySignaturePayload, Witness,
-    MAX_PERMISSION_ACCOUNTS,
+    GetMultiSigAccountResponse, InitGenesisPayload, MultiSigPermission, RemoveAccountPayload,
+    RemoveAccountResult, SetAccountWeightPayload, SetThresholdPayload, SetWeightResult,
+    VerifySignaturePayload, Witness, MAX_PERMISSION_ACCOUNTS,
 };
 
 const MAX_MULTI_SIGNATURE_RECURSION_DEPTH: u8 = 8;
@@ -30,6 +30,45 @@ pub struct MultiSignatureService<SDK> {
 impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
     pub fn new(sdk: SDK) -> Self {
         MultiSignatureService { sdk }
+    }
+
+    #[genesis]
+    fn init_genesis(&mut self, payload: InitGenesisPayload) {
+        if payload.addr_with_weight.is_empty()
+            || payload.addr_with_weight.len() > MAX_PERMISSION_ACCOUNTS as usize
+        {
+            panic!("Invalid account number");
+        }
+
+        let weight_sum = payload
+            .addr_with_weight
+            .iter()
+            .map(|item| item.weight as u32)
+            .sum::<u32>();
+
+        if payload.threshold == 0 || weight_sum < payload.threshold {
+            panic!("Invalid threshold or weights");
+        }
+
+        let address = payload.address.clone();
+        let accounts = payload
+            .addr_with_weight
+            .iter()
+            .map(|item| Account {
+                address:     item.address.clone(),
+                weight:      item.weight,
+                is_multiple: true,
+            })
+            .collect::<Vec<_>>();
+
+        let permission = MultiSigPermission {
+            accounts,
+            owner: payload.owner,
+            threshold: payload.threshold,
+            memo: payload.memo,
+        };
+
+        self.sdk.set_account_value(&address, 0u8, permission);
     }
 
     #[cycles(210_00)]
@@ -116,7 +155,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
         }
     }
 
-    #[cycles(100_00)]
+    #[cycles(210_00)]
     #[read]
     fn verify_signature(
         &self,
@@ -155,12 +194,10 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
         }
 
         let mut recursion_depth = 0u8;
-        let mut weight_acc = 0u32;
         self._verify_multi_signature(
             &ctx.get_tx_hash().unwrap(),
             &Witness::new(pubkeys, signatures).to_addr_map(),
             &payload.sender,
-            &mut weight_acc,
             &mut recursion_depth,
         )
     }
@@ -170,7 +207,6 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
         tx_hash: &Hash,
         wit_map: &HashMap<Address, (Bytes, Bytes)>,
         sender: &Address,
-        weight_acc: &mut u32,
         recursion_depth: &mut u8,
     ) -> ServiceResponse<()> {
         // check recursion depth
@@ -178,6 +214,8 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
         if *recursion_depth > MAX_MULTI_SIGNATURE_RECURSION_DEPTH {
             return ServiceResponse::<()>::from_error(116, "above max recursion depth".to_owned());
         }
+
+        let mut weight_acc = 0u32;
 
         let permission = self
             .sdk
@@ -191,26 +229,19 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
             if !account.is_multiple {
                 if let Some((pk, sig)) = wit_map.get(&account.address) {
                     if !self._verify_single_signature(tx_hash, sig, pk).is_error() {
-                        *weight_acc += account.weight as u32;
+                        weight_acc += account.weight as u32;
                     }
                 }
             } else {
-                let mut sub_weight_acc = 0u32;
                 if !self
-                    ._verify_multi_signature(
-                        tx_hash,
-                        wit_map,
-                        &account.address,
-                        &mut sub_weight_acc,
-                        recursion_depth,
-                    )
+                    ._verify_multi_signature(tx_hash, wit_map, &account.address, recursion_depth)
                     .is_error()
                 {
-                    *weight_acc += account.weight as u32;
+                    weight_acc += account.weight as u32;
                 }
             }
 
-            if *weight_acc >= permission.threshold {
+            if weight_acc >= permission.threshold {
                 return ServiceResponse::<()>::from_succeed(());
             }
         }
@@ -218,7 +249,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
         ServiceResponse::<()>::from_error(117, "multi signature not verified".to_owned())
     }
 
-    #[cycles(100_00)]
+    #[cycles(210_00)]
     #[write]
     fn change_owner(
         &mut self,
@@ -249,7 +280,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
         }
     }
 
-    #[cycles(100_00)]
+    #[cycles(210_00)]
     #[write]
     fn change_memo(
         &mut self,

@@ -22,6 +22,15 @@ pub enum RemoveAccountResult {
     BelowThreshold,
 }
 
+#[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug)]
+pub struct InitGenesisPayload {
+    pub address:          Address,
+    pub owner:            Address,
+    pub addr_with_weight: Vec<AddressWithWeight>,
+    pub threshold:        u32,
+    pub memo:             String,
+}
+
 #[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub struct GenerateMultiSigAccountPayload {
     pub owner:            Address,
