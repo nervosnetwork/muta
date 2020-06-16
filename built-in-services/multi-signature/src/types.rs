@@ -7,7 +7,6 @@ use protocol::fixed_codec::{FixedCodec, FixedCodecError};
 use protocol::types::{Address, Bytes};
 use protocol::ProtocolResult;
 
-pub const MAX_PERMISSION_ACCOUNTS: u8 = 16;
 #[derive(Clone, Debug)]
 pub enum SetWeightResult {
     Success,
