@@ -5,7 +5,8 @@ use creep::Context;
 
 use crate::traits::{ExecutorParams, ExecutorResp, TrustFeedback};
 use crate::types::{
-    Address, Block, Bytes, Hash, MerkleRoot, Metadata, Proof, Receipt, SignedTransaction, Validator,
+    Address, Block, Bytes, Hash, Hex, MerkleRoot, Metadata, Proof, Receipt, SignedTransaction,
+    Validator,
 };
 use crate::{traits::mempool::MixedTxHashes, ProtocolResult};
 
@@ -139,7 +140,7 @@ pub trait CommonConsensusAdapter: Send + Sync {
         block_height: u64,
         vote_hash: Bytes,
         aggregated_signature_bytes: Bytes,
-        signed_voters: Vec<Bytes>,
+        vote_pubkeys: Vec<Hex>,
     ) -> ProtocolResult<()>;
 
     fn verity_proof_weight(

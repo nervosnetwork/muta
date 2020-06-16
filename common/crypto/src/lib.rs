@@ -273,7 +273,7 @@ mod benches {
         let aggregated_key = BlsPublicKey::aggregate(
             priv_pub_keys
                 .iter()
-                .map(|key_pair| &key_pair.1)
+                .map(|key_pair| key_pair.1.clone())
                 .collect::<Vec<_>>(),
         );
 
@@ -314,7 +314,7 @@ mod benches {
         let aggregated_key = BlsPublicKey::aggregate(
             priv_pub_keys
                 .iter()
-                .map(|key_pair| &key_pair.1)
+                .map(|key_pair| key_pair.1.clone())
                 .collect::<Vec<_>>(),
         );
 
@@ -355,7 +355,7 @@ mod benches {
         let aggregated_key = BlsPublicKey::aggregate(
             priv_pub_keys
                 .iter()
-                .map(|key_pair| &key_pair.1)
+                .map(|key_pair| key_pair.1.clone())
                 .collect::<Vec<_>>(),
         );
 
@@ -396,7 +396,7 @@ mod benches {
         let aggregated_key = BlsPublicKey::aggregate(
             priv_pub_keys
                 .iter()
-                .map(|key_pair| &key_pair.1)
+                .map(|key_pair| key_pair.1.clone())
                 .collect::<Vec<_>>(),
         );
 
@@ -437,7 +437,7 @@ mod benches {
         let aggregated_key = BlsPublicKey::aggregate(
             priv_pub_keys
                 .iter()
-                .map(|key_pair| &key_pair.1)
+                .map(|key_pair| key_pair.1.clone())
                 .collect::<Vec<_>>(),
         );
 

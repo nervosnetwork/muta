@@ -14,7 +14,7 @@ use common_crypto::{
 };
 use protocol::fixed_codec::FixedCodec;
 use protocol::traits::Context;
-use protocol::types::{Address, Hash, MerkleRoot, SignedTransaction};
+use protocol::types::{Address, Hash, Hex, MerkleRoot, SignedTransaction};
 use protocol::{Bytes, ProtocolError, ProtocolResult};
 
 pub struct OverlordCrypto {
@@ -103,21 +103,10 @@ impl Crypto for OverlordCrypto {
             let pub_key = map.get(addr).ok_or_else(|| {
                 ProtocolError::from(ConsensusError::Other("lose public key".to_string()))
             })?;
-            pub_keys.push(pub_key);
+            pub_keys.push(pub_key.clone());
         }
 
-        let aggregate_key = BlsPublicKey::aggregate(pub_keys);
-        let aggregated_signature = BlsSignature::try_from(aggregated_signature.as_ref())
-            .map_err(|e| ProtocolError::from(ConsensusError::CryptoErr(Box::new(e))))?;
-        let hash = HashValue::try_from(hash.as_ref()).map_err(|_| {
-            ProtocolError::from(ConsensusError::Other(
-                "failed to convert hash value".to_string(),
-            ))
-        })?;
-
-        aggregated_signature
-            .verify(&hash, &aggregate_key, &self.common_ref)
-            .map_err(|e| ProtocolError::from(ConsensusError::CryptoErr(Box::new(e))))?;
+        self.inner_verify_aggregated_signature(hash, pub_keys, aggregated_signature)?;
         Ok(())
     }
 }
@@ -139,6 +128,27 @@ impl OverlordCrypto {
         let mut map = self.addr_pubkey.write();
 
         *map = new_addr_pubkey;
+    }
+
+    pub fn inner_verify_aggregated_signature(
+        &self,
+        hash: Bytes,
+        pub_keys: Vec<BlsPublicKey>,
+        signature: Bytes,
+    ) -> ProtocolResult<()> {
+        let aggregate_key = BlsPublicKey::aggregate(pub_keys);
+        let aggregated_signature = BlsSignature::try_from(signature.as_ref())
+            .map_err(|e| ProtocolError::from(ConsensusError::CryptoErr(Box::new(e))))?;
+        let hash = HashValue::try_from(hash.as_ref()).map_err(|_| {
+            ProtocolError::from(ConsensusError::Other(
+                "failed to convert hash value".to_string(),
+            ))
+        })?;
+
+        aggregated_signature
+            .verify(&hash, &aggregate_key, &self.common_ref)
+            .map_err(|e| ProtocolError::from(ConsensusError::CryptoErr(Box::new(e))))?;
+        Ok(())
     }
 }
 
@@ -179,8 +189,16 @@ pub fn digest_signed_transactions(signed_txs: &[SignedTransaction]) -> ProtocolR
     Ok(Hash::digest(list_bytes.freeze()))
 }
 
+pub fn convert_hex_to_bls_pubkeys(hex: Hex) -> ProtocolResult<BlsPublicKey> {
+    let hex_pubkey = hex::decode(hex.as_string_trim0x())
+        .map_err(|e| ConsensusError::Other(format!("from hex error {:?}", e)))?;
+    let ret = BlsPublicKey::try_from(hex_pubkey.as_ref())
+        .map_err(|e| ConsensusError::CryptoErr(Box::new(e)))?;
+    Ok(ret)
+}
+
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
 
     #[test]
@@ -211,12 +229,34 @@ mod test {
         }
 
         let signature = BlsSignature::combine(sigs_and_pub_keys.clone());
-        let aggregate_key =
-            BlsPublicKey::aggregate(sigs_and_pub_keys.iter().map(|s| &s.1).collect::<Vec<_>>());
+        let aggregate_key = BlsPublicKey::aggregate(
+            sigs_and_pub_keys
+                .iter()
+                .map(|s| s.1.clone())
+                .collect::<Vec<_>>(),
+        );
 
         let res = signature.verify(&hash, &aggregate_key, &"muta".into());
         println!("{:?}", res);
         assert!(res.is_ok());
+    }
+
+    #[test]
+    fn test_aggregate_pubkeys_order() {
+        let public_keys = vec![
+            hex::decode("041054fe9a65be0891094ed37fb3655e3ffb12353bc0a1b4f8673b52ad65d1ca481780cf7e988eb8dcdc05d8352f03605b0d11afb2525b3f1b55ec694509248bcfead39cbb292725d710e2a509c77ed051d1d49e15e429cf6d12b9be7c02179612").unwrap(),
+            hex::decode("040c15c82ed07dc866ab7c3af3a070eb4340ac0439bf12bb49cbed5797d52707e009f7c17414777b0213b9a55c8a5c08290ce40c366d59322db418b7ff41277090bd25614174763c9fd725ede1f65f3e61ca9acdb35f59e33d556e738add14d536").unwrap(),
+            hex::decode("040b3118acefdfbb11ded262a7f3c90dfca4fbc0200a92b4f6bb80210ab85e39f79458f7d47f7cb06864df0571e7591a4e0858df0b52a4c3ae19ae3adc32e1da0ec4cbdca108365ee433becdb1ccebb1b339647788dfad94ebae1cbd770fcfa4e5").unwrap(),
+            hex::decode("040709f204e3ec5b8bdd9f2bb6edc9cb1704fc1e4952661ba7532ea8e37f3b159b8d41987ee6707d32bdf494e2deb00b7f049a4670a5ce1ad8e429fcacc5bbc69cb03b71a7f1d831d0b47dda5e62642d420ff0a545950cb1db19d42fe04e2c91d2").unwrap(),
+        ];
+        let mut pub_keys = public_keys
+            .into_iter()
+            .map(|pk| BlsPublicKey::try_from(pk.as_ref()).unwrap())
+            .collect::<Vec<_>>();
+        let pk_1 = BlsPublicKey::aggregate(pub_keys.clone());
+        pub_keys.reverse();
+        let pk_2 = BlsPublicKey::aggregate(pub_keys);
+        assert_eq!(pk_1, pk_2);
     }
 
     #[test]
@@ -231,5 +271,13 @@ mod test {
         assert!(!check_list_roots(&roots_3, &roots_2));
         assert!(!check_list_roots(&roots_4, &roots_2));
         assert!(!check_list_roots(&roots_5, &roots_2));
+    }
+
+    #[test]
+    fn test_convert_from_hex() {
+        let hex_str = "0x04188ef9488c19458a963cc57b567adde7db8f8b6bec392d5cb7b67b0abc1ed6cd966edc451f6ac2ef38079460eb965e890d1f576e4039a20467820237cda753f07a8b8febae1ec052190973a1bcf00690ea8fc0168b3fbbccd1c4e402eda5ef22";
+        assert!(
+            convert_hex_to_bls_pubkeys(Hex::from_string(String::from(hex_str)).unwrap()).is_ok()
+        );
     }
 }

@@ -20,7 +20,7 @@ use protocol::traits::{
     ServiceMapping, Storage, SynchronizationAdapter, TrustFeedback,
 };
 use protocol::types::{
-    Address, Block, Bytes, Hash, MerkleRoot, Metadata, Proof, Receipt, SignedTransaction,
+    Address, Block, Bytes, Hash, Hex, MerkleRoot, Metadata, Proof, Receipt, SignedTransaction,
     TransactionRequest, Validator,
 };
 use protocol::{fixed_codec::FixedCodec, ProtocolResult};
@@ -33,7 +33,7 @@ use crate::message::{
     BROADCAST_HEIGHT, RPC_SYNC_PULL_BLOCK, RPC_SYNC_PULL_PROOF, RPC_SYNC_PULL_TXS,
 };
 use crate::status::{ExecutedInfo, StatusAgent};
-use crate::util::{ExecuteInfo, OverlordCrypto};
+use crate::util::{convert_hex_to_bls_pubkeys, ExecuteInfo, OverlordCrypto};
 use crate::BlockHeaderField::{PreviousBlockHash, ProofHash, Proposer};
 use crate::BlockProofField::{BitMap, HashMismatch, HeightMismatch, Signature, WeightNotFound};
 use crate::{BlockHeaderField, BlockProofField, ConsensusError};
@@ -678,14 +678,36 @@ where
             block_hash: proof.block_hash.as_bytes(),
         };
 
-        let vote_hash = self.crypto.hash(protocol::Bytes::from(rlp::encode(&vote)));
+        let weight_map = authority_list
+            .iter()
+            .map(|node| (node.address.clone(), node.vote_weight))
+            .collect::<HashMap<overlord::types::Address, u32>>();
+        self.verity_proof_weight(
+            ctx.clone(),
+            block.header.height,
+            weight_map,
+            signed_voters.clone(),
+        )?;
+
+        let vote_hash = self.crypto.hash(Bytes::from(rlp::encode(&vote)));
+        let hex_pubkeys = metadata
+            .verifier_list
+            .iter()
+            .filter_map(|v| {
+                if signed_voters.contains(&v.address.as_bytes()) {
+                    Some(v.bls_pub_key.clone())
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
 
         self.verify_proof_signature(
             ctx.clone(),
             block.header.height,
             vote_hash.clone(),
             proof.signature.clone(),
-            signed_voters.clone(),
+            hex_pubkeys,
         ).map_err(|e| {
             log::error!("[consensus] verify_proof_signature error, height {}, vote: {:?}, vote_hash:{:?}, sig:{:?}, signed_voter:{:?}",
             block.header.height,
@@ -696,14 +718,6 @@ where
             );
             e
         })?;
-
-        let weight_map = authority_list
-            .iter()
-            .map(|node| (node.address.clone(), node.vote_weight))
-            .collect::<HashMap<overlord::types::Address, u32>>();
-
-        self.verity_proof_weight(ctx.clone(), block.header.height, weight_map, signed_voters)?;
-
         Ok(())
     }
 
@@ -714,11 +728,15 @@ where
         block_height: u64,
         vote_hash: Bytes,
         aggregated_signature_bytes: Bytes,
-        signed_voters: Vec<Bytes>,
+        vote_keys: Vec<Hex>,
     ) -> ProtocolResult<()> {
-        // check sig
+        let mut pub_keys = Vec::new();
+        for hex in vote_keys.into_iter() {
+            pub_keys.push(convert_hex_to_bls_pubkeys(hex)?)
+        }
+
         self.crypto
-            .verify_aggregated_signature(aggregated_signature_bytes, vote_hash, signed_voters)
+            .inner_verify_aggregated_signature(vote_hash, pub_keys, aggregated_signature_bytes)
             .map_err(|e| {
                 log::error!("[consensus] verify_proof_signature error: {}", e);
                 ConsensusError::VerifyProof(block_height, Signature).into()
