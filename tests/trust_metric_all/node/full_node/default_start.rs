@@ -194,9 +194,11 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
 
     // Init mempool
     let current_block = storage.get_latest_block(Context::new()).await?;
-    let mempool_adapter = DefaultMemPoolAdapter::<Secp256k1, _, _>::new(
+    let mempool_adapter = DefaultMemPoolAdapter::<Secp256k1, _, _, _, _>::new(
         network_service.handle(),
         Arc::clone(&storage),
+        Arc::new(db.clone()),
+        Arc::clone(&service_mapping),
         config.mempool.broadcast_txs_size,
         config.mempool.broadcast_txs_interval,
     );

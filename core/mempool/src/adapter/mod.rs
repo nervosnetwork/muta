@@ -26,8 +26,11 @@ use log::{debug, error};
 use common_crypto::Crypto;
 use protocol::{
     fixed_codec::FixedCodec,
-    traits::{Context, Gossip, MemPoolAdapter, PeerTrust, Priority, Rpc, Storage, TrustFeedback},
-    types::{Hash, SignedTransaction},
+    traits::{
+        Context, ExecutorFactory, ExecutorParams, Gossip, MemPoolAdapter, PeerTrust, Priority, Rpc,
+        ServiceMapping, Storage, TrustFeedback,
+    },
+    types::{Address, Hash, SignedTransaction, TransactionRequest},
     ProtocolError, ProtocolErrorKind, ProtocolResult,
 };
 
@@ -132,9 +135,11 @@ impl IntervalTxsBroadcaster {
     }
 }
 
-pub struct DefaultMemPoolAdapter<C, N, S> {
-    network: N,
-    storage: Arc<S>,
+pub struct DefaultMemPoolAdapter<C, N, S, DB, Mapping> {
+    network:         N,
+    storage:         Arc<S>,
+    trie_db:         Arc<DB>,
+    service_mapping: Arc<Mapping>,
 
     timeout_gap:  AtomicU64,
     cycles_limit: AtomicU64,
@@ -146,15 +151,19 @@ pub struct DefaultMemPoolAdapter<C, N, S> {
     pin_c: PhantomData<C>,
 }
 
-impl<C, N, S> DefaultMemPoolAdapter<C, N, S>
+impl<C, N, S, DB, Mapping> DefaultMemPoolAdapter<C, N, S, DB, Mapping>
 where
     C: Crypto,
     N: Rpc + PeerTrust + Gossip + Clone + Unpin + 'static,
     S: Storage,
+    DB: cita_trie::DB + 'static,
+    Mapping: ServiceMapping + 'static,
 {
     pub fn new(
         network: N,
         storage: Arc<S>,
+        trie_db: Arc<DB>,
+        service_mapping: Arc<Mapping>,
         broadcast_txs_size: usize,
         broadcast_txs_interval: u64,
     ) -> Self {
@@ -178,6 +187,8 @@ where
         DefaultMemPoolAdapter {
             network,
             storage,
+            trie_db,
+            service_mapping,
 
             timeout_gap: AtomicU64::new(0),
             cycles_limit: AtomicU64::new(0),
@@ -192,11 +203,13 @@ where
 }
 
 #[async_trait]
-impl<C, N, S> MemPoolAdapter for DefaultMemPoolAdapter<C, N, S>
+impl<C, N, S, DB, Mapping> MemPoolAdapter for DefaultMemPoolAdapter<C, N, S, DB, Mapping>
 where
     C: Crypto + Send + Sync + 'static,
     N: Rpc + PeerTrust + Gossip + Clone + Unpin + 'static,
     S: Storage + 'static,
+    DB: cita_trie::DB + 'static,
+    Mapping: ServiceMapping + 'static,
 {
     #[muta_apm::derive::tracing_span(
         kind = "mempool.adapter",

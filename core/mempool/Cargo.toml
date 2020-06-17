@@ -28,6 +28,7 @@ futures-timer = "3.0"
 log = "0.4"
 tokio = { version = "0.2", features = ["macros", "rt-core", "sync", "blocking"]}
 muta-apm = "0.1.0-alpha.7"
+cita_trie = "2.0"
 
 [dev-dependencies]
 chashmap = "2.2"

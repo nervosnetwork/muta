@@ -199,11 +199,21 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         .listen(config.network.listening_address)
         .await?;
 
+    // Init trie db
+    let path_state = config.data_path_for_state();
+    let trie_db = Arc::new(RocksTrieDB::new(
+        path_state,
+        config.executor.light,
+        config.rocksdb.max_open_files,
+    )?);
+
     // Init mempool
     let current_block = storage.get_latest_block(Context::new()).await?;
-    let mempool_adapter = DefaultMemPoolAdapter::<Secp256k1, _, _>::new(
+    let mempool_adapter = DefaultMemPoolAdapter::<Secp256k1, _, _, _, _>::new(
         network_service.handle(),
         Arc::clone(&storage),
+        Arc::clone(&trie_db),
+        Arc::clone(&service_mapping),
         config.mempool.broadcast_txs_size,
         config.mempool.broadcast_txs_interval,
     );
@@ -221,14 +231,6 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
                 .set(monitor_mempool.get_tx_cache().len().await as i64);
         }
     });
-
-    // Init trie db
-    let path_state = config.data_path_for_state();
-    let trie_db = Arc::new(RocksTrieDB::new(
-        path_state,
-        config.executor.light,
-        config.rocksdb.max_open_files,
-    )?);
 
     // self private key
     let hex_privkey = hex::decode(config.privkey.as_string_trim0x()).map_err(MainError::FromHex)?;

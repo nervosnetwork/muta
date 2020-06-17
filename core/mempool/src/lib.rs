@@ -125,11 +125,7 @@ where
         Ok(())
     }
 
-    #[muta_apm::derive::tracing_span(
-        kind = "mempool",
-        logs = "{'txs':
-     'txs.len()'}"
-    )]
+    #[muta_apm::derive::tracing_span(kind = "mempool", logs = "{'txs': 'txs.len()'}")]
     async fn verify_tx_in_parallel(
         &self,
         ctx: Context,

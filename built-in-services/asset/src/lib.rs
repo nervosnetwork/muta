@@ -4,11 +4,9 @@ pub mod types;
 
 use std::collections::BTreeMap;
 
-use bytes::Bytes;
-
 use binding_macro::{cycles, genesis, service};
 use protocol::traits::{ExecutorParams, ServiceResponse, ServiceSDK, StoreMap};
-use protocol::types::{Address, Hash, ServiceContext};
+use protocol::types::{Address, Bytes, Hash, ServiceContext};
 
 use crate::types::{
     ApproveEvent, ApprovePayload, Asset, AssetBalance, CreateAssetPayload, GetAllowancePayload,
