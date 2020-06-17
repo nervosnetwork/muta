@@ -127,7 +127,7 @@ where
         order_root: MerkleRoot,
         height: u64,
         cycles_price: u64,
-        coinbase: Address,
+        proposer: Address,
         block_hash: Hash,
         signed_txs: Vec<SignedTransaction>,
         cycles_limit: u64,
@@ -141,7 +141,7 @@ where
             block_hash,
             signed_txs,
             order_root,
-            coinbase,
+            proposer,
             cycles_limit,
             timestamp,
         };
@@ -461,6 +461,7 @@ where
         state_root: MerkleRoot,
         height: u64,
         timestamp: u64,
+        proposer: Address,
     ) -> ProtocolResult<Metadata> {
         let executor = EF::from_root(
             state_root.clone(),
@@ -476,6 +477,7 @@ where
             height,
             timestamp,
             cycles_limit: u64::max_value(),
+            proposer,
         };
         let exec_resp = executor.read(&params, &caller, 1, &TransactionRequest {
             service_name: "metadata".to_string(),
@@ -541,6 +543,7 @@ where
             previous_block.header.state_root.clone(),
             previous_block.header.height,
             previous_block.header.timestamp,
+            previous_block.header.proposer,
         )?;
 
         let authority_map = previous_metadata
@@ -654,6 +657,7 @@ where
             previous_block.header.state_root.clone(),
             previous_block.header.height,
             previous_block.header.timestamp,
+            previous_block.header.proposer,
         )?;
 
         let mut authority_list = metadata
@@ -920,6 +924,7 @@ where
             height,
             timestamp: info.timestamp,
             cycles_limit: info.cycles_limit,
+            proposer: info.proposer,
         };
         let resp = executor.exec(ctx.clone(), &exec_params, &txs)?;
         common_apm::metrics::consensus::CONSENSUS_TIME_HISTOGRAM_VEC_STATIC

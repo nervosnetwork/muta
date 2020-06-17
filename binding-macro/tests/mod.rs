@@ -418,6 +418,7 @@ fn mock_executor_params() -> ExecutorParams {
         height:       9,
         timestamp:    99,
         cycles_limit: 99999,
+        proposer:     Address::from_hash(Hash::from_empty()).unwrap(),
     }
 }
 

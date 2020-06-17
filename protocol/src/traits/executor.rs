@@ -21,6 +21,7 @@ pub struct ExecutorParams {
     pub height:       u64,
     pub timestamp:    u64,
     pub cycles_limit: u64,
+    pub proposer:     Address,
 }
 
 #[derive(Debug, Clone, Default)]

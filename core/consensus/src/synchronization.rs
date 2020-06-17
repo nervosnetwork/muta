@@ -326,6 +326,7 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
             block.header.state_root.clone(),
             block.header.height,
             block.header.timestamp,
+            block.header.proposer.clone(),
         )?;
 
         self.crypto
@@ -440,6 +441,7 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
             height: rich_block.block.header.height,
             timestamp: rich_block.block.header.timestamp,
             cycles_limit,
+            proposer: rich_block.block.header.proposer,
         };
         let resp = self
             .adapter

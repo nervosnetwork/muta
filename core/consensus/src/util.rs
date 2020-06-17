@@ -161,7 +161,7 @@ pub struct ExecuteInfo {
     pub signed_txs:   Vec<SignedTransaction>,
     pub order_root:   MerkleRoot,
     pub cycles_price: u64,
-    pub coinbase:     Address,
+    pub proposer:     Address,
     pub timestamp:    u64,
     pub cycles_limit: u64,
 }

@@ -124,6 +124,7 @@ pub trait CommonConsensusAdapter: Send + Sync {
         state_root: MerkleRoot,
         height: u64,
         timestamp: u64,
+        proposer: Address,
     ) -> ProtocolResult<Metadata>;
 
     fn report_bad(&self, ctx: Context, feedback: TrustFeedback);
@@ -193,7 +194,7 @@ pub trait ConsensusAdapter: CommonConsensusAdapter + Send + Sync {
         order_root: MerkleRoot,
         height: u64,
         cycles_price: u64,
-        coinbase: Address,
+        proposer: Address,
         block_hash: Hash,
         signed_txs: Vec<SignedTransaction>,
         cycles_limit: u64,

@@ -52,6 +52,7 @@ fn test_create_genesis() {
         height:       1,
         timestamp:    0,
         cycles_limit: std::u64::MAX,
+        proposer:     Address::from_hash(Hash::from_empty()).unwrap(),
     };
     let caller = Address::from_hex("0xf8389d774afdad8755ef8e629e5a154fddc6325a").unwrap();
     let request = TransactionRequest {
@@ -95,6 +96,7 @@ fn test_exec() {
         height:       1,
         timestamp:    0,
         cycles_limit: std::u64::MAX,
+        proposer:     Address::from_hash(Hash::from_empty()).unwrap(),
     };
 
     let stx = mock_signed_tx();
@@ -137,6 +139,7 @@ fn test_emit_event() {
         height:       1,
         timestamp:    0,
         cycles_limit: std::u64::MAX,
+        proposer:     Address::from_hash(Hash::from_empty()).unwrap(),
     };
 
     let mut stx = mock_signed_tx();
@@ -186,6 +189,7 @@ fn test_revert_event_on_exec_error() {
         height:       1,
         timestamp:    0,
         cycles_limit: std::u64::MAX,
+        proposer:     Address::from_hash(Hash::from_empty()).unwrap(),
     };
 
     let mut stx = mock_signed_tx();
@@ -234,6 +238,7 @@ fn test_tx_hook() {
         height:       1,
         timestamp:    0,
         cycles_limit: std::u64::MAX,
+        proposer:     Address::from_hash(Hash::from_empty()).unwrap(),
     };
 
     // no tx hook
@@ -315,6 +320,7 @@ fn bench_execute(b: &mut Bencher) {
             height:       1,
             timestamp:    0,
             cycles_limit: std::u64::MAX,
+            proposer:     Address::from_hash(Hash::from_empty()).unwrap(),
         };
         let txs = txs.clone();
         executor.exec(Context::new(), &params, &txs).unwrap();

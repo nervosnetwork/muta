@@ -280,6 +280,7 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
         _state_root: MerkleRoot,
         _height: u64,
         _timestamp: u64,
+        _proposer: Address,
     ) -> ProtocolResult<Metadata> {
         Ok(Metadata {
             chain_id:        Hash::from_empty(),
@@ -343,6 +344,7 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
             previous_block.header.state_root.clone(),
             previous_block.header.height,
             previous_block.header.timestamp,
+            previous_block.header.proposer,
         )?;
 
         let authority_map = previous_metadata
@@ -447,6 +449,7 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
             previous_block.header.state_root.clone(),
             previous_block.header.height,
             previous_block.header.timestamp,
+            previous_block.header.proposer,
         )?;
 
         let mut authority_list = metadata
