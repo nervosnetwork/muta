@@ -209,14 +209,15 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
 
     // Init mempool
     let current_block = storage.get_latest_block(Context::new()).await?;
-    let mempool_adapter = DefaultMemPoolAdapter::<Secp256k1, _, _, _, _>::new(
-        network_service.handle(),
-        Arc::clone(&storage),
-        Arc::clone(&trie_db),
-        Arc::clone(&service_mapping),
-        config.mempool.broadcast_txs_size,
-        config.mempool.broadcast_txs_interval,
-    );
+    let mempool_adapter =
+        DefaultMemPoolAdapter::<ServiceExecutorFactory, Secp256k1, _, _, _, _>::new(
+            network_service.handle(),
+            Arc::clone(&storage),
+            Arc::clone(&trie_db),
+            Arc::clone(&service_mapping),
+            config.mempool.broadcast_txs_size,
+            config.mempool.broadcast_txs_interval,
+        );
     let mempool = Arc::new(HashMemPool::new(
         config.mempool.pool_size as usize,
         mempool_adapter,

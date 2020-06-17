@@ -2,7 +2,7 @@ mod types;
 
 use binding_macro::{cycles, genesis, service};
 use protocol::traits::{ExecutorParams, ServiceResponse, ServiceSDK, StoreMap};
-use protocol::types::{Address, ServiceContext, SignedTransaction};
+use protocol::types::{Address, ServiceContext};
 
 use crate::types::{AddVerifiedItemPayload, InitGenesisPayload, RemoveVerifiedItemPayload};
 
@@ -38,24 +38,10 @@ impl<SDK: ServiceSDK> AuthorizationService<SDK> {
 
     #[cycles(210_00)]
     #[read]
-    fn check_authorization(
-        &self,
-        ctx: ServiceContext,
-        payload: SignedTransaction,
-    ) -> ServiceResponse<()> {
-        let payload_json = match serde_json::to_string(&payload) {
-            Ok(json_string) => json_string,
-            Err(_) => {
-                return ServiceResponse::<()>::from_error(
-                    101,
-                    "serialize transaction to json error".to_owned(),
-                )
-            }
-        };
-
+    fn check_authorization(&self, ctx: ServiceContext, payload: String) -> ServiceResponse<()> {
         for (service_name, mathod_name) in self.verified_map.iter() {
             if self
-                ._do_verify(&ctx, &service_name, &mathod_name, &payload_json)
+                ._do_verify(&ctx, &service_name, &mathod_name, &payload)
                 .is_error()
             {
                 return ServiceResponse::<()>::from_error(

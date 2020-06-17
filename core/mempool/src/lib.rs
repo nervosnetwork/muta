@@ -102,7 +102,7 @@ where
         self.tx_cache.check_reach_limit(self.pool_size).await?;
         self.tx_cache.check_exist(tx_hash).await?;
         self.adapter
-            .check_signature(ctx.clone(), tx.clone())
+            .check_authorization(ctx.clone(), tx.clone())
             .await?;
         self.adapter
             .check_transaction(ctx.clone(), tx.clone())
@@ -142,7 +142,7 @@ where
 
                 tokio::spawn(async move {
                     adapter
-                        .check_signature(ctx.clone(), signed_tx.clone())
+                        .check_authorization(ctx.clone(), signed_tx.clone())
                         .await?;
                     adapter
                         .check_transaction(ctx.clone(), signed_tx.clone())
@@ -438,6 +438,9 @@ pub enum MemPoolError {
 
     #[display(fmt = "Batch transaction validation failed")]
     VerifyBatchTransactions,
+
+    #[display(fmt = "Encode transaction to JSON failed")]
+    EncodeJson,
 }
 
 impl Error for MemPoolError {}
