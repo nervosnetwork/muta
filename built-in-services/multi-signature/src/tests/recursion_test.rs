@@ -69,6 +69,65 @@ fn test_recursion_verify_signature() {
         signatures: sigs,
         sender:     sender_new,
     });
-    println!("{:?}", res);
-    // assert_eq!(res.is_error(), false);
+
+    assert_eq!(res.is_error(), false);
+}
+
+#[test]
+fn test_recursion_depth() {
+    let cycles_limit = 1024 * 1024 * 1024; // 1073741824
+    let caller = Address::from_hex("0x755cdba6ae4f479f7164792b318b2a06c759833b").unwrap();
+    let mut service = new_multi_signature_service();
+    let owner_keypair = gen_one_keypair();
+    let owner = Address::from_pubkey_bytes(owner_keypair.1.clone()).unwrap();
+    let mut all_keypairs = Vec::new();
+
+    let init_keypairs = gen_keypairs(4);
+    let mut init_keypairs_clone = init_keypairs.clone();
+    all_keypairs.append(&mut init_keypairs_clone);
+
+    let init_multi_sig_account = init_keypairs
+        .iter()
+        .map(|pair| to_multi_sig_account(pair.1.clone()))
+        .collect::<Vec<_>>();
+
+    let mut sender = service
+        .generate_account(
+            mock_context(cycles_limit, caller.clone()),
+            GenerateMultiSigAccountPayload {
+                owner:            owner.clone(),
+                addr_with_weight: init_multi_sig_account,
+                threshold:        4,
+                memo:             String::new(),
+            },
+        )
+        .succeed_data
+        .address;
+
+    for _i in 0..7 {
+        let new_keypair = gen_keypairs(3);
+        let mut new_keypair_clone = new_keypair.clone();
+        all_keypairs.append(&mut new_keypair_clone);
+
+        let mut multi_sig_account = new_keypair
+            .iter()
+            .map(|pair| to_multi_sig_account(pair.1.clone()))
+            .collect::<Vec<_>>();
+        multi_sig_account.push(AddressWithWeight {
+            address: sender.clone(),
+            weight:  1u8,
+        });
+        let res = service.generate_account(
+            mock_context(cycles_limit, caller.clone()),
+            GenerateMultiSigAccountPayload {
+                owner:            owner.clone(),
+                addr_with_weight: multi_sig_account,
+                threshold:        4,
+                memo:             String::new(),
+            },
+        );
+
+        assert_eq!(res.is_error(), false);
+        sender = res.succeed_data.address;
+    }
 }

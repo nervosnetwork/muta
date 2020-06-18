@@ -108,7 +108,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
             .map(|s| self._recursion_depth(&s.address))
             .max()
             .unwrap_or(0);
-        if depth > MAX_MULTI_SIGNATURE_RECURSION_DEPTH {
+        if depth >= MAX_MULTI_SIGNATURE_RECURSION_DEPTH {
             return ServiceResponse::<GenerateMultiSigAccountResponse>::from_error(
                 116,
                 "above max recursion depth".to_owned(),
@@ -226,7 +226,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
     ) -> ServiceResponse<()> {
         // check recursion depth
         *recursion_depth += 1;
-        if *recursion_depth > MAX_MULTI_SIGNATURE_RECURSION_DEPTH {
+        if *recursion_depth >= MAX_MULTI_SIGNATURE_RECURSION_DEPTH {
             return ServiceResponse::<()>::from_error(116, "above max recursion depth".to_owned());
         }
 
@@ -289,7 +289,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
             }
 
             // check new owner's recursion depth
-            if self._recursion_depth(&payload.new_owner) > MAX_MULTI_SIGNATURE_RECURSION_DEPTH {
+            if self._recursion_depth(&payload.new_owner) >= MAX_MULTI_SIGNATURE_RECURSION_DEPTH {
                 return ServiceResponse::<()>::from_error(
                     116,
                     "new owner above max recursion depth".to_owned(),
@@ -372,7 +372,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
 
             // check whether the new account above max recursion depth
             if self._recursion_depth(&payload.new_account.address)
-                > MAX_MULTI_SIGNATURE_RECURSION_DEPTH - 1
+                >= MAX_MULTI_SIGNATURE_RECURSION_DEPTH - 1
             {
                 return ServiceResponse::<()>::from_error(
                     116,
