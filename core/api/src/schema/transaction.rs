@@ -1,6 +1,6 @@
 use protocol::ProtocolResult;
 
-use crate::schema::{Bytes, Hash, SchemaError, Uint64};
+use crate::schema::{Address, Bytes, Hash, SchemaError, Uint64};
 
 #[derive(juniper::GraphQLObject, Clone)]
 pub struct SignedTransaction {
@@ -9,6 +9,7 @@ pub struct SignedTransaction {
     pub cycles_price: Uint64,
     pub nonce:        Hash,
     pub timeout:      Uint64,
+    pub sender:       Address,
     pub service_name: String,
     pub method:       String,
     pub payload:      String,
@@ -25,6 +26,7 @@ impl From<protocol::types::SignedTransaction> for SignedTransaction {
             cycles_price: Uint64::from(stx.raw.cycles_price),
             nonce:        Hash::from(stx.raw.nonce),
             timeout:      Uint64::from(stx.raw.timeout),
+            sender:       Address::from(stx.raw.sender),
             service_name: stx.raw.request.service_name,
             method:       stx.raw.request.method,
             payload:      stx.raw.request.payload,
@@ -66,6 +68,7 @@ pub struct InputRawTransaction {
     pub service_name: String,
     pub method:       String,
     pub payload:      String,
+    pub sender:       Address,
 }
 
 #[derive(juniper::GraphQLInputObject, Clone)]
@@ -107,5 +110,6 @@ pub fn to_transaction(raw: InputRawTransaction) -> ProtocolResult<protocol::type
             method:       raw.method.to_owned(),
             payload:      raw.payload.to_owned(),
         },
+        sender:       protocol::types::Address::from_hex(&raw.sender.as_hex())?,
     })
 }

@@ -4,7 +4,8 @@ use bytes::Bytes;
 use prost::Message;
 
 use crate::{
-    codec::{primitive::Hash, CodecError, ProtocolCodecSync},
+    codec::primitive::{Address, Hash},
+    codec::{CodecError, ProtocolCodecSync},
     field, impl_default_bytes_codec_for,
     types::primitive as protocol_primitive,
     ProtocolError, ProtocolResult,
@@ -41,6 +42,9 @@ pub struct RawTransaction {
 
     #[prost(message, tag = "6")]
     pub request: Option<TransactionRequest>,
+
+    #[prost(message, tag = "7")]
+    pub sender: Option<Address>,
 }
 
 #[derive(Clone, Message)]
@@ -96,6 +100,7 @@ impl From<transaction::RawTransaction> for RawTransaction {
         let chain_id = Some(Hash::from(raw.chain_id));
         let nonce = Some(Hash::from(raw.nonce));
         let request = Some(TransactionRequest::from(raw.request));
+        let sender = Some(Address::from(raw.sender));
 
         RawTransaction {
             chain_id,
@@ -104,6 +109,7 @@ impl From<transaction::RawTransaction> for RawTransaction {
             timeout: raw.timeout,
             cycles_limit: raw.cycles_limit,
             request,
+            sender,
         }
     }
 }
@@ -115,6 +121,7 @@ impl TryFrom<RawTransaction> for transaction::RawTransaction {
         let chain_id = field!(raw.chain_id, "RawTransaction", "chain_id")?;
         let nonce = field!(raw.nonce, "RawTransaction", "nonce")?;
         let request = field!(raw.request, "RawTransaction", "request")?;
+        let sender = field!(raw.sender, "RawTransaction", "sender")?;
 
         let raw_tx = transaction::RawTransaction {
             chain_id:     protocol_primitive::Hash::try_from(chain_id)?,
@@ -123,6 +130,7 @@ impl TryFrom<RawTransaction> for transaction::RawTransaction {
             cycles_price: raw.cycles_price,
             cycles_limit: raw.cycles_limit,
             request:      transaction::TransactionRequest::try_from(request)?,
+            sender:       protocol_primitive::Address::try_from(sender)?,
         };
 
         Ok(raw_tx)

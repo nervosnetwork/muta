@@ -5,7 +5,7 @@ use common_crypto::{
 };
 use protocol::{
     fixed_codec::FixedCodec,
-    types::{Hash, JsonString, RawTransaction, SignedTransaction, TransactionRequest},
+    types::{Address, Hash, JsonString, RawTransaction, SignedTransaction, TransactionRequest},
     Bytes, BytesMut,
 };
 use rand::{rngs::OsRng, RngCore};
@@ -94,6 +94,7 @@ impl SignedTransactionBuilder {
             cycles_limit: self.cycles_limit,
             cycles_price: 1,
             request,
+            sender: Address::from_pubkey_bytes(pk.pub_key().to_bytes()).unwrap(),
         };
 
         let raw_bytes = raw.encode_fixed().expect("encode raw tx");

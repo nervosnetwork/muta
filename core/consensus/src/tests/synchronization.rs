@@ -33,6 +33,8 @@ use bit_vec::BitVec;
 use overlord::types::{AggregatedSignature, AggregatedVote, Node, SignedVote, Vote, VoteType};
 use overlord::{extract_voters, Crypto};
 
+const PUB_KEY_STR: &str = "031288a6788678c25952eba8693b2f278f66e2187004b64ac09416d07f83f96d5b";
+
 // Test the blocks gap from 1 to 4.
 #[test]
 fn sync_gap_test() {
@@ -799,6 +801,10 @@ fn mock_tx_list(num: usize, height: u64) -> Vec<SignedTransaction> {
                 method:       "test_method".to_owned(),
                 payload:      "test_payload".to_owned(),
             },
+            sender:       Address::from_pubkey_bytes(Bytes::from(
+                hex::decode(PUB_KEY_STR).unwrap(),
+            ))
+            .unwrap(),
         };
 
         let bytes = raw.encode_fixed().unwrap();

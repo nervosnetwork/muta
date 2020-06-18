@@ -225,6 +225,7 @@ pub fn mock_raw_tx() -> RawTransaction {
         cycles_price: 1,
         cycles_limit: 100,
         request:      mock_transaction_request(),
+        sender:       mock_address(),
     }
 }
 

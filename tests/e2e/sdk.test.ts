@@ -1,6 +1,6 @@
-import {delay, mutaClient} from "./utils";
+import { AssetService } from "@mutajs/service"
 import * as sdk from "muta-sdk";
-import { AssetService }  from "@mutajs/service"
+import { mutaClient } from "./utils";
 
 describe("API test via muta-sdk-js", () => {
   test("getLatestBlock", async () => {
@@ -18,7 +18,7 @@ describe("API test via muta-sdk-js", () => {
       "0xf56924db538e77bb5951eb5ff0d02b88983c49c45eea30e8ae3e7234b311436c";
 
     const account = sdk.Muta.accountFromPrivateKey(from_pk);
-    const assetService = new AssetService(mutaClient, account);
+    const assetService = new AssetService(mutaClient, account.address, account);
 
     const from_balance_before = await assetService.get_balance({
       user: from_addr,

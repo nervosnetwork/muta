@@ -25,6 +25,8 @@ use protocol::ProtocolResult;
 use crate::executor::ServiceExecutor;
 use test_service::TestService;
 
+pub const PUB_KEY_STR: &str = "031288a6788678c25952eba8693b2f278f66e2187004b64ac09416d07f83f96d5b";
+
 #[test]
 fn test_create_genesis() {
     let toml_str = include_str!("./genesis_services.toml");
@@ -340,15 +342,14 @@ fn mock_signed_tx() -> SignedTransaction {
             payload:      r#"{ "name": "MutaToken2", "symbol": "MT2", "supply": 320000011 }"#
                 .to_owned(),
         },
+        sender:       Address::from_pubkey_bytes(Bytes::from(hex::decode(PUB_KEY_STR).unwrap()))
+            .unwrap(),
     };
 
     SignedTransaction {
         raw,
         tx_hash: Hash::from_empty(),
-        pubkey: Bytes::from(
-            hex::decode("031288a6788678c25952eba8693b2f278f66e2187004b64ac09416d07f83f96d5b")
-                .unwrap(),
-        ),
+        pubkey: Bytes::from(hex::decode(PUB_KEY_STR).unwrap()),
         signature: BytesMut::from("").freeze(),
     }
 }

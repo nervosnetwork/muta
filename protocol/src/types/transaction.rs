@@ -2,7 +2,7 @@ use bytes::Bytes;
 use muta_codec_derive::RlpFixedCodec;
 
 use crate::fixed_codec::{FixedCodec, FixedCodecError};
-use crate::types::primitive::{Hash, JsonString};
+use crate::types::primitive::{Address, Hash, JsonString};
 use crate::ProtocolResult;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -13,6 +13,7 @@ pub struct RawTransaction {
     pub nonce:        Hash,
     pub request:      TransactionRequest,
     pub timeout:      u64,
+    pub sender:       Address,
 }
 
 #[derive(RlpFixedCodec, Clone, Debug, PartialEq, Eq)]
