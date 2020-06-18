@@ -153,6 +153,7 @@ impl<
             height,
             timestamp: block.header.timestamp,
             cycles_limit,
+            proposer: block.header.proposer,
         };
         executor.read(&params, &caller, cycles_price, &TransactionRequest {
             service_name,

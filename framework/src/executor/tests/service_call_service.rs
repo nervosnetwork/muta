@@ -12,7 +12,7 @@ use protocol::traits::{
     Context, Executor, ExecutorParams, Service, ServiceMapping, ServiceResponse, ServiceSDK,
 };
 use protocol::types::{
-    Genesis, Hash, RawTransaction, ServiceContext, SignedTransaction, TransactionRequest,
+    Address, Genesis, Hash, RawTransaction, ServiceContext, SignedTransaction, TransactionRequest,
 };
 use protocol::ProtocolResult;
 
@@ -48,6 +48,7 @@ fn test_service_call_service() {
         height:       1,
         timestamp:    0,
         cycles_limit: std::u64::MAX,
+        proposer:     Address::from_hash(Hash::from_empty()).unwrap(),
     };
 
     let raw = RawTransaction {

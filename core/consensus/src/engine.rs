@@ -371,6 +371,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             pill.block.header.state_root.clone(),
             pill.block.header.height,
             pill.block.header.timestamp,
+            pill.block.header.proposer.clone(),
         )?;
         info!(
             "[consensus]: validator of height {} is {:?}",
@@ -514,6 +515,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             old_block.header.state_root.clone(),
             old_block.header.timestamp,
             old_block.header.height,
+            old_block.header.proposer,
         )?;
         let mut old_validators = old_metadata
             .verifier_list
@@ -581,7 +583,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
         ctx: Context,
         order_root: MerkleRoot,
         height: u64,
-        address: Address,
+        proposer: Address,
         timestamp: u64,
         block_hash: Hash,
         txs: Vec<SignedTransaction>,
@@ -595,7 +597,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
                 order_root,
                 height,
                 status.cycles_price,
-                address,
+                proposer,
                 block_hash,
                 txs,
                 status.cycles_limit,
