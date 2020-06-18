@@ -4,7 +4,9 @@ use binding_macro::{cycles, genesis, service};
 use protocol::traits::{ExecutorParams, ServiceResponse, ServiceSDK, StoreMap};
 use protocol::types::{Address, ServiceContext};
 
-use crate::types::{AddVerifiedItemPayload, InitGenesisPayload, RemoveVerifiedItemPayload};
+use crate::types::{
+    AddVerifiedItemPayload, InitGenesisPayload, RemoveVerifiedItemPayload, SetAdminPayload,
+};
 
 const AUTHORIZATION_ADMIN_KEY: &str = "authotization_admin";
 
@@ -61,7 +63,7 @@ impl<SDK: ServiceSDK> AuthorizationService<SDK> {
         ctx: ServiceContext,
         payload: AddVerifiedItemPayload,
     ) -> ServiceResponse<()> {
-        if !self.is_admin(&ctx) {
+        if !self._is_admin(&ctx) {
             return ServiceResponse::<()>::from_error(103, "Invalid caller".to_owned());
         }
 
@@ -77,11 +79,24 @@ impl<SDK: ServiceSDK> AuthorizationService<SDK> {
         ctx: ServiceContext,
         payload: RemoveVerifiedItemPayload,
     ) -> ServiceResponse<()> {
-        if !self.is_admin(&ctx) {
+        if !self._is_admin(&ctx) {
             return ServiceResponse::<()>::from_error(103, "Invalid caller".to_owned());
         }
 
         self.verified_map.remove(&payload.service_name);
+        ServiceResponse::from_succeed(())
+    }
+
+    #[cycles(210_00)]
+    #[write]
+    fn set_admin(&mut self, ctx: ServiceContext, payload: SetAdminPayload) -> ServiceResponse<()> {
+        if !self._is_admin(&ctx) {
+            return ServiceResponse::<()>::from_error(103, "Invalid caller".to_owned());
+        }
+
+        self.sdk
+            .set_value(AUTHORIZATION_ADMIN_KEY.to_string(), payload.new_admin);
+
         ServiceResponse::from_succeed(())
     }
 
@@ -96,11 +111,12 @@ impl<SDK: ServiceSDK> AuthorizationService<SDK> {
             .read(&ctx, None, service_name, method_name, &payload_json)
     }
 
-    fn is_admin(&self, ctx: &ServiceContext) -> bool {
+    fn _is_admin(&self, ctx: &ServiceContext) -> bool {
         let admin: Address = self
             .sdk
             .get_value(&AUTHORIZATION_ADMIN_KEY.to_string())
             .expect("must have an admin");
+
         ctx.get_caller() == admin
     }
 }

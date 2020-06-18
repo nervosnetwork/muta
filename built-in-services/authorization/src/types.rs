@@ -22,3 +22,8 @@ pub struct AddVerifiedItemPayload {
 pub struct RemoveVerifiedItemPayload {
     pub service_name: String,
 }
+
+#[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug)]
+pub struct SetAdminPayload {
+    pub new_admin: Address,
+}
