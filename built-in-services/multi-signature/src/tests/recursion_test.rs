@@ -33,6 +33,7 @@ fn test_recursion_verify_signature() {
         .iter()
         .map(|pair| to_multi_sig_account(pair.1.clone()))
         .collect::<Vec<_>>();
+
     multi_sig_account.push(AddressWithWeight {
         address: sender,
         weight:  1u8,
@@ -105,11 +106,11 @@ fn test_recursion_depth() {
         .address;
 
     for _i in 0..7 {
-        let new_keypair = gen_keypairs(3);
-        let mut new_keypair_clone = new_keypair.clone();
-        all_keypairs.append(&mut new_keypair_clone);
+        let new_keypairs = gen_keypairs(3);
+        let mut new_keypairs_clone = new_keypairs.clone();
+        all_keypairs.append(&mut new_keypairs_clone);
 
-        let mut multi_sig_account = new_keypair
+        let mut multi_sig_account = new_keypairs
             .iter()
             .map(|pair| to_multi_sig_account(pair.1.clone()))
             .collect::<Vec<_>>();
@@ -130,4 +131,18 @@ fn test_recursion_depth() {
         assert_eq!(res.is_error(), false);
         sender = res.succeed_data.address;
     }
+
+    let res = service.generate_account(
+        mock_context(cycles_limit, caller.clone()),
+        GenerateMultiSigAccountPayload {
+            owner:            owner.clone(),
+            addr_with_weight: vec![AddressWithWeight {
+                address: sender.clone(),
+                weight:  4u8,
+            }],
+            threshold:        1,
+            memo:             String::new(),
+        },
+    );
+    assert!(res.is_error());
 }
