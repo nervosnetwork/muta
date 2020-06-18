@@ -133,15 +133,15 @@ fn test_recursion_depth() {
     }
 
     let res = service.generate_account(
-        mock_context(cycles_limit, caller.clone()),
+        mock_context(cycles_limit, caller),
         GenerateMultiSigAccountPayload {
-            owner:            owner.clone(),
+            owner,
             addr_with_weight: vec![AddressWithWeight {
-                address: sender.clone(),
+                address: sender,
                 weight:  4u8,
             }],
-            threshold:        1,
-            memo:             String::new(),
+            threshold: 1,
+            memo: String::new(),
         },
     );
     assert!(res.is_error());
