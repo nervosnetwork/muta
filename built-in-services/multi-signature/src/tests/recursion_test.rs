@@ -79,7 +79,7 @@ fn test_recursion_depth() {
     let caller = Address::from_hex("0x755cdba6ae4f479f7164792b318b2a06c759833b").unwrap();
     let mut service = new_multi_signature_service();
     let owner_keypair = gen_one_keypair();
-    let owner = Address::from_pubkey_bytes(owner_keypair.1.clone()).unwrap();
+    let owner = Address::from_pubkey_bytes(owner_keypair.1).unwrap();
     let mut all_keypairs = Vec::new();
 
     let init_keypairs = gen_keypairs(4);

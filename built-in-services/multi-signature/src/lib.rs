@@ -247,13 +247,11 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
                         weight_acc += account.weight as u32;
                     }
                 }
-            } else {
-                if !self
-                    ._verify_multi_signature(tx_hash, wit_map, &account.address, recursion_depth)
-                    .is_error()
-                {
-                    weight_acc += account.weight as u32;
-                }
+            } else if !self
+                ._verify_multi_signature(tx_hash, wit_map, &account.address, recursion_depth)
+                .is_error()
+            {
+                weight_acc += account.weight as u32;
             }
 
             if weight_acc >= permission.threshold {
