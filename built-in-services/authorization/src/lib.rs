@@ -18,9 +18,11 @@ pub struct AuthorizationService<SDK> {
 #[service]
 impl<SDK: ServiceSDK> AuthorizationService<SDK> {
     pub fn new(mut sdk: SDK) -> Self {
-        let verified_map: Box<dyn StoreMap<String, String>> =
+        let mut verified_map: Box<dyn StoreMap<String, String>> =
             sdk.alloc_or_recover_map("authotization");
 
+        verified_map.insert("multi-signature".to_owned(), "verify_signature".to_owned());
+        
         Self { sdk, verified_map }
     }
 

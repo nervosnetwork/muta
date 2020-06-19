@@ -314,6 +314,7 @@ where
             height,
             timestamp: block.header.timestamp,
             cycles_limit: 99999,
+            proposer: block.header.proposer,
         };
         let exec_resp = executor.read(&params, &caller, 1, &TransactionRequest {
             service_name: "authorization".to_string(),
