@@ -9,6 +9,8 @@ use crate::types::{
 };
 
 const AUTHORIZATION_ADMIN_KEY: &str = "authotization_admin";
+const MULTI_SIG_SERVICE: &str = "multi_signature";
+const MULTI_SIG_METHOD: &str = "verify_signature";
 
 pub struct AuthorizationService<SDK> {
     sdk:          SDK,
@@ -21,8 +23,8 @@ impl<SDK: ServiceSDK> AuthorizationService<SDK> {
         let mut verified_map: Box<dyn StoreMap<String, String>> =
             sdk.alloc_or_recover_map("authotization");
 
-        verified_map.insert("multi-signature".to_owned(), "verify_signature".to_owned());
-        
+        verified_map.insert(MULTI_SIG_SERVICE.to_owned(), MULTI_SIG_METHOD.to_owned());
+
         Self { sdk, verified_map }
     }
 

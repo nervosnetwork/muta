@@ -65,7 +65,7 @@ fn test_recursion_verify_signature() {
 
     assert_eq!(pks.len(), sigs.len());
 
-    let res = service.verify_signature(ctx, VerifySignaturePayload {
+    let res = service._inner_verify_signature(&ctx, VerifySignaturePayload {
         pubkeys:    pks,
         signatures: sigs,
         sender:     sender_new,

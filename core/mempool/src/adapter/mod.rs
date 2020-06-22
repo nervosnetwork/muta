@@ -300,8 +300,6 @@ where
         })?;
 
         let block = self.storage.get_latest_block(ctx_clone.clone()).await?;
-        let height = block.header.height;
-
         let caller = Address::from_hex("0x0000000000000000000000000000000000000000")?;
         let executor = EF::from_root(
             block.header.state_root.clone(),
@@ -310,19 +308,19 @@ where
             Arc::clone(&self.service_mapping),
         )?;
         let params = ExecutorParams {
-            state_root: block.header.state_root,
-            height,
-            timestamp: block.header.timestamp,
+            state_root:   block.header.state_root,
+            height:       block.header.height,
+            timestamp:    block.header.timestamp,
             cycles_limit: 99999,
-            proposer: block.header.proposer,
+            proposer:     block.header.proposer,
         };
-        let exec_resp = executor.read(&params, &caller, 1, &TransactionRequest {
+        let check_resp = executor.read(&params, &caller, 1, &TransactionRequest {
             service_name: "authorization".to_string(),
             method:       "check_authorization".to_string(),
             payload:      stx_json,
         })?;
 
-        if exec_resp.is_error() {
+        if check_resp.is_error() {
             if ctx_clone.is_network_origin_txs() {
                 network_clone.report(
                     ctx_clone,
@@ -338,29 +336,6 @@ where
             }
             .into());
         }
-
-        //     let hash = tx.tx_hash.as_bytes();
-        //     let pub_key = tx.pubkey.as_ref();
-        //     let sig = tx.signature.as_ref();
-
-        //     C::verify_signature(hash.as_ref(), sig, pub_key).map_err(|_| {
-        //         if ctx.is_network_origin_txs() {
-        //             network.report(
-        //                 ctx,
-        //                 TrustFeedback::Worse(format!(
-        //                     "Mempool wrong signature of tx {:?}",
-        //                     tx.tx_hash
-        //                 )),
-        //             );
-        //         }
-
-        //         MemPoolError::CheckSig {
-        //             tx_hash: tx.tx_hash,
-        //         }
-        //         .into()
-        //     })
-
-        // .await;
 
         Ok(())
     }
