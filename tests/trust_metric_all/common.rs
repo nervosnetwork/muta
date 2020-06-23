@@ -109,9 +109,7 @@ impl SignedTransactionBuilder {
                 .pub_key()
                 .to_bytes()
                 .to_vec()])),
-            signature: Bytes::from(rlp::encode_list::<Vec<u8>, _>(&[sig
-                .to_bytes()
-                .to_vec()])),
+            signature: Bytes::from(rlp::encode_list::<Vec<u8>, _>(&[sig.to_bytes().to_vec()])),
         }
     }
 }
