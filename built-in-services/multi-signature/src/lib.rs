@@ -5,6 +5,7 @@ mod tests;
 pub mod types;
 
 use std::collections::HashMap;
+use std::panic::catch_unwind;
 
 use binding_macro::{cycles, genesis, service};
 
@@ -177,16 +178,26 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
         ctx: ServiceContext,
         payload: SignedTransaction,
     ) -> ServiceResponse<()> {
+        let pubkeys = if let Ok(pubkeys_bytes) =
+            catch_unwind(|| rlp::decode_list::<Vec<u8>>(&payload.pubkey.to_vec()))
+        {
+            pubkeys_bytes
+        } else {
+            return ServiceResponse::<()>::from_error(122, "decode pubkey failed".to_owned());
+        };
+
+        let sigs = if let Ok(sigs_bytes) =
+            catch_unwind(|| rlp::decode_list::<Vec<u8>>(&payload.signature.to_vec()))
+        {
+            sigs_bytes
+        } else {
+            return ServiceResponse::<()>::from_error(122, "decode signatures failed".to_owned());
+        };
+
         self._inner_verify_signature(&ctx, VerifySignaturePayload {
             tx_hash:    payload.tx_hash.clone(),
-            pubkeys:    rlp::decode_list::<Vec<u8>>(&payload.pubkey.to_vec())
-                .into_iter()
-                .map(Bytes::from)
-                .collect::<Vec<_>>(),
-            signatures: rlp::decode_list::<Vec<u8>>(&payload.signature.to_vec())
-                .into_iter()
-                .map(Bytes::from)
-                .collect::<Vec<_>>(),
+            pubkeys:    pubkeys.into_iter().map(Bytes::from).collect::<Vec<_>>(),
+            signatures: sigs.into_iter().map(Bytes::from).collect::<Vec<_>>(),
             sender:     payload.raw.sender.clone(),
         })
     }
