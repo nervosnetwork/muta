@@ -2,6 +2,7 @@ use asset::AssetService;
 use authorization::AuthorizationService;
 use derive_more::{Display, From};
 use metadata::MetadataService;
+use multi_signature::MultiSignatureService;
 use muta::MutaBuilder;
 use protocol::traits::{Service, ServiceMapping, ServiceSDK};
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
@@ -19,6 +20,7 @@ impl ServiceMapping for DefaultServiceMapping {
             "asset" => Box::new(AssetService::new(sdk)) as Box<dyn Service>,
             "authorization" => Box::new(AuthorizationService::new(sdk)) as Box<dyn Service>,
             "metadata" => Box::new(MetadataService::new(sdk)) as Box<dyn Service>,
+            "multi_signature" => Box::new(MultiSignatureService::new(sdk)) as Box<dyn Service>,
             "util" => Box::new(UtilService::new(sdk)) as Box<dyn Service>,
             _ => {
                 return Err(MappingError::NotFoundService {
@@ -36,6 +38,7 @@ impl ServiceMapping for DefaultServiceMapping {
             "asset".to_owned(),
             "authorization".to_owned(),
             "metadata".to_owned(),
+            "multi_signature".to_owned(),
             "util".to_owned(),
         ]
     }
