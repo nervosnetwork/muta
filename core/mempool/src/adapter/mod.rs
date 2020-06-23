@@ -298,6 +298,8 @@ where
             );
             MemPoolError::EncodeJson
         })?;
+        let payload_json =
+            serde_json::to_string(&stx_json).map_err(|_| MemPoolError::EncodeJson)?;
 
         let block = self.storage.get_latest_block(ctx_clone.clone()).await?;
         let caller = Address::from_hex("0x0000000000000000000000000000000000000000")?;
@@ -317,7 +319,7 @@ where
         let check_resp = executor.read(&params, &caller, 1, &TransactionRequest {
             service_name: "authorization".to_string(),
             method:       "check_authorization".to_string(),
-            payload:      stx_json,
+            payload:      payload_json,
         })?;
 
         if check_resp.is_error() {

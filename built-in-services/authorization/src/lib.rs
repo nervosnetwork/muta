@@ -46,13 +46,14 @@ impl<SDK: ServiceSDK> AuthorizationService<SDK> {
     #[read]
     fn check_authorization(&self, ctx: ServiceContext, payload: String) -> ServiceResponse<()> {
         for (service_name, mathod_name) in self.verified_map.iter() {
-            if self
-                ._do_verify(&ctx, &service_name, &mathod_name, &payload)
-                .is_error()
-            {
+            let resp = self._do_verify(&ctx, &service_name, &mathod_name, &payload);
+            if resp.is_error() {
                 return ServiceResponse::<()>::from_error(
                     102,
-                    format!("verify transaction {:?} error", mathod_name),
+                    format!(
+                        "verify transaction {:?} error {:?}",
+                        mathod_name, resp.error_message
+                    ),
                 );
             }
         }
