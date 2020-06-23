@@ -195,10 +195,10 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
         };
 
         self._inner_verify_signature(&ctx, VerifySignaturePayload {
-            tx_hash:    payload.tx_hash.clone(),
+            tx_hash:    payload.tx_hash,
             pubkeys:    pubkeys.into_iter().map(Bytes::from).collect::<Vec<_>>(),
             signatures: sigs.into_iter().map(Bytes::from).collect::<Vec<_>>(),
-            sender:     payload.raw.sender.clone(),
+            sender:     payload.raw.sender,
         })
     }
 
