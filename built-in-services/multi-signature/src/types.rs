@@ -4,7 +4,7 @@ use muta_codec_derive::RlpFixedCodec;
 use serde::{Deserialize, Serialize};
 
 use protocol::fixed_codec::{FixedCodec, FixedCodecError};
-use protocol::types::{Address, Bytes};
+use protocol::types::{Address, Bytes, Hash};
 use protocol::ProtocolResult;
 
 #[derive(Clone, Debug)]
@@ -45,6 +45,7 @@ pub struct GenerateMultiSigAccountResponse {
 
 #[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug)]
 pub struct VerifySignaturePayload {
+    pub tx_hash:    Hash,
     pub pubkeys:    Vec<Bytes>,
     pub signatures: Vec<Bytes>,
     pub sender:     Address,

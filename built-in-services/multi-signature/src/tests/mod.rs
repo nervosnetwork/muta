@@ -184,6 +184,7 @@ fn gen_single_witness(privkey: &Bytes, hash: &Hash) -> VerifySignaturePayload {
         pubkeys:    vec![pk.clone()],
         signatures: vec![sig],
         sender:     Address::from_pubkey_bytes(pk).unwrap(),
+        tx_hash:    hash.clone(),
     }
 }
 

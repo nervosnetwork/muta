@@ -178,6 +178,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
         payload: SignedTransaction,
     ) -> ServiceResponse<()> {
         self._inner_verify_signature(&ctx, VerifySignaturePayload {
+            tx_hash:    payload.tx_hash.clone(),
             pubkeys:    rlp::decode_list::<Vec<u8>>(&payload.pubkey.to_vec())
                 .into_iter()
                 .map(Bytes::from)
@@ -491,7 +492,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
             if let Ok(addr) = Address::from_pubkey_bytes(pubkeys[0].clone()) {
                 if addr == payload.sender {
                     return self._verify_single_signature(
-                        &ctx.get_tx_hash().unwrap(),
+                        &payload.tx_hash,
                         &signatures[0],
                         &pubkeys[0],
                     );
