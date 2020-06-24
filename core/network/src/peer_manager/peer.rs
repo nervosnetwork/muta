@@ -45,7 +45,7 @@ pub enum Connectedness {
 
 impl From<usize> for Connectedness {
     fn from(src: usize) -> Connectedness {
-        use self::Connectedness::*;
+        use self::Connectedness::{CanConnect, Connected, Connecting, NotConnected, Unconnectable};
 
         debug_assert!(
             src == NotConnected as usize

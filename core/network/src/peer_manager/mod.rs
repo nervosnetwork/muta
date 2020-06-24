@@ -915,7 +915,9 @@ impl PeerManager {
     }
 
     fn connect_failed(&mut self, addr: Multiaddr, error_kind: ConnectionErrorKind) {
-        use ConnectionErrorKind::*;
+        use ConnectionErrorKind::{
+            DNSResolver, Io, PeerIdNotMatch, ProtocolHandle, SecioHandshake,
+        };
 
         let peer_addr: PeerMultiaddr = match addr.clone().try_into() {
             Ok(pma) => pma,
@@ -977,7 +979,8 @@ impl PeerManager {
     }
 
     fn session_failed(&self, sid: SessionId, error_kind: SessionErrorKind) {
-        use SessionErrorKind::*;
+        use SessionErrorKind::{Io, Protocol, Unexpected};
+
         debug!("session {} failed", sid);
 
         let session = match self.inner.remove_session(sid) {
@@ -1028,7 +1031,7 @@ impl PeerManager {
     }
 
     fn peer_misbehave(&self, pid: PeerId, kind: MisbehaviorKind) {
-        use MisbehaviorKind::*;
+        use MisbehaviorKind::{Discovery, PingTimeout, PingUnexpect};
 
         let peer = match self.inner.peer(&pid) {
             Some(p) => p,
@@ -1070,7 +1073,7 @@ impl PeerManager {
     }
 
     fn trust_metric_feedback(&self, pid: PeerId, feedback: TrustFeedback) {
-        use TrustFeedback::*;
+        use TrustFeedback::{Bad, Fatal, Good, Neutral, Worse};
 
         let peer = match self.inner.peer(&pid) {
             Some(p) => p,

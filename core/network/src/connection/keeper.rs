@@ -85,7 +85,11 @@ impl ConnectionServiceKeeper {
     }
 
     fn process_connect_error(&self, ty: ConnectionType, error: TentacleError, addr: Multiaddr) {
-        use TentacleError::*;
+        use TentacleError::{
+            ConnectSelf, DNSResolverError, HandshakeError, IoError, PeerIdNotMatch,
+            RepeatedConnection, ServiceProtoHandleAbnormallyClosed, ServiceProtoHandleBlock,
+            SessionProtoHandleAbnormallyClosed, SessionProtoHandleBlock,
+        };
 
         let kind = match error {
             ConnectSelf => {

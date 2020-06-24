@@ -183,7 +183,7 @@ pub struct ConnectedAddr {
 
 impl From<&Multiaddr> for ConnectedAddr {
     fn from(multiaddr: &Multiaddr) -> Self {
-        use tentacle::multiaddr::Protocol::*;
+        use tentacle::multiaddr::Protocol::{DNS4, DNS6, IP4, IP6, TCP, TLS};
 
         let mut host = None;
         let mut port = 0u16;
