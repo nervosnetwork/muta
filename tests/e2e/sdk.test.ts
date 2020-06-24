@@ -1,6 +1,10 @@
-import { AssetService } from "@mutajs/service"
-import * as sdk from "muta-sdk";
-import { mutaClient } from "./utils";
+import { Account } from '@mutajs/account';
+import { AssetService } from '@mutajs/service'
+import { toHex } from '@mutajs/utils';
+import { retry } from '@mutajs/client';
+import * as sdk from 'muta-sdk';
+import { mutaClient } from './utils';
+import { MultiSigService } from './multisig';
 
 describe("API test via muta-sdk-js", () => {
   test("getLatestBlock", async () => {
@@ -52,5 +56,61 @@ describe("API test via muta-sdk-js", () => {
     expect(from_balance_after.succeedData.balance).toBe(c1 - 1);
     const c2 = to_balance_before.succeedData.balance as number;
     expect(to_balance_after.succeedData.balance).toBe(c2 + 1);
+  });
+
+  test('multisig', async () => {
+    const wangYe = Account.fromPrivateKey(
+      '0x1000000000000000000000000000000000000000000000000000000000000000',
+    );
+    const qing = Account.fromPrivateKey(
+      '0x2000000000000000000000000000000000000000000000000000000000000000',
+    );
+
+    const multiSigService = new MultiSigService(mutaClient, wangYe.address, wangYe);
+
+    const GenerateMultiSigAccountPayload = {
+      owner: wangYe.address,
+      addr_with_weight: [{ address: wangYe.address, weight: 1 }, { address: qing.address, weight: 1 }],
+      threshold: 2,
+      memo: 'welcome to BiYouCun'
+    };
+    const generated = await multiSigService.generate_account(GenerateMultiSigAccountPayload);
+    expect(Number(generated.response.response.code)).toBe(0);
+
+    const multiSigAddress = generated.response.response.succeedData.address;
+    const createAssetTx = await mutaClient.composeTransaction({
+      method: 'create_asset',
+      payload: {
+        name:      'miao',
+        supply:    2077,
+        symbol:    '😺',
+      },
+      serviceName: 'asset',
+      sender: multiSigAddress,
+    });
+
+    const signedCreateAssetTx = wangYe.signTransaction(createAssetTx);
+    try {
+      await mutaClient.sendTransaction(signedCreateAssetTx);
+      throw 'should failed';
+    } catch(e) {
+      expect(String(e)).toContain('CheckSig');
+    }
+
+    const bothSignedCreateAssetTx = qing.signMultiSigTransaction(signedCreateAssetTx);
+    const txHash = await mutaClient.sendTransaction(bothSignedCreateAssetTx);
+    const receipt = await retry(() => mutaClient.getReceipt(toHex(txHash)));
+    expect(Number(receipt.response.response.code)).toBe(0);
+
+    // MultiSig address balance
+    const asset = JSON.parse(receipt.response.response.succeedData);
+    const assetService = new AssetService(mutaClient, wangYe.address, wangYe);
+    const balance = await assetService.get_balance({
+        asset_id: asset.id,
+        user: multiSigAddress,
+    });
+
+    expect(Number(balance.code)).toBe(0);
+    expect(Number(balance.succeedData.balance)).toBe(2077);
   });
 });
