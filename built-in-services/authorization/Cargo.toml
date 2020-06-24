@@ -1,6 +1,6 @@
 [package]
-name = "asset"
-version = "0.1.0-alpha.0"
+name = "authorization"
+version = "0.1.0"
 authors = ["Muta Dev <muta@nervos.org>"]
 edition = "2018"
 repository = "https://github.com/nervosnetwork/muta"

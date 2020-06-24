@@ -5,12 +5,13 @@ mod tests;
 pub mod types;
 
 use std::collections::HashMap;
+use std::panic::catch_unwind;
 
 use binding_macro::{cycles, genesis, service};
 
 use common_crypto::{Crypto, Secp256k1};
 use protocol::traits::{ExecutorParams, ServiceResponse, ServiceSDK};
-use protocol::types::{Address, Bytes, Hash, ServiceContext};
+use protocol::types::{Address, Bytes, Hash, ServiceContext, SignedTransaction};
 
 use crate::types::{
     Account, AddAccountPayload, ChangeMemoPayload, ChangeOwnerPayload,
@@ -175,91 +176,30 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
     fn verify_signature(
         &self,
         ctx: ServiceContext,
-        payload: VerifySignaturePayload,
+        payload: SignedTransaction,
     ) -> ServiceResponse<()> {
-        let pubkeys = payload.pubkeys.clone();
-        let signatures = payload.signatures.clone();
+        let pubkeys = if let Ok(pubkeys_bytes) =
+            catch_unwind(|| rlp::decode_list::<Vec<u8>>(&payload.pubkey.to_vec()))
+        {
+            pubkeys_bytes
+        } else {
+            return ServiceResponse::<()>::from_error(122, "decode pubkey failed".to_owned());
+        };
 
-        if pubkeys.len() != signatures.len() {
-            return ServiceResponse::<()>::from_error(
-                114,
-                "pubkkeys len is not equal to signatures len".to_owned(),
-            );
-        }
+        let sigs = if let Ok(sigs_bytes) =
+            catch_unwind(|| rlp::decode_list::<Vec<u8>>(&payload.signature.to_vec()))
+        {
+            sigs_bytes
+        } else {
+            return ServiceResponse::<()>::from_error(122, "decode signatures failed".to_owned());
+        };
 
-        if pubkeys.len() > MAX_PERMISSION_ACCOUNTS as usize {
-            return ServiceResponse::<()>::from_error(
-                115,
-                "len of signatures must be [1,16]".to_owned(),
-            );
-        }
-
-        if pubkeys.len() == 1 {
-            if let Ok(addr) = Address::from_pubkey_bytes(pubkeys[0].clone()) {
-                if addr == payload.sender {
-                    return self._verify_single_signature(
-                        &ctx.get_tx_hash().unwrap(),
-                        &signatures[0],
-                        &pubkeys[0],
-                    );
-                }
-            } else {
-                return ServiceResponse::<()>::from_error(123, "invalid public key".to_owned());
-            }
-        }
-
-        let mut recursion_depth = 0u8;
-        self._verify_multi_signature(
-            &ctx.get_tx_hash().unwrap(),
-            &Witness::new(pubkeys, signatures).to_addr_map(),
-            &payload.sender,
-            &mut recursion_depth,
-        )
-    }
-
-    fn _verify_multi_signature(
-        &self,
-        tx_hash: &Hash,
-        wit_map: &HashMap<Address, (Bytes, Bytes)>,
-        sender: &Address,
-        recursion_depth: &mut u8,
-    ) -> ServiceResponse<()> {
-        // check recursion depth
-        *recursion_depth += 1;
-        if *recursion_depth >= MAX_MULTI_SIGNATURE_RECURSION_DEPTH {
-            return ServiceResponse::<()>::from_error(116, "above max recursion depth".to_owned());
-        }
-
-        let mut weight_acc = 0u32;
-
-        let permission = self
-            .sdk
-            .get_account_value::<_, MultiSigPermission>(sender, &0u8);
-        if permission.is_none() {
-            return ServiceResponse::<()>::from_error(113, "account not existed".to_owned());
-        }
-        let permission = permission.unwrap();
-
-        for account in permission.accounts.iter() {
-            if !account.is_multiple {
-                if let Some((pk, sig)) = wit_map.get(&account.address) {
-                    if !self._verify_single_signature(tx_hash, sig, pk).is_error() {
-                        weight_acc += account.weight as u32;
-                    }
-                }
-            } else if !self
-                ._verify_multi_signature(tx_hash, wit_map, &account.address, recursion_depth)
-                .is_error()
-            {
-                weight_acc += account.weight as u32;
-            }
-
-            if weight_acc >= permission.threshold {
-                return ServiceResponse::<()>::from_succeed(());
-            }
-        }
-
-        ServiceResponse::<()>::from_error(117, "multi signature not verified".to_owned())
+        self._inner_verify_signature(VerifySignaturePayload {
+            tx_hash:    payload.tx_hash,
+            pubkeys:    pubkeys.into_iter().map(Bytes::from).collect::<Vec<_>>(),
+            signatures: sigs.into_iter().map(Bytes::from).collect::<Vec<_>>(),
+            sender:     payload.raw.sender,
+        })
     }
 
     #[cycles(210_00)]
@@ -279,7 +219,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
             }
 
             // check owner signature
-            if self.verify_signature(ctx, payload.witness).is_error() {
+            if self._inner_verify_signature(payload.witness).is_error() {
                 return ServiceResponse::<()>::from_error(
                     120,
                     "owner signature verified failed".to_owned(),
@@ -320,7 +260,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
             }
 
             // check owner signature
-            if self.verify_signature(ctx, payload.witness).is_error() {
+            if self._inner_verify_signature(payload.witness).is_error() {
                 return ServiceResponse::<()>::from_error(
                     120,
                     "owner signature verified failed".to_owned(),
@@ -361,7 +301,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
             }
 
             // check owner signature
-            if self.verify_signature(ctx, payload.witness).is_error() {
+            if self._inner_verify_signature(payload.witness).is_error() {
                 return ServiceResponse::<()>::from_error(
                     120,
                     "owner signature verified failed".to_owned(),
@@ -405,7 +345,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
             }
 
             // check owner signature
-            if self.verify_signature(ctx, payload.witness).is_error() {
+            if self._inner_verify_signature(payload.witness).is_error() {
                 return ServiceResponse::<Account>::from_error(
                     120,
                     "owner signature verified failed".to_owned(),
@@ -447,7 +387,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
             }
 
             // check owner signature
-            if self.verify_signature(ctx, payload.witness).is_error() {
+            if self._inner_verify_signature(payload.witness).is_error() {
                 return ServiceResponse::<()>::from_error(
                     120,
                     "owner signature verified failed".to_owned(),
@@ -503,7 +443,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
             }
 
             // check owner signature
-            if self.verify_signature(ctx, payload.witness).is_error() {
+            if self._inner_verify_signature(payload.witness).is_error() {
                 return ServiceResponse::<()>::from_error(
                     120,
                     "owner signature verified failed".to_owned(),
@@ -517,6 +457,92 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
         } else {
             ServiceResponse::<()>::from_error(113, "account not existed".to_owned())
         }
+    }
+
+    fn _inner_verify_signature(&self, payload: VerifySignaturePayload) -> ServiceResponse<()> {
+        let pubkeys = payload.pubkeys.clone();
+        let signatures = payload.signatures.clone();
+
+        if pubkeys.len() != signatures.len() {
+            return ServiceResponse::<()>::from_error(
+                114,
+                "pubkkeys len is not equal to signatures len".to_owned(),
+            );
+        }
+
+        if pubkeys.len() > MAX_PERMISSION_ACCOUNTS as usize {
+            return ServiceResponse::<()>::from_error(
+                115,
+                "len of signatures must be [1,16]".to_owned(),
+            );
+        }
+
+        if pubkeys.len() == 1 {
+            if let Ok(addr) = Address::from_pubkey_bytes(pubkeys[0].clone()) {
+                if addr == payload.sender {
+                    return self._verify_single_signature(
+                        &payload.tx_hash,
+                        &signatures[0],
+                        &pubkeys[0],
+                    );
+                }
+            } else {
+                return ServiceResponse::<()>::from_error(123, "invalid public key".to_owned());
+            }
+        }
+
+        let mut recursion_depth = 0u8;
+        self._verify_multi_signature(
+            &payload.tx_hash,
+            &Witness::new(pubkeys, signatures).to_addr_map(),
+            &payload.sender,
+            &mut recursion_depth,
+        )
+    }
+
+    fn _verify_multi_signature(
+        &self,
+        tx_hash: &Hash,
+        wit_map: &HashMap<Address, (Bytes, Bytes)>,
+        sender: &Address,
+        recursion_depth: &mut u8,
+    ) -> ServiceResponse<()> {
+        // check recursion depth
+        *recursion_depth += 1;
+        if *recursion_depth >= MAX_MULTI_SIGNATURE_RECURSION_DEPTH {
+            return ServiceResponse::<()>::from_error(116, "above max recursion depth".to_owned());
+        }
+
+        let mut weight_acc = 0u32;
+
+        let permission = self
+            .sdk
+            .get_account_value::<_, MultiSigPermission>(sender, &0u8);
+        if permission.is_none() {
+            return ServiceResponse::<()>::from_error(113, "account not existed".to_owned());
+        }
+        let permission = permission.unwrap();
+
+        for account in permission.accounts.iter() {
+            if !account.is_multiple {
+                if let Some((pk, sig)) = wit_map.get(&account.address) {
+                    if !self._verify_single_signature(tx_hash, sig, pk).is_error() {
+                        weight_acc += account.weight as u32;
+                    }
+                }
+            } else if !self
+                ._verify_multi_signature(tx_hash, wit_map, &account.address, recursion_depth)
+                .is_error()
+            {
+                weight_acc += account.weight as u32;
+            }
+
+            if weight_acc >= permission.threshold {
+                return ServiceResponse::<()>::from_succeed(());
+            }
+        }
+
+        ServiceResponse::<()>::from_error(117, "multi signature not verified".to_owned())
     }
 
     fn _verify_single_signature(

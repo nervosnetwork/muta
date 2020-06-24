@@ -63,7 +63,7 @@ pub trait MemPoolAdapter: Send + Sync {
 
     async fn broadcast_tx(&self, ctx: Context, tx: SignedTransaction) -> ProtocolResult<()>;
 
-    async fn check_signature(&self, ctx: Context, tx: SignedTransaction) -> ProtocolResult<()>;
+    async fn check_authorization(&self, ctx: Context, tx: SignedTransaction) -> ProtocolResult<()>;
 
     async fn check_transaction(&self, ctx: Context, tx: SignedTransaction) -> ProtocolResult<()>;
 

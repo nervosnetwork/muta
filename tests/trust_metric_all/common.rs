@@ -105,8 +105,11 @@ impl SignedTransactionBuilder {
         SignedTransaction {
             raw,
             tx_hash,
-            pubkey: pk.pub_key().to_bytes(),
-            signature: sig.to_bytes(),
+            pubkey: Bytes::from(rlp::encode_list::<Vec<u8>, _>(&[pk
+                .pub_key()
+                .to_bytes()
+                .to_vec()])),
+            signature: Bytes::from(rlp::encode_list::<Vec<u8>, _>(&[sig.to_bytes().to_vec()])),
         }
     }
 }
