@@ -14,7 +14,7 @@ protocol = { path = "../../protocol", package = "muta-protocol" }
 futures = "0.3"
 derive_more = "0.15"
 lazy_static = "1.4"
-parking_lot = "0.10"
+parking_lot = "0.11"
 async-trait = "0.1"
 rocksdb = "0.14"
 tokio = { version = "0.2", features = [ "sync" ] }

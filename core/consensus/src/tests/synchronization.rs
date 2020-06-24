@@ -845,20 +845,14 @@ fn mock_proof(block_hash: Hash, height: u64, round: u64, key_tool: &KeyTool) -> 
         vote_type: VoteType::Precommit,
         block_hash: block_hash.as_bytes(),
     };
-    // println!("mocking proof, height: {}", height);
-    // println!("      vote : {:?}", vote.clone());
 
     let vote_hash = key_tool.overlord_crypto.hash(Bytes::from(encode(&vote)));
-    // println!("      vote_hash : {:?}", vote_hash);
     let bls_signature = key_tool.overlord_crypto.sign(vote_hash).unwrap();
-
     let signed_vote = SignedVote {
         voter:     key_tool.signer_node.secp_address.as_bytes(),
         signature: bls_signature,
         vote:      vote.clone(),
     };
-
-    // println!("      signed_voter : {:?}", signed_vote.clone().voter);
 
     let signed_voter =
         vec![Address::from_hex("0x82c67c421d208fb7015d2da79550212a50f2e773").unwrap()]
@@ -893,16 +887,6 @@ fn mock_proof(block_hash: Hash, height: u64, round: u64, key_tool: &KeyTool) -> 
         address_bitmap: Bytes::from(bit_map.to_bytes()),
     };
 
-    // println!(
-    //     "      address_bitmap : {:?}",
-    //     aggregated_signature.clone().address_bitmap
-    // );
-    //
-    // println!(
-    //     "       aggregated_signature.signature_bytes : {:?}",
-    //     aggregated_signature.clone().signature
-    // );
-
     let aggregated_vote = AggregatedVote {
         signature: aggregated_signature,
 
@@ -918,7 +902,7 @@ fn mock_proof(block_hash: Hash, height: u64, round: u64, key_tool: &KeyTool) -> 
         round:      0,
         block_hash: Hash::from_bytes(aggregated_vote.block_hash).unwrap(),
         signature:  aggregated_vote.signature.signature.clone(),
-        bitmap:     aggregated_vote.signature.address_bitmap.clone(),
+        bitmap:     aggregated_vote.signature.address_bitmap,
     }
 }
 

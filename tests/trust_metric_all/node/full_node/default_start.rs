@@ -138,22 +138,22 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
 
     // Init network
     let network_config = NetworkConfig::new()
-        .max_connections(config.network.max_connected_peers.clone())
-        .whitelist_peers_only(config.network.whitelist_peers_only.clone())
+        .max_connections(config.network.max_connected_peers)
+        .whitelist_peers_only(config.network.whitelist_peers_only)
         .peer_trust_metric(
             consts::NETWORK_TRUST_METRIC_INTERVAL,
             config.network.trust_max_history_duration,
         )?
         .peer_soft_ban(consts::NETWORK_SOFT_BAND_DURATION)
         .peer_fatal_ban(config.network.fatal_ban_duration)
-        .rpc_timeout(config.network.rpc_timeout.clone())
+        .rpc_timeout(config.network.rpc_timeout)
         .ping_interval(consts::NETWORK_PING_INTERVAL)
-        .selfcheck_interval(config.network.selfcheck_interval.clone())
+        .selfcheck_interval(config.network.selfcheck_interval)
         .max_wait_streams(config.network.max_wait_streams)
-        .max_frame_length(config.network.max_frame_length.clone())
-        .send_buffer_size(config.network.send_buffer_size.clone())
+        .max_frame_length(config.network.max_frame_length)
+        .send_buffer_size(config.network.send_buffer_size)
         .write_timeout(config.network.write_timeout)
-        .recv_buffer_size(config.network.recv_buffer_size.clone());
+        .recv_buffer_size(config.network.recv_buffer_size);
 
     let network_privkey = config.privkey.as_string_trim0x();
 
