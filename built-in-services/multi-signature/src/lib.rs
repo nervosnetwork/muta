@@ -194,7 +194,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
             return ServiceResponse::<()>::from_error(122, "decode signatures failed".to_owned());
         };
 
-        self._inner_verify_signature(&ctx, VerifySignaturePayload {
+        self._inner_verify_signature(VerifySignaturePayload {
             tx_hash:    payload.tx_hash,
             pubkeys:    pubkeys.into_iter().map(Bytes::from).collect::<Vec<_>>(),
             signatures: sigs.into_iter().map(Bytes::from).collect::<Vec<_>>(),
@@ -219,10 +219,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
             }
 
             // check owner signature
-            if self
-                ._inner_verify_signature(&ctx, payload.witness)
-                .is_error()
-            {
+            if self._inner_verify_signature(payload.witness).is_error() {
                 return ServiceResponse::<()>::from_error(
                     120,
                     "owner signature verified failed".to_owned(),
@@ -263,10 +260,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
             }
 
             // check owner signature
-            if self
-                ._inner_verify_signature(&ctx, payload.witness)
-                .is_error()
-            {
+            if self._inner_verify_signature(payload.witness).is_error() {
                 return ServiceResponse::<()>::from_error(
                     120,
                     "owner signature verified failed".to_owned(),
@@ -307,10 +301,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
             }
 
             // check owner signature
-            if self
-                ._inner_verify_signature(&ctx, payload.witness)
-                .is_error()
-            {
+            if self._inner_verify_signature(payload.witness).is_error() {
                 return ServiceResponse::<()>::from_error(
                     120,
                     "owner signature verified failed".to_owned(),
@@ -354,10 +345,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
             }
 
             // check owner signature
-            if self
-                ._inner_verify_signature(&ctx, payload.witness)
-                .is_error()
-            {
+            if self._inner_verify_signature(payload.witness).is_error() {
                 return ServiceResponse::<Account>::from_error(
                     120,
                     "owner signature verified failed".to_owned(),
@@ -399,10 +387,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
             }
 
             // check owner signature
-            if self
-                ._inner_verify_signature(&ctx, payload.witness)
-                .is_error()
-            {
+            if self._inner_verify_signature(payload.witness).is_error() {
                 return ServiceResponse::<()>::from_error(
                     120,
                     "owner signature verified failed".to_owned(),
@@ -458,10 +443,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
             }
 
             // check owner signature
-            if self
-                ._inner_verify_signature(&ctx, payload.witness)
-                .is_error()
-            {
+            if self._inner_verify_signature(payload.witness).is_error() {
                 return ServiceResponse::<()>::from_error(
                     120,
                     "owner signature verified failed".to_owned(),
@@ -477,11 +459,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
         }
     }
 
-    fn _inner_verify_signature(
-        &self,
-        ctx: &ServiceContext,
-        payload: VerifySignaturePayload,
-    ) -> ServiceResponse<()> {
+    fn _inner_verify_signature(&self, payload: VerifySignaturePayload) -> ServiceResponse<()> {
         let pubkeys = payload.pubkeys.clone();
         let signatures = payload.signatures.clone();
 
@@ -515,7 +493,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
 
         let mut recursion_depth = 0u8;
         self._verify_multi_signature(
-            &ctx.get_tx_hash().unwrap(),
+            &payload.tx_hash,
             &Witness::new(pubkeys, signatures).to_addr_map(),
             &payload.sender,
             &mut recursion_depth,
