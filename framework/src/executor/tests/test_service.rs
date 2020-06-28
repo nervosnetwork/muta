@@ -9,16 +9,6 @@ pub struct TestService<SDK> {
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
-pub struct TestReadPayload {
-    pub key: String,
-}
-
-#[derive(Deserialize, Serialize, Clone, Debug, Default)]
-pub struct TestReadResponse {
-    pub value: String,
-}
-
-#[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct TestWritePayload {
     pub key:   String,
     pub value: String,
@@ -36,14 +26,9 @@ impl<SDK: ServiceSDK> TestService<SDK> {
 
     #[cycles(100_00)]
     #[read]
-    fn test_read(
-        &self,
-        ctx: ServiceContext,
-        payload: TestReadPayload,
-    ) -> ServiceResponse<TestReadResponse> {
-        let value: String = self.sdk.get_value(&payload.key).unwrap_or_default();
-        let res = TestReadResponse { value };
-        ServiceResponse::<TestReadResponse>::from_succeed(res)
+    fn test_read(&self, ctx: ServiceContext, payload: String) -> ServiceResponse<String> {
+        let value: String = self.sdk.get_value(&payload).unwrap_or_default();
+        ServiceResponse::from_succeed(value)
     }
 
     #[cycles(210_00)]
@@ -91,6 +76,40 @@ impl<SDK: ServiceSDK> TestService<SDK> {
         ServiceResponse::<TestWriteResponse>::from_succeed(TestWriteResponse {})
     }
 
+    #[cycles(210_00)]
+    #[write]
+    fn test_panic(&mut self, ctx: ServiceContext, _payload: String) -> ServiceResponse<()> {
+        panic!("hello panic");
+    }
+
+    #[cycles(210_00)]
+    #[write]
+    fn tx_hook_before_panic(
+        &mut self,
+        ctx: ServiceContext,
+        _payload: String,
+    ) -> ServiceResponse<()> {
+        self.sdk.set_value(
+            "tx_hook_before_panic".to_owned(),
+            "tx_hook_before_panic".to_owned(),
+        );
+        ServiceResponse::from_succeed(())
+    }
+
+    #[cycles(210_00)]
+    #[write]
+    fn tx_hook_after_panic(
+        &mut self,
+        ctx: ServiceContext,
+        _payload: String,
+    ) -> ServiceResponse<()> {
+        self.sdk.set_value(
+            "tx_hook_after_panic".to_owned(),
+            "tx_hook_after_panic".to_owned(),
+        );
+        ServiceResponse::from_succeed(())
+    }
+
     #[tx_hook_before]
     fn test_tx_hook_before(&mut self, ctx: ServiceContext) {
         if ctx.get_service_name() == "test"
@@ -98,6 +117,12 @@ impl<SDK: ServiceSDK> TestService<SDK> {
         {
             ctx.emit_event("test_tx_hook_before invoked".to_owned());
         }
+
+        if ctx.get_service_method() == "tx_hook_before_panic" {
+            panic!("tx hook before");
+        }
+
+        self.sdk.set_value("before".to_owned(), "before".to_owned());
     }
 
     #[tx_hook_after]
@@ -107,5 +132,11 @@ impl<SDK: ServiceSDK> TestService<SDK> {
         {
             ctx.emit_event("test_tx_hook_after invoked".to_owned());
         }
+
+        if ctx.get_service_method() == "tx_hook_after_panic" {
+            panic!("tx hook before");
+        }
+
+        self.sdk.set_value("after".to_owned(), "after".to_owned());
     }
 }

@@ -291,6 +291,192 @@ fn test_tx_hook() {
     assert_eq!(&receipt.events[1].data, "test_tx_hook_after invoked");
 }
 
+#[test]
+fn test_commit_tx_hook_use_panic_tx() {
+    let toml_str = include_str!("./genesis_services.toml");
+    let genesis: Genesis = toml::from_str(toml_str).unwrap();
+
+    let db = Arc::new(MemoryDB::new(false));
+
+    let root = ServiceExecutor::create_genesis(
+        genesis.services,
+        Arc::clone(&db),
+        Arc::new(MockStorage {}),
+        Arc::new(MockServiceMapping {}),
+    )
+    .unwrap();
+
+    let mut executor = ServiceExecutor::with_root(
+        root.clone(),
+        Arc::clone(&db),
+        Arc::new(MockStorage {}),
+        Arc::new(MockServiceMapping {}),
+    )
+    .unwrap();
+
+    let params = ExecutorParams {
+        state_root:   root,
+        height:       1,
+        timestamp:    0,
+        cycles_limit: std::u64::MAX,
+        proposer:     Address::from_hash(Hash::from_empty()).unwrap(),
+    };
+
+    let mut stx = mock_signed_tx();
+    stx.raw.request.service_name = "test".to_owned();
+    stx.raw.request.method = "test_panic".to_owned();
+    stx.raw.request.payload = r#""""#.to_owned();
+
+    let txs = vec![stx];
+    let error_resp = executor.exec(Context::new(), &params, &txs);
+    assert!(error_resp.is_err());
+
+    let caller = Address::from_hex("0xf8389d774afdad8755ef8e629e5a154fddc6325a").unwrap();
+    let request = TransactionRequest {
+        service_name: "test".to_owned(),
+        method:       "test_read".to_owned(),
+        payload:      r#""before""#.to_owned(),
+    };
+    let before = executor
+        .read(&params, &caller, 1, &request)
+        .expect("read before");
+    assert_eq!(before.succeed_data, r#""before""#);
+
+    let request = TransactionRequest {
+        service_name: "test".to_owned(),
+        method:       "test_read".to_owned(),
+        payload:      r#""after""#.to_owned(),
+    };
+    let after = executor
+        .read(&params, &caller, 1, &request)
+        .expect("read after");
+    assert_eq!(after.succeed_data, r#""after""#);
+}
+
+#[test]
+fn test_tx_hook_before_panic() {
+    let toml_str = include_str!("./genesis_services.toml");
+    let genesis: Genesis = toml::from_str(toml_str).unwrap();
+
+    let db = Arc::new(MemoryDB::new(false));
+
+    let root = ServiceExecutor::create_genesis(
+        genesis.services,
+        Arc::clone(&db),
+        Arc::new(MockStorage {}),
+        Arc::new(MockServiceMapping {}),
+    )
+    .unwrap();
+
+    let mut executor = ServiceExecutor::with_root(
+        root.clone(),
+        Arc::clone(&db),
+        Arc::new(MockStorage {}),
+        Arc::new(MockServiceMapping {}),
+    )
+    .unwrap();
+
+    let params = ExecutorParams {
+        state_root:   root,
+        height:       1,
+        timestamp:    0,
+        cycles_limit: std::u64::MAX,
+        proposer:     Address::from_hash(Hash::from_empty()).unwrap(),
+    };
+
+    let mut stx = mock_signed_tx();
+    stx.raw.request.service_name = "test".to_owned();
+    stx.raw.request.method = "tx_hook_before_panic".to_owned();
+    stx.raw.request.payload = r#""""#.to_owned();
+
+    let txs = vec![stx];
+    let error_resp = executor.exec(Context::new(), &params, &txs);
+    assert!(error_resp.is_ok());
+
+    let caller = Address::from_hex("0xf8389d774afdad8755ef8e629e5a154fddc6325a").unwrap();
+    let request = TransactionRequest {
+        service_name: "test".to_owned(),
+        method:       "test_read".to_owned(),
+        payload:      r#""tx_hook_before_panic""#.to_owned(),
+    };
+    let before = executor
+        .read(&params, &caller, 1, &request)
+        .expect("read tx");
+    assert_eq!(before.succeed_data, r#""tx_hook_before_panic""#);
+
+    let request = TransactionRequest {
+        service_name: "test".to_owned(),
+        method:       "test_read".to_owned(),
+        payload:      r#""after""#.to_owned(),
+    };
+    let after = executor
+        .read(&params, &caller, 1, &request)
+        .expect("read after");
+    assert_eq!(after.succeed_data, r#""after""#);
+}
+
+#[test]
+fn test_tx_hook_after_panic() {
+    let toml_str = include_str!("./genesis_services.toml");
+    let genesis: Genesis = toml::from_str(toml_str).unwrap();
+
+    let db = Arc::new(MemoryDB::new(false));
+
+    let root = ServiceExecutor::create_genesis(
+        genesis.services,
+        Arc::clone(&db),
+        Arc::new(MockStorage {}),
+        Arc::new(MockServiceMapping {}),
+    )
+    .unwrap();
+
+    let mut executor = ServiceExecutor::with_root(
+        root.clone(),
+        Arc::clone(&db),
+        Arc::new(MockStorage {}),
+        Arc::new(MockServiceMapping {}),
+    )
+    .unwrap();
+
+    let params = ExecutorParams {
+        state_root:   root,
+        height:       1,
+        timestamp:    0,
+        cycles_limit: std::u64::MAX,
+        proposer:     Address::from_hash(Hash::from_empty()).unwrap(),
+    };
+
+    let mut stx = mock_signed_tx();
+    stx.raw.request.service_name = "test".to_owned();
+    stx.raw.request.method = "tx_hook_after_panic".to_owned();
+    stx.raw.request.payload = r#""""#.to_owned();
+
+    let txs = vec![stx];
+    let error_resp = executor.exec(Context::new(), &params, &txs);
+    assert!(error_resp.is_ok());
+
+    let caller = Address::from_hex("0xf8389d774afdad8755ef8e629e5a154fddc6325a").unwrap();
+    let request = TransactionRequest {
+        service_name: "test".to_owned(),
+        method:       "test_read".to_owned(),
+        payload:      r#""before""#.to_owned(),
+    };
+    let after = executor
+        .read(&params, &caller, 1, &request)
+        .expect("read before");
+    assert_eq!(after.succeed_data, r#""before""#);
+
+    let request = TransactionRequest {
+        service_name: "test".to_owned(),
+        method:       "test_read".to_owned(),
+        payload:      r#""tx_hook_after_panic""#.to_owned(),
+    };
+    let before = executor
+        .read(&params, &caller, 1, &request)
+        .expect("read tx");
+    assert_eq!(before.succeed_data, r#""tx_hook_after_panic""#);
+}
+
 #[bench]
 fn bench_execute(b: &mut Bencher) {
     let toml_str = include_str!("./genesis_services.toml");
