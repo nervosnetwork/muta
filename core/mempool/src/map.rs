@@ -54,7 +54,7 @@ where
 
         for hash in hashes.iter() {
             let index = get_index(hash);
-            h.entry(index).or_insert_with(|| vec![]).push(hash.clone());
+            h.entry(index).or_insert_with(Vec::new).push(hash.clone());
         }
 
         let futs = h

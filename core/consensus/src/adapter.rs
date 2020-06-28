@@ -762,7 +762,7 @@ where
             if weight_map.contains_key(signed_voter_address.as_ref()) {
                 let weight = weight_map
                     .get(signed_voter_address.as_ref())
-                    .ok_or({ ConsensusError::VerifyProof(block_height, WeightNotFound) })
+                    .ok_or(ConsensusError::VerifyProof(block_height, WeightNotFound))
                     .map_err(|e| {
                         log::error!(
                             "[consensus] verity_proof_weight,signed_voter_address: {:?}",

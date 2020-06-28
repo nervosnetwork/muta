@@ -77,7 +77,7 @@ impl FromStr for DnsAddr {
     type Err = NetworkError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        use NetworkError::*;
+        use NetworkError::UnexpectedPeerAddr;
 
         let comps = s.split(':').collect::<Vec<_>>();
         if comps.len() != 2 {

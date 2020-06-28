@@ -1,4 +1,5 @@
 #![feature(async_closure)]
+#![allow(clippy::mutable_key_type)]
 
 mod config;
 mod default_start;

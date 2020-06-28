@@ -1,4 +1,5 @@
 #![feature(test)]
+#![allow(clippy::mutable_key_type)]
 
 pub mod codec;
 pub mod fixed_codec;

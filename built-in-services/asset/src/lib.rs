@@ -1,3 +1,5 @@
+#![allow(clippy::mutable_key_type)]
+
 #[cfg(test)]
 mod tests;
 pub mod types;

@@ -173,8 +173,8 @@ fn test_transfer_from() {
             grantee:  to_address.clone(),
         })
         .succeed_data;
-    assert_eq!(allowance_res.asset_id, asset.id.clone());
-    assert_eq!(allowance_res.grantee, to_address.clone());
+    assert_eq!(allowance_res.asset_id, asset.id);
+    assert_eq!(allowance_res.grantee, to_address);
     assert_eq!(allowance_res.value, 1000);
 
     let balance_res = service

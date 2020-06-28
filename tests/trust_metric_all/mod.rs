@@ -1,3 +1,5 @@
+#![allow(clippy::mutable_key_type)]
+
 mod common;
 mod consensus;
 mod logger;

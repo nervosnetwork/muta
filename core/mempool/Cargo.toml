@@ -33,4 +33,4 @@ cita_trie = "2.0"
 
 [dev-dependencies]
 chashmap = "2.2"
-parking_lot = "0.10"
+parking_lot = "0.11"
