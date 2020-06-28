@@ -25,6 +25,20 @@ use protocol::ProtocolResult;
 use crate::executor::ServiceExecutor;
 use test_service::TestService;
 
+macro_rules! read {
+    ($executor:expr, $params:expr, $caller:expr, $payload:expr) => {{
+        let request = TransactionRequest {
+            service_name: "test".to_owned(),
+            method:       "test_read".to_owned(),
+            payload:      $payload.to_owned(),
+        };
+
+        $executor
+            .read($params, $caller, 1, &request)
+            .expect(&format!("read {}", $payload))
+    }};
+}
+
 pub const PUB_KEY_STR: &str = "031288a6788678c25952eba8693b2f278f66e2187004b64ac09416d07f83f96d5b";
 
 #[test]
@@ -475,6 +489,7 @@ fn test_tx_hook_before_cancel() {
         height:       1,
         timestamp:    0,
         cycles_limit: std::u64::MAX,
+        proposer:     Address::from_hash(Hash::from_empty()).unwrap(),
     };
 
     let mut stx = mock_signed_tx();
@@ -531,6 +546,7 @@ fn test_tx_hook_after_cancel() {
         height:       1,
         timestamp:    0,
         cycles_limit: std::u64::MAX,
+        proposer:     Address::from_hash(Hash::from_empty()).unwrap(),
     };
 
     let mut stx = mock_signed_tx();
