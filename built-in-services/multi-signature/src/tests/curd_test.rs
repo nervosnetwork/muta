@@ -73,12 +73,10 @@ fn test_generate_multi_signature() {
 #[test]
 fn test_set_threshold() {
     let cycles_limit = 1024 * 1024 * 1024; // 1073741824
-    let caller = Address::from_hex("0x755cdba6ae4f479f7164792b318b2a06c759833b").unwrap();
-    let context = mock_context(cycles_limit, caller);
-
     let mut service = new_multi_signature_service();
     let owner = gen_one_keypair();
     let owner_address = Address::from_pubkey_bytes(owner.1).unwrap();
+    let context = mock_context(cycles_limit, owner_address.clone());
     let keypairs = gen_keypairs(4);
     let account_pubkeys = keypairs
         .iter()
@@ -115,12 +113,10 @@ fn test_set_threshold() {
 #[test]
 fn test_add_account() {
     let cycles_limit = 1024 * 1024 * 1024; // 1073741824
-    let caller = Address::from_hex("0x755cdba6ae4f479f7164792b318b2a06c759833b").unwrap();
-    let context = mock_context(cycles_limit, caller);
-
     let mut service = new_multi_signature_service();
     let owner = gen_one_keypair();
     let owner_address = Address::from_pubkey_bytes(owner.1).unwrap();
+    let context = mock_context(cycles_limit, owner_address.clone());
     let keypairs = gen_keypairs(15);
     let mut account_pubkeys = keypairs
         .iter()
@@ -170,12 +166,10 @@ fn test_add_account() {
 #[test]
 fn test_set_weight() {
     let cycles_limit = 1024 * 1024 * 1024; // 1073741824
-    let caller = Address::from_hex("0x755cdba6ae4f479f7164792b318b2a06c759833b").unwrap();
-    let context = mock_context(cycles_limit, caller);
-
     let mut service = new_multi_signature_service();
     let owner = gen_one_keypair();
     let owner_address = Address::from_pubkey_bytes(owner.1).unwrap();
+    let context = mock_context(cycles_limit, owner_address.clone());
     let keypairs = gen_keypairs(4);
     let mut account_pubkeys = keypairs
         .iter()
@@ -226,12 +220,10 @@ fn test_set_weight() {
 #[test]
 fn test_remove_account() {
     let cycles_limit = 1024 * 1024 * 1024; // 1073741824
-    let caller = Address::from_hex("0x755cdba6ae4f479f7164792b318b2a06c759833b").unwrap();
-    let context = mock_context(cycles_limit, caller);
-
     let mut service = new_multi_signature_service();
     let owner = gen_one_keypair();
     let owner_address = Address::from_pubkey_bytes(owner.1).unwrap();
+    let context = mock_context(cycles_limit, owner_address.clone());
     let keypairs = gen_keypairs(4);
     let mut account_pubkeys = keypairs
         .iter()
