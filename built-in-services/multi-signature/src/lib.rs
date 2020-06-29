@@ -103,13 +103,12 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
         }
 
         // check the recursion depth
-        let depth = payload
+        if payload
             .addr_with_weight
             .iter()
-            .map(|s| self._recursion_depth(&s.address))
-            .max()
-            .unwrap_or(0);
-        if depth >= MAX_MULTI_SIGNATURE_RECURSION_DEPTH {
+            .map(|s| self._is_recursion_depth_overflow(&s.address, 0))
+            .any(|res| res)
+        {
             return ServiceResponse::<GenerateMultiSigAccountResponse>::from_error(
                 116,
                 "above max recursion depth".to_owned(),
@@ -214,20 +213,12 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
             .get_account_value::<_, MultiSigPermission>(&payload.multi_sig_address, &0u8)
         {
             // check owner address
-            if permission.owner != payload.witness.sender {
+            if ctx.get_caller() != permission.owner {
                 return ServiceResponse::<()>::from_error(118, "invalid owner".to_owned());
             }
 
-            // check owner signature
-            if self._inner_verify_signature(payload.witness).is_error() {
-                return ServiceResponse::<()>::from_error(
-                    120,
-                    "owner signature verified failed".to_owned(),
-                );
-            }
-
             // check new owner's recursion depth
-            if self._recursion_depth(&payload.new_owner) >= MAX_MULTI_SIGNATURE_RECURSION_DEPTH {
+            if self._is_recursion_depth_overflow(&payload.new_owner, 0) {
                 return ServiceResponse::<()>::from_error(
                     116,
                     "new owner above max recursion depth".to_owned(),
@@ -255,16 +246,8 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
             .get_account_value::<_, MultiSigPermission>(&payload.multi_sig_address, &0u8)
         {
             // check owner address
-            if permission.owner != payload.witness.sender {
+            if ctx.get_caller() != permission.owner {
                 return ServiceResponse::<()>::from_error(118, "invalid owner".to_owned());
-            }
-
-            // check owner signature
-            if self._inner_verify_signature(payload.witness).is_error() {
-                return ServiceResponse::<()>::from_error(
-                    120,
-                    "owner signature verified failed".to_owned(),
-                );
             }
 
             permission.set_memo(payload.new_memo);
@@ -288,7 +271,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
             .get_account_value::<_, MultiSigPermission>(&payload.multi_sig_address, &0u8)
         {
             // check owner address
-            if permission.owner != payload.witness.sender {
+            if ctx.get_caller() != permission.owner {
                 return ServiceResponse::<()>::from_error(118, "invalid owner".to_owned());
             }
 
@@ -300,18 +283,8 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
                 );
             }
 
-            // check owner signature
-            if self._inner_verify_signature(payload.witness).is_error() {
-                return ServiceResponse::<()>::from_error(
-                    120,
-                    "owner signature verified failed".to_owned(),
-                );
-            }
-
             // check whether the new account above max recursion depth
-            if self._recursion_depth(&payload.new_account.address)
-                >= MAX_MULTI_SIGNATURE_RECURSION_DEPTH - 1
-            {
+            if self._is_recursion_depth_overflow(&payload.new_account.address, 1) {
                 return ServiceResponse::<()>::from_error(
                     116,
                     "new account above max recursion depth".to_owned(),
@@ -340,16 +313,8 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
             .get_account_value::<_, MultiSigPermission>(&payload.multi_sig_address, &0u8)
         {
             // check owner address
-            if permission.owner != payload.witness.sender {
+            if ctx.get_caller() != permission.owner {
                 return ServiceResponse::<Account>::from_error(118, "invalid owner".to_owned());
-            }
-
-            // check owner signature
-            if self._inner_verify_signature(payload.witness).is_error() {
-                return ServiceResponse::<Account>::from_error(
-                    120,
-                    "owner signature verified failed".to_owned(),
-                );
             }
 
             match permission.remove_account(&payload.account_address) {
@@ -382,16 +347,8 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
             .get_account_value::<_, MultiSigPermission>(&payload.multi_sig_address, &0u8)
         {
             // check owner address
-            if permission.owner != payload.witness.sender {
+            if ctx.get_caller() != permission.owner {
                 return ServiceResponse::<()>::from_error(118, "invalid owner".to_owned());
-            }
-
-            // check owner signature
-            if self._inner_verify_signature(payload.witness).is_error() {
-                return ServiceResponse::<()>::from_error(
-                    120,
-                    "owner signature verified failed".to_owned(),
-                );
             }
 
             match permission.set_account_weight(&payload.account_address, payload.new_weight) {
@@ -424,8 +381,8 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
             .get_account_value::<_, MultiSigPermission>(&payload.multi_sig_address, &0u8)
         {
             // check owner address
-            if permission.owner != payload.witness.sender {
-                return ServiceResponse::<()>::from_error(121, "invalid owner".to_owned());
+            if ctx.get_caller() != permission.owner {
+                return ServiceResponse::<()>::from_error(118, "invalid owner".to_owned());
             }
 
             // check new threshold
@@ -439,14 +396,6 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
                 return ServiceResponse::<()>::from_error(
                     121,
                     "new threshold larger the sum of the weights".to_owned(),
-                );
-            }
-
-            // check owner signature
-            if self._inner_verify_signature(payload.witness).is_error() {
-                return ServiceResponse::<()>::from_error(
-                    120,
-                    "owner signature verified failed".to_owned(),
                 );
             }
 
@@ -561,21 +510,24 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
         }
     }
 
-    fn _recursion_depth(&self, address: &Address) -> u8 {
+    fn _is_recursion_depth_overflow(&self, address: &Address, recursion_depth: u8) -> bool {
+        let depth_clone = recursion_depth + 1;
+        if depth_clone >= MAX_MULTI_SIGNATURE_RECURSION_DEPTH {
+            return true;
+        }
+
         if let Some(permission) = self
             .sdk
             .get_account_value::<_, MultiSigPermission>(address, &0u8)
         {
-            let max = permission
+            permission
                 .accounts
                 .iter()
                 .filter(|account| account.is_multiple)
-                .map(|account| self._recursion_depth(&account.address))
-                .max()
-                .unwrap_or(0);
-            max + 1
+                .map(|account| self._is_recursion_depth_overflow(&account.address, depth_clone))
+                .any(|overflow| overflow)
         } else {
-            0u8
+            false
         }
     }
 }

@@ -173,7 +173,7 @@ fn sign(privkey: &Bytes, hash: &Hash) -> Bytes {
         .to_bytes()
 }
 
-fn gen_single_witness(privkey: &Bytes, hash: &Hash) -> VerifySignaturePayload {
+fn _gen_single_witness(privkey: &Bytes, hash: &Hash) -> VerifySignaturePayload {
     let privkey = Secp256k1PrivateKey::try_from(privkey.as_ref()).unwrap();
     let pk = privkey.pub_key().to_bytes();
     let sig = privkey
