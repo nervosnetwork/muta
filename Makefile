@@ -49,7 +49,6 @@ clippy:
 
 
 ci: fmt clippy test
-	git diff --exit-code Cargo.lock
 
 info:
 	date
