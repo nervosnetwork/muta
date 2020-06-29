@@ -1,0 +1,9 @@
+FROM mutadev/muta:build-env
+
+LABEL maintainer="yejiayu.fe@gmail.com"
+
+WORKDIR /app
+
+COPY . .
+
+RUN make ci

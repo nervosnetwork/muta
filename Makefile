@@ -56,14 +56,6 @@ info:
 	pwd
 	env
 
-docker-build:
-	docker build -t mutadev/muta:build -f devtools/docker/dockerfiles/Dockerfile.muta_build .
-	docker build -t mutadev/muta:run -f devtools/docker/dockerfiles/Dockerfile.muta_run .
-	docker build -t mutadev/muta:${COMMIT} .
-
-docker-push:
-	docker push mutadev/muta:${COMMIT}
-
 e2e-test:
 	cargo build --example muta-chain
 	rm -rf ./devtools/chain/data
