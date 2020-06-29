@@ -419,13 +419,6 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
             );
         }
 
-        if pubkeys.len() > MAX_PERMISSION_ACCOUNTS as usize {
-            return ServiceResponse::<()>::from_error(
-                115,
-                "len of signatures must be [1,16]".to_owned(),
-            );
-        }
-
         if pubkeys.len() == 1 {
             if let Ok(addr) = Address::from_pubkey_bytes(pubkeys[0].clone()) {
                 if addr == payload.sender {
