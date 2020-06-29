@@ -78,7 +78,7 @@ fn test_set_threshold() {
 
     let mut service = new_multi_signature_service();
     let owner = gen_one_keypair();
-    let owner_address = Address::from_pubkey_bytes(owner.1.clone()).unwrap();
+    let owner_address = Address::from_pubkey_bytes(owner.1).unwrap();
     let keypairs = gen_keypairs(4);
     let account_pubkeys = keypairs
         .iter()
@@ -120,7 +120,7 @@ fn test_add_account() {
 
     let mut service = new_multi_signature_service();
     let owner = gen_one_keypair();
-    let owner_address = Address::from_pubkey_bytes(owner.1.clone()).unwrap();
+    let owner_address = Address::from_pubkey_bytes(owner.1).unwrap();
     let keypairs = gen_keypairs(15);
     let mut account_pubkeys = keypairs
         .iter()
@@ -175,7 +175,7 @@ fn test_set_weight() {
 
     let mut service = new_multi_signature_service();
     let owner = gen_one_keypair();
-    let owner_address = Address::from_pubkey_bytes(owner.1.clone()).unwrap();
+    let owner_address = Address::from_pubkey_bytes(owner.1).unwrap();
     let keypairs = gen_keypairs(4);
     let mut account_pubkeys = keypairs
         .iter()
@@ -231,7 +231,7 @@ fn test_remove_account() {
 
     let mut service = new_multi_signature_service();
     let owner = gen_one_keypair();
-    let owner_address = Address::from_pubkey_bytes(owner.1.clone()).unwrap();
+    let owner_address = Address::from_pubkey_bytes(owner.1).unwrap();
     let keypairs = gen_keypairs(4);
     let mut account_pubkeys = keypairs
         .iter()
