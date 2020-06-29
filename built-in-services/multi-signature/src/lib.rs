@@ -491,12 +491,11 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
             }
         }
 
-        let mut recursion_depth = 0u8;
         self._verify_multi_signature(
             &payload.tx_hash,
             &Witness::new(pubkeys, signatures).to_addr_map(),
             &payload.sender,
-            &mut recursion_depth,
+            0u8,
         )
     }
 
@@ -505,11 +504,13 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
         tx_hash: &Hash,
         wit_map: &HashMap<Address, (Bytes, Bytes)>,
         sender: &Address,
-        recursion_depth: &mut u8,
+        recursion_depth: u8,
     ) -> ServiceResponse<()> {
+        // use local variable to do DFS
+        let depth_clone = recursion_depth + 1;
+
         // check recursion depth
-        *recursion_depth += 1;
-        if *recursion_depth >= MAX_MULTI_SIGNATURE_RECURSION_DEPTH {
+        if depth_clone >= MAX_MULTI_SIGNATURE_RECURSION_DEPTH {
             return ServiceResponse::<()>::from_error(116, "above max recursion depth".to_owned());
         }
 
@@ -531,7 +532,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
                     }
                 }
             } else if !self
-                ._verify_multi_signature(tx_hash, wit_map, &account.address, recursion_depth)
+                ._verify_multi_signature(tx_hash, wit_map, &account.address, depth_clone)
                 .is_error()
             {
                 weight_acc += account.weight as u32;
