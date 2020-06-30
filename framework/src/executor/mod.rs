@@ -30,6 +30,8 @@ use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 use crate::binding::sdk::{DefaultChainQuerier, DefaultServiceSDK};
 use crate::binding::state::{GeneralServiceState, MPTTrie};
 
+const SERVICE_NOT_FOUND_CODE: u64 = 62077;
+
 trait TxHooks {
     fn before(&mut self, _: Context, _: ServiceContext) -> ProtocolResult<()> {
         Ok(())
@@ -383,14 +385,16 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
     }
 
     fn call(&self, context: ServiceContext, exec_type: ExecType) -> ServiceResponse<String> {
-        let sdk = self
-            .get_sdk(context.get_service_name())
-            .unwrap_or_else(|e| panic!("get target service sdk failed: {}", e));
+        let service_name = context.get_service_name();
 
-        let mut service = self
-            .service_mapping
-            .get_service(context.get_service_name(), sdk)
-            .unwrap_or_else(|e| panic!("get target service failed: {}", e));
+        let sdk = match self.get_sdk(&service_name) {
+            Ok(sdk) => sdk,
+            Err(e) => return ServiceResponse::from_error(SERVICE_NOT_FOUND_CODE, e.to_string()),
+        };
+        let mut service = match self.service_mapping.get_service(&service_name, sdk) {
+            Ok(s) => s,
+            Err(e) => return ServiceResponse::from_error(SERVICE_NOT_FOUND_CODE, e.to_string()),
+        };
 
         match exec_type {
             ExecType::Read => service.read_(context),
