@@ -107,19 +107,35 @@ impl<DB: TrieDB> CommitHooks<DB> {
     }
 
     // bagua kan 101 :)
-    fn kan<H: FnOnce() -> R, R>(states: Rc<ServiceStateMap<DB>>, hook: H) -> ProtocolResult<()> {
+    fn kan<H: FnOnce() -> R, R>(
+        context: ServiceContext,
+        states: Rc<ServiceStateMap<DB>>,
+        hook: H,
+    ) -> ProtocolResult<()> {
         match panic::catch_unwind(AssertUnwindSafe(hook)) {
-            Ok(_) => states.stash(),
+            Ok(_) if !context.canceled() => states.stash(),
+            Ok(_) => {
+                states.stash()?;
+
+                // An reason must be passed to cancel
+                let reason = context.cancel_reason();
+                debug_assert!(reason.is_some());
+
+                Err(ExecutorError::Canceled {
+                    service: context.get_service_name().to_owned(),
+                    reason,
+                }
+                .into())
+            }
             Err(_) => states.revert_cache(),
         }
     }
 }
 
 impl<DB: TrieDB> TxHooks for CommitHooks<DB> {
-    // TODO: support abort execution
     fn before(&mut self, _context: Context, service_context: ServiceContext) -> ProtocolResult<()> {
         for hook in self.inner.iter_mut() {
-            Self::kan(Rc::clone(&self.states), || {
+            Self::kan(service_context.clone(), Rc::clone(&self.states), || {
                 hook.tx_hook_before_(service_context.clone())
             })?;
         }
@@ -129,7 +145,7 @@ impl<DB: TrieDB> TxHooks for CommitHooks<DB> {
 
     fn after(&mut self, _context: Context, service_context: ServiceContext) -> ProtocolResult<()> {
         for hook in self.inner.iter_mut() {
-            Self::kan(Rc::clone(&self.states), || {
+            Self::kan(service_context.clone(), Rc::clone(&self.states), || {
                 hook.tx_hook_after_(service_context.clone())
             })?;
         }
@@ -512,6 +528,12 @@ pub enum ExecutorError {
     QueryService(String),
     #[display(fmt = "Call service failed: {:?}", _0)]
     CallService(String),
+
+    #[display(fmt = "service {} canceled {:?}", service, reason)]
+    Canceled {
+        service: String,
+        reason:  Option<String>,
+    },
 }
 
 impl std::error::Error for ExecutorError {}

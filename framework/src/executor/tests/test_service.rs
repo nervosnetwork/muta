@@ -110,6 +110,35 @@ impl<SDK: ServiceSDK> TestService<SDK> {
         ServiceResponse::from_succeed(())
     }
 
+    #[cycles(210_00)]
+    #[write]
+    fn tx_hook_before_cancel(
+        &mut self,
+        ctx: ServiceContext,
+        _payload: String,
+    ) -> ServiceResponse<()> {
+        self.sdk.set_value(
+            "tx_hook_before_cancel".to_owned(),
+            "tx_hook_before_cancel".to_owned(),
+        );
+        ServiceResponse::from_succeed(())
+    }
+
+    #[cycles(210_00)]
+    #[write]
+    fn tx_hook_after_cancel(
+        &mut self,
+        ctx: ServiceContext,
+        _payload: String,
+    ) -> ServiceResponse<()> {
+        self.sdk.set_value(
+            "tx_hook_after_cancel".to_owned(),
+            "tx_hook_after_cancel".to_owned(),
+        );
+        ctx.cancel("tx_hook_after_cancel".to_owned());
+        ServiceResponse::from_error(1, "tx_hook_after_cancel".to_owned())
+    }
+
     #[tx_hook_before]
     fn test_tx_hook_before(&mut self, ctx: ServiceContext) {
         if ctx.get_service_name() == "test"
@@ -120,6 +149,10 @@ impl<SDK: ServiceSDK> TestService<SDK> {
 
         if ctx.get_service_method() == "tx_hook_before_panic" {
             panic!("tx hook before");
+        }
+
+        if ctx.get_service_method() == "tx_hook_before_cancel" {
+            ctx.cancel("tx_hook_before_cancel".to_owned());
         }
 
         self.sdk.set_value("before".to_owned(), "before".to_owned());
@@ -135,6 +168,10 @@ impl<SDK: ServiceSDK> TestService<SDK> {
 
         if ctx.get_service_method() == "tx_hook_after_panic" {
             panic!("tx hook before");
+        }
+
+        if ctx.get_service_method() == "tx_hook_after_cancel" {
+            ctx.cancel("tx_hook_after_cancel".to_owned());
         }
 
         self.sdk.set_value("after".to_owned(), "after".to_owned());
