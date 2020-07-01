@@ -3,7 +3,7 @@ use super::diagnostic::{
     TrustTwinEventResp, TwinEvent, RPC_RESP_TRUST_NEW_INTERVAL, RPC_RESP_TRUST_REPORT,
     RPC_RESP_TRUST_TWIN_EVENT, RPC_TRUST_NEW_INTERVAL, RPC_TRUST_REPORT, RPC_TRUST_TWIN_EVENT,
 };
-use super::{config::Config, consts, common::RunningStatus};
+use super::{common::RunningStatus, config::Config, consts};
 
 use common_crypto::{PrivateKey, Secp256k1PrivateKey};
 use core_consensus::message::{
@@ -130,11 +130,12 @@ pub async fn connect(full_node_port: u16, listen_port: u16, running: RunningStat
 
 impl ClientNode {
     pub fn connected(&self) -> bool {
-        self.full_node_running.is_running() &&
-        self.network
-            .diagnostic
-            .session_by_chain(&self.remote_chain_addr)
-            .is_some()
+        self.full_node_running.is_running()
+            && self
+                .network
+                .diagnostic
+                .session_by_chain(&self.remote_chain_addr)
+                .is_some()
     }
 
     pub async fn broadcast<M: MessageCodec>(&self, endpoint: &str, msg: M) -> ClientResult<()> {

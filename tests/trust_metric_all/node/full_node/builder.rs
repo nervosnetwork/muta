@@ -89,7 +89,13 @@ impl<Mapping: 'static + ServiceMapping> Muta<Mapping> {
         let memory_db = MemoryDB::default();
 
         self.create_genesis(memory_db.clone()).await?;
-        start(self.config, Arc::clone(&self.service_mapping), memory_db, running).await?;
+        start(
+            self.config,
+            Arc::clone(&self.service_mapping),
+            memory_db,
+            running,
+        )
+        .await?;
 
         Ok(())
     }
