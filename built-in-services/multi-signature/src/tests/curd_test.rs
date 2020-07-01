@@ -1,6 +1,7 @@
 use crate::types::{
     AddAccountPayload, GenerateMultiSigAccountPayload, GetMultiSigAccountPayload,
     MultiSigPermission, RemoveAccountPayload, SetAccountWeightPayload, SetThresholdPayload,
+    UpdateAccountPayload,
 };
 
 use super::*;
@@ -161,6 +162,63 @@ fn test_add_account() {
         threshold: 3,
         memo:      String::new(),
     });
+}
+
+#[test]
+fn test_update_account() {
+    let cycles_limit = 1024 * 1024 * 1024; // 1073741824
+    let mut service = new_multi_signature_service();
+    let owner = gen_one_keypair();
+    let owner_address = Address::from_pubkey_bytes(owner.1).unwrap();
+    let context = mock_context(cycles_limit, owner_address.clone());
+    let keypairs = gen_keypairs(4);
+    let account_pubkeys = keypairs
+        .iter()
+        .map(|pair| to_multi_sig_account(pair.1.clone()))
+        .collect::<Vec<_>>();
+    let multi_sig_address = service
+        .generate_account(context.clone(), GenerateMultiSigAccountPayload {
+            owner:            owner_address.clone(),
+            addr_with_weight: account_pubkeys.clone(),
+            threshold:        4,
+            memo:             String::new(),
+        })
+        .succeed_data
+        .address;
+
+    let new_owner = gen_one_keypair();
+    let new_owner_address = Address::from_pubkey_bytes(new_owner.1.clone()).unwrap();
+    let context = mock_context(cycles_limit, owner_address.clone());
+    let account_pubkeys = vec![AddressWithWeight {
+        address: multi_sig_address.clone(),
+        weight:  1u8,
+    }];
+    let res = service.update_account(context.clone(), UpdateAccountPayload {
+        account_address:  multi_sig_address.clone(),
+        new_account_info: GenerateMultiSigAccountPayload {
+            owner:            new_owner_address.clone(),
+            addr_with_weight: account_pubkeys,
+            threshold:        1,
+            memo:             String::new(),
+        },
+    });
+    assert!(res.is_error());
+
+    let keypairs = gen_keypairs(4);
+    let account_pubkeys = keypairs
+        .iter()
+        .map(|pair| to_multi_sig_account(pair.1.clone()))
+        .collect::<Vec<_>>();
+    let res = service.update_account(context, UpdateAccountPayload {
+        account_address:  multi_sig_address,
+        new_account_info: GenerateMultiSigAccountPayload {
+            owner:            new_owner_address,
+            addr_with_weight: account_pubkeys,
+            threshold:        1,
+            memo:             String::new(),
+        },
+    });
+    assert_eq!(res.is_error(), false);
 }
 
 #[test]

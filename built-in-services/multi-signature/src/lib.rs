@@ -18,7 +18,7 @@ use crate::types::{
     GenerateMultiSigAccountPayload, GenerateMultiSigAccountResponse, GetMultiSigAccountPayload,
     GetMultiSigAccountResponse, InitGenesisPayload, MultiSigPermission, RemoveAccountPayload,
     RemoveAccountResult, SetAccountWeightPayload, SetThresholdPayload, SetWeightResult,
-    VerifySignaturePayload, Witness,
+    UpdateAccountPayload, VerifySignaturePayload, Witness,
 };
 
 const MAX_MULTI_SIGNATURE_RECURSION_DEPTH: u8 = 8;
@@ -199,6 +199,101 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
             signatures: sigs.into_iter().map(Bytes::from).collect::<Vec<_>>(),
             sender:     payload.raw.sender,
         })
+    }
+
+    #[cycles(210_00)]
+    #[write]
+    fn update_account(
+        &mut self,
+        ctx: ServiceContext,
+        payload: UpdateAccountPayload,
+    ) -> ServiceResponse<()> {
+        if let Some(permission) = self
+            .sdk
+            .get_account_value::<_, MultiSigPermission>(&payload.account_address, &0u8)
+        {
+            // check owner address
+            if ctx.get_caller() != permission.owner {
+                return ServiceResponse::<()>::from_error(118, "invalid owner".to_owned());
+            }
+
+            let new_info = payload.new_account_info.clone();
+
+            // check if account contains itself
+            if new_info
+                .addr_with_weight
+                .iter()
+                .map(|a| a.address.clone())
+                .any(|addr| addr == payload.account_address)
+            {
+                return ServiceResponse::<()>::from_error(
+                    115,
+                    "account can not contain itself".to_owned(),
+                );
+            }
+
+            // check sum of weight
+            if new_info.addr_with_weight.is_empty()
+                || new_info.addr_with_weight.len() > MAX_PERMISSION_ACCOUNTS as usize
+            {
+                return ServiceResponse::<()>::from_error(
+                    110,
+                    "accounts length must be [1,16]".to_owned(),
+                );
+            }
+
+            let weight_sum = new_info
+                .addr_with_weight
+                .iter()
+                .map(|item| item.weight as u32)
+                .sum::<u32>();
+
+            // check if sum of the weights is above threshold
+            if new_info.threshold == 0 || weight_sum < new_info.threshold {
+                return ServiceResponse::<()>::from_error(
+                    111,
+                    "accounts weight or threshold not valid".to_owned(),
+                );
+            }
+
+            // check the recursion depth
+            if new_info
+                .addr_with_weight
+                .iter()
+                .map(|s| self._is_recursion_depth_overflow(&s.address, 0))
+                .any(|res| res)
+            {
+                return ServiceResponse::<()>::from_error(
+                    116,
+                    "above max recursion depth".to_owned(),
+                );
+            }
+
+            let accounts = new_info
+                .addr_with_weight
+                .iter()
+                .map(|item| Account {
+                    address:     item.address.clone(),
+                    weight:      item.weight,
+                    is_multiple: !self
+                        .get_account_from_address(ctx.clone(), GetMultiSigAccountPayload {
+                            multi_sig_address: item.address.clone(),
+                        })
+                        .is_error(),
+                })
+                .collect::<Vec<_>>();
+
+            self.sdk
+                .set_account_value(&payload.account_address, 0u8, MultiSigPermission {
+                    accounts,
+                    owner: new_info.owner,
+                    threshold: new_info.threshold,
+                    memo: new_info.memo,
+                });
+            return ServiceResponse::<()>::from_succeed(());
+        }
+
+        ServiceResponse::<()>::from_error(113, "account not existed".to_owned())
     }
 
     #[cycles(210_00)]

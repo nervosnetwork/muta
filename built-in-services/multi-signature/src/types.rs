@@ -98,6 +98,12 @@ pub struct SetThresholdPayload {
     pub new_threshold:     u32,
 }
 
+#[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug)]
+pub struct UpdateAccountPayload {
+    pub account_address:  Address,
+    pub new_account_info: GenerateMultiSigAccountPayload,
+}
+
 #[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug, Default, PartialEq, Eq)]
 pub struct MultiSigPermission {
     pub owner:     Address,
