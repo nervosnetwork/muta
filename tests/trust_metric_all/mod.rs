@@ -17,13 +17,14 @@ fn trust_test(test: impl FnOnce(ClientNode) -> BoxFuture<'static, ()> + Send + '
     let local = tokio::task::LocalSet::new();
 
     local.block_on(&mut rt, async move {
-        tokio::task::spawn_local(node::full_node::run(full_port));
+        let running = common::RunningStatus::new();
+        tokio::task::spawn_local(node::full_node::run(full_port, running.clone()));
         // Sleep a while for full node network to running, otherwise will
         // trigger network retry back off.
         tokio::time::delay_for(std::time::Duration::from_secs(FULL_NODE_SETUP_WAIT_TIME)).await;
 
         let handle = tokio::spawn(async move {
-            let client_node = node::client_node::connect(full_port, client_port).await;
+            let client_node = node::client_node::connect(full_port, client_port, running).await;
 
             test(client_node).await;
         });

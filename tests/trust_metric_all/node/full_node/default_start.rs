@@ -131,6 +131,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     config: Config,
     service_mapping: Arc<Mapping>,
     db: MemoryDB,
+    running: common::RunningStatus,
 ) -> ProtocolResult<()> {
     log::info!("node starts");
     // Init Block db
@@ -482,6 +483,8 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         }
     });
 
+    let _ = running;
     exec_demon.run().await;
+
     Ok(())
 }
