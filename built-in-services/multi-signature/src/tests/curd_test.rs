@@ -177,9 +177,9 @@ fn test_update_account() {
         .map(|pair| to_multi_sig_account(pair.1.clone()))
         .collect::<Vec<_>>();
     let multi_sig_address = service
-        .generate_account(context.clone(), GenerateMultiSigAccountPayload {
+        .generate_account(context, GenerateMultiSigAccountPayload {
             owner:            owner_address.clone(),
-            addr_with_weight: account_pubkeys.clone(),
+            addr_with_weight: account_pubkeys,
             threshold:        4,
             memo:             String::new(),
         })
@@ -187,8 +187,8 @@ fn test_update_account() {
         .address;
 
     let new_owner = gen_one_keypair();
-    let new_owner_address = Address::from_pubkey_bytes(new_owner.1.clone()).unwrap();
-    let context = mock_context(cycles_limit, owner_address.clone());
+    let new_owner_address = Address::from_pubkey_bytes(new_owner.1).unwrap();
+    let context = mock_context(cycles_limit, owner_address);
     let account_pubkeys = vec![AddressWithWeight {
         address: multi_sig_address.clone(),
         weight:  1u8,
