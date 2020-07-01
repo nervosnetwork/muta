@@ -55,7 +55,7 @@ impl<K: FixedCodec> FixedCodec for FixedKeys<K> {
 
 pub struct FixedBuckets<K: FixedCodec + PartialEq> {
     pub keys_bucket:  Vec<Bucket<K>>,
-    pub bucket_lens:  Vec<u32>,
+    pub bucket_lens:  Vec<u64>,
     pub is_recovered: Vec<bool>,
 }
 
@@ -67,7 +67,7 @@ impl<K: FixedCodec + PartialEq> FixedBuckets<K> {
 
         for _i in 0..16 {
             keys_bucket.push(Bucket::new());
-            bucket_lens.push(0u32);
+            bucket_lens.push(0u64);
             is_recovered.push(false);
         }
 
@@ -112,7 +112,7 @@ impl<K: FixedCodec + PartialEq> FixedBuckets<K> {
     }
 
     /// The function will panic when index is greater than or equal 16.
-    fn get_abs_index_interval(&self, index: usize) -> (u32, u32) {
+    fn get_abs_index_interval(&self, index: usize) -> (u64, u64) {
         (self.bucket_lens[index], self.bucket_lens[index + 1])
     }
 
@@ -125,13 +125,13 @@ impl<K: FixedCodec + PartialEq> FixedBuckets<K> {
         let mut acc = self.bucket_lens[index];
 
         for i in start..17 {
-            acc += self.keys_bucket[i - 1].len() as u32;
+            acc += self.keys_bucket[i - 1].len() as u64;
             self.bucket_lens[i] = acc;
         }
     }
 
     #[cfg(test)]
-    fn len(&self) -> u32 {
+    fn len(&self) -> u64 {
         self.bucket_lens[16]
     }
 
@@ -259,7 +259,7 @@ mod tests {
 
         println!("{:?}", buckets.bucket_lens);
 
-        let intervals = (0u32..=16).map(|i| i * 16).collect::<Vec<_>>();
+        let intervals = (0u64..=16).map(|i| i * 16).collect::<Vec<_>>();
         assert!(intervals == buckets.bucket_lens);
         assert!(buckets.len() == 256);
 
@@ -293,7 +293,7 @@ mod tests {
         let _ = buckets
             .remove_item(get_bucket_index(&key.encode_fixed().unwrap()), &key)
             .unwrap();
-        let intervals = (0u32..=16)
+        let intervals = (0u64..=16)
             .map(|i| if i == 0 { 0 } else { i * 16 - 1 })
             .collect::<Vec<_>>();
         assert!(buckets.len() == 255);

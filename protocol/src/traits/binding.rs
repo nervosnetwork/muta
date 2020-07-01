@@ -209,7 +209,7 @@ pub trait StoreMap<K: FixedCodec + PartialEq, V: FixedCodec> {
 
     fn remove(&mut self, key: &K) -> Option<V>;
 
-    fn len(&self) -> u32;
+    fn len(&self) -> u64;
 
     fn is_empty(&self) -> bool;
 
@@ -217,17 +217,17 @@ pub trait StoreMap<K: FixedCodec + PartialEq, V: FixedCodec> {
 }
 
 pub trait StoreArray<E: FixedCodec> {
-    fn get(&self, index: u32) -> Option<E>;
+    fn get(&self, index: u64) -> Option<E>;
 
     fn push(&mut self, element: E);
 
-    fn remove(&mut self, index: u32);
+    fn remove(&mut self, index: u64);
 
-    fn len(&self) -> u32;
+    fn len(&self) -> u64;
 
     fn is_empty(&self) -> bool;
 
-    fn iter<'a>(&'a self) -> Box<dyn Iterator<Item = (u32, E)> + 'a>;
+    fn iter<'a>(&'a self) -> Box<dyn Iterator<Item = (u64, E)> + 'a>;
 }
 
 pub trait StoreUint64 {
@@ -265,7 +265,7 @@ pub trait StoreString {
 
     fn set(&mut self, val: &str);
 
-    fn len(&self) -> u32;
+    fn len(&self) -> u64;
 
     fn is_empty(&self) -> bool;
 }
