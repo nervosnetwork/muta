@@ -22,7 +22,7 @@ use protocol::types::{
 };
 use protocol::ProtocolResult;
 
-use crate::executor::ServiceExecutor;
+use crate::executor::{ServiceExecutor, SERVICE_NOT_FOUND_CODE};
 use test_service::TestService;
 
 macro_rules! read {
@@ -224,6 +224,49 @@ fn test_revert_event_on_exec_error() {
 
     assert_eq!(receipt.response.response.code, 111);
     assert_eq!(receipt.events.len(), 0);
+}
+
+#[test]
+fn test_service_not_found_panic() {
+    let toml_str = include_str!("./genesis_services.toml");
+    let genesis: Genesis = toml::from_str(toml_str).unwrap();
+
+    let db = Arc::new(MemoryDB::new(false));
+
+    let root = ServiceExecutor::create_genesis(
+        genesis.services,
+        Arc::clone(&db),
+        Arc::new(MockStorage {}),
+        Arc::new(MockServiceMapping {}),
+    )
+    .unwrap();
+
+    let mut executor = ServiceExecutor::with_root(
+        root.clone(),
+        Arc::clone(&db),
+        Arc::new(MockStorage {}),
+        Arc::new(MockServiceMapping {}),
+    )
+    .unwrap();
+
+    let params = ExecutorParams {
+        state_root:   root,
+        height:       1,
+        timestamp:    0,
+        cycles_limit: std::u64::MAX,
+        proposer:     Address::from_hash(Hash::from_empty()).unwrap(),
+    };
+
+    let mut stx = mock_signed_tx();
+    stx.raw.request.service_name = "FlyMeToTheMars".to_owned();
+
+    let txs = vec![stx];
+    let executor_resp = executor
+        .exec(Context::new(), &params, &txs)
+        .expect("should not panic on service not found");
+    let receipt = &executor_resp.receipts[0];
+
+    assert_eq!(receipt.response.response.code, SERVICE_NOT_FOUND_CODE);
 }
 
 #[test]
