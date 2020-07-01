@@ -73,7 +73,7 @@ fn test_default_store_string() {
 
     ss.set("ok");
     assert_eq!(ss.get(), String::from("ok"));
-    assert_eq!(ss.len(), 2u32);
+    assert_eq!(ss.len(), 2u64);
 }
 
 #[test]
@@ -113,7 +113,7 @@ fn test_default_store_map() {
     sm.remove(&Hash::digest(Bytes::from("key_1"))).unwrap();
 
     assert_eq!(sm.contains(&Hash::digest(Bytes::from("key_1"))), false);
-    assert_eq!(sm.len(), 1u32);
+    assert_eq!(sm.len(), 1u64);
 
     let sm = DefaultStoreMap::<_, Hash, Bytes>::new(Rc::clone(&rs), "test");
     assert_eq!(
@@ -130,26 +130,26 @@ fn test_default_store_array() {
 
     let mut sa = DefaultStoreArray::<_, Bytes>::new(Rc::clone(&rs), "test");
 
-    assert_eq!(sa.len(), 0u32);
-    assert_eq!(sa.get(0u32).is_none(), true);
+    assert_eq!(sa.len(), 0u64);
+    assert_eq!(sa.get(0u64).is_none(), true);
 
     sa.push(Bytes::from("111"));
     sa.push(Bytes::from("222"));
 
-    assert_eq!(sa.get(3u32).is_none(), true);
+    assert_eq!(sa.get(3u64).is_none(), true);
 
     {
         let mut it = sa.iter();
-        assert_eq!(it.next().unwrap(), (0u32, Bytes::from("111")));
-        assert_eq!(it.next().unwrap(), (1u32, Bytes::from("222")));
+        assert_eq!(it.next().unwrap(), (0u64, Bytes::from("111")));
+        assert_eq!(it.next().unwrap(), (1u64, Bytes::from("222")));
         assert_eq!(it.next().is_none(), true);
     }
 
-    assert_eq!(sa.get(0u32).unwrap(), Bytes::from("111"));
-    assert_eq!(sa.get(1u32).unwrap(), Bytes::from("222"));
+    assert_eq!(sa.get(0u64).unwrap(), Bytes::from("111"));
+    assert_eq!(sa.get(1u64).unwrap(), Bytes::from("222"));
 
-    sa.remove(0u32);
+    sa.remove(0u64);
 
-    assert_eq!(sa.len(), 1u32);
-    assert_eq!(sa.get(0u32).unwrap(), Bytes::from("222"));
+    assert_eq!(sa.len(), 1u64);
+    assert_eq!(sa.get(0u64).unwrap(), Bytes::from("222"));
 }

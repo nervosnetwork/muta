@@ -41,7 +41,7 @@ impl<S: ServiceState, E: FixedCodec> DefaultStoreArray<S, E> {
         }
     }
 
-    fn inner_get(&self, index: u32) -> ProtocolResult<Option<E>> {
+    fn inner_get(&self, index: u64) -> ProtocolResult<Option<E>> {
         if let Some(k) = self.keys.inner.get(index as usize) {
             self.state.borrow().get(k)?.map_or_else(
                 || {
@@ -71,7 +71,7 @@ impl<S: ServiceState, E: FixedCodec> DefaultStoreArray<S, E> {
 
     // TODO(@zhounan): Atomicity of insert(k, v) and insert self.keys to
     // ServiceState is not guaranteed for now That must be settled soon after.
-    fn inner_remove(&mut self, index: u32) -> ProtocolResult<()> {
+    fn inner_remove(&mut self, index: u64) -> ProtocolResult<()> {
         let key = self.keys.inner.remove(index as usize);
         self.state
             .borrow_mut()
@@ -82,7 +82,7 @@ impl<S: ServiceState, E: FixedCodec> DefaultStoreArray<S, E> {
 }
 
 impl<S: ServiceState, E: FixedCodec> StoreArray<E> for DefaultStoreArray<S, E> {
-    fn get(&self, index: u32) -> Option<E> {
+    fn get(&self, index: u64) -> Option<E> {
         self.inner_get(index)
             .unwrap_or_else(|e| panic!("StoreArray get value failed: {}", e))
     }
@@ -92,13 +92,13 @@ impl<S: ServiceState, E: FixedCodec> StoreArray<E> for DefaultStoreArray<S, E> {
             .unwrap_or_else(|e| panic!("StoreArray push value failed: {}", e));
     }
 
-    fn remove(&mut self, index: u32) {
+    fn remove(&mut self, index: u64) {
         self.inner_remove(index)
             .unwrap_or_else(|e| panic!("StoreArray remove value failed: {}", e));
     }
 
-    fn len(&self) -> u32 {
-        self.keys.inner.len() as u32
+    fn len(&self) -> u64 {
+        self.keys.inner.len() as u64
     }
 
     fn is_empty(&self) -> bool {
@@ -109,19 +109,19 @@ impl<S: ServiceState, E: FixedCodec> StoreArray<E> for DefaultStoreArray<S, E> {
         }
     }
 
-    fn iter<'a>(&'a self) -> Box<dyn Iterator<Item = (u32, E)> + 'a> {
+    fn iter<'a>(&'a self) -> Box<dyn Iterator<Item = (u64, E)> + 'a> {
         Box::new(ArrayIter::<E, Self>::new(0, self))
     }
 }
 
 struct ArrayIter<'a, E: FixedCodec, A: StoreArray<E>> {
-    idx:     u32,
+    idx:     u64,
     array:   &'a A,
     phantom: PhantomData<E>,
 }
 
 impl<'a, E: FixedCodec, A: StoreArray<E>> ArrayIter<'a, E, A> {
-    pub fn new(idx: u32, array: &'a A) -> Self {
+    pub fn new(idx: u64, array: &'a A) -> Self {
         ArrayIter {
             idx,
             array,
@@ -131,7 +131,7 @@ impl<'a, E: FixedCodec, A: StoreArray<E>> ArrayIter<'a, E, A> {
 }
 
 impl<'a, E: FixedCodec, A: StoreArray<E>> Iterator for ArrayIter<'a, E, A> {
-    type Item = (u32, E);
+    type Item = (u64, E);
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.idx < self.array.len() {

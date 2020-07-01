@@ -18,7 +18,7 @@ pub struct DefaultStoreMap<S: ServiceState, K: FixedCodec + PartialEq, V: FixedC
     var_name: String,
     keys:     RefCell<FixedBuckets<K>>,
     len_key:  Bytes,
-    len:      u32,
+    len:      u64,
     phantom:  PhantomData<V>,
 }
 
@@ -34,7 +34,7 @@ where
             .borrow()
             .get(&len_key)
             .expect("Get len failed")
-            .unwrap_or(0u32);
+            .unwrap_or(0u64);
 
         DefaultStoreMap {
             state,
@@ -226,7 +226,7 @@ where
         }
     }
 
-    fn len(&self) -> u32 {
+    fn len(&self) -> u64 {
         self.len
     }
 
@@ -246,7 +246,7 @@ pub struct NewMapIter<
     K: 'static + FixedCodec + PartialEq,
     V: 'static + FixedCodec,
 > {
-    idx: u32,
+    idx: u64,
     map: &'a DefaultStoreMap<S, K, V>,
 }
 
@@ -256,7 +256,7 @@ where
     K: 'static + FixedCodec + PartialEq,
     V: 'static + FixedCodec,
 {
-    pub fn new(idx: u32, map: &'a DefaultStoreMap<S, K, V>) -> Self {
+    pub fn new(idx: u64, map: &'a DefaultStoreMap<S, K, V>) -> Self {
         Self { idx, map }
     }
 }
@@ -340,11 +340,11 @@ mod tests {
         let res = (0..17)
             .map(|i| {
                 if i > max {
-                    2u32
+                    2u64
                 } else if i > min {
-                    1u32
+                    1u64
                 } else {
-                    0u32
+                    0u64
                 }
             })
             .collect::<Vec<_>>();

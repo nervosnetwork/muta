@@ -251,8 +251,8 @@ impl<S: ServiceState> DefaultStoreString<S> {
         }
     }
 
-    fn inner_len(&self) -> ProtocolResult<u32> {
-        self.inner_get().map(|s| s.len() as u32)
+    fn inner_len(&self) -> ProtocolResult<u64> {
+        self.inner_get().map(|s| s.len() as u64)
     }
 
     fn is_empty_(&self) -> ProtocolResult<bool> {
@@ -271,7 +271,7 @@ impl<S: ServiceState> StoreString for DefaultStoreString<S> {
             .unwrap_or_else(|e| panic!("StoreString set failed: {}", e));
     }
 
-    fn len(&self) -> u32 {
+    fn len(&self) -> u64 {
         self.inner_len()
             .unwrap_or_else(|e| panic!("StoreString get length failed: {}", e))
     }
