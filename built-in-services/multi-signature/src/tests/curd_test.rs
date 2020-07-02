@@ -3,6 +3,7 @@ use crate::types::{
     MultiSigPermission, RemoveAccountPayload, SetAccountWeightPayload, SetThresholdPayload,
     UpdateAccountPayload,
 };
+use crate::ADEPTIVE_ADDRESS;
 
 use super::*;
 
@@ -109,6 +110,34 @@ fn test_set_threshold() {
         new_threshold: 2,
     });
     assert_eq!(res.error_message, "".to_owned());
+}
+
+#[test]
+fn test_adeption_address() {
+    let cycles_limit = 1024 * 1024 * 1024; // 1073741824
+    let mut service = new_multi_signature_service();
+    let owner = gen_one_keypair();
+    let owner_address = Address::from_pubkey_bytes(owner.1).unwrap();
+    let context = mock_context(cycles_limit, owner_address);
+    let keypairs = gen_keypairs(15);
+    let account_pubkeys = keypairs
+        .iter()
+        .map(|pair| to_multi_sig_account(pair.1.clone()))
+        .collect::<Vec<_>>();
+    let multi_sig_address = service
+        .generate_account(context.clone(), GenerateMultiSigAccountPayload {
+            owner:            ADEPTIVE_ADDRESS.clone(),
+            addr_with_weight: account_pubkeys,
+            threshold:        3,
+            memo:             String::new(),
+        })
+        .succeed_data
+        .address;
+
+    let permission = service.get_account_from_address(context, GetMultiSigAccountPayload {
+        multi_sig_address: multi_sig_address.clone(),
+    });
+    assert_eq!(multi_sig_address, permission.succeed_data.permission.owner);
 }
 
 #[test]
