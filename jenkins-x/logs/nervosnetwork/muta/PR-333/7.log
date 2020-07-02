@@ -1,0 +1,626 @@
+
+Showing logs for build [32mnervosnetwork-muta-pr-333-pr-bu-mp795-7[0m stage [32mci[0m and container [32mstep-credential-initializer-992pm[0m
+{"level":"info","ts":1593682210.2500443,"logger":"fallback-logger","caller":"logging/config.go:69","msg":"Fetch GitHub commit ID from kodata failed: open /var/run/ko/refs/heads/0.8.0-ns-support: no such file or directory"}
+{"level":"info","ts":1593682210.2502818,"logger":"fallback-logger","caller":"creds-init/main.go:40","msg":"Credentials initialized."}
+
+Showing logs for build [32mnervosnetwork-muta-pr-333-pr-bu-mp795-7[0m stage [32mci[0m and container [32mstep-working-dir-initializer-r9fw8[0m
+{"level":"info","ts":1593682214.2293503,"logger":"fallback-logger","caller":"logging/config.go:69","msg":"Fetch GitHub commit ID from kodata failed: open /var/run/ko/HEAD: no such file or directory"}
+{"level":"info","ts":1593682214.2299967,"logger":"fallback-logger","caller":"bash/main.go:64","msg":"Successfully executed command \"sh -c mkdir -p /workspace/source\"; output "}
+
+Showing logs for build [32mnervosnetwork-muta-pr-333-pr-bu-mp795-7[0m stage [32mci[0m and container [32mstep-place-tools[0m
+
+Showing logs for build [32mnervosnetwork-muta-pr-333-pr-bu-mp795-7[0m stage [32mci[0m and container [32mstep-git-source-nervosnetwork-muta-pr-333-pr-bu-mp795-fq8lp[0m
+{"level":"info","ts":1593682305.7802038,"logger":"fallback-logger","caller":"logging/config.go:69","msg":"Fetch GitHub commit ID from kodata failed: open /var/run/ko/refs/heads/0.8.0-ns-support: no such file or directory"}
+{"level":"info","ts":1593682308.0798948,"logger":"fallback-logger","caller":"git/git.go:103","msg":"Successfully cloned https://github.com/nervosnetwork/muta.git @ master in path /workspace/source"}
+
+Showing logs for build [32mnervosnetwork-muta-pr-333-pr-bu-mp795-7[0m stage [32mci[0m and container [32mstep-setup-builder-home[0m
+
+Showing logs for build [32mnervosnetwork-muta-pr-333-pr-bu-mp795-7[0m stage [32mci[0m and container [32mstep-git-merge[0m
+Using SHAs from PULL_REFS=master:cdf4a1c91856528f8064d6c81d36ee765dee6752,333:d3e35641ef0aa5ffd8410a073f7e98efcd10e3d5
+DEBUG: JX_LOG_LEVEL=error LC_ALL=C git fetch origin --unshallow d3e35641ef0aa5ffd8410a073f7e98efcd10e3d5: cdf4a1c91856528f8064d6c81d36ee765dee6752:
+DEBUG: ran git fetch --unshallow origin d3e35641ef0aa5ffd8410a073f7e98efcd10e3d5: cdf4a1c91856528f8064d6c81d36ee765dee6752: in 
+DEBUG: LC_ALL=C JX_LOG_LEVEL=error git branch
+DEBUG: JX_LOG_LEVEL=error LC_ALL=C git checkout master
+DEBUG: ran git checkout master in 
+DEBUG: LC_ALL=C JX_LOG_LEVEL=error git reset --hard cdf4a1c91856528f8064d6c81d36ee765dee6752
+DEBUG: ran git reset --hard cdf4a1c91856528f8064d6c81d36ee765dee6752 in 
+DEBUG: LC_ALL=C JX_LOG_LEVEL=error git clean -fd .
+DEBUG: ran clean --force -d . in 
+DEBUG: LC_ALL=C JX_LOG_LEVEL=error git merge d3e35641ef0aa5ffd8410a073f7e98efcd10e3d5
+DEBUG: ran git merge d3e35641ef0aa5ffd8410a073f7e98efcd10e3d5 in 
+DEBUG: JX_LOG_LEVEL=error LC_ALL=C git log --format=%H%x1f%an%x1f%ae%x1f%cn%x1f%ce%x1f%s%n%b%x1e cdf4a1c91856528f8064d6c81d36ee765dee6752..HEAD
+Merged SHA d3e35641ef0aa5ffd8410a073f7e98efcd10e3d5 with commit message 'update' into base branch master
+Merged SHA dcfb51d821ea18f55fbb925670eadd77427fc5fb with commit message 'update' into base branch master
+Merged SHA 4a49cfdc25aa8ad98c1bf80e26d12469c78937dd with commit message 'update' into base branch master
+Merged SHA aa3dbb8509f9317b73ff16a362907667dd6e830d with commit message 'update jenkins-x' into base branch master
+Merged SHA 225bf9355195867a1373ee0f9d68e1c1100d8a33 with commit message 'Test cicd' into base branch master
+
+Showing logs for build [32mnervosnetwork-muta-pr-333-pr-bu-mp795-7[0m stage [32mci[0m and container [32mstep-make-ci[0m
+cargo fmt  --all -- --check
+info: syncing channel updates for 'nightly-2020-05-14-x86_64-unknown-linux-gnu'
+info: latest update on 2020-05-14, rust version 1.45.0-nightly (75e1463c5 2020-05-13)
+info: downloading component 'cargo'
+info: downloading component 'clippy'
+info: downloading component 'rust-docs'
+info: downloading component 'rust-std'
+info: downloading component 'rustc'
+info: downloading component 'rustfmt'
+info: installing component 'cargo'
+info: installing component 'clippy'
+info: installing component 'rust-docs'
+info: installing component 'rust-std'
+info: installing component 'rustc'
+info: installing component 'rustfmt'
+env  cargo clippy  --all --all-targets --all-features -- \
+	-D warnings -D clippy::clone_on_ref_ptr -D clippy::enum_glob_use
+   Compiling libc v0.2.71
+   Compiling proc-macro2 v1.0.18
+   Compiling unicode-xid v0.2.1
+   Compiling syn v1.0.33
+   Compiling serde_derive v1.0.114
+   Compiling serde v1.0.114
+    Checking cfg-if v0.1.10
+   Compiling autocfg v1.0.0
+   Compiling maybe-uninit v2.0.0
+    Checking lazy_static v1.4.0
+   Compiling byteorder v1.3.4
+   Compiling log v0.4.8
+   Compiling memchr v2.3.3
+   Compiling either v1.5.3
+    Checking futures v0.1.29
+   Compiling scopeguard v1.1.0
+    Checking slab v0.4.2
+   Compiling rayon-core v1.7.1
+    Checking fnv v1.0.7
+   Compiling autocfg v0.1.7
+    Checking itoa v0.4.6
+   Compiling pin-project-internal v0.4.22
+   Compiling proc-macro-nested v0.1.6
+   Compiling semver-parser v0.7.0
+   Compiling proc-macro-hack v0.5.16
+    Checking futures-core v0.3.5
+    Checking futures-sink v0.3.5
+   Compiling ryu v1.0.5
+    Checking rand_core v0.4.2
+    Checking once_cell v1.4.0
+   Compiling serde_json v1.0.56
+    Checking pin-utils v0.1.0
+    Checking futures-io v0.3.5
+   Compiling getrandom v0.1.14
+   Compiling bitflags v1.2.1
+   Compiling crunchy v0.2.2
+   Compiling heapsize v0.4.2
+    Checking smallvec v1.4.0
+   Compiling crunchy v0.1.6
+    Checking gimli v0.21.0
+    Checking adler32 v1.1.0
+    Checking rustc-demangle v0.1.16
+    Checking ppv-lite86 v0.2.8
+    Checking object v0.20.0
+   Compiling anyhow v1.0.31
+   Compiling typenum v1.12.0
+    Checking rustc-hex v2.1.0
+   Compiling proc-macro2 v0.4.30
+   Compiling unicode-xid v0.1.0
+   Compiling syn v0.15.44
+    Checking percent-encoding v2.1.0
+    Checking opaque-debug v0.2.3
+    Checking byte-tools v0.3.1
+    Checking json v0.12.4
+    Checking dyn-clone v1.0.2
+    Checking hex v0.4.2
+    Checking hashbrown v0.3.1
+    Checking arc-swap v0.4.7
+   Compiling version_check v0.9.2
+    Checking pin-project-lite v0.1.7
+   Compiling failure_derive v0.1.8
+    Checking matches v0.1.8
+    Checking tinyvec v0.3.3
+   Compiling regex-syntax v0.6.18
+    Checking match_cfg v0.1.0
+    Checking spin v0.5.2
+   Compiling protobuf v2.15.1
+   Compiling prometheus v0.8.0 (https://github.com/tikv/rust-prometheus.git?rev=fd122caa03#fd122caa)
+    Checking keccak v0.1.0
+    Checking miracl_amcl v3.2.5
+   Compiling pkg-config v0.3.17
+   Compiling glob v0.3.0
+   Compiling unicode-width v0.1.8
+    Checking percent-encoding v1.0.1
+   Compiling quick-error v1.2.3
+   Compiling vec_map v0.8.2
+    Checking foreign-types-shared v0.1.1
+   Compiling strsim v0.8.0
+   Compiling termcolor v1.1.0
+   Compiling bindgen v0.53.3
+   Compiling yaml-rust v0.3.5
+   Compiling openssl v0.10.30
+   Compiling ansi_term v0.11.0
+   Compiling lazycell v1.2.1
+   Compiling peeking_take_while v0.1.2
+   Compiling rustc-hash v1.1.0
+   Compiling shlex v0.1.1
+    Checking fake-simd v0.1.2
+    Checking untrusted v0.7.1
+    Checking unsigned-varint v0.2.3
+    Checking dtoa v0.4.6
+   Compiling crc32fast v1.2.0
+    Checking linked-hash-map v0.5.3
+    Checking bs58 v0.3.1
+   Compiling tentacle-secio v0.2.2 (https://github.com/zeroqn/p2p?rev=31db6ad#31db6ad8)
+    Checking adler v0.2.2
+    Checking instant v0.1.5
+   Compiling httparse v1.3.4
+    Checking copyless v0.1.5
+   Compiling unicode-segmentation v1.6.0
+   Compiling encoding_rs v0.8.23
+    Checking futures-timer v2.0.2
+    Checking mime v0.3.16
+   Compiling rustversion v1.0.3
+    Checking traitobject v0.1.0
+    Checking futures-timer v3.0.2
+    Checking try-lock v0.2.2
+    Checking bit-vec v0.6.2
+   Compiling native-tls v0.2.4
+    Checking sha1 v0.6.0
+    Checking language-tags v0.2.2
+    Checking base64 v0.11.0
+    Checking arc-swap v0.3.11
+    Checking antidote v1.0.0
+    Checking openssl-probe v0.1.2
+    Checking log-mdc v0.1.0
+    Checking static_merkle_tree v1.1.0
+    Checking uuid v0.8.1
+    Checking stringreader v0.1.1
+    Checking subtle v1.0.0
+    Checking static_assertions v1.1.0
+    Checking stable_deref_trait v1.1.1
+    Checking hex v0.3.2
+    Checking creep v0.1.1
+    Checking bs58 v0.2.5
+    Checking common-pubsub v0.1.0-alpha.0 (/workspace/source/common/pubsub)
+    Checking common-channel v0.1.0-alpha.0 (/workspace/source/common/channel)
+    Checking try_from v0.3.2
+   Compiling thread_local v1.0.1
+   Compiling lock_api v0.2.0
+    Checking lock_api v0.3.4
+    Checking lock_api v0.4.0
+   Compiling itertools v0.8.2
+    Checking futures-channel v0.3.5
+   Compiling semver v0.9.0
+    Checking rand_core v0.3.1
+    Checking rand_jitter v0.1.4
+    Checking futures-task v0.3.5
+   Compiling crossbeam-utils v0.7.2
+   Compiling memoffset v0.5.5
+   Compiling crossbeam-epoch v0.8.2
+   Compiling rayon v1.3.1
+   Compiling num-traits v0.2.12
+   Compiling num-integer v0.1.43
+   Compiling indexmap v1.4.0
+   Compiling num-bigint v0.2.6
+    Checking miniz_oxide v0.3.7
+    Checking flatbuffers v0.6.1
+    Checking rlp v0.4.5
+   Compiling rand_pcg v0.1.2
+   Compiling rand_chacha v0.1.1
+   Compiling rand v0.6.5
+    Checking block-padding v0.1.5
+    Checking creep v0.2.2
+    Checking unicode-bidi v0.3.4
+    Checking unicode-normalization v0.1.13
+   Compiling textwrap v0.11.0
+   Compiling humantime v1.3.0
+   Compiling nom v5.1.2
+   Compiling unicase v2.6.0
+   Compiling error-chain v0.12.2
+    Checking foreign-types v0.3.2
+    Checking tokio-sync v0.1.8
+   Compiling clang-sys v0.29.3
+    Checking miniz_oxide v0.4.0
+    Checking lru-cache v0.1.2
+    Checking yaml-rust v0.4.4
+    Checking unsafe-any v0.4.2
+   Compiling heck v0.3.1
+    Checking owning_ref v0.3.3
+    Checking rand_xorshift v0.1.1
+    Checking rand_hc v0.1.0
+    Checking rand_isaac v0.1.1
+   Compiling rustc_version v0.2.3
+    Checking addr2line v0.12.2
+    Checking flatbuffers-verifier v0.2.1
+    Checking impl-rlp v0.2.1
+    Checking typemap v0.3.3
+   Compiling smallvec v0.6.13
+    Checking aho-corasick v0.7.13
+    Checking xml-rs v0.7.0
+    Checking snap v0.2.5
+    Checking fxhash v0.2.1
+    Checking base64 v0.10.1
+    Checking idna v0.1.5
+    Checking idna v0.2.0
+    Checking quote v1.0.7
+   Compiling tiny-keccak v1.5.0
+    Checking uint v0.4.1
+   Compiling parking_lot_core v0.5.0
+   Compiling parking_lot v0.8.0
+   Compiling parking_lot_core v0.6.2
+   Compiling parking_lot v0.9.0
+   Compiling hyper v0.12.35
+    Checking num_cpus v1.13.0
+    Checking iovec v0.1.4
+    Checking rand_os v0.1.3
+    Checking rand v0.4.6
+    Checking net2 v0.2.34
+    Checking backtrace v0.3.49
+    Checking parking_lot_core v0.7.2
+    Checking signal-hook-registry v1.2.0
+    Checking hostname v0.3.1
+    Checking time v0.1.43
+    Checking parking_lot_core v0.8.0
+    Checking atty v0.2.14
+    Checking socket2 v0.3.12
+    Checking thread-id v3.3.0
+   Compiling which v3.1.1
+    Checking flate2 v1.0.16
+   Compiling quote v0.6.13
+    Checking crossbeam-queue v0.2.3
+    Checking crossbeam-channel v0.4.2
+    Checking tokio-executor v0.1.10
+   Compiling hasher v0.1.3
+    Checking xmltree v0.8.0
+    Checking generic-array v0.12.3
+    Checking url v1.7.2
+    Checking regex v1.3.9
+    Checking url v2.1.1
+    Checking bytes v0.4.12
+    Checking threadpool v1.8.1
+    Checking futures-cpupool v0.1.8
+    Checking rand_core v0.5.1
+    Checking resolv-conf v0.6.3
+    Checking parking_lot v0.10.2
+    Checking clap v2.33.1
+    Checking parking_lot v0.11.0
+    Checking ordered-float v1.1.0
+   Compiling mime_guess v2.0.3
+    Checking tokio-current-thread v0.1.7
+    Checking tokio-timer v0.2.13
+    Checking fixed-hash v0.2.5
+    Checking rand v0.3.23
+    Checking parking_lot_core v0.2.14
+    Checking crossbeam-deque v0.7.3
+    Checking digest v0.8.1
+    Checking block-buffer v0.7.3
+    Checking block-cipher-trait v0.6.2
+    Checking stream-cipher v0.3.2
+    Checking crypto-mac v0.7.0
+    Checking rand_chacha v0.2.2
+    Checking rand_pcg v0.2.1
+    Checking http v0.1.21
+    Checking tokio-buf v0.1.1
+    Checking string v0.2.1
+    Checking cookie v0.12.0
+    Checking chrono v0.4.12
+    Checking publicsuffix v1.5.4
+    Checking libmath v0.1.4
+    Checking parking_lot v0.4.8
+    Checking sha3 v0.8.2
+    Checking sha2 v0.8.2
+    Checking aes-soft v0.3.3
+    Checking twofish v0.2.0
+    Checking uuid v0.7.4
+    Checking ctr v0.3.2
+    Checking hmac v0.7.1
+   Compiling cexpr v0.4.0
+    Checking rand v0.7.3
+    Checking prime_tools v0.2.2
+    Checking chashmap v2.2.2
+    Checking aes-ctr v0.3.0
+    Checking fixed-hash v0.5.2
+    Checking http-body v0.1.0
+   Compiling cc v1.0.41
+   Compiling synstructure v0.12.4
+   Compiling synstructure v0.10.2
+   Compiling secp256k1-sys v0.1.2
+   Compiling openssl-sys v0.9.58
+   Compiling libloading v0.5.2
+   Compiling ring v0.16.12
+   Compiling secp256k1 v0.15.5
+   Compiling brotli-sys v0.3.2
+    Checking secp256k1 v0.17.2
+    Checking brotli2 v0.3.2
+   Compiling derive_more v0.15.0
+   Compiling quickcheck_macros v0.8.0
+   Compiling zeroize_derive v0.9.3
+   Compiling futures-macro v0.3.5
+   Compiling derive_more v0.99.9
+   Compiling async-trait v0.1.36
+   Compiling prost-derive v0.6.1
+   Compiling tokio-macros v0.2.5
+   Compiling muta-codec-derive v0.2.0
+   Compiling thiserror-impl v1.0.20
+   Compiling trackable_derive v0.1.3
+   Compiling static-metric-proc-macros v0.1.0 (https://github.com/tikv/rust-prometheus.git?rev=fd122caa03#fd122caa)
+   Compiling ophelia-derive v0.2.0
+   Compiling actix-macros v0.1.2
+   Compiling enum-as-inner v0.3.2
+   Compiling actix-web-codegen v0.2.2
+   Compiling juniper_codegen v0.14.2
+    Checking zeroize v0.9.3
+    Checking failure v0.1.8
+    Checking trackable v0.2.23
+    Checking thiserror v1.0.20
+    Checking ophelia-hasher v0.2.0
+    Checking thrift_codec v0.1.1
+    Checking rustracing v0.4.0
+   Compiling proc-macro-error-attr v0.3.4
+    Checking rustracing_jaeger v0.4.1
+   Compiling proc-macro-error v0.3.4
+    Checking prometheus-static-metric v0.3.0 (https://github.com/tikv/rust-prometheus.git?rev=fd122caa03#fd122caa)
+   Compiling juniper_codegen v0.14.2 (https://github.com/graphql-rust/juniper?rev=eff086a#eff086a3)
+    Checking pin-project v0.4.22
+   Compiling futures-util v0.3.5
+    Checking futures-executor v0.3.5
+    Checking actix-service v1.0.5
+    Checking futures v0.3.5
+    Checking bytes v0.5.5
+    Checking ethereum-types-serialize v0.2.2
+    Checking bincode v1.3.1
+    Checking serde-value v0.5.3
+    Checking serde_yaml v0.8.13
+    Checking serde_urlencoded v0.6.1
+    Checking serde_urlencoded v0.5.5
+    Checking toml v0.4.10
+    Checking toml v0.5.6
+    Checking impl-serde v0.2.3
+    Checking ethbloom v0.5.3
+    Checking ethbloom v0.8.1
+    Checking mio v0.6.22
+    Checking tokio-io v0.1.13
+    Checking attohttpc v0.4.5
+    Checking actix-threadpool v0.3.2
+    Checking tokio-threadpool v0.1.18
+    Checking want v0.2.0
+    Checking env_logger v0.7.1
+    Checking env_logger v0.6.2
+    Checking ethereum-types v0.4.2
+    Checking prost v0.6.1
+    Checking ophelia v0.2.0
+    Checking tentacle-multiaddr v0.1.0 (https://github.com/zeroqn/p2p?rev=31db6ad#31db6ad8)
+    Checking http v0.2.1
+    Checking bytestring v0.1.5
+    Checking igd v0.9.1
+    Checking juniper v0.14.2 (https://github.com/graphql-rust/juniper?rev=eff086a#eff086a3)
+    Checking ophelia-secp256k1 v0.2.0
+    Checking quickcheck v0.9.2
+    Checking tokio-codec v0.1.2
+    Checking h2 v0.1.26
+    Checking tokio-fs v0.1.7
+    Checking mio-uds v0.6.8
+    Checking tokio-reactor v0.1.12
+    Checking amcl_wrapper v0.2.3
+    Checking log4rs v0.8.3
+    Checking cookie_store v0.7.0
+    Checking moodyblues-sdk v0.3.0
+    Checking tokio v0.2.21
+    Checking tokio-uds v0.2.7
+    Checking tokio-tcp v0.1.4
+    Checking tokio-udp v0.1.6
+    Checking tokio v0.1.22
+    Checking rlp v0.3.0
+    Checking secret_sharing v0.1.1
+    Checking bls_amcl v0.7.0
+    Checking tentacle-secio v0.1.11
+    Checking cita_trie v2.0.0
+    Checking ophelia-bls-amcl v0.2.0
+    Checking ophelia-bls-amcl v0.1.1
+    Checking common-logger v0.1.0-alpha.0 (/workspace/source/common/logger)
+    Checking muta-protocol v0.1.0-alpha.1 (/workspace/source/protocol)
+    Checking muta-protocol v0.1.0-alpha.1
+    Checking common-crypto v0.1.0-alpha.0 (/workspace/source/common/crypto)
+    Checking actix-router v0.2.4
+   Compiling muta-apm-derive v0.1.0-alpha.12
+    Checking muta-keypair v0.1.0-alpha.1 (/workspace/source/devtools/keypair)
+    Checking tokio-util v0.2.0
+    Checking actix-rt v1.1.1
+    Checking trust-dns-proto v0.18.0-alpha.2
+    Checking tokio-util v0.3.1
+    Checking overlord v0.2.0-alpha.13
+    Checking muta-apm v0.1.0-alpha.15
+    Checking common-merkle v0.1.0-alpha.0 (/workspace/source/common/merkle)
+    Checking binding-macro v0.1.0-alpha.0 (/workspace/source/binding-macro)
+    Checking hyper-tls v0.3.2
+    Checking common-apm v0.1.0 (/workspace/source/common/apm)
+    Checking overlord v0.2.0-alpha.13 (https://github.com/nervosnetwork/overlord?rev=f9a5dbe6#f9a5dbe6)
+    Checking reqwest v0.9.24
+    Checking tokio-yamux v0.1.14 (https://github.com/zeroqn/p2p?rev=31db6ad#31db6ad8)
+    Checking actix-codec v0.2.0
+    Checking h2 v0.2.5
+    Checking actix-utils v1.0.6
+    Checking tentacle v0.2.7 (https://github.com/zeroqn/p2p?rev=31db6ad#31db6ad8)
+    Checking common-config-parser v0.1.0-alpha.0 (/workspace/source/common/config-parser)
+    Checking actix-server v1.0.3
+    Checking actix-tls v1.0.0
+    Checking actix-testing v1.0.1
+    Checking trust-dns-resolver v0.18.0-alpha.2
+    Checking tentacle-identify v0.2.10 (https://github.com/zeroqn/p2p?rev=31db6ad#31db6ad8)
+    Checking tentacle-ping v0.3.9 (https://github.com/zeroqn/p2p?rev=31db6ad#31db6ad8)
+    Checking tentacle-discovery v0.2.9 (https://github.com/zeroqn/p2p?rev=31db6ad#31db6ad8)
+    Checking actix-connect v1.0.2
+    Checking core-network v0.1.0-alpha.0 (/workspace/source/core/network)
+    Checking actix-http v1.0.1
+   Compiling librocksdb-sys v6.7.4
+    Checking metadata v0.1.0-alpha.0 (/workspace/source/built-in-services/metadata)
+    Checking asset v0.1.0-alpha.0 (/workspace/source/built-in-services/asset)
+    Checking util v0.1.0-alpha.0 (/workspace/source/built-in-services/util)
+    Checking multi-signature v0.1.0-alpha.0 (/workspace/source/built-in-services/multi-signature)
+    Checking authorization v0.1.0 (/workspace/source/built-in-services/authorization)
+    Checking core-mempool v0.1.0-alpha.0 (/workspace/source/core/mempool)
+    Checking awc v1.0.1
+    Checking actix-web v2.0.0
+    Checking core-api v0.1.0-alpha.0 (/workspace/source/core/api)
+The following warnings were emitted during compilation:
+
+warning: couldn't execute `llvm-config --prefix` (error: No such file or directory (os error 2))
+warning: set the LLVM_CONFIG_PATH environment variable to the full path to a valid `llvm-config` executable (including the executable itself)
+warning: c++: internal compiler error: Killed (program cc1plus)
+warning: Please submit a full bug report,
+warning: with preprocessed source if appropriate.
+warning: See <file:///usr/share/doc/gcc-7/README.Bugs> for instructions.
+warning: rocksdb/table/plain/plain_table_builder.cc:302:1: fatal error: error writing to /tmp/cc6Bpmkv.s: Cannot allocate memory
+warning:  }  // namespace rocksdb
+warning:  ^
+warning: compilation terminated.
+warning: c++: internal compiler error: Killed (program cc1plus)
+warning: Please submit a full bug report,
+warning: with preprocessed source if appropriate.
+warning: See <file:///usr/share/doc/gcc-7/README.Bugs> for instructions.
+
+error: failed to run custom build command for `librocksdb-sys v6.7.4`
+
+Caused by:
+  process didn't exit successfully: `/workspace/source/target/debug/build/librocksdb-sys-628d8fae8543bebb/build-script-build` (exit code: 1)
+--- stdout
+cargo:rerun-if-changed=build.rs
+cargo:warning=couldn't execute `llvm-config --prefix` (error: No such file or directory (os error 2))
+cargo:warning=set the LLVM_CONFIG_PATH environment variable to the full path to a valid `llvm-config` executable (including the executable itself)
+cargo:rerun-if-changed=rocksdb/
+NUM_JOBS = Some("16")
+TARGET = Some("x86_64-unknown-linux-gnu")
+OPT_LEVEL = Some("0")
+HOST = Some("x86_64-unknown-linux-gnu")
+CXX_x86_64-unknown-linux-gnu = None
+CXX_x86_64_unknown_linux_gnu = None
+HOST_CXX = None
+CXX = None
+CXXFLAGS_x86_64-unknown-linux-gnu = None
+CXXFLAGS_x86_64_unknown_linux_gnu = None
+HOST_CXXFLAGS = None
+CXXFLAGS = None
+CRATE_CC_NO_DEFAULTS = None
+DEBUG = Some("true")
+CARGO_CFG_TARGET_FEATURE = Some("fxsr,mmx,sse,sse2")
+CXX_x86_64-unknown-linux-gnu = None
+CXX_x86_64_unknown_linux_gnu = None
+HOST_CXX = None
+CXX = None
+CXXFLAGS_x86_64-unknown-linux-gnu = None
+CXXFLAGS_x86_64_unknown_linux_gnu = None
+HOST_CXXFLAGS = None
+CXXFLAGS = None
+CRATE_CC_NO_DEFAULTS = None
+CARGO_CFG_TARGET_FEATURE = Some("fxsr,mmx,sse,sse2")
+CXX_x86_64-unknown-linux-gnu = None
+CXX_x86_64_unknown_linux_gnu = None
+HOST_CXX = None
+CXX = None
+CXXFLAGS_x86_64-unknown-linux-gnu = None
+CXXFLAGS_x86_64_unknown_linux_gnu = None
+HOST_CXXFLAGS = None
+CXXFLAGS = None
+CRATE_CC_NO_DEFAULTS = None
+CARGO_CFG_TARGET_FEATURE = Some("fxsr,mmx,sse,sse2")
+CXX_x86_64-unknown-linux-gnu = None
+CXX_x86_64_unknown_linux_gnu = None
+HOST_CXX = None
+CXX = None
+CXXFLAGS_x86_64-unknown-linux-gnu = None
+CXXFLAGS_x86_64_unknown_linux_gnu = None
+HOST_CXXFLAGS = None
+CXXFLAGS = None
+CRATE_CC_NO_DEFAULTS = None
+CARGO_CFG_TARGET_FEATURE = Some("fxsr,mmx,sse,sse2")
+CXX_x86_64-unknown-linux-gnu = None
+CXX_x86_64_unknown_linux_gnu = None
+HOST_CXX = None
+CXX = None
+CXXFLAGS_x86_64-unknown-linux-gnu = None
+CXXFLAGS_x86_64_unknown_linux_gnu = None
+HOST_CXXFLAGS = None
+CXXFLAGS = None
+CRATE_CC_NO_DEFAULTS = None
+CARGO_CFG_TARGET_FEATURE = Some("fxsr,mmx,sse,sse2")
+running: "c++" "-O0" "-ffunction-sections" "-fdata-sections" "-fPIC" "-g" "-fno-omit-frame-pointer" "-m64" "-I" "rocksdb/include/" "-I" "rocksdb/" "-I" "rocksdb/third-party/gtest-1.8.1/fused-src/" "-I" "snappy/" "-I" "lz4/lib/" "-I" "zstd/lib/" "-I" "zstd/lib/dictBuilder/" "-I" "zlib/" "-I" "bzip2/" "-I" "." "-Wall" "-Wextra" "-std=c++11" "-Wno-unused-parameter" "-msse2" "-msse4.1" "-msse4.2" "-mpclmul" "-DSNAPPY=1" "-DLZ4=1" "-DZSTD=1" "-DZLIB=1" "-DBZIP2=1" "-DNDEBUG=1" "-DHAVE_PCLMUL=1" "-DHAVE_SSE42=1" "-DOS_LINUX=1" "-DROCKSDB_PLATFORM_POSIX=1" "-DROCKSDB_LIB_IO_POSIX=1" "-o" "/workspace/source/target/debug/build/librocksdb-sys-30b3d049ae1421f9/out/rocksdb/table/plain/plain_table_builder.o" "-c" "rocksdb/table/plain/plain_table_builder.cc"
+running: "c++" "-O0" "-ffunction-sections" "-fdata-sections" "-fPIC" "-g" "-fno-omit-frame-pointer" "-m64" "-I" "rocksdb/include/" "-I" "rocksdb/" "-I" "rocksdb/third-party/gtest-1.8.1/fused-src/" "-I" "snappy/" "-I" "lz4/lib/" "-I" "zstd/lib/" "-I" "zstd/lib/dictBuilder/" "-I" "zlib/" "-I" "bzip2/" "-I" "." "-Wall" "-Wextra" "-std=c++11" "-Wno-unused-parameter" "-msse2" "-msse4.1" "-msse4.2" "-mpclmul" "-DSNAPPY=1" "-DLZ4=1" "-DZSTD=1" "-DZLIB=1" "-DBZIP2=1" "-DNDEBUG=1" "-DHAVE_PCLMUL=1" "-DHAVE_SSE42=1" "-DOS_LINUX=1" "-DROCKSDB_PLATFORM_POSIX=1" "-DROCKSDB_LIB_IO_POSIX=1" "-o" "/workspace/source/target/debug/build/librocksdb-sys-30b3d049ae1421f9/out/rocksdb/db/compaction/compaction_picker_universal.o" "-c" "rocksdb/db/compaction/compaction_picker_universal.cc"
+running: "c++" "-O0" "-ffunction-sections" "-fdata-sections" "-fPIC" "-g" "-fno-omit-frame-pointer" "-m64" "-I" "rocksdb/include/" "-I" "rocksdb/" "-I" "rocksdb/third-party/gtest-1.8.1/fused-src/" "-I" "snappy/" "-I" "lz4/lib/" "-I" "zstd/lib/" "-I" "zstd/lib/dictBuilder/" "-I" "zlib/" "-I" "bzip2/" "-I" "." "-Wall" "-Wextra" "-std=c++11" "-Wno-unused-parameter" "-msse2" "-msse4.1" "-msse4.2" "-mpclmul" "-DSNAPPY=1" "-DLZ4=1" "-DZSTD=1" "-DZLIB=1" "-DBZIP2=1" "-DNDEBUG=1" "-DHAVE_PCLMUL=1" "-DHAVE_SSE42=1" "-DOS_LINUX=1" "-DROCKSDB_PLATFORM_POSIX=1" "-DROCKSDB_LIB_IO_POSIX=1" "-o" "/workspace/source/target/debug/build/librocksdb-sys-30b3d049ae1421f9/out/rocksdb/db/db_impl/db_impl_files.o" "-c" "rocksdb/db/db_impl/db_impl_files.cc"
+running: "c++" "-O0" "-ffunction-sections" "-fdata-sections" "-fPIC" "-g" "-fno-omit-frame-pointer" "-m64" "-I" "rocksdb/include/" "-I" "rocksdb/" "-I" "rocksdb/third-party/gtest-1.8.1/fused-src/" "-I" "snappy/" "-I" "lz4/lib/" "-I" "zstd/lib/" "-I" "zstd/lib/dictBuilder/" "-I" "zlib/" "-I" "bzip2/" "-I" "." "-Wall" "-Wextra" "-std=c++11" "-Wno-unused-parameter" "-msse2" "-msse4.1" "-msse4.2" "-mpclmul" "-DSNAPPY=1" "-DLZ4=1" "-DZSTD=1" "-DZLIB=1" "-DBZIP2=1" "-DNDEBUG=1" "-DHAVE_PCLMUL=1" "-DHAVE_SSE42=1" "-DOS_LINUX=1" "-DROCKSDB_PLATFORM_POSIX=1" "-DROCKSDB_LIB_IO_POSIX=1" "-o" "/workspace/source/target/debug/build/librocksdb-sys-30b3d049ae1421f9/out/rocksdb/table/plain/plain_table_key_coding.o" "-c" "rocksdb/table/plain/plain_table_key_coding.cc"
+running: "c++" "-O0" "-ffunction-sections" "-fdata-sections" "-fPIC" "-g" "-fno-omit-frame-pointer" "-m64" "-I" "rocksdb/include/" "-I" "rocksdb/" "-I" "rocksdb/third-party/gtest-1.8.1/fused-src/" "-I" "snappy/" "-I" "lz4/lib/" "-I" "zstd/lib/" "-I" "zstd/lib/dictBuilder/" "-I" "zlib/" "-I" "bzip2/" "-I" "." "-Wall" "-Wextra" "-std=c++11" "-Wno-unused-parameter" "-msse2" "-msse4.1" "-msse4.2" "-mpclmul" "-DSNAPPY=1" "-DLZ4=1" "-DZSTD=1" "-DZLIB=1" "-DBZIP2=1" "-DNDEBUG=1" "-DHAVE_PCLMUL=1" "-DHAVE_SSE42=1" "-DOS_LINUX=1" "-DROCKSDB_PLATFORM_POSIX=1" "-DROCKSDB_LIB_IO_POSIX=1" "-o" "/workspace/source/target/debug/build/librocksdb-sys-30b3d049ae1421f9/out/rocksdb/db/compacted_db_impl.o" "-c" "rocksdb/db/compacted_db_impl.cc"
+running: "c++" "-O0" "-ffunction-sections" "-fdata-sections" "-fPIC" "-g" "-fno-omit-frame-pointer" "-m64" "-I" "rocksdb/include/" "-I" "rocksdb/" "-I" "rocksdb/third-party/gtest-1.8.1/fused-src/" "-I" "snappy/" "-I" "lz4/lib/" "-I" "zstd/lib/" "-I" "zstd/lib/dictBuilder/" "-I" "zlib/" "-I" "bzip2/" "-I" "." "-Wall" "-Wextra" "-std=c++11" "-Wno-unused-parameter" "-msse2" "-msse4.1" "-msse4.2" "-mpclmul" "-DSNAPPY=1" "-DLZ4=1" "-DZSTD=1" "-DZLIB=1" "-DBZIP2=1" "-DNDEBUG=1" "-DHAVE_PCLMUL=1" "-DHAVE_SSE42=1" "-DOS_LINUX=1" "-DROCKSDB_PLATFORM_POSIX=1" "-DROCKSDB_LIB_IO_POSIX=1" "-o" "/workspace/source/target/debug/build/librocksdb-sys-30b3d049ae1421f9/out/rocksdb/memory/jemalloc_nodump_allocator.o" "-c" "rocksdb/memory/jemalloc_nodump_allocator.cc"
+running: "c++" "-O0" "-ffunction-sections" "-fdata-sections" "-fPIC" "-g" "-fno-omit-frame-pointer" "-m64" "-I" "rocksdb/include/" "-I" "rocksdb/" "-I" "rocksdb/third-party/gtest-1.8.1/fused-src/" "-I" "snappy/" "-I" "lz4/lib/" "-I" "zstd/lib/" "-I" "zstd/lib/dictBuilder/" "-I" "zlib/" "-I" "bzip2/" "-I" "." "-Wall" "-Wextra" "-std=c++11" "-Wno-unused-parameter" "-msse2" "-msse4.1" "-msse4.2" "-mpclmul" "-DSNAPPY=1" "-DLZ4=1" "-DZSTD=1" "-DZLIB=1" "-DBZIP2=1" "-DNDEBUG=1" "-DHAVE_PCLMUL=1" "-DHAVE_SSE42=1" "-DOS_LINUX=1" "-DROCKSDB_PLATFORM_POSIX=1" "-DROCKSDB_LIB_IO_POSIX=1" "-o" "/workspace/source/target/debug/build/librocksdb-sys-30b3d049ae1421f9/out/rocksdb/db/wal_manager.o" "-c" "rocksdb/db/wal_manager.cc"
+running: "c++" "-O0" "-ffunction-sections" "-fdata-sections" "-fPIC" "-g" "-fno-omit-frame-pointer" "-m64" "-I" "rocksdb/include/" "-I" "rocksdb/" "-I" "rocksdb/third-party/gtest-1.8.1/fused-src/" "-I" "snappy/" "-I" "lz4/lib/" "-I" "zstd/lib/" "-I" "zstd/lib/dictBuilder/" "-I" "zlib/" "-I" "bzip2/" "-I" "." "-Wall" "-Wextra" "-std=c++11" "-Wno-unused-parameter" "-msse2" "-msse4.1" "-msse4.2" "-mpclmul" "-DSNAPPY=1" "-DLZ4=1" "-DZSTD=1" "-DZLIB=1" "-DBZIP2=1" "-DNDEBUG=1" "-DHAVE_PCLMUL=1" "-DHAVE_SSE42=1" "-DOS_LINUX=1" "-DROCKSDB_PLATFORM_POSIX=1" "-DROCKSDB_LIB_IO_POSIX=1" "-o" "/workspace/source/target/debug/build/librocksdb-sys-30b3d049ae1421f9/out/rocksdb/cache/clock_cache.o" "-c" "rocksdb/cache/clock_cache.cc"
+running: "c++" "-O0" "-ffunction-sections" "-fdata-sections" "-fPIC" "-g" "-fno-omit-frame-pointer" "-m64" "-I" "rocksdb/include/" "-I" "rocksdb/" "-I" "rocksdb/third-party/gtest-1.8.1/fused-src/" "-I" "snappy/" "-I" "lz4/lib/" "-I" "zstd/lib/" "-I" "zstd/lib/dictBuilder/" "-I" "zlib/" "-I" "bzip2/" "-I" "." "-Wall" "-Wextra" "-std=c++11" "-Wno-unused-parameter" "-msse2" "-msse4.1" "-msse4.2" "-mpclmul" "-DSNAPPY=1" "-DLZ4=1" "-DZSTD=1" "-DZLIB=1" "-DBZIP2=1" "-DNDEBUG=1" "-DHAVE_PCLMUL=1" "-DHAVE_SSE42=1" "-DOS_LINUX=1" "-DROCKSDB_PLATFORM_POSIX=1" "-DROCKSDB_LIB_IO_POSIX=1" "-o" "/workspace/source/target/debug/build/librocksdb-sys-30b3d049ae1421f9/out/rocksdb/util/comparator.o" "-c" "rocksdb/util/comparator.cc"
+running: "c++" "-O0" "-ffunction-sections" "-fdata-sections" "-fPIC" "-g" "-fno-omit-frame-pointer" "-m64" "-I" "rocksdb/include/" "-I" "rocksdb/" "-I" "rocksdb/third-party/gtest-1.8.1/fused-src/" "-I" "snappy/" "-I" "lz4/lib/" "-I" "zstd/lib/" "-I" "zstd/lib/dictBuilder/" "-I" "zlib/" "-I" "bzip2/" "-I" "." "-Wall" "-Wextra" "-std=c++11" "-Wno-unused-parameter" "-msse2" "-msse4.1" "-msse4.2" "-mpclmul" "-DSNAPPY=1" "-DLZ4=1" "-DZSTD=1" "-DZLIB=1" "-DBZIP2=1" "-DNDEBUG=1" "-DHAVE_PCLMUL=1" "-DHAVE_SSE42=1" "-DOS_LINUX=1" "-DROCKSDB_PLATFORM_POSIX=1" "-DROCKSDB_LIB_IO_POSIX=1" "-o" "/workspace/source/target/debug/build/librocksdb-sys-30b3d049ae1421f9/out/rocksdb/table/adaptive/adaptive_table_factory.o" "-c" "rocksdb/table/adaptive/adaptive_table_factory.cc"
+running: "c++" "-O0" "-ffunction-sections" "-fdata-sections" "-fPIC" "-g" "-fno-omit-frame-pointer" "-m64" "-I" "rocksdb/include/" "-I" "rocksdb/" "-I" "rocksdb/third-party/gtest-1.8.1/fused-src/" "-I" "snappy/" "-I" "lz4/lib/" "-I" "zstd/lib/" "-I" "zstd/lib/dictBuilder/" "-I" "zlib/" "-I" "bzip2/" "-I" "." "-Wall" "-Wextra" "-std=c++11" "-Wno-unused-parameter" "-msse2" "-msse4.1" "-msse4.2" "-mpclmul" "-DSNAPPY=1" "-DLZ4=1" "-DZSTD=1" "-DZLIB=1" "-DBZIP2=1" "-DNDEBUG=1" "-DHAVE_PCLMUL=1" "-DHAVE_SSE42=1" "-DOS_LINUX=1" "-DROCKSDB_PLATFORM_POSIX=1" "-DROCKSDB_LIB_IO_POSIX=1" "-o" "/workspace/source/target/debug/build/librocksdb-sys-30b3d049ae1421f9/out/rocksdb/util/dynamic_bloom.o" "-c" "rocksdb/util/dynamic_bloom.cc"
+running: "c++" "-O0" "-ffunction-sections" "-fdata-sections" "-fPIC" "-g" "-fno-omit-frame-pointer" "-m64" "-I" "rocksdb/include/" "-I" "rocksdb/" "-I" "rocksdb/third-party/gtest-1.8.1/fused-src/" "-I" "snappy/" "-I" "lz4/lib/" "-I" "zstd/lib/" "-I" "zstd/lib/dictBuilder/" "-I" "zlib/" "-I" "bzip2/" "-I" "." "-Wall" "-Wextra" "-std=c++11" "-Wno-unused-parameter" "-msse2" "-msse4.1" "-msse4.2" "-mpclmul" "-DSNAPPY=1" "-DLZ4=1" "-DZSTD=1" "-DZLIB=1" "-DBZIP2=1" "-DNDEBUG=1" "-DHAVE_PCLMUL=1" "-DHAVE_SSE42=1" "-DOS_LINUX=1" "-DROCKSDB_PLATFORM_POSIX=1" "-DROCKSDB_LIB_IO_POSIX=1" "-o" "/workspace/source/target/debug/build/librocksdb-sys-30b3d049ae1421f9/out/rocksdb/db/error_handler.o" "-c" "rocksdb/db/error_handler.cc"
+running: "c++" "-O0" "-ffunction-sections" "-fdata-sections" "-fPIC" "-g" "-fno-omit-frame-pointer" "-m64" "-I" "rocksdb/include/" "-I" "rocksdb/" "-I" "rocksdb/third-party/gtest-1.8.1/fused-src/" "-I" "snappy/" "-I" "lz4/lib/" "-I" "zstd/lib/" "-I" "zstd/lib/dictBuilder/" "-I" "zlib/" "-I" "bzip2/" "-I" "." "-Wall" "-Wextra" "-std=c++11" "-Wno-unused-parameter" "-msse2" "-msse4.1" "-msse4.2" "-mpclmul" "-DSNAPPY=1" "-DLZ4=1" "-DZSTD=1" "-DZLIB=1" "-DBZIP2=1" "-DNDEBUG=1" "-DHAVE_PCLMUL=1" "-DHAVE_SSE42=1" "-DOS_LINUX=1" "-DROCKSDB_PLATFORM_POSIX=1" "-DROCKSDB_LIB_IO_POSIX=1" "-o" "/workspace/source/target/debug/build/librocksdb-sys-30b3d049ae1421f9/out/rocksdb/util/thread_local.o" "-c" "rocksdb/util/thread_local.cc"
+running: "c++" "-O0" "-ffunction-sections" "-fdata-sections" "-fPIC" "-g" "-fno-omit-frame-pointer" "-m64" "-I" "rocksdb/include/" "-I" "rocksdb/" "-I" "rocksdb/third-party/gtest-1.8.1/fused-src/" "-I" "snappy/" "-I" "lz4/lib/" "-I" "zstd/lib/" "-I" "zstd/lib/dictBuilder/" "-I" "zlib/" "-I" "bzip2/" "-I" "." "-Wall" "-Wextra" "-std=c++11" "-Wno-unused-parameter" "-msse2" "-msse4.1" "-msse4.2" "-mpclmul" "-DSNAPPY=1" "-DLZ4=1" "-DZSTD=1" "-DZLIB=1" "-DBZIP2=1" "-DNDEBUG=1" "-DHAVE_PCLMUL=1" "-DHAVE_SSE42=1" "-DOS_LINUX=1" "-DROCKSDB_PLATFORM_POSIX=1" "-DROCKSDB_LIB_IO_POSIX=1" "-o" "/workspace/source/target/debug/build/librocksdb-sys-30b3d049ae1421f9/out/rocksdb/table/table_properties.o" "-c" "rocksdb/table/table_properties.cc"
+running: "c++" "-O0" "-ffunction-sections" "-fdata-sections" "-fPIC" "-g" "-fno-omit-frame-pointer" "-m64" "-I" "rocksdb/include/" "-I" "rocksdb/" "-I" "rocksdb/third-party/gtest-1.8.1/fused-src/" "-I" "snappy/" "-I" "lz4/lib/" "-I" "zstd/lib/" "-I" "zstd/lib/dictBuilder/" "-I" "zlib/" "-I" "bzip2/" "-I" "." "-Wall" "-Wextra" "-std=c++11" "-Wno-unused-parameter" "-msse2" "-msse4.1" "-msse4.2" "-mpclmul" "-DSNAPPY=1" "-DLZ4=1" "-DZSTD=1" "-DZLIB=1" "-DBZIP2=1" "-DNDEBUG=1" "-DHAVE_PCLMUL=1" "-DHAVE_SSE42=1" "-DOS_LINUX=1" "-DROCKSDB_PLATFORM_POSIX=1" "-DROCKSDB_LIB_IO_POSIX=1" "-o" "/workspace/source/target/debug/build/librocksdb-sys-30b3d049ae1421f9/out/rocksdb/trace_replay/block_cache_tracer.o" "-c" "rocksdb/trace_replay/block_cache_tracer.cc"
+running: "c++" "-O0" "-ffunction-sections" "-fdata-sections" "-fPIC" "-g" "-fno-omit-frame-pointer" "-m64" "-I" "rocksdb/include/" "-I" "rocksdb/" "-I" "rocksdb/third-party/gtest-1.8.1/fused-src/" "-I" "snappy/" "-I" "lz4/lib/" "-I" "zstd/lib/" "-I" "zstd/lib/dictBuilder/" "-I" "zlib/" "-I" "bzip2/" "-I" "." "-Wall" "-Wextra" "-std=c++11" "-Wno-unused-parameter" "-msse2" "-msse4.1" "-msse4.2" "-mpclmul" "-DSNAPPY=1" "-DLZ4=1" "-DZSTD=1" "-DZLIB=1" "-DBZIP2=1" "-DNDEBUG=1" "-DHAVE_PCLMUL=1" "-DHAVE_SSE42=1" "-DOS_LINUX=1" "-DROCKSDB_PLATFORM_POSIX=1" "-DROCKSDB_LIB_IO_POSIX=1" "-o" "/workspace/source/target/debug/build/librocksdb-sys-30b3d049ae1421f9/out/rocksdb/file/delete_scheduler.o" "-c" "rocksdb/file/delete_scheduler.cc"
+exit code: 0
+exit code: 0
+running: "c++" "-O0" "-ffunction-sections" "-fdata-sections" "-fPIC" "-g" "-fno-omit-frame-pointer" "-m64" "-I" "rocksdb/include/" "-I" "rocksdb/" "-I" "rocksdb/third-party/gtest-1.8.1/fused-src/" "-I" "snappy/" "-I" "lz4/lib/" "-I" "zstd/lib/" "-I" "zstd/lib/dictBuilder/" "-I" "zlib/" "-I" "bzip2/" "-I" "." "-Wall" "-Wextra" "-std=c++11" "-Wno-unused-parameter" "-msse2" "-msse4.1" "-msse4.2" "-mpclmul" "-DSNAPPY=1" "-DLZ4=1" "-DZSTD=1" "-DZLIB=1" "-DBZIP2=1" "-DNDEBUG=1" "-DHAVE_PCLMUL=1" "-DHAVE_SSE42=1" "-DOS_LINUX=1" "-DROCKSDB_PLATFORM_POSIX=1" "-DROCKSDB_LIB_IO_POSIX=1" "-o" "/workspace/source/target/debug/build/librocksdb-sys-30b3d049ae1421f9/out/rocksdb/cache/lru_cache.o" "-c" "rocksdb/cache/lru_cache.cc"
+running: "c++" "-O0" "-ffunction-sections" "-fdata-sections" "-fPIC" "-g" "-fno-omit-frame-pointer" "-m64" "-I" "rocksdb/include/" "-I" "rocksdb/" "-I" "rocksdb/third-party/gtest-1.8.1/fused-src/" "-I" "snappy/" "-I" "lz4/lib/" "-I" "zstd/lib/" "-I" "zstd/lib/dictBuilder/" "-I" "zlib/" "-I" "bzip2/" "-I" "." "-Wall" "-Wextra" "-std=c++11" "-Wno-unused-parameter" "-msse2" "-msse4.1" "-msse4.2" "-mpclmul" "-DSNAPPY=1" "-DLZ4=1" "-DZSTD=1" "-DZLIB=1" "-DBZIP2=1" "-DNDEBUG=1" "-DHAVE_PCLMUL=1" "-DHAVE_SSE42=1" "-DOS_LINUX=1" "-DROCKSDB_PLATFORM_POSIX=1" "-DROCKSDB_LIB_IO_POSIX=1" "-o" "/workspace/source/target/debug/build/librocksdb-sys-30b3d049ae1421f9/out/rocksdb/util/compression_context_cache.o" "-c" "rocksdb/util/compression_context_cache.cc"
+exit code: 0
+running: "c++" "-O0" "-ffunction-sections" "-fdata-sections" "-fPIC" "-g" "-fno-omit-frame-pointer" "-m64" "-I" "rocksdb/include/" "-I" "rocksdb/" "-I" "rocksdb/third-party/gtest-1.8.1/fused-src/" "-I" "snappy/" "-I" "lz4/lib/" "-I" "zstd/lib/" "-I" "zstd/lib/dictBuilder/" "-I" "zlib/" "-I" "bzip2/" "-I" "." "-Wall" "-Wextra" "-std=c++11" "-Wno-unused-parameter" "-msse2" "-msse4.1" "-msse4.2" "-mpclmul" "-DSNAPPY=1" "-DLZ4=1" "-DZSTD=1" "-DZLIB=1" "-DBZIP2=1" "-DNDEBUG=1" "-DHAVE_PCLMUL=1" "-DHAVE_SSE42=1" "-DOS_LINUX=1" "-DROCKSDB_PLATFORM_POSIX=1" "-DROCKSDB_LIB_IO_POSIX=1" "-o" "/workspace/source/target/debug/build/librocksdb-sys-30b3d049ae1421f9/out/rocksdb/memtable/alloc_tracker.o" "-c" "rocksdb/memtable/alloc_tracker.cc"
+exit code: 0
+running: "c++" "-O0" "-ffunction-sections" "-fdata-sections" "-fPIC" "-g" "-fno-omit-frame-pointer" "-m64" "-I" "rocksdb/include/" "-I" "rocksdb/" "-I" "rocksdb/third-party/gtest-1.8.1/fused-src/" "-I" "snappy/" "-I" "lz4/lib/" "-I" "zstd/lib/" "-I" "zstd/lib/dictBuilder/" "-I" "zlib/" "-I" "bzip2/" "-I" "." "-Wall" "-Wextra" "-std=c++11" "-Wno-unused-parameter" "-msse2" "-msse4.1" "-msse4.2" "-mpclmul" "-DSNAPPY=1" "-DLZ4=1" "-DZSTD=1" "-DZLIB=1" "-DBZIP2=1" "-DNDEBUG=1" "-DHAVE_PCLMUL=1" "-DHAVE_SSE42=1" "-DOS_LINUX=1" "-DROCKSDB_PLATFORM_POSIX=1" "-DROCKSDB_LIB_IO_POSIX=1" "-o" "/workspace/source/target/debug/build/librocksdb-sys-30b3d049ae1421f9/out/rocksdb/util/threadpool_imp.o" "-c" "rocksdb/util/threadpool_imp.cc"
+exit code: 0
+running: "c++" "-O0" "-ffunction-sections" "-fdata-sections" "-fPIC" "-g" "-fno-omit-frame-pointer" "-m64" "-I" "rocksdb/include/" "-I" "rocksdb/" "-I" "rocksdb/third-party/gtest-1.8.1/fused-src/" "-I" "snappy/" "-I" "lz4/lib/" "-I" "zstd/lib/" "-I" "zstd/lib/dictBuilder/" "-I" "zlib/" "-I" "bzip2/" "-I" "." "-Wall" "-Wextra" "-std=c++11" "-Wno-unused-parameter" "-msse2" "-msse4.1" "-msse4.2" "-mpclmul" "-DSNAPPY=1" "-DLZ4=1" "-DZSTD=1" "-DZLIB=1" "-DBZIP2=1" "-DNDEBUG=1" "-DHAVE_PCLMUL=1" "-DHAVE_SSE42=1" "-DOS_LINUX=1" "-DROCKSDB_PLATFORM_POSIX=1" "-DROCKSDB_LIB_IO_POSIX=1" "-o" "/workspace/source/target/debug/build/librocksdb-sys-30b3d049ae1421f9/out/rocksdb/memtable/hash_linklist_rep.o" "-c" "rocksdb/memtable/hash_linklist_rep.cc"
+exit code: 0
+running: "c++" "-O0" "-ffunction-sections" "-fdata-sections" "-fPIC" "-g" "-fno-omit-frame-pointer" "-m64" "-I" "rocksdb/include/" "-I" "rocksdb/" "-I" "rocksdb/third-party/gtest-1.8.1/fused-src/" "-I" "snappy/" "-I" "lz4/lib/" "-I" "zstd/lib/" "-I" "zstd/lib/dictBuilder/" "-I" "zlib/" "-I" "bzip2/" "-I" "." "-Wall" "-Wextra" "-std=c++11" "-Wno-unused-parameter" "-msse2" "-msse4.1" "-msse4.2" "-mpclmul" "-DSNAPPY=1" "-DLZ4=1" "-DZSTD=1" "-DZLIB=1" "-DBZIP2=1" "-DNDEBUG=1" "-DHAVE_PCLMUL=1" "-DHAVE_SSE42=1" "-DOS_LINUX=1" "-DROCKSDB_PLATFORM_POSIX=1" "-DROCKSDB_LIB_IO_POSIX=1" "-o" "/workspace/source/target/debug/build/librocksdb-sys-30b3d049ae1421f9/out/rocksdb/cache/sharded_cache.o" "-c" "rocksdb/cache/sharded_cache.cc"
+exit code: 0
+running: "c++" "-O0" "-ffunction-sections" "-fdata-sections" "-fPIC" "-g" "-fno-omit-frame-pointer" "-m64" "-I" "rocksdb/include/" "-I" "rocksdb/" "-I" "rocksdb/third-party/gtest-1.8.1/fused-src/" "-I" "snappy/" "-I" "lz4/lib/" "-I" "zstd/lib/" "-I" "zstd/lib/dictBuilder/" "-I" "zlib/" "-I" "bzip2/" "-I" "." "-Wall" "-Wextra" "-std=c++11" "-Wno-unused-parameter" "-msse2" "-msse4.1" "-msse4.2" "-mpclmul" "-DSNAPPY=1" "-DLZ4=1" "-DZSTD=1" "-DZLIB=1" "-DBZIP2=1" "-DNDEBUG=1" "-DHAVE_PCLMUL=1" "-DHAVE_SSE42=1" "-DOS_LINUX=1" "-DROCKSDB_PLATFORM_POSIX=1" "-DROCKSDB_LIB_IO_POSIX=1" "-o" "/workspace/source/target/debug/build/librocksdb-sys-30b3d049ae1421f9/out/rocksdb/util/hash.o" "-c" "rocksdb/util/hash.cc"
+exit code: 0
+running: "c++" "-O0" "-ffunction-sections" "-fdata-sections" "-fPIC" "-g" "-fno-omit-frame-pointer" "-m64" "-I" "rocksdb/include/" "-I" "rocksdb/" "-I" "rocksdb/third-party/gtest-1.8.1/fused-src/" "-I" "snappy/" "-I" "lz4/lib/" "-I" "zstd/lib/" "-I" "zstd/lib/dictBuilder/" "-I" "zlib/" "-I" "bzip2/" "-I" "." "-Wall" "-Wextra" "-std=c++11" "-Wno-unused-parameter" "-msse2" "-msse4.1" "-msse4.2" "-mpclmul" "-DSNAPPY=1" "-DLZ4=1" "-DZSTD=1" "-DZLIB=1" "-DBZIP2=1" "-DNDEBUG=1" "-DHAVE_PCLMUL=1" "-DHAVE_SSE42=1" "-DOS_LINUX=1" "-DROCKSDB_PLATFORM_POSIX=1" "-DROCKSDB_LIB_IO_POSIX=1" "-o" "/workspace/source/target/debug/build/librocksdb-sys-30b3d049ae1421f9/out/rocksdb/util/concurrent_task_limiter_impl.o" "-c" "rocksdb/util/concurrent_task_limiter_impl.cc"
+exit code: 0
+running: "c++" "-O0" "-ffunction-sections" "-fdata-sections" "-fPIC" "-g" "-fno-omit-frame-pointer" "-m64" "-I" "rocksdb/include/" "-I" "rocksdb/" "-I" "rocksdb/third-party/gtest-1.8.1/fused-src/" "-I" "snappy/" "-I" "lz4/lib/" "-I" "zstd/lib/" "-I" "zstd/lib/dictBuilder/" "-I" "zlib/" "-I" "bzip2/" "-I" "." "-Wall" "-Wextra" "-std=c++11" "-Wno-unused-parameter" "-msse2" "-msse4.1" "-msse4.2" "-mpclmul" "-DSNAPPY=1" "-DLZ4=1" "-DZSTD=1" "-DZLIB=1" "-DBZIP2=1" "-DNDEBUG=1" "-DHAVE_PCLMUL=1" "-DHAVE_SSE42=1" "-DOS_LINUX=1" "-DROCKSDB_PLATFORM_POSIX=1" "-DROCKSDB_LIB_IO_POSIX=1" "-o" "/workspace/source/target/debug/build/librocksdb-sys-30b3d049ae1421f9/out/rocksdb/table/block_based/block.o" "-c" "rocksdb/table/block_based/block.cc"
+exit code: 0
+running: "c++" "-O0" "-ffunction-sections" "-fdata-sections" "-fPIC" "-g" "-fno-omit-frame-pointer" "-m64" "-I" "rocksdb/include/" "-I" "rocksdb/" "-I" "rocksdb/third-party/gtest-1.8.1/fused-src/" "-I" "snappy/" "-I" "lz4/lib/" "-I" "zstd/lib/" "-I" "zstd/lib/dictBuilder/" "-I" "zlib/" "-I" "bzip2/" "-I" "." "-Wall" "-Wextra" "-std=c++11" "-Wno-unused-parameter" "-msse2" "-msse4.1" "-msse4.2" "-mpclmul" "-DSNAPPY=1" "-DLZ4=1" "-DZSTD=1" "-DZLIB=1" "-DBZIP2=1" "-DNDEBUG=1" "-DHAVE_PCLMUL=1" "-DHAVE_SSE42=1" "-DOS_LINUX=1" "-DROCKSDB_PLATFORM_POSIX=1" "-DROCKSDB_LIB_IO_POSIX=1" "-o" "/workspace/source/target/debug/build/librocksdb-sys-30b3d049ae1421f9/out/rocksdb/db/arena_wrapped_db_iter.o" "-c" "rocksdb/db/arena_wrapped_db_iter.cc"
+exit code: 0
+running: "c++" "-O0" "-ffunction-sections" "-fdata-sections" "-fPIC" "-g" "-fno-omit-frame-pointer" "-m64" "-I" "rocksdb/include/" "-I" "rocksdb/" "-I" "rocksdb/third-party/gtest-1.8.1/fused-src/" "-I" "snappy/" "-I" "lz4/lib/" "-I" "zstd/lib/" "-I" "zstd/lib/dictBuilder/" "-I" "zlib/" "-I" "bzip2/" "-I" "." "-Wall" "-Wextra" "-std=c++11" "-Wno-unused-parameter" "-msse2" "-msse4.1" "-msse4.2" "-mpclmul" "-DSNAPPY=1" "-DLZ4=1" "-DZSTD=1" "-DZLIB=1" "-DBZIP2=1" "-DNDEBUG=1" "-DHAVE_PCLMUL=1" "-DHAVE_SSE42=1" "-DOS_LINUX=1" "-DROCKSDB_PLATFORM_POSIX=1" "-DROCKSDB_LIB_IO_POSIX=1" "-o" "/workspace/source/target/debug/build/librocksdb-sys-30b3d049ae1421f9/out/rocksdb/util/murmurhash.o" "-c" "rocksdb/util/murmurhash.cc"
+exit code: 0
+running: "c++" "-O0" "-ffunction-sections" "-fdata-sections" "-fPIC" "-g" "-fno-omit-frame-pointer" "-m64" "-I" "rocksdb/include/" "-I" "rocksdb/" "-I" "rocksdb/third-party/gtest-1.8.1/fused-src/" "-I" "snappy/" "-I" "lz4/lib/" "-I" "zstd/lib/" "-I" "zstd/lib/dictBuilder/" "-I" "zlib/" "-I" "bzip2/" "-I" "." "-Wall" "-Wextra" "-std=c++11" "-Wno-unused-parameter" "-msse2" "-msse4.1" "-msse4.2" "-mpclmul" "-DSNAPPY=1" "-DLZ4=1" "-DZSTD=1" "-DZLIB=1" "-DBZIP2=1" "-DNDEBUG=1" "-DHAVE_PCLMUL=1" "-DHAVE_SSE42=1" "-DOS_LINUX=1" "-DROCKSDB_PLATFORM_POSIX=1" "-DROCKSDB_LIB_IO_POSIX=1" "-o" "/workspace/source/target/debug/build/librocksdb-sys-30b3d049ae1421f9/out/rocksdb/util/crc32c.o" "-c" "rocksdb/util/crc32c.cc"
+exit code: 0
+running: "c++" "-O0" "-ffunction-sections" "-fdata-sections" "-fPIC" "-g" "-fno-omit-frame-pointer" "-m64" "-I" "rocksdb/include/" "-I" "rocksdb/" "-I" "rocksdb/third-party/gtest-1.8.1/fused-src/" "-I" "snappy/" "-I" "lz4/lib/" "-I" "zstd/lib/" "-I" "zstd/lib/dictBuilder/" "-I" "zlib/" "-I" "bzip2/" "-I" "." "-Wall" "-Wextra" "-std=c++11" "-Wno-unused-parameter" "-msse2" "-msse4.1" "-msse4.2" "-mpclmul" "-DSNAPPY=1" "-DLZ4=1" "-DZSTD=1" "-DZLIB=1" "-DBZIP2=1" "-DNDEBUG=1" "-DHAVE_PCLMUL=1" "-DHAVE_SSE42=1" "-DOS_LINUX=1" "-DROCKSDB_PLATFORM_POSIX=1" "-DROCKSDB_LIB_IO_POSIX=1" "-o" "/workspace/source/target/debug/build/librocksdb-sys-30b3d049ae1421f9/out/rocksdb/util/random.o" "-c" "rocksdb/util/random.cc"
+exit code: 0
+running: "c++" "-O0" "-ffunction-sections" "-fdata-sections" "-fPIC" "-g" "-fno-omit-frame-pointer" "-m64" "-I" "rocksdb/include/" "-I" "rocksdb/" "-I" "rocksdb/third-party/gtest-1.8.1/fused-src/" "-I" "snappy/" "-I" "lz4/lib/" "-I" "zstd/lib/" "-I" "zstd/lib/dictBuilder/" "-I" "zlib/" "-I" "bzip2/" "-I" "." "-Wall" "-Wextra" "-std=c++11" "-Wno-unused-parameter" "-msse2" "-msse4.1" "-msse4.2" "-mpclmul" "-DSNAPPY=1" "-DLZ4=1" "-DZSTD=1" "-DZLIB=1" "-DBZIP2=1" "-DNDEBUG=1" "-DHAVE_PCLMUL=1" "-DHAVE_SSE42=1" "-DOS_LINUX=1" "-DROCKSDB_PLATFORM_POSIX=1" "-DROCKSDB_LIB_IO_POSIX=1" "-o" "/workspace/source/target/debug/build/librocksdb-sys-30b3d049ae1421f9/out/rocksdb/table/two_level_iterator.o" "-c" "rocksdb/table/two_level_iterator.cc"
+cargo:warning=c++: internal compiler error: Killed (program cc1plus)
+cargo:warning=Please submit a full bug report,
+cargo:warning=with preprocessed source if appropriate.
+cargo:warning=See <file:///usr/share/doc/gcc-7/README.Bugs> for instructions.
+exit code: 4
+exit code: 0
+cargo:warning=rocksdb/table/plain/plain_table_builder.cc:302:1: fatal error: error writing to /tmp/cc6Bpmkv.s: Cannot allocate memory
+cargo:warning= }  // namespace rocksdb
+cargo:warning= ^
+cargo:warning=compilation terminated.
+exit code: 1
+cargo:warning=c++: internal compiler error: Killed (program cc1plus)
+cargo:warning=Please submit a full bug report,
+cargo:warning=with preprocessed source if appropriate.
+cargo:warning=See <file:///usr/share/doc/gcc-7/README.Bugs> for instructions.
+exit code: 4
+exit code: 0
+exit code: 0
+exit code: 0
+exit code: 0
+exit code: 0
+exit code: 0
+exit code: 0
+exit code: 0
+exit code: 0
+exit code: 0
+exit code: 0
+exit code: 0
+
+--- stderr
+
+
+error occurred: Command "c++" "-O0" "-ffunction-sections" "-fdata-sections" "-fPIC" "-g" "-fno-omit-frame-pointer" "-m64" "-I" "rocksdb/include/" "-I" "rocksdb/" "-I" "rocksdb/third-party/gtest-1.8.1/fused-src/" "-I" "snappy/" "-I" "lz4/lib/" "-I" "zstd/lib/" "-I" "zstd/lib/dictBuilder/" "-I" "zlib/" "-I" "bzip2/" "-I" "." "-Wall" "-Wextra" "-std=c++11" "-Wno-unused-parameter" "-msse2" "-msse4.1" "-msse4.2" "-mpclmul" "-DSNAPPY=1" "-DLZ4=1" "-DZSTD=1" "-DZLIB=1" "-DBZIP2=1" "-DNDEBUG=1" "-DHAVE_PCLMUL=1" "-DHAVE_SSE42=1" "-DOS_LINUX=1" "-DROCKSDB_PLATFORM_POSIX=1" "-DROCKSDB_LIB_IO_POSIX=1" "-o" "/workspace/source/target/debug/build/librocksdb-sys-30b3d049ae1421f9/out/rocksdb/db/error_handler.o" "-c" "rocksdb/db/error_handler.cc" with args "c++" did not execute successfully (status code exit code: 4).
+
+
+
+Makefile:47: recipe for target 'clippy' failed
+make: *** [clippy] Error 101
+[31m
+Pipeline failed on stage 'ci' : container 'step-make-ci'. The execution of the pipeline has stopped.[0m
