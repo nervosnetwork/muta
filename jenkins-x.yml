@@ -5,15 +5,26 @@ pipelineConfig:
       pipeline:
         agent:
           image: mutadev/muta:build-env
+        stages:
+          - name: ci
+            options:
+              containerOptions:
+                resources:
+                  limits:
+                    cpu: 4
+                    memory: 4Gi
+                  requests:
+                    cpu: 2
+                    memory: 2Gi
             steps:
-              - name: ci
+              - name: make-ci
                 command: make
                 args: ['ci']
 
-              - name: e2e
+              - name: make-e2e
                 command: make
                 args: ['e2e-test']
 
-              - name: release-build
+               - name: make-release
                 command: make
                 args: ['prod']
