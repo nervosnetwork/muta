@@ -5,16 +5,6 @@ pipelineConfig:
       pipeline:
         agent:
           image: mutadev/muta:build-env
-        stages:
-            options:
-              containerOptions:
-                resources:
-                  limits:
-                    cpu: 4
-                    memory: 4Gi
-                  requests:
-                    cpu: 2
-                    memory: 2Gi
             steps:
               - name: ci
                 command: make
