@@ -15,6 +15,7 @@ common-crypto = { path = "../../common/crypto" }
 derive_more = "0.99"
 hasher = { version="0.1", features = ["hash-keccak"] }
 hex = "0.4"
+lazy_static = "1.4"
 muta-codec-derive = "0.2"
 protocol = { path = "../../protocol", package = "muta-protocol" }
 rand = "0.7"

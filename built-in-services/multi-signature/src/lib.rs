@@ -24,6 +24,10 @@ use crate::types::{
 const MAX_MULTI_SIGNATURE_RECURSION_DEPTH: u8 = 8;
 const MAX_PERMISSION_ACCOUNTS: u8 = 16;
 
+lazy_static::lazy_static! {
+    static ref ADEPTIVE_ADDRESS: Address = Address::from_hex("0xffffffffffffffffffff").unwrap();
+}
+
 pub struct MultiSignatureService<SDK> {
     sdk: SDK,
 }
@@ -63,9 +67,15 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
             })
             .collect::<Vec<_>>();
 
+        let owner = if payload.owner == ADEPTIVE_ADDRESS.clone() {
+            address.clone()
+        } else {
+            payload.owner.clone()
+        };
+
         let permission = MultiSigPermission {
             accounts,
-            owner: payload.owner,
+            owner,
             threshold: payload.threshold,
             memo: payload.memo,
         };
@@ -132,9 +142,15 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
                 })
                 .collect::<Vec<_>>();
 
+            let owner = if payload.owner == ADEPTIVE_ADDRESS.clone() {
+                address.clone()
+            } else {
+                payload.owner.clone()
+            };
+
             let permission = MultiSigPermission {
                 accounts,
-                owner: payload.owner,
+                owner,
                 threshold: payload.threshold,
                 memo: payload.memo,
             };
