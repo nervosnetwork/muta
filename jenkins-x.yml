@@ -25,6 +25,6 @@ pipelineConfig:
                 command: make
                 args: ['e2e-test']
 
-               - name: make-release
+              - name: make-release
                 command: make
                 args: ['prod']
