@@ -25,7 +25,7 @@ matrix:
   - rust: nightly
 
 install: ./devtools/ci/install.sh
-script: 
+script:
   # Output something every 10 minutes or Travis kills the job
   - while sleep 5m; do echo "=====[ $SECONDS seconds still running ]====="; done &
   - ./devtools/ci/script.sh
@@ -46,3 +46,18 @@ env:
 
 before_cache:
   - rm -rf "$TRAVIS_HOME"/.cargo/registry"
+
+after_success: |
+  wget https://github.com/SimonKagstrom/kcov/archive/master.tar.gz &&
+  tar xzf master.tar.gz &&
+  cd kcov-master &&
+  mkdir build &&
+  cd build &&
+  cmake .. &&
+  make &&
+  make install DESTDIR=../../kcov-build &&
+  cd ../.. &&
+  rm -rf kcov-master &&
+  for file in target/debug/examplerust-*; do [ -x "${file}" ] || continue; mkdir -p "target/cov/$(basename $file)"; ./kcov-build/usr/local/bin/kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"; done &&
+  bash <(curl -s https://codecov.io/bash) &&
+  echo "Uploaded code coverage"
