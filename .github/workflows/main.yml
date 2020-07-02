@@ -38,5 +38,4 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           file: ${{ steps.coverage.outputs.report }}
-          yml: ./codecov.yml
           fail_ci_if_error: true
