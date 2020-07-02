@@ -1,0 +1,48 @@
+
+Showing logs for build [32mnervosnetwork-muta-master-relea-25zfq-4[0m stage [32mfrom-build-pack[0m and container [32mstep-credential-initializer-rlcf7[0m
+{"level":"info","ts":1593688986.4592998,"logger":"fallback-logger","caller":"logging/config.go:69","msg":"Fetch GitHub commit ID from kodata failed: open /var/run/ko/refs/heads/0.8.0-ns-support: no such file or directory"}
+{"level":"info","ts":1593688986.4595277,"logger":"fallback-logger","caller":"creds-init/main.go:40","msg":"Credentials initialized."}
+
+Showing logs for build [32mnervosnetwork-muta-master-relea-25zfq-4[0m stage [32mfrom-build-pack[0m and container [32mstep-working-dir-initializer-z984p[0m
+{"level":"info","ts":1593688987.7025774,"logger":"fallback-logger","caller":"logging/config.go:69","msg":"Fetch GitHub commit ID from kodata failed: open /var/run/ko/HEAD: no such file or directory"}
+{"level":"info","ts":1593688987.7032049,"logger":"fallback-logger","caller":"bash/main.go:64","msg":"Successfully executed command \"sh -c mkdir -p /workspace/source\"; output "}
+
+Showing logs for build [32mnervosnetwork-muta-master-relea-25zfq-4[0m stage [32mfrom-build-pack[0m and container [32mstep-place-tools[0m
+
+Showing logs for build [32mnervosnetwork-muta-master-relea-25zfq-4[0m stage [32mfrom-build-pack[0m and container [32mstep-git-source-nervosnetwork-muta-master-relea-25zfq-2gcht[0m
+{"level":"info","ts":1593689028.7887864,"logger":"fallback-logger","caller":"logging/config.go:69","msg":"Fetch GitHub commit ID from kodata failed: open /var/run/ko/refs/heads/0.8.0-ns-support: no such file or directory"}
+{"level":"info","ts":1593689031.6428666,"logger":"fallback-logger","caller":"git/git.go:103","msg":"Successfully cloned https://github.com/nervosnetwork/muta.git @ v0.2.4 in path /workspace/source"}
+
+Showing logs for build [32mnervosnetwork-muta-master-relea-25zfq-4[0m stage [32mfrom-build-pack[0m and container [32mstep-setup-builder-home[0m
+
+Showing logs for build [32mnervosnetwork-muta-master-relea-25zfq-4[0m stage [32mfrom-build-pack[0m and container [32mstep-git-merge[0m
+Using SHAs from PULL_REFS=master:a4ab4a6209e0978148983e88447ac2d9178fa42a
+WARNING: no SHAs to merge, falling back to initial cloned commit
+
+Showing logs for build [32mnervosnetwork-muta-master-relea-25zfq-4[0m stage [32mfrom-build-pack[0m and container [32mstep-setup-jx-git-credentials[0m
+Generated Git credentials file /workspace/xdg_config/git/credentials
+
+Showing logs for build [32mnervosnetwork-muta-master-relea-25zfq-4[0m stage [32mfrom-build-pack[0m and container [32mstep-build-rustup[0m
+info: syncing channel updates for 'nightly-x86_64-unknown-linux-gnu'
+info: latest update on 2020-07-02, rust version 1.46.0-nightly (f781babf8 2020-07-01)
+info: downloading component 'cargo'
+info: downloading component 'clippy'
+info: downloading component 'rust-docs'
+info: downloading component 'rust-std'
+info: downloading component 'rustc'
+info: downloading component 'rustfmt'
+info: installing component 'cargo'
+info: installing component 'clippy'
+info: installing component 'rust-docs'
+info: installing component 'rust-std'
+info: installing component 'rustc'
+info: installing component 'rustfmt'
+info: override toolchain for '/workspace/source' set to 'nightly-x86_64-unknown-linux-gnu'
+
+  nightly-x86_64-unknown-linux-gnu installed - rustc 1.46.0-nightly (f781babf8 2020-07-01)
+
+
+Showing logs for build [32mnervosnetwork-muta-master-relea-25zfq-4[0m stage [32mfrom-build-pack[0m and container [32mstep-build-cargo-install[0m
+error: Using `cargo install` to install the binaries for the package in current working directory is no longer supported, use `cargo install --path .` instead. Use `cargo build` if you want to simply build the package.
+[31m
+Pipeline failed on stage 'from-build-pack' : container 'step-build-cargo-install'. The execution of the pipeline has stopped.[0m
