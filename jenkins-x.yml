@@ -22,6 +22,7 @@ pipelineConfig:
                 args: ['ci']
 
               - name: make-e2e
+                image: mutadev/muta:e2e-env
                 command: make
                 args: ['e2e-test']
 
