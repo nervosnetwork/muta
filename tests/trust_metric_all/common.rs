@@ -13,10 +13,30 @@ use rand::{rngs::OsRng, RngCore};
 use std::{
     net::TcpListener,
     path::PathBuf,
-    sync::atomic::{AtomicU16, Ordering},
+    sync::atomic::{AtomicBool, AtomicU16, Ordering},
+    sync::Arc,
 };
 
 static AVAILABLE_PORT: AtomicU16 = AtomicU16::new(2000);
+
+#[derive(Clone)]
+pub struct RunningStatus(Arc<AtomicBool>);
+
+impl RunningStatus {
+    pub fn new() -> Self {
+        RunningStatus(Arc::new(AtomicBool::new(true)))
+    }
+
+    pub fn is_running(&self) -> bool {
+        self.0.load(Ordering::SeqCst)
+    }
+}
+
+impl Drop for RunningStatus {
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::SeqCst)
+    }
+}
 
 pub fn tmp_dir() -> PathBuf {
     let mut tmp_dir = std::env::temp_dir();

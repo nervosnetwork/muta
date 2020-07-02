@@ -3,7 +3,7 @@ use super::diagnostic::{
     TrustTwinEventResp, TwinEvent, RPC_RESP_TRUST_NEW_INTERVAL, RPC_RESP_TRUST_REPORT,
     RPC_RESP_TRUST_TWIN_EVENT, RPC_TRUST_NEW_INTERVAL, RPC_TRUST_REPORT, RPC_TRUST_TWIN_EVENT,
 };
-use super::{config::Config, consts};
+use super::{common::RunningStatus, config::Config, consts};
 
 use common_crypto::{PrivateKey, Secp256k1PrivateKey};
 use core_consensus::message::{
@@ -56,9 +56,10 @@ pub struct ClientNode {
     pub network:           NetworkServiceHandle,
     pub remote_chain_addr: Address,
     pub priv_key:          Secp256k1PrivateKey,
+    pub full_node_running: RunningStatus,
 }
 
-pub async fn connect(full_node_port: u16, listen_port: u16) -> ClientNode {
+pub async fn connect(full_node_port: u16, listen_port: u16, running: RunningStatus) -> ClientNode {
     let full_node_hex_pubkey = full_node_hex_pubkey();
     let full_node_chain_addr = full_node_chain_addr(&full_node_hex_pubkey);
     let full_node_addr = format!("127.0.0.1:{}", full_node_port);
@@ -123,15 +124,18 @@ pub async fn connect(full_node_port: u16, listen_port: u16) -> ClientNode {
         network: handle,
         remote_chain_addr: full_node_chain_addr,
         priv_key,
+        full_node_running: running,
     }
 }
 
 impl ClientNode {
     pub fn connected(&self) -> bool {
-        self.network
-            .diagnostic
-            .session_by_chain(&self.remote_chain_addr)
-            .is_some()
+        self.full_node_running.is_running()
+            && self
+                .network
+                .diagnostic
+                .session_by_chain(&self.remote_chain_addr)
+                .is_some()
     }
 
     pub async fn broadcast<M: MessageCodec>(&self, endpoint: &str, msg: M) -> ClientResult<()> {

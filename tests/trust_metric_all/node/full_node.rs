@@ -62,12 +62,13 @@ impl From<MappingError> for ProtocolError {
     }
 }
 
-pub async fn run(listen_port: u16) {
+// Note: inject runnning_status
+pub async fn run(listen_port: u16, running_status: common::RunningStatus) {
     let builder = MutaBuilder::new()
         .config_path(consts::CHAIN_CONFIG_PATH)
         .genesis_path(consts::CHAIN_GENESIS_PATH)
         .service_mapping(DefaultServiceMapping {});
 
     let muta = builder.build(listen_port).expect("build");
-    muta.run().await.expect("run");
+    muta.run(running_status).await.expect("run");
 }
