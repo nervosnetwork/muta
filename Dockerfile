@@ -1,4 +1,11 @@
-FROM debian:8
-EXPOSE 8080
-CMD ["/muta"]
-COPY ./ /
+FROM mutadev/muta:build-env
+
+LABEL maintainer="yejiayu.fe@gmail.com"
+
+WORKDIR /app
+
+COPY . .
+RUN make prod
+
+EXPOSE 1337 8000
+CMD ["/app/target/release/examples/muta-chain"]
