@@ -7,15 +7,15 @@ pipelineConfig:
           image: mutadev/muta:build-env
         stages:
           - name: ci
-            # options:
-            #   containerOptions:
-            #     resources:
-            #       limits:
-            #         cpu: 4
-            #         memory: 4Gi
-            #       requests:
-            #         cpu: 2
-            #         memory: 2Gi
+            options:
+              containerOptions:
+                resources:
+                  limits:
+                    cpu: 8
+                    memory: 8Gi
+                  requests:
+                    cpu: 4
+                    memory: 4Gi
             steps:
               - name: make-ci
                 command: make

@@ -1,0 +1,10 @@
+FROM mutadev/muta:e2e-env
+
+LABEL maintainer="yejiayu.fe@gmail.com"
+
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+        yarn \
+        nodejs; \
+    rm -rf /var/lib/apt/lists/*
