@@ -63,35 +63,30 @@ pub struct GetMultiSigAccountResponse {
 
 #[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug)]
 pub struct ChangeOwnerPayload {
-    pub witness:           VerifySignaturePayload,
     pub multi_sig_address: Address,
     pub new_owner:         Address,
 }
 
 #[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug)]
 pub struct ChangeMemoPayload {
-    pub witness:           VerifySignaturePayload,
     pub multi_sig_address: Address,
     pub new_memo:          String,
 }
 
 #[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug)]
 pub struct AddAccountPayload {
-    pub witness:           VerifySignaturePayload,
     pub multi_sig_address: Address,
     pub new_account:       Account,
 }
 
 #[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug)]
 pub struct RemoveAccountPayload {
-    pub witness:           VerifySignaturePayload,
     pub multi_sig_address: Address,
     pub account_address:   Address,
 }
 
 #[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug)]
 pub struct SetAccountWeightPayload {
-    pub witness:           VerifySignaturePayload,
     pub multi_sig_address: Address,
     pub account_address:   Address,
     pub new_weight:        u8,
@@ -99,9 +94,14 @@ pub struct SetAccountWeightPayload {
 
 #[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug)]
 pub struct SetThresholdPayload {
-    pub witness:           VerifySignaturePayload,
     pub multi_sig_address: Address,
     pub new_threshold:     u32,
+}
+
+#[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug)]
+pub struct UpdateAccountPayload {
+    pub account_address:  Address,
+    pub new_account_info: GenerateMultiSigAccountPayload,
 }
 
 #[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug, Default, PartialEq, Eq)]

@@ -1,7 +1,9 @@
 use crate::types::{
     AddAccountPayload, GenerateMultiSigAccountPayload, GetMultiSigAccountPayload,
     MultiSigPermission, RemoveAccountPayload, SetAccountWeightPayload, SetThresholdPayload,
+    UpdateAccountPayload,
 };
+use crate::ADEPTIVE_ADDRESS;
 
 use super::*;
 
@@ -73,13 +75,10 @@ fn test_generate_multi_signature() {
 #[test]
 fn test_set_threshold() {
     let cycles_limit = 1024 * 1024 * 1024; // 1073741824
-    let caller = Address::from_hex("0x755cdba6ae4f479f7164792b318b2a06c759833b").unwrap();
-    let context = mock_context(cycles_limit, caller);
-    let tx_hash = context.get_tx_hash().unwrap();
-
     let mut service = new_multi_signature_service();
     let owner = gen_one_keypair();
-    let owner_address = Address::from_pubkey_bytes(owner.1.clone()).unwrap();
+    let owner_address = Address::from_pubkey_bytes(owner.1).unwrap();
+    let context = mock_context(cycles_limit, owner_address.clone());
     let keypairs = gen_keypairs(4);
     let account_pubkeys = keypairs
         .iter()
@@ -97,7 +96,6 @@ fn test_set_threshold() {
 
     // test new threshold above sum of the weights
     let res = service.set_threshold(context.clone(), SetThresholdPayload {
-        witness:           gen_single_witness(&owner.0, &tx_hash),
         multi_sig_address: multi_sig_address.clone(),
         new_threshold:     5,
     });
@@ -108,7 +106,6 @@ fn test_set_threshold() {
 
     // test set new threshold success
     let res = service.set_threshold(context, SetThresholdPayload {
-        witness: gen_single_witness(&owner.0, &tx_hash),
         multi_sig_address,
         new_threshold: 2,
     });
@@ -116,15 +113,40 @@ fn test_set_threshold() {
 }
 
 #[test]
-fn test_add_account() {
+fn test_adeption_address() {
     let cycles_limit = 1024 * 1024 * 1024; // 1073741824
-    let caller = Address::from_hex("0x755cdba6ae4f479f7164792b318b2a06c759833b").unwrap();
-    let context = mock_context(cycles_limit, caller);
-    let tx_hash = context.get_tx_hash().unwrap();
-
     let mut service = new_multi_signature_service();
     let owner = gen_one_keypair();
-    let owner_address = Address::from_pubkey_bytes(owner.1.clone()).unwrap();
+    let owner_address = Address::from_pubkey_bytes(owner.1).unwrap();
+    let context = mock_context(cycles_limit, owner_address);
+    let keypairs = gen_keypairs(15);
+    let account_pubkeys = keypairs
+        .iter()
+        .map(|pair| to_multi_sig_account(pair.1.clone()))
+        .collect::<Vec<_>>();
+    let multi_sig_address = service
+        .generate_account(context.clone(), GenerateMultiSigAccountPayload {
+            owner:            ADEPTIVE_ADDRESS.clone(),
+            addr_with_weight: account_pubkeys,
+            threshold:        3,
+            memo:             String::new(),
+        })
+        .succeed_data
+        .address;
+
+    let permission = service.get_account_from_address(context, GetMultiSigAccountPayload {
+        multi_sig_address: multi_sig_address.clone(),
+    });
+    assert_eq!(multi_sig_address, permission.succeed_data.permission.owner);
+}
+
+#[test]
+fn test_add_account() {
+    let cycles_limit = 1024 * 1024 * 1024; // 1073741824
+    let mut service = new_multi_signature_service();
+    let owner = gen_one_keypair();
+    let owner_address = Address::from_pubkey_bytes(owner.1).unwrap();
+    let context = mock_context(cycles_limit, owner_address.clone());
     let keypairs = gen_keypairs(15);
     let mut account_pubkeys = keypairs
         .iter()
@@ -144,7 +166,6 @@ fn test_add_account() {
     let new_keypair = gen_one_keypair();
     account_pubkeys.push(to_multi_sig_account(new_keypair.1.clone()));
     let res = service.add_account(context.clone(), AddAccountPayload {
-        witness:           gen_single_witness(&owner.0, &tx_hash),
         multi_sig_address: multi_sig_address.clone(),
         new_account:       to_multi_sig_account(new_keypair.1).into_signle_account(),
     });
@@ -153,7 +174,6 @@ fn test_add_account() {
     // test add new account success above max count value
     let new_keypair = gen_one_keypair();
     let res = service.add_account(context.clone(), AddAccountPayload {
-        witness:           gen_single_witness(&owner.0, &tx_hash),
         multi_sig_address: multi_sig_address.clone(),
         new_account:       to_multi_sig_account(new_keypair.1).into_signle_account(),
     });
@@ -174,15 +194,69 @@ fn test_add_account() {
 }
 
 #[test]
-fn test_set_weight() {
+fn test_update_account() {
     let cycles_limit = 1024 * 1024 * 1024; // 1073741824
-    let caller = Address::from_hex("0x755cdba6ae4f479f7164792b318b2a06c759833b").unwrap();
-    let context = mock_context(cycles_limit, caller);
-    let tx_hash = context.get_tx_hash().unwrap();
-
     let mut service = new_multi_signature_service();
     let owner = gen_one_keypair();
-    let owner_address = Address::from_pubkey_bytes(owner.1.clone()).unwrap();
+    let owner_address = Address::from_pubkey_bytes(owner.1).unwrap();
+    let context = mock_context(cycles_limit, owner_address.clone());
+    let keypairs = gen_keypairs(4);
+    let account_pubkeys = keypairs
+        .iter()
+        .map(|pair| to_multi_sig_account(pair.1.clone()))
+        .collect::<Vec<_>>();
+    let multi_sig_address = service
+        .generate_account(context, GenerateMultiSigAccountPayload {
+            owner:            owner_address.clone(),
+            addr_with_weight: account_pubkeys,
+            threshold:        4,
+            memo:             String::new(),
+        })
+        .succeed_data
+        .address;
+
+    let new_owner = gen_one_keypair();
+    let new_owner_address = Address::from_pubkey_bytes(new_owner.1).unwrap();
+    let context = mock_context(cycles_limit, owner_address);
+    let account_pubkeys = vec![AddressWithWeight {
+        address: multi_sig_address.clone(),
+        weight:  1u8,
+    }];
+    let res = service.update_account(context.clone(), UpdateAccountPayload {
+        account_address:  multi_sig_address.clone(),
+        new_account_info: GenerateMultiSigAccountPayload {
+            owner:            new_owner_address.clone(),
+            addr_with_weight: account_pubkeys,
+            threshold:        1,
+            memo:             String::new(),
+        },
+    });
+    assert!(res.is_error());
+
+    let keypairs = gen_keypairs(4);
+    let account_pubkeys = keypairs
+        .iter()
+        .map(|pair| to_multi_sig_account(pair.1.clone()))
+        .collect::<Vec<_>>();
+    let res = service.update_account(context, UpdateAccountPayload {
+        account_address:  multi_sig_address,
+        new_account_info: GenerateMultiSigAccountPayload {
+            owner:            new_owner_address,
+            addr_with_weight: account_pubkeys,
+            threshold:        1,
+            memo:             String::new(),
+        },
+    });
+    assert_eq!(res.is_error(), false);
+}
+
+#[test]
+fn test_set_weight() {
+    let cycles_limit = 1024 * 1024 * 1024; // 1073741824
+    let mut service = new_multi_signature_service();
+    let owner = gen_one_keypair();
+    let owner_address = Address::from_pubkey_bytes(owner.1).unwrap();
+    let context = mock_context(cycles_limit, owner_address.clone());
     let keypairs = gen_keypairs(4);
     let mut account_pubkeys = keypairs
         .iter()
@@ -201,7 +275,6 @@ fn test_set_weight() {
 
     // test set weight success
     let res = service.set_account_weight(context.clone(), SetAccountWeightPayload {
-        witness:           gen_single_witness(&owner.0, &tx_hash),
         multi_sig_address: multi_sig_address.clone(),
         account_address:   to_be_changed_address.clone(),
         new_weight:        2,
@@ -210,7 +283,6 @@ fn test_set_weight() {
 
     // test set an invalid weight
     let res = service.set_account_weight(context.clone(), SetAccountWeightPayload {
-        witness:           gen_single_witness(&owner.0, &tx_hash),
         multi_sig_address: multi_sig_address.clone(),
         account_address:   to_be_changed_address,
         new_weight:        0,
@@ -235,13 +307,10 @@ fn test_set_weight() {
 #[test]
 fn test_remove_account() {
     let cycles_limit = 1024 * 1024 * 1024; // 1073741824
-    let caller = Address::from_hex("0x755cdba6ae4f479f7164792b318b2a06c759833b").unwrap();
-    let context = mock_context(cycles_limit, caller);
-    let tx_hash = context.get_tx_hash().unwrap();
-
     let mut service = new_multi_signature_service();
     let owner = gen_one_keypair();
-    let owner_address = Address::from_pubkey_bytes(owner.1.clone()).unwrap();
+    let owner_address = Address::from_pubkey_bytes(owner.1).unwrap();
+    let context = mock_context(cycles_limit, owner_address.clone());
     let keypairs = gen_keypairs(4);
     let mut account_pubkeys = keypairs
         .iter()
@@ -259,7 +328,6 @@ fn test_remove_account() {
     let to_be_removed_address = Address::from_pubkey_bytes(keypairs[3].1.clone()).unwrap();
 
     let res = service.remove_account(context.clone(), RemoveAccountPayload {
-        witness:           gen_single_witness(&owner.0, &tx_hash),
         multi_sig_address: multi_sig_address.clone(),
         account_address:   to_be_removed_address,
     });
@@ -268,7 +336,6 @@ fn test_remove_account() {
 
     let to_be_removed_address = Address::from_pubkey_bytes(keypairs[2].1.clone()).unwrap();
     let res = service.remove_account(context.clone(), RemoveAccountPayload {
-        witness:           gen_single_witness(&owner.0, &tx_hash),
         multi_sig_address: multi_sig_address.clone(),
         account_address:   to_be_removed_address,
     });
