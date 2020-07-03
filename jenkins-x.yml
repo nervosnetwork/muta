@@ -3,10 +3,8 @@ pipelineConfig:
   pipelines:
     pullRequest:
       pipeline:
-        agent:
-          image: mutadev/muta:build-env
         stages:
-          - name: ci
+          - name: test
             options:
               containerOptions:
                 resources:
@@ -17,35 +15,12 @@ pipelineConfig:
                     cpu: 4
                     memory: 4Gi
             steps:
-              - name: make-ci
+              - name: make-fmt
                 command: make
-                args: ['ci']
-    # pullRequest:
-    #   pipeline:
-    #     agent:
-    #       image: mutadev/muta:build-env
-    #   build:
-    #     steps:
-    #     - command: cargo fmt
-    #     - command: cargo clippy
-    release:
-      pipeline:
-        agent:
-          image: mutadev/muta:build-env
-        stages:
-        - name: release
-          options:
-            containerOptions:
-              name: ""
-              resources:
-                limits:
-                  cpu: "4"
-                  memory: 4Gi
-                requests:
-                  cpu: "2"
-                  memory: 2Gi
-          steps:
-          - args:
-            - prod
-            command: make
-            name: make-release
+                args: ['fmt']
+              - name: make-clippy
+                command: make
+                args: ['clippy']
+              - name: make-unit-test
+                command: make
+                args: ['test']
