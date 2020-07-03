@@ -1,14 +1,14 @@
 buildPack: none
 pipelineConfig:
   pipelines:
-    pullRequest:
-      pipeline:
-        agent:
-          image: mutadev/muta:build-env
-      build:
-        steps:
-        - command: cargo fmt
-        - command: cargo clippy
+    # pullRequest:
+    #   pipeline:
+    #     agent:
+    #       image: mutadev/muta:build-env
+    #   build:
+    #     steps:
+    #     - command: cargo fmt
+    #     - command: cargo clippy
     release:
       pipeline:
         agent:
