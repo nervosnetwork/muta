@@ -1,22 +1,26 @@
 buildPack: none
 pipelineConfig:
   pipelines:
-    release:
+    pullRequest:
       pipeline:
-        agent:
-          image: mutadev/muta:build-env
         stages:
-          - name: ci
+          - name: test
             options:
               containerOptions:
                 resources:
                   limits:
+                    cpu: 8
+                    memory: 8Gi
+                  requests:
                     cpu: 4
                     memory: 4Gi
-                  requests:
-                    cpu: 2
-                    memory: 2Gi
             steps:
-              - name: make-release
+              - name: make-fmt
                 command: make
-                args: ['prod']
+                args: ['fmt']
+              - name: make-clippy
+                command: make
+                args: ['clippy']
+              - name: make-unit-test
+                command: make
+                args: ['test']
