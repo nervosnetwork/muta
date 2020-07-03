@@ -1,0 +1,94 @@
+
+Showing logs for build [32mmeta-nervosnetwork-muta-pr-333-2cg48-23[0m stage [32mmeta-pipeline[0m and container [32mstep-credential-initializer-jxnmx[0m
+{"level":"info","ts":1593774616.47561,"logger":"fallback-logger","caller":"logging/config.go:69","msg":"Fetch GitHub commit ID from kodata failed: open /var/run/ko/refs/heads/0.8.0-ns-support: no such file or directory"}
+{"level":"info","ts":1593774616.4758432,"logger":"fallback-logger","caller":"creds-init/main.go:40","msg":"Credentials initialized."}
+
+Showing logs for build [32mmeta-nervosnetwork-muta-pr-333-2cg48-23[0m stage [32mmeta-pipeline[0m and container [32mstep-working-dir-initializer-4cpwj[0m
+{"level":"info","ts":1593774617.4633265,"logger":"fallback-logger","caller":"logging/config.go:69","msg":"Fetch GitHub commit ID from kodata failed: open /var/run/ko/HEAD: no such file or directory"}
+{"level":"info","ts":1593774617.4642026,"logger":"fallback-logger","caller":"bash/main.go:64","msg":"Successfully executed command \"sh -c mkdir -p /workspace/source\"; output "}
+
+Showing logs for build [32mmeta-nervosnetwork-muta-pr-333-2cg48-23[0m stage [32mmeta-pipeline[0m and container [32mstep-place-tools[0m
+
+Showing logs for build [32mmeta-nervosnetwork-muta-pr-333-2cg48-23[0m stage [32mmeta-pipeline[0m and container [32mstep-git-source-meta-nervosnetwork-muta-pr-333-2cg48-5fpgg[0m
+{"level":"info","ts":1593774621.5015311,"logger":"fallback-logger","caller":"logging/config.go:69","msg":"Fetch GitHub commit ID from kodata failed: open /var/run/ko/refs/heads/0.8.0-ns-support: no such file or directory"}
+{"level":"info","ts":1593774623.7509289,"logger":"fallback-logger","caller":"git/git.go:103","msg":"Successfully cloned https://github.com/nervosnetwork/muta.git @ a4ab4a6209e0978148983e88447ac2d9178fa42a in path /workspace/source"}
+
+Showing logs for build [32mmeta-nervosnetwork-muta-pr-333-2cg48-23[0m stage [32mmeta-pipeline[0m and container [32mstep-git-merge[0m
+Using SHAs from PULL_REFS=master:a4ab4a6209e0978148983e88447ac2d9178fa42a,333:c5da1af4e83fa4f7efb266dbe383686fd22dd681
+DEBUG: LC_ALL=C JX_LOG_LEVEL=error git fetch origin --unshallow c5da1af4e83fa4f7efb266dbe383686fd22dd681: a4ab4a6209e0978148983e88447ac2d9178fa42a:
+DEBUG: ran git fetch --unshallow origin c5da1af4e83fa4f7efb266dbe383686fd22dd681: a4ab4a6209e0978148983e88447ac2d9178fa42a: in 
+DEBUG: LC_ALL=C JX_LOG_LEVEL=error git branch
+DEBUG: LC_ALL=C JX_LOG_LEVEL=error git checkout master
+DEBUG: ran git checkout master in 
+DEBUG: LC_ALL=C JX_LOG_LEVEL=error git reset --hard a4ab4a6209e0978148983e88447ac2d9178fa42a
+DEBUG: ran git reset --hard a4ab4a6209e0978148983e88447ac2d9178fa42a in 
+DEBUG: JX_LOG_LEVEL=error LC_ALL=C git clean -fd .
+DEBUG: ran clean --force -d . in 
+DEBUG: JX_LOG_LEVEL=error LC_ALL=C git merge c5da1af4e83fa4f7efb266dbe383686fd22dd681
+DEBUG: ran git merge c5da1af4e83fa4f7efb266dbe383686fd22dd681 in 
+DEBUG: JX_LOG_LEVEL=error LC_ALL=C git log --format=%H%x1f%an%x1f%ae%x1f%cn%x1f%ce%x1f%s%n%b%x1e a4ab4a6209e0978148983e88447ac2d9178fa42a..HEAD
+Merged SHA c5da1af4e83fa4f7efb266dbe383686fd22dd681 with commit message 'release pipline' into base branch master
+Merged SHA c53d090abc93ab9da7d874d75d6c86e97abb6b63 with commit message 'update pipeline' into base branch master
+Merged SHA 0c8fe07911dadf04e50fc0d6ced61e8fd26e627d with commit message 'update e2e-env' into base branch master
+Merged SHA 762c076449a21c045ebc1f96076d2e19dc468271 with commit message 'Merge pull request #7 from zeroqn/fix-trust-metrics-integration-tests-panic-rpc-timeout' into base branch master
+Merged SHA 1cddc6f1c286e3d8c7a0787ad3a51e5e60bd6123 with commit message 'chore(e2e): upgrade dependencies' into base branch master
+Merged SHA 9934580172fdf1dd3bf9bf69b47c2427de35e2fe with commit message 'Merge pull request #6 from zeroqn/fix-trust-metrics-integration-tests-panic-rpc-timeout' into base branch master
+Merged SHA 5ff6010a1395e07e95e858cf2ce00c48fedb2fb7 with commit message 'change(trust_metric_test): check running status before rpc and broadcast' into base branch master
+Merged SHA 3072304602ddad62f76df0d0d6eddc423a20f5d9 with commit message 'fix(trust_metric_test): await spawned consensus join handle' into base branch master
+Merged SHA ec828379c0ee1979e3b7d35953fc43f2023c9e7a with commit message 'Merge pull request #5 from zeroqn/fix-trust-metrics-integration-tests-panic-rpc-timeout' into base branch master
+Merged SHA f5110ba911e8f5fec88417dd4cf085eff0c31675 with commit message 'fix(trust_metric_test): rpc timeout failure after full node panic' into base branch master
+Merged SHA 76529e94cbfa499a784395217e66b9431e0a6f8c with commit message 'remove Travis CI' into base branch master
+Merged SHA 09c4fd8dde711bb76c80732bb4ea7baf39d27b87 with commit message 'update' into base branch master
+Merged SHA 972891939c6432a8d4962e321f7e953085d33ba2 with commit message 'update' into base branch master
+Merged SHA 487eb43211a818a05dfa5254960f56b0d71412b7 with commit message 'add e2e env' into base branch master
+Merged SHA a23d0afe0c3f53143faceef585dde497c3e6d31e with commit message 'update' into base branch master
+Merged SHA b72887042f9b56b09b59822fc813b75b96bb38e4 with commit message 'update' into base branch master
+Merged SHA d07784b3c31c975eb649faefdfe31fb4b2df5b40 with commit message 'update' into base branch master
+Merged SHA 2a42e0490f2c95991a240656f51f4dd6f68161de with commit message 'update' into base branch master
+Merged SHA 5c1068b2c869fdcfb38dd760f5e6cc41e5175ab0 with commit message 'update jenkins-x' into base branch master
+Merged SHA 034085b26331865cf941307eecad707356da4961 with commit message 'Test cicd' into base branch master
+
+Showing logs for build [32mmeta-nervosnetwork-muta-pr-333-2cg48-23[0m stage [32mmeta-pipeline[0m and container [32mstep-merge-pull-refs[0m
+DEBUG: LC_ALL=C JX_LOG_LEVEL=error git fetch origin --unshallow c5da1af4e83fa4f7efb266dbe383686fd22dd681: a4ab4a6209e0978148983e88447ac2d9178fa42a:
+DEBUG: LC_ALL=C JX_LOG_LEVEL=error git fetch origin c5da1af4e83fa4f7efb266dbe383686fd22dd681: a4ab4a6209e0978148983e88447ac2d9178fa42a:
+DEBUG: ran git fetch origin c5da1af4e83fa4f7efb266dbe383686fd22dd681: a4ab4a6209e0978148983e88447ac2d9178fa42a: in 
+DEBUG: LC_ALL=C JX_LOG_LEVEL=error git rev-parse --is-shallow-repository
+DEBUG: Unshallowed git repo in 
+DEBUG: LC_ALL=C JX_LOG_LEVEL=error git branch
+DEBUG: LC_ALL=C JX_LOG_LEVEL=error git checkout master
+DEBUG: ran git checkout master in 
+DEBUG: LC_ALL=C JX_LOG_LEVEL=error git reset --hard a4ab4a6209e0978148983e88447ac2d9178fa42a
+DEBUG: ran git reset --hard a4ab4a6209e0978148983e88447ac2d9178fa42a in 
+DEBUG: LC_ALL=C JX_LOG_LEVEL=error git clean -fd .
+DEBUG: ran clean --force -d . in 
+DEBUG: LC_ALL=C JX_LOG_LEVEL=error git merge c5da1af4e83fa4f7efb266dbe383686fd22dd681
+DEBUG: ran git merge c5da1af4e83fa4f7efb266dbe383686fd22dd681 in 
+DEBUG: LC_ALL=C JX_LOG_LEVEL=error git log --format=%H%x1f%an%x1f%ae%x1f%cn%x1f%ce%x1f%s%n%b%x1e a4ab4a6209e0978148983e88447ac2d9178fa42a..HEAD
+Merged SHA c5da1af4e83fa4f7efb266dbe383686fd22dd681 with commit message 'release pipline' into base branch master
+Merged SHA c53d090abc93ab9da7d874d75d6c86e97abb6b63 with commit message 'update pipeline' into base branch master
+Merged SHA 0c8fe07911dadf04e50fc0d6ced61e8fd26e627d with commit message 'update e2e-env' into base branch master
+Merged SHA 762c076449a21c045ebc1f96076d2e19dc468271 with commit message 'Merge pull request #7 from zeroqn/fix-trust-metrics-integration-tests-panic-rpc-timeout' into base branch master
+Merged SHA 1cddc6f1c286e3d8c7a0787ad3a51e5e60bd6123 with commit message 'chore(e2e): upgrade dependencies' into base branch master
+Merged SHA 9934580172fdf1dd3bf9bf69b47c2427de35e2fe with commit message 'Merge pull request #6 from zeroqn/fix-trust-metrics-integration-tests-panic-rpc-timeout' into base branch master
+Merged SHA 5ff6010a1395e07e95e858cf2ce00c48fedb2fb7 with commit message 'change(trust_metric_test): check running status before rpc and broadcast' into base branch master
+Merged SHA 3072304602ddad62f76df0d0d6eddc423a20f5d9 with commit message 'fix(trust_metric_test): await spawned consensus join handle' into base branch master
+Merged SHA ec828379c0ee1979e3b7d35953fc43f2023c9e7a with commit message 'Merge pull request #5 from zeroqn/fix-trust-metrics-integration-tests-panic-rpc-timeout' into base branch master
+Merged SHA f5110ba911e8f5fec88417dd4cf085eff0c31675 with commit message 'fix(trust_metric_test): rpc timeout failure after full node panic' into base branch master
+Merged SHA 76529e94cbfa499a784395217e66b9431e0a6f8c with commit message 'remove Travis CI' into base branch master
+Merged SHA 09c4fd8dde711bb76c80732bb4ea7baf39d27b87 with commit message 'update' into base branch master
+Merged SHA 972891939c6432a8d4962e321f7e953085d33ba2 with commit message 'update' into base branch master
+Merged SHA 487eb43211a818a05dfa5254960f56b0d71412b7 with commit message 'add e2e env' into base branch master
+Merged SHA a23d0afe0c3f53143faceef585dde497c3e6d31e with commit message 'update' into base branch master
+Merged SHA b72887042f9b56b09b59822fc813b75b96bb38e4 with commit message 'update' into base branch master
+Merged SHA d07784b3c31c975eb649faefdfe31fb4b2df5b40 with commit message 'update' into base branch master
+Merged SHA 2a42e0490f2c95991a240656f51f4dd6f68161de with commit message 'update' into base branch master
+Merged SHA 5c1068b2c869fdcfb38dd760f5e6cc41e5175ab0 with commit message 'update jenkins-x' into base branch master
+Merged SHA 034085b26331865cf941307eecad707356da4961 with commit message 'Test cicd' into base branch master
+
+Showing logs for build [32mmeta-nervosnetwork-muta-pr-333-2cg48-23[0m stage [32mmeta-pipeline[0m and container [32mstep-create-effective-pipeline[0m
+Effective pipeline written to jenkins-x-pr-build-effective.yml
+
+Showing logs for build [32mmeta-nervosnetwork-muta-pr-333-2cg48-23[0m stage [32mmeta-pipeline[0m and container [32mstep-create-tekton-crds[0m
+error: failed to generate Tekton CRDs: unable to extract the requested pipeline: no pipeline defined for kind pullrequest
+[31m
+Pipeline failed on stage 'meta-pipeline' : container 'step-create-tekton-crds'. The execution of the pipeline has stopped.[0m
