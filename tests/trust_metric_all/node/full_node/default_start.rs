@@ -8,6 +8,7 @@ use super::{common, config::Config, consts, error::MainError, memory_db::MemoryD
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::sync::Arc;
+use std::panic;
 
 use bytes::Bytes;
 use futures::lock::Mutex;
@@ -474,7 +475,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         brake_ratio:     metadata.brake_ratio,
     };
 
-    tokio::spawn(async move {
+    let consensus_handle = tokio::spawn(async move {
         if let Err(e) = overlord_consensus
             .run(consensus_interval, authority_list, Some(timer_config))
             .await
@@ -483,8 +484,10 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         }
     });
 
-    let _ = running;
     exec_demon.run().await;
+
+    let _ = consensus_handle.await;
+    let _ = running;
 
     Ok(())
 }
