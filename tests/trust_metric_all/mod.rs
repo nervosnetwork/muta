@@ -9,6 +9,8 @@ mod node;
 use futures::future::BoxFuture;
 use node::client_node::{ClientNode, ClientNodeError};
 
+use std::panic;
+
 const FULL_NODE_SETUP_WAIT_TIME: u64 = 5;
 
 fn trust_test(test: impl FnOnce(ClientNode) -> BoxFuture<'static, ()> + Send + 'static) {
@@ -18,7 +20,9 @@ fn trust_test(test: impl FnOnce(ClientNode) -> BoxFuture<'static, ()> + Send + '
 
     local.block_on(&mut rt, async move {
         let running = common::RunningStatus::new();
-        tokio::task::spawn_local(node::full_node::run(full_port, running.clone()));
+        let _ = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+            let _ = tokio::task::spawn_local(node::full_node::run(full_port, running.clone()));
+        }));
         // Sleep a while for full node network to running, otherwise will
         // trigger network retry back off.
         tokio::time::delay_for(std::time::Duration::from_secs(FULL_NODE_SETUP_WAIT_TIME)).await;
