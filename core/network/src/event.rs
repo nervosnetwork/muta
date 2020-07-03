@@ -5,6 +5,7 @@ use protocol::{traits::TrustFeedback, types::Address};
 #[cfg(not(test))]
 use tentacle::context::SessionContext;
 use tentacle::{
+    error::TransportErrorKind,
     multiaddr::Multiaddr,
     secio::{PeerId, PublicKey},
     service::TargetProtocol,
@@ -42,6 +43,9 @@ pub enum ConnectionErrorKind {
     #[display(fmt = "dns resolver {}", _0)]
     DNSResolver(Box<dyn Error + Send>),
 
+    #[display(fmt = "multiaddr {} is not supported", _0)]
+    MultiaddrNotSuppored(Multiaddr),
+
     #[display(fmt = "handshake {}", _0)]
     SecioHandshake(Box<dyn Error + Send>),
 
@@ -50,6 +54,20 @@ pub enum ConnectionErrorKind {
 
     #[display(fmt = "protocol handle block or abnormally closed")]
     ProtocolHandle,
+}
+
+impl From<TransportErrorKind> for ConnectionErrorKind {
+    fn from(err: TransportErrorKind) -> ConnectionErrorKind {
+        match err {
+            TransportErrorKind::Io(err) => ConnectionErrorKind::Io(err),
+            TransportErrorKind::NotSupported(addr) => {
+                ConnectionErrorKind::MultiaddrNotSuppored(addr)
+            }
+            TransportErrorKind::DNSResolverError(_, _) => {
+                ConnectionErrorKind::DNSResolver(Box::new(err))
+            }
+        }
+    }
 }
 
 #[derive(Debug, Display)]
@@ -66,6 +84,7 @@ pub enum SessionErrorKind {
     },
 
     #[display(fmt = "unexpect {}", _0)]
+    #[allow(dead_code)]
     Unexpected(Box<dyn Error + Send>),
 }
 
@@ -84,6 +103,7 @@ pub enum MisbehaviorKind {
 
 #[derive(Debug, Display, PartialEq, Eq)]
 pub enum ConnectionType {
+    #[allow(dead_code)]
     #[display(fmt = "Receive an repeated connection")]
     Inbound,
     #[display(fmt = "Dial an repeated connection")]

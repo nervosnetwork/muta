@@ -1,9 +1,9 @@
-use std::{io, marker::PhantomData};
+use std::marker::PhantomData;
 
 use futures::channel::mpsc::UnboundedSender;
 use log::error;
 use tentacle::{
-    error::Error as TentacleError,
+    error::SendErrorKind,
     service::{ServiceControl, TargetSession},
     SessionId,
 };
@@ -121,12 +121,8 @@ where
         };
 
         let ret = ret.map_err(|err| match &err {
-            TentacleError::IoError(io_err) => match io_err.kind() {
-                io::ErrorKind::BrokenPipe => NetworkError::Shutdown,
-                io::ErrorKind::WouldBlock => NetworkError::Busy,
-                _ => NetworkError::UnexpectedError(Box::new(err)),
-            },
-            _ => NetworkError::UnexpectedError(Box::new(err)),
+            SendErrorKind::BrokenPipe => NetworkError::Shutdown,
+            SendErrorKind::WouldBlock => NetworkError::Busy,
         });
 
         if ret.is_err() || opt_blocked.is_some() {

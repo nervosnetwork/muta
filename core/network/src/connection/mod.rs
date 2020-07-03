@@ -15,10 +15,10 @@ use std::{
 use futures::{
     channel::mpsc::UnboundedReceiver, channel::mpsc::UnboundedSender, pin_mut, stream::Stream,
 };
-use log::{debug, error};
+use log::debug;
 use tentacle::{
-    builder::ServiceBuilder, error::Error as TentacleError, multiaddr::Multiaddr,
-    secio::SecioKeyPair, service::Service,
+    builder::ServiceBuilder, error::SendErrorKind, multiaddr::Multiaddr, secio::SecioKeyPair,
+    service::Service,
 };
 
 use crate::{
@@ -124,31 +124,21 @@ impl<P: NetworkProtocol> ConnectionService<P> {
         ConnectionServiceControl::new(control_ref.clone(), mgr_tx, book)
     }
 
-    // NOTE: control.dial() and control.disconnect() both return same two
-    // kinds of error: io::ErrorKind::BrokenPipe and io::ErrorKind::WouldBlock.
-    //
     // BrokenPipe means service is closed.
     // WouldBlock means service is temporary unavailable.
     //
     // If WouldBlock is returned, we should try again later.
     pub fn process_event(&mut self, event: ConnectionEvent) {
-        use std::io;
-
         enum State {
             Closed,
-            Busy,                      // limit to 2048 in tentacle
-            Unexpected(TentacleError), // Logic update required
+            Busy, // limit to 2048 in tentacle
         }
 
         macro_rules! try_do {
             ($ctrl_op:expr) => {{
                 let ret = $ctrl_op.map_err(|err| match &err {
-                    TentacleError::IoError(io_err) => match io_err.kind() {
-                        io::ErrorKind::BrokenPipe => State::Closed,
-                        io::ErrorKind::WouldBlock => State::Busy,
-                        _ => State::Unexpected(err),
-                    },
-                    _ => State::Unexpected(err),
+                    SendErrorKind::BrokenPipe => State::Closed,
+                    SendErrorKind::WouldBlock => State::Busy,
                 });
 
                 match ret {
@@ -156,10 +146,6 @@ impl<P: NetworkProtocol> ConnectionService<P> {
                     Err(state) => match state {
                         State::Closed => return, // Early abort func
                         State::Busy => Err::<(), ()>(()),
-                        State::Unexpected(e) => {
-                            error!("network: connection: process_event() unexpected: {}", e);
-                            Err::<(), ()>(())
-                        }
                     },
                 }
             }};

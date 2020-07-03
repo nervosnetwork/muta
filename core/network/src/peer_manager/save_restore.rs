@@ -158,7 +158,7 @@ impl ser::Serialize for SerdePubKey {
     where
         S: ser::Serializer,
     {
-        serializer.serialize_bytes(self.0.encode().as_ref())
+        serializer.serialize_bytes(self.0.clone().encode().as_ref())
     }
 }
 

@@ -4,7 +4,7 @@ use futures::channel::mpsc::UnboundedSender;
 use log::{debug, error};
 use tentacle::{
     context::ServiceContext,
-    error::Error as TentacleError,
+    error::{DialerErrorKind, ListenErrorKind},
     multiaddr::Multiaddr,
     service::{ServiceError, ServiceEvent},
     traits::ServiceHandle,
@@ -84,34 +84,42 @@ impl ConnectionServiceKeeper {
         }
     }
 
-    fn process_connect_error(&self, ty: ConnectionType, error: TentacleError, addr: Multiaddr) {
-        use TentacleError::{
-            ConnectSelf, DNSResolverError, HandshakeError, IoError, PeerIdNotMatch,
-            RepeatedConnection, ServiceProtoHandleAbnormallyClosed, ServiceProtoHandleBlock,
-            SessionProtoHandleAbnormallyClosed, SessionProtoHandleBlock,
+    fn process_dailer_error(&self, addr: Multiaddr, error: DialerErrorKind) {
+        use DialerErrorKind::{
+            HandshakeError, IoError, PeerIdNotMatch, RepeatedConnection, TransportError,
         };
 
         let kind = match error {
-            ConnectSelf => {
-                let connect_self = PeerManagerEvent::AddNewListenAddr { addr };
-                return self.report_peer(connect_self);
-            }
+            IoError(err) => ConnectionErrorKind::Io(err),
+            PeerIdNotMatch => ConnectionErrorKind::PeerIdNotMatch,
             RepeatedConnection(sid) => {
+                let ty = ConnectionType::Outbound;
                 let repeated_connection = PeerManagerEvent::RepeatedConnection { ty, sid, addr };
                 return self.report_peer(repeated_connection);
             }
-            IoError(err) => ConnectionErrorKind::Io(err),
-            PeerIdNotMatch => ConnectionErrorKind::PeerIdNotMatch,
-            DNSResolverError(e) => ConnectionErrorKind::DNSResolver(Box::new(e)),
-            HandshakeError(e) => ConnectionErrorKind::SecioHandshake(Box::new(e)),
-            SessionProtoHandleBlock(_)
-            | ServiceProtoHandleBlock
-            | ServiceProtoHandleAbnormallyClosed
-            | SessionProtoHandleAbnormallyClosed(_) => ConnectionErrorKind::ProtocolHandle,
+            HandshakeError(err) => ConnectionErrorKind::SecioHandshake(Box::new(err)),
+            TransportError(err) => ConnectionErrorKind::from(err),
         };
 
-        let connect_failed = PeerManagerEvent::ConnectFailed { addr, kind };
-        self.report_peer(connect_failed);
+        let dail_failed = PeerManagerEvent::ConnectFailed { addr, kind };
+        self.report_peer(dail_failed);
+    }
+
+    fn process_listen_error(&self, addr: Multiaddr, error: ListenErrorKind) {
+        use ListenErrorKind::{IoError, RepeatedConnection, TransportError};
+
+        let kind = match error {
+            IoError(err) => ConnectionErrorKind::Io(err),
+            RepeatedConnection(sid) => {
+                let ty = ConnectionType::Outbound;
+                let repeated_connection = PeerManagerEvent::RepeatedConnection { ty, sid, addr };
+                return self.report_peer(repeated_connection);
+            }
+            TransportError(err) => ConnectionErrorKind::from(err),
+        };
+
+        let listen_failed = PeerManagerEvent::ConnectFailed { addr, kind };
+        self.report_peer(listen_failed);
     }
 }
 
@@ -120,10 +128,10 @@ impl ServiceHandle for ConnectionServiceKeeper {
     fn handle_error(&mut self, _ctx: &mut ServiceContext, err: ServiceError) {
         match err {
             ServiceError::DialerError { error, address } => {
-                self.process_connect_error(ConnectionType::Outbound, error, address)
+                self.process_dailer_error(address, error)
             }
             ServiceError::ListenError { error, address } => {
-                self.process_connect_error(ConnectionType::Inbound, error, address)
+                self.process_listen_error(address, error)
             }
             ServiceError::ProtocolSelectError { session_context, proto_name } => {
                 let protocol_identity = if let Some(proto_name) = proto_name {
@@ -166,14 +174,9 @@ impl ServiceHandle for ConnectionServiceKeeper {
             }
 
             ServiceError::MuxerError { session_context, error } => {
-                let kind = if let TentacleError::IoError(err) = error {
-                    SessionErrorKind::Io(err)
-                } else {
-                    SessionErrorKind::Unexpected(Box::new(error))
-                };
                 let muxer_broken = PeerManagerEvent::SessionFailed {
                     sid: session_context.id,
-                    kind,
+                    kind: SessionErrorKind::Io(error)
                 };
 
                 self.report_peer(muxer_broken);
