@@ -5,24 +5,28 @@ pipelineConfig:
       pipeline:
         agent:
           image: mutadev/muta:build-env
-        stages:
-          - name: test
-            options:
-              containerOptions:
-                resources:
-                  limits:
-                    cpu: 8
-                    memory: 8Gi
-                  requests:
-                    cpu: 4
-                    memory: 4Gi
-            steps:
-              - name: make-fmt
-                command: make
-                args: ['fmt']
-              - name: make-clippy
-                command: make
-                args: ['clippy']
-              - name: make-unit-test
-                command: make
-                args: ['test']
+        parallel:
+        - name: test
+          options:
+            containerOptions:
+              name: ""
+              resources:
+                limits:
+                  cpu: "8"
+                  memory: 8Gi
+                requests:
+                  cpu: "4"
+                  memory: 4Gi
+          steps:
+          - args:
+            - fmt
+            command: make
+            name: make-fmt
+          - args:
+            - clippy
+            command: make
+            name: make-clippy
+          - args:
+            - test
+            command: make
+            name: make-unit-test
