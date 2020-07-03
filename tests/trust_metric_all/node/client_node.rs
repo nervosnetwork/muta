@@ -138,14 +138,24 @@ impl ClientNode {
                 .is_some()
     }
 
+    pub fn connected_session(&self, addr: &Address) -> Option<usize> {
+        if !self.connected() {
+            None
+        } else {
+            self.network
+                .diagnostic
+                .session_by_chain(addr)
+                .map(|sid| sid.value())
+        }
+    }
+
     pub async fn broadcast<M: MessageCodec>(&self, endpoint: &str, msg: M) -> ClientResult<()> {
-        let diagnostic = &self.network.diagnostic;
-        let sid = match diagnostic.session_by_chain(&self.remote_chain_addr) {
+        let sid = match self.connected_session(&self.remote_chain_addr) {
             Some(sid) => sid,
             None => return Err(ClientNodeError::NotConnected),
         };
 
-        let ctx = Context::new().with_value::<usize>("session_id", sid.value());
+        let ctx = Context::new().with_value::<usize>("session_id", sid);
         let users = vec![self.remote_chain_addr.clone()];
         if let Err(e) = self
             .users_cast::<M>(ctx, endpoint, users, msg, Priority::High)
@@ -172,13 +182,12 @@ impl ClientNode {
         endpoint: &str,
         msg: M,
     ) -> ClientResult<R> {
-        let diagnostic = &self.network.diagnostic;
-        let sid = match diagnostic.session_by_chain(&self.remote_chain_addr) {
+        let sid = match self.connected_session(&self.remote_chain_addr) {
             Some(sid) => sid,
             None => return Err(ClientNodeError::NotConnected),
         };
 
-        let ctx = Context::new().with_value::<usize>("session_id", sid.value());
+        let ctx = Context::new().with_value::<usize>("session_id", sid);
         match self.call::<M, R>(ctx, endpoint, msg, Priority::High).await {
             Ok(resp) => Ok(resp),
             Err(e)

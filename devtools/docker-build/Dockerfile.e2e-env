@@ -1,0 +1,12 @@
+FROM mutadev/muta:build-env
+
+LABEL maintainer="yejiayu.fe@gmail.com"
+
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y curl; \
+    curl -sL https://deb.nodesource.com/setup_12.x | bash -; \
+    apt-get install -y nodejs; \
+    rm -rf /var/lib/apt/lists/*
+
+RUN npm i yarn -g;
