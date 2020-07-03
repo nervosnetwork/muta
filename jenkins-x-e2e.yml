@@ -3,20 +3,19 @@ pipelineConfig:
   pipelines:
     pullRequest:
       pipeline:
-        agent:
-          image: mutadev/muta:build-env
         stages:
-          - name: ci
+          - name: e2e
             options:
               containerOptions:
                 resources:
                   limits:
+                    cpu: 8
+                    memory: 8Gi
+                  requests:
                     cpu: 4
                     memory: 4Gi
-                  requests:
-                    cpu: 2
-                    memory: 2Gi
             steps:
-              - name: make-release
+              - name: make-e2e
+                image: mutadev/muta:e2e-env
                 command: make
-                args: ['prod']
+                args: ['e2e-test']
