@@ -1,4 +1,9 @@
-
+cleanup:
+  Annotations:
+    helm.sh/hook: pre-delete
+    helm.sh/hook-delete-policy: hook-succeeded
+  Args:
+  - --cleanup
 expose:
   Annotations:
     helm.sh/hook: post-install,post-upgrade
@@ -7,16 +12,9 @@ expose:
     exposer: Ingress
     http: true
     tlsacme: false
-
-cleanup:
-  Args:
-    - --cleanup
-  Annotations:
-    helm.sh/hook: pre-delete
-    helm.sh/hook-delete-policy: hook-succeeded
-
 preview:
   image:
-    repository:
-    tag:
     pullPolicy: IfNotPresent
+    repository: null
+    tag: null
+  namespace: muta-previews
