@@ -1,7 +1,7 @@
 buildPack: none
 pipelineConfig:
   pipelines:
-    pullRequest:
+    release:
       pipeline:
         agent:
           image: mutadev/muta:build-env
