@@ -1,22 +1,32 @@
 buildPack: none
 pipelineConfig:
   pipelines:
+    pullRequest:
+      pipeline:
+        agent:
+          image: mutadev/muta:build-env
+      build:
+        steps:
+        - command: cargo fmt
+        - command: cargo clippy
     release:
       pipeline:
         agent:
           image: mutadev/muta:build-env
         stages:
-          - name: release
-            options:
-              containerOptions:
-                resources:
-                  limits:
-                    cpu: 4
-                    memory: 4Gi
-                  requests:
-                    cpu: 2
-                    memory: 2Gi
-            steps:
-              - name: make-release
-                command: make
-                args: ['prod']
+        - name: release
+          options:
+            containerOptions:
+              name: ""
+              resources:
+                limits:
+                  cpu: "4"
+                  memory: 4Gi
+                requests:
+                  cpu: "2"
+                  memory: 2Gi
+          steps:
+          - args:
+            - prod
+            command: make
+            name: make-release
