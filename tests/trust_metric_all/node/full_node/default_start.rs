@@ -8,7 +8,6 @@ use super::{common, config::Config, consts, error::MainError, memory_db::MemoryD
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::sync::Arc;
-use std::panic;
 
 use bytes::Bytes;
 use futures::lock::Mutex;
@@ -485,7 +484,6 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     });
 
     exec_demon.run().await;
-
     let _ = consensus_handle.await;
     let _ = running;
 
