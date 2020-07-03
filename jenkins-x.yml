@@ -6,7 +6,7 @@ pipelineConfig:
         agent:
           image: mutadev/muta:build-env
         stages:
-          - name: ci
+          - name: release
             options:
               containerOptions:
                 resources:
