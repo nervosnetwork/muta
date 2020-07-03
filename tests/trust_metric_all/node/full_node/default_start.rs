@@ -474,7 +474,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         brake_ratio:     metadata.brake_ratio,
     };
 
-    tokio::spawn(async move {
+    let consensus_handle = tokio::spawn(async move {
         if let Err(e) = overlord_consensus
             .run(consensus_interval, authority_list, Some(timer_config))
             .await
@@ -483,8 +483,9 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         }
     });
 
-    let _ = running;
     exec_demon.run().await;
+    let _ = consensus_handle.await;
+    let _ = running;
 
     Ok(())
 }
