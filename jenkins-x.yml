@@ -3,6 +3,8 @@ pipelineConfig:
   pipelines:
     pullRequest:
       pipeline:
+        agent:
+          image: mutadev/muta:build-env
         stages:
           - name: test
             options:
