@@ -1,3 +1,36 @@
+# buildPack: none
+# pipelineConfig:
+#   pipelines:
+#     pullRequest:
+#       pipeline:
+#         agent:
+#           image: mutadev/muta:build-env
+#         parallel:
+#         - name: test
+#           options:
+#             containerOptions:
+#               name: ""
+#               resources:
+#                 limits:
+#                   cpu: "8"
+#                   memory: 8Gi
+#                 requests:
+#                   cpu: "4"
+#                   memory: 4Gi
+#           steps:
+#           - args:
+#             - fmt
+#             command: make
+#             name: make-fmt
+#           - args:
+#             - clippy
+#             command: make
+#             name: make-clippy
+#           - args:
+#             - test
+#             command: make
+#             name: make-unit-test
+
 buildPack: none
 pipelineConfig:
   pipelines:
@@ -5,28 +38,21 @@ pipelineConfig:
       pipeline:
         agent:
           image: mutadev/muta:build-env
-        parallel:
-        - name: test
-          options:
-            containerOptions:
-              name: ""
-              resources:
-                limits:
-                  cpu: "8"
-                  memory: 8Gi
-                requests:
-                  cpu: "4"
-                  memory: 4Gi
-          steps:
-          - args:
-            - fmt
-            command: make
-            name: make-fmt
-          - args:
-            - clippy
-            command: make
-            name: make-clippy
-          - args:
-            - test
-            command: make
-            name: make-unit-test
+        stages:
+          - name: "ci-test"
+            parallel:
+              - name: "cargo fmt"
+                steps:
+                  - command: make
+                    args:
+                      - fmt
+              - name: "cargo clippy"
+                steps:
+                  - command: make
+                    args:
+                      - "clippy"
+              - name: "cargo test"
+                steps:
+                  - command: make
+                    args:
+                      - "test"
