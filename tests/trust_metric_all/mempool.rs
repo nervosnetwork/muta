@@ -292,6 +292,8 @@ fn should_be_disconnected_for_repeated_timeout_smaller_than_latest_height_only_w
 ) {
     trust_test(move |client_node| {
         Box::pin(async move {
+            // Sleep a while for full node to generate blocks
+            tokio::time::delay_for(std::time::Duration::from_secs(5)).await;
             let mut latest_report = client_node.trust_report().await.expect("get report");
 
             let stx = common::stx_builder()
