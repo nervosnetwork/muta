@@ -1,0 +1,15 @@
+buildPack: none
+pipelineConfig:
+  pipelines:
+    pullRequest:
+      pipeline:
+        agent:
+          image: mutadev/muta:e2e-env
+        stages:
+          - name: e2e
+            parallel:
+              - name: "cargo e2e"
+                steps:
+                  - command: make
+                    args:
+                      - e2e-test
