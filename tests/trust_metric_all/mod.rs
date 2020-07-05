@@ -11,23 +11,21 @@ use node::client_node::{ClientNode, ClientNodeError};
 
 use std::panic;
 
-const FULL_NODE_SETUP_WAIT_TIME: u64 = 5;
-
 fn trust_test(test: impl FnOnce(ClientNode) -> BoxFuture<'static, ()> + Send + 'static) {
     let (full_port, client_port) = common::available_port_pair();
     let mut rt = tokio::runtime::Runtime::new().expect("create runtime");
     let local = tokio::task::LocalSet::new();
 
     local.block_on(&mut rt, async move {
-        let running = common::RunningStatus::new();
-        tokio::task::spawn_local(node::full_node::run(full_port, running.clone()));
+        let full_node_running = common::RunningStatus::new();
+        tokio::task::spawn_local(node::full_node::run(full_port, full_node_running.clone()));
 
-        // Sleep a while for full node network to running, otherwise will
-        // trigger network retry back off.
-        tokio::time::delay_for(std::time::Duration::from_secs(FULL_NODE_SETUP_WAIT_TIME)).await;
+        // Wait for full node network initialization
+        full_node_running.wait().await;
 
         let handle = tokio::spawn(async move {
-            let client_node = node::client_node::connect(full_port, client_port, running).await;
+            let client_node =
+                node::client_node::connect(full_port, client_port, full_node_running).await;
 
             test(client_node).await;
         });

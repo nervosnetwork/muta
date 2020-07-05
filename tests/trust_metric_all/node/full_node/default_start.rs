@@ -483,6 +483,9 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         }
     });
 
+    // We are set up
+    running.wait().await;
+
     exec_demon.run().await;
     let _ = consensus_handle.await;
     let _ = running;
