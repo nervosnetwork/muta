@@ -6,10 +6,10 @@ pipelineConfig:
         agent:
           image: mutadev/muta:build-env
         stages:
-          - name: fmt
+          - name: unit
             parallel:
-              - name: "cargo fmt"
+              - name: "cargo test"
                 steps:
                   - command: make
                     args:
-                      - fmt
+                      - test

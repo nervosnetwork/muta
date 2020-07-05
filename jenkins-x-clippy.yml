@@ -6,10 +6,10 @@ pipelineConfig:
         agent:
           image: mutadev/muta:build-env
         stages:
-          - name: fmt
+          - name: "clippy"
             parallel:
               - name: "cargo fmt"
                 steps:
                   - command: make
                     args:
-                      - fmt
+                      - clippy
