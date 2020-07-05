@@ -1,0 +1,15 @@
+buildPack: none
+pipelineConfig:
+  pipelines:
+    pullRequest:
+      pipeline:
+        agent:
+          image: mutadev/muta:build-env
+        stages:
+          - name: "ci-test"
+            parallel:
+              - name: "cargo fmt"
+                steps:
+                  - command: make
+                    args:
+                      - fmt
