@@ -7,9 +7,15 @@ pipelineConfig:
           image: mutadev/muta-build-env:v0.1.0
         stages:
           - name: unit
-            parallel:
-              - name: "cargo test"
-                steps:
-                  - command: make
-                    args:
-                      - test
+            options:
+              containerOptions:
+                resources:
+                  limits:
+                    cpu: 4
+                    memory: 8Gi
+                  requests:
+                    cpu: 3
+                    memory: 6Gi
+            steps:
+              - name: unit
+                command: 'make test'

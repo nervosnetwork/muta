@@ -7,9 +7,15 @@ pipelineConfig:
           image: mutadev/muta-e2e-env:v0.1.0
         stages:
           - name: e2e
-            parallel:
-              - name: "cargo e2e"
-                steps:
-                  - command: make
-                    args:
-                      - e2e-test
+            options:
+              containerOptions:
+                resources:
+                  limits:
+                    cpu: 6
+                    memory: 8Gi
+                  requests:
+                    cpu: 4
+                    memory: 4Gi
+            steps:
+              - name: e2e
+                command: 'make e2e-test'

@@ -6,10 +6,16 @@ pipelineConfig:
         agent:
           image: mutadev/muta-build-env:v0.1.0
         stages:
-          - name: "clippy"
-            parallel:
-              - name: "cargo fmt"
-                steps:
-                  - command: make
-                    args:
-                      - clippy
+          - name: clippy
+            options:
+              containerOptions:
+                resources:
+                  limits:
+                    cpu: 2
+                    memory: 4Gi
+                  requests:
+                    cpu: 2
+                    memory: 4Gi
+            steps:
+              - name: clippy
+                command: 'make clippy'
