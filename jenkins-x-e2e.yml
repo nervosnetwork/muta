@@ -11,10 +11,10 @@ pipelineConfig:
               containerOptions:
                 resources:
                   limits:
-                    cpu: 6
+                    cpu: 4
                     memory: 8Gi
                   requests:
-                    cpu: 4
+                    cpu: 3
                     memory: 4Gi
             steps:
               - name: e2e
