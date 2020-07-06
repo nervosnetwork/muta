@@ -17,4 +17,4 @@ preview:
     pullPolicy: IfNotPresent
     repository: null
     tag: null
-  namespace: muta-previews
+  namespace: jx-previews
