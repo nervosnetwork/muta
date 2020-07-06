@@ -60,7 +60,7 @@ e2e-test:
 	rm -rf ./devtools/chain/data
 	./target/debug/examples/muta-chain > /tmp/log 2>&1 &
 	cd tests/e2e && yarn && ./wait-for-it.sh -t 300 localhost:8000 -- yarn run test
-	killall -2 muta-chain
+	pkill -2 muta-chain
 
 e2e-test-via-docker:
 	docker-compose -f tests/e2e/docker-compose-e2e-test.yaml up --exit-code-from e2e-test --force-recreate
