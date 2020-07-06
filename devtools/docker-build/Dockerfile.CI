@@ -1,4 +1,4 @@
-FROM mutadev/muta:build-env
+FROM mutadev/muta-build-env:v0.1.0
 
 LABEL maintainer="yejiayu.fe@gmail.com"
 

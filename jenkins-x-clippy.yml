@@ -1,0 +1,21 @@
+buildPack: none
+pipelineConfig:
+  pipelines:
+    pullRequest:
+      pipeline:
+        agent:
+          image: mutadev/muta-build-env:v0.1.0
+        stages:
+          - name: clippy
+            options:
+              containerOptions:
+                resources:
+                  limits:
+                    cpu: 4
+                    memory: 8Gi
+                  requests:
+                    cpu: 3
+                    memory: 4Gi
+            steps:
+              - name: clippy
+                command: 'make clippy'

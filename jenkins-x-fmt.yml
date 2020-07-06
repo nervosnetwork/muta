@@ -1,0 +1,21 @@
+buildPack: none
+pipelineConfig:
+  pipelines:
+    pullRequest:
+      pipeline:
+        agent:
+          image: mutadev/muta-build-env:v0.1.0
+        stages:
+          - name: fmt
+            options:
+              containerOptions:
+                resources:
+                  limits:
+                    cpu: 2
+                    memory: 2Gi
+                  requests:
+                    cpu: 2
+                    memory: 2Gi
+            steps:
+              - name: fmt
+                command: 'make fmt'
