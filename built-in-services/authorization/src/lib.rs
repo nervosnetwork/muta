@@ -109,7 +109,7 @@ impl<SDK: ServiceSDK> AuthorizationService<SDK> {
             self.verified_list.remove(index);
             ServiceResponse::from_succeed(())
         } else {
-            return ServiceResponse::<()>::from_error(104, "Can not find item".to_owned());
+            ServiceResponse::<()>::from_error(104, "Can not find item".to_owned())
         }
     }
 
