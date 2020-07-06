@@ -1,0 +1,1293 @@
+
+Showing logs for build [32mnervosnetwork-muta-pr-336-unit-pgm9n-32[0m stage [32munit[0m and container [32mstep-credential-initializer-7scmk[0m
+{"level":"info","ts":1594013335.8106632,"logger":"fallback-logger","caller":"logging/config.go:69","msg":"Fetch GitHub commit ID from kodata failed: open /var/run/ko/refs/heads/0.8.0-ns-support: no such file or directory"}
+{"level":"info","ts":1594013335.8109288,"logger":"fallback-logger","caller":"creds-init/main.go:40","msg":"Credentials initialized."}
+
+Showing logs for build [32mnervosnetwork-muta-pr-336-unit-pgm9n-32[0m stage [32munit[0m and container [32mstep-working-dir-initializer-f8kgl[0m
+{"level":"info","ts":1594013336.7942042,"logger":"fallback-logger","caller":"logging/config.go:69","msg":"Fetch GitHub commit ID from kodata failed: open /var/run/ko/HEAD: no such file or directory"}
+{"level":"info","ts":1594013336.7948434,"logger":"fallback-logger","caller":"bash/main.go:64","msg":"Successfully executed command \"sh -c mkdir -p /workspace/source\"; output "}
+
+Showing logs for build [32mnervosnetwork-muta-pr-336-unit-pgm9n-32[0m stage [32munit[0m and container [32mstep-place-tools[0m
+
+Showing logs for build [32mnervosnetwork-muta-pr-336-unit-pgm9n-32[0m stage [32munit[0m and container [32mstep-git-source-nervosnetwork-muta-pr-336-unit-pgm9n-rxx8t[0m
+{"level":"info","ts":1594013341.9094822,"logger":"fallback-logger","caller":"logging/config.go:69","msg":"Fetch GitHub commit ID from kodata failed: open /var/run/ko/refs/heads/0.8.0-ns-support: no such file or directory"}
+{"level":"info","ts":1594013344.1960633,"logger":"fallback-logger","caller":"git/git.go:103","msg":"Successfully cloned https://github.com/nervosnetwork/muta.git @ master in path /workspace/source"}
+
+Showing logs for build [32mnervosnetwork-muta-pr-336-unit-pgm9n-32[0m stage [32munit[0m and container [32mstep-setup-builder-home[0m
+
+Showing logs for build [32mnervosnetwork-muta-pr-336-unit-pgm9n-32[0m stage [32munit[0m and container [32mstep-git-merge[0m
+Using SHAs from PULL_REFS=master:7251f16d24a71de1c3981299ba2ed9fa10b3adba,336:01c342b8a94d4d839b253a0acfe01a2319f41970
+DEBUG: LC_ALL=C JX_LOG_LEVEL=error git fetch origin --unshallow 01c342b8a94d4d839b253a0acfe01a2319f41970: 7251f16d24a71de1c3981299ba2ed9fa10b3adba:
+DEBUG: ran git fetch --unshallow origin 01c342b8a94d4d839b253a0acfe01a2319f41970: 7251f16d24a71de1c3981299ba2ed9fa10b3adba: in 
+DEBUG: LC_ALL=C JX_LOG_LEVEL=error git branch
+DEBUG: LC_ALL=C JX_LOG_LEVEL=error git checkout master
+DEBUG: ran git checkout master in 
+DEBUG: LC_ALL=C JX_LOG_LEVEL=error git reset --hard 7251f16d24a71de1c3981299ba2ed9fa10b3adba
+DEBUG: ran git reset --hard 7251f16d24a71de1c3981299ba2ed9fa10b3adba in 
+DEBUG: JX_LOG_LEVEL=error LC_ALL=C git clean -fd .
+DEBUG: ran clean --force -d . in 
+DEBUG: LC_ALL=C JX_LOG_LEVEL=error git merge 01c342b8a94d4d839b253a0acfe01a2319f41970
+DEBUG: ran git merge 01c342b8a94d4d839b253a0acfe01a2319f41970 in 
+DEBUG: LC_ALL=C JX_LOG_LEVEL=error git log --format=%H%x1f%an%x1f%ae%x1f%cn%x1f%ce%x1f%s%n%b%x1e 7251f16d24a71de1c3981299ba2ed9fa10b3adba..HEAD
+Merged SHA 01c342b8a94d4d839b253a0acfe01a2319f41970 with commit message 'update' into base branch master
+Merged SHA ae307343d050e6cbaac4f2ca43e4ceebcd652d97 with commit message 'update' into base branch master
+Merged SHA 7587b7b7aaad3bf53a573d9d1ff9edd8e84b294a with commit message 'e2e test' into base branch master
+Merged SHA 9a815bfbc7997642e9b59806350fa770d185f5ee with commit message 'update' into base branch master
+Merged SHA 2cf9933051687952c9df6f37a5d656996bc3bed1 with commit message 'update' into base branch master
+Merged SHA 4fd251b54c31a5398d20bb44bf8acb3ee94f3f21 with commit message 'update' into base branch master
+Merged SHA 7a193b854fa42c713ac76045b68c002ab6421015 with commit message 'update' into base branch master
+Merged SHA 8a34de86b94e6cf537e567577dd5a0e825fb38f2 with commit message 'parallel' into base branch master
+Merged SHA 0e1a1822c451a1c12f0d4ed3bfac7de3d3f5cf50 with commit message 'fix ci test' into base branch master
+
+Showing logs for build [32mnervosnetwork-muta-pr-336-unit-pgm9n-32[0m stage [32munit[0m and container [32mstep-unit[0m
+env  cargo test  --all -- --nocapture
+info: syncing channel updates for 'nightly-2020-05-14-x86_64-unknown-linux-gnu'
+info: latest update on 2020-05-14, rust version 1.45.0-nightly (75e1463c5 2020-05-13)
+info: downloading component 'cargo'
+info: downloading component 'clippy'
+info: downloading component 'rust-docs'
+info: downloading component 'rust-std'
+info: downloading component 'rustc'
+info: downloading component 'rustfmt'
+info: installing component 'cargo'
+info: installing component 'clippy'
+info: installing component 'rust-docs'
+info: installing component 'rust-std'
+info: installing component 'rustc'
+info: installing component 'rustfmt'
+    Updating crates.io index
+    Updating git repository `https://github.com/graphql-rust/juniper`
+    Updating git repository `https://github.com/tikv/rust-prometheus.git`
+    Updating git repository `https://github.com/nervosnetwork/overlord`
+    Updating git repository `https://github.com/zeroqn/p2p`
+ Downloading crates ...
+  Downloaded actix-codec v0.2.0
+  Downloaded actix-utils v1.0.6
+  Downloaded actix-web v2.0.0
+  Downloaded base64 v0.10.1
+  Downloaded bindgen v0.53.3
+  Downloaded autocfg v1.0.0
+  Downloaded bit-vec v0.6.2
+  Downloaded awc v1.0.1
+  Downloaded cexpr v0.4.0
+  Downloaded error-chain v0.12.2
+  Downloaded brotli2 v0.3.2
+  Downloaded clap v2.33.1
+  Downloaded block-cipher-trait v0.6.2
+  Downloaded aes-ctr v0.3.0
+  Downloaded fixed-hash v0.5.2
+  Downloaded futures-channel v0.3.5
+  Downloaded chashmap v2.2.2
+  Downloaded gimli v0.21.0
+  Downloaded foreign-types-shared v0.1.1
+  Downloaded fnv v1.0.7
+  Downloaded getrandom v0.1.14
+  Downloaded h2 v0.2.5
+  Downloaded futures-sink v0.3.5
+  Downloaded copyless v0.1.5
+  Downloaded hex v0.3.2
+  Downloaded hmac v0.7.1
+  Downloaded ethereum-types-serialize v0.2.2
+  Downloaded anyhow v1.0.31
+  Downloaded ethereum-types v0.4.2
+  Downloaded bincode v1.3.1
+  Downloaded hex v0.4.2
+  Downloaded hasher v0.1.3
+  Downloaded hashbrown v0.3.1
+  Downloaded generic-array v0.12.3
+  Downloaded heck v0.3.1
+  Downloaded futures-core v0.3.5
+  Downloaded failure_derive v0.1.8
+  Downloaded dtoa v0.4.6
+  Downloaded base64 v0.11.0
+  Downloaded env_logger v0.7.1
+  Downloaded h2 v0.1.26
+  Downloaded glob v0.3.0
+  Downloaded futures-macro v0.3.5
+  Downloaded digest v0.8.1
+  Downloaded ctr v0.3.2
+  Downloaded crunchy v0.1.6
+  Downloaded creep v0.2.2
+  Downloaded crc32fast v1.2.0
+  Downloaded aho-corasick v0.7.13
+  Downloaded fxhash v0.2.1
+  Downloaded futures-util v0.3.5
+  Downloaded futures-timer v3.0.2
+  Downloaded futures-io v0.3.5
+  Downloaded futures-executor v0.3.5
+  Downloaded futures-cpupool v0.1.8
+  Downloaded futures v0.1.29
+  Downloaded flate2 v1.0.16
+  Downloaded http v0.1.21
+  Downloaded humantime v1.3.0
+  Downloaded http v0.2.1
+  Downloaded impl-rlp v0.2.1
+  Downloaded hyper v0.12.35
+  Downloaded idna v0.1.5
+  Downloaded keccak v0.1.0
+  Downloaded lock_api v0.3.4
+  Downloaded hyper-tls v0.3.2
+  Downloaded libloading v0.5.2
+  Downloaded impl-serde v0.2.3
+  Downloaded match_cfg v0.1.0
+  Downloaded matches v0.1.8
+  Downloaded lock_api v0.4.0
+  Downloaded memoffset v0.5.5
+  Downloaded memchr v2.3.3
+  Downloaded nom v5.1.2
+  Downloaded num_cpus v1.13.0
+  Downloaded once_cell v1.4.0
+  Downloaded object v0.20.0
+  Downloaded prime_tools v0.2.2
+  Downloaded net2 v0.2.34
+  Downloaded pin-project-lite v0.1.7
+  Downloaded parking_lot v0.4.8
+  Downloaded ophelia v0.2.0
+  Downloaded pin-project v0.4.22
+  Downloaded quickcheck_macros v0.8.0
+  Downloaded rand_chacha v0.2.2
+  Downloaded proc-macro-error v0.3.4
+  Downloaded parking_lot_core v0.5.0
+  Downloaded rand_isaac v0.1.1
+  Downloaded quote v0.6.13
+  Downloaded rand_os v0.1.3
+  Downloaded overlord v0.2.0-alpha.13
+  Downloaded rand_jitter v0.1.4
+  Downloaded rand_hc v0.1.0
+  Downloaded rand_core v0.3.1
+  Downloaded rand v0.7.3
+  Downloaded rand v0.4.6
+  Downloaded quick-error v1.2.3
+  Downloaded parking_lot_core v0.8.0
+  Downloaded prost-derive v0.6.1
+  Downloaded ophelia-secp256k1 v0.2.0
+  Downloaded rand_core v0.4.2
+  Downloaded parking_lot_core v0.2.14
+  Downloaded rand v0.6.5
+  Downloaded rand_pcg v0.1.2
+  Downloaded rand v0.3.23
+  Downloaded quote v1.0.7
+  Downloaded proc-macro2 v1.0.18
+  Downloaded pin-project-internal v0.4.22
+  Downloaded parking_lot_core v0.6.2
+  Downloaded parking_lot v0.11.0
+  Downloaded parking_lot v0.8.0
+  Downloaded ophelia-hasher v0.2.0
+  Downloaded openssl-probe v0.1.2
+  Downloaded percent-encoding v1.0.1
+  Downloaded parking_lot_core v0.7.2
+  Downloaded ordered-float v1.1.0
+  Downloaded ophelia-derive v0.2.0
+  Downloaded openssl v0.10.30
+  Downloaded publicsuffix v1.5.4
+  Downloaded protobuf v2.15.1
+  Downloaded prost v0.6.1
+  Downloaded proc-macro2 v0.4.30
+  Downloaded proc-macro-nested v0.1.6
+  Downloaded proc-macro-hack v0.5.16
+  Downloaded proc-macro-error-attr v0.3.4
+  Downloaded pkg-config v0.3.17
+  Downloaded pin-utils v0.1.0
+  Downloaded peeking_take_while v0.1.2
+  Downloaded parking_lot v0.10.2
+  Downloaded parking_lot v0.9.0
+  Downloaded opaque-debug v0.2.3
+  Downloaded muta-protocol v0.1.0-alpha.1
+  Downloaded percent-encoding v2.1.0
+  Downloaded owning_ref v0.3.3
+  Downloaded ophelia-bls-amcl v0.2.0
+  Downloaded ophelia-bls-amcl v0.1.1
+  Downloaded openssl-sys v0.9.58
+  Downloaded num-traits v0.2.12
+  Downloaded rand_xorshift v0.1.1
+  Downloaded num-integer v0.1.43
+  Downloaded rand_pcg v0.2.1
+  Downloaded mio-uds v0.6.8
+  Downloaded rayon v1.3.1
+  Downloaded regex v1.3.9
+  Downloaded rocksdb v0.12.4
+  Downloaded rocksdb v0.14.0
+  Downloaded scopeguard v1.1.0
+  Downloaded secret_sharing v0.1.1
+  Downloaded secp256k1 v0.17.2
+  Downloaded serde_yaml v0.8.13
+  Downloaded sha1 v0.6.0
+  Downloaded socket2 v0.3.12
+  Downloaded serde-value v0.5.3
+  Downloaded rustc-hex v2.1.0
+  Downloaded shlex v0.1.1
+  Downloaded smallvec v0.6.13
+  Downloaded serde_urlencoded v0.6.1
+  Downloaded serde_urlencoded v0.5.5
+  Downloaded serde_derive v1.0.114
+  Downloaded stringreader v0.1.1
+  Downloaded static_assertions v1.1.0
+  Downloaded spin v0.5.2
+  Downloaded syn v0.15.44
+  Downloaded stream-cipher v0.3.2
+  Downloaded thiserror-impl v1.0.20
+  Downloaded textwrap v0.11.0
+  Downloaded syn v1.0.33
+  Downloaded tokio-timer v0.2.13
+  Downloaded tokio-util v0.2.0
+  Downloaded tokio-tcp v0.1.4
+  Downloaded tokio v0.2.21
+  Downloaded toml v0.5.6
+  Downloaded traitobject v0.1.0
+  Downloaded tokio v0.1.22
+  Downloaded unsafe-any v0.4.2
+  Downloaded unicode-xid v0.1.0
+  Downloaded unicode-xid v0.2.1
+  Downloaded version_check v0.9.2
+  Downloaded want v0.2.0
+  Downloaded uuid v0.8.1
+  Downloaded uuid v0.7.4
+  Downloaded vec_map v0.8.2
+  Downloaded url v2.1.1
+  Downloaded url v1.7.2
+  Downloaded untrusted v0.7.1
+  Downloaded unsigned-varint v0.2.3
+  Downloaded unicase v2.6.0
+  Downloaded typenum v1.12.0
+  Downloaded twofish v0.2.0
+  Downloaded uint v0.4.1
+  Downloaded try-lock v0.2.2
+  Downloaded unicode-normalization v0.1.13
+  Downloaded tiny-keccak v1.5.0
+  Downloaded unicode-width v0.1.8
+  Downloaded unicode-segmentation v1.6.0
+  Downloaded typemap v0.3.3
+  Downloaded trust-dns-resolver v0.18.0-alpha.2
+  Downloaded which v3.1.1
+  Downloaded trust-dns-proto v0.18.0-alpha.2
+  Downloaded trackable_derive v0.1.3
+  Downloaded trackable v0.2.23
+  Downloaded byte-tools v0.3.1
+  Downloaded tokio-util v0.3.1
+  Downloaded tokio-uds v0.2.7
+  Downloaded tokio-threadpool v0.1.18
+  Downloaded yaml-rust v0.4.4
+  Downloaded tokio-buf v0.1.1
+  Downloaded time v0.1.43
+  Downloaded tinyvec v0.3.3
+  Downloaded toml v0.4.10
+  Downloaded xmltree v0.8.0
+  Downloaded xml-rs v0.7.0
+  Downloaded tokio-reactor v0.1.12
+  Downloaded tokio-current-thread v0.1.7
+  Downloaded zeroize_derive v0.9.3
+  Downloaded zeroize v0.9.3
+  Downloaded librocksdb-sys v6.7.4
+  Downloaded thread_local v1.0.1
+  Downloaded tokio-fs v0.1.7
+  Downloaded quickcheck v0.9.2
+  Downloaded synstructure v0.10.2
+  Downloaded rand_core v0.5.1
+  Downloaded rand_chacha v0.1.1
+  Downloaded tokio-sync v0.1.8
+  Downloaded tokio-macros v0.2.5
+  Downloaded tokio-codec v0.1.2
+  Downloaded tokio-io v0.1.13
+  Downloaded strsim v0.8.0
+  Downloaded ppv-lite86 v0.2.8
+  Downloaded stable_deref_trait v1.1.1
+  Downloaded semver-parser v0.7.0
+  Downloaded ring v0.16.12
+  Downloaded tokio-executor v0.1.10
+  Downloaded thrift_codec v0.1.1
+  Downloaded rustc-demangle v0.1.16
+  Downloaded try_from v0.3.2
+  Downloaded threadpool v1.8.1
+  Downloaded thread-id v3.3.0
+  Downloaded unicode-bidi v0.3.4
+  Downloaded thiserror v1.0.20
+  Downloaded tentacle-secio v0.1.11
+  Downloaded termcolor v1.1.0
+  Downloaded tokio-udp v0.1.6
+  Downloaded synstructure v0.12.4
+  Downloaded string v0.2.1
+  Downloaded smallvec v1.4.0
+  Downloaded static_merkle_tree v1.1.0
+  Downloaded subtle v1.0.0
+  Downloaded sha2 v0.8.2
+  Downloaded signal-hook-registry v1.2.0
+  Downloaded slab v0.4.2
+  Downloaded sha3 v0.8.2
+  Downloaded serde_json v1.0.56
+  Downloaded snap v0.2.5
+  Downloaded serde v1.0.114
+  Downloaded semver v0.9.0
+  Downloaded futures-task v0.3.5
+  Downloaded secp256k1-sys v0.1.2
+  Downloaded rustracing v0.4.0
+  Downloaded rustc_version v0.2.3
+  Downloaded secp256k1 v0.15.5
+  Downloaded ryu v1.0.5
+  Downloaded rustversion v1.0.3
+  Downloaded rustracing_jaeger v0.4.1
+  Downloaded rustc-hash v1.1.0
+  Downloaded rlp v0.3.0
+  Downloaded resolv-conf v0.6.3
+  Downloaded arc-swap v0.4.7
+  Downloaded regex-syntax v0.6.18
+  Downloaded rlp v0.4.5
+  Downloaded reqwest v0.9.24
+  Downloaded rayon-core v1.7.1
+  Downloaded heapsize v0.4.2
+  Downloaded miniz_oxide v0.3.7
+  Downloaded yaml-rust v0.3.5
+  Downloaded miniz_oxide v0.4.0
+  Downloaded num-bigint v0.2.6
+  Downloaded muta-apm-derive v0.1.0-alpha.12
+  Downloaded moodyblues-sdk v0.3.0
+  Downloaded mime_guess v2.0.3
+  Downloaded native-tls v0.2.4
+  Downloaded muta-codec-derive v0.2.0
+  Downloaded miracl_amcl v3.2.5
+  Downloaded mio v0.6.22
+  Downloaded mime v0.3.16
+  Downloaded muta-apm v0.1.0-alpha.15
+  Downloaded maybe-uninit v2.0.0
+  Downloaded lru-cache v0.1.2
+  Downloaded log4rs v0.8.3
+  Downloaded log-mdc v0.1.0
+  Downloaded log v0.4.8
+  Downloaded lock_api v0.2.0
+  Downloaded linked-hash-map v0.5.3
+  Downloaded libmath v0.1.4
+  Downloaded language-tags v0.2.2
+  Downloaded itertools v0.8.2
+  Downloaded libc v0.2.71
+  Downloaded lazycell v1.2.1
+  Downloaded lazy_static v1.4.0
+  Downloaded juniper_codegen v0.14.2
+  Downloaded json v0.12.4
+  Downloaded itoa v0.4.6
+  Downloaded instant v0.1.6
+  Downloaded iovec v0.1.4
+  Downloaded indexmap v1.4.0
+  Downloaded igd v0.9.1
+  Downloaded idna v0.2.0
+  Downloaded httparse v1.3.4
+  Downloaded http-body v0.1.0
+  Downloaded hostname v0.3.1
+  Downloaded encoding_rs v0.8.23
+  Downloaded dyn-clone v1.0.2
+  Downloaded bs58 v0.2.5
+  Downloaded foreign-types v0.3.2
+  Downloaded env_logger v0.6.2
+  Downloaded crossbeam-utils v0.7.2
+  Downloaded chrono v0.4.13
+  Downloaded cfg-if v0.1.10
+  Downloaded bytes v0.5.5
+  Downloaded futures-timer v2.0.2
+  Downloaded futures v0.3.5
+  Downloaded flatbuffers-verifier v0.2.1
+  Downloaded flatbuffers v0.6.1
+  Downloaded failure v0.1.8
+  Downloaded ethbloom v0.5.3
+  Downloaded enum-as-inner v0.3.2
+  Downloaded either v1.5.3
+  Downloaded derive_more v0.15.0
+  Downloaded creep v0.1.1
+  Downloaded cookie v0.12.0
+  Downloaded clang-sys v0.29.3
+  Downloaded bytes v0.4.12
+  Downloaded block-padding v0.1.5
+  Downloaded fixed-hash v0.2.5
+  Downloaded crossbeam-epoch v0.8.2
+  Downloaded bs58 v0.3.1
+  Downloaded bitflags v1.2.1
+  Downloaded actix-testing v1.0.1
+  Downloaded fake-simd v0.1.2
+  Downloaded ethbloom v0.8.1
+  Downloaded derive_more v0.99.9
+  Downloaded crypto-mac v0.7.0
+  Downloaded crunchy v0.2.2
+  Downloaded crossbeam-queue v0.2.3
+  Downloaded crossbeam-deque v0.7.3
+  Downloaded crossbeam-channel v0.4.2
+  Downloaded cookie_store v0.7.0
+  Downloaded cc v1.0.41
+  Downloaded byteorder v1.3.4
+  Downloaded brotli-sys v0.3.2
+  Downloaded bls_amcl v0.7.0
+  Downloaded backtrace v0.3.49
+  Downloaded actix-web-codegen v0.2.2
+  Downloaded cita_trie v2.0.0
+  Downloaded bytestring v0.1.5
+  Downloaded atty v0.2.14
+  Downloaded block-buffer v0.7.3
+  Downloaded antidote v1.0.0
+  Downloaded attohttpc v0.4.5
+  Downloaded amcl_wrapper v0.2.3
+  Downloaded aes-soft v0.3.3
+  Downloaded actix-threadpool v0.3.2
+  Downloaded actix-service v1.0.5
+  Downloaded actix-server v1.0.3
+  Downloaded actix-rt v1.1.1
+  Downloaded actix-router v0.2.4
+  Downloaded actix-http v1.0.1
+  Downloaded adler32 v1.1.0
+  Downloaded actix-macros v0.1.2
+  Downloaded actix-connect v1.0.2
+  Downloaded autocfg v0.1.7
+  Downloaded async-trait v0.1.36
+  Downloaded arc-swap v0.3.11
+  Downloaded ansi_term v0.11.0
+  Downloaded adler v0.2.2
+  Downloaded addr2line v0.12.2
+  Downloaded actix-tls v1.0.0
+   Compiling libc v0.2.71
+   Compiling proc-macro2 v1.0.18
+   Compiling unicode-xid v0.2.1
+   Compiling syn v1.0.33
+   Compiling cfg-if v0.1.10
+   Compiling lazy_static v1.4.0
+   Compiling serde_derive v1.0.114
+   Compiling serde v1.0.114
+   Compiling autocfg v1.0.0
+   Compiling scopeguard v1.1.0
+   Compiling maybe-uninit v2.0.0
+   Compiling either v1.5.3
+   Compiling log v0.4.8
+   Compiling byteorder v1.3.4
+   Compiling memchr v2.3.3
+   Compiling futures v0.1.29
+   Compiling slab v0.4.2
+   Compiling rayon-core v1.7.1
+   Compiling itoa v0.4.6
+   Compiling fnv v1.0.7
+   Compiling futures-core v0.3.5
+   Compiling futures-sink v0.3.5
+   Compiling semver-parser v0.7.0
+   Compiling autocfg v0.1.7
+   Compiling rand_core v0.4.2
+   Compiling proc-macro-hack v0.5.16
+   Compiling pin-project-internal v0.4.22
+   Compiling proc-macro-nested v0.1.6
+   Compiling once_cell v1.4.0
+   Compiling ryu v1.0.5
+   Compiling pin-utils v0.1.0
+   Compiling serde_json v1.0.56
+   Compiling futures-io v0.3.5
+   Compiling getrandom v0.1.14
+   Compiling gimli v0.21.0
+   Compiling adler32 v1.1.0
+   Compiling bitflags v1.2.1
+   Compiling object v0.20.0
+   Compiling rustc-demangle v0.1.16
+   Compiling smallvec v1.4.0
+   Compiling ppv-lite86 v0.2.8
+   Compiling rustc-hex v2.1.0
+   Compiling anyhow v1.0.31
+   Compiling typenum v1.12.0
+   Compiling crunchy v0.2.2
+   Compiling heapsize v0.4.2
+   Compiling crunchy v0.1.6
+   Compiling regex-syntax v0.6.18
+   Compiling proc-macro2 v0.4.30
+   Compiling unicode-xid v0.1.0
+   Compiling json v0.12.4
+   Compiling syn v0.15.44
+   Compiling percent-encoding v2.1.0
+   Compiling dyn-clone v1.0.2
+   Compiling hex v0.4.2
+   Compiling hashbrown v0.3.1
+   Compiling opaque-debug v0.2.3
+   Compiling byte-tools v0.3.1
+   Compiling quick-error v1.2.3
+   Compiling failure_derive v0.1.8
+   Compiling version_check v0.9.2
+   Compiling match_cfg v0.1.0
+   Compiling spin v0.5.2
+   Compiling arc-swap v0.4.7
+   Compiling pin-project-lite v0.1.7
+   Compiling tinyvec v0.3.3
+   Compiling matches v0.1.8
+   Compiling protobuf v2.15.1
+   Compiling prometheus v0.8.0 (https://github.com/tikv/rust-prometheus.git?rev=fd122caa03#fd122caa)
+   Compiling keccak v0.1.0
+   Compiling termcolor v1.1.0
+   Compiling miracl_amcl v3.2.5
+   Compiling glob v0.3.0
+   Compiling unicode-width v0.1.8
+   Compiling ansi_term v0.11.0
+   Compiling strsim v0.8.0
+   Compiling yaml-rust v0.3.5
+   Compiling vec_map v0.8.2
+   Compiling pkg-config v0.3.17
+   Compiling bindgen v0.53.3
+   Compiling shlex v0.1.1
+   Compiling rustc-hash v1.1.0
+   Compiling lazycell v1.2.1
+   Compiling peeking_take_while v0.1.2
+   Compiling percent-encoding v1.0.1
+   Compiling openssl v0.10.30
+   Compiling foreign-types-shared v0.1.1
+   Compiling dtoa v0.4.6
+   Compiling crc32fast v1.2.0
+   Compiling fake-simd v0.1.2
+   Compiling adler v0.2.2
+   Compiling untrusted v0.7.1
+   Compiling unsigned-varint v0.2.3
+   Compiling linked-hash-map v0.5.3
+   Compiling instant v0.1.6
+   Compiling bs58 v0.3.1
+   Compiling tentacle-secio v0.2.2 (https://github.com/zeroqn/p2p?rev=31db6ad#31db6ad8)
+   Compiling httparse v1.3.4
+   Compiling copyless v0.1.5
+   Compiling encoding_rs v0.8.23
+   Compiling mime v0.3.16
+   Compiling futures-timer v2.0.2
+   Compiling unicode-segmentation v1.6.0
+   Compiling futures-timer v3.0.2
+   Compiling traitobject v0.1.0
+   Compiling rustversion v1.0.3
+   Compiling bit-vec v0.6.2
+   Compiling try-lock v0.2.2
+   Compiling arc-swap v0.3.11
+   Compiling native-tls v0.2.4
+   Compiling antidote v1.0.0
+   Compiling log-mdc v0.1.0
+   Compiling sha1 v0.6.0
+   Compiling language-tags v0.2.2
+   Compiling openssl-probe v0.1.2
+   Compiling static_merkle_tree v1.1.0
+   Compiling base64 v0.11.0
+   Compiling uuid v0.8.1
+   Compiling stringreader v0.1.1
+   Compiling stable_deref_trait v1.1.1
+   Compiling static_assertions v1.1.0
+   Compiling subtle v1.0.0
+   Compiling bs58 v0.2.5
+   Compiling creep v0.1.1
+   Compiling hex v0.3.2
+   Compiling common-channel v0.1.0-alpha.0 (/workspace/source/common/channel)
+   Compiling common-pubsub v0.1.0-alpha.0 (/workspace/source/common/pubsub)
+   Compiling try_from v0.3.2
+   Compiling lock_api v0.3.4
+   Compiling lock_api v0.2.0
+   Compiling lock_api v0.4.0
+   Compiling thread_local v1.0.1
+   Compiling itertools v0.8.2
+   Compiling futures-channel v0.3.5
+   Compiling semver v0.9.0
+   Compiling rand_core v0.3.1
+   Compiling rand_jitter v0.1.4
+   Compiling futures-task v0.3.5
+   Compiling miniz_oxide v0.3.7
+   Compiling crossbeam-utils v0.7.2
+   Compiling memoffset v0.5.5
+   Compiling crossbeam-epoch v0.8.2
+   Compiling rayon v1.3.1
+   Compiling num-traits v0.2.12
+   Compiling num-integer v0.1.43
+   Compiling indexmap v1.4.0
+   Compiling num-bigint v0.2.6
+   Compiling rlp v0.4.5
+   Compiling rand_chacha v0.1.1
+   Compiling rand_pcg v0.1.2
+   Compiling rand v0.6.5
+   Compiling flatbuffers v0.6.1
+   Compiling creep v0.2.2
+   Compiling block-padding v0.1.5
+   Compiling humantime v1.3.0
+   Compiling unicode-bidi v0.3.4
+   Compiling tokio-sync v0.1.8
+   Compiling textwrap v0.11.0
+   Compiling unicode-normalization v0.1.13
+   Compiling nom v5.1.2
+   Compiling unicase v2.6.0
+   Compiling error-chain v0.12.2
+   Compiling foreign-types v0.3.2
+   Compiling miniz_oxide v0.4.0
+   Compiling clang-sys v0.29.3
+   Compiling yaml-rust v0.4.4
+   Compiling lru-cache v0.1.2
+   Compiling unsafe-any v0.4.2
+   Compiling heck v0.3.1
+   Compiling owning_ref v0.3.3
+   Compiling addr2line v0.12.2
+   Compiling rand_xorshift v0.1.1
+   Compiling rand_hc v0.1.0
+   Compiling rand_isaac v0.1.1
+   Compiling rustc_version v0.2.3
+   Compiling impl-rlp v0.2.1
+   Compiling flatbuffers-verifier v0.2.1
+   Compiling typemap v0.3.3
+   Compiling smallvec v0.6.13
+   Compiling aho-corasick v0.7.13
+   Compiling idna v0.1.5
+   Compiling idna v0.2.0
+   Compiling snap v0.2.5
+   Compiling fxhash v0.2.1
+   Compiling base64 v0.10.1
+   Compiling xml-rs v0.7.0
+   Compiling tiny-keccak v1.5.0
+   Compiling quote v1.0.7
+   Compiling uint v0.4.1
+   Compiling parking_lot_core v0.5.0
+   Compiling parking_lot v0.8.0
+   Compiling parking_lot_core v0.6.2
+   Compiling parking_lot v0.9.0
+   Compiling hyper v0.12.35
+   Compiling num_cpus v1.13.0
+   Compiling rand_os v0.1.3
+   Compiling rand v0.4.6
+   Compiling iovec v0.1.4
+   Compiling backtrace v0.3.49
+   Compiling net2 v0.2.34
+   Compiling parking_lot_core v0.7.2
+   Compiling hostname v0.3.1
+   Compiling signal-hook-registry v1.2.0
+   Compiling atty v0.2.14
+   Compiling which v3.1.1
+   Compiling time v0.1.43
+   Compiling parking_lot_core v0.8.0
+   Compiling socket2 v0.3.12
+   Compiling thread-id v3.3.0
+   Compiling flate2 v1.0.16
+   Compiling quote v0.6.13
+   Compiling hasher v0.1.3
+   Compiling url v1.7.2
+   Compiling generic-array v0.12.3
+   Compiling crossbeam-queue v0.2.3
+   Compiling crossbeam-channel v0.4.2
+   Compiling tokio-executor v0.1.10
+   Compiling url v2.1.1
+   Compiling regex v1.3.9
+   Compiling xmltree v0.8.0
+   Compiling threadpool v1.8.1
+   Compiling futures-cpupool v0.1.8
+   Compiling bytes v0.4.12
+   Compiling rand_core v0.5.1
+   Compiling parking_lot v0.10.2
+   Compiling resolv-conf v0.6.3
+   Compiling clap v2.33.1
+   Compiling ordered-float v1.1.0
+   Compiling parking_lot v0.11.0
+   Compiling fixed-hash v0.2.5
+   Compiling rand v0.3.23
+   Compiling parking_lot_core v0.2.14
+   Compiling mime_guess v2.0.3
+   Compiling crossbeam-deque v0.7.3
+   Compiling digest v0.8.1
+   Compiling block-buffer v0.7.3
+   Compiling block-cipher-trait v0.6.2
+   Compiling stream-cipher v0.3.2
+   Compiling crypto-mac v0.7.0
+   Compiling tokio-timer v0.2.13
+   Compiling tokio-current-thread v0.1.7
+   Compiling cookie v0.12.0
+   Compiling rand_chacha v0.2.2
+   Compiling rand_pcg v0.2.1
+   Compiling http v0.1.21
+   Compiling tokio-buf v0.1.1
+   Compiling string v0.2.1
+   Compiling cexpr v0.4.0
+   Compiling libmath v0.1.4
+   Compiling chrono v0.4.13
+   Compiling publicsuffix v1.5.4
+   Compiling parking_lot v0.4.8
+   Compiling uuid v0.7.4
+   Compiling sha3 v0.8.2
+   Compiling sha2 v0.8.2
+   Compiling aes-soft v0.3.3
+   Compiling twofish v0.2.0
+   Compiling ctr v0.3.2
+   Compiling hmac v0.7.1
+   Compiling prime_tools v0.2.2
+   Compiling rand v0.7.3
+   Compiling chashmap v2.2.2
+   Compiling aes-ctr v0.3.0
+   Compiling http-body v0.1.0
+   Compiling fixed-hash v0.5.2
+   Compiling synstructure v0.12.4
+   Compiling synstructure v0.10.2
+   Compiling cc v1.0.41
+   Compiling secp256k1-sys v0.1.2
+   Compiling libloading v0.5.2
+   Compiling openssl-sys v0.9.58
+   Compiling ring v0.16.12
+   Compiling secp256k1 v0.15.5
+   Compiling brotli-sys v0.3.2
+   Compiling futures-macro v0.3.5
+   Compiling derive_more v0.99.9
+   Compiling async-trait v0.1.36
+   Compiling prost-derive v0.6.1
+   Compiling muta-codec-derive v0.2.0
+   Compiling thiserror-impl v1.0.20
+   Compiling tokio-macros v0.2.5
+   Compiling trackable_derive v0.1.3
+   Compiling static-metric-proc-macros v0.1.0 (https://github.com/tikv/rust-prometheus.git?rev=fd122caa03#fd122caa)
+   Compiling ophelia-derive v0.2.0
+   Compiling actix-macros v0.1.2
+   Compiling enum-as-inner v0.3.2
+   Compiling actix-web-codegen v0.2.2
+   Compiling juniper_codegen v0.14.2
+   Compiling zeroize_derive v0.9.3
+   Compiling derive_more v0.15.0
+   Compiling quickcheck_macros v0.8.0
+   Compiling trackable v0.2.23
+   Compiling failure v0.1.8
+   Compiling proc-macro-error-attr v0.3.4
+   Compiling thrift_codec v0.1.1
+   Compiling rustracing v0.4.0
+   Compiling brotli2 v0.3.2
+   Compiling secp256k1 v0.17.2
+   Compiling thiserror v1.0.20
+   Compiling zeroize v0.9.3
+   Compiling ophelia-hasher v0.2.0
+   Compiling rustracing_jaeger v0.4.1
+   Compiling proc-macro-error v0.3.4
+   Compiling juniper_codegen v0.14.2 (https://github.com/graphql-rust/juniper?rev=eff086a#eff086a3)
+   Compiling prometheus-static-metric v0.3.0 (https://github.com/tikv/rust-prometheus.git?rev=fd122caa03#fd122caa)
+   Compiling pin-project v0.4.22
+   Compiling futures-util v0.3.5
+   Compiling futures-executor v0.3.5
+   Compiling actix-service v1.0.5
+   Compiling futures v0.3.5
+   Compiling bytes v0.5.5
+   Compiling ethereum-types-serialize v0.2.2
+   Compiling bincode v1.3.1
+   Compiling serde-value v0.5.3
+   Compiling serde_yaml v0.8.13
+   Compiling serde_urlencoded v0.6.1
+   Compiling serde_urlencoded v0.5.5
+   Compiling toml v0.4.10
+   Compiling toml v0.5.6
+   Compiling impl-serde v0.2.3
+   Compiling ethbloom v0.5.3
+   Compiling mio v0.6.22
+   Compiling env_logger v0.7.1
+   Compiling attohttpc v0.4.5
+   Compiling tokio-io v0.1.13
+   Compiling actix-threadpool v0.3.2
+   Compiling tokio-threadpool v0.1.18
+   Compiling want v0.2.0
+   Compiling env_logger v0.6.2
+   Compiling ethbloom v0.8.1
+   Compiling ethereum-types v0.4.2
+   Compiling quickcheck v0.9.2
+   Compiling juniper v0.14.2 (https://github.com/graphql-rust/juniper?rev=eff086a#eff086a3)
+   Compiling prost v0.6.1
+   Compiling ophelia v0.2.0
+   Compiling tentacle-multiaddr v0.1.0 (https://github.com/zeroqn/p2p?rev=31db6ad#31db6ad8)
+   Compiling http v0.2.1
+   Compiling bytestring v0.1.5
+   Compiling igd v0.9.1
+   Compiling tokio-codec v0.1.2
+   Compiling h2 v0.1.26
+   Compiling mio-uds v0.6.8
+   Compiling tokio-reactor v0.1.12
+   Compiling tokio-fs v0.1.7
+   Compiling ophelia-secp256k1 v0.2.0
+   Compiling amcl_wrapper v0.2.3
+   Compiling log4rs v0.8.3
+   Compiling cookie_store v0.7.0
+   Compiling moodyblues-sdk v0.3.0
+   Compiling tokio v0.2.21
+   Compiling tokio-uds v0.2.7
+   Compiling tokio-udp v0.1.6
+   Compiling tokio-tcp v0.1.4
+   Compiling rlp v0.3.0
+   Compiling muta-apm-derive v0.1.0-alpha.12
+   Compiling secret_sharing v0.1.1
+   Compiling tokio v0.1.22
+   Compiling cita_trie v2.0.0
+   Compiling bls_amcl v0.7.0
+   Compiling common-logger v0.1.0-alpha.0 (/workspace/source/common/logger)
+   Compiling tentacle-secio v0.1.11
+   Compiling ophelia-bls-amcl v0.2.0
+   Compiling ophelia-bls-amcl v0.1.1
+   Compiling muta-protocol v0.1.0-alpha.1 (/workspace/source/protocol)
+   Compiling muta-protocol v0.1.0-alpha.1
+   Compiling actix-router v0.2.4
+   Compiling common-crypto v0.1.0-alpha.0 (/workspace/source/common/crypto)
+   Compiling muta-apm v0.1.0-alpha.15
+   Compiling common-apm v0.1.0 (/workspace/source/common/apm)
+   Compiling common-merkle v0.1.0-alpha.0 (/workspace/source/common/merkle)
+   Compiling tokio-util v0.2.0
+   Compiling actix-rt v1.1.1
+   Compiling trust-dns-proto v0.18.0-alpha.2
+   Compiling tokio-util v0.3.1
+   Compiling overlord v0.2.0-alpha.13 (https://github.com/nervosnetwork/overlord?rev=f9a5dbe6#f9a5dbe6)
+   Compiling overlord v0.2.0-alpha.13
+   Compiling tokio-yamux v0.1.14 (https://github.com/zeroqn/p2p?rev=31db6ad#31db6ad8)
+   Compiling actix-codec v0.2.0
+   Compiling hyper-tls v0.3.2
+   Compiling h2 v0.2.5
+   Compiling binding-macro v0.1.0-alpha.0 (/workspace/source/binding-macro)
+   Compiling muta-keypair v0.1.0-alpha.1 (/workspace/source/devtools/keypair)
+   Compiling actix-utils v1.0.6
+   Compiling librocksdb-sys v6.7.4
+   Compiling reqwest v0.9.24
+   Compiling tentacle v0.2.7 (https://github.com/zeroqn/p2p?rev=31db6ad#31db6ad8)
+   Compiling trust-dns-resolver v0.18.0-alpha.2
+   Compiling actix-server v1.0.3
+   Compiling actix-tls v1.0.0
+   Compiling tentacle-ping v0.3.9 (https://github.com/zeroqn/p2p?rev=31db6ad#31db6ad8)
+   Compiling tentacle-identify v0.2.10 (https://github.com/zeroqn/p2p?rev=31db6ad#31db6ad8)
+   Compiling tentacle-discovery v0.2.9 (https://github.com/zeroqn/p2p?rev=31db6ad#31db6ad8)
+   Compiling common-config-parser v0.1.0-alpha.0 (/workspace/source/common/config-parser)
+   Compiling actix-testing v1.0.1
+   Compiling asset v0.1.0-alpha.0 (/workspace/source/built-in-services/asset)
+   Compiling metadata v0.1.0-alpha.0 (/workspace/source/built-in-services/metadata)
+   Compiling util v0.1.0-alpha.0 (/workspace/source/built-in-services/util)
+   Compiling multi-signature v0.1.0-alpha.0 (/workspace/source/built-in-services/multi-signature)
+   Compiling authorization v0.1.0 (/workspace/source/built-in-services/authorization)
+   Compiling actix-connect v1.0.2
+   Compiling core-network v0.1.0-alpha.0 (/workspace/source/core/network)
+   Compiling actix-http v1.0.1
+   Compiling awc v1.0.1
+   Compiling core-mempool v0.1.0-alpha.0 (/workspace/source/core/mempool)
+   Compiling actix-web v2.0.0
+   Compiling core-api v0.1.0-alpha.0 (/workspace/source/core/api)
+   Compiling rocksdb v0.12.4
+   Compiling rocksdb v0.14.0
+   Compiling framework v0.1.0-alpha.0 (/workspace/source/framework)
+   Compiling core-storage v0.1.0-alpha.0 (/workspace/source/core/storage)
+   Compiling core-consensus v0.1.0-alpha.0 (/workspace/source/core/consensus)
+   Compiling muta v0.1.0-alpha.0 (/workspace/source)
+    Finished test [unoptimized + debuginfo] target(s) in 9m 14s
+     Running target/debug/deps/asset-6cb46949695047f3
+
+running 4 tests
+test tests::test_create_asset ... ok
+test tests::test_approve ... ok
+test tests::test_transfer ... ok
+test tests::test_transfer_from ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+
+     Running target/debug/deps/authorization-9fc6cbb20a13bc20
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+
+     Running target/debug/deps/binding_macro-a0c21811a2c7e0e4
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+
+     Running target/debug/deps/mod-5ca295a046455138
+
+running 7 tests
+test test_cycles ... ok
+test test_read_and_write_with_noneparams ... ok
+test test_read_and_write ... ok
+test test_hooks ... ok
+test test_service ... ok
+test test_service_none_response ... ok
+test test_service_none_payload ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+
+     Running target/debug/deps/common_apm-734816ec0e7e05cf
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+
+     Running target/debug/deps/common_channel-0d349c36ed7b5b80
+
+running 1 test
+test tests::it_works ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+
+     Running target/debug/deps/common_config_parser-6fb8311aa2ebd61f
+
+running 4 tests
+test tests::test_parse ... ignored
+test tests::test_parse_file ... ignored
+test tests::test_parse_http ... ignored
+test tests::test_parse_reader ... ok
+
+test result: ok. 1 passed; 0 failed; 3 ignored; 0 measured; 0 filtered out
+
+     Running target/debug/deps/common_crypto-db50046925e71f62
+
+running 10 tests
+test benches::bench_4_aggregated_sig ... ok
+test benches::bench_4_aggregated_sig_verify ... ok
+test benches::bench_8_aggregated_sig ... ok
+test benches::bench_8_aggregated_sig_verify ... ok
+test benches::bench_16_aggregated_sig ... ok
+test benches::bench_16_aggregated_sig_verify ... ok
+test benches::bench_32_aggregated_sig ... ok
+test benches::bench_32_aggregated_sig_verify ... ok
+test benches::bench_64_aggregated_sig_verify ... ok
+test benches::bench_64_aggregated_sig ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+
+     Running target/debug/deps/common_logger-9f72c0f085d05b22
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+
+     Running target/debug/deps/common_merkle-65f150a0478e49be
+
+running 5 tests
+test benches::bench_merkle_1000_hashes ... ok
+test benches::bench_merkle_2000_hashes ... ok
+test benches::bench_merkle_4000_hashes ... ok
+test benches::bench_merkle_8000_hashes ... ok
+test benches::bench_merkle_16000_hashes ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+
+     Running target/debug/deps/common_pubsub-bbb32d51ed9b53c5
+
+running 1 test
+test tests::it_works ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+
+     Running target/debug/deps/core_api-b1e32f1baa4a6902
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+
+     Running target/debug/deps/core_consensus-2906d8aea2dcc329
+
+running 16 tests
+test util::tests::test_zip_roots ... ok
+test util::tests::test_convert_from_hex ... ok
+test fixed_types::test::test_block_codec ... ok
+test util::tests::test_aggregate_pubkeys_order ... ok
+test wal::tests::test_txs_wal ... ok
+test wal::tests::test_wal_txs_codec ... ok
+test wal::tests::bench_save_wal_1000_txs ... ok
+test wal::tests::bench_save_wal_2000_txs ... ok
+test wal::tests::bench_save_wal_4000_txs ... ok
+test wal::tests::bench_save_wal_8000_txs ... ok
+test fixed_types::test::test_txs_codec ... ok
+Ok(())
+test util::tests::test_bls_amcl ... ok
+test wal::tests::bench_txs_prost_encode ... ok
+test wal::tests::bench_txs_rlp_encode ... ok
+test wal::tests::bench_save_wal_16000_txs ... ok
+test tests::synchronization::sync_gap_test ... test tests::synchronization::sync_gap_test has been running for over 60 seconds
+test tests::synchronization::sync_gap_test ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+
+     Running target/debug/deps/core_mempool-d6f583f1ab76643d
+
+running 40 tests
+test tests::mempool::bench_check_sig_serial_1 ... ok
+test adapter::tests::test_interval_broadcast_reach_cache_size ... ok
+test map::tests::bench_std_map_insert ... ok
+test map::tests::bench_chashmap_insert ... ok
+test tests::mempool::bench_check_sig_serial_10 ... ok
+test map::tests::bench_map_insert ... ok
+test adapter::tests::test_interval_timer ... ok
+test adapter::tests::test_interval_broadcast_reach_interval ... ok
+test tests::mempool::bench_check_sig ... ok
+test adapter::tests::test_interval_broadcast ... ok
+test tests::mempool::bench_mock_txs ... ok
+test tests::mempool::bench_check_sig_serial_100 ... ok
+test tests::mempool::bench_insert_serial_10 ... ok
+test tests::mempool::bench_insert_serial_1 ... ok
+test tests::mempool::bench_flush ... ok
+test tests::mempool::bench_insert ... ok
+test tests::mempool::bench_insert_serial_100 ... ok
+test tx_cache::tests::bench_flush ... ok
+test tests::mempool::test_insert ... ok
+test tests::mempool::test_sync_propose_txs ... ok
+test tx_cache::tests::bench_flush_insert ... ok
+test tx_cache::tests::bench_gen_txs ... ok
+test tests::mempool::test_package_order_consistent_with_insert_order ... ok
+test tx_cache::tests::bench_insert ... ok
+test tx_cache::tests::test_insert_overlap ... ok
+test tx_cache::tests::bench_package ... ok
+test tx_cache::tests::bench_package_insert ... ok
+test tx_cache::tests::test_concurrent_insert ... ok
+test tests::mempool::test_ensure_order_txs ... ok
+test tests::mempool::test_package ... ok
+test tests::mempool::bench_check_sig_serial_1000 ... ok
+test tests::mempool::test_flush ... ok
+test tests::mempool::bench_insert_serial_1000 ... ok
+test tests::mempool::bench_get_10000_full_txs ... ok
+test tests::mempool::bench_get_20000_full_txs ... ok
+test tests::mempool::bench_get_40000_full_txs ... ok
+bench_sign size 30000 cost 31.807877383s
+test tests::mempool::bench_sign ... ok
+test tests::mempool::bench_get_80000_full_txs ... test tests::mempool::bench_get_80000_full_txs has been running for over 60 seconds
+test tests::mempool::bench_package ... test tests::mempool::bench_package has been running for over 60 seconds
+test tests::mempool::bench_sign_with_spawn_list ... test tests::mempool::bench_sign_with_spawn_list has been running for over 60 seconds
+test tests::mempool::bench_package ... ok
+bench_sign_with_spawn_list size 30000 cost 38.145231181s
+test tests::mempool::bench_sign_with_spawn_list ... ok
+test tests::mempool::bench_get_80000_full_txs ... ok
+
+test result: ok. 40 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+
+     Running target/debug/deps/core_network-1f48b8b4c0a5022c
+
+running 93 tests
+test endpoint::tests::should_able_parse_valid_endpoint_url ... ok
+test peer_manager::shared::tests::should_push_not_found_chain_addr_to_unconneded_on_by_chain ... ok
+test peer_manager::peer::tests::should_reset_trust_metric_history_after_unban ... ok
+test peer_manager::test_manager::should_add_new_listen_on_add_new_listen_addr ... ok
+test peer_manager::test_manager::should_always_include_our_listen_addrs_in_return_from_manager_handle_random_addrs ... ok
+test peer_manager::test_manager::should_add_one_bad_event_on_session_blocked ... ok
+test peer_manager::test_manager::should_accept_new_peer_inbound_connection_on_new_session ... ok
+test peer_manager::test_manager::should_add_one_bad_event_for_good_feedback_on_trust_metric ... ok
+test peer_manager::test_manager::should_add_ten_bad_events_for_worse_feedback_on_trust_metric ... ok
+test peer_manager::test_manager::should_add_multiaddrs_to_peer_on_identified_addrs ... ok
+test peer_manager::test_manager::should_add_one_bad_event_for_bad_feedback_on_trust_metric ... ok
+test peer_manager::test_manager::should_accept_outbound_connection_and_remove_mached_connecting_on_new_session ... ok
+test peer_manager::test_manager::should_disconnect_and_ban_peer_for_fatal_feedback_on_trust_metric ... ok
+test peer_manager::test_manager::should_connect_peers_even_if_they_are_not_retry_ready_on_connect_peers_now ... ok
+test message::tests::prop_protocol_type_serialization ... ok
+test peer_manager::test_manager::should_add_new_outbound_multiaddr_to_peer_on_new_session ... ok
+test peer_manager::test_manager::should_always_remove_inbound_multiaddr_even_if_we_reach_max_connections_on_new_session ... ok
+test peer_manager::test_manager::should_exclude_whitelisted_peer_if_below_fourty_score_on_worse_feedback_on_trust_metric ... ok
+test peer_manager::test_manager::should_do_nothing_for_neutral_feedback_on_trust_metric ... ok
+test peer_manager::test_manager::should_enforce_id_if_not_included_on_repeated_connection ... ok
+test peer_manager::test_manager::should_disconnect_peer_on_misbehave ... ok
+test peer_manager::test_manager::should_disconnect_and_soft_ban_peer_if_below_fourty_score_on_worse_feedback_on_trust_metric ... ok
+test peer_manager::test_manager::should_ensure_disconnect_session_on_session_failed ... ok
+test peer_manager::test_manager::should_give_up_peer_for_discovery_on_misbehave ... ok
+test peer_manager::test_manager::should_exclude_whitelisted_peer_for_fatal_feedback_on_trust_metric ... ok
+test peer_manager::test_manager::should_give_up_peer_for_ping_unexpect_on_misbehave ... ok
+test peer_manager::test_manager::should_give_up_peer_for_protocol_error_on_session_failed ... ok
+test peer_manager::test_manager::should_enforce_id_in_multiaddr_on_new_session ... ok
+test peer_manager::test_manager::should_give_up_peer_for_unexpected_error_on_session_failed ... ok
+test peer_manager::test_manager::should_give_up_peer_if_run_out_retry_on_connect_failed ... ok
+test peer_manager::test_manager::should_give_up_peer_itself_if_protocol_handle_error_on_connect_failed ... ok
+test peer_manager::test_manager::should_increase_retry_for_ping_timeout_on_misbehave ... ok
+test peer_manager::test_manager::should_increase_peer_retry_if_all_multiaddrs_failed_on_conect_failed ... ok
+test peer_manager::test_manager::should_increase_retry_for_io_error_on_session_failed ... ok
+test peer_manager::test_manager::should_inc_peer_multiaddr_failure_count_for_io_error_on_connect_failed ... ok
+test peer_manager::test_manager::should_inc_peer_multiaddr_failure_count_for_dns_error_on_connect_failed ... ok
+test peer_manager::test_manager::should_give_up_peer_itself_if_secio_handshake_error_on_connect_failed ... ok
+test peer_manager::test_manager::should_mark_session_blocked_on_session_blocked ... ok
+test peer_manager::test_manager::should_not_knock_out_peer_just_set_up_trust_metric_on_worse_feedback_on_trust_metric ... ok
+test peer_manager::test_manager::should_give_up_peer_multiaddr_if_peer_id_not_match_on_connect_failed ... ok
+test peer_manager::test_manager::should_ignore_inbound_address_on_new_session ... ok
+test peer_manager::test_manager::should_not_reset_exist_multiaddr_failure_count_on_discover_multi_addrs ... ok
+test peer_manager::test_manager::should_not_reset_exist_multiaddr_failure_count_on_identified_addrs ... ok
+test peer_manager::test_manager::should_increase_retry_for_short_alive_session_on_session_closed ... ok
+[2020-07-06T05:43:36Z ERROR core_network::peer_manager] got new session event on same peer PeerId(QmTJRXaqA5wmD3RsYjkrhSYEw63SLZH95fe1S6h6gD5gXn)
+test peer_manager::test_manager::should_keep_new_connection_for_error_outdated_peer_session_on_new_session ... ok
+[2020-07-06T05:43:36Z ERROR core_network::peer_manager] network: impossible, peer session SessionId(1) outdated
+test peer_manager::test_manager::should_not_replace_whitelisted_peer_even_with_better_score_due_to_max_connections_on_new_session ... ok
+test peer_manager::test_manager::should_only_allow_incoming_peers_in_whitelist_if_whitelist_only_enabled ... ok
+test peer_manager::test_manager::should_only_connect_peers_in_whitelist_if_whitelist_only_enabled ... ok
+test peer_manager::test_manager::should_allow_whitelisted_peer_session_even_if_we_reach_max_connections_on_new_session ... ok
+test peer_manager::test_manager::should_push_id_to_listen_multiaddr_if_not_included_on_add_new_listen_addr ... ok
+test peer_manager::test_manager::should_push_id_to_multiaddrs_if_not_included_on_identified_addrs ... ok
+test peer_manager::test_manager::should_reduce_trust_score_on_misbehave ... ok
+test peer_manager::test_manager::should_reduce_trust_score_on_session_failed ... ok
+test peer_manager::test_manager::should_pause_trust_metric_on_session_closed ... ok
+test peer_manager::test_manager::should_never_expire_peers_from_config_whitelist ... ok
+test peer_manager::test_manager::should_refresh_whitelist_on_whitelist_peers_by_chain_addrs ... ok
+[2020-07-06T05:43:36Z ERROR core_network::peer_manager] got new session event on same peer PeerId(QmSJbkrErPoV91cMBR9WTg48CuAssphpxiWc1k1pEHhE2k)
+test peer_manager::test_manager::should_reject_banned_peer_on_new_session ... ok
+test peer_manager::test_manager::should_reject_new_connection_for_same_peer_on_new_session ... ok
+test peer_manager::test_manager::should_remove_listen_even_if_no_peer_id_included_on_remove_listen_addr ... ok
+test peer_manager::test_manager::should_insert_peers_on_discover_multi_addrs ... ok
+test peer_manager::test_manager::should_remove_expired_peers_in_whitelist ... ok
+test peer_manager::test_manager::should_remove_inbound_multiaddr_on_repeated_connection ... ok
+test peer_manager::test_manager::should_remove_listen_on_remove_listen_addr ... ok
+test peer_manager::test_manager::should_reset_outbound_peer_multiaddr_failure_count_on_new_session ... ok
+test peer_manager::test_manager::should_remove_matched_peer_inbound_address_from_ctx_even_if_it_doesnt_have_id_on_new_session ... ok
+test peer_manager::test_manager::should_not_refresh_never_expired_peers_from_config_whitelist ... ok
+test peer_manager::test_manager::should_not_replace_peer_not_old_enough_due_to_max_connections_on_new_session ... ok
+test peer_manager::test_manager::should_set_matched_peer_pubkey_on_new_session ... ok
+test peer_manager::test_manager::should_remove_connecting_even_if_session_is_reject_due_to_reach_max_connections_on_new_session ... ok
+test peer_manager::test_manager::should_reset_peer_failure_for_outbound_multiaddr_on_repeated_connection ... ok
+test peer_manager::test_manager::should_reset_peer_retry_on_peer_alive ... ok
+test peer_manager::test_manager::should_return_early_if_we_already_give_up_peer_on_connect_failed ... ok
+test peer_manager::test_manager::should_remove_session_on_session_closed ... ok
+test peer_manager::test_manager::should_not_replace_any_peer_if_incoming_hasnt_trust_score_due_to_max_connections_on_new_session ... ok
+test peer_manager::test_manager::should_setup_trust_metric_if_none_on_peer_misbehave ... ok
+test peer_manager::test_manager::should_setup_trust_metric_if_none_on_session_blocked ... ok
+test peer_manager::test_manager::should_skip_our_listen_multiaddrs_on_discover_multi_addrs ... ok
+test peer_manager::test_manager::should_setup_trust_metric_if_none_on_session_failed ... ok
+test peer_manager::test_manager::should_start_trust_metric_on_connected_peer_on_new_session ... ok
+test peer_manager::test_manager::should_not_replace_any_higher_score_peer_due_to_max_connections_on_new_session ... ok
+test peer_manager::trust_metric::tests::good_interval_cap_test ... ok
+test peer_manager::test_manager::should_skip_peers_not_in_can_connect_or_not_connected_connectedness_on_connect_peers_now ... ok
+test peer_manager::test_manager::should_update_chain_book_on_new_session ... ok
+test peer_manager::test_manager::should_update_peer_alive_on_peer_alive ... ok
+test peer_manager::test_manager::should_reject_new_connections_when_we_reach_max_connections_on_new_session ... ok
+test peer_manager::test_manager::should_setup_trust_metric_if_none_on_session_closed ... ok
+test peer_manager::test_manager::should_wait_for_other_connecting_multiaddrs_if_we_dont_give_up_peer_on_connect_failed ... ok
+test peer_manager::test_manager::should_pick_good_peer_first_on_finding_connectable_peers ... ok
+test peer_manager::test_manager::should_whitelist_peer_chain_addrs_on_whitelist_peers_by_chain_addrs ... ok
+test peer_manager::trust_metric::tests::basic_metric_test ... ok
+test peer_manager::test_manager::should_replace_low_quality_peer_with_better_one_due_to_max_connections_on_new_session ... ok
+test peer_manager::test_manager::should_try_all_peer_multiaddrs_on_connect_peers_now ... ok
+test message::tests::prop_vec_protocol_type_serialization ... ok
+
+test result: ok. 93 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+
+     Running target/debug/deps/common-e0c56f5ffe63c798
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+
+     Running target/debug/deps/core_storage-0baa22e0cdabd185
+
+running 16 tests
+test tests::storage::test_storage_latest_proof_insert ... ok
+test tests::storage::test_storage_block_insert ... ok
+test tests::storage::test_storage_wal_insert ... ok
+test tests::storage::test_storage_receipts_insert ... ok
+test tests::storage::test_storage_transactions_insert ... ok
+test tests::adapter::test_adapter_remove ... ok
+test tests::adapter::test_adapter_insert ... ok
+test tests::adapter::test_adapter_batch_modify ... ok
+test tests::storage::bench_insert_10000_receipts ... ok
+test tests::storage::bench_insert_10000_txs ... ok
+test tests::storage::bench_insert_20000_receipts ... ok
+test tests::storage::bench_insert_20000_txs ... ok
+test tests::storage::bench_insert_40000_receipts ... ok
+test tests::storage::bench_insert_40000_txs ... ok
+test tests::storage::bench_insert_80000_receipts ... ok
+test tests::storage::bench_insert_80000_txs ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+
+     Running target/debug/deps/framework-d2a350e1aedcd749
+
+running 25 tests
+[0, 16, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 240, 256]
+test binding::store::tests::test_contains ... ok
+test binding::store::tests::test_remove ... ok
+test binding::store::tests::test_insert ... ok
+test binding::tests::store::test_default_store_bool ... ok
+test binding::tests::store::test_default_store_string ... ok
+test binding::tests::state::test_state_insert ... ok
+test binding::tests::store::test_default_store_array ... ok
+test binding::tests::state::test_state_account ... ok
+test binding::tests::store::test_default_store_uint64 ... ok
+test binding::store::map::tests::test_map_and_bucket ... ok
+test binding::tests::store::test_default_store_map ... ok
+test executor::tests::test_create_genesis ... ok
+test binding::tests::sdk::test_service_sdk ... ok
+thread 'executor::tests::test_tx_hook_before_panic' panicked at 'tx hook before', framework/src/executor/tests/test_service.rs:151:13
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test executor::tests::test_tx_hook_before_cancel ... ok
+thread 'executor::tests::test_commit_tx_hook_use_panic_tx' panicked at 'hello panic', framework/src/executor/tests/test_service.rs:82:9
+thread 'executor::tests::test_tx_hook_after_panic' panicked at 'tx hook before', framework/src/executor/tests/test_service.rs:170:13
+test executor::tests::test_tx_hook_after_cancel ... ok
+test executor::tests::test_commit_tx_hook_use_panic_tx ... ok
+test executor::tests::test_service_not_found_panic ... ok
+test executor::tests::test_revert_event_on_exec_error ... ok
+test executor::tests::test_emit_event ... ok
+test executor::tests::test_tx_hook_after_panic ... ok
+test executor::tests::test_tx_hook_before_panic ... ok
+test executor::tests::service_call_service::test_service_call_service ... ok
+test executor::tests::test_exec ... ok
+test executor::tests::test_tx_hook ... ok
+test executor::tests::bench_execute ... ok
+
+test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+
+     Running target/debug/deps/metadata-426a9638d237908c
+
+running 1 test
+test tests::test_get_metadata ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+
+     Running target/debug/deps/multi_signature-9bd7782d48336f4f
+
+running 9 tests
+test tests::curd_test::test_set_threshold ... ok
+test tests::curd_test::test_set_weight ... ok
+test tests::curd_test::test_remove_account ... ok
+test tests::curd_test::test_update_account ... ok
+test tests::curd_test::test_adeption_address ... ok
+test tests::curd_test::test_generate_multi_signature ... ok
+test tests::curd_test::test_add_account ... ok
+test tests::recursion_test::test_recursion_verify_signature ... ok
+test tests::recursion_test::test_recursion_depth ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+
+     Running target/debug/deps/muta-c2bd8fbc57e54370
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+
+     Running target/debug/deps/trust_metric-cb0093739dc5dad1
+
+running 19 tests
+thread 'tokio-runtime-worker' panicked at 'impossible, session doesn't have trust metric', tests/trust_metric_all/node/diagnostic.rs:42:41
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+thread 'tokio-runtime-worker' panicked at 'metadata should not be none', /workspace/source/built-in-services/metadata/src/lib.rs:26:34
+thread 'tokio-runtime-worker' panicked at 'exec queue dropped!', /rustc/75e1463c52aaea25bd32ed53c73797357e561cce/src/libstd/macros.rs:13:23
+test trust_metric_all::mempool::should_be_disconnected_for_repeated_exceed_cycles_limit_only_within_four_intervals ... ok
+thread 'tokio-runtime-worker' panicked at 'metadata should not be none', /workspace/source/built-in-services/metadata/src/lib.rs:26:34
+thread 'tokio-runtime-worker' panicked at 'exec queue dropped!', /rustc/75e1463c52aaea25bd32ed53c73797357e561cce/src/libstd/macros.rs:13:23
+test trust_metric_all::mempool::should_report_good_on_valid_transaction ... ok
+thread 'tokio-runtime-worker' panicked at 'metadata should not be none', /workspace/source/built-in-services/metadata/src/lib.rs:26:34
+thread 'tokio-runtime-worker' panicked at 'metadata should not be none', /workspace/source/built-in-services/metadata/src/lib.rs:26:34
+thread 'tokio-runtime-worker' panicked at 'exec queue dropped!', /rustc/75e1463c52aaea25bd32ed53c73797357e561cce/src/libstd/macros.rs:13:23
+test trust_metric_all::mempool::should_be_disconnected_for_repeated_wrong_chain_id_only_within_four_intervals ... ok
+thread 'tokio-runtime-worker' panicked at 'metadata should not be none', /workspace/source/built-in-services/metadata/src/lib.rs:26:34
+thread 'tokio-runtime-worker' panicked at 'metadata should not be none', /workspace/source/built-in-services/metadata/src/lib.rs:26:34
+thread 'tokio-runtime-worker' panicked at 'metadata should not be none', /workspace/source/built-in-services/metadata/src/lib.rs:26:34
+thread 'tokio-runtime-worker' panicked at 'exec queue dropped!', /rustc/75e1463c52aaea25bd32ed53c73797357e561cce/src/libstd/macros.rs:13:23
+test trust_metric_all::should_have_working_trust_diagnostic ... ok
+thread 'tokio-runtime-worker' panicked at 'metadata should not be none', /workspace/source/built-in-services/metadata/src/lib.rs:26:34
+test trust_metric_all::trust_metric_basic_setup_test ... ok
+thread 'tokio-runtime-worker' panicked at 'get report: Unexpected("rpc to /rpc_call/diagnostic/trust_report [ProtocolError] Kind: Network Error: Internal(RpcTimeout(None))")', tests/trust_metric_all/consensus.rs:88:37
+thread 'trust_metric_all::consensus::should_be_disconnected_for_repeated_undecodeable_qc_within_four_intervals' panicked at 'test pass: JoinError::Panic(...)', tests/trust_metric_all/mod.rs:35:9
+test trust_metric_all::consensus::should_be_disconnected_for_repeated_undecodeable_qc_within_four_intervals ... FAILED
+thread 'tokio-runtime-worker' panicked at 'get report: Unexpected("rpc to /rpc_call/diagnostic/trust_report [ProtocolError] Kind: Network Error: Internal(RpcTimeout(None))")', tests/trust_metric_all/mempool.rs:251:37
+thread 'trust_metric_all::mempool::should_be_disconnected_for_repeated_timeout_larger_than_gap_only_within_four_intervals' panicked at 'test pass: JoinError::Panic(...)', tests/trust_metric_all/mod.rs:35:9
+thread 'tokio-runtime-worker' panicked at 'fetch trust report: Unexpected("rpc to /rpc_call/diagnostic/trust_report [ProtocolError] Kind: Network Error: Internal(RpcTimeout(None))")', tests/trust_metric_all/mod.rs:137:30
+thread 'trust_metric_all::should_be_disconnected_for_repeated_s_strategy_within_17_intervals_from_max_score' panicked at 'test pass: JoinError::Panic(...)', tests/trust_metric_all/mod.rs:35:9
+test trust_metric_all::mempool::should_be_disconnected_for_repeated_timeout_larger_than_gap_only_within_four_intervals ... FAILED
+test trust_metric_all::should_be_disconnected_for_repeated_s_strategy_within_17_intervals_from_max_score ... FAILED
+thread 'tokio-runtime-worker' panicked at 'get report: Unexpected("rpc to /rpc_call/diagnostic/trust_report [ProtocolError] Kind: Network Error: Internal(RpcTimeout(None))")', tests/trust_metric_all/consensus.rs:50:37
+thread 'trust_metric_all::consensus::should_be_disconnected_for_repeated_undecodeable_vote_within_four_intervals' panicked at 'test pass: JoinError::Panic(...)', tests/trust_metric_all/mod.rs:35:9
+test trust_metric_all::consensus::should_be_disconnected_for_repeated_undecodeable_vote_within_four_intervals ... FAILED
+test trust_metric_all::consensus::should_be_disconnected_for_repeated_undecodeable_choke_within_four_intervals ... ok
+test trust_metric_all::should_able_to_reconnect_after_trust_metric_soft_ban ... ok
+test trust_metric_all::mempool::should_be_disconnected_for_repeated_wrong_tx_hash_only_within_four_intervals ... ok
+test trust_metric_all::mempool::should_be_disconnected_for_repeated_wrong_signature_only_within_four_intervals ... ok
+test trust_metric_all::consensus::should_be_disconnected_for_repeated_undecodeable_proposal_within_four_intervals ... ok
+test trust_metric_all::consensus::should_be_disconnected_for_repeated_malicious_new_height_broadcast_within_four_intervals ... ok
+test trust_metric_all::mempool::should_be_disconnected_for_repeated_timeout_smaller_than_latest_height_only_within_four_intervals ... ok
+thread 'tokio-runtime-worker' panicked at 'unexpected unexpected rpc to /rpc_call/diagnostic/trust_report [ProtocolError] Kind: Network Error: Internal(RpcTimeout(None))', tests/trust_metric_all/mempool.rs:141:31
+thread 'trust_metric_all::mempool::should_be_disconnected_for_repeated_exceed_tx_size_limit_only_within_four_intervals' panicked at 'test pass: JoinError::Panic(...)', tests/trust_metric_all/mod.rs:35:9
+thread 'tokio-runtime-worker' panicked at 'unexpected rpc to /rpc_call/diagnostic/trust_twin_event [ProtocolError] Kind: Network Error: Internal(RpcTimeout(None))', tests/trust_metric_all/mod.rs:112:21
+thread 'trust_metric_all::should_be_disconnected_for_repeated_bad_only_within_four_intervals_from_max_score' panicked at 'test pass: JoinError::Panic(...)', tests/trust_metric_all/mod.rs:35:9
+test trust_metric_all::should_be_disconnected_for_repeated_bad_only_within_four_intervals_from_max_score ... FAILED
+thread 'tokio-runtime-worker' panicked at 'exec queue dropped!', /rustc/75e1463c52aaea25bd32ed53c73797357e561cce/src/libstd/macros.rs:13:23
+test trust_metric_all::mempool::should_be_disconnected_for_repeated_exceed_tx_size_limit_only_within_four_intervals ... FAILED
+test trust_metric_all::should_keep_connected_for_z_strategy_but_have_lower_score ... ok
+
+failures:
+
+failures:
+    trust_metric_all::consensus::should_be_disconnected_for_repeated_undecodeable_qc_within_four_intervals
+    trust_metric_all::consensus::should_be_disconnected_for_repeated_undecodeable_vote_within_four_intervals
+    trust_metric_all::mempool::should_be_disconnected_for_repeated_exceed_tx_size_limit_only_within_four_intervals
+    trust_metric_all::mempool::should_be_disconnected_for_repeated_timeout_larger_than_gap_only_within_four_intervals
+    trust_metric_all::should_be_disconnected_for_repeated_bad_only_within_four_intervals_from_max_score
+    trust_metric_all::should_be_disconnected_for_repeated_s_strategy_within_17_intervals_from_max_score
+
+test result: FAILED. 13 passed; 6 failed; 0 ignored; 0 measured; 0 filtered out
+
+error: test failed, to rerun pass '-p muta --test trust_metric'
+Makefile:19: recipe for target 'test' failed
+make: *** [test] Error 101
+[31m
+Pipeline failed on stage 'unit' : container 'step-unit'. The execution of the pipeline has stopped.[0m
