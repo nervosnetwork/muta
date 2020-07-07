@@ -1,7 +1,7 @@
 #![allow(clippy::mutable_key_type)]
 
 mod common;
-// mod consensus;
+mod consensus;
 mod logger;
 mod mempool;
 mod node;
