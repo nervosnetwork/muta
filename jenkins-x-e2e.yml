@@ -32,7 +32,7 @@ pipelineConfig:
                 image: cnych/kaniko-executor:v0.22.0
                 command: /kaniko/executor
                 args:
-                  - --dockerfile=/workspace/source/devtools/docker-build/Dockerfile
+                  - --dockerfile=devtools/docker-build/Dockerfile
                   - --destination=mutadev/muta:${inputs.params.version}
                   - --context=/workspace/source
               - name: e2e
