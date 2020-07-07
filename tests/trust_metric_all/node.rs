@@ -6,5 +6,4 @@ pub mod sync;
 mod config;
 mod diagnostic;
 
-use super::common;
 pub use diagnostic::TwinEvent;

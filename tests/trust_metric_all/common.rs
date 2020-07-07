@@ -9,45 +9,14 @@ use protocol::{
     Bytes, BytesMut,
 };
 use rand::{rngs::OsRng, RngCore};
-use tokio::sync::{Barrier, BarrierWaitResult};
 
 use std::{
     net::TcpListener,
     path::PathBuf,
-    sync::atomic::{AtomicBool, AtomicU16, Ordering},
-    sync::Arc,
+    sync::atomic::{AtomicU16, Ordering},
 };
 
 static AVAILABLE_PORT: AtomicU16 = AtomicU16::new(2000);
-
-#[derive(Clone)]
-pub struct RunningStatus {
-    barrier: Arc<Barrier>,
-    running: Arc<AtomicBool>,
-}
-
-impl RunningStatus {
-    pub fn new() -> Self {
-        RunningStatus {
-            barrier: Arc::new(Barrier::new(2)),
-            running: Arc::new(AtomicBool::new(true)),
-        }
-    }
-
-    pub fn is_running(&self) -> bool {
-        self.running.load(Ordering::SeqCst)
-    }
-
-    pub async fn wait(&self) -> BarrierWaitResult {
-        self.barrier.wait().await
-    }
-}
-
-impl Drop for RunningStatus {
-    fn drop(&mut self) {
-        self.running.store(false, Ordering::SeqCst)
-    }
-}
 
 pub fn tmp_dir() -> PathBuf {
     let mut tmp_dir = std::env::temp_dir();
