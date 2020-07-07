@@ -7,8 +7,14 @@ pipelineConfig:
           image: mutadev/muta-e2e-env:v0.1.0
         stages:
           - name: e2e
+            environment:
+              - name: DOCKER_CONFIG
+                value: /tekton/home/.docker
             options:
               containerOptions:
+                volumeMounts:
+                  - name: kaniko-secret
+                    mountPath: /secrets
                 resources:
                   limits:
                     cpu: 4
@@ -16,6 +22,21 @@ pipelineConfig:
                   requests:
                     cpu: 3
                     memory: 4Gi
+              volumes:
+                - name: kaniko-secret
+                  secret:
+                    secretName: kaniko-secret
+                    items:
+                      - key: kaniko-secret
+                        path: kaniko/kaniko-secret.json
+
             steps:
+              - name: build-and-push
+                image: cnych/kaniko-executor:v0.22.0
+                command:
+                  - /kaniko/executor
+                  - --dockerfile=/workspace/repo/devtools/docker-build/Dockerfile
+                  - --destination=mutadev/muta:${inputs.params.version}
+                  - --context=/workspace/repo
               - name: e2e
                 command: 'make e2e-test'
