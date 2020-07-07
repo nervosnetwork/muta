@@ -16,9 +16,9 @@ pipelineConfig:
                   requests:
                     cpu: 3
                     memory: 4Gi
-            timeout:
-              time: 30
-              unit: minutes
+              timeout:
+                time: 30
+                unit: minutes
             steps:
               - name: clippy
                 command: 'make clippy'
