@@ -32,8 +32,8 @@ pipelineConfig:
                 image: cnych/kaniko-executor:v0.22.0
                 command: /kaniko/executor
                 args:
-                  - --dockerfile=/workspace/repo/devtools/docker-build/Dockerfile
+                  - --dockerfile=/workspace/source/devtools/docker-build/Dockerfile
                   - --destination=mutadev/muta:${inputs.params.version}
-                  - --context=/workspace/repo
+                  - --context=/workspace/source
               - name: e2e
                 command: 'make e2e-test'
