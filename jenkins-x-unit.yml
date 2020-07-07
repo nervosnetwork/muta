@@ -13,6 +13,9 @@ pipelineConfig:
           - name: unit
             options:
               containerOptions:
+                volumeMounts:
+                  - name: jenkins-docker-cfg
+                    mountPath: /kaniko/.docker
                 resources:
                   limits:
                     cpu: 8
@@ -20,10 +23,24 @@ pipelineConfig:
                   requests:
                     cpu: 4
                     memory: 8Gi
+              volumes:
+                - name: jenkins-docker-cfg
+                  secret:
+                    secretName: jenkins-docker-cfg
+                    items:
+                      - key: config.json
+                        path: config.json
 
             steps:
+              # - name: build-and-push
+              #   image: gcr.io/kaniko-project/executor:9912ccbf8d22bbafbf971124600fbb0b13b9cbd6
+              #   command: /kaniko/executor
+              #   args:
+              #     - --dockerfile=/workspace/source/devtools/docker-build/Dockerfile
+              #     - --destination=mutadev/muta:${inputs.params.version}
+              #     - --context=/workspace/source
+              #     - --cache-dir=/workspace
               - name: unit
-                command: cargo
+                command: make
                 args:
                   - test
-                  - --all
