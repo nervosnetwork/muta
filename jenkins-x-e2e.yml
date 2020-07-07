@@ -7,14 +7,11 @@ pipelineConfig:
           image: mutadev/muta-e2e-env:v0.1.0
         stages:
           - name: e2e
-            environment:
-              - name: DOCKER_CONFIG
-                value: /tekton/home/.docker
             options:
               containerOptions:
                 volumeMounts:
-                  - name: kaniko-secret
-                    mountPath: /secrets
+                  - name: jenkins-docker-cfg
+                    mountPath: /kaniko/.docker
                 resources:
                   limits:
                     cpu: 4
@@ -23,12 +20,12 @@ pipelineConfig:
                     cpu: 3
                     memory: 4Gi
               volumes:
-                - name: kaniko-secret
+                - name: jenkins-docker-cfg
                   secret:
-                    secretName: kaniko-secret
+                    secretName: jenkins-docker-cfg
                     items:
-                      - key: kaniko-secret
-                        path: kaniko/kaniko-secret.json
+                      - key: config.json
+                        path: config.json
 
             steps:
               - name: build-and-push
