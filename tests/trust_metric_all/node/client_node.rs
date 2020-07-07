@@ -1,15 +1,20 @@
 use super::diagnostic::{
-    TrustNewIntervalReq, TrustNewIntervalResp, TrustReport, TrustReportReq, TrustTwinEventReq,
-    TrustTwinEventResp, TwinEvent, RPC_RESP_TRUST_NEW_INTERVAL, RPC_RESP_TRUST_REPORT,
-    RPC_RESP_TRUST_TWIN_EVENT, RPC_TRUST_NEW_INTERVAL, RPC_TRUST_REPORT, RPC_TRUST_TWIN_EVENT,
+    TrustNewIntervalReq, TrustTwinEventReq, TwinEvent, GOSSIP_TRUST_NEW_INTERVAL,
+    GOSSIP_TRUST_TWIN_EVENT,
 };
-use super::{common::RunningStatus, config::Config, consts};
+use super::{
+    config::Config,
+    consts,
+    sync::{Sync, SyncError, SyncEvent},
+};
 
 use common_crypto::{PrivateKey, Secp256k1PrivateKey};
 use core_consensus::message::{
-    FixedBlock, FixedHeight, RPC_RESP_SYNC_PULL_BLOCK, RPC_SYNC_PULL_BLOCK,
+    FixedBlock, FixedHeight, BROADCAST_HEIGHT, RPC_RESP_SYNC_PULL_BLOCK, RPC_SYNC_PULL_BLOCK,
 };
-use core_network::{NetworkConfig, NetworkService, NetworkServiceHandle};
+use core_network::{
+    DiagnosticEvent, NetworkConfig, NetworkService, NetworkServiceHandle, TrustReport,
+};
 use derive_more::Display;
 use protocol::{
     async_trait,
@@ -19,6 +24,8 @@ use protocol::{
 };
 
 use std::{
+    collections::HashSet,
+    iter::FromIterator,
     net::{IpAddr, Ipv4Addr, SocketAddr},
     ops::Deref,
 };
@@ -32,6 +39,16 @@ pub enum ClientNodeError {
     Unexpected(String),
 }
 impl std::error::Error for ClientNodeError {}
+
+impl From<SyncError> for ClientNodeError {
+    fn from(err: SyncError) -> Self {
+        match err {
+            SyncError::Recv(err) => ClientNodeError::Unexpected(err.to_string()),
+            SyncError::Timeout => ClientNodeError::Unexpected(err.to_string()),
+            SyncError::Disconected => ClientNodeError::NotConnected,
+        }
+    }
+}
 
 type ClientResult<T> = Result<T, ClientNodeError>;
 
@@ -52,14 +69,26 @@ impl MessageHandler for DummyPullBlockRpcHandler {
     }
 }
 
+struct ReceiveRemoteHeight(Sync);
+
+#[async_trait]
+impl MessageHandler for ReceiveRemoteHeight {
+    type Message = u64;
+
+    async fn process(&self, _: Context, msg: u64) -> TrustFeedback {
+        self.0.emit(DiagnosticEvent::RemoteHeight { height: msg });
+        TrustFeedback::Neutral
+    }
+}
+
 pub struct ClientNode {
     pub network:           NetworkServiceHandle,
     pub remote_chain_addr: Address,
     pub priv_key:          Secp256k1PrivateKey,
-    pub full_node_running: RunningStatus,
+    pub sync:              Sync,
 }
 
-pub async fn connect(full_node_port: u16, listen_port: u16, running: RunningStatus) -> ClientNode {
+pub async fn connect(full_node_port: u16, listen_port: u16, sync: Sync) -> ClientNode {
     let full_node_hex_pubkey = full_node_hex_pubkey();
     let full_node_chain_addr = full_node_chain_addr(&full_node_hex_pubkey);
     let full_node_addr = format!("127.0.0.1:{}", full_node_port);
@@ -84,15 +113,23 @@ pub async fn connect(full_node_port: u16, listen_port: u16, running: RunningStat
     network
         .register_rpc_response::<FixedBlock>(RPC_RESP_SYNC_PULL_BLOCK)
         .expect("register consensus rpc response pull block");
+
     network
-        .register_rpc_response::<TrustReport>(RPC_RESP_TRUST_REPORT)
-        .expect("register trust report rpc response");
-    network
-        .register_rpc_response::<TrustNewIntervalResp>(RPC_RESP_TRUST_NEW_INTERVAL)
-        .expect("register trigger trust new interval");
-    network
-        .register_rpc_response::<TrustTwinEventResp>(RPC_RESP_TRUST_TWIN_EVENT)
-        .expect("register trigger basic trust test");
+        .register_endpoint_handler(
+            BROADCAST_HEIGHT,
+            Box::new(ReceiveRemoteHeight(sync.clone())),
+        )
+        .expect("register remote height");
+
+    let hook_fn = |sync: Sync| -> _ {
+        Box::new(move |event: DiagnosticEvent| {
+            // We only care connected event on client node
+            if let DiagnosticEvent::NewSession = event {
+                sync.emit(event)
+            }
+        })
+    };
+    network.register_diagnostic_hook(hook_fn(sync.clone()));
 
     network
         .listen(SocketAddr::new(
@@ -103,53 +140,43 @@ pub async fn connect(full_node_port: u16, listen_port: u16, running: RunningStat
         .expect("test node listen");
 
     tokio::spawn(network);
-
-    let mut count = 100u8;
-    while count > 0 {
-        count -= 1;
-        if handle
-            .diagnostic
-            .session_by_chain(&full_node_chain_addr)
-            .is_some()
-        {
-            break;
-        }
-        tokio::time::delay_for(std::time::Duration::from_secs(1)).await;
-    }
-    if count == 0 {
-        panic!("failed to connect full node");
-    }
+    sync.wait_connected().await;
 
     ClientNode {
         network: handle,
         remote_chain_addr: full_node_chain_addr,
         priv_key,
-        full_node_running: running,
+        sync,
     }
 }
 
 impl ClientNode {
+    // # Panic
+    pub async fn wait_connected(&self) {
+        self.sync.wait_connected().await
+    }
+
     pub fn connected(&self) -> bool {
-        self.full_node_running.is_running()
-            && self
-                .network
-                .diagnostic
-                .session_by_chain(&self.remote_chain_addr)
-                .is_some()
+        let diagnostic = &self.network.diagnostic;
+        let opt_session = diagnostic.session_by_chain(&self.remote_chain_addr);
+
+        self.sync.is_connected() && opt_session.is_some()
     }
 
     pub fn connected_session(&self, addr: &Address) -> Option<usize> {
         if !self.connected() {
             None
         } else {
-            self.network
-                .diagnostic
-                .session_by_chain(addr)
-                .map(|sid| sid.value())
+            let diagnostic = &self.network.diagnostic;
+            let opt_session = diagnostic.session_by_chain(addr);
+
+            opt_session.map(|sid| sid.value())
         }
     }
 
     pub async fn broadcast<M: MessageCodec>(&self, endpoint: &str, msg: M) -> ClientResult<()> {
+        use Priority::High;
+
         let sid = match self.connected_session(&self.remote_chain_addr) {
             Some(sid) => sid,
             None => return Err(ClientNodeError::NotConnected),
@@ -157,28 +184,22 @@ impl ClientNode {
 
         let ctx = Context::new().with_value::<usize>("session_id", sid);
         let users = vec![self.remote_chain_addr.clone()];
-        if let Err(e) = self
-            .users_cast::<M>(ctx, endpoint, users, msg, Priority::High)
-            .await
-        {
-            if !self.connected() {
-                Err(ClientNodeError::NotConnected)
-            } else {
-                Err(ClientNodeError::Unexpected(format!(
-                    "broadcast to {} {}",
-                    endpoint, e
-                )))
+
+        match self.users_cast::<M>(ctx, endpoint, users, msg, High).await {
+            Err(_) if !self.connected() => Err(ClientNodeError::NotConnected),
+            Err(e) => {
+                let err_msg = format!("broadcast to {} {}", endpoint, e);
+                Err(ClientNodeError::Unexpected(err_msg))
             }
-        } else {
-            Ok(())
+            Ok(_) => Ok(()),
         }
     }
 
-    pub async fn rpc<M: MessageCodec, R: MessageCodec>(
-        &self,
-        endpoint: &str,
-        msg: M,
-    ) -> ClientResult<R> {
+    pub async fn rpc<M, R>(&self, endpoint: &str, msg: M) -> ClientResult<R>
+    where
+        M: MessageCodec,
+        R: MessageCodec,
+    {
         let sid = match self.connected_session(&self.remote_chain_addr) {
             Some(sid) => sid,
             None => return Err(ClientNodeError::NotConnected),
@@ -187,81 +208,78 @@ impl ClientNode {
         let ctx = Context::new().with_value::<usize>("session_id", sid);
         match self.call::<M, R>(ctx, endpoint, msg, Priority::High).await {
             Ok(resp) => Ok(resp),
-            Err(e)
-                if e.to_string().contains("RpcTimeout")
-                    || e.to_string().contains("rpc timeout") =>
-            {
-                if !self.connected() {
-                    Err(ClientNodeError::NotConnected)
-                } else {
-                    Err(ClientNodeError::Unexpected(format!(
-                        "rpc to {} {}",
-                        endpoint, e
-                    )))
-                }
+            Err(e) if e.to_string().to_lowercase().contains("timeout") && !self.connected() => {
+                Err(ClientNodeError::NotConnected)
             }
-            Err(e) => Err(ClientNodeError::Unexpected(format!(
-                "rpc to {} {}",
-                endpoint, e
-            ))),
+            Err(e) => {
+                let err_msg = format!("rpc to {} {}", endpoint, e);
+                Err(ClientNodeError::Unexpected(err_msg))
+            }
         }
     }
 
-    pub async fn genesis_block(&self) -> ClientResult<Block> {
+    pub async fn get_block(&self, height: u64) -> ClientResult<Block> {
         let resp = self
-            .rpc::<_, FixedBlock>(RPC_SYNC_PULL_BLOCK, FixedHeight::new(0))
+            .rpc::<_, FixedBlock>(RPC_SYNC_PULL_BLOCK, FixedHeight::new(height))
             .await?;
         Ok(resp.inner)
     }
 
-    pub async fn trust_report(&self) -> ClientResult<TrustReport> {
-        self.rpc(RPC_TRUST_REPORT, TrustReportReq(0)).await
-    }
-
-    pub async fn trust_new_interval(&self) -> ClientResult<TrustReport> {
-        self.rpc(RPC_TRUST_NEW_INTERVAL, TrustNewIntervalReq(0))
-            .await?;
-
-        self.until_new_interval_report().await
-    }
-
     pub async fn trust_twin_event(&self, event: TwinEvent) -> ClientResult<()> {
-        self.rpc::<_, TrustTwinEventResp>(RPC_TRUST_TWIN_EVENT, TrustTwinEventReq(event))
+        self.broadcast(GOSSIP_TRUST_TWIN_EVENT, TrustTwinEventReq(event))
             .await?;
+
+        let mut targets: HashSet<TwinEvent> = if event == TwinEvent::Both {
+            HashSet::from_iter(vec![TwinEvent::Good, TwinEvent::Bad])
+        } else {
+            HashSet::from_iter(vec![event])
+        };
+
+        while !targets.is_empty() {
+            let _ = match self.until_trust_processed().await? {
+                TrustFeedback::Bad(_) => targets.remove(&TwinEvent::Bad),
+                TrustFeedback::Good => targets.remove(&TwinEvent::Good),
+                TrustFeedback::Worse(_) => targets.remove(&TwinEvent::Worse),
+                TrustFeedback::Neutral | TrustFeedback::Fatal(_) => {
+                    // No Fatal action yet
+                    println!("skip neutral or fatal feedback");
+                    continue;
+                }
+            };
+        }
+
         Ok(())
     }
 
-    pub async fn until_trust_report_changed(
-        &self,
-        last_report: &TrustReport,
-    ) -> ClientResult<TrustReport> {
-        let mut count = 30u8;
-        while count > 0 {
-            count -= 1;
-            let report = self.trust_report().await?;
-            if report.good_events != last_report.good_events
-                || report.bad_events != last_report.bad_events
-            {
-                return Ok(report);
-            }
-            tokio::time::delay_for(std::time::Duration::from_millis(500)).await;
-        }
+    pub async fn until_trust_processed(&self) -> ClientResult<TrustFeedback> {
+        let event = self.sync.recv().await?;
 
-        panic!("until trust report timeout");
+        loop {
+            match event {
+                SyncEvent::TrustMetric(feedback) => return Ok(feedback),
+                SyncEvent::RemoteHeight(_) => continue,
+                _ => return Err(ClientNodeError::Unexpected(event.to_string())),
+            }
+        }
     }
 
-    async fn until_new_interval_report(&self) -> ClientResult<TrustReport> {
-        let mut count = 30u8;
-        while count > 0 {
-            count -= 1;
-            let report = self.trust_report().await?;
-            if report.good_events == 0 && report.bad_events == 0 {
-                return Ok(report);
-            }
-            tokio::time::delay_for(std::time::Duration::from_millis(500)).await;
-        }
+    pub async fn trust_new_interval(&self) -> ClientResult<TrustReport> {
+        self.broadcast(GOSSIP_TRUST_NEW_INTERVAL, TrustNewIntervalReq(0))
+            .await?;
 
-        panic!("until trust new interval timeout");
+        loop {
+            let event = self.sync.recv().await?;
+            match event {
+                SyncEvent::TrustReport(report) => return Ok(report),
+                SyncEvent::Connected => {
+                    return Err(ClientNodeError::Unexpected("connected".to_owned()))
+                }
+                SyncEvent::TrustMetric(_) | SyncEvent::RemoteHeight(_) => {
+                    println!("skip event {}", event);
+                    continue;
+                }
+            }
+        }
     }
 }
 

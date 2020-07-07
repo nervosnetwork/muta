@@ -638,6 +638,10 @@ pub struct PeerManager {
 
     // save restore
     peer_dat_file: Box<dyn SaveRestore>,
+
+    // diagnostic event hook
+    #[cfg(feature = "diagnostic")]
+    diagnostic_hook: Option<diagnostic::DiagnosticHookFn>,
 }
 
 impl PeerManager {
@@ -671,6 +675,9 @@ impl PeerManager {
             hb_waker: waker,
 
             peer_dat_file,
+
+            #[cfg(feature = "diagnostic")]
+            diagnostic_hook: None,
         }
     }
 
@@ -682,6 +689,11 @@ impl PeerManager {
 
     pub fn share_session_book(&self, config: SharedSessionsConfig) -> SharedSessions {
         SharedSessions::new(Arc::clone(&self.inner), config)
+    }
+
+    #[cfg(feature = "diagnostic")]
+    pub fn register_diagnostic_hook(&mut self, f: diagnostic::DiagnosticHookFn) {
+        self.diagnostic_hook = Some(f);
     }
 
     #[cfg(feature = "diagnostic")]
@@ -1362,10 +1374,17 @@ impl Future for PeerManager {
 
             // service ready in common
             let event = crate::service_ready!("peer manager", event_rx.poll_next(ctx));
+            log::debug!("network: {:?}: event {}", self.peer_id, event);
 
-            debug!("network: {:?}: event {}", self.peer_id, event);
+            #[cfg(feature = "diagnostic")]
+            let diag_event: Option<diagnostic::DiagnosticEvent> = From::from(&event);
 
             self.process_event(event);
+
+            #[cfg(feature = "diagnostic")]
+            if let (Some(hook), Some(event)) = (self.diagnostic_hook.as_ref(), diag_event) {
+                hook(event)
+            }
         }
 
         // Check connecting count

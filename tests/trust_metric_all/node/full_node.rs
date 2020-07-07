@@ -3,7 +3,7 @@ mod default_start;
 mod error;
 mod memory_db;
 
-use super::{common, config, consts, diagnostic};
+use super::{config, consts, diagnostic, sync::Sync};
 use builder::MutaBuilder;
 
 use asset::AssetService;
@@ -63,12 +63,12 @@ impl From<MappingError> for ProtocolError {
 }
 
 // Note: inject runnning_status
-pub async fn run(listen_port: u16, running_status: common::RunningStatus) {
+pub async fn run(listen_port: u16, sync: Sync) {
     let builder = MutaBuilder::new()
         .config_path(consts::CHAIN_CONFIG_PATH)
         .genesis_path(consts::CHAIN_GENESIS_PATH)
         .service_mapping(DefaultServiceMapping {});
 
     let muta = builder.build(listen_port).expect("build");
-    muta.run(running_status).await.expect("run");
+    muta.run(sync).await.expect("run");
 }

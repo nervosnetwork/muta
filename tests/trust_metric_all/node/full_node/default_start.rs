@@ -1,9 +1,10 @@
 use super::diagnostic::{
-    TrustNewIntervalHandler, TrustReportHandler, TrustTwinEventHandler, RPC_TRUST_NEW_INTERVAL,
-    RPC_TRUST_REPORT, RPC_TRUST_TWIN_EVENT,
+    TrustNewIntervalHandler, TrustTwinEventHandler, GOSSIP_TRUST_NEW_INTERVAL,
+    GOSSIP_TRUST_TWIN_EVENT,
 };
 /// Almost same as src/default_start.rs, only remove graphql service.
-use super::{common, config::Config, consts, error::MainError, memory_db::MemoryDB};
+use super::{config::Config, consts, error::MainError, memory_db::MemoryDB, Sync};
+use crate::trust_metric_all::common;
 
 use std::collections::HashMap;
 use std::convert::TryFrom;
@@ -36,7 +37,7 @@ use core_mempool::{
     DefaultMemPoolAdapter, HashMemPool, MsgPushTxs, NewTxsHandler, PullTxsHandler,
     END_GOSSIP_NEW_TXS, RPC_PULL_TXS, RPC_RESP_PULL_TXS,
 };
-use core_network::{NetworkConfig, NetworkService};
+use core_network::{DiagnosticEvent, NetworkConfig, NetworkService};
 use core_storage::{ImplStorage, StorageError};
 use framework::executor::{ServiceExecutor, ServiceExecutorFactory};
 use protocol::traits::{APIAdapter, Context, MemPool, NodeInfo, ServiceMapping, Storage};
@@ -131,7 +132,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     config: Config,
     service_mapping: Arc<Mapping>,
     db: MemoryDB,
-    running: common::RunningStatus,
+    sync: Sync,
 ) -> ProtocolResult<()> {
     log::info!("node starts");
     // Init Block db
@@ -181,17 +182,19 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
 
     // Register diagnostic
     network_service.register_endpoint_handler(
-        RPC_TRUST_REPORT,
-        Box::new(TrustReportHandler(network_service.handle())),
+        GOSSIP_TRUST_NEW_INTERVAL,
+        Box::new(TrustNewIntervalHandler::new(
+            sync.clone(),
+            network_service.handle(),
+        )),
     )?;
     network_service.register_endpoint_handler(
-        RPC_TRUST_NEW_INTERVAL,
-        Box::new(TrustNewIntervalHandler(network_service.handle())),
-    )?;
-    network_service.register_endpoint_handler(
-        RPC_TRUST_TWIN_EVENT,
+        GOSSIP_TRUST_TWIN_EVENT,
         Box::new(TrustTwinEventHandler(network_service.handle())),
     )?;
+
+    let hook_fn = |sync: Sync| -> _ { Box::new(move |event: DiagnosticEvent| sync.emit(event)) };
+    network_service.register_diagnostic_hook(hook_fn(sync.clone()));
 
     // Init mempool
     let current_block = storage.get_latest_block(Context::new()).await?;
@@ -449,6 +452,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
 
     // Run network
     tokio::spawn(network_service);
+    sync.wait().await;
 
     // Run sync
     tokio::spawn(async move {
@@ -483,12 +487,9 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         }
     });
 
-    // We are set up
-    running.wait().await;
-
     exec_demon.run().await;
     let _ = consensus_handle.await;
-    let _ = running;
+    let _ = sync;
 
     Ok(())
 }
