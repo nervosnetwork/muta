@@ -41,4 +41,6 @@ pipelineConfig:
                   - --context=/workspace/source
                   - --cache-dir=/workspace
               - name: e2e
-                command: 'make e2e-test'
+                command: make
+                args:
+                  - e2e-test

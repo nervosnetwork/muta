@@ -23,4 +23,6 @@ pipelineConfig:
 
             steps:
               - name: unit
-                command: 'make test'
+                command: make
+                args:
+                  - test

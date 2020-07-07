@@ -23,4 +23,6 @@ pipelineConfig:
 
             steps:
               - name: clippy
-                command: 'make clippy'
+                command: make
+                args:
+                  - clippy

@@ -23,4 +23,6 @@ pipelineConfig:
 
             steps:
               - name: fmt
-                command: 'make fmt'
+                command: make
+                args:
+                  - fmt
