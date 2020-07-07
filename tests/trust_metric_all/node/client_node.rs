@@ -252,9 +252,8 @@ impl ClientNode {
     }
 
     pub async fn until_trust_processed(&self) -> ClientResult<TrustFeedback> {
-        let event = self.sync.recv().await?;
-
         loop {
+            let event = self.sync.recv().await?;
             match event {
                 SyncEvent::TrustMetric(feedback) => return Ok(feedback),
                 SyncEvent::RemoteHeight(_) => continue,
