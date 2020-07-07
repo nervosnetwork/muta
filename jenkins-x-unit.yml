@@ -23,6 +23,7 @@ pipelineConfig:
 
             steps:
               - name: unit
-                command: make
+                command: cargo
                 args:
                   - test
+                  - --all
