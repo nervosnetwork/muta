@@ -3,7 +3,7 @@
 mod common;
 // mod consensus;
 mod logger;
-// mod mempool;
+mod mempool;
 mod node;
 
 use futures::future::BoxFuture;
