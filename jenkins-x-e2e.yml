@@ -18,11 +18,11 @@ pipelineConfig:
                     mountPath: /kaniko/.docker
                 resources:
                   limits:
-                    cpu: 4
+                    cpu: 8
                     memory: 8Gi
                   requests:
-                    cpu: 3
-                    memory: 4Gi
+                    cpu: 4
+                    memory: 8Gi
               volumes:
                 - name: jenkins-docker-cfg
                   secret:

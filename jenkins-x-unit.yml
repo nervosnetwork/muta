@@ -15,11 +15,11 @@ pipelineConfig:
               containerOptions:
                 resources:
                   limits:
-                    cpu: 4
+                    cpu: 8
                     memory: 8Gi
                   requests:
-                    cpu: 3
-                    memory: 6Gi
+                    cpu: 4
+                    memory: 8Gi
 
             steps:
               - name: unit
