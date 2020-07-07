@@ -29,11 +29,12 @@ pipelineConfig:
 
             steps:
               - name: build-and-push
-                image: cnych/kaniko-executor:v0.22.0
+                image: gcr.io/kaniko-project/executor:9912ccbf8d22bbafbf971124600fbb0b13b9cbd6
                 command: /kaniko/executor
                 args:
-                  - --dockerfile=devtools/docker-build/Dockerfile
+                  - --dockerfile=/workspace/source/devtools/docker-build/Dockerfile
                   - --destination=mutadev/muta:${inputs.params.version}
                   - --context=/workspace/source
+                  - --cache-dir=/workspace
               - name: e2e
                 command: 'make e2e-test'
