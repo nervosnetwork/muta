@@ -67,14 +67,12 @@ impl MessageHandler for TrustTwinEventHandler {
 
     async fn process(&self, ctx: Context, msg: Self::Message) -> TrustFeedback {
         match msg.0 {
-            TwinEvent::Good => self.report(ctx.clone(), TrustFeedback::Good),
-            TwinEvent::Bad => self.report(ctx.clone(), TrustFeedback::Bad("twin bad".to_owned())),
-            TwinEvent::Worse => {
-                self.report(ctx.clone(), TrustFeedback::Worse("twin worse".to_owned()))
-            }
+            TwinEvent::Good => self.report(ctx, TrustFeedback::Good),
+            TwinEvent::Bad => self.report(ctx, TrustFeedback::Bad("twin bad".to_owned())),
+            TwinEvent::Worse => self.report(ctx, TrustFeedback::Worse("twin worse".to_owned())),
             TwinEvent::Both => {
                 self.report(ctx.clone(), TrustFeedback::Good);
-                self.report(ctx.clone(), TrustFeedback::Bad("twin bad".to_owned()));
+                self.report(ctx, TrustFeedback::Bad("twin bad".to_owned()));
             }
         }
 
