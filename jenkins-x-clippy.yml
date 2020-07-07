@@ -5,6 +5,10 @@ pipelineConfig:
       pipeline:
         agent:
           image: mutadev/muta-build-env:v0.1.0
+        options:
+          timeout:
+            time: 30
+            unit: minutes
         stages:
           - name: clippy
             options:
@@ -16,9 +20,7 @@ pipelineConfig:
                   requests:
                     cpu: 3
                     memory: 4Gi
-              timeout:
-                time: 30
-                unit: minutes
+
             steps:
               - name: clippy
                 command: 'make clippy'
