@@ -1,6 +1,23 @@
-##  (2020-07-01)
+##  (2020-07-07)
 
 
+
+
+## 0.2.0-alpha.0 (2020-07-06)
+
+* refactor(auth): change verified map to array (#337) ([d7ea75a](https://github.com/yejiayu/muta/commit/d7ea75a)), closes [#337](https://github.com/yejiayu/muta/issues/337)
+* refactor(service): calculate multi-signature recursion depth (#322) ([0a83036](https://github.com/yejiayu/muta/commit/0a83036)), closes [#322](https://github.com/yejiayu/muta/issues/322)
+* chore: Fix ci (#336) ([03ad6e9](https://github.com/yejiayu/muta/commit/03ad6e9)), closes [#336](https://github.com/yejiayu/muta/issues/336)
+* chore: Replace Travis Ci with Jenkins-x (#333) ([05481d3](https://github.com/yejiayu/muta/commit/05481d3)), closes [#333](https://github.com/yejiayu/muta/issues/333)
+* chore: Update CI pipeline (#335) ([a915200](https://github.com/yejiayu/muta/commit/a915200)), closes [#335](https://github.com/yejiayu/muta/issues/335)
+* chore: Update OWNERS (#332) ([cdf4a1c](https://github.com/yejiayu/muta/commit/cdf4a1c)), closes [#332](https://github.com/yejiayu/muta/issues/332)
+* chore(CHANGELOG): Update v0.2 CHANGELOG (#328) ([f2bd65a](https://github.com/yejiayu/muta/commit/f2bd65a)), closes [#328](https://github.com/yejiayu/muta/issues/328)
+* Add customized preview namespace ([7921b02](https://github.com/yejiayu/muta/commit/7921b02))
+* Add customized preview namespace ([2c6db84](https://github.com/yejiayu/muta/commit/2c6db84))
+* Delete skaffold.yaml ([7251f16](https://github.com/yejiayu/muta/commit/7251f16))
+* Draft create ([95a7d91](https://github.com/yejiayu/muta/commit/95a7d91))
+* Draft create ([b23b2b5](https://github.com/yejiayu/muta/commit/b23b2b5))
+* fix(trust_metric_test): unreliable full node exit check (#327) ([a4ab4a6](https://github.com/yejiayu/muta/commit/a4ab4a6)), closes [#327](https://github.com/yejiayu/muta/issues/327)
 
 
 ## 0.2.0-dev.0 (2020-07-01)
