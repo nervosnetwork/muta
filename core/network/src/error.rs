@@ -139,6 +139,9 @@ pub enum NetworkError {
     #[display(fmt = "trust max history should be longer than {} secs", _0)]
     SmallTrustMaxHistory(u64),
 
+    #[display(fmt = "transport {}", _0)]
+    Transport(tentacle::error::TransportErrorKind),
+
     #[display(fmt = "internal error: {}", _0)]
     Internal(Box<dyn Error + Send>),
 }
@@ -172,6 +175,12 @@ impl From<NetworkError> for ProtocolError {
 impl From<std::io::Error> for NetworkError {
     fn from(err: std::io::Error) -> NetworkError {
         NetworkError::IoError(err)
+    }
+}
+
+impl From<tentacle::error::TransportErrorKind> for NetworkError {
+    fn from(err: tentacle::error::TransportErrorKind) -> NetworkError {
+        NetworkError::Transport(err)
     }
 }
 
