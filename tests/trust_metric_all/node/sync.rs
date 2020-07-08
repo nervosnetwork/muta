@@ -13,7 +13,7 @@ use std::{
     time::Duration,
 };
 
-const SYNC_RECV_TIMEOUT: Duration = Duration::from_secs(60);
+const SYNC_RECV_TIMEOUT: Duration = Duration::from_secs(120);
 
 #[derive(Debug, Display)]
 pub enum SyncError {
