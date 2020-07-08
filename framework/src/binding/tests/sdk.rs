@@ -268,6 +268,8 @@ pub fn mock_receipt_response() -> ReceiptResponse {
 pub fn mock_event() -> Event {
     Event {
         service: "mock-event".to_owned(),
+        method:  "mock-method".to_owned(),
+        name:    "mock-method".to_owned(),
         data:    "mock-data".to_owned(),
     }
 }

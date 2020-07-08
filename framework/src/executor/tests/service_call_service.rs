@@ -116,7 +116,10 @@ impl<SDK: ServiceSDK> MockService<SDK> {
 
         let asset: Asset = serde_json::from_str(&ret.succeed_data).unwrap();
 
-        ctx.emit_event("call create asset succeed".to_owned());
+        ctx.emit_event(
+            "mock-asset".to_owned(),
+            "call create asset succeed".to_owned(),
+        );
         ServiceResponse::<Asset>::from_succeed(asset)
     }
 }
