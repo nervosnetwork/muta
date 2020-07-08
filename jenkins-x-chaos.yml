@@ -1,16 +1,16 @@
 buildPack: none
 pipelineConfig:
   pipelines:
-    release:
+    pullRequest:
       pipeline:
         agent:
           image: mutadev/muta-build-env:v0.3.0
         options:
           timeout:
-            time: 30
+            time: 300 # 5H
             unit: minutes
         stages:
-          - name: release
+          - name: chaos
             environment:
               - name: BASE_WORKSPACE
                 value: /workspace/source
@@ -56,5 +56,5 @@ pipelineConfig:
                 command: /kaniko/executor
                 args:
                   - --dockerfile=/workspace/source/devtools/docker-build/Dockerfile
-                  - --destination=mutadev/${inputs.params.repo_name}:latest
+                  - --destination=mutadev/${inputs.params.repo_name}:${inputs.params.version}
                   - --context=/workspace/source

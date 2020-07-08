@@ -34,11 +34,8 @@ check:
 build:
 	${CARGO} build ${VERBOSE} --release
 
-prod:
-	${CARGO} build ${VERBOSE} --release
-
-prod-test:
-	${CARGO} test ${VERBOSE} --all -- --nocapture
+prod-muta-chain:
+	${CARGO} build ${VERBOSE} --release --example muta-chain
 
 fmt:
 	cargo fmt ${VERBOSE} --all -- --check
