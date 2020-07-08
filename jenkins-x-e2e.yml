@@ -5,17 +5,34 @@ pipelineConfig:
       pipeline:
         agent:
           image: mutadev/muta-e2e-env:v0.1.0
+        options:
+          timeout:
+            time: 30
+            unit: minutes
         stages:
           - name: e2e
             options:
               containerOptions:
+                volumeMounts:
+                  - name: jenkins-docker-cfg
+                    mountPath: /kaniko/.docker
                 resources:
                   limits:
                     cpu: 4
                     memory: 8Gi
                   requests:
-                    cpu: 3
-                    memory: 4Gi
+                    cpu: 2
+                    memory: 8Gi
+              volumes:
+                - name: jenkins-docker-cfg
+                  secret:
+                    secretName: jenkins-docker-cfg
+                    items:
+                      - key: config.json
+                        path: config.json
+
             steps:
               - name: e2e
-                command: 'make e2e-test'
+                command: make
+                args:
+                  - e2e-test

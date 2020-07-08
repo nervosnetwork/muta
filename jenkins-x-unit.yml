@@ -5,6 +5,10 @@ pipelineConfig:
       pipeline:
         agent:
           image: mutadev/muta-build-env:v0.1.0
+        options:
+          timeout:
+            time: 30
+            unit: minutes
         stages:
           - name: unit
             options:
@@ -14,8 +18,11 @@ pipelineConfig:
                     cpu: 4
                     memory: 8Gi
                   requests:
-                    cpu: 3
-                    memory: 6Gi
+                    cpu: 2
+                    memory: 8Gi
+
             steps:
               - name: unit
-                command: 'make test'
+                command: make
+                args:
+                  - test

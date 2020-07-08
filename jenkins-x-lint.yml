@@ -5,8 +5,12 @@ pipelineConfig:
       pipeline:
         agent:
           image: mutadev/muta-build-env:v0.1.0
+        options:
+          timeout:
+            time: 30
+            unit: minutes
         stages:
-          - name: clippy
+          - name: lint
             options:
               containerOptions:
                 resources:
@@ -14,8 +18,15 @@ pipelineConfig:
                     cpu: 4
                     memory: 8Gi
                   requests:
-                    cpu: 3
-                    memory: 4Gi
+                    cpu: 2
+                    memory: 8Gi
+
             steps:
+              - name: fmt
+                command: make
+                args:
+                  - fmt
               - name: clippy
-                command: 'make clippy'
+                command: make
+                args:
+                  - clippy
