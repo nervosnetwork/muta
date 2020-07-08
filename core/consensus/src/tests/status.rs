@@ -61,7 +61,7 @@ fn test_update_by_committed() {
     let mut block = mock_block_from_status(&status);
     block.header.height += 1;
     status.update_by_committed(
-        metadata.clone(),
+        metadata,
         block.clone(),
         Hash::digest(block.encode_fixed().unwrap()),
         block.header.proof,
@@ -178,7 +178,7 @@ fn mock_current_status(exec_lag: u64) -> CurrentConsensusStatus {
         latest_committed_height:     HEIGHT_TEN,
         exec_height:                 HEIGHT_TEN - exec_lag,
         current_hash:                mock_hash(),
-        latest_committed_state_root: state_roots.last().cloned().unwrap_or(mock_hash()),
+        latest_committed_state_root: state_roots.last().cloned().unwrap_or_else(mock_hash),
         list_confirm_root:           mock_roots(exec_lag),
         list_state_root:             state_roots,
         list_receipt_root:           mock_roots(exec_lag),
