@@ -333,7 +333,7 @@ where
                 )
             }
 
-            return Err(MemPoolError::CheckSig {
+            return Err(MemPoolError::CheckAuthorization {
                 tx_hash: tx_clone.tx_hash,
             }
             .into());

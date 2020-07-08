@@ -146,7 +146,7 @@ async fn check_hash(tx: SignedTransaction) -> ProtocolResult<()> {
 
 fn check_sig(tx: &SignedTransaction) -> ProtocolResult<()> {
     if Secp256k1::verify_signature(&tx.tx_hash.as_bytes(), &tx.signature, &tx.pubkey).is_err() {
-        return Err(MemPoolError::CheckSig {
+        return Err(MemPoolError::CheckAuthorization {
             tx_hash: tx.tx_hash.clone(),
         }
         .into());

@@ -2,9 +2,7 @@ import fetch from "node-fetch";
 import { createHttpLink } from "apollo-link-http";
 import { InMemoryCache } from "apollo-cache-inmemory";
 import ApolloClient from "apollo-client";
-import { readFileSync } from "fs";
 import { Muta } from "@mutadev/muta-sdk";
-const toml = require("toml");
 
 export const CHAIN_ID =
   "0xb6a4d7da21443f5e816e8700eea87610e6d769657d6b8ec73028457bf2ca4036";
