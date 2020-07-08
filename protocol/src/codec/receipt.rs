@@ -61,12 +61,9 @@ pub struct Event {
     pub service: Vec<u8>,
 
     #[prost(bytes, tag = "2")]
-    pub method: Vec<u8>,
-
-    #[prost(bytes, tag = "3")]
     pub name: Vec<u8>,
 
-    #[prost(bytes, tag = "4")]
+    #[prost(bytes, tag = "3")]
     pub data: Vec<u8>,
 }
 
@@ -158,7 +155,6 @@ impl From<receipt::Event> for Event {
     fn from(event: receipt::Event) -> Event {
         Event {
             service: event.service.as_bytes().to_vec(),
-            method:  event.method.as_bytes().to_vec(),
             name:    event.name.as_bytes().to_vec(),
             data:    event.data.as_bytes().to_vec(),
         }
@@ -171,7 +167,6 @@ impl TryFrom<Event> for receipt::Event {
     fn try_from(event: Event) -> Result<receipt::Event, Self::Error> {
         Ok(receipt::Event {
             service: String::from_utf8(event.service).map_err(CodecError::FromStringUtf8)?,
-            method:  String::from_utf8(event.method).map_err(CodecError::FromStringUtf8)?,
             name:    String::from_utf8(event.name).map_err(CodecError::FromStringUtf8)?,
             data:    String::from_utf8(event.data).map_err(CodecError::FromStringUtf8)?,
         })

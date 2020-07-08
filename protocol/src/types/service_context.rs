@@ -165,7 +165,6 @@ impl ServiceContext {
     pub fn emit_event(&self, name: String, message: String) {
         self.events.borrow_mut().push(Event {
             service: self.service_name.clone(),
-            method: self.service_method.clone(),
             name,
             data: message,
         })

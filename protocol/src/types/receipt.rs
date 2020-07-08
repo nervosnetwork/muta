@@ -8,7 +8,6 @@ use crate::{traits::ServiceResponse, ProtocolResult};
 #[derive(RlpFixedCodec, Debug, Clone, PartialEq, Eq)]
 pub struct Event {
     pub service: String,
-    pub method:  String,
     pub name:    String,
     pub data:    String,
 }
