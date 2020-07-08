@@ -22,3 +22,6 @@ mod traits;
 pub use config::NetworkConfig;
 pub use message::{serde, serde_multi};
 pub use service::{NetworkService, NetworkServiceHandle};
+
+#[cfg(feature = "diagnostic")]
+pub use peer_manager::diagnostic::{DiagnosticEvent, TrustReport};

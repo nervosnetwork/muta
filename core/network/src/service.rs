@@ -23,7 +23,7 @@ use protocol::{
 };
 
 #[cfg(feature = "diagnostic")]
-use crate::peer_manager::diagnostic::Diagnostic;
+use crate::peer_manager::diagnostic::{Diagnostic, DiagnosticHookFn};
 use crate::{
     common::{socket_to_multi_addr, HeartBeat},
     compression::Snappy,
@@ -311,6 +311,13 @@ impl NetworkService {
         }
 
         Ok(())
+    }
+
+    #[cfg(feature = "diagnostic")]
+    pub fn register_diagnostic_hook(&mut self, f: DiagnosticHookFn) {
+        if let Some(peer_mgr) = self.peer_mgr.as_mut() {
+            peer_mgr.register_diagnostic_hook(f);
+        }
     }
 
     pub fn handle(&self) -> NetworkServiceHandle {

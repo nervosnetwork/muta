@@ -1,9 +1,9 @@
 use super::{
-    common::RunningStatus,
     config::Config,
     default_start::{create_genesis, start},
     error::MainError,
     memory_db::MemoryDB,
+    Sync,
 };
 
 use std::{
@@ -84,7 +84,7 @@ impl<Mapping: 'static + ServiceMapping> Muta<Mapping> {
         }
     }
 
-    pub async fn run(self, running: RunningStatus) -> ProtocolResult<()> {
+    pub async fn run(self, sync: Sync) -> ProtocolResult<()> {
         // run muta
         let memory_db = MemoryDB::default();
 
@@ -93,7 +93,7 @@ impl<Mapping: 'static + ServiceMapping> Muta<Mapping> {
             self.config,
             Arc::clone(&self.service_mapping),
             memory_db,
-            running,
+            sync,
         )
         .await?;
 

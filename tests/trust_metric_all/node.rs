@@ -1,9 +1,9 @@
 pub mod client_node;
 pub mod consts;
 pub mod full_node;
+pub mod sync;
 
 mod config;
 mod diagnostic;
 
-use super::common;
 pub use diagnostic::TwinEvent;

@@ -13,7 +13,7 @@ pub enum Priority {
     Normal,
 }
 
-#[derive(Debug, Display)]
+#[derive(Debug, Display, Clone)]
 pub enum TrustFeedback {
     #[display(fmt = "fatal {}", _0)]
     Fatal(String),
