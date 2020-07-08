@@ -3,8 +3,11 @@ use std::convert::TryFrom;
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use bit_vec::BitVec;
 use futures::executor::block_on;
 use futures::lock::Mutex;
+use overlord::types::{AggregatedSignature, AggregatedVote, Node, SignedVote, Vote, VoteType};
+use overlord::{extract_voters, Crypto};
 use parking_lot::RwLock;
 use rlp::encode;
 
@@ -29,9 +32,6 @@ use crate::util::{convert_hex_to_bls_pubkeys, digest_signed_transactions, Overlo
 use crate::BlockHeaderField::{PreviousBlockHash, ProofHash, Proposer};
 use crate::BlockProofField::{BitMap, HashMismatch, HeightMismatch, WeightNotFound};
 use crate::{BlockHeaderField, BlockProofField, ConsensusError};
-use bit_vec::BitVec;
-use overlord::types::{AggregatedSignature, AggregatedVote, Node, SignedVote, Vote, VoteType};
-use overlord::{extract_voters, Crypto};
 
 const PUB_KEY_STR: &str = "031288a6788678c25952eba8693b2f278f66e2187004b64ac09416d07f83f96d5b";
 

@@ -62,7 +62,7 @@ impl StatusAgent {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, Display)]
+#[derive(Serialize, Deserialize, Clone, Debug, Display, PartialEq, Eq)]
 #[display(
     fmt = "latest_committed_height {}, exec height {}, current_hash {:?}, latest_committed_state_root {:?} list state root {:?}, list receipt root {:?}, list confirm root {:?}, list cycle used {:?}",
     latest_committed_height,
@@ -104,7 +104,7 @@ impl CurrentConsensusStatus {
             .clone()
     }
 
-    fn update_by_executed(&mut self, info: ExecutedInfo) {
+    pub(crate) fn update_by_executed(&mut self, info: ExecutedInfo) {
         if info.exec_height <= self.exec_height {
             return;
         }
@@ -119,7 +119,7 @@ impl CurrentConsensusStatus {
         self.list_state_root.push(info.state_root);
     }
 
-    fn update_by_committed(
+    pub(crate) fn update_by_committed(
         &mut self,
         metadata: Metadata,
         block: Block,
@@ -138,7 +138,7 @@ impl CurrentConsensusStatus {
         self.split_off(&block);
     }
 
-    fn set_metadata(&mut self, metadata: Metadata) {
+    pub(crate) fn set_metadata(&mut self, metadata: Metadata) {
         self.cycles_limit = metadata.cycles_limit;
         self.cycles_price = metadata.cycles_price;
         self.consensus_interval = metadata.interval;
@@ -155,6 +155,9 @@ impl CurrentConsensusStatus {
         self.propose_ratio = metadata.propose_ratio;
         self.prevote_ratio = metadata.prevote_ratio;
         self.precommit_ratio = metadata.precommit_ratio;
+        self.brake_ratio = metadata.brake_ratio;
+        self.max_tx_size = metadata.max_tx_size;
+        self.tx_num_limit = metadata.tx_num_limit;
     }
 
     fn split_off(&mut self, block: &Block) {
