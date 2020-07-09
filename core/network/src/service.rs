@@ -18,8 +18,7 @@ use protocol::{
     traits::{
         Context, Gossip, MessageCodec, MessageHandler, PeerTrust, Priority, Rpc, TrustFeedback,
     },
-    types::Address,
-    ProtocolResult,
+    ProtocolResult, Bytes,
 };
 
 #[cfg(feature = "diagnostic")]
@@ -66,18 +65,18 @@ impl Gossip for NetworkServiceHandle {
         self.gossip.broadcast(cx, end, msg, p).await
     }
 
-    async fn users_cast<M>(
+    async fn multicast<M>(
         &self,
         cx: Context,
         end: &str,
-        users: Vec<Address>,
+        peer_ids: Vec<Bytes>,
         msg: M,
         p: Priority,
     ) -> ProtocolResult<()>
     where
         M: MessageCodec,
     {
-        self.gossip.users_cast(cx, end, users, msg, p).await
+        self.gossip.multicast(cx, end, peer_ids, msg, p).await
     }
 }
 

@@ -61,6 +61,8 @@ where
         self.sender.send(tar, msg, pri)
     }
 
+    // FIXME
+    #[allow(dead_code)]
     async fn users_send(
         &self,
         _ctx: Context,
@@ -88,22 +90,23 @@ where
         Ok(())
     }
 
-    async fn users_cast<M>(
+    async fn multicast<M>(
         &self,
-        cx: Context,
-        end: &str,
-        users: Vec<Address>,
-        msg: M,
-        p: Priority,
+        _cx: Context,
+        _end: &str,
+        _peer_ids: Vec<Bytes>,
+        _msg: M,
+        _p: Priority,
     ) -> ProtocolResult<()>
     where
         M: MessageCodec,
     {
-        let msg = self.package_message(cx.clone(), end, msg).await?;
-        let user_count = users.len();
-        self.users_send(cx, users, msg, p).await?;
-        common_apm::metrics::network::on_network_message_sent_multi_target(end, user_count as i64);
-
-        Ok(())
+        todo!()
+        // let msg = self.package_message(cx.clone(), end, msg).await?;
+        // let user_count = users.len();
+        // self.users_send(cx, users, msg, p).await?;
+        // common_apm::metrics::network::on_network_message_sent_multi_target(end, user_count as i64);
+        //
+        // Ok(())
     }
 }

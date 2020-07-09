@@ -573,11 +573,11 @@ mod tests {
             Ok(())
         }
 
-        async fn users_cast<M>(
+        async fn multicast<M>(
             &self,
             _: Context,
             _: &str,
-            _: Vec<Address>,
+            _: Vec<Bytes>,
             _: M,
             _: Priority,
         ) -> ProtocolResult<()>

@@ -185,7 +185,7 @@ impl ClientNode {
         let ctx = Context::new().with_value::<usize>("session_id", sid);
         let users = vec![self.remote_chain_addr.clone()];
 
-        match self.users_cast::<M>(ctx, endpoint, users, msg, High).await {
+        match self.multicast::<M>(ctx, endpoint, users, msg, High).await {
             Err(_) if !self.connected() => Err(ClientNodeError::NotConnected),
             Err(e) => {
                 let err_msg = format!("broadcast to {} {}", endpoint, e);
