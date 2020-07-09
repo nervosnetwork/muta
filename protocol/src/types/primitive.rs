@@ -24,7 +24,7 @@ pub const GENESIS_HEIGHT: u64 = 0;
 const HASH_LEN: usize = 32;
 
 // Should started with 0x
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Default)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Hex(String);
 
 impl Hex {
@@ -42,6 +42,12 @@ impl Hex {
 
     pub fn as_string_trim0x(&self) -> String {
         (&self.0[2..]).to_owned()
+    }
+}
+
+impl Default for Hex {
+    fn default() -> Self {
+        Hex::from_string("0x".to_owned()).expect("Hex must start with 0x")
     }
 }
 
@@ -345,6 +351,7 @@ mod tests {
     use bytes::Bytes;
 
     use super::{Address, Hash};
+    use crate::types::Hex;
 
     #[test]
     fn test_hash() {
@@ -372,5 +379,13 @@ mod tests {
 
         let address = Address::from_bytes(bytes).unwrap();
         assert_eq!(add_str, &address.as_hex().to_uppercase().as_str()[2..]);
+    }
+
+    #[test]
+    fn test_hex() {
+        let hex_str = "0x112233445566AABBcc";
+        let hex = Hex::from_string(hex_str.to_owned()).unwrap();
+
+        assert_eq!(hex_str, hex.0.as_str());
     }
 }
