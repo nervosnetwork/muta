@@ -35,6 +35,11 @@ pipelineConfig:
                         path: config.json
 
             steps:
+              - name: create-chaos-crd
+                command: kubectl
+                args:
+                  - version
+
               - name: build-release
                 image: mutadev/muta-build-env:v0.3.0
                 env:
