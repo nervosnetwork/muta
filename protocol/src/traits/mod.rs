@@ -20,7 +20,9 @@ pub use executor::{
     ServiceResponse,
 };
 pub use mempool::{MemPool, MemPoolAdapter, MixedTxHashes};
-pub use network::{Gossip, MessageCodec, MessageHandler, PeerTrust, Priority, Rpc, TrustFeedback};
+pub use network::{
+    Gossip, MessageCodec, MessageHandler, Network, PeerTag, PeerTrust, Priority, Rpc, TrustFeedback,
+};
 pub use storage::{
     IntoIteratorByRef, Storage, StorageAdapter, StorageBatchModify, StorageCategory,
     StorageIterator, StorageSchema,
