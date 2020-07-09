@@ -13,7 +13,7 @@ use core_consensus::message::{
     FixedBlock, FixedHeight, BROADCAST_HEIGHT, RPC_RESP_SYNC_PULL_BLOCK, RPC_SYNC_PULL_BLOCK,
 };
 use core_network::{
-    DiagnosticEvent, NetworkConfig, NetworkService, NetworkServiceHandle, TrustReport,
+    DiagnosticEvent, NetworkConfig, NetworkService, NetworkServiceHandle, PeerId, TrustReport,
 };
 use derive_more::Display;
 use protocol::{
@@ -82,15 +82,15 @@ impl MessageHandler for ReceiveRemoteHeight {
 }
 
 pub struct ClientNode {
-    pub network:           NetworkServiceHandle,
-    pub remote_chain_addr: Address,
-    pub priv_key:          Secp256k1PrivateKey,
-    pub sync:              Sync,
+    pub network:        NetworkServiceHandle,
+    pub remote_peer_id: PeerId,
+    pub priv_key:       Secp256k1PrivateKey,
+    pub sync:           Sync,
 }
 
 pub async fn connect(full_node_port: u16, listen_port: u16, sync: Sync) -> ClientNode {
     let full_node_hex_pubkey = full_node_hex_pubkey();
-    let full_node_chain_addr = full_node_chain_addr(&full_node_hex_pubkey);
+    let full_node_peer_id = full_node_peer_id(&full_node_hex_pubkey);
     let full_node_addr = format!("127.0.0.1:{}", full_node_port);
 
     let config = NetworkConfig::new()
@@ -144,7 +144,7 @@ pub async fn connect(full_node_port: u16, listen_port: u16, sync: Sync) -> Clien
 
     ClientNode {
         network: handle,
-        remote_chain_addr: full_node_chain_addr,
+        remote_peer_id: full_node_peer_id,
         priv_key,
         sync,
     }
@@ -158,17 +158,17 @@ impl ClientNode {
 
     pub fn connected(&self) -> bool {
         let diagnostic = &self.network.diagnostic;
-        let opt_session = diagnostic.session_by_chain(&self.remote_chain_addr);
+        let opt_session = diagnostic.session(&self.remote_peer_id);
 
         self.sync.is_connected() && opt_session.is_some()
     }
 
-    pub fn connected_session(&self, addr: &Address) -> Option<usize> {
+    pub fn connected_session(&self, peer_id: &PeerId) -> Option<usize> {
         if !self.connected() {
             None
         } else {
             let diagnostic = &self.network.diagnostic;
-            let opt_session = diagnostic.session_by_chain(addr);
+            let opt_session = diagnostic.session(peer_id);
 
             opt_session.map(|sid| sid.value())
         }
@@ -183,9 +183,9 @@ impl ClientNode {
         };
 
         let ctx = Context::new().with_value::<usize>("session_id", sid);
-        let users = vec![self.remote_chain_addr.clone()];
+        let peers = vec![self.remote_peer_id.clone()];
 
-        match self.multicast::<M>(ctx, endpoint, users, msg, High).await {
+        match self.multicast::<M>(ctx, endpoint, peers, msg, High).await {
             Err(_) if !self.connected() => Err(ClientNodeError::NotConnected),
             Err(e) => {
                 let err_msg = format!("broadcast to {} {}", endpoint, e);
@@ -300,9 +300,13 @@ fn full_node_hex_pubkey() -> String {
     full_node.pubkey.as_string_trim0x()
 }
 
-fn full_node_chain_addr(hex_pubkey: &str) -> Address {
-    let pubkey = hex::decode(hex_pubkey).expect("decode hex full node pubkey");
-    Address::from_pubkey_bytes(pubkey.into()).expect("full node chain address")
+fn full_node_peer_id(hex_pubkey: &str) -> PeerId {
+    let pubkey = {
+        let pubkey_bytes = hex::decode(hex_pubkey).expect("decode hex full node pubkey");
+        tentacle::secio::PublicKey::from_bytes(pubkey_bytes).expect("decode pubkey")
+    };
+
+    pubkye.peer_id()
 }
 
 fn mock_block(height: u64) -> Block {
