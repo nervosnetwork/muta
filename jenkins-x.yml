@@ -56,5 +56,5 @@ pipelineConfig:
                 command: /kaniko/executor
                 args:
                   - --dockerfile=/workspace/source/devtools/docker-build/Dockerfile
-                  - --destination=mutadev/${inputs.params.repo_name}:latest
+                  - --destination=mutadev/${REPO_NAME}:${VERSION}
                   - --context=/workspace/source
