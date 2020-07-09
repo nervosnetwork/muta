@@ -1,3 +1,15 @@
+use crate::{error::NetworkError, traits::MultiaddrExt};
+
+use derive_more::Display;
+use futures::{pin_mut, task::AtomicWaker};
+use futures_timer::Delay;
+use protocol::Bytes;
+use serde_derive::{Deserialize, Serialize};
+use tentacle::{
+    multiaddr::{Multiaddr, Protocol},
+    secio::PeerId,
+};
+
 use std::{
     borrow::Cow,
     future::Future,
@@ -9,17 +21,6 @@ use std::{
     time::{Duration, Instant},
     vec::IntoIter,
 };
-
-use derive_more::Display;
-use futures::{pin_mut, task::AtomicWaker};
-use futures_timer::Delay;
-use serde_derive::{Deserialize, Serialize};
-use tentacle::{
-    multiaddr::{Multiaddr, Protocol},
-    secio::PeerId,
-};
-
-use crate::traits::MultiaddrExt;
 
 #[macro_export]
 macro_rules! loop_ready {
@@ -42,6 +43,10 @@ macro_rules! service_ready {
             }
         }
     };
+}
+
+pub fn peer_id_from_bytes(bytes: Bytes) -> Result<PeerId, NetworkError> {
+    PeerId::from_bytes(bytes.to_vec()).map_err(|_| NetworkError::InvalidPeerId)
 }
 
 pub fn socket_to_multi_addr(socket_addr: SocketAddr) -> Multiaddr {

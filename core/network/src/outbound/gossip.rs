@@ -1,12 +1,12 @@
 use async_trait::async_trait;
 use protocol::{
     traits::{Context, Gossip, MessageCodec, Priority},
-    types::Address,
     Bytes, ProtocolResult,
 };
 use tentacle::service::TargetSession;
 
 use crate::{
+    common::peer_id_from_bytes,
     endpoint::Endpoint,
     error::NetworkError,
     message::{Headers, NetworkMessage},
@@ -61,16 +61,19 @@ where
         self.sender.send(tar, msg, pri)
     }
 
-    // FIXME
-    #[allow(dead_code)]
-    async fn users_send(
+    async fn multisend(
         &self,
         _ctx: Context,
-        users: Vec<Address>,
+        peer_ids: Vec<Bytes>,
         msg: Bytes,
         pri: Priority,
     ) -> Result<(), NetworkError> {
-        self.sender.users_send(users, msg, pri).await
+        let peers = peer_ids
+            .into_iter()
+            .map(peer_id_from_bytes)
+            .collect::<Result<Vec<_>, _>>()?;
+
+        self.sender.multisend(peers, msg, pri).await
     }
 }
 
@@ -92,21 +95,24 @@ where
 
     async fn multicast<M>(
         &self,
-        _cx: Context,
-        _end: &str,
-        _peer_ids: Vec<Bytes>,
-        _msg: M,
-        _p: Priority,
+        cx: Context,
+        end: &str,
+        peer_ids: Vec<Bytes>,
+        msg: M,
+        p: Priority,
     ) -> ProtocolResult<()>
     where
         M: MessageCodec,
     {
-        todo!()
-        // let msg = self.package_message(cx.clone(), end, msg).await?;
-        // let user_count = users.len();
-        // self.users_send(cx, users, msg, p).await?;
-        // common_apm::metrics::network::on_network_message_sent_multi_target(end, user_count as i64);
-        //
-        // Ok(())
+        let msg = self.package_message(cx.clone(), end, msg).await?;
+        let multicast_count = peer_ids.len();
+
+        self.multisend(cx, peer_ids, msg, p).await?;
+
+        common_apm::metrics::network::on_network_message_sent_multi_target(
+            end,
+            multicast_count as i64,
+        );
+        Ok(())
     }
 }

@@ -95,14 +95,12 @@ pub enum NetworkError {
     },
 
     #[display(
-        fmt = "send incompletely, unconnected {:?} unknown {:?}, other {:?}",
+        fmt = "send incompletely, unconnected {:?}, other {:?}",
         unconnected,
-        unknown,
         other
     )]
-    UserSend {
-        unconnected: Option<Vec<Address>>,
-        unknown:     Option<Vec<Address>>,
+    MultiCast {
+        unconnected: Option<Vec<PeerId>>,
         other:       Option<Box<dyn Error + Send>>,
     },
 
@@ -117,6 +115,9 @@ pub enum NetworkError {
 
     #[display(fmt = "cannot decode private key bytes")]
     InvalidPrivateKey,
+
+    #[display(fmt = "cannot decode peer id")]
+    InvalidPeerId,
 
     #[display(fmt = "unsupported peer address {}", _0)]
     UnexpectedPeerAddr(String),

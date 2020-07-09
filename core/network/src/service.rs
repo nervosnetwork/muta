@@ -18,7 +18,7 @@ use protocol::{
     traits::{
         Context, Gossip, MessageCodec, MessageHandler, PeerTrust, Priority, Rpc, TrustFeedback,
     },
-    ProtocolResult, Bytes,
+    Bytes, ProtocolResult,
 };
 
 #[cfg(feature = "diagnostic")]
