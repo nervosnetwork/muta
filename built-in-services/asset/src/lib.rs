@@ -173,7 +173,7 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
             return ServiceResponse::<Asset>::from_error(103, format!("{:?}", e));
         }
         let event_str = event_res.unwrap();
-        ctx.emit_event("Create".to_owned(), event_str);
+        ctx.emit_event("CreateAsset".to_owned(), event_str);
 
         ServiceResponse::<Asset>::from_succeed(asset)
     }
@@ -206,7 +206,7 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
             return ServiceResponse::<()>::from_error(103, format!("{:?}", e));
         };
         let event_str = event_res.unwrap();
-        ctx.emit_event("Transfer".to_owned(), event_str);
+        ctx.emit_event("TransferAsset".to_owned(), event_str);
 
         ServiceResponse::<()>::from_succeed(())
     }
@@ -255,7 +255,7 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
             return ServiceResponse::<()>::from_error(103, format!("{:?}", e));
         };
         let event_str = event_res.unwrap();
-        ctx.emit_event("Approve".to_owned(), event_str);
+        ctx.emit_event("ApproveAsset".to_owned(), event_str);
 
         ServiceResponse::<()>::from_succeed(())
     }
