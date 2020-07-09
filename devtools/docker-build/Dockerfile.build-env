@@ -12,23 +12,10 @@ RUN set -eux; \
         git \
         build-essential \ 
         pkg-config \
+        openssl \
+        libssl-dev \
         libclang-dev clang; \
     rm -rf /var/lib/apt/lists/*
-
-ENV OPENSSL_VERSION=1.1.1c \
-    OPENSSL_SHA256=f6fb3079ad15076154eda9413fed42877d668e7069d9b87396d0804fdb3f4c90
-
-RUN set -eux; \
-    url="https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz"; \
-    wget "$url"; \
-    echo "${OPENSSL_SHA256} *openssl-${OPENSSL_VERSION}.tar.gz" | sha256sum -c -; \
-    tar -xzf "openssl-${OPENSSL_VERSION}.tar.gz"; \
-    cd openssl-${OPENSSL_VERSION}; \
-    ./config no-shared no-zlib -fPIC -DOPENSSL_NO_SECURE_MEMORY; \
-    make; \
-    make install; \
-    cd ..; \
-    rm -rf openssl-${OPENSSL_VERSION} openssl-${OPENSSL_VERSION}.tar.gz
 
 ENV RUSTUP_HOME=/usr/local/rustup \
     CARGO_HOME=/usr/local/cargo \
