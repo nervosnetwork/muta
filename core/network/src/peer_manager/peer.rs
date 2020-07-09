@@ -1,4 +1,4 @@
-use super::{time, PeerAddrSet, Retry, TrustMetric, MAX_RETRY_COUNT};
+use super::{time, PeerAddrSet, Retry, Tags, TrustMetric, MAX_RETRY_COUNT};
 
 use std::{
     borrow::Borrow,
@@ -14,7 +14,7 @@ use std::{
 
 use derive_more::Display;
 use parking_lot::RwLock;
-use protocol::{types::Address, Bytes};
+use protocol::{traits::PeerTag, types::Address, Bytes};
 use tentacle::{
     secio::{PeerId, PublicKey},
     SessionId,
@@ -72,8 +72,8 @@ pub struct Peer {
     pub id:          PeerId,
     pub multiaddrs:  PeerAddrSet,
     pub retry:       Retry,
+    pub tags:        Tags,
     pubkey:          RwLock<Option<PublicKey>>,
-    chain_addr:      RwLock<Option<Address>>,
     trust_metric:    RwLock<Option<TrustMetric>>,
     connectedness:   AtomicUsize,
     session_id:      AtomicUsize,
@@ -89,8 +89,8 @@ impl Peer {
             id:              peer_id.clone(),
             multiaddrs:      PeerAddrSet::new(peer_id),
             retry:           Retry::new(MAX_RETRY_COUNT),
+            tags:            Tags::default(),
             pubkey:          RwLock::new(None),
-            chain_addr:      RwLock::new(None),
             trust_metric:    RwLock::new(None),
             connectedness:   AtomicUsize::new(Connectedness::NotConnected as usize),
             session_id:      AtomicUsize::new(0),
@@ -120,10 +120,6 @@ impl Peer {
         self.pubkey.read().clone()
     }
 
-    pub fn owned_chain_addr(&self) -> Option<Address> {
-        self.chain_addr.read().clone()
-    }
-
     pub fn set_pubkey(&self, pubkey: PublicKey) -> Result<(), ErrorKind> {
         if pubkey.peer_id() != self.id {
             Err(ErrorKind::PublicKeyNotMatchId {
@@ -131,10 +127,7 @@ impl Peer {
                 id: self.id.clone(),
             })
         } else {
-            let chain_addr = Peer::pubkey_to_chain_addr(&pubkey)?;
-
             *self.pubkey.write() = Some(pubkey);
-            *self.chain_addr.write() = Some(chain_addr);
             Ok(())
         }
     }
@@ -226,8 +219,7 @@ impl Peer {
 
     pub fn ban(&self, timeout: Duration) {
         let expired_at = Duration::from_secs(time::now()) + timeout;
-        self.ban_expired_at
-            .store(expired_at.as_secs(), Ordering::SeqCst);
+        self.tags.insert(PeerTag::ban(expired_at.as_secs()));
     }
 
     #[cfg(test)]
@@ -270,9 +262,8 @@ impl fmt::Display for Peer {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "{:?} chain addr {:?} multiaddr {:?} last connected at {} alive {} retry {} current {}",
+            "{:?} multiaddr {:?} last connected at {} alive {} retry {} current {}",
             self.id,
-            self.chain_addr,
             self.multiaddrs.all(),
             self.connected_at.load(Ordering::SeqCst),
             self.alive.load(Ordering::SeqCst),
