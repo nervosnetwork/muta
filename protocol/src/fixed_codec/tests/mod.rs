@@ -56,6 +56,7 @@ pub fn mock_receipt() -> Receipt {
 pub fn mock_event() -> Event {
     Event {
         service: "mock-event".to_owned(),
+        name:    "mock-name".to_owned(),
         data:    "mock-data".to_owned(),
     }
 }

@@ -162,10 +162,11 @@ impl ServiceContext {
         *self.canceled.borrow_mut() = Some(reason);
     }
 
-    pub fn emit_event(&self, message: String) {
+    pub fn emit_event(&self, name: String, message: String) {
         self.events.borrow_mut().push(Event {
             service: self.service_name.clone(),
-            data:    message,
+            name,
+            data: message,
         })
     }
 }
