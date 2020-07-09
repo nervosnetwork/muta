@@ -16,8 +16,8 @@ SYS_ROCKSDB := $(if ${USE_SYS_ROCKSDB},ROCKSDB_LIB_DIR=${SYS_LIB_DIR},)
 CARGO := env ${SYS_ROCKSDB} cargo
 
 test:
-	${CARGO} test ${VERBOSE} --all  --release -- --skip trust_metric --nocapture
-	${CARGO} test --release -- --test-threads=1
+	${CARGO} test ${VERBOSE} --all -- --skip trust_metric --nocapture
+	${CARGO} test -- --test-threads=1
 
 doc:
 	cargo doc --all --no-deps
