@@ -1,5 +1,4 @@
 use std::{
-    borrow::Cow,
     error::Error,
     fmt::Debug,
     hash::{Hash, Hasher},
@@ -38,19 +37,19 @@ pub enum PeerTag {
     Consensus,
     #[display(fmt = "always allow")]
     AlwaysAllow,
-    #[display(fmt = "banned, expired_at {}", expired_at)]
-    Ban { expired_at: u64 }, // timestamp
+    #[display(fmt = "banned, until {}", until)]
+    Ban { until: u64 }, // timestamp
     #[display(fmt = "{}", _0)]
     Custom(String), // TODO: Hide custom constructor
 }
 
 impl PeerTag {
-    pub fn ban(expired_at: u64) -> Self {
-        PeerTag::Ban { expired_at }
+    pub fn ban(until: u64) -> Self {
+        PeerTag::Ban { until }
     }
 
     pub fn ban_key() -> Self {
-        PeerTag::Ban { expired_at: 0 }
+        PeerTag::Ban { until: 0 }
     }
 
     pub fn custom<S: AsRef<str>>(s: S) -> Result<Self, ()> {

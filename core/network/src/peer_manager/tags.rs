@@ -1,3 +1,6 @@
+use super::time;
+use crate::error::ErrorKind;
+
 use parking_lot::RwLock;
 use protocol::traits::PeerTag;
 
@@ -13,18 +16,32 @@ impl Default for Tags {
 }
 
 impl Tags {
-    pub fn banned_until(&self) -> Option<u64> {
+    pub fn get_banned_until(&self) -> Option<u64> {
         let opt_banned = { self.0.read().get(&PeerTag::ban_key()).cloned() };
 
-        if let Some(PeerTag::Ban { expired_at }) = opt_banned {
-            Some(expired_at)
+        if let Some(PeerTag::Ban { until }) = opt_banned {
+            Some(until)
         } else {
             None
         }
     }
 
-    pub fn ban(&self, timeout: Duration) {
-        if self.contains(&PeerTag::Consensus) || self.contains(&PeerTag::kk)
+    pub fn insert_ban(&self, timeout: Duration) -> Result<(), ErrorKind> {
+        if self.contains(&PeerTag::Consensus) || self.contains(&PeerTag::AlwaysAllow) {
+            return Err(ErrorKind::Untaggable(format!(
+                "consensus and always allow cannot be ban"
+            )));
+        }
+
+        let until = Duration::from_secs(time::now()) + timeout;
+        self.0.write().insert(PeerTag::ban(until.as_secs()));
+
+        Ok(())
+    }
+
+    #[cfg(test)]
+    pub fn set_ban_until(&self, until: u64) {
+        self.0.write().insert(PeerTag::ban(until));
     }
 
     pub fn insert(&self, tag: PeerTag) {

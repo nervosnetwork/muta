@@ -3,7 +3,6 @@ use std::borrow::Cow;
 use async_trait::async_trait;
 use protocol::{
     traits::{Context, Priority},
-    types::Address,
     Bytes,
 };
 use tentacle::{
@@ -25,6 +24,25 @@ pub trait NetworkProtocol {
     fn metas(self) -> Vec<ProtocolMeta>;
 
     fn message_proto_id() -> ProtocolId;
+}
+
+pub trait DecodePeerId {
+    fn decode_str<'a, S: AsRef<[u8]> + 'a>(s: S) -> Result<PeerId, NetworkError>;
+}
+
+impl DecodePeerId for PeerId {
+    fn decode_str<'a, S: AsRef<[u8]> + 'a>(s: S) -> Result<PeerId, NetworkError> {
+        let str = String::from_utf8_lossy(s.as_ref());
+
+        if let Ok(Ok(peer_id)) = bs58::decode(str.as_ref())
+            .into_vec()
+            .map(PeerId::from_bytes)
+        {
+            Ok(peer_id)
+        } else {
+            Err(NetworkError::InvalidPeerId)
+        }
+    }
 }
 
 #[rustfmt::skip]
@@ -65,7 +83,7 @@ pub trait SessionBook {
     fn all(&self) -> Vec<SessionId>;
     fn connected_addr(&self, sid: SessionId) -> Option<ConnectedAddr>;
     fn pending_data_size(&self, sid: SessionId) -> usize;
-    fn whitelist(&self) -> Vec<Address>;
+    fn allowlist(&self) -> Vec<PeerId>;
 }
 
 pub trait MultiaddrExt {
