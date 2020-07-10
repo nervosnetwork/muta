@@ -1,5 +1,5 @@
-import { Address } from '@mutajs/types';
-import { createBindingClass, write, Write } from '@mutajs/service';
+import { Address } from '@mutadev/types';
+import { createServiceBindingClass, write, Write } from '@mutadev/service';
 
 type u8 = number;
 type u32 = number;
@@ -21,9 +21,12 @@ interface GenerateMultiSigAccountResponse {
 }
 
 export interface MultiSigServiceModel {
-  generate_account: Write<GenerateMultiSigAccountPayload, GenerateMultiSigAccountResponse>;
+    generate_account: Write<GenerateMultiSigAccountPayload, GenerateMultiSigAccountResponse>;
 }
 
-export const MultiSigService = createBindingClass<MultiSigServiceModel>('multi_signature', {
-    generate_account: write(),
-});
+export const MultiSigService = createServiceBindingClass({
+    serviceName: 'multi_signature',
+    write: {
+        generate_account: write<GenerateMultiSigAccountPayload, GenerateMultiSigAccountResponse>(),
+    }
+})
