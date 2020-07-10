@@ -36,10 +36,12 @@ pipelineConfig:
 
             steps:
               - name: create-chaos-crd
-                image: bitnami/kubectl:1.14.3
-                command: kubectl
+                # image: bitnami/kubectl:1.14.3
+                image: alpine/helm:3.2.4
+                command: helm
                 args:
-                  - envsubst < devtools/kube/deploy-chaos-crd-template.yml | kubectl create -f -
+                  # - envsubst < devtools/kube/deploy-chaos-crd-template.yml | kubectl create -f -
+                  - help
 
               - name: build-release
                 image: mutadev/muta-build-env:v0.3.0
