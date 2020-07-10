@@ -1,7 +1,7 @@
 apiVersion: nervos.org/v1alpha1
 kind: Muta
 metadata:
-  name: chaos-muta-example
+  name: chaos-${REPO_NAME}-${VERSION}
   namespace: mutadev # Only supports deployment to the mutadev namespace
 spec:
   image: mutadev/muta:latest # docker image
