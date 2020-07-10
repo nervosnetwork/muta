@@ -22,7 +22,8 @@
 # dev
 devtools/chain/data
 
-tests/e2e/node_modules/
+tests/e2e/node_modules
+tests/e2e/yarn-error.log
 
 # rocksdb
 **/rocksdb/

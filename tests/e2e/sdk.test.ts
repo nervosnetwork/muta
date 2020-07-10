@@ -9,9 +9,23 @@ import { MultiSigService } from './multisig';
 describe("API test via muta-sdk-js", () => {
   test("getLatestBlock", async () => {
     let current_height = await mutaClient.getLatestBlockHeight();
-    // console.log(current_height);
     expect(current_height).toBeGreaterThan(0);
   });
+
+  test("getNoneBlock", async () => {
+    let block = await mutaClient.getBlock("0xffffffff");
+    expect(block).toBe(null);
+  })
+
+  test("getNoneTransaction", async () => {
+    let tx = await mutaClient.getTransaction("0xf56924db538e77bb5951eb5ff0d02b88983c49c45eea30e8ae3e7234b311436c");
+    expect(tx).toBe(null);
+  })
+
+  test("getNoneReceipt", async () => {
+    let receipt = await mutaClient.getReceipt("0xf56924db538e77bb5951eb5ff0d02b88983c49c45eea30e8ae3e7234b311436c");
+    expect(receipt).toBe(null);
+  })
 
   test("transfer work", async () => {
     const from_addr = "0xf8389d774afdad8755ef8e629e5a154fddc6325a";
