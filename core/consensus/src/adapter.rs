@@ -548,11 +548,11 @@ where
 
         let authority_map = previous_metadata
             .verifier_list
-            .into_iter()
+            .iter()
             .map(|v| {
-                let address = v.address.as_bytes();
+                let address = v.peer_id.clone();
                 let node = Node {
-                    address:        v.address.as_bytes(),
+                    address:        v.peer_id.clone(),
                     propose_weight: v.propose_weight,
                     vote_weight:    v.vote_weight,
                 };
@@ -563,7 +563,10 @@ where
         // TODO: useless check
         // check proposer
         if block.header.height != 0
-            && !authority_map.contains_key(&block.header.proposer.as_bytes())
+            && !previous_metadata
+                .verifier_list
+                .iter()
+                .any(|v| v.address == block.header.proposer)
         {
             log::error!(
                 "[consensus] verify_block_header, block.header.proposer: {:?}, authority_map: {:?}",
@@ -575,10 +578,10 @@ where
 
         // check validators
         for validator in block.header.validators.iter() {
-            if !authority_map.contains_key(&validator.address.as_bytes()) {
+            if !authority_map.contains_key(&validator.peer_id) {
                 log::error!(
                     "[consensus] verify_block_header, validator.address: {:?}, authority_map: {:?}",
-                    validator.address,
+                    validator.peer_id,
                     authority_map
                 );
                 return Err(ConsensusError::VerifyBlockHeader(
@@ -587,14 +590,14 @@ where
                 )
                 .into());
             } else {
-                let node = authority_map.get(&validator.address.as_bytes()).unwrap();
+                let node = authority_map.get(&validator.peer_id).unwrap();
 
                 if node.vote_weight != validator.vote_weight
                     || node.propose_weight != validator.vote_weight
                 {
                     log::error!(
                         "[consensus] verify_block_header, validator.address: {:?}, authority_map: {:?}",
-                        validator.address,
+                        validator.peer_id,
                         authority_map
                     );
                     return Err(ConsensusError::VerifyBlockHeader(
@@ -664,7 +667,7 @@ where
             .verifier_list
             .iter()
             .map(|v| Node {
-                address:        v.address.as_bytes(),
+                address:        v.peer_id.clone(),
                 propose_weight: v.propose_weight,
                 vote_weight:    v.vote_weight,
             })
@@ -698,7 +701,7 @@ where
             .verifier_list
             .iter()
             .filter_map(|v| {
-                if signed_voters.contains(&v.address.as_bytes()) {
+                if signed_voters.contains(&v.peer_id) {
                     Some(v.bls_pub_key.clone())
                 } else {
                     None

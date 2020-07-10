@@ -279,7 +279,7 @@ pub fn mock_event() -> Event {
 
 pub fn mock_validator() -> Validator {
     Validator {
-        address:        mock_address(),
+        peer_id:        get_random_bytes(16),
         propose_weight: 1,
         vote_weight:    1,
     }
@@ -325,4 +325,9 @@ pub fn mock_block(order_size: usize) -> Block {
         header:            mock_block_header(),
         ordered_tx_hashes: (0..order_size).map(|_| mock_hash()).collect(),
     }
+}
+
+fn get_random_bytes(len: usize) -> Bytes {
+    let vec: Vec<u8> = (0..len).map(|_| rand::random::<u8>()).collect();
+    Bytes::from(vec)
 }

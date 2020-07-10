@@ -177,7 +177,7 @@ impl ClientNode {
     pub async fn broadcast<M: MessageCodec>(&self, endpoint: &str, msg: M) -> ClientResult<()> {
         use Priority::High;
 
-        let sid = match self.connected_session(&self.remote_chain_addr) {
+        let sid = match self.connected_session(&self.remote_peer_id) {
             Some(sid) => sid,
             None => return Err(ClientNodeError::NotConnected),
         };
@@ -200,7 +200,7 @@ impl ClientNode {
         M: MessageCodec,
         R: MessageCodec,
     {
-        let sid = match self.connected_session(&self.remote_chain_addr) {
+        let sid = match self.connected_session(&self.remote_peer_id) {
             Some(sid) => sid,
             None => return Err(ClientNodeError::NotConnected),
         };
@@ -306,7 +306,7 @@ fn full_node_peer_id(hex_pubkey: &str) -> PeerId {
         tentacle::secio::PublicKey::from_bytes(pubkey_bytes).expect("decode pubkey")
     };
 
-    pubkye.peer_id()
+    pubkey.peer_id()
 }
 
 fn mock_block(height: u64) -> Block {

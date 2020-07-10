@@ -94,8 +94,8 @@ pub struct Proof {
 
 #[derive(Clone, Message)]
 pub struct Validator {
-    #[prost(message, tag = "1")]
-    pub address: Option<Address>,
+    #[prost(bytes, tag = "1")]
+    pub peer_id: Vec<u8>,
 
     #[prost(uint32, tag = "2")]
     pub propose_weight: u32,
@@ -297,12 +297,10 @@ impl TryFrom<Proof> for block::Proof {
 
 impl From<block::Validator> for Validator {
     fn from(validator: block::Validator) -> Validator {
-        let address = Some(Address::from(validator.address));
-
         Validator {
-            address,
+            peer_id:        validator.peer_id.to_vec(),
             propose_weight: validator.propose_weight,
-            vote_weight: validator.vote_weight,
+            vote_weight:    validator.vote_weight,
         }
     }
 }
@@ -311,10 +309,8 @@ impl TryFrom<Validator> for block::Validator {
     type Error = ProtocolError;
 
     fn try_from(validator: Validator) -> Result<block::Validator, Self::Error> {
-        let address = field!(validator.address, "Validator", "address")?;
-
         let validator = block::Validator {
-            address:        protocol_primitive::Address::try_from(address)?,
+            peer_id:        Bytes::from(validator.peer_id),
             propose_weight: validator.propose_weight,
             vote_weight:    validator.vote_weight,
         };

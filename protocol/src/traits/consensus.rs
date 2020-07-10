@@ -13,7 +13,7 @@ use crate::{traits::mempool::MixedTxHashes, ProtocolResult};
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum MessageTarget {
     Broadcast,
-    Specified(Address),
+    Specified(Bytes),
 }
 
 #[derive(Debug, Clone)]

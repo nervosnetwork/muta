@@ -2,7 +2,7 @@ use super::{Inner, WORSE_TRUST_SCALAR_RATIO};
 use crate::event::PeerManagerEvent;
 
 use derive_more::Display;
-use protocol::{traits::TrustFeedback, types::Address};
+use protocol::traits::TrustFeedback;
 use tentacle::{secio::PeerId, SessionId};
 
 use std::sync::Arc;

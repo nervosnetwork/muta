@@ -61,7 +61,7 @@ pub struct Proof {
 
 #[derive(RlpFixedCodec, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Validator {
-    pub address:        Address,
+    pub peer_id:        Bytes,
     pub propose_weight: u32,
     pub vote_weight:    u32,
 }

@@ -305,6 +305,7 @@ pub struct Metadata {
 #[derive(RlpFixedCodec, Serialize, Deserialize, Clone, PartialEq, Eq, Default)]
 pub struct ValidatorExtend {
     pub bls_pub_key:    Hex,
+    pub peer_id:        Bytes,
     pub address:        Address,
     pub propose_weight: u32,
     pub vote_weight:    u32,
@@ -321,9 +322,10 @@ impl fmt::Debug for ValidatorExtend {
 
         write!(
             f,
-            "bls public key {:?}, address {:?}, propose weight {}, vote weight {}",
+            "bls public key {:?}, address {:?}, preer ID {:?}, propose weight {}, vote weight {}",
             pk,
-            self.address.as_hex(),
+            self.address,
+            hex::encode(&self.peer_id),
             self.propose_weight,
             self.vote_weight
         )
