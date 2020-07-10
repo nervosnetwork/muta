@@ -70,6 +70,9 @@ pub enum ErrorKind {
 
     #[display(fmt = "kind: public key {:?} not match {:?}", pubkey, id)]
     PublicKeyNotMatchId { pubkey: PublicKey, id: PeerId },
+
+    #[display(fmt = "kind: untaggable {}", _0)]
+    Untaggable(String),
 }
 
 impl Error for ErrorKind {}

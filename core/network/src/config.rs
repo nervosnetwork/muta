@@ -8,7 +8,7 @@ use std::{
 };
 
 use log::error;
-use protocol::{types::Address, ProtocolResult};
+use protocol::ProtocolResult;
 use tentacle::{
     multiaddr::{multiaddr, Multiaddr, Protocol},
     secio::{PeerId, SecioKeyPair},
@@ -116,8 +116,8 @@ pub struct NetworkConfig {
 
     // peer manager
     pub bootstraps:             Vec<ArcPeer>,
-    pub whitelist:              Vec<Address>,
-    pub whitelist_peers_only:   bool,
+    pub allowlist:              Vec<PeerId>,
+    pub allowlist_only:         bool,
     pub enable_save_restore:    bool,
     pub peer_dat_file:          PathBuf,
     pub peer_trust_interval:    Duration,
@@ -162,8 +162,8 @@ impl NetworkConfig {
             write_timeout:    DEFAULT_WRITE_TIMEOUT,
 
             bootstraps:             Default::default(),
-            whitelist:              Default::default(),
-            whitelist_peers_only:   false,
+            allowlist:              Default::default(),
+            allowlist_only:         false,
             enable_save_restore:    false,
             peer_dat_file:          PathBuf::from(DEFAULT_PEER_DAT_FILE.to_owned()),
             peer_trust_interval:    DEFAULT_PEER_TRUST_INTERVAL_DURATION,
@@ -267,19 +267,19 @@ impl NetworkConfig {
         Ok(self)
     }
 
-    pub fn whitelist(mut self, chain_addr_strs: Vec<String>) -> ProtocolResult<Self> {
-        let chain_addrs = chain_addr_strs
-            .into_iter()
-            .map(|s| Address::from_hex(&s))
-            .collect::<ProtocolResult<Vec<_>>>()?;
+    pub fn allowlist(mut self, peer_id_strs: Vec<String>) -> ProtocolResult<Self> {
+        let peer_ids = peer_id_strs
+            .iter()
+            .map(PeerId::decode_str)
+            .collect::<Result<Vec<_>, _>>()?;
 
-        self.whitelist = chain_addrs;
+        self.allowlist = peer_ids;
         Ok(self)
     }
 
-    pub fn whitelist_peers_only(mut self, flag: Option<bool>) -> Self {
+    pub fn allowlist_only(mut self, flag: Option<bool>) -> Self {
         if let Some(flag) = flag {
-            self.whitelist_peers_only = flag;
+            self.allowlist_only = flag;
         }
         self
     }
@@ -426,17 +426,17 @@ impl From<&NetworkConfig> for PeerManagerConfig {
             TrustMetricConfig::new(config.peer_trust_interval, config.peer_trust_max_history);
 
         PeerManagerConfig {
-            our_id:                   config.secio_keypair.peer_id(),
-            pubkey:                   config.secio_keypair.public_key(),
-            bootstraps:               config.bootstraps.clone(),
-            whitelist_by_chain_addrs: config.whitelist.clone(),
-            whitelist_peers_only:     config.whitelist_peers_only,
-            peer_trust_config:        Arc::new(peer_trust_config),
-            peer_fatal_ban:           config.peer_fatal_ban,
-            peer_soft_ban:            config.peer_soft_ban,
-            max_connections:          config.max_connections,
-            routine_interval:         config.peer_manager_heart_beat_interval,
-            peer_dat_file:            config.peer_dat_file.clone(),
+            our_id:            config.secio_keypair.peer_id(),
+            pubkey:            config.secio_keypair.public_key(),
+            bootstraps:        config.bootstraps.clone(),
+            allowlist:         config.allowlist.clone(),
+            allowlist_only:    config.allowlist_only,
+            peer_trust_config: Arc::new(peer_trust_config),
+            peer_fatal_ban:    config.peer_fatal_ban,
+            peer_soft_ban:     config.peer_soft_ban,
+            max_connections:   config.max_connections,
+            routine_interval:  config.peer_manager_heart_beat_interval,
+            peer_dat_file:     config.peer_dat_file.clone(),
         }
     }
 }
