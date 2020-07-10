@@ -41,7 +41,7 @@ pipelineConfig:
                 args:
                   - create
                   - -f
-                  - devtools/kueb/deploy-chaos-crd-template.yml
+                  - devtools/kube/deploy-chaos-crd-template.yml
 
               - name: build-release
                 image: mutadev/muta-build-env:v0.3.0
