@@ -382,9 +382,9 @@
   resolved "https://registry.yarnpkg.com/@mutadev/defaults/-/defaults-0.2.0-dev.tgz#549e1504a12c4a9c7a4a6a76dcd6db79059a6805"
   integrity sha512-wZgPUmknBOq0po7TZZKtHREYLXJvjokUoPFcdcqO0loLE2mNoFUm5VSBtUBNLh3nt1hm/m14uliTFUhp3+M/Mw==
 
-"@mutadev/@mutadev/muta-sdk@0.2.0-dev+pr315.0":
+"@mutadev/muta-sdk@0.2.0-dev+pr315.0":
   version "0.2.0-dev"
-  resolved "https://registry.yarnpkg.com/@mutadev/@mutadev/muta-sdk/-/@mutadev/muta-sdk-0.2.0-dev.tgz#b2f57a3f8a61b96c01edc32de14001ee98a753e7"
+  resolved "https://registry.yarnpkg.com/@mutadev/muta-sdk/-/muta-sdk-0.2.0-dev.tgz#b2f57a3f8a61b96c01edc32de14001ee98a753e7"
   integrity sha512-+iQ0WO80VYlGg+sIvzwX4KDtvvsbhgedEMjVTq96iaY+AmfV/SEZiFT691cHP3MA7lRvjkKK0ZxnxGbcjsZr5w==
   dependencies:
     "@mutadev/account" "0.2.0-dev+pr315.0"
