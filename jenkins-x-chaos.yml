@@ -39,9 +39,7 @@ pipelineConfig:
                 image: bitnami/kubectl:1.14.3
                 command: kubectl
                 args:
-                  - create
-                  - -f
-                  - devtools/kube/deploy-chaos-crd-template.yml
+                  - envsubst < devtools/kube/deploy-chaos-crd-template.yml | kubectl create -f -
 
               - name: build-release
                 image: mutadev/muta-build-env:v0.3.0
