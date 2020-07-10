@@ -36,9 +36,11 @@ pipelineConfig:
 
             steps:
               - name: create-chaos-crd
+                image: bitnami/kubectl:1.14.3
                 command: kubectl
                 args:
-                  - version
+                  - get
+                  - pods
 
               - name: build-release
                 image: mutadev/muta-build-env:v0.3.0
