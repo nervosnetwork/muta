@@ -86,46 +86,44 @@ impl<
         &self,
         ctx: Context,
         height: Option<u64>,
-    ) -> ProtocolResult<Block> {
-        let block = match height {
-            Some(id) => self
-                .storage
-                .get_block(ctx.clone(), id)
-                .await?
-                .ok_or_else(|| APIError::NotFound)?,
-            None => self.storage.get_latest_block(ctx).await?,
-        };
-
-        Ok(block)
+    ) -> ProtocolResult<Option<Block>> {
+        match height {
+            Some(id) => self.storage.get_block(ctx.clone(), id).await,
+            None => Ok(Some(self.storage.get_latest_block(ctx).await?)),
+        }
     }
 
-    async fn get_receipt_by_tx_hash(&self, ctx: Context, tx_hash: Hash) -> ProtocolResult<Receipt> {
-        let receipt = self
+    async fn get_receipt_by_tx_hash(
+        &self,
+        ctx: Context,
+        tx_hash: Hash,
+    ) -> ProtocolResult<Option<Receipt>> {
+        let opt_receipt = self
             .storage
             .get_receipt_by_hash(ctx.clone(), tx_hash)
-            .await?
-            .ok_or_else(|| APIError::NotFound)?;
+            .await?;
+
         let exec_height = self.storage.get_latest_block(ctx).await?.header.exec_height;
-        let height = receipt.height;
-        if exec_height >= height {
-            return Ok(receipt);
+
+        match opt_receipt {
+            Some(receipt) => {
+                let height = receipt.height;
+                if exec_height >= height {
+                    Ok(Some(receipt))
+                } else {
+                    Ok(None)
+                }
+            }
+            None => Ok(None),
         }
-        Err(APIError::UnExecedError {
-            real:   exec_height,
-            expect: height,
-        }
-        .into())
     }
 
     async fn get_transaction_by_hash(
         &self,
         ctx: Context,
         tx_hash: Hash,
-    ) -> ProtocolResult<SignedTransaction> {
-        self.storage
-            .get_transaction_by_hash(ctx, tx_hash)
-            .await?
-            .ok_or_else(|| APIError::NotFound.into())
+    ) -> ProtocolResult<Option<SignedTransaction>> {
+        self.storage.get_transaction_by_hash(ctx, tx_hash).await
     }
 
     async fn query_service(
@@ -139,7 +137,10 @@ impl<
         method: String,
         payload: String,
     ) -> ProtocolResult<ServiceResponse<String>> {
-        let block = self.get_block_by_height(ctx.clone(), Some(height)).await?;
+        let block = self
+            .get_block_by_height(ctx.clone(), Some(height))
+            .await?
+            .ok_or_else(|| APIError::NotFound)?;
 
         let executor = EF::from_root(
             block.header.state_root.clone(),

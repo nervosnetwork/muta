@@ -3,7 +3,7 @@ import { createHttpLink } from "apollo-link-http";
 import { InMemoryCache } from "apollo-cache-inmemory";
 import ApolloClient from "apollo-client";
 import { readFileSync } from "fs";
-import { Muta } from "muta-sdk";
+import { Muta } from "@mutadev/muta-sdk";
 const toml = require("toml");
 
 export const CHAIN_ID =

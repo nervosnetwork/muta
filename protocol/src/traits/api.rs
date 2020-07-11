@@ -12,16 +12,23 @@ pub trait APIAdapter: Send + Sync {
         signed_tx: SignedTransaction,
     ) -> ProtocolResult<()>;
 
-    async fn get_block_by_height(&self, ctx: Context, height: Option<u64>)
-        -> ProtocolResult<Block>;
+    async fn get_block_by_height(
+        &self,
+        ctx: Context,
+        height: Option<u64>,
+    ) -> ProtocolResult<Option<Block>>;
 
-    async fn get_receipt_by_tx_hash(&self, ctx: Context, tx_hash: Hash) -> ProtocolResult<Receipt>;
+    async fn get_receipt_by_tx_hash(
+        &self,
+        ctx: Context,
+        tx_hash: Hash,
+    ) -> ProtocolResult<Option<Receipt>>;
 
     async fn get_transaction_by_hash(
         &self,
         ctx: Context,
         tx_hash: Hash,
-    ) -> ProtocolResult<SignedTransaction>;
+    ) -> ProtocolResult<Option<SignedTransaction>>;
 
     async fn query_service(
         &self,

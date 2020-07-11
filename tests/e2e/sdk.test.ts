@@ -1,17 +1,31 @@
-import { Account } from '@mutajs/account';
-import { AssetService } from '@mutajs/service'
-import { toHex } from '@mutajs/utils';
-import { retry } from '@mutajs/client';
-import * as sdk from 'muta-sdk';
+import { Account } from '@mutadev/account';
+import { AssetService } from '@mutadev/service'
+import { toHex } from '@mutadev/utils';
+import { retry } from '@mutadev/client';
+import * as sdk from '@mutadev/muta-sdk';
 import { mutaClient } from './utils';
 import { MultiSigService } from './multisig';
 
-describe("API test via muta-sdk-js", () => {
+describe("API test via @mutadev/muta-sdk-js", () => {
   test("getLatestBlock", async () => {
     let current_height = await mutaClient.getLatestBlockHeight();
-    // console.log(current_height);
     expect(current_height).toBeGreaterThan(0);
   });
+
+  test("getNoneBlock", async () => {
+    let block = await mutaClient.getBlock("0xffffffff");
+    expect(block).toBe(null);
+  })
+
+  test("getNoneTransaction", async () => {
+    let tx = await mutaClient.getTransaction("0xf56924db538e77bb5951eb5ff0d02b88983c49c45eea30e8ae3e7234b311436c");
+    expect(tx).toBe(null);
+  })
+
+  test("getNoneReceipt", async () => {
+    let receipt = await mutaClient.getReceipt("0xf56924db538e77bb5951eb5ff0d02b88983c49c45eea30e8ae3e7234b311436c");
+    expect(receipt).toBe(null);
+  })
 
   test("transfer work", async () => {
     const from_addr = "0xf8389d774afdad8755ef8e629e5a154fddc6325a";
@@ -22,13 +36,13 @@ describe("API test via muta-sdk-js", () => {
       "0xf56924db538e77bb5951eb5ff0d02b88983c49c45eea30e8ae3e7234b311436c";
 
     const account = sdk.Muta.accountFromPrivateKey(from_pk);
-    const assetService = new AssetService(mutaClient, account.address, account);
+    const assetService = new AssetService(mutaClient, account);
 
-    const from_balance_before = await assetService.get_balance({
+    const from_balance_before = await assetService.read.get_balance({
       user: from_addr,
       asset_id: asset_id
     })!;
-    const to_balance_before = await assetService.get_balance({
+    const to_balance_before = await assetService.read.get_balance({
       user: to_addr,
       asset_id: asset_id,
     })!;
@@ -36,18 +50,18 @@ describe("API test via muta-sdk-js", () => {
     // transfer
     expect(account.address).toBe(from_addr);
 
-    await assetService.transfer({
+    await assetService.write.transfer({
       asset_id: asset_id,
       to: to_addr,
       value: 0x01,
     })
 
     // check result
-    let from_balance_after = await assetService.get_balance({
+    let from_balance_after = await assetService.read.get_balance({
       user: from_addr,
       asset_id: asset_id,
     })!;
-    const to_balance_after = await assetService.get_balance({
+    const to_balance_after = await assetService.read.get_balance({
       user: to_addr,
       asset_id: asset_id,
     })!;
@@ -66,7 +80,7 @@ describe("API test via muta-sdk-js", () => {
       '0x2000000000000000000000000000000000000000000000000000000000000000',
     );
 
-    const multiSigService = new MultiSigService(mutaClient, wangYe.address, wangYe);
+    const multiSigService = new MultiSigService(mutaClient, wangYe);
 
     const GenerateMultiSigAccountPayload = {
       owner: wangYe.address,
@@ -74,7 +88,7 @@ describe("API test via muta-sdk-js", () => {
       threshold: 2,
       memo: 'welcome to BiYouCun'
     };
-    const generated = await multiSigService.generate_account(GenerateMultiSigAccountPayload);
+    const generated = await multiSigService.write.generate_account(GenerateMultiSigAccountPayload);
     expect(Number(generated.response.response.code)).toBe(0);
 
     const multiSigAddress = generated.response.response.succeedData.address;
@@ -97,15 +111,15 @@ describe("API test via muta-sdk-js", () => {
       expect(String(e)).toContain('CheckSig');
     }
 
-    const bothSignedCreateAssetTx = qing.signMultiSigTransaction(signedCreateAssetTx);
+    const bothSignedCreateAssetTx = qing.signTransaction(signedCreateAssetTx);
     const txHash = await mutaClient.sendTransaction(bothSignedCreateAssetTx);
     const receipt = await retry(() => mutaClient.getReceipt(toHex(txHash)));
     expect(Number(receipt.response.response.code)).toBe(0);
 
     // MultiSig address balance
-    const asset = JSON.parse(receipt.response.response.succeedData);
-    const assetService = new AssetService(mutaClient, wangYe.address, wangYe);
-    const balance = await assetService.get_balance({
+    const asset = JSON.parse(receipt.response.response.succeedData as string);
+    const assetService = new AssetService(mutaClient, wangYe);
+    const balance = await assetService.read.get_balance({
         asset_id: asset.id,
         user: multiSigAddress,
     });
