@@ -306,8 +306,13 @@ impl Inner {
         self.sessions.read().len()
     }
 
-    pub fn add_peer(&self, peer: ArcPeer) {
-        self.peers.write().insert(peer.clone());
+    /// If peer exists, return false
+    pub fn add_peer(&self, peer: ArcPeer) -> bool {
+        self.peers.write().insert(peer.clone())
+    }
+
+    pub fn peer_count(&self) -> usize {
+        self.peers.read().len()
     }
 
     pub fn peer(&self, peer_id: &PeerId) -> Option<ArcPeer> {
@@ -336,11 +341,6 @@ impl Inner {
         let qualified_peers = book.iter().filter(connectable).map(ArcPeer::to_owned);
 
         qualified_peers.choose_multiple(&mut rng, max)
-    }
-
-    #[allow(dead_code)]
-    pub fn remove_peer(&self, peer_id: &PeerId) -> Option<ArcPeer> {
-        self.peers.write().take(peer_id)
     }
 
     pub fn session(&self, sid: SessionId) -> Option<ArcSession> {
@@ -472,12 +472,12 @@ impl PeerManager {
         let heart_beat = HeartBeat::new(Arc::clone(&waker), config.routine_interval);
         let peer_dat_file = Box::new(NoPeerDatFile);
 
-        for peer_id in config.allowlist.iter() {
-            let peer = inner
-                .peer(peer_id)
-                .unwrap_or_else(|| ArcPeer::new(peer_id.to_owned()));
+        for peer_id in config.allowlist.iter().cloned() {
+            assert_eq!(inner.peer_count(), 0, "should be empty before bootstrapped");
 
+            let peer = ArcPeer::new(peer_id);
             peer.tags.insert(PeerTag::AlwaysAllow);
+
             inner.add_peer(peer);
         }
 

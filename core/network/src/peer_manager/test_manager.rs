@@ -674,7 +674,10 @@ async fn should_reject_banned_peer_on_new_session() {
     let inner = mgr.core_inner();
     inner.add_peer(test_peer.clone());
 
-    test_peer.tags.insert_ban(Duration::from_secs(10)).expect("insert ban tag");
+    test_peer
+        .tags
+        .insert_ban(Duration::from_secs(10))
+        .expect("insert ban tag");
     assert!(test_peer.banned(), "should be banned");
 
     let sess_ctx = SessionContext::make(
@@ -2164,7 +2167,9 @@ async fn should_accept_always_allow_peer_even_if_we_reach_max_connections_on_new
     );
     let new_session = PeerManagerEvent::NewSession {
         pid:    always_allow_peer.owned_id(),
-        pubkey: always_allow_peer.owned_pubkey().expect("always allow peer's pubkey"),
+        pubkey: always_allow_peer
+            .owned_pubkey()
+            .expect("always allow peer's pubkey"),
         ctx:    sess_ctx.arced(),
     };
     mgr.poll_event(new_session).await;
@@ -2209,9 +2214,14 @@ async fn should_only_connect_peers_in_allowlist_if_enable_allowlist_only() {
     let manager = PeerManager::new(config, mgr_rx, conn_tx);
 
     let inner = manager.inner();
-    inner.add_peer(test_peer.clone());
     inner.add_peer(another_peer);
-    assert!(test_peer.tags.contains(&PeerTag::AlwaysAllow));
+
+    let allowed_peer = inner
+        .peer(&test_peer.id)
+        .expect("should be inserted through config");
+    // Add multiaddrs to peer inserted by allowlist
+    allowed_peer.multiaddrs.insert(test_peer.multiaddrs.all());
+    assert!(allowed_peer.tags.contains(&PeerTag::AlwaysAllow));
 
     let mut manager = MockManager::new(manager, mgr_tx);
     manager.poll().await;
@@ -2267,9 +2277,12 @@ async fn should_only_accept_incoming_from_peer_in_allowlist_if_enable_allowlist_
     let manager = PeerManager::new(config, mgr_rx, conn_tx);
 
     let inner = manager.inner();
-    inner.add_peer(test_peer.clone());
     inner.add_peer(another_peer.clone());
-    assert!(test_peer.tags.contains(&PeerTag::AlwaysAllow));
+
+    let allowed_peer = inner
+        .peer(&test_peer.id)
+        .expect("should be inserted through config");
+    assert!(allowed_peer.tags.contains(&PeerTag::AlwaysAllow));
 
     let mut manager = MockManager::new(manager, mgr_tx);
     assert_eq!(inner.connected(), 0, "should have zero connections");
@@ -2303,11 +2316,15 @@ async fn should_only_accept_incoming_from_peer_in_allowlist_if_enable_allowlist_
             .pop()
             .expect("peer multiaddr"),
         SessionType::Inbound,
-        test_peer.owned_pubkey().expect("always allow peer's pubkey"),
+        test_peer
+            .owned_pubkey()
+            .expect("always allow peer's pubkey"),
     );
     let new_session = PeerManagerEvent::NewSession {
         pid:    test_peer.owned_id(),
-        pubkey: test_peer.owned_pubkey().expect("always allow peer's pubkey"),
+        pubkey: test_peer
+            .owned_pubkey()
+            .expect("always allow peer's pubkey"),
         ctx:    sess_ctx.arced(),
     };
     manager.poll_event(new_session).await;
