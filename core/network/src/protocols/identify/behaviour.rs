@@ -179,9 +179,9 @@ impl IdentifyCallback {
 
 /// Identify protocol
 pub struct IdentifyBehaviour {
-    pub(crate) callback:       IdentifyCallback,
-    pub(crate) remote_infos:   HashMap<SessionId, RemoteInfo>,
-    pub(crate) global_ip_only: bool,
+    pub(crate) callback:     IdentifyCallback,
+    pub(crate) remote_infos: HashMap<SessionId, RemoteInfo>,
+    global_ip_only:          bool,
 }
 
 impl IdentifyBehaviour {
@@ -200,12 +200,14 @@ impl IdentifyBehaviour {
         b"Identify message"
     }
 
+    pub fn global_ip_only(&self) -> bool {
+        self.global_ip_only
+    }
+
     /// Turning off global ip only mode will allow any ip to be broadcast,
     /// default is true
-    #[cfg(feature = "allow_global_ip")]
-    pub fn global_ip_only(mut self, global_ip_only: bool) -> Self {
+    pub fn set_global_ip_only(&mut self, global_ip_only: bool) {
         self.global_ip_only = global_ip_only;
-        self
     }
 
     pub fn process_listens(

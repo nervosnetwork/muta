@@ -22,12 +22,18 @@ pub struct Identify(IdentifyProtocol);
 
 impl Identify {
     pub fn new(peer_mgr: PeerManagerHandle, event_tx: UnboundedSender<PeerManagerEvent>) -> Self {
-        let behaviour = IdentifyBehaviour::new(peer_mgr, event_tx);
+        let mut behaviour = IdentifyBehaviour::new(peer_mgr, event_tx);
 
-        #[cfg(feature = "allow_global_ip")]
-        log::info!("network: allow global ip");
-        #[cfg(feature = "allow_global_ip")]
-        let behaviour = behaviour.global_ip_only(false);
+        #[cfg(not(feature = "global_ip_only"))]
+        {
+            log::info!("network: turn off global ip only");
+            behaviour.set_global_ip_only(false);
+        }
+        #[cfg(feature = "global_ip_only")]
+        {
+            log::info!("network: turn on global ip only");
+            behaviour.set_global_ip_only(true);
+        }
 
         Identify(IdentifyProtocol::new(behaviour))
     }
