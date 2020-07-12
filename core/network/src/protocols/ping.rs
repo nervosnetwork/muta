@@ -1,6 +1,7 @@
 mod behaviour;
 mod message;
 #[allow(dead_code)]
+#[allow(clippy::all)]
 mod message_mol;
 mod protocol;
 use self::protocol::PingProtocol;
