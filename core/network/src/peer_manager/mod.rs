@@ -1,7 +1,6 @@
 #![allow(clippy::mutable_key_type)]
 
 mod addr_set;
-mod disc;
 mod ident;
 mod peer;
 mod retry;
@@ -19,7 +18,6 @@ use retry::Retry;
 use save_restore::{NoPeerDatFile, PeerDatFile, SaveRestore};
 use tags::Tags;
 
-pub use disc::DiscoveryAddrManager;
 pub use ident::IdentifyCallback;
 pub use peer::{ArcPeer, Connectedness};
 pub use shared::{SharedSessions, SharedSessionsConfig};

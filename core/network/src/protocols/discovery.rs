@@ -1,32 +1,47 @@
-use std::time::Duration;
+mod addr;
+mod behaviour;
+mod message;
+#[allow(dead_code)]
+mod message_mol; // Auto generated code
+mod protocol;
+mod substream;
 
+use self::protocol::DiscoveryProtocol;
+use addr::AddressManager;
+use behaviour::DiscoveryBehaviour;
+
+use crate::{event::PeerManagerEvent, peer_manager::PeerManagerHandle};
+
+use futures::channel::mpsc::UnboundedSender;
 use tentacle::{
     builder::MetaBuilder,
     service::{ProtocolHandle, ProtocolMeta},
     ProtocolId,
 };
-use tentacle_discovery::AddressManager;
+
+use std::time::Duration;
 
 pub const NAME: &str = "chain_discovery";
 pub const SUPPORT_VERSIONS: [&str; 1] = ["0.1"];
 
-pub struct Discovery<M> {
-    inner: tentacle_discovery::DiscoveryProtocol<M>,
-}
+pub struct Discovery(DiscoveryProtocol);
 
-impl<M: AddressManager + Send + 'static + Unpin> Discovery<M> {
-    pub fn new(addr_mgr: M, sync_interval: Duration) -> Self {
-        let inner_discovery = tentacle_discovery::Discovery::new(addr_mgr, Some(sync_interval));
+impl Discovery {
+    pub fn new(
+        peer_mgr: PeerManagerHandle,
+        event_tx: UnboundedSender<PeerManagerEvent>,
+        sync_interval: Duration,
+    ) -> Self {
+        let address_manager = AddressManager::new(peer_mgr, event_tx);
+        let behaviour = DiscoveryBehaviour::new(address_manager, Some(sync_interval));
 
         #[cfg(feature = "allow_global_ip")]
         log::info!("network: allow global ip");
 
         #[cfg(feature = "allow_global_ip")]
-        let inner_discovery = inner_discovery.global_ip_only(false);
+        let behaviour = behaviour.global_ip_only(false);
 
-        let inner = tentacle_discovery::DiscoveryProtocol::new(inner_discovery);
-
-        Discovery { inner }
+        Discovery(DiscoveryProtocol::new(behaviour))
     }
 
     pub fn build_meta(self, protocol_id: ProtocolId) -> ProtocolMeta {
@@ -34,7 +49,7 @@ impl<M: AddressManager + Send + 'static + Unpin> Discovery<M> {
             .id(protocol_id)
             .name(name!(NAME))
             .support_versions(support_versions!(SUPPORT_VERSIONS))
-            .service_handle(move || ProtocolHandle::Callback(Box::new(self.inner)))
+            .service_handle(move || ProtocolHandle::Callback(Box::new(self.0)))
             .build()
     }
 }
