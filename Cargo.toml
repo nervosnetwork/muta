@@ -34,6 +34,7 @@ hex = "0.4"
 rlp = "0.4"
 toml = "0.5"
 tokio = { version = "0.2", features = ["macros", "rt-core", "rt-util", "signal", "time"] }
+tentacle-secio = { version = "0.1", features = [ "flatc" ] }
 muta-apm = "0.1.0-alpha.7"
 futures-timer="3.0"
 

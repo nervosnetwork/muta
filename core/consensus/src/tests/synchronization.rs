@@ -514,7 +514,7 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
             .map(|node| (node.address.clone(), node.vote_weight))
             .collect::<HashMap<_, _>>();
 
-        self.verity_proof_weight(ctx.clone(), block.header.height, weight_map, signed_voters)?;
+        self.verify_proof_weight(ctx.clone(), block.header.height, weight_map, signed_voters)?;
 
         Ok(())
     }
@@ -540,7 +540,7 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
             })
     }
 
-    fn verity_proof_weight(
+    fn verify_proof_weight(
         &self,
         _ctx: Context,
         block_height: u64,
@@ -554,7 +554,7 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
             if weight_map.contains_key(signed_voter_address) {
                 let weight = weight_map.get(signed_voter_address).ok_or({
                     log::error!(
-                        "[consensus] verity_proof_weight, signed_voter_address: {:?}",
+                        "[consensus] verify_proof_weight, signed_voter_address: {:?}",
                         hex::encode(signed_voter_address)
                     );
                     ConsensusError::VerifyProof(block_height, WeightNotFound)
@@ -562,7 +562,7 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
                 accumulator += u64::from(*(weight));
             } else {
                 log::error!(
-                    "[consensus] verity_proof_weight,signed_voter_address: {:?}",
+                    "[consensus] verify_proof_weight,signed_voter_address: {:?}",
                     hex::encode(signed_voter_address)
                 );
                 return Err(
@@ -573,7 +573,7 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
 
         if 3 * accumulator <= 2 * total_validator_weight {
             log::error!(
-                "[consensus] verity_proof_weight, accumulator: {}, total: {}",
+                "[consensus] verify_proof_weight, accumulator: {}, total: {}",
                 accumulator,
                 total_validator_weight
             );

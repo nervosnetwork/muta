@@ -689,7 +689,7 @@ where
             .iter()
             .map(|node| (node.address.clone(), node.vote_weight))
             .collect::<HashMap<overlord::types::Address, u32>>();
-        self.verity_proof_weight(
+        self.verify_proof_weight(
             ctx.clone(),
             block.header.height,
             weight_map,
@@ -751,7 +751,7 @@ where
     }
 
     #[muta_apm::derive::tracing_span(kind = "consensus.adapter")]
-    fn verity_proof_weight(
+    fn verify_proof_weight(
         &self,
         ctx: Context,
         block_height: u64,
@@ -768,7 +768,7 @@ where
                     .ok_or(ConsensusError::VerifyProof(block_height, WeightNotFound))
                     .map_err(|e| {
                         log::error!(
-                            "[consensus] verity_proof_weight,signed_voter_address: {:?}",
+                            "[consensus] verify_proof_weight,signed_voter_address: {:?}",
                             signed_voter_address
                         );
                         e
@@ -776,7 +776,7 @@ where
                 accumulator += u64::from(*(weight));
             } else {
                 log::error!(
-                    "[consensus] verity_proof_weight, weight not found, signed_voter_address: {:?}",
+                    "[consensus] verify_proof_weight, weight not found, signed_voter_address: {:?}",
                     signed_voter_address
                 );
                 return Err(
@@ -787,7 +787,7 @@ where
 
         if 3 * accumulator <= 2 * total_validator_weight {
             log::error!(
-                "[consensus] verity_proof_weight, accumulator: {}, total: {}",
+                "[consensus] verify_proof_weight, accumulator: {}, total: {}",
                 accumulator,
                 total_validator_weight
             );

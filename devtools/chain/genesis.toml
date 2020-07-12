@@ -18,15 +18,16 @@ name = "metadata"
 payload = '''
 {
     "chain_id": "0xb6a4d7da21443f5e816e8700eea87610e6d769657d6b8ec73028457bf2ca4036",
-    "common_ref": "0x703873635a6b51513451",
+    "common_ref": "0x6853675068394a6a7450",
     "timeout_gap": 20,
     "cycles_limit": 1000000,
     "cycles_price": 1,
     "interval": 3000,
     "verifier_list": [
         {
-            "bls_pub_key": "0x04188ef9488c19458a963cc57b567adde7db8f8b6bec392d5cb7b67b0abc1ed6cd966edc451f6ac2ef38079460eb965e890d1f576e4039a20467820237cda753f07a8b8febae1ec052190973a1bcf00690ea8fc0168b3fbbccd1c4e402eda5ef22",
-            "address": "0xf8389d774afdad8755ef8e629e5a154fddc6325a",
+            "bls_pub_key": "0x040c3393c426ddbc2ed817ad2069c3d0dbf7257a295d55983246eec21f927095e003a8214ca33f5555a2b2f3a5a6c85eac19b657e6742720ef7de10945f84bbefdb48a6f3ca9ef891c13f7eaede2a96462e79e2949d9e86bf9a831da67e1a568e0",
+            "address": "0x2963cb2595fce9ea9f2ae22bcf9bb06cb500f821",
+            "peer_id": "0x1220a8fa41c212812f49b01b96b9cc9f00c21593ab843eae1417548d6725c134f080",
             "propose_weight": 1,
             "vote_weight": 1
         }

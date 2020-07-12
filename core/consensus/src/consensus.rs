@@ -120,7 +120,7 @@ impl<Adapter: ConsensusAdapter + 'static> OverlordConsensus<Adapter> {
         ));
 
         let overlord = Overlord::new(
-            node_info.self_address.as_bytes(),
+            node_info.self_peer_id.clone(),
             Arc::clone(&engine),
             crypto,
             engine,
