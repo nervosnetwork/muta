@@ -1,19 +1,19 @@
-use std::time::Duration;
+use crate::{
+    event::PeerManagerEvent,
+    message::RawSessionMessage,
+    peer_manager::PeerManagerHandle,
+    protocols::{discovery::Discovery, identify::Identify, ping::Ping, transmitter::Transmitter},
+    traits::NetworkProtocol,
+};
 
 use futures::channel::mpsc::UnboundedSender;
 use tentacle::{
     service::{ProtocolMeta, TargetProtocol},
     ProtocolId,
 };
-use tentacle_discovery::AddressManager;
 use tentacle_identify::Callback;
 
-use crate::{
-    event::PeerManagerEvent,
-    message::RawSessionMessage,
-    protocols::{discovery::Discovery, identify::Identify, ping::Ping, transmitter::Transmitter},
-    traits::NetworkProtocol,
-};
+use std::time::Duration;
 
 pub const PING_PROTOCOL_ID: usize = 1;
 pub const IDENTIFY_PROTOCOL_ID: usize = 2;
@@ -21,10 +21,10 @@ pub const DISCOVERY_PROTOCOL_ID: usize = 3;
 pub const TRANSMITTER_PROTOCOL_ID: usize = 4;
 
 #[derive(Default)]
-pub struct CoreProtocolBuilder<M, C> {
+pub struct CoreProtocolBuilder<C> {
     ping:        Option<Ping>,
     identify:    Option<Identify<C>>,
-    discovery:   Option<Discovery<M>>,
+    discovery:   Option<Discovery>,
     transmitter: Option<Transmitter>,
 }
 
@@ -33,9 +33,8 @@ pub struct CoreProtocol {
 }
 
 impl CoreProtocol {
-    pub fn build<M, C>() -> CoreProtocolBuilder<M, C>
+    pub fn build<C>() -> CoreProtocolBuilder<C>
     where
-        M: AddressManager + Send + 'static + Unpin,
         C: Callback + Send + 'static + Unpin,
     {
         CoreProtocolBuilder::new()
@@ -61,9 +60,8 @@ impl NetworkProtocol for CoreProtocol {
     }
 }
 
-impl<M, C> CoreProtocolBuilder<M, C>
+impl<C> CoreProtocolBuilder<C>
 where
-    M: AddressManager + Send + 'static + Unpin,
     C: Callback + Send + 'static + Unpin,
 {
     pub fn new() -> Self {
@@ -94,8 +92,13 @@ where
         self
     }
 
-    pub fn discovery(mut self, addr_mgr: M, sync_interval: Duration) -> Self {
-        let discovery = Discovery::new(addr_mgr, sync_interval);
+    pub fn discovery(
+        mut self,
+        peer_mgr: PeerManagerHandle,
+        event_tx: UnboundedSender<PeerManagerEvent>,
+        sync_interval: Duration,
+    ) -> Self {
+        let discovery = Discovery::new(peer_mgr, event_tx, sync_interval);
 
         self.discovery = Some(discovery);
         self
