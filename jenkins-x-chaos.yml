@@ -55,7 +55,7 @@ pipelineConfig:
                 command: /kaniko/executor
                 args:
                   - --dockerfile=/workspace/source/devtools/docker-build/Dockerfile
-                  - --destination=mutadev/${REPO_NAME}:${VERSION}
+                  - --destination=mutadev/${REPO_NAME}:${BRANCH_NAME}
                   - --context=/workspace/source
 
               - name: create-chaos-crd
@@ -63,18 +63,18 @@ pipelineConfig:
                 command: helm
                 args:
                   - install
-                  - chaos-${REPO_NAME}-${VERSION}
+                  - chaos-${REPO_NAME}-${BRANCH_NAME}
                   - charts/deploy-chaos
                   - --namespace
                   - mutadev
                   - --set
-                  - size=8,repo_name=${REPO_NAME},version=${VERSION},resources.cpu=1100m,resources.memory=8Gi
+                  - size=8,repo_name=${REPO_NAME},BRANCH_NAME=${BRANCH_NAME},resources.cpu=1100m,resources.memory=8Gi
               - name: delete-chaos-crd
                 image: alpine/helm:3.2.4
                 command: helm
                 args:
                   - uninstall
-                  - chaos-${REPO_NAME}-${VERSION}
+                  - chaos-${REPO_NAME}-${BRANCH_NAME}
                   - --namespace
                   - mutadev
 
