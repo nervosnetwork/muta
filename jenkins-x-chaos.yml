@@ -35,14 +35,6 @@ pipelineConfig:
                         path: config.json
 
             steps:
-              - name: create-chaos-crd
-                # image: bitnami/kubectl:1.14.3
-                image: alpine/helm:3.2.4
-                command: helm
-                args:
-                  # - envsubst < devtools/kube/deploy-chaos-crd-template.yml | kubectl create -f -
-                  - help
-
               - name: build-release
                 image: mutadev/muta-build-env:v0.3.0
                 env:
@@ -58,7 +50,6 @@ pipelineConfig:
                   - --release
                   - --example 
                   - muta-chain
-
               - name: push-image
                 image: gcr.io/kaniko-project/executor:9912ccbf8d22bbafbf971124600fbb0b13b9cbd6
                 command: /kaniko/executor
@@ -66,3 +57,24 @@ pipelineConfig:
                   - --dockerfile=/workspace/source/devtools/docker-build/Dockerfile
                   - --destination=mutadev/${REPO_NAME}:${VERSION}
                   - --context=/workspace/source
+
+              - name: create-chaos-crd
+                image: alpine/helm:3.2.4
+                command: helm
+                args:
+                  - install
+                  - chaos-${REPO_NAME}-${VERSION}
+                  - charts/deploy-chaos
+                  - --namespace
+                  - mutadev
+                  - --set
+                  - size=8,repo_name=${REPO_NAME},version=${VERSION},resources.cpu=1100m,resources.memory=8Gi
+              - name: delete-chaos-crd
+                image: alpine/helm:3.2.4
+                command: helm
+                args:
+                  - uninstall
+                  - chaos-${REPO_NAME}-${VERSION}
+                  - --namespace
+                  - mutadev
+

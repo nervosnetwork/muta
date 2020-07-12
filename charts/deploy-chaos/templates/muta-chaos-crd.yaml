@@ -1,23 +1,25 @@
 apiVersion: nervos.org/v1alpha1
 kind: Muta
 metadata:
-  name: chaos-${REPO_NAME}-${VERSION}
-  namespace: mutadev # Only supports deployment to the mutadev namespace
+  name: chaos-{{ .Values.repo_name }}-{{ .Values.version }}
+  namespace: {{ .Values.namespace }} # Only supports deployment to the mutadev namespace
 spec:
-  image: mutadev/muta:latest # docker image
+  image: mutadev/{{ .Values.repo_name }}:{{ .Values.version }} # docker image
   resources:
     limits:
-      cpu: 1100m
-      memory: 3Gi
-      ephemeral-storage: 5Gi
+      cpu: {{ .Values.resources.cpu }}
+      memory: {{ .Values.resources.memory }}
+      ephemeral-storage: {{ .Values.resources.storage }}
     requests:
-      cpu: 1100m
-      memory: 3Gi
-      ephemeral-storage: 5Gi
-  chaos: # all / stable-network-corrupt / stable-network-delay / stable-network-duplicate / stable-network-loss / stable-network-partition / stable-node-failure / stable-node-kill
-    - all
+      cpu: {{ .Values.resources.cpu }}
+      memory: {{ .Values.resources.memory }}
+      ephemeral-storage: {{ .Values.resources.storage }}
+  chaos:  # all / stable-network-corrupt / stable-network-delay / stable-network-duplicate / stable-network-loss / stable-network-partition / stable-node-failure / stable-node-kill
+  {{- range .Values.chaos }}
+    - {{ . }}
+  {{- end }}
   size: {{ .Values.size }} # Node numbers
-  persistent: false # Persistent data
+  persistent: {{ .Values.resources.persistent }} # Persistent data
   config: # see https://github.com/nervosnetwork/muta/blob/master/devtools/chain/config.toml
     data_path: "/app/data"
     graphql:
@@ -28,11 +30,11 @@ spec:
       maxconn: 25000
     network:
       listening_address: "0.0.0.0:1337"
-      rpc_timeout: 10
+      rpc_timeout: {{ .Values.chain_config.network.rpc_timeout }}
     mempool:
-      pool_size: 20000
-      broadcast_txs_size: 200
-      broadcast_txs_interval: 200
+      pool_size: {{ .Values.chain_config.mempool.pool_size }}
+      broadcast_txs_size: {{ .Values.chain_config.mempool.broadcast_txs_size }}
+      broadcast_txs_interval: {{ .Values.chain_config.mempool.broadcast_txs_interval }}
     executor:
       light: false
     logger:
@@ -46,19 +48,21 @@ spec:
         # "overlord::state::process": "debug"
         # "core_consensus": "error"
   genesis: # https://github.com/nervosnetwork/muta/blob/master/devtools/chain/genesis.toml
-    prevhash: "0x44915be5b6c20b0678cf05fcddbbaa832e25d7e6ac538784cd5c24de00d47472"
+    prevhash: {{ .Values.chain_genesis.prevhash }}
     metadata:
-      chain_id: "0xb6a4d7da21443f5e816e8700eea87610e6d769657d6b8ec73028457bf2ca4036"
-      timeout_gap: 20
-      cycles_limit: 99999999
-      cycles_price: 1
-      interval: 3000
-      propose_ratio: 15
-      prevote_ratio: 15
-      precommit_ratio: 10
-      brake_ratio: 3
-      tx_num_limit: 20000
-      max_tx_size: 1073741824
+      chain_id: {{ .Values.chain_genesis.metadata.chain_id }}
+      timeout_gap: {{ .Values.chain_genesis.metadata.timeout_gap }}
+      cycles_limit: {{ .Values.chain_genesis.metadata.cycles_limit }}
+      cycles_price: {{ .Values.chain_genesis.metadata.cycles_price }}
+      interval: {{ .Values.chain_genesis.metadata.interval }}
+      propose_ratio: {{ .Values.chain_genesis.metadata.propose_ratio }}
+      prevote_ratio: {{ .Values.chain_genesis.metadata.prevote_ratio }}
+      precommit_ratio: {{ .Values.chain_genesis.metadata.precommit_ratio }}
+      brake_ratio: {{ .Values.chain_genesis.metadata.brake_ratio }}
+      tx_num_limit: {{ .Values.chain_genesis.metadata.tx_num_limit }}
+      max_tx_size: {{ .Values.chain_genesis.metadata.max_tx_size }}
     services:
-      - name: asset
-        payload: '{ "id": "0xf56924db538e77bb5951eb5ff0d02b88983c49c45eea30e8ae3e7234b311436c", "name": "MutaToken", "symbol": "MT", "supply": 320000011, "issuer": "0xf8389d774afdad8755ef8e629e5a154fddc6325a" }'
+    {{- range $service := .Values.chain_genesis.services }}
+      - name: {{ $service.name }}
+        payload: {{ $service.payload | toJson | quote }}
+    {{- end }}

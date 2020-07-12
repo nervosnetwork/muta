@@ -2,67 +2,45 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
-replicaCount: 1
+namespace: mutadev
 
-image:
-  repository: nginx
-  pullPolicy: IfNotPresent
+repo_name: muta
+version: latest
 
-imagePullSecrets: []
-nameOverride: ""
-fullnameOverride: ""
+resources:
+  cpu: 1100m
+  memory: 3Gi
+  storage: 5Gi
+  persistent: false
 
-serviceAccount:
-  # Specifies whether a service account should be created
-  create: true
-  # Annotations to add to the service account
-  annotations: {}
-  # The name of the service account to use.
-  # If not set and create is true, a name is generated using the fullname template
-  name:
+chaos: 
+  - all
 
-podSecurityContext: {}
-  # fsGroup: 2000
+size: 4
 
-securityContext: {}
-  # capabilities:
-  #   drop:
-  #   - ALL
-  # readOnlyRootFilesystem: true
-  # runAsNonRoot: true
-  # runAsUser: 1000
+chain_config:
+  network:
+    rpc_timeout: 10
+  mempool:
+    pool_size: 30000
+    broadcast_txs_size: 200
+    broadcast_txs_interval: 200
 
-service:
-  type: ClusterIP
-  port: 80
+chain_genesis:
+  prevhash: 0x44915be5b6c20b0678cf05fcddbbaa832e25d7e6ac538784cd5c24de00d47472
+  metadata:
+    chain_id: 0xb6a4d7da21443f5e816e8700eea87610e6d769657d6b8ec73028457bf2ca4036
+    timeout_gap: 20
+    cycles_limit: 99999999
+    cycles_price: 1
+    interval: 3000
+    propose_ratio: 15
+    prevote_ratio: 15
+    precommit_ratio: 10
+    brake_ratio: 3
+    tx_num_limit: 20000
+    max_tx_size: 1073741824
+  services:
+    - name: asset
+      payload: { "id": "0xf56924db538e77bb5951eb5ff0d02b88983c49c45eea30e8ae3e7234b311436c", "name": "MutaToken", "symbol": "MT", "supply": 320000011, "issuer": "0xf8389d774afdad8755ef8e629e5a154fddc6325a" }
 
-ingress:
-  enabled: false
-  annotations: {}
-    # kubernetes.io/ingress.class: nginx
-    # kubernetes.io/tls-acme: "true"
-  hosts:
-    - host: chart-example.local
-      paths: []
-  tls: []
-  #  - secretName: chart-example-tls
-  #    hosts:
-  #      - chart-example.local
-
-resources: {}
-  # We usually recommend not to specify default resources and to leave this as a conscious
-  # choice for the user. This also increases chances charts run on environments with little
-  # resources, such as Minikube. If you do want to specify resources, uncomment the following
-  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
-  # limits:
-  #   cpu: 100m
-  #   memory: 128Mi
-  # requests:
-  #   cpu: 100m
-  #   memory: 128Mi
-
-nodeSelector: {}
-
-tolerations: []
-
-affinity: {}
