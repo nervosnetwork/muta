@@ -33,13 +33,18 @@ impl Discovery {
         sync_interval: Duration,
     ) -> Self {
         let address_manager = AddressManager::new(peer_mgr, event_tx);
-        let behaviour = DiscoveryBehaviour::new(address_manager, Some(sync_interval));
+        let mut behaviour = DiscoveryBehaviour::new(address_manager, Some(sync_interval));
 
-        #[cfg(feature = "allow_global_ip")]
-        log::info!("network: allow global ip");
-
-        #[cfg(feature = "allow_global_ip")]
-        let behaviour = behaviour.global_ip_only(false);
+        #[cfg(not(feature = "global_ip_only"))]
+        {
+            log::info!("network: turn off global ip only");
+            behaviour.set_global_ip_only(false);
+        }
+        #[cfg(feature = "global_ip_only")]
+        {
+            log::info!("network: turn on global ip only");
+            behaviour.set_global_ip_only(true);
+        }
 
         Discovery(DiscoveryProtocol::new(behaviour))
     }

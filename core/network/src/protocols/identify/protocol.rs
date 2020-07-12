@@ -67,7 +67,7 @@ impl ServiceProtocol for IdentifyProtocol {
             .filter(|addr| {
                 multiaddr_to_socketaddr(addr)
                     .map(|socket_addr| {
-                        !self.behaviour.global_ip_only || is_reachable(socket_addr.ip())
+                        !self.behaviour.global_ip_only() || is_reachable(socket_addr.ip())
                     })
                     .unwrap_or(false)
             })

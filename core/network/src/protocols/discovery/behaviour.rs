@@ -80,10 +80,8 @@ impl DiscoveryBehaviour {
 
     /// Turning off global ip only mode will allow any ip to be broadcast,
     /// default is true
-    #[cfg(feature = "allow_global_ip")]
-    pub fn global_ip_only(mut self, global_ip_only: bool) -> Self {
+    pub fn set_global_ip_only(&mut self, global_ip_only: bool) {
         self.global_ip_only = global_ip_only;
-        self
     }
 
     pub fn handle(&self) -> DiscoveryBehaviourHandle {

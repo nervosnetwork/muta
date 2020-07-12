@@ -39,10 +39,10 @@ quickcheck_macros = "0.8"
 tokio = { version = "0.2", features = ["macros", "rt-core"]}
 
 [features]
-allow_global_ip = []
+default = ["global_ip_only"]
+global_ip_only = []
 diagnostic = []
 
 [[test]]
 name = "broadcast"
 path = "tests/gossip_test.rs"
-required-features = [ "allow_global_ip" ]
