@@ -50,8 +50,6 @@ pub struct DiscoveryBehaviour {
     dynamic_query_cycle: Option<Duration>,
 
     check_interval: Option<Interval>,
-
-    global_ip_only: bool,
 }
 
 #[derive(Clone)]
@@ -74,14 +72,7 @@ impl DiscoveryBehaviour {
             substream_receiver,
             dead_keys: HashSet::default(),
             dynamic_query_cycle: query_cycle,
-            global_ip_only: true,
         }
-    }
-
-    /// Turning off global ip only mode will allow any ip to be broadcast,
-    /// default is true
-    pub fn set_global_ip_only(&mut self, global_ip_only: bool) {
-        self.global_ip_only = global_ip_only;
     }
 
     pub fn handle(&self) -> DiscoveryBehaviourHandle {
@@ -139,16 +130,20 @@ impl DiscoveryBehaviour {
     }
 
     fn poll_substreams(&mut self, cx: &mut Context, announce_multiaddrs: &mut Vec<Multiaddr>) {
-        let announce_fn =
-            |announce_multiaddrs: &mut Vec<Multiaddr>, global_ip_only: bool, addr: &Multiaddr| {
-                if !global_ip_only
-                    || multiaddr_to_socketaddr(addr)
-                        .map(|addr| is_reachable(addr.ip()))
-                        .unwrap_or_default()
-                {
-                    announce_multiaddrs.push(addr.clone());
-                }
-            };
+        #[cfg(feature = "global_ip_only")]
+        let global_ip_only = true;
+        #[cfg(not(feature = "global_ip_only"))]
+        let global_ip_only = false;
+
+        let announce_fn = |announce_multiaddrs: &mut Vec<Multiaddr>, addr: &Multiaddr| {
+            if !global_ip_only
+                || multiaddr_to_socketaddr(addr)
+                    .map(|addr| is_reachable(addr.ip()))
+                    .unwrap_or_default()
+            {
+                announce_multiaddrs.push(addr.clone());
+            }
+        };
         for (key, value) in self.substreams.iter_mut() {
             value.check_timer();
 
@@ -181,7 +176,7 @@ impl DiscoveryBehaviour {
 
             if value.announce {
                 if let RemoteAddress::Listen(ref addr) = value.remote_addr {
-                    announce_fn(announce_multiaddrs, self.global_ip_only, addr)
+                    announce_fn(announce_multiaddrs, addr)
                 }
                 value.announce = false;
                 value.last_announce = Some(Instant::now());
