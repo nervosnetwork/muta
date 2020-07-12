@@ -2,7 +2,8 @@ mod behaviour;
 mod common;
 mod message;
 #[allow(dead_code)]
-mod message_mol;
+#[allow(clippy::all)]
+mod message_mol; // Auto generated code
 mod protocol;
 use self::protocol::IdentifyProtocol;
 use behaviour::IdentifyBehaviour;
