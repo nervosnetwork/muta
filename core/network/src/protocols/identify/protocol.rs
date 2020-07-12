@@ -18,16 +18,12 @@ const CHECK_TIMEOUT_INTERVAL: u64 = 1;
 const CHECK_TIMEOUT_TOKEN: u64 = 100;
 
 pub struct IdentifyProtocol {
-    secio_enabled: bool,
-    behaviour:     IdentifyBehaviour,
+    behaviour: IdentifyBehaviour,
 }
 
 impl IdentifyProtocol {
     pub fn new(behaviour: IdentifyBehaviour) -> Self {
-        IdentifyProtocol {
-            secio_enabled: true,
-            behaviour,
-        }
+        IdentifyProtocol { behaviour }
     }
 }
 
@@ -51,7 +47,6 @@ impl ServiceProtocol for IdentifyProtocol {
         if session.remote_pubkey.is_none() {
             error!("IdentifyProtocol require secio enabled!");
             let _ = context.disconnect(session.id);
-            self.secio_enabled = false;
             return;
         }
 
@@ -90,21 +85,15 @@ impl ServiceProtocol for IdentifyProtocol {
     }
 
     fn disconnected(&mut self, context: ProtocolContextMutRef) {
-        if self.secio_enabled {
-            let info = self
-                .behaviour
-                .remote_infos
-                .remove(&context.session.id)
-                .expect("RemoteInfo must exists");
-            trace!("IdentifyProtocol disconnected from {:?}", info.peer_id);
-        }
+        let info = self
+            .behaviour
+            .remote_infos
+            .remove(&context.session.id)
+            .expect("RemoteInfo must exists");
+        trace!("IdentifyProtocol disconnected from {:?}", info.peer_id);
     }
 
     fn received(&mut self, mut context: ProtocolContextMutRef, data: bytes::Bytes) {
-        if !self.secio_enabled {
-            return;
-        }
-
         let session = context.session;
 
         match IdentifyMessage::decode(&data) {
@@ -150,10 +139,6 @@ impl ServiceProtocol for IdentifyProtocol {
     }
 
     fn notify(&mut self, context: &mut ProtocolContext, _token: u64) {
-        if !self.secio_enabled {
-            return;
-        }
-
         let now = Instant::now();
         for (session_id, info) in &self.behaviour.remote_infos {
             if (info.listen_addrs.is_none() || info.observed_addr.is_none())
