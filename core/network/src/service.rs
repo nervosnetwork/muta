@@ -36,7 +36,7 @@ use crate::{
     message::RawSessionMessage,
     metrics::Metrics,
     outbound::{NetworkGossip, NetworkRpc},
-    peer_manager::{IdentifyCallback, PeerManager, PeerManagerConfig, SharedSessions},
+    peer_manager::{PeerManager, PeerManagerConfig, SharedSessions},
     protocols::CoreProtocol,
     reactor::{MessageRouter, Reactor},
     rpc_map::RpcMap,
@@ -200,10 +200,9 @@ impl NetworkService {
 
         // Build service protocol
         let disc_sync_interval = config.discovery_sync_interval;
-        let ident_callback = IdentifyCallback::new(peer_mgr_handle.clone(), mgr_tx.clone());
         let proto = CoreProtocol::build()
             .ping(config.ping_interval, config.ping_timeout, mgr_tx.clone())
-            .identify(ident_callback)
+            .identify(peer_mgr_handle.clone(), mgr_tx.clone())
             .discovery(peer_mgr_handle, mgr_tx.clone(), disc_sync_interval)
             .transmitter(raw_msg_tx.clone())
             .build();

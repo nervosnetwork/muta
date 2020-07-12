@@ -11,7 +11,6 @@ use tentacle::{
     service::{ProtocolMeta, TargetProtocol},
     ProtocolId,
 };
-use tentacle_identify::Callback;
 
 use std::time::Duration;
 
@@ -21,9 +20,9 @@ pub const DISCOVERY_PROTOCOL_ID: usize = 3;
 pub const TRANSMITTER_PROTOCOL_ID: usize = 4;
 
 #[derive(Default)]
-pub struct CoreProtocolBuilder<C> {
+pub struct CoreProtocolBuilder {
     ping:        Option<Ping>,
-    identify:    Option<Identify<C>>,
+    identify:    Option<Identify>,
     discovery:   Option<Discovery>,
     transmitter: Option<Transmitter>,
 }
@@ -33,10 +32,7 @@ pub struct CoreProtocol {
 }
 
 impl CoreProtocol {
-    pub fn build<C>() -> CoreProtocolBuilder<C>
-    where
-        C: Callback + Send + 'static + Unpin,
-    {
+    pub fn build() -> CoreProtocolBuilder {
         CoreProtocolBuilder::new()
     }
 }
@@ -60,10 +56,7 @@ impl NetworkProtocol for CoreProtocol {
     }
 }
 
-impl<C> CoreProtocolBuilder<C>
-where
-    C: Callback + Send + 'static + Unpin,
-{
+impl CoreProtocolBuilder {
     pub fn new() -> Self {
         CoreProtocolBuilder {
             ping:        None,
@@ -85,8 +78,12 @@ where
         self
     }
 
-    pub fn identify(mut self, callback: C) -> Self {
-        let identify = Identify::new(callback);
+    pub fn identify(
+        mut self,
+        peer_mgr: PeerManagerHandle,
+        event_tx: UnboundedSender<PeerManagerEvent>,
+    ) -> Self {
+        let identify = Identify::new(peer_mgr, event_tx);
 
         self.identify = Some(identify);
         self
