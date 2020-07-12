@@ -1,4 +1,5 @@
 mod behaviour;
+mod common;
 mod message;
 #[allow(dead_code)]
 mod message_mol;
@@ -22,19 +23,12 @@ pub struct Identify(IdentifyProtocol);
 
 impl Identify {
     pub fn new(peer_mgr: PeerManagerHandle, event_tx: UnboundedSender<PeerManagerEvent>) -> Self {
-        let mut behaviour = IdentifyBehaviour::new(peer_mgr, event_tx);
-
-        #[cfg(not(feature = "global_ip_only"))]
-        {
-            log::info!("network: turn off global ip only");
-            behaviour.set_global_ip_only(false);
-        }
         #[cfg(feature = "global_ip_only")]
-        {
-            log::info!("network: turn on global ip only");
-            behaviour.set_global_ip_only(true);
-        }
+        log::info!("turn on global ip only");
+        #[cfg(not(feature = "global_ip_only"))]
+        log::info!("turn off global ip only");
 
+        let behaviour = IdentifyBehaviour::new(peer_mgr, event_tx);
         Identify(IdentifyProtocol::new(behaviour))
     }
 
