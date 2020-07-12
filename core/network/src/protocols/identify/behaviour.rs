@@ -1,3 +1,4 @@
+use super::common::reachable;
 use crate::{event::PeerManagerEvent, peer_manager::PeerManagerHandle};
 
 use futures::channel::mpsc::UnboundedSender;
@@ -7,12 +8,9 @@ use tentacle::{
     multiaddr::Multiaddr,
     secio::PeerId,
     service::SessionType,
-    utils::{is_reachable, multiaddr_to_socketaddr},
-    SessionId,
 };
 
 use std::{
-    collections::HashMap,
     sync::atomic::{AtomicBool, Ordering},
     sync::Arc,
     time::{Duration, Instant},
@@ -61,12 +59,7 @@ pub struct RemoteInfo {
 }
 
 impl RemoteInfo {
-    pub fn new(session: SessionContext, timeout: Duration) -> RemoteInfo {
-        let peer_id = session
-            .remote_pubkey
-            .as_ref()
-            .map(|key| PeerId::from_public_key(&key))
-            .expect("secio must enabled!");
+    pub fn new(peer_id: PeerId, session: SessionContext, timeout: Duration) -> RemoteInfo {
         RemoteInfo {
             peer_id,
             session,
@@ -106,14 +99,69 @@ impl AddrReporter {
     }
 }
 
-pub struct IdentifyCallback {
-    peer_mgr: PeerManagerHandle,
-    reporter: AddrReporter,
+/// Identify protocol
+pub struct IdentifyBehaviour {
+    peer_mgr:      PeerManagerHandle,
+    addr_reporter: AddrReporter,
 }
 
-impl IdentifyCallback {
-    fn new(peer_mgr: PeerManagerHandle, reporter: AddrReporter) -> Self {
-        IdentifyCallback { peer_mgr, reporter }
+impl IdentifyBehaviour {
+    pub fn new(peer_mgr: PeerManagerHandle, event_tx: UnboundedSender<PeerManagerEvent>) -> Self {
+        let addr_reporter = AddrReporter::new(event_tx);
+
+        IdentifyBehaviour {
+            peer_mgr,
+            addr_reporter,
+        }
+    }
+
+    pub fn identify(&mut self) -> &[u8] {
+        b"Identify message"
+    }
+
+    pub fn process_listens(
+        &mut self,
+        info: &mut RemoteInfo,
+        listens: Vec<Multiaddr>,
+    ) -> MisbehaveResult {
+        if info.listen_addrs.is_some() {
+            debug!("remote({:?}) repeat send observed address", info.peer_id);
+            self.misbehave(&info.peer_id, Misbehavior::DuplicateListenAddrs)
+        } else if listens.len() > MAX_ADDRS {
+            self.misbehave(&info.peer_id, Misbehavior::TooManyAddresses(listens.len()))
+        } else {
+            trace!("received listen addresses: {:?}", listens);
+            let reachable_addrs = listens.into_iter().filter(reachable).collect::<Vec<_>>();
+
+            info.listen_addrs = Some(reachable_addrs.clone());
+            self.add_remote_listen_addrs(&info.peer_id, reachable_addrs);
+
+            MisbehaveResult::Continue
+        }
+    }
+
+    pub fn process_observed(
+        &mut self,
+        info: &mut RemoteInfo,
+        observed: Multiaddr,
+    ) -> MisbehaveResult {
+        if info.observed_addr.is_some() {
+            debug!("remote({:?}) repeat send listen addresses", info.peer_id);
+            self.misbehave(&info.peer_id, Misbehavior::DuplicateObservedAddr)
+        } else {
+            trace!("received observed address: {}", observed);
+            let mut unobservable = |info: &mut RemoteInfo, observed| -> bool {
+                self.add_observed_addr(&info.peer_id, observed, info.session.ty)
+                    .is_disconnect()
+            };
+
+            if reachable(&observed) && unobservable(info, observed.clone()) {
+                return MisbehaveResult::Disconnect;
+            }
+
+            info.observed_addr = Some(observed);
+            MisbehaveResult::Continue
+        }
     }
 
     pub fn received_identify(
@@ -124,20 +172,18 @@ impl IdentifyCallback {
         MisbehaveResult::Continue
     }
 
-    pub fn local_listen_addrs(&mut self) -> Vec<Multiaddr> {
+    pub fn local_listen_addrs(&self) -> Vec<Multiaddr> {
         self.peer_mgr.listen_addrs()
     }
 
-    pub fn add_remote_listen_addrs(&mut self, peer: &PeerId, addrs: Vec<Multiaddr>) {
-        debug!(
-            "network: add remote listen address {:?} addrs {:?}",
-            peer, addrs
-        );
+    pub fn add_remote_listen_addrs(&mut self, peer_id: &PeerId, addrs: Vec<Multiaddr>) {
+        debug!("add remote listen {:?} addrs {:?}", peer_id, addrs);
 
-        let pid = peer.clone();
-        let identified_addrs = PeerManagerEvent::IdentifiedAddrs { pid, addrs };
-
-        self.reporter.report(identified_addrs);
+        let identified_addrs = PeerManagerEvent::IdentifiedAddrs {
+            pid: peer_id.to_owned(),
+            addrs,
+        };
+        self.addr_reporter.report(identified_addrs);
     }
 
     pub fn add_observed_addr(
@@ -146,10 +192,7 @@ impl IdentifyCallback {
         addr: Multiaddr,
         ty: SessionType,
     ) -> MisbehaveResult {
-        debug!(
-            "network: add observed addr: {:?}, addr {:?}, ty: {:?}",
-            peer, addr, ty
-        );
+        debug!("add observed: {:?}, addr {:?}, ty: {:?}", peer, addr, ty);
 
         // Noop right now
         MisbehaveResult::Continue
@@ -159,125 +202,18 @@ impl IdentifyCallback {
     pub fn misbehave(&mut self, peer: &PeerId, kind: Misbehavior) -> MisbehaveResult {
         match kind {
             Misbehavior::DuplicateListenAddrs => {
-                debug!("network: peer {:?} misbehave: duplicatelisten addrs", peer)
+                debug!("peer {:?} misbehave: duplicatelisten addrs", peer)
             }
-            Misbehavior::DuplicateObservedAddr => debug!(
-                "network: peer {:?} misbehave: duplicate observed addr",
-                peer
-            ),
-            Misbehavior::TooManyAddresses(size) => debug!(
-                "network: peer {:?} misbehave: too many address {}",
-                peer, size
-            ),
-            Misbehavior::InvalidData => debug!("network: peer {:?} misbehave: invalid data", peer),
-            Misbehavior::Timeout => debug!("network: peer {:?} misbehave: timeout", peer),
+            Misbehavior::DuplicateObservedAddr => {
+                debug!("peer {:?} misbehave: duplicate observed addr", peer)
+            }
+            Misbehavior::TooManyAddresses(size) => {
+                debug!("peer {:?} misbehave: too many address {}", peer, size)
+            }
+            Misbehavior::InvalidData => debug!("peer {:?} misbehave: invalid data", peer),
+            Misbehavior::Timeout => debug!("peer {:?} misbehave: timeout", peer),
         }
 
         MisbehaveResult::Disconnect
-    }
-}
-
-/// Identify protocol
-pub struct IdentifyBehaviour {
-    pub(crate) callback:     IdentifyCallback,
-    pub(crate) remote_infos: HashMap<SessionId, RemoteInfo>,
-    global_ip_only:          bool,
-}
-
-impl IdentifyBehaviour {
-    pub fn new(peer_mgr: PeerManagerHandle, event_tx: UnboundedSender<PeerManagerEvent>) -> Self {
-        let reporter = AddrReporter::new(event_tx);
-        let callback = IdentifyCallback::new(peer_mgr, reporter);
-
-        IdentifyBehaviour {
-            callback,
-            remote_infos: HashMap::default(),
-            global_ip_only: true,
-        }
-    }
-
-    pub fn identify(&mut self) -> &[u8] {
-        b"Identify message"
-    }
-
-    pub fn global_ip_only(&self) -> bool {
-        self.global_ip_only
-    }
-
-    /// Turning off global ip only mode will allow any ip to be broadcast,
-    /// default is true
-    pub fn set_global_ip_only(&mut self, global_ip_only: bool) {
-        self.global_ip_only = global_ip_only;
-    }
-
-    pub fn process_listens(
-        &mut self,
-        context: &mut ProtocolContextMutRef,
-        listens: Vec<Multiaddr>,
-    ) -> MisbehaveResult {
-        let session = context.session;
-        let info = self
-            .remote_infos
-            .get_mut(&session.id)
-            .expect("RemoteInfo must exists");
-
-        if info.listen_addrs.is_some() {
-            debug!("remote({:?}) repeat send observed address", info.peer_id);
-            self.callback
-                .misbehave(&info.peer_id, Misbehavior::DuplicateListenAddrs)
-        } else if listens.len() > MAX_ADDRS {
-            self.callback
-                .misbehave(&info.peer_id, Misbehavior::TooManyAddresses(listens.len()))
-        } else {
-            trace!("received listen addresses: {:?}", listens);
-            let global_ip_only = self.global_ip_only;
-            let reachable_addrs = listens
-                .into_iter()
-                .filter(|addr| {
-                    multiaddr_to_socketaddr(addr)
-                        .map(|socket_addr| !global_ip_only || is_reachable(socket_addr.ip()))
-                        .unwrap_or(false)
-                })
-                .collect::<Vec<_>>();
-            self.callback
-                .add_remote_listen_addrs(&info.peer_id, reachable_addrs.clone());
-            info.listen_addrs = Some(reachable_addrs);
-            MisbehaveResult::Continue
-        }
-    }
-
-    pub fn process_observed(
-        &mut self,
-        context: &mut ProtocolContextMutRef,
-        observed: Multiaddr,
-    ) -> MisbehaveResult {
-        let session = context.session;
-        let mut info = self
-            .remote_infos
-            .get_mut(&session.id)
-            .expect("RemoteInfo must exists");
-
-        if info.observed_addr.is_some() {
-            debug!("remote({:?}) repeat send listen addresses", info.peer_id);
-            self.callback
-                .misbehave(&info.peer_id, Misbehavior::DuplicateObservedAddr)
-        } else {
-            trace!("received observed address: {}", observed);
-
-            let global_ip_only = self.global_ip_only;
-            if multiaddr_to_socketaddr(&observed)
-                .map(|socket_addr| socket_addr.ip())
-                .filter(|ip_addr| !global_ip_only || is_reachable(*ip_addr))
-                .is_some()
-                && self
-                    .callback
-                    .add_observed_addr(&info.peer_id, observed.clone(), info.session.ty)
-                    .is_disconnect()
-            {
-                return MisbehaveResult::Disconnect;
-            }
-            info.observed_addr = Some(observed);
-            MisbehaveResult::Continue
-        }
     }
 }

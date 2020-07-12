@@ -1,5 +1,6 @@
 use super::{
     behaviour::{IdentifyBehaviour, Misbehavior, RemoteInfo, MAX_ADDRS},
+    common::reachable,
     message::IdentifyMessage,
 };
 
@@ -8,66 +9,64 @@ use tentacle::{
     context::{ProtocolContext, ProtocolContextMutRef},
     multiaddr::{Multiaddr, Protocol},
     traits::ServiceProtocol,
-    utils::{is_reachable, multiaddr_to_socketaddr},
+    SessionId,
 };
 
-use std::time::{Duration, Instant};
+use std::{
+    collections::HashMap,
+    time::{Duration, Instant},
+};
 
-const DEFAULT_TIMEOUT: u64 = 8;
-const CHECK_TIMEOUT_INTERVAL: u64 = 1;
+const DEFAULT_TIMEOUT: Duration = Duration::from_secs(8);
+const CHECK_TIMEOUT_INTERVAL: Duration = Duration::from_secs(1);
 const CHECK_TIMEOUT_TOKEN: u64 = 100;
 
 pub struct IdentifyProtocol {
-    behaviour: IdentifyBehaviour,
+    remote_infos: HashMap<SessionId, RemoteInfo>,
+    behaviour:    IdentifyBehaviour,
 }
 
 impl IdentifyProtocol {
     pub fn new(behaviour: IdentifyBehaviour) -> Self {
-        IdentifyProtocol { behaviour }
+        IdentifyProtocol {
+            remote_infos: HashMap::new(),
+            behaviour,
+        }
     }
 }
 
 impl ServiceProtocol for IdentifyProtocol {
     fn init(&mut self, context: &mut ProtocolContext) {
         let proto_id = context.proto_id;
-        if context
-            .set_service_notify(
-                proto_id,
-                Duration::from_secs(CHECK_TIMEOUT_INTERVAL),
-                CHECK_TIMEOUT_TOKEN,
-            )
-            .is_err()
+
+        if let Err(e) =
+            context.set_service_notify(proto_id, CHECK_TIMEOUT_INTERVAL, CHECK_TIMEOUT_TOKEN)
         {
-            warn!("identify start fail")
+            warn!("identify start fail {}", e);
         }
     }
 
     fn connected(&mut self, context: ProtocolContextMutRef, _version: &str) {
         let session = context.session;
-        if session.remote_pubkey.is_none() {
-            error!("IdentifyProtocol require secio enabled!");
-            let _ = context.disconnect(session.id);
-            return;
-        }
+        let remote_peer_id = match &session.remote_pubkey {
+            Some(pubkey) => pubkey.peer_id(),
+            None => {
+                error!("IdentifyProtocol require secio enabled!");
+                let _ = context.disconnect(session.id);
+                return;
+            }
+        };
 
-        let remote_info = RemoteInfo::new(session.clone(), Duration::from_secs(DEFAULT_TIMEOUT));
-        trace!("IdentifyProtocol sconnected from {:?}", remote_info.peer_id);
-        self.behaviour.remote_infos.insert(session.id, remote_info);
+        trace!("IdentifyProtocol connected from {:?}", remote_peer_id);
+        let remote_info = RemoteInfo::new(remote_peer_id, session.clone(), DEFAULT_TIMEOUT);
+        self.remote_infos.insert(session.id, remote_info);
 
         let listen_addrs: Vec<Multiaddr> = self
             .behaviour
-            .callback
             .local_listen_addrs()
-            .iter()
-            .filter(|addr| {
-                multiaddr_to_socketaddr(addr)
-                    .map(|socket_addr| {
-                        !self.behaviour.global_ip_only() || is_reachable(socket_addr.ip())
-                    })
-                    .unwrap_or(false)
-            })
+            .into_iter()
+            .filter(reachable)
             .take(MAX_ADDRS)
-            .cloned()
             .collect();
 
         let observed_addr = session
@@ -86,7 +85,6 @@ impl ServiceProtocol for IdentifyProtocol {
 
     fn disconnected(&mut self, context: ProtocolContextMutRef) {
         let info = self
-            .behaviour
             .remote_infos
             .remove(&context.session.id)
             .expect("RemoteInfo must exists");
@@ -98,19 +96,21 @@ impl ServiceProtocol for IdentifyProtocol {
 
         match IdentifyMessage::decode(&data) {
             Some(message) => {
+                let mut remote_info = self
+                    .remote_infos
+                    .get_mut(&context.session.id)
+                    .expect("RemoteInfo must exists");
+                let behaviour = &mut self.behaviour;
+
                 // Need to interrupt processing, avoid pollution
-                if self
-                    .behaviour
-                    .callback
+                if behaviour
                     .received_identify(&mut context, message.identify)
                     .is_disconnect()
-                    || self
-                        .behaviour
-                        .process_listens(&mut context, message.listen_addrs)
+                    || behaviour
+                        .process_listens(&mut remote_info, message.listen_addrs)
                         .is_disconnect()
-                    || self
-                        .behaviour
-                        .process_observed(&mut context, message.observed_addr)
+                    || behaviour
+                        .process_observed(&mut remote_info, message.observed_addr)
                         .is_disconnect()
                 {
                     let _ = context.disconnect(session.id);
@@ -118,7 +118,6 @@ impl ServiceProtocol for IdentifyProtocol {
             }
             None => {
                 let info = self
-                    .behaviour
                     .remote_infos
                     .get(&session.id)
                     .expect("RemoteInfo must exists");
@@ -128,7 +127,6 @@ impl ServiceProtocol for IdentifyProtocol {
                 );
                 if self
                     .behaviour
-                    .callback
                     .misbehave(&info.peer_id, Misbehavior::InvalidData)
                     .is_disconnect()
                 {
@@ -140,14 +138,14 @@ impl ServiceProtocol for IdentifyProtocol {
 
     fn notify(&mut self, context: &mut ProtocolContext, _token: u64) {
         let now = Instant::now();
-        for (session_id, info) in &self.behaviour.remote_infos {
+
+        for (session_id, info) in &self.remote_infos {
             if (info.listen_addrs.is_none() || info.observed_addr.is_none())
                 && (info.connected_at + info.timeout) <= now
             {
                 debug!("{:?} receive identify message timeout", info.peer_id);
                 if self
                     .behaviour
-                    .callback
                     .misbehave(&info.peer_id, Misbehavior::Timeout)
                     .is_disconnect()
                 {
