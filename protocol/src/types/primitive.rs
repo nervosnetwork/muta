@@ -325,7 +325,7 @@ impl fmt::Debug for ValidatorExtend {
             "bls public key {:?}, address {:?}, preer ID {:?}, propose weight {}, vote weight {}",
             pk,
             self.address,
-            hex::encode(&self.peer_id),
+            bs58::encode(&self.peer_id).into_string(),
             self.propose_weight,
             self.vote_weight
         )
