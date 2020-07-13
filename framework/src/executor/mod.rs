@@ -1,3 +1,4 @@
+mod error;
 mod factory;
 #[cfg(test)]
 mod tests;
@@ -14,7 +15,6 @@ use std::{
 };
 
 use cita_trie::DB as TrieDB;
-use derive_more::Display;
 
 use common_apm::muta_apm;
 use protocol::traits::{
@@ -25,20 +25,33 @@ use protocol::types::{
     Address, Hash, MerkleRoot, Receipt, ReceiptResponse, ServiceContext, ServiceContextParams,
     ServiceParam, SignedTransaction, TransactionRequest,
 };
-use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
+use protocol::{ProtocolError, ProtocolResult};
 
 use crate::binding::sdk::{DefaultChainQuerier, DefaultServiceSDK};
 use crate::binding::state::{GeneralServiceState, MPTTrie};
+use crate::executor::error::ExecutorError;
 
 const SERVICE_NOT_FOUND_CODE: u64 = 62077;
 
 trait TxHooks {
-    fn before(&mut self, _: Context, _: ServiceContext) -> ProtocolResult<()> {
-        Ok(())
+    fn before(
+        &mut self,
+        _: Context,
+        _: ServiceContext,
+    ) -> ProtocolResult<Vec<ServiceResponse<String>>> {
+        Ok(vec![ServiceResponse::from_succeed(
+            "default_implement".to_owned(),
+        )])
     }
 
-    fn after(&mut self, _: Context, _: ServiceContext) -> ProtocolResult<()> {
-        Ok(())
+    fn after(
+        &mut self,
+        _: Context,
+        _: ServiceContext,
+    ) -> ProtocolResult<Vec<ServiceResponse<String>>> {
+        Ok(vec![ServiceResponse::from_succeed(
+            "default_implement".to_owned(),
+        )])
     }
 }
 
@@ -109,50 +122,58 @@ impl<DB: TrieDB> CommitHooks<DB> {
     }
 
     // bagua kan 101 :)
-    fn kan<H: FnOnce() -> R, R>(
-        context: ServiceContext,
+    fn kan<H: FnOnce() -> ServiceResponse<String>>(
+        _context: ServiceContext,
         states: Rc<ServiceStateMap<DB>>,
         hook: H,
-    ) -> ProtocolResult<()> {
+    ) -> ProtocolResult<ServiceResponse<String>> {
         match panic::catch_unwind(AssertUnwindSafe(hook)) {
-            Ok(_) if !context.canceled() => states.stash(),
-            Ok(_) => {
+            Ok(res) => {
                 states.stash()?;
 
-                // An reason must be passed to cancel
-                let reason = context.cancel_reason();
-                debug_assert!(reason.is_some());
-
-                Err(ExecutorError::Canceled {
-                    service: context.get_service_name().to_owned(),
-                    reason,
-                }
-                .into())
+                Ok(res)
             }
-            Err(_) => states.revert_cache(),
+            Err(e) => {
+                states.revert_cache()?;
+                // something really bad happens, chain maybe fork, must halt
+                Err(ProtocolError::from(ExecutorError::TxHook(e)))
+            }
         }
     }
 }
 
 impl<DB: TrieDB> TxHooks for CommitHooks<DB> {
-    fn before(&mut self, _context: Context, service_context: ServiceContext) -> ProtocolResult<()> {
+    fn before(
+        &mut self,
+        _context: Context,
+        service_context: ServiceContext,
+    ) -> ProtocolResult<Vec<ServiceResponse<String>>> {
+        let mut ret: Vec<ServiceResponse<String>> = Vec::new();
         for hook in self.inner.iter_mut() {
-            Self::kan(service_context.clone(), Rc::clone(&self.states), || {
+            let resp = Self::kan(service_context.clone(), Rc::clone(&self.states), || {
                 hook.tx_hook_before_(service_context.clone())
             })?;
+            ret.push(resp);
         }
 
-        Ok(())
+        Ok(ret)
     }
 
-    fn after(&mut self, _context: Context, service_context: ServiceContext) -> ProtocolResult<()> {
+    fn after(
+        &mut self,
+        _context: Context,
+        service_context: ServiceContext,
+    ) -> ProtocolResult<Vec<ServiceResponse<String>>> {
+        let mut ret: Vec<ServiceResponse<String>> = Vec::new();
+
         for hook in self.inner.iter_mut() {
-            Self::kan(service_context.clone(), Rc::clone(&self.states), || {
+            let resp = Self::kan(service_context.clone(), Rc::clone(&self.states), || {
                 hook.tx_hook_after_(service_context.clone())
             })?;
+            ret.push(resp);
         }
 
-        Ok(())
+        Ok(ret)
     }
 }
 
@@ -379,7 +400,14 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
     ) -> ProtocolResult<ServiceResponse<String>> {
         let mut tx_hooks = self.get_tx_hooks(exec_type);
 
-        tx_hooks.before(context.clone(), service_context.clone())?;
+        let resp = tx_hooks.before(context.clone(), service_context.clone())?;
+        self.states.stash()?;
+
+        if resp.iter().filter(|r| r.is_error()).count() > 0 {
+            tx_hooks.after(context, service_context)?;
+            self.states.stash()?;
+            return Ok(ServiceResponse::from_error(65535, "skip_tx_run".to_owned()));
+        };
 
         let ret = match panic::catch_unwind(AssertUnwindSafe(|| {
             self.call(service_context.clone(), exec_type)
@@ -391,13 +419,17 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
             Err(e) => {
                 self.revert_cache()?;
                 log::error!("inner chain error occurred when calling service: {:?}", e);
-                Err(ExecutorError::CallService(format!("{:?}", e)).into())
+                Err(ProtocolError::from(ExecutorError::CallService(format!(
+                    "{:?}",
+                    e
+                ))))
             }
-        };
+        }?;
 
         tx_hooks.after(context, service_context)?;
+        self.states.stash()?;
 
-        ret
+        Ok(ret)
     }
 
     fn call(&self, context: ServiceContext, exec_type: ExecType) -> ServiceResponse<String> {
@@ -514,36 +546,5 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
 
     fn write(&self, context: ServiceContext) -> ServiceResponse<String> {
         self.call(context, ExecType::Write)
-    }
-}
-
-#[derive(Debug, Display)]
-pub enum ExecutorError {
-    #[display(fmt = "service {:?} was not found", service)]
-    NotFoundService { service: String },
-    #[display(fmt = "service {:?} method {:?} was not found", service, method)]
-    NotFoundMethod { service: String, method: String },
-    #[display(fmt = "Parsing payload to json failed {:?}", _0)]
-    JsonParse(serde_json::Error),
-
-    #[display(fmt = "Init service genesis failed: {:?}", _0)]
-    InitService(String),
-    #[display(fmt = "Query service failed: {:?}", _0)]
-    QueryService(String),
-    #[display(fmt = "Call service failed: {:?}", _0)]
-    CallService(String),
-
-    #[display(fmt = "service {} canceled {:?}", service, reason)]
-    Canceled {
-        service: String,
-        reason:  Option<String>,
-    },
-}
-
-impl std::error::Error for ExecutorError {}
-
-impl From<ExecutorError> for ProtocolError {
-    fn from(err: ExecutorError) -> ProtocolError {
-        ProtocolError::new(ProtocolErrorKind::Executor, Box::new(err))
     }
 }
