@@ -454,12 +454,12 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
     /// Only signed vote will be transmit to the relayer.
     #[muta_apm::derive::tracing_span(
         kind = "consensus.engine",
-        logs = "{'address': 'Address::from_bytes(addr.clone()).unwrap().as_hex()'}"
+        logs = "{'peer_id': 'hex::encode(peer_id.clone())'}"
     )]
     async fn transmit_to_relayer(
         &self,
         ctx: Context,
-        addr: Bytes,
+        peer_id: Bytes,
         msg: OverlordMsg<FixedPill>,
     ) -> Result<(), Box<dyn Error + Send>> {
         match msg {
@@ -470,7 +470,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
                         ctx,
                         msg,
                         END_GOSSIP_SIGNED_VOTE,
-                        MessageTarget::Specified(addr),
+                        MessageTarget::Specified(peer_id),
                     )
                     .await?;
             }
@@ -481,7 +481,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
                         ctx,
                         msg,
                         END_GOSSIP_AGGREGATED_VOTE,
-                        MessageTarget::Specified(addr),
+                        MessageTarget::Specified(peer_id),
                     )
                     .await?;
             }
