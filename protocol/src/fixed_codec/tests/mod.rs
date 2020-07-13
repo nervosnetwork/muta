@@ -100,7 +100,7 @@ pub fn mock_sign_tx() -> SignedTransaction {
 
 pub fn mock_validator() -> Validator {
     Validator {
-        peer_id:        get_random_bytes(16),
+        pub_key:        get_random_bytes(32),
         propose_weight: 1,
         vote_weight:    1,
     }

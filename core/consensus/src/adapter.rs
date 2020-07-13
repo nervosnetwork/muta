@@ -550,9 +550,9 @@ where
             .verifier_list
             .iter()
             .map(|v| {
-                let address = v.peer_id.decode();
+                let address = v.pub_key.decode();
                 let node = Node {
-                    address:        v.peer_id.decode(),
+                    address:        v.pub_key.decode(),
                     propose_weight: v.propose_weight,
                     vote_weight:    v.vote_weight,
                 };
@@ -578,10 +578,10 @@ where
 
         // check validators
         for validator in block.header.validators.iter() {
-            if !authority_map.contains_key(&validator.peer_id) {
+            if !authority_map.contains_key(&validator.pub_key) {
                 log::error!(
-                    "[consensus] verify_block_header, validator.address: {:?}, authority_map: {:?}",
-                    validator.peer_id,
+                    "[consensus] verify_block_header, validator.pub_key: {:?}, authority_map: {:?}",
+                    validator.pub_key,
                     authority_map
                 );
                 return Err(ConsensusError::VerifyBlockHeader(
@@ -590,14 +590,14 @@ where
                 )
                 .into());
             } else {
-                let node = authority_map.get(&validator.peer_id).unwrap();
+                let node = authority_map.get(&validator.pub_key).unwrap();
 
                 if node.vote_weight != validator.vote_weight
                     || node.propose_weight != validator.vote_weight
                 {
                     log::error!(
-                        "[consensus] verify_block_header, validator.address: {:?}, authority_map: {:?}",
-                        validator.peer_id,
+                        "[consensus] verify_block_header, validator.pub_key: {:?}, authority_map: {:?}",
+                        validator.pub_key,
                         authority_map
                     );
                     return Err(ConsensusError::VerifyBlockHeader(
@@ -667,7 +667,7 @@ where
             .verifier_list
             .iter()
             .map(|v| Node {
-                address:        v.peer_id.decode(),
+                address:        v.pub_key.decode(),
                 propose_weight: v.propose_weight,
                 vote_weight:    v.vote_weight,
             })
@@ -701,7 +701,7 @@ where
             .verifier_list
             .iter()
             .filter_map(|v| {
-                if signed_voters.contains(&v.peer_id.decode()) {
+                if signed_voters.contains(&v.pub_key.decode()) {
                     Some(v.bls_pub_key.clone())
                 } else {
                     None

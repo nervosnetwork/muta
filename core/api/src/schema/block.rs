@@ -67,7 +67,7 @@ pub struct Proof {
 #[derive(juniper::GraphQLObject, Clone)]
 #[graphql(description = "Validator address set")]
 pub struct Validator {
-    pub peer_id:        Bytes,
+    pub pub_key:        Bytes,
     pub propose_weight: i32,
     pub vote_weight:    i32,
 }
@@ -142,7 +142,7 @@ impl From<protocol::types::Proof> for Proof {
 impl From<protocol::types::Validator> for Validator {
     fn from(validator: protocol::types::Validator) -> Self {
         Validator {
-            peer_id:        Bytes::from(validator.peer_id),
+            pub_key:        Bytes::from(validator.pub_key),
             propose_weight: validator.vote_weight as i32,
             vote_weight:    validator.vote_weight as i32,
         }

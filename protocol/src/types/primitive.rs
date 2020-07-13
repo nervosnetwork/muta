@@ -310,7 +310,7 @@ pub struct Metadata {
 #[derive(RlpFixedCodec, Serialize, Deserialize, Clone, PartialEq, Eq, Default)]
 pub struct ValidatorExtend {
     pub bls_pub_key:    Hex,
-    pub peer_id:        Hex,
+    pub pub_key:        Hex,
     pub address:        Address,
     pub propose_weight: u32,
     pub vote_weight:    u32,
@@ -324,12 +324,11 @@ impl fmt::Debug for ValidatorExtend {
         } else {
             bls_pub_key.as_str()
         };
-        let peer_id = bs58::encode(&self.peer_id.decode()).into_string();
 
         write!(
             f,
-            "bls public key {:?}, address {:?}, preer ID {}, propose weight {}, vote weight {}",
-            pk, self.address, peer_id, self.propose_weight, self.vote_weight
+            "bls public key {:?}, public key {:?}, address {:?} propose weight {}, vote weight {}",
+            pk, self.pub_key, self.address, self.propose_weight, self.vote_weight
         )
     }
 }
@@ -396,9 +395,9 @@ mod tests {
     #[test]
     fn test_validator_extend() {
         let extend = ValidatorExtend {
-            bls_pub_key: Hex::from_string("0x04195bf31d7de5e98d4a4b4d6f248bdc4fe203a2f771e2fc0264b912214ef5d9e4316f6aedd89de0e0052c744ff29c94280ab51f1baa9c7784f9e29284b47b4d51144344dcae4bc819353352d21d138bc59e97916a3991343379695681e8fcb1c1".to_owned()).unwrap(),
-            peer_id:     Hex::from_string("0x1220c7b1dc28da9eeecc7b825f39d0c1e79f87a5cf8a44d888c9f1f1b1ad6be0c79b".to_owned()).unwrap(),
-            address: Address::from_hex("0x85f6162ac2c2223ce784155f304fe685372fa795").unwrap(),
+            bls_pub_key: Hex::from_string("0x0401139331589f32220ec5f41f6faa0f5c3f4d36af011ab014cefd9d8f36b53b04a2031f681d1c9648a2a5d534d742931b0a5a4132da9ee752c1144d6396bed6cfc635c9687258cec9b60b387d35cf9e13f29091e11ae88024d74ca904c0ea3fb3".to_owned()).unwrap(),
+            pub_key:     Hex::from_string("0x026c184a9016f6f71a234c86b141621f38b68c78602ab06768db4d83682c616004".to_owned()).unwrap(),
+            address:     Address::from_hex("0x76961e339fe2f1f931d84c425754806fb4174c34").unwrap(),
             propose_weight: 1,
             vote_weight:    1,
         };

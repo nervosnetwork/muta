@@ -352,9 +352,9 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
             .verifier_list
             .iter()
             .map(|v| {
-                let address = v.peer_id.decode();
+                let address = v.pub_key.decode();
                 let node = Node {
-                    address:        v.peer_id.decode(),
+                    address:        v.pub_key.decode(),
                     propose_weight: v.propose_weight,
                     vote_weight:    v.vote_weight,
                 };
@@ -379,10 +379,12 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
 
         // check validators
         for validator in block.header.validators.iter() {
-            if !authority_map.contains_key(&validator.peer_id) {
+            let validator_address = Address::from_pubkey_bytes(validator.pub_key.clone());
+
+            if !authority_map.contains_key(&validator.pub_key) {
                 log::error!(
                     "[consensus] verify_block_header, validator.address: {:?}, authority_map: {:?}",
-                    validator.peer_id,
+                    validator_address,
                     authority_map
                 );
                 return Err(ConsensusError::VerifyBlockHeader(
@@ -391,14 +393,14 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
                 )
                 .into());
             } else {
-                let node = authority_map.get(&validator.peer_id).unwrap();
+                let node = authority_map.get(&validator.pub_key).unwrap();
 
                 if node.vote_weight != validator.vote_weight
                     || node.propose_weight != validator.vote_weight
                 {
                     log::error!(
                         "[consensus] verify_block_header, validator.address: {:?}, authority_map: {:?}",
-                        validator.peer_id,
+                        validator_address,
                         authority_map
                     );
                     return Err(ConsensusError::VerifyBlockHeader(
@@ -460,7 +462,7 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
             .verifier_list
             .iter()
             .map(|v| Node {
-                address:        v.peer_id.decode(),
+                address:        v.pub_key.decode(),
                 propose_weight: v.propose_weight,
                 vote_weight:    v.vote_weight,
             })
@@ -483,7 +485,7 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
             .verifier_list
             .iter()
             .filter_map(|v| {
-                if signed_voters.contains(&v.peer_id.decode()) {
+                if signed_voters.contains(&v.pub_key.decode()) {
                     Some(v.bls_pub_key.clone())
                 } else {
                     None
@@ -551,7 +553,7 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
         let mut accumulator = 0u64;
         for signed_voter_address in signed_voters.iter() {
             if weight_map.contains_key(signed_voter_address) {
-                let weight = weight_map.get(signed_voter_address).ok_or({
+                let weight = weight_map.get(signed_voter_address).ok_or_else(|| {
                     log::error!(
                         "[consensus] verify_proof_weight, signed_voter_address: {:?}",
                         hex::encode(signed_voter_address)
@@ -564,6 +566,7 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
                     "[consensus] verify_proof_weight,signed_voter_address: {:?}",
                     hex::encode(signed_voter_address)
                 );
+
                 return Err(
                     ConsensusError::VerifyProof(block_height, BlockProofField::Validator).into(),
                 );
@@ -670,12 +673,12 @@ fn mock_chained_rich_block(len: u64, gap: u64, key_tool: &KeyTool) -> (Vec<RichB
             proof: last_proof,
             validator_version: 0,
             validators: vec![Validator {
-                peer_id:        Bytes::from(
-                    hex::decode(
-                        "1220c8007bb2f04b921ec052df4836a5c81e658c8975e4b514da3cefbc64cb824932",
-                    )
-                    .unwrap(),
-                ),
+                pub_key:        Hex::from_string(
+                    "0x025a1f87bd7980510d8d4224e9e521ba2e98865f420c555568b1b71a64977b5e41"
+                        .to_owned(),
+                )
+                .unwrap()
+                .decode(),
                 propose_weight: 5,
                 vote_weight:    5,
             }],
@@ -755,10 +758,11 @@ fn mock_genesis_rich_block() -> RichBlock {
         },
         validator_version:              0,
         validators:                     vec![Validator {
-            peer_id:        Bytes::from(
-                hex::decode("1220c8007bb2f04b921ec052df4836a5c81e658c8975e4b514da3cefbc64cb824932")
-                    .unwrap(),
-            ),
+            pub_key:        Hex::from_string(
+                "0x025a1f87bd7980510d8d4224e9e521ba2e98865f420c555568b1b71a64977b5e41".to_owned(),
+            )
+            .unwrap()
+            .decode(),
             propose_weight: 0,
             vote_weight:    0,
         }],
@@ -859,18 +863,15 @@ fn mock_proof(block_hash: Hash, height: u64, round: u64, key_tool: &KeyTool) -> 
         .hash(Bytes::from(rlp::encode(&vote)));
     let bls_signature = key_tool.overlord_crypto.sign(vote_hash).unwrap();
     let signed_vote = SignedVote {
-        voter:     key_tool.signer_node.peer_id.clone(),
+        voter:     key_tool.signer_node.secp_public_key.to_bytes(),
         signature: bls_signature,
         vote:      vote.clone(),
     };
 
-    let signed_voter = vec![Bytes::from(
-        hex::decode("1220c8007bb2f04b921ec052df4836a5c81e658c8975e4b514da3cefbc64cb824932")
-            .unwrap(),
-    )]
-    .iter()
-    .cloned()
-    .collect::<HashSet<Bytes>>(); //
+    let signed_voter = vec![key_tool.signer_node.secp_public_key.to_bytes()]
+        .iter()
+        .cloned()
+        .collect::<HashSet<Bytes>>(); //
     let mut bit_map = BitVec::from_elem(3, false);
 
     let mut authority_list: Vec<Node> = key_tool
@@ -878,7 +879,7 @@ fn mock_proof(block_hash: Hash, height: u64, round: u64, key_tool: &KeyTool) -> 
         .clone()
         .iter()
         .map(|v| Node {
-            address:        v.peer_id.decode(),
+            address:        v.pub_key.decode(),
             propose_weight: v.propose_weight,
             vote_weight:    v.vote_weight,
         })
@@ -906,7 +907,7 @@ fn mock_proof(block_hash: Hash, height: u64, round: u64, key_tool: &KeyTool) -> 
         height,
         round,
         block_hash: block_hash.as_bytes(),
-        leader: key_tool.signer_node.peer_id.clone(),
+        leader: key_tool.signer_node.secp_public_key.to_bytes(),
     };
 
     Proof {
@@ -950,19 +951,13 @@ fn exec_txs(height: u64, txs: &[SignedTransaction]) -> (ExecutorResp, MerkleRoot
 struct SignerNode {
     secp_private_key: Secp256k1PrivateKey,
     secp_public_key:  Secp256k1PublicKey,
-    peer_id:          Bytes,
 }
 
 impl SignerNode {
-    pub fn new(
-        secp_private_key: Secp256k1PrivateKey,
-        secp_public_key: Secp256k1PublicKey,
-        peer_id: Bytes,
-    ) -> Self {
+    pub fn new(secp_private_key: Secp256k1PrivateKey, secp_public_key: Secp256k1PublicKey) -> Self {
         SignerNode {
             secp_private_key,
             secp_public_key,
-            peer_id,
         }
     }
 }
@@ -992,11 +987,7 @@ fn get_mock_key_tool() -> KeyTool {
         hex::decode("bd5da51982aa5ccc1bd6cec68ffee0caa708671ba5149390c39e4f660bfe4c49").unwrap();
     let secp_privkey = Secp256k1PrivateKey::try_from(hex_privkey.as_ref()).unwrap();
     let secp_pubkey: Secp256k1PublicKey = secp_privkey.pub_key();
-    let peer_id =
-        hex::decode("1220c8007bb2f04b921ec052df4836a5c81e658c8975e4b514da3cefbc64cb824932")
-            .unwrap();
-
-    let signer_node = SignerNode::new(secp_privkey, secp_pubkey, Bytes::from(peer_id));
+    let signer_node = SignerNode::new(secp_privkey, secp_pubkey);
 
     // generate BLS/OverlordCrypto
     let mut bls_priv_key = Vec::new();
@@ -1016,15 +1007,16 @@ fn get_mock_key_tool() -> KeyTool {
 fn get_mock_public_keys_and_common_ref() -> (HashMap<Bytes, BlsPublicKey>, BlsCommonReference) {
     let mut bls_pub_keys: HashMap<Bytes, BlsPublicKey> = HashMap::new();
 
-    // weight = 3
+    // weight = 5
     let bls_hex = Hex::from_string("0x04061c1c36a4252e8267ca143d1947f185dd6a04b5cc20f3ec85290e4e631fb67766392fa726120b1235da64fb2e5ffa4813c7dfe67b8019765b231ac0fbb5e5d45b12cf39ba98c02a6f1587bc6f4d8d7b7324efb40d3b6798b3f1792fc414c5df".to_string()
     ).unwrap();
     let bls_hex = hex::decode(bls_hex.as_string_trim0x()).unwrap();
     bls_pub_keys.insert(
-        Bytes::from(
-            hex::decode("1220c8007bb2f04b921ec052df4836a5c81e658c8975e4b514da3cefbc64cb824932")
-                .unwrap(),
-        ),
+        Hex::from_string(
+            "0x025a1f87bd7980510d8d4224e9e521ba2e98865f420c555568b1b71a64977b5e41".to_owned(),
+        )
+        .unwrap()
+        .decode(),
         BlsPublicKey::try_from(bls_hex.as_ref()).unwrap(),
     );
 
@@ -1033,10 +1025,11 @@ fn get_mock_public_keys_and_common_ref() -> (HashMap<Bytes, BlsPublicKey>, BlsCo
     ).unwrap();
     let bls_hex = hex::decode(bls_hex.as_string_trim0x()).unwrap();
     bls_pub_keys.insert(
-        Bytes::from(
-            hex::decode("122095c712e8fc94f2febfd4eb21a05dbc78ed2b45a7135e7a72422cfa69a22bf14c")
-                .unwrap(),
-        ),
+        Hex::from_string(
+            "0x028206a78f082023be8eed96f8d3c09c006bd827fb47c04950b62d8dfcb4134467".to_owned(),
+        )
+        .unwrap()
+        .decode(),
         BlsPublicKey::try_from(bls_hex.as_ref()).unwrap(),
     );
 
@@ -1045,10 +1038,11 @@ fn get_mock_public_keys_and_common_ref() -> (HashMap<Bytes, BlsPublicKey>, BlsCo
     ).unwrap();
     let bls_hex = hex::decode(bls_hex.as_string_trim0x()).unwrap();
     bls_pub_keys.insert(
-        Bytes::from(
-            hex::decode("122024ff8439058d2fa71492e7606547dadc0e0d8bda3c240cca50b6066fa813b1c2")
-                .unwrap(),
-        ),
+        Hex::from_string(
+            "0x0230eb18bc3f638750affffff2fe7be468e50feb9cdd5e6af947b3e4505f2ed5e2".to_owned(),
+        )
+        .unwrap()
+        .decode(),
         BlsPublicKey::try_from(bls_hex.as_ref()).unwrap(),
     );
 
@@ -1063,21 +1057,21 @@ fn mock_verifier_list() -> Vec<ValidatorExtend> {
     vec![
         ValidatorExtend {
             bls_pub_key: Hex::from_string("0x04061c1c36a4252e8267ca143d1947f185dd6a04b5cc20f3ec85290e4e631fb67766392fa726120b1235da64fb2e5ffa4813c7dfe67b8019765b231ac0fbb5e5d45b12cf39ba98c02a6f1587bc6f4d8d7b7324efb40d3b6798b3f1792fc414c5df".to_owned()).unwrap(),
-            peer_id: Hex::from_string("0x1220c8007bb2f04b921ec052df4836a5c81e658c8975e4b514da3cefbc64cb824932".to_owned()).unwrap(),
+            pub_key: Hex::from_string("0x025a1f87bd7980510d8d4224e9e521ba2e98865f420c555568b1b71a64977b5e41".to_owned()).unwrap(),
             address: Address::from_hex("0x40e680f764a84c3add6753685aecf59700e24a4b").unwrap(),
             propose_weight: 5,
             vote_weight:    5,
         },
         ValidatorExtend {
             bls_pub_key: Hex::from_string("0x0410d89f114ebd98a984fa2e964decc6b7b7542326a1abb6e4725b34c70f4408dbfff312ce163147039a6b07737b25902d082194cfe36b50f81d5106f6ee6ea146c4fbcfc87de87bdcd49ce087c01411b37c520402bd0a40fd13ce550c237362a0".to_owned()).unwrap(),
-            peer_id: Hex::from_string("0x122095c712e8fc94f2febfd4eb21a05dbc78ed2b45a7135e7a72422cfa69a22bf14c".to_owned()).unwrap(),
+            pub_key: Hex::from_string("0x028206a78f082023be8eed96f8d3c09c006bd827fb47c04950b62d8dfcb4134467".to_owned()).unwrap(),
             address: Address::from_hex("0x8b1de21fb70dc97256f756fbdb04f91891e329bf").unwrap(),
             propose_weight: 1,
             vote_weight:    1,
         },
         ValidatorExtend {
             bls_pub_key: Hex::from_string("0x0402de7a497fb892c60aa98e3ec31a2de10d7f0f952aba3764caed202e3874cdb536b4c018c198a7c9354b898f9500ec6812a72f83b72ba3fa31b16be77bedbc056625db790174ee811b3d763bb1bca1fcceaf00333e1b3ba98bfa53e65d9e6488".to_owned()).unwrap(),
-            peer_id: Hex::from_string("0x122024ff8439058d2fa71492e7606547dadc0e0d8bda3c240cca50b6066fa813b1c2".to_owned()).unwrap(),
+            pub_key: Hex::from_string("0x0230eb18bc3f638750affffff2fe7be468e50feb9cdd5e6af947b3e4505f2ed5e2".to_owned()).unwrap(),
             address: Address::from_hex("0x8af94238483ea5660f3d30674db9b0ee683d9948").unwrap(),
             propose_weight: 1,
             vote_weight:    1,

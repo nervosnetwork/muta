@@ -21,7 +21,6 @@ struct Keypair {
     pub private_key:    String,
     pub public_key:     String,
     pub address:        String,
-    pub peer_id_hex:    String,
     pub peer_id:        String,
     pub bls_public_key: String,
 }
@@ -76,7 +75,6 @@ pub fn main() {
 
         k.private_key = add_0x(hex::encode(seckey.as_ref()));
         k.public_key = add_0x(hex::encode(pubkey));
-        k.peer_id_hex = add_0x(hex::encode(keypair.to_public_key().peer_id().as_bytes()));
         k.peer_id = keypair.to_public_key().peer_id().to_base58();
         k.address = add_0x(user_addr.as_hex());
 

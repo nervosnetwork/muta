@@ -95,7 +95,7 @@ pub struct Proof {
 #[derive(Clone, Message)]
 pub struct Validator {
     #[prost(bytes, tag = "1")]
-    pub peer_id: Vec<u8>,
+    pub pub_key: Vec<u8>,
 
     #[prost(uint32, tag = "2")]
     pub propose_weight: u32,
@@ -298,7 +298,7 @@ impl TryFrom<Proof> for block::Proof {
 impl From<block::Validator> for Validator {
     fn from(validator: block::Validator) -> Validator {
         Validator {
-            peer_id:        validator.peer_id.to_vec(),
+            pub_key:        validator.pub_key.to_vec(),
             propose_weight: validator.propose_weight,
             vote_weight:    validator.vote_weight,
         }
@@ -310,7 +310,7 @@ impl TryFrom<Validator> for block::Validator {
 
     fn try_from(validator: Validator) -> Result<block::Validator, Self::Error> {
         let validator = block::Validator {
-            peer_id:        Bytes::from(validator.peer_id),
+            pub_key:        Bytes::from(validator.pub_key),
             propose_weight: validator.propose_weight,
             vote_weight:    validator.vote_weight,
         };

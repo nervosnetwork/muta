@@ -119,7 +119,7 @@ impl<Adapter: ConsensusAdapter + 'static> OverlordConsensus<Adapter> {
             lock,
         ));
 
-        let overlord = Overlord::new(node_info.self_peer_id, Arc::clone(&engine), crypto, engine);
+        let overlord = Overlord::new(node_info.self_pub_key, Arc::clone(&engine), crypto, engine);
         let overlord_handler = overlord.get_handler();
         let status = status_agent.to_inner();
 
@@ -177,7 +177,7 @@ pub fn gen_overlord_status(
     let mut authority_list = validators
         .into_iter()
         .map(|v| Node {
-            address:        v.peer_id.clone(),
+            address:        v.pub_key.clone(),
             propose_weight: v.propose_weight,
             vote_weight:    v.vote_weight,
         })

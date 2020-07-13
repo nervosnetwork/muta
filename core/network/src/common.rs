@@ -7,7 +7,7 @@ use protocol::Bytes;
 use serde_derive::{Deserialize, Serialize};
 use tentacle::{
     multiaddr::{Multiaddr, Protocol},
-    secio::PeerId,
+    secio::{PeerId, PublicKey},
 };
 
 use std::{
@@ -47,6 +47,13 @@ macro_rules! service_ready {
 
 pub fn peer_id_from_bytes(bytes: Bytes) -> Result<PeerId, NetworkError> {
     PeerId::from_bytes(bytes.to_vec()).map_err(|_| NetworkError::InvalidPeerId)
+}
+
+pub fn peer_id_from_pubkey_bytes(bytes: Bytes) -> Result<PeerId, NetworkError> {
+    let pubkey =
+        PublicKey::secp256k1_raw_key(&bytes).map_err(|_| NetworkError::InvalidPublicKey)?;
+
+    Ok(PeerId::from_public_key(&pubkey))
 }
 
 pub fn socket_to_multi_addr(socket_addr: SocketAddr) -> Multiaddr {

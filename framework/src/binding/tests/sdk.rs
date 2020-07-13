@@ -197,7 +197,7 @@ pub fn mock_address() -> Address {
     Address::from_hash(hash).unwrap()
 }
 
-pub fn mock_peer_id(s: &'static str) -> Bytes {
+pub fn mock_pub_key(s: &'static str) -> Bytes {
     Hash::digest(Bytes::from(s)).as_bytes()
 }
 
@@ -283,7 +283,7 @@ pub fn mock_event() -> Event {
 
 pub fn mock_validator(s: &'static str) -> Validator {
     Validator {
-        peer_id:        mock_peer_id(s),
+        pub_key:        mock_pub_key(s),
         propose_weight: 1,
         vote_weight:    1,
     }
