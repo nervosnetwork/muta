@@ -136,7 +136,7 @@ impl SubstreamValue {
                 count:       MAX_ADDR_TO_SEND as u32,
                 listen_port: substream.listen_port,
             });
-            addr_known.insert(ConnectableAddr::from(&substream.remote_addr.clone()));
+            addr_known.insert(ConnectableAddr::from(&substream.remote_addr));
 
             RemoteAddress::Listen(substream.remote_addr)
         } else {

@@ -189,7 +189,7 @@ pub struct ConnectableAddr {
 
 impl From<&Multiaddr> for ConnectableAddr {
     fn from(addr: &Multiaddr) -> ConnectableAddr {
-        use tentacle::multiaddr::Protocol::*;
+        use tentacle::multiaddr::Protocol::{DNS4, DNS6, IP4, IP6, TCP, TLS};
 
         let mut host = None;
         let mut port = 0u16;
