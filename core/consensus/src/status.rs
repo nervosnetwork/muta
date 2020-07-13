@@ -146,7 +146,7 @@ impl CurrentConsensusStatus {
             .verifier_list
             .iter()
             .map(|v| Validator {
-                peer_id:        v.peer_id.clone(),
+                peer_id:        v.peer_id.decode(),
                 propose_weight: v.propose_weight,
                 vote_weight:    v.vote_weight,
             })

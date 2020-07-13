@@ -25,3 +25,5 @@ pub use service::{NetworkService, NetworkServiceHandle};
 
 #[cfg(feature = "diagnostic")]
 pub use peer_manager::diagnostic::{DiagnosticEvent, TrustReport};
+
+pub use tentacle::secio::PeerId;

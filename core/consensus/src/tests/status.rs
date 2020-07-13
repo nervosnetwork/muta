@@ -151,6 +151,7 @@ fn mock_validators_extend(len: usize) -> Vec<ValidatorExtend> {
                 "0xd654c7a6747fc2e34808c1ebb1510bfb19b443d639f2fab6dc41fce9f634de37".to_string(),
             )
             .unwrap(),
+            peer_id:        mock_peer_id(),
             address:        mock_address(),
             propose_weight: random::<u32>(),
             vote_weight:    random::<u32>(),
@@ -201,7 +202,7 @@ fn mock_validators(len: usize) -> Vec<Validator> {
 
 fn mock_validator() -> Validator {
     Validator {
-        address:        mock_address(),
+        peer_id:        mock_peer_id().decode(),
         propose_weight: random::<u32>(),
         vote_weight:    random::<u32>(),
     }
@@ -228,6 +229,13 @@ fn mock_hash() -> Hash {
 fn mock_address() -> Address {
     let hash = mock_hash();
     Address::from_hash(hash).unwrap()
+}
+
+fn mock_peer_id() -> Hex {
+    Hex::from_string(
+        "0x1220c7b1dc28da9eeecc7b825f39d0c1e79f87a5cf8a44d888c9f1f1b1ad6be0c79b".to_owned(),
+    )
+    .unwrap()
 }
 
 fn get_random_bytes(len: usize) -> Bytes {

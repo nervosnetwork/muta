@@ -64,7 +64,7 @@ fn mock_metadata() -> Metadata {
         interval:        3000,
         verifier_list:   [ValidatorExtend {
             bls_pub_key: Hex::from_string("0x04188ef9488c19458a963cc57b567adde7db8f8b6bec392d5cb7b67b0abc1ed6cd966edc451f6ac2ef38079460eb965e890d1f576e4039a20467820237cda753f07a8b8febae1ec052190973a1bcf00690ea8fc0168b3fbbccd1c4e402eda5ef22".to_owned()).unwrap(),
-            peer_id:        Bytes::from(hex::decode("0405e7689f808af9fea532548b1b90d1fac48112b4a6a83bc331629df70647a84cf8a0dbc73352ab78664a15f57caaef860f3a6c6ceb128f6ec01a86ac96c8b7f2ba3be79387faf69c7f3bd112f0ddf3c6225a7fe23ec0c680cf93580716dd6fe4".to_string()).unwrap()),
+            peer_id:     Hex::from_string("0x1220c7b1dc28da9eeecc7b825f39d0c1e79f87a5cf8a44d888c9f1f1b1ad6be0c79b".to_owned()).unwrap(),
             address: Address::from_hex("0xCAB8EEA4799C21379C20EF5BAA2CC8AF1BEC475B").unwrap(),
             propose_weight: 1,
             vote_weight:    1,

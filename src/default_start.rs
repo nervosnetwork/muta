@@ -57,7 +57,7 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
         .verifier_list
         .iter()
         .map(|v| Validator {
-            peer_id:        v.peer_id.clone(),
+            peer_id:        v.peer_id.decode(),
             propose_weight: v.propose_weight,
             vote_weight:    v.vote_weight,
         })
@@ -298,7 +298,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         .verifier_list
         .iter()
         .map(|v| Validator {
-            peer_id:        v.peer_id.clone(),
+            peer_id:        v.peer_id.decode(),
             propose_weight: v.propose_weight,
             vote_weight:    v.vote_weight,
         })
@@ -347,7 +347,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
 
     let mut bls_pub_keys = HashMap::new();
     for validator_extend in metadata.verifier_list.iter() {
-        let address = validator_extend.peer_id.clone();
+        let address = validator_extend.peer_id.decode(); // Use peer id bytes instead
         let hex_pubkey = hex::decode(validator_extend.bls_pub_key.as_string_trim0x())
             .map_err(MainError::FromHex)?;
         let pub_key = BlsPublicKey::try_from(hex_pubkey.as_ref()).map_err(MainError::Crypto)?;

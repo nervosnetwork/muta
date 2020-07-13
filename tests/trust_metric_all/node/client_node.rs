@@ -183,7 +183,7 @@ impl ClientNode {
         };
 
         let ctx = Context::new().with_value::<usize>("session_id", sid);
-        let peers = vec![self.remote_peer_id.clone()];
+        let peers = vec![Bytes::from(self.remote_peer_id.clone().into_bytes())];
 
         match self.multicast::<M>(ctx, endpoint, peers, msg, High).await {
             Err(_) if !self.connected() => Err(ClientNodeError::NotConnected),
@@ -303,7 +303,7 @@ fn full_node_hex_pubkey() -> String {
 fn full_node_peer_id(hex_pubkey: &str) -> PeerId {
     let pubkey = {
         let pubkey_bytes = hex::decode(hex_pubkey).expect("decode hex full node pubkey");
-        tentacle::secio::PublicKey::from_bytes(pubkey_bytes).expect("decode pubkey")
+        tentacle::secio::PublicKey::secp256k1_raw_key(pubkey_bytes).expect("decode pubkey")
     };
 
     pubkey.peer_id()

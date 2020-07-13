@@ -520,7 +520,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             .verifier_list
             .into_iter()
             .map(|v| Node {
-                address:        v.peer_id,
+                address:        v.peer_id.decode(),
                 propose_weight: v.propose_weight,
                 vote_weight:    v.vote_weight,
             })
@@ -759,7 +759,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
 pub fn generate_new_crypto_map(metadata: Metadata) -> ProtocolResult<HashMap<Bytes, BlsPublicKey>> {
     let mut new_addr_pubkey_map = HashMap::new();
     for validator in metadata.verifier_list.into_iter() {
-        let addr = validator.peer_id;
+        let addr = validator.peer_id.decode();
         let hex_pubkey = hex::decode(validator.bls_pub_key.as_string_trim0x()).map_err(|err| {
             ConsensusError::Other(format!("hex decode metadata bls pubkey error {:?}", err))
         })?;

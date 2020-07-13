@@ -550,9 +550,9 @@ where
             .verifier_list
             .iter()
             .map(|v| {
-                let address = v.peer_id.clone();
+                let address = v.peer_id.decode();
                 let node = Node {
-                    address:        v.peer_id.clone(),
+                    address:        v.peer_id.decode(),
                     propose_weight: v.propose_weight,
                     vote_weight:    v.vote_weight,
                 };
@@ -667,7 +667,7 @@ where
             .verifier_list
             .iter()
             .map(|v| Node {
-                address:        v.peer_id.clone(),
+                address:        v.peer_id.decode(),
                 propose_weight: v.propose_weight,
                 vote_weight:    v.vote_weight,
             })
@@ -701,7 +701,7 @@ where
             .verifier_list
             .iter()
             .filter_map(|v| {
-                if signed_voters.contains(&v.peer_id) {
+                if signed_voters.contains(&v.peer_id.decode()) {
                     Some(v.bls_pub_key.clone())
                 } else {
                     None

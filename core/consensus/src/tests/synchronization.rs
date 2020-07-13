@@ -353,9 +353,9 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
             .verifier_list
             .iter()
             .map(|v| {
-                let address = v.peer_id.clone();
+                let address = v.peer_id.decode();
                 let node = Node {
-                    address:        v.peer_id.clone(),
+                    address:        v.peer_id.decode(),
                     propose_weight: v.propose_weight,
                     vote_weight:    v.vote_weight,
                 };
@@ -461,7 +461,7 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
             .verifier_list
             .iter()
             .map(|v| Node {
-                address:        v.peer_id.clone(),
+                address:        v.peer_id.decode(),
                 propose_weight: v.propose_weight,
                 vote_weight:    v.vote_weight,
             })
@@ -484,7 +484,7 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
             .verifier_list
             .iter()
             .filter_map(|v| {
-                if signed_voters.contains(&v.peer_id) {
+                if signed_voters.contains(&v.peer_id.decode()) {
                     Some(v.bls_pub_key.clone())
                 } else {
                     None
@@ -879,7 +879,7 @@ fn mock_proof(block_hash: Hash, height: u64, round: u64, key_tool: &KeyTool) -> 
         .clone()
         .iter()
         .map(|v| Node {
-            address:        v.peer_id.clone(),
+            address:        v.peer_id.decode(),
             propose_weight: v.propose_weight,
             vote_weight:    v.vote_weight,
         })
@@ -1064,21 +1064,21 @@ fn mock_verifier_list() -> Vec<ValidatorExtend> {
     vec![
         ValidatorExtend {
             bls_pub_key: Hex::from_string("0x04061c1c36a4252e8267ca143d1947f185dd6a04b5cc20f3ec85290e4e631fb67766392fa726120b1235da64fb2e5ffa4813c7dfe67b8019765b231ac0fbb5e5d45b12cf39ba98c02a6f1587bc6f4d8d7b7324efb40d3b6798b3f1792fc414c5df".to_owned()).unwrap(),
-            peer_id: Bytes::from(hex::decode("1220c8007bb2f04b921ec052df4836a5c81e658c8975e4b514da3cefbc64cb824932").unwrap()),
+            peer_id: Hex::from_string("0x1220c8007bb2f04b921ec052df4836a5c81e658c8975e4b514da3cefbc64cb824932".to_owned()).unwrap(),
             address: Address::from_hex("0x40e680f764a84c3add6753685aecf59700e24a4b").unwrap(),
             propose_weight: 5,
             vote_weight:    5,
         },
         ValidatorExtend {
             bls_pub_key: Hex::from_string("0x0410d89f114ebd98a984fa2e964decc6b7b7542326a1abb6e4725b34c70f4408dbfff312ce163147039a6b07737b25902d082194cfe36b50f81d5106f6ee6ea146c4fbcfc87de87bdcd49ce087c01411b37c520402bd0a40fd13ce550c237362a0".to_owned()).unwrap(),
-            peer_id:        Bytes::from(hex::decode("122095c712e8fc94f2febfd4eb21a05dbc78ed2b45a7135e7a72422cfa69a22bf14c").unwrap()),
+            peer_id: Hex::from_string("0x122095c712e8fc94f2febfd4eb21a05dbc78ed2b45a7135e7a72422cfa69a22bf14c".to_owned()).unwrap(),
             address: Address::from_hex("0x8b1de21fb70dc97256f756fbdb04f91891e329bf").unwrap(),
             propose_weight: 1,
             vote_weight:    1,
         },
         ValidatorExtend {
             bls_pub_key: Hex::from_string("0x0402de7a497fb892c60aa98e3ec31a2de10d7f0f952aba3764caed202e3874cdb536b4c018c198a7c9354b898f9500ec6812a72f83b72ba3fa31b16be77bedbc056625db790174ee811b3d763bb1bca1fcceaf00333e1b3ba98bfa53e65d9e6488".to_owned()).unwrap(),
-            peer_id:        Bytes::from(hex::decode("122024ff8439058d2fa71492e7606547dadc0e0d8bda3c240cca50b6066fa813b1c2").unwrap()),
+            peer_id: Hex::from_string("0x122024ff8439058d2fa71492e7606547dadc0e0d8bda3c240cca50b6066fa813b1c2".to_owned()).unwrap(),
             address: Address::from_hex("0x8af94238483ea5660f3d30674db9b0ee683d9948").unwrap(),
             propose_weight: 1,
             vote_weight:    1,
