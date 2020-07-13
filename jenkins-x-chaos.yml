@@ -18,6 +18,8 @@ pipelineConfig:
                 value: "4"
               - name: CHAIN_GENESIS_TIMEOUT_GAP
                 value: "9999"
+              - name: APP_VERSION
+                value: pr-${PULL_NUMBER}-${BUILD_NUMBER}
             options:
               containerOptions:
                 volumeMounts:
@@ -59,7 +61,7 @@ pipelineConfig:
                 command: /kaniko/executor
                 args:
                   - --dockerfile=/workspace/source/devtools/docker-build/Dockerfile
-                  - --destination=mutadev/${REPO_NAME}:${BRANCH_NAME}-${BUILD_NUMBER}
+                  - --destination=mutadev/${REPO_NAME}:${APP_VERSION}
                   - --context=/workspace/source
 
               - name: create-chaos-crd
@@ -67,12 +69,12 @@ pipelineConfig:
                 command: helm
                 args:
                   - install
-                  - chaos-${REPO_NAME}-${BRANCH_NAME}-${BUILD_NUMBER}
+                  - chaos-${REPO_NAME}-${APP_VERSION}
                   - charts/deploy-chaos
                   - --namespace
                   - mutadev
                   - --set
-                  - size=${NODE_SIZE},repo_name=${REPO_NAME},version=${BRANCH_NAME}-${BUILD_NUMBER},resources.cpu=1100m,resources.memory=8Gi,chain_genesis.metadata.timeout_gap=${CHAIN_GENESIS_TIMEOUT_GAP}
+                  - size=${NODE_SIZE},repo_name=${REPO_NAME},version=${APP_VERSION}-${BUILD_NUMBER},resources.cpu=1100m,resources.memory=8Gi,chain_genesis.metadata.timeout_gap=${CHAIN_GENESIS_TIMEOUT_GAP}
               # - name: run-benchmark
               #   image: mutadev/benchmark:v0.1.0
               #   command: node
@@ -85,7 +87,7 @@ pipelineConfig:
                 command: helm
                 args:
                   - uninstall
-                  - chaos-${REPO_NAME}-${BRANCH_NAME}-${BUILD_NUMBER}
+                  - chaos-${REPO_NAME}-${APP_VERSION}
                   - --namespace
                   - mutadev
 
