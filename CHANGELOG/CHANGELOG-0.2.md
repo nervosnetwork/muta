@@ -1,10 +1,13 @@
-##  (2020-07-07)
+##  (2020-07-13)
 
-
-
-
-## 0.2.0-alpha.0 (2020-07-06)
-
+* chore: Add lint pipeline (#342) ([4c32b5c](https://github.com/yejiayu/muta/commit/4c32b5c)), closes [#342](https://github.com/yejiayu/muta/issues/342)
+* chore: Fix pipeline of build image (#344) ([f946c19](https://github.com/yejiayu/muta/commit/f946c19)), closes [#344](https://github.com/yejiayu/muta/issues/344)
+* chore: Update CHANGELOG v0.2.0-alpha.0 ([21386ca](https://github.com/yejiayu/muta/commit/21386ca))
+* chore(network): upgrade tentacle to v0.3.0alpha5 (#339) ([a0dff93](https://github.com/yejiayu/muta/commit/a0dff93)), closes [#339](https://github.com/yejiayu/muta/issues/339)
+* feat!: add 'name' field in event struct (#347) ([f7f5d75](https://github.com/yejiayu/muta/commit/f7f5d75)), closes [#347](https://github.com/yejiayu/muta/issues/347)
+* feat(api)!: Allowed to return None (#315) ([b69d1eb](https://github.com/yejiayu/muta/commit/b69d1eb)), closes [#315](https://github.com/yejiayu/muta/issues/315)
+* test(consensus): add unit test of current consensus status (#343) ([d9d186c](https://github.com/yejiayu/muta/commit/d9d186c)), closes [#343](https://github.com/yejiayu/muta/issues/343)
+* refactor(tests): trust metric integration tests (#340) ([2405cbe](https://github.com/yejiayu/muta/commit/2405cbe)), closes [#340](https://github.com/yejiayu/muta/issues/340)
 * refactor(auth): change verified map to array (#337) ([d7ea75a](https://github.com/yejiayu/muta/commit/d7ea75a)), closes [#337](https://github.com/yejiayu/muta/issues/337)
 * refactor(service): calculate multi-signature recursion depth (#322) ([0a83036](https://github.com/yejiayu/muta/commit/0a83036)), closes [#322](https://github.com/yejiayu/muta/issues/322)
 * chore: Fix ci (#336) ([03ad6e9](https://github.com/yejiayu/muta/commit/03ad6e9)), closes [#336](https://github.com/yejiayu/muta/issues/336)
@@ -18,10 +21,6 @@
 * Draft create ([95a7d91](https://github.com/yejiayu/muta/commit/95a7d91))
 * Draft create ([b23b2b5](https://github.com/yejiayu/muta/commit/b23b2b5))
 * fix(trust_metric_test): unreliable full node exit check (#327) ([a4ab4a6](https://github.com/yejiayu/muta/commit/a4ab4a6)), closes [#327](https://github.com/yejiayu/muta/issues/327)
-
-
-## 0.2.0-dev.0 (2020-07-01)
-
 * change(executor): panic when service not found in call fn (#324) ([2a413e6](https://github.com/yejiayu/muta/commit/2a413e6)), closes [#324](https://github.com/yejiayu/muta/issues/324)
 * chore(docker): Update dockerfile for Next CI/CD (#323) ([f118cac](https://github.com/yejiayu/muta/commit/f118cac)), closes [#323](https://github.com/yejiayu/muta/issues/323)
 * chore(toolchain): upgrade rust toolchain version (#321) ([5ed3145](https://github.com/yejiayu/muta/commit/5ed3145)), closes [#321](https://github.com/yejiayu/muta/issues/321)
