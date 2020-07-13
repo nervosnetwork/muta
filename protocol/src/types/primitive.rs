@@ -29,11 +29,12 @@ pub struct Hex(String);
 
 impl Hex {
     pub fn from_string(s: String) -> ProtocolResult<Self> {
-        if s.starts_with("0x") {
-            Ok(Self(s))
-        } else {
-            Err(TypesError::HexPrefix.into())
+        if (!s.starts_with("0x") && !s.starts_with("0X")) || s.len() < 3 {
+            return Err(TypesError::HexPrefix.into());
         }
+
+        hex::decode(&s[2..]).map_err(|error| TypesError::FromHex { error })?;
+        Ok(Hex(s))
     }
 
     pub fn as_string(&self) -> String {
@@ -42,6 +43,10 @@ impl Hex {
 
     pub fn as_string_trim0x(&self) -> String {
         (&self.0[2..]).to_owned()
+    }
+
+    pub fn decode(&self) -> Bytes {
+        Bytes::from(hex::decode(&self.0[2..]).expect("impossible, already checked in from_string"))
     }
 }
 
@@ -319,11 +324,7 @@ impl fmt::Debug for ValidatorExtend {
         } else {
             bls_pub_key.as_str()
         };
-
-        let peer_id = match hex::decode(&self.peer_id.as_string_trim0x()) {
-            Ok(bytes) => bs58::encode(&bytes).into_string(),
-            Err(_) => self.peer_id.0.to_owned(),
-        };
+        let peer_id = bs58::encode(&self.peer_id.decode()).into_string();
 
         write!(
             f,
