@@ -418,8 +418,8 @@ pub enum MemPoolError {
     #[display(fmt = "Tx inserts candidate_queue failed, len: {}", len)]
     InsertCandidate { len: usize },
 
-    #[display(fmt = "Tx: {:?} check_sig failed", tx_hash)]
-    CheckAuthorization { tx_hash: Hash },
+    #[display(fmt = "Tx: {:?} check authorization error {:?}", tx_hash, err_info)]
+    CheckAuthorization { tx_hash: Hash, err_info: String },
 
     #[display(fmt = "Check_hash failed, expect: {:?}, get: {:?}", expect, actual)]
     CheckHash { expect: Hash, actual: Hash },

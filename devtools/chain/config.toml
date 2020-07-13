@@ -13,7 +13,7 @@ maxconn = 25000
 max_payload_size = 1048576
 
 [network]
-listening_address = "0.0.0.0:13390"
+listening_address = "0.0.0.0:1337"
 rpc_timeout = 10
 
 [consensus]

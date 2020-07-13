@@ -334,7 +334,8 @@ where
             }
 
             return Err(MemPoolError::CheckAuthorization {
-                tx_hash: tx_clone.tx_hash,
+                tx_hash:  tx_clone.tx_hash,
+                err_info: check_resp.error_message,
             }
             .into());
         }
