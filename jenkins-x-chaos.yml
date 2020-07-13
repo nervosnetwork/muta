@@ -15,9 +15,9 @@ pipelineConfig:
               - name: BASE_WORKSPACE
                 value: /workspace/source
               - name: NODE_SIZE
-                value: 4
+                value: "4"
               - name: CHAIN_GENESIS_TIMEOUT_GAP
-                value: 9999
+                value: "9999"
             options:
               containerOptions:
                 volumeMounts:
