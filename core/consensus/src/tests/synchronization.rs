@@ -9,7 +9,6 @@ use futures::lock::Mutex;
 use overlord::types::{AggregatedSignature, AggregatedVote, Node, SignedVote, Vote, VoteType};
 use overlord::{extract_voters, Crypto};
 use parking_lot::RwLock;
-use tentacle_secio::SecioKeyPair;
 
 use common_crypto::{
     BlsCommonReference, BlsPrivateKey, BlsPublicKey, HashValue, PrivateKey, PublicKey,
@@ -993,9 +992,9 @@ fn get_mock_key_tool() -> KeyTool {
         hex::decode("bd5da51982aa5ccc1bd6cec68ffee0caa708671ba5149390c39e4f660bfe4c49").unwrap();
     let secp_privkey = Secp256k1PrivateKey::try_from(hex_privkey.as_ref()).unwrap();
     let secp_pubkey: Secp256k1PublicKey = secp_privkey.pub_key();
-    let keypair = SecioKeyPair::secp256k1_raw_key(secp_privkey.to_bytes().as_ref())
-        .expect("secp256k1 keypair");
-    let peer_id = keypair.to_public_key().peer_id().into_bytes();
+    let peer_id =
+        hex::decode("1220c8007bb2f04b921ec052df4836a5c81e658c8975e4b514da3cefbc64cb824932")
+            .unwrap();
 
     let signer_node = SignerNode::new(secp_privkey, secp_pubkey, Bytes::from(peer_id));
 
