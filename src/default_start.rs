@@ -6,7 +6,6 @@ use std::time::Duration;
 use bytes::Bytes;
 use futures::{future, lock::Mutex};
 use futures_timer::Delay;
-use tentacle_secio::SecioKeyPair;
 #[cfg(unix)]
 use tokio::signal::unix::{self as os_impl};
 
@@ -238,8 +237,6 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     let hex_privkey = hex::decode(config.privkey.as_string_trim0x()).map_err(MainError::FromHex)?;
     let my_privkey =
         Secp256k1PrivateKey::try_from(hex_privkey.as_ref()).map_err(MainError::Crypto)?;
-    // FIXME: unwrap()
-    let keypair = SecioKeyPair::secp256k1_raw_key(&hex_privkey).unwrap();
     let my_pubkey = my_privkey.pub_key();
     let my_address = Address::from_pubkey_bytes(my_pubkey.to_bytes())?;
 
@@ -307,12 +304,11 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         })
         .collect();
 
+    let my_peer_id = hex::encode(network_service.peer_id().as_bytes());
     let node_info = NodeInfo {
         chain_id:     metadata.chain_id.clone(),
         self_address: my_address.clone(),
-        self_peer_id: Bytes::from(
-            "0x".to_owned() + &hex::encode(keypair.to_public_key().peer_id().into_bytes()),
-        ),
+        self_peer_id: Bytes::from("0x".to_owned() + &my_peer_id),
     };
     let current_header = &current_block.header;
     let block_hash = Hash::digest(current_block.header.encode_fixed()?);

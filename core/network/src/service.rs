@@ -20,6 +20,7 @@ use protocol::{
     },
     Bytes, ProtocolResult,
 };
+use tentacle::secio::PeerId;
 
 #[cfg(feature = "diagnostic")]
 use crate::peer_manager::diagnostic::{Diagnostic, DiagnosticHookFn};
@@ -328,6 +329,10 @@ impl NetworkService {
             #[cfg(feature = "diagnostic")]
             diagnostic:                                self.diagnostic.clone(),
         }
+    }
+
+    pub fn peer_id(&self) -> PeerId {
+        self.config.secio_keypair.peer_id()
     }
 
     pub async fn listen(&mut self, socket_addr: SocketAddr) -> ProtocolResult<()> {
