@@ -72,10 +72,13 @@ pipelineConfig:
                   - --namespace
                   - mutadev
                   - --set
-                  - size=4,repo_name=${REPO_NAME},version=${BRANCH_NAME}-${BUILD_NUMBER},resources.cpu=1100m,resources.memory=8Gi
-              - name: run-benchmark
-                image: node:alpine3.12
-                command:
+                  - size=${NODE_SIZE},repo_name=${REPO_NAME},version=${BRANCH_NAME}-${BUILD_NUMBER},resources.cpu=1100m,resources.memory=8Gi,chain_genesis.metadata.timeout_gap=${CHAIN_GENESIS_TIMEOUT_GAP}
+              # - name: run-benchmark
+              #   image: mutadev/benchmark:v0.1.0
+              #   command: node
+              #   args:
+              #     - index.js
+              #     - 
 
               - name: delete-chaos-crd
                 image: alpine/helm:3.2.4

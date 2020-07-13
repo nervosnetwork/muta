@@ -22,7 +22,7 @@ chain_config:
   network:
     rpc_timeout: 10
   mempool:
-    pool_size: 30000
+    pool_size: 20000
     broadcast_txs_size: 200
     broadcast_txs_interval: 200
 
@@ -38,7 +38,7 @@ chain_genesis:
     prevote_ratio: 15
     precommit_ratio: 10
     brake_ratio: 3
-    tx_num_limit: 20000
+    tx_num_limit: 10000
     max_tx_size: 1073741824
   services:
     - name: asset
