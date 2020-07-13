@@ -301,11 +301,11 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         })
         .collect();
 
-    let my_peer_id = hex::encode(network_service.peer_id().as_bytes());
+    let my_peer_id = Bytes::from(network_service.peer_id().into_bytes());
     let node_info = NodeInfo {
         chain_id:     metadata.chain_id.clone(),
         self_address: my_address.clone(),
-        self_peer_id: Bytes::from("0x".to_owned() + &my_peer_id),
+        self_peer_id: my_peer_id,
     };
     let current_header = &current_block.header;
     let block_hash = Hash::digest(current_block.header.encode_fixed()?);
