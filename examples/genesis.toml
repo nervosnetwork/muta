@@ -26,14 +26,14 @@ payload = '''
     "verifier_list": [
         {
             "bls_pub_key": "0x0415e096d77867ebd9a36581ed91afbb3377a653beb76dfd1acc6f078838d2e40a8819444698923f9fccf367ab8d276fec099b857e35bef77df53327e5d2165ceef813b9289cc75c0140465777b76e37a8d5762d2eef9aff94a8ec52aed6be30a2",
-            "address": "0x5235aaa2a4d20b513728afb0f13dc695443f1a80"
+            "address": "0x5235aaa2a4d20b513728afb0f13dc695443f1a80",
             "peer_id": "0x1220100b9942e60a55abcbf25b8700ece7552ed8d680be62e9fe50aba9951b9ff5d6",
             "propose_weight": 1,
             "vote_weight": 1
         },
         {
             "bls_pub_key": "0x040bcc7162b391562c2ca5628fa16905d99078987af2d798c5e29a9c04ea4fe34a1ae31155b0162dcaaaabd4c4e64b98670b45b9f8ebddc16b072b431aab0f18d3240109ce6e3f85bca6d3e4d7aa001dac0d213326abf39da397fed8497e9af26d",
-            "address": "0x68d383e586683b943e6a0c4a042e8aaa3729dcdf"
+            "address": "0x68d383e586683b943e6a0c4a042e8aaa3729dcdf",
             "peer_id": "0x1220718c67c7543581a1d1133f43ba4a12da8edc92dd161d534b00c0475d31c7f859",
             "propose_weight": 1,
             "vote_weight": 1
