@@ -305,7 +305,7 @@ pub struct Metadata {
 #[derive(RlpFixedCodec, Serialize, Deserialize, Clone, PartialEq, Eq, Default)]
 pub struct ValidatorExtend {
     pub bls_pub_key:    Hex,
-    pub peer_id:        Bytes,
+    pub peer_id:        Hex,
     pub address:        Address,
     pub propose_weight: u32,
     pub vote_weight:    u32,
@@ -320,14 +320,15 @@ impl fmt::Debug for ValidatorExtend {
             bls_pub_key.as_str()
         };
 
+        let peer_id = match hex::decode(&self.peer_id.as_string_trim0x()) {
+            Ok(bytes) => bs58::encode(&bytes).into_string(),
+            Err(_) => self.peer_id.0.to_owned(),
+        };
+
         write!(
             f,
-            "bls public key {:?}, address {:?}, preer ID {:?}, propose weight {}, vote weight {}",
-            pk,
-            self.address,
-            bs58::encode(&self.peer_id).into_string(),
-            self.propose_weight,
-            self.vote_weight
+            "bls public key {:?}, address {:?}, preer ID {}, propose weight {}, vote weight {}",
+            pk, self.address, peer_id, self.propose_weight, self.vote_weight
         )
     }
 }
@@ -395,7 +396,7 @@ mod tests {
     fn test_validator_extend() {
         let extend = ValidatorExtend {
             bls_pub_key: Hex::from_string("0x04195bf31d7de5e98d4a4b4d6f248bdc4fe203a2f771e2fc0264b912214ef5d9e4316f6aedd89de0e0052c744ff29c94280ab51f1baa9c7784f9e29284b47b4d51144344dcae4bc819353352d21d138bc59e97916a3991343379695681e8fcb1c1".to_owned()).unwrap(),
-            peer_id:        Bytes::from(hex::decode("1220b4f89f60d42d7242cac567d1df57eabf7e47d5d00498e8de3964040ff162a1cf").unwrap()),
+            peer_id:     Hex::from_string("0x1220c7b1dc28da9eeecc7b825f39d0c1e79f87a5cf8a44d888c9f1f1b1ad6be0c79b".to_owned()).unwrap(),
             address: Address::from_hex("0x85f6162ac2c2223ce784155f304fe685372fa795").unwrap(),
             propose_weight: 1,
             vote_weight:    1,
