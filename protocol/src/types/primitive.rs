@@ -352,8 +352,8 @@ fn ensure_len(real: usize, expect: usize) -> ProtocolResult<()> {
 mod tests {
     use bytes::Bytes;
 
-    use super::{Address, Hash};
-    use crate::types::Hex;
+    use super::{Address, Hash, ValidatorExtend};
+    use crate::{fixed_codec::FixedCodec, types::Hex};
 
     #[test]
     fn test_hash() {
@@ -389,5 +389,19 @@ mod tests {
         let hex = Hex::from_string(hex_str.to_owned()).unwrap();
 
         assert_eq!(hex_str, hex.0.as_str());
+    }
+
+    #[test]
+    fn test_validator_extend() {
+        let extend = ValidatorExtend {
+            bls_pub_key: Hex::from_string("0x04195bf31d7de5e98d4a4b4d6f248bdc4fe203a2f771e2fc0264b912214ef5d9e4316f6aedd89de0e0052c744ff29c94280ab51f1baa9c7784f9e29284b47b4d51144344dcae4bc819353352d21d138bc59e97916a3991343379695681e8fcb1c1".to_owned()).unwrap(),
+            peer_id:        Bytes::from(hex::decode("1220b4f89f60d42d7242cac567d1df57eabf7e47d5d00498e8de3964040ff162a1cf").unwrap()),
+            address: Address::from_hex("0x85f6162ac2c2223ce784155f304fe685372fa795").unwrap(),
+            propose_weight: 1,
+            vote_weight:    1,
+        };
+
+        let decoded = ValidatorExtend::decode_fixed(extend.encode_fixed().unwrap()).unwrap();
+        assert_eq!(decoded, extend);
     }
 }
