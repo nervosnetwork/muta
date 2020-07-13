@@ -89,15 +89,14 @@ pub struct ClientNode {
 }
 
 pub async fn connect(full_node_port: u16, listen_port: u16, sync: Sync) -> ClientNode {
-    let full_node_hex_pubkey = full_node_hex_pubkey();
-    let full_node_peer_id = full_node_peer_id(&full_node_hex_pubkey);
+    let full_node_peer_id = full_node_peer_id();
     let full_node_addr = format!("127.0.0.1:{}", full_node_port);
 
     let config = NetworkConfig::new()
         .ping_interval(consts::NETWORK_PING_INTERVAL)
         .peer_trust_metric(consts::NETWORK_TRUST_METRIC_INTERVAL, None)
         .expect("peer trust")
-        .bootstraps(vec![(full_node_hex_pubkey, full_node_addr)])
+        .bootstraps(vec![(full_node_peer_id.to_base58(), full_node_addr)])
         .expect("test node config");
     let priv_key = Secp256k1PrivateKey::generate(&mut rand::rngs::OsRng);
 
@@ -290,23 +289,17 @@ impl Deref for ClientNode {
     }
 }
 
-fn full_node_hex_pubkey() -> String {
+fn full_node_peer_id() -> PeerId {
     let config: Config =
         common_config_parser::parse(&consts::CHAIN_CONFIG_PATH).expect("parse chain config.toml");
 
     let mut bootstraps = config.network.bootstraps.expect("config.toml full node");
     let full_node = bootstraps.pop().expect("there should be one bootstrap");
 
-    full_node.pubkey.as_string_trim0x()
-}
-
-fn full_node_peer_id(hex_pubkey: &str) -> PeerId {
-    let pubkey = {
-        let pubkey_bytes = hex::decode(hex_pubkey).expect("decode hex full node pubkey");
-        tentacle::secio::PublicKey::secp256k1_raw_key(pubkey_bytes).expect("decode pubkey")
-    };
-
-    pubkey.peer_id()
+    let peer_id_bytes = bs58::decode(full_node.peer_id)
+        .into_vec()
+        .expect("decode base58 peer id");
+    PeerId::from_bytes(peer_id_bytes).expect("peer id from")
 }
 
 fn mock_block(height: u64) -> Block {

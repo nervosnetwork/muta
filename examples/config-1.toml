@@ -1,5 +1,5 @@
 data_path = "./devtools/chain/data/1"
-privkey = "0x592d6f62cd5c3464d4956ea585ec7007bcf5217eb89cc50bf14eea95f3b09706"
+privkey = "0xb4116bd2d920058dceb7a9aa3cbfd842e58492dd85de6defa2627bda5ad4a6c4"
 
 [network]
 listening_address = "0.0.0.0:1337"

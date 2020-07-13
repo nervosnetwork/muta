@@ -25,9 +25,9 @@ payload = '''
     "interval": 3000,
     "verifier_list": [
         {
-            "bls_pub_key": "0x040c3393c426ddbc2ed817ad2069c3d0dbf7257a295d55983246eec21f927095e003a8214ca33f5555a2b2f3a5a6c85eac19b657e6742720ef7de10945f84bbefdb48a6f3ca9ef891c13f7eaede2a96462e79e2949d9e86bf9a831da67e1a568e0",
-            "address": "0x2963cb2595fce9ea9f2ae22bcf9bb06cb500f821",
-            "peer_id": "0x1220a8fa41c212812f49b01b96b9cc9f00c21593ab843eae1417548d6725c134f080",
+            "bls_pub_key": "0x0415e096d77867ebd9a36581ed91afbb3377a653beb76dfd1acc6f078838d2e40a8819444698923f9fccf367ab8d276fec099b857e35bef77df53327e5d2165ceef813b9289cc75c0140465777b76e37a8d5762d2eef9aff94a8ec52aed6be30a2",
+            "address": "0x5235aaa2a4d20b513728afb0f13dc695443f1a80",
+            "peer_id": "0x1220100b9942e60a55abcbf25b8700ece7552ed8d680be62e9fe50aba9951b9ff5d6",
             "propose_weight": 1,
             "vote_weight": 1
         }

@@ -47,7 +47,7 @@ rand = "0.7"
 cita_trie = "2.0"
 core-network = { path = "./core/network", features = ["diagnostic"] }
 tokio = { version = "0.2", features = ["full"] }
-tentacle = { git = "https://github.com/zeroqn/p2p", branch = "v0.3.0.alpha5-muta", features = [ "molc" ]}
+bs58 = "0.3"
 
 [workspace]
 members = [
