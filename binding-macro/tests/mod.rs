@@ -102,6 +102,31 @@ fn test_tx_hooks() {
 }
 
 #[test]
+fn test_tx_hooks() {
+    struct Tests {
+        pub height: u64,
+    };
+
+    impl Tests {
+        #[tx_hook_after]
+        fn tx_hook_after(&mut self, params: &ExecutorParams) {
+            self.height = params.height;
+        }
+
+        #[tx_hook_before]
+        fn tx_hook_before(&mut self, params: &ExecutorParams) {
+            self.height = params.height;
+        }
+    }
+
+    let mut t = Tests { height: 0 };
+    t.tx_hook_after(&mock_executor_params());
+    assert_eq!(t.height, 9);
+    t.tx_hook_before(&mock_executor_params());
+    assert_eq!(t.height, 9);
+}
+
+#[test]
 fn test_read_and_write_with_noneparams() {
     struct Tests;
 
