@@ -197,6 +197,10 @@ pub fn mock_address() -> Address {
     Address::from_hash(hash).unwrap()
 }
 
+pub fn mock_peer_id(s: &'static str) -> Bytes {
+    Hash::digest(Bytes::from(s)).as_bytes()
+}
+
 pub fn mock_hash() -> Hash {
     Hash::digest(Bytes::from("mock"))
 }
@@ -277,9 +281,9 @@ pub fn mock_event() -> Event {
 // Mock Block
 // #####################
 
-pub fn mock_validator() -> Validator {
+pub fn mock_validator(s: &'static str) -> Validator {
     Validator {
-        peer_id:        get_random_bytes(16),
+        peer_id:        mock_peer_id(s),
         propose_weight: 1,
         vote_weight:    1,
     }
@@ -312,10 +316,10 @@ pub fn mock_block_header() -> BlockHeader {
         proof:                          mock_proof(),
         validator_version:              1,
         validators:                     vec![
-            mock_validator(),
-            mock_validator(),
-            mock_validator(),
-            mock_validator(),
+            mock_validator("a"),
+            mock_validator("b"),
+            mock_validator("c"),
+            mock_validator("d"),
         ],
     }
 }
@@ -325,9 +329,4 @@ pub fn mock_block(order_size: usize) -> Block {
         header:            mock_block_header(),
         ordered_tx_hashes: (0..order_size).map(|_| mock_hash()).collect(),
     }
-}
-
-fn get_random_bytes(len: usize) -> Bytes {
-    let vec: Vec<u8> = (0..len).map(|_| rand::random::<u8>()).collect();
-    Bytes::from(vec)
 }
