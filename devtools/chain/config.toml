@@ -1,5 +1,5 @@
 # crypto
-privkey = "0x45c56be699dca666191ad3446897e0f480da234da896270202514a0e1a587c3f"
+privkey = "0x4a33067c449635c434cc758ed5f595e1f5653debc45233997c93814c31f710d5"
 
 # db config
 data_path = "./devtools/chain/data"
@@ -20,7 +20,7 @@ rpc_timeout = 10
 sync_txs_chunk_size = 5000
 
 [[network.bootstraps]]
-pubkey = "0x031288a6788678c25952eba8693b2f278f66e2187004b64ac09416d07f83f96d5b"
+pubkey = "0x026c184a9016f6f71a234c86b141621f38b68c78602ab06768db4d83682c616004"
 address = "0.0.0.0:1888"
 
 [mempool]

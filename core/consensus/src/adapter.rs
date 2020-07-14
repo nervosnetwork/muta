@@ -548,11 +548,11 @@ where
 
         let authority_map = previous_metadata
             .verifier_list
-            .into_iter()
+            .iter()
             .map(|v| {
-                let address = v.address.as_bytes();
+                let address = v.pub_key.decode();
                 let node = Node {
-                    address:        v.address.as_bytes(),
+                    address:        v.pub_key.decode(),
                     propose_weight: v.propose_weight,
                     vote_weight:    v.vote_weight,
                 };
@@ -563,7 +563,10 @@ where
         // TODO: useless check
         // check proposer
         if block.header.height != 0
-            && !authority_map.contains_key(&block.header.proposer.as_bytes())
+            && !previous_metadata
+                .verifier_list
+                .iter()
+                .any(|v| v.address == block.header.proposer)
         {
             log::error!(
                 "[consensus] verify_block_header, block.header.proposer: {:?}, authority_map: {:?}",
@@ -575,10 +578,10 @@ where
 
         // check validators
         for validator in block.header.validators.iter() {
-            if !authority_map.contains_key(&validator.address.as_bytes()) {
+            if !authority_map.contains_key(&validator.pub_key) {
                 log::error!(
-                    "[consensus] verify_block_header, validator.address: {:?}, authority_map: {:?}",
-                    validator.address,
+                    "[consensus] verify_block_header, validator.pub_key: {:?}, authority_map: {:?}",
+                    validator.pub_key,
                     authority_map
                 );
                 return Err(ConsensusError::VerifyBlockHeader(
@@ -587,14 +590,14 @@ where
                 )
                 .into());
             } else {
-                let node = authority_map.get(&validator.address.as_bytes()).unwrap();
+                let node = authority_map.get(&validator.pub_key).unwrap();
 
                 if node.vote_weight != validator.vote_weight
                     || node.propose_weight != validator.vote_weight
                 {
                     log::error!(
-                        "[consensus] verify_block_header, validator.address: {:?}, authority_map: {:?}",
-                        validator.address,
+                        "[consensus] verify_block_header, validator.pub_key: {:?}, authority_map: {:?}",
+                        validator.pub_key,
                         authority_map
                     );
                     return Err(ConsensusError::VerifyBlockHeader(
@@ -664,7 +667,7 @@ where
             .verifier_list
             .iter()
             .map(|v| Node {
-                address:        v.address.as_bytes(),
+                address:        v.pub_key.decode(),
                 propose_weight: v.propose_weight,
                 vote_weight:    v.vote_weight,
             })
@@ -686,7 +689,7 @@ where
             .iter()
             .map(|node| (node.address.clone(), node.vote_weight))
             .collect::<HashMap<overlord::types::Address, u32>>();
-        self.verity_proof_weight(
+        self.verify_proof_weight(
             ctx.clone(),
             block.header.height,
             weight_map,
@@ -698,7 +701,7 @@ where
             .verifier_list
             .iter()
             .filter_map(|v| {
-                if signed_voters.contains(&v.address.as_bytes()) {
+                if signed_voters.contains(&v.pub_key.decode()) {
                     Some(v.bls_pub_key.clone())
                 } else {
                     None
@@ -748,7 +751,7 @@ where
     }
 
     #[muta_apm::derive::tracing_span(kind = "consensus.adapter")]
-    fn verity_proof_weight(
+    fn verify_proof_weight(
         &self,
         ctx: Context,
         block_height: u64,
@@ -765,7 +768,7 @@ where
                     .ok_or(ConsensusError::VerifyProof(block_height, WeightNotFound))
                     .map_err(|e| {
                         log::error!(
-                            "[consensus] verity_proof_weight,signed_voter_address: {:?}",
+                            "[consensus] verify_proof_weight,signed_voter_address: {:?}",
                             signed_voter_address
                         );
                         e
@@ -773,7 +776,7 @@ where
                 accumulator += u64::from(*(weight));
             } else {
                 log::error!(
-                    "[consensus] verity_proof_weight, weight not found, signed_voter_address: {:?}",
+                    "[consensus] verify_proof_weight, weight not found, signed_voter_address: {:?}",
                     signed_voter_address
                 );
                 return Err(
@@ -784,7 +787,7 @@ where
 
         if 3 * accumulator <= 2 * total_validator_weight {
             log::error!(
-                "[consensus] verity_proof_weight, accumulator: {}, total: {}",
+                "[consensus] verify_proof_weight, accumulator: {}, total: {}",
                 accumulator,
                 total_validator_weight
             );
