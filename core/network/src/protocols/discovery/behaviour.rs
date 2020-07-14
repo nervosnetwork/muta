@@ -1,6 +1,6 @@
 use super::{
     addr::{AddressManager, ConnectableAddr, DEFAULT_MAX_KNOWN},
-    message::{DiscoveryMessage, Node, Nodes},
+    message::{DiscoveryMessage, Nodes},
     substream::{RemoteAddress, Substream, SubstreamKey, SubstreamValue},
 };
 
@@ -205,17 +205,13 @@ impl DiscoveryBehaviour {
             if !announce_multiaddrs.is_empty() {
                 let items = announce_multiaddrs
                     .into_iter()
-                    .map(|addr| Node {
-                        addresses: vec![addr],
-                    })
+                    .map(|addr| vec![addr])
                     .collect::<Vec<_>>();
-                let nodes = Nodes {
-                    announce: true,
-                    items,
-                };
+
+                let announce = true;
                 value
                     .pending_messages
-                    .push_back(DiscoveryMessage::Nodes(nodes));
+                    .push_back(DiscoveryMessage::new_nodes(announce, items));
             }
 
             match value.send_messages(cx) {
@@ -277,8 +273,9 @@ impl Stream for DiscoveryBehaviour {
                 let addrs = nodes
                     .items
                     .into_iter()
-                    .flat_map(|node| node.addresses.into_iter())
+                    .flat_map(|node| node.addrs())
                     .collect::<Vec<_>>();
+
                 self.addr_mgr.add_new_addrs(session_id, addrs);
                 Poll::Ready(Some(()))
             }
