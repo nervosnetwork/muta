@@ -20,7 +20,7 @@ rpc_timeout = 10
 sync_txs_chunk_size = 5000
 
 [[network.bootstraps]]
-pubkey = "0x026c184a9016f6f71a234c86b141621f38b68c78602ab06768db4d83682c616004"
+peer_id = "QmeG2AjWkLbK5ThySV7TrX5KuFryPsaM8GBgDs6Ch1Z5xJ"
 address = "0.0.0.0:1888"
 
 [mempool]

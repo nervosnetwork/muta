@@ -2,8 +2,8 @@ use super::{Inner, WORSE_TRUST_SCALAR_RATIO};
 use crate::event::PeerManagerEvent;
 
 use derive_more::Display;
-use protocol::{traits::TrustFeedback, types::Address};
-use tentacle::SessionId;
+use protocol::traits::TrustFeedback;
+use tentacle::{secio::PeerId, SessionId};
 
 use std::sync::Arc;
 
@@ -70,10 +70,8 @@ impl Diagnostic {
         Diagnostic(inner)
     }
 
-    pub fn session_by_chain(&self, addr: &Address) -> Option<SessionId> {
-        let chain = self.0.chain.read();
-
-        match chain.get(addr).map(|peer| peer.session_id()) {
+    pub fn session(&self, peer_id: &PeerId) -> Option<SessionId> {
+        match self.0.peer(peer_id).map(|p| p.session_id()) {
             Some(sid) if sid != SessionId::new(0) => Some(sid),
             _ => None,
         }

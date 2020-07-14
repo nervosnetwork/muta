@@ -113,7 +113,7 @@ where
 
             MessageTarget::Specified(addr) => {
                 self.network
-                    .users_cast(ctx, end, vec![addr], msg, Priority::High)
+                    .multicast(ctx, end, vec![addr], msg, Priority::High)
                     .await
             }
         }

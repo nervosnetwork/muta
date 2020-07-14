@@ -6,7 +6,7 @@ listening_address = "0.0.0.0:1340"
 rpc_timeout = 10
 
 [[network.bootstraps]]
-pubkey = "0x038aa869ca5e2f092a8b9de0c60c57adb0836d9ca277c0eccdae2833460f027106"
+peer_id = "QmeG2AjWkLbK5ThySV7TrX5KuFryPsaM8GBgDs6Ch1Z5xJ"
 address = "localhost:1337" # Replace it with your IP
 
 [graphql]

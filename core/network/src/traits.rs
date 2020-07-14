@@ -31,7 +31,7 @@ pub trait NetworkProtocol {
 #[async_trait]
 pub trait MessageSender {
     fn send(&self, tar: TargetSession, msg: Bytes, pri: Priority) -> Result<(), NetworkError>;
-    async fn users_send(&self, users: Vec<Address>, msg: Bytes, pri: Priority) -> Result<(), NetworkError>;
+    async fn multisend(&self, peers: Vec<PeerId>, msg: Bytes, pri: Priority) -> Result<(), NetworkError>;
 }
 
 pub trait Compression {
@@ -61,8 +61,7 @@ pub trait SessionBook {
     fn all_sendable(&self) -> Vec<SessionId>;
     fn all_blocked(&self) -> Vec<SessionId>;
     fn refresh_blocked(&self);
-    fn by_chain(&self, addrs: Vec<Address>) -> (Vec<SessionId>, Vec<Address>);
-    fn peers_by_chain(&self, addrs: Vec<Address>) -> (Vec<PeerId>, Vec<Address>);
+    fn peers(&self, pids: Vec<PeerId>) -> (Vec<SessionId>, Vec<PeerId>);
     fn all(&self) -> Vec<SessionId>;
     fn connected_addr(&self, sid: SessionId) -> Option<ConnectedAddr>;
     fn pending_data_size(&self, sid: SessionId) -> usize;

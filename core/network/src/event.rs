@@ -170,6 +170,8 @@ pub enum PeerManagerEvent {
         feedback: TrustFeedback,
     },
 
+    // FIXME: Reomve Whitelist
+    #[allow(dead_code)]
     #[display(fmt = "whitelist peers by chain addresses {:?}", chain_addrs)]
     WhitelistPeersByChainAddr { chain_addrs: Vec<Address> },
 
