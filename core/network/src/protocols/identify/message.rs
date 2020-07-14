@@ -1,87 +1,42 @@
-use super::message_mol;
-
-use molecule::prelude::{Builder, Entity, Reader};
-use protocol::Bytes;
+use prost::{EncodeError, Message};
+use protocol::{Bytes, BytesMut};
 use tentacle::multiaddr::Multiaddr;
 
 use std::convert::TryFrom;
 
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct IdentifyMessage<'a> {
-    pub(crate) listen_addrs:  Vec<Multiaddr>,
-    pub(crate) observed_addr: Multiaddr,
-    pub(crate) identify:      &'a [u8],
+#[derive(Clone, PartialEq, Eq, Message)]
+pub struct IdentifyMessage {
+    #[prost(bytes, repeated, tag = "1")]
+    pub listen_addrs:  Vec<Vec<u8>>,
+    #[prost(bytes, tag = "2")]
+    pub observed_addr: Vec<u8>,
+    #[prost(string, tag = "3")]
+    pub identify:      String,
 }
 
-impl<'a> IdentifyMessage<'a> {
-    pub(crate) fn new(
-        listen_addrs: Vec<Multiaddr>,
-        observed_addr: Multiaddr,
-        identify: &'a [u8],
-    ) -> Self {
+impl IdentifyMessage {
+    pub fn new(listen_addrs: Vec<Multiaddr>, observed_addr: Multiaddr, identify: String) -> Self {
         IdentifyMessage {
-            listen_addrs,
-            observed_addr,
+            listen_addrs: listen_addrs.into_iter().map(|addr| addr.to_vec()).collect(),
+            observed_addr: observed_addr.to_vec(),
             identify,
         }
     }
 
-    pub(crate) fn encode(self) -> Bytes {
-        let identify = message_mol::Bytes::new_builder()
-            .set(self.identify.to_vec().into_iter().map(Into::into).collect())
-            .build();
-        let observed_addr = message_mol::Address::new_builder()
-            .bytes(
-                message_mol::Bytes::new_builder()
-                    .set(
-                        self.observed_addr
-                            .to_vec()
-                            .into_iter()
-                            .map(Into::into)
-                            .collect(),
-                    )
-                    .build(),
-            )
-            .build();
-        let mut listen_addrs = Vec::with_capacity(self.listen_addrs.len());
-        for addr in self.listen_addrs {
-            listen_addrs.push(
-                message_mol::Address::new_builder()
-                    .bytes(
-                        message_mol::Bytes::new_builder()
-                            .set(addr.to_vec().into_iter().map(Into::into).collect())
-                            .build(),
-                    )
-                    .build(),
-            )
-        }
-        let listen_addrs = message_mol::AddressVec::new_builder()
-            .set(listen_addrs)
-            .build();
-
-        message_mol::IdentifyMessage::new_builder()
-            .listen_addrs(listen_addrs)
-            .observed_addr(observed_addr)
-            .identify(identify)
-            .build()
-            .as_bytes()
+    pub fn listen_addrs(&self) -> Vec<Multiaddr> {
+        let addrs = self.listen_addrs.iter().cloned();
+        let to_multiaddrs = addrs.filter_map(|bytes| Multiaddr::try_from(bytes).ok());
+        to_multiaddrs.collect()
     }
 
-    pub(crate) fn decode(data: &'a [u8]) -> Option<Self> {
-        let reader = message_mol::IdentifyMessageReader::from_compatible_slice(data).ok()?;
+    pub fn observed_addr(&self) -> Option<Multiaddr> {
+        Multiaddr::try_from(self.observed_addr.clone()).ok()
+    }
 
-        let identify = reader.identify().raw_data();
-        let observed_addr =
-            Multiaddr::try_from(reader.observed_addr().bytes().raw_data().to_vec()).ok()?;
-        let mut listen_addrs = Vec::with_capacity(reader.listen_addrs().len());
-        for addr in reader.listen_addrs().iter() {
-            listen_addrs.push(Multiaddr::try_from(addr.bytes().raw_data().to_vec()).ok()?)
-        }
+    pub fn to_bytes(self) -> Result<Bytes, EncodeError> {
+        let mut buf = BytesMut::with_capacity(self.encoded_len());
+        self.encode(&mut buf)?;
 
-        Some(IdentifyMessage {
-            identify,
-            observed_addr,
-            listen_addrs,
-        })
+        Ok(buf.freeze())
     }
 }

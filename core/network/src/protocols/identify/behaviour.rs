@@ -2,7 +2,7 @@ use super::common::reachable;
 use crate::{event::PeerManagerEvent, peer_manager::PeerManagerHandle};
 
 use futures::channel::mpsc::UnboundedSender;
-use log::{debug, trace};
+use log::{debug, trace, warn};
 use tentacle::{
     context::{ProtocolContextMutRef, SessionContext},
     multiaddr::Multiaddr,
@@ -115,8 +115,8 @@ impl IdentifyBehaviour {
         }
     }
 
-    pub fn identify(&mut self) -> &[u8] {
-        b"Identify message"
+    pub fn identify(&mut self) -> &str {
+        "Identify message"
     }
 
     pub fn process_listens(
@@ -143,12 +143,20 @@ impl IdentifyBehaviour {
     pub fn process_observed(
         &mut self,
         info: &mut RemoteInfo,
-        observed: Multiaddr,
+        observed: Option<Multiaddr>,
     ) -> MisbehaveResult {
         if info.observed_addr.is_some() {
             debug!("remote({:?}) repeat send listen addresses", info.peer_id);
             self.misbehave(&info.peer_id, Misbehavior::DuplicateObservedAddr)
         } else {
+            let observed = match observed {
+                Some(addr) => addr,
+                None => {
+                    warn!("observed is none from peer {:?}", info.peer_id);
+                    return MisbehaveResult::Disconnect;
+                }
+            };
+
             trace!("received observed address: {}", observed);
             let mut unobservable = |info: &mut RemoteInfo, observed| -> bool {
                 self.add_observed_addr(&info.peer_id, observed, info.session.ty)
