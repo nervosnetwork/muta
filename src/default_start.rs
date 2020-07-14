@@ -58,6 +58,7 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
         .iter()
         .map(|v| Validator {
             pub_key:        v.pub_key.decode(),
+            address:        v.address.as_bytes(),
             propose_weight: v.propose_weight,
             vote_weight:    v.vote_weight,
         })
@@ -296,6 +297,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         .iter()
         .map(|v| Validator {
             pub_key:        v.pub_key.decode(),
+            address:        v.address.as_bytes(),
             propose_weight: v.propose_weight,
             vote_weight:    v.vote_weight,
         })

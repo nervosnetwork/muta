@@ -284,6 +284,7 @@ pub fn mock_event() -> Event {
 pub fn mock_validator(s: &'static str) -> Validator {
     Validator {
         pub_key:        mock_pub_key(s),
+        address:        mock_address().as_bytes(),
         propose_weight: 1,
         vote_weight:    1,
     }

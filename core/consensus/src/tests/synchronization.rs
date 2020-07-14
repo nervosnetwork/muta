@@ -679,6 +679,9 @@ fn mock_chained_rich_block(len: u64, gap: u64, key_tool: &KeyTool) -> (Vec<RichB
                 )
                 .unwrap()
                 .decode(),
+                address:        Address::from_hex("0x40e680f764a84c3add6753685aecf59700e24a4b")
+                    .unwrap()
+                    .as_bytes(),
                 propose_weight: 5,
                 vote_weight:    5,
             }],
@@ -763,6 +766,9 @@ fn mock_genesis_rich_block() -> RichBlock {
             )
             .unwrap()
             .decode(),
+            address:        Address::from_hex("0x40e680f764a84c3add6753685aecf59700e24a4b")
+                .unwrap()
+                .as_bytes(),
             propose_weight: 0,
             vote_weight:    0,
         }],
