@@ -40,7 +40,7 @@ pipelineConfig:
 
             steps:
               - name: watchdog
-                image: mutadev/muta-watchdog:v0.1.0
+                image: mutadev/muta-watchdog:v0.1.1
                 env:
                   - name: WATCH_DURATION
                     value: 4H
