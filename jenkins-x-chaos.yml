@@ -39,25 +39,6 @@ pipelineConfig:
                         path: config.json
 
             steps:
-              - name: watchdog
-                image: mutadev/muta-watchdog:v0.1.2
-                env:
-                  - name: WATCH_DURATION
-                    value: 4H
-                  - name: APP_NAMESPACE
-                    value: mutadev
-                  - name: APP_PORT
-                    value: "8000"
-                  - name: APP_GRAPHQL_URL
-                    value: graphql
-                  - name: JOB_BENCHMARK_DURATION
-                    value: "300"
-                  - name: JOB_BENCHMARK_TIMEOUT_GAP
-                    value: "9999"
-                  - name: JOB_BENCHMARK_CPU
-                    value: "3"
-                command: APP_NAME=chaos-${REPO_NAME}-pr-${PULL_NUMBER}-${BUILD_NUMBER} node /watchdog/index.js
-
               - name: build-release
                 image: mutadev/muta-build-env:v0.3.0
                 env:
@@ -92,6 +73,25 @@ pipelineConfig:
                   - mutadev
                   - --set
                   - size=${NODE_SIZE},repo_name=${REPO_NAME},version=pr-${PULL_NUMBER}-${BUILD_NUMBER},resources.cpu=1100m,resources.memory=8Gi,chain_genesis.metadata.timeout_gap=${CHAIN_GENESIS_TIMEOUT_GAP}
+              
+              - name: watchdog
+                image: mutadev/muta-watchdog:v0.1.2
+                env:
+                  - name: WATCH_DURATION
+                    value: 4H
+                  - name: APP_NAMESPACE
+                    value: mutadev
+                  - name: APP_PORT
+                    value: "8000"
+                  - name: APP_GRAPHQL_URL
+                    value: graphql
+                  - name: JOB_BENCHMARK_DURATION
+                    value: "300"
+                  - name: JOB_BENCHMARK_TIMEOUT_GAP
+                    value: "9999"
+                  - name: JOB_BENCHMARK_CPU
+                    value: "3"
+                command: APP_NAME=chaos-${REPO_NAME}-pr-${PULL_NUMBER}-${BUILD_NUMBER} node /watchdog/index.js
 
               - name: delete-chaos-crd
                 image: alpine/helm:3.2.4
