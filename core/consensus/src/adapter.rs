@@ -578,10 +578,12 @@ where
 
         // check validators
         for validator in block.header.validators.iter() {
+            let validator_address = Address::from_pubkey_bytes(validator.pub_key);
+
             if !authority_map.contains_key(&validator.pub_key) {
                 log::error!(
-                    "[consensus] verify_block_header, validator.pub_key: {:?}, authority_map: {:?}",
-                    validator.pub_key,
+                    "[consensus] verify_block_header, validator.address: {:?}, authority_map: {:?}",
+                    validator_address,
                     authority_map
                 );
                 return Err(ConsensusError::VerifyBlockHeader(
@@ -596,8 +598,8 @@ where
                     || node.propose_weight != validator.vote_weight
                 {
                     log::error!(
-                        "[consensus] verify_block_header, validator.pub_key: {:?}, authority_map: {:?}",
-                        validator.pub_key,
+                        "[consensus] verify_block_header, validator.address: {:?}, authority_map: {:?}",
+                        validator_address,
                         authority_map
                     );
                     return Err(ConsensusError::VerifyBlockHeader(
