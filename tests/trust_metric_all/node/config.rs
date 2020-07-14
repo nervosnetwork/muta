@@ -30,7 +30,7 @@ pub struct ConfigNetwork {
 
 #[derive(Debug, Deserialize)]
 pub struct ConfigNetworkBootstrap {
-    pub pubkey:  Hex,
+    pub peer_id: String,
     pub address: String,
 }
 
