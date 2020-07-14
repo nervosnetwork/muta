@@ -82,7 +82,7 @@ describe("API test via @mutadev/muta-sdk-js", () => {
 
     const multiSigService = new MultiSigService(mutaClient, wangYe);
 
-    const GenerateMultiSigAccountPayload = {
+    var GenerateMultiSigAccountPayload = {
       owner: wangYe.address,
       addr_with_weight: [{ address: wangYe.address, weight: 1 }, { address: qing.address, weight: 1 }],
       threshold: 2,
@@ -108,7 +108,7 @@ describe("API test via @mutadev/muta-sdk-js", () => {
       await mutaClient.sendTransaction(signedCreateAssetTx);
       throw 'should failed';
     } catch(e) {
-      expect(String(e)).toContain('CheckSig');
+      expect(String(e)).toContain('CheckAuthorization');
     }
 
     const bothSignedCreateAssetTx = qing.signTransaction(signedCreateAssetTx);
@@ -126,5 +126,61 @@ describe("API test via @mutadev/muta-sdk-js", () => {
 
     expect(Number(balance.code)).toBe(0);
     expect(Number(balance.succeedData.balance)).toBe(2077);
+
+    const newMultiSigAccountPayload = {
+      owner: wangYe.address,
+      addr_with_weight: [{ address: wangYe.address, weight: 3 }, { address: qing.address, weight: 1 }],
+      threshold: 4,
+      memo: 'welcome to BiYouCun'
+    };
+
+    const updateAccountPayload = {
+      account_address: multiSigAddress,
+      new_account_info: newMultiSigAccountPayload,
+    };
+
+    const update = await multiSigService.write.update_account(updateAccountPayload);
+    expect(Number(update.response.response.code)).toBe(0);
+
+    const fei = Account.fromPrivateKey(
+      '0x3000000000000000000000000000000000000000000000000000000000000000',
+    );
+
+    var GenerateMultiSigAccountPayload = {
+      owner: wangYe.address,
+      addr_with_weight: [{ address: multiSigAddress, weight: 2 }, { address: fei.address, weight: 1 }],
+      threshold: 2,
+      memo: 'welcome to CiYouCun'
+    };
+    const newGenerate = await multiSigService.write.generate_account(GenerateMultiSigAccountPayload);
+    expect(Number(newGenerate.response.response.code)).toBe(0);
+
+    const newMultiSigAddress = newGenerate.response.response.succeedData.address;
+    const newAssetTx = await mutaClient.composeTransaction({
+      method: 'create_asset',
+      payload: {
+        name: 'miaomiao',
+        supply: 2078,
+        symbol: '😺😺',
+      },
+      serviceName: 'asset',
+      sender: newMultiSigAddress,
+    });
+
+    const newSignedCreateAssetTx = wangYe.signTransaction(newAssetTx);
+    const newBothCreateAssetTx = qing.signTransaction(newSignedCreateAssetTx);
+    const newTxHash = await mutaClient.sendTransaction(newBothCreateAssetTx);
+    const newReceipt = await retry(() => mutaClient.getReceipt(toHex(newTxHash)));
+    expect(Number(newReceipt.response.response.code)).toBe(0);
+
+    const newAsset = JSON.parse(newReceipt.response.response.succeedData as string);
+    const newAssetService = new AssetService(mutaClient, wangYe);
+    const newBalance = await newAssetService.read.get_balance({
+      asset_id: newAsset.id,
+      user: newMultiSigAddress,
+    });
+
+    expect(Number(newBalance.code)).toBe(0);
+    expect(Number(newBalance.succeedData.balance)).toBe(2078);
   });
 });
