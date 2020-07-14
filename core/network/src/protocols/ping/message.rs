@@ -28,7 +28,7 @@ impl PingMessage {
         }
     }
 
-    pub fn to_bytes(self) -> Result<Bytes, EncodeError> {
+    pub fn into_bytes(self) -> Result<Bytes, EncodeError> {
         let mut buf = BytesMut::with_capacity(self.encoded_len());
         self.encode(&mut buf)?;
 
