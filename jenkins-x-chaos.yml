@@ -40,7 +40,7 @@ pipelineConfig:
 
             steps:
               - name: watchdog
-                image: mutadev/muta-watchdog:v0.1.1
+                image: mutadev/muta-watchdog:v0.1.2
                 env:
                   - name: WATCH_DURATION
                     value: 4H
@@ -56,7 +56,7 @@ pipelineConfig:
                     value: "9999"
                   - name: JOB_BENCHMARK_CPU
                     value: "3"
-                command: APP_NAME=chaos-${REPO_NAME}-pr-${PULL_NUMBER}-${BUILD_NUMBER} node /app/index.js
+                command: APP_NAME=chaos-${REPO_NAME}-pr-${PULL_NUMBER}-${BUILD_NUMBER} node /watchdog/index.js
 
               - name: build-release
                 image: mutadev/muta-build-env:v0.3.0
