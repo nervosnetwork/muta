@@ -97,13 +97,10 @@ pub struct Validator {
     #[prost(bytes, tag = "1")]
     pub pub_key: Vec<u8>,
 
-    #[prost(bytes, tag = "2")]
-    pub address: Vec<u8>,
-
-    #[prost(uint32, tag = "3")]
+    #[prost(uint32, tag = "2")]
     pub propose_weight: u32,
 
-    #[prost(uint32, tag = "4")]
+    #[prost(uint32, tag = "3")]
     pub vote_weight: u32,
 }
 
@@ -302,7 +299,6 @@ impl From<block::Validator> for Validator {
     fn from(validator: block::Validator) -> Validator {
         Validator {
             pub_key:        validator.pub_key.to_vec(),
-            address:        validator.address.to_vec(),
             propose_weight: validator.propose_weight,
             vote_weight:    validator.vote_weight,
         }
@@ -315,7 +311,6 @@ impl TryFrom<Validator> for block::Validator {
     fn try_from(validator: Validator) -> Result<block::Validator, Self::Error> {
         let validator = block::Validator {
             pub_key:        Bytes::from(validator.pub_key),
-            address:        Bytes::from(validator.address),
             propose_weight: validator.propose_weight,
             vote_weight:    validator.vote_weight,
         };

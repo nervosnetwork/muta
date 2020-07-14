@@ -203,7 +203,6 @@ fn mock_validators(len: usize) -> Vec<Validator> {
 fn mock_validator() -> Validator {
     Validator {
         pub_key:        mock_pub_key().decode(),
-        address:        mock_address().as_bytes(),
         propose_weight: random::<u32>(),
         vote_weight:    random::<u32>(),
     }

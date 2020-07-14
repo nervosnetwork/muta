@@ -147,7 +147,6 @@ impl CurrentConsensusStatus {
             .iter()
             .map(|v| Validator {
                 pub_key:        v.pub_key.decode(),
-                address:        v.address.as_bytes(),
                 propose_weight: v.propose_weight,
                 vote_weight:    v.vote_weight,
             })
