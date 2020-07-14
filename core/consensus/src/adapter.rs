@@ -578,7 +578,7 @@ where
 
         // check validators
         for validator in block.header.validators.iter() {
-            let validator_address = Address::from_pubkey_bytes(validator.pub_key);
+            let validator_address = Address::from_pubkey_bytes(validator.pub_key.clone());
 
             if !authority_map.contains_key(&validator.pub_key) {
                 log::error!(
