@@ -39,7 +39,7 @@ quickcheck_macros = "0.8"
 tokio = { version = "0.2", features = ["macros", "rt-core"]}
 
 [features]
-default = ["global_ip_only"]
+default = []
 global_ip_only = []
 diagnostic = []
 
