@@ -64,13 +64,37 @@ pub fn gen_service_code(_: TokenStream, item: TokenStream) -> TokenStream {
     };
     let tx_hook_before = &hooks.tx_before;
     let tx_hook_before_body = match tx_hook_before {
-        Some(tx_hook_before) => quote! { self.#tx_hook_before(_ctx) },
-        None => quote! {()},
+        Some(tx_hook_before) => quote! {
+            let res = self.#tx_hook_before(_ctx);
+            if !res.is_error() {
+                let mut data_json = serde_json::to_string(&res.succeed_data).unwrap_or_else(|e| panic!("encode succeed_data of ServiceResponse failed: {:?}", e));
+                if data_json == "null" {
+                    data_json = "".to_owned();
+                }
+                ServiceResponse::<String>::from_succeed(data_json)
+            } else {
+                ServiceResponse::<String>::from_error(res.code, res.error_message.clone())
+            }
+        },
+        None => quote! {ServiceResponse::<String>::from_succeed("".to_owned())},
     };
     let tx_hook_after = &hooks.tx_after;
     let tx_hook_after_body = match tx_hook_after {
-        Some(tx_hook_after) => quote! { self.#tx_hook_after(_ctx) },
-        None => quote! {()},
+        Some(tx_hook_after) => {
+            quote! {
+                let res = self.#tx_hook_after(_ctx);
+                if !res.is_error() {
+                    let mut data_json = serde_json::to_string(&res.succeed_data).unwrap_or_else(|e| panic!("encode succeed_data of ServiceResponse failed: {:?}", e));
+                    if data_json == "null" {
+                        data_json = "".to_owned();
+                    }
+                    ServiceResponse::<String>::from_succeed(data_json)
+                } else {
+                    ServiceResponse::<String>::from_error(res.code, res.error_message.clone())
+                }
+            }
+        }
+        None => quote! {ServiceResponse::<String>::from_succeed("".to_owned())},
     };
 
     let list_method_meta: Vec<MethodMeta> = methods.into_iter().map(extract_method_meta).collect();
@@ -99,12 +123,12 @@ pub fn gen_service_code(_: TokenStream, item: TokenStream) -> TokenStream {
                 #hook_after_body
             }
 
-            fn tx_hook_before_(&mut self, _ctx: ServiceContext) {
+            fn tx_hook_before_(&mut self, _ctx: ServiceContext) -> ServiceResponse<String> {
                 #tx_hook_before_body
             }
 
-            fn tx_hook_after_(&mut self, _ctx: ServiceContext) {
-                #tx_hook_after_body
+            fn tx_hook_after_(&mut self, _ctx: ServiceContext) -> ServiceResponse<String> {
+                 #tx_hook_after_body
             }
 
             fn read_(&self, ctx: protocol::types::ServiceContext) -> ServiceResponse<String> {

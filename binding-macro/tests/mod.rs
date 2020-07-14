@@ -22,14 +22,15 @@ use protocol::types::{
 fn test_read_and_write() {
     struct Tests;
 
+    #[service]
     impl Tests {
         #[read]
-        fn test_read_fn(&self, _ctx: ServiceContext, _s: &str) -> ServiceResponse<String> {
+        fn test_read_fn(&self, _ctx: ServiceContext) -> ServiceResponse<String> {
             ServiceResponse::<String>::from_succeed("read".to_owned())
         }
 
         #[write]
-        fn test_write_fn(&mut self, _ctx: ServiceContext, _s: &str) -> ServiceResponse<String> {
+        fn test_write_fn(&mut self, _ctx: ServiceContext) -> ServiceResponse<String> {
             ServiceResponse::<String>::from_succeed("write".to_owned())
         }
     }
@@ -38,13 +39,10 @@ fn test_read_and_write() {
 
     let mut t = Tests {};
     assert_eq!(
-        t.test_read_fn(context.clone(), "read").succeed_data,
+        t.test_read_fn(context.clone()).succeed_data,
         "read".to_owned()
     );
-    assert_eq!(
-        t.test_write_fn(context, "write").succeed_data,
-        "write".to_owned()
-    );
+    assert_eq!(t.test_write_fn(context).succeed_data, "write".to_owned());
 }
 
 #[test]
@@ -53,17 +51,16 @@ fn test_hooks() {
         pub height: u64,
     };
 
+    #[service]
     impl Tests {
         #[hook_after]
-        fn hook_after(&mut self, params: &ExecutorParams) -> ServiceResponse<()> {
+        fn hook_after(&mut self, params: &ExecutorParams) {
             self.height = params.height;
-            ServiceResponse::<()>::from_succeed(())
         }
 
         #[hook_before]
-        fn hook_before(&mut self, params: &ExecutorParams) -> ServiceResponse<()> {
+        fn hook_before(&mut self, params: &ExecutorParams) {
             self.height = params.height;
-            ServiceResponse::<()>::from_succeed(())
         }
     }
 
@@ -75,9 +72,40 @@ fn test_hooks() {
 }
 
 #[test]
+fn test_tx_hooks() {
+    struct Tests {
+        pub height: u64,
+    };
+
+    #[service]
+    impl Tests {
+        #[tx_hook_after]
+        fn tx_hook_after(&mut self, _ctx: ServiceContext) -> ServiceResponse<()> {
+            self.height = 9;
+            ServiceResponse::from_succeed(())
+        }
+
+        #[tx_hook_before]
+        fn tx_hook_before(&mut self, _ctx: ServiceContext) -> ServiceResponse<()> {
+            self.height = 10;
+            ServiceResponse::from_succeed(())
+        }
+    }
+
+    let mut t = Tests { height: 0 };
+    let context = get_context(1000, "", "", "");
+
+    t.tx_hook_after(context.clone());
+    assert_eq!(t.height, 9);
+    t.tx_hook_before(context);
+    assert_eq!(t.height, 10);
+}
+
+#[test]
 fn test_read_and_write_with_noneparams() {
     struct Tests;
 
+    #[service]
     impl Tests {
         #[read]
         fn test_read_fn(&self, _ctx: ServiceContext) -> ServiceResponse<()> {
@@ -101,6 +129,7 @@ fn test_read_and_write_with_noneparams() {
 fn test_cycles() {
     struct Tests;
 
+    #[service]
     impl Tests {
         #[cycles(100)]
         fn test_cycles(&self, ctx: ServiceContext) -> ServiceResponse<()> {

@@ -92,9 +92,10 @@ pub trait Service {
     fn hook_after_(&mut self, _params: &ExecutorParams) {}
 
     // Called before tx execution
-    fn tx_hook_before_(&mut self, _ctx: ServiceContext) {}
+    fn tx_hook_before_(&mut self, _ctx: ServiceContext) -> ServiceResponse<String>;
+
     // Called after tx execution
-    fn tx_hook_after_(&mut self, _ctx: ServiceContext) {}
+    fn tx_hook_after_(&mut self, _ctx: ServiceContext) -> ServiceResponse<String>;
 
     fn write_(&mut self, ctx: ServiceContext) -> ServiceResponse<String>;
 
