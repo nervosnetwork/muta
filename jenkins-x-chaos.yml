@@ -60,7 +60,7 @@ pipelineConfig:
                     value: "3"
                 command: node
                 args:
-                  - ./app/index.js
+                  - /app/index.js
 
               - name: build-release
                 image: mutadev/muta-build-env:v0.3.0
