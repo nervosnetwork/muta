@@ -18,9 +18,9 @@ use protocol::{
     traits::{
         Context, Gossip, MessageCodec, MessageHandler, PeerTrust, Priority, Rpc, TrustFeedback,
     },
-    types::Address,
-    ProtocolResult,
+    Bytes, ProtocolResult,
 };
+use tentacle::secio::PeerId;
 
 #[cfg(feature = "diagnostic")]
 use crate::peer_manager::diagnostic::{Diagnostic, DiagnosticHookFn};
@@ -66,18 +66,18 @@ impl Gossip for NetworkServiceHandle {
         self.gossip.broadcast(cx, end, msg, p).await
     }
 
-    async fn users_cast<M>(
+    async fn multicast<M>(
         &self,
         cx: Context,
         end: &str,
-        users: Vec<Address>,
+        peer_ids: Vec<Bytes>,
         msg: M,
         p: Priority,
     ) -> ProtocolResult<()>
     where
         M: MessageCodec,
     {
-        self.gossip.users_cast(cx, end, users, msg, p).await
+        self.gossip.multicast(cx, end, peer_ids, msg, p).await
     }
 }
 
@@ -329,6 +329,10 @@ impl NetworkService {
             #[cfg(feature = "diagnostic")]
             diagnostic:                                self.diagnostic.clone(),
         }
+    }
+
+    pub fn peer_id(&self) -> PeerId {
+        self.config.secio_keypair.peer_id()
     }
 
     pub async fn listen(&mut self, socket_addr: SocketAddr) -> ProtocolResult<()> {
