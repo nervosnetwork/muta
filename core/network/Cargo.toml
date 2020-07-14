@@ -28,7 +28,6 @@ snap = "0.2"
 tentacle = { version = "0.3.0-alpha.5", features = ["molc"]}
 tokio = { version = "0.2", features = ["macros", "rt-core"]}
 tokio-util = { version = "0.2", features = ["codec"] }
-molecule = "0.6"
 hostname = "0.3"
 lazy_static = "1.4"
 
