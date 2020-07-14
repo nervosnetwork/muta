@@ -1,11 +1,12 @@
 use super::{
     addr::{AddrKnown, AddressManager, ConnectableAddr, Misbehavior},
-    message::{DiscoveryCodec, DiscoveryMessage, Node, Nodes},
+    message::{DiscoveryMessage, Nodes, Payload},
 };
 
 use bytes::{BufMut, BytesMut};
 use futures::{channel::mpsc::Receiver, Sink, Stream};
 use log::{debug, trace, warn};
+use prost::Message;
 use tentacle::{
     context::ProtocolContextMutRef,
     error::SendErrorKind,
@@ -15,7 +16,7 @@ use tentacle::{
     ProtocolId, SessionId,
 };
 use tokio::io::{AsyncRead, AsyncWrite};
-use tokio_util::codec::Framed;
+use tokio_util::codec::{length_delimited::LengthDelimitedCodec, Decoder, Encoder, Framed};
 
 use std::{
     collections::VecDeque,
@@ -28,13 +29,62 @@ use std::{
 // FIXME: should be a more high level version number
 const VERSION: u32 = 0;
 // The maximum number of new addresses to accumulate before announcing.
-const MAX_ADDR_TO_SEND: usize = 1000;
+const MAX_ADDR_TO_SEND: u32 = 1000;
 // Every 24 hours send announce nodes message
 const ANNOUNCE_INTERVAL: u64 = 3600 * 24;
 const ANNOUNCE_THRESHOLD: usize = 10;
 
 // The maximum number addresses in on Nodes item
 const MAX_ADDRS: usize = 3;
+
+pub(crate) struct DiscoveryCodec {
+    inner: LengthDelimitedCodec,
+}
+
+impl Default for DiscoveryCodec {
+    fn default() -> DiscoveryCodec {
+        DiscoveryCodec {
+            inner: LengthDelimitedCodec::new(),
+        }
+    }
+}
+
+impl Decoder for DiscoveryCodec {
+    type Error = io::Error;
+    type Item = DiscoveryMessage;
+
+    fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+        match self.inner.decode(src) {
+            Ok(Some(frame)) => {
+                let maybe_msg = DiscoveryMessage::decode(frame.freeze());
+                maybe_msg.map(Some).map_err(|err| {
+                    debug!("deserialize {}", err);
+                    io::ErrorKind::InvalidData.into()
+                })
+            }
+            Ok(None) => Ok(None),
+            Err(err) => {
+                debug!("codec decode {}", err);
+                Err(io::ErrorKind::InvalidData.into())
+            }
+        }
+    }
+}
+
+impl Encoder for DiscoveryCodec {
+    type Error = io::Error;
+    type Item = DiscoveryMessage;
+
+    fn encode(&mut self, item: Self::Item, dst: &mut BytesMut) -> Result<(), Self::Error> {
+        let mut buf = BytesMut::with_capacity(item.encoded_len());
+        item.encode(&mut buf).map_err(|err| {
+            warn!("serialize {}", err);
+            io::ErrorKind::InvalidData
+        })?;
+
+        self.inner.encode(buf.freeze(), dst)
+    }
+}
 
 #[derive(Eq, PartialEq, Hash, Debug, Clone)]
 pub struct SubstreamKey {
@@ -131,11 +181,11 @@ impl SubstreamValue {
         debug!("direction: {:?}", direction);
         let mut addr_known = AddrKnown::new(max_known);
         let remote_addr = if direction.is_outbound() {
-            pending_messages.push_back(DiscoveryMessage::GetNodes {
-                version:     VERSION,
-                count:       MAX_ADDR_TO_SEND as u32,
-                listen_port: substream.listen_port,
-            });
+            pending_messages.push_back(DiscoveryMessage::new_get_nodes(
+                VERSION,
+                MAX_ADDR_TO_SEND,
+                substream.listen_port,
+            ));
             addr_known.insert(ConnectableAddr::from(&substream.remote_addr));
 
             RemoteAddress::Listen(substream.remote_addr)
@@ -201,7 +251,9 @@ impl SubstreamValue {
         addr_mgr: &mut AddressManager,
     ) -> Result<Option<Nodes>, io::Error> {
         match message {
-            DiscoveryMessage::GetNodes { listen_port, .. } => {
+            DiscoveryMessage {
+                payload: Some(Payload::GetNodes(get_nodes)),
+            } => {
                 if self.received_get_nodes {
                     // TODO: misbehavior
                     if addr_mgr
@@ -219,6 +271,7 @@ impl SubstreamValue {
                     let mut items = addr_mgr.get_random(2500);
 
                     // change client random outbound port to client listen port
+                    let listen_port = get_nodes.listen_port();
                     debug!("listen port: {:?}", listen_port);
                     if let Some(port) = listen_port {
                         self.remote_addr.update_port(port);
@@ -236,25 +289,22 @@ impl SubstreamValue {
                             items[idx] = last_item;
                         }
                     }
-                    let items = items
-                        .into_iter()
-                        .map(|addr| Node {
-                            addresses: vec![addr],
-                        })
-                        .collect::<Vec<_>>();
-                    let nodes = Nodes {
-                        announce: false,
-                        items,
-                    };
+
+                    let announce = false;
+                    let items = items.into_iter().map(|addr| vec![addr]).collect::<Vec<_>>();
+
                     self.pending_messages
-                        .push_back(DiscoveryMessage::Nodes(nodes));
+                        .push_back(DiscoveryMessage::new_nodes(announce, items));
+
                     self.received_get_nodes = true;
                 }
             }
-            DiscoveryMessage::Nodes(nodes) => {
+            DiscoveryMessage {
+                payload: Some(Payload::Nodes(nodes)),
+            } => {
                 for item in &nodes.items {
-                    if item.addresses.len() > MAX_ADDRS {
-                        let misbehavior = Misbehavior::TooManyAddresses(item.addresses.len());
+                    if item.addrs.len() > MAX_ADDRS {
+                        let misbehavior = Misbehavior::TooManyAddresses(item.addrs.len());
                         if addr_mgr
                             .misbehave(self.session_id, misbehavior)
                             .is_disconnect()
@@ -293,7 +343,7 @@ impl SubstreamValue {
                         // TODO: more clear error type
                         return Err(io::ErrorKind::Other.into());
                     }
-                } else if nodes.items.len() > MAX_ADDR_TO_SEND {
+                } else if nodes.items.len() > MAX_ADDR_TO_SEND as usize {
                     warn!(
                         "Too many items (announce=false) length={}",
                         nodes.items.len()
@@ -315,6 +365,9 @@ impl SubstreamValue {
                     self.received_nodes = true;
                     return Ok(Some(nodes));
                 }
+            }
+            DiscoveryMessage { payload: None } => {
+                // TODO: misbehavior
             }
         }
         Ok(None)
@@ -338,7 +391,7 @@ impl SubstreamValue {
                     if let Some(nodes) = self.handle_message(message, addr_mgr)? {
                         // Add to known address list
                         for node in &nodes.items {
-                            for addr in &node.addresses {
+                            for addr in node.clone().addrs() {
                                 trace!("received address: {}", addr);
                                 self.addr_known.insert(ConnectableAddr::from(addr));
                             }

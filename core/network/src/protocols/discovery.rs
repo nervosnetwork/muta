@@ -1,9 +1,6 @@
 mod addr;
 mod behaviour;
 mod message;
-#[allow(dead_code)]
-#[allow(clippy::all)]
-mod message_mol; // Auto generated code
 mod protocol;
 mod substream;
 
