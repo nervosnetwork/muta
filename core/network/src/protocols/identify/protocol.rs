@@ -5,6 +5,7 @@ use super::{
 };
 
 use log::{debug, error, trace, warn};
+use prost::Message;
 use tentacle::{
     context::{ProtocolContext, ProtocolContextMutRef},
     multiaddr::{Multiaddr, Protocol},
@@ -79,8 +80,19 @@ impl ServiceProtocol for IdentifyProtocol {
             .collect::<Multiaddr>();
 
         let identify = self.behaviour.identify();
-        let data = IdentifyMessage::new(listen_addrs, observed_addr, identify).encode();
-        let _ = context.quick_send_message(data);
+        let msg = match IdentifyMessage::new(listen_addrs, observed_addr, identify.to_owned())
+            .to_bytes()
+        {
+            Ok(msg) => msg,
+            Err(err) => {
+                warn!("encode {}", err);
+                return;
+            }
+        };
+
+        if let Err(err) = context.quick_send_message(msg) {
+            warn!("quick send message {}", err);
+        }
     }
 
     fn disconnected(&mut self, context: ProtocolContextMutRef) {
@@ -94,8 +106,8 @@ impl ServiceProtocol for IdentifyProtocol {
     fn received(&mut self, mut context: ProtocolContextMutRef, data: bytes::Bytes) {
         let session = context.session;
 
-        match IdentifyMessage::decode(&data) {
-            Some(message) => {
+        match IdentifyMessage::decode(data) {
+            Ok(message) => {
                 let mut remote_info = self
                     .remote_infos
                     .get_mut(&context.session.id)
@@ -104,27 +116,29 @@ impl ServiceProtocol for IdentifyProtocol {
 
                 // Need to interrupt processing, avoid pollution
                 if behaviour
-                    .received_identify(&mut context, message.identify)
+                    .received_identify(&mut context, message.identify.as_bytes())
                     .is_disconnect()
                     || behaviour
-                        .process_listens(&mut remote_info, message.listen_addrs)
+                        .process_listens(&mut remote_info, message.listen_addrs())
                         .is_disconnect()
                     || behaviour
-                        .process_observed(&mut remote_info, message.observed_addr)
+                        .process_observed(&mut remote_info, message.observed_addr())
                         .is_disconnect()
                 {
                     let _ = context.disconnect(session.id);
                 }
             }
-            None => {
+            Err(_) => {
                 let info = self
                     .remote_infos
                     .get(&session.id)
                     .expect("RemoteInfo must exists");
-                debug!(
+
+                warn!(
                     "IdentifyProtocol received invalid data from {:?}",
                     info.peer_id
                 );
+
                 if self
                     .behaviour
                     .misbehave(&info.peer_id, Misbehavior::InvalidData)
