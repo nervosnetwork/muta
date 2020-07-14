@@ -150,17 +150,17 @@ impl ServiceContext {
         self.timestamp
     }
 
-    // pub fn canceled(&self) -> bool {
-    // self.canceled.borrow().is_some()
-    // }
-    //
-    // pub fn cancel_reason(&self) -> Option<Reason> {
-    // self.canceled.borrow().to_owned()
-    // }
-    //
-    // pub fn cancel(&self, reason: String) {
-    // self.canceled.borrow_mut() = Some(reason);
-    // }
+    pub fn canceled(&self) -> bool {
+        self.canceled.borrow().is_some()
+    }
+
+    pub fn cancel_reason(&self) -> Option<Reason> {
+        self.canceled.borrow().to_owned()
+    }
+
+    pub fn cancel(&self, reason: String) {
+        *self.canceled.borrow_mut() = Some(reason);
+    }
 
     pub fn emit_event(&self, name: String, message: String) {
         self.events.borrow_mut().push(Event {
@@ -226,5 +226,13 @@ mod tests {
         assert_eq!(ctx.get_service_name(), "service_name");
         assert_eq!(ctx.get_service_method(), "service_method");
         assert_eq!(ctx.get_payload(), "service_payload");
+
+        let bro = ctx.clone();
+        let reason = "hurry up, bus is about to leave".to_owned();
+
+        ctx.cancel(reason.clone());
+        assert!(ctx.canceled());
+        assert!(bro.canceled());
+        assert_eq!(bro.cancel_reason(), Some(reason));
     }
 }

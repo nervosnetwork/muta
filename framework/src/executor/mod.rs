@@ -426,6 +426,10 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
             }
         }?;
 
+        if ret.is_error() {
+            service_context.cancel("tx_exec_return_code_not_zero".to_owned());
+        }
+
         tx_hooks.after(context, service_context)?;
         self.states.stash()?;
 
