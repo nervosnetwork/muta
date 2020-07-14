@@ -2,6 +2,7 @@ use super::message::{PingMessage, PingPayload};
 
 use futures::channel::mpsc::Sender;
 use log::{debug, error, warn};
+use prost::Message;
 use tentacle::{
     context::{ProtocolContext, ProtocolContextMutRef},
     secio::PeerId,
@@ -151,46 +152,52 @@ impl ServiceProtocol for PingProtocol {
             .get(&session.id)
             .map(|ps| ps.peer_id.clone())
         {
-            match PingMessage::decode(data.as_ref()) {
-                None => {
-                    error!("decode message error");
-                    self.send_event(PingEvent::UnexpectedError(peer_id));
+            match PingMessage::decode(data) {
+                Err(err) => {
+                    warn!("decode message {}", err);
+                    self.send_event(PingEvent::UnexpectedError(peer_id))
                 }
-                Some(msg) => {
-                    match msg {
-                        PingPayload::Ping(nonce) => {
-                            if context
-                                .send_message(PingMessage::build_pong(nonce))
-                                .is_err()
-                            {
-                                debug!("send message fail");
+                Ok(PingMessage { payload: None }) => {
+                    self.send_event(PingEvent::UnexpectedError(peer_id))
+                }
+                Ok(PingMessage { payload: Some(pld) }) => match pld {
+                    PingPayload::Ping(nonce) => {
+                        let pong = match PingMessage::new_pong(nonce).to_bytes() {
+                            Ok(p) => p,
+                            Err(err) => {
+                                warn!("encode pong {}", err);
+                                return;
                             }
-                            self.send_event(PingEvent::Ping(peer_id));
+                        };
+
+                        if let Err(err) = context.send_message(pong) {
+                            debug!("send message {}", err);
                         }
-                        PingPayload::Pong(nonce) => {
-                            // check pong
-                            if self
-                                .connected_session_ids
-                                .get(&session.id)
-                                .map(|ps| (ps.processing, ps.nonce()))
-                                == Some((true, nonce))
-                            {
-                                let ping_time =
-                                    match self.connected_session_ids.get_mut(&session.id) {
-                                        Some(ps) => {
-                                            ps.processing = false;
-                                            ps.elapsed()
-                                        }
-                                        None => return,
-                                    };
-                                self.send_event(PingEvent::Pong(peer_id, ping_time));
-                            } else {
-                                // ignore if nonce is incorrect
-                                self.send_event(PingEvent::UnexpectedError(peer_id));
-                            }
+                        self.send_event(PingEvent::Ping(peer_id));
+                    }
+                    PingPayload::Pong(nonce) => {
+                        // check pong
+                        if self
+                            .connected_session_ids
+                            .get(&session.id)
+                            .map(|ps| (ps.processing, ps.nonce()))
+                            == Some((true, nonce))
+                        {
+                            let ping_time = match self.connected_session_ids.get_mut(&session.id) {
+                                Some(ps) => {
+                                    ps.processing = false;
+                                    ps.elapsed()
+                                }
+                                None => return,
+                            };
+                            self.send_event(PingEvent::Pong(peer_id, ping_time));
+                        } else {
+                            // ignore if nonce is incorrect
+
+                            self.send_event(PingEvent::UnexpectedError(peer_id));
                         }
                     }
-                }
+                },
             }
         }
     }
@@ -214,17 +221,23 @@ impl ServiceProtocol for PingProtocol {
                     })
                     .collect();
                 if !peers.is_empty() {
-                    let ping_msg = PingMessage::build_ping(peers[0].1);
+                    let ping = match PingMessage::new_ping(peers[0].1).to_bytes() {
+                        Ok(p) => p,
+                        Err(err) => {
+                            warn!("encode ping {}", err);
+                            return;
+                        }
+                    };
+
                     let peer_ids: Vec<SessionId> = peers
                         .into_iter()
                         .map(|(session_id, _)| session_id)
                         .collect();
                     let proto_id = context.proto_id;
-                    if context
-                        .filter_broadcast(TargetSession::Multi(peer_ids), proto_id, ping_msg)
-                        .is_err()
-                    {
-                        debug!("send message fail");
+                    let target = TargetSession::Multi(peer_ids);
+
+                    if let Err(err) = context.filter_broadcast(target, proto_id, ping) {
+                        debug!("send message {}", err);
                     }
                 }
             }
