@@ -46,8 +46,6 @@ pipelineConfig:
                     value: 4H
                   - name: APP_NAMESPACE
                     value: mutadev
-                  - name: APP_NAME
-                    value: chaos-${REPO_NAME}-pr-${PULL_NUMBER}-${BUILD_NUMBER}
                   - name: APP_PORT
                     value: "8000"
                   - name: APP_GRAPHQL_URL
@@ -58,9 +56,7 @@ pipelineConfig:
                     value: "9999"
                   - name: JOB_BENCHMARK_CPU
                     value: "3"
-                command: node
-                args:
-                  - /app/index.js
+                command: APP_NAME=chaos-${REPO_NAME}-pr-${PULL_NUMBER}-${BUILD_NUMBER} node /app/index.js
 
               - name: build-release
                 image: mutadev/muta-build-env:v0.3.0
