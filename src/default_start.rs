@@ -515,7 +515,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     });
 
     let (abortable_demon, abort_handle) = future::abortable(exec_demon.run());
-    tokio::task::spawn_local(abortable_demon);
+    let exec_handler = tokio::task::spawn_local(abortable_demon);
 
     // Init graphql
     let mut graphql_config = GraphQLConfig::default();
@@ -540,20 +540,24 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         core_api::start_graphql(graphql_config, api_adapter).await;
     });
 
-    #[cfg(windows)]
-    let _ = tokio::signal::ctrl_c().await;
-    #[cfg(unix)]
-    {
-        let mut sigtun_int = os_impl::signal(os_impl::SignalKind::interrupt()).unwrap();
-        let mut sigtun_term = os_impl::signal(os_impl::SignalKind::terminate()).unwrap();
-        tokio::select! {
-            _ = sigtun_int.recv() => {}
-            _ = sigtun_term.recv() => {}
+    let ctrl_c_handler = tokio::task::spawn_local(async {
+        #[cfg(windows)]
+        let _ = tokio::signal::ctrl_c().await;
+        #[cfg(unix)]
+        {
+            let mut sigtun_int = os_impl::signal(os_impl::SignalKind::interrupt()).unwrap();
+            let mut sigtun_term = os_impl::signal(os_impl::SignalKind::terminate()).unwrap();
+            tokio::select! {
+                _ = sigtun_int.recv() => {}
+                _ = sigtun_term.recv() => {}
+            };
         }
-    }
+    });
 
-    // Abort consensus
+    tokio::select! {
+        _ = exec_handler =>{log::error!("exec_daemon is down, quit.")},
+        _ = ctrl_c_handler =>{log::info!("ctrl + c is pressed, quit.")},
+    };
     abort_handle.abort();
-
     Ok(())
 }
