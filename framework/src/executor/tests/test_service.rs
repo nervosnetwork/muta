@@ -140,7 +140,7 @@ impl<SDK: ServiceSDK> TestService<SDK> {
     }
 
     #[tx_hook_before]
-    fn test_tx_hook_before(&mut self, ctx: ServiceContext) {
+    fn test_tx_hook_before(&mut self, ctx: ServiceContext) -> ServiceResponse<()> {
         if ctx.get_service_name() == "test"
             && ctx.get_payload().to_owned().contains("test_hook_before")
         {
@@ -159,10 +159,11 @@ impl<SDK: ServiceSDK> TestService<SDK> {
         }
 
         self.sdk.set_value("before".to_owned(), "before".to_owned());
+        ServiceResponse::from_succeed(())
     }
 
     #[tx_hook_after]
-    fn test_tx_hook_after(&mut self, ctx: ServiceContext) {
+    fn test_tx_hook_after(&mut self, ctx: ServiceContext) -> ServiceResponse<()> {
         if ctx.get_service_name() == "test"
             && ctx.get_payload().to_owned().contains("test_hook_after")
         {
@@ -181,5 +182,6 @@ impl<SDK: ServiceSDK> TestService<SDK> {
         }
 
         self.sdk.set_value("after".to_owned(), "after".to_owned());
+        ServiceResponse::from_succeed(())
     }
 }
