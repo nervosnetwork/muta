@@ -75,7 +75,7 @@ pipelineConfig:
                   - size=${NODE_SIZE},repo_name=${REPO_NAME},version=pr-${PULL_NUMBER}-${BUILD_NUMBER},resources.cpu=1100m,resources.memory=8Gi,chain_genesis.metadata.timeout_gap=${CHAIN_GENESIS_TIMEOUT_GAP}
 
               - name: chaos-watchdog
-                image: mutadev/chaos-watchdog:v0.1.0
+                image: mutadev/chaos-watchdog:v0.1.1
                 env:
                   - name: WATCH_DURATION
                     value: 4H
