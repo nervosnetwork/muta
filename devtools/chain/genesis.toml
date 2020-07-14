@@ -27,6 +27,7 @@ payload = '''
         {
             "bls_pub_key": "0x0401139331589f32220ec5f41f6faa0f5c3f4d36af011ab014cefd9d8f36b53b04a2031f681d1c9648a2a5d534d742931b0a5a4132da9ee752c1144d6396bed6cfc635c9687258cec9b60b387d35cf9e13f29091e11ae88024d74ca904c0ea3fb3",
             "pub_key": "0x026c184a9016f6f71a234c86b141621f38b68c78602ab06768db4d83682c616004",
+            "address": "0x76961e339fe2f1f931d84c425754806fb4174c34",
             "propose_weight": 1,
             "vote_weight": 1
         }
