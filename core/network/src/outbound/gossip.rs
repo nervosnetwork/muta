@@ -6,7 +6,7 @@ use protocol::{
 use tentacle::service::TargetSession;
 
 use crate::{
-    common::peer_id_from_pubkey_bytes,
+    common::peer_id_from_bytes,
     endpoint::Endpoint,
     error::NetworkError,
     message::{Headers, NetworkMessage},
@@ -64,13 +64,13 @@ where
     async fn multisend(
         &self,
         _ctx: Context,
-        pub_keys: Vec<Bytes>,
+        peer_ids: Vec<Bytes>,
         msg: Bytes,
         pri: Priority,
     ) -> Result<(), NetworkError> {
-        let peers = pub_keys
+        let peers = peer_ids
             .into_iter()
-            .map(peer_id_from_pubkey_bytes)
+            .map(peer_id_from_bytes)
             .collect::<Result<Vec<_>, _>>()?;
 
         self.sender.multisend(peers, msg, pri).await
