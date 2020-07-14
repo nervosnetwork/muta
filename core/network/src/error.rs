@@ -185,6 +185,12 @@ impl From<tentacle::error::TransportErrorKind> for NetworkError {
     }
 }
 
+impl From<NetworkError> for Box<dyn Error + Send> {
+    fn from(err: NetworkError) -> Box<dyn Error + Send> {
+        err.boxed()
+    }
+}
+
 impl NetworkError {
     pub fn boxed(self) -> Box<dyn Error + Send> {
         Box::new(self) as Box<dyn Error + Send>

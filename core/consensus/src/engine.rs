@@ -462,6 +462,8 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         pub_key: Bytes,
         msg: OverlordMsg<FixedPill>,
     ) -> Result<(), Box<dyn Error + Send>> {
+        let peer_id = Bytes::from(core_network::peer_id_from_pubkey_bytes(pub_key.clone())?.into_bytes());
+
         match msg {
             OverlordMsg::SignedVote(sv) => {
                 let msg = sv.rlp_bytes();
@@ -470,7 +472,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
                         ctx,
                         msg,
                         END_GOSSIP_SIGNED_VOTE,
-                        MessageTarget::Specified(pub_key),
+                        MessageTarget::Specified(peer_id),
                     )
                     .await?;
             }
@@ -481,7 +483,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
                         ctx,
                         msg,
                         END_GOSSIP_AGGREGATED_VOTE,
-                        MessageTarget::Specified(pub_key),
+                        MessageTarget::Specified(peer_id),
                     )
                     .await?;
             }
