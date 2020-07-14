@@ -81,7 +81,7 @@ impl ServiceProtocol for IdentifyProtocol {
 
         let identify = self.behaviour.identify();
         let msg = match IdentifyMessage::new(listen_addrs, observed_addr, identify.to_owned())
-            .to_bytes()
+            .into_bytes()
         {
             Ok(msg) => msg,
             Err(err) => {

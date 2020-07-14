@@ -162,7 +162,7 @@ impl ServiceProtocol for PingProtocol {
                 }
                 Ok(PingMessage { payload: Some(pld) }) => match pld {
                     PingPayload::Ping(nonce) => {
-                        let pong = match PingMessage::new_pong(nonce).to_bytes() {
+                        let pong = match PingMessage::new_pong(nonce).into_bytes() {
                             Ok(p) => p,
                             Err(err) => {
                                 warn!("encode pong {}", err);
@@ -221,7 +221,7 @@ impl ServiceProtocol for PingProtocol {
                     })
                     .collect();
                 if !peers.is_empty() {
-                    let ping = match PingMessage::new_ping(peers[0].1).to_bytes() {
+                    let ping = match PingMessage::new_ping(peers[0].1).into_bytes() {
                         Ok(p) => p,
                         Err(err) => {
                             warn!("encode ping {}", err);
