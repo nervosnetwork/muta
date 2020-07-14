@@ -394,7 +394,7 @@ fn test_commit_tx_hook_use_panic_tx() {
     assert_eq!(before.succeed_data, r#""before""#);
 
     let after = read!(executor, &params, &caller, r#""after""#);
-    assert_eq!(after.succeed_data, r#""after""#);
+    assert_eq!(after.succeed_data, r#""""#);
 }
 
 #[test]
@@ -435,7 +435,7 @@ fn test_tx_hook_before_panic() {
 
     let txs = vec![stx];
     let error_resp = executor.exec(Context::new(), &params, &txs);
-    assert!(error_resp.is_ok());
+    assert!(error_resp.is_err());
 
     let caller = Address::from_hex("0xf8389d774afdad8755ef8e629e5a154fddc6325a").unwrap();
 
@@ -443,13 +443,10 @@ fn test_tx_hook_before_panic() {
     assert_eq!(before.succeed_data, r#""""#);
 
     let tx_hook_before_panic = read!(executor, &params, &caller, r#""tx_hook_before_panic""#);
-    assert_eq!(
-        tx_hook_before_panic.succeed_data,
-        r#""tx_hook_before_panic""#
-    );
+    assert_eq!(tx_hook_before_panic.succeed_data, r#""""#);
 
     let after = read!(executor, &params, &caller, r#""after""#);
-    assert_eq!(after.succeed_data, r#""after""#);
+    assert_eq!(after.succeed_data, r#""""#);
 }
 
 #[test]
@@ -490,7 +487,7 @@ fn test_tx_hook_after_panic() {
 
     let txs = vec![stx];
     let error_resp = executor.exec(Context::new(), &params, &txs);
-    assert!(error_resp.is_ok());
+    assert!(error_resp.is_err());
 
     let caller = Address::from_hex("0xf8389d774afdad8755ef8e629e5a154fddc6325a").unwrap();
 
@@ -499,123 +496,6 @@ fn test_tx_hook_after_panic() {
 
     let tx_hook_after_panic = read!(executor, &params, &caller, r#""tx_hook_after_panic""#);
     assert_eq!(tx_hook_after_panic.succeed_data, r#""tx_hook_after_panic""#);
-
-    let after = read!(executor, &params, &caller, r#""after""#);
-    assert_eq!(after.succeed_data, r#""""#);
-}
-
-#[test]
-fn test_tx_hook_before_cancel() {
-    let toml_str = include_str!("./genesis_services.toml");
-    let genesis: Genesis = toml::from_str(toml_str).unwrap();
-
-    let db = Arc::new(MemoryDB::new(false));
-
-    let root = ServiceExecutor::create_genesis(
-        genesis.services,
-        Arc::clone(&db),
-        Arc::new(MockStorage {}),
-        Arc::new(MockServiceMapping {}),
-    )
-    .unwrap();
-
-    let mut executor = ServiceExecutor::with_root(
-        root.clone(),
-        Arc::clone(&db),
-        Arc::new(MockStorage {}),
-        Arc::new(MockServiceMapping {}),
-    )
-    .unwrap();
-
-    let params = ExecutorParams {
-        state_root:   root,
-        height:       1,
-        timestamp:    0,
-        cycles_limit: std::u64::MAX,
-        proposer:     Address::from_hash(Hash::from_empty()).unwrap(),
-    };
-
-    let mut stx = mock_signed_tx();
-    stx.raw.request.service_name = "test".to_owned();
-    stx.raw.request.method = "tx_hook_before_cancel".to_owned();
-    stx.raw.request.payload = r#""""#.to_owned();
-
-    let txs = vec![stx];
-    let error_resp = executor.exec(Context::new(), &params, &txs);
-    assert!(error_resp.is_err());
-    assert!(error_resp
-        .err()
-        .expect("err")
-        .to_string()
-        .contains("Canceled"));
-
-    let caller = Address::from_hex("0xf8389d774afdad8755ef8e629e5a154fddc6325a").unwrap();
-
-    let before = read!(executor, &params, &caller, r#""before""#);
-    assert_eq!(before.succeed_data, r#""before""#);
-
-    let tx_hook_before_cancel = read!(executor, &params, &caller, r#""tx_hook_before_cancel""#);
-    assert_eq!(tx_hook_before_cancel.succeed_data, r#""""#);
-
-    let after = read!(executor, &params, &caller, r#""after""#);
-    assert_eq!(after.succeed_data, r#""""#);
-}
-
-#[test]
-fn test_tx_hook_after_cancel() {
-    let toml_str = include_str!("./genesis_services.toml");
-    let genesis: Genesis = toml::from_str(toml_str).unwrap();
-
-    let db = Arc::new(MemoryDB::new(false));
-
-    let root = ServiceExecutor::create_genesis(
-        genesis.services,
-        Arc::clone(&db),
-        Arc::new(MockStorage {}),
-        Arc::new(MockServiceMapping {}),
-    )
-    .unwrap();
-
-    let mut executor = ServiceExecutor::with_root(
-        root.clone(),
-        Arc::clone(&db),
-        Arc::new(MockStorage {}),
-        Arc::new(MockServiceMapping {}),
-    )
-    .unwrap();
-
-    let params = ExecutorParams {
-        state_root:   root,
-        height:       1,
-        timestamp:    0,
-        cycles_limit: std::u64::MAX,
-        proposer:     Address::from_hash(Hash::from_empty()).unwrap(),
-    };
-
-    let mut stx = mock_signed_tx();
-    stx.raw.request.service_name = "test".to_owned();
-    stx.raw.request.method = "tx_hook_after_cancel".to_owned();
-    stx.raw.request.payload = r#""""#.to_owned();
-
-    let txs = vec![stx];
-    let error_resp = executor.exec(Context::new(), &params, &txs);
-    assert!(error_resp.is_err());
-    assert!(error_resp
-        .err()
-        .expect("err")
-        .to_string()
-        .contains("Canceled"));
-
-    let caller = Address::from_hex("0xf8389d774afdad8755ef8e629e5a154fddc6325a").unwrap();
-
-    let before = read!(executor, &params, &caller, r#""before""#);
-    assert_eq!(before.succeed_data, r#""before""#);
-
-    let tx_hook_after_cancel = read!(executor, &params, &caller, r#""tx_hook_after_cancel""#);
-    assert_eq!(
-        tx_hook_after_cancel.succeed_data,
-        r#""tx_hook_after_cancel""#
-    );
 
     let after = read!(executor, &params, &caller, r#""after""#);
     assert_eq!(after.succeed_data, r#""""#);
