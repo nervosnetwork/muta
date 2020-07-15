@@ -197,10 +197,6 @@ pub fn mock_address() -> Address {
     Address::from_hash(hash).unwrap()
 }
 
-pub fn mock_pub_key(s: &'static str) -> Bytes {
-    Hash::digest(Bytes::from(s)).as_bytes()
-}
-
 pub fn mock_hash() -> Hash {
     Hash::digest(Bytes::from("mock"))
 }
@@ -281,9 +277,9 @@ pub fn mock_event() -> Event {
 // Mock Block
 // #####################
 
-pub fn mock_validator(s: &'static str) -> Validator {
+pub fn mock_validator() -> Validator {
     Validator {
-        pub_key:        mock_pub_key(s),
+        address:        mock_address(),
         propose_weight: 1,
         vote_weight:    1,
     }
@@ -316,10 +312,10 @@ pub fn mock_block_header() -> BlockHeader {
         proof:                          mock_proof(),
         validator_version:              1,
         validators:                     vec![
-            mock_validator("a"),
-            mock_validator("b"),
-            mock_validator("c"),
-            mock_validator("d"),
+            mock_validator(),
+            mock_validator(),
+            mock_validator(),
+            mock_validator(),
         ],
     }
 }

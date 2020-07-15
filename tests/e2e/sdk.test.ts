@@ -1,10 +1,10 @@
+import { Account } from '@mutadev/account';
 import { AssetService } from '@mutadev/service'
+import { toHex } from '@mutadev/utils';
+import { retry } from '@mutadev/client';
 import * as sdk from '@mutadev/muta-sdk';
 import { mutaClient } from './utils';
 import { MultiSigService } from './multisig';
-
-const { Account, retry } = sdk;
-const { toHex } = sdk.utils;
 
 describe("API test via @mutadev/muta-sdk-js", () => {
   test("getLatestBlock", async () => {
