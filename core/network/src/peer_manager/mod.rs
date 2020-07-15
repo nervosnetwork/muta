@@ -270,8 +270,9 @@ impl Deref for ArcSession {
 }
 
 struct Inner {
-    sessions: RwLock<HashSet<ArcSession>>,
-    peers:    RwLock<HashSet<ArcPeer>>,
+    consensus: RwLock<HashSet<PeerId>>,
+    sessions:  RwLock<HashSet<ArcSession>>,
+    peers:     RwLock<HashSet<ArcPeer>>,
 
     listen: RwLock<HashSet<PeerMultiaddr>>,
 }
@@ -279,8 +280,9 @@ struct Inner {
 impl Inner {
     pub fn new() -> Self {
         Inner {
-            sessions: Default::default(),
-            peers:    Default::default(),
+            consensus: Default::default(),
+            sessions:  Default::default(),
+            peers:     Default::default(),
 
             listen: Default::default(),
         }
@@ -426,6 +428,53 @@ impl PeerManagerHandle {
         };
 
         listen.into_iter().map(sanitize).collect()
+    }
+
+    pub fn tag(&self, peer_id: &PeerId, tag: PeerTag) -> Result<(), NetworkError> {
+        let consensus_tag = tag == PeerTag::Consensus;
+
+        if let Some(peer) = self.inner.peer(peer_id) {
+            peer.tags.insert(tag)?;
+        } else {
+            let peer = ArcPeer::new(peer_id.to_owned());
+            peer.tags.insert(tag)?;
+            self.inner.add_peer(peer);
+        }
+
+        if consensus_tag {
+            self.inner.consensus.write().insert(peer_id.to_owned());
+        }
+
+        Ok(())
+    }
+
+    pub fn untag(&self, peer_id: &PeerId, tag: &PeerTag) {
+        if let Some(peer) = self.inner.peer(peer_id) {
+            peer.tags.remove(tag);
+        }
+
+        if tag == &PeerTag::Consensus {
+            self.inner.consensus.write().remove(peer_id);
+        }
+    }
+
+    pub fn set_consensus(&self, peer_ids: Vec<PeerId>) {
+        {
+            for peer_id in self.inner.consensus.read().iter() {
+                if let Some(peer) = self.inner.peer(peer_id) {
+                    peer.tags.remove(&PeerTag::Consensus)
+                }
+            }
+        }
+
+        for peer_id in peer_ids.iter() {
+            let _ = self.tag(peer_id, PeerTag::Consensus);
+        }
+
+        {
+            let id_set = HashSet::from_iter(peer_ids);
+            *self.inner.consensus.write() = id_set;
+        }
     }
 }
 
