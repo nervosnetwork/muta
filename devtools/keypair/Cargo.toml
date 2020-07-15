@@ -20,4 +20,4 @@ protocol = { version = "0.1.0-alpha.1", package = "muta-protocol" }
 rand = "0.7"
 serde = {version = "1.0", features = ["derive"]}
 serde_json = "1.0"
-tentacle-secio = { version = "0.1", features = [ "molc" ] }
+tentacle-secio = { version = "0.1", features = [ "flatc" ] }

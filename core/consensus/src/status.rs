@@ -146,7 +146,7 @@ impl CurrentConsensusStatus {
             .verifier_list
             .iter()
             .map(|v| Validator {
-                pub_key:        v.pub_key.decode(),
+                address:        v.address.clone(),
                 propose_weight: v.propose_weight,
                 vote_weight:    v.vote_weight,
             })

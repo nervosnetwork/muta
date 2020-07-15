@@ -119,7 +119,12 @@ impl<Adapter: ConsensusAdapter + 'static> OverlordConsensus<Adapter> {
             lock,
         ));
 
-        let overlord = Overlord::new(node_info.self_pub_key, Arc::clone(&engine), crypto, engine);
+        let overlord = Overlord::new(
+            node_info.self_address.as_bytes(),
+            Arc::clone(&engine),
+            crypto,
+            engine,
+        );
         let overlord_handler = overlord.get_handler();
         let status = status_agent.to_inner();
 
@@ -177,7 +182,7 @@ pub fn gen_overlord_status(
     let mut authority_list = validators
         .into_iter()
         .map(|v| Node {
-            address:        v.pub_key.clone(),
+            address:        v.address.as_bytes(),
             propose_weight: v.propose_weight,
             vote_weight:    v.vote_weight,
         })
@@ -211,7 +216,7 @@ impl<T: overlord::Codec> OverlordMsgExt for OverlordMsg<T> {
             OverlordMsg::AggregatedVote(av) => av.get_height().to_string(),
             OverlordMsg::RichStatus(s) => s.height.to_string(),
             OverlordMsg::SignedChoke(sc) => sc.choke.height.to_string(),
-            _ => "".to_owned(),
+            OverlordMsg::Stop => "".to_owned(),
         }
     }
 
@@ -220,8 +225,9 @@ impl<T: overlord::Codec> OverlordMsgExt for OverlordMsg<T> {
             OverlordMsg::SignedProposal(sp) => sp.proposal.round.to_string(),
             OverlordMsg::SignedVote(sv) => sv.get_round().to_string(),
             OverlordMsg::AggregatedVote(av) => av.get_round().to_string(),
+            OverlordMsg::RichStatus(_) => "".to_owned(),
             OverlordMsg::SignedChoke(sc) => sc.choke.round.to_string(),
-            _ => "".to_owned(),
+            OverlordMsg::Stop => "".to_owned(),
         }
     }
 }
