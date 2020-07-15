@@ -3,14 +3,14 @@ use protocol::{
     traits::{Context, Gossip, MessageCodec, Priority},
     Bytes, ProtocolResult,
 };
-use tentacle::service::TargetSession;
+use tentacle::{secio::PeerId, service::TargetSession};
 
 use crate::{
-    common::peer_id_from_bytes,
     endpoint::Endpoint,
     error::NetworkError,
     message::{Headers, NetworkMessage},
     traits::{Compression, MessageSender},
+    PeerIdExt,
 };
 
 #[derive(Clone)]
@@ -61,19 +61,21 @@ where
         self.sender.send(tar, msg, pri)
     }
 
-    async fn multisend(
+    async fn multisend<'a, P: AsRef<[Bytes]> + 'a>(
         &self,
         _ctx: Context,
-        peer_ids: Vec<Bytes>,
+        peer_ids: P,
         msg: Bytes,
         pri: Priority,
     ) -> Result<(), NetworkError> {
-        let peers = peer_ids
-            .into_iter()
-            .map(peer_id_from_bytes)
-            .collect::<Result<Vec<_>, _>>()?;
+        let peer_ids = {
+            let byteses = peer_ids.as_ref().iter();
+            let maybe_ids = byteses.map(<PeerId as PeerIdExt>::from_bytes);
 
-        self.sender.multisend(peers, msg, pri).await
+            maybe_ids.collect::<Result<Vec<_>, _>>()?
+        };
+
+        self.sender.multisend(peer_ids, msg, pri).await
     }
 }
 
@@ -93,19 +95,20 @@ where
         Ok(())
     }
 
-    async fn multicast<M>(
+    async fn multicast<'a, M, P>(
         &self,
         cx: Context,
         end: &str,
-        peer_ids: Vec<Bytes>,
+        peer_ids: P,
         msg: M,
         p: Priority,
     ) -> ProtocolResult<()>
     where
         M: MessageCodec,
+        P: AsRef<[Bytes]> + Send + 'a,
     {
         let msg = self.package_message(cx.clone(), end, msg).await?;
-        let multicast_count = peer_ids.len();
+        let multicast_count = peer_ids.as_ref().len();
 
         self.multisend(cx, peer_ids, msg, p).await?;
 

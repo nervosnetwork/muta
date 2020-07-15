@@ -68,16 +68,17 @@ pub trait Gossip: Send + Sync {
     where
         M: MessageCodec;
 
-    async fn multicast<M>(
+    async fn multicast<'a, M, P>(
         &self,
         cx: Context,
         end: &str,
-        peer_ids: Vec<Bytes>,
+        peer_ids: P,
         msg: M,
         p: Priority,
     ) -> ProtocolResult<()>
     where
-        M: MessageCodec;
+        M: MessageCodec,
+        P: AsRef<[Bytes]> + Send + 'a;
 }
 
 #[async_trait]

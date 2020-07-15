@@ -14,6 +14,8 @@ use tokio::sync::mpsc::{channel, Receiver, Sender};
 use common_apm::muta_apm;
 use common_merkle::Merkle;
 
+use core_network::{PeerId, PeerIdExt};
+
 use protocol::traits::{
     CommonConsensusAdapter, ConsensusAdapter, Context, ExecutorFactory, ExecutorParams,
     ExecutorResp, Gossip, MemPool, MessageTarget, MixedTxHashes, PeerTrust, Priority, Rpc,
@@ -111,9 +113,11 @@ where
                     .await
             }
 
-            MessageTarget::Specified(addr) => {
+            MessageTarget::Specified(pub_key) => {
+                let peer_id_bytes = PeerId::from_pubkey_bytes(pub_key)?.into_bytes_ext();
+
                 self.network
-                    .multicast(ctx, end, vec![addr], msg, Priority::High)
+                    .multicast(ctx, end, [peer_id_bytes], msg, Priority::High)
                     .await
             }
         }

@@ -32,7 +32,6 @@ tentacle-identify = { git = "https://github.com/zeroqn/p2p", branch = "v0.3.0.al
 tokio = { version = "0.2", features = ["macros", "rt-core"]}
 hostname = "0.3"
 lazy_static = "1.4"
-bs58 = "0.3"
 
 [dev-dependencies]
 env_logger = "0.6"

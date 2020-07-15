@@ -8,19 +8,20 @@ use std::{
 };
 
 use log::error;
-use protocol::{types::Address, Bytes, ProtocolResult};
+use protocol::{types::Address, ProtocolResult};
 use tentacle::{
     multiaddr::{multiaddr, Multiaddr, Protocol},
-    secio::SecioKeyPair,
+    secio::{PeerId, SecioKeyPair},
 };
 
 use crate::{
-    common::{peer_id_from_bytes, socket_to_multi_addr},
+    common::socket_to_multi_addr,
     connection::ConnectionConfig,
     error::NetworkError,
     peer_manager::{ArcPeer, PeerManagerConfig, SharedSessionsConfig, TrustMetricConfig},
     selfcheck::SelfCheckConfig,
     traits::MultiaddrExt,
+    PeerIdExt,
 };
 
 // TODO: 0.0.0.0 expose? 127.0.0.1 doesn't work because of tentacle-discovery.
@@ -237,15 +238,10 @@ impl NetworkConfig {
         mut self,
         pairs: Vec<(PeerIdBase58Str, PeerAddrStr)>,
     ) -> ProtocolResult<Self> {
-        let to_peer = |(peer_id_str, peer_addr): (PeerIdBase58Str, PeerAddrStr)| -> _ {
-            let peer_id_bytes = bs58::decode(&peer_id_str)
-                .into_vec()
-                .map_err(|_| NetworkError::InvalidPeerId)?;
-
-            let peer_id = peer_id_from_bytes(Bytes::from(peer_id_bytes))
-                .map_err(|_| NetworkError::InvalidPeerId)?;
-
+        let to_peer = |(pid_str, peer_addr): (PeerIdBase58Str, PeerAddrStr)| -> _ {
+            let peer_id = PeerId::from_str_ext(&pid_str)?;
             let mut multiaddr = Self::parse_peer_addr(peer_addr)?;
+
             let peer = ArcPeer::new(peer_id.clone());
 
             if let Some(id_bytes) = multiaddr.id_bytes() {

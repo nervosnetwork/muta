@@ -184,7 +184,7 @@ impl ClientNode {
         let ctx = Context::new().with_value::<usize>("session_id", sid);
         let peers = vec![Bytes::from(self.remote_peer_id.clone().into_bytes())];
 
-        match self.multicast::<M>(ctx, endpoint, peers, msg, High).await {
+        match self.multicast(ctx, endpoint, peers, msg, High).await {
             Err(_) if !self.connected() => Err(ClientNodeError::NotConnected),
             Err(e) => {
                 let err_msg = format!("broadcast to {} {}", endpoint, e);
@@ -296,10 +296,7 @@ fn full_node_peer_id() -> PeerId {
     let mut bootstraps = config.network.bootstraps.expect("config.toml full node");
     let full_node = bootstraps.pop().expect("there should be one bootstrap");
 
-    let peer_id_bytes = bs58::decode(full_node.peer_id)
-        .into_vec()
-        .expect("decode base58 peer id");
-    PeerId::from_bytes(peer_id_bytes).expect("peer id from")
+    full_node.peer_id.parse().expect("parse peer id")
 }
 
 fn mock_block(height: u64) -> Block {
