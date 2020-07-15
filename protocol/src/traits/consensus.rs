@@ -128,6 +128,8 @@ pub trait CommonConsensusAdapter: Send + Sync {
         proposer: Address,
     ) -> ProtocolResult<Metadata>;
 
+    fn tag_consensus(&self, ctx: Context, peer_ids: Vec<Bytes>) -> ProtocolResult<()>;
+
     fn report_bad(&self, ctx: Context, feedback: TrustFeedback);
 
     fn set_args(&self, context: Context, timeout_gap: u64, cycles_limit: u64, max_tx_size: u64);

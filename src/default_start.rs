@@ -38,7 +38,7 @@ use core_network::{NetworkConfig, NetworkService};
 use core_storage::{adapter::rocks::RocksAdapter, ImplStorage, StorageError};
 use framework::binding::state::RocksTrieDB;
 use framework::executor::{ServiceExecutor, ServiceExecutorFactory};
-use protocol::traits::{APIAdapter, Context, MemPool, NodeInfo, ServiceMapping, Storage};
+use protocol::traits::{APIAdapter, Context, MemPool, Network, NodeInfo, ServiceMapping, Storage};
 use protocol::types::{Address, Block, BlockHeader, Genesis, Hash, Metadata, Proof, Validator};
 use protocol::{fixed_codec::FixedCodec, ProtocolResult};
 
@@ -398,6 +398,16 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         crypto,
         lock,
     ));
+
+    let pub_keys = metadata
+        .verifier_list
+        .iter()
+        .map(|v| v.pub_key.decode())
+        .collect();
+
+    network_service
+        .handle()
+        .tag_consensus(Context::new(), pub_keys)?;
 
     // Re-execute block from exec_height + 1 to current_height, so that init the
     // lost current status.

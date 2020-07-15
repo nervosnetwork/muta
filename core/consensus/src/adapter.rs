@@ -18,7 +18,7 @@ use core_network::{PeerId, PeerIdExt};
 
 use protocol::traits::{
     CommonConsensusAdapter, ConsensusAdapter, Context, ExecutorFactory, ExecutorParams,
-    ExecutorResp, Gossip, MemPool, MessageTarget, MixedTxHashes, PeerTrust, Priority, Rpc,
+    ExecutorResp, Gossip, MemPool, MessageTarget, MixedTxHashes, Network, PeerTrust, Priority, Rpc,
     ServiceMapping, Storage, SynchronizationAdapter, TrustFeedback,
 };
 use protocol::types::{
@@ -45,7 +45,7 @@ const OVERLORD_GAP: usize = 10;
 pub struct OverlordConsensusAdapter<
     EF: ExecutorFactory<DB, S, Mapping>,
     M: MemPool,
-    N: Rpc + PeerTrust + Gossip + 'static,
+    N: Rpc + PeerTrust + Gossip + Network + 'static,
     S: Storage,
     DB: cita_trie::DB,
     Mapping: ServiceMapping,
@@ -68,7 +68,7 @@ impl<EF, M, N, S, DB, Mapping> ConsensusAdapter
 where
     EF: ExecutorFactory<DB, S, Mapping>,
     M: MemPool + 'static,
-    N: Rpc + PeerTrust + Gossip + 'static,
+    N: Rpc + PeerTrust + Gossip + Network + 'static,
     S: Storage + 'static,
     DB: cita_trie::DB + 'static,
     Mapping: ServiceMapping + 'static,
@@ -220,7 +220,7 @@ impl<EF, M, N, S, DB, Mapping> SynchronizationAdapter
 where
     EF: ExecutorFactory<DB, S, Mapping>,
     M: MemPool + 'static,
-    N: Rpc + PeerTrust + Gossip + 'static,
+    N: Rpc + PeerTrust + Gossip + Network + 'static,
     S: Storage + 'static,
     DB: cita_trie::DB + 'static,
     Mapping: ServiceMapping + 'static,
@@ -354,7 +354,7 @@ impl<EF, M, N, S, DB, Mapping> CommonConsensusAdapter
 where
     EF: ExecutorFactory<DB, S, Mapping>,
     M: MemPool + 'static,
-    N: Rpc + PeerTrust + Gossip + 'static,
+    N: Rpc + PeerTrust + Gossip + Network + 'static,
     S: Storage + 'static,
     DB: cita_trie::DB + 'static,
     Mapping: ServiceMapping + 'static,
@@ -490,6 +490,15 @@ where
         })?;
 
         Ok(serde_json::from_str(&exec_resp.succeed_data).expect("Decode metadata failed!"))
+    }
+
+    fn tag_consensus(&self, ctx: Context, pub_keys: Vec<Bytes>) -> ProtocolResult<()> {
+        let peer_ids_bytes = pub_keys
+            .iter()
+            .map(|pk| PeerId::from_pubkey_bytes(pk).map(PeerIdExt::into_bytes_ext))
+            .collect::<Result<_, _>>()?;
+
+        self.network.tag_consensus(ctx, peer_ids_bytes)
     }
 
     #[muta_apm::derive::tracing_span(kind = "consensus.adapter")]
@@ -808,7 +817,7 @@ impl<EF, M, N, S, DB, Mapping> OverlordConsensusAdapter<EF, M, N, S, DB, Mapping
 where
     EF: ExecutorFactory<DB, S, Mapping>,
     M: MemPool + 'static,
-    N: Rpc + PeerTrust + Gossip + 'static,
+    N: Rpc + PeerTrust + Gossip + Network + 'static,
     S: Storage + 'static,
     DB: cita_trie::DB + 'static,
     Mapping: ServiceMapping + 'static,

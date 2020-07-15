@@ -2768,7 +2768,7 @@ async fn should_able_to_untag_peer() {
 }
 
 #[tokio::test]
-async fn should_remove_old_consensus_peer_tag_when_set_consensus() {
+async fn should_remove_old_consensus_peer_tag_when_tag_consensus() {
     let (mgr, _conn_rx) = make_manager(0, 20);
     let handle = mgr.inner.handle();
 
@@ -2779,7 +2779,7 @@ async fn should_remove_old_consensus_peer_tag_when_set_consensus() {
     assert!(peer.tags.contains(&PeerTag::Consensus));
 
     let new_consensus = make_peer(3077);
-    handle.set_consensus(vec![new_consensus.owned_id()]);
+    handle.tag_consensus(vec![new_consensus.owned_id()]);
 
     let new_consensus = mgr.core_inner().peer(&new_consensus.id).unwrap();
     assert!(new_consensus.tags.contains(&PeerTag::Consensus));
