@@ -1,0 +1,68 @@
+apiVersion: nervos.org/v1alpha1
+kind: Muta
+metadata:
+  name: chaos-{{ .Values.repo_name }}-{{ .Values.version }}
+  namespace: {{ .Values.namespace }} # Only supports deployment to the mutadev namespace
+spec:
+  image: mutadev/{{ .Values.repo_name }}:{{ .Values.version }} # docker image
+  resources:
+    limits:
+      cpu: {{ .Values.resources.cpu }}
+      memory: {{ .Values.resources.memory }}
+      ephemeral-storage: {{ .Values.resources.storage }}
+    requests:
+      cpu: {{ .Values.resources.cpu }}
+      memory: {{ .Values.resources.memory }}
+      ephemeral-storage: {{ .Values.resources.storage }}
+  chaos:  # all / stable-network-corrupt / stable-network-delay / stable-network-duplicate / stable-network-loss / stable-network-partition / stable-node-failure / stable-node-kill
+  {{- range .Values.chaos }}
+    - {{ . }}
+  {{- end }}
+  size: {{ .Values.size }} # Node numbers
+  persistent: {{ .Values.resources.persistent }} # Persistent data
+  config: # see https://github.com/nervosnetwork/muta/blob/master/devtools/chain/config.toml
+    data_path: "/app/data"
+    graphql:
+      listening_address: "0.0.0.0:8000"
+      graphql_uri: "/graphql"
+      graphiql_uri: "/"
+      workers: 0 # if 0, uses number of available logical cpu as threads count.
+      maxconn: 25000
+    network:
+      listening_address: "0.0.0.0:1337"
+      rpc_timeout: {{ .Values.chain_config.network.rpc_timeout }}
+    mempool:
+      pool_size: {{ .Values.chain_config.mempool.pool_size }}
+      broadcast_txs_size: {{ .Values.chain_config.mempool.broadcast_txs_size }}
+      broadcast_txs_interval: {{ .Values.chain_config.mempool.broadcast_txs_interval }}
+    executor:
+      light: false
+    logger:
+      filter: "info"
+      log_to_console: true
+      console_show_file_and_line: false
+      log_path: "logs/"
+      log_to_file: true
+      metrics: true
+      modules_level:
+        # "overlord::state::process": "debug"
+        # "core_consensus": "error"
+  genesis: # https://github.com/nervosnetwork/muta/blob/master/devtools/chain/genesis.toml
+    prevhash: {{ .Values.chain_genesis.prevhash }}
+    metadata:
+      chain_id: {{ .Values.chain_genesis.metadata.chain_id }}
+      timeout_gap: {{ .Values.chain_genesis.metadata.timeout_gap }}
+      cycles_limit: {{ .Values.chain_genesis.metadata.cycles_limit }}
+      cycles_price: {{ .Values.chain_genesis.metadata.cycles_price }}
+      interval: {{ .Values.chain_genesis.metadata.interval }}
+      propose_ratio: {{ .Values.chain_genesis.metadata.propose_ratio }}
+      prevote_ratio: {{ .Values.chain_genesis.metadata.prevote_ratio }}
+      precommit_ratio: {{ .Values.chain_genesis.metadata.precommit_ratio }}
+      brake_ratio: {{ .Values.chain_genesis.metadata.brake_ratio }}
+      tx_num_limit: {{ .Values.chain_genesis.metadata.tx_num_limit }}
+      max_tx_size: {{ .Values.chain_genesis.metadata.max_tx_size }}
+    services:
+    {{- range $service := .Values.chain_genesis.services }}
+      - name: {{ $service.name }}
+        payload: {{ $service.payload | toJson | quote }}
+    {{- end }}
