@@ -572,16 +572,17 @@ mod tests {
             Ok(())
         }
 
-        async fn multicast<M>(
+        async fn multicast<'a, M, P>(
             &self,
             _: Context,
             _: &str,
-            _: Vec<Bytes>,
+            _: P,
             _: M,
             _: Priority,
         ) -> ProtocolResult<()>
         where
             M: MessageCodec,
+            P: AsRef<[Bytes]> + Send + 'a,
         {
             unreachable!()
         }

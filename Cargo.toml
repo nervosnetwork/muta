@@ -47,7 +47,6 @@ rand = "0.7"
 cita_trie = "2.0"
 core-network = { path = "./core/network", features = ["diagnostic"] }
 tokio = { version = "0.2", features = ["full"] }
-bs58 = "0.3"
 
 [workspace]
 members = [

@@ -66,16 +66,17 @@ impl Gossip for NetworkServiceHandle {
         self.gossip.broadcast(cx, end, msg, p).await
     }
 
-    async fn multicast<M>(
+    async fn multicast<'a, M, P>(
         &self,
         cx: Context,
         end: &str,
-        peer_ids: Vec<Bytes>,
+        peer_ids: P,
         msg: M,
         p: Priority,
     ) -> ProtocolResult<()>
     where
         M: MessageCodec,
+        P: AsRef<[Bytes]> + Send + 'a,
     {
         self.gossip.multicast(cx, end, peer_ids, msg, p).await
     }
