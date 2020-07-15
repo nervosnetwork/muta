@@ -1,10 +1,25 @@
 use super::time;
-use crate::error::ErrorKind;
+use crate::error::NetworkError;
 
+use derive_more::Display;
 use parking_lot::RwLock;
 use protocol::traits::PeerTag;
 
 use std::{collections::HashSet, time::Duration};
+
+#[derive(Debug, Display, PartialEq, Eq)]
+pub enum TagError {
+    #[display(fmt = "cannot ban always allowed or consensus peer")]
+    AlwaysAllow,
+}
+
+impl std::error::Error for TagError {}
+
+impl From<TagError> for NetworkError {
+    fn from(err: TagError) -> NetworkError {
+        NetworkError::Internal(Box::new(err))
+    }
+}
 
 #[derive(Debug)]
 pub struct Tags(RwLock<HashSet<PeerTag>>);
@@ -26,17 +41,9 @@ impl Tags {
         }
     }
 
-    pub fn insert_ban(&self, timeout: Duration) -> Result<(), ErrorKind> {
-        if self.contains(&PeerTag::Consensus) || self.contains(&PeerTag::AlwaysAllow) {
-            return Err(ErrorKind::Untaggable(
-                "consensus and always allow cannot be ban".to_owned(),
-            ));
-        }
-
+    pub fn insert_ban(&self, timeout: Duration) -> Result<(), TagError> {
         let until = Duration::from_secs(time::now()) + timeout;
-        self.0.write().insert(PeerTag::ban(until.as_secs()));
-
-        Ok(())
+        self.insert(PeerTag::ban(until.as_secs()))
     }
 
     #[cfg(test)]
@@ -44,8 +51,15 @@ impl Tags {
         self.0.write().insert(PeerTag::ban(until));
     }
 
-    pub fn insert(&self, tag: PeerTag) {
+    pub fn insert(&self, tag: PeerTag) -> Result<(), TagError> {
+        if let PeerTag::Ban { .. } = tag {
+            if self.contains(&PeerTag::Consensus) || self.contains(&PeerTag::AlwaysAllow) {
+                return Err(TagError::AlwaysAllow);
+            }
+        }
+
         self.0.write().insert(tag);
+        Ok(())
     }
 
     pub fn remove(&self, tag: &PeerTag) {

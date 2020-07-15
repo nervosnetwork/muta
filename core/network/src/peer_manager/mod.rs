@@ -476,7 +476,7 @@ impl PeerManager {
             assert_eq!(inner.peer_count(), 0, "should be empty before bootstrapped");
 
             let peer = ArcPeer::new(peer_id);
-            peer.tags.insert(PeerTag::AlwaysAllow);
+            let _ = peer.tags.insert(PeerTag::AlwaysAllow);
 
             inner.add_peer(peer);
         }
