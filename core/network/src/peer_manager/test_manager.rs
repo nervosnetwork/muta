@@ -910,7 +910,7 @@ async fn should_not_replace_peer_in_allowlist_with_better_score_peer_due_to_max_
     // Update alive, only old enough peer can be replaced
     target_peer.set_alive(peer_trust_config.interval().as_secs() * 20 + 20);
     // Add always allow tag
-    target_peer.tags.insert(PeerTag::AlwaysAllow);
+    target_peer.tags.insert(PeerTag::AlwaysAllow).unwrap();
 
     let test_peer = make_peer(2077);
     inner.add_peer(test_peer.clone());
@@ -2130,7 +2130,7 @@ async fn should_accept_always_allow_peer_even_if_we_reach_max_connections_on_new
 
     let peer = make_peer(2019);
     let always_allow_peer = make_peer(2077);
-    always_allow_peer.tags.insert(PeerTag::AlwaysAllow);
+    always_allow_peer.tags.insert(PeerTag::AlwaysAllow).unwrap();
 
     let inner = mgr.core_inner();
     inner.add_peer(always_allow_peer.clone());
@@ -2371,7 +2371,7 @@ async fn should_exclude_always_allow_peer_from_fatal_feedback_ban_on_trust_metri
     let test_peer = remote_peers.first().expect("get first peer");
 
     let inner = mgr.core_inner();
-    test_peer.tags.insert(PeerTag::AlwaysAllow);
+    test_peer.tags.insert(PeerTag::AlwaysAllow).unwrap();
     inner.add_peer(test_peer.clone());
 
     let feedback = PeerManagerEvent::TrustMetric {
@@ -2519,7 +2519,7 @@ async fn should_not_punish_always_allow_peer_when_its_score_below_fourty_on_wors
     );
 
     let inner = mgr.core_inner();
-    test_peer.tags.insert(PeerTag::AlwaysAllow);
+    test_peer.tags.insert(PeerTag::AlwaysAllow).unwrap();
     inner.add_peer(test_peer.clone());
 
     let feedback = PeerManagerEvent::TrustMetric {
