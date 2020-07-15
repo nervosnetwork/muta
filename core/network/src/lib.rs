@@ -23,15 +23,12 @@ pub use config::NetworkConfig;
 pub use error::NetworkError;
 pub use message::{serde, serde_multi};
 pub use service::{NetworkService, NetworkServiceHandle};
-pub use tentacle::secio::PeerId;
-pub use traits::DecodePeerId;
 
 #[cfg(feature = "diagnostic")]
 pub use peer_manager::diagnostic::{DiagnosticEvent, TrustReport};
 
 pub use tentacle::secio::PeerId;
 
-use error::NetworkError;
 use protocol::Bytes;
 use tentacle::secio::PublicKey;
 

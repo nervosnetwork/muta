@@ -26,25 +26,6 @@ pub trait NetworkProtocol {
     fn message_proto_id() -> ProtocolId;
 }
 
-pub trait DecodePeerId {
-    fn decode_str<'a, S: AsRef<[u8]> + 'a>(s: S) -> Result<PeerId, NetworkError>;
-}
-
-impl DecodePeerId for PeerId {
-    fn decode_str<'a, S: AsRef<[u8]> + 'a>(s: S) -> Result<PeerId, NetworkError> {
-        let str = String::from_utf8_lossy(s.as_ref());
-
-        if let Ok(Ok(peer_id)) = bs58::decode(str.as_ref())
-            .into_vec()
-            .map(PeerId::from_bytes)
-        {
-            Ok(peer_id)
-        } else {
-            Err(NetworkError::InvalidPeerId)
-        }
-    }
-}
-
 #[rustfmt::skip]
 #[async_trait]
 pub trait MessageSender {
