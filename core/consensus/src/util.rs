@@ -114,11 +114,11 @@ impl Crypto for OverlordCrypto {
 impl OverlordCrypto {
     pub fn new(
         private_key: BlsPrivateKey,
-        addr_pubkey: HashMap<Bytes, BlsPublicKey>,
+        pubkey_to_bls_pubkey: HashMap<Bytes, BlsPublicKey>,
         common_ref: BlsCommonReference,
     ) -> Self {
         OverlordCrypto {
-            addr_pubkey: RwLock::new(addr_pubkey),
+            addr_pubkey: RwLock::new(pubkey_to_bls_pubkey),
             private_key,
             common_ref,
         }
