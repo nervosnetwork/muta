@@ -609,7 +609,10 @@ impl PeerManager {
             return;
         }
 
-        if self.config.allowlist_only && !remote_peer.tags.contains(&PeerTag::AlwaysAllow) {
+        if self.config.allowlist_only
+            && !remote_peer.tags.contains(&PeerTag::AlwaysAllow)
+            && !remote_peer.tags.contains(&PeerTag::Consensus)
+        {
             debug!("allowlist_only enabled, reject peer {:?}", remote_peer.id);
             remote_peer.mark_disconnected();
             self.disconnect_session(ctx.id);
@@ -637,6 +640,7 @@ impl PeerManager {
                     // intervals
                     if incoming_trust_score > session_trust_score
                         && !session.peer.tags.contains(&PeerTag::AlwaysAllow)
+                        && !session.peer.tags.contains(&PeerTag::Consensus)
                         && session.peer.alive()
                             > self.config.peer_trust_config.interval().as_secs() * 20
                     {
@@ -648,7 +652,10 @@ impl PeerManager {
                 false
             };
 
-            if !remote_peer.tags.contains(&PeerTag::AlwaysAllow) && !found_replacement() {
+            if !remote_peer.tags.contains(&PeerTag::AlwaysAllow)
+                && !remote_peer.tags.contains(&PeerTag::Consensus)
+                && !found_replacement()
+            {
                 remote_peer.mark_disconnected();
                 self.disconnect_session(ctx.id);
                 return;
@@ -923,7 +930,9 @@ impl PeerManager {
         match &feedback {
             Fatal(reason) => {
                 warn!("peer {:?} trust feedback fatal {}", pid, reason);
-                if peer.tags.contains(&PeerTag::AlwaysAllow) {
+                if peer.tags.contains(&PeerTag::AlwaysAllow)
+                    || peer.tags.contains(&PeerTag::Consensus)
+                {
                     return;
                 }
 
@@ -953,7 +962,10 @@ impl PeerManager {
                     _ => unreachable!(),
                 };
 
-                if peer_trust_metric.knock_out() && !peer.tags.contains(&PeerTag::AlwaysAllow) {
+                if peer_trust_metric.knock_out()
+                    && !peer.tags.contains(&PeerTag::AlwaysAllow)
+                    && !peer.tags.contains(&PeerTag::Consensus)
+                {
                     let soft_ban = self.config.peer_soft_ban.as_secs();
                     info!("peer {:?} knocked out, soft ban {} seconds", pid, soft_ban);
 
@@ -1024,7 +1036,10 @@ impl PeerManager {
 
     fn connect_peers(&mut self, peers: Vec<ArcPeer>) {
         let connectable = |p: ArcPeer| -> Option<ArcPeer> {
-            if self.config.allowlist_only && !p.tags.contains(&PeerTag::AlwaysAllow) {
+            if self.config.allowlist_only
+                && !p.tags.contains(&PeerTag::AlwaysAllow)
+                && !p.tags.contains(&PeerTag::Consensus)
+            {
                 debug!("filter peer {:?} not in allowlist", p.id);
                 return None;
             }
