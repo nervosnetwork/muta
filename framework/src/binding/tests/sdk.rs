@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use cita_trie::MemoryDB;
 
-use protocol::traits::{Context, NoopDispatcher, ServiceResponse, ServiceSDK, Storage};
+use protocol::traits::{Context, ServiceResponse, ServiceSDK, Storage};
 use protocol::types::{
     Address, Block, BlockHeader, Event, Hash, MerkleRoot, Proof, RawTransaction, Receipt,
     ReceiptResponse, SignedTransaction, TransactionRequest, Validator,
@@ -26,7 +26,7 @@ fn test_service_sdk() {
     let arcs = Arc::new(MockStorage {});
     let cq = DefaultChainQuerier::new(Arc::clone(&arcs));
 
-    let mut sdk = DefaultServiceSDK::new(Rc::clone(&rs), Rc::new(cq), NoopDispatcher {});
+    let mut sdk = DefaultServiceSDK::new(Rc::clone(&rs), Rc::new(cq));
 
     // test sdk store bool
     let mut sdk_bool = sdk.alloc_or_recover_bool("test_bool");

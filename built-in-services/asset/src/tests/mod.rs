@@ -7,7 +7,7 @@ use cita_trie::MemoryDB;
 
 use framework::binding::sdk::{DefaultChainQuerier, DefaultServiceSDK};
 use framework::binding::state::{GeneralServiceState, MPTTrie};
-use protocol::traits::{Context, NoopDispatcher, Storage};
+use protocol::traits::{Context, Storage};
 use protocol::types::{
     Address, Block, Hash, Proof, Receipt, ServiceContext, ServiceContextParams, SignedTransaction,
 };
@@ -194,22 +194,14 @@ fn test_transfer_from() {
     assert_eq!(balance_res.balance, 24);
 }
 
-fn new_asset_service() -> AssetService<
-    DefaultServiceSDK<
-        GeneralServiceState<MemoryDB>,
-        DefaultChainQuerier<MockStorage>,
-        NoopDispatcher,
-    >,
-> {
+fn new_asset_service(
+) -> AssetService<DefaultServiceSDK<GeneralServiceState<MemoryDB>, DefaultChainQuerier<MockStorage>>>
+{
     let chain_db = DefaultChainQuerier::new(Arc::new(MockStorage {}));
     let trie = MPTTrie::new(Arc::new(MemoryDB::new(false)));
     let state = GeneralServiceState::new(trie);
 
-    let sdk = DefaultServiceSDK::new(
-        Rc::new(RefCell::new(state)),
-        Rc::new(chain_db),
-        NoopDispatcher {},
-    );
+    let sdk = DefaultServiceSDK::new(Rc::new(RefCell::new(state)), Rc::new(chain_db));
 
     AssetService::new(sdk)
 }

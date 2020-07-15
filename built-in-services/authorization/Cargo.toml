@@ -11,6 +11,8 @@ repository = "https://github.com/nervosnetwork/muta"
 binding-macro = { path = "../../binding-macro" }
 protocol = { path = "../../protocol", package = "muta-protocol" }
 
+multi-signature = { path = "../multi-signature" }
+
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 lazy_static = "1.4"

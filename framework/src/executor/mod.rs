@@ -8,6 +8,7 @@ pub use factory::ServiceExecutorFactory;
 use std::{
     cell::RefCell,
     collections::HashMap,
+    marker::PhantomData,
     ops::{Deref, DerefMut},
     panic::{self, AssertUnwindSafe},
     rc::Rc,
@@ -18,8 +19,8 @@ use cita_trie::DB as TrieDB;
 
 use common_apm::muta_apm;
 use protocol::traits::{
-    Context, Dispatcher, Executor, ExecutorParams, ExecutorResp, NoopDispatcher, Service,
-    ServiceMapping, ServiceResponse, ServiceState, Storage,
+    Context, Executor, ExecutorParams, ExecutorResp, Service, ServiceMapping, ServiceResponse,
+    ServiceState, Storage,
 };
 use protocol::types::{
     Address, Event, Hash, MerkleRoot, Receipt, ReceiptResponse, ServiceContext,
@@ -27,7 +28,7 @@ use protocol::types::{
 };
 use protocol::{ProtocolError, ProtocolResult};
 
-use crate::binding::sdk::{DefaultChainQuerier, DefaultServiceSDK};
+use crate::binding::sdk::{DefaultChainQuerier, DefaultSDKFactory};
 use crate::binding::state::{GeneralServiceState, MPTTrie};
 use crate::executor::error::ExecutorError;
 
@@ -68,7 +69,7 @@ enum ExecType {
     Write,
 }
 
-struct ServiceStateMap<DB: TrieDB>(HashMap<String, Rc<RefCell<GeneralServiceState<DB>>>>);
+pub struct ServiceStateMap<DB: TrieDB>(HashMap<String, Rc<RefCell<GeneralServiceState<DB>>>>);
 
 impl<DB: TrieDB> ServiceStateMap<DB> {
     fn new() -> ServiceStateMap<DB> {
@@ -109,12 +110,15 @@ impl<DB: TrieDB> ServiceStateMap<DB> {
 }
 
 struct CommitHooks<DB: TrieDB> {
-    inner:  Vec<Box<dyn Service>>,
+    inner:  Vec<Rc<RefCell<Box<dyn Service>>>>,
     states: Rc<ServiceStateMap<DB>>,
 }
 
 impl<DB: TrieDB> CommitHooks<DB> {
-    fn new(hooks: Vec<Box<dyn Service>>, states: Rc<ServiceStateMap<DB>>) -> CommitHooks<DB> {
+    fn new(
+        hooks: Vec<Rc<RefCell<Box<dyn Service>>>>,
+        states: Rc<ServiceStateMap<DB>>,
+    ) -> CommitHooks<DB> {
         Self {
             inner: hooks,
             states,
@@ -151,7 +155,7 @@ impl<DB: TrieDB> TxHooks for CommitHooks<DB> {
         let mut ret: Vec<ServiceResponse<String>> = Vec::new();
         for hook in self.inner.iter_mut() {
             let resp = Self::kan(service_context.clone(), Rc::clone(&self.states), || {
-                hook.tx_hook_before_(service_context.clone())
+                hook.borrow_mut().tx_hook_before_(service_context.clone())
             })?;
             ret.push(resp);
         }
@@ -168,7 +172,7 @@ impl<DB: TrieDB> TxHooks for CommitHooks<DB> {
 
         for hook in self.inner.iter_mut() {
             let resp = Self::kan(service_context.clone(), Rc::clone(&self.states), || {
-                hook.tx_hook_after_(service_context.clone())
+                hook.borrow_mut().tx_hook_after_(service_context.clone())
             })?;
             ret.push(resp);
         }
@@ -179,20 +183,11 @@ impl<DB: TrieDB> TxHooks for CommitHooks<DB> {
 
 pub struct ServiceExecutor<S: Storage, DB: TrieDB, Mapping: ServiceMapping> {
     service_mapping: Arc<Mapping>,
-    querier:         Rc<DefaultChainQuerier<S>>,
     states:          Rc<ServiceStateMap<DB>>,
-    root_state:      Rc<RefCell<GeneralServiceState<DB>>>,
-}
+    root_state:      GeneralServiceState<DB>,
+    services:        HashMap<String, Rc<RefCell<Box<dyn Service>>>>,
 
-impl<S: Storage, DB: TrieDB, Mapping: ServiceMapping> Clone for ServiceExecutor<S, DB, Mapping> {
-    fn clone(&self) -> Self {
-        Self {
-            service_mapping: Arc::clone(&self.service_mapping),
-            querier:         Rc::clone(&self.querier),
-            states:          Rc::clone(&self.states),
-            root_state:      Rc::clone(&self.root_state),
-        }
-    }
+    phantom: PhantomData<S>,
 }
 
 impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMapping>
@@ -213,16 +208,17 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
             states.insert(name, Rc::new(RefCell::new(GeneralServiceState::new(trie))));
         }
 
+        let states = Rc::new(states);
+        let sdk_factory = DefaultSDKFactory::new(Rc::clone(&states), Rc::clone(&querier));
+
         for params in services.into_iter() {
             let state = states
                 .get(&params.name)
                 .ok_or(ExecutorError::NotFoundService {
                     service: params.name.to_owned(),
                 })?;
-            let sdk =
-                DefaultServiceSDK::new(Rc::clone(state), Rc::clone(&querier), NoopDispatcher {});
 
-            let mut service = mapping.get_service(&params.name, sdk)?;
+            let mut service = mapping.get_service(&params.name, &sdk_factory)?;
             panic::catch_unwind(AssertUnwindSafe(|| {
                 service.genesis_(params.payload.clone())
             }))
@@ -247,12 +243,14 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
         storage: Arc<S>,
         service_mapping: Arc<Mapping>,
     ) -> ProtocolResult<Self> {
+        let querier = Rc::new(DefaultChainQuerier::new(Arc::clone(&storage)));
         let trie = MPTTrie::from(root, Arc::clone(&trie_db))?;
         let root_state = GeneralServiceState::new(trie);
+        let list_service_name = service_mapping.list_service_name();
 
         let mut states = ServiceStateMap::new();
-        for name in service_mapping.list_service_name().into_iter() {
-            let trie = match root_state.get(&name)? {
+        for name in list_service_name.iter() {
+            let trie = match root_state.get(name)? {
                 Some(service_root) => MPTTrie::from(service_root, Arc::clone(&trie_db))?,
                 None => MPTTrie::new(Arc::clone(&trie_db)),
             };
@@ -261,11 +259,21 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
             states.insert(name.to_owned(), Rc::new(RefCell::new(service_state)));
         }
 
+        let states = Rc::new(states);
+        let sdk_factory = DefaultSDKFactory::new(Rc::clone(&states), Rc::clone(&querier));
+
+        let mut services = HashMap::new();
+        for name in list_service_name.iter() {
+            let service = service_mapping.get_service(name, &sdk_factory)?;
+            services.insert(name.clone(), Rc::new(RefCell::new(service)));
+        }
+
         Ok(Self {
             service_mapping,
-            querier: Rc::new(DefaultChainQuerier::new(storage)),
-            states: Rc::new(states),
-            root_state: Rc::new(RefCell::new(root_state)),
+            states,
+            root_state,
+            services,
+            phantom: PhantomData,
         })
     }
 
@@ -273,10 +281,10 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
     fn commit(&mut self, ctx: Context) -> ProtocolResult<MerkleRoot> {
         for (name, state) in self.states.iter() {
             let root = state.borrow_mut().commit()?;
-            self.root_state.borrow_mut().insert(name.to_owned(), root)?;
+            self.root_state.insert(name.to_owned(), root)?;
         }
-        self.root_state.borrow_mut().stash()?;
-        self.root_state.borrow_mut().commit()
+        self.root_state.stash()?;
+        self.root_state.commit()
     }
 
     fn stash(&mut self) -> ProtocolResult<()> {
@@ -298,16 +306,15 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
         exec_params: &ExecutorParams,
     ) -> ProtocolResult<()> {
         for name in self.service_mapping.list_service_name().into_iter() {
-            let sdk = self.get_sdk(&name)?;
-            let mut service = self.service_mapping.get_service(name.as_str(), sdk)?;
+            let service = self.get_service(name.as_str())?;
 
             let hook_ret = match hook_type {
-                HookType::Before => {
-                    panic::catch_unwind(AssertUnwindSafe(|| service.hook_before_(exec_params)))
-                }
-                HookType::After => {
-                    panic::catch_unwind(AssertUnwindSafe(|| service.hook_after_(exec_params)))
-                }
+                HookType::Before => panic::catch_unwind(AssertUnwindSafe(|| {
+                    service.borrow_mut().hook_before_(exec_params)
+                })),
+                HookType::After => panic::catch_unwind(AssertUnwindSafe(|| {
+                    service.borrow_mut().hook_after_(exec_params)
+                })),
             };
 
             if hook_ret.is_err() {
@@ -319,23 +326,16 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
         Ok(())
     }
 
-    fn get_sdk(
-        &self,
-        service: &str,
-    ) -> ProtocolResult<DefaultServiceSDK<GeneralServiceState<DB>, DefaultChainQuerier<S>, Self>>
-    {
-        let state = self
-            .states
+    fn get_service(&self, service: &str) -> ProtocolResult<Rc<RefCell<Box<dyn Service>>>> {
+        self.services
             .get(service)
-            .ok_or(ExecutorError::NotFoundService {
-                service: service.to_owned(),
-            })?;
-
-        Ok(DefaultServiceSDK::new(
-            Rc::clone(&state),
-            Rc::clone(&self.querier),
-            (*self).clone(),
-        ))
+            .map(|s| Rc::clone(s))
+            .ok_or_else(|| {
+                ExecutorError::NotFoundService {
+                    service: service.to_owned(),
+                }
+                .into()
+            })
     }
 
     fn get_context(
@@ -375,20 +375,11 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
                 let mut tx_hooks = vec![];
 
                 for name in self.service_mapping.list_service_name().into_iter() {
-                    let sdk = self
-                        .get_sdk(&name)
-                        .unwrap_or_else(|e| panic!("get target service sdk failed: {}", e));
-
-                    let tx_hook_service = self
-                        .service_mapping
-                        .get_service(name.as_str(), sdk)
-                        .unwrap_or_else(|e| panic!("get target service sdk failed: {}", e));
-
+                    let tx_hook_service = self.get_service(name.as_str()).expect("no service");
                     tx_hooks.push(tx_hook_service);
                 }
 
-                let hooks = CommitHooks::new(tx_hooks, Rc::clone(&self.states));
-                Box::new(hooks)
+                Box::new(CommitHooks::new(tx_hooks, Rc::clone(&self.states)))
             }
         }
     }
@@ -445,19 +436,19 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
 
     fn call(&self, context: ServiceContext, exec_type: ExecType) -> ServiceResponse<String> {
         let service_name = context.get_service_name();
+        let service = self.get_service(service_name);
 
-        let sdk = match self.get_sdk(&service_name) {
-            Ok(sdk) => sdk,
-            Err(e) => return ServiceResponse::from_error(SERVICE_NOT_FOUND_CODE, e.to_string()),
-        };
-        let mut service = match self.service_mapping.get_service(&service_name, sdk) {
-            Ok(s) => s,
-            Err(e) => return ServiceResponse::from_error(SERVICE_NOT_FOUND_CODE, e.to_string()),
-        };
+        if service.is_err() {
+            return ServiceResponse::from_error(
+                SERVICE_NOT_FOUND_CODE,
+                "can not found service".to_owned(),
+            );
+        }
 
+        let service = service.unwrap();
         match exec_type {
-            ExecType::Read => service.read_(context),
-            ExecType::Write => service.write_(context),
+            ExecType::Read => service.borrow().read_(context),
+            ExecType::Write => service.borrow_mut().write_(context),
         }
     }
 }
@@ -546,17 +537,5 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
         )?;
         panic::catch_unwind(AssertUnwindSafe(|| self.call(context, ExecType::Read)))
             .map_err(|e| ProtocolError::from(ExecutorError::QueryService(format!("{:?}", e))))
-    }
-}
-
-impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMapping> Dispatcher
-    for ServiceExecutor<S, DB, Mapping>
-{
-    fn read(&self, context: ServiceContext) -> ServiceResponse<String> {
-        self.call(context, ExecType::Read)
-    }
-
-    fn write(&self, context: ServiceContext) -> ServiceResponse<String> {
-        self.call(context, ExecType::Write)
     }
 }

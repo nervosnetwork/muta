@@ -1,17 +1,19 @@
 use std::iter::Iterator;
 
-use bytes::Bytes;
-
 use crate::fixed_codec::FixedCodec;
 use crate::traits::{ExecutorParams, ServiceResponse};
 use crate::types::{Address, Block, Hash, MerkleRoot, Receipt, ServiceContext, SignedTransaction};
 use crate::ProtocolResult;
 
+pub trait SDKFactory<SDK: ServiceSDK> {
+    fn get_sdk(&self, name: &str) -> ProtocolResult<SDK>;
+}
+
 pub trait ServiceMapping: Send + Sync {
-    fn get_service<SDK: 'static + ServiceSDK>(
+    fn get_service<SDK: 'static + ServiceSDK, Factory: SDKFactory<SDK>>(
         &self,
         name: &str,
-        sdk: SDK,
+        factory: &Factory,
     ) -> ProtocolResult<Box<dyn Service>>;
 
     fn list_service_name(&self) -> Vec<String>;
@@ -176,29 +178,6 @@ pub trait ServiceSDK {
     // Get a receipt by `tx_hash`
     // if not found on the chain, return None
     fn get_receipt_by_hash(&self, tx_hash: &Hash) -> Option<Receipt>;
-
-    // Call other read-only methods of `service` and return the results
-    // synchronously NOTE: You can use recursive calls, but the maximum call
-    // stack is 1024
-    fn read(
-        &self,
-        ctx: &ServiceContext,
-        extra: Option<Bytes>,
-        service: &str,
-        method: &str,
-        payload: &str,
-    ) -> ServiceResponse<String>;
-
-    // Call other writable methods of `service` and return the results synchronously
-    // NOTE: You can use recursive calls, but the maximum call stack is 1024
-    fn write(
-        &mut self,
-        ctx: &ServiceContext,
-        extra: Option<Bytes>,
-        service: &str,
-        method: &str,
-        payload: &str,
-    ) -> ServiceResponse<String>;
 }
 
 pub trait StoreMap<K: FixedCodec + PartialEq, V: FixedCodec> {

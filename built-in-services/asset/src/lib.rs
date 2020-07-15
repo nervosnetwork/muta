@@ -52,7 +52,11 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
 
     #[cycles(10_000)]
     #[read]
-    fn get_asset(&self, ctx: ServiceContext, payload: GetAssetPayload) -> ServiceResponse<Asset> {
+    pub fn get_asset(
+        &self,
+        ctx: ServiceContext,
+        payload: GetAssetPayload,
+    ) -> ServiceResponse<Asset> {
         if let Some(asset) = self.assets.get(&payload.id) {
             ServiceResponse::<Asset>::from_succeed(asset)
         } else {
@@ -62,7 +66,7 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
 
     #[cycles(10_000)]
     #[read]
-    fn get_balance(
+    pub fn get_balance(
         &self,
         ctx: ServiceContext,
         payload: GetBalancePayload,
@@ -93,7 +97,7 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
 
     #[cycles(10_000)]
     #[read]
-    fn get_allowance(
+    pub fn get_allowance(
         &self,
         ctx: ServiceContext,
         payload: GetAllowancePayload,
@@ -132,7 +136,7 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
 
     #[cycles(21_000)]
     #[write]
-    fn create_asset(
+    pub fn create_asset(
         &mut self,
         ctx: ServiceContext,
         payload: CreateAssetPayload,
@@ -180,7 +184,11 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
 
     #[cycles(21_000)]
     #[write]
-    fn transfer(&mut self, ctx: ServiceContext, payload: TransferPayload) -> ServiceResponse<()> {
+    pub fn transfer(
+        &mut self,
+        ctx: ServiceContext,
+        payload: TransferPayload,
+    ) -> ServiceResponse<()> {
         let caller = ctx.get_caller();
         let asset_id = payload.asset_id.clone();
         let value = payload.value;
@@ -213,7 +221,7 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
 
     #[cycles(21_000)]
     #[write]
-    fn approve(&mut self, ctx: ServiceContext, payload: ApprovePayload) -> ServiceResponse<()> {
+    pub fn approve(&mut self, ctx: ServiceContext, payload: ApprovePayload) -> ServiceResponse<()> {
         let caller = ctx.get_caller();
         let asset_id = payload.asset_id.clone();
         let value = payload.value;
@@ -262,7 +270,7 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
 
     #[cycles(21_000)]
     #[write]
-    fn transfer_from(
+    pub fn transfer_from(
         &mut self,
         ctx: ServiceContext,
         payload: TransferFromPayload,

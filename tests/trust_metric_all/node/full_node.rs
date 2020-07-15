@@ -11,20 +11,28 @@ use authorization::AuthorizationService;
 use derive_more::{Display, From};
 use metadata::MetadataService;
 use multi_signature::MultiSignatureService;
-use protocol::traits::{Service, ServiceMapping, ServiceSDK};
+use protocol::traits::{SDKFactory, Service, ServiceMapping, ServiceSDK};
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
 struct DefaultServiceMapping;
 
 impl ServiceMapping for DefaultServiceMapping {
-    fn get_service<SDK: 'static + ServiceSDK>(
+    fn get_service<SDK: 'static + ServiceSDK, Factory: SDKFactory<SDK>>(
         &self,
         name: &str,
-        sdk: SDK,
+        factory: &Factory,
     ) -> ProtocolResult<Box<dyn Service>> {
+        let sdk = factory.get_sdk(name)?;
+
         let service = match name {
+            "authorization" => {
+                let multi_sig_sdk = factory.get_sdk("multi_signature")?;
+                Box::new(AuthorizationService::new(
+                    sdk,
+                    MultiSignatureService::new(multi_sig_sdk),
+                )) as Box<dyn Service>
+            }
             "asset" => Box::new(AssetService::new(sdk)) as Box<dyn Service>,
-            "authorization" => Box::new(AuthorizationService::new(sdk)) as Box<dyn Service>,
             "metadata" => Box::new(MetadataService::new(sdk)) as Box<dyn Service>,
             "multi_signature" => Box::new(MultiSignatureService::new(sdk)) as Box<dyn Service>,
             _ => {

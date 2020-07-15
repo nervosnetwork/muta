@@ -6,7 +6,6 @@ use std::cell::RefCell;
 use std::panic::{self, AssertUnwindSafe};
 use std::rc::Rc;
 
-use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 
 use protocol::fixed_codec::FixedCodec;
@@ -530,33 +529,6 @@ impl ServiceSDK for MockServiceSDK {
     // Get a receipt by `tx_hash`
     // if not found on the chain, return None
     fn get_receipt_by_hash(&self, _tx_hash: &Hash) -> Option<Receipt> {
-        unimplemented!()
-    }
-
-    // Call other read-only methods of `service` and return the results
-    // synchronously NOTE: You can use recursive calls, but the maximum call
-    // stack is 1024
-    fn read(
-        &self,
-        _ctx: &ServiceContext,
-        _extra: Option<Bytes>,
-        _service: &str,
-        _method: &str,
-        _payload: &str,
-    ) -> ServiceResponse<String> {
-        unimplemented!()
-    }
-
-    // Call other writable methods of `service` and return the results synchronously
-    // NOTE: You can use recursive calls, but the maximum call stack is 1024
-    fn write(
-        &mut self,
-        _ctx: &ServiceContext,
-        _extra: Option<Bytes>,
-        _service: &str,
-        _method: &str,
-        _payload: &str,
-    ) -> ServiceResponse<String> {
         unimplemented!()
     }
 }
