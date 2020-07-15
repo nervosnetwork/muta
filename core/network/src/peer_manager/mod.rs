@@ -308,7 +308,7 @@ impl Inner {
 
     /// If peer exists, return false
     pub fn add_peer(&self, peer: ArcPeer) -> bool {
-        self.peers.write().insert(peer.clone())
+        self.peers.write().insert(peer)
     }
 
     pub fn peer_count(&self) -> usize {
@@ -584,7 +584,7 @@ impl PeerManager {
         let remote_peer = opt_peer.unwrap_or_else(|| ArcPeer::new(remote_peer_id.clone()));
 
         if !remote_peer.has_pubkey() {
-            if let Err(e) = remote_peer.set_pubkey(pubkey.clone()) {
+            if let Err(e) = remote_peer.set_pubkey(pubkey) {
                 error!("impossible, set public key failed {}", e);
                 error!("new session without peer pubkey, chain book will not be updated");
             }

@@ -28,9 +28,9 @@ impl Tags {
 
     pub fn insert_ban(&self, timeout: Duration) -> Result<(), ErrorKind> {
         if self.contains(&PeerTag::Consensus) || self.contains(&PeerTag::AlwaysAllow) {
-            return Err(ErrorKind::Untaggable(format!(
-                "consensus and always allow cannot be ban"
-            )));
+            return Err(ErrorKind::Untaggable(
+                "consensus and always allow cannot be ban".to_owned(),
+            ));
         }
 
         let until = Duration::from_secs(time::now()) + timeout;

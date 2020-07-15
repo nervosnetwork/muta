@@ -267,7 +267,7 @@ impl NetworkConfig {
         Ok(self)
     }
 
-    pub fn allowlist<'a, S: AsRef<[String]>>(mut self, peer_id_strs: S) -> ProtocolResult<Self> {
+    pub fn allowlist<S: AsRef<[String]>>(mut self, peer_id_strs: S) -> ProtocolResult<Self> {
         let peer_ids = {
             let str_iter = peer_id_strs.as_ref().iter();
             let to_peer_ids = str_iter.map(PeerId::from_str_ext);
