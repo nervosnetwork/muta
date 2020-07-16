@@ -338,6 +338,13 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
             metadata.max_tx_size,
         );
 
+        let pub_keys = metadata
+            .verifier_list
+            .iter()
+            .map(|v| v.pub_key.decode())
+            .collect();
+        self.adapter.tag_consensus(ctx.clone(), pub_keys)?;
+
         log::info!(
             "[synchronization]: commit_block, committing block header: {}, committing proof:{:?}",
             block.header.clone(),
