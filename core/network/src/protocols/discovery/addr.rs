@@ -121,8 +121,8 @@ impl AddressManager {
         MisbehaveResult::Disconnect
     }
 
-    pub fn get_random(&mut self, n: usize) -> Vec<Multiaddr> {
-        self.peer_mgr.random_addrs(n).into_iter().collect()
+    pub fn get_random(&mut self, n: usize, sid: SessionId) -> Vec<Multiaddr> {
+        self.peer_mgr.random_addrs(n, sid).into_iter().collect()
     }
 }
 
