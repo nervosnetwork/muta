@@ -2739,3 +2739,49 @@ async fn should_setup_trust_metric_if_none_on_session_blocked() {
         "should have 1 bad event"
     );
 }
+
+#[tokio::test]
+async fn should_able_to_tag_peer() {
+    let (mgr, _conn_rx) = make_manager(0, 20);
+    let handle = mgr.inner.handle();
+
+    let peer = make_peer(2077);
+    handle.tag(&peer.id, PeerTag::Consensus).unwrap();
+
+    let peer = mgr.core_inner().peer(&peer.id).unwrap();
+    assert!(peer.tags.contains(&PeerTag::Consensus));
+}
+
+#[tokio::test]
+async fn should_able_to_untag_peer() {
+    let (mgr, _conn_rx) = make_manager(0, 20);
+    let handle = mgr.inner.handle();
+
+    let peer = make_peer(2077);
+    handle.tag(&peer.id, PeerTag::Consensus).unwrap();
+
+    let peer = mgr.core_inner().peer(&peer.id).unwrap();
+    assert!(peer.tags.contains(&PeerTag::Consensus));
+
+    handle.untag(&peer.id, &PeerTag::Consensus);
+    assert!(!peer.tags.contains(&PeerTag::Consensus));
+}
+
+#[tokio::test]
+async fn should_remove_old_consensus_peer_tag_when_tag_consensus() {
+    let (mgr, _conn_rx) = make_manager(0, 20);
+    let handle = mgr.inner.handle();
+
+    let peer = make_peer(2077);
+    handle.tag(&peer.id, PeerTag::Consensus).unwrap();
+
+    let peer = mgr.core_inner().peer(&peer.id).unwrap();
+    assert!(peer.tags.contains(&PeerTag::Consensus));
+
+    let new_consensus = make_peer(3077);
+    handle.tag_consensus(vec![new_consensus.owned_id()]);
+
+    let new_consensus = mgr.core_inner().peer(&new_consensus.id).unwrap();
+    assert!(new_consensus.tags.contains(&PeerTag::Consensus));
+    assert!(!peer.tags.contains(&PeerTag::Consensus));
+}

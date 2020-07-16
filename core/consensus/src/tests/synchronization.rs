@@ -300,6 +300,10 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
         })
     }
 
+    fn tag_consensus(&self, _: Context, _: Vec<Bytes>) -> ProtocolResult<()> {
+        Ok(())
+    }
+
     fn report_bad(&self, _ctx: Context, _feedback: TrustFeedback) {}
 
     fn set_args(
