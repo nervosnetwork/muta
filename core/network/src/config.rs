@@ -11,7 +11,7 @@ use log::error;
 use protocol::{types::Address, ProtocolResult};
 use tentacle::{
     multiaddr::{multiaddr, Multiaddr, Protocol},
-    secio::{PublicKey, SecioKeyPair},
+    secio::{PeerId, SecioKeyPair},
 };
 
 use crate::{
@@ -21,6 +21,7 @@ use crate::{
     peer_manager::{ArcPeer, PeerManagerConfig, SharedSessionsConfig, TrustMetricConfig},
     selfcheck::SelfCheckConfig,
     traits::MultiaddrExt,
+    PeerIdExt,
 };
 
 // TODO: 0.0.0.0 expose? 127.0.0.1 doesn't work because of tentacle-discovery.
@@ -62,9 +63,9 @@ pub const DEFAULT_RPC_TIMEOUT: u64 = 10;
 // Selfcheck
 pub const DEFAULT_SELF_CHECK_INTERVAL: u64 = 30;
 
-pub type PublicKeyHexStr = String;
 pub type PrivateKeyHexStr = String;
 pub type PeerAddrStr = String;
+pub type PeerIdBase58Str = String;
 
 // Example:
 //  example.com:2077
@@ -235,16 +236,13 @@ impl NetworkConfig {
 
     pub fn bootstraps(
         mut self,
-        pairs: Vec<(PublicKeyHexStr, PeerAddrStr)>,
+        pairs: Vec<(PeerIdBase58Str, PeerAddrStr)>,
     ) -> ProtocolResult<Self> {
-        let to_peer = |(pk_hex, peer_addr): (PublicKeyHexStr, PeerAddrStr)| -> _ {
-            let pk = hex::decode(pk_hex)
-                .map(PublicKey::Secp256k1)
-                .map_err(|_| NetworkError::InvalidPublicKey)?;
-            let peer_id = pk.peer_id();
-
+        let to_peer = |(pid_str, peer_addr): (PeerIdBase58Str, PeerAddrStr)| -> _ {
+            let peer_id = PeerId::from_str_ext(&pid_str)?;
             let mut multiaddr = Self::parse_peer_addr(peer_addr)?;
-            let peer = ArcPeer::from_pubkey(pk).map_err(NetworkError::from)?;
+
+            let peer = ArcPeer::new(peer_id.clone());
 
             if let Some(id_bytes) = multiaddr.id_bytes() {
                 if id_bytes != peer_id.as_bytes() {

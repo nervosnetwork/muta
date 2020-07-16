@@ -13,7 +13,7 @@ use core_consensus::message::{
     FixedBlock, FixedHeight, BROADCAST_HEIGHT, RPC_RESP_SYNC_PULL_BLOCK, RPC_SYNC_PULL_BLOCK,
 };
 use core_network::{
-    DiagnosticEvent, NetworkConfig, NetworkService, NetworkServiceHandle, TrustReport,
+    DiagnosticEvent, NetworkConfig, NetworkService, NetworkServiceHandle, PeerId, TrustReport,
 };
 use derive_more::Display;
 use protocol::{
@@ -82,22 +82,21 @@ impl MessageHandler for ReceiveRemoteHeight {
 }
 
 pub struct ClientNode {
-    pub network:           NetworkServiceHandle,
-    pub remote_chain_addr: Address,
-    pub priv_key:          Secp256k1PrivateKey,
-    pub sync:              Sync,
+    pub network:        NetworkServiceHandle,
+    pub remote_peer_id: PeerId,
+    pub priv_key:       Secp256k1PrivateKey,
+    pub sync:           Sync,
 }
 
 pub async fn connect(full_node_port: u16, listen_port: u16, sync: Sync) -> ClientNode {
-    let full_node_hex_pubkey = full_node_hex_pubkey();
-    let full_node_chain_addr = full_node_chain_addr(&full_node_hex_pubkey);
+    let full_node_peer_id = full_node_peer_id();
     let full_node_addr = format!("127.0.0.1:{}", full_node_port);
 
     let config = NetworkConfig::new()
         .ping_interval(consts::NETWORK_PING_INTERVAL)
         .peer_trust_metric(consts::NETWORK_TRUST_METRIC_INTERVAL, None)
         .expect("peer trust")
-        .bootstraps(vec![(full_node_hex_pubkey, full_node_addr)])
+        .bootstraps(vec![(full_node_peer_id.to_base58(), full_node_addr)])
         .expect("test node config");
     let priv_key = Secp256k1PrivateKey::generate(&mut rand::rngs::OsRng);
 
@@ -144,7 +143,7 @@ pub async fn connect(full_node_port: u16, listen_port: u16, sync: Sync) -> Clien
 
     ClientNode {
         network: handle,
-        remote_chain_addr: full_node_chain_addr,
+        remote_peer_id: full_node_peer_id,
         priv_key,
         sync,
     }
@@ -158,17 +157,17 @@ impl ClientNode {
 
     pub fn connected(&self) -> bool {
         let diagnostic = &self.network.diagnostic;
-        let opt_session = diagnostic.session_by_chain(&self.remote_chain_addr);
+        let opt_session = diagnostic.session(&self.remote_peer_id);
 
         self.sync.is_connected() && opt_session.is_some()
     }
 
-    pub fn connected_session(&self, addr: &Address) -> Option<usize> {
+    pub fn connected_session(&self, peer_id: &PeerId) -> Option<usize> {
         if !self.connected() {
             None
         } else {
             let diagnostic = &self.network.diagnostic;
-            let opt_session = diagnostic.session_by_chain(addr);
+            let opt_session = diagnostic.session(peer_id);
 
             opt_session.map(|sid| sid.value())
         }
@@ -177,15 +176,15 @@ impl ClientNode {
     pub async fn broadcast<M: MessageCodec>(&self, endpoint: &str, msg: M) -> ClientResult<()> {
         use Priority::High;
 
-        let sid = match self.connected_session(&self.remote_chain_addr) {
+        let sid = match self.connected_session(&self.remote_peer_id) {
             Some(sid) => sid,
             None => return Err(ClientNodeError::NotConnected),
         };
 
         let ctx = Context::new().with_value::<usize>("session_id", sid);
-        let users = vec![self.remote_chain_addr.clone()];
+        let peers = vec![Bytes::from(self.remote_peer_id.clone().into_bytes())];
 
-        match self.users_cast::<M>(ctx, endpoint, users, msg, High).await {
+        match self.multicast(ctx, endpoint, peers, msg, High).await {
             Err(_) if !self.connected() => Err(ClientNodeError::NotConnected),
             Err(e) => {
                 let err_msg = format!("broadcast to {} {}", endpoint, e);
@@ -200,7 +199,7 @@ impl ClientNode {
         M: MessageCodec,
         R: MessageCodec,
     {
-        let sid = match self.connected_session(&self.remote_chain_addr) {
+        let sid = match self.connected_session(&self.remote_peer_id) {
             Some(sid) => sid,
             None => return Err(ClientNodeError::NotConnected),
         };
@@ -290,19 +289,14 @@ impl Deref for ClientNode {
     }
 }
 
-fn full_node_hex_pubkey() -> String {
+fn full_node_peer_id() -> PeerId {
     let config: Config =
         common_config_parser::parse(&consts::CHAIN_CONFIG_PATH).expect("parse chain config.toml");
 
     let mut bootstraps = config.network.bootstraps.expect("config.toml full node");
     let full_node = bootstraps.pop().expect("there should be one bootstrap");
 
-    full_node.pubkey.as_string_trim0x()
-}
-
-fn full_node_chain_addr(hex_pubkey: &str) -> Address {
-    let pubkey = hex::decode(hex_pubkey).expect("decode hex full node pubkey");
-    Address::from_pubkey_bytes(pubkey.into()).expect("full node chain address")
+    full_node.peer_id.parse().expect("parse peer id")
 }
 
 fn mock_block(height: u64) -> Block {

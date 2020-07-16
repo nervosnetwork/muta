@@ -1,3 +1,14 @@
+use crate::traits::MultiaddrExt;
+
+use derive_more::Display;
+use futures::{pin_mut, task::AtomicWaker};
+use futures_timer::Delay;
+use serde_derive::{Deserialize, Serialize};
+use tentacle::{
+    multiaddr::{Multiaddr, Protocol},
+    secio::PeerId,
+};
+
 use std::{
     borrow::Cow,
     future::Future,
@@ -9,17 +20,6 @@ use std::{
     time::{Duration, Instant},
     vec::IntoIter,
 };
-
-use derive_more::Display;
-use futures::{pin_mut, task::AtomicWaker};
-use futures_timer::Delay;
-use serde_derive::{Deserialize, Serialize};
-use tentacle::{
-    multiaddr::{Multiaddr, Protocol},
-    secio::PeerId,
-};
-
-use crate::traits::MultiaddrExt;
 
 #[macro_export]
 macro_rules! loop_ready {

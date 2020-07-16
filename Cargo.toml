@@ -51,7 +51,6 @@ util = { path = "built-in-services/util"}
 rand = "0.7"
 core-network = { path = "./core/network", features = ["diagnostic"] }
 tokio = { version = "0.2", features = ["full"] }
-bs58 = "0.3"
 
 [workspace]
 members = [
