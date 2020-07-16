@@ -123,6 +123,7 @@ fn mock_validators_extend(len: usize) -> Vec<ValidatorExtend> {
                 "0xd654c7a6747fc2e34808c1ebb1510bfb19b443d639f2fab6dc41fce9f634de37".to_string(),
             )
             .unwrap(),
+            pub_key:        mock_pub_key(),
             address:        mock_address(),
             propose_weight: random::<u32>(),
             vote_weight:    random::<u32>(),

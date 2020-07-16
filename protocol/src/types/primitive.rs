@@ -29,11 +29,12 @@ pub struct Hex(String);
 
 impl Hex {
     pub fn from_string(s: String) -> ProtocolResult<Self> {
-        if s.starts_with("0x") {
-            Ok(Self(s))
-        } else {
-            Err(TypesError::HexPrefix.into())
+        if (!s.starts_with("0x") && !s.starts_with("0X")) || s.len() < 3 {
+            return Err(TypesError::HexPrefix.into());
         }
+
+        hex::decode(&s[2..]).map_err(|error| TypesError::FromHex { error })?;
+        Ok(Hex(s))
     }
 
     pub fn as_string(&self) -> String {
@@ -42,6 +43,10 @@ impl Hex {
 
     pub fn as_string_trim0x(&self) -> String {
         (&self.0[2..]).to_owned()
+    }
+
+    pub fn decode(&self) -> Bytes {
+        Bytes::from(hex::decode(&self.0[2..]).expect("impossible, already checked in from_string"))
     }
 }
 
@@ -305,6 +310,7 @@ pub struct Metadata {
 #[derive(RlpFixedCodec, Serialize, Deserialize, Clone, PartialEq, Eq, Default)]
 pub struct ValidatorExtend {
     pub bls_pub_key:    Hex,
+    pub pub_key:        Hex,
     pub address:        Address,
     pub propose_weight: u32,
     pub vote_weight:    u32,
@@ -321,11 +327,8 @@ impl fmt::Debug for ValidatorExtend {
 
         write!(
             f,
-            "bls public key {:?}, address {:?}, propose weight {}, vote weight {}",
-            pk,
-            self.address.as_hex(),
-            self.propose_weight,
-            self.vote_weight
+            "bls public key {:?}, public key {:?}, address {:?} propose weight {}, vote weight {}",
+            pk, self.pub_key, self.address, self.propose_weight, self.vote_weight
         )
     }
 }
@@ -350,8 +353,8 @@ fn ensure_len(real: usize, expect: usize) -> ProtocolResult<()> {
 mod tests {
     use bytes::Bytes;
 
-    use super::{Address, Hash};
-    use crate::types::Hex;
+    use super::{Address, Hash, ValidatorExtend};
+    use crate::{fixed_codec::FixedCodec, types::Hex};
 
     #[test]
     fn test_hash() {
@@ -387,5 +390,19 @@ mod tests {
         let hex = Hex::from_string(hex_str.to_owned()).unwrap();
 
         assert_eq!(hex_str, hex.0.as_str());
+    }
+
+    #[test]
+    fn test_validator_extend() {
+        let extend = ValidatorExtend {
+            bls_pub_key: Hex::from_string("0x0401139331589f32220ec5f41f6faa0f5c3f4d36af011ab014cefd9d8f36b53b04a2031f681d1c9648a2a5d534d742931b0a5a4132da9ee752c1144d6396bed6cfc635c9687258cec9b60b387d35cf9e13f29091e11ae88024d74ca904c0ea3fb3".to_owned()).unwrap(),
+            pub_key:     Hex::from_string("0x026c184a9016f6f71a234c86b141621f38b68c78602ab06768db4d83682c616004".to_owned()).unwrap(),
+            address:     Address::from_hex("0x76961e339fe2f1f931d84c425754806fb4174c34").unwrap(),
+            propose_weight: 1,
+            vote_weight:    1,
+        };
+
+        let decoded = ValidatorExtend::decode_fixed(extend.encode_fixed().unwrap()).unwrap();
+        assert_eq!(decoded, extend);
     }
 }

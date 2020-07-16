@@ -21,6 +21,7 @@ struct Keypair {
     pub private_key:    String,
     pub public_key:     String,
     pub address:        String,
+    pub peer_id:        String,
     pub bls_public_key: String,
 }
 
@@ -70,10 +71,11 @@ pub fn main() {
         };
         let keypair = SecioKeyPair::secp256k1_raw_key(seckey.as_ref()).expect("secp256k1 keypair");
         let pubkey = keypair.to_public_key().inner();
-        let user_addr = Address::from_pubkey_bytes(pubkey.into()).expect("user addr");
+        let user_addr = Address::from_pubkey_bytes(pubkey.clone().into()).expect("user addr");
 
         k.private_key = add_0x(hex::encode(seckey.as_ref()));
-        k.public_key = add_0x(hex::encode(keypair.to_public_key().inner()));
+        k.public_key = add_0x(hex::encode(pubkey));
+        k.peer_id = keypair.to_public_key().peer_id().to_base58();
         k.address = add_0x(user_addr.as_hex());
 
         let priv_key =

@@ -19,6 +19,7 @@ pub enum MessageTarget {
 #[derive(Debug, Clone)]
 pub struct NodeInfo {
     pub chain_id:     Hash,
+    pub self_pub_key: Bytes,
     pub self_address: Address,
 }
 
@@ -144,7 +145,7 @@ pub trait CommonConsensusAdapter: Send + Sync {
         vote_pubkeys: Vec<Hex>,
     ) -> ProtocolResult<()>;
 
-    fn verity_proof_weight(
+    fn verify_proof_weight(
         &self,
         ctx: Context,
         block_height: u64,
