@@ -3,7 +3,7 @@ use crate::{common::ConnectedAddr, traits::SessionBook};
 
 use log::debug;
 use parking_lot::RwLock;
-use protocol::types::Address;
+use protocol::traits::PeerTag;
 use tentacle::{secio::PeerId, SessionId};
 
 use std::{collections::HashSet, sync::Arc};
@@ -108,12 +108,17 @@ impl SessionBook for SharedSessions {
             .unwrap_or_else(|| 0)
     }
 
-    fn whitelist(&self) -> Vec<Address> {
-        self.inner
-            .whitelist
+    fn allowlist(&self) -> Vec<PeerId> {
+        self.sessions()
             .read()
             .iter()
-            .map(|p| p.owned_chain_addr())
+            .filter_map(|s| {
+                if s.peer.tags.contains(&PeerTag::AlwaysAllow) {
+                    Some(s.peer.id.to_owned())
+                } else {
+                    None
+                }
+            })
             .collect()
     }
 }

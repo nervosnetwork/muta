@@ -1,4 +1,8 @@
-use std::{error::Error, fmt::Debug};
+use std::{
+    error::Error,
+    fmt::Debug,
+    hash::{Hash, Hasher},
+};
 
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -25,6 +29,59 @@ pub enum TrustFeedback {
     Neutral,
     #[display(fmt = "good")]
     Good,
+}
+
+#[derive(Debug, Display, Clone)]
+pub enum PeerTag {
+    #[display(fmt = "consensus")]
+    Consensus,
+    #[display(fmt = "always allow")]
+    AlwaysAllow,
+    #[display(fmt = "banned, until {}", until)]
+    Ban { until: u64 }, // timestamp
+    #[display(fmt = "{}", _0)]
+    Custom(String), // TODO: Hide custom constructor
+}
+
+impl PeerTag {
+    pub fn ban(until: u64) -> Self {
+        PeerTag::Ban { until }
+    }
+
+    pub fn ban_key() -> Self {
+        PeerTag::Ban { until: 0 }
+    }
+
+    pub fn custom<S: AsRef<str>>(s: S) -> Result<Self, ()> {
+        let custom_str = s.as_ref();
+        match custom_str {
+            "consensus" | "always_allow" | "ban" => Err(()),
+            _ => Ok(PeerTag::Custom(custom_str.to_owned())),
+        }
+    }
+
+    pub fn str(&self) -> &str {
+        match self {
+            PeerTag::Consensus => "consensus",
+            PeerTag::AlwaysAllow => "always_allow",
+            PeerTag::Ban { .. } => "ban",
+            PeerTag::Custom(str) => str,
+        }
+    }
+}
+
+impl PartialEq for PeerTag {
+    fn eq(&self, other: &PeerTag) -> bool {
+        self.str() == other.str()
+    }
+}
+
+impl Eq for PeerTag {}
+
+impl Hash for PeerTag {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.str().hash(state)
+    }
 }
 
 #[async_trait]
@@ -97,6 +154,11 @@ pub trait Rpc: Send + Sync {
     ) -> ProtocolResult<()>
     where
         M: MessageCodec;
+}
+
+pub trait Network: Send + Sync {
+    fn add_tag(&self, ctx: Context, peer_id: Bytes, tag: PeerTag) -> ProtocolResult<()>;
+    fn remove_tag(&self, ctx: Context, peer_id: Bytes, tag: &PeerTag) -> ProtocolResult<()>;
 }
 
 pub trait PeerTrust: Send + Sync {
