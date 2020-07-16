@@ -37,7 +37,7 @@ use core_mempool::{
     DefaultMemPoolAdapter, HashMemPool, MsgPushTxs, NewTxsHandler, PullTxsHandler,
     END_GOSSIP_NEW_TXS, RPC_PULL_TXS, RPC_RESP_PULL_TXS,
 };
-use core_network::{DiagnosticEvent, NetworkConfig, NetworkService};
+use core_network::{DiagnosticEvent, NetworkConfig, NetworkService, PeerId, PeerIdExt};
 use core_storage::{ImplStorage, StorageError};
 use framework::executor::{ServiceExecutor, ServiceExecutorFactory};
 use protocol::traits::{APIAdapter, Context, MemPool, Network, NodeInfo, ServiceMapping, Storage};
@@ -371,15 +371,15 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         lock,
     ));
 
-    let pub_keys = metadata
+    let peer_ids = metadata
         .verifier_list
         .iter()
-        .map(|v| v.pub_key.decode())
-        .collect();
+        .map(|v| PeerId::from_pubkey_bytes(v.pub_key.decode()).map(PeerIdExt::into_bytes_ext))
+        .collect::<Result<Vec<_>, _>>()?;
 
     network_service
         .handle()
-        .tag_consensus(Context::new(), pub_keys)?;
+        .tag_consensus(Context::new(), peer_ids)?;
 
     // Re-execute block from exec_height + 1 to current_height, so that init the
     // lost current status.

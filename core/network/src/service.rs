@@ -148,7 +148,7 @@ impl Network for NetworkServiceHandle {
     fn tag_consensus(&self, _: Context, peer_ids: Vec<Bytes>) -> ProtocolResult<()> {
         let peer_ids = peer_ids
             .into_iter()
-            .map(PeerId::from_pubkey_bytes)
+            .map(<PeerId as PeerIdExt>::from_bytes)
             .collect::<Result<Vec<_>, _>>()?;
         self.peer_state.tag_consensus(peer_ids);
 
