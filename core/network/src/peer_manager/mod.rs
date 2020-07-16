@@ -270,6 +270,8 @@ impl Deref for ArcSession {
 }
 
 struct Inner {
+    our_id: Arc<PeerId>,
+
     consensus: RwLock<HashSet<PeerId>>,
     sessions:  RwLock<HashSet<ArcSession>>,
     peers:     RwLock<HashSet<ArcPeer>>,
@@ -278,8 +280,10 @@ struct Inner {
 }
 
 impl Inner {
-    pub fn new() -> Self {
+    pub fn new(our_id: PeerId) -> Self {
         Inner {
+            our_id: Arc::new(our_id),
+
             consensus: Default::default(),
             sessions:  Default::default(),
             peers:     Default::default(),
@@ -403,16 +407,41 @@ impl PeerManagerHandle {
         self.inner.session(sid).map(|s| s.peer.owned_id())
     }
 
-    pub fn random_addrs(&self, max: usize) -> Vec<Multiaddr> {
+    pub fn random_addrs(&self, max: usize, sid: SessionId) -> Vec<Multiaddr> {
         let mut rng = rand::thread_rng();
         let book = self.inner.peers.read();
         let peers = book.iter().choose_multiple(&mut rng, max);
 
-        // Should always include our self
-        let our_self = self.listen_addrs();
-        let condidates = peers.into_iter().map(|p| p.multiaddrs.all_raw()).flatten();
+        let is_self_consensus = self
+            .inner
+            .peer(&self.inner.our_id)
+            .map(|p| p.tags.contains(&PeerTag::Consensus))
+            .unwrap_or_else(|| false);
 
-        our_self.into_iter().chain(condidates).take(max).collect()
+        let is_remote_consensus = self
+            .inner
+            .session(sid)
+            .map(|s| s.peer.tags.contains(&PeerTag::Consensus))
+            .unwrap_or_else(|| false);
+
+        let condidates = peers
+            .into_iter()
+            .filter_map(|p| {
+                if !is_remote_consensus && p.tags.contains(&PeerTag::Consensus) {
+                    None
+                } else {
+                    Some(p.multiaddrs.all_raw())
+                }
+            })
+            .flatten();
+
+        if !is_self_consensus {
+            // Should always include our self
+            let our_self = self.listen_addrs();
+            our_self.into_iter().chain(condidates).take(max).collect()
+        } else {
+            condidates.take(max).collect()
+        }
     }
 
     pub fn listen_addrs(&self) -> Vec<Multiaddr> {
@@ -511,7 +540,7 @@ impl PeerManager {
     ) -> Self {
         let peer_id = config.our_id.clone();
 
-        let inner = Arc::new(Inner::new());
+        let inner = Arc::new(Inner::new(config.our_id.clone()));
         let bootstraps = HashSet::from_iter(config.bootstraps.clone());
         let waker = Arc::new(AtomicWaker::new());
         let heart_beat = HeartBeat::new(Arc::clone(&waker), config.routine_interval);

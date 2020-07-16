@@ -139,7 +139,11 @@ mod tests {
             write_timeout:          10,
         };
 
-        let inner = Arc::new(Inner::new());
+        let keypair = SecioKeyPair::secp256k1_generated();
+        let pubkey = keypair.public_key();
+        let self_peer_id = pubkey.peer_id();
+
+        let inner = Arc::new(Inner::new(self_peer_id));
         let sessions = SharedSessions::new(Arc::clone(&inner), sess_conf);
 
         let keypair = SecioKeyPair::secp256k1_generated();

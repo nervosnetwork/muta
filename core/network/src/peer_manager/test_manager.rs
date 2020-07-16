@@ -2115,7 +2115,7 @@ async fn should_always_include_our_listen_addrs_in_return_from_manager_handle_ra
     }
 
     let handle = mgr.inner.handle();
-    let addrs = handle.random_addrs(100);
+    let addrs = handle.random_addrs(100, 1.into());
 
     assert!(
         !listen_multiaddrs.iter().any(|lma| !addrs.contains(&*lma)),
