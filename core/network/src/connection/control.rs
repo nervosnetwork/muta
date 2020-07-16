@@ -4,12 +4,13 @@ use futures::channel::mpsc::UnboundedSender;
 use log::error;
 use tentacle::{
     error::SendErrorKind,
+    secio::PeerId,
     service::{ServiceControl, TargetSession},
     SessionId,
 };
 
 use async_trait::async_trait;
-use protocol::{traits::Priority, types::Address, Bytes};
+use protocol::{traits::Priority, Bytes};
 
 use crate::{
     error::NetworkError,
@@ -136,53 +137,34 @@ where
         Ok(())
     }
 
-    async fn users_send(
+    async fn multisend(
         &self,
-        chain_addrs: Vec<Address>,
+        peer_ids: Vec<PeerId>,
         msg: Bytes,
         pri: Priority,
     ) -> Result<(), NetworkError> {
-        let (connected, unconnected) = self.sessions.by_chain(chain_addrs.clone());
+        let (connected, unconnected) = self.sessions.peers(peer_ids);
         let send_ret = self.send(TargetSession::Multi(connected), msg, pri);
-
-        let whitelist_peers = PeerManagerEvent::WhitelistPeersByChainAddr { chain_addrs };
-        if self.mgr_srv.unbounded_send(whitelist_peers).is_err() {
-            error!("network: peer manager service exit");
-        }
-
         if unconnected.is_empty() {
             return send_ret;
         }
 
-        let (pids, unknown) = self.sessions.peers_by_chain(unconnected.clone());
-        let connect_peers = PeerManagerEvent::ConnectPeersNow { pids };
+        let connect_peers = PeerManagerEvent::ConnectPeersNow {
+            pids: unconnected.clone(),
+        };
         if self.mgr_srv.unbounded_send(connect_peers).is_err() {
             error!("network: peer manager service exit");
         }
 
-        let unconnected = unconnected
-            .into_iter()
-            .filter(|a| !unknown.contains(a))
-            .collect::<Vec<_>>();
-
-        if send_ret.is_err() || !unconnected.is_empty() || !unknown.is_empty() {
+        if send_ret.is_err() || !unconnected.is_empty() {
             let other = send_ret.err().map(NetworkError::boxed);
             let unconnected = if unconnected.is_empty() {
                 None
             } else {
                 Some(unconnected)
             };
-            let unknown = if unknown.is_empty() {
-                None
-            } else {
-                Some(unknown)
-            };
 
-            return Err(NetworkError::UserSend {
-                unconnected,
-                unknown,
-                other,
-            });
+            return Err(NetworkError::MultiCast { unconnected, other });
         }
 
         Ok(())

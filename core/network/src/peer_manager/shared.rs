@@ -73,37 +73,20 @@ impl SessionBook for SharedSessions {
         }
     }
 
-    fn by_chain(&self, addrs: Vec<Address>) -> (Vec<SessionId>, Vec<Address>) {
-        let chain = self.inner.chain.read();
-
+    fn peers(&self, pids: Vec<PeerId>) -> (Vec<SessionId>, Vec<PeerId>) {
         let mut connected = Vec::new();
         let mut unconnected = Vec::new();
-        for addr in addrs {
-            match chain.get(&addr) {
+
+        for peer_id in pids {
+            match self.inner.peer(&peer_id) {
                 Some(peer) if peer.connectedness() == Connectedness::Connected => {
-                    connected.push(peer.session_id());
+                    connected.push(peer.session_id())
                 }
-                _ => unconnected.push(addr),
+                _ => unconnected.push(peer_id),
             }
         }
 
         (connected, unconnected)
-    }
-
-    fn peers_by_chain(&self, addrs: Vec<Address>) -> (Vec<PeerId>, Vec<Address>) {
-        let chain = self.inner.chain.read();
-
-        let mut peers = Vec::new();
-        let mut unknown = Vec::new();
-        for addr in addrs {
-            if let Some(peer) = chain.get(&addr) {
-                peers.push(peer.owned_id());
-            } else {
-                unknown.push(addr);
-            }
-        }
-
-        (peers, unknown)
     }
 
     fn all(&self) -> Vec<SessionId> {
@@ -138,14 +121,14 @@ impl SessionBook for SharedSessions {
 #[cfg(test)]
 mod tests {
     use super::{SessionBook, SharedSessions, SharedSessionsConfig};
-    use crate::peer_manager::{Inner, Peer};
+    use crate::peer_manager::Inner;
 
     use tentacle::secio::SecioKeyPair;
 
     use std::sync::Arc;
 
     #[test]
-    fn should_push_not_found_chain_addr_to_unconneded_on_by_chain() {
+    fn should_return_unconnected_peer_ids() {
         let sess_conf = SharedSessionsConfig {
             max_stream_window_size: 10,
             write_timeout:          10,
@@ -156,17 +139,10 @@ mod tests {
 
         let keypair = SecioKeyPair::secp256k1_generated();
         let pubkey = keypair.public_key();
-        let chain_addr = Peer::pubkey_to_chain_addr(&pubkey).expect("chain addr");
+        let peer_id = pubkey.peer_id();
+        assert!(inner.peer(&peer_id).is_none(), "should not be registered");
 
-        assert!(
-            inner.peer_by_chain(&chain_addr).is_none(),
-            "should not be registered"
-        );
-
-        let (_, unconnected) = sessions.by_chain(vec![chain_addr.clone()]);
-        assert!(
-            unconnected.contains(&chain_addr),
-            "should be inserted to unconnected"
-        );
+        let (_, unconnected) = sessions.peers(vec![peer_id.clone()]);
+        assert!(unconnected.contains(&peer_id));
     }
 }

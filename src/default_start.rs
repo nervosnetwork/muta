@@ -181,10 +181,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     let mut bootstrap_pairs = vec![];
     if let Some(bootstrap) = &config.network.bootstraps {
         for bootstrap in bootstrap.iter() {
-            bootstrap_pairs.push((
-                bootstrap.pubkey.as_string_trim0x(),
-                bootstrap.address.to_owned(),
-            ));
+            bootstrap_pairs.push((bootstrap.peer_id.to_owned(), bootstrap.address.to_owned()));
         }
     }
 

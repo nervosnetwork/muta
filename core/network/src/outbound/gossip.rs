@@ -1,16 +1,16 @@
 use async_trait::async_trait;
 use protocol::{
     traits::{Context, Gossip, MessageCodec, Priority},
-    types::Address,
     Bytes, ProtocolResult,
 };
-use tentacle::service::TargetSession;
+use tentacle::{secio::PeerId, service::TargetSession};
 
 use crate::{
     endpoint::Endpoint,
     error::NetworkError,
     message::{Headers, NetworkMessage},
     traits::{Compression, MessageSender},
+    PeerIdExt,
 };
 
 #[derive(Clone)]
@@ -61,14 +61,21 @@ where
         self.sender.send(tar, msg, pri)
     }
 
-    async fn users_send(
+    async fn multisend<'a, P: AsRef<[Bytes]> + 'a>(
         &self,
         _ctx: Context,
-        users: Vec<Address>,
+        peer_ids: P,
         msg: Bytes,
         pri: Priority,
     ) -> Result<(), NetworkError> {
-        self.sender.users_send(users, msg, pri).await
+        let peer_ids = {
+            let byteses = peer_ids.as_ref().iter();
+            let maybe_ids = byteses.map(<PeerId as PeerIdExt>::from_bytes);
+
+            maybe_ids.collect::<Result<Vec<_>, _>>()?
+        };
+
+        self.sender.multisend(peer_ids, msg, pri).await
     }
 }
 
@@ -88,22 +95,27 @@ where
         Ok(())
     }
 
-    async fn users_cast<M>(
+    async fn multicast<'a, M, P>(
         &self,
         cx: Context,
         end: &str,
-        users: Vec<Address>,
+        peer_ids: P,
         msg: M,
         p: Priority,
     ) -> ProtocolResult<()>
     where
         M: MessageCodec,
+        P: AsRef<[Bytes]> + Send + 'a,
     {
         let msg = self.package_message(cx.clone(), end, msg).await?;
-        let user_count = users.len();
-        self.users_send(cx, users, msg, p).await?;
-        common_apm::metrics::network::on_network_message_sent_multi_target(end, user_count as i64);
+        let multicast_count = peer_ids.as_ref().len();
 
+        self.multisend(cx, peer_ids, msg, p).await?;
+
+        common_apm::metrics::network::on_network_message_sent_multi_target(
+            end,
+            multicast_count as i64,
+        );
         Ok(())
     }
 }
