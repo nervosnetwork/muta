@@ -141,7 +141,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     // Init network
     let network_config = NetworkConfig::new()
         .max_connections(config.network.max_connected_peers)
-        .whitelist_peers_only(config.network.whitelist_peers_only)
+        .allowlist_only(config.network.allowlist_only)
         .peer_trust_metric(
             consts::NETWORK_TRUST_METRIC_INTERVAL,
             config.network.trust_max_history_duration,
@@ -166,11 +166,11 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         }
     }
 
-    let whitelist = config.network.whitelist.clone().unwrap_or_default();
+    let allowlist = config.network.allowlist.clone().unwrap_or_default();
 
     let network_config = network_config
         .bootstraps(bootstrap_pairs)?
-        .whitelist(whitelist)?
+        .allowlist(allowlist)?
         .secio_keypair(network_privkey)?;
     let mut network_service = NetworkService::new(network_config);
     network_service

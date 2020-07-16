@@ -3,7 +3,6 @@ use std::borrow::Cow;
 use async_trait::async_trait;
 use protocol::{
     traits::{Context, Priority},
-    types::Address,
     Bytes,
 };
 use tentacle::{
@@ -65,7 +64,7 @@ pub trait SessionBook {
     fn all(&self) -> Vec<SessionId>;
     fn connected_addr(&self, sid: SessionId) -> Option<ConnectedAddr>;
     fn pending_data_size(&self, sid: SessionId) -> usize;
-    fn whitelist(&self) -> Vec<Address>;
+    fn allowlist(&self) -> Vec<PeerId>;
 }
 
 pub trait MultiaddrExt {

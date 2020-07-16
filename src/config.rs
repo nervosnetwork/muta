@@ -23,8 +23,8 @@ pub struct ConfigGraphQL {
 #[derive(Debug, Deserialize)]
 pub struct ConfigNetwork {
     pub bootstraps:                 Option<Vec<ConfigNetworkBootstrap>>,
-    pub whitelist:                  Option<Vec<String>>,
-    pub whitelist_peers_only:       Option<bool>,
+    pub allowlist:                  Option<Vec<String>>,
+    pub allowlist_only:             Option<bool>,
     pub trust_interval_duration:    Option<u64>,
     pub trust_max_history_duration: Option<u64>,
     pub fatal_ban_duration:         Option<u64>,

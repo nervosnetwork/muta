@@ -30,6 +30,7 @@ tokio = { version = "0.2", features = ["macros", "rt-core"]}
 tokio-util = { version = "0.2", features = ["codec"] }
 hostname = "0.3"
 lazy_static = "1.4"
+bs58 = "0.3"
 
 [dev-dependencies]
 env_logger = "0.6"
