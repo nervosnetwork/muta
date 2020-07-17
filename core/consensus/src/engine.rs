@@ -728,6 +728,13 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
             metadata.max_tx_size,
         );
 
+        let pub_keys = metadata
+            .verifier_list
+            .iter()
+            .map(|v| v.pub_key.decode())
+            .collect();
+        self.adapter.tag_consensus(Context::new(), pub_keys)?;
+
         let block_hash = Hash::digest(block.header.encode_fixed()?);
 
         if block.header.height != proof.height {
