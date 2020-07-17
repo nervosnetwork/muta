@@ -5,7 +5,7 @@ use tentacle::multiaddr::Multiaddr;
 
 #[derive(Clone, Copy, PartialEq, Eq, Oneof)]
 pub enum ListenPort {
-    #[prost(uint32, tag = "1")]
+    #[prost(uint32, tag = "3")]
     On(u32),
 }
 
@@ -114,5 +114,24 @@ impl std::fmt::Display for DiscoveryMessage {
             DiscoveryMessage { payload: None } => write!(f, "Empty payload")?,
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use prost::Message;
+    use protocol::BytesMut;
+
+    #[test]
+    fn discovery_message_serialize_deserialize() {
+        let msg = DiscoveryMessage::new_get_nodes(0, 50, Some(1337));
+
+        let mut buf = BytesMut::with_capacity(msg.encoded_len());
+        msg.encode(&mut buf).unwrap();
+
+        let decoded_msg = DiscoveryMessage::decode(buf.freeze()).unwrap();
+        assert_eq!(decoded_msg, msg);
     }
 }
