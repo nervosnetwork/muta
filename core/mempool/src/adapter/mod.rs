@@ -28,7 +28,7 @@ use protocol::{
     fixed_codec::FixedCodec,
     traits::{
         Context, ExecutorFactory, ExecutorParams, Gossip, MemPoolAdapter, PeerTrust, Priority, Rpc,
-        ServiceMapping, Storage, TrustFeedback,
+        ServiceMapping, ServiceResponse, Storage, TrustFeedback,
     },
     types::{Address, Hash, SignedTransaction, TransactionRequest},
     ProtocolError, ProtocolErrorKind, ProtocolResult,
@@ -259,87 +259,92 @@ where
         let network_clone = network.clone();
         let ctx_clone = ctx.clone();
         let tx_clone = tx.clone();
+        let block = self.storage.get_latest_block(ctx.clone()).await?;
+        let trie_db_clone = Arc::clone(&self.trie_db);
+        let storage_clone = Arc::clone(&self.storage);
+        let service_mapping_clone = Arc::clone(&self.service_mapping);
 
-        let blocking_res: Result<ProtocolResult<()>, _> = tokio::task::spawn_blocking(move || {
-            // Verify transaction hash
-            let fixed_bytes = tx.raw.encode_fixed()?;
-            let tx_hash = Hash::digest(fixed_bytes);
+        let blocking_res: ProtocolResult<ServiceResponse<String>> =
+            tokio::task::spawn_blocking(move || {
+                // Verify transaction hash
+                let fixed_bytes = tx_clone.raw.encode_fixed()?;
+                let tx_hash = Hash::digest(fixed_bytes);
 
-            if tx_hash != tx.tx_hash {
-                if ctx.is_network_origin_txs() {
-                    network.report(
-                        ctx,
-                        TrustFeedback::Worse(format!(
-                            "Mempool wrong tx_hash of tx {:?}",
-                            tx.tx_hash
-                        )),
-                    );
+                if tx_hash != tx_clone.tx_hash {
+                    if ctx_clone.is_network_origin_txs() {
+                        network.report(
+                            ctx_clone,
+                            TrustFeedback::Worse(format!(
+                                "Mempool wrong tx_hash of tx {:?}",
+                                tx_clone.tx_hash
+                            )),
+                        );
+                    }
+
+                    return Err(MemPoolError::CheckHash {
+                        expect: tx_clone.tx_hash,
+                        actual: tx_hash,
+                    }
+                    .into());
                 }
 
-                let wrong_hash = MemPoolError::CheckHash {
-                    expect: tx.tx_hash,
-                    actual: tx_hash,
+                // Verify transaction signatures
+                let stx_json = serde_json::to_string(&tx_clone).map_err(|_| {
+                    network_clone.report(
+                        ctx_clone.clone(),
+                        TrustFeedback::Worse(format!(
+                            "Mempool encode json error {:?}",
+                            tx_clone.tx_hash
+                        )),
+                    );
+                    MemPoolError::EncodeJson
+                })?;
+                let payload_json =
+                    serde_json::to_string(&stx_json).map_err(|_| MemPoolError::EncodeJson)?;
+
+                let caller = Address::from_hex("0x0000000000000000000000000000000000000000")?;
+                let executor = EF::from_root(
+                    block.header.state_root.clone(),
+                    Arc::clone(&trie_db_clone),
+                    Arc::clone(&storage_clone),
+                    Arc::clone(&service_mapping_clone),
+                )?;
+                let params = ExecutorParams {
+                    state_root:   block.header.state_root,
+                    height:       block.header.height,
+                    timestamp:    block.header.timestamp,
+                    cycles_limit: 99999,
+                    proposer:     block.header.proposer,
                 };
+                let check_resp = executor.read(&params, &caller, 1, &TransactionRequest {
+                    service_name: "authorization".to_string(),
+                    method:       "check_authorization".to_string(),
+                    payload:      payload_json,
+                })?;
 
-                return Err(wrong_hash.into());
-            }
-            Ok(())
-        })
-        .await;
+                Ok(check_resp)
+            })
+            .await
+            .map_err(|_| AdapterError::Internal)?;
 
-        if blocking_res.is_err() || blocking_res.unwrap().is_err() {
-            return Err(AdapterError::Internal.into());
-        }
-
-        let stx_json = serde_json::to_string(&tx_clone).map_err(|_| {
-            network_clone.report(
-                ctx_clone.clone(),
-                TrustFeedback::Worse(format!("Mempool encode json error {:?}", tx_clone.tx_hash)),
-            );
-            MemPoolError::EncodeJson
-        })?;
-        let payload_json =
-            serde_json::to_string(&stx_json).map_err(|_| MemPoolError::EncodeJson)?;
-
-        let block = self.storage.get_latest_block(ctx_clone.clone()).await?;
-        let caller = Address::from_hex("0x0000000000000000000000000000000000000000")?;
-        let executor = EF::from_root(
-            block.header.state_root.clone(),
-            Arc::clone(&self.trie_db),
-            Arc::clone(&self.storage),
-            Arc::clone(&self.service_mapping),
-        )?;
-        let params = ExecutorParams {
-            state_root:   block.header.state_root,
-            height:       block.header.height,
-            timestamp:    block.header.timestamp,
-            cycles_limit: 99999,
-            proposer:     block.header.proposer,
-        };
-        let check_resp = executor.read(&params, &caller, 1, &TransactionRequest {
-            service_name: "authorization".to_string(),
-            method:       "check_authorization".to_string(),
-            payload:      payload_json,
-        })?;
-
+        let check_resp = blocking_res?;
         if check_resp.is_error() {
-            if ctx_clone.is_network_origin_txs() {
-                network_clone.report(
-                    ctx_clone,
+            if ctx.is_network_origin_txs() {
+                self.network.report(
+                    ctx,
                     TrustFeedback::Worse(format!(
                         "Mempool check authorization failed tx hash {:?}",
-                        tx_clone.tx_hash.clone()
+                        tx.tx_hash.clone()
                     )),
                 )
             }
 
             return Err(MemPoolError::CheckAuthorization {
-                tx_hash:  tx_clone.tx_hash,
+                tx_hash:  tx.tx_hash,
                 err_info: check_resp.error_message,
             }
             .into());
         }
-
         Ok(())
     }
 
