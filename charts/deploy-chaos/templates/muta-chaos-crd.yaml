@@ -21,7 +21,7 @@ spec:
   size: {{ .Values.size }} # Node numbers
   persistent: {{ .Values.resources.persistent }} # Persistent data
   config: # see https://github.com/nervosnetwork/muta/blob/master/devtools/chain/config.toml
-    data_path: "/app/data"
+    data_path: "/.muta/data"
     graphql:
       listening_address: "0.0.0.0:8000"
       graphql_uri: "/graphql"
