@@ -54,6 +54,7 @@ pipelineConfig:
               value: /usr/include/openssl
             image: mutadev/muta-build-env:v0.3.0
             name: build-release
+
           - args:
             - --dockerfile=/workspace/source/devtools/docker-build/Dockerfile
             - --destination=mutadev/${REPO_NAME}:${BRANCH_NAME}
@@ -61,10 +62,11 @@ pipelineConfig:
             command: /kaniko/executor
             image: gcr.io/kaniko-project/executor:9912ccbf8d22bbafbf971124600fbb0b13b9cbd6
             name: push-image
+
           - args:
             - --dockerfile=/workspace/source/devtools/docker-build/Dockerfile
             - --destination=mutadev/${REPO_NAME}:latest
             - --context=/workspace/source
             command: /kaniko/executor
             image: gcr.io/kaniko-project/executor:9912ccbf8d22bbafbf971124600fbb0b13b9cbd6
-            name: push-image
+            name: push-image-latest
