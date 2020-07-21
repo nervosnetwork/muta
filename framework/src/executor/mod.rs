@@ -407,7 +407,7 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
 
         let event_index = event.borrow().len();
 
-        let ret = if resp.iter().filter(|r| r.is_error()).count() > 0 {
+        let ret = if resp.iter().any(|r| r.is_error()) {
             self.revert_cache()?;
             event.borrow_mut().truncate(event_index);
             ServiceResponse::from_error(65535, "skip_tx_run".to_owned())
@@ -433,7 +433,7 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
 
         let resp = tx_hooks.after(context, service_context)?;
 
-        if resp.iter().filter(|r| r.is_error()).count() > 0 {
+        if resp.iter().any(|r| r.is_error()) {
             event.borrow_mut().truncate(event_index);
             self.states.revert_cache()?;
         } else {
