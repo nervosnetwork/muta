@@ -327,11 +327,7 @@ where
             .await
             .map_err(|_| AdapterError::Internal)?;
 
-        if blocking_res.is_err() {
-            return Err(AdapterError::Internal.into());
-        }
-
-        let check_resp = blocking_res.unwrap();
+        let check_resp = blocking_res?;
         if check_resp.is_error() {
             if ctx.is_network_origin_txs() {
                 self.network.report(
