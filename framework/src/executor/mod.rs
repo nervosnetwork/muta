@@ -405,7 +405,7 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
         let resp = tx_hooks.before(context.clone(), service_context.clone())?;
         self.states.stash()?;
 
-        let event_index = event.borrow().len();
+        let event_index = event.borrow_mut().len();
 
         let ret = if resp.iter().any(|r| r.is_error()) {
             self.revert_cache()?;
@@ -489,21 +489,19 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
                     Rc::clone(&event),
                 )?;
 
-                let exec_resp =
-                    self.catch_call(ctx.clone(), service_context.clone(), ExecType::Write, event)?;
-                let events = if exec_resp.is_error() {
-                    Vec::new()
-                } else {
-                    service_context.get_events()
-                };
-
+                let exec_resp = self.catch_call(
+                    ctx.clone(),
+                    service_context.clone(),
+                    ExecType::Write,
+                    Rc::clone(&event),
+                )?;
                 Ok(Receipt {
-                    state_root: MerkleRoot::from_empty(),
-                    height: service_context.get_current_height(),
-                    tx_hash: stx.tx_hash.clone(),
+                    state_root:  MerkleRoot::from_empty(),
+                    height:      service_context.get_current_height(),
+                    tx_hash:     stx.tx_hash.clone(),
                     cycles_used: service_context.get_cycles_used(),
-                    events,
-                    response: ReceiptResponse {
+                    events:      service_context.get_events(),
+                    response:    ReceiptResponse {
                         service_name: service_context.get_service_name().to_owned(),
                         method:       service_context.get_service_method().to_owned(),
                         response:     exec_resp,

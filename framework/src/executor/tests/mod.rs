@@ -1,8 +1,11 @@
 extern crate test;
 
-mod service_call_service;
-mod test_service;
+#[cfg(test)]
+mod framework;
 
+mod service_call_service;
+
+mod test_service;
 use std::sync::Arc;
 
 use async_trait::async_trait;
