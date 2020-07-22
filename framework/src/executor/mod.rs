@@ -22,8 +22,8 @@ use protocol::traits::{
     ServiceMapping, ServiceResponse, ServiceState, Storage,
 };
 use protocol::types::{
-    Address, Hash, MerkleRoot, Receipt, ReceiptResponse, ServiceContext, ServiceContextParams,
-    ServiceParam, SignedTransaction, TransactionRequest,
+    Address, Event, Hash, MerkleRoot, Receipt, ReceiptResponse, ServiceContext,
+    ServiceContextParams, ServiceParam, SignedTransaction, TransactionRequest,
 };
 use protocol::{ProtocolError, ProtocolResult};
 
@@ -347,6 +347,7 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
         cycles_limit: u64,
         params: &ExecutorParams,
         request: &TransactionRequest,
+        event: Rc<RefCell<Vec<Event>>>,
     ) -> ProtocolResult<ServiceContext> {
         let ctx_params = ServiceContextParams {
             tx_hash,
@@ -361,7 +362,7 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
             service_method: request.method.to_owned(),
             service_payload: request.payload.to_owned(),
             extra: None,
-            events: Rc::new(RefCell::new(vec![])),
+            events: event,
         };
 
         Ok(ServiceContext::new(ctx_params))
@@ -397,41 +398,47 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
         context: Context,
         service_context: ServiceContext,
         exec_type: ExecType,
+        event: Rc<RefCell<Vec<Event>>>,
     ) -> ProtocolResult<ServiceResponse<String>> {
         let mut tx_hooks = self.get_tx_hooks(exec_type);
 
         let resp = tx_hooks.before(context.clone(), service_context.clone())?;
         self.states.stash()?;
 
-        if resp.iter().filter(|r| r.is_error()).count() > 0 {
-            tx_hooks.after(context, service_context)?;
-            self.states.stash()?;
-            return Ok(ServiceResponse::from_error(65535, "skip_tx_run".to_owned()));
-        };
+        let event_index = event.borrow_mut().len();
 
-        let ret = match panic::catch_unwind(AssertUnwindSafe(|| {
-            self.call(service_context.clone(), exec_type)
-        })) {
-            Ok(r) => {
-                self.stash()?;
-                Ok(r)
-            }
-            Err(e) => {
-                self.revert_cache()?;
-                log::error!("inner chain error occurred when calling service: {:?}", e);
-                Err(ProtocolError::from(ExecutorError::CallService(format!(
-                    "{:?}",
-                    e
-                ))))
-            }
-        }?;
+        let ret = if resp.iter().any(|r| r.is_error()) {
+            self.revert_cache()?;
+            event.borrow_mut().truncate(event_index);
+            ServiceResponse::from_error(65535, "skip_tx_run".to_owned())
+        } else {
+            match panic::catch_unwind(AssertUnwindSafe(|| {
+                self.call(service_context.clone(), exec_type)
+            })) {
+                Ok(r) => Ok(r),
+                Err(e) => {
+                    self.revert_cache()?;
+                    log::error!("inner chain error occurred when calling service: {:?}", e);
+                    Err(ProtocolError::from(ExecutorError::CallService(format!(
+                        "{:?}",
+                        e
+                    ))))
+                }
+            }?
+        };
 
         if ret.is_error() {
             service_context.cancel("tx_exec_return_code_not_zero".to_owned());
         }
 
-        tx_hooks.after(context, service_context)?;
-        self.states.stash()?;
+        let resp = tx_hooks.after(context, service_context)?;
+
+        if resp.iter().any(|r| r.is_error()) {
+            event.borrow_mut().truncate(event_index);
+            self.states.revert_cache()?;
+        } else {
+            self.states.stash()?;
+        }
 
         Ok(ret)
     }
@@ -470,6 +477,7 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
         let mut receipts = txs
             .iter()
             .map(|stx| {
+                let event = Rc::new(RefCell::new(vec![]));
                 let service_context = self.get_context(
                     Some(stx.tx_hash.clone()),
                     Some(stx.raw.nonce.clone()),
@@ -478,23 +486,22 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
                     stx.raw.cycles_limit,
                     params,
                     &stx.raw.request,
+                    Rc::clone(&event),
                 )?;
 
-                let exec_resp =
-                    self.catch_call(ctx.clone(), service_context.clone(), ExecType::Write)?;
-                let events = if exec_resp.is_error() {
-                    Vec::new()
-                } else {
-                    service_context.get_events()
-                };
-
+                let exec_resp = self.catch_call(
+                    ctx.clone(),
+                    service_context.clone(),
+                    ExecType::Write,
+                    Rc::clone(&event),
+                )?;
                 Ok(Receipt {
-                    state_root: MerkleRoot::from_empty(),
-                    height: service_context.get_current_height(),
-                    tx_hash: stx.tx_hash.clone(),
+                    state_root:  MerkleRoot::from_empty(),
+                    height:      service_context.get_current_height(),
+                    tx_hash:     stx.tx_hash.clone(),
                     cycles_used: service_context.get_cycles_used(),
-                    events,
-                    response: ReceiptResponse {
+                    events:      service_context.get_events(),
+                    response:    ReceiptResponse {
                         service_name: service_context.get_service_name().to_owned(),
                         method:       service_context.get_service_method().to_owned(),
                         response:     exec_resp,
@@ -535,6 +542,7 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
             std::u64::MAX,
             params,
             request,
+            Rc::new(RefCell::new(vec![])),
         )?;
         panic::catch_unwind(AssertUnwindSafe(|| self.call(context, ExecType::Read)))
             .map_err(|e| ProtocolError::from(ExecutorError::QueryService(format!("{:?}", e))))
