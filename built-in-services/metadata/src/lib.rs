@@ -20,7 +20,7 @@ impl<SDK: ServiceSDK> MetadataService<SDK> {
         self.sdk.set_value(METADATA_KEY.to_string(), metadata)
     }
 
-    #[cycles(210_00)]
+    #[cycles(21_000)]
     #[read]
     fn get_metadata(&self, ctx: ServiceContext) -> ServiceResponse<Metadata> {
         let metadata: Metadata = self

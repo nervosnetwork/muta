@@ -24,14 +24,14 @@ impl<SDK: ServiceSDK> TestService<SDK> {
         Self { sdk }
     }
 
-    #[cycles(100_00)]
+    #[cycles(10_000)]
     #[read]
     fn test_read(&self, ctx: ServiceContext, payload: String) -> ServiceResponse<String> {
         let value: String = self.sdk.get_value(&payload).unwrap_or_default();
         ServiceResponse::from_succeed(value)
     }
 
-    #[cycles(210_00)]
+    #[cycles(21_000)]
     #[write]
     fn test_write(
         &mut self,
@@ -42,7 +42,7 @@ impl<SDK: ServiceSDK> TestService<SDK> {
         ServiceResponse::<TestWriteResponse>::from_succeed(TestWriteResponse {})
     }
 
-    #[cycles(210_00)]
+    #[cycles(21_000)]
     #[write]
     fn test_revert_event(
         &mut self,
@@ -52,7 +52,7 @@ impl<SDK: ServiceSDK> TestService<SDK> {
         ServiceResponse::from_error(111, "error".to_owned())
     }
 
-    #[cycles(210_00)]
+    #[cycles(21_000)]
     #[write]
     fn test_event(
         &mut self,
@@ -63,7 +63,7 @@ impl<SDK: ServiceSDK> TestService<SDK> {
         ServiceResponse::from_succeed(TestWriteResponse::default())
     }
 
-    #[cycles(210_00)]
+    #[cycles(21_000)]
     #[write]
     fn test_service_call_invoke_hook_only_once(
         &mut self,
@@ -76,13 +76,13 @@ impl<SDK: ServiceSDK> TestService<SDK> {
         ServiceResponse::<TestWriteResponse>::from_succeed(TestWriteResponse {})
     }
 
-    #[cycles(210_00)]
+    #[cycles(21_000)]
     #[write]
     fn test_panic(&mut self, ctx: ServiceContext, _payload: String) -> ServiceResponse<()> {
         panic!("hello panic");
     }
 
-    #[cycles(210_00)]
+    #[cycles(21_000)]
     #[write]
     fn tx_hook_before_panic(
         &mut self,
@@ -96,7 +96,7 @@ impl<SDK: ServiceSDK> TestService<SDK> {
         ServiceResponse::from_succeed(())
     }
 
-    #[cycles(210_00)]
+    #[cycles(21_000)]
     #[write]
     fn tx_hook_after_panic(
         &mut self,
