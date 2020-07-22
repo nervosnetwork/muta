@@ -11,7 +11,7 @@ resources:
   cpu: 1Gi
   memory: 4Gi
   storage: 6Gi
-  persistent: false
+  persistent: true
 
 chaos: 
   - all
