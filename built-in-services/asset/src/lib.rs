@@ -50,7 +50,7 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
             .set_account_value(&asset.issuer, asset.id, asset_balance)
     }
 
-    #[cycles(100_00)]
+    #[cycles(10_000)]
     #[read]
     fn get_asset(&self, ctx: ServiceContext, payload: GetAssetPayload) -> ServiceResponse<Asset> {
         if let Some(asset) = self.assets.get(&payload.id) {
@@ -60,7 +60,7 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
         }
     }
 
-    #[cycles(100_00)]
+    #[cycles(10_000)]
     #[read]
     fn get_balance(
         &self,
@@ -91,7 +91,7 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
         ServiceResponse::<GetBalanceResponse>::from_succeed(res)
     }
 
-    #[cycles(100_00)]
+    #[cycles(10_000)]
     #[read]
     fn get_allowance(
         &self,
@@ -130,7 +130,7 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
         }
     }
 
-    #[cycles(210_00)]
+    #[cycles(21_000)]
     #[write]
     fn create_asset(
         &mut self,
@@ -178,7 +178,7 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
         ServiceResponse::<Asset>::from_succeed(asset)
     }
 
-    #[cycles(210_00)]
+    #[cycles(21_000)]
     #[write]
     fn transfer(&mut self, ctx: ServiceContext, payload: TransferPayload) -> ServiceResponse<()> {
         let caller = ctx.get_caller();
@@ -211,7 +211,7 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
         ServiceResponse::<()>::from_succeed(())
     }
 
-    #[cycles(210_00)]
+    #[cycles(21_000)]
     #[write]
     fn approve(&mut self, ctx: ServiceContext, payload: ApprovePayload) -> ServiceResponse<()> {
         let caller = ctx.get_caller();
@@ -260,7 +260,7 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
         ServiceResponse::<()>::from_succeed(())
     }
 
-    #[cycles(210_00)]
+    #[cycles(21_000)]
     #[write]
     fn transfer_from(
         &mut self,

@@ -83,7 +83,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
         self.sdk.set_account_value(&address, 0u8, permission);
     }
 
-    #[cycles(210_00)]
+    #[cycles(21_000)]
     #[write]
     fn generate_account(
         &mut self,
@@ -167,7 +167,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
         }
     }
 
-    #[cycles(100_00)]
+    #[cycles(10_000)]
     #[read]
     fn get_account_from_address(
         &self,
@@ -186,7 +186,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
         }
     }
 
-    #[cycles(210_00)]
+    #[cycles(21_000)]
     #[read]
     fn verify_signature(
         &self,
@@ -217,7 +217,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
         })
     }
 
-    #[cycles(210_00)]
+    #[cycles(21_000)]
     #[write]
     fn update_account(
         &mut self,
@@ -312,7 +312,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
         ServiceResponse::<()>::from_error(113, "account not existed".to_owned())
     }
 
-    #[cycles(210_00)]
+    #[cycles(21_000)]
     #[write]
     fn change_owner(
         &mut self,
@@ -345,7 +345,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
         }
     }
 
-    #[cycles(210_00)]
+    #[cycles(21_000)]
     #[write]
     fn change_memo(
         &mut self,
@@ -370,7 +370,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
         }
     }
 
-    #[cycles(210_00)]
+    #[cycles(21_000)]
     #[write]
     fn add_account(
         &mut self,
@@ -412,7 +412,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
         }
     }
 
-    #[cycles(210_00)]
+    #[cycles(21_000)]
     #[write]
     fn remove_account(
         &mut self,
@@ -446,7 +446,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
         ServiceResponse::<Account>::from_error(113, "account not existed".to_owned())
     }
 
-    #[cycles(210_00)]
+    #[cycles(21_000)]
     #[write]
     fn set_account_weight(
         &mut self,
@@ -480,7 +480,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
         ServiceResponse::<()>::from_error(113, "account not existed".to_owned())
     }
 
-    #[cycles(210_00)]
+    #[cycles(21_000)]
     #[write]
     fn set_threshold(
         &mut self,

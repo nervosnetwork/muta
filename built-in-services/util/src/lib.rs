@@ -22,7 +22,7 @@ impl<SDK: ServiceSDK> UtilService<SDK> {
         Self { _sdk }
     }
 
-    #[cycles(100_00)]
+    #[cycles(10_000)]
     #[read]
     fn keccak256(
         &self,
@@ -42,7 +42,7 @@ impl<SDK: ServiceSDK> UtilService<SDK> {
         ServiceResponse::<KeccakResponse>::from_succeed(response)
     }
 
-    #[cycles(100_00)]
+    #[cycles(10_000)]
     #[read]
     fn verify(
         &self,

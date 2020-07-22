@@ -206,7 +206,7 @@ impl<SDK: ServiceSDK> TestService<SDK> {
         Self { _sdk: sdk }
     }
 
-    #[cycles(100_00)]
+    #[cycles(10_000)]
     #[read]
     fn test_read(&self, _ctx: ServiceContext) -> ServiceResponse<String> {
         ServiceResponse::from_succeed("".to_owned())

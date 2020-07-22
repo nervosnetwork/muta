@@ -46,7 +46,7 @@ impl<SDK: ServiceSDK> AuthorizationService<SDK> {
         }
     }
 
-    #[cycles(210_00)]
+    #[cycles(21_000)]
     #[read]
     fn check_authorization(&self, ctx: ServiceContext, payload: String) -> ServiceResponse<()> {
         for (_idx, item) in self.verified_list.iter() {
@@ -65,7 +65,7 @@ impl<SDK: ServiceSDK> AuthorizationService<SDK> {
         ServiceResponse::from_succeed(())
     }
 
-    #[cycles(210_00)]
+    #[cycles(21_000)]
     #[write]
     fn add_verified_item(
         &mut self,
@@ -85,7 +85,7 @@ impl<SDK: ServiceSDK> AuthorizationService<SDK> {
         ServiceResponse::from_succeed(())
     }
 
-    #[cycles(210_00)]
+    #[cycles(21_000)]
     #[write]
     fn remove_verified_item(
         &mut self,
@@ -113,7 +113,7 @@ impl<SDK: ServiceSDK> AuthorizationService<SDK> {
         }
     }
 
-    #[cycles(210_00)]
+    #[cycles(21_000)]
     #[write]
     fn set_admin(&mut self, ctx: ServiceContext, payload: SetAdminPayload) -> ServiceResponse<()> {
         if !self._is_admin(&ctx) {

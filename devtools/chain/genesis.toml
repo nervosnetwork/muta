@@ -20,7 +20,7 @@ payload = '''
     "chain_id": "0xb6a4d7da21443f5e816e8700eea87610e6d769657d6b8ec73028457bf2ca4036",
     "common_ref": "0x703873635a6b51513451",
     "timeout_gap": 20,
-    "cycles_limit": 1000000,
+    "cycles_limit": 4294967295,
     "cycles_price": 1,
     "interval": 3000,
     "verifier_list": [
