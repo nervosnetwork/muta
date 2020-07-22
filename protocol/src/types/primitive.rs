@@ -1,9 +1,12 @@
+use std::convert::TryFrom;
 use std::fmt;
 
 use bytes::Bytes;
 use hasher::{Hasher, HasherKeccak};
 use lazy_static::lazy_static;
 use muta_codec_derive::RlpFixedCodec;
+use ophelia::UncompressedPublicKey;
+use ophelia_secp256k1::Secp256k1PublicKey;
 use serde::de;
 use serde::{Deserialize, Serialize};
 
@@ -247,15 +250,14 @@ impl<'de> Deserialize<'de> for Address {
     }
 }
 
-#[allow(dead_code)]
-const UNCOMPRESSED_PUBKEY_SIZE: usize = 65;
-
 impl Address {
-    pub fn from_pubkey_bytes(bytes: Bytes) -> ProtocolResult<Self> {
-        // FIXME: enable this after network pr merged
-        // if bytes.len() != UNCOMPRESSED_PUBKEY_SIZE {
-        //     return Err(TypesError::CompactPublicKey.into());
-        // }
+    pub fn from_pubkey_bytes(mut bytes: Bytes) -> ProtocolResult<Self> {
+        let uncompressed_pubkey_len = <Secp256k1PublicKey as UncompressedPublicKey>::LENGTH;
+        if bytes.len() != uncompressed_pubkey_len {
+            let pubkey = Secp256k1PublicKey::try_from(bytes.as_ref())
+                .map_err(|_| TypesError::InvalidPublicKey)?;
+            bytes = pubkey.to_uncompressed_bytes();
+        }
 
         let hash = Hash::digest(bytes);
         Self::from_hash(hash)
