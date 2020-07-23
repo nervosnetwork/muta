@@ -292,11 +292,8 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         commit: Commit<FixedPill>,
     ) -> Result<Status, Box<dyn Error + Send>> {
         let lock = self.lock.try_lock();
-
         if lock.is_none() {
-            return Err(
-                ProtocolError::from(ConsensusError::Other("lock in sync".to_string())).into(),
-            );
+            return Err(ProtocolError::from(ConsensusError::LockInSync).into());
         }
 
         let current_consensus_status = self.status_agent.to_inner();
@@ -313,6 +310,14 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
                 authority_list: covert_to_overlord_authority(&current_consensus_status.validators),
             };
             return Ok(status);
+        }
+
+        if current_height != current_consensus_status.latest_committed_height + 1 {
+            return Err(ProtocolError::from(ConsensusError::OutdatedCommit(
+                current_height,
+                current_consensus_status.latest_committed_height,
+            ))
+            .into());
         }
 
         let pill = commit.content.inner;
