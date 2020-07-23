@@ -5,15 +5,15 @@ use std::convert::TryFrom;
 use std::default::Default;
 
 use clap::App;
-use ophelia::{PublicKey, ToBlsPublicKey};
+use ophelia::{PublicKey, ToBlsPublicKey, ToPublicKey, UncompressedPublicKey};
 use ophelia_bls_amcl::BlsPrivateKey;
+use ophelia_secp256k1::Secp256k1PrivateKey;
 use protocol::types::{Address, Hash};
 use protocol::{Bytes, BytesMut};
 use rand::distributions::Alphanumeric;
 use rand::Rng;
 use rand::{rngs::OsRng, RngCore};
 use serde::Serialize;
-use tentacle_secio::SecioKeyPair;
 
 #[derive(Default, Serialize, Debug)]
 struct Keypair {

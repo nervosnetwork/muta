@@ -15,7 +15,7 @@ use tokio::signal::unix::{self as os_impl};
 
 use common_crypto::{
     BlsCommonReference, BlsPrivateKey, BlsPublicKey, PublicKey, Secp256k1, Secp256k1PrivateKey,
-    ToPublicKey,
+    ToPublicKey, UncompressedPublicKey,
 };
 use core_api::adapter::DefaultAPIAdapter;
 use core_api::config::GraphQLConfig;
@@ -239,7 +239,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     let my_privkey =
         Secp256k1PrivateKey::try_from(hex_privkey.as_ref()).map_err(MainError::Crypto)?;
     let my_pubkey = my_privkey.pub_key();
-    let my_address = Address::from_pubkey_bytes(my_pubkey.to_bytes())?;
+    let my_address = Address::from_pubkey_bytes(my_pubkey.to_uncompressed_bytes())?;
 
     // Get metadata
     let api_adapter = DefaultAPIAdapter::<ServiceExecutorFactory, _, _, _, _>::new(
