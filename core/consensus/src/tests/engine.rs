@@ -36,11 +36,19 @@ async fn test_repetitive_commit() {
 
     let block = mock_block_from_status(&init_status);
 
-    let res = engine.commit(Context::new(), 11, mock_commit(block.clone())).await;
+    let res = engine
+        .commit(Context::new(), 11, mock_commit(block.clone()))
+        .await;
     assert!(res.is_ok());
 
-    let res = engine.commit(Context::new(), 11, mock_commit(block.clone())).await;
+    let status = engine.get_current_status();
+
+    let res = engine
+        .commit(Context::new(), 11, mock_commit(block.clone()))
+        .await;
     assert!(res.is_err());
+
+    assert_eq!(status, engine.get_current_status());
 }
 
 fn mock_commit(block: Block) -> Commit<FixedPill> {

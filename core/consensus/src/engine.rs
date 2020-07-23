@@ -760,6 +760,11 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
         self.crypto.update(generate_new_crypto_map(metadata)?);
         Ok(())
     }
+
+    #[cfg(test)]
+    pub fn get_current_status(&self) -> crate::status::CurrentConsensusStatus {
+        self.status_agent.to_inner()
+    }
 }
 
 pub fn generate_new_crypto_map(metadata: Metadata) -> ProtocolResult<HashMap<Bytes, BlsPublicKey>> {
