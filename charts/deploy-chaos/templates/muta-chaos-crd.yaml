@@ -14,7 +14,7 @@ spec:
       cpu: {{ .Values.resources.cpu }}
       memory: {{ .Values.resources.memory }}
       ephemeral-storage: {{ .Values.resources.storage }}
-  chaos: []  # all / stable-network-corrupt / stable-network-delay / stable-network-duplicate / stable-network-loss / stable-network-partition / stable-node-failure / stable-node-kill
+  chaos: [] # all / stable-network-corrupt / stable-network-delay / stable-network-duplicate / stable-network-loss / stable-network-partition / stable-node-failure / stable-node-kill
   # {{- range .Values.chaos }}
   #   - {{ . }}
   # {{- end }}
