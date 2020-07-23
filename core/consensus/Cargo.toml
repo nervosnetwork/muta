@@ -23,7 +23,7 @@ prost = "0.6"
 rlp = "0.4"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-tokio = { version = "0.2", features = ["macros", "sync", "rt-core"] }
+tokio = { version = "0.2", features = ["macros", "sync", "rt-core", "rt-threaded"] }
 bytes = { version = "0.5", features = ["serde"] }
 
 common-apm = { path = "../../common/apm" }
