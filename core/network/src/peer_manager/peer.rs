@@ -22,48 +22,43 @@ use tentacle::{
 
 use crate::error::ErrorKind;
 
-const CONNECTEDNESS_MASK: usize = 0b1110;
-
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Clone, Copy, Display)]
 #[repr(usize)]
 pub enum Connectedness {
     #[display(fmt = "not connected")]
-    NotConnected = 0 << 1,
+    NotConnected = 0,
 
     #[display(fmt = "can connect")]
-    CanConnect = 1 << 1,
+    CanConnect = 1,
 
     #[display(fmt = "connected")]
-    Connected = 2 << 1,
+    Connected = 2,
 
     #[display(fmt = "unconnectable")]
-    Unconnectable = 3 << 1,
+    Unconnectable = 3,
 
     #[display(fmt = "connecting")]
-    Connecting = 4 << 1,
+    Connecting = 4,
 }
 
 impl From<usize> for Connectedness {
     fn from(src: usize) -> Connectedness {
         use self::Connectedness::{CanConnect, Connected, Connecting, NotConnected, Unconnectable};
 
-        debug_assert!(
-            src == NotConnected as usize
-                || src == CanConnect as usize
-                || src == Connected as usize
-                || src == Unconnectable as usize
-                || src == Connecting as usize
-        );
-
-        unsafe { ::std::mem::transmute(src) }
+        match src {
+            0 => NotConnected,
+            1 => CanConnect,
+            2 => Connected,
+            3 => Unconnectable,
+            4 => Connecting,
+            _ => NotConnected,
+        }
     }
 }
 
 impl From<Connectedness> for usize {
     fn from(src: Connectedness) -> usize {
-        let v = src as usize;
-        debug_assert!(v & CONNECTEDNESS_MASK == v);
-        v
+        src as usize
     }
 }
 
@@ -326,7 +321,7 @@ impl Hash for ArcPeer {
 
 #[cfg(test)]
 mod tests {
-    use super::ArcPeer;
+    use super::{ArcPeer, Connectedness};
     use crate::peer_manager::{time, TrustMetric, TrustMetricConfig};
 
     use tentacle::secio::SecioKeyPair;
@@ -356,5 +351,21 @@ mod tests {
             0,
             "should reset peer trust history"
         );
+    }
+
+    #[test]
+    fn should_be_able_to_convert_between_connectedness_and_usize() {
+        assert_eq!(usize::from(Connectedness::NotConnected), 0usize);
+        assert_eq!(usize::from(Connectedness::CanConnect), 1usize);
+        assert_eq!(usize::from(Connectedness::Connected), 2usize);
+        assert_eq!(usize::from(Connectedness::Unconnectable), 3usize);
+        assert_eq!(usize::from(Connectedness::Connecting), 4usize);
+
+        assert_eq!(Connectedness::from(0usize), Connectedness::NotConnected);
+        assert_eq!(Connectedness::from(1usize), Connectedness::CanConnect);
+        assert_eq!(Connectedness::from(2usize), Connectedness::Connected);
+        assert_eq!(Connectedness::from(3usize), Connectedness::Unconnectable);
+        assert_eq!(Connectedness::from(4usize), Connectedness::Connecting);
+        assert_eq!(Connectedness::from(5usize), Connectedness::NotConnected);
     }
 }
