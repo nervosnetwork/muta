@@ -5,15 +5,15 @@ use std::convert::TryFrom;
 use std::default::Default;
 
 use clap::App;
-use ophelia::{PublicKey, ToBlsPublicKey, ToPublicKey, UncompressedPublicKey};
+use ophelia::{PublicKey, ToBlsPublicKey};
 use ophelia_bls_amcl::BlsPrivateKey;
-use ophelia_secp256k1::Secp256k1PrivateKey;
 use protocol::types::{Address, Hash};
 use protocol::{Bytes, BytesMut};
 use rand::distributions::Alphanumeric;
 use rand::Rng;
 use rand::{rngs::OsRng, RngCore};
 use serde::Serialize;
+use tentacle_secio::SecioKeyPair;
 
 #[derive(Default, Serialize, Debug)]
 struct Keypair {
@@ -71,12 +71,12 @@ pub fn main() {
         };
         let keypair = SecioKeyPair::secp256k1_raw_key(seckey.as_ref()).expect("secp256k1 keypair");
         let pubkey = keypair.to_public_key().inner();
-        let user_addr = Address::from_pubkey_bytes(pubkey.clone().into()).expect("user addr");
+        let address = Address::from_pubkey_bytes(pubkey.clone().into()).expect("address");
 
         k.private_key = add_0x(hex::encode(seckey.as_ref()));
         k.public_key = add_0x(hex::encode(pubkey));
         k.peer_id = keypair.to_public_key().peer_id().to_base58();
-        k.address = add_0x(user_addr.as_hex());
+        k.address = address.as_hex();
 
         let priv_key =
             BlsPrivateKey::try_from([&[0u8; 16], seckey.as_ref()].concat().as_ref()).unwrap();
