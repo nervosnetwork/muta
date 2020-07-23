@@ -35,6 +35,9 @@ pub enum TypesError {
 
     #[display(fmt = "Hex should start with 0x")]
     HexPrefix,
+
+    #[display(fmt = "Expect uncompressed public key bytes to generate address")]
+    CompactPublicKey,
 }
 
 impl Error for TypesError {}

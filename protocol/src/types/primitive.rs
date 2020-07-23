@@ -247,18 +247,25 @@ impl<'de> Deserialize<'de> for Address {
     }
 }
 
+#[allow(dead_code)]
+const UNCOMPRESSED_PUBKEY_SIZE: usize = 65;
+
 impl Address {
     pub fn from_pubkey_bytes(bytes: Bytes) -> ProtocolResult<Self> {
-        let hash = Hash::digest(bytes);
+        // FIXME: enable this after network pr merged
+        // if bytes.len() != UNCOMPRESSED_PUBKEY_SIZE {
+        //     return Err(TypesError::CompactPublicKey.into());
+        // }
 
+        let hash = Hash::digest(bytes);
         Self::from_hash(hash)
     }
 
     pub fn from_hash(hash: Hash) -> ProtocolResult<Self> {
-        let mut hash_val = hash.as_bytes();
-        hash_val.truncate(20);
+        let hash_val = hash.as_bytes();
+        ensure_len(hash_val.len(), HASH_LEN)?;
 
-        Self::from_bytes(hash_val)
+        Self::from_bytes(Bytes::copy_from_slice(&hash_val[12..]))
     }
 
     pub fn from_bytes(bytes: Bytes) -> ProtocolResult<Self> {
@@ -366,10 +373,10 @@ mod tests {
 
     #[test]
     fn test_from_pubkey_bytes() {
-        let pubkey = "031313016e9670deb49779c1b0c646d6a25a545712658f9781995f623bcd0d0b3d";
-        let expect_addr = "0xc38f8210896e11a75e1a1f13805d39088d157d7f";
+        let uncompressed_pubkey = "04f97763e5966303a6277902841501705ce2c4e348914b146039023a3edf026b37c632d1ee6fe46c0c48e3a8246b26b2ea726dc6414a441e5b0173f1614e591449";
+        let expect_addr = "0x697ebacbfaa18d41f4e0b814597a28c7a770ce2d";
 
-        let pubkey_bytes = Bytes::from(hex::decode(pubkey).unwrap());
+        let pubkey_bytes = Bytes::from(hex::decode(uncompressed_pubkey).unwrap());
         let addr = Address::from_pubkey_bytes(pubkey_bytes).unwrap();
 
         assert_eq!(addr.as_hex(), expect_addr);
