@@ -38,13 +38,17 @@ muta-apm = "0.1.0-alpha.7"
 futures-timer="3.0"
 
 [dev-dependencies]
+cita_trie = "2.0"
+async-trait = "0.1"
+toml = "0.5"
+lazy_static = "1.4"
+muta-codec-derive = "0.2"
 asset = { path = "built-in-services/asset" }
 multi-signature = { path = "built-in-services/multi-signature" }
 authorization = { path = "built-in-services/authorization" }
 metadata = { path = "built-in-services/metadata"}
 util = { path = "built-in-services/util"}
 rand = "0.7"
-cita_trie = "2.0"
 core-network = { path = "./core/network", features = ["diagnostic"] }
 tokio = { version = "0.2", features = ["full"] }
 
@@ -83,3 +87,7 @@ crate-type = ["bin"]
 name = "trust_metric"
 path = "tests/trust_metric.rs"
 required-features = [ "core-network/diagnostic" ]
+
+[[bench]]
+name = "bench_execute"
+path = "benchmark/mod.rs"

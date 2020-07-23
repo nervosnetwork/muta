@@ -5,8 +5,8 @@ use binding_macro::{cycles, service, tx_hook_after, tx_hook_before};
 use bytes::{Bytes, BytesMut};
 use cita_trie::MemoryDB;
 use protocol::traits::{
-    Context, Executor, ExecutorParams, ExecutorResp, Service, ServiceMapping, ServiceResponse,
-    ServiceSDK, Storage,
+    Context, Executor, ExecutorParams, ExecutorResp, SDKFactory, Service, ServiceMapping,
+    ServiceResponse, ServiceSDK, Storage,
 };
 use protocol::types::{
     Address, Block, Genesis, Hash, Proof, RawTransaction, Receipt, ServiceContext,
@@ -178,11 +178,13 @@ impl Storage for MockStorage {
 pub struct MockServiceMapping;
 
 impl ServiceMapping for MockServiceMapping {
-    fn get_service<SDK: 'static + ServiceSDK>(
+    fn get_service<SDK: 'static + ServiceSDK, Factory: SDKFactory<SDK>>(
         &self,
         name: &str,
-        sdk: SDK,
+        factory: &Factory,
     ) -> ProtocolResult<Box<dyn Service>> {
+        let sdk = factory.get_sdk(name)?;
+
         let service = match name {
             "TestService" => Box::new(TestService::new(sdk)) as Box<dyn Service>,
             _ => panic!("not found service"),

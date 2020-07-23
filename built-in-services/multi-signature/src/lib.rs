@@ -188,7 +188,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
 
     #[cycles(21_000)]
     #[read]
-    fn verify_signature(
+    pub fn verify_signature(
         &self,
         ctx: ServiceContext,
         payload: SignedTransaction,

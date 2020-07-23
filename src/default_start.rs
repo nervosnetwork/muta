@@ -72,7 +72,7 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
         path_block,
         config.rocksdb.max_open_files,
     )?);
-    let storage = Arc::new(ImplStorage::new(Arc::clone(&rocks_adapter)));
+    let storage = Arc::new(ImplStorage::new(rocks_adapter));
 
     match storage.get_latest_block(Context::new()).await {
         Ok(genesis_block) => {

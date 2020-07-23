@@ -299,8 +299,6 @@ where
                     );
                     MemPoolError::EncodeJson
                 })?;
-                let payload_json =
-                    serde_json::to_string(&stx_json).map_err(|_| MemPoolError::EncodeJson)?;
 
                 let caller = Address::from_hex("0x0000000000000000000000000000000000000000")?;
                 let executor = EF::from_root(
@@ -319,7 +317,7 @@ where
                 let check_resp = executor.read(&params, &caller, 1, &TransactionRequest {
                     service_name: "authorization".to_string(),
                     method:       "check_authorization".to_string(),
-                    payload:      payload_json,
+                    payload:      stx_json,
                 })?;
 
                 Ok(check_resp)

@@ -1,0 +1,52 @@
+timestamp = 0
+prevhash = "0x44915be5b6c20b0678cf05fcddbbaa832e25d7e6ac538784cd5c24de00d47472"
+
+[[services]]
+name = "asset"
+payload = '''
+{
+    "id": "0xf56924db538e77bb5951eb5ff0d02b88983c49c45eea30e8ae3e7234b311436c",
+    "name": "HuobiToken",
+    "symbol": "HT",
+    "supply": 320000011,
+    "precision": 100000,
+    "issuer": "0xcff1002107105460941f797828f468667aa1a2db",
+    "fee_account": "0x503492f4bddc731a72b8caa806183f921c284f8e",
+    "fee": 10,
+    "admin": "0xcff1002107105460941f797828f468667aa1a2db",
+    "relayable": true
+}
+'''
+
+# private key of this admin:
+# 2b672bb959fa7a852d7259b129b65aee9c83b39f427d6f7bded1f58c4c9310c2
+[[services]]
+name = "governance"
+payload = '''
+{
+    "info": {
+        "admin": "0xcff1002107105460941f797828f468667aa1a2db",
+        "tx_failure_fee": 10,
+        "tx_floor_fee": 20,
+        "profit_deduct_rate_per_million": 3,
+        "tx_fee_discount": [
+            {
+                "threshold": 1000,
+                "discount_percent": 90
+            },
+            {
+                "threshold": 10000,
+                "discount_percent": 70
+            },
+            {
+                "threshold": 100000,
+                "discount_percent": 50
+            }
+        ],
+        "miner_benefit": 10
+    },
+    "tx_fee_inlet_address": "0x503492f4bddc731a72b8caa806183f921c284f8e",
+    "miner_profit_outlet_address": "0xcff1002107105460941f797828f468667aa1a2db",
+    "miner_charge_map": []
+}
+'''
