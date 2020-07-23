@@ -130,6 +130,16 @@ pub enum ConsensusError {
     #[display(fmt = "Storage item not found")]
     StorageItemNotFound,
 
+    #[display(fmt = "Lock in sync")]
+    LockInSync,
+
+    #[display(
+        fmt = "Commit an outdated block, block_height {}, last_committed_height {}",
+        _0,
+        _1
+    )]
+    OutdatedCommit(u64, u64),
+
     /// Other error used for very few errors.
     #[display(fmt = "{:?}", _0)]
     Other(String),
