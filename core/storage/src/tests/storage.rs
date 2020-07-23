@@ -6,29 +6,31 @@ use test::Bencher;
 
 use protocol::traits::{Context, Storage};
 use protocol::types::Hash;
+use tokio::runtime::Runtime;
 
 use crate::adapter::memory::MemoryAdapter;
 use crate::tests::{get_random_bytes, mock_block, mock_proof, mock_receipt, mock_signed_tx};
 use crate::ImplStorage;
+use crate::BATCH_VALUE_DECODE_NUMBER;
 
-#[test]
-fn test_storage_block_insert() {
+#[tokio::test]
+async fn test_storage_block_insert() {
     let storage = ImplStorage::new(Arc::new(MemoryAdapter::new()));
 
     let height = 100;
     let block = mock_block(height, Hash::digest(get_random_bytes(10)));
 
-    exec!(storage.insert_block(Context::new(), block));
+    storage.insert_block(Context::new(), block).await.unwrap();
 
-    let block = exec!(storage.get_latest_block(Context::new()));
+    let block = storage.get_latest_block(Context::new()).await.unwrap();
     assert_eq!(height, block.header.height);
 
-    let block = exec!(storage.get_block(Context::new(), height));
+    let block = storage.get_block(Context::new(), height).await.unwrap();
     assert_eq!(Some(height), block.map(|b| b.header.height));
 }
 
-#[test]
-fn test_storage_receipts_insert() {
+#[tokio::test]
+async fn test_storage_receipts_insert() {
     let storage = ImplStorage::new(Arc::new(MemoryAdapter::new()));
     let height = 2077;
 
@@ -42,8 +44,14 @@ fn test_storage_receipts_insert() {
         receipts.push(receipt);
     }
 
-    exec!(storage.insert_receipts(Context::new(), height, receipts.clone()));
-    let receipts_2 = exec!(storage.get_receipts(Context::new(), height, hashes));
+    storage
+        .insert_receipts(Context::new(), height, receipts.clone())
+        .await
+        .unwrap();
+    let receipts_2 = storage
+        .get_receipts(Context::new(), height, hashes)
+        .await
+        .unwrap();
 
     for i in 0..10 {
         assert_eq!(
@@ -53,8 +61,42 @@ fn test_storage_receipts_insert() {
     }
 }
 
-#[test]
-fn test_storage_transactions_insert() {
+#[tokio::test]
+async fn test_storage_receipts_get_batch_decode() {
+    let storage = ImplStorage::new(Arc::new(MemoryAdapter::new()));
+    let height = 2077;
+    let count = BATCH_VALUE_DECODE_NUMBER + 100;
+
+    let mut receipts = Vec::new();
+    let mut hashes = Vec::new();
+
+    for _ in 0..count {
+        let tx_hash = Hash::digest(get_random_bytes(10));
+        hashes.push(tx_hash.clone());
+        let receipt = mock_receipt(tx_hash.clone());
+        receipts.push(receipt);
+    }
+
+    storage
+        .insert_receipts(Context::new(), height, receipts.clone())
+        .await
+        .unwrap();
+
+    let receipts_2 = storage
+        .get_receipts(Context::new(), height, hashes)
+        .await
+        .unwrap();
+
+    for i in 0..count {
+        assert_eq!(
+            Some(receipts.get(i).unwrap()),
+            receipts_2.get(i).unwrap().as_ref()
+        );
+    }
+}
+
+#[tokio::test]
+async fn test_storage_transactions_insert() {
     let storage = ImplStorage::new(Arc::new(MemoryAdapter::new()));
     let height = 2020;
 
@@ -68,8 +110,14 @@ fn test_storage_transactions_insert() {
         transactions.push(transaction);
     }
 
-    exec!(storage.insert_transactions(Context::new(), height, transactions.clone()));
-    let transactions_2 = exec!(storage.get_transactions(Context::new(), height, hashes));
+    storage
+        .insert_transactions(Context::new(), height, transactions.clone())
+        .await
+        .unwrap();
+    let transactions_2 = storage
+        .get_transactions(Context::new(), height, hashes)
+        .await
+        .unwrap();
 
     for i in 0..10 {
         assert_eq!(
@@ -79,26 +127,65 @@ fn test_storage_transactions_insert() {
     }
 }
 
-#[test]
-fn test_storage_latest_proof_insert() {
+#[tokio::test]
+async fn test_storage_transactions_get_batch_decode() {
+    let storage = ImplStorage::new(Arc::new(MemoryAdapter::new()));
+    let height = 2020;
+    let count = BATCH_VALUE_DECODE_NUMBER + 100;
+
+    let mut transactions = Vec::new();
+    let mut hashes = Vec::new();
+
+    for _ in 0..count {
+        let tx_hash = Hash::digest(get_random_bytes(10));
+        hashes.push(tx_hash.clone());
+        let transaction = mock_signed_tx(tx_hash.clone());
+        transactions.push(transaction);
+    }
+
+    storage
+        .insert_transactions(Context::new(), height, transactions.clone())
+        .await
+        .unwrap();
+    let transactions_2 = storage
+        .get_transactions(Context::new(), height, hashes)
+        .await
+        .unwrap();
+
+    for i in 0..count {
+        assert_eq!(
+            Some(transactions.get(i).unwrap()),
+            transactions_2.get(i).unwrap().as_ref()
+        );
+    }
+}
+
+#[tokio::test]
+async fn test_storage_latest_proof_insert() {
     let storage = ImplStorage::new(Arc::new(MemoryAdapter::new()));
 
     let block_hash = Hash::digest(get_random_bytes(10));
     let proof = mock_proof(block_hash);
 
-    exec!(storage.update_latest_proof(Context::new(), proof.clone()));
-    let proof_2 = exec!(storage.get_latest_proof(Context::new(),));
+    storage
+        .update_latest_proof(Context::new(), proof.clone())
+        .await
+        .unwrap();
+    let proof_2 = storage.get_latest_proof(Context::new()).await.unwrap();
 
     assert_eq!(proof.block_hash, proof_2.block_hash);
 }
 
-#[test]
-fn test_storage_wal_insert() {
+#[tokio::test]
+async fn test_storage_wal_insert() {
     let storage = ImplStorage::new(Arc::new(MemoryAdapter::new()));
 
     let info = get_random_bytes(64);
-    exec!(storage.update_overlord_wal(Context::new(), info.clone()));
-    let info_2 = exec!(storage.load_overlord_wal(Context::new(),));
+    storage
+        .update_overlord_wal(Context::new(), info.clone())
+        .await
+        .unwrap();
+    let info_2 = storage.load_overlord_wal(Context::new()).await.unwrap();
     assert_eq!(info, info_2);
 }
 
@@ -122,8 +209,9 @@ fn bench_insert_10000_receipts(b: &mut Bencher) {
         .map(|_| mock_receipt(Hash::digest(get_random_bytes(10))))
         .collect::<Vec<_>>();
 
-    b.iter(move || {
-        exec!(storage.insert_receipts(Context::new(), height, receipts.clone()));
+    let mut rt = Runtime::new().unwrap();
+    b.iter(|| {
+        rt.block_on(storage.insert_receipts(Context::new(), height, receipts.clone())).unwrap()
     })
 }
 
@@ -136,8 +224,10 @@ fn bench_insert_20000_receipts(b: &mut Bencher) {
         .map(|_| mock_receipt(Hash::digest(get_random_bytes(10))))
         .collect::<Vec<_>>();
 
+    let mut rt = Runtime::new().unwrap();
     b.iter(move || {
-        exec!(storage.insert_receipts(Context::new(), height, receipts.clone()));
+        rt.block_on(storage.insert_receipts(Context::new(), height, receipts.clone()))
+            .unwrap()
     })
 }
 
@@ -150,8 +240,10 @@ fn bench_insert_40000_receipts(b: &mut Bencher) {
         .map(|_| mock_receipt(Hash::digest(get_random_bytes(10))))
         .collect::<Vec<_>>();
 
+    let mut rt = Runtime::new().unwrap();
     b.iter(move || {
-        exec!(storage.insert_receipts(Context::new(), height, receipts.clone()));
+        rt.block_on(storage.insert_receipts(Context::new(), height, receipts.clone()))
+            .unwrap()
     })
 }
 
@@ -164,8 +256,10 @@ fn bench_insert_80000_receipts(b: &mut Bencher) {
         .map(|_| mock_receipt(Hash::digest(get_random_bytes(10))))
         .collect::<Vec<_>>();
 
+    let mut rt = Runtime::new().unwrap();
     b.iter(move || {
-        exec!(storage.insert_receipts(Context::new(), height, receipts.clone()));
+        rt.block_on(storage.insert_receipts(Context::new(), height, receipts.clone()))
+            .unwrap()
     })
 }
 #[bench]
@@ -177,8 +271,10 @@ fn bench_insert_10000_txs(b: &mut Bencher) {
         .map(|_| mock_signed_tx(Hash::digest(get_random_bytes(10))))
         .collect::<Vec<_>>();
 
+    let mut rt = Runtime::new().unwrap();
     b.iter(move || {
-        exec!(storage.insert_transactions(Context::new(), height, txs.clone()));
+        rt.block_on(storage.insert_transactions(Context::new(), height, txs.clone()))
+            .unwrap()
     })
 }
 
@@ -191,8 +287,10 @@ fn bench_insert_20000_txs(b: &mut Bencher) {
         .map(|_| mock_signed_tx(Hash::digest(get_random_bytes(10))))
         .collect::<Vec<_>>();
 
+    let mut rt = Runtime::new().unwrap();
     b.iter(move || {
-        exec!(storage.insert_transactions(Context::new(), height, txs.clone()));
+        rt.block_on(storage.insert_transactions(Context::new(), height, txs.clone()))
+            .unwrap()
     })
 }
 
@@ -205,8 +303,10 @@ fn bench_insert_40000_txs(b: &mut Bencher) {
         .map(|_| mock_signed_tx(Hash::digest(get_random_bytes(10))))
         .collect::<Vec<_>>();
 
+    let mut rt = Runtime::new().unwrap();
     b.iter(move || {
-        exec!(storage.insert_transactions(Context::new(), height, txs.clone()));
+        rt.block_on(storage.insert_transactions(Context::new(), height, txs.clone()))
+            .unwrap()
     })
 }
 
@@ -219,7 +319,9 @@ fn bench_insert_80000_txs(b: &mut Bencher) {
         .map(|_| mock_signed_tx(Hash::digest(get_random_bytes(10))))
         .collect::<Vec<_>>();
 
+    let mut rt = Runtime::new().unwrap();
     b.iter(move || {
-        exec!(storage.insert_transactions(Context::new(), height, txs.clone()));
+        rt.block_on(storage.insert_transactions(Context::new(), height, txs.clone()))
+            .unwrap()
     })
 }
