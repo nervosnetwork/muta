@@ -14,10 +14,10 @@ spec:
       cpu: {{ .Values.resources.cpu }}
       memory: {{ .Values.resources.memory }}
       ephemeral-storage: {{ .Values.resources.storage }}
-  chaos:  # all / stable-network-corrupt / stable-network-delay / stable-network-duplicate / stable-network-loss / stable-network-partition / stable-node-failure / stable-node-kill
-  {{- range .Values.chaos }}
-    - {{ . }}
-  {{- end }}
+  chaos: []  # all / stable-network-corrupt / stable-network-delay / stable-network-duplicate / stable-network-loss / stable-network-partition / stable-node-failure / stable-node-kill
+  # {{- range .Values.chaos }}
+  #   - {{ . }}
+  # {{- end }}
   size: {{ .Values.size }} # Node numbers
   persistent: {{ .Values.resources.persistent }} # Persistent data
   config: # see https://github.com/nervosnetwork/muta/blob/master/devtools/chain/config.toml
