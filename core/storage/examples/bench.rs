@@ -1,7 +1,7 @@
 use core_storage::{adapter::rocks::RocksAdapter, CommonHashKey, ImplStorage};
 use protocol::{
     traits::{Context, Storage},
-    types::{Address, Bytes, Hash, RawTransaction, SignedTransaction, TransactionRequest},
+    types::{Bytes, Hash, RawTransaction, SignedTransaction, TransactionRequest},
 };
 
 use std::{
@@ -15,7 +15,7 @@ use std::{
 };
 
 const NUMBER_OF_TXS_PER_ROUND: usize = 15_000; // 1.5W, 2.5M
-const ADDRESS_STR: &str = "0xCAB8EEA4799C21379C20EF5BAA2CC8AF1BEC475B";
+const ADDRESS_STR: &str = "muta1mu4rq2mwvy2h4uss4al7u7ejj5rlcdmpeurh24";
 
 #[tokio::main]
 pub async fn main() {
@@ -166,7 +166,7 @@ fn mock_signed_tx(tx_hash: Hash) -> SignedTransaction {
         cycles_limit: 10,
         cycles_price: 1,
         request,
-        sender: Address::from_hex(ADDRESS_STR).unwrap(),
+        sender: ADDRESS_STR.parse().unwrap(),
     };
 
     SignedTransaction {

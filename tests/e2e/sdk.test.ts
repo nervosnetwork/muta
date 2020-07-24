@@ -28,10 +28,10 @@ describe("API test via @mutadev/muta-sdk-js", () => {
   })
 
   test("transfer work", async () => {
-    const from_addr = "0xf8389d774afdad8755ef8e629e5a154fddc6325a";
+    const from_addr = "muta1mu4rq2mwvy2h4uss4al7u7ejj5rlcdmpeurh24";
     const from_pk =
-      "0x45c56be699dca666191ad3446897e0f480da234da896270202514a0e1a587c3f";
-    const to_addr = "0x0000000000000000000000000000000000000001";
+      "0x02ee34d1ce8270cd236e9455d4ab9e756c4478779b1a20d7ce1c247af61ec2be3b";
+    const to_addr = "muta1cxfhds7zj4h5k4g659krpj6dqhmlawdvtj2uhl";
     const asset_id =
       "0xf56924db538e77bb5951eb5ff0d02b88983c49c45eea30e8ae3e7234b311436c";
 

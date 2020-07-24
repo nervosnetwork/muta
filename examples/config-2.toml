@@ -1,12 +1,12 @@
 data_path = "./devtools/chain/data/2"
-privkey = "0x86756d9074b984526f6780a46958b7b358565a7ef14aa4185854ee95b77b126c"
+privkey = "0x340e99f05e998266082359c01f2ec97102474d7b2fb750c4967b45bd2eb86a05"
 
 [network]
 listening_address = "0.0.0.0:1338"
 rpc_timeout = 10
 
 [[network.bootstraps]]
-peer_id = "QmeG2AjWkLbK5ThySV7TrX5KuFryPsaM8GBgDs6Ch1Z5xJ"
+peer_id = "QmZTHDCgo21skh7de1Newi66GyPzpuo7RhKcEZoKwSyY3F"
 address = "localhost:1337" # Replace it with your IP
 
 [graphql]

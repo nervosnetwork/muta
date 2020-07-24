@@ -110,6 +110,6 @@ pub fn to_transaction(raw: InputRawTransaction) -> ProtocolResult<protocol::type
             method:       raw.method.to_owned(),
             payload:      raw.payload.to_owned(),
         },
-        sender:       protocol::types::Address::from_hex(&raw.sender.as_hex())?,
+        sender:       raw.sender.to_str().parse()?,
     })
 }

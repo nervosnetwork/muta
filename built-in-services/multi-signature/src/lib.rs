@@ -25,7 +25,8 @@ const MAX_MULTI_SIGNATURE_RECURSION_DEPTH: u8 = 8;
 const MAX_PERMISSION_ACCOUNTS: u8 = 16;
 
 lazy_static::lazy_static! {
-    pub static ref ADEPTIVE_ADDRESS: Address = Address::from_hex("0xffffffffffffffffffffffffffffffffffffffff").unwrap();
+    // FIXME:
+    pub static ref ADEPTIVE_ADDRESS: Address = "muta1mu4rq2mwvy2h4uss4al7u7ejj5rlcdmpeurh24".parse().unwrap();
 }
 
 pub struct MultiSignatureService<SDK> {

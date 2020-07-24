@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
+use std::str::FromStr;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -32,7 +33,7 @@ use crate::BlockHeaderField::{PreviousBlockHash, ProofHash, Proposer};
 use crate::BlockProofField::{BitMap, HashMismatch, HeightMismatch, WeightNotFound};
 use crate::{BlockHeaderField, BlockProofField, ConsensusError};
 
-const PUB_KEY_STR: &str = "031288a6788678c25952eba8693b2f278f66e2187004b64ac09416d07f83f96d5b";
+const PUB_KEY_STR: &str = "02ee34d1ce8270cd236e9455d4ab9e756c4478779b1a20d7ce1c247af61ec2be3b";
 
 // Test the blocks gap from 1 to 4.
 #[test]
@@ -673,12 +674,12 @@ fn mock_chained_rich_block(len: u64, gap: u64, key_tool: &KeyTool) -> (Vec<RichB
             state_root: Hash::from_empty(),
             receipt_root: vec![],
             cycles_used: vec![],
-            proposer: Address::from_hex("0x40e680f764a84c3add6753685aecf59700e24a4b").unwrap(),
+            proposer: Address::from_str("muta1mu4rq2mwvy2h4uss4al7u7ejj5rlcdmpeurh24").unwrap(),
             proof: last_proof,
             validator_version: 0,
             validators: vec![Validator {
                 pub_key:        Hex::from_string(
-                    "0x025a1f87bd7980510d8d4224e9e521ba2e98865f420c555568b1b71a64977b5e41"
+                    "0x02ee34d1ce8270cd236e9455d4ab9e756c4478779b1a20d7ce1c247af61ec2be3b"
                         .to_owned(),
                 )
                 .unwrap()
@@ -749,10 +750,9 @@ fn mock_genesis_rich_block() -> RichBlock {
         state_root:                     Hash::from_empty(),
         receipt_root:                   vec![],
         cycles_used:                    vec![],
-        proposer:                       Address::from_hex(
-            "0x40e680f764a84c3add6753685aecf59700e24a4b",
-        )
-        .unwrap(),
+        proposer:                       "muta1mu4rq2mwvy2h4uss4al7u7ejj5rlcdmpeurh24"
+            .parse()
+            .unwrap(),
         proof:                          Proof {
             height:     0,
             round:      0,
@@ -763,7 +763,7 @@ fn mock_genesis_rich_block() -> RichBlock {
         validator_version:              0,
         validators:                     vec![Validator {
             pub_key:        Hex::from_string(
-                "0x025a1f87bd7980510d8d4224e9e521ba2e98865f420c555568b1b71a64977b5e41".to_owned(),
+                "0x02ee34d1ce8270cd236e9455d4ab9e756c4478779b1a20d7ce1c247af61ec2be3b".to_owned(),
             )
             .unwrap()
             .decode(),
@@ -827,7 +827,7 @@ fn mock_tx_list(num: usize, height: u64) -> Vec<SignedTransaction> {
 
         // sign it vividly
         let hex_privkey =
-            hex::decode("d654c7a6747fc2e34808c1ebb1510bfb19b443d639f2fab6dc41fce9f634de37")
+            hex::decode("e05d9e08a18cf5573a92d030342c3b45395cd952e02346ba78e16421ee9dad88")
                 .unwrap();
         let test_privkey = Secp256k1PrivateKey::try_from(hex_privkey.as_ref()).unwrap();
         let test_pubkey = test_privkey.pub_key();
@@ -988,7 +988,7 @@ impl KeyTool {
 
 fn get_mock_key_tool() -> KeyTool {
     let hex_privkey =
-        hex::decode("bd5da51982aa5ccc1bd6cec68ffee0caa708671ba5149390c39e4f660bfe4c49").unwrap();
+        hex::decode("e05d9e08a18cf5573a92d030342c3b45395cd952e02346ba78e16421ee9dad88").unwrap();
     let secp_privkey = Secp256k1PrivateKey::try_from(hex_privkey.as_ref()).unwrap();
     let secp_pubkey: Secp256k1PublicKey = secp_privkey.pub_key();
     let signer_node = SignerNode::new(secp_privkey, secp_pubkey);
@@ -997,7 +997,7 @@ fn get_mock_key_tool() -> KeyTool {
     let mut bls_priv_key = Vec::new();
     bls_priv_key.extend_from_slice(&[0u8; 16]);
     let mut tmp =
-        hex::decode("bd5da51982aa5ccc1bd6cec68ffee0caa708671ba5149390c39e4f660bfe4c49").unwrap();
+        hex::decode("e05d9e08a18cf5573a92d030342c3b45395cd952e02346ba78e16421ee9dad88").unwrap();
     bls_priv_key.append(&mut tmp);
     let bls_priv_key = BlsPrivateKey::try_from(bls_priv_key.as_ref()).unwrap();
 
@@ -1012,12 +1012,12 @@ fn get_mock_public_keys_and_common_ref() -> (HashMap<Bytes, BlsPublicKey>, BlsCo
     let mut bls_pub_keys: HashMap<Bytes, BlsPublicKey> = HashMap::new();
 
     // weight = 5
-    let bls_hex = Hex::from_string("0x04061c1c36a4252e8267ca143d1947f185dd6a04b5cc20f3ec85290e4e631fb67766392fa726120b1235da64fb2e5ffa4813c7dfe67b8019765b231ac0fbb5e5d45b12cf39ba98c02a6f1587bc6f4d8d7b7324efb40d3b6798b3f1792fc414c5df".to_string()
+    let bls_hex = Hex::from_string("0x040c49fc3191406e86defff7c4d5f5a177acc758f24aaf5b820ff298260c6a994b7df3c2b5cd472466641db41f43f02f8109199b2fade972a85a6086a3b264280f034f3e307219950259d195de2f33e132c4e9cb8b5e9cc33f5b649a63e0a4dcba".to_string()
     ).unwrap();
     let bls_hex = hex::decode(bls_hex.as_string_trim0x()).unwrap();
     bls_pub_keys.insert(
         Hex::from_string(
-            "0x025a1f87bd7980510d8d4224e9e521ba2e98865f420c555568b1b71a64977b5e41".to_owned(),
+            "0x02ee34d1ce8270cd236e9455d4ab9e756c4478779b1a20d7ce1c247af61ec2be3b".to_owned(),
         )
         .unwrap()
         .decode(),
@@ -1025,12 +1025,12 @@ fn get_mock_public_keys_and_common_ref() -> (HashMap<Bytes, BlsPublicKey>, BlsCo
     );
 
     // weight = 1
-    let bls_hex = Hex::from_string("0x0410d89f114ebd98a984fa2e964decc6b7b7542326a1abb6e4725b34c70f4408dbfff312ce163147039a6b07737b25902d082194cfe36b50f81d5106f6ee6ea146c4fbcfc87de87bdcd49ce087c01411b37c520402bd0a40fd13ce550c237362a0".to_string()
+    let bls_hex = Hex::from_string("0x040a9672523700e34ea6c347f46aa08a887bf8c909f5104ad8f06296cc9518968bedef2d5eee919228eb7dd3fbfb5f09e6131cbf53409d1ed83ca470af5536140e4b213e9d9318c11437abc98da38d4631bd353b5ef73293a32ab4b0e1e8df073f".to_string()
     ).unwrap();
     let bls_hex = hex::decode(bls_hex.as_string_trim0x()).unwrap();
     bls_pub_keys.insert(
         Hex::from_string(
-            "0x028206a78f082023be8eed96f8d3c09c006bd827fb47c04950b62d8dfcb4134467".to_owned(),
+            "0x03d7a5df7f0f5e086db991606fcf3f85ce74120e455c6b4046894bd51ec5ff1dd6".to_owned(),
         )
         .unwrap()
         .decode(),
@@ -1038,19 +1038,19 @@ fn get_mock_public_keys_and_common_ref() -> (HashMap<Bytes, BlsPublicKey>, BlsCo
     );
 
     // weight = 1
-    let bls_hex = Hex::from_string("0x0402de7a497fb892c60aa98e3ec31a2de10d7f0f952aba3764caed202e3874cdb536b4c018c198a7c9354b898f9500ec6812a72f83b72ba3fa31b16be77bedbc056625db790174ee811b3d763bb1bca1fcceaf00333e1b3ba98bfa53e65d9e6488".to_string()
+    let bls_hex = Hex::from_string("0x0408a17e64561d452db78d064255391fe4bd909804e427a4e91804376c472cd228c357c23ebad2b006400c434248dfd6bb0662a8b595c5e0b6ac41eae96a31e20fd983a7a022b3f00fc6354051f842c3add7afda6dbd1d6ae1fd385a17e18081f2".to_string()
     ).unwrap();
     let bls_hex = hex::decode(bls_hex.as_string_trim0x()).unwrap();
     bls_pub_keys.insert(
         Hex::from_string(
-            "0x0230eb18bc3f638750affffff2fe7be468e50feb9cdd5e6af947b3e4505f2ed5e2".to_owned(),
+            "0x0202685aba390610f902880a4e01464953bb5d81ad51318800e66b4fe2721590e9".to_owned(),
         )
         .unwrap()
         .decode(),
         BlsPublicKey::try_from(bls_hex.as_ref()).unwrap(),
     );
 
-    let hex_common_ref = hex::decode("5131414c656c5454355a").unwrap();
+    let hex_common_ref = hex::decode("68555146426b4c424546").unwrap();
     let common_ref: BlsCommonReference =
         std::str::from_utf8(hex_common_ref.as_ref()).unwrap().into();
 
@@ -1060,23 +1060,23 @@ fn get_mock_public_keys_and_common_ref() -> (HashMap<Bytes, BlsPublicKey>, BlsCo
 fn mock_verifier_list() -> Vec<ValidatorExtend> {
     vec![
         ValidatorExtend {
-            bls_pub_key: Hex::from_string("0x04061c1c36a4252e8267ca143d1947f185dd6a04b5cc20f3ec85290e4e631fb67766392fa726120b1235da64fb2e5ffa4813c7dfe67b8019765b231ac0fbb5e5d45b12cf39ba98c02a6f1587bc6f4d8d7b7324efb40d3b6798b3f1792fc414c5df".to_owned()).unwrap(),
-            pub_key: Hex::from_string("0x025a1f87bd7980510d8d4224e9e521ba2e98865f420c555568b1b71a64977b5e41".to_owned()).unwrap(),
-            address: Address::from_hex("0x40e680f764a84c3add6753685aecf59700e24a4b").unwrap(),
+            bls_pub_key: Hex::from_string("0x040c49fc3191406e86defff7c4d5f5a177acc758f24aaf5b820ff298260c6a994b7df3c2b5cd472466641db41f43f02f8109199b2fade972a85a6086a3b264280f034f3e307219950259d195de2f33e132c4e9cb8b5e9cc33f5b649a63e0a4dcba".to_owned()).unwrap(),
+            pub_key: Hex::from_string("0x02ee34d1ce8270cd236e9455d4ab9e756c4478779b1a20d7ce1c247af61ec2be3b".to_owned()).unwrap(),
+            address: Address::from_str("muta1mu4rq2mwvy2h4uss4al7u7ejj5rlcdmpeurh24").unwrap(),
             propose_weight: 5,
             vote_weight:    5,
         },
         ValidatorExtend {
-            bls_pub_key: Hex::from_string("0x0410d89f114ebd98a984fa2e964decc6b7b7542326a1abb6e4725b34c70f4408dbfff312ce163147039a6b07737b25902d082194cfe36b50f81d5106f6ee6ea146c4fbcfc87de87bdcd49ce087c01411b37c520402bd0a40fd13ce550c237362a0".to_owned()).unwrap(),
-            pub_key: Hex::from_string("0x028206a78f082023be8eed96f8d3c09c006bd827fb47c04950b62d8dfcb4134467".to_owned()).unwrap(),
-            address: Address::from_hex("0x8b1de21fb70dc97256f756fbdb04f91891e329bf").unwrap(),
+            bls_pub_key: Hex::from_string("0x040a9672523700e34ea6c347f46aa08a887bf8c909f5104ad8f06296cc9518968bedef2d5eee919228eb7dd3fbfb5f09e6131cbf53409d1ed83ca470af5536140e4b213e9d9318c11437abc98da38d4631bd353b5ef73293a32ab4b0e1e8df073f".to_owned()).unwrap(),
+            pub_key: Hex::from_string("0x03d7a5df7f0f5e086db991606fcf3f85ce74120e455c6b4046894bd51ec5ff1dd6".to_owned()).unwrap(),
+            address: Address::from_str("muta1cxfhds7zj4h5k4g659krpj6dqhmlawdvtj2uhl").unwrap(),
             propose_weight: 1,
             vote_weight:    1,
         },
         ValidatorExtend {
-            bls_pub_key: Hex::from_string("0x0402de7a497fb892c60aa98e3ec31a2de10d7f0f952aba3764caed202e3874cdb536b4c018c198a7c9354b898f9500ec6812a72f83b72ba3fa31b16be77bedbc056625db790174ee811b3d763bb1bca1fcceaf00333e1b3ba98bfa53e65d9e6488".to_owned()).unwrap(),
-            pub_key: Hex::from_string("0x0230eb18bc3f638750affffff2fe7be468e50feb9cdd5e6af947b3e4505f2ed5e2".to_owned()).unwrap(),
-            address: Address::from_hex("0x8af94238483ea5660f3d30674db9b0ee683d9948").unwrap(),
+            bls_pub_key: Hex::from_string("0x0408a17e64561d452db78d064255391fe4bd909804e427a4e91804376c472cd228c357c23ebad2b006400c434248dfd6bb0662a8b595c5e0b6ac41eae96a31e20fd983a7a022b3f00fc6354051f842c3add7afda6dbd1d6ae1fd385a17e18081f2".to_owned()).unwrap(),
+            pub_key: Hex::from_string("0x0202685aba390610f902880a4e01464953bb5d81ad51318800e66b4fe2721590e9".to_owned()).unwrap(),
+            address: Address::from_str("muta1xzwm48kcp3gn72tgqn8ttw8wzek09mu96jpgtx").unwrap(),
             propose_weight: 1,
             vote_weight:    1,
         },
@@ -1085,39 +1085,39 @@ fn mock_verifier_list() -> Vec<ValidatorExtend> {
 
 #[rustfmt::skip]
 // {
-//   "common_ref": "0x5131414c656c5454355a",
+//   "common_ref": "0x68555146426b4c424546",
 //   "keypairs": [
 //     {
 //       "index": 1,
-//       "private_key": "0xbd5da51982aa5ccc1bd6cec68ffee0caa708671ba5149390c39e4f660bfe4c49",
-//       "public_key": "0x025a1f87bd7980510d8d4224e9e521ba2e98865f420c555568b1b71a64977b5e41",
-//       "address": "0x40e680f764a84c3add6753685aecf59700e24a4b",
-//       "peer_id": "0x1220c8007bb2f04b921ec052df4836a5c81e658c8975e4b514da3cefbc64cb824932",
-//       "bls_public_key": "0x04061c1c36a4252e8267ca143d1947f185dd6a04b5cc20f3ec85290e4e631fb67766392fa726120b1235da64fb2e5ffa4813c7dfe67b8019765b231ac0fbb5e5d45b12cf39ba98c02a6f1587bc6f4d8d7b7324efb40d3b6798b3f1792fc414c5df"
+//       "private_key": "0xe05d9e08a18cf5573a92d030342c3b45395cd952e02346ba78e16421ee9dad88",
+//       "public_key": "0x02ee34d1ce8270cd236e9455d4ab9e756c4478779b1a20d7ce1c247af61ec2be3b",
+//       "address": "muta1mu4rq2mwvy2h4uss4al7u7ejj5rlcdmpeurh24",
+//       "peer_id": "QmZTHDCgo21skh7de1Newi66GyPzpuo7RhKcEZoKwSyY3F",
+//       "bls_public_key": "0x040c49fc3191406e86defff7c4d5f5a177acc758f24aaf5b820ff298260c6a994b7df3c2b5cd472466641db41f43f02f8109199b2fade972a85a6086a3b264280f034f3e307219950259d195de2f33e132c4e9cb8b5e9cc33f5b649a63e0a4dcba"
 //     },
 //     {
 //       "index": 2,
-//       "private_key": "0xabec0e3a9cc9e5722a8582f5fd7cbaada11a12b0f2733873699aa1c17218f35a",
-//       "public_key": "0x028206a78f082023be8eed96f8d3c09c006bd827fb47c04950b62d8dfcb4134467",
-//       "address": "0x8b1de21fb70dc97256f756fbdb04f91891e329bf",
-//       "peer_id": "0x122095c712e8fc94f2febfd4eb21a05dbc78ed2b45a7135e7a72422cfa69a22bf14c",
-//       "bls_public_key": "0x0410d89f114ebd98a984fa2e964decc6b7b7542326a1abb6e4725b34c70f4408dbfff312ce163147039a6b07737b25902d082194cfe36b50f81d5106f6ee6ea146c4fbcfc87de87bdcd49ce087c01411b37c520402bd0a40fd13ce550c237362a0"
+//       "private_key": "0x340e99f05e998266082359c01f2ec97102474d7b2fb750c4967b45bd2eb86a05",
+//       "public_key": "0x03d7a5df7f0f5e086db991606fcf3f85ce74120e455c6b4046894bd51ec5ff1dd6",
+//       "address": "muta1cxfhds7zj4h5k4g659krpj6dqhmlawdvtj2uhl",
+//       "peer_id": "QmaKS9H4zgd8EShbdAG2eiU9cp6x6dpLCEU8V9ijsDgCJH",
+//       "bls_public_key": "0x040a9672523700e34ea6c347f46aa08a887bf8c909f5104ad8f06296cc9518968bedef2d5eee919228eb7dd3fbfb5f09e6131cbf53409d1ed83ca470af5536140e4b213e9d9318c11437abc98da38d4631bd353b5ef73293a32ab4b0e1e8df073f"
 //     },
 //     {
 //       "index": 3,
-//       "private_key": "0x1c43ffb8a5110b37bf2fba6678760fee4cf5a408526c1ef00f28b8f574df1d92",
-//       "public_key": "0x0230eb18bc3f638750affffff2fe7be468e50feb9cdd5e6af947b3e4505f2ed5e2",
-//       "address": "0x8af94238483ea5660f3d30674db9b0ee683d9948",
-//       "peer_id": "0x122024ff8439058d2fa71492e7606547dadc0e0d8bda3c240cca50b6066fa813b1c2",
-//       "bls_public_key": "0x0402de7a497fb892c60aa98e3ec31a2de10d7f0f952aba3764caed202e3874cdb536b4c018c198a7c9354b898f9500ec6812a72f83b72ba3fa31b16be77bedbc056625db790174ee811b3d763bb1bca1fcceaf00333e1b3ba98bfa53e65d9e6488"
+//       "private_key": "0x24ea3d9100f94f854f2c04863ddfd70542ff157bcb355bc842c092ada979b88b",
+//       "public_key": "0x0202685aba390610f902880a4e01464953bb5d81ad51318800e66b4fe2721590e9",
+//       "address": "muta1xzwm48kcp3gn72tgqn8ttw8wzek09mu96jpgtx",
+//       "peer_id": "QmT5hRDjWkvGHYUWRz61p91UnBcndDMrXVCb2uDNqS51zd",
+//       "bls_public_key": "0x0408a17e64561d452db78d064255391fe4bd909804e427a4e91804376c472cd228c357c23ebad2b006400c434248dfd6bb0662a8b595c5e0b6ac41eae96a31e20fd983a7a022b3f00fc6354051f842c3add7afda6dbd1d6ae1fd385a17e18081f2"
 //     },
 //     {
 //       "index": 4,
-//       "private_key": "0x598e505735b9237fcb6736a3a69bb8e7c8293ca4a9b3458b9cbeb1207d2b421f",
-//       "public_key": "0x036fa093c97cbacf1094abd51d3799f9b0920a8decb27f3d126fff37854b58fbb6",
-//       "address": "0x8fff53935d33415ba794d9d81e710872727f9a2d",
-//       "peer_id": "0x122008bbfbff46a3ad94dabb521d0f57e37c3e09b716496be22282e1b560f93963f1",
-//       "bls_public_key": "0x0407d5cd1321e00c596c5c10bc1fd07fad1bf56b3b8e262ae49b1d220a21fcdcf1232862dc51db3673b1337a44d9d04a991415f3afc872e188e2208e7a71ba3d86352a0ad10f5938dfeeb9594c1091ff29051b5baaee825c62c9487835daad9fa8"
+//       "private_key": "0x0246d8517ac7cdaed20f5d24cc33ecff2b43d33495f79bdaef914a06ed3e9457",
+//       "public_key": "0x030766fdbd9db18e9d4bfee2dfa14ca22c055944f6e38ce8a781db0d6d35585ee6",
+//       "address": "muta1ktadyyuwzkacv5t6yepst9h086qnz33fk6d4u0",
+//       "peer_id": "QmYcFNdcmV2cutEyAtiuSw2TVtC7mFNrh7dbAwiN9EYt8R",
+//       "bls_public_key": "0x040228bfc1d23fa5adc8ad580dda3f3fa55e30fedab2a2c793f0ea13261ea22b42c325e135cc47b202ae704cdf4096af080616d38990f1902bdc0c2ce8a0d5d5eb49c8297a40bff81618f035ef497dede1aa5b14b29045f42630cab2f51b75bb62"
 //     }
 //   ]
 // }

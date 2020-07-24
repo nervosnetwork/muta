@@ -2,6 +2,7 @@
 
 extern crate test;
 
+use std::str::FromStr;
 use std::sync::Arc;
 
 use bytes::{Bytes, BytesMut};
@@ -21,10 +22,10 @@ use asset::AssetService;
 use governance::GovernanceService;
 
 lazy_static::lazy_static! {
-    pub static ref ADMIN_ACCOUNT: Address = Address::from_hex("0xcff1002107105460941f797828f468667aa1a2db").unwrap();
-    pub static ref FEE_ACCOUNT: Address = Address::from_hex("0xcff1002107105460941f797828f468667aa1a2db").unwrap();
-    pub static ref FEE_INLET_ACCOUNT: Address = Address::from_hex("0x503492f4bddc731a72b8caa806183f921c284f8e").unwrap();
-    pub static ref PROPOSER_ACCOUNT: Address = Address::from_hex("0x755cdba6ae4f479f7164792b318b2a06c759833b").unwrap();
+    pub static ref ADMIN_ACCOUNT: Address = Address::from_str("muta1mu4rq2mwvy2h4uss4al7u7ejj5rlcdmpeurh24").unwrap();
+    pub static ref FEE_ACCOUNT: Address = Address::from_str("muta1mu4rq2mwvy2h4uss4al7u7ejj5rlcdmpeurh24").unwrap();
+    pub static ref FEE_INLET_ACCOUNT: Address = Address::from_str("muta1cxfhds7zj4h5k4g659krpj6dqhmlawdvtj2uhl").unwrap();
+    pub static ref PROPOSER_ACCOUNT: Address = Address::from_str("muta1xzwm48kcp3gn72tgqn8ttw8wzek09mu96jpgtx").unwrap();
     pub static ref NATIVE_ASSET_ID: Hash = Hash::from_hex("0xf56924db538e77bb5951eb5ff0d02b88983c49c45eea30e8ae3e7234b311436c").unwrap();
 }
 

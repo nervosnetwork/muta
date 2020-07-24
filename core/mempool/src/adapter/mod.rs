@@ -30,7 +30,7 @@ use protocol::{
         Context, ExecutorFactory, ExecutorParams, Gossip, MemPoolAdapter, PeerTrust, Priority, Rpc,
         ServiceMapping, ServiceResponse, Storage, TrustFeedback,
     },
-    types::{Address, Hash, SignedTransaction, TransactionRequest},
+    types::{Hash, SignedTransaction, TransactionRequest},
     ProtocolError, ProtocolErrorKind, ProtocolResult,
 };
 
@@ -300,7 +300,7 @@ where
                     MemPoolError::EncodeJson
                 })?;
 
-                let caller = Address::from_hex("0x0000000000000000000000000000000000000000")?;
+                let caller = "muta100000000000000000000000000000000000000".parse()?;
                 let executor = EF::from_root(
                     block.header.state_root.clone(),
                     Arc::clone(&trie_db_clone),

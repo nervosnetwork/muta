@@ -1,6 +1,7 @@
 use std::boxed::Box;
 use std::collections::HashMap;
 use std::marker::PhantomData;
+use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -474,7 +475,7 @@ where
             Arc::clone(&self.service_mapping),
         )?;
 
-        let caller = Address::from_hex("0x0000000000000000000000000000000000000000")?;
+        let caller = Address::from_str("muta100000000000000000000000000000000000000")?;
 
         let params = ExecutorParams {
             state_root,

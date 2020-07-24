@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use crate::types::{
     AddAccountPayload, GenerateMultiSigAccountPayload, GetMultiSigAccountPayload,
     MultiSigPermission, RemoveAccountPayload, SetAccountWeightPayload, SetThresholdPayload,
@@ -10,7 +12,7 @@ use super::*;
 #[test]
 fn test_generate_multi_signature() {
     let cycles_limit = 1024 * 1024 * 1024; // 1073741824
-    let caller = Address::from_hex("0x755cdba6ae4f479f7164792b318b2a06c759833b").unwrap();
+    let caller = Address::from_str("muta1mu4rq2mwvy2h4uss4al7u7ejj5rlcdmpeurh24").unwrap();
     let context = mock_context(cycles_limit, caller);
 
     let mut service = new_multi_signature_service();

@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::str::FromStr;
 use std::sync::Arc;
 
 use cita_trie::MemoryDB;
@@ -24,7 +25,7 @@ use crate::UtilService;
 #[test]
 fn test_hash() {
     let cycles_limit = 1024 * 1024 * 1024; // 1073741824
-    let caller = Address::from_hex("0x755cdba6ae4f479f7164792b318b2a06c759833b").unwrap();
+    let caller = Address::from_str("muta1mu4rq2mwvy2h4uss4al7u7ejj5rlcdmpeurh24").unwrap();
     let context = mock_context(cycles_limit, caller);
 
     let service = new_util_service();
@@ -44,7 +45,7 @@ fn test_hash() {
 #[test]
 fn test_verify() {
     let cycles_limit = 1024 * 1024 * 1024; // 1073741824
-    let caller = Address::from_hex("0x755cdba6ae4f479f7164792b318b2a06c759833b").unwrap();
+    let caller = Address::from_str("muta1mu4rq2mwvy2h4uss4al7u7ejj5rlcdmpeurh24").unwrap();
     let context = mock_context(cycles_limit, caller);
 
     let service = new_util_service();

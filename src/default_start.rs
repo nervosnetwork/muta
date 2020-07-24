@@ -119,7 +119,7 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
         state_root: genesis_state_root,
         receipt_root: vec![],
         cycles_used: vec![],
-        proposer: Address::from_hex("0x0000000000000000000000000000000000000000")?,
+        proposer: Address::from_str("muta100000000000000000000000000000000000000")?,
         proof: Proof {
             height:     0,
             round:      0,

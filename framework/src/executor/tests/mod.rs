@@ -4,6 +4,7 @@ extern crate test;
 mod framework;
 mod test_service;
 
+use std::str::FromStr;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -71,12 +72,12 @@ fn test_create_genesis() {
         cycles_limit: std::u64::MAX,
         proposer:     Address::from_hash(Hash::from_empty()).unwrap(),
     };
-    let caller = Address::from_hex("0xf8389d774afdad8755ef8e629e5a154fddc6325a").unwrap();
+    let caller = Address::from_str("muta1mu4rq2mwvy2h4uss4al7u7ejj5rlcdmpeurh24").unwrap();
     let request = TransactionRequest {
         service_name: "asset".to_owned(),
         method:       "get_balance".to_owned(),
         payload:
-            r#"{"asset_id": "0xf56924db538e77bb5951eb5ff0d02b88983c49c45eea30e8ae3e7234b311436c", "user": "0xf8389d774afdad8755ef8e629e5a154fddc6325a"}"#
+            r#"{"asset_id": "0xf56924db538e77bb5951eb5ff0d02b88983c49c45eea30e8ae3e7234b311436c", "user": "muta1mu4rq2mwvy2h4uss4al7u7ejj5rlcdmpeurh24"}"#
                 .to_owned(),
     };
     let res = executor.read(&params, &caller, 1, &request).unwrap();
@@ -389,7 +390,7 @@ fn test_commit_tx_hook_use_panic_tx() {
     let error_resp = executor.exec(Context::new(), &params, &txs);
     assert!(error_resp.is_err());
 
-    let caller = Address::from_hex("0xf8389d774afdad8755ef8e629e5a154fddc6325a").unwrap();
+    let caller = Address::from_str("muta1mu4rq2mwvy2h4uss4al7u7ejj5rlcdmpeurh24").unwrap();
 
     let before = read!(executor, &params, &caller, r#""before""#);
     assert_eq!(before.succeed_data, r#""before""#);
@@ -438,7 +439,7 @@ fn test_tx_hook_before_panic() {
     let error_resp = executor.exec(Context::new(), &params, &txs);
     assert!(error_resp.is_err());
 
-    let caller = Address::from_hex("0xf8389d774afdad8755ef8e629e5a154fddc6325a").unwrap();
+    let caller = Address::from_str("muta1mu4rq2mwvy2h4uss4al7u7ejj5rlcdmpeurh24").unwrap();
 
     let before = read!(executor, &params, &caller, r#""before""#);
     assert_eq!(before.succeed_data, r#""""#);
@@ -490,7 +491,7 @@ fn test_tx_hook_after_panic() {
     let error_resp = executor.exec(Context::new(), &params, &txs);
     assert!(error_resp.is_err());
 
-    let caller = Address::from_hex("0xf8389d774afdad8755ef8e629e5a154fddc6325a").unwrap();
+    let caller = Address::from_str("muta1mu4rq2mwvy2h4uss4al7u7ejj5rlcdmpeurh24").unwrap();
 
     let before = read!(executor, &params, &caller, r#""before""#);
     assert_eq!(before.succeed_data, r#""before""#);

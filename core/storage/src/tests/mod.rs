@@ -7,12 +7,12 @@ use rand::random;
 
 use protocol::traits::ServiceResponse;
 use protocol::types::{
-    Address, Block, BlockHeader, Hash, Proof, RawTransaction, Receipt, ReceiptResponse,
-    SignedTransaction, TransactionRequest,
+    Block, BlockHeader, Hash, Proof, RawTransaction, Receipt, ReceiptResponse, SignedTransaction,
+    TransactionRequest,
 };
 use protocol::Bytes;
 
-const ADDRESS_STR: &str = "0xCAB8EEA4799C21379C20EF5BAA2CC8AF1BEC475B";
+const ADDRESS_STR: &str = "muta1mu4rq2mwvy2h4uss4al7u7ejj5rlcdmpeurh24";
 
 fn mock_signed_tx(tx_hash: Hash) -> SignedTransaction {
     let nonce = Hash::digest(Bytes::from("XXXX"));
@@ -30,7 +30,7 @@ fn mock_signed_tx(tx_hash: Hash) -> SignedTransaction {
         cycles_limit: 10,
         cycles_price: 1,
         request,
-        sender: Address::from_hex(ADDRESS_STR).unwrap(),
+        sender: ADDRESS_STR.parse().unwrap(),
     };
 
     SignedTransaction {
@@ -77,7 +77,7 @@ fn mock_block(height: u64, block_hash: Hash) -> Block {
         state_root: nonce,
         receipt_root: Vec::new(),
         cycles_used: vec![999_999],
-        proposer: Address::from_hex(ADDRESS_STR).unwrap(),
+        proposer: ADDRESS_STR.parse().unwrap(),
         proof: mock_proof(block_hash),
         validator_version: 1,
         validators: Vec::new(),
