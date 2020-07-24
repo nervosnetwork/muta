@@ -100,6 +100,7 @@ fn init_crypto() -> OverlordCrypto {
 
 fn mock_node_info() -> NodeInfo {
     NodeInfo {
+        self_pub_key: mock_pub_key().decode(),
         chain_id:     mock_hash(),
         self_address: mock_address(),
     }
@@ -216,6 +217,10 @@ impl CommonConsensusAdapter for MockConsensusAdapter {
     ) {
     }
 
+    fn tag_consensus(&self, _ctx: Context, _peer_ids: Vec<Bytes>) -> ProtocolResult<()> {
+        Ok(())
+    }
+
     fn verify_proof_signature(
         &self,
         _ctx: Context,
@@ -227,7 +232,7 @@ impl CommonConsensusAdapter for MockConsensusAdapter {
         Ok(())
     }
 
-    fn verity_proof_weight(
+    fn verify_proof_weight(
         &self,
         _ctx: Context,
         _block_height: u64,
