@@ -33,6 +33,9 @@ pub enum TypesError {
     #[display(fmt = "{:?} is an invalid address", address)]
     InvalidAddress { address: String },
 
+    #[display(fmt = "{}", error)]
+    Bech32 { error: bech32::Error },
+
     #[display(fmt = "Hex should start with 0x")]
     HexPrefix,
 

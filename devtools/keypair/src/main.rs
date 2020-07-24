@@ -76,7 +76,7 @@ pub fn main() {
         k.private_key = add_0x(hex::encode(seckey.as_ref()));
         k.public_key = add_0x(hex::encode(pubkey));
         k.peer_id = keypair.to_public_key().peer_id().to_base58();
-        k.address = address.as_hex();
+        k.address = address.to_string();
 
         let priv_key =
             BlsPrivateKey::try_from([&[0u8; 16], seckey.as_ref()].concat().as_ref()).unwrap();

@@ -1,6 +1,8 @@
 use std::convert::TryFrom;
 use std::fmt;
+use std::str::FromStr;
 
+use bech32::{self, FromBase32, ToBase32};
 use bytes::Bytes;
 use hasher::{Hasher, HasherKeccak};
 use lazy_static::lazy_static;
@@ -19,6 +21,9 @@ pub const METADATA_KEY: &str = "metadata";
 lazy_static! {
     static ref HASHER_INST: HasherKeccak = HasherKeccak::new();
 }
+
+/// The address bech32 hrp
+static ADDRESS_HRP: &str = include!(concat!(env!("OUT_DIR"), "/address_hrp.rs"));
 
 /// The height of the genesis block.
 pub const GENESIS_HEIGHT: u64 = 0;
@@ -55,7 +60,7 @@ impl Hex {
 
 impl Default for Hex {
     fn default() -> Self {
-        Hex::from_string("0x".to_owned()).expect("Hex must start with 0x")
+        Hex::from_string("0x1".to_owned()).expect("Hex must start with 0x")
     }
 }
 
@@ -213,7 +218,7 @@ impl Serialize for Address {
     where
         S: serde::ser::Serializer,
     {
-        serializer.serialize_str(&self.as_hex())
+        serializer.serialize_str(&self.to_string())
     }
 }
 
@@ -223,21 +228,21 @@ impl<'de> de::Visitor<'de> for AddressVisitor {
     type Value = Address;
 
     fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str("Expect a hex string")
+        formatter.write_str("Expect a bech32 string")
     }
 
     fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
     where
         E: de::Error,
     {
-        Address::from_hex(&v).map_err(|e| de::Error::custom(e.to_string()))
+        Address::from_str(&v).map_err(|e| de::Error::custom(e.to_string()))
     }
 
     fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
     where
         E: de::Error,
     {
-        Address::from_hex(&v).map_err(|e| de::Error::custom(e.to_string()))
+        Address::from_str(&v).map_err(|e| de::Error::custom(e.to_string()))
     }
 }
 
@@ -277,26 +282,33 @@ impl Address {
         Ok(Self(bytes))
     }
 
-    pub fn from_hex(s: &str) -> ProtocolResult<Self> {
-        let s = clean_0x(s)?;
-        let bytes = hex::decode(s).map_err(TypesError::from)?;
-
-        let bytes = Bytes::from(bytes);
-        Self::from_bytes(bytes)
-    }
-
     pub fn as_bytes(&self) -> Bytes {
         self.0.clone()
     }
+}
 
-    pub fn as_hex(&self) -> String {
-        "0x".to_owned() + &hex::encode(self.0.clone())
+impl FromStr for Address {
+    type Err = TypesError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (_, data) = bech32::decode(s).map_err(TypesError::from)?;
+        let bytes = Vec::<u8>::from_base32(&data).map_err(TypesError::from)?;
+
+        Ok(Address(Bytes::from(bytes)))
     }
 }
 
 impl fmt::Debug for Address {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.as_hex())
+        // NOTE: ADDRESS_HRP was verified in protocol/build.rs
+        bech32::encode_to_fmt(f, ADDRESS_HRP, &self.0.to_base32()).unwrap()
+    }
+}
+
+impl fmt::Display for Address {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        // NOTE: ADDRESS_HRP was verified in protocol/build.rs
+        bech32::encode_to_fmt(f, ADDRESS_HRP, &self.0.to_base32()).unwrap()
     }
 }
 
@@ -361,6 +373,7 @@ fn ensure_len(real: usize, expect: usize) -> ProtocolResult<()> {
 
 #[cfg(test)]
 mod tests {
+    use bech32::{self, FromBase32};
     use bytes::Bytes;
 
     use super::{Address, Hash, ValidatorExtend};
@@ -376,22 +389,23 @@ mod tests {
 
     #[test]
     fn test_from_pubkey_bytes() {
-        let uncompressed_pubkey = "04f97763e5966303a6277902841501705ce2c4e348914b146039023a3edf026b37c632d1ee6fe46c0c48e3a8246b26b2ea726dc6414a441e5b0173f1614e591449";
-        let expect_addr = "0x697ebacbfaa18d41f4e0b814597a28c7a770ce2d";
+        let pubkey = "02ee34d1ce8270cd236e9455d4ab9e756c4478779b1a20d7ce1c247af61ec2be3b";
+        let expect_addr = "muta1mu4rq2mwvy2h4uss4al7u7ejj5rlcdmpeurh24";
 
-        let pubkey_bytes = Bytes::from(hex::decode(uncompressed_pubkey).unwrap());
+        let pubkey_bytes = Bytes::from(hex::decode(pubkey).unwrap());
         let addr = Address::from_pubkey_bytes(pubkey_bytes).unwrap();
 
-        assert_eq!(addr.as_hex(), expect_addr);
+        assert_eq!(addr.to_string(), expect_addr);
     }
 
     #[test]
     fn test_address() {
-        let add_str = "CAB8EEA4799C21379C20EF5BAA2CC8AF1BEC475B";
-        let bytes = Bytes::from(hex::decode(add_str).unwrap());
+        let add_str = "muta1mu4rq2mwvy2h4uss4al7u7ejj5rlcdmpeurh24";
+        let (_, data) = bech32::decode(add_str).unwrap();
+        let bytes = Bytes::from(Vec::<u8>::from_base32(&data).unwrap());
 
         let address = Address::from_bytes(bytes).unwrap();
-        assert_eq!(add_str, &address.as_hex().to_uppercase().as_str()[2..]);
+        assert_eq!(add_str, &address.to_string());
     }
 
     #[test]
@@ -405,9 +419,8 @@ mod tests {
     #[test]
     fn test_validator_extend() {
         let extend = ValidatorExtend {
-            bls_pub_key: Hex::from_string("0x0401139331589f32220ec5f41f6faa0f5c3f4d36af011ab014cefd9d8f36b53b04a2031f681d1c9648a2a5d534d742931b0a5a4132da9ee752c1144d6396bed6cfc635c9687258cec9b60b387d35cf9e13f29091e11ae88024d74ca904c0ea3fb3".to_owned()).unwrap(),
-            pub_key:     Hex::from_string("0x026c184a9016f6f71a234c86b141621f38b68c78602ab06768db4d83682c616004".to_owned()).unwrap(),
-            address:     Address::from_hex("0x76961e339fe2f1f931d84c425754806fb4174c34").unwrap(),
+            bls_pub_key: Hex::from_string("0x040c49fc3191406e86defff7c4d5f5a177acc758f24aaf5b820ff298260c6a994b7df3c2b5cd472466641db41f43f02f8109199b2fade972a85a6086a3b264280f034f3e307219950259d195de2f33e132c4e9cb8b5e9cc33f5b649a63e0a4dcba".to_owned()).unwrap(),
+            pub_key: Hex::from_string("0x02ee34d1ce8270cd236e9455d4ab9e756c4478779b1a20d7ce1c247af61ec2be3b".to_owned()).unwrap(),     address: "muta1mu4rq2mwvy2h4uss4al7u7ejj5rlcdmpeurh24".parse().unwrap(),
             propose_weight: 1,
             vote_weight:    1,
         };
