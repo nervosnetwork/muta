@@ -8,7 +8,6 @@ use crate::trust_metric_all::common;
 
 use std::collections::HashMap;
 use std::convert::TryFrom;
-use std::str::FromStr;
 use std::sync::Arc;
 
 use bytes::Bytes;
@@ -42,7 +41,9 @@ use core_network::{DiagnosticEvent, NetworkConfig, NetworkService, PeerId, PeerI
 use core_storage::{ImplStorage, StorageError};
 use framework::executor::{ServiceExecutor, ServiceExecutorFactory};
 use protocol::traits::{APIAdapter, Context, MemPool, Network, NodeInfo, ServiceMapping, Storage};
-use protocol::types::{Address, Block, BlockHeader, Genesis, Hash, Metadata, Proof, Validator};
+use protocol::types::{
+    Address, Block, BlockHeader, Genesis, Hash, Metadata, Proof, Validator, ADDRESS_HRP,
+};
 use protocol::{fixed_codec::FixedCodec, ProtocolResult};
 
 pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
@@ -90,6 +91,7 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
     )?;
 
     // Build genesis block.
+    let proposer = Address::from_hash(Hash::digest(Bytes::from_static(ADDRESS_HRP.as_bytes())))?;
     let genesis_block_header = BlockHeader {
         chain_id: metadata.chain_id.clone(),
         height: 0,
@@ -102,7 +104,7 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
         state_root: genesis_state_root,
         receipt_root: vec![],
         cycles_used: vec![],
-        proposer: Address::from_str("muta100000000000000000000000000000000000000")?,
+        proposer,
         proof: Proof {
             height:     0,
             round:      0,

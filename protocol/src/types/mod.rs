@@ -15,8 +15,8 @@ pub use block::{Block, BlockHeader, Pill, Proof, Validator};
 pub use bytes::{Bytes, BytesMut};
 pub use genesis::{Genesis, ServiceParam};
 pub use primitive::{
-    Address, Hash, Hex, JsonString, MerkleRoot, Metadata, ValidatorExtend, GENESIS_HEIGHT,
-    METADATA_KEY,
+    Address, Hash, Hex, JsonString, MerkleRoot, Metadata, ValidatorExtend, ADDRESS_HRP,
+    GENESIS_HEIGHT, METADATA_KEY,
 };
 pub use receipt::{Event, Receipt, ReceiptResponse};
 pub use service_context::{ServiceContext, ServiceContextError, ServiceContextParams};

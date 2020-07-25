@@ -23,7 +23,7 @@ lazy_static! {
 }
 
 /// The address bech32 hrp
-static ADDRESS_HRP: &str = include!(concat!(env!("OUT_DIR"), "/address_hrp.rs"));
+pub static ADDRESS_HRP: &str = include!(concat!(env!("OUT_DIR"), "/address_hrp.rs"));
 
 /// The height of the genesis block.
 pub const GENESIS_HEIGHT: u64 = 0;

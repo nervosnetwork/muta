@@ -30,8 +30,8 @@ use protocol::{
         Context, ExecutorFactory, ExecutorParams, Gossip, MemPoolAdapter, PeerTrust, Priority, Rpc,
         ServiceMapping, ServiceResponse, Storage, TrustFeedback,
     },
-    types::{Hash, SignedTransaction, TransactionRequest},
-    ProtocolError, ProtocolErrorKind, ProtocolResult,
+    types::{Address, Hash, SignedTransaction, TransactionRequest, ADDRESS_HRP},
+    Bytes, ProtocolError, ProtocolErrorKind, ProtocolResult,
 };
 
 use crate::adapter::message::{
@@ -300,7 +300,8 @@ where
                     MemPoolError::EncodeJson
                 })?;
 
-                let caller = "muta100000000000000000000000000000000000000".parse()?;
+                let caller =
+                    Address::from_hash(Hash::digest(Bytes::from_static(ADDRESS_HRP.as_bytes())))?;
                 let executor = EF::from_root(
                     block.header.state_root.clone(),
                     Arc::clone(&trie_db_clone),
