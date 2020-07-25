@@ -291,9 +291,14 @@ impl FromStr for Address {
     type Err = TypesError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let (_, data) = bech32::decode(s).map_err(TypesError::from)?;
-        let bytes = Vec::<u8>::from_base32(&data).map_err(TypesError::from)?;
+        let (hrp, data) = bech32::decode(s).map_err(TypesError::from)?;
+        if hrp != ADDRESS_HRP {
+            return Err(TypesError::InvalidAddress {
+                address: s.to_owned(),
+            });
+        }
 
+        let bytes = Vec::<u8>::from_base32(&data).map_err(TypesError::from)?;
         Ok(Address(Bytes::from(bytes)))
     }
 }
