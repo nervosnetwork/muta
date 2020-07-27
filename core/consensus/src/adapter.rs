@@ -579,7 +579,7 @@ where
         let consensus_interval = previous_metadata.interval;
 
         if !validate_timestamp(current_timestamp, timestamp, consensus_interval) {
-            return Err(ConsensusError::InvalidTimestamp);
+            return Err(ConsensusError::InvalidTimestamp.into());
         }
 
         // TODO: useless check
@@ -997,11 +997,13 @@ where
 
 fn validate_timestamp(current_timestamp: u64, proposal_timestamp: u64, consensus_interval: u64) -> bool {
     // this node timestamp should be longer than the proposal timestamp
-    if proposal_timestamp < current_timestamp {
+    if proposal_timestamp > current_timestamp {
         return false
     }
 
-    if proposal_timestamp > (proposal_timestamp + consensus_interval) {
+    // The interval between the two should not be greater than 'consensus_time'.
+    let time_gap = current_timestamp - proposal_timestamp;
+    if time_gap > consensus_interval {
         return false
     }
 
@@ -1033,5 +1035,33 @@ fn gen_executed_info(
         receipt_root: receipt,
         confirm_root: order_root,
         state_root: exec_resp.state_root,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::validate_timestamp;
+
+    #[test]
+    fn test_validate_timestamp() {
+        let consensus_interval = 10;
+
+        // current 10 > proposal 1 > true
+        assert_eq!(validate_timestamp(10, 1, consensus_interval), true);
+
+        // current 10 < proposal 11. false
+        assert_eq!(validate_timestamp(10, 11, consensus_interval), false);
+
+         // current 10 == proposal 10. true
+        assert_eq!(validate_timestamp(10, 10, consensus_interval), false);
+
+        // (current 20 > proposal 9) > consensus_interval false
+        assert_eq!(validate_timestamp(20, 9, consensus_interval), false);
+
+        // (current 20 > proposal 10) == consensus_interval false
+        assert_eq!(validate_timestamp(20, 10, consensus_interval), true);
+
+        // (current 20 == proposal 11) < consensus_interval true
+        assert_eq!(validate_timestamp(20, 11, consensus_interval), true);
     }
 }

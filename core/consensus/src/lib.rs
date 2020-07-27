@@ -103,6 +103,7 @@ pub enum ConsensusError {
     #[display(fmt = "Consensus missed pill cooresponding {:?}", _0)]
     MissingPill(Hash),
 
+    /// Invalid timestamp
     #[display(fmt = "Consensus invalid timestamp")]
     InvalidTimestamp,
 
