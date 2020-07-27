@@ -54,51 +54,51 @@ pipelineConfig:
                   - --release
                   - --example 
                   - muta-chain
-              - name: push-image
-                image: gcr.io/kaniko-project/executor:9912ccbf8d22bbafbf971124600fbb0b13b9cbd6
-                command: /kaniko/executor
-                args:
-                  - --dockerfile=/workspace/source/devtools/docker-build/Dockerfile
-                  - --destination=mutadev/${REPO_NAME}:pr-${PULL_NUMBER}-${BUILD_NUMBER}
-                  - --context=/workspace/source
+              # - name: push-image
+              #   image: gcr.io/kaniko-project/executor:9912ccbf8d22bbafbf971124600fbb0b13b9cbd6
+              #   command: /kaniko/executor
+              #   args:
+              #     - --dockerfile=/workspace/source/devtools/docker-build/Dockerfile
+              #     - --destination=mutadev/${REPO_NAME}:pr-${PULL_NUMBER}-${BUILD_NUMBER}
+              #     - --context=/workspace/source
 
-              - name: create-chaos-crd
-                image: alpine/helm:3.2.4
-                command: helm
-                args:
-                  - install
-                  - chaos-${REPO_NAME}-pr-${PULL_NUMBER}-${BUILD_NUMBER}
-                  - charts/deploy-chaos
-                  - --namespace
-                  - mutadev
-                  - --set
-                  - size=${NODE_SIZE},repo_name=${REPO_NAME},version=pr-${PULL_NUMBER}-${BUILD_NUMBER},resources.cpu=1100m,resources.memory=8Gi,chain_genesis.metadata.timeout_gap=${CHAIN_GENESIS_TIMEOUT_GAP}
+              # - name: create-chaos-crd
+              #   image: alpine/helm:3.2.4
+              #   command: helm
+              #   args:
+              #     - install
+              #     - chaos-${REPO_NAME}-pr-${PULL_NUMBER}-${BUILD_NUMBER}
+              #     - charts/deploy-chaos
+              #     - --namespace
+              #     - mutadev
+              #     - --set
+              #     - size=${NODE_SIZE},repo_name=${REPO_NAME},version=pr-${PULL_NUMBER}-${BUILD_NUMBER},resources.cpu=1100m,resources.memory=8Gi,chain_genesis.metadata.timeout_gap=${CHAIN_GENESIS_TIMEOUT_GAP}
               
-              - name: watchdog
-                image: mutadev/muta-watchdog:v0.1.11
-                env:
-                  - name: WATCH_DURATION
-                    value: 1H
-                  - name: APP_NAMESPACE
-                    value: mutadev
-                  - name: APP_PORT
-                    value: "8000"
-                  - name: APP_GRAPHQL_URL
-                    value: graphql
-                  - name: JOB_BENCHMARK_DURATION
-                    value: "300"
-                  - name: JOB_BENCHMARK_TIMEOUT_GAP
-                    value: "9999"
-                  - name: JOB_BENCHMARK_CPU
-                    value: "3"
-                command: APP_NAME=chaos-${REPO_NAME}-pr-${PULL_NUMBER}-${BUILD_NUMBER} node /watchdog/index.js
+              # - name: watchdog
+              #   image: mutadev/muta-watchdog:v0.1.11
+              #   env:
+              #     - name: WATCH_DURATION
+              #       value: 1H
+              #     - name: APP_NAMESPACE
+              #       value: mutadev
+              #     - name: APP_PORT
+              #       value: "8000"
+              #     - name: APP_GRAPHQL_URL
+              #       value: graphql
+              #     - name: JOB_BENCHMARK_DURATION
+              #       value: "300"
+              #     - name: JOB_BENCHMARK_TIMEOUT_GAP
+              #       value: "9999"
+              #     - name: JOB_BENCHMARK_CPU
+              #       value: "3"
+              #   command: APP_NAME=chaos-${REPO_NAME}-pr-${PULL_NUMBER}-${BUILD_NUMBER} node /watchdog/index.js
 
-              - name: delete-chaos-crd
-                image: alpine/helm:3.2.4
-                command: helm
-                args:
-                  - uninstall
-                  - chaos-${REPO_NAME}-pr-${PULL_NUMBER}-${BUILD_NUMBER}
-                  - --namespace
-                  - mutadev
+              # - name: delete-chaos-crd
+              #   image: alpine/helm:3.2.4
+              #   command: helm
+              #   args:
+              #     - uninstall
+              #     - chaos-${REPO_NAME}-pr-${PULL_NUMBER}-${BUILD_NUMBER}
+              #     - --namespace
+              #     - mutadev
 
