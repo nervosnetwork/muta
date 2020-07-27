@@ -1,9 +1,13 @@
 use std::collections::HashMap;
 use std::convert::TryFrom;
+use std::panic;
 use std::sync::Arc;
+use std::thread;
 use std::time::Duration;
 
+use backtrace::Backtrace;
 use bytes::Bytes;
+use futures::stream::StreamExt;
 use futures::{future, lock::Mutex};
 use futures_timer::Delay;
 #[cfg(unix)]
@@ -554,10 +558,42 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         }
     });
 
+    // register channel of panic
+    let (panic_sender, mut panic_receiver) = tokio::sync::mpsc::channel::<()>(1);
+
+    panic::set_hook(Box::new(move |info: &panic::PanicInfo| {
+        let mut panic_sender = panic_sender.clone();
+        panic_log(info);
+        panic_sender.try_send(()).expect("panic_receiver is droped");
+    }));
+
     tokio::select! {
         _ = exec_handler =>{log::error!("exec_daemon is down, quit.")},
         _ = ctrl_c_handler =>{log::info!("ctrl + c is pressed, quit.")},
+        _ = panic_receiver.next() =>{log::info!("child thraed panic, quit.")},
     };
     abort_handle.abort();
     Ok(())
+}
+
+fn panic_log(info: &panic::PanicInfo) {
+    let backtrace = Backtrace::new();
+    let thread = thread::current();
+    let name = thread.name().unwrap_or("unnamed");
+    let location = info.location().unwrap(); // The current implementation always returns Some
+    let msg = match info.payload().downcast_ref::<&'static str>() {
+        Some(s) => *s,
+        None => match info.payload().downcast_ref::<String>() {
+            Some(s) => &*s,
+            None => "Box<Any>",
+        },
+    };
+    log::error!(
+        target: "panic", "thread '{}' panicked at '{}': {}:{} {:?}",
+        name,
+        msg,
+        location.file(),
+        location.line(),
+        backtrace,
+    );
 }
