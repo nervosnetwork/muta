@@ -1,8 +1,6 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::{panic, thread};
 
-use backtrace::Backtrace;
 use json::JsonValue;
 use log::LevelFilter;
 use log4rs::append::console::ConsoleAppender;
@@ -23,8 +21,6 @@ pub fn init<S: ::std::hash::BuildHasher>(
     log_path: PathBuf,
     modules_level: HashMap<String, String, S>,
 ) {
-    setup_panic_logger();
-
     let console = ConsoleAppender::builder()
         .encoder(Box::new(PatternEncoder::new(
             if console_show_file_and_line {
@@ -101,29 +97,4 @@ pub fn metrics(name: &str, mut content: JsonValue) {
         content["name"] = name.into();
         content
     });
-}
-
-fn setup_panic_logger() {
-    let panic_logger = |info: &panic::PanicInfo| {
-        let backtrace = Backtrace::new();
-        let thread = thread::current();
-        let name = thread.name().unwrap_or("unnamed");
-        let location = info.location().unwrap(); // The current implementation always returns Some
-        let msg = match info.payload().downcast_ref::<&'static str>() {
-            Some(s) => *s,
-            None => match info.payload().downcast_ref::<String>() {
-                Some(s) => &*s,
-                None => "Box<Any>",
-            },
-        };
-        log::error!(
-            target: "panic", "thread '{}' panicked at '{}': {}:{} {:?}",
-            name,
-            msg,
-            location.file(),
-            location.line(),
-            backtrace,
-        );
-    };
-    panic::set_hook(Box::new(panic_logger));
 }

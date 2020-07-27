@@ -20,6 +20,7 @@ core-consensus = { path = "./core/consensus" }
 binding-macro = { path = "./binding-macro" }
 framework = { path = "./framework" }
 
+backtrace = "0.3"
 actix-rt = "1.0"
 derive_more = "0.99"
 futures = "0.3"
@@ -33,7 +34,7 @@ bytes = "0.5"
 hex = "0.4"
 rlp = "0.4"
 toml = "0.5"
-tokio = { version = "0.2", features = ["macros", "rt-core", "rt-util", "signal", "time"] }
+tokio = { version = "0.2", features = ["macros", "sync", "rt-core", "rt-util", "signal", "time"] }
 muta-apm = "0.1.0-alpha.7"
 futures-timer="3.0"
 

@@ -2,12 +2,16 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::sync::Arc;
 use std::time::Duration;
+use std::panic;
+use std::thread;
 
+use backtrace::Backtrace;
 use bytes::Bytes;
 use futures::{future, lock::Mutex};
 use futures_timer::Delay;
 #[cfg(unix)]
 use tokio::signal::unix::{self as os_impl};
+use futures::stream::StreamExt;
 
 use common_crypto::{
     BlsCommonReference, BlsPrivateKey, BlsPublicKey, PublicKey, Secp256k1, Secp256k1PrivateKey,
@@ -554,10 +558,45 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         }
     });
 
+    // register channel of panic
+    let (panic_sender, mut panic_receiver) = tokio::sync::mpsc::channel::<()>(1);
+    // let panic_receiver = Pin::new(panic_receiver);
+    // let (panic_sender, panic_receiver) = sync::mpsc::channel::<()>(1);
+    // let mut panic_handler = PanicShutdownHandle::new();
+    // let mut panic_sender = panic_handler.sender.clone();
+    panic::set_hook(Box::new(move |info: &panic::PanicInfo| {
+        let mut panic_sender = panic_sender.clone();
+        panic_log(info);
+        panic_sender.try_send(()).expect("panic_receiver is droped");
+    }));
+    
     tokio::select! {
         _ = exec_handler =>{log::error!("exec_daemon is down, quit.")},
         _ = ctrl_c_handler =>{log::info!("ctrl + c is pressed, quit.")},
+        _ = panic_receiver.next() =>{log::info!("child thraed panic, quit.")},
     };
     abort_handle.abort();
     Ok(())
+}
+
+fn panic_log(info: &panic::PanicInfo) {
+    let backtrace = Backtrace::new();
+    let thread = thread::current();
+    let name = thread.name().unwrap_or("unnamed");
+    let location = info.location().unwrap(); // The current implementation always returns Some
+    let msg = match info.payload().downcast_ref::<&'static str>() {
+        Some(s) => *s,
+        None => match info.payload().downcast_ref::<String>() {
+            Some(s) => &*s,
+            None => "Box<Any>",
+        },
+    };
+    log::error!(
+        target: "panic", "thread '{}' panicked at '{}': {}:{} {:?}",
+        name,
+        msg,
+        location.file(),
+        location.line(),
+        backtrace,
+    );
 }
