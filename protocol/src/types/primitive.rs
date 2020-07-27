@@ -258,6 +258,7 @@ impl Address {
                 .map_err(|_| TypesError::InvalidPublicKey)?;
             bytes = pubkey.to_uncompressed_bytes();
         }
+        let bytes = bytes.split_off(1); // Drop first byte
 
         let hash = Hash::digest(bytes);
         Self::from_hash(hash)
