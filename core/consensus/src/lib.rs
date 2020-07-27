@@ -103,6 +103,9 @@ pub enum ConsensusError {
     #[display(fmt = "Consensus missed pill cooresponding {:?}", _0)]
     MissingPill(Hash),
 
+    #[display(fmt = "Consensus invalid timestamp")]
+    InvalidTimestamp,
+
     /// Consensus missed the block header.
     #[display(fmt = "Consensus missed block header of {} block", _0)]
     MissingBlockHeader(u64),

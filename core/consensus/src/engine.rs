@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
 use std::error::Error;
 use std::sync::Arc;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
 use futures::lock::Mutex;
@@ -32,7 +32,7 @@ use crate::message::{
     END_GOSSIP_SIGNED_VOTE,
 };
 use crate::status::StatusAgent;
-use crate::util::{check_list_roots, digest_signed_transactions, OverlordCrypto};
+use crate::util::{check_list_roots, time_now, digest_signed_transactions, OverlordCrypto};
 use crate::wal::SignedTxsWAL;
 use crate::ConsensusError;
 
@@ -798,13 +798,6 @@ fn covert_to_overlord_authority(validators: &[Validator]) -> Vec<Node> {
         .collect::<Vec<_>>();
     authority.sort();
     authority
-}
-
-fn time_now() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_millis() as u64
 }
 
 async fn sync_txs<CA: ConsensusAdapter>(

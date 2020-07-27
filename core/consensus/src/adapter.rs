@@ -35,7 +35,7 @@ use crate::message::{
     BROADCAST_HEIGHT, RPC_SYNC_PULL_BLOCK, RPC_SYNC_PULL_PROOF, RPC_SYNC_PULL_TXS,
 };
 use crate::status::{ExecutedInfo, StatusAgent};
-use crate::util::{convert_hex_to_bls_pubkeys, ExecuteInfo, OverlordCrypto};
+use crate::util::{convert_hex_to_bls_pubkeys, time_now, ExecuteInfo, OverlordCrypto};
 use crate::BlockHeaderField::{PreviousBlockHash, ProofHash, Proposer};
 use crate::BlockProofField::{BitMap, HashMismatch, HeightMismatch, Signature, WeightNotFound};
 use crate::{BlockHeaderField, BlockProofField, ConsensusError};
@@ -572,6 +572,15 @@ where
                 (address, node)
             })
             .collect::<HashMap<_, _>>();
+        
+         // verify block timestamp.
+        let timestamp = block.header.timestamp;
+        let current_timestamp = time_now();
+        let consensus_interval = previous_metadata.interval;
+
+        if !validate_timestamp(current_timestamp, timestamp, consensus_interval) {
+            return Err(ConsensusError::InvalidTimestamp);
+        }
 
         // TODO: useless check
         // check proposer
@@ -984,6 +993,19 @@ where
     ) -> ProtocolResult<()> {
         self.storage.insert_receipts(ctx, height, receipts).await
     }
+}
+
+fn validate_timestamp(current_timestamp: u64, proposal_timestamp: u64, consensus_interval: u64) -> bool {
+    // this node timestamp should be longer than the proposal timestamp
+    if proposal_timestamp < current_timestamp {
+        return false
+    }
+
+    if proposal_timestamp > (proposal_timestamp + consensus_interval) {
+        return false
+    }
+
+    true
 }
 
 fn gen_executed_info(
