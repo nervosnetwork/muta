@@ -394,8 +394,8 @@ mod tests {
 
     #[test]
     fn test_from_pubkey_bytes() {
-        let pubkey = "02ee34d1ce8270cd236e9455d4ab9e756c4478779b1a20d7ce1c247af61ec2be3b";
-        let expect_addr = "muta1mu4rq2mwvy2h4uss4al7u7ejj5rlcdmpeurh24";
+        let pubkey = "02ef0cb0d7bc6c18b4bea1f5908d9106522b35ab3c399369605d4242525bda7e60";
+        let expect_addr = "muta14e0lmgck835vm2dfm0w3ckv6svmez8fdgdl705";
 
         let pubkey_bytes = Bytes::from(hex::decode(pubkey).unwrap());
         let addr = Address::from_pubkey_bytes(pubkey_bytes).unwrap();
@@ -405,7 +405,7 @@ mod tests {
 
     #[test]
     fn test_address() {
-        let add_str = "muta1mu4rq2mwvy2h4uss4al7u7ejj5rlcdmpeurh24";
+        let add_str = "muta14e0lmgck835vm2dfm0w3ckv6svmez8fdgdl705";
         let (_, data) = bech32::decode(add_str).unwrap();
         let bytes = Bytes::from(Vec::<u8>::from_base32(&data).unwrap());
 
@@ -424,11 +424,12 @@ mod tests {
     #[test]
     fn test_validator_extend() {
         let extend = ValidatorExtend {
-            bls_pub_key: Hex::from_string("0x040c49fc3191406e86defff7c4d5f5a177acc758f24aaf5b820ff298260c6a994b7df3c2b5cd472466641db41f43f02f8109199b2fade972a85a6086a3b264280f034f3e307219950259d195de2f33e132c4e9cb8b5e9cc33f5b649a63e0a4dcba".to_owned()).unwrap(),
-            pub_key: Hex::from_string("0x02ee34d1ce8270cd236e9455d4ab9e756c4478779b1a20d7ce1c247af61ec2be3b".to_owned()).unwrap(),     address: "muta1mu4rq2mwvy2h4uss4al7u7ejj5rlcdmpeurh24".parse().unwrap(),
-            propose_weight: 1,
-            vote_weight:    1,
-        };
+           bls_pub_key: Hex::from_string("0x04102947214862a503c73904deb5818298a186d68c7907bb609583192a7de6331493835e5b8281f4d9ee705537c0e765580e06f86ddce5867812fceb42eecefd209f0eddd0389d6b7b0100f00fb119ef9ab23826c6ea09aadcc76fa6cea6a32724".to_owned()).unwrap(),
+           pub_key: Hex::from_string("0x02ef0cb0d7bc6c18b4bea1f5908d9106522b35ab3c399369605d4242525bda7e60".to_owned()).unwrap(),
+           address: "muta14e0lmgck835vm2dfm0w3ckv6svmez8fdgdl705".parse().unwrap(),
+           propose_weight: 1,
+           vote_weight:    1,
+       };
 
         let decoded = ValidatorExtend::decode_fixed(extend.encode_fixed().unwrap()).unwrap();
         assert_eq!(decoded, extend);

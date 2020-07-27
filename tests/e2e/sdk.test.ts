@@ -25,13 +25,13 @@ describe("API test via @mutadev/muta-sdk-js", () => {
   test("getNoneReceipt", async () => {
     let receipt = await mutaClient.getReceipt("0xf56924db538e77bb5951eb5ff0d02b88983c49c45eea30e8ae3e7234b311436c");
     expect(receipt).toBe(null);
-  })
+ })
 
-  test("transfer work", async () => {
-    const from_addr = "muta1mu4rq2mwvy2h4uss4al7u7ejj5rlcdmpeurh24";
-    const from_pk =
-      "0x02ee34d1ce8270cd236e9455d4ab9e756c4478779b1a20d7ce1c247af61ec2be3b";
-    const to_addr = "muta1cxfhds7zj4h5k4g659krpj6dqhmlawdvtj2uhl";
+ test("transfer work", async () => {
+   const from_addr = "muta14e0lmgck835vm2dfm0w3ckv6svmez8fdgdl705";
+   const from_pk =
+     "0x02ef0cb0d7bc6c18b4bea1f5908d9106522b35ab3c399369605d4242525bda7e60";
+   const to_addr = "muta15a8a9ksxe3hhjpw3l7wz7ry778qg8h9wz8y35p";
     const asset_id =
       "0xf56924db538e77bb5951eb5ff0d02b88983c49c45eea30e8ae3e7234b311436c";
 

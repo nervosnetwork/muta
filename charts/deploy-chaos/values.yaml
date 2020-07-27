@@ -13,7 +13,7 @@ resources:
   storage: 6Gi
   persistent: true
 
-chaos: 
+chaos:
   - all
 
 size: 4
@@ -42,5 +42,4 @@ chain_genesis:
     max_tx_size: 1073741824
   services:
     - name: asset
-      payload: { "id": "0xf56924db538e77bb5951eb5ff0d02b88983c49c45eea30e8ae3e7234b311436c", "name": "MutaToken", "symbol": "MT", "supply": 320000011, "issuer": "muta1mu4rq2mwvy2h4uss4al7u7ejj5rlcdmpeurh24" }
-
+      payload: { "id": "0xf56924db538e77bb5951eb5ff0d02b88983c49c45eea30e8ae3e7234b311436c", "name": "MutaToken", "symbol": "MT", "supply": 320000011, "issuer": "muta14e0lmgck835vm2dfm0w3ckv6svmez8fdgdl705" }

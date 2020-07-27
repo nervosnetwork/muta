@@ -12,7 +12,7 @@ use protocol::types::{
 };
 use protocol::Bytes;
 
-const ADDRESS_STR: &str = "muta1mu4rq2mwvy2h4uss4al7u7ejj5rlcdmpeurh24";
+const ADDRESS_STR: &str = "muta14e0lmgck835vm2dfm0w3ckv6svmez8fdgdl705";
 
 fn mock_signed_tx(tx_hash: Hash) -> SignedTransaction {
     let nonce = Hash::digest(Bytes::from("XXXX"));

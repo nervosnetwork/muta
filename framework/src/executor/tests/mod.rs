@@ -41,7 +41,7 @@ macro_rules! read {
     }};
 }
 
-pub const PUB_KEY_STR: &str = "031288a6788678c25952eba8693b2f278f66e2187004b64ac09416d07f83f96d5b";
+pub const PUB_KEY_STR: &str = "02ef0cb0d7bc6c18b4bea1f5908d9106522b35ab3c399369605d4242525bda7e60";
 
 #[test]
 fn test_create_genesis() {
@@ -72,14 +72,14 @@ fn test_create_genesis() {
         cycles_limit: std::u64::MAX,
         proposer:     Address::from_hash(Hash::from_empty()).unwrap(),
     };
-    let caller = Address::from_str("muta1mu4rq2mwvy2h4uss4al7u7ejj5rlcdmpeurh24").unwrap();
+    let caller = Address::from_str("muta14e0lmgck835vm2dfm0w3ckv6svmez8fdgdl705").unwrap();
     let request = TransactionRequest {
-        service_name: "asset".to_owned(),
-        method:       "get_balance".to_owned(),
-        payload:
-            r#"{"asset_id": "0xf56924db538e77bb5951eb5ff0d02b88983c49c45eea30e8ae3e7234b311436c", "user": "muta1mu4rq2mwvy2h4uss4al7u7ejj5rlcdmpeurh24"}"#
-                .to_owned(),
-    };
+       service_name: "asset".to_owned(),
+       method:       "get_balance".to_owned(),
+       payload:
+           r#"{"asset_id": "0xf56924db538e77bb5951eb5ff0d02b88983c49c45eea30e8ae3e7234b311436c", "user": "muta14e0lmgck835vm2dfm0w3ckv6svmez8fdgdl705"}"#
+               .to_owned(),
+   };
     let res = executor.read(&params, &caller, 1, &request).unwrap();
     let resp: GetBalanceResponse = serde_json::from_str(&res.succeed_data).unwrap();
 
@@ -390,7 +390,7 @@ fn test_commit_tx_hook_use_panic_tx() {
     let error_resp = executor.exec(Context::new(), &params, &txs);
     assert!(error_resp.is_err());
 
-    let caller = Address::from_str("muta1mu4rq2mwvy2h4uss4al7u7ejj5rlcdmpeurh24").unwrap();
+    let caller = Address::from_str("muta14e0lmgck835vm2dfm0w3ckv6svmez8fdgdl705").unwrap();
 
     let before = read!(executor, &params, &caller, r#""before""#);
     assert_eq!(before.succeed_data, r#""before""#);
@@ -439,7 +439,7 @@ fn test_tx_hook_before_panic() {
     let error_resp = executor.exec(Context::new(), &params, &txs);
     assert!(error_resp.is_err());
 
-    let caller = Address::from_str("muta1mu4rq2mwvy2h4uss4al7u7ejj5rlcdmpeurh24").unwrap();
+    let caller = Address::from_str("muta14e0lmgck835vm2dfm0w3ckv6svmez8fdgdl705").unwrap();
 
     let before = read!(executor, &params, &caller, r#""before""#);
     assert_eq!(before.succeed_data, r#""""#);
@@ -491,7 +491,7 @@ fn test_tx_hook_after_panic() {
     let error_resp = executor.exec(Context::new(), &params, &txs);
     assert!(error_resp.is_err());
 
-    let caller = Address::from_str("muta1mu4rq2mwvy2h4uss4al7u7ejj5rlcdmpeurh24").unwrap();
+    let caller = Address::from_str("muta14e0lmgck835vm2dfm0w3ckv6svmez8fdgdl705").unwrap();
 
     let before = read!(executor, &params, &caller, r#""before""#);
     assert_eq!(before.succeed_data, r#""before""#);

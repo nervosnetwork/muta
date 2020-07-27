@@ -7,28 +7,28 @@ payload = '''
 {
     "id": "0xf56924db538e77bb5951eb5ff0d02b88983c49c45eea30e8ae3e7234b311436c",
     "name": "HuobiToken",
-    "symbol": "HT",
-    "supply": 320000011,
-    "precision": 100000,
-    "issuer": "muta1mu4rq2mwvy2h4uss4al7u7ejj5rlcdmpeurh24",
-    "fee_account": "muta1cxfhds7zj4h5k4g659krpj6dqhmlawdvtj2uhl",
-    "fee": 10,
-    "admin": "muta1mu4rq2mwvy2h4uss4al7u7ejj5rlcdmpeurh24",
-    "relayable": true
+   "symbol": "HT",
+   "supply": 320000011,
+   "precision": 100000,
+   "issuer": "muta14e0lmgck835vm2dfm0w3ckv6svmez8fdgdl705",
+   "fee_account": "muta15a8a9ksxe3hhjpw3l7wz7ry778qg8h9wz8y35p",
+   "fee": 10,
+   "admin": "muta14e0lmgck835vm2dfm0w3ckv6svmez8fdgdl705",
+   "relayable": true
 }
 '''
 
 # private key of this admin:
-# e05d9e08a18cf5573a92d030342c3b45395cd952e02346ba78e16421ee9dad88
+# 5ec982173d54d830b6789cbbbe43eaa2853a5ff752d1ebc1b266cf9790314f8a
 [[services]]
 name = "governance"
 payload = '''
 {
-    "info": {
-        "admin": "muta1mu4rq2mwvy2h4uss4al7u7ejj5rlcdmpeurh24",
-        "tx_failure_fee": 10,
-        "tx_floor_fee": 20,
-        "profit_deduct_rate_per_million": 3,
+   "info": {
+       "admin": "muta14e0lmgck835vm2dfm0w3ckv6svmez8fdgdl705",
+       "tx_failure_fee": 10,
+       "tx_floor_fee": 20,
+       "profit_deduct_rate_per_million": 3,
         "tx_fee_discount": [
             {
                 "threshold": 1000,
@@ -43,10 +43,10 @@ payload = '''
                 "discount_percent": 50
             }
         ],
-        "miner_benefit": 10
-    },
-    "tx_fee_inlet_address": "muta1cxfhds7zj4h5k4g659krpj6dqhmlawdvtj2uhl",
-    "miner_profit_outlet_address": "muta1mu4rq2mwvy2h4uss4al7u7ejj5rlcdmpeurh24",
-    "miner_charge_map": []
+       "miner_benefit": 10
+   },
+   "tx_fee_inlet_address": "muta15a8a9ksxe3hhjpw3l7wz7ry778qg8h9wz8y35p",
+   "miner_profit_outlet_address": "muta14e0lmgck835vm2dfm0w3ckv6svmez8fdgdl705",
+   "miner_charge_map": []
 }
 '''

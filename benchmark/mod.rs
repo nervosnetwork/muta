@@ -22,11 +22,11 @@ use asset::AssetService;
 use governance::GovernanceService;
 
 lazy_static::lazy_static! {
-    pub static ref ADMIN_ACCOUNT: Address = Address::from_str("muta1mu4rq2mwvy2h4uss4al7u7ejj5rlcdmpeurh24").unwrap();
-    pub static ref FEE_ACCOUNT: Address = Address::from_str("muta1mu4rq2mwvy2h4uss4al7u7ejj5rlcdmpeurh24").unwrap();
-    pub static ref FEE_INLET_ACCOUNT: Address = Address::from_str("muta1cxfhds7zj4h5k4g659krpj6dqhmlawdvtj2uhl").unwrap();
-    pub static ref PROPOSER_ACCOUNT: Address = Address::from_str("muta1xzwm48kcp3gn72tgqn8ttw8wzek09mu96jpgtx").unwrap();
-    pub static ref NATIVE_ASSET_ID: Hash = Hash::from_hex("0xf56924db538e77bb5951eb5ff0d02b88983c49c45eea30e8ae3e7234b311436c").unwrap();
+   pub static ref ADMIN_ACCOUNT: Address = Address::from_str("muta14e0lmgck835vm2dfm0w3ckv6svmez8fdgdl705").unwrap();
+   pub static ref FEE_ACCOUNT: Address = Address::from_str("muta14e0lmgck835vm2dfm0w3ckv6svmez8fdgdl705").unwrap();
+   pub static ref FEE_INLET_ACCOUNT: Address = Address::from_str("muta15a8a9ksxe3hhjpw3l7wz7ry778qg8h9wz8y35p").unwrap();
+   pub static ref PROPOSER_ACCOUNT: Address = Address::from_str("muta1h99h6f54vytatam3ckftrmvcdpn4jlmnwm6hl0").unwrap();
+   pub static ref NATIVE_ASSET_ID: Hash = Hash::from_hex("0xf56924db538e77bb5951eb5ff0d02b88983c49c45eea30e8ae3e7234b311436c").unwrap();
 }
 
 macro_rules! benchmark {

@@ -15,7 +15,7 @@ use std::{
 };
 
 const NUMBER_OF_TXS_PER_ROUND: usize = 15_000; // 1.5W, 2.5M
-const ADDRESS_STR: &str = "muta1mu4rq2mwvy2h4uss4al7u7ejj5rlcdmpeurh24";
+const ADDRESS_STR: &str = "muta14e0lmgck835vm2dfm0w3ckv6svmez8fdgdl705";
 
 #[tokio::main]
 pub async fn main() {

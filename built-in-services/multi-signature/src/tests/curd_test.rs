@@ -12,7 +12,7 @@ use super::*;
 #[test]
 fn test_generate_multi_signature() {
     let cycles_limit = 1024 * 1024 * 1024; // 1073741824
-    let caller = Address::from_str("muta1mu4rq2mwvy2h4uss4al7u7ejj5rlcdmpeurh24").unwrap();
+    let caller = Address::from_str("muta14e0lmgck835vm2dfm0w3ckv6svmez8fdgdl705").unwrap();
     let context = mock_context(cycles_limit, caller);
 
     let mut service = new_multi_signature_service();

@@ -6,49 +6,54 @@ name = "asset"
 payload = '''
 {
     "id": "0xf56924db538e77bb5951eb5ff0d02b88983c49c45eea30e8ae3e7234b311436c",
-    "name": "MutaToken",
-    "symbol": "MT",
-    "supply": 320000011,
-    "issuer": "muta1mu4rq2mwvy2h4uss4al7u7ejj5rlcdmpeurh24"
+   "name": "MutaToken",
+   "symbol": "MT",
+   "supply": 320000011,
+   "issuer": "muta14e0lmgck835vm2dfm0w3ckv6svmez8fdgdl705"
 }
 '''
 
+# private keys:
+# 0x5ec982173d54d830b6789cbbbe43eaa2853a5ff752d1ebc1b266cf9790314f8a
+# 0x8dfbd3c689308d29c058cce163984a2ae8d5fc5191ce6b1e18bd1d7b95a8c632
+# 0xfc659f0ed09a4ba0d2d1836af7520d1a050a7739d598dc98517bbbe7a2e38124
+# 0x7c01d6539419cffc78ab0779dabe88fad3f70c20ef47a562ac4ba5b7bd704b8e
 [[services]]
 name = "metadata"
 payload = '''
 {
     "chain_id": "0xb6a4d7da21443f5e816e8700eea87610e6d769657d6b8ec73028457bf2ca4036",
-    "common_ref": "0x68555146426b4c424546",
+    "common_ref": "0x6c747758636859487038",
     "timeout_gap": 20,
     "cycles_limit": 999999999999,
     "cycles_price": 1,
     "interval": 3000,
     "verifier_list": [
+       {
+           "bls_pub_key": "0x04102947214862a503c73904deb5818298a186d68c7907bb609583192a7de6331493835e5b8281f4d9ee705537c0e765580e06f86ddce5867812fceb42eecefd209f0eddd0389d6b7b0100f00fb119ef9ab23826c6ea09aadcc76fa6cea6a32724",
+           "pub_key": "0x02ef0cb0d7bc6c18b4bea1f5908d9106522b35ab3c399369605d4242525bda7e60",
+           "address": "muta14e0lmgck835vm2dfm0w3ckv6svmez8fdgdl705",
+           "propose_weight": 1,
+           "vote_weight": 1
+       },
         {
-            "bls_pub_key": "0x040c49fc3191406e86defff7c4d5f5a177acc758f24aaf5b820ff298260c6a994b7df3c2b5cd472466641db41f43f02f8109199b2fade972a85a6086a3b264280f034f3e307219950259d195de2f33e132c4e9cb8b5e9cc33f5b649a63e0a4dcba",
-            "pub_key": "0x02ee34d1ce8270cd236e9455d4ab9e756c4478779b1a20d7ce1c247af61ec2be3b",
-            "address": "muta1mu4rq2mwvy2h4uss4al7u7ejj5rlcdmpeurh24",
+            "bls_pub_key": "0x0418e16bd67ce0b58a575f506967706be733c96feef19a06bb37d510000d89905f2f61b7da4d831cb1bb01e2f99833362602a0a252dfd1e95c75c1eadb0db220e3722c9a077b730e7f6cec5f4a55bfc9a4d88db3e6c27684aa8335456824070501",
+            "pub_key": "0x03dbd1dbf3835efb4ec34a360ee671ee1d22425425368edfc5b9ffafc812e86200",
+            "address": "muta15a8a9ksxe3hhjpw3l7wz7ry778qg8h9wz8y35p",
             "propose_weight": 1,
             "vote_weight": 1
         },
         {
-            "bls_pub_key": "0x040a9672523700e34ea6c347f46aa08a887bf8c909f5104ad8f06296cc9518968bedef2d5eee919228eb7dd3fbfb5f09e6131cbf53409d1ed83ca470af5536140e4b213e9d9318c11437abc98da38d4631bd353b5ef73293a32ab4b0e1e8df073f",
-            "pub_key": "0x03d7a5df7f0f5e086db991606fcf3f85ce74120e455c6b4046894bd51ec5ff1dd6",
-            "address": "muta1cxfhds7zj4h5k4g659krpj6dqhmlawdvtj2uhl",
+            "bls_pub_key": "0x040944276f414c46330227f2c0c5a998aba3d400ed19cfc2d31d3e7fcc442ce9f91ea86e172dc3c1b6cedc364bd52ba1cf074529e52337cd80ab32a196a3d42ab46eee25120b44fdd2b5c4268bf3b84c72d068ea83d0530a5461dc30b6a63a60e9",
+            "pub_key": "0x03cba4ae147eb24891d78c9527798577419b7db913b4b03ba548c28f40c5841166",
+            "address": "muta1h99h6f54vytatam3ckftrmvcdpn4jlmnwm6hl0",
             "propose_weight": 1,
             "vote_weight": 1
         },
         {
-            "bls_pub_key": "0x0408a17e64561d452db78d064255391fe4bd909804e427a4e91804376c472cd228c357c23ebad2b006400c434248dfd6bb0662a8b595c5e0b6ac41eae96a31e20fd983a7a022b3f00fc6354051f842c3add7afda6dbd1d6ae1fd385a17e18081f2",
-            "pub_key": "0x0202685aba390610f902880a4e01464953bb5d81ad51318800e66b4fe2721590e9",
-            "address": "muta1xzwm48kcp3gn72tgqn8ttw8wzek09mu96jpgtx",
-            "propose_weight": 1,
-            "vote_weight": 1
-        },
-        {
-            "bls_pub_key": "0x040228bfc1d23fa5adc8ad580dda3f3fa55e30fedab2a2c793f0ea13261ea22b42c325e135cc47b202ae704cdf4096af080616d38990f1902bdc0c2ce8a0d5d5eb49c8297a40bff81618f035ef497dede1aa5b14b29045f42630cab2f51b75bb62",
-            "pub_key": "0x030766fdbd9db18e9d4bfee2dfa14ca22c055944f6e38ce8a781db0d6d35585ee6",
-            "address": "muta1ktadyyuwzkacv5t6yepst9h086qnz33fk6d4u0",
+            "bls_pub_key": "0x041342e9a35278b298a67006cd98d663053e3f7eb72a08ffe9835074e430b2112a866c1c8d981edcd793cb16d459fc952b0464007d876355eea671e74727588bae69740c6a0b49d8142b7b0821a78acd34b4d8012b9ef69444a476e03d5fea5330",
+            "pub_key": "0x0245a0c291f56c2c5751db1c0bf1ed986e703d29a0fe023df770fe92c7c2347316",
+            "address": "muta16xukzz73l5r6vulk9q697tave8c5mfu33mwud6",
             "propose_weight": 1,
             "vote_weight": 1
         }

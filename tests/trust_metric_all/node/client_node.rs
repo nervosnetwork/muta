@@ -303,7 +303,7 @@ fn full_node_peer_id() -> PeerId {
 fn mock_block(height: u64) -> Block {
     let block_hash = Hash::digest(Bytes::from("22"));
     let nonce = Hash::digest(Bytes::from("33"));
-    let addr_str = "muta1mu4rq2mwvy2h4uss4al7u7ejj5rlcdmpeurh24";
+    let addr_str = "muta14e0lmgck835vm2dfm0w3ckv6svmez8fdgdl705";
 
     let proof = Proof {
         height: 0,
