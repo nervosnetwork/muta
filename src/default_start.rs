@@ -1,17 +1,17 @@
 use std::collections::HashMap;
 use std::convert::TryFrom;
-use std::sync::Arc;
-use std::time::Duration;
 use std::panic;
+use std::sync::Arc;
 use std::thread;
+use std::time::Duration;
 
 use backtrace::Backtrace;
 use bytes::Bytes;
+use futures::stream::StreamExt;
 use futures::{future, lock::Mutex};
 use futures_timer::Delay;
 #[cfg(unix)]
 use tokio::signal::unix::{self as os_impl};
-use futures::stream::StreamExt;
 
 use common_crypto::{
     BlsCommonReference, BlsPrivateKey, BlsPublicKey, PublicKey, Secp256k1, Secp256k1PrivateKey,
@@ -566,7 +566,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         panic_log(info);
         panic_sender.try_send(()).expect("panic_receiver is droped");
     }));
-    
+
     tokio::select! {
         _ = exec_handler =>{log::error!("exec_daemon is down, quit.")},
         _ = ctrl_c_handler =>{log::info!("ctrl + c is pressed, quit.")},
