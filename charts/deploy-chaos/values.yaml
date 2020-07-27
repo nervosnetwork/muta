@@ -8,10 +8,10 @@ repo_name: muta
 version: latest
 
 resources:
-  cpu: 1Gi
+  cpu: 1100m
   memory: 4Gi
   storage: 6Gi
-  persistent: false
+  persistent: true
 
 chaos: 
   - all

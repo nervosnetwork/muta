@@ -7,7 +7,7 @@ pipelineConfig:
           image: mutadev/muta-build-env:v0.3.0
         options:
           timeout:
-            time: 180 # 2H
+            time: 180 # 3H
             unit: minutes
         stages:
           - name: chaos
@@ -75,7 +75,7 @@ pipelineConfig:
                   - size=${NODE_SIZE},repo_name=${REPO_NAME},version=pr-${PULL_NUMBER}-${BUILD_NUMBER},resources.cpu=1100m,resources.memory=8Gi,chain_genesis.metadata.timeout_gap=${CHAIN_GENESIS_TIMEOUT_GAP}
               
               - name: watchdog
-                image: mutadev/muta-watchdog:v0.1.10
+                image: mutadev/muta-watchdog:v0.1.11
                 env:
                   - name: WATCH_DURATION
                     value: 1H
