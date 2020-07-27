@@ -577,8 +577,8 @@ where
         let timestamp = block.header.timestamp;
         let current_timestamp = time_now();
         let consensus_interval = previous_metadata.interval;
-        
-        // The last block timestamp should be less than proposal timestamp.
+
+        // The previous block timestamp should be less than proposal timestamp.
         if previous_block.header.timestamp > timestamp {
             return Err(ConsensusError::InvalidTimestamp.into());
         }
