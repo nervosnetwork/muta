@@ -560,10 +560,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
 
     // register channel of panic
     let (panic_sender, mut panic_receiver) = tokio::sync::mpsc::channel::<()>(1);
-    // let panic_receiver = Pin::new(panic_receiver);
-    // let (panic_sender, panic_receiver) = sync::mpsc::channel::<()>(1);
-    // let mut panic_handler = PanicShutdownHandle::new();
-    // let mut panic_sender = panic_handler.sender.clone();
+
     panic::set_hook(Box::new(move |info: &panic::PanicInfo| {
         let mut panic_sender = panic_sender.clone();
         panic_log(info);
