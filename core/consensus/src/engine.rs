@@ -32,7 +32,7 @@ use crate::message::{
     END_GOSSIP_SIGNED_VOTE,
 };
 use crate::status::StatusAgent;
-use crate::util::{check_list_roots, time_now, digest_signed_transactions, OverlordCrypto};
+use crate::util::{check_list_roots, digest_signed_transactions, time_now, OverlordCrypto};
 use crate::wal::SignedTxsWAL;
 use crate::ConsensusError;
 

@@ -572,8 +572,8 @@ where
                 (address, node)
             })
             .collect::<HashMap<_, _>>();
-        
-         // verify block timestamp.
+
+        // verify block timestamp.
         let timestamp = block.header.timestamp;
         let current_timestamp = time_now();
         let consensus_interval = previous_metadata.interval;
@@ -995,16 +995,20 @@ where
     }
 }
 
-fn validate_timestamp(current_timestamp: u64, proposal_timestamp: u64, consensus_interval: u64) -> bool {
+fn validate_timestamp(
+    current_timestamp: u64,
+    proposal_timestamp: u64,
+    consensus_interval: u64,
+) -> bool {
     // this node timestamp should be longer than the proposal timestamp
     if proposal_timestamp > current_timestamp {
-        return false
+        return false;
     }
 
     // The interval between the two should not be greater than 'consensus_time'.
     let time_gap = current_timestamp - proposal_timestamp;
     if time_gap > consensus_interval {
-        return false
+        return false;
     }
 
     true
@@ -1052,7 +1056,7 @@ mod tests {
         // current 10 < proposal 11. false
         assert_eq!(validate_timestamp(10, 11, consensus_interval), false);
 
-         // current 10 == proposal 10. true
+        // current 10 == proposal 10. true
         assert_eq!(validate_timestamp(10, 10, consensus_interval), false);
 
         // (current 20 > proposal 9) > consensus_interval false
