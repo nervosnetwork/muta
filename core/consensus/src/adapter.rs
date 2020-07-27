@@ -1057,12 +1057,12 @@ mod tests {
         assert_eq!(validate_timestamp(10, 11, consensus_interval), false);
 
         // current 10 == proposal 10. true
-        assert_eq!(validate_timestamp(10, 10, consensus_interval), false);
+        assert_eq!(validate_timestamp(10, 10, consensus_interval), true);
 
         // (current 20 > proposal 9) > consensus_interval false
         assert_eq!(validate_timestamp(20, 9, consensus_interval), false);
 
-        // (current 20 > proposal 10) == consensus_interval false
+        // (current 20 > proposal 10) == consensus_interval true
         assert_eq!(validate_timestamp(20, 10, consensus_interval), true);
 
         // (current 20 == proposal 11) < consensus_interval true
