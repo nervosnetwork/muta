@@ -29,6 +29,7 @@ byteorder = "1.3"
 muta-codec-derive = "0.2"
 ophelia = "0.3"
 ophelia-secp256k1 = "0.3"
+bech32 = "0.7"
 
 [dev-dependencies]
 rayon = "1.3"
