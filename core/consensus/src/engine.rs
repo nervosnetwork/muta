@@ -195,18 +195,11 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
                 .await?;
 
             // verify block timestamp.
-            let timestamp = block.inner.block.header.timestamp;
-            let current_timestamp = time_now();
-            let consensus_interval = previous_metadata.interval;
-
-            // The previous block timestamp should be less than proposal timestamp.
-            if previous_block.header.timestamp > timestamp {
-                return Err(ConsensusError::InvalidTimestamp.into());
-            }
-
-            if !validate_timestamp(current_timestamp, timestamp, consensus_interval) {
-                return Err(ConsensusError::InvalidTimestamp.into());
-            }
+            self.validate_proposal_timestamp(
+                ctx.clone(),
+                &previous_block,
+                block.inner.block.header.timestamp,
+            )?;
 
             self.adapter
                 .verify_proof(
@@ -781,6 +774,34 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
         Ok(())
     }
 
+    fn validate_proposal_timestamp(
+        &self,
+        ctx: Context,
+        previous_block: &Block,
+        proposal_timestamp: u64,
+    ) -> ProtocolResult<()> {
+        let current_timestamp = time_now();
+        let previous_metadata = self.adapter.get_metadata(
+            ctx,
+            previous_block.header.state_root.clone(),
+            previous_block.header.height,
+            previous_block.header.timestamp,
+            previous_block.header.proposer.clone(),
+        )?;
+        let consensus_interval = previous_metadata.interval;
+
+        // The previous block timestamp should be less than proposal timestamp.
+        if previous_block.header.timestamp > proposal_timestamp {
+            return Err(ConsensusError::InvalidTimestamp.into());
+        }
+
+        if !validate_timestamp(current_timestamp, proposal_timestamp, consensus_interval) {
+            return Err(ConsensusError::InvalidTimestamp.into());
+        }
+
+        Ok(())
+    }
+
     #[cfg(test)]
     pub fn get_current_status(&self) -> crate::status::CurrentConsensusStatus {
         self.status_agent.to_inner()
@@ -820,4 +841,51 @@ async fn sync_txs<CA: ConsensusAdapter>(
     propose_hashes: Vec<Hash>,
 ) -> ProtocolResult<()> {
     adapter.sync_txs(ctx, propose_hashes).await
+}
+
+fn validate_timestamp(
+    current_timestamp: u64,
+    proposal_timestamp: u64,
+    consensus_interval: u64,
+) -> bool {
+    // this node timestamp should be longer than the proposal timestamp
+    if proposal_timestamp > current_timestamp {
+        return false;
+    }
+
+    // The interval between the two should not be greater than 'consensus_time'.
+    let time_gap = current_timestamp - proposal_timestamp;
+    if time_gap > consensus_interval {
+        return false;
+    }
+
+    true
+}
+
+#[cfg(test)]
+mod tests {
+    use super::validate_timestamp;
+
+    #[test]
+    fn test_validate_timestamp() {
+        let consensus_interval = 10;
+
+        // current 10 > proposal 1 > true
+        assert_eq!(validate_timestamp(10, 1, consensus_interval), true);
+
+        // current 10 < proposal 11. false
+        assert_eq!(validate_timestamp(10, 11, consensus_interval), false);
+
+        // current 10 == proposal 10. true
+        assert_eq!(validate_timestamp(10, 10, consensus_interval), true);
+
+        // (current 20 > proposal 9) > consensus_interval false
+        assert_eq!(validate_timestamp(20, 9, consensus_interval), false);
+
+        // (current 20 > proposal 10) == consensus_interval true
+        assert_eq!(validate_timestamp(20, 10, consensus_interval), true);
+
+        // (current 20 == proposal 11) < consensus_interval true
+        assert_eq!(validate_timestamp(20, 11, consensus_interval), true);
+    }
 }
