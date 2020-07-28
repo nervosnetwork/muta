@@ -459,13 +459,12 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
     /// Only signed vote will be transmit to the relayer.
     #[muta_apm::derive::tracing_span(
         kind = "consensus.engine",
-        logs = "{'address':
-    'Address::from_bytes(addr.clone()).unwrap().as_hex()'}"
+        logs = "{'pub_key': 'hex::encode(pub_key.clone())'}"
     )]
     async fn transmit_to_relayer(
         &self,
         ctx: Context,
-        addr: Bytes,
+        pub_key: Bytes,
         msg: OverlordMsg<FixedPill>,
     ) -> Result<(), Box<dyn Error + Send>> {
         match msg {
@@ -476,7 +475,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
                         ctx,
                         msg,
                         END_GOSSIP_SIGNED_VOTE,
-                        MessageTarget::Specified(Address::from_bytes(addr)?),
+                        MessageTarget::Specified(pub_key),
                     )
                     .await?;
             }
@@ -487,7 +486,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
                         ctx,
                         msg,
                         END_GOSSIP_AGGREGATED_VOTE,
-                        MessageTarget::Specified(Address::from_bytes(addr)?),
+                        MessageTarget::Specified(pub_key),
                     )
                     .await?;
             }
@@ -526,7 +525,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             .verifier_list
             .into_iter()
             .map(|v| Node {
-                address:        v.address.as_bytes(),
+                address:        v.pub_key.decode(),
                 propose_weight: v.propose_weight,
                 vote_weight:    v.vote_weight,
             })
@@ -729,6 +728,13 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
             metadata.max_tx_size,
         );
 
+        let pub_keys = metadata
+            .verifier_list
+            .iter()
+            .map(|v| v.pub_key.decode())
+            .collect();
+        self.adapter.tag_consensus(Context::new(), pub_keys)?;
+
         let block_hash = Hash::digest(block.header.encode_fixed()?);
 
         if block.header.height != proof.height {
@@ -770,7 +776,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
 pub fn generate_new_crypto_map(metadata: Metadata) -> ProtocolResult<HashMap<Bytes, BlsPublicKey>> {
     let mut new_addr_pubkey_map = HashMap::new();
     for validator in metadata.verifier_list.into_iter() {
-        let addr = validator.address.as_bytes();
+        let addr = validator.pub_key.decode();
         let hex_pubkey = hex::decode(validator.bls_pub_key.as_string_trim0x()).map_err(|err| {
             ConsensusError::Other(format!("hex decode metadata bls pubkey error {:?}", err))
         })?;
@@ -785,7 +791,7 @@ fn covert_to_overlord_authority(validators: &[Validator]) -> Vec<Node> {
     let mut authority = validators
         .iter()
         .map(|v| Node {
-            address:        v.address.as_bytes(),
+            address:        v.pub_key.clone(),
             propose_weight: v.propose_weight,
             vote_weight:    v.vote_weight,
         })

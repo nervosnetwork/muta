@@ -1,11 +1,15 @@
-use std::{error::Error, fmt::Debug};
+use std::{
+    error::Error,
+    fmt::Debug,
+    hash::{Hash, Hasher},
+};
 
 use async_trait::async_trait;
 use bytes::Bytes;
 use derive_more::Display;
 use serde::{Deserialize, Serialize};
 
-use crate::{traits::Context, types::Address, ProtocolError, ProtocolErrorKind, ProtocolResult};
+use crate::{traits::Context, ProtocolError, ProtocolErrorKind, ProtocolResult};
 
 #[derive(Debug)]
 pub enum Priority {
@@ -25,6 +29,59 @@ pub enum TrustFeedback {
     Neutral,
     #[display(fmt = "good")]
     Good,
+}
+
+#[derive(Debug, Display, Clone)]
+pub enum PeerTag {
+    #[display(fmt = "consensus")]
+    Consensus,
+    #[display(fmt = "always allow")]
+    AlwaysAllow,
+    #[display(fmt = "banned, until {}", until)]
+    Ban { until: u64 }, // timestamp
+    #[display(fmt = "{}", _0)]
+    Custom(String), // TODO: Hide custom constructor
+}
+
+impl PeerTag {
+    pub fn ban(until: u64) -> Self {
+        PeerTag::Ban { until }
+    }
+
+    pub fn ban_key() -> Self {
+        PeerTag::Ban { until: 0 }
+    }
+
+    pub fn custom<S: AsRef<str>>(s: S) -> Result<Self, ()> {
+        let custom_str = s.as_ref();
+        match custom_str {
+            "consensus" | "always_allow" | "ban" => Err(()),
+            _ => Ok(PeerTag::Custom(custom_str.to_owned())),
+        }
+    }
+
+    pub fn str(&self) -> &str {
+        match self {
+            PeerTag::Consensus => "consensus",
+            PeerTag::AlwaysAllow => "always_allow",
+            PeerTag::Ban { .. } => "ban",
+            PeerTag::Custom(str) => str,
+        }
+    }
+}
+
+impl PartialEq for PeerTag {
+    fn eq(&self, other: &PeerTag) -> bool {
+        self.str() == other.str()
+    }
+}
+
+impl Eq for PeerTag {}
+
+impl Hash for PeerTag {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.str().hash(state)
+    }
 }
 
 #[async_trait]
@@ -68,16 +125,17 @@ pub trait Gossip: Send + Sync {
     where
         M: MessageCodec;
 
-    async fn users_cast<M>(
+    async fn multicast<'a, M, P>(
         &self,
         cx: Context,
         end: &str,
-        users: Vec<Address>,
+        peer_ids: P,
         msg: M,
         p: Priority,
     ) -> ProtocolResult<()>
     where
-        M: MessageCodec;
+        M: MessageCodec,
+        P: AsRef<[Bytes]> + Send + 'a;
 }
 
 #[async_trait]
@@ -96,6 +154,12 @@ pub trait Rpc: Send + Sync {
     ) -> ProtocolResult<()>
     where
         M: MessageCodec;
+}
+
+pub trait Network: Send + Sync {
+    fn tag(&self, ctx: Context, peer_id: Bytes, tag: PeerTag) -> ProtocolResult<()>;
+    fn untag(&self, ctx: Context, peer_id: Bytes, tag: &PeerTag) -> ProtocolResult<()>;
+    fn tag_consensus(&self, ctx: Context, peer_ids: Vec<Bytes>) -> ProtocolResult<()>;
 }
 
 pub trait PeerTrust: Send + Sync {

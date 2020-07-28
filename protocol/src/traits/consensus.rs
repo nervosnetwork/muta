@@ -13,12 +13,13 @@ use crate::{traits::mempool::MixedTxHashes, ProtocolResult};
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum MessageTarget {
     Broadcast,
-    Specified(Address),
+    Specified(Bytes),
 }
 
 #[derive(Debug, Clone)]
 pub struct NodeInfo {
     pub chain_id:     Hash,
+    pub self_pub_key: Bytes,
     pub self_address: Address,
 }
 
@@ -127,6 +128,8 @@ pub trait CommonConsensusAdapter: Send + Sync {
         proposer: Address,
     ) -> ProtocolResult<Metadata>;
 
+    fn tag_consensus(&self, ctx: Context, peer_ids: Vec<Bytes>) -> ProtocolResult<()>;
+
     fn report_bad(&self, ctx: Context, feedback: TrustFeedback);
 
     fn set_args(&self, context: Context, timeout_gap: u64, cycles_limit: u64, max_tx_size: u64);
@@ -144,7 +147,7 @@ pub trait CommonConsensusAdapter: Send + Sync {
         vote_pubkeys: Vec<Hex>,
     ) -> ProtocolResult<()>;
 
-    fn verity_proof_weight(
+    fn verify_proof_weight(
         &self,
         ctx: Context,
         block_height: u64,

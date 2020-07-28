@@ -16,11 +16,12 @@ use futures::{
 use log::{debug, error, info};
 use protocol::{
     traits::{
-        Context, Gossip, MessageCodec, MessageHandler, PeerTrust, Priority, Rpc, TrustFeedback,
+        Context, Gossip, MessageCodec, MessageHandler, Network, PeerTag, PeerTrust, Priority, Rpc,
+        TrustFeedback,
     },
-    types::Address,
-    ProtocolResult,
+    Bytes, ProtocolResult,
 };
+use tentacle::secio::PeerId;
 
 #[cfg(feature = "diagnostic")]
 use crate::peer_manager::diagnostic::{Diagnostic, DiagnosticHookFn};
@@ -36,15 +37,13 @@ use crate::{
     message::RawSessionMessage,
     metrics::Metrics,
     outbound::{NetworkGossip, NetworkRpc},
-    peer_manager::{
-        DiscoveryAddrManager, IdentifyCallback, PeerManager, PeerManagerConfig, SharedSessions,
-    },
+    peer_manager::{PeerManager, PeerManagerConfig, PeerManagerHandle, SharedSessions},
     protocols::CoreProtocol,
     reactor::{MessageRouter, Reactor},
     rpc_map::RpcMap,
     selfcheck::SelfCheck,
     traits::NetworkContext,
-    NetworkConfig,
+    NetworkConfig, PeerIdExt,
 };
 
 #[derive(Clone)]
@@ -52,6 +51,7 @@ pub struct NetworkServiceHandle {
     gossip:     NetworkGossip<ConnectionServiceControl<CoreProtocol, SharedSessions>, Snappy>,
     rpc:        NetworkRpc<ConnectionServiceControl<CoreProtocol, SharedSessions>, Snappy>,
     peer_trust: UnboundedSender<PeerManagerEvent>,
+    peer_state: PeerManagerHandle,
 
     #[cfg(feature = "diagnostic")]
     pub diagnostic: Diagnostic,
@@ -66,18 +66,19 @@ impl Gossip for NetworkServiceHandle {
         self.gossip.broadcast(cx, end, msg, p).await
     }
 
-    async fn users_cast<M>(
+    async fn multicast<'a, M, P>(
         &self,
         cx: Context,
         end: &str,
-        users: Vec<Address>,
+        peer_ids: P,
         msg: M,
         p: Priority,
     ) -> ProtocolResult<()>
     where
         M: MessageCodec,
+        P: AsRef<[Bytes]> + Send + 'a,
     {
-        self.gossip.users_cast(cx, end, users, msg, p).await
+        self.gossip.multicast(cx, end, peer_ids, msg, p).await
     }
 }
 
@@ -129,6 +130,32 @@ impl PeerTrust for NetworkServiceHandle {
     }
 }
 
+impl Network for NetworkServiceHandle {
+    fn tag(&self, _: Context, peer_id: Bytes, tag: PeerTag) -> ProtocolResult<()> {
+        let peer_id = <PeerId as PeerIdExt>::from_bytes(peer_id)?;
+        self.peer_state.tag(&peer_id, tag)?;
+
+        Ok(())
+    }
+
+    fn untag(&self, _: Context, peer_id: Bytes, tag: &PeerTag) -> ProtocolResult<()> {
+        let peer_id = <PeerId as PeerIdExt>::from_bytes(peer_id)?;
+        self.peer_state.untag(&peer_id, tag);
+
+        Ok(())
+    }
+
+    fn tag_consensus(&self, _: Context, peer_ids: Vec<Bytes>) -> ProtocolResult<()> {
+        let peer_ids = peer_ids
+            .into_iter()
+            .map(<PeerId as PeerIdExt>::from_bytes)
+            .collect::<Result<Vec<_>, _>>()?;
+        self.peer_state.tag_consensus(peer_ids);
+
+        Ok(())
+    }
+}
+
 enum NetworkConnectionService {
     NoListen(ConnectionService<CoreProtocol>), // no listen address yet
     Ready(ConnectionService<CoreProtocol>),
@@ -153,9 +180,10 @@ pub struct NetworkService {
     rpc_map: Arc<RpcMap>,
 
     // Core service
-    net_conn_srv: Option<NetworkConnectionService>,
-    peer_mgr:     Option<PeerManager>,
-    router:       Option<MessageRouter<Snappy, SharedSessions>>,
+    net_conn_srv:    Option<NetworkConnectionService>,
+    peer_mgr:        Option<PeerManager>,
+    peer_mgr_handle: PeerManagerHandle,
+    router:          Option<MessageRouter<Snappy, SharedSessions>>,
 
     // Metrics
     metrics: Option<Metrics<SharedSessions>>,
@@ -202,12 +230,10 @@ impl NetworkService {
 
         // Build service protocol
         let disc_sync_interval = config.discovery_sync_interval;
-        let disc_addr_mgr = DiscoveryAddrManager::new(peer_mgr_handle.clone(), mgr_tx.clone());
-        let ident_callback = IdentifyCallback::new(peer_mgr_handle, mgr_tx.clone());
         let proto = CoreProtocol::build()
             .ping(config.ping_interval, config.ping_timeout, mgr_tx.clone())
-            .identify(ident_callback)
-            .discovery(disc_addr_mgr, disc_sync_interval)
+            .identify(peer_mgr_handle.clone(), mgr_tx.clone())
+            .discovery(peer_mgr_handle.clone(), mgr_tx.clone(), disc_sync_interval)
             .transmitter(raw_msg_tx.clone())
             .build();
 
@@ -252,6 +278,7 @@ impl NetworkService {
 
             net_conn_srv: Some(NetworkConnectionService::NoListen(conn_srv)),
             peer_mgr: Some(peer_mgr),
+            peer_mgr_handle,
             router: Some(router),
 
             metrics: Some(metrics),
@@ -325,10 +352,15 @@ impl NetworkService {
             gossip:     self.gossip.clone(),
             rpc:        self.rpc.clone(),
             peer_trust: self.mgr_tx.clone(),
+            peer_state: self.peer_mgr_handle.clone(),
 
             #[cfg(feature = "diagnostic")]
             diagnostic:                                self.diagnostic.clone(),
         }
+    }
+
+    pub fn peer_id(&self) -> PeerId {
+        self.config.secio_keypair.peer_id()
     }
 
     pub async fn listen(&mut self, socket_addr: SocketAddr) -> ProtocolResult<()> {

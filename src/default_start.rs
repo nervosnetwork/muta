@@ -38,11 +38,11 @@ use core_mempool::{
     DefaultMemPoolAdapter, HashMemPool, MsgPushTxs, NewTxsHandler, PullTxsHandler,
     END_GOSSIP_NEW_TXS, RPC_PULL_TXS, RPC_RESP_PULL_TXS, RPC_RESP_PULL_TXS_SYNC,
 };
-use core_network::{NetworkConfig, NetworkService};
+use core_network::{NetworkConfig, NetworkService, PeerId, PeerIdExt};
 use core_storage::{adapter::rocks::RocksAdapter, ImplStorage, StorageError};
 use framework::binding::state::RocksTrieDB;
 use framework::executor::{ServiceExecutor, ServiceExecutorFactory};
-use protocol::traits::{APIAdapter, Context, MemPool, NodeInfo, ServiceMapping, Storage};
+use protocol::traits::{APIAdapter, Context, MemPool, Network, NodeInfo, ServiceMapping, Storage};
 use protocol::types::{Address, Block, BlockHeader, Genesis, Hash, Metadata, Proof, Validator};
 use protocol::{fixed_codec::FixedCodec, ProtocolResult};
 
@@ -61,7 +61,7 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
         .verifier_list
         .iter()
         .map(|v| Validator {
-            address:        v.address.clone(),
+            pub_key:        v.pub_key.decode(),
             propose_weight: v.propose_weight,
             vote_weight:    v.vote_weight,
         })
@@ -164,7 +164,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     // Init network
     let network_config = NetworkConfig::new()
         .max_connections(config.network.max_connected_peers)
-        .whitelist_peers_only(config.network.whitelist_peers_only)
+        .allowlist_only(config.network.allowlist_only)
         .peer_trust_metric(
             config.network.trust_interval_duration,
             config.network.trust_max_history_duration,
@@ -185,19 +185,16 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     let mut bootstrap_pairs = vec![];
     if let Some(bootstrap) = &config.network.bootstraps {
         for bootstrap in bootstrap.iter() {
-            bootstrap_pairs.push((
-                bootstrap.pubkey.as_string_trim0x(),
-                bootstrap.address.to_owned(),
-            ));
+            bootstrap_pairs.push((bootstrap.peer_id.to_owned(), bootstrap.address.to_owned()));
         }
     }
 
-    let whitelist = config.network.whitelist.clone().unwrap_or_default();
-
+    let allowlist = config.network.allowlist.clone().unwrap_or_default();
     let network_config = network_config
         .bootstraps(bootstrap_pairs)?
-        .whitelist(whitelist)?
+        .allowlist(allowlist)?
         .secio_keypair(network_privkey)?;
+
     let mut network_service = NetworkService::new(network_config);
     network_service
         .listen(config.network.listening_address)
@@ -302,7 +299,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         .verifier_list
         .iter()
         .map(|v| Validator {
-            address:        v.address.clone(),
+            pub_key:        v.pub_key.decode(),
             propose_weight: v.propose_weight,
             vote_weight:    v.vote_weight,
         })
@@ -311,6 +308,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     let node_info = NodeInfo {
         chain_id:     metadata.chain_id.clone(),
         self_address: my_address.clone(),
+        self_pub_key: my_pubkey.to_bytes(),
     };
     let current_header = &current_block.header;
     let block_hash = Hash::digest(current_block.header.encode_fixed()?);
@@ -349,7 +347,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
 
     let mut bls_pub_keys = HashMap::new();
     for validator_extend in metadata.verifier_list.iter() {
-        let address = validator_extend.address.as_bytes();
+        let address = validator_extend.pub_key.decode();
         let hex_pubkey = hex::decode(validator_extend.bls_pub_key.as_string_trim0x())
             .map_err(MainError::FromHex)?;
         let pub_key = BlsPublicKey::try_from(hex_pubkey.as_ref()).map_err(MainError::Crypto)?;
@@ -404,6 +402,16 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         crypto,
         lock,
     ));
+
+    let peer_ids = metadata
+        .verifier_list
+        .iter()
+        .map(|v| PeerId::from_pubkey_bytes(v.pub_key.decode()).map(PeerIdExt::into_bytes_ext))
+        .collect::<Result<Vec<_>, _>>()?;
+
+    network_service
+        .handle()
+        .tag_consensus(Context::new(), peer_ids)?;
 
     // Re-execute block from exec_height + 1 to current_height, so that init the
     // lost current status.
@@ -496,7 +504,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     let authority_list = validators
         .iter()
         .map(|v| Node {
-            address:        v.address.as_bytes(),
+            address:        v.pub_key.clone(),
             propose_weight: v.propose_weight,
             vote_weight:    v.vote_weight,
         })

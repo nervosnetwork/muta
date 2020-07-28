@@ -4,7 +4,7 @@ mod synchronization;
 
 use rand::random;
 
-use protocol::types::{Address, Block, BlockHeader, Hash, MerkleRoot, Proof, Validator};
+use protocol::types::{Address, Block, BlockHeader, Hash, Hex, MerkleRoot, Proof, Validator};
 use protocol::Bytes;
 
 use crate::status::CurrentConsensusStatus;
@@ -90,13 +90,20 @@ fn get_random_bytes(len: usize) -> Bytes {
     Bytes::from(vec)
 }
 
+fn mock_pub_key() -> Hex {
+    Hex::from_string(
+        "0x026c184a9016f6f71a234c86b141621f38b68c78602ab06768db4d83682c616004".to_owned(),
+    )
+    .unwrap()
+}
+
 fn mock_validators(len: usize) -> Vec<Validator> {
     (0..len).map(|_| mock_validator()).collect::<Vec<_>>()
 }
 
 fn mock_validator() -> Validator {
     Validator {
-        address:        mock_address(),
+        pub_key:        mock_pub_key().decode(),
         propose_weight: random::<u32>(),
         vote_weight:    random::<u32>(),
     }

@@ -9,7 +9,6 @@ use futures::lock::Mutex;
 use overlord::types::{AggregatedSignature, AggregatedVote, Node, SignedVote, Vote, VoteType};
 use overlord::{extract_voters, Crypto};
 use parking_lot::RwLock;
-use rlp::encode;
 
 use common_crypto::{
     BlsCommonReference, BlsPrivateKey, BlsPublicKey, HashValue, PrivateKey, PublicKey,
@@ -286,7 +285,7 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
     ) -> ProtocolResult<Metadata> {
         Ok(Metadata {
             chain_id:        Hash::from_empty(),
-            common_ref:      Hex::from_string("0x3453376d613471795964".to_string()).unwrap(),
+            common_ref:      Hex::from_string("0x5131414c656c5454355a".to_string()).unwrap(),
             timeout_gap:     20,
             cycles_limit:    9999,
             cycles_price:    1,
@@ -299,6 +298,10 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
             tx_num_limit:    20000,
             max_tx_size:     1_073_741_824,
         })
+    }
+
+    fn tag_consensus(&self, _: Context, _: Vec<Bytes>) -> ProtocolResult<()> {
+        Ok(())
     }
 
     fn report_bad(&self, _ctx: Context, _feedback: TrustFeedback) {}
@@ -351,11 +354,11 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
 
         let authority_map = previous_metadata
             .verifier_list
-            .into_iter()
+            .iter()
             .map(|v| {
-                let address = v.address.as_bytes();
+                let address = v.pub_key.decode();
                 let node = Node {
-                    address:        v.address.as_bytes(),
+                    address:        v.pub_key.decode(),
                     propose_weight: v.propose_weight,
                     vote_weight:    v.vote_weight,
                 };
@@ -365,7 +368,10 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
 
         // check proposer
         if block.header.height != 0
-            && !authority_map.contains_key(&block.header.proposer.as_bytes())
+            && !previous_metadata
+                .verifier_list
+                .iter()
+                .any(|v| v.address == block.header.proposer)
         {
             log::error!(
                 "[consensus] verify_block_header, block.header.proposer: {:?}, authority_map: {:?}",
@@ -377,10 +383,12 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
 
         // check validators
         for validator in block.header.validators.iter() {
-            if !authority_map.contains_key(&validator.address.as_bytes()) {
+            let validator_address = Address::from_pubkey_bytes(validator.pub_key.clone());
+
+            if !authority_map.contains_key(&validator.pub_key) {
                 log::error!(
                     "[consensus] verify_block_header, validator.address: {:?}, authority_map: {:?}",
-                    validator.address,
+                    validator_address,
                     authority_map
                 );
                 return Err(ConsensusError::VerifyBlockHeader(
@@ -389,14 +397,14 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
                 )
                 .into());
             } else {
-                let node = authority_map.get(&validator.address.as_bytes()).unwrap();
+                let node = authority_map.get(&validator.pub_key).unwrap();
 
                 if node.vote_weight != validator.vote_weight
                     || node.propose_weight != validator.vote_weight
                 {
                     log::error!(
                         "[consensus] verify_block_header, validator.address: {:?}, authority_map: {:?}",
-                        validator.address,
+                        validator_address,
                         authority_map
                     );
                     return Err(ConsensusError::VerifyBlockHeader(
@@ -458,7 +466,7 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
             .verifier_list
             .iter()
             .map(|v| Node {
-                address:        v.address.as_bytes(),
+                address:        v.pub_key.decode(),
                 propose_weight: v.propose_weight,
                 vote_weight:    v.vote_weight,
             })
@@ -481,7 +489,7 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
             .verifier_list
             .iter()
             .filter_map(|v| {
-                if signed_voters.contains(&v.address.as_bytes()) {
+                if signed_voters.contains(&v.pub_key.decode()) {
                     Some(v.bls_pub_key.clone())
                 } else {
                     None
@@ -509,9 +517,9 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
         let weight_map = authority_list
             .iter()
             .map(|node| (node.address.clone(), node.vote_weight))
-            .collect::<HashMap<overlord::types::Address, u32>>();
+            .collect::<HashMap<_, _>>();
 
-        self.verity_proof_weight(ctx.clone(), block.header.height, weight_map, signed_voters)?;
+        self.verify_proof_weight(ctx.clone(), block.header.height, weight_map, signed_voters)?;
 
         Ok(())
     }
@@ -537,7 +545,7 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
             })
     }
 
-    fn verity_proof_weight(
+    fn verify_proof_weight(
         &self,
         _ctx: Context,
         block_height: u64,
@@ -547,21 +555,22 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
         let total_validator_weight: u64 = weight_map.iter().map(|pair| u64::from(*pair.1)).sum();
 
         let mut accumulator = 0u64;
-        for signed_voter_address in signed_voters {
-            if weight_map.contains_key(signed_voter_address.as_ref()) {
-                let weight = weight_map.get(signed_voter_address.as_ref()).ok_or({
+        for signed_voter_address in signed_voters.iter() {
+            if weight_map.contains_key(signed_voter_address) {
+                let weight = weight_map.get(signed_voter_address).ok_or_else(|| {
                     log::error!(
-                        "[consensus] verity_proof_weight,signed_voter_address: {:?}",
-                        signed_voter_address
+                        "[consensus] verify_proof_weight, signed_voter_address: {:?}",
+                        hex::encode(signed_voter_address)
                     );
                     ConsensusError::VerifyProof(block_height, WeightNotFound)
                 })?;
                 accumulator += u64::from(*(weight));
             } else {
                 log::error!(
-                    "[consensus] verity_proof_weight,signed_voter_address: {:?}",
-                    signed_voter_address
+                    "[consensus] verify_proof_weight,signed_voter_address: {:?}",
+                    hex::encode(signed_voter_address)
                 );
+
                 return Err(
                     ConsensusError::VerifyProof(block_height, BlockProofField::Validator).into(),
                 );
@@ -570,7 +579,7 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
 
         if 3 * accumulator <= 2 * total_validator_weight {
             log::error!(
-                "[consensus] verity_proof_weight, accumulator: {}, total: {}",
+                "[consensus] verify_proof_weight, accumulator: {}, total: {}",
                 accumulator,
                 total_validator_weight
             );
@@ -664,12 +673,16 @@ fn mock_chained_rich_block(len: u64, gap: u64, key_tool: &KeyTool) -> (Vec<RichB
             state_root: Hash::from_empty(),
             receipt_root: vec![],
             cycles_used: vec![],
-            proposer: Address::from_hex("0x82c67c421d208fb7015d2da79550212a50f2e773").unwrap(),
+            proposer: Address::from_hex("0x40e680f764a84c3add6753685aecf59700e24a4b").unwrap(),
             proof: last_proof,
             validator_version: 0,
             validators: vec![Validator {
-                address:        Address::from_hex("0x82c67c421d208fb7015d2da79550212a50f2e773")
-                    .unwrap(),
+                pub_key:        Hex::from_string(
+                    "0x025a1f87bd7980510d8d4224e9e521ba2e98865f420c555568b1b71a64977b5e41"
+                        .to_owned(),
+                )
+                .unwrap()
+                .decode(),
                 propose_weight: 5,
                 vote_weight:    5,
             }],
@@ -737,7 +750,7 @@ fn mock_genesis_rich_block() -> RichBlock {
         receipt_root:                   vec![],
         cycles_used:                    vec![],
         proposer:                       Address::from_hex(
-            "0x82c67c421d208fb7015d2da79550212a50f2e773",
+            "0x40e680f764a84c3add6753685aecf59700e24a4b",
         )
         .unwrap(),
         proof:                          Proof {
@@ -749,8 +762,11 @@ fn mock_genesis_rich_block() -> RichBlock {
         },
         validator_version:              0,
         validators:                     vec![Validator {
-            address:        Address::from_hex("0x82c67c421d208fb7015d2da79550212a50f2e773")
-                .unwrap(),
+            pub_key:        Hex::from_string(
+                "0x025a1f87bd7980510d8d4224e9e521ba2e98865f420c555568b1b71a64977b5e41".to_owned(),
+            )
+            .unwrap()
+            .decode(),
             propose_weight: 0,
             vote_weight:    0,
         }],
@@ -846,19 +862,20 @@ fn mock_proof(block_hash: Hash, height: u64, round: u64, key_tool: &KeyTool) -> 
         block_hash: block_hash.as_bytes(),
     };
 
-    let vote_hash = key_tool.overlord_crypto.hash(Bytes::from(encode(&vote)));
+    let vote_hash = key_tool
+        .overlord_crypto
+        .hash(Bytes::from(rlp::encode(&vote)));
     let bls_signature = key_tool.overlord_crypto.sign(vote_hash).unwrap();
     let signed_vote = SignedVote {
-        voter:     key_tool.signer_node.secp_address.as_bytes(),
+        voter:     key_tool.signer_node.secp_public_key.to_bytes(),
         signature: bls_signature,
         vote:      vote.clone(),
     };
 
-    let signed_voter =
-        vec![Address::from_hex("0x82c67c421d208fb7015d2da79550212a50f2e773").unwrap()]
-            .iter()
-            .cloned()
-            .collect::<HashSet<Address>>(); //
+    let signed_voter = vec![key_tool.signer_node.secp_public_key.to_bytes()]
+        .iter()
+        .cloned()
+        .collect::<HashSet<Bytes>>(); //
     let mut bit_map = BitVec::from_elem(3, false);
 
     let mut authority_list: Vec<Node> = key_tool
@@ -866,7 +883,7 @@ fn mock_proof(block_hash: Hash, height: u64, round: u64, key_tool: &KeyTool) -> 
         .clone()
         .iter()
         .map(|v| Node {
-            address:        v.address.as_bytes(),
+            address:        v.pub_key.decode(),
             propose_weight: v.propose_weight,
             vote_weight:    v.vote_weight,
         })
@@ -874,7 +891,7 @@ fn mock_proof(block_hash: Hash, height: u64, round: u64, key_tool: &KeyTool) -> 
     authority_list.sort();
 
     for (index, node) in authority_list.iter().enumerate() {
-        if signed_voter.contains(&Address::from_bytes(node.address.clone()).unwrap()) {
+        if signed_voter.contains(&node.address) {
             bit_map.set(index, true);
         }
     }
@@ -894,7 +911,7 @@ fn mock_proof(block_hash: Hash, height: u64, round: u64, key_tool: &KeyTool) -> 
         height,
         round,
         block_hash: block_hash.as_bytes(),
-        leader: key_tool.signer_node.secp_address.as_bytes(),
+        leader: key_tool.signer_node.secp_public_key.to_bytes(),
     };
 
     Proof {
@@ -938,19 +955,13 @@ fn exec_txs(height: u64, txs: &[SignedTransaction]) -> (ExecutorResp, MerkleRoot
 struct SignerNode {
     secp_private_key: Secp256k1PrivateKey,
     secp_public_key:  Secp256k1PublicKey,
-    secp_address:     Address,
 }
 
 impl SignerNode {
-    pub fn new(
-        secp_private_key: Secp256k1PrivateKey,
-        secp_public_key: Secp256k1PublicKey,
-        secp_address: Address,
-    ) -> Self {
+    pub fn new(secp_private_key: Secp256k1PrivateKey, secp_public_key: Secp256k1PublicKey) -> Self {
         SignerNode {
             secp_private_key,
             secp_public_key,
-            secp_address,
         }
     }
 }
@@ -977,18 +988,16 @@ impl KeyTool {
 
 fn get_mock_key_tool() -> KeyTool {
     let hex_privkey =
-        hex::decode("d654c7a6747fc2e34808c1ebb1510bfb19b443d639f2fab6dc41fce9f634de37").unwrap();
+        hex::decode("bd5da51982aa5ccc1bd6cec68ffee0caa708671ba5149390c39e4f660bfe4c49").unwrap();
     let secp_privkey = Secp256k1PrivateKey::try_from(hex_privkey.as_ref()).unwrap();
     let secp_pubkey: Secp256k1PublicKey = secp_privkey.pub_key();
-    let secp_address = Address::from_pubkey_bytes(secp_pubkey.to_bytes()).unwrap();
-
-    let signer_node = SignerNode::new(secp_privkey, secp_pubkey, secp_address);
+    let signer_node = SignerNode::new(secp_privkey, secp_pubkey);
 
     // generate BLS/OverlordCrypto
     let mut bls_priv_key = Vec::new();
     bls_priv_key.extend_from_slice(&[0u8; 16]);
     let mut tmp =
-        hex::decode("d654c7a6747fc2e34808c1ebb1510bfb19b443d639f2fab6dc41fce9f634de37").unwrap();
+        hex::decode("bd5da51982aa5ccc1bd6cec68ffee0caa708671ba5149390c39e4f660bfe4c49").unwrap();
     bls_priv_key.append(&mut tmp);
     let bls_priv_key = BlsPrivateKey::try_from(bls_priv_key.as_ref()).unwrap();
 
@@ -1002,40 +1011,46 @@ fn get_mock_key_tool() -> KeyTool {
 fn get_mock_public_keys_and_common_ref() -> (HashMap<Bytes, BlsPublicKey>, BlsCommonReference) {
     let mut bls_pub_keys: HashMap<Bytes, BlsPublicKey> = HashMap::new();
 
-    // weight = 3
-    let bls_hex = Hex::from_string("0x0403142cf2dc63d122cc31e8245daa661b4b7c47793a9ab14e3c27430e3a835cb50b0bda0ea90480765d73d509e02c15f8031c20a77254fb0a8ec2919f2ed13b02034153776ad30d8fad90da15e0b85cd98cb81fa5f810c62563c8b507ef11604e".to_string()
+    // weight = 5
+    let bls_hex = Hex::from_string("0x04061c1c36a4252e8267ca143d1947f185dd6a04b5cc20f3ec85290e4e631fb67766392fa726120b1235da64fb2e5ffa4813c7dfe67b8019765b231ac0fbb5e5d45b12cf39ba98c02a6f1587bc6f4d8d7b7324efb40d3b6798b3f1792fc414c5df".to_string()
     ).unwrap();
     let bls_hex = hex::decode(bls_hex.as_string_trim0x()).unwrap();
     bls_pub_keys.insert(
-        Address::from_hex("0x82c67c421d208fb7015d2da79550212a50f2e773")
-            .unwrap()
-            .as_bytes(),
+        Hex::from_string(
+            "0x025a1f87bd7980510d8d4224e9e521ba2e98865f420c555568b1b71a64977b5e41".to_owned(),
+        )
+        .unwrap()
+        .decode(),
         BlsPublicKey::try_from(bls_hex.as_ref()).unwrap(),
     );
 
     // weight = 1
-    let bls_hex = Hex::from_string("0x0414a4665f0d3d0a2b034e933a40f8e84a2113b12cdc33c1f17d28a4a5313768cfdb5c1b6d8f9a3e0df54c87d6fb196b1a0e93d284bfe15814f5bce36c4092bdf26c88b77798570a3ac251c630cc7995a89047f51b2a9aebb1046d81d52486be32".to_string()
+    let bls_hex = Hex::from_string("0x0410d89f114ebd98a984fa2e964decc6b7b7542326a1abb6e4725b34c70f4408dbfff312ce163147039a6b07737b25902d082194cfe36b50f81d5106f6ee6ea146c4fbcfc87de87bdcd49ce087c01411b37c520402bd0a40fd13ce550c237362a0".to_string()
     ).unwrap();
     let bls_hex = hex::decode(bls_hex.as_string_trim0x()).unwrap();
     bls_pub_keys.insert(
-        Address::from_hex("0x6c9e6d3ccf42a3e67f6bf132a53a92db3bc065b5")
-            .unwrap()
-            .as_bytes(),
+        Hex::from_string(
+            "0x028206a78f082023be8eed96f8d3c09c006bd827fb47c04950b62d8dfcb4134467".to_owned(),
+        )
+        .unwrap()
+        .decode(),
         BlsPublicKey::try_from(bls_hex.as_ref()).unwrap(),
     );
 
     // weight = 1
-    let bls_hex = Hex::from_string("0x04051326c12edd4eded8a215566390a03896389b80422a652327fc438d64d65f1f60065b69215bb5c0864a46e149ba30d21138ad5981ad6e0c79a357eeb686a4d0cd690caccca169e6393a9b1cc850c203f474276ae71c291a1523ce76f0a8851e".to_string()
+    let bls_hex = Hex::from_string("0x0402de7a497fb892c60aa98e3ec31a2de10d7f0f952aba3764caed202e3874cdb536b4c018c198a7c9354b898f9500ec6812a72f83b72ba3fa31b16be77bedbc056625db790174ee811b3d763bb1bca1fcceaf00333e1b3ba98bfa53e65d9e6488".to_string()
     ).unwrap();
     let bls_hex = hex::decode(bls_hex.as_string_trim0x()).unwrap();
     bls_pub_keys.insert(
-        Address::from_hex("0x9b80c81780b782d03b3cebe0033bb78cb8d855d7")
-            .unwrap()
-            .as_bytes(),
+        Hex::from_string(
+            "0x0230eb18bc3f638750affffff2fe7be468e50feb9cdd5e6af947b3e4505f2ed5e2".to_owned(),
+        )
+        .unwrap()
+        .decode(),
         BlsPublicKey::try_from(bls_hex.as_ref()).unwrap(),
     );
 
-    let hex_common_ref = hex::decode("3453376d613471795964").unwrap();
+    let hex_common_ref = hex::decode("5131414c656c5454355a").unwrap();
     let common_ref: BlsCommonReference =
         std::str::from_utf8(hex_common_ref.as_ref()).unwrap().into();
 
@@ -1045,71 +1060,66 @@ fn get_mock_public_keys_and_common_ref() -> (HashMap<Bytes, BlsPublicKey>, BlsCo
 fn mock_verifier_list() -> Vec<ValidatorExtend> {
     vec![
         ValidatorExtend {
-
-            bls_pub_key: Hex::from_string("0x0403142cf2dc63d122cc31e8245daa661b4b7c47793a9ab14e3c27430e3a835cb50b0bda0ea90480765d73d509e02c15f8031c20a77254fb0a8ec2919f2ed13b02034153776ad30d8fad90da15e0b85cd98cb81fa5f810c62563c8b507ef11604e".to_owned()).unwrap(),
-            address:        Address::from_hex("0x82c67c421d208fb7015d2da79550212a50f2e773").unwrap(),
+            bls_pub_key: Hex::from_string("0x04061c1c36a4252e8267ca143d1947f185dd6a04b5cc20f3ec85290e4e631fb67766392fa726120b1235da64fb2e5ffa4813c7dfe67b8019765b231ac0fbb5e5d45b12cf39ba98c02a6f1587bc6f4d8d7b7324efb40d3b6798b3f1792fc414c5df".to_owned()).unwrap(),
+            pub_key: Hex::from_string("0x025a1f87bd7980510d8d4224e9e521ba2e98865f420c555568b1b71a64977b5e41".to_owned()).unwrap(),
+            address: Address::from_hex("0x40e680f764a84c3add6753685aecf59700e24a4b").unwrap(),
             propose_weight: 5,
             vote_weight:    5,
         },
         ValidatorExtend {
-            bls_pub_key: Hex::from_string("0x0414a4665f0d3d0a2b034e933a40f8e84a2113b12cdc33c1f17d28a4a5313768cfdb5c1b6d8f9a3e0df54c87d6fb196b1a0e93d284bfe15814f5bce36c4092bdf26c88b77798570a3ac251c630cc7995a89047f51b2a9aebb1046d81d52486be32".to_owned()).unwrap(),
-            address:        Address::from_hex("0x6c9e6d3ccf42a3e67f6bf132a53a92db3bc065b5").unwrap(),
+            bls_pub_key: Hex::from_string("0x0410d89f114ebd98a984fa2e964decc6b7b7542326a1abb6e4725b34c70f4408dbfff312ce163147039a6b07737b25902d082194cfe36b50f81d5106f6ee6ea146c4fbcfc87de87bdcd49ce087c01411b37c520402bd0a40fd13ce550c237362a0".to_owned()).unwrap(),
+            pub_key: Hex::from_string("0x028206a78f082023be8eed96f8d3c09c006bd827fb47c04950b62d8dfcb4134467".to_owned()).unwrap(),
+            address: Address::from_hex("0x8b1de21fb70dc97256f756fbdb04f91891e329bf").unwrap(),
             propose_weight: 1,
             vote_weight:    1,
         },
         ValidatorExtend {
-            bls_pub_key: Hex::from_string("0x04051326c12edd4eded8a215566390a03896389b80422a652327fc438d64d65f1f60065b69215bb5c0864a46e149ba30d21138ad5981ad6e0c79a357eeb686a4d0cd690caccca169e6393a9b1cc850c203f474276ae71c291a1523ce76f0a8851e".to_owned()).unwrap(),
-            address:        Address::from_hex("0x9b80c81780b782d03b3cebe0033bb78cb8d855d7").unwrap(),
+            bls_pub_key: Hex::from_string("0x0402de7a497fb892c60aa98e3ec31a2de10d7f0f952aba3764caed202e3874cdb536b4c018c198a7c9354b898f9500ec6812a72f83b72ba3fa31b16be77bedbc056625db790174ee811b3d763bb1bca1fcceaf00333e1b3ba98bfa53e65d9e6488".to_owned()).unwrap(),
+            pub_key: Hex::from_string("0x0230eb18bc3f638750affffff2fe7be468e50feb9cdd5e6af947b3e4505f2ed5e2".to_owned()).unwrap(),
+            address: Address::from_hex("0x8af94238483ea5660f3d30674db9b0ee683d9948").unwrap(),
             propose_weight: 1,
             vote_weight:    1,
         },
     ]
 }
 
+#[rustfmt::skip]
 // {
-// "common_ref": "3453376d613471795964",
-// "keypairs": [
-// {
-// "index": 1,
-// "private_key":
-// "d654c7a6747fc2e34808c1ebb1510bfb19b443d639f2fab6dc41fce9f634de37",
-// "public_key":
-// "03eacfbe0c216b9afd1370da335a49f49b88a4a34cc99c15885812e36bfab774fd",
-// "address": "82c67c421d208fb7015d2da79550212a50f2e773",
-// "bls_public_key":
-// "0403142cf2dc63d122cc31e8245daa661b4b7c47793a9ab14e3c27430e3a835cb50b0bda0ea90480765d73d509e02c15f8031c20a77254fb0a8ec2919f2ed13b02034153776ad30d8fad90da15e0b85cd98cb81fa5f810c62563c8b507ef11604e"
-// },
-// {
-// "index": 2,
-// "private_key":
-// "aa0374de198a4ba1187e4a41b316e159ab256ce129bcc76c10d746edfe6f82e5",
-// "public_key":
-// "03bf246a94a98a4c96a71a02187b8bc98539f853287800a7fa38d67b2ed9643bd2",
-// "address": "6c9e6d3ccf42a3e67f6bf132a53a92db3bc065b5",
-// "bls_public_key":
-// "0414a4665f0d3d0a2b034e933a40f8e84a2113b12cdc33c1f17d28a4a5313768cfdb5c1b6d8f9a3e0df54c87d6fb196b1a0e93d284bfe15814f5bce36c4092bdf26c88b77798570a3ac251c630cc7995a89047f51b2a9aebb1046d81d52486be32"
-// },
-// {
-// "index": 3,
-// "private_key":
-// "0c27b03412cae1df9cd7374c2eab1daff1023721f9930f44d7f5a0f8172a2b32",
-// "public_key":
-// "028b1e157e441a3cd6f2f6116ecac24235c02e1d66471407484fba5dca44242a8f",
-// "address": "9b80c81780b782d03b3cebe0033bb78cb8d855d7",
-// "bls_public_key":
-// "04051326c12edd4eded8a215566390a03896389b80422a652327fc438d64d65f1f60065b69215bb5c0864a46e149ba30d21138ad5981ad6e0c79a357eeb686a4d0cd690caccca169e6393a9b1cc850c203f474276ae71c291a1523ce76f0a8851e"
-// },
-// {
-// "index": 4,
-// "private_key":
-// "fc57fc08dc883891b88292a2d2915050b9a09c8a6096dfb04372bdd15162665e",
-// "public_key":
-// "03c00ce1cb83fbf8151c98d110d8cc4d83a6884fcee27916d416882ce42ae5925c",
-// "address": "0804d72af82a05733df54a72278a73629b4bea17",
-// "bls_public_key":
-// "040d606915df9b432acf66cdd9338d240fe781fb05249957201613113dda384960022649e9fd9e8b66c8962bb5e223d30405c5590e8d9cae893384ace1789d61a73b325e638ef5ee1c47d3b2a5a863e19b54fbfc881b5cc0b8bb05fce04d514807"
-// }
-// ]
+//   "common_ref": "0x5131414c656c5454355a",
+//   "keypairs": [
+//     {
+//       "index": 1,
+//       "private_key": "0xbd5da51982aa5ccc1bd6cec68ffee0caa708671ba5149390c39e4f660bfe4c49",
+//       "public_key": "0x025a1f87bd7980510d8d4224e9e521ba2e98865f420c555568b1b71a64977b5e41",
+//       "address": "0x40e680f764a84c3add6753685aecf59700e24a4b",
+//       "peer_id": "0x1220c8007bb2f04b921ec052df4836a5c81e658c8975e4b514da3cefbc64cb824932",
+//       "bls_public_key": "0x04061c1c36a4252e8267ca143d1947f185dd6a04b5cc20f3ec85290e4e631fb67766392fa726120b1235da64fb2e5ffa4813c7dfe67b8019765b231ac0fbb5e5d45b12cf39ba98c02a6f1587bc6f4d8d7b7324efb40d3b6798b3f1792fc414c5df"
+//     },
+//     {
+//       "index": 2,
+//       "private_key": "0xabec0e3a9cc9e5722a8582f5fd7cbaada11a12b0f2733873699aa1c17218f35a",
+//       "public_key": "0x028206a78f082023be8eed96f8d3c09c006bd827fb47c04950b62d8dfcb4134467",
+//       "address": "0x8b1de21fb70dc97256f756fbdb04f91891e329bf",
+//       "peer_id": "0x122095c712e8fc94f2febfd4eb21a05dbc78ed2b45a7135e7a72422cfa69a22bf14c",
+//       "bls_public_key": "0x0410d89f114ebd98a984fa2e964decc6b7b7542326a1abb6e4725b34c70f4408dbfff312ce163147039a6b07737b25902d082194cfe36b50f81d5106f6ee6ea146c4fbcfc87de87bdcd49ce087c01411b37c520402bd0a40fd13ce550c237362a0"
+//     },
+//     {
+//       "index": 3,
+//       "private_key": "0x1c43ffb8a5110b37bf2fba6678760fee4cf5a408526c1ef00f28b8f574df1d92",
+//       "public_key": "0x0230eb18bc3f638750affffff2fe7be468e50feb9cdd5e6af947b3e4505f2ed5e2",
+//       "address": "0x8af94238483ea5660f3d30674db9b0ee683d9948",
+//       "peer_id": "0x122024ff8439058d2fa71492e7606547dadc0e0d8bda3c240cca50b6066fa813b1c2",
+//       "bls_public_key": "0x0402de7a497fb892c60aa98e3ec31a2de10d7f0f952aba3764caed202e3874cdb536b4c018c198a7c9354b898f9500ec6812a72f83b72ba3fa31b16be77bedbc056625db790174ee811b3d763bb1bca1fcceaf00333e1b3ba98bfa53e65d9e6488"
+//     },
+//     {
+//       "index": 4,
+//       "private_key": "0x598e505735b9237fcb6736a3a69bb8e7c8293ca4a9b3458b9cbeb1207d2b421f",
+//       "public_key": "0x036fa093c97cbacf1094abd51d3799f9b0920a8decb27f3d126fff37854b58fbb6",
+//       "address": "0x8fff53935d33415ba794d9d81e710872727f9a2d",
+//       "peer_id": "0x122008bbfbff46a3ad94dabb521d0f57e37c3e09b716496be22282e1b560f93963f1",
+//       "bls_public_key": "0x0407d5cd1321e00c596c5c10bc1fd07fad1bf56b3b8e262ae49b1d220a21fcdcf1232862dc51db3673b1337a44d9d04a991415f3afc872e188e2208e7a71ba3d86352a0ad10f5938dfeeb9594c1091ff29051b5baaee825c62c9487835daad9fa8"
+//     }
+//   ]
 // }
 
 fn assert_sync(status: CurrentConsensusStatus, latest_block: Block) {

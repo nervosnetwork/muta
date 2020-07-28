@@ -70,6 +70,9 @@ pub enum ErrorKind {
 
     #[display(fmt = "kind: public key {:?} not match {:?}", pubkey, id)]
     PublicKeyNotMatchId { pubkey: PublicKey, id: PeerId },
+
+    #[display(fmt = "kind: untaggable {}", _0)]
+    Untaggable(String),
 }
 
 impl Error for ErrorKind {}
@@ -95,14 +98,12 @@ pub enum NetworkError {
     },
 
     #[display(
-        fmt = "send incompletely, unconnected {:?} unknown {:?}, other {:?}",
+        fmt = "send incompletely, unconnected {:?}, other {:?}",
         unconnected,
-        unknown,
         other
     )]
-    UserSend {
-        unconnected: Option<Vec<Address>>,
-        unknown:     Option<Vec<Address>>,
+    MultiCast {
+        unconnected: Option<Vec<PeerId>>,
         other:       Option<Box<dyn Error + Send>>,
     },
 
@@ -117,6 +118,9 @@ pub enum NetworkError {
 
     #[display(fmt = "cannot decode private key bytes")]
     InvalidPrivateKey,
+
+    #[display(fmt = "cannot decode peer id")]
+    InvalidPeerId,
 
     #[display(fmt = "unsupported peer address {}", _0)]
     UnexpectedPeerAddr(String),
@@ -181,6 +185,12 @@ impl From<std::io::Error> for NetworkError {
 impl From<tentacle::error::TransportErrorKind> for NetworkError {
     fn from(err: tentacle::error::TransportErrorKind) -> NetworkError {
         NetworkError::Transport(err)
+    }
+}
+
+impl From<NetworkError> for Box<dyn Error + Send> {
+    fn from(err: NetworkError) -> Box<dyn Error + Send> {
+        err.boxed()
     }
 }
 

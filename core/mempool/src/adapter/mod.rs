@@ -522,7 +522,6 @@ mod tests {
 
     use protocol::{
         traits::{Context, Gossip, MessageCodec, Priority},
-        types::Address,
         Bytes, ProtocolResult,
     };
 
@@ -576,16 +575,17 @@ mod tests {
             Ok(())
         }
 
-        async fn users_cast<M>(
+        async fn multicast<'a, M, P>(
             &self,
             _: Context,
             _: &str,
-            _: Vec<Address>,
+            _: P,
             _: M,
             _: Priority,
         ) -> ProtocolResult<()>
         where
             M: MessageCodec,
+            P: AsRef<[Bytes]> + Send + 'a,
         {
             unreachable!()
         }

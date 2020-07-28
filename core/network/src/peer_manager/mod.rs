@@ -1,12 +1,11 @@
 #![allow(clippy::mutable_key_type)]
 
 mod addr_set;
-mod disc;
-mod ident;
 mod peer;
 mod retry;
 mod save_restore;
 mod shared;
+mod tags;
 mod time;
 mod trust_metric;
 
@@ -14,12 +13,10 @@ mod trust_metric;
 pub mod diagnostic;
 
 use addr_set::PeerAddrSet;
-use peer::Peer;
 use retry::Retry;
 use save_restore::{NoPeerDatFile, PeerDatFile, SaveRestore};
+use tags::Tags;
 
-pub use disc::DiscoveryAddrManager;
-pub use ident::IdentifyCallback;
 pub use peer::{ArcPeer, Connectedness};
 pub use shared::{SharedSessions, SharedSessionsConfig};
 pub use trust_metric::{TrustMetric, TrustMetricConfig};
@@ -30,7 +27,7 @@ mod test_manager;
 use std::{
     borrow::Borrow,
     cmp::PartialEq,
-    collections::{HashMap, HashSet},
+    collections::HashSet,
     convert::{TryFrom, TryInto},
     future::Future,
     hash::{Hash, Hasher},
@@ -38,7 +35,7 @@ use std::{
     ops::Deref,
     path::PathBuf,
     pin::Pin,
-    sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
+    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
     sync::Arc,
     task::{Context, Poll},
     time::Duration,
@@ -53,7 +50,7 @@ use futures::{
 };
 use log::{debug, error, info, warn};
 use parking_lot::RwLock;
-use protocol::{traits::TrustFeedback, types::Address};
+use protocol::traits::{PeerTag, TrustFeedback};
 use rand::seq::IteratorRandom;
 use serde_derive::{Deserialize, Serialize};
 #[cfg(not(test))]
@@ -83,7 +80,6 @@ const BACKOFF_BASE: u64 = 2;
 const MAX_RETRY_INTERVAL: u64 = 512; // seconds
 const MAX_RETRY_COUNT: u8 = 30;
 const SHORT_ALIVE_SESSION: u64 = 3; // seconds
-const WHITELIST_TIMEOUT: u64 = 2 * 60 * 60; // 2 hour
 const MAX_CONNECTING_MARGIN: usize = 10;
 
 const GOOD_TRUST_SCORE: u8 = 80u8;
@@ -207,117 +203,6 @@ impl Hash for ConnectingAttempt {
 }
 
 #[derive(Debug)]
-enum ExpireTime {
-    At(AtomicU64), // Duration
-    Never,
-}
-
-#[cfg(test)]
-#[derive(Debug, PartialEq, Eq)]
-enum TestExpireTime {
-    At(u64),
-    Never,
-}
-
-#[derive(Debug)]
-struct WhitelistedPeer {
-    chain_addr: Address,
-    expire:     ExpireTime,
-}
-
-#[derive(Debug, Clone)]
-struct ArcWhitelistedPeer(Arc<WhitelistedPeer>);
-
-impl ArcWhitelistedPeer {
-    pub fn new(chain_addr: Address) -> Self {
-        let expire_at = AtomicU64::new(time::now() + WHITELIST_TIMEOUT);
-
-        let peer = WhitelistedPeer {
-            chain_addr,
-            expire: ExpireTime::At(expire_at),
-        };
-
-        ArcWhitelistedPeer(Arc::new(peer))
-    }
-
-    pub fn new_never(chain_addr: Address) -> Self {
-        let peer = WhitelistedPeer {
-            chain_addr,
-            expire: ExpireTime::Never,
-        };
-
-        ArcWhitelistedPeer(Arc::new(peer))
-    }
-
-    pub fn owned_chain_addr(&self) -> Address {
-        self.chain_addr.to_owned()
-    }
-
-    pub fn refresh_expire_time(&self) {
-        match &self.expire {
-            ExpireTime::At(at) => at.store(time::now() + WHITELIST_TIMEOUT, Ordering::SeqCst),
-            ExpireTime::Never => (),
-        }
-    }
-
-    #[cfg(test)]
-    pub fn set_expire_time_at(&self, new_at: u64) {
-        match &self.expire {
-            ExpireTime::At(at) => at.store(new_at, Ordering::SeqCst),
-            ExpireTime::Never => {
-                panic!(
-                    "set expire time on never expired whitelist peer {:?}",
-                    self.chain_addr
-                );
-            }
-        }
-    }
-
-    #[cfg(test)]
-    pub fn expire_time(&self) -> TestExpireTime {
-        match &self.expire {
-            ExpireTime::At(at) => TestExpireTime::At(at.load(Ordering::SeqCst)),
-            ExpireTime::Never => TestExpireTime::Never,
-        }
-    }
-
-    pub fn is_expired(&self) -> bool {
-        match &self.expire {
-            ExpireTime::At(at) => time::now() > at.load(Ordering::SeqCst),
-            ExpireTime::Never => false,
-        }
-    }
-}
-
-impl Borrow<Address> for ArcWhitelistedPeer {
-    fn borrow(&self) -> &Address {
-        &self.chain_addr
-    }
-}
-
-impl PartialEq for ArcWhitelistedPeer {
-    fn eq(&self, other: &ArcWhitelistedPeer) -> bool {
-        self.chain_addr == other.chain_addr
-    }
-}
-
-impl Eq for ArcWhitelistedPeer {}
-
-impl Hash for ArcWhitelistedPeer {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.chain_addr.hash(state)
-    }
-}
-
-impl Deref for ArcWhitelistedPeer {
-    type Target = WhitelistedPeer;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-#[derive(Debug)]
 struct Session {
     id:             SessionId,
     ctx:            Arc<SessionContext>,
@@ -385,23 +270,23 @@ impl Deref for ArcSession {
 }
 
 struct Inner {
-    whitelist: RwLock<HashSet<ArcWhitelistedPeer>>,
+    our_id: Arc<PeerId>,
 
-    sessions: RwLock<HashSet<ArcSession>>,
-    peers:    RwLock<HashSet<ArcPeer>>,
-    chain:    RwLock<HashMap<Address, ArcPeer>>,
+    consensus: RwLock<HashSet<PeerId>>,
+    sessions:  RwLock<HashSet<ArcSession>>,
+    peers:     RwLock<HashSet<ArcPeer>>,
 
     listen: RwLock<HashSet<PeerMultiaddr>>,
 }
 
 impl Inner {
-    pub fn new() -> Self {
+    pub fn new(our_id: PeerId) -> Self {
         Inner {
-            whitelist: Default::default(),
+            our_id: Arc::new(our_id),
 
-            sessions: Default::default(),
-            peers:    Default::default(),
-            chain:    Default::default(),
+            consensus: Default::default(),
+            sessions:  Default::default(),
+            peers:     Default::default(),
 
             listen: Default::default(),
         }
@@ -423,23 +308,17 @@ impl Inner {
         self.sessions.read().len()
     }
 
-    pub fn add_peer(&self, peer: ArcPeer) {
-        self.peers.write().insert(peer.clone());
-        if let Some(chain_addr) = peer.owned_chain_addr() {
-            self.chain.write().insert(chain_addr, peer);
-        }
+    /// If peer exists, return false
+    pub fn add_peer(&self, peer: ArcPeer) -> bool {
+        self.peers.write().insert(peer)
     }
 
-    pub fn add_chain_addr(&self, chain_addr: Address, peer: ArcPeer) {
-        self.chain.write().insert(chain_addr, peer);
+    pub fn peer_count(&self) -> usize {
+        self.peers.read().len()
     }
 
     pub fn peer(&self, peer_id: &PeerId) -> Option<ArcPeer> {
         self.peers.read().get(peer_id).cloned()
-    }
-
-    pub fn peer_by_chain(&self, chain_addr: &Address) -> Option<ArcPeer> {
-        self.chain.read().get(chain_addr).cloned()
     }
 
     pub fn contains(&self, peer_id: &PeerId) -> bool {
@@ -466,61 +345,6 @@ impl Inner {
         qualified_peers.choose_multiple(&mut rng, max)
     }
 
-    #[allow(dead_code)]
-    pub fn remove_peer(&self, peer_id: &PeerId) -> Option<ArcPeer> {
-        let opt_peer = { self.peers.write().take(peer_id) };
-        if let Some(chain_addr) = opt_peer.and_then(|p| p.owned_chain_addr()) {
-            self.chain.write().remove(&chain_addr)
-        } else {
-            None
-        }
-    }
-
-    pub fn whitelist_peers_by_chain_addr(&self, chain_addrs: Vec<Address>) {
-        let mut addition_whitelist = Vec::new();
-
-        {
-            let whitelist = self.whitelist.read();
-            for ca in chain_addrs.into_iter() {
-                if let Some(peer) = whitelist.get(&ca) {
-                    peer.refresh_expire_time();
-                } else {
-                    addition_whitelist.push(ArcWhitelistedPeer::new(ca))
-                }
-            }
-        }
-
-        self.whitelist.write().extend(addition_whitelist);
-    }
-
-    pub fn whitelist_never_expired_peers_by_chain_addr(&self, chain_addrs: Vec<Address>) {
-        let whitelisted = chain_addrs
-            .into_iter()
-            .map(ArcWhitelistedPeer::new_never)
-            .collect::<Vec<_>>();
-
-        self.whitelist.write().extend(whitelisted);
-    }
-
-    pub fn whitelisted_by_chain_addr(&self, chain_addr: &Address) -> bool {
-        self.whitelist.read().contains(chain_addr)
-    }
-
-    pub fn whitelisted(&self, peer: &ArcPeer) -> bool {
-        match peer.owned_chain_addr() {
-            Some(ca) => self.whitelisted_by_chain_addr(&ca),
-            None => {
-                warn!("call whitelisted on peer {:?} without chain addr", peer.id);
-                false
-            }
-        }
-    }
-
-    #[cfg(test)]
-    pub fn whitelist(&self) -> HashSet<ArcWhitelistedPeer> {
-        self.whitelist.read().iter().cloned().collect()
-    }
-
     pub fn session(&self, sid: SessionId) -> Option<ArcSession> {
         self.sessions.read().get(&sid).cloned()
     }
@@ -538,18 +362,10 @@ impl Inner {
     }
 
     fn restore(&self, peers: Vec<ArcPeer>) {
-        let chain_peers: Vec<_> = peers
-            .clone()
-            .into_iter()
-            .filter_map(|p| p.owned_chain_addr().map(|a| (a, p)))
-            .collect();
-
         self.peers.write().extend(peers);
-        self.chain.write().extend(chain_peers);
     }
 }
 
-// TODO: Store our secret key?
 #[derive(Debug, Clone)]
 pub struct PeerManagerConfig {
     /// Our Peer ID
@@ -561,10 +377,10 @@ pub struct PeerManagerConfig {
     /// Bootstrap peers
     pub bootstraps: Vec<ArcPeer>,
 
-    /// Never expired whitelist peers by chain address
-    pub whitelist_by_chain_addrs: Vec<Address>,
-    /// Only allow peers in whitelist
-    pub whitelist_peers_only:     bool,
+    /// Always accept/connect peers in list
+    pub allowlist:      Vec<PeerId>,
+    /// Only accept/conect peers in allowlist
+    pub allowlist_only: bool,
 
     /// Trust metric config
     pub peer_trust_config: Arc<TrustMetricConfig>,
@@ -591,16 +407,41 @@ impl PeerManagerHandle {
         self.inner.session(sid).map(|s| s.peer.owned_id())
     }
 
-    pub fn random_addrs(&self, max: usize) -> Vec<Multiaddr> {
+    pub fn random_addrs(&self, max: usize, sid: SessionId) -> Vec<Multiaddr> {
         let mut rng = rand::thread_rng();
         let book = self.inner.peers.read();
         let peers = book.iter().choose_multiple(&mut rng, max);
 
-        // Should always include our self
-        let our_self = self.listen_addrs();
-        let condidates = peers.into_iter().map(|p| p.multiaddrs.all_raw()).flatten();
+        let is_self_consensus = self
+            .inner
+            .peer(&self.inner.our_id)
+            .map(|p| p.tags.contains(&PeerTag::Consensus))
+            .unwrap_or_else(|| false);
 
-        our_self.into_iter().chain(condidates).take(max).collect()
+        let is_remote_consensus = self
+            .inner
+            .session(sid)
+            .map(|s| s.peer.tags.contains(&PeerTag::Consensus))
+            .unwrap_or_else(|| false);
+
+        let condidates = peers
+            .into_iter()
+            .filter_map(|p| {
+                if !is_remote_consensus && p.tags.contains(&PeerTag::Consensus) {
+                    None
+                } else {
+                    Some(p.multiaddrs.all_raw())
+                }
+            })
+            .flatten();
+
+        if !is_self_consensus {
+            // Should always include our self
+            let our_self = self.listen_addrs();
+            our_self.into_iter().chain(condidates).take(max).collect()
+        } else {
+            condidates.take(max).collect()
+        }
     }
 
     pub fn listen_addrs(&self) -> Vec<Multiaddr> {
@@ -616,6 +457,53 @@ impl PeerManagerHandle {
         };
 
         listen.into_iter().map(sanitize).collect()
+    }
+
+    pub fn tag(&self, peer_id: &PeerId, tag: PeerTag) -> Result<(), NetworkError> {
+        let consensus_tag = tag == PeerTag::Consensus;
+
+        if let Some(peer) = self.inner.peer(peer_id) {
+            peer.tags.insert(tag)?;
+        } else {
+            let peer = ArcPeer::new(peer_id.to_owned());
+            peer.tags.insert(tag)?;
+            self.inner.add_peer(peer);
+        }
+
+        if consensus_tag {
+            self.inner.consensus.write().insert(peer_id.to_owned());
+        }
+
+        Ok(())
+    }
+
+    pub fn untag(&self, peer_id: &PeerId, tag: &PeerTag) {
+        if let Some(peer) = self.inner.peer(peer_id) {
+            peer.tags.remove(tag);
+        }
+
+        if tag == &PeerTag::Consensus {
+            self.inner.consensus.write().remove(peer_id);
+        }
+    }
+
+    pub fn tag_consensus(&self, peer_ids: Vec<PeerId>) {
+        {
+            for peer_id in self.inner.consensus.read().iter() {
+                if let Some(peer) = self.inner.peer(peer_id) {
+                    peer.tags.remove(&PeerTag::Consensus)
+                }
+            }
+        }
+
+        for peer_id in peer_ids.iter() {
+            let _ = self.tag(peer_id, PeerTag::Consensus);
+        }
+
+        {
+            let id_set = HashSet::from_iter(peer_ids);
+            *self.inner.consensus.write() = id_set;
+        }
     }
 }
 
@@ -652,13 +540,20 @@ impl PeerManager {
     ) -> Self {
         let peer_id = config.our_id.clone();
 
-        let inner = Arc::new(Inner::new());
+        let inner = Arc::new(Inner::new(config.our_id.clone()));
         let bootstraps = HashSet::from_iter(config.bootstraps.clone());
         let waker = Arc::new(AtomicWaker::new());
         let heart_beat = HeartBeat::new(Arc::clone(&waker), config.routine_interval);
         let peer_dat_file = Box::new(NoPeerDatFile);
 
-        inner.whitelist_never_expired_peers_by_chain_addr(config.whitelist_by_chain_addrs.clone());
+        for peer_id in config.allowlist.iter().cloned() {
+            assert_eq!(inner.peer_count(), 0, "should be empty before bootstrapped");
+
+            let peer = ArcPeer::new(peer_id);
+            let _ = peer.tags.insert(PeerTag::AlwaysAllow);
+
+            inner.add_peer(peer);
+        }
 
         PeerManager {
             inner,
@@ -763,16 +658,9 @@ impl PeerManager {
         let remote_peer = opt_peer.unwrap_or_else(|| ArcPeer::new(remote_peer_id.clone()));
 
         if !remote_peer.has_pubkey() {
-            if let Err(e) = remote_peer.set_pubkey(pubkey.clone()) {
+            if let Err(e) = remote_peer.set_pubkey(pubkey) {
                 error!("impossible, set public key failed {}", e);
                 error!("new session without peer pubkey, chain book will not be updated");
-            }
-        }
-
-        // Update chain book
-        if let Some(chain_addr) = remote_peer.owned_chain_addr() {
-            if self.inner.peer_by_chain(&chain_addr).is_none() {
-                self.inner.add_chain_addr(chain_addr, remote_peer.clone());
             }
         }
 
@@ -788,13 +676,6 @@ impl PeerManager {
             }
         }
 
-        if self.config.whitelist_peers_only && !self.inner.whitelisted(&remote_peer) {
-            debug!("whitelist only enabled, reject peer {:?}", remote_peer.id);
-            remote_peer.mark_disconnected();
-            self.disconnect_session(ctx.id);
-            return;
-        }
-
         if remote_peer.banned() {
             info!("banned peer {:?} incomming", remote_peer_id);
             remote_peer.mark_disconnected();
@@ -802,12 +683,17 @@ impl PeerManager {
             return;
         }
 
-        if self.inner.connected() >= self.config.max_connections {
-            let whitelisted = match Peer::pubkey_to_chain_addr(&pubkey) {
-                Ok(ca) => self.inner.whitelisted_by_chain_addr(&ca),
-                _ => false,
-            };
+        if self.config.allowlist_only
+            && !remote_peer.tags.contains(&PeerTag::AlwaysAllow)
+            && !remote_peer.tags.contains(&PeerTag::Consensus)
+        {
+            debug!("allowlist_only enabled, reject peer {:?}", remote_peer.id);
+            remote_peer.mark_disconnected();
+            self.disconnect_session(ctx.id);
+            return;
+        }
 
+        if self.inner.connected() >= self.config.max_connections {
             let found_replacement = || -> bool {
                 let incoming_trust_score = match remote_peer.trust_metric() {
                     Some(trust_metric) => trust_metric.trust_score(),
@@ -815,7 +701,7 @@ impl PeerManager {
                 };
 
                 for session in self.inner.share_sessions() {
-                    let trust_score = match session.peer.trust_metric() {
+                    let session_trust_score = match session.peer.trust_metric() {
                         Some(trust_metric) => trust_metric.trust_score(),
                         None => {
                             // Impossible
@@ -826,8 +712,9 @@ impl PeerManager {
 
                     // Ensure that session be replaced has traveled enough
                     // intervals
-                    if incoming_trust_score > trust_score
-                        && !self.inner.whitelisted(&session.peer)
+                    if incoming_trust_score > session_trust_score
+                        && !session.peer.tags.contains(&PeerTag::AlwaysAllow)
+                        && !session.peer.tags.contains(&PeerTag::Consensus)
                         && session.peer.alive()
                             > self.config.peer_trust_config.interval().as_secs() * 20
                     {
@@ -839,7 +726,10 @@ impl PeerManager {
                 false
             };
 
-            if !whitelisted && !found_replacement() {
+            if !remote_peer.tags.contains(&PeerTag::AlwaysAllow)
+                && !remote_peer.tags.contains(&PeerTag::Consensus)
+                && !found_replacement()
+            {
                 remote_peer.mark_disconnected();
                 self.disconnect_session(ctx.id);
                 return;
@@ -847,7 +737,6 @@ impl PeerManager {
         }
 
         // Currently we only save accepted peer.
-        // TODO: ban ip for too many different peer id within a short period
         // TODO: save to database
         if !self.inner.contains(&remote_peer_id) {
             self.inner.add_peer(remote_peer.clone());
@@ -1115,14 +1004,19 @@ impl PeerManager {
         match &feedback {
             Fatal(reason) => {
                 warn!("peer {:?} trust feedback fatal {}", pid, reason);
-                if self.inner.whitelisted(&peer) {
+                if peer.tags.contains(&PeerTag::AlwaysAllow)
+                    || peer.tags.contains(&PeerTag::Consensus)
+                {
                     return;
                 }
 
                 let fatal_ban = self.config.peer_fatal_ban;
                 info!("peer {:?} ban {} seconds", pid, fatal_ban.as_secs());
                 peer_trust_metric.pause();
-                peer.ban(fatal_ban);
+                if let Err(e) = peer.tags.insert_ban(fatal_ban) {
+                    warn!("ban peer {}", e);
+                    debug!("impossible, we already make sure peer isn't in allowlist");
+                }
 
                 if let Some(session) = self.inner.remove_session(peer.session_id()) {
                     self.disconnect_session(session.id);
@@ -1142,12 +1036,18 @@ impl PeerManager {
                     _ => unreachable!(),
                 };
 
-                if peer_trust_metric.knock_out() && !self.inner.whitelisted(&peer) {
+                if peer_trust_metric.knock_out()
+                    && !peer.tags.contains(&PeerTag::AlwaysAllow)
+                    && !peer.tags.contains(&PeerTag::Consensus)
+                {
                     let soft_ban = self.config.peer_soft_ban.as_secs();
                     info!("peer {:?} knocked out, soft ban {} seconds", pid, soft_ban);
 
                     peer_trust_metric.pause();
-                    peer.ban(Duration::from_secs(soft_ban));
+                    if let Err(e) = peer.tags.insert_ban(Duration::from_secs(soft_ban)) {
+                        warn!("ban peer {}", e);
+                        debug!("impossible, we already make sure peer isn't in allowlist");
+                    }
 
                     if let Some(session) = self.inner.remove_session(peer.session_id()) {
                         self.disconnect_session(session.id);
@@ -1210,8 +1110,11 @@ impl PeerManager {
 
     fn connect_peers(&mut self, peers: Vec<ArcPeer>) {
         let connectable = |p: ArcPeer| -> Option<ArcPeer> {
-            if self.config.whitelist_peers_only && !self.inner.whitelisted(&p) {
-                debug!("filter peer {:?} not in whitelist", p.id);
+            if self.config.allowlist_only
+                && !p.tags.contains(&PeerTag::AlwaysAllow)
+                && !p.tags.contains(&PeerTag::Consensus)
+            {
+                debug!("filter peer {:?} not in allowlist", p.id);
                 return None;
             }
 
@@ -1328,9 +1231,6 @@ impl PeerManager {
             PeerManagerEvent::TrustMetric { pid, feedback } => {
                 self.trust_metric_feedback(pid, feedback)
             }
-            PeerManagerEvent::WhitelistPeersByChainAddr { chain_addrs } => {
-                self.inner.whitelist_peers_by_chain_addr(chain_addrs);
-            }
             PeerManagerEvent::DiscoverMultiAddrs { addrs } => self.dicover_multi_multiaddrs(addrs),
             PeerManagerEvent::IdentifiedAddrs { pid, addrs } => self.identified_addrs(&pid, addrs),
             PeerManagerEvent::AddNewListenAddr { addr } => {
@@ -1421,9 +1321,6 @@ impl Future for PeerManager {
                 self.connect_peers(connectable_peers);
             }
         }
-
-        // Clean expired whitelisted peer
-        self.inner.whitelist.write().retain(|p| !p.is_expired());
 
         Poll::Pending
     }

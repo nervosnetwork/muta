@@ -55,8 +55,9 @@ fn mock_metadata() -> Metadata {
         cycles_price:    1,
         interval:        3000,
         verifier_list:   [ValidatorExtend {
-            bls_pub_key: Hex::from_string("0x04188ef9488c19458a963cc57b567adde7db8f8b6bec392d5cb7b67b0abc1ed6cd966edc451f6ac2ef38079460eb965e890d1f576e4039a20467820237cda753f07a8b8febae1ec052190973a1bcf00690ea8fc0168b3fbbccd1c4e402eda5ef22".to_owned()).unwrap(),
-            address:        Address::from_hex("0xCAB8EEA4799C21379C20EF5BAA2CC8AF1BEC475B").unwrap(),
+            bls_pub_key: Hex::from_string("0x0401139331589f32220ec5f41f6faa0f5c3f4d36af011ab014cefd9d8f36b53b04a2031f681d1c9648a2a5d534d742931b0a5a4132da9ee752c1144d6396bed6cfc635c9687258cec9b60b387d35cf9e13f29091e11ae88024d74ca904c0ea3fb3".to_owned()).unwrap(),
+            pub_key:     Hex::from_string("0x026c184a9016f6f71a234c86b141621f38b68c78602ab06768db4d83682c616004".to_owned()).unwrap(),
+            address:     Address::from_hex("0x76961e339fe2f1f931d84c425754806fb4174c34").unwrap(),
             propose_weight: 1,
             vote_weight:    1,
         }]
