@@ -2,9 +2,9 @@ use futures::channel::mpsc::UnboundedSender;
 use log::error;
 use tentacle::{
     builder::MetaBuilder,
-    context::{ProtocolContext, ProtocolContextMutRef},
+    context::ProtocolContextMutRef,
     service::{ProtocolHandle, ProtocolMeta},
-    traits::ServiceProtocol,
+    traits::SessionProtocol,
     ProtocolId,
 };
 
@@ -27,16 +27,17 @@ impl Transmitter {
             .id(protocol_id)
             .name(name!(NAME))
             .support_versions(support_versions!(SUPPORT_VERSIONS))
-            .service_handle(move || ProtocolHandle::Callback(Box::new(self)))
+            .session_handle(move || {
+                let transmitter = Transmitter {
+                    msg_deliver: self.msg_deliver.clone(),
+                };
+                ProtocolHandle::Callback(Box::new(transmitter))
+            })
             .build()
     }
 }
 
-impl ServiceProtocol for Transmitter {
-    fn init(&mut self, _ctx: &mut ProtocolContext) {
-        // Nothing to init
-    }
-
+impl SessionProtocol for Transmitter {
     fn received(&mut self, ctx: ProtocolContextMutRef, data: tentacle::bytes::Bytes) {
         let pubkey = ctx.session.remote_pubkey.as_ref();
         // Peers without encryption will not able to connect to us.
