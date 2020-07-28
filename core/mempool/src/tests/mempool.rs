@@ -31,6 +31,26 @@ macro_rules! insert {
     };
 }
 
+#[test]
+fn test_dup_order_hashes() {
+    let hashes = vec![
+        Hash::digest(Bytes::from("test1")),
+        Hash::digest(Bytes::from("test2")),
+        Hash::digest(Bytes::from("test3")),
+        Hash::digest(Bytes::from("test4")),
+        Hash::digest(Bytes::from("test2")),
+    ];
+    assert_eq!(check_dup_order_hashes(&hashes).is_err(), true);
+
+    let hashes = vec![
+        Hash::digest(Bytes::from("test1")),
+        Hash::digest(Bytes::from("test2")),
+        Hash::digest(Bytes::from("test3")),
+        Hash::digest(Bytes::from("test4")),
+    ];
+    assert_eq!(check_dup_order_hashes(&hashes).is_err(), false);
+}
+
 #[tokio::test]
 async fn test_insert() {
     // 1. insertion under pool size.

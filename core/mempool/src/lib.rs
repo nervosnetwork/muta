@@ -19,6 +19,7 @@ use std::error::Error;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
+use std::collections::HashSet;
 
 use async_trait::async_trait;
 use derive_more::Display;
@@ -308,6 +309,8 @@ where
         height: Option<u64>,
         order_tx_hashes: Vec<Hash>,
     ) -> ProtocolResult<()> {
+        check_dup_order_hashes(&order_tx_hashes)?;
+
         let unknown_hashes = self.show_unknown_txs(order_tx_hashes).await;
         if !unknown_hashes.is_empty() {
             let unknown_len = unknown_hashes.len();
@@ -369,6 +372,20 @@ where
     }
 }
 
+fn check_dup_order_hashes(order_tx_hashes: &[Hash]) -> ProtocolResult<()> {
+    let mut dup_set = HashSet::with_capacity(order_tx_hashes.len());
+
+    for hash in order_tx_hashes.iter() {
+        if dup_set.contains(hash){
+            return Err(MemPoolError::EnsureDup{ hash: hash.clone() }.into())
+        }
+
+        dup_set.insert(hash.clone());
+    }
+
+    Ok(())
+}
+
 pub enum TxType {
     NewTx,
     ProposeTx,
@@ -411,6 +428,9 @@ pub enum MemPoolError {
 
     #[display(fmt = "Pull txs, require: {}, response: {}", require, response)]
     EnsureBreak { require: usize, response: usize },
+
+    #[display(fmt = "There is duplication in order transactions. duplication tx_hash {:?}", hash)]
+    EnsureDup { hash: Hash },
 
     #[display(fmt = "Fetch full txs, require: {}, response: {}", require, response)]
     MisMatch { require: usize, response: usize },
