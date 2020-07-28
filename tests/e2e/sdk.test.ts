@@ -30,12 +30,12 @@ describe("API test via @mutadev/muta-sdk-js", () => {
  test("transfer work", async () => {
    const from_addr = "muta14e0lmgck835vm2dfm0w3ckv6svmez8fdgdl705";
    const from_pk =
-     "0x02ef0cb0d7bc6c18b4bea1f5908d9106522b35ab3c399369605d4242525bda7e60";
+     "0x5ec982173d54d830b6789cbbbe43eaa2853a5ff752d1ebc1b266cf9790314f8a";
    const to_addr = "muta15a8a9ksxe3hhjpw3l7wz7ry778qg8h9wz8y35p";
     const asset_id =
       "0xf56924db538e77bb5951eb5ff0d02b88983c49c45eea30e8ae3e7234b311436c";
 
-    const account = sdk.Muta.accountFromPrivateKey(from_pk);
+    const account = new sdk.Account(from_pk);
     const assetService = new AssetService(mutaClient, account);
 
     const from_balance_before = await assetService.read.get_balance({
