@@ -20,7 +20,7 @@ use protocol::traits::{Context, MemPool, MemPoolAdapter, MixedTxHashes};
 use protocol::types::{Address, Hash, RawTransaction, SignedTransaction, TransactionRequest};
 use protocol::{Bytes, ProtocolResult};
 
-use crate::{HashMemPool, MemPoolError, check_dup_order_hashes};
+use crate::{check_dup_order_hashes, HashMemPool, MemPoolError};
 
 const CYCLE_LIMIT: u64 = 1_000_000;
 const TX_NUM_LIMIT: u64 = 10_000;

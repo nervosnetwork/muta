@@ -15,11 +15,11 @@ pub use adapter::message::{
 pub use adapter::DefaultMemPoolAdapter;
 pub use adapter::{DEFAULT_BROADCAST_TXS_INTERVAL, DEFAULT_BROADCAST_TXS_SIZE};
 
+use std::collections::HashSet;
 use std::error::Error;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
-use std::collections::HashSet;
 
 use async_trait::async_trait;
 use derive_more::Display;
@@ -376,8 +376,8 @@ fn check_dup_order_hashes(order_tx_hashes: &[Hash]) -> ProtocolResult<()> {
     let mut dup_set = HashSet::with_capacity(order_tx_hashes.len());
 
     for hash in order_tx_hashes.iter() {
-        if dup_set.contains(hash){
-            return Err(MemPoolError::EnsureDup{ hash: hash.clone() }.into())
+        if dup_set.contains(hash) {
+            return Err(MemPoolError::EnsureDup { hash: hash.clone() }.into());
         }
 
         dup_set.insert(hash.clone());
@@ -429,7 +429,10 @@ pub enum MemPoolError {
     #[display(fmt = "Pull txs, require: {}, response: {}", require, response)]
     EnsureBreak { require: usize, response: usize },
 
-    #[display(fmt = "There is duplication in order transactions. duplication tx_hash {:?}", hash)]
+    #[display(
+        fmt = "There is duplication in order transactions. duplication tx_hash {:?}",
+        hash
+    )]
     EnsureDup { hash: Hash },
 
     #[display(fmt = "Fetch full txs, require: {}, response: {}", require, response)]
