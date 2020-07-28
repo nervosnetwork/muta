@@ -35,7 +35,7 @@ use crate::message::{
     BROADCAST_HEIGHT, RPC_SYNC_PULL_BLOCK, RPC_SYNC_PULL_PROOF, RPC_SYNC_PULL_TXS,
 };
 use crate::status::{ExecutedInfo, StatusAgent};
-use crate::util::{convert_hex_to_bls_pubkeys, time_now, ExecuteInfo, OverlordCrypto};
+use crate::util::{convert_hex_to_bls_pubkeys, ExecuteInfo, OverlordCrypto};
 use crate::BlockHeaderField::{PreviousBlockHash, ProofHash, Proposer};
 use crate::BlockProofField::{BitMap, HashMismatch, HeightMismatch, Signature, WeightNotFound};
 use crate::{BlockHeaderField, BlockProofField, ConsensusError};
@@ -572,20 +572,6 @@ where
                 (address, node)
             })
             .collect::<HashMap<_, _>>();
-
-        // verify block timestamp.
-        let timestamp = block.header.timestamp;
-        let current_timestamp = time_now();
-        let consensus_interval = previous_metadata.interval;
-
-        // The previous block timestamp should be less than proposal timestamp.
-        if previous_block.header.timestamp > timestamp {
-            return Err(ConsensusError::InvalidTimestamp.into());
-        }
-
-        if !validate_timestamp(current_timestamp, timestamp, consensus_interval) {
-            return Err(ConsensusError::InvalidTimestamp.into());
-        }
 
         // TODO: useless check
         // check proposer

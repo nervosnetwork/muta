@@ -193,7 +193,21 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
                 .adapter
                 .get_block_by_height(ctx.clone(), block.inner.block.header.height - 1)
                 .await?;
+            
+            // verify block timestamp.
+            let timestamp = block.inner.block.header.timestamp;
+            let current_timestamp = time_now();
+            let consensus_interval = previous_metadata.interval;
 
+            // The previous block timestamp should be less than proposal timestamp.
+            if previous_block.header.timestamp > timestamp {
+                return Err(ConsensusError::InvalidTimestamp.into());
+            }
+
+            if !validate_timestamp(current_timestamp, timestamp, consensus_interval) {
+                return Err(ConsensusError::InvalidTimestamp.into());
+            }
+            
             self.adapter
                 .verify_proof(
                     ctx.clone(),
