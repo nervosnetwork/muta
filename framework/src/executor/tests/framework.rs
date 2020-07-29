@@ -16,7 +16,7 @@ use protocol::ProtocolResult;
 use std::sync::Arc;
 
 lazy_static::lazy_static! {
-    pub static ref ADMIN_ACCOUNT: Address = Address::from_hex("0xcff1002107105460941f797828f468667aa1a2db").unwrap();
+   pub static ref ADMIN_ACCOUNT: Address = "muta14e0lmgck835vm2dfm0w3ckv6svmez8fdgdl705".parse().unwrap();
 }
 
 macro_rules! exec_txs {

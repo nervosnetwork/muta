@@ -443,8 +443,11 @@ mod tests {
         let chain_id = rand_hash.clone();
         let nonce = rand_hash.clone();
         let tx_hash = rand_hash;
-        let add_str = "10CAB8EEA4799C21379C20EF5BAA2CC8AF1BEC475B";
-        let bytes = Bytes::from(hex::decode(add_str).unwrap());
+        let pubkey = {
+            let hex_str = "03380295981e77dcd0a3f50c1d58867e590f2837f03daf639d683ec5e995c02984";
+            Bytes::from(hex::decode(hex_str).unwrap())
+        };
+        let fake_sig = Hash::digest(pubkey.clone()).as_bytes();
 
         let request = TransactionRequest {
             service_name: "test".to_owned(),
@@ -459,13 +462,13 @@ mod tests {
             cycles_limit: TX_CYCLE,
             cycles_price: 1,
             request,
-            sender: Address::from_pubkey_bytes(bytes.clone()).unwrap(),
+            sender: Address::from_pubkey_bytes(pubkey.clone()).unwrap(),
         };
         SignedTransaction {
             raw,
             tx_hash,
-            pubkey: bytes.clone(),
-            signature: bytes,
+            pubkey,
+            signature: fake_sig,
         }
     }
 

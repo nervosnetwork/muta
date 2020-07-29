@@ -149,7 +149,7 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
         }
         let payload_str = payload_res.unwrap();
 
-        let id = Hash::digest(Bytes::from(payload_str + &caller.as_hex()));
+        let id = Hash::digest(Bytes::from(payload_str + &caller.to_string()));
 
         if self.assets.contains(&id) {
             return ServiceResponse::<Asset>::from_error(102, "asset id existed".to_owned());

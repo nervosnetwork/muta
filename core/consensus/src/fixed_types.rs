@@ -177,6 +177,7 @@ impl FixedSignedTxs {
 #[cfg(test)]
 mod test {
     use std::convert::From;
+    use std::str::FromStr;
 
     use futures::executor;
     use rand::random;
@@ -189,11 +190,11 @@ mod test {
 
     use super::{FixedBlock, FixedSignedTxs};
 
-    const PUB_KEY_STR: &str = "031288a6788678c25952eba8693b2f278f66e2187004b64ac09416d07f83f96d5b";
+    const PUB_KEY_STR: &str = "02ee34d1ce8270cd236e9455d4ab9e756c4478779b1a20d7ce1c247af61ec2be3b";
 
     fn gen_block(height: u64, block_hash: Hash) -> Block {
         let nonce = Hash::digest(Bytes::from("XXXX"));
-        let addr_str = "0xCAB8EEA4799C21379C20EF5BAA2CC8AF1BEC475B";
+        let addr_str = "muta14e0lmgck835vm2dfm0w3ckv6svmez8fdgdl705";
         let header = BlockHeader {
             chain_id: nonce.clone(),
             height,
@@ -206,7 +207,7 @@ mod test {
             state_root: nonce,
             receipt_root: Vec::new(),
             cycles_used: vec![999_999],
-            proposer: Address::from_hex(addr_str).unwrap(),
+            proposer: Address::from_str(addr_str).unwrap(),
             proof: mock_proof(block_hash),
             validator_version: 1,
             validators: Vec::new(),

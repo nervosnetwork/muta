@@ -3,7 +3,7 @@
 pub use ophelia::HashValue;
 pub use ophelia::{
     BlsSignatureVerify, Crypto, Error, PrivateKey, PublicKey, Signature, ToBlsPublicKey,
-    ToPublicKey,
+    ToPublicKey, UncompressedPublicKey,
 };
 pub use ophelia_bls_amcl::{BlsCommonReference, BlsPrivateKey, BlsPublicKey, BlsSignature};
 pub use ophelia_secp256k1::{

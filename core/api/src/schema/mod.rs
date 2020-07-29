@@ -57,8 +57,8 @@ impl Hash {
 }
 
 impl Address {
-    pub fn as_hex(&self) -> String {
-        self.0.to_uppercase()
+    pub fn to_str(&self) -> &str {
+        &self.0
     }
 }
 
@@ -92,7 +92,7 @@ impl From<protocol::types::Hash> for Hash {
 
 impl From<protocol::types::Address> for Address {
     fn from(address: protocol::types::Address) -> Self {
-        Address(address.as_hex())
+        Address(address.to_string())
     }
 }
 

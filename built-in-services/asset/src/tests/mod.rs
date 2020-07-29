@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::str::FromStr;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -22,7 +23,7 @@ use crate::AssetService;
 #[test]
 fn test_create_asset() {
     let cycles_limit = 1024 * 1024 * 1024; // 1073741824
-    let caller = Address::from_hex("0x755cdba6ae4f479f7164792b318b2a06c759833b").unwrap();
+    let caller = Address::from_str("muta14e0lmgck835vm2dfm0w3ckv6svmez8fdgdl705").unwrap();
     let context = mock_context(cycles_limit, caller.clone());
 
     let mut service = new_asset_service();
@@ -57,7 +58,7 @@ fn test_create_asset() {
 #[test]
 fn test_transfer() {
     let cycles_limit = 1024 * 1024 * 1024; // 1073741824
-    let caller = Address::from_hex("0x755cdba6ae4f479f7164792b318b2a06c759833b").unwrap();
+    let caller = Address::from_str("muta14e0lmgck835vm2dfm0w3ckv6svmez8fdgdl705").unwrap();
     let context = mock_context(cycles_limit, caller.clone());
 
     let mut service = new_asset_service();
@@ -72,7 +73,7 @@ fn test_transfer() {
         })
         .succeed_data;
 
-    let to_address = Address::from_hex("0x666cdba6ae4f479f7164792b318b2a06c759833b").unwrap();
+    let to_address = Address::from_str("muta15a8a9ksxe3hhjpw3l7wz7ry778qg8h9wz8y35p").unwrap();
     service.transfer(context.clone(), TransferPayload {
         asset_id: asset.id.clone(),
         to:       to_address.clone(),
@@ -100,7 +101,7 @@ fn test_transfer() {
 #[test]
 fn test_approve() {
     let cycles_limit = 1024 * 1024 * 1024; // 1073741824
-    let caller = Address::from_hex("0x755cdba6ae4f479f7164792b318b2a06c759833b").unwrap();
+    let caller = Address::from_str("muta14e0lmgck835vm2dfm0w3ckv6svmez8fdgdl705").unwrap();
     let context = mock_context(cycles_limit, caller.clone());
 
     let mut service = new_asset_service();
@@ -114,7 +115,7 @@ fn test_approve() {
         })
         .succeed_data;
 
-    let to_address = Address::from_hex("0x666cdba6ae4f479f7164792b318b2a06c759833b").unwrap();
+    let to_address = Address::from_str("muta15a8a9ksxe3hhjpw3l7wz7ry778qg8h9wz8y35p").unwrap();
     service.approve(context.clone(), ApprovePayload {
         asset_id: asset.id.clone(),
         to:       to_address.clone(),
@@ -136,7 +137,7 @@ fn test_approve() {
 #[test]
 fn test_transfer_from() {
     let cycles_limit = 1024 * 1024 * 1024; // 1073741824
-    let caller = Address::from_hex("0x755cdba6ae4f479f7164792b318b2a06c759833b").unwrap();
+    let caller = Address::from_str("muta14e0lmgck835vm2dfm0w3ckv6svmez8fdgdl705").unwrap();
     let context = mock_context(cycles_limit, caller.clone());
 
     let mut service = new_asset_service();
@@ -150,7 +151,7 @@ fn test_transfer_from() {
         })
         .succeed_data;
 
-    let to_address = Address::from_hex("0x666cdba6ae4f479f7164792b318b2a06c759833b").unwrap();
+    let to_address = Address::from_str("muta15a8a9ksxe3hhjpw3l7wz7ry778qg8h9wz8y35p").unwrap();
     service.approve(context.clone(), ApprovePayload {
         asset_id: asset.id.clone(),
         to:       to_address.clone(),

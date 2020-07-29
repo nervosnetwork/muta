@@ -161,7 +161,7 @@ impl Query {
             None => 1,
         };
 
-        let address = protocol::types::Address::from_hex(&caller.as_hex())?;
+        let address: protocol::types::Address = caller.to_str().parse()?;
 
         let exec_resp = state_ctx
             .adapter

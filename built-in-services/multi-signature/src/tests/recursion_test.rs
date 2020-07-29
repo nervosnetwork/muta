@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use crate::types::{GenerateMultiSigAccountPayload, VerifySignaturePayload};
 
 use super::*;
@@ -5,7 +7,7 @@ use super::*;
 #[test]
 fn test_recursion_verify_signature() {
     let cycles_limit = 1024 * 1024 * 1024; // 1073741824
-    let caller = Address::from_hex("0x755cdba6ae4f479f7164792b318b2a06c759833b").unwrap();
+    let caller = Address::from_str("muta14e0lmgck835vm2dfm0w3ckv6svmez8fdgdl705").unwrap();
     let mut service = new_multi_signature_service();
     let owner = Address::from_pubkey_bytes(gen_one_keypair().1).unwrap();
 
@@ -78,7 +80,7 @@ fn test_recursion_verify_signature() {
 #[test]
 fn test_recursion_depth() {
     let cycles_limit = 1024 * 1024 * 1024; // 1073741824
-    let caller = Address::from_hex("0x755cdba6ae4f479f7164792b318b2a06c759833b").unwrap();
+    let caller = Address::from_str("muta14e0lmgck835vm2dfm0w3ckv6svmez8fdgdl705").unwrap();
     let mut service = new_multi_signature_service();
     let owner_keypair = gen_one_keypair();
     let owner = Address::from_pubkey_bytes(owner_keypair.1).unwrap();

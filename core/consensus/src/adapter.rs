@@ -23,7 +23,7 @@ use protocol::traits::{
 };
 use protocol::types::{
     Address, Block, Bytes, Hash, Hex, MerkleRoot, Metadata, Proof, Receipt, SignedTransaction,
-    TransactionRequest, Validator,
+    TransactionRequest, Validator, ADDRESS_HRP,
 };
 use protocol::{fixed_codec::FixedCodec, ProtocolResult};
 
@@ -474,7 +474,7 @@ where
             Arc::clone(&self.service_mapping),
         )?;
 
-        let caller = Address::from_hex("0x0000000000000000000000000000000000000000")?;
+        let caller = Address::from_hash(Hash::digest(Bytes::from_static(ADDRESS_HRP.as_bytes())))?;
 
         let params = ExecutorParams {
             state_root,

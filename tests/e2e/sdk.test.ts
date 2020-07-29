@@ -25,17 +25,17 @@ describe("API test via @mutadev/muta-sdk-js", () => {
   test("getNoneReceipt", async () => {
     let receipt = await mutaClient.getReceipt("0xf56924db538e77bb5951eb5ff0d02b88983c49c45eea30e8ae3e7234b311436c");
     expect(receipt).toBe(null);
-  })
+ })
 
-  test("transfer work", async () => {
-    const from_addr = "0xf8389d774afdad8755ef8e629e5a154fddc6325a";
-    const from_pk =
-      "0x45c56be699dca666191ad3446897e0f480da234da896270202514a0e1a587c3f";
-    const to_addr = "0x0000000000000000000000000000000000000001";
+ test("transfer work", async () => {
+   const from_addr = "muta14e0lmgck835vm2dfm0w3ckv6svmez8fdgdl705";
+   const from_pk =
+     "0x5ec982173d54d830b6789cbbbe43eaa2853a5ff752d1ebc1b266cf9790314f8a";
+   const to_addr = "muta15a8a9ksxe3hhjpw3l7wz7ry778qg8h9wz8y35p";
     const asset_id =
       "0xf56924db538e77bb5951eb5ff0d02b88983c49c45eea30e8ae3e7234b311436c";
 
-    const account = sdk.Muta.accountFromPrivateKey(from_pk);
+    const account = new sdk.Account(from_pk);
     const assetService = new AssetService(mutaClient, account);
 
     const from_balance_before = await assetService.read.get_balance({

@@ -15,7 +15,7 @@ use tokio::signal::unix::{self as os_impl};
 
 use common_crypto::{
     BlsCommonReference, BlsPrivateKey, BlsPublicKey, PublicKey, Secp256k1, Secp256k1PrivateKey,
-    ToPublicKey,
+    ToPublicKey, UncompressedPublicKey,
 };
 use core_api::adapter::DefaultAPIAdapter;
 use core_api::config::GraphQLConfig;
@@ -43,7 +43,9 @@ use core_storage::{adapter::rocks::RocksAdapter, ImplStorage, StorageError};
 use framework::binding::state::RocksTrieDB;
 use framework::executor::{ServiceExecutor, ServiceExecutorFactory};
 use protocol::traits::{APIAdapter, Context, MemPool, Network, NodeInfo, ServiceMapping, Storage};
-use protocol::types::{Address, Block, BlockHeader, Genesis, Hash, Metadata, Proof, Validator};
+use protocol::types::{
+    Address, Block, BlockHeader, Genesis, Hash, Metadata, Proof, Validator, ADDRESS_HRP,
+};
 use protocol::{fixed_codec::FixedCodec, ProtocolResult};
 
 use crate::config::Config;
@@ -107,6 +109,7 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
     )?;
 
     // Build genesis block.
+    let proposer = Address::from_hash(Hash::digest(Bytes::from_static(ADDRESS_HRP.as_bytes())))?;
     let genesis_block_header = BlockHeader {
         chain_id: metadata.chain_id.clone(),
         height: 0,
@@ -119,7 +122,7 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
         state_root: genesis_state_root,
         receipt_root: vec![],
         cycles_used: vec![],
-        proposer: Address::from_hex("0x0000000000000000000000000000000000000000")?,
+        proposer,
         proof: Proof {
             height:     0,
             round:      0,
@@ -239,7 +242,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     let my_privkey =
         Secp256k1PrivateKey::try_from(hex_privkey.as_ref()).map_err(MainError::Crypto)?;
     let my_pubkey = my_privkey.pub_key();
-    let my_address = Address::from_pubkey_bytes(my_pubkey.to_bytes())?;
+    let my_address = Address::from_pubkey_bytes(my_pubkey.to_uncompressed_bytes())?;
 
     // Get metadata
     let api_adapter = DefaultAPIAdapter::<ServiceExecutorFactory, _, _, _, _>::new(

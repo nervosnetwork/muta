@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::str::FromStr;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -19,7 +20,7 @@ use crate::MetadataService;
 #[test]
 fn test_get_metadata() {
     let cycles_limit = 1024 * 1024 * 1024; // 1073741824
-    let caller = Address::from_hex("0x755cdba6ae4f479f7164792b318b2a06c759833b").unwrap();
+    let caller = Address::from_str("muta14e0lmgck835vm2dfm0w3ckv6svmez8fdgdl705").unwrap();
     let context = mock_context(cycles_limit, caller);
 
     let init_metadata = mock_metadata();
@@ -53,14 +54,14 @@ fn mock_metadata() -> Metadata {
         timeout_gap:     20,
         cycles_limit:    99_999_999,
         cycles_price:    1,
-        interval:        3000,
-        verifier_list:   [ValidatorExtend {
-            bls_pub_key: Hex::from_string("0x0401139331589f32220ec5f41f6faa0f5c3f4d36af011ab014cefd9d8f36b53b04a2031f681d1c9648a2a5d534d742931b0a5a4132da9ee752c1144d6396bed6cfc635c9687258cec9b60b387d35cf9e13f29091e11ae88024d74ca904c0ea3fb3".to_owned()).unwrap(),
-            pub_key:     Hex::from_string("0x026c184a9016f6f71a234c86b141621f38b68c78602ab06768db4d83682c616004".to_owned()).unwrap(),
-            address:     Address::from_hex("0x76961e339fe2f1f931d84c425754806fb4174c34").unwrap(),
-            propose_weight: 1,
-            vote_weight:    1,
-        }]
+       interval:        3000,
+       verifier_list:   [ValidatorExtend {
+           bls_pub_key: Hex::from_string("0x04102947214862a503c73904deb5818298a186d68c7907bb609583192a7de6331493835e5b8281f4d9ee705537c0e765580e06f86ddce5867812fceb42eecefd209f0eddd0389d6b7b0100f00fb119ef9ab23826c6ea09aadcc76fa6cea6a32724".to_owned()).unwrap(),
+           pub_key:     Hex::from_string("0x02ef0cb0d7bc6c18b4bea1f5908d9106522b35ab3c399369605d4242525bda7e60".to_owned()).unwrap(),
+           address:     Address::from_str("muta14e0lmgck835vm2dfm0w3ckv6svmez8fdgdl705").unwrap(),
+           propose_weight: 1,
+           vote_weight:    1,
+       }]
         .to_vec(),
         propose_ratio:   10,
         prevote_ratio:   10,

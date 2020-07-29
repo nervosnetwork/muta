@@ -28,6 +28,7 @@ use std::{
     iter::FromIterator,
     net::{IpAddr, Ipv4Addr, SocketAddr},
     ops::Deref,
+    str::FromStr,
 };
 
 #[derive(Debug, Display)]
@@ -302,7 +303,7 @@ fn full_node_peer_id() -> PeerId {
 fn mock_block(height: u64) -> Block {
     let block_hash = Hash::digest(Bytes::from("22"));
     let nonce = Hash::digest(Bytes::from("33"));
-    let addr_str = "0xCAB8EEA4799C21379C20EF5BAA2CC8AF1BEC475B";
+    let addr_str = "muta14e0lmgck835vm2dfm0w3ckv6svmez8fdgdl705";
 
     let proof = Proof {
         height: 0,
@@ -324,7 +325,7 @@ fn mock_block(height: u64) -> Block {
         state_root: nonce,
         receipt_root: Vec::new(),
         cycles_used: vec![999_999],
-        proposer: Address::from_hex(addr_str).unwrap(),
+        proposer: Address::from_str(addr_str).unwrap(),
         proof,
         validator_version: 1,
         validators: Vec::new(),
