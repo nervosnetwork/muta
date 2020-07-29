@@ -1,11 +1,10 @@
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::atomic::AtomicU64;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::task::{Context, Poll};
 
 use arc_swap::ArcSwapOption;
-use dashmap::DashMap;
 use futures::channel::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use futures::channel::oneshot;
 use futures::stream::Stream;
@@ -16,7 +15,8 @@ use tentacle::secio::PeerId;
 use tentacle::service::TargetSession;
 use tentacle::SessionId;
 
-use super::message::{Recipient, TransmitterMessage};
+use super::message::{InternalMessage, Recipient, TransmitterMessage};
+use super::MAX_CHUNK_SIZE;
 
 use crate::connection::{ConnectionServiceControl, ProtocolMessage};
 use crate::error::{ErrorKind, NetworkError};
@@ -47,13 +47,8 @@ impl TransmitterBehaviour {
     ) {
         let (pending_sending_tx, pending_sending_rx) = mpsc::unbounded();
 
-        let background_sending = BackgroundSending {
-            conn_ctrl,
-            peers_serv,
-            sessions,
-            session_seq: DashMap::new(),
-            pending_sending_rx,
-        };
+        let background_sending =
+            BackgroundSending::new(conn_ctrl, peers_serv, sessions, pending_sending_rx);
         tokio::spawn(background_sending);
 
         self.pending_sending_tx
@@ -97,21 +92,37 @@ struct PendingSending {
 }
 
 struct BackgroundSending {
-    conn_ctrl:          ConnectionServiceControl,
-    peers_serv:         UnboundedSender<PeerManagerEvent>,
-    sessions:           SharedSessions,
-    session_seq:        DashMap<SessionId, AtomicU64>, /* Maintain data seq number for every
-                                                        * session */
+    conn_ctrl:  ConnectionServiceControl,
+    peers_serv: UnboundedSender<PeerManagerEvent>,
+    sessions:   SharedSessions,
+    data_seq:   AtomicU64,
+
     pending_sending_rx: UnboundedReceiver<PendingSending>,
 }
 
 impl BackgroundSending {
+    pub fn new(
+        conn_ctrl: ConnectionServiceControl,
+        peers_serv: UnboundedSender<PeerManagerEvent>,
+        sessions: SharedSessions,
+        pending_sending_rx: UnboundedReceiver<PendingSending>,
+    ) -> Self {
+        BackgroundSending {
+            conn_ctrl,
+            peers_serv,
+            sessions,
+            data_seq: AtomicU64::new(0),
+
+            pending_sending_rx,
+        }
+    }
+
     pub fn context(&self) -> SendingContext<'_> {
         SendingContext {
-            conn_ctrl:   &self.conn_ctrl,
-            peers_serv:  &self.peers_serv,
-            sessions:    &self.sessions,
-            session_seq: &self.session_seq,
+            conn_ctrl:  &self.conn_ctrl,
+            peers_serv: &self.peers_serv,
+            sessions:   &self.sessions,
+            data_seq:   &self.data_seq,
         }
     }
 }
@@ -140,10 +151,10 @@ impl Future for BackgroundSending {
 }
 
 struct SendingContext<'a> {
-    conn_ctrl:   &'a ConnectionServiceControl,
-    peers_serv:  &'a UnboundedSender<PeerManagerEvent>,
-    sessions:    &'a SharedSessions,
-    session_seq: &'a DashMap<SessionId, AtomicU64>,
+    conn_ctrl:  &'a ConnectionServiceControl,
+    peers_serv: &'a UnboundedSender<PeerManagerEvent>,
+    sessions:   &'a SharedSessions,
+    data_seq:   &'a AtomicU64,
 }
 
 impl<'a> SendingContext<'a> {
@@ -159,7 +170,7 @@ impl<'a> SendingContext<'a> {
     fn send_to_sessions(
         &self,
         target: TargetSession,
-        data: Bytes,
+        mut data: Bytes,
         priority: Priority,
     ) -> Result<(), NetworkError> {
         let (target, opt_blocked) = match self.filter_blocked(target) {
@@ -173,24 +184,96 @@ impl<'a> SendingContext<'a> {
             (Some(tar), opt_blocked) => (tar, opt_blocked),
         };
 
-        let proto_msg = ProtocolMessage {
-            protocol_id: TRANSMITTER_PROTOCOL_ID.into(),
-            target,
-            data,
-            priority,
-        };
+        let seq = self.data_seq.fetch_add(1, Ordering::SeqCst);
 
-        let ret = self.conn_ctrl.send(proto_msg).map_err(|err| match &err {
-            SendErrorKind::BrokenPipe => NetworkError::Shutdown,
-            SendErrorKind::WouldBlock => NetworkError::Busy,
-        });
+        if data.len() < MAX_CHUNK_SIZE {
+            let internal_msg = InternalMessage {
+                seq,
+                eof: true,
+                data,
+            };
 
-        if ret.is_err() || opt_blocked.is_some() {
-            let other = ret.err();
-            return Err(NetworkError::Send {
-                blocked: opt_blocked,
-                other:   other.map(NetworkError::boxed),
+            let proto_msg = ProtocolMessage {
+                protocol_id: TRANSMITTER_PROTOCOL_ID.into(),
+                target,
+                data: internal_msg.encode(),
+                priority,
+            };
+
+            let ret = self.conn_ctrl.send(proto_msg).map_err(|err| match &err {
+                SendErrorKind::BrokenPipe => NetworkError::Shutdown,
+                SendErrorKind::WouldBlock => NetworkError::Busy,
             });
+
+            if ret.is_err() || opt_blocked.is_some() {
+                let other = ret.err();
+                return Err(NetworkError::Send {
+                    blocked: opt_blocked,
+                    other:   other.map(NetworkError::boxed),
+                });
+            }
+
+            return Ok(());
+        }
+
+        while !data.is_empty() {
+            if data.len() > MAX_CHUNK_SIZE {
+                let chunk = data.split_to(MAX_CHUNK_SIZE);
+
+                let internal_msg = InternalMessage {
+                    seq,
+                    eof: false,
+                    data: chunk,
+                };
+
+                let proto_msg = ProtocolMessage {
+                    protocol_id: TRANSMITTER_PROTOCOL_ID.into(),
+                    target: target.clone(),
+                    data: internal_msg.encode(),
+                    priority,
+                };
+
+                let ret = self.conn_ctrl.send(proto_msg).map_err(|err| match &err {
+                    SendErrorKind::BrokenPipe => NetworkError::Shutdown,
+                    SendErrorKind::WouldBlock => NetworkError::Busy,
+                });
+
+                if ret.is_err() {
+                    let other = ret.err();
+                    return Err(NetworkError::Send {
+                        blocked: opt_blocked,
+                        other:   other.map(NetworkError::boxed),
+                    });
+                }
+            } else {
+                let last_data = std::mem::replace(&mut data, Bytes::new());
+
+                let internal_msg = InternalMessage {
+                    seq,
+                    eof: true,
+                    data: last_data,
+                };
+
+                let proto_msg = ProtocolMessage {
+                    protocol_id: TRANSMITTER_PROTOCOL_ID.into(),
+                    target: target.clone(),
+                    data: internal_msg.encode(),
+                    priority,
+                };
+
+                let ret = self.conn_ctrl.send(proto_msg).map_err(|err| match &err {
+                    SendErrorKind::BrokenPipe => NetworkError::Shutdown,
+                    SendErrorKind::WouldBlock => NetworkError::Busy,
+                });
+
+                if ret.is_err() || opt_blocked.is_some() {
+                    let other = ret.err();
+                    return Err(NetworkError::Send {
+                        blocked: opt_blocked,
+                        other:   other.map(NetworkError::boxed),
+                    });
+                }
+            }
         }
 
         Ok(())

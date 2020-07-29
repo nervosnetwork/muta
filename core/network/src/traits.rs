@@ -1,17 +1,14 @@
 use std::borrow::Cow;
 
-use protocol::{traits::Context, Bytes};
-use tentacle::{
-    multiaddr::Multiaddr,
-    secio::PeerId,
-    service::{ProtocolMeta, TargetProtocol},
-    SessionId,
-};
+use protocol::traits::Context;
+use protocol::Bytes;
+use tentacle::multiaddr::Multiaddr;
+use tentacle::secio::PeerId;
+use tentacle::service::{ProtocolMeta, TargetProtocol};
+use tentacle::SessionId;
 
-use crate::{
-    common::ConnectedAddr,
-    error::{ErrorKind, NetworkError},
-};
+use crate::common::ConnectedAddr;
+use crate::error::{ErrorKind, NetworkError};
 
 pub trait NetworkProtocol {
     fn target() -> TargetProtocol;

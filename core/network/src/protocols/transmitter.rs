@@ -2,6 +2,8 @@ mod behaviour;
 mod message;
 mod protocol;
 
+use std::time::Duration;
+
 use futures::channel::mpsc::UnboundedSender;
 use tentacle::builder::MetaBuilder;
 use tentacle::service::{ProtocolHandle, ProtocolMeta};
@@ -13,6 +15,8 @@ pub use message::{ReceivedMessage, Recipient, TransmitterMessage};
 
 pub const NAME: &str = "chain_transmitter";
 pub const SUPPORT_VERSIONS: [&str; 1] = ["0.3"];
+pub const DATA_SEQ_TIMEOUT: Duration = Duration::from_secs(60);
+pub const MAX_CHUNK_SIZE: usize = 1000 * 1000; // 1MB
 
 #[derive(Clone)]
 pub struct Transmitter {
