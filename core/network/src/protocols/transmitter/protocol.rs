@@ -6,7 +6,7 @@ use tentacle::context::ProtocolContextMutRef;
 use tentacle::traits::SessionProtocol;
 
 use super::message::{InternalMessage, ReceivedMessage};
-use super::DATA_SEQ_TIMEOUT;
+use super::{DATA_SEQ_TIMEOUT, MAX_CHUNK_SIZE};
 
 pub struct TransmitterProtocol {
     data_tx:            UnboundedSender<ReceivedMessage>,
@@ -38,6 +38,17 @@ impl SessionProtocol for TransmitterProtocol {
         };
 
         let InternalMessage { seq, eof, data } = InternalMessage::decode(data);
+
+        if data.len() > MAX_CHUNK_SIZE {
+            log::warn!(
+                "session {} data size exceed {}, drop it",
+                ctx.session.id,
+                MAX_CHUNK_SIZE
+            );
+
+            return;
+        }
+
         if seq == self.current_data_seq {
             if self.first_seq_bytes_at.elapsed() > DATA_SEQ_TIMEOUT {
                 log::warn!(
