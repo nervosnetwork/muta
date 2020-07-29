@@ -38,11 +38,6 @@ pub struct GenerateMultiSigAccountPayload {
     pub memo:             String,
 }
 
-#[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug, Default)]
-pub struct GenerateMultiSigAccountResponse {
-    pub address: Address,
-}
-
 #[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug)]
 pub struct VerifySignaturePayload {
     pub tx_hash:    Hash,

@@ -61,7 +61,7 @@ fn test_generate_multi_signature() {
     assert!(!multi_sig_address.is_error());
 
     // test get permission by multi-signature address
-    let addr = multi_sig_address.succeed_data.address;
+    let addr = multi_sig_address.succeed_data;
     let permission = service.get_account_from_address(context, GetMultiSigAccountPayload {
         multi_sig_address: addr,
     });
@@ -93,8 +93,7 @@ fn test_set_threshold() {
             threshold:        3,
             memo:             String::new(),
         })
-        .succeed_data
-        .address;
+        .succeed_data;
 
     // test new threshold above sum of the weights
     let res = service.set_threshold(context.clone(), SetThresholdPayload {
@@ -133,8 +132,7 @@ fn test_adeption_address() {
             threshold:        3,
             memo:             String::new(),
         })
-        .succeed_data
-        .address;
+        .succeed_data;
 
     let permission = service.get_account_from_address(context, GetMultiSigAccountPayload {
         multi_sig_address: multi_sig_address.clone(),
@@ -161,8 +159,7 @@ fn test_add_account() {
             threshold:        3,
             memo:             String::new(),
         })
-        .succeed_data
-        .address;
+        .succeed_data;
 
     // test add new account success
     let new_keypair = gen_one_keypair();
@@ -214,8 +211,7 @@ fn test_update_account() {
             threshold:        4,
             memo:             String::new(),
         })
-        .succeed_data
-        .address;
+        .succeed_data;
 
     let new_owner = gen_one_keypair();
     let new_owner_address = Address::from_pubkey_bytes(new_owner.1).unwrap();
@@ -271,8 +267,7 @@ fn test_set_weight() {
             threshold:        4,
             memo:             String::new(),
         })
-        .succeed_data
-        .address;
+        .succeed_data;
     let to_be_changed_address = Address::from_pubkey_bytes(keypairs[0].1.clone()).unwrap();
 
     // test set weight success
@@ -325,8 +320,7 @@ fn test_remove_account() {
             threshold:        3,
             memo:             String::new(),
         })
-        .succeed_data
-        .address;
+        .succeed_data;
     let to_be_removed_address = Address::from_pubkey_bytes(keypairs[3].1.clone()).unwrap();
 
     let res = service.remove_account(context.clone(), RemoveAccountPayload {

@@ -27,8 +27,7 @@ fn test_recursion_verify_signature() {
                 memo:             String::new(),
             },
         )
-        .succeed_data
-        .address;
+        .succeed_data;
 
     let keypairs = gen_keypairs(3);
     let mut multi_sig_account = keypairs
@@ -51,8 +50,7 @@ fn test_recursion_verify_signature() {
                 memo: String::new(),
             },
         )
-        .succeed_data
-        .address;
+        .succeed_data;
 
     let ctx = mock_context(cycles_limit, caller);
     let tx_hash = ctx.get_tx_hash().unwrap();
@@ -105,8 +103,7 @@ fn test_recursion_depth() {
                 memo:             String::new(),
             },
         )
-        .succeed_data
-        .address;
+        .succeed_data;
 
     for _i in 0..7 {
         let new_keypairs = gen_keypairs(3);
@@ -132,7 +129,7 @@ fn test_recursion_depth() {
         );
 
         assert_eq!(res.is_error(), false);
-        sender = res.succeed_data.address;
+        sender = res.succeed_data;
     }
 
     let res = service.generate_account(
