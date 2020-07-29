@@ -73,6 +73,9 @@ pub enum ErrorKind {
 
     #[display(fmt = "kind: untaggable {}", _0)]
     Untaggable(String),
+
+    #[display(fmt = "kind: internal {}", _0)]
+    Internal(String),
 }
 
 impl Error for ErrorKind {}

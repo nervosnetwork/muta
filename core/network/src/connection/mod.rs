@@ -1,31 +1,28 @@
 mod control;
 mod keeper;
-pub use control::ConnectionServiceControl;
+
+pub use control::{ConnectionServiceControl, ProtocolMessage};
 pub use keeper::ConnectionServiceKeeper;
 
-use std::{
-    collections::VecDeque,
-    future::Future,
-    marker::PhantomData,
-    pin::Pin,
-    task::{Context, Poll},
-    time::Duration,
-};
+use std::collections::VecDeque;
+use std::future::Future;
+use std::marker::PhantomData;
+use std::pin::Pin;
+use std::task::{Context, Poll};
+use std::time::Duration;
 
-use futures::{
-    channel::mpsc::UnboundedReceiver, channel::mpsc::UnboundedSender, pin_mut, stream::Stream,
-};
+use futures::channel::mpsc::UnboundedReceiver;
+use futures::stream::Stream;
 use log::debug;
-use tentacle::{
-    builder::ServiceBuilder, error::SendErrorKind, multiaddr::Multiaddr, secio::SecioKeyPair,
-    service::Service,
-};
+use tentacle::builder::ServiceBuilder;
+use tentacle::error::SendErrorKind;
+use tentacle::multiaddr::Multiaddr;
+use tentacle::secio::SecioKeyPair;
+use tentacle::service::Service;
 
-use crate::{
-    error::NetworkError,
-    event::{ConnectionEvent, PeerManagerEvent},
-    traits::{NetworkProtocol, SessionBook},
-};
+use crate::error::NetworkError;
+use crate::event::ConnectionEvent;
+use crate::traits::NetworkProtocol;
 
 pub struct ConnectionConfig {
     /// Secio keypair for stream encryption and peer identity
@@ -114,14 +111,8 @@ impl<P: NetworkProtocol> ConnectionService<P> {
         Ok(())
     }
 
-    pub fn control<B: SessionBook>(
-        &self,
-        mgr_tx: UnboundedSender<PeerManagerEvent>,
-        book: B,
-    ) -> ConnectionServiceControl<P, B> {
-        let control_ref = self.inner.control();
-
-        ConnectionServiceControl::new(control_ref.clone(), mgr_tx, book)
+    pub fn control(&self) -> ConnectionServiceControl {
+        ConnectionServiceControl::new(self.inner.control().clone())
     }
 
     // BrokenPipe means service is closed.
@@ -205,7 +196,7 @@ impl<P: NetworkProtocol + Unpin> Future for ConnectionService<P> {
         // No-empty means service is temporary unavailable, try later
         while serv_mut.pending_events.is_empty() {
             let event_rx = &mut serv_mut.event_rx;
-            pin_mut!(event_rx);
+            futures::pin_mut!(event_rx);
 
             let event = crate::service_ready!("connection service", event_rx.poll_next(ctx));
             debug!("network: event [{}]", event);
@@ -216,7 +207,7 @@ impl<P: NetworkProtocol + Unpin> Future for ConnectionService<P> {
         // Advance service state
         loop {
             let inner = &mut serv_mut.inner;
-            pin_mut!(inner);
+            futures::pin_mut!(inner);
 
             crate::service_ready!("connection service", inner.poll_next(ctx));
         }

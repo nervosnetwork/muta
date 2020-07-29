@@ -1,55 +1,43 @@
-use std::{
-    future::Future,
-    net::SocketAddr,
-    pin::Pin,
-    sync::Arc,
-    task::{Context as TaskContext, Poll},
-};
+use std::future::Future;
+use std::net::SocketAddr;
+use std::pin::Pin;
+use std::sync::Arc;
+use std::task::{Context as TaskContext, Poll};
 
 use async_trait::async_trait;
-use futures::{
-    channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
-    pin_mut,
-    stream::Stream,
-    task::AtomicWaker,
-};
+use futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
+use futures::stream::Stream;
+use futures::task::AtomicWaker;
 use log::{debug, error, info};
-use protocol::{
-    traits::{
-        Context, Gossip, MessageCodec, MessageHandler, Network, PeerTag, PeerTrust, Priority, Rpc,
-        TrustFeedback,
-    },
-    Bytes, ProtocolResult,
+use protocol::traits::{
+    Context, Gossip, MessageCodec, MessageHandler, Network, PeerTag, PeerTrust, Priority, Rpc,
+    TrustFeedback,
 };
+use protocol::{Bytes, ProtocolResult};
 use tentacle::secio::PeerId;
 
+use crate::common::{socket_to_multi_addr, HeartBeat};
+use crate::compression::Snappy;
+use crate::connection::{ConnectionConfig, ConnectionService, ConnectionServiceKeeper};
+use crate::endpoint::{Endpoint, EndpointScheme};
+use crate::error::NetworkError;
+use crate::event::{ConnectionEvent, PeerManagerEvent};
+use crate::metrics::Metrics;
+use crate::outbound::{NetworkGossip, NetworkRpc};
 #[cfg(feature = "diagnostic")]
 use crate::peer_manager::diagnostic::{Diagnostic, DiagnosticHookFn};
-use crate::{
-    common::{socket_to_multi_addr, HeartBeat},
-    compression::Snappy,
-    connection::{
-        ConnectionConfig, ConnectionService, ConnectionServiceControl, ConnectionServiceKeeper,
-    },
-    endpoint::{Endpoint, EndpointScheme},
-    error::NetworkError,
-    event::{ConnectionEvent, PeerManagerEvent},
-    message::RawSessionMessage,
-    metrics::Metrics,
-    outbound::{NetworkGossip, NetworkRpc},
-    peer_manager::{PeerManager, PeerManagerConfig, PeerManagerHandle, SharedSessions},
-    protocols::CoreProtocol,
-    reactor::{MessageRouter, Reactor},
-    rpc_map::RpcMap,
-    selfcheck::SelfCheck,
-    traits::NetworkContext,
-    NetworkConfig, PeerIdExt,
-};
+use crate::peer_manager::{PeerManager, PeerManagerConfig, PeerManagerHandle, SharedSessions};
+use crate::protocols::{CoreProtocol, ReceivedMessage};
+use crate::reactor::{MessageRouter, Reactor};
+use crate::rpc_map::RpcMap;
+use crate::selfcheck::SelfCheck;
+use crate::traits::NetworkContext;
+use crate::{NetworkConfig, PeerIdExt};
 
 #[derive(Clone)]
 pub struct NetworkServiceHandle {
-    gossip:     NetworkGossip<ConnectionServiceControl<CoreProtocol, SharedSessions>, Snappy>,
-    rpc:        NetworkRpc<ConnectionServiceControl<CoreProtocol, SharedSessions>, Snappy>,
+    gossip:     NetworkGossip<Snappy>,
+    rpc:        NetworkRpc<Snappy>,
     peer_trust: UnboundedSender<PeerManagerEvent>,
     peer_state: PeerManagerHandle,
 
@@ -165,18 +153,18 @@ pub struct NetworkService {
     sys_rx: UnboundedReceiver<NetworkError>,
 
     // Heart beats
-    conn_tx:    UnboundedSender<ConnectionEvent>,
-    mgr_tx:     UnboundedSender<PeerManagerEvent>,
-    raw_msg_tx: UnboundedSender<RawSessionMessage>,
-    heart_beat: Option<HeartBeat>,
-    hb_waker:   Arc<AtomicWaker>,
+    conn_tx:      UnboundedSender<ConnectionEvent>,
+    mgr_tx:       UnboundedSender<PeerManagerEvent>,
+    recv_data_tx: UnboundedSender<ReceivedMessage>,
+    heart_beat:   Option<HeartBeat>,
+    hb_waker:     Arc<AtomicWaker>,
 
     // Config backup
     config: NetworkConfig,
 
     // Public service components
-    gossip:  NetworkGossip<ConnectionServiceControl<CoreProtocol, SharedSessions>, Snappy>,
-    rpc:     NetworkRpc<ConnectionServiceControl<CoreProtocol, SharedSessions>, Snappy>,
+    gossip:  NetworkGossip<Snappy>,
+    rpc:     NetworkRpc<Snappy>,
     rpc_map: Arc<RpcMap>,
 
     // Core service
@@ -200,7 +188,7 @@ impl NetworkService {
     pub fn new(config: NetworkConfig) -> Self {
         let (mgr_tx, mgr_rx) = unbounded();
         let (conn_tx, conn_rx) = unbounded();
-        let (raw_msg_tx, raw_msg_rx) = unbounded();
+        let (recv_data_tx, recv_data_rx) = unbounded();
         let (sys_tx, sys_rx) = unbounded();
 
         let hb_waker = Arc::new(AtomicWaker::new());
@@ -234,21 +222,26 @@ impl NetworkService {
             .ping(config.ping_interval, config.ping_timeout, mgr_tx.clone())
             .identify(peer_mgr_handle.clone(), mgr_tx.clone())
             .discovery(peer_mgr_handle.clone(), mgr_tx.clone(), disc_sync_interval)
-            .transmitter(raw_msg_tx.clone())
+            .transmitter(recv_data_tx.clone())
             .build();
+        let transmitter = proto.transmitter();
 
         // Build connection service
         let keeper = ConnectionServiceKeeper::new(mgr_tx.clone(), sys_tx.clone());
         let conn_srv = ConnectionService::<CoreProtocol>::new(proto, conn_config, keeper, conn_rx);
-        let conn_ctrl = conn_srv.control(mgr_tx.clone(), session_book.clone());
+        let conn_ctrl = conn_srv.control();
+
+        transmitter
+            .behaviour
+            .init(conn_ctrl, mgr_tx.clone(), session_book.clone());
 
         // Build public service components
         let rpc_map = Arc::new(RpcMap::new());
-        let gossip = NetworkGossip::new(conn_ctrl.clone(), Snappy);
+        let gossip = NetworkGossip::new(transmitter.clone(), Snappy);
         let rpc_map_clone = Arc::clone(&rpc_map);
-        let rpc = NetworkRpc::new(conn_ctrl, Snappy, rpc_map_clone, (&config).into());
+        let rpc = NetworkRpc::new(transmitter, Snappy, rpc_map_clone, (&config).into());
         let router = MessageRouter::new(
-            raw_msg_rx,
+            recv_data_rx,
             mgr_tx.clone(),
             Snappy,
             session_book.clone(),
@@ -265,7 +258,7 @@ impl NetworkService {
             sys_rx,
             conn_tx,
             mgr_tx,
-            raw_msg_tx,
+            recv_data_tx,
             hb_waker,
 
             heart_beat: Some(heart_beat),
@@ -461,14 +454,14 @@ impl Future for NetworkService {
             info!("network: peer manager closed");
         }
 
-        if self.raw_msg_tx.is_closed() {
+        if self.recv_data_tx.is_closed() {
             info!("network: message router closed");
         }
 
         // Process system error report
         loop {
             let sys_rx = &mut self.as_mut().sys_rx;
-            pin_mut!(sys_rx);
+            futures::pin_mut!(sys_rx);
 
             let sys_err = service_ready!(sys_rx.poll_next(ctx));
             error!("network: system error: {}", sys_err);

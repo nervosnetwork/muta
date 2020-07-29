@@ -1,41 +1,43 @@
 use async_trait::async_trait;
-use protocol::{
-    traits::{Context, Gossip, MessageCodec, Priority},
-    Bytes, ProtocolResult,
-};
-use tentacle::{secio::PeerId, service::TargetSession};
+use protocol::traits::{Context, Gossip, MessageCodec, Priority};
+use protocol::{Bytes, ProtocolResult};
+use tentacle::secio::PeerId;
+use tentacle::service::TargetSession;
 
-use crate::{
-    endpoint::Endpoint,
-    error::NetworkError,
-    message::{Headers, NetworkMessage},
-    traits::{Compression, MessageSender},
-    PeerIdExt,
-};
+use crate::endpoint::Endpoint;
+use crate::error::NetworkError;
+use crate::message::{Headers, NetworkMessage};
+use crate::protocols::{Recipient, Transmitter, TransmitterMessage};
+use crate::traits::Compression;
+use crate::PeerIdExt;
 
 #[derive(Clone)]
-pub struct NetworkGossip<S, C> {
-    sender:      S,
+pub struct NetworkGossip<C> {
+    transmitter: Transmitter,
     compression: C,
 }
 
-impl<S, C> NetworkGossip<S, C>
+impl<C> NetworkGossip<C>
 where
-    S: MessageSender + Sync + Send + Clone,
     C: Compression + Sync + Send + Clone,
 {
-    pub fn new(sender: S, compression: C) -> Self {
+    pub fn new(transmitter: Transmitter, compression: C) -> Self {
         NetworkGossip {
-            sender,
+            transmitter,
             compression,
         }
     }
 
-    async fn package_message<M>(&self, ctx: Context, end: &str, mut msg: M) -> ProtocolResult<Bytes>
+    async fn package_message<M>(
+        &self,
+        ctx: Context,
+        endpoint: &str,
+        mut msg: M,
+    ) -> ProtocolResult<Bytes>
     where
         M: MessageCodec,
     {
-        let endpoint = end.parse::<Endpoint>()?;
+        let endpoint = endpoint.parse::<Endpoint>()?;
         let data = msg.encode().await?;
         let mut headers = Headers::default();
         if let Some(state) = common_apm::muta_apm::MutaTracer::span_state(&ctx) {
@@ -51,22 +53,28 @@ where
         Ok(msg)
     }
 
-    fn send(
+    async fn send_to_sessions(
         &self,
         _ctx: Context,
-        tar: TargetSession,
-        msg: Bytes,
-        pri: Priority,
+        target_session: TargetSession,
+        data: Bytes,
+        priority: Priority,
     ) -> Result<(), NetworkError> {
-        self.sender.send(tar, msg, pri)
+        let msg = TransmitterMessage {
+            recipient: Recipient::Session(target_session),
+            priority,
+            data,
+        };
+
+        self.transmitter.behaviour.send(msg).await
     }
 
-    async fn multisend<'a, P: AsRef<[Bytes]> + 'a>(
+    async fn send_to_peers<'a, P: AsRef<[Bytes]> + 'a>(
         &self,
         _ctx: Context,
         peer_ids: P,
-        msg: Bytes,
-        pri: Priority,
+        data: Bytes,
+        priority: Priority,
     ) -> Result<(), NetworkError> {
         let peer_ids = {
             let byteses = peer_ids.as_ref().iter();
@@ -75,45 +83,56 @@ where
             maybe_ids.collect::<Result<Vec<_>, _>>()?
         };
 
-        self.sender.multisend(peer_ids, msg, pri).await
+        let msg = TransmitterMessage {
+            recipient: Recipient::PeerId(peer_ids),
+            priority,
+            data,
+        };
+
+        self.transmitter.behaviour.send(msg).await
     }
 }
 
 #[async_trait]
-impl<S, C> Gossip for NetworkGossip<S, C>
+impl<C> Gossip for NetworkGossip<C>
 where
-    S: MessageSender + Sync + Send + Clone,
     C: Compression + Sync + Send + Clone,
 {
-    async fn broadcast<M>(&self, cx: Context, end: &str, msg: M, p: Priority) -> ProtocolResult<()>
+    async fn broadcast<M>(
+        &self,
+        cx: Context,
+        endpoint: &str,
+        msg: M,
+        priority: Priority,
+    ) -> ProtocolResult<()>
     where
         M: MessageCodec,
     {
-        let msg = self.package_message(cx.clone(), end, msg).await?;
-        self.send(cx, TargetSession::All, msg, p)?;
-        common_apm::metrics::network::on_network_message_sent_all_target(end);
+        let msg = self.package_message(cx.clone(), endpoint, msg).await?;
+        self.send_to_sessions(cx, TargetSession::All, msg, priority)
+            .await?;
+        common_apm::metrics::network::on_network_message_sent_all_target(endpoint);
         Ok(())
     }
 
     async fn multicast<'a, M, P>(
         &self,
         cx: Context,
-        end: &str,
+        endpoint: &str,
         peer_ids: P,
         msg: M,
-        p: Priority,
+        priority: Priority,
     ) -> ProtocolResult<()>
     where
         M: MessageCodec,
         P: AsRef<[Bytes]> + Send + 'a,
     {
-        let msg = self.package_message(cx.clone(), end, msg).await?;
+        let msg = self.package_message(cx.clone(), endpoint, msg).await?;
         let multicast_count = peer_ids.as_ref().len();
 
-        self.multisend(cx, peer_ids, msg, p).await?;
-
+        self.send_to_peers(cx, peer_ids, msg, priority).await?;
         common_apm::metrics::network::on_network_message_sent_multi_target(
-            end,
+            endpoint,
             multicast_count as i64,
         );
         Ok(())

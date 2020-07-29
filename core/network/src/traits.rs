@@ -1,16 +1,11 @@
 use std::borrow::Cow;
 
-use async_trait::async_trait;
-use protocol::{
-    traits::{Context, Priority},
-    Bytes,
-};
+use protocol::{traits::Context, Bytes};
 use tentacle::{
     multiaddr::Multiaddr,
     secio::PeerId,
-    service::TargetSession,
     service::{ProtocolMeta, TargetProtocol},
-    ProtocolId, SessionId,
+    SessionId,
 };
 
 use crate::{
@@ -22,15 +17,6 @@ pub trait NetworkProtocol {
     fn target() -> TargetProtocol;
 
     fn metas(self) -> Vec<ProtocolMeta>;
-
-    fn message_proto_id() -> ProtocolId;
-}
-
-#[rustfmt::skip]
-#[async_trait]
-pub trait MessageSender {
-    fn send(&self, tar: TargetSession, msg: Bytes, pri: Priority) -> Result<(), NetworkError>;
-    async fn multisend(&self, peers: Vec<PeerId>, msg: Bytes, pri: Priority) -> Result<(), NetworkError>;
 }
 
 pub trait Compression {
