@@ -22,13 +22,13 @@ pub struct ReceivedMessage {
     pub data:       Bytes,
 }
 
-pub(crate) struct InternalMessage {
+pub(crate) struct SeqChunkMessage {
     pub seq:  u64,
     pub eof:  bool,
     pub data: Bytes,
 }
 
-impl InternalMessage {
+impl SeqChunkMessage {
     pub fn encode(self) -> Bytes {
         let eof = if self.eof { 1u8 } else { 0u8 };
         let mut buf = BytesMut::with_capacity(9 + self.data.len());
@@ -46,13 +46,13 @@ impl InternalMessage {
         let seq = bytes.get_u64();
         let eof = bytes.get_u8() == 1;
 
-        InternalMessage { seq, eof, data }
+        SeqChunkMessage { seq, eof, data }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::InternalMessage;
+    use super::SeqChunkMessage;
 
     use protocol::Bytes;
 
@@ -60,13 +60,13 @@ mod tests {
     fn test_internal_message_codec() {
         let data = b"hello muta";
 
-        let chunk = InternalMessage {
+        let chunk = SeqChunkMessage {
             seq:  1u64,
             eof:  false,
             data: Bytes::from_static(data),
         };
 
-        let chunk = InternalMessage::decode(chunk.encode());
+        let chunk = SeqChunkMessage::decode(chunk.encode());
         assert_eq!(chunk.data, Bytes::from_static(data));
         assert_eq!(chunk.eof, false);
     }

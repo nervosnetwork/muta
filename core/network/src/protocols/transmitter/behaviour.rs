@@ -15,7 +15,7 @@ use tentacle::secio::PeerId;
 use tentacle::service::TargetSession;
 use tentacle::SessionId;
 
-use super::message::{InternalMessage, Recipient, TransmitterMessage};
+use super::message::{Recipient, SeqChunkMessage, TransmitterMessage};
 use super::MAX_CHUNK_SIZE;
 
 use crate::connection::{ConnectionServiceControl, ProtocolMessage};
@@ -188,7 +188,7 @@ impl<'a> SendingContext<'a> {
         log::debug!("seq {} data size {}", seq, data.len());
 
         if data.len() < MAX_CHUNK_SIZE {
-            let internal_msg = InternalMessage {
+            let internal_msg = SeqChunkMessage {
                 seq,
                 eof: true,
                 data,
@@ -221,7 +221,7 @@ impl<'a> SendingContext<'a> {
             if data.len() > MAX_CHUNK_SIZE {
                 let chunk = data.split_to(MAX_CHUNK_SIZE);
 
-                let internal_msg = InternalMessage {
+                let internal_msg = SeqChunkMessage {
                     seq,
                     eof: false,
                     data: chunk,
@@ -249,7 +249,7 @@ impl<'a> SendingContext<'a> {
             } else {
                 let last_data = std::mem::replace(&mut data, Bytes::new());
 
-                let internal_msg = InternalMessage {
+                let internal_msg = SeqChunkMessage {
                     seq,
                     eof: true,
                     data: last_data,

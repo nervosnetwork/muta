@@ -5,7 +5,7 @@ use protocol::Bytes;
 use tentacle::context::ProtocolContextMutRef;
 use tentacle::traits::SessionProtocol;
 
-use super::message::{InternalMessage, ReceivedMessage};
+use super::message::{ReceivedMessage, SeqChunkMessage};
 use super::{DATA_SEQ_TIMEOUT, MAX_CHUNK_SIZE};
 
 pub struct TransmitterProtocol {
@@ -43,7 +43,7 @@ impl SessionProtocol for TransmitterProtocol {
             return;
         }
 
-        let InternalMessage { seq, eof, data } = InternalMessage::decode(data);
+        let SeqChunkMessage { seq, eof, data } = SeqChunkMessage::decode(data);
         log::debug!("recived seq {} eof {} data size {}", seq, eof, data.len());
 
         if data.len() > MAX_CHUNK_SIZE {
