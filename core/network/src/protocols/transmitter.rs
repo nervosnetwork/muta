@@ -16,7 +16,7 @@ pub use message::{ReceivedMessage, Recipient, TransmitterMessage};
 pub const NAME: &str = "chain_transmitter";
 pub const SUPPORT_VERSIONS: [&str; 1] = ["0.3"];
 pub const DATA_SEQ_TIMEOUT: Duration = Duration::from_secs(60);
-pub const MAX_CHUNK_SIZE: usize = 1000 * 1000; // 1MB
+pub const MAX_CHUNK_SIZE: usize = 4 * 1000 * 1000; // 4MB
 
 #[derive(Clone)]
 pub struct Transmitter {
