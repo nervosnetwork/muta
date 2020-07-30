@@ -185,6 +185,7 @@ impl<'a> SendingContext<'a> {
         };
 
         let seq = self.data_seq.fetch_add(1, Ordering::SeqCst);
+        log::debug!("seq {} data size {}", seq, data.len());
 
         if data.len() < MAX_CHUNK_SIZE {
             let internal_msg = InternalMessage {

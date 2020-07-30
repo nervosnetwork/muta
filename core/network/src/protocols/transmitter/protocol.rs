@@ -44,11 +44,12 @@ impl SessionProtocol for TransmitterProtocol {
         }
 
         let InternalMessage { seq, eof, data } = InternalMessage::decode(data);
+        log::debug!("recived seq {} eof {} data size {}", seq, eof, data.len());
 
         if data.len() > MAX_CHUNK_SIZE {
             log::warn!(
-                "session {} data size exceed {}, drop it",
-                ctx.session.id,
+                "session {} data size > {}, drop it",
+                session_id,
                 MAX_CHUNK_SIZE
             );
 
@@ -59,7 +60,7 @@ impl SessionProtocol for TransmitterProtocol {
             if self.first_seq_bytes_at.elapsed() > DATA_SEQ_TIMEOUT {
                 log::warn!(
                     "session {} data seq {} timeout, drop it",
-                    ctx.session.id,
+                    session_id,
                     self.current_data_seq
                 );
 
@@ -68,7 +69,11 @@ impl SessionProtocol for TransmitterProtocol {
             }
 
             self.data_buf.extend(data.as_ref());
+            log::debug!("data buf size {}", self.data_buf.len());
         } else {
+            log::debug!("new data seq {}", seq);
+
+            self.current_data_seq = seq;
             self.data_buf.clear();
             self.data_buf.extend(data.as_ref());
             self.data_buf.shrink_to_fit();
@@ -80,8 +85,10 @@ impl SessionProtocol for TransmitterProtocol {
         }
 
         let data = std::mem::replace(&mut self.data_buf, Vec::new());
+        log::debug!("final seq {} data size {}", seq, data.len());
+
         let recv_msg = ReceivedMessage {
-            session_id: ctx.session.id,
+            session_id,
             peer_id,
             data: Bytes::from(data),
         };
