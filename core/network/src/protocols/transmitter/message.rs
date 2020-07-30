@@ -31,8 +31,8 @@ pub(crate) struct InternalMessage {
 impl InternalMessage {
     pub fn encode(self) -> Bytes {
         let eof = if self.eof { 1u8 } else { 0u8 };
+        let mut buf = BytesMut::with_capacity(9 + self.data.len());
 
-        let mut buf = BytesMut::new();
         buf.put_u64(self.seq);
         buf.put_u8(eof);
         buf.extend_from_slice(self.data.as_ref());
@@ -40,14 +40,34 @@ impl InternalMessage {
         buf.freeze()
     }
 
+    // Note: already check data size in protocol received.
     pub fn decode(mut bytes: Bytes) -> Self {
+        let data = bytes.split_off(9);
         let seq = bytes.get_u64();
         let eof = bytes.get_u8() == 1;
 
-        InternalMessage {
-            seq,
-            eof,
-            data: bytes,
-        }
+        InternalMessage { seq, eof, data }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::InternalMessage;
+
+    use protocol::Bytes;
+
+    #[test]
+    fn test_internal_message_codec() {
+        let data = b"hello muta";
+
+        let chunk = InternalMessage {
+            seq:  1u64,
+            eof:  false,
+            data: Bytes::from_static(data),
+        };
+
+        let chunk = InternalMessage::decode(chunk.encode());
+        assert_eq!(chunk.data, Bytes::from_static(data));
+        assert_eq!(chunk.eof, false);
     }
 }
