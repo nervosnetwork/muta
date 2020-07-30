@@ -61,9 +61,9 @@ fn test_generate_multi_signature() {
     assert!(!multi_sig_address.is_error());
 
     // test get permission by multi-signature address
-    let addr = multi_sig_address.succeed_data.address;
+    let addr = multi_sig_address.succeed_data;
     let permission = service.get_account_from_address(context, GetMultiSigAccountPayload {
-        multi_sig_address: addr,
+        multi_sig_address: addr.address,
     });
     assert!(!permission.is_error());
     assert_eq!(permission.succeed_data.permission, MultiSigPermission {

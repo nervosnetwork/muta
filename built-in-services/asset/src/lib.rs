@@ -15,10 +15,102 @@ use crate::types::{
     GetAllowanceResponse, GetAssetPayload, GetBalancePayload, GetBalanceResponse,
     InitGenesisPayload, TransferEvent, TransferFromEvent, TransferFromPayload, TransferPayload,
 };
+macro_rules! impl_assets {
+    ($self: expr, $method: ident, $ctx: expr) => {{
+        let res = $self.$method($ctx.clone());
+        if res.is_error() {
+            Err(ServiceResponse::from_error(res.code, res.error_message))
+        } else {
+            Ok(res.succeed_data)
+        }
+    }};
+    ($self: expr, $method: ident, $ctx: expr, $payload: expr) => {{
+        let res = $self.$method($ctx.clone(), $payload);
+        if res.is_error() {
+            Err(ServiceResponse::from_error(res.code, res.error_message))
+        } else {
+            Ok(res.succeed_data)
+        }
+    }};
+}
+
+pub trait Assets {
+    fn create_(
+        &mut self,
+        ctx: &ServiceContext,
+        payload: CreateAssetPayload,
+    ) -> Result<Asset, ServiceResponse<()>>;
+
+    fn balance_(
+        &self,
+        ctx: &ServiceContext,
+        payload: GetBalancePayload,
+    ) -> Result<GetBalanceResponse, ServiceResponse<()>>;
+
+    fn transfer_(
+        &mut self,
+        ctx: &ServiceContext,
+        payload: TransferPayload,
+    ) -> Result<(), ServiceResponse<()>>;
+
+    fn transfer_from_(
+        &mut self,
+        ctx: &ServiceContext,
+        payload: TransferFromPayload,
+    ) -> Result<(), ServiceResponse<()>>;
+
+    fn allowance_(
+        &self,
+        ctx: &ServiceContext,
+        payload: GetAllowancePayload,
+    ) -> Result<GetAllowanceResponse, ServiceResponse<()>>;
+}
 
 pub struct AssetService<SDK> {
     sdk:    SDK,
     assets: Box<dyn StoreMap<Hash, Asset>>,
+}
+
+impl<SDK: ServiceSDK> Assets for AssetService<SDK> {
+    fn create_(
+        &mut self,
+        ctx: &ServiceContext,
+        payload: CreateAssetPayload,
+    ) -> Result<Asset, ServiceResponse<()>> {
+        impl_assets!(self, create_asset, ctx, payload)
+    }
+
+    fn balance_(
+        &self,
+        ctx: &ServiceContext,
+        payload: GetBalancePayload,
+    ) -> Result<GetBalanceResponse, ServiceResponse<()>> {
+        impl_assets!(self, get_balance, ctx, payload)
+    }
+
+    fn transfer_(
+        &mut self,
+        ctx: &ServiceContext,
+        payload: TransferPayload,
+    ) -> Result<(), ServiceResponse<()>> {
+        impl_assets!(self, transfer, ctx, payload)
+    }
+
+    fn transfer_from_(
+        &mut self,
+        ctx: &ServiceContext,
+        payload: TransferFromPayload,
+    ) -> Result<(), ServiceResponse<()>> {
+        impl_assets!(self, transfer_from, ctx, payload)
+    }
+
+    fn allowance_(
+        &self,
+        ctx: &ServiceContext,
+        payload: GetAllowancePayload,
+    ) -> Result<GetAllowanceResponse, ServiceResponse<()>> {
+        impl_assets!(self, get_allowance, ctx, payload)
+    }
 }
 
 #[service]
@@ -52,11 +144,7 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
 
     #[cycles(10_000)]
     #[read]
-    pub fn get_asset(
-        &self,
-        ctx: ServiceContext,
-        payload: GetAssetPayload,
-    ) -> ServiceResponse<Asset> {
+    fn get_asset(&self, ctx: ServiceContext, payload: GetAssetPayload) -> ServiceResponse<Asset> {
         if let Some(asset) = self.assets.get(&payload.id) {
             ServiceResponse::<Asset>::from_succeed(asset)
         } else {
@@ -66,7 +154,7 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
 
     #[cycles(10_000)]
     #[read]
-    pub fn get_balance(
+    fn get_balance(
         &self,
         ctx: ServiceContext,
         payload: GetBalancePayload,
@@ -97,7 +185,7 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
 
     #[cycles(10_000)]
     #[read]
-    pub fn get_allowance(
+    fn get_allowance(
         &self,
         ctx: ServiceContext,
         payload: GetAllowancePayload,
@@ -136,7 +224,7 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
 
     #[cycles(21_000)]
     #[write]
-    pub fn create_asset(
+    fn create_asset(
         &mut self,
         ctx: ServiceContext,
         payload: CreateAssetPayload,
@@ -221,7 +309,7 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
 
     #[cycles(21_000)]
     #[write]
-    pub fn approve(&mut self, ctx: ServiceContext, payload: ApprovePayload) -> ServiceResponse<()> {
+    fn approve(&mut self, ctx: ServiceContext, payload: ApprovePayload) -> ServiceResponse<()> {
         let caller = ctx.get_caller();
         let asset_id = payload.asset_id.clone();
         let value = payload.value;

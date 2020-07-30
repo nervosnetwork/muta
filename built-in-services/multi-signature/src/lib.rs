@@ -29,8 +29,59 @@ lazy_static::lazy_static! {
    pub static ref ADEPTIVE_ADDRESS: Address = "muta14e0lmgck835vm2dfm0w3ckv6svmez8fdgdl705".parse().unwrap();
 }
 
+macro_rules! impl_multisig {
+    ($self: expr, $method: ident, $ctx: expr) => {{
+        let res = $self.$method($ctx.clone());
+        if res.is_error() {
+            Err(ServiceResponse::from_error(res.code, res.error_message))
+        } else {
+            Ok(res.succeed_data)
+        }
+    }};
+    ($self: expr, $method: ident, $ctx: expr, $payload: expr) => {{
+        let res = $self.$method($ctx.clone(), $payload);
+        if res.is_error() {
+            Err(ServiceResponse::from_error(res.code, res.error_message))
+        } else {
+            Ok(res.succeed_data)
+        }
+    }};
+}
+
+pub trait MultiSignature {
+    fn verify_signature_(
+        &self,
+        ctx: &ServiceContext,
+        payload: SignedTransaction,
+    ) -> Result<(), ServiceResponse<()>>;
+
+    fn generate_account_(
+        &mut self,
+        ctx: &ServiceContext,
+        payload: GenerateMultiSigAccountPayload,
+    ) -> Result<GenerateMultiSigAccountResponse, ServiceResponse<()>>;
+}
+
 pub struct MultiSignatureService<SDK> {
     sdk: SDK,
+}
+
+impl<SDK: ServiceSDK> MultiSignature for MultiSignatureService<SDK> {
+    fn verify_signature_(
+        &self,
+        ctx: &ServiceContext,
+        payload: SignedTransaction,
+    ) -> Result<(), ServiceResponse<()>> {
+        impl_multisig!(self, verify_signature, ctx, payload)
+    }
+
+    fn generate_account_(
+        &mut self,
+        ctx: &ServiceContext,
+        payload: GenerateMultiSigAccountPayload,
+    ) -> Result<GenerateMultiSigAccountResponse, ServiceResponse<()>> {
+        impl_multisig!(self, generate_account, ctx, payload)
+    }
 }
 
 #[service]
