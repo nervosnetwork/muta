@@ -1,0 +1,45 @@
+[package]
+name = "byzantine"
+version = "0.0.1-alpha.0"
+authors = ["Muta Dev <muta@nervos.org>"]
+edition = "2018"
+repository = "https://github.com/nervosnetwork/muta"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+common-apm = { path = "../common/apm" }
+common-config-parser = { path = "../common/config-parser" }
+common-crypto = { path = "../common/crypto" }
+common-logger = { path = "../common/logger" }
+common-merkle = { path = "../common/merkle" }
+protocol = { path = "../protocol", package = "muta-protocol" }
+core-api = { path = "../core/api" }
+core-storage = { path = "../core/storage" }
+core-mempool = { path = "../core/mempool" }
+core-network = { path = "../core/network" }
+core-consensus = { path = "../core/consensus" }
+overlord = { git = "https://github.com/nervosnetwork/overlord", rev = "b965dc4b" }
+
+binding-macro = { path = "../binding-macro" }
+framework = { path = "../framework" }
+
+actix-rt = "1.0"
+async-trait = "0.1"
+derive_more = "0.99"
+lazy_static = "1.4"
+futures = "0.3"
+parking_lot = "0.11"
+serde = "1.0"
+serde_derive = "1.0"
+serde_json = "1.0"
+log = "0.4"
+clap = "2.33"
+bytes = "0.5"
+hex = "0.4"
+rlp = "0.4"
+rand = "0.7"
+toml = "0.5"
+tokio = { version = "0.2", features = ["macros", "rt-core", "rt-util", "signal", "time"] }
+muta-apm = "0.1.0-alpha.7"
+futures-timer="3.0"

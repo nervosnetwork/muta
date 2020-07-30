@@ -1,0 +1,454 @@
+interval = 500
+[[list]]
+msg_type = { SendProposal = "Valid" }     # not cause bugs
+probability = 0.01
+num_range = [1, 2]
+priority = "High"
+
+#################
+##### NewTx #####
+#################
+[[list]]
+msg_type = { NewTxs = "InvalidStruct" }     # not cause bugs
+probability = 0.01
+num_range = [1, 10]
+priority = "Normal"
+
+[[list]]
+msg_type = { NewTxs = "InvalidHash" }    ##### will cause panic
+probability = 0.2
+num_range = [1, 10]
+priority = "Normal"
+
+[[list]]
+msg_type = { NewTxs = "InvalidSig" }    ##### will cause panic
+probability = 0.2
+num_range = [1, 10]
+priority = "Normal"
+
+[[list]]
+msg_type = { NewTxs = "InvalidChainID" }   ##### will cause panic
+probability = 0.2
+num_range = [1, 10]
+priority = "Normal"
+
+[[list]]
+msg_type = { NewTxs = "InvalidCyclesPrice" }    ##### will cause panic
+probability = 0.2
+num_range = [1, 10]
+priority = "Normal"
+
+[[list]]
+msg_type = { NewTxs = "InvalidCyclesLimit" }      ##### will cause panic
+probability = 0.2
+num_range = [1, 10]
+priority = "Normal"
+
+[[list]]
+msg_type = { NewTxs = "InvalidNonceOfRandLen" }     ##### will cause panic, should wait for a little long time
+probability = 0.2
+num_range = [1, 10]
+priority = "Normal"
+
+[[list]]
+msg_type = { NewTxs = "InvalidNonceDup" }      ##### will cause panic
+probability = 0.2
+num_range = [1, 10]
+priority = "Normal"
+
+[[list]]
+msg_type = { NewTxs = "InvalidRequest" }      ##### will cause panic
+probability = 0.2
+num_range = [1, 10]
+priority = "Normal"
+
+[[list]]
+msg_type = { NewTxs = "InvalidTimeout" }      ##### will cause panic
+probability = 0.2
+num_range = [1, 10]
+priority = "Normal"
+
+[[list]]
+msg_type = { NewTxs = "InvalidSender" }        # not cause bugs
+probability = 0.2
+num_range = [1, 10]
+priority = "Normal"
+
+#########################
+###### RecvProposal #####
+#########################
+[[list]]
+req_end = "/gossip/consensus/signed_proposal"       # not cause bugs
+msg_type = { RecvProposal = "InvalidHeight" }
+probability = 0.2
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+req_end = "/gossip/consensus/signed_proposal"      # not cause bugs
+msg_type = { RecvProposal = "InvalidHash" }
+probability = 0.2
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+req_end = "/gossip/consensus/signed_proposal"      # not cause bugs
+msg_type = { RecvProposal = "NotExistTxs" }
+probability = 0.2
+num_range = [1, 1000]
+priority = "High"
+
+[[list]]
+req_end = "/gossip/consensus/signed_proposal"      # not cause bugs
+msg_type = { RecvProposal = "InvalidStruct" }
+probability = 0.2
+num_range = [1, 2]
+priority = "High"
+
+#########################
+###### SendProposal #####
+#########################
+[[list]]
+msg_type = { SendProposal = "InvalidStruct" }    # not cause bugs
+probability = 0.2
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendProposal = "InvalidChainId" }    # not cause bugs
+probability = 0.2
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendProposal = "InvalidPrevHash" }    # not cause bugs
+probability = 0.2
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendProposal = "InvalidHeight" }    # not cause bugs
+probability = 0.2
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendProposal = "InvalidExecHeight" }    # not cause bugs
+probability = 0.2
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendProposal = "InvalidTimestamp" }    # not cause bugs
+probability = 0.2
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendProposal = "InvalidOrderRoot" }    # not cause bugs
+probability = 0.2
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendProposal = "InvalidSignedTxsHash" }    # not cause bugs
+probability = 0.2
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendProposal = "InvalidConfirmRoot" }    # not cause bugs
+probability = 0.2
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendProposal = "InvalidStateRoot" }    # not cause bugs
+probability = 0.2
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendProposal = "InvalidReceiptRoot" }    # not cause bugs
+probability = 0.2
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendProposal = "InvalidCyclesUsed" }    # not cause bugs
+probability = 0.2
+num_range = [1, 10]
+priority = "High"
+#
+[[list]]
+msg_type = { SendProposal = "InvalidBlockProposer" }    # not cause bugs
+probability = 0.2
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendProposal = "InvalidProof" }    # not cause bugs
+probability = 0.2
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendProposal = "InvalidVersion" }    # not cause bugs
+probability = 0.2
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendProposal = "InvalidValidators" }    # not cause bugs
+probability = 0.2
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendProposal = "InvalidTxHash" }    # not cause bugs
+probability = 0.2
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendProposal = "InvalidSig" }     # not cause bugs
+probability = 0.2
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendProposal = "InvalidProposalHeight" }   # not cause bugs
+probability = 0.2
+num_range = [1, 10]
+priority = "High"
+
+#[[list]]
+#msg_type = { SendProposal = "InvalidRound" }    # ##### will broken liveness
+#probability = 0.2
+#num_range = [1, 10]
+#priority = "High"
+
+#[[list]]
+#msg_type = { SendProposal = "InvalidContentStruct" }   ##### will cause panic
+#probability = 0.2
+#num_range = [1, 10]
+#priority = "High"
+
+#[[list]]
+#msg_type = { SendProposal = "InvalidBlockHash" }    ##### will cause panic
+#probability = 0.2
+#num_range = [1, 10]
+#priority = "High"
+
+[[list]]
+msg_type = { SendProposal = "InvalidLock" }    # not cause bugs
+probability = 0.2
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendProposal = "InvalidProposalProposer" }    # not cause bugs
+probability = 0.2
+num_range = [1, 10]
+priority = "High"
+
+###################
+#### SendVote #####
+###################
+[[list]]
+msg_type = { SendVote = "InvalidStruct" }    # not cause bugs
+probability = 0.2
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendVote = "InvalidHeight" }    # not cause bugs
+probability = 0.2
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendVote = "InvalidRound" }    # not cause bugs
+probability = 0.2
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendVote = "InvalidBlockHash" }    # not cause bugs
+probability = 0.2
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendVote = "InvalidSig" }    # not cause bugs
+probability = 0.2
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendVote = "InvalidVoter" }    # not cause bugs
+probability = 0.2
+num_range = [1, 10]
+priority = "High"
+
+#################
+#### SendQC #####
+#################
+[[list]]
+msg_type = { SendQC = "InvalidStruct" }   # not cause bugs
+probability = 0.2
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendQC = "InvalidHeight" }   # not cause bugs
+probability = 0.2
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendQC = "InvalidRound" }   # not cause bugs
+probability = 0.2
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendQC = "InvalidBlockHash" }   # not cause bugs
+probability = 0.2
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendQC = "InvalidSig" }   # not cause bugs
+probability = 0.2
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendQC = "InvalidLeader" }   # not cause bugs
+probability = 0.2
+num_range = [1, 10]
+priority = "High"
+
+####################
+#### SendChoke #####
+####################
+
+[[list]]
+msg_type = { SendChoke = "InvalidStruct" }   # not cause bugs
+probability = 0.2
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendChoke = "InvalidHeight" }   # not cause bugs
+probability = 0.2
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendChoke = "InvalidRound" }   # not cause bugs
+probability = 0.2
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendChoke = "InvalidFrom" }   # not cause bugs
+probability = 0.2
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendChoke = "InvalidSig" }   # not cause bugs
+probability = 0.2
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendChoke = "InvalidAddress" }   # not cause bugs
+probability = 0.2
+num_range = [1, 10]
+priority = "High"
+
+#####################
+#### SendHeight #####
+#####################
+[[list]]
+msg_type = "SendHeight"   # not cause bugs
+probability = 0.2
+num_range = [1, 10]
+priority = "High"
+
+#####################
+#### PullTxs #####
+#####################
+
+[[list]]
+req_end = "/rpc_call/mempool/pull_txs"
+msg_type = { PullTxs = "InvalidStruct" }     # not cause bugs
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+req_end = "/rpc_call/mempool/pull_txs"
+msg_type = { PullTxs = "InvalidHash" }    # not cause bugs
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+req_end = "/rpc_call/mempool/pull_txs"
+msg_type = { PullTxs = "InvalidSig" }    # not cause bugs
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+req_end = "/rpc_call/mempool/pull_txs"
+msg_type = { PullTxs = "InvalidChainID" }   # not cause bugs
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+req_end = "/rpc_call/mempool/pull_txs"
+msg_type = { PullTxs = "InvalidCyclesPrice" }    # not cause bugs
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+req_end = "/rpc_call/mempool/pull_txs"
+msg_type = { PullTxs = "InvalidCyclesLimit" }      # not cause bugs
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+req_end = "/rpc_call/mempool/pull_txs"
+msg_type = { PullTxs = "InvalidNonceOfRandLen" }     # not cause bugs
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+req_end = "/rpc_call/mempool/pull_txs"
+msg_type = { PullTxs = "InvalidRequest" }      # not cause bugs
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+req_end = "/rpc_call/mempool/pull_txs"
+msg_type = { PullTxs = "InvalidTimeout" }      # not cause bugs
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+req_end = "/rpc_call/mempool/pull_txs"
+msg_type = { PullTxs = "InvalidSender" }        # not cause bugs
+probability = 1.0
+num_range = [1, 10]
+priority = "High"

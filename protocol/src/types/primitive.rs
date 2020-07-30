@@ -223,6 +223,11 @@ impl Hash {
     pub fn as_hex(&self) -> String {
         "0x".to_owned() + &hex::encode(self.0.clone())
     }
+
+    /// Used for byzantine test
+    pub fn from_invalid_bytes(bytes: Bytes) -> Self {
+        Self(bytes)
+    }
 }
 
 impl Default for Hash {
@@ -322,6 +327,11 @@ impl Address {
 
         let bytes = Bytes::from(bytes);
         Self::from_bytes(bytes)
+    }
+
+    /// Used for byzantine test
+    pub fn from_invalid_bytes(bytes: Bytes) -> Self {
+        Self(bytes)
     }
 }
 

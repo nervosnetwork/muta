@@ -16,7 +16,7 @@ pub const RPC_PULL_TXS: &str = "/rpc_call/mempool/pull_txs";
 pub const RPC_RESP_PULL_TXS: &str = "/rpc_resp/mempool/pull_txs";
 pub const RPC_RESP_PULL_TXS_SYNC: &str = "/rpc_resp/mempool/pull_txs_sync";
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MsgNewTxs {
     #[serde(with = "core_network::serde_multi")]
     pub batch_stxs: Vec<SignedTransaction>,
@@ -88,7 +88,7 @@ where
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MsgPullTxs {
     pub height: Option<u64>,
     #[serde(with = "core_network::serde_multi")]
