@@ -15,10 +15,10 @@ use protocol::types::{Address, Bytes, Hash, ServiceContext, SignedTransaction};
 
 use crate::types::{
     Account, AddAccountPayload, ChangeMemoPayload, ChangeOwnerPayload,
-    GenerateMultiSigAccountPayload, GetMultiSigAccountPayload, GetMultiSigAccountResponse,
-    InitGenesisPayload, MultiSigPermission, RemoveAccountPayload, RemoveAccountResult,
-    SetAccountWeightPayload, SetThresholdPayload, SetWeightResult, UpdateAccountPayload,
-    VerifySignaturePayload, Witness,
+    GenerateMultiSigAccountPayload, GenerateMultiSigAccountResponse, GetMultiSigAccountPayload,
+    GetMultiSigAccountResponse, InitGenesisPayload, MultiSigPermission, RemoveAccountPayload,
+    RemoveAccountResult, SetAccountWeightPayload, SetThresholdPayload, SetWeightResult,
+    UpdateAccountPayload, VerifySignaturePayload, Witness,
 };
 
 const MAX_MULTI_SIGNATURE_RECURSION_DEPTH: u8 = 8;
@@ -59,7 +59,7 @@ pub trait MultiSignature {
         &mut self,
         ctx: &ServiceContext,
         payload: GenerateMultiSigAccountPayload,
-    ) -> Result<Address, ServiceResponse<()>>;
+    ) -> Result<GenerateMultiSigAccountResponse, ServiceResponse<()>>;
 }
 
 pub struct MultiSignatureService<SDK> {
@@ -79,7 +79,7 @@ impl<SDK: ServiceSDK> MultiSignature for MultiSignatureService<SDK> {
         &mut self,
         ctx: &ServiceContext,
         payload: GenerateMultiSigAccountPayload,
-    ) -> Result<Address, ServiceResponse<()>> {
+    ) -> Result<GenerateMultiSigAccountResponse, ServiceResponse<()>> {
         impl_multisig!(self, generate_account, ctx, payload)
     }
 }
@@ -141,11 +141,11 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
         &mut self,
         ctx: ServiceContext,
         payload: GenerateMultiSigAccountPayload,
-    ) -> ServiceResponse<Address> {
+    ) -> ServiceResponse<GenerateMultiSigAccountResponse> {
         if payload.addr_with_weight.is_empty()
             || payload.addr_with_weight.len() > MAX_PERMISSION_ACCOUNTS as usize
         {
-            return ServiceResponse::<Address>::from_error(
+            return ServiceResponse::<GenerateMultiSigAccountResponse>::from_error(
                 110,
                 "accounts length must be [1,16]".to_owned(),
             );
@@ -158,7 +158,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
             .sum::<u32>();
 
         if payload.threshold == 0 || weight_sum < payload.threshold {
-            return ServiceResponse::<Address>::from_error(
+            return ServiceResponse::<GenerateMultiSigAccountResponse>::from_error(
                 111,
                 "accounts weight or threshold not valid".to_owned(),
             );
@@ -171,7 +171,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
             .map(|s| self._is_recursion_depth_overflow(&s.address, 0))
             .any(|res| res)
         {
-            return ServiceResponse::<Address>::from_error(
+            return ServiceResponse::<GenerateMultiSigAccountResponse>::from_error(
                 116,
                 "above max recursion depth".to_owned(),
             );
@@ -208,9 +208,11 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
             };
 
             self.sdk.set_account_value(&address, 0u8, permission);
-            ServiceResponse::<Address>::from_succeed(address)
+            ServiceResponse::<GenerateMultiSigAccountResponse>::from_succeed(
+                GenerateMultiSigAccountResponse { address },
+            )
         } else {
-            ServiceResponse::<Address>::from_error(
+            ServiceResponse::<GenerateMultiSigAccountResponse>::from_error(
                 112,
                 "generate address from tx_hash failed".to_owned(),
             )
