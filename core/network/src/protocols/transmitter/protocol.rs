@@ -36,6 +36,12 @@ impl SessionProtocol for TransmitterProtocol {
                 return;
             }
         };
+        let session_id = ctx.session.id;
+
+        if data.len() < 10 {
+            log::warn!("session {} data size < 10, drop it", session_id);
+            return;
+        }
 
         let InternalMessage { seq, eof, data } = InternalMessage::decode(data);
 
