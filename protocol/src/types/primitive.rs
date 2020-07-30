@@ -285,6 +285,14 @@ impl Address {
     pub fn as_bytes(&self) -> Bytes {
         self.0.clone()
     }
+
+    pub fn from_hex(s: &str) -> ProtocolResult<Self> {
+        let s = clean_0x(s)?;
+        let bytes = hex::decode(s).map_err(TypesError::from)?;
+
+        let bytes = Bytes::from(bytes);
+        Self::from_bytes(bytes)
+    }
 }
 
 impl FromStr for Address {
@@ -390,6 +398,14 @@ mod tests {
 
         let bytes = hash.as_bytes();
         Hash::from_bytes(bytes).unwrap();
+    }
+
+    #[test]
+    fn test_from_hex() {
+        let address_hex = "0x755cdba6ae4f479f7164792b318b2a06c759833b";
+        let address_bech32 = "muta1w4wdhf4wfare7uty0y4nrze2qmr4nqem9j7teu";
+        let address = Address::from_hex(address_hex).unwrap();
+        assert_eq!(address.to_string(), address_bech32);
     }
 
     #[test]
