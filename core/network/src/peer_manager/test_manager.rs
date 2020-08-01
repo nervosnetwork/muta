@@ -1,7 +1,8 @@
 use super::{
     time, ArcPeer, Connectedness, ConnectingAttempt, Inner, MisbehaviorKind, PeerManager,
     PeerManagerConfig, PeerMultiaddr, TrustMetric, TrustMetricConfig, GOOD_TRUST_SCORE,
-    MAX_CONNECTING_MARGIN, MAX_RETRY_COUNT, REPEATED_CONNECTION_TIMEOUT, SHORT_ALIVE_SESSION,
+    MAX_CONNECTING_MARGIN, MAX_RETRY_COUNT, REPEATED_CONNECTION_TIMEOUT, SAME_IP_LIMIT_BAN,
+    SHORT_ALIVE_SESSION,
 };
 use crate::{
     common::ConnectedAddr,
@@ -2842,6 +2843,12 @@ async fn should_reject_same_ip_connection_when_reach_limit_on_new_session() {
         same_ip_peer.session_id(),
         expect_sid,
         "should not change peer session id"
+    );
+
+    let inserted_same_ip_peer = inner.peer(&same_ip_peer.id).unwrap();
+    assert_eq!(
+        inserted_same_ip_peer.tags.get_banned_until(),
+        Some(time::now() + SAME_IP_LIMIT_BAN.as_secs())
     );
 
     let conn_event = conn_rx.next().await.expect("should have disconnect event");

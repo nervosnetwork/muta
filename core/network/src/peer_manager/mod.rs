@@ -64,6 +64,7 @@ use crate::event::{
 };
 use crate::traits::MultiaddrExt;
 
+const SAME_IP_LIMIT_BAN: Duration = Duration::from_secs(5 * 60);
 const REPEATED_CONNECTION_TIMEOUT: u64 = 30; // seconds
 const BACKOFF_BASE: u64 = 2;
 const MAX_RETRY_INTERVAL: u64 = 512; // seconds
@@ -693,6 +694,12 @@ impl PeerManager {
 
         if let Err(err) = self.inner.sessions.insert(session) {
             warn!("insert session {} failed: {}", ctx.id, err);
+
+            // Ban this peer for a while so we won't choose it again
+            // NOTE: Always allowed and consensus peer cannot be banned.
+            if let Err(err) = remote_peer.tags.insert_ban(SAME_IP_LIMIT_BAN) {
+                warn!("ban same ip peer {:?} failed: {}", remote_peer.id, err);
+            }
 
             remote_peer.mark_disconnected();
             self.disconnect_session(ctx.id);
