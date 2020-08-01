@@ -30,6 +30,7 @@ pub struct ConfigNetwork {
     pub fatal_ban_duration:         Option<u64>,
     pub soft_ban_duration:          Option<u64>,
     pub max_connected_peers:        Option<usize>,
+    pub same_ip_conn_limit:         Option<usize>,
     pub listening_address:          SocketAddr,
     pub rpc_timeout:                Option<u64>,
     pub selfcheck_interval:         Option<u64>,
