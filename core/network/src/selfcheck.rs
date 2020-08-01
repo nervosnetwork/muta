@@ -9,7 +9,7 @@ use std::{
 use futures::task::AtomicWaker;
 use log::info;
 
-use crate::{common::HeartBeat, traits::SessionBook};
+use crate::{common::HeartBeat, traits::SharedSessionBook};
 
 pub struct SelfCheckConfig {
     pub interval: Duration,
@@ -23,7 +23,7 @@ pub(crate) struct SelfCheck<S> {
 
 impl<S> SelfCheck<S>
 where
-    S: SessionBook + Send + Unpin + 'static,
+    S: SharedSessionBook + Send + Unpin + 'static,
 {
     pub fn new(sessions: S, config: SelfCheckConfig) -> Self {
         let waker = Arc::new(AtomicWaker::new());
@@ -66,7 +66,7 @@ where
 
 impl<S> Future for SelfCheck<S>
 where
-    S: SessionBook + Send + Unpin + 'static,
+    S: SharedSessionBook + Send + Unpin + 'static,
 {
     type Output = ();
 

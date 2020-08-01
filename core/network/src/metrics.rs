@@ -10,7 +10,7 @@ use futures::task::AtomicWaker;
 
 use crate::{
     common::{ConnectedAddr, HeartBeat},
-    traits::SessionBook,
+    traits::SharedSessionBook,
 };
 
 const METRICS_INTERVAL: Duration = Duration::from_secs(1);
@@ -23,7 +23,7 @@ pub(crate) struct Metrics<S> {
 
 impl<S> Metrics<S>
 where
-    S: SessionBook + Send + Unpin + 'static,
+    S: SharedSessionBook + Send + Unpin + 'static,
 {
     pub fn new(sessions: S) -> Self {
         let waker = Arc::new(AtomicWaker::new());
@@ -60,7 +60,7 @@ where
 
 impl<S> Future for Metrics<S>
 where
-    S: SessionBook + Send + Unpin + 'static,
+    S: SharedSessionBook + Send + Unpin + 'static,
 {
     type Output = ();
 

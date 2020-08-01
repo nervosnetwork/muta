@@ -174,7 +174,7 @@ impl Future for HeartBeat {
     }
 }
 
-#[derive(Debug, Display, PartialEq, Eq, Serialize, Deserialize, Clone)]
+#[derive(Debug, Display, PartialEq, Eq, Serialize, Deserialize, Clone, Hash)]
 #[display(fmt = "{}:{}", host, port)]
 pub struct ConnectedAddr {
     pub host: String,

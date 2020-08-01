@@ -24,7 +24,7 @@ use tentacle::{
 use crate::{
     error::NetworkError,
     event::{ConnectionEvent, PeerManagerEvent},
-    traits::{NetworkProtocol, SessionBook},
+    traits::{NetworkProtocol, SharedSessionBook},
 };
 
 pub struct ConnectionConfig {
@@ -114,7 +114,7 @@ impl<P: NetworkProtocol> ConnectionService<P> {
         Ok(())
     }
 
-    pub fn control<B: SessionBook>(
+    pub fn control<B: SharedSessionBook>(
         &self,
         mgr_tx: UnboundedSender<PeerManagerEvent>,
         book: B,

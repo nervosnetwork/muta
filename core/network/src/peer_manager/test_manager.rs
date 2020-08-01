@@ -144,6 +144,7 @@ fn make_manager(
         peer_fatal_ban,
         peer_soft_ban,
         max_connections,
+        same_ip_conn_limit: 99,
         routine_interval: Duration::from_secs(10),
         peer_dat_file,
     };
@@ -249,8 +250,7 @@ async fn should_accept_outbound_connection_and_remove_mached_connecting_on_new_s
     assert_eq!(
         mgr.connecting().len(),
         1,
-        "should have one connecting
-attempt"
+        "should have one connecting attempt"
     );
 
     let sess_ctx = SessionContext::make(
@@ -2205,6 +2205,7 @@ async fn should_only_connect_peers_in_allowlist_if_enable_allowlist_only() {
         peer_fatal_ban,
         peer_soft_ban,
         max_connections: 10,
+        same_ip_conn_limit: 99,
         routine_interval: Duration::from_secs(10),
         peer_dat_file,
     };
@@ -2268,6 +2269,7 @@ async fn should_only_accept_incoming_from_peer_in_allowlist_if_enable_allowlist_
         peer_fatal_ban,
         peer_soft_ban,
         max_connections: 10,
+        same_ip_conn_limit: 9,
         routine_interval: Duration::from_secs(10),
         peer_dat_file,
     };
@@ -2784,4 +2786,67 @@ async fn should_remove_old_consensus_peer_tag_when_tag_consensus() {
     let new_consensus = mgr.core_inner().peer(&new_consensus.id).unwrap();
     assert!(new_consensus.tags.contains(&PeerTag::Consensus));
     assert!(!peer.tags.contains(&PeerTag::Consensus));
+}
+
+#[tokio::test]
+async fn should_reject_same_ip_connection_when_reach_limit_on_new_session() {
+    let manager_pubkey = make_pubkey();
+    let manager_id = manager_pubkey.peer_id();
+    let mut peer_dat_file = std::env::temp_dir();
+    peer_dat_file.push("peer.dat");
+    let peer_trust_config = Arc::new(TrustMetricConfig::default());
+    let peer_fatal_ban = Duration::from_secs(50);
+    let peer_soft_ban = Duration::from_secs(10);
+
+    let config = PeerManagerConfig {
+        our_id: manager_id,
+        pubkey: manager_pubkey,
+        bootstraps: Default::default(),
+        allowlist: vec![],
+        allowlist_only: false,
+        peer_trust_config,
+        peer_fatal_ban,
+        peer_soft_ban,
+        max_connections: 10,
+        same_ip_conn_limit: 1,
+        routine_interval: Duration::from_secs(10),
+        peer_dat_file,
+    };
+
+    let (conn_tx, mut conn_rx) = unbounded();
+    let (mgr_tx, mgr_rx) = unbounded();
+    let manager = PeerManager::new(config, mgr_rx, conn_tx);
+
+    let mut mgr = MockManager::new(manager, mgr_tx);
+    make_sessions(&mut mgr, 1, 5000).await;
+
+    let same_ip_peer = make_peer(9527);
+    let expect_sid = same_ip_peer.session_id();
+
+    let sess_ctx = SessionContext::make(
+        SessionId::new(99),
+        same_ip_peer.multiaddrs.all_raw().pop().unwrap(),
+        SessionType::Outbound,
+        same_ip_peer.owned_pubkey().expect("pubkey"),
+    );
+    let new_session = PeerManagerEvent::NewSession {
+        pid:    same_ip_peer.owned_id(),
+        pubkey: same_ip_peer.owned_pubkey().expect("pubkey"),
+        ctx:    sess_ctx.arced(),
+    };
+    mgr.poll_event(new_session).await;
+
+    let inner = mgr.core_inner();
+    assert_eq!(inner.connected(), 1, "should not increase conn count");
+    assert_eq!(
+        same_ip_peer.session_id(),
+        expect_sid,
+        "should not change peer session id"
+    );
+
+    let conn_event = conn_rx.next().await.expect("should have disconnect event");
+    match conn_event {
+        ConnectionEvent::Disconnect(sid) => assert_eq!(sid, 99.into(), "should be new session id"),
+        _ => panic!("should be disconnect event"),
+    }
 }
