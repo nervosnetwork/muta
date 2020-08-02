@@ -185,7 +185,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
                 })
                 .collect::<Vec<_>>();
 
-            let owner = if payload.autonomy == true {
+            let owner = if payload.autonomy {
                 address.clone()
             } else {
                 payload.owner.clone()
