@@ -128,7 +128,9 @@ macro_rules! perf_exec {
         )
         .unwrap();
 
-        let resp = executor.exec(Context::new(), &params, &create_asset_txs).unwrap();
+        let resp = executor
+            .exec(Context::new(), &params, &create_asset_txs)
+            .unwrap();
         params.state_root = resp.state_root;
         params.height += 1;
         params.timestamp += 2;
