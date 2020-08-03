@@ -58,7 +58,7 @@ impl From<&PeerManagerConfig> for Config {
         Config {
             same_ip_conn_limit:  config.same_ip_conn_limit,
             inbound_conn_limit:  config.inbound_conn_limit,
-            outbound_conn_limit: config.max_connections - config.inbound_conn_limit,
+            outbound_conn_limit: config.outbound_conn_limit,
         }
     }
 }
