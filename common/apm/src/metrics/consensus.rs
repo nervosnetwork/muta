@@ -41,12 +41,6 @@ make_auto_flush_static_metric! {
 }
 
 lazy_static! {
-    pub static ref CONSENSUS_HEIGHT_PLUS_PLUS_VEC: IntCounterVec = register_int_counter_vec!(
-        "muta_concensus_height_plus_plus",
-        "Height plus plus by consensus or sync",
-        &["type"]
-    )
-    .unwrap();
     pub static ref CONSENSUS_RESULT_COUNTER_VEC: IntCounterVec = register_int_counter_vec!(
         "muta_concensus_result",
         "Total number of consensus result",
