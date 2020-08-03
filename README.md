@@ -54,6 +54,10 @@ We provide detailed service development guides and some service examples.
 * [Service Examples](https://nervosnetwork.github.io/muta-docs/#/en-us/service_eg.md)
 * [Develop a DEX Chain](https://nervosnetwork.github.io/muta-docs/#/en-us/dex.md)
 
+## Resources
+
+Related resources can be found [here](./docs/resources.md)
+
 ## Who is using Muta？
 
 Muta powers some open source projects.

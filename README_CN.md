@@ -53,6 +53,10 @@ Service 是 Muta 框架中用于扩展的抽象层，用户可以基于 Service 
 * [Service 开发指南](https://nervosnetwork.github.io/muta-docs/#service_dev.md)
 * [Service 示例](https://nervosnetwork.github.io/muta-docs/#service_eg.md)
 
+## 相关资源
+
+可以在[这边](./docs/resources.md)找到相关的开发资源
+
 ## 谁在使用 Muta？
 
 <p align="left">
