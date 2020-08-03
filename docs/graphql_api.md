@@ -19,10 +19,10 @@ node, and then try open http://127.0.0.1:8000/graphiql in the browser.
     * [Block](#block)
     * [BlockHeader](#blockheader)
     * [Event](#event)
-    * [ExecResp](#execresp)
     * [Proof](#proof)
     * [Receipt](#receipt)
     * [ReceiptResponse](#receiptresponse)
+    * [ServiceResponse](#serviceresponse)
     * [SignedTransaction](#signedtransaction)
     * [Validator](#validator)
   * [Inputs](#inputs)
@@ -52,7 +52,7 @@ node, and then try open http://127.0.0.1:8000/graphiql in the browser.
 <tbody>
 <tr>
 <td colspan="2" valign="top"><strong>getBlock</strong></td>
-<td valign="top"><a href="#/graphql_api?id=block">Block</a>!</td>
+<td valign="top"><a href="#/graphql_api?id=block">Block</a></td>
 <td>
 
 Get the block
@@ -66,7 +66,7 @@ Get the block
 </tr>
 <tr>
 <td colspan="2" valign="top"><strong>getTransaction</strong></td>
-<td valign="top"><a href="#/graphql_api?id=signedtransaction">SignedTransaction</a>!</td>
+<td valign="top"><a href="#/graphql_api?id=signedtransaction">SignedTransaction</a></td>
 <td>
 
 Get the transaction by hash
@@ -80,7 +80,7 @@ Get the transaction by hash
 </tr>
 <tr>
 <td colspan="2" valign="top"><strong>getReceipt</strong></td>
-<td valign="top"><a href="#/graphql_api?id=receipt">Receipt</a>!</td>
+<td valign="top"><a href="#/graphql_api?id=receipt">Receipt</a></td>
 <td>
 
 Get the receipt by transaction hash
@@ -94,7 +94,7 @@ Get the receipt by transaction hash
 </tr>
 <tr>
 <td colspan="2" valign="top"><strong>queryService</strong></td>
-<td valign="top"><a href="#/graphql_api?id=execresp">ExecResp</a>!</td>
+<td valign="top"><a href="#/graphql_api?id=serviceresponse">ServiceResponse</a>!</td>
 <td>
 
 query service
@@ -228,6 +228,15 @@ The body section of a block
 
 </td>
 </tr>
+<tr>
+<td colspan="2" valign="top"><strong>hash</strong></td>
+<td valign="top"><a href="#/graphql_api?id=hash">Hash</a>!</td>
+<td>
+
+Hash of the block
+
+</td>
+</tr>
 </tbody>
 </table>
 
@@ -273,7 +282,7 @@ The height to which the block has been executed
 </td>
 </tr>
 <tr>
-<td colspan="2" valign="top"><strong>preHash</strong></td>
+<td colspan="2" valign="top"><strong>prevHash</strong></td>
 <td valign="top"><a href="#/graphql_api?id=hash">Hash</a>!</td>
 <td>
 
@@ -296,6 +305,15 @@ A timestamp that records when the block was created
 <td>
 
 The merkle root of ordered transactions
+
+</td>
+</tr>
+<tr>
+<td colspan="2" valign="top"><strong>orderSignedTransactionsHash</strong></td>
+<td valign="top"><a href="#/graphql_api?id=hash">Hash</a>!</td>
+<td>
+
+The hash of ordered signed transactions
 
 </td>
 </tr>
@@ -384,33 +402,13 @@ The version of validator is designed for cross chain
 <td></td>
 </tr>
 <tr>
+<td colspan="2" valign="top"><strong>name</strong></td>
+<td valign="top"><a href="#/graphql_api?id=string">String</a>!</td>
+<td></td>
+</tr>
+<tr>
 <td colspan="2" valign="top"><strong>data</strong></td>
 <td valign="top"><a href="#/graphql_api?id=string">String</a>!</td>
-<td></td>
-</tr>
-</tbody>
-</table>
-
-### ExecResp
-
-<table>
-<thead>
-<tr>
-<th align="left">Field</th>
-<th align="right">Argument</th>
-<th align="left">Type</th>
-<th align="left">Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td colspan="2" valign="top"><strong>ret</strong></td>
-<td valign="top"><a href="#/graphql_api?id=string">String</a>!</td>
-<td></td>
-</tr>
-<tr>
-<td colspan="2" valign="top"><strong>isError</strong></td>
-<td valign="top"><a href="#/graphql_api?id=boolean">Boolean</a>!</td>
 <td></td>
 </tr>
 </tbody>
@@ -526,13 +524,38 @@ The verifier of the block header proved
 <td></td>
 </tr>
 <tr>
-<td colspan="2" valign="top"><strong>ret</strong></td>
+<td colspan="2" valign="top"><strong>response</strong></td>
+<td valign="top"><a href="#/graphql_api?id=serviceresponse">ServiceResponse</a>!</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+
+### ServiceResponse
+
+<table>
+<thead>
+<tr>
+<th align="left">Field</th>
+<th align="right">Argument</th>
+<th align="left">Type</th>
+<th align="left">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td colspan="2" valign="top"><strong>code</strong></td>
+<td valign="top"><a href="#/graphql_api?id=uint64">Uint64</a>!</td>
+<td></td>
+</tr>
+<tr>
+<td colspan="2" valign="top"><strong>succeedData</strong></td>
 <td valign="top"><a href="#/graphql_api?id=string">String</a>!</td>
 <td></td>
 </tr>
 <tr>
-<td colspan="2" valign="top"><strong>isError</strong></td>
-<td valign="top"><a href="#/graphql_api?id=boolean">Boolean</a>!</td>
+<td colspan="2" valign="top"><strong>errorMessage</strong></td>
+<td valign="top"><a href="#/graphql_api?id=string">String</a>!</td>
 <td></td>
 </tr>
 </tbody>
@@ -573,6 +596,11 @@ The verifier of the block header proved
 <tr>
 <td colspan="2" valign="top"><strong>timeout</strong></td>
 <td valign="top"><a href="#/graphql_api?id=uint64">Uint64</a>!</td>
+<td></td>
+</tr>
+<tr>
+<td colspan="2" valign="top"><strong>sender</strong></td>
+<td valign="top"><a href="#/graphql_api?id=address">Address</a>!</td>
 <td></td>
 </tr>
 <tr>
@@ -623,8 +651,8 @@ Validator address set
 </thead>
 <tbody>
 <tr>
-<td colspan="2" valign="top"><strong>address</strong></td>
-<td valign="top"><a href="#/graphql_api?id=address">Address</a>!</td>
+<td colspan="2" valign="top"><strong>pubkey</strong></td>
+<td valign="top"><a href="#/graphql_api?id=bytes">Bytes</a>!</td>
 <td></td>
 </tr>
 <tr>
@@ -709,6 +737,11 @@ For security and performance reasons, Muta will only deal with trade request ove
 <tr>
 <td colspan="2" valign="top"><strong>payload</strong></td>
 <td valign="top"><a href="#/graphql_api?id=string">String</a>!</td>
+<td></td>
+</tr>
+<tr>
+<td colspan="2" valign="top"><strong>sender</strong></td>
+<td valign="top"><a href="#/graphql_api?id=address">Address</a>!</td>
 <td></td>
 </tr>
 </tbody>
