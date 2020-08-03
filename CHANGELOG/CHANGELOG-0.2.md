@@ -1,37 +1,78 @@
-##  (2020-07-13)
+# [](https://github.com/nervosnetwork/muta/compare/v0.2.0-alpha.1...v) (2020-08-03)
 
-* chore: Add lint pipeline (#342) ([4c32b5c](https://github.com/yejiayu/muta/commit/4c32b5c)), closes [#342](https://github.com/yejiayu/muta/issues/342)
-* chore: Fix pipeline of build image (#344) ([f946c19](https://github.com/yejiayu/muta/commit/f946c19)), closes [#344](https://github.com/yejiayu/muta/issues/344)
-* chore: Update CHANGELOG v0.2.0-alpha.0 ([21386ca](https://github.com/yejiayu/muta/commit/21386ca))
-* chore(network): upgrade tentacle to v0.3.0alpha5 (#339) ([a0dff93](https://github.com/yejiayu/muta/commit/a0dff93)), closes [#339](https://github.com/yejiayu/muta/issues/339)
-* feat!: add 'name' field in event struct (#347) ([f7f5d75](https://github.com/yejiayu/muta/commit/f7f5d75)), closes [#347](https://github.com/yejiayu/muta/issues/347)
-* feat(api)!: Allowed to return None (#315) ([b69d1eb](https://github.com/yejiayu/muta/commit/b69d1eb)), closes [#315](https://github.com/yejiayu/muta/issues/315)
-* test(consensus): add unit test of current consensus status (#343) ([d9d186c](https://github.com/yejiayu/muta/commit/d9d186c)), closes [#343](https://github.com/yejiayu/muta/issues/343)
-* refactor(tests): trust metric integration tests (#340) ([2405cbe](https://github.com/yejiayu/muta/commit/2405cbe)), closes [#340](https://github.com/yejiayu/muta/issues/340)
-* refactor(auth): change verified map to array (#337) ([d7ea75a](https://github.com/yejiayu/muta/commit/d7ea75a)), closes [#337](https://github.com/yejiayu/muta/issues/337)
-* refactor(service): calculate multi-signature recursion depth (#322) ([0a83036](https://github.com/yejiayu/muta/commit/0a83036)), closes [#322](https://github.com/yejiayu/muta/issues/322)
-* chore: Fix ci (#336) ([03ad6e9](https://github.com/yejiayu/muta/commit/03ad6e9)), closes [#336](https://github.com/yejiayu/muta/issues/336)
-* chore: Replace Travis Ci with Jenkins-x (#333) ([05481d3](https://github.com/yejiayu/muta/commit/05481d3)), closes [#333](https://github.com/yejiayu/muta/issues/333)
-* chore: Update CI pipeline (#335) ([a915200](https://github.com/yejiayu/muta/commit/a915200)), closes [#335](https://github.com/yejiayu/muta/issues/335)
-* chore: Update OWNERS (#332) ([cdf4a1c](https://github.com/yejiayu/muta/commit/cdf4a1c)), closes [#332](https://github.com/yejiayu/muta/issues/332)
-* chore(CHANGELOG): Update v0.2 CHANGELOG (#328) ([f2bd65a](https://github.com/yejiayu/muta/commit/f2bd65a)), closes [#328](https://github.com/yejiayu/muta/issues/328)
-* Add customized preview namespace ([7921b02](https://github.com/yejiayu/muta/commit/7921b02))
-* Add customized preview namespace ([2c6db84](https://github.com/yejiayu/muta/commit/2c6db84))
-* Delete skaffold.yaml ([7251f16](https://github.com/yejiayu/muta/commit/7251f16))
-* Draft create ([95a7d91](https://github.com/yejiayu/muta/commit/95a7d91))
-* Draft create ([b23b2b5](https://github.com/yejiayu/muta/commit/b23b2b5))
-* fix(trust_metric_test): unreliable full node exit check (#327) ([a4ab4a6](https://github.com/yejiayu/muta/commit/a4ab4a6)), closes [#327](https://github.com/yejiayu/muta/issues/327)
-* change(executor): panic when service not found in call fn (#324) ([2a413e6](https://github.com/yejiayu/muta/commit/2a413e6)), closes [#324](https://github.com/yejiayu/muta/issues/324)
-* chore(docker): Update dockerfile for Next CI/CD (#323) ([f118cac](https://github.com/yejiayu/muta/commit/f118cac)), closes [#323](https://github.com/yejiayu/muta/issues/323)
-* chore(toolchain): upgrade rust toolchain version (#321) ([5ed3145](https://github.com/yejiayu/muta/commit/5ed3145)), closes [#321](https://github.com/yejiayu/muta/issues/321)
-* refactor: add proposer in execute params (#319) ([bf9747b](https://github.com/yejiayu/muta/commit/bf9747b)), closes [#319](https://github.com/yejiayu/muta/issues/319)
-* refactor(store): change index and len to u64 (#325) ([7697586](https://github.com/yejiayu/muta/commit/7697586)), closes [#325](https://github.com/yejiayu/muta/issues/325)
-* feat(executor): allow cancel execution units through context (#317) ([eafb489](https://github.com/yejiayu/muta/commit/eafb489)), closes [#317](https://github.com/yejiayu/muta/issues/317)
-* feat(executor): indenpendent tx hook states commit (#316) ([fde6450](https://github.com/yejiayu/muta/commit/fde6450)), closes [#316](https://github.com/yejiayu/muta/issues/316)
-* feat(protocol): Remove the logs bloom from block header (#312) ([ff1e0df](https://github.com/yejiayu/muta/commit/ff1e0df)), closes [#312](https://github.com/yejiayu/muta/issues/312)
-* feat(service)!: add authorization service for mempool (#320) ([a3c3433](https://github.com/yejiayu/muta/commit/a3c3433)), closes [#320](https://github.com/yejiayu/muta/issues/320)
-* feat(service)!: add multiple signatures service (#318) ([f8f16cd](https://github.com/yejiayu/muta/commit/f8f16cd)), closes [#318](https://github.com/yejiayu/muta/issues/318)
-* fix(framework)!: DefalutServiceSDK typo (#311) ([aa6f1dd](https://github.com/yejiayu/muta/commit/aa6f1dd)), closes [#311](https://github.com/yejiayu/muta/issues/311)
-* fix(executor): tx events aren't cleared on execution error (#313) ([1605cf5](https://github.com/yejiayu/muta/commit/1605cf5)), closes [#313](https://github.com/yejiayu/muta/issues/313)
-* fix(proof): Verify aggregated signature in checking proof (#308) ([d2a98b0](https://github.com/yejiayu/muta/commit/d2a98b0)), closes [#308](https://github.com/yejiayu/muta/issues/308)
-* fix(WAL): Ignore path already exist (#304) ([02df937](https://github.com/yejiayu/muta/commit/02df937)), closes [#304](https://github.com/yejiayu/muta/issues/304)
+
+### Bug Fixes
+
+* **consensus:** return an error when committing an outdated block ([#371](https://github.com/nervosnetwork/muta/issues/371)) ([b3d518b](https://github.com/nervosnetwork/muta/commit/b3d518b52658b40746ef708fa8cde5c96a39a539))
+* **mempool:** Ensure that there are no duplicate transactions in the order transaction ([#379](https://github.com/nervosnetwork/muta/issues/379)) ([97708ac](https://github.com/nervosnetwork/muta/commit/97708ac385be2243344d700a0d7c928f18fd51b3))
+* **storage:** test batch receipts get panic ([#373](https://github.com/nervosnetwork/muta/issues/373)) ([300a3c6](https://github.com/nervosnetwork/muta/commit/300a3c65cf0399c2ba37a3bd655e06719b660330))
+
+
+### Features
+
+* **network:** tag consensus peer ([#364](https://github.com/nervosnetwork/muta/issues/364)) ([9b27df1](https://github.com/nervosnetwork/muta/commit/9b27df1015a25792cc210c5aa0dd473a45ae885d)), closes [#354](https://github.com/nervosnetwork/muta/issues/354) [#2](https://github.com/nervosnetwork/muta/issues/2) [#3](https://github.com/nervosnetwork/muta/issues/3) [#4](https://github.com/nervosnetwork/muta/issues/4) [#5](https://github.com/nervosnetwork/muta/issues/5) [#6](https://github.com/nervosnetwork/muta/issues/6) [#7](https://github.com/nervosnetwork/muta/issues/7)
+* Add global panic hook ([#376](https://github.com/nervosnetwork/muta/issues/376)) ([7382279](https://github.com/nervosnetwork/muta/commit/738227962771a6a66b85f2fd199df2e699b43adc))
+
+
+### Performance Improvements
+
+* **executor:** use inner call instead of service dispatcher ([#365](https://github.com/nervosnetwork/muta/issues/365)) ([7b1d2a3](https://github.com/nervosnetwork/muta/commit/7b1d2a32d5c20306af3868e5265bd2530dd9493b))
+
+
+### BREAKING CHANGES
+
+* **network:** - replace Validator address bytes with pubkey bytes
+
+* change(consensus): log validator address instead of its public key
+
+Block proposer is address instead public key
+
+* fix: compilation failed
+* **network:** - change users_cast to multicast, take peer_ids bytes instead of Address
+- network bootstrap configuration now takes peer id instead of pubkey hex
+
+* refactor(network): PeerId api
+
+
+
+# [0.2.0-alpha.1](https://github.com/nervosnetwork/muta/compare/v0.1.2-beta...v0.2.0-alpha.1) (2020-07-22)
+
+
+### Bug Fixes
+
+* **executor:** The logic to deal with tx_hook and tx_body ([#367](https://github.com/nervosnetwork/muta/issues/367)) ([749d558](https://github.com/nervosnetwork/muta/commit/749d558b8b58a1943bfa2842dcedcc45218c0f78))
+* **executor:** tx events aren't cleared on execution error ([#313](https://github.com/nervosnetwork/muta/issues/313)) ([1605cf5](https://github.com/nervosnetwork/muta/commit/1605cf59b558b97889bb431da7f81fd424b90a89))
+* **proof:** Verify aggregated signature in checking proof ([#308](https://github.com/nervosnetwork/muta/issues/308)) ([d2a98b0](https://github.com/nervosnetwork/muta/commit/d2a98b06e44449ca756f135c1b235ff0d80eaf67))
+* **trust_metric_test:** unreliable full node exit check ([#327](https://github.com/nervosnetwork/muta/issues/327)) ([a4ab4a6](https://github.com/nervosnetwork/muta/commit/a4ab4a6209e0978148983e88447ac2d9178fa42a))
+* **WAL:** Ignore path already exist ([#304](https://github.com/nervosnetwork/muta/issues/304)) ([02df937](https://github.com/nervosnetwork/muta/commit/02df937fb6449c9b3b0b50e790e0ecf6bfc1ee3d))
+
+
+### Performance Improvements
+
+* **mempool:** parallel verifying signatures in mempool ([#359](https://github.com/nervosnetwork/muta/issues/359)) ([2ccdf1a](https://github.com/nervosnetwork/muta/commit/2ccdf1a67a40cd483749a98a1a68c37bcf1d473c))
+
+
+### Reverts
+
+* Revert "refactor(consensus)!: replace Validator address bytes with pubkey bytes (#354)" (#361) ([4dabfa2](https://github.com/nervosnetwork/muta/commit/4dabfa231961d1ec8be1ba42bf05781f55395aed)), closes [#354](https://github.com/nervosnetwork/muta/issues/354) [#361](https://github.com/nervosnetwork/muta/issues/361)
+
+
+* refactor(consensus)!: replace Validator address bytes with pubkey bytes (#354) ([e4433d7](https://github.com/nervosnetwork/muta/commit/e4433d793e8a63788ec682880afc93474e0d2414)), closes [#354](https://github.com/nervosnetwork/muta/issues/354)
+
+
+### Features
+
+* **executor:** allow cancel execution units through context ([#317](https://github.com/nervosnetwork/muta/issues/317)) ([eafb489](https://github.com/nervosnetwork/muta/commit/eafb489f78f7521487c6b2d25dd9912e43f76500))
+* **executor:** indenpendent tx hook states commit ([#316](https://github.com/nervosnetwork/muta/issues/316)) ([fde6450](https://github.com/nervosnetwork/muta/commit/fde645010363a4664033370e4109e4d1f08b13bc))
+* **protocol:** Remove the logs bloom from block header ([#312](https://github.com/nervosnetwork/muta/issues/312)) ([ff1e0df](https://github.com/nervosnetwork/muta/commit/ff1e0df1e8a65cc480825a49eed9495cc31ecee0))
+
+
+### BREAKING CHANGES
+
+* - replace Validator address bytes with pubkey bytes
+
+* change(consensus): log validator address instead of its public key
+
+Block proposer is address instead public key
+
+* fix: compilation failed
