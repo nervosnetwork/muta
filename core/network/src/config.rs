@@ -40,6 +40,7 @@ pub const DEFAULT_MAX_WAIT_STREAMS: usize = 256;
 pub const DEFAULT_WRITE_TIMEOUT: u64 = 10; // seconds
 
 pub const DEFAULT_SAME_IP_CONN_LIMIT: usize = 1;
+pub const DEFAULT_INBOUND_CONN_LIMIT: usize = 20;
 
 // Default peer trust metric
 pub const DEFAULT_PEER_TRUST_INTERVAL_DURATION: Duration = Duration::from_secs(60);
@@ -127,6 +128,7 @@ pub struct NetworkConfig {
     pub peer_fatal_ban:         Duration,
     pub peer_soft_ban:          Duration,
     pub same_ip_conn_limit:     usize,
+    pub inbound_conn_limit:     usize,
 
     // identity and encryption
     pub secio_keypair: SecioKeyPair,
@@ -174,6 +176,7 @@ impl NetworkConfig {
             peer_fatal_ban:         DEFAULT_PEER_FATAL_BAN_DURATION,
             peer_soft_ban:          DEFAULT_PEER_SOFT_BAN_DURATION,
             same_ip_conn_limit:     DEFAULT_SAME_IP_CONN_LIMIT,
+            inbound_conn_limit:     DEFAULT_INBOUND_CONN_LIMIT,
 
             secio_keypair: SecioKeyPair::secp256k1_generated(),
 
@@ -190,12 +193,16 @@ impl NetworkConfig {
         }
     }
 
-    pub fn max_connections(mut self, max: Option<usize>) -> Self {
+    pub fn max_connections(mut self, max: Option<usize>) -> ProtocolResult<Self> {
         if let Some(max) = max {
+            if max <= self.inbound_conn_limit {
+                return Err(NetworkError::InboundLimitEqualOrSmallerThanMaxConn.into());
+            }
+
             self.max_connections = max;
         }
 
-        self
+        Ok(self)
     }
 
     pub fn same_ip_conn_limit(mut self, limit: Option<usize>) -> Self {
@@ -204,6 +211,18 @@ impl NetworkConfig {
         }
 
         self
+    }
+
+    pub fn inbound_conn_limit(mut self, limit: Option<usize>) -> ProtocolResult<Self> {
+        if let Some(limit) = limit {
+            if self.max_connections <= limit {
+                return Err(NetworkError::InboundLimitEqualOrSmallerThanMaxConn.into());
+            }
+
+            self.inbound_conn_limit = limit;
+        }
+
+        Ok(self)
     }
 
     pub fn max_frame_length(mut self, max: Option<usize>) -> Self {
@@ -449,6 +468,7 @@ impl From<&NetworkConfig> for PeerManagerConfig {
             peer_soft_ban:      config.peer_soft_ban,
             max_connections:    config.max_connections,
             same_ip_conn_limit: config.same_ip_conn_limit,
+            inbound_conn_limit: config.inbound_conn_limit,
             routine_interval:   config.peer_manager_heart_beat_interval,
             peer_dat_file:      config.peer_dat_file.clone(),
         }

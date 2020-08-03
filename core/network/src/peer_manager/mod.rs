@@ -287,6 +287,11 @@ impl Inner {
     fn restore(&self, peers: Vec<ArcPeer>) {
         self.peers.write().extend(peers);
     }
+
+    #[cfg(test)]
+    fn outbound_count(&self) -> usize {
+        self.sessions.outbound_count()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -307,6 +312,9 @@ pub struct PeerManagerConfig {
 
     /// Limit connections from same ip
     pub same_ip_conn_limit: usize,
+
+    /// Limit inbound connections
+    pub inbound_conn_limit: usize,
 
     /// Trust metric config
     pub peer_trust_config: Arc<TrustMetricConfig>,

@@ -145,7 +145,8 @@ fn make_manager(
         peer_fatal_ban,
         peer_soft_ban,
         max_connections,
-        same_ip_conn_limit: 99,
+        same_ip_conn_limit: max_connections,
+        inbound_conn_limit: max_connections / 2,
         routine_interval: Duration::from_secs(10),
         peer_dat_file,
     };
@@ -165,6 +166,8 @@ fn make_pubkey() -> PublicKey {
 async fn make_sessions(mgr: &mut MockManager, num: u16, init_port: u16) -> Vec<ArcPeer> {
     let mut next_sid = 1;
     let mut peers = Vec::with_capacity(num as usize);
+    let inbound_limit = mgr.config().inbound_conn_limit;
+    let outbound_limit = mgr.config().max_connections - inbound_limit;
     let inner = mgr.core_inner();
 
     for n in (0..num).into_iter() {
@@ -172,10 +175,16 @@ async fn make_sessions(mgr: &mut MockManager, num: u16, init_port: u16) -> Vec<A
         let remote_pid = remote_pubkey.peer_id();
         let remote_addr = make_multiaddr(init_port + n, Some(remote_pid.clone()));
 
+        let ty = if inner.outbound_count() == outbound_limit {
+            SessionType::Inbound
+        } else {
+            SessionType::Outbound
+        };
+
         let sess_ctx = SessionContext::make(
             SessionId::new(next_sid),
             remote_addr.clone(),
-            SessionType::Outbound,
+            ty,
             remote_pubkey.clone(),
         );
         next_sid += 1;
@@ -2207,6 +2216,7 @@ async fn should_only_connect_peers_in_allowlist_if_enable_allowlist_only() {
         peer_soft_ban,
         max_connections: 10,
         same_ip_conn_limit: 99,
+        inbound_conn_limit: 5,
         routine_interval: Duration::from_secs(10),
         peer_dat_file,
     };
@@ -2271,6 +2281,7 @@ async fn should_only_accept_incoming_from_peer_in_allowlist_if_enable_allowlist_
         peer_soft_ban,
         max_connections: 10,
         same_ip_conn_limit: 9,
+        inbound_conn_limit: 5,
         routine_interval: Duration::from_secs(10),
         peer_dat_file,
     };
@@ -2810,6 +2821,7 @@ async fn should_reject_same_ip_connection_when_reach_limit_on_new_session() {
         peer_soft_ban,
         max_connections: 10,
         same_ip_conn_limit: 1,
+        inbound_conn_limit: 5,
         routine_interval: Duration::from_secs(10),
         peer_dat_file,
     };

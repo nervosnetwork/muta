@@ -146,6 +146,9 @@ pub enum NetworkError {
     #[display(fmt = "transport {}", _0)]
     Transport(tentacle::error::TransportErrorKind),
 
+    #[display(fmt = "inbound connection limit is equal or smaller than max connections")]
+    InboundLimitEqualOrSmallerThanMaxConn,
+
     #[display(fmt = "internal error: {}", _0)]
     Internal(Box<dyn Error + Send>),
 }
