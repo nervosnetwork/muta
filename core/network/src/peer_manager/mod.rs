@@ -16,7 +16,7 @@ pub mod diagnostic;
 use addr_set::PeerAddrSet;
 use retry::Retry;
 use save_restore::{NoPeerDatFile, PeerDatFile, SaveRestore};
-use session_book::{ArcSession, SessionContext};
+use session_book::{AcceptableSession, ArcSession, SessionContext};
 use tags::Tags;
 
 pub use peer::{ArcPeer, Connectedness};
@@ -664,12 +664,6 @@ impl PeerManager {
             }
         }
 
-        // Currently we only save accepted peer.
-        // TODO: save to database
-        if !self.inner.contains(&remote_peer_id) {
-            self.inner.add_peer(remote_peer.clone());
-        }
-
         let connectedness = remote_peer.connectedness();
         if connectedness == Connectedness::Connected {
             // This should not happen, because of repeated connection event
@@ -692,20 +686,34 @@ impl PeerManager {
         let session = ArcSession::new(remote_peer.clone(), Arc::clone(&ctx));
         info!("new session from {}", session.connected_addr);
 
-        if let Err(err) = self.inner.sessions.insert(session) {
-            warn!("insert session {} failed: {}", ctx.id, err);
-
-            // Ban this peer for a while so we won't choose it again
-            // NOTE: Always allowed and consensus peer cannot be banned.
-            if let Err(err) = remote_peer.tags.insert_ban(SAME_IP_LIMIT_BAN) {
-                warn!("ban same ip peer {:?} failed: {}", remote_peer.id, err);
-            }
-
-            remote_peer.mark_disconnected();
-            self.disconnect_session(ctx.id);
-            return;
+        // Currently we only save accepted peer.
+        // NOTE: We have to save peer first to be able to ban it. Check out
+        // SAME_IP_LIMIT_BAN.
+        // TODO: save to database
+        if !self.inner.contains(&remote_peer_id) {
+            self.inner.add_peer(remote_peer.clone());
         }
 
+        // Always allow peer in allowlist and consensus peer
+        if !remote_peer.tags.contains(&PeerTag::AlwaysAllow)
+            && !remote_peer.tags.contains(&PeerTag::Consensus)
+        {
+            if let Err(err) = self.inner.sessions.acceptable(&session) {
+                warn!("session {} unacceptable {}", ctx.id, err);
+
+                // Ban this peer for a while so we won't choose it again
+                // NOTE: Always allowed and consensus peer cannot be banned.
+                if let Err(err) = remote_peer.tags.insert_ban(SAME_IP_LIMIT_BAN) {
+                    warn!("ban same ip peer {:?} failed: {}", remote_peer.id, err);
+                }
+
+                remote_peer.mark_disconnected();
+                self.disconnect_session(ctx.id);
+                return;
+            }
+        }
+
+        self.inner.sessions.insert(AcceptableSession(session));
         remote_peer.mark_connected(ctx.id);
 
         match remote_peer.trust_metric() {

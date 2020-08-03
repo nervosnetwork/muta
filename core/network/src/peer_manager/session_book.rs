@@ -114,6 +114,8 @@ impl Deref for ArcSession {
     }
 }
 
+pub struct AcceptableSession(pub ArcSession);
+
 pub struct SessionBook {
     config: Config,
 
@@ -158,26 +160,30 @@ impl SessionBook {
         f(&mut sessions.iter())
     }
 
-    pub fn insert(&self, session: ArcSession) -> Result<(), self::Error> {
+    pub fn acceptable(&self, session: &ArcSession) -> Result<(), self::Error> {
         let session_host = &session.connected_addr.host;
         let host_count = {
-            let mut hosts = self.hosts.write();
-            *hosts.entry(session_host.to_owned()).or_insert(0)
+            let hosts = self.hosts.read();
+            hosts.get(session_host).cloned().unwrap_or_else(|| 0)
         };
 
         if host_count == usize::MAX || host_count + 1 > self.config.same_ip_conn_limit {
             return Err(self::Error::ReachSameIPConnLimit);
         }
 
-        {
-            let mut hosts = self.hosts.write();
-            if let Some(count) = hosts.get_mut(session_host) {
-                *count += 1;
-            }
-            self.sessions.write().insert(session);
-        }
-
         Ok(())
+    }
+
+    pub fn insert(&self, AcceptableSession(session): AcceptableSession) {
+        let session_host = &session.connected_addr.host;
+
+        let mut hosts = self.hosts.write();
+        hosts
+            .entry(session_host.to_owned())
+            .and_modify(|c| *c += 1)
+            .or_insert(1);
+
+        self.sessions.write().insert(session);
     }
 
     pub fn remove(&self, sid: &SessionId) -> Option<ArcSession> {
@@ -208,7 +214,7 @@ mod tests {
     use tentacle::service::SessionType;
     use tentacle::SessionId;
 
-    use super::{ArcSession, Config, Error, SessionBook};
+    use super::{AcceptableSession, ArcSession, Config, Error, SessionBook};
     use crate::peer_manager::{ArcPeer, PeerMultiaddr};
     use crate::test::mock::SessionContext;
     use crate::traits::MultiaddrExt;
@@ -263,7 +269,9 @@ mod tests {
         let book = SessionBook::new(config);
 
         let session = make_session(100, 1.into());
-        assert!(book.insert(session.clone()).is_ok());
+        assert!(book.acceptable(&session).is_ok());
+
+        book.insert(AcceptableSession(session.clone()));
         assert_eq!(
             book.hosts.read().get(&session.connected_addr.host),
             Some(&1)
@@ -271,7 +279,7 @@ mod tests {
 
         let same_ip_session = make_session(101, 2.into());
         assert_eq!(
-            book.insert(same_ip_session),
+            book.acceptable(&same_ip_session),
             Err(Error::ReachSameIPConnLimit)
         );
     }
@@ -284,7 +292,9 @@ mod tests {
         let book = SessionBook::new(config);
 
         let session = make_session(100, 1.into());
-        assert!(book.insert(session.clone()).is_ok());
+        assert!(book.acceptable(&session).is_ok());
+
+        book.insert(AcceptableSession(session.clone()));
         assert_eq!(
             book.hosts.read().get(&session.connected_addr.host),
             Some(&1)
