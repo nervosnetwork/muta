@@ -78,7 +78,7 @@ impl cita_trie::DB for RocksTrieDB {
 
         self.db.write(batch).map_err(to_store_err)?;
 
-        on_storage_put_state(inst.elapsed(), keys.len() as i64);
+        on_storage_put_state(inst.elapsed(), total_size as i64);
         Ok(())
     }
 
