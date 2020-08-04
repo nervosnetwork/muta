@@ -74,6 +74,74 @@ macro_rules! benchmark {
     }};
 }
 
+macro_rules! perf_exec {
+    ($assets_num: expr, $payload: expr, $num: expr, $bencher: expr) => {{
+        let memdb = Arc::new(RocksTrieDB::new("./free-space/state", false, 1024).unwrap());
+
+        let rocks_adapter = Arc::new(RocksAdapter::new("./free-space/block", 1024).unwrap());
+
+        let storage = Arc::new(ImplStorage::new(Arc::clone(&rocks_adapter)));
+        let toml_str = include_str!("./benchmark_genesis.toml");
+        let genesis: Genesis = toml::from_str(toml_str).unwrap();
+
+        let root = ServiceExecutor::create_genesis(
+            genesis.services,
+            Arc::clone(&memdb),
+            Arc::clone(&storage),
+            Arc::new(MockServiceMapping {}),
+        )
+        .unwrap();
+
+        let create_asset_txs = (0..$assets_num)
+            .map(|n| {
+                let payload = asset::types::CreateAssetPayload {
+                    name:   "muta_".to_string() + n.to_string().as_str(),
+                    symbol: "muta_".to_string() + n.to_string().as_str(),
+                    supply: 100_000,
+                };
+
+                construct_stx(TransactionRequest {
+                    service_name: "asset".to_string(),
+                    method:       "create_asset".to_string(),
+                    payload:      serde_json::to_string(&payload).unwrap(),
+                })
+            })
+            .collect::<Vec<_>>();
+
+        let stxs = (0..$num)
+            .map(|_| construct_stx($payload.clone()))
+            .collect::<Vec<_>>();
+
+        let mut params = ExecutorParams {
+            state_root:   root.clone(),
+            height:       1,
+            timestamp:    0,
+            cycles_limit: u64::max_value(),
+            proposer:     PROPOSER_ACCOUNT.clone(),
+        };
+
+        let mut executor = ServiceExecutor::with_root(
+            root,
+            Arc::clone(&memdb),
+            Arc::clone(&storage),
+            Arc::new(MockServiceMapping {}),
+        )
+        .unwrap();
+
+        let resp = executor
+            .exec(Context::new(), &params, &create_asset_txs)
+            .unwrap();
+        params.state_root = resp.state_root;
+        params.height += 1;
+        params.timestamp += 2;
+
+        $bencher.iter(|| {
+            let txs = stxs.clone();
+            executor.exec(Context::new(), &params, &txs).unwrap();
+        });
+    }};
+}
+
 mod bench;
 // This is a test service that provides transaction hooks.
 mod governance;
