@@ -24,11 +24,6 @@ use crate::types::{
 const MAX_MULTI_SIGNATURE_RECURSION_DEPTH: u8 = 8;
 const MAX_PERMISSION_ACCOUNTS: u8 = 16;
 
-lazy_static::lazy_static! {
-   // FIXME:
-   pub static ref ADEPTIVE_ADDRESS: Address = "muta14e0lmgck835vm2dfm0w3ckv6svmez8fdgdl705".parse().unwrap();
-}
-
 macro_rules! impl_multisig {
     ($self: expr, $method: ident, $ctx: expr) => {{
         let res = $self.$method($ctx.clone());
@@ -119,15 +114,9 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
             })
             .collect::<Vec<_>>();
 
-        let owner = if payload.owner == ADEPTIVE_ADDRESS.clone() {
-            address.clone()
-        } else {
-            payload.owner.clone()
-        };
-
         let permission = MultiSigPermission {
             accounts,
-            owner,
+            owner: payload.owner,
             threshold: payload.threshold,
             memo: payload.memo,
         };
@@ -194,7 +183,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
                 })
                 .collect::<Vec<_>>();
 
-            let owner = if payload.owner == ADEPTIVE_ADDRESS.clone() {
+            let owner = if payload.autonomy {
                 address.clone()
             } else {
                 payload.owner.clone()
@@ -285,10 +274,8 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
                 return ServiceResponse::<()>::from_error(118, "invalid owner".to_owned());
             }
 
-            let new_info = payload.new_account_info.clone();
-
             // check if account contains itself
-            if new_info
+            if payload
                 .addr_with_weight
                 .iter()
                 .map(|a| a.address.clone())
@@ -301,8 +288,8 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
             }
 
             // check sum of weight
-            if new_info.addr_with_weight.is_empty()
-                || new_info.addr_with_weight.len() > MAX_PERMISSION_ACCOUNTS as usize
+            if payload.addr_with_weight.is_empty()
+                || payload.addr_with_weight.len() > MAX_PERMISSION_ACCOUNTS as usize
             {
                 return ServiceResponse::<()>::from_error(
                     110,
@@ -310,14 +297,14 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
                 );
             }
 
-            let weight_sum = new_info
+            let weight_sum = payload
                 .addr_with_weight
                 .iter()
                 .map(|item| item.weight as u32)
                 .sum::<u32>();
 
             // check if sum of the weights is above threshold
-            if new_info.threshold == 0 || weight_sum < new_info.threshold {
+            if payload.threshold == 0 || weight_sum < payload.threshold {
                 return ServiceResponse::<()>::from_error(
                     111,
                     "accounts weight or threshold not valid".to_owned(),
@@ -325,7 +312,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
             }
 
             // check the recursion depth
-            if new_info
+            if payload
                 .addr_with_weight
                 .iter()
                 .map(|s| self._is_recursion_depth_overflow(&s.address, 0))
@@ -337,7 +324,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
                 );
             }
 
-            let accounts = new_info
+            let accounts = payload
                 .addr_with_weight
                 .iter()
                 .map(|item| Account {
@@ -354,9 +341,9 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
             self.sdk
                 .set_account_value(&payload.account_address, 0u8, MultiSigPermission {
                     accounts,
-                    owner: new_info.owner,
-                    threshold: new_info.threshold,
-                    memo: new_info.memo,
+                    owner: payload.owner,
+                    threshold: payload.threshold,
+                    memo: payload.memo,
                 });
             return ServiceResponse::<()>::from_succeed(());
         }

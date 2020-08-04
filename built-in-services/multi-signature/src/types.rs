@@ -33,6 +33,7 @@ pub struct InitGenesisPayload {
 #[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub struct GenerateMultiSigAccountPayload {
     pub owner:            Address,
+    pub autonomy:         bool,
     pub addr_with_weight: Vec<AddressWithWeight>,
     pub threshold:        u32,
     pub memo:             String,
@@ -101,7 +102,10 @@ pub struct SetThresholdPayload {
 #[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug)]
 pub struct UpdateAccountPayload {
     pub account_address:  Address,
-    pub new_account_info: GenerateMultiSigAccountPayload,
+    pub owner:            Address,
+    pub addr_with_weight: Vec<AddressWithWeight>,
+    pub threshold:        u32,
+    pub memo:             String,
 }
 
 #[derive(RlpFixedCodec, Deserialize, Serialize, Clone, Debug, Default, PartialEq, Eq)]
