@@ -1,4 +1,26 @@
-# [](https://github.com/nervosnetwork/muta/compare/v0.2.0-alpha.1...v) (2020-08-03)
+# [](https://github.com/nervosnetwork/muta/compare/v0.2.0-beta.1...v) (2020-08-04)
+
+
+### Bug Fixes
+
+* **consensus:** Add timestamp checking ([#377](https://github.com/nervosnetwork/muta/issues/377)) ([382ede9](https://github.com/nervosnetwork/muta/commit/382ede9367b910a06b59f3562ecd28ab8100d39e))
+
+
+### Features
+
+* **benchmark:** add a perf benchmark macro ([#391](https://github.com/nervosnetwork/muta/issues/391)) ([eb24311](https://github.com/nervosnetwork/muta/commit/eb2431149b6865a82d0e4286536f65319a5e1d1f))
+* **Cargo:** add random leader feature for muta ([#385](https://github.com/nervosnetwork/muta/issues/385)) ([43da977](https://github.com/nervosnetwork/muta/commit/43da9772b22b97ab4797b80ce5161f1a49827543))
+
+
+### Performance Improvements
+
+* **metrics:** Add metrics of state ([#397](https://github.com/nervosnetwork/muta/issues/397)) ([5822764](https://github.com/nervosnetwork/muta/commit/5822764240f8b4e8cfeca4bccf7d399a0bf71897))
+
+### BREAKING CHANGE
+
+* **MultiSig:** change interface and substitute adaptive_address for autonomy ([#384](https://github.com/nervosnetwork/muta/pull/384)) ([a58831e](https://github.com/nervosnetwork/muta/commit/a58831ee029bf27ba79ed08bf0ece7f511abd899))
+
+# [0.2.0-beta.1](https://github.com/nervosnetwork/muta/compare/v0.2.0-alpha.1...v0.2.0-beta.1) (2020-08-03)
 
 
 ### Bug Fixes
