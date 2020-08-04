@@ -38,7 +38,7 @@ impl cita_trie::DB for RocksTrieDB {
 
         let res = self.db.get(key).map_err(to_store_err)?.map(|v| v.to_vec());
 
-        on_storage_get_state(inst, 1);
+        on_storage_get_state(inst.elapsed(), 1i64);
         Ok(res)
     }
 
@@ -54,7 +54,7 @@ impl cita_trie::DB for RocksTrieDB {
             .put(Bytes::from(key), Bytes::from(value))
             .map_err(to_store_err)?;
 
-        on_storage_put_state(inst, size);
+        on_storage_put_state(inst.elapsed(), size as i64);
         Ok(())
     }
 
@@ -78,7 +78,7 @@ impl cita_trie::DB for RocksTrieDB {
 
         self.db.write(batch).map_err(to_store_err)?;
 
-        on_storage_put_state(inst, keys.len());
+        on_storage_put_state(inst.elapsed(), keys.len() as i64);
         Ok(())
     }
 
