@@ -59,11 +59,6 @@ impl SignedTransactionBuilder {
         self
     }
 
-    pub fn timeout(mut self, timeout: u64) -> Self {
-        self.timeout = timeout;
-        self
-    }
-
     pub fn cycles_limit(mut self, cycles_limit: u64) -> Self {
         self.cycles_limit = cycles_limit;
         self
