@@ -59,7 +59,7 @@ We provide detailed service development guides and some service examples.
 Muta powers some open source projects.
 
 <p align="left">
-  <a href="https://github.com/nervosnetwork/muta">
+  <a href="https://www.huobichain.com/">
     <img src="https://github.com/nervosnetwork/muta-docs/blob/master/static/user/s_huobichain.jpg" width="150">
   </a>
 </p>

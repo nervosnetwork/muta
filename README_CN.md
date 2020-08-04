@@ -56,7 +56,7 @@ Service 是 Muta 框架中用于扩展的抽象层，用户可以基于 Service 
 ## 谁在使用 Muta？
 
 <p align="left">
-  <a href="https://github.com/HuobiGroup/huobi-chain">
+  <a href="https://www.huobichain.com/">
     <img src="https://github.com/nervosnetwork/muta-docs/blob/master/static/user/s_huobichain.jpg" width="150">
   </a>
 </p>
