@@ -2895,3 +2895,157 @@ async fn should_reject_same_ip_connection_when_reach_limit_on_new_session() {
         _ => panic!("should be disconnect event"),
     }
 }
+
+#[tokio::test]
+async fn should_not_dail_new_peer_after_reach_outbound_conn_limit() {
+    let (mut mgr, mut conn_rx) = make_manager(0, 4);
+    let outbound_conn_limit = mgr.config().outbound_conn_limit;
+    let _remote_peers = make_sessions(
+        &mut mgr,
+        outbound_conn_limit as u16,
+        5000,
+        SessionType::Outbound,
+    )
+    .await;
+
+    let inner = mgr.core_inner();
+    assert_eq!(
+        inner.connected(),
+        outbound_conn_limit,
+        "should have pre connected connections just one below outbound conn limit"
+    );
+
+    mgr.poll().await;
+    match conn_rx.try_next() {
+        Err(_) => (),
+        _ => panic!("should not have any event"),
+    }
+}
+
+#[tokio::test]
+async fn should_reject_inbound_conn_when_reach_inbound_conn_limit() {
+    let (mut mgr, mut conn_rx) = make_manager(0, 20);
+    let inbound_conn_limit = mgr.config().inbound_conn_limit;
+    let _remote_peers = make_sessions(
+        &mut mgr,
+        inbound_conn_limit as u16,
+        5000,
+        SessionType::Inbound,
+    )
+    .await;
+
+    let inner = mgr.core_inner();
+    assert_eq!(
+        inner.connected(),
+        inbound_conn_limit,
+        "should have reach inbound conn limit"
+    );
+
+    let remote_pubkey = make_pubkey();
+    let remote_peer_id = remote_pubkey.peer_id();
+    let remote_addr = make_multiaddr(6000, Some(remote_pubkey.peer_id()));
+
+    let sess_ctx = SessionContext::make(
+        SessionId::new(99),
+        remote_addr.clone(),
+        SessionType::Inbound,
+        remote_pubkey.clone(),
+    );
+    let new_session = PeerManagerEvent::NewSession {
+        pid:    remote_peer_id.clone(),
+        pubkey: remote_pubkey.clone(),
+        ctx:    sess_ctx.arced(),
+    };
+    mgr.poll_event(new_session).await;
+
+    assert_eq!(
+        inner.connected(),
+        inbound_conn_limit,
+        "should not accept inbound connection"
+    );
+
+    let conn_event = conn_rx.next().await.expect("should have disconnect event");
+    match conn_event {
+        ConnectionEvent::Disconnect(sid) => assert_eq!(sid, 99.into(), "should be new session id"),
+        _ => panic!("should be disconnect event"),
+    }
+}
+
+#[tokio::test]
+async fn should_accept_peer_in_allowlist_even_reach_inbound_conn_limit() {
+    let manager_pubkey = make_pubkey();
+    let manager_id = manager_pubkey.peer_id();
+    let mut peer_dat_file = std::env::temp_dir();
+    peer_dat_file.push("peer.dat");
+    let peer_trust_config = Arc::new(TrustMetricConfig::default());
+    let peer_fatal_ban = Duration::from_secs(50);
+    let peer_soft_ban = Duration::from_secs(10);
+
+    let test_peer = make_peer(2077);
+
+    let config = PeerManagerConfig {
+        our_id: manager_id,
+        pubkey: manager_pubkey,
+        bootstraps: Default::default(),
+        allowlist: vec![test_peer.id.to_owned()],
+        allowlist_only: false,
+        peer_trust_config,
+        peer_fatal_ban,
+        peer_soft_ban,
+        max_connections: 10,
+        same_ip_conn_limit: 9,
+        inbound_conn_limit: 5,
+        outbound_conn_limit: 5,
+        routine_interval: Duration::from_secs(10),
+        peer_dat_file,
+    };
+
+    let (conn_tx, _conn_rx) = unbounded();
+    let (mgr_tx, mgr_rx) = unbounded();
+    let manager = PeerManager::new(config, mgr_rx, conn_tx);
+
+    let inner = manager.inner();
+    let allowed_peer = inner
+        .peer(&test_peer.id)
+        .expect("should be inserted through config");
+    assert!(allowed_peer.tags.contains(&PeerTag::AlwaysAllow));
+
+    let mut manager = MockManager::new(manager, mgr_tx);
+    assert_eq!(inner.connected(), 0, "should have zero connections");
+
+    let inbound_conn_limit = manager.config().inbound_conn_limit;
+    let _remote_peers = make_sessions(
+        &mut manager,
+        inbound_conn_limit as u16,
+        5000,
+        SessionType::Inbound,
+    )
+    .await;
+
+    let sess_ctx = SessionContext::make(
+        SessionId::new(666),
+        test_peer
+            .multiaddrs
+            .all_raw()
+            .pop()
+            .expect("peer multiaddr"),
+        SessionType::Inbound,
+        test_peer
+            .owned_pubkey()
+            .expect("always allow peer's pubkey"),
+    );
+    let new_session = PeerManagerEvent::NewSession {
+        pid:    test_peer.owned_id(),
+        pubkey: test_peer
+            .owned_pubkey()
+            .expect("always allow peer's pubkey"),
+        ctx:    sess_ctx.arced(),
+    };
+    manager.poll_event(new_session).await;
+
+    assert_eq!(
+        inner.connected(),
+        inbound_conn_limit + 1,
+        "should accept peer in allowlist"
+    );
+}
