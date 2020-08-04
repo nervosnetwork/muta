@@ -414,12 +414,6 @@ where
         let timeout_gap = self.timeout_gap.load(Ordering::SeqCst);
 
         if stx.raw.timeout > latest_height + timeout_gap {
-            if ctx.is_network_origin_txs() {
-                self.network.report(
-                    ctx.clone(),
-                    TrustFeedback::Bad(format!("Mempool invalid timeout of tx {:?}", stx.tx_hash)),
-                );
-            }
             let invalid_timeout = MemPoolError::InvalidTimeout {
                 tx_hash: stx.tx_hash,
             };
@@ -428,12 +422,6 @@ where
         }
 
         if stx.raw.timeout < latest_height {
-            if ctx.is_network_origin_txs() {
-                self.network.report(
-                    ctx,
-                    TrustFeedback::Bad(format!("Mempool timeout of tx {:?}", stx.tx_hash)),
-                );
-            }
             let timeout = MemPoolError::Timeout {
                 tx_hash: stx.tx_hash,
                 timeout: stx.raw.timeout,
