@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
 use std::error::Error;
 use std::sync::Arc;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
 use futures::lock::Mutex;
@@ -32,7 +32,7 @@ use crate::message::{
     END_GOSSIP_SIGNED_VOTE,
 };
 use crate::status::StatusAgent;
-use crate::util::{check_list_roots, digest_signed_transactions, OverlordCrypto};
+use crate::util::{check_list_roots, digest_signed_transactions, time_now, OverlordCrypto};
 use crate::wal::SignedTxsWAL;
 use crate::ConsensusError;
 
@@ -175,6 +175,8 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         // If the block is proposed by self, it does not need to check. Get full signed
         // transactions directly.
         if !exemption {
+            let current_timestamp = time_now();
+
             self.adapter
                 .verify_block_header(ctx.clone(), block.inner.block.clone())
                 .await
@@ -193,6 +195,15 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
                 .adapter
                 .get_block_by_height(ctx.clone(), block.inner.block.header.height - 1)
                 .await?;
+
+            // verify block timestamp.
+            if !validate_timestamp(
+                current_timestamp,
+                block.inner.block.header.timestamp,
+                previous_block.header.timestamp,
+            ) {
+                return Err(ProtocolError::from(ConsensusError::InvalidTimestamp).into());
+            }
 
             self.adapter
                 .verify_proof(
@@ -800,17 +811,43 @@ fn covert_to_overlord_authority(validators: &[Validator]) -> Vec<Node> {
     authority
 }
 
-fn time_now() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_millis() as u64
-}
-
 async fn sync_txs<CA: ConsensusAdapter>(
     ctx: Context,
     adapter: Arc<CA>,
     propose_hashes: Vec<Hash>,
 ) -> ProtocolResult<()> {
     adapter.sync_txs(ctx, propose_hashes).await
+}
+
+fn validate_timestamp(
+    current_timestamp: u64,
+    proposal_timestamp: u64,
+    previous_timestamp: u64,
+) -> bool {
+    if proposal_timestamp < previous_timestamp {
+        return false;
+    }
+
+    if proposal_timestamp > current_timestamp {
+        return false;
+    }
+
+    true
+}
+
+#[cfg(test)]
+mod tests {
+    use super::validate_timestamp;
+
+    #[test]
+    fn test_validate_timestamp() {
+        // current 10, proposal 9, previous 8. true
+        assert_eq!(validate_timestamp(10, 9, 8), true);
+
+        // current 10, proposal 11, previous 8. true
+        assert_eq!(validate_timestamp(10, 11, 8), false);
+
+        // current 10, proposal 9, previous 11. true
+        assert_eq!(validate_timestamp(10, 9, 11), false);
+    }
 }
