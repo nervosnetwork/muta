@@ -55,7 +55,7 @@ impl cita_trie::DB for RocksTrieDB {
         for i in 0..keys.len() {
             let key = &keys[i];
             let value = &values[i];
-            batch.put(key, value).map_err(to_store_err)?;
+            batch.put(key, value);
         }
 
         self.db.write(batch).map_err(to_store_err)?;
@@ -73,7 +73,7 @@ impl cita_trie::DB for RocksTrieDB {
         if self.light {
             let mut batch = WriteBatch::default();
             for key in keys {
-                batch.delete(key).map_err(to_store_err)?;
+                batch.delete(key);
             }
 
             self.db.write(batch).map_err(to_store_err)?;
