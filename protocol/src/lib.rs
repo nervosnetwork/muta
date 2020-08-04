@@ -12,6 +12,8 @@ pub use async_trait::async_trait;
 pub use bytes::{Buf, BufMut, Bytes, BytesMut};
 use derive_more::{Constructor, Display};
 
+pub use types::{address_hrp, address_hrp_inited, init_address_hrp};
+
 #[derive(Debug, Clone)]
 pub enum ProtocolErrorKind {
     // traits
