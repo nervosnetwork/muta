@@ -1,7 +1,10 @@
 use std::convert::TryFrom;
 use std::fmt;
 use std::str::FromStr;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
+use arc_swap::ArcSwap;
 use bech32::{self, FromBase32, ToBase32};
 use bytes::Bytes;
 use hasher::{Hasher, HasherKeccak};
@@ -20,10 +23,36 @@ pub const METADATA_KEY: &str = "metadata";
 
 lazy_static! {
     static ref HASHER_INST: HasherKeccak = HasherKeccak::new();
+    static ref ADDRESS_HRP: ArcSwap<String> = ArcSwap::from(Arc::new("muta".to_owned()));
+    static ref ADDRESS_HRP_INITED: AtomicBool = AtomicBool::new(false);
 }
 
-/// The address bech32 hrp
-pub static ADDRESS_HRP: &str = include!(concat!(env!("OUT_DIR"), "/address_hrp.rs"));
+pub fn address_hrp() -> Arc<String> {
+    ADDRESS_HRP.load_full()
+}
+
+pub fn init_address_hrp(address_hrp: String) {
+    if ADDRESS_HRP_INITED.load(Ordering::SeqCst) {
+        panic!("address hrp can only be inited once");
+    }
+
+    // Verify address hrp
+    let hash = HASHER_INST.digest(b"hello muta");
+    assert_eq!(hash.len(), 32);
+
+    let bytes = &hash[12..];
+    assert_eq!(bytes.len(), 20);
+
+    bech32::encode(&address_hrp, bytes.to_base32()).expect("invalid address hrp");
+
+    // Set address hrp
+    ADDRESS_HRP.store(Arc::new(address_hrp));
+    ADDRESS_HRP_INITED.store(true, Ordering::SeqCst);
+}
+
+pub fn address_hrp_inited() -> bool {
+    ADDRESS_HRP_INITED.load(Ordering::SeqCst)
+}
 
 /// The height of the genesis block.
 pub const GENESIS_HEIGHT: u64 = 0;
@@ -300,7 +329,7 @@ impl FromStr for Address {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let (hrp, data) = bech32::decode(s).map_err(TypesError::from)?;
-        if hrp != ADDRESS_HRP {
+        if &hrp != address_hrp().as_ref() {
             return Err(TypesError::InvalidAddress {
                 address: s.to_owned(),
             });
@@ -313,33 +342,34 @@ impl FromStr for Address {
 
 impl fmt::Debug for Address {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        // NOTE: ADDRESS_HRP was verified in protocol/build.rs
-        bech32::encode_to_fmt(f, ADDRESS_HRP, &self.0.to_base32()).unwrap()
+        // NOTE: ADDRESS_HRP was verified in init_address_hrp fn
+        bech32::encode_to_fmt(f, address_hrp().as_ref(), &self.0.to_base32()).unwrap()
     }
 }
 
 impl fmt::Display for Address {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        // NOTE: ADDRESS_HRP was verified in protocol/build.rs
-        bech32::encode_to_fmt(f, ADDRESS_HRP, &self.0.to_base32()).unwrap()
+        // NOTE: ADDRESS_HRP was verified in init_address_hrp fn
+        bech32::encode_to_fmt(f, address_hrp().as_ref(), &self.0.to_base32()).unwrap()
     }
 }
 
 #[derive(RlpFixedCodec, Deserialize, Default, Serialize, Clone, Debug, PartialEq, Eq)]
 pub struct Metadata {
-    pub chain_id:        Hash,
-    pub common_ref:      Hex,
-    pub timeout_gap:     u64,
-    pub cycles_limit:    u64,
-    pub cycles_price:    u64,
-    pub interval:        u64,
-    pub verifier_list:   Vec<ValidatorExtend>,
-    pub propose_ratio:   u64,
-    pub prevote_ratio:   u64,
-    pub precommit_ratio: u64,
-    pub brake_ratio:     u64,
-    pub tx_num_limit:    u64,
-    pub max_tx_size:     u64,
+    pub chain_id:           Hash,
+    pub bech32_address_hrp: String,
+    pub common_ref:         Hex,
+    pub timeout_gap:        u64,
+    pub cycles_limit:       u64,
+    pub cycles_price:       u64,
+    pub interval:           u64,
+    pub verifier_list:      Vec<ValidatorExtend>,
+    pub propose_ratio:      u64,
+    pub prevote_ratio:      u64,
+    pub precommit_ratio:    u64,
+    pub brake_ratio:        u64,
+    pub tx_num_limit:       u64,
+    pub max_tx_size:        u64,
 }
 
 #[derive(RlpFixedCodec, Serialize, Deserialize, Clone, PartialEq, Eq, Default)]
@@ -389,7 +419,7 @@ mod tests {
     use bech32::{self, FromBase32};
     use bytes::Bytes;
 
-    use super::{Address, Hash, ValidatorExtend};
+    use super::{address_hrp, init_address_hrp, Address, Hash, ValidatorExtend};
     use crate::{fixed_codec::FixedCodec, types::Hex};
 
     #[test]
@@ -449,5 +479,18 @@ mod tests {
 
         let decoded = ValidatorExtend::decode_fixed(extend.encode_fixed().unwrap()).unwrap();
         assert_eq!(decoded, extend);
+    }
+
+    // Note: All tests run in same process, change ADDRESS_HRP affects other tests
+    #[ignore]
+    #[test]
+    #[should_panic(expected = "address hrp can only be inited once")]
+    fn test_init_address_hrp() {
+        assert_eq!(address_hrp().as_ref(), "muta", "default value");
+
+        init_address_hrp("miao".to_owned());
+        assert_eq!(address_hrp().as_ref(), "miao", "should be updated value");
+
+        init_address_hrp("miaomiao".to_owned());
     }
 }

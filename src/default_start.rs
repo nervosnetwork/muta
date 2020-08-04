@@ -43,9 +43,7 @@ use core_storage::{adapter::rocks::RocksAdapter, ImplStorage, StorageError};
 use framework::binding::state::RocksTrieDB;
 use framework::executor::{ServiceExecutor, ServiceExecutorFactory};
 use protocol::traits::{APIAdapter, Context, MemPool, Network, NodeInfo, ServiceMapping, Storage};
-use protocol::types::{
-    Address, Block, BlockHeader, Genesis, Hash, Metadata, Proof, Validator, ADDRESS_HRP,
-};
+use protocol::types::{Address, Block, BlockHeader, Genesis, Hash, Metadata, Proof, Validator};
 use protocol::{fixed_codec::FixedCodec, ProtocolResult};
 
 use crate::config::Config;
@@ -108,8 +106,15 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
         servive_mapping,
     )?;
 
+    // Set bech32 address hrp
+    if !protocol::address_hrp_inited() {
+        protocol::init_address_hrp(metadata.bech32_address_hrp);
+    }
+
     // Build genesis block.
-    let proposer = Address::from_hash(Hash::digest(Bytes::from_static(ADDRESS_HRP.as_bytes())))?;
+    let proposer = Address::from_hash(Hash::digest(Bytes::from(
+        protocol::address_hrp().as_ref().to_owned(),
+    )))?;
     let genesis_block_header = BlockHeader {
         chain_id: metadata.chain_id.clone(),
         height: 0,
@@ -271,6 +276,11 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
 
     let metadata: Metadata =
         serde_json::from_str(&exec_resp.succeed_data).expect("Decode metadata failed!");
+
+    // Set bech32 address hrp
+    if !protocol::address_hrp_inited() {
+        protocol::init_address_hrp(metadata.bech32_address_hrp);
+    }
 
     // set args in mempool
     mempool.set_args(
