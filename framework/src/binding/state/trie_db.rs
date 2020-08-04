@@ -36,7 +36,7 @@ impl cita_trie::DB for RocksTrieDB {
     fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Self::Error> {
         let inst = Instant::now();
 
-        let res = self.db.get(key).map_err(to_store_err)?.map(|v| v.to_vec())
+        let res = self.db.get(key).map_err(to_store_err)?.map(|v| v.to_vec());
 
         on_storage_get_state(inst, 1);
         Ok(res)
