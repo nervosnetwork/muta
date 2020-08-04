@@ -1,50 +1,42 @@
-use std::{
-    future::Future,
-    net::SocketAddr,
-    pin::Pin,
-    sync::Arc,
-    task::{Context as TaskContext, Poll},
-};
+use std::future::Future;
+use std::net::SocketAddr;
+use std::pin::Pin;
+use std::sync::Arc;
+use std::task::{Context as TaskContext, Poll};
 
 use async_trait::async_trait;
-use futures::{
-    channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
-    pin_mut,
-    stream::Stream,
-    task::AtomicWaker,
-};
+use futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
+use futures::stream::Stream;
+use futures::task::AtomicWaker;
 use log::{debug, error, info};
-use protocol::{
-    traits::{
-        Context, Gossip, MessageCodec, MessageHandler, Network, PeerTag, PeerTrust, Priority, Rpc,
-        TrustFeedback,
-    },
-    Bytes, ProtocolResult,
+use protocol::traits::{
+    Context, Gossip, MessageCodec, MessageHandler, Network, PeerTag, PeerTrust, Priority, Rpc,
+    TrustFeedback,
 };
+use protocol::types::Hash;
+use protocol::{Bytes, ProtocolResult};
 use tentacle::secio::PeerId;
 
+use crate::common::{socket_to_multi_addr, HeartBeat};
+use crate::compression::Snappy;
+use crate::connection::{
+    ConnectionConfig, ConnectionService, ConnectionServiceControl, ConnectionServiceKeeper,
+};
+use crate::endpoint::{Endpoint, EndpointScheme};
+use crate::error::NetworkError;
+use crate::event::{ConnectionEvent, PeerManagerEvent};
+use crate::message::RawSessionMessage;
+use crate::metrics::Metrics;
+use crate::outbound::{NetworkGossip, NetworkRpc};
 #[cfg(feature = "diagnostic")]
 use crate::peer_manager::diagnostic::{Diagnostic, DiagnosticHookFn};
-use crate::{
-    common::{socket_to_multi_addr, HeartBeat},
-    compression::Snappy,
-    connection::{
-        ConnectionConfig, ConnectionService, ConnectionServiceControl, ConnectionServiceKeeper,
-    },
-    endpoint::{Endpoint, EndpointScheme},
-    error::NetworkError,
-    event::{ConnectionEvent, PeerManagerEvent},
-    message::RawSessionMessage,
-    metrics::Metrics,
-    outbound::{NetworkGossip, NetworkRpc},
-    peer_manager::{PeerManager, PeerManagerConfig, PeerManagerHandle, SharedSessions},
-    protocols::CoreProtocol,
-    reactor::{MessageRouter, Reactor},
-    rpc_map::RpcMap,
-    selfcheck::SelfCheck,
-    traits::NetworkContext,
-    NetworkConfig, PeerIdExt,
-};
+use crate::peer_manager::{PeerManager, PeerManagerConfig, PeerManagerHandle, SharedSessions};
+use crate::protocols::CoreProtocol;
+use crate::reactor::{MessageRouter, Reactor};
+use crate::rpc_map::RpcMap;
+use crate::selfcheck::SelfCheck;
+use crate::traits::NetworkContext;
+use crate::{NetworkConfig, PeerIdExt};
 
 #[derive(Clone)]
 pub struct NetworkServiceHandle {
@@ -363,6 +355,10 @@ impl NetworkService {
         self.config.secio_keypair.peer_id()
     }
 
+    pub fn set_chain_id(&self, chain_id: Hash) {
+        todo!()
+    }
+
     pub async fn listen(&mut self, socket_addr: SocketAddr) -> ProtocolResult<()> {
         if let Some(NetworkConnectionService::NoListen(conn_srv)) = &mut self.net_conn_srv {
             debug!("network: listen to {}", socket_addr);
@@ -468,7 +464,7 @@ impl Future for NetworkService {
         // Process system error report
         loop {
             let sys_rx = &mut self.as_mut().sys_rx;
-            pin_mut!(sys_rx);
+            futures::pin_mut!(sys_rx);
 
             let sys_err = service_ready!(sys_rx.poll_next(ctx));
             error!("network: system error: {}", sys_err);

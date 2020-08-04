@@ -42,6 +42,7 @@ use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::Duration;
 
+use arc_swap::ArcSwap;
 use derive_more::Display;
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use futures::stream::Stream;
@@ -193,7 +194,8 @@ impl Hash for ConnectingAttempt {
 }
 
 struct Inner {
-    our_id: Arc<PeerId>,
+    our_id:   Arc<PeerId>,
+    chain_id: ArcSwap<protocol::types::Hash>,
 
     sessions:  SessionBook,
     consensus: RwLock<HashSet<PeerId>>,
@@ -206,6 +208,7 @@ impl Inner {
     pub fn new(our_id: PeerId, sessions: SessionBook) -> Self {
         Inner {
             our_id: Arc::new(our_id),
+            chain_id: ArcSwap::new(Arc::new(protocol::types::Hash::from_empty())),
 
             sessions,
             consensus: Default::default(),
@@ -225,6 +228,14 @@ impl Inner {
 
     pub fn remove_listen(&self, multiaddr: &PeerMultiaddr) {
         self.listen.write().remove(multiaddr);
+    }
+
+    pub fn set_chain_id(&self, chain_id: protocol::types::Hash) {
+        self.chain_id.store(Arc::new(chain_id));
+    }
+
+    pub fn chain_id(&self) -> Arc<protocol::types::Hash> {
+        self.chain_id.load_full()
     }
 
     pub fn connected(&self) -> usize {
@@ -341,6 +352,10 @@ pub struct PeerManagerHandle {
 impl PeerManagerHandle {
     pub fn peer_id(&self, sid: SessionId) -> Option<PeerId> {
         self.inner.session(sid).map(|s| s.peer.owned_id())
+    }
+
+    pub fn chain_id(&self) -> Arc<protocol::types::Hash> {
+        self.inner.chain_id()
     }
 
     pub fn random_addrs(&self, max: usize, sid: SessionId) -> Vec<Multiaddr> {
