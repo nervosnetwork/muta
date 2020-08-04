@@ -48,12 +48,13 @@ impl cita_trie::DB for RocksTrieDB {
 
     fn insert(&self, key: Vec<u8>, value: Vec<u8>) -> Result<(), Self::Error> {
         let inst = Instant::now();
+        let size = key.len() + value.len();
 
         self.db
             .put(Bytes::from(key), Bytes::from(value))
             .map_err(to_store_err)?;
 
-        on_storage_put_state(inst, 1);
+        on_storage_put_state(inst, size);
         Ok(())
     }
 
@@ -64,10 +65,14 @@ impl cita_trie::DB for RocksTrieDB {
             return Err(RocksTrieDBError::BatchLengthMismatch);
         }
 
+        let mut total_size = 0;
         let mut batch = WriteBatch::default();
         for i in 0..keys.len() {
             let key = &keys[i];
             let value = &values[i];
+
+            total_size += key.len();
+            total_size += value.len();
             batch.put(key, value).map_err(to_store_err)?;
         }
 

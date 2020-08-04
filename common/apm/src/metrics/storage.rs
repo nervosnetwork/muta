@@ -76,11 +76,11 @@ lazy_static! {
 pub fn on_storage_get_state(duration: Duration, keys: i64) {
     let seconds = duration_to_sec(duration);
 
-    STORAGE_PUT_CF_TIME_USAGE.state.inc_by(seconds);
-    STORAGE_PUT_CF_BYTES_COUNTER.state.inc_by(size);
+    STORAGE_GET_CF_TIME_USAGE.state.inc_by(seconds);
+    STORAGE_GET_CF_COUNTER.state.inc_by(keys);
 }
 
-pub fn on_storage_put_state(duration: Duration, keys: i64) {
+pub fn on_storage_put_state(duration: Duration, size: i64) {
     let seconds = duration_to_sec(duration);
 
     STORAGE_PUT_CF_TIME_USAGE.state.inc_by(seconds);
