@@ -114,11 +114,9 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
             })
             .collect::<Vec<_>>();
 
-        let owner = payload.owner;
-
         let permission = MultiSigPermission {
             accounts,
-            owner,
+            owner: payload.owner,
             threshold: payload.threshold,
             memo: payload.memo,
         };
