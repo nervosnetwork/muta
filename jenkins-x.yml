@@ -2,72 +2,55 @@ buildPack: none
 noReleasePrepare: true
 pipelineConfig:
   pipelines:
-    pullRequest:
-      build:
-        steps:
-        - command: echo noop
     release:
       pipeline:
         agent:
           image: mutadev/muta-build-env:v0.3.0
-        options:
-          timeout:
-            time: 30
-            unit: minutes
         stages:
-        - environment:
-          - name: BASE_WORKSPACE
-            value: /workspace/source
-          name: release
-          options:
-            containerOptions:
-              name: ""
-              resources:
-                limits:
-                  cpu: "4"
-                  memory: 8Gi
-                requests:
-                  cpu: "2"
-                  memory: 8Gi
-              volumeMounts:
-              - mountPath: /kaniko/.docker
-                name: jenkins-docker-cfg
-            volumes:
-            - name: jenkins-docker-cfg
-              secret:
-                items:
-                - key: config.json
-                  path: config.json
-                secretName: jenkins-docker-cfg
-          steps:
-          - args:
-            - build
-            - --release
-            - --example
-            - muta-chain
-            command: cargo
-            env:
-            - name: OPENSSL_STATIC
-              value: "1"
-            - name: OPENSSL_LIB_DIR
-              value: /usr/lib/x86_64-linux-gnu
-            - name: OPENSSL_INCLUDE_DIR
-              value: /usr/include/openssl
-            image: mutadev/muta-build-env:v0.3.0
-            name: build-release
+          - name: release
+            environment:
+              - name: BASE_WORKSPACE
+                value: /workspace/source
+            options:
+              containerOptions:
+                volumeMounts:
+                  - name: jenkins-docker-cfg
+                    mountPath: /kaniko/.docker
+                resources:
+                  limits:
+                    cpu: 4
+                    memory: 8Gi
+                  requests:
+                    cpu: 2
+                    memory: 8Gi
+              volumes:
+                - name: jenkins-docker-cfg
+                  secret:
+                    secretName: jenkins-docker-cfg
+                    items:
+                      - key: config.json
+                        path: config.json
 
-          - args:
-            - --dockerfile=/workspace/source/devtools/docker-build/Dockerfile
-            - --destination=mutadev/${REPO_NAME}:${BRANCH_NAME}
-            - --context=/workspace/source
-            command: /kaniko/executor
-            image: gcr.io/kaniko-project/executor:9912ccbf8d22bbafbf971124600fbb0b13b9cbd6
-            name: push-image
-
-          - args:
-            - --dockerfile=/workspace/source/devtools/docker-build/Dockerfile
-            - --destination=mutadev/${REPO_NAME}:latest
-            - --context=/workspace/source
-            command: /kaniko/executor
-            image: gcr.io/kaniko-project/executor:9912ccbf8d22bbafbf971124600fbb0b13b9cbd6
-            name: push-image-latest
+            steps:
+              - name: build-release
+                image: mutadev/muta-build-env:v0.3.0
+                env:
+                  - name: OPENSSL_STATIC
+                    value: "1"
+                  - name: OPENSSL_LIB_DIR
+                    value: /usr/lib/x86_64-linux-gnu
+                  - name: OPENSSL_INCLUDE_DIR
+                    value: /usr/include/openssl
+                command: cargo
+                args:
+                  - build
+                  - --release
+                  - --example 
+                  - muta-chain
+              - name: push-image
+                image: gcr.io/kaniko-project/executor:9912ccbf8d22bbafbf971124600fbb0b13b9cbd6
+                command: /kaniko/executor
+                args:
+                  - --dockerfile=/workspace/source/devtools/docker-build/Dockerfile
+                  - --destination=mutadev/${REPO_NAME}:latest
+                  - --context=/workspace/source
