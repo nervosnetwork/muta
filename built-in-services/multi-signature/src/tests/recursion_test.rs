@@ -22,6 +22,7 @@ fn test_recursion_verify_signature() {
             mock_context(cycles_limit, caller.clone()),
             GenerateMultiSigAccountPayload {
                 owner:            owner.clone(),
+                autonomy:         false,
                 addr_with_weight: init_multi_sig_account,
                 threshold:        4,
                 memo:             String::new(),
@@ -46,6 +47,7 @@ fn test_recursion_verify_signature() {
             mock_context(cycles_limit, caller.clone()),
             GenerateMultiSigAccountPayload {
                 owner,
+                autonomy: false,
                 addr_with_weight: multi_sig_account,
                 threshold: 4,
                 memo: String::new(),
@@ -100,6 +102,7 @@ fn test_recursion_depth() {
             mock_context(cycles_limit, caller.clone()),
             GenerateMultiSigAccountPayload {
                 owner:            owner.clone(),
+                autonomy:         false,
                 addr_with_weight: init_multi_sig_account,
                 threshold:        4,
                 memo:             String::new(),
@@ -125,6 +128,7 @@ fn test_recursion_depth() {
             mock_context(cycles_limit, caller.clone()),
             GenerateMultiSigAccountPayload {
                 owner:            owner.clone(),
+                autonomy:         false,
                 addr_with_weight: multi_sig_account,
                 threshold:        4,
                 memo:             String::new(),
@@ -139,6 +143,7 @@ fn test_recursion_depth() {
         mock_context(cycles_limit, caller),
         GenerateMultiSigAccountPayload {
             owner,
+            autonomy: false,
             addr_with_weight: vec![AddressWithWeight {
                 address: sender,
                 weight:  4u8,

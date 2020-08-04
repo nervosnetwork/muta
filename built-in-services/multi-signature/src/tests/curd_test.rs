@@ -5,7 +5,6 @@ use crate::types::{
     MultiSigPermission, RemoveAccountPayload, SetAccountWeightPayload, SetThresholdPayload,
     UpdateAccountPayload,
 };
-use crate::ADEPTIVE_ADDRESS;
 
 use super::*;
 
@@ -26,6 +25,7 @@ fn test_generate_multi_signature() {
     let multi_sig_address =
         service.generate_account(context.clone(), GenerateMultiSigAccountPayload {
             owner:            owner.clone(),
+            autonomy:         false,
             addr_with_weight: accounts,
             threshold:        12,
             memo:             String::new(),
@@ -40,6 +40,7 @@ fn test_generate_multi_signature() {
     let multi_sig_address =
         service.generate_account(context.clone(), GenerateMultiSigAccountPayload {
             owner:            owner.clone(),
+            autonomy:         false,
             addr_with_weight: accounts,
             threshold:        12,
             memo:             String::new(),
@@ -54,6 +55,7 @@ fn test_generate_multi_signature() {
     let multi_sig_address =
         service.generate_account(context.clone(), GenerateMultiSigAccountPayload {
             owner:            owner.clone(),
+            autonomy:         false,
             addr_with_weight: accounts.clone(),
             threshold:        3,
             memo:             String::new(),
@@ -89,6 +91,7 @@ fn test_set_threshold() {
     let multi_sig_address = service
         .generate_account(context.clone(), GenerateMultiSigAccountPayload {
             owner:            owner_address,
+            autonomy:         false,
             addr_with_weight: account_pubkeys,
             threshold:        3,
             memo:             String::new(),
@@ -128,7 +131,8 @@ fn test_adeption_address() {
         .collect::<Vec<_>>();
     let multi_sig_address = service
         .generate_account(context.clone(), GenerateMultiSigAccountPayload {
-            owner:            ADEPTIVE_ADDRESS.clone(),
+            owner:            Address::default(),
+            autonomy:         true,
             addr_with_weight: account_pubkeys,
             threshold:        3,
             memo:             String::new(),
@@ -157,6 +161,7 @@ fn test_add_account() {
     let multi_sig_address = service
         .generate_account(context.clone(), GenerateMultiSigAccountPayload {
             owner:            owner_address.clone(),
+            autonomy:         false,
             addr_with_weight: account_pubkeys.clone(),
             threshold:        3,
             memo:             String::new(),
@@ -210,6 +215,7 @@ fn test_update_account() {
     let multi_sig_address = service
         .generate_account(context, GenerateMultiSigAccountPayload {
             owner:            owner_address.clone(),
+            autonomy:         false,
             addr_with_weight: account_pubkeys,
             threshold:        4,
             memo:             String::new(),
@@ -226,12 +232,10 @@ fn test_update_account() {
     }];
     let res = service.update_account(context.clone(), UpdateAccountPayload {
         account_address:  multi_sig_address.clone(),
-        new_account_info: GenerateMultiSigAccountPayload {
-            owner:            new_owner_address.clone(),
-            addr_with_weight: account_pubkeys,
-            threshold:        1,
-            memo:             String::new(),
-        },
+        owner:            new_owner_address.clone(),
+        addr_with_weight: account_pubkeys,
+        threshold:        1,
+        memo:             String::new(),
     });
     assert!(res.is_error());
 
@@ -242,12 +246,10 @@ fn test_update_account() {
         .collect::<Vec<_>>();
     let res = service.update_account(context, UpdateAccountPayload {
         account_address:  multi_sig_address,
-        new_account_info: GenerateMultiSigAccountPayload {
-            owner:            new_owner_address,
-            addr_with_weight: account_pubkeys,
-            threshold:        1,
-            memo:             String::new(),
-        },
+        owner:            new_owner_address,
+        addr_with_weight: account_pubkeys,
+        threshold:        1,
+        memo:             String::new(),
     });
     assert_eq!(res.is_error(), false);
 }
@@ -267,6 +269,7 @@ fn test_set_weight() {
     let multi_sig_address = service
         .generate_account(context.clone(), GenerateMultiSigAccountPayload {
             owner:            owner_address.clone(),
+            autonomy:         false,
             addr_with_weight: account_pubkeys.clone(),
             threshold:        4,
             memo:             String::new(),
@@ -321,6 +324,7 @@ fn test_remove_account() {
     let multi_sig_address = service
         .generate_account(context.clone(), GenerateMultiSigAccountPayload {
             owner:            owner_address.clone(),
+            autonomy:         false,
             addr_with_weight: account_pubkeys.clone(),
             threshold:        3,
             memo:             String::new(),

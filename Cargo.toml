@@ -80,8 +80,13 @@ members = [
   "protocol",
 ]
 
+[features]
+default = []
+random_leader = ["core-consensus/random_leader"]
+
 [[example]]
 name = "muta-chain"
+features = [ "random_leader" ]
 crate-type = ["bin"]
 
 [[test]]
