@@ -41,9 +41,7 @@ use core_network::{DiagnosticEvent, NetworkConfig, NetworkService, PeerId, PeerI
 use core_storage::{ImplStorage, StorageError};
 use framework::executor::{ServiceExecutor, ServiceExecutorFactory};
 use protocol::traits::{APIAdapter, Context, MemPool, Network, NodeInfo, ServiceMapping, Storage};
-use protocol::types::{
-    Address, Block, BlockHeader, Genesis, Hash, Metadata, Proof, Validator, ADDRESS_HRP,
-};
+use protocol::types::{Address, Block, BlockHeader, Genesis, Hash, Metadata, Proof, Validator};
 use protocol::{fixed_codec::FixedCodec, ProtocolResult};
 
 pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
@@ -91,7 +89,9 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
     )?;
 
     // Build genesis block.
-    let proposer = Address::from_hash(Hash::digest(Bytes::from_static(ADDRESS_HRP.as_bytes())))?;
+    let proposer = Address::from_hash(Hash::digest(Bytes::from(
+        protocol::address_hrp().as_ref().to_owned(),
+    )))?;
     let genesis_block_header = BlockHeader {
         chain_id: metadata.chain_id.clone(),
         height: 0,

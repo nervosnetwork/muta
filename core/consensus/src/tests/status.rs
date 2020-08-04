@@ -97,22 +97,23 @@ fn check_vec(status_before: &CurrentConsensusStatus, status_after: &CurrentConse
 
 fn mock_metadata() -> Metadata {
     Metadata {
-        chain_id:        mock_hash(),
-        common_ref:      Hex::from_string(
+        chain_id:           mock_hash(),
+        bech32_address_hrp: "muta".to_owned(),
+        common_ref:         Hex::from_string(
             "0xd654c7a6747fc2e34808c1ebb1510bfb19b443d639f2fab6dc41fce9f634de37".to_string(),
         )
         .unwrap(),
-        timeout_gap:     random::<u64>(),
-        cycles_limit:    random::<u64>(),
-        cycles_price:    random::<u64>(),
-        verifier_list:   mock_validators_extend(4),
-        interval:        random::<u64>(),
-        propose_ratio:   random::<u64>(),
-        prevote_ratio:   random::<u64>(),
-        precommit_ratio: random::<u64>(),
-        brake_ratio:     random::<u64>(),
-        tx_num_limit:    random::<u64>(),
-        max_tx_size:     random::<u64>(),
+        timeout_gap:        random::<u64>(),
+        cycles_limit:       random::<u64>(),
+        cycles_price:       random::<u64>(),
+        verifier_list:      mock_validators_extend(4),
+        interval:           random::<u64>(),
+        propose_ratio:      random::<u64>(),
+        prevote_ratio:      random::<u64>(),
+        precommit_ratio:    random::<u64>(),
+        brake_ratio:        random::<u64>(),
+        tx_num_limit:       random::<u64>(),
+        max_tx_size:        random::<u64>(),
     }
 }
 

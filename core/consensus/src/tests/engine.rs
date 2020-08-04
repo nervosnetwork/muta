@@ -108,19 +108,20 @@ fn mock_node_info() -> NodeInfo {
 
 fn mock_metadata() -> Metadata {
     Metadata {
-        chain_id:        mock_hash(),
-        common_ref:      Hex::from_string("0x703873635a6b51513451".to_string()).unwrap(),
-        timeout_gap:     20,
-        cycles_limit:    600000,
-        cycles_price:    1,
-        interval:        3000,
-        verifier_list:   vec![],
-        propose_ratio:   3,
-        prevote_ratio:   3,
-        precommit_ratio: 3,
-        brake_ratio:     3,
-        tx_num_limit:    3,
-        max_tx_size:     3000,
+        chain_id:           mock_hash(),
+        bech32_address_hrp: "muta".to_owned(),
+        common_ref:         Hex::from_string("0x703873635a6b51513451".to_string()).unwrap(),
+        timeout_gap:        20,
+        cycles_limit:       600000,
+        cycles_price:       1,
+        interval:           3000,
+        verifier_list:      vec![],
+        propose_ratio:      3,
+        prevote_ratio:      3,
+        precommit_ratio:    3,
+        brake_ratio:        3,
+        tx_num_limit:       3,
+        max_tx_size:        3000,
     }
 }
 

@@ -18,6 +18,7 @@ name = "metadata"
 payload = '''
 {
     "chain_id": "0xb6a4d7da21443f5e816e8700eea87610e6d769657d6b8ec73028457bf2ca4036",
+    "bech32_address_hrp": "muta",
     "common_ref": "0x6c747758636859487038",
     "timeout_gap": 20,
     "cycles_limit": 4294967295,
