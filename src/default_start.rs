@@ -171,9 +171,9 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
 
     // Init network
     let network_config = NetworkConfig::new()
-        .max_connections(config.network.max_connected_peers)
+        .max_connections(config.network.max_connected_peers)?
         .same_ip_conn_limit(config.network.same_ip_conn_limit)
-        .inbound_conn_limit(config.network.inbound_conn_limit)
+        .inbound_conn_limit(config.network.inbound_conn_limit)?
         .allowlist_only(config.network.allowlist_only)
         .peer_trust_metric(
             config.network.trust_interval_duration,
