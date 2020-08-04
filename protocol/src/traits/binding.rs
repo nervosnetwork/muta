@@ -5,6 +5,16 @@ use crate::traits::{ExecutorParams, ServiceResponse};
 use crate::types::{Address, Block, Hash, MerkleRoot, Receipt, ServiceContext, SignedTransaction};
 use crate::ProtocolResult;
 
+#[macro_export]
+macro_rules! try_service_response {
+    ($service_resp: expr) => {{
+        if $service_resp.is_error() {
+            return ServiceResponse::from_error($service_resp.code, $service_resp.error_message);
+        }
+        $service_resp.succeed_data
+    }};
+}
+
 pub trait SDKFactory<SDK: ServiceSDK> {
     fn get_sdk(&self, name: &str) -> ProtocolResult<SDK>;
 }

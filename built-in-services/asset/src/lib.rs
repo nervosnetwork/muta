@@ -8,6 +8,7 @@ use std::collections::BTreeMap;
 
 use binding_macro::{cycles, genesis, service};
 use protocol::traits::{ExecutorParams, ServiceResponse, ServiceSDK, StoreMap};
+use protocol::try_service_response;
 use protocol::types::{Address, Bytes, Hash, ServiceContext};
 
 use crate::types::{
@@ -15,57 +16,32 @@ use crate::types::{
     GetAllowanceResponse, GetAssetPayload, GetBalancePayload, GetBalanceResponse,
     InitGenesisPayload, TransferEvent, TransferFromEvent, TransferFromPayload, TransferPayload,
 };
-macro_rules! impl_assets {
-    ($self: expr, $method: ident, $ctx: expr) => {{
-        let res = $self.$method($ctx.clone());
-        if res.is_error() {
-            Err(ServiceResponse::from_error(res.code, res.error_message))
-        } else {
-            Ok(res.succeed_data)
-        }
-    }};
-    ($self: expr, $method: ident, $ctx: expr, $payload: expr) => {{
-        let res = $self.$method($ctx.clone(), $payload);
-        if res.is_error() {
-            Err(ServiceResponse::from_error(res.code, res.error_message))
-        } else {
-            Ok(res.succeed_data)
-        }
-    }};
-}
 
 pub const ASSET_SERVICE_NAME: &str = "asset";
 
 pub trait Assets {
-    fn create_(
-        &mut self,
-        ctx: &ServiceContext,
-        payload: CreateAssetPayload,
-    ) -> Result<Asset, ServiceResponse<()>>;
+    fn create_(&mut self, ctx: &ServiceContext, payload: CreateAssetPayload)
+        -> ServiceResponse<()>;
 
     fn balance_(
         &self,
         ctx: &ServiceContext,
         payload: GetBalancePayload,
-    ) -> Result<GetBalanceResponse, ServiceResponse<()>>;
+    ) -> ServiceResponse<GetBalanceResponse>;
 
-    fn transfer_(
-        &mut self,
-        ctx: &ServiceContext,
-        payload: TransferPayload,
-    ) -> Result<(), ServiceResponse<()>>;
+    fn transfer_(&mut self, ctx: &ServiceContext, payload: TransferPayload) -> ServiceResponse<()>;
 
     fn transfer_from_(
         &mut self,
         ctx: &ServiceContext,
         payload: TransferFromPayload,
-    ) -> Result<(), ServiceResponse<()>>;
+    ) -> ServiceResponse<()>;
 
     fn allowance_(
         &self,
         ctx: &ServiceContext,
         payload: GetAllowancePayload,
-    ) -> Result<GetAllowanceResponse, ServiceResponse<()>>;
+    ) -> ServiceResponse<GetAllowanceResponse>;
 }
 
 pub struct AssetService<SDK> {
@@ -78,40 +54,38 @@ impl<SDK: ServiceSDK> Assets for AssetService<SDK> {
         &mut self,
         ctx: &ServiceContext,
         payload: CreateAssetPayload,
-    ) -> Result<Asset, ServiceResponse<()>> {
-        impl_assets!(self, create_asset, ctx, payload)
+    ) -> ServiceResponse<()> {
+        let res = self.create_asset(ctx.clone(), payload);
+        try_service_response!(res);
+        ServiceResponse::from_succeed(())
     }
 
     fn balance_(
         &self,
         ctx: &ServiceContext,
         payload: GetBalancePayload,
-    ) -> Result<GetBalanceResponse, ServiceResponse<()>> {
-        impl_assets!(self, get_balance, ctx, payload)
+    ) -> ServiceResponse<GetBalanceResponse> {
+        self.get_balance(ctx.clone(), payload)
     }
 
-    fn transfer_(
-        &mut self,
-        ctx: &ServiceContext,
-        payload: TransferPayload,
-    ) -> Result<(), ServiceResponse<()>> {
-        impl_assets!(self, transfer, ctx, payload)
+    fn transfer_(&mut self, ctx: &ServiceContext, payload: TransferPayload) -> ServiceResponse<()> {
+        self.transfer(ctx.clone(), payload)
     }
 
     fn transfer_from_(
         &mut self,
         ctx: &ServiceContext,
         payload: TransferFromPayload,
-    ) -> Result<(), ServiceResponse<()>> {
-        impl_assets!(self, transfer_from, ctx, payload)
+    ) -> ServiceResponse<()> {
+        self.transfer_from(ctx.clone(), payload)
     }
 
     fn allowance_(
         &self,
         ctx: &ServiceContext,
         payload: GetAllowancePayload,
-    ) -> Result<GetAllowanceResponse, ServiceResponse<()>> {
-        impl_assets!(self, get_allowance, ctx, payload)
+    ) -> ServiceResponse<GetAllowanceResponse> {
+        self.get_allowance(ctx.clone(), payload)
     }
 }
 
