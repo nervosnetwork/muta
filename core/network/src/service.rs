@@ -362,7 +362,7 @@ impl NetworkService {
     }
 
     pub fn set_chain_id(&self, chain_id: Hash) {
-        todo!()
+        self.peer_mgr_handle.set_chain_id(chain_id);
     }
 
     pub async fn listen(&mut self, socket_addr: SocketAddr) -> ProtocolResult<()> {

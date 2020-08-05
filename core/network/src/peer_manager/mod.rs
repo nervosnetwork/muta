@@ -354,6 +354,10 @@ impl PeerManagerHandle {
         self.inner.session(sid).map(|s| s.peer.owned_id())
     }
 
+    pub fn set_chain_id(&self, chain_id: protocol::types::Hash) {
+        self.inner.set_chain_id(chain_id);
+    }
+
     pub fn chain_id(&self) -> Arc<protocol::types::Hash> {
         self.inner.chain_id()
     }

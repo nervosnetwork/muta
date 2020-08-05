@@ -104,6 +104,11 @@ pub async fn connect(full_node_port: u16, listen_port: u16, sync: Sync) -> Clien
     let mut network = NetworkService::new(config);
     let handle = network.handle();
 
+    let chain_id =
+        Hash::from_hex("0xb6a4d7da21443f5e816e8700eea87610e6d769657d6b8ec73028457bf2ca4036")
+            .unwrap();
+    network.set_chain_id(chain_id);
+
     network
         .register_endpoint_handler(
             RPC_SYNC_PULL_BLOCK,

@@ -284,6 +284,9 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         protocol::init_address_hrp(metadata.bech32_address_hrp);
     }
 
+    // set chain id in network
+    network_service.set_chain_id(metadata.chain_id.clone());
+
     // set args in mempool
     mempool.set_args(
         metadata.timeout_gap,
