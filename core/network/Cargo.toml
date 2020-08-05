@@ -42,8 +42,8 @@ tokio = { version = "0.2", features = ["macros", "rt-core"]}
 [features]
 default = []
 global_ip_only = []
-diagnostic = []
 disable_chain_id_check = []
+diagnostic = ["disable_chain_id_check"]
 
 [[test]]
 name = "broadcast"
