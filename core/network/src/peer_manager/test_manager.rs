@@ -2824,6 +2824,10 @@ async fn should_reject_same_ip_connection_when_reach_limit_on_new_session() {
     let same_ip_peer = make_peer(9527);
     let expect_sid = same_ip_peer.session_id();
 
+    // Save same ip peer
+    let inner = mgr.core_inner();
+    inner.add_peer(same_ip_peer.clone());
+
     let sess_ctx = SessionContext::make(
         SessionId::new(99),
         same_ip_peer.multiaddrs.all_raw().pop().unwrap(),
@@ -2837,7 +2841,6 @@ async fn should_reject_same_ip_connection_when_reach_limit_on_new_session() {
     };
     mgr.poll_event(new_session).await;
 
-    let inner = mgr.core_inner();
     assert_eq!(inner.connected(), 1, "should not increase conn count");
     assert_eq!(
         same_ip_peer.session_id(),

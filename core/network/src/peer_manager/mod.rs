@@ -686,14 +686,6 @@ impl PeerManager {
         let session = ArcSession::new(remote_peer.clone(), Arc::clone(&ctx));
         info!("new session from {}", session.connected_addr);
 
-        // Currently we only save accepted peer.
-        // NOTE: We have to save peer first to be able to ban it. Check out
-        // SAME_IP_LIMIT_BAN.
-        // TODO: save to database
-        if !self.inner.contains(&remote_peer_id) {
-            self.inner.add_peer(remote_peer.clone());
-        }
-
         // Always allow peer in allowlist and consensus peer
         if !remote_peer.tags.contains(&PeerTag::AlwaysAllow)
             && !remote_peer.tags.contains(&PeerTag::Consensus)
@@ -711,6 +703,12 @@ impl PeerManager {
                 self.disconnect_session(ctx.id);
                 return;
             }
+        }
+
+        // Currently we only save accepted peer.
+        // TODO: save to database
+        if !self.inner.contains(&remote_peer_id) {
+            self.inner.add_peer(remote_peer.clone());
         }
 
         self.inner.sessions.insert(AcceptableSession(session));
