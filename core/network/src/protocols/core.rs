@@ -35,6 +35,13 @@ impl CoreProtocol {
     pub fn build() -> CoreProtocolBuilder {
         CoreProtocolBuilder::new()
     }
+
+    pub fn build_identify(
+        peer_mgr: PeerManagerHandle,
+        event_tx: UnboundedSender<PeerManagerEvent>,
+    ) -> Identify {
+        Identify::new(peer_mgr, event_tx)
+    }
 }
 
 impl NetworkProtocol for CoreProtocol {
@@ -78,24 +85,19 @@ impl CoreProtocolBuilder {
         self
     }
 
-    pub fn identify(
-        mut self,
-        peer_mgr: PeerManagerHandle,
-        event_tx: UnboundedSender<PeerManagerEvent>,
-    ) -> Self {
-        let identify = Identify::new(peer_mgr, event_tx);
-
+    pub fn identify(mut self, identify: Identify) -> Self {
         self.identify = Some(identify);
         self
     }
 
     pub fn discovery(
         mut self,
+        identify: Identify,
         peer_mgr: PeerManagerHandle,
         event_tx: UnboundedSender<PeerManagerEvent>,
         sync_interval: Duration,
     ) -> Self {
-        let discovery = Discovery::new(peer_mgr, event_tx, sync_interval);
+        let discovery = Discovery::new(identify, peer_mgr, event_tx, sync_interval);
 
         self.discovery = Some(discovery);
         self

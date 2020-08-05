@@ -289,14 +289,16 @@ impl SubstreamValue {
                             let identify_status = Arc::clone(&self.identify_status);
                             let session_id = self.session_id;
                             let addr = addr.clone();
-                            let addr_mgr = addr_mgr.clone();
+                            let mut addr_mgr = addr_mgr.clone();
 
                             tokio::spawn(async move {
-                                let status = identify_status.lock().await;
+                                let mut status = identify_status.lock().await;
 
                                 match &mut *status {
-                                    IdentifyStatus::Done(ret) if ret.is_err() => return,
-                                    IdentifyStatus::Done(ret) if ret.is_ok() => {
+                                    IdentifyStatus::Done(ret) => {
+                                        if ret.is_err() {
+                                            return;
+                                        }
                                         addr_mgr.add_new_addr(session_id, addr);
                                     }
                                     IdentifyStatus::Wait(fut) => {

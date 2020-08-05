@@ -270,15 +270,17 @@ impl Stream for DiscoveryBehaviour {
                     .collect::<Vec<_>>();
 
                 if let Some(substream_val) = self.substreams.get(&key) {
-                    let addr_mgr = self.addr_mgr.clone();
+                    let mut addr_mgr = self.addr_mgr.clone();
                     let identify_status = Arc::clone(&substream_val.identify_status);
 
                     tokio::spawn(async move {
-                        let status = identify_status.lock().await;
+                        let mut status = identify_status.lock().await;
 
                         match &mut *status {
-                            IdentifyStatus::Done(ret) if ret.is_err() => return,
-                            IdentifyStatus::Done(ret) if ret.is_ok() => {
+                            IdentifyStatus::Done(ret) => {
+                                if ret.is_err() {
+                                    return;
+                                }
                                 addr_mgr.add_new_addrs(session_id, addrs);
                             }
                             IdentifyStatus::Wait(fut) => {

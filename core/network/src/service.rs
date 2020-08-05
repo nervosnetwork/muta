@@ -222,10 +222,16 @@ impl NetworkService {
 
         // Build service protocol
         let disc_sync_interval = config.discovery_sync_interval;
+        let identify = CoreProtocol::build_identify(peer_mgr_handle.clone(), mgr_tx.clone());
         let proto = CoreProtocol::build()
             .ping(config.ping_interval, config.ping_timeout, mgr_tx.clone())
-            .identify(peer_mgr_handle.clone(), mgr_tx.clone())
-            .discovery(peer_mgr_handle.clone(), mgr_tx.clone(), disc_sync_interval)
+            .identify(identify.clone())
+            .discovery(
+                identify,
+                peer_mgr_handle.clone(),
+                mgr_tx.clone(),
+                disc_sync_interval,
+            )
             .transmitter(raw_msg_tx.clone())
             .build();
 
