@@ -1,18 +1,17 @@
-use crate::{
-    event::PeerManagerEvent,
-    message::RawSessionMessage,
-    peer_manager::PeerManagerHandle,
-    protocols::{discovery::Discovery, identify::Identify, ping::Ping, transmitter::Transmitter},
-    traits::NetworkProtocol,
-};
+use std::time::Duration;
 
 use futures::channel::mpsc::UnboundedSender;
-use tentacle::{
-    service::{ProtocolMeta, TargetProtocol},
-    ProtocolId,
-};
+use tentacle::service::{ProtocolMeta, TargetProtocol};
+use tentacle::ProtocolId;
 
-use std::time::Duration;
+use crate::event::PeerManagerEvent;
+use crate::message::RawSessionMessage;
+use crate::peer_manager::PeerManagerHandle;
+use crate::protocols::discovery::Discovery;
+use crate::protocols::identify::Identify;
+use crate::protocols::ping::Ping;
+use crate::protocols::transmitter::Transmitter;
+use crate::traits::NetworkProtocol;
 
 pub const PING_PROTOCOL_ID: usize = 1;
 pub const IDENTIFY_PROTOCOL_ID: usize = 2;
@@ -28,19 +27,13 @@ pub struct CoreProtocolBuilder {
 }
 
 pub struct CoreProtocol {
-    metas: Vec<ProtocolMeta>,
+    metas:        Vec<ProtocolMeta>,
+    pub identify: Identify,
 }
 
 impl CoreProtocol {
     pub fn build() -> CoreProtocolBuilder {
         CoreProtocolBuilder::new()
-    }
-
-    pub fn build_identify(
-        peer_mgr: PeerManagerHandle,
-        event_tx: UnboundedSender<PeerManagerEvent>,
-    ) -> Identify {
-        Identify::new(peer_mgr, event_tx)
     }
 }
 
@@ -85,19 +78,24 @@ impl CoreProtocolBuilder {
         self
     }
 
-    pub fn identify(mut self, identify: Identify) -> Self {
+    pub fn identify(
+        mut self,
+        peer_mgr: PeerManagerHandle,
+        event_tx: UnboundedSender<PeerManagerEvent>,
+    ) -> Self {
+        let identify = Identify::new(peer_mgr, event_tx);
+
         self.identify = Some(identify);
         self
     }
 
     pub fn discovery(
         mut self,
-        identify: Identify,
         peer_mgr: PeerManagerHandle,
         event_tx: UnboundedSender<PeerManagerEvent>,
         sync_interval: Duration,
     ) -> Self {
-        let discovery = Discovery::new(identify, peer_mgr, event_tx, sync_interval);
+        let discovery = Discovery::new(peer_mgr, event_tx, sync_interval);
 
         self.discovery = Some(discovery);
         self
@@ -120,28 +118,16 @@ impl CoreProtocolBuilder {
             transmitter,
         } = self;
 
-        // Panic early during protocol setup not runtime
-        assert!(ping.is_some(), "init: missing protocol ping");
-        assert!(identify.is_some(), "init: missing protocol identify");
-        assert!(discovery.is_some(), "init: missing protocol discovery");
-        assert!(transmitter.is_some(), "init: missing protocol transmitter");
+        let ping = ping.expect("init: missing protocol ping");
+        let identify = identify.expect("init: missing protocol identify");
+        let discovery = discovery.expect("init: missing protocol discovery");
+        let transmitter = transmitter.expect("init: missing protocol transmitter");
 
-        if let Some(ping) = ping {
-            metas.push(ping.build_meta(PING_PROTOCOL_ID.into()));
-        }
+        metas.push(ping.build_meta(PING_PROTOCOL_ID.into()));
+        metas.push(identify.clone().build_meta(IDENTIFY_PROTOCOL_ID.into()));
+        metas.push(discovery.build_meta(DISCOVERY_PROTOCOL_ID.into()));
+        metas.push(transmitter.build_meta(TRANSMITTER_PROTOCOL_ID.into()));
 
-        if let Some(identify) = identify {
-            metas.push(identify.build_meta(IDENTIFY_PROTOCOL_ID.into()));
-        }
-
-        if let Some(discovery) = discovery {
-            metas.push(discovery.build_meta(DISCOVERY_PROTOCOL_ID.into()));
-        }
-
-        if let Some(transmitter) = transmitter {
-            metas.push(transmitter.build_meta(TRANSMITTER_PROTOCOL_ID.into()));
-        }
-
-        CoreProtocol { metas }
+        CoreProtocol { metas, identify }
     }
 }
