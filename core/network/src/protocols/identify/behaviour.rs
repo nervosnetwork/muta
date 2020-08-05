@@ -3,7 +3,9 @@ use std::sync::Arc;
 
 use futures::channel::mpsc::UnboundedSender;
 use log::{debug, trace, warn};
+#[cfg(not(feature = "disable_chain_id_check"))]
 use protocol::types::Hash;
+#[cfg(not(feature = "disable_chain_id_check"))]
 use protocol::Bytes;
 use tentacle::multiaddr::Multiaddr;
 use tentacle::secio::PeerId;
@@ -148,6 +150,13 @@ impl IdentifyBehaviour {
         }
     }
 
+    #[cfg(feature = "disable_chain_id_check")]
+    pub fn received_identify(&self, info: &mut RemoteInfo, _identify: &[u8]) -> MisbehaveResult {
+        info.identification.pass();
+        MisbehaveResult::Continue
+    }
+
+    #[cfg(not(feature = "disable_chain_id_check"))]
     pub fn received_identify(&self, info: &mut RemoteInfo, identify: &[u8]) -> MisbehaveResult {
         let hash = match Hash::from_bytes(Bytes::from(identify.to_vec())) {
             Ok(h) => h,

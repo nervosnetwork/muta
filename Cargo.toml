@@ -92,7 +92,7 @@ crate-type = ["bin"]
 [[test]]
 name = "trust_metric"
 path = "tests/trust_metric.rs"
-required-features = [ "core-network/diagnostic" ]
+required-features = [ "core-network/diagnostic", "core-network/disable_chain_id_check" ]
 
 [[bench]]
 name = "bench_execute"
