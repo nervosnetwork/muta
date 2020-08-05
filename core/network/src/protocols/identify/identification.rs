@@ -54,9 +54,8 @@ impl Future for WaitIdentification {
 
 impl Drop for WaitIdentification {
     fn drop(&mut self) {
-        match &mut *self.ident.status.lock() {
-            IdentificationStatus::Pending(wakerset) => wakerset.remove(self.idx),
-            _ => (),
+        if let IdentificationStatus::Pending(wakerset) = &mut *self.ident.status.lock() {
+            wakerset.remove(self.idx);
         }
     }
 }

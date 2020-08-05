@@ -139,9 +139,7 @@ impl ServiceProtocol for IdentifyProtocol {
             .collect::<Multiaddr>();
 
         let identify = self.behaviour.identify();
-        let msg = match IdentifyMessage::new(listen_addrs, observed_addr, identify.to_owned())
-            .into_bytes()
-        {
+        let msg = match IdentifyMessage::new(listen_addrs, observed_addr, identify).into_bytes() {
             Ok(msg) => msg,
             Err(err) => {
                 warn!("encode {}", err);
