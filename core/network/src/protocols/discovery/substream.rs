@@ -1,29 +1,30 @@
-use std::collections::VecDeque;
-use std::io;
-use std::pin::Pin;
-use std::sync::Arc;
-use std::task::{Context, Poll};
-use std::time::{Duration, Instant};
+use super::{
+    addr::{AddrKnown, AddressManager, ConnectableAddr, Misbehavior},
+    message::{DiscoveryMessage, Nodes, Payload},
+};
 
 use bytes::{BufMut, BytesMut};
-use futures::channel::mpsc::Receiver;
-use futures::lock::Mutex;
-use futures::{Sink, Stream};
+use futures::{channel::mpsc::Receiver, Sink, Stream};
 use log::{debug, trace, warn};
 use prost::Message;
-use tentacle::context::ProtocolContextMutRef;
-use tentacle::error::SendErrorKind;
-use tentacle::multiaddr::{Multiaddr, Protocol};
-use tentacle::service::{ServiceControl, SessionType};
-use tentacle::utils::multiaddr_to_socketaddr;
-use tentacle::{ProtocolId, SessionId};
+use tentacle::{
+    context::ProtocolContextMutRef,
+    error::SendErrorKind,
+    multiaddr::{Multiaddr, Protocol},
+    service::{ServiceControl, SessionType},
+    utils::multiaddr_to_socketaddr,
+    ProtocolId, SessionId,
+};
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_util::codec::{length_delimited::LengthDelimitedCodec, Decoder, Encoder, Framed};
 
-use crate::protocols::identify::WaitIdentification;
-
-use super::addr::{AddrKnown, AddressManager, ConnectableAddr, Misbehavior};
-use super::message::{DiscoveryMessage, Nodes, Payload};
+use std::{
+    collections::VecDeque,
+    io,
+    pin::Pin,
+    task::{Context, Poll},
+    time::{Duration, Instant},
+};
 
 // FIXME: should be a more high level version number
 const VERSION: u32 = 0;
@@ -83,11 +84,6 @@ impl Encoder for DiscoveryCodec {
 
         self.inner.encode(buf.freeze(), dst)
     }
-}
-
-pub enum IdentifyStatus {
-    Done(Result<(), ()>),
-    Wait(WaitIdentification),
 }
 
 #[derive(Eq, PartialEq, Hash, Debug, Clone)]
@@ -171,7 +167,6 @@ pub struct SubstreamValue {
     received_get_nodes:             bool,
     received_nodes:                 bool,
     remote_closed:                  bool,
-    pub(crate) identify_status:     Arc<Mutex<IdentifyStatus>>,
 }
 
 impl SubstreamValue {
@@ -198,7 +193,6 @@ impl SubstreamValue {
             RemoteAddress::Init(substream.remote_addr)
         };
 
-        let identify_status = Arc::new(Mutex::new(IdentifyStatus::Wait(substream.ident_fut)));
         SubstreamValue {
             framed_stream: Framed::new(substream.stream, DiscoveryCodec::default()),
             last_announce: None,
@@ -213,7 +207,6 @@ impl SubstreamValue {
             received_get_nodes: false,
             received_nodes: false,
             remote_closed: false,
-            identify_status,
         }
     }
 
@@ -286,30 +279,7 @@ impl SubstreamValue {
 
                         // add client listen address to manager
                         if let RemoteAddress::Listen(ref addr) = self.remote_addr {
-                            let identify_status = Arc::clone(&self.identify_status);
-                            let session_id = self.session_id;
-                            let addr = addr.clone();
-                            let mut addr_mgr = addr_mgr.clone();
-
-                            tokio::spawn(async move {
-                                let mut status = identify_status.lock().await;
-
-                                match &mut *status {
-                                    IdentifyStatus::Done(ret) => {
-                                        if ret.is_err() {
-                                            return;
-                                        }
-                                        addr_mgr.add_new_addr(session_id, addr);
-                                    }
-                                    IdentifyStatus::Wait(fut) => {
-                                        let ret = fut.await;
-                                        if ret.is_ok() {
-                                            addr_mgr.add_new_addr(session_id, addr);
-                                        }
-                                        *status = IdentifyStatus::Done(ret);
-                                    }
-                                }
-                            });
+                            addr_mgr.add_new_addr(self.session_id, addr.clone());
                         }
                     }
 
@@ -448,15 +418,10 @@ pub struct Substream {
     pub direction:   SessionType,
     pub stream:      StreamHandle,
     pub listen_port: Option<u16>,
-    pub ident_fut:   WaitIdentification,
 }
 
 impl Substream {
-    pub fn new(
-        ident_fut: WaitIdentification,
-        context: ProtocolContextMutRef,
-        receiver: Receiver<Vec<u8>>,
-    ) -> Substream {
+    pub fn new(context: ProtocolContextMutRef, receiver: Receiver<Vec<u8>>) -> Substream {
         let stream = StreamHandle {
             data_buf: BytesMut::default(),
             proto_id: context.proto_id,
@@ -478,7 +443,6 @@ impl Substream {
             direction: context.session.ty,
             stream,
             listen_port,
-            ident_fut,
         }
     }
 

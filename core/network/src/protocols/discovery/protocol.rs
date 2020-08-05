@@ -1,31 +1,32 @@
+use super::{
+    behaviour::{DiscoveryBehaviour, DiscoveryBehaviourHandle},
+    substream::Substream,
+};
+
+use futures::{
+    channel::mpsc::{channel, Sender},
+    future::FutureExt,
+    stream::StreamExt,
+};
+use log::{debug, warn};
+use tentacle::{
+    context::{ProtocolContext, ProtocolContextMutRef},
+    traits::ServiceProtocol,
+    SessionId,
+};
+
 use std::collections::HashMap;
 
-use futures::channel::mpsc::{channel, Sender};
-use futures::future::FutureExt;
-use futures::stream::StreamExt;
-use log::{debug, warn};
-use tentacle::context::{ProtocolContext, ProtocolContextMutRef};
-use tentacle::traits::ServiceProtocol;
-use tentacle::SessionId;
-
-use crate::protocols::identify::Identify;
-
-use super::behaviour::{DiscoveryBehaviour, DiscoveryBehaviourHandle};
-use super::substream::Substream;
-
 pub struct DiscoveryProtocol {
-    identify:          Identify,
     behaviour:         Option<DiscoveryBehaviour>,
     behaviour_handle:  DiscoveryBehaviourHandle,
     discovery_senders: HashMap<SessionId, Sender<Vec<u8>>>,
 }
 
 impl DiscoveryProtocol {
-    pub fn new(identify: Identify, behaviour: DiscoveryBehaviour) -> DiscoveryProtocol {
+    pub fn new(behaviour: DiscoveryBehaviour) -> DiscoveryProtocol {
         let behaviour_handle = behaviour.handle();
-
         DiscoveryProtocol {
-            identify,
             behaviour: Some(behaviour),
             behaviour_handle,
             discovery_senders: HashMap::default(),
@@ -65,18 +66,9 @@ impl ServiceProtocol for DiscoveryProtocol {
             session.id, session.address, session.ty
         );
 
-        let ident_fut = match self.identify.proto.wait(&context) {
-            Ok(wait) => wait,
-            Err(err) => {
-                warn!("wait {} session identification: {}", session.id, err);
-                return;
-            }
-        };
-
         let (sender, receiver) = channel(8);
         self.discovery_senders.insert(session.id, sender);
-
-        let substream = Substream::new(ident_fut, context, receiver);
+        let substream = Substream::new(context, receiver);
         match self.behaviour_handle.substream_sender.try_send(substream) {
             Ok(_) => {
                 debug!("Send substream success");

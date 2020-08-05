@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use derive_more::Display;
 use log::{debug, error, trace, warn};
 use parking_lot::RwLock;
 use prost::Message;
@@ -20,15 +19,6 @@ use super::message::IdentifyMessage;
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(8);
 const CHECK_TIMEOUT_INTERVAL: Duration = Duration::from_secs(1);
 const CHECK_TIMEOUT_TOKEN: u64 = 100;
-
-#[derive(Debug, Display)]
-pub enum Error {
-    #[display(fmt = "session does not enable encryption")]
-    EncryptionNotEnable,
-
-    #[display(fmt = "unexpect {}", _0)]
-    Unexpected(&'static str),
-}
 
 pub struct RemoteInfo {
     pub peer_id:        PeerId,
@@ -68,16 +58,18 @@ impl IdentifyProtocol {
         }
     }
 
-    pub fn wait(&self, context: &ProtocolContextMutRef) -> Result<WaitIdentification, self::Error> {
-        self.insert_info_if_new(context)?;
+    pub fn wait(&self, context: &ProtocolContextMutRef) -> Result<WaitIdentification, ()> {
+        if self.insert_info_if_new(context).is_err() {
+            return Err(());
+        }
 
         match self.remote_infos.read().get(&context.session.id) {
             Some(remote_info) => Ok(remote_info.identification.wait()),
-            None => Err(self::Error::Unexpected("identify remote info not found")),
+            None => Err(()),
         }
     }
 
-    fn insert_info_if_new(&self, context: &ProtocolContextMutRef) -> Result<(), self::Error> {
+    fn insert_info_if_new(&self, context: &ProtocolContextMutRef) -> Result<(), ()> {
         let session = context.session;
         {
             if self.remote_infos.read().get(&session.id).is_some() {
@@ -90,7 +82,7 @@ impl IdentifyProtocol {
             None => {
                 error!("IdentifyProtocol require secio enabled!");
                 let _ = context.disconnect(session.id);
-                return Err(self::Error::EncryptionNotEnable);
+                return Err(());
             }
         };
 

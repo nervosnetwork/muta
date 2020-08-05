@@ -1,18 +1,22 @@
-use std::collections::{BTreeMap, HashMap, HashSet};
-use std::net::{IpAddr, SocketAddr};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
-use std::time::Instant;
+use crate::{
+    event::{MisbehaviorKind, PeerManagerEvent},
+    peer_manager::PeerManagerHandle,
+};
 
 use futures::channel::mpsc::UnboundedSender;
 use log::{error, warn};
-use tentacle::bytes::{Bytes, BytesMut};
-use tentacle::multiaddr::{Multiaddr, Protocol};
-use tentacle::utils::is_reachable;
-use tentacle::SessionId;
+use tentacle::{
+    bytes::{Bytes, BytesMut},
+    multiaddr::{Multiaddr, Protocol},
+    utils::is_reachable,
+    SessionId,
+};
 
-use crate::event::{MisbehaviorKind, PeerManagerEvent};
-use crate::peer_manager::PeerManagerHandle;
+use std::{
+    collections::{BTreeMap, HashMap, HashSet},
+    net::{IpAddr, SocketAddr},
+    time::Instant,
+};
 
 pub(crate) const DEFAULT_MAX_KNOWN: usize = 5000;
 
@@ -45,35 +49,33 @@ impl MisbehaveResult {
     }
 }
 
-#[derive(Clone)]
 struct AddrReporter {
     inner:    UnboundedSender<PeerManagerEvent>,
-    shutdown: Arc<AtomicBool>,
+    shutdown: bool,
 }
 
 impl AddrReporter {
     pub fn new(reporter: UnboundedSender<PeerManagerEvent>) -> Self {
         AddrReporter {
             inner:    reporter,
-            shutdown: Arc::new(AtomicBool::new(false)),
+            shutdown: false,
         }
     }
 
     // TODO: upstream heart-beat check
     pub fn report(&mut self, event: PeerManagerEvent) {
-        if self.shutdown.load(Ordering::SeqCst) {
+        if self.shutdown {
             return;
         }
 
         if self.inner.unbounded_send(event).is_err() {
             error!("network: discovery: peer manager offline");
 
-            self.shutdown.store(true, Ordering::SeqCst);
+            self.shutdown = true;
         }
     }
 }
 
-#[derive(Clone)]
 pub struct AddressManager {
     peer_mgr: PeerManagerHandle,
     reporter: AddrReporter,

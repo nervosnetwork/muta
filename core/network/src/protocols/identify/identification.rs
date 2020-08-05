@@ -24,15 +24,6 @@ impl WaitIdentification {
     }
 }
 
-impl Clone for WaitIdentification {
-    fn clone(&self) -> Self {
-        WaitIdentification {
-            idx:   usize::MAX,
-            ident: self.ident.clone(),
-        }
-    }
-}
-
 impl Future for WaitIdentification {
     type Output = Result<(), ()>;
 
