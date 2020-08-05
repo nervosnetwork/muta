@@ -1,29 +1,22 @@
-use super::{
-    addr::{AddressManager, ConnectableAddr, DEFAULT_MAX_KNOWN},
-    message::{DiscoveryMessage, Nodes},
-    substream::{RemoteAddress, Substream, SubstreamKey, SubstreamValue},
-};
+use std::collections::{HashMap, HashSet, VecDeque};
+use std::pin::Pin;
+use std::sync::Arc;
+use std::task::{Context, Poll};
+use std::time::{Duration, Instant};
 
-use futures::{
-    channel::mpsc::{channel, Receiver, Sender},
-    stream::FusedStream,
-    Stream,
-};
+use futures::channel::mpsc::{channel, Receiver, Sender};
+use futures::stream::FusedStream;
+use futures::Stream;
 use log::debug;
 use rand::seq::SliceRandom;
-use tentacle::{
-    multiaddr::Multiaddr,
-    utils::{is_reachable, multiaddr_to_socketaddr},
-    SessionId,
-};
+use tentacle::multiaddr::Multiaddr;
+use tentacle::utils::{is_reachable, multiaddr_to_socketaddr};
+use tentacle::SessionId;
 use tokio::time::Interval;
 
-use std::{
-    collections::{HashMap, HashSet, VecDeque},
-    pin::Pin,
-    task::{Context, Poll},
-    time::{Duration, Instant},
-};
+use super::addr::{AddressManager, ConnectableAddr, DEFAULT_MAX_KNOWN};
+use super::message::{DiscoveryMessage, Nodes};
+use super::substream::{IdentifyStatus, RemoteAddress, Substream, SubstreamKey, SubstreamValue};
 
 const CHECK_INTERVAL: Duration = Duration::from_secs(3);
 
@@ -269,14 +262,36 @@ impl Stream for DiscoveryBehaviour {
         self.send_messages(cx);
 
         match self.pending_nodes.pop_front() {
-            Some((_key, session_id, nodes)) => {
+            Some((key, session_id, nodes)) => {
                 let addrs = nodes
                     .items
                     .into_iter()
                     .flat_map(|node| node.addrs())
                     .collect::<Vec<_>>();
 
-                self.addr_mgr.add_new_addrs(session_id, addrs);
+                if let Some(substream_val) = self.substreams.get(&key) {
+                    let addr_mgr = self.addr_mgr.clone();
+                    let identify_status = Arc::clone(&substream_val.identify_status);
+
+                    tokio::spawn(async move {
+                        let status = identify_status.lock().await;
+
+                        match &mut *status {
+                            IdentifyStatus::Done(ret) if ret.is_err() => return,
+                            IdentifyStatus::Done(ret) if ret.is_ok() => {
+                                addr_mgr.add_new_addrs(session_id, addrs);
+                            }
+                            IdentifyStatus::Wait(fut) => {
+                                let ret = fut.await;
+                                if ret.is_ok() {
+                                    addr_mgr.add_new_addrs(session_id, addrs);
+                                }
+                                *status = IdentifyStatus::Done(ret);
+                            }
+                        }
+                    });
+                }
+
                 Poll::Ready(Some(()))
             }
             None => Poll::Pending,

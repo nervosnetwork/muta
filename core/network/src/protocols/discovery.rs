@@ -4,20 +4,20 @@ mod message;
 mod protocol;
 mod substream;
 
+use std::time::Duration;
+
+use futures::channel::mpsc::UnboundedSender;
+use tentacle::builder::MetaBuilder;
+use tentacle::service::{ProtocolHandle, ProtocolMeta};
+use tentacle::ProtocolId;
+
+use crate::event::PeerManagerEvent;
+use crate::peer_manager::PeerManagerHandle;
+use crate::protocols::identify::Identify;
+
 use self::protocol::DiscoveryProtocol;
 use addr::AddressManager;
 use behaviour::DiscoveryBehaviour;
-
-use crate::{event::PeerManagerEvent, peer_manager::PeerManagerHandle};
-
-use futures::channel::mpsc::UnboundedSender;
-use tentacle::{
-    builder::MetaBuilder,
-    service::{ProtocolHandle, ProtocolMeta},
-    ProtocolId,
-};
-
-use std::time::Duration;
 
 pub const NAME: &str = "chain_discovery";
 pub const SUPPORT_VERSIONS: [&str; 1] = ["0.1"];
@@ -26,6 +26,7 @@ pub struct Discovery(DiscoveryProtocol);
 
 impl Discovery {
     pub fn new(
+        identify: Identify,
         peer_mgr: PeerManagerHandle,
         event_tx: UnboundedSender<PeerManagerEvent>,
         sync_interval: Duration,
@@ -38,7 +39,7 @@ impl Discovery {
         let address_manager = AddressManager::new(peer_mgr, event_tx);
         let behaviour = DiscoveryBehaviour::new(address_manager, Some(sync_interval));
 
-        Discovery(DiscoveryProtocol::new(behaviour))
+        Discovery(DiscoveryProtocol::new(identify, behaviour))
     }
 
     pub fn build_meta(self, protocol_id: ProtocolId) -> ProtocolMeta {

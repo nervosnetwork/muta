@@ -15,6 +15,8 @@ use tentacle::ProtocolId;
 use crate::event::PeerManagerEvent;
 use crate::peer_manager::PeerManagerHandle;
 
+pub use identification::WaitIdentification;
+
 pub const NAME: &str = "chain_identify";
 pub const SUPPORT_VERSIONS: [&str; 1] = ["0.1"];
 
