@@ -492,7 +492,7 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
     }
 
     fn update_status(&self, ctx: Context, sync_status_agent: StatusAgent) -> ProtocolResult<()> {
-        let sync_status = sync_status_agent.to_inner().clone();
+        let sync_status = sync_status_agent.to_inner();
 
         self.status.replace(sync_status.clone());
         self.adapter.update_status(
