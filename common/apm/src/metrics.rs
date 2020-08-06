@@ -58,14 +58,12 @@ pub fn all_metrics() -> ProtocolResult<Vec<u8>> {
 #[cfg(test)]
 mod tests {
     use super::duration_to_sec;
-    use std::time::{Duration, Instant};
+    use std::time::Duration;
 
     #[test]
     fn test_duration_to_sec() {
-        let inst = Instant::now();
-        let d = Duration::from_nanos(10000000010);
+        let d = Duration::from_millis(1110);
         let sec = duration_to_sec(d);
-        let sec2 = duration_to_sec(inst.elapsed());
-        println!("sec {:?} sec2 {:?}", sec, sec2);
+        assert_eq!(sec, 1.11);
     }
 }
