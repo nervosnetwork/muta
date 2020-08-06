@@ -1,9 +1,8 @@
 <!--  Thanks for sending a pull request! -->
 <!--  Have I run `make ci`? -->
 
-**What type of PR is this?**
-
 **What this PR does / why we need it**:
+
 
 **Which issue(s) this PR fixes**:
 <!--
@@ -11,5 +10,16 @@
 Usage: `Fixes #<issue number>`, or `Fixes (paste link of issue)`.
 -->
 Fixes #
+
+
+**Which docs this PR relation**:
+
+Ref #
+
+
+**Which toolchain this PR adaption**:
+
+No BREACKING_CHANGE
+
 
 **Special notes for your reviewer**:
