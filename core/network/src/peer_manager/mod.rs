@@ -1314,26 +1314,25 @@ impl Future for PeerManager {
         }
 
         // Process unidentified sessions
-        let mut identified_sessions = self.unidentified_backlog.drain().collect::<Vec<_>>();
-        for UnidentifiedSession { event, ident_fut } in identified_sessions {
+        let unidentified_sessions = self.unidentified_backlog.drain().collect::<Vec<_>>();
+        for mut session in unidentified_sessions {
+            let ident_fut = &mut session.ident_fut;
             futures::pin_mut!(ident_fut);
 
             match ident_fut.poll(ctx) {
                 Poll::Pending => {
-                    let unidentified_session = UnidentifiedSession {
-                        event,
-                        ident_fut: *ident_fut,
-                    };
-
-                    self.unidentified_backlog.insert(unidentified_session);
+                    self.unidentified_backlog.insert(session);
                 }
                 Poll::Ready(ret) => match ret {
-                    Ok(()) => self.process_event(PeerManagerEvent::NewSession {
-                        pid:    event.pubkey.peer_id(),
-                        pubkey: event.pubkey,
-                        ctx:    event.ctx,
-                    }),
-                    Err(()) => self.disconnect_session(event.ctx.id),
+                    Ok(()) => {
+                        let UnidentifiedSession { event, .. } = session;
+                        self.process_event(PeerManagerEvent::NewSession {
+                            pid:    event.pubkey.peer_id(),
+                            pubkey: event.pubkey,
+                            ctx:    event.ctx,
+                        });
+                    }
+                    Err(()) => self.disconnect_session(session.event.ctx.id),
                 },
             }
         }
