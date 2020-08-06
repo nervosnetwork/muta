@@ -560,7 +560,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     }
     if let Some(tls) = config.graphql.tls {
         graphql_config.tls = Some(GraphQLTLS {
-            private_key_file_path: tls.private_key_file_path,
+            private_key_file_path:       tls.private_key_file_path,
             certificate_chain_file_path: tls.certificate_chain_file_path,
         })
     }
