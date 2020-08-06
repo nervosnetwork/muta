@@ -1,29 +1,23 @@
-use super::{
-    addr::{AddressManager, ConnectableAddr, DEFAULT_MAX_KNOWN},
-    message::{DiscoveryMessage, Nodes},
-    substream::{RemoteAddress, Substream, SubstreamKey, SubstreamValue},
-};
+use std::collections::{HashMap, HashSet, VecDeque};
+use std::pin::Pin;
+use std::task::{Context, Poll};
+use std::time::{Duration, Instant};
 
-use futures::{
-    channel::mpsc::{channel, Receiver, Sender},
-    stream::FusedStream,
-    Stream,
-};
+use futures::channel::mpsc::{channel, Receiver, Sender};
+use futures::stream::FusedStream;
+use futures::Stream;
 use log::debug;
 use rand::seq::SliceRandom;
-use tentacle::{
-    multiaddr::Multiaddr,
-    utils::{is_reachable, multiaddr_to_socketaddr},
-    SessionId,
-};
+use tentacle::multiaddr::Multiaddr;
+use tentacle::utils::{is_reachable, multiaddr_to_socketaddr};
+use tentacle::SessionId;
 use tokio::time::Interval;
 
-use std::{
-    collections::{HashMap, HashSet, VecDeque},
-    pin::Pin,
-    task::{Context, Poll},
-    time::{Duration, Instant},
-};
+use crate::peer_manager::PeerManagerHandle;
+
+use super::addr::{AddressManager, ConnectableAddr, DEFAULT_MAX_KNOWN};
+use super::message::{DiscoveryMessage, Nodes};
+use super::substream::{RemoteAddress, Substream, SubstreamKey, SubstreamValue};
 
 const CHECK_INTERVAL: Duration = Duration::from_secs(3);
 
@@ -33,6 +27,10 @@ pub struct DiscoveryBehaviour {
 
     // Address Manager
     addr_mgr: AddressManager,
+
+    // TODO: Remove address manager
+    // Peer Manager
+    peer_mgr: PeerManagerHandle,
 
     // The Nodes not yet been yield
     pending_nodes: VecDeque<(SubstreamKey, SessionId, Nodes)>,
@@ -55,17 +53,24 @@ pub struct DiscoveryBehaviour {
 #[derive(Clone)]
 pub struct DiscoveryBehaviourHandle {
     pub substream_sender: Sender<Substream>,
+    pub peer_mgr:         PeerManagerHandle,
 }
 
 impl DiscoveryBehaviour {
     /// Query cycle means checking and synchronizing the cycle time of the
     /// currently connected node, default is 24 hours
-    pub fn new(addr_mgr: AddressManager, query_cycle: Option<Duration>) -> DiscoveryBehaviour {
+    pub fn new(
+        addr_mgr: AddressManager,
+        peer_mgr: PeerManagerHandle,
+        query_cycle: Option<Duration>,
+    ) -> DiscoveryBehaviour {
         let (substream_sender, substream_receiver) = channel(8);
+
         DiscoveryBehaviour {
             check_interval: None,
             max_known: DEFAULT_MAX_KNOWN,
             addr_mgr,
+            peer_mgr,
             pending_nodes: VecDeque::default(),
             substreams: HashMap::default(),
             substream_sender,
@@ -78,6 +83,7 @@ impl DiscoveryBehaviour {
     pub fn handle(&self) -> DiscoveryBehaviourHandle {
         DiscoveryBehaviourHandle {
             substream_sender: self.substream_sender.clone(),
+            peer_mgr:         self.peer_mgr.clone(),
         }
     }
 

@@ -3,8 +3,8 @@ mod r#macro;
 
 mod core;
 mod discovery;
-mod identify;
 mod ping;
 mod transmitter;
 
+pub mod identify;
 pub use self::core::{CoreProtocol, CoreProtocolBuilder};

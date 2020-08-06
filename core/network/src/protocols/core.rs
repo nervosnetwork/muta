@@ -27,13 +27,17 @@ pub struct CoreProtocolBuilder {
 }
 
 pub struct CoreProtocol {
-    metas:        Vec<ProtocolMeta>,
-    pub identify: Identify,
+    metas:    Vec<ProtocolMeta>,
+    identify: Identify,
 }
 
 impl CoreProtocol {
     pub fn build() -> CoreProtocolBuilder {
         CoreProtocolBuilder::new()
+    }
+
+    pub fn identify(&self) -> Identify {
+        self.identify.clone()
     }
 }
 

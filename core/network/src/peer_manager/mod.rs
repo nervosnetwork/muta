@@ -63,6 +63,7 @@ use crate::event::{
     ConnectionErrorKind, ConnectionEvent, ConnectionType, MisbehaviorKind, PeerManagerEvent,
     SessionErrorKind,
 };
+use crate::protocols::identify::{Identify, WaitIdentification};
 use crate::traits::MultiaddrExt;
 
 const SAME_IP_LIMIT_BAN: Duration = Duration::from_secs(5 * 60);
@@ -304,6 +305,36 @@ impl Inner {
     }
 }
 
+struct UnidentifiedSessionEvent {
+    pubkey: PublicKey,
+    ctx:    Arc<SessionContext>,
+}
+
+struct UnidentifiedSession {
+    event:     UnidentifiedSessionEvent,
+    ident_fut: WaitIdentification,
+}
+
+impl Borrow<UnidentifiedSessionEvent> for UnidentifiedSession {
+    fn borrow(&self) -> &UnidentifiedSessionEvent {
+        &self.event
+    }
+}
+
+impl PartialEq for UnidentifiedSession {
+    fn eq(&self, other: &UnidentifiedSession) -> bool {
+        self.event.ctx.id == other.event.ctx.id
+    }
+}
+
+impl Eq for UnidentifiedSession {}
+
+impl Hash for UnidentifiedSession {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.event.ctx.id.hash(state)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct PeerManagerConfig {
     /// Our Peer ID
@@ -360,6 +391,10 @@ impl PeerManagerHandle {
 
     pub fn chain_id(&self) -> Arc<protocol::types::Hash> {
         self.inner.chain_id()
+    }
+
+    pub fn contains_session(&self, session_id: SessionId) -> bool {
+        self.inner.session(session_id).is_some()
     }
 
     pub fn random_addrs(&self, max: usize, sid: SessionId) -> Vec<Multiaddr> {
@@ -472,6 +507,11 @@ pub struct PeerManager {
     // peers currently connecting
     connecting: HashSet<ConnectingAttempt>,
 
+    // unidentified session backlog
+    unidentified_backlog: HashSet<UnidentifiedSession>,
+    // TODO: Split store and manager logic
+    identify_protocol:    Option<Identify>,
+
     event_rx: UnboundedReceiver<PeerManagerEvent>,
     conn_tx:  UnboundedSender<ConnectionEvent>,
 
@@ -519,6 +559,8 @@ impl PeerManager {
             bootstraps,
 
             connecting: Default::default(),
+            unidentified_backlog: Default::default(),
+            identify_protocol: None,
 
             event_rx,
             conn_tx,
@@ -537,6 +579,10 @@ impl PeerManager {
         PeerManagerHandle {
             inner: Arc::clone(&self.inner),
         }
+    }
+
+    pub fn set_identify_protocol(&mut self, identify_protocol: Identify) {
+        self.identify_protocol = Some(identify_protocol);
     }
 
     pub fn share_session_book(&self, config: shared::Config) -> SharedSessions {
@@ -603,6 +649,27 @@ impl PeerManager {
         for peer in peers.into_iter() {
             self.connecting.insert(ConnectingAttempt::new(peer));
         }
+    }
+
+    fn new_unidentified_session(&mut self, pubkey: PublicKey, ctx: Arc<SessionContext>) {
+        let session_id = ctx.id;
+        let event = UnidentifiedSessionEvent { pubkey, ctx };
+        let identify = self
+            .identify_protocol
+            .as_ref()
+            .expect("identify protocol must be set");
+
+        let ident_fut = match identify.wait_identified(session_id) {
+            Ok(fut) => fut,
+            Err(err) => {
+                log::warn!("wait session identify: {}", err);
+                self.disconnect_session(session_id);
+                return;
+            }
+        };
+
+        let unidentified_session = UnidentifiedSession { event, ident_fut };
+        self.unidentified_backlog.insert(unidentified_session);
     }
 
     fn new_session(&mut self, pubkey: PublicKey, ctx: Arc<SessionContext>) {
@@ -1191,6 +1258,9 @@ impl PeerManager {
         match event {
             PeerManagerEvent::ConnectPeersNow { pids } => self.connect_peers_by_id(pids),
             PeerManagerEvent::ConnectFailed { addr, kind } => self.connect_failed(addr, kind),
+            PeerManagerEvent::UnidentifiedSession { pubkey, ctx, .. } => {
+                self.new_unidentified_session(pubkey, ctx)
+            }
             PeerManagerEvent::NewSession { pubkey, ctx, .. } => self.new_session(pubkey, ctx),
             // NOTE: Alice may disconnect to Bob, but bob didn't know
             // that, so the next time, Alice try to connect to Bob will
@@ -1241,6 +1311,31 @@ impl Future for PeerManager {
         // Spawn heart beat
         if let Some(heart_beat) = self.heart_beat.take() {
             tokio::spawn(heart_beat);
+        }
+
+        // Process unidentified sessions
+        let mut identified_sessions = self.unidentified_backlog.drain().collect::<Vec<_>>();
+        for UnidentifiedSession { event, ident_fut } in identified_sessions {
+            futures::pin_mut!(ident_fut);
+
+            match ident_fut.poll(ctx) {
+                Poll::Pending => {
+                    let unidentified_session = UnidentifiedSession {
+                        event,
+                        ident_fut: *ident_fut,
+                    };
+
+                    self.unidentified_backlog.insert(unidentified_session);
+                }
+                Poll::Ready(ret) => match ret {
+                    Ok(()) => self.process_event(PeerManagerEvent::NewSession {
+                        pid:    event.pubkey.peer_id(),
+                        pubkey: event.pubkey,
+                        ctx:    event.ctx,
+                    }),
+                    Err(()) => self.disconnect_session(event.ctx.id),
+                },
+            }
         }
 
         // Process manager events

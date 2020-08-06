@@ -135,6 +135,19 @@ pub enum PeerManagerEvent {
         ctx:    Arc<SessionContext>,
     },
 
+    #[display(
+        fmt = "unidentified session {} peer {:?} addr {} ty {:?}",
+        "ctx.id",
+        pid,
+        "ctx.address",
+        "ctx.ty"
+    )]
+    UnidentifiedSession {
+        pid:    PeerId,
+        pubkey: PublicKey,
+        ctx:    Arc<SessionContext>,
+    },
+
     #[display(fmt = "repeated connection type {} session {} addr {}", ty, sid, addr)]
     RepeatedConnection {
         ty:   ConnectionType,
