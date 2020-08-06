@@ -15,10 +15,10 @@ use protocol::{traits::Priority, Bytes};
 use crate::{
     error::NetworkError,
     event::PeerManagerEvent,
-    traits::{MessageSender, NetworkProtocol, SessionBook},
+    traits::{MessageSender, NetworkProtocol, SharedSessionBook},
 };
 
-pub struct ConnectionServiceControl<P: NetworkProtocol, B: SessionBook> {
+pub struct ConnectionServiceControl<P: NetworkProtocol, B: SharedSessionBook> {
     inner:    ServiceControl,
     mgr_srv:  UnboundedSender<PeerManagerEvent>,
     sessions: B,
@@ -27,7 +27,7 @@ pub struct ConnectionServiceControl<P: NetworkProtocol, B: SessionBook> {
     pin_protocol: PhantomData<fn() -> P>,
 }
 
-impl<P: NetworkProtocol, B: SessionBook> ConnectionServiceControl<P, B> {
+impl<P: NetworkProtocol, B: SharedSessionBook> ConnectionServiceControl<P, B> {
     pub fn new(
         control: ServiceControl,
         mgr_srv: UnboundedSender<PeerManagerEvent>,
@@ -84,7 +84,7 @@ impl<P: NetworkProtocol, B: SessionBook> ConnectionServiceControl<P, B> {
     }
 }
 
-impl<P: NetworkProtocol, B: SessionBook + Clone> Clone for ConnectionServiceControl<P, B> {
+impl<P: NetworkProtocol, B: SharedSessionBook + Clone> Clone for ConnectionServiceControl<P, B> {
     fn clone(&self) -> Self {
         ConnectionServiceControl {
             inner:    self.inner.clone(),
@@ -100,7 +100,7 @@ impl<P: NetworkProtocol, B: SessionBook + Clone> Clone for ConnectionServiceCont
 impl<P, B> MessageSender for ConnectionServiceControl<P, B>
 where
     P: NetworkProtocol,
-    B: SessionBook + Send + Sync + Unpin + 'static,
+    B: SharedSessionBook + Send + Sync + Unpin + 'static,
 {
     fn send(&self, tar: TargetSession, msg: Bytes, pri: Priority) -> Result<(), NetworkError> {
         let proto_id = P::message_proto_id();
