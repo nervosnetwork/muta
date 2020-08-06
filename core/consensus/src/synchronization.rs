@@ -496,7 +496,7 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
 
         self.status.replace(sync_status.clone());
         self.adapter.update_status(
-            ctx.clone(),
+            ctx,
             sync_status.latest_committed_height,
             sync_status.consensus_interval,
             sync_status.propose_ratio,
