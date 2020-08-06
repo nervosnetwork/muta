@@ -2,15 +2,19 @@ use std::borrow::Borrow;
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use derive_more::Display;
 use parking_lot::RwLock;
+use tentacle::service::SessionType;
 use tentacle::SessionId;
 
 use super::{ArcPeer, PeerManagerConfig};
 use crate::common::ConnectedAddr;
+use crate::config::{
+    DEFAULT_INBOUND_CONN_LIMIT, DEFAULT_MAX_CONNECTIONS, DEFAULT_SAME_IP_CONN_LIMIT,
+};
 
 #[cfg(test)]
 pub use crate::test::mock::SessionContext;
@@ -24,17 +28,27 @@ type Count = usize;
 pub enum Error {
     #[display(fmt = "reach same ip connections limit")]
     ReachSameIPConnLimit,
+
+    #[display(fmt = "reach inbound connections limit")]
+    ReachInboundConnLimit,
+
+    #[display(fmt = "reach outbound connections limit")]
+    ReachOutboundConnLimit,
 }
 
 #[derive(Debug)]
 pub struct Config {
-    same_ip_conn_limit: usize,
+    same_ip_conn_limit:  usize,
+    inbound_conn_limit:  usize,
+    outbound_conn_limit: usize,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Config {
-            same_ip_conn_limit: 1,
+            same_ip_conn_limit:  DEFAULT_SAME_IP_CONN_LIMIT,
+            inbound_conn_limit:  DEFAULT_INBOUND_CONN_LIMIT,
+            outbound_conn_limit: DEFAULT_MAX_CONNECTIONS - DEFAULT_INBOUND_CONN_LIMIT,
         }
     }
 }
@@ -42,7 +56,9 @@ impl Default for Config {
 impl From<&PeerManagerConfig> for Config {
     fn from(config: &PeerManagerConfig) -> Config {
         Config {
-            same_ip_conn_limit: config.same_ip_conn_limit,
+            same_ip_conn_limit:  config.same_ip_conn_limit,
+            inbound_conn_limit:  config.inbound_conn_limit,
+            outbound_conn_limit: config.outbound_conn_limit,
         }
     }
 }
@@ -71,6 +87,10 @@ impl ArcSession {
         };
 
         ArcSession(Arc::new(session))
+    }
+
+    pub fn ty(&self) -> SessionType {
+        self.ctx.ty
     }
 
     pub fn block(&self) {
@@ -121,6 +141,9 @@ pub struct SessionBook {
 
     hosts:    RwLock<HashMap<Host, Count>>,
     sessions: RwLock<HashSet<ArcSession>>,
+
+    inbound_count:  AtomicUsize,
+    outbound_count: AtomicUsize,
 }
 
 impl Default for SessionBook {
@@ -137,6 +160,8 @@ impl SessionBook {
             config,
             hosts: Default::default(),
             sessions: Default::default(),
+            inbound_count: AtomicUsize::new(0),
+            outbound_count: AtomicUsize::new(0),
         }
     }
 
@@ -160,6 +185,14 @@ impl SessionBook {
         f(&mut sessions.iter())
     }
 
+    pub fn inbound_count(&self) -> usize {
+        self.inbound_count.load(Ordering::SeqCst)
+    }
+
+    pub fn outbound_count(&self) -> usize {
+        self.outbound_count.load(Ordering::SeqCst)
+    }
+
     pub fn acceptable(&self, session: &ArcSession) -> Result<(), self::Error> {
         let session_host = &session.connected_addr.host;
         let host_count = {
@@ -171,7 +204,15 @@ impl SessionBook {
             return Err(self::Error::ReachSameIPConnLimit);
         }
 
-        Ok(())
+        match session.ty() {
+            SessionType::Inbound if self.inbound_count() >= self.config.inbound_conn_limit => {
+                Err(self::Error::ReachInboundConnLimit)
+            }
+            SessionType::Outbound if self.outbound_count() >= self.config.outbound_conn_limit => {
+                Err(self::Error::ReachOutboundConnLimit)
+            }
+            _ => Ok(()),
+        }
     }
 
     pub fn insert(&self, AcceptableSession(session): AcceptableSession) {
@@ -182,6 +223,11 @@ impl SessionBook {
             .entry(session_host.to_owned())
             .and_modify(|c| *c += 1)
             .or_insert(1);
+
+        match session.ty() {
+            SessionType::Inbound => self.inbound_count.fetch_add(1, Ordering::SeqCst),
+            SessionType::Outbound => self.outbound_count.fetch_add(1, Ordering::SeqCst),
+        };
 
         self.sessions.write().insert(session);
     }
@@ -198,6 +244,13 @@ impl SessionBook {
             } else if let Some(count) = hosts.get_mut(session_host) {
                 *count -= 1;
             }
+        }
+
+        if let Some(ty) = session.as_ref().map(|s| s.ty()) {
+            match ty {
+                SessionType::Inbound => self.inbound_count.fetch_sub(1, Ordering::SeqCst),
+                SessionType::Outbound => self.outbound_count.fetch_sub(1, Ordering::SeqCst),
+            };
         }
 
         session
@@ -248,15 +301,10 @@ mod tests {
         peer
     }
 
-    fn make_session(port: u16, sid: SessionId) -> ArcSession {
+    fn make_session(port: u16, sid: SessionId, ty: SessionType) -> ArcSession {
         let peer = make_peer(port);
         let multiaddr = peer.multiaddrs.all_raw().pop().unwrap();
-        let ctx = SessionContext::make(
-            sid,
-            multiaddr,
-            SessionType::Outbound,
-            peer.owned_pubkey().unwrap(),
-        );
+        let ctx = SessionContext::make(sid, multiaddr, ty, peer.owned_pubkey().unwrap());
 
         ArcSession::new(peer, Arc::new(ctx))
     }
@@ -264,11 +312,13 @@ mod tests {
     #[test]
     fn should_reject_session_when_reach_same_ip_conn_limit() {
         let config = Config {
-            same_ip_conn_limit: 1,
+            same_ip_conn_limit:  1,
+            inbound_conn_limit:  20,
+            outbound_conn_limit: 20,
         };
         let book = SessionBook::new(config);
 
-        let session = make_session(100, 1.into());
+        let session = make_session(100, 1.into(), SessionType::Inbound);
         assert!(book.acceptable(&session).is_ok());
 
         book.insert(AcceptableSession(session.clone()));
@@ -277,7 +327,7 @@ mod tests {
             Some(&1)
         );
 
-        let same_ip_session = make_session(101, 2.into());
+        let same_ip_session = make_session(101, 2.into(), SessionType::Inbound);
         assert_eq!(
             book.acceptable(&same_ip_session),
             Err(Error::ReachSameIPConnLimit)
@@ -287,11 +337,13 @@ mod tests {
     #[test]
     fn should_reduce_host_count() {
         let config = Config {
-            same_ip_conn_limit: 5,
+            same_ip_conn_limit:  5,
+            inbound_conn_limit:  20,
+            outbound_conn_limit: 20,
         };
         let book = SessionBook::new(config);
 
-        let session = make_session(100, 1.into());
+        let session = make_session(100, 1.into(), SessionType::Inbound);
         assert!(book.acceptable(&session).is_ok());
 
         book.insert(AcceptableSession(session.clone()));
@@ -302,5 +354,57 @@ mod tests {
 
         book.remove(&(1.into()));
         assert_eq!(book.hosts.read().get(&session.connected_addr.host), None);
+    }
+
+    #[test]
+    fn should_reject_inbound_session_when_reach_inbound_limit() {
+        let config = Config {
+            same_ip_conn_limit:  5,
+            inbound_conn_limit:  1,
+            outbound_conn_limit: 20,
+        };
+        let book = SessionBook::new(config);
+
+        let session = make_session(100, 1.into(), SessionType::Inbound);
+        assert!(book.acceptable(&session).is_ok());
+
+        book.insert(AcceptableSession(session.clone()));
+        assert_eq!(
+            book.hosts.read().get(&session.connected_addr.host),
+            Some(&1)
+        );
+        assert_eq!(book.inbound_count(), 1);
+
+        let same_ip_session = make_session(101, 2.into(), SessionType::Inbound);
+        assert_eq!(
+            book.acceptable(&same_ip_session),
+            Err(Error::ReachInboundConnLimit)
+        );
+    }
+
+    #[test]
+    fn should_reject_outbound_session_when_reach_outbound_limit() {
+        let config = Config {
+            same_ip_conn_limit:  5,
+            inbound_conn_limit:  10,
+            outbound_conn_limit: 1,
+        };
+        let book = SessionBook::new(config);
+
+        let session = make_session(100, 1.into(), SessionType::Outbound);
+        assert!(book.acceptable(&session).is_ok());
+
+        book.insert(AcceptableSession(session.clone()));
+        assert_eq!(
+            book.hosts.read().get(&session.connected_addr.host),
+            Some(&1)
+        );
+        assert_eq!(book.outbound_count(), 1);
+
+        let same_ip_session = make_session(101, 2.into(), SessionType::Outbound);
+        assert_eq!(
+            book.acceptable(&same_ip_session),
+            Err(Error::ReachOutboundConnLimit)
+        );
     }
 }

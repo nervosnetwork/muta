@@ -143,7 +143,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
 
     // Init network
     let network_config = NetworkConfig::new()
-        .max_connections(config.network.max_connected_peers)
+        .max_connections(config.network.max_connected_peers)?
         .allowlist_only(config.network.allowlist_only)
         .peer_trust_metric(
             consts::NETWORK_TRUST_METRIC_INTERVAL,

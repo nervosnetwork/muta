@@ -287,6 +287,10 @@ impl Inner {
     fn restore(&self, peers: Vec<ArcPeer>) {
         self.peers.write().extend(peers);
     }
+
+    fn outbound_count(&self) -> usize {
+        self.sessions.outbound_count()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -307,6 +311,12 @@ pub struct PeerManagerConfig {
 
     /// Limit connections from same ip
     pub same_ip_conn_limit: usize,
+
+    /// Limit inbound connections
+    pub inbound_conn_limit: usize,
+
+    /// Limit outbound connections
+    pub outbound_conn_limit: usize,
 
     /// Trust metric config
     pub peer_trust_config: Arc<TrustMetricConfig>,
@@ -1236,10 +1246,12 @@ impl Future for PeerManager {
 
         // Check connecting count
         let connected_count = self.inner.connected();
-        let connection_attempts = connected_count + self.connecting.len();
-        let max_connection_attempts = self.config.max_connections + MAX_CONNECTING_MARGIN;
+        let outbound_count = self.inner.outbound_count();
+        let connection_attempts = outbound_count + self.connecting.len();
+        let max_connection_attempts = self.config.outbound_conn_limit + MAX_CONNECTING_MARGIN;
 
         if connected_count < self.config.max_connections
+            && outbound_count < self.config.outbound_conn_limit
             && connection_attempts < max_connection_attempts
         {
             let filter_good_peer = |peer: &ArcPeer| -> bool {

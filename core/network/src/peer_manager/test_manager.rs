@@ -134,6 +134,7 @@ fn make_manager(
     let peer_trust_config = Arc::new(TrustMetricConfig::default());
     let peer_fatal_ban = Duration::from_secs(50);
     let peer_soft_ban = Duration::from_secs(10);
+    let inbound_conn_limit = max_connections / 2;
 
     let config = PeerManagerConfig {
         our_id: manager_id,
@@ -145,7 +146,9 @@ fn make_manager(
         peer_fatal_ban,
         peer_soft_ban,
         max_connections,
-        same_ip_conn_limit: 99,
+        same_ip_conn_limit: max_connections,
+        inbound_conn_limit,
+        outbound_conn_limit: max_connections - inbound_conn_limit,
         routine_interval: Duration::from_secs(10),
         peer_dat_file,
     };
@@ -162,9 +165,16 @@ fn make_pubkey() -> PublicKey {
     keypair.public_key()
 }
 
-async fn make_sessions(mgr: &mut MockManager, num: u16, init_port: u16) -> Vec<ArcPeer> {
+async fn make_sessions(
+    mgr: &mut MockManager,
+    num: u16,
+    init_port: u16,
+    sess_ty: SessionType,
+) -> Vec<ArcPeer> {
     let mut next_sid = 1;
     let mut peers = Vec::with_capacity(num as usize);
+    let inbound_limit = mgr.config().inbound_conn_limit;
+    let outbound_limit = mgr.config().max_connections - inbound_limit;
     let inner = mgr.core_inner();
 
     for n in (0..num).into_iter() {
@@ -172,10 +182,17 @@ async fn make_sessions(mgr: &mut MockManager, num: u16, init_port: u16) -> Vec<A
         let remote_pid = remote_pubkey.peer_id();
         let remote_addr = make_multiaddr(init_port + n, Some(remote_pid.clone()));
 
+        let ty = if sess_ty == SessionType::Outbound && inner.outbound_count() == outbound_limit {
+            // Switch to create inbound session
+            SessionType::Inbound
+        } else {
+            sess_ty
+        };
+
         let sess_ctx = SessionContext::make(
             SessionId::new(next_sid),
             remote_addr.clone(),
-            SessionType::Outbound,
+            ty,
             remote_pubkey.clone(),
         );
         next_sid += 1;
@@ -417,7 +434,7 @@ async fn should_enforce_id_in_multiaddr_on_new_session() {
 #[tokio::test]
 async fn should_add_new_outbound_multiaddr_to_peer_on_new_session() {
     let (mut mgr, _conn_rx) = make_manager(2, 20);
-    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+    let remote_peers = make_sessions(&mut mgr, 1, 5000, SessionType::Outbound).await;
 
     let inner = mgr.core_inner();
     assert_eq!(inner.connected(), 1, "should have one without bootstrap");
@@ -455,7 +472,7 @@ async fn should_add_new_outbound_multiaddr_to_peer_on_new_session() {
 #[tokio::test]
 async fn should_always_remove_inbound_multiaddr_even_if_we_reach_max_connections_on_new_session() {
     let (mut mgr, _conn_rx) = make_manager(0, 2);
-    let _remote_peers = make_sessions(&mut mgr, 2, 5000).await;
+    let _remote_peers = make_sessions(&mut mgr, 2, 5000, SessionType::Outbound).await;
 
     let inner = mgr.core_inner();
     let test_peer = make_peer(9527);
@@ -528,7 +545,7 @@ async fn should_remove_matched_peer_inbound_address_from_ctx_even_if_it_doesnt_h
 #[tokio::test]
 async fn should_reject_new_connection_for_same_peer_on_new_session() {
     let (mut mgr, mut conn_rx) = make_manager(0, 20);
-    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+    let remote_peers = make_sessions(&mut mgr, 1, 5000, SessionType::Outbound).await;
 
     let test_peer = remote_peers.first().expect("get first peer");
     let expect_sid = test_peer.session_id();
@@ -564,7 +581,7 @@ async fn should_reject_new_connection_for_same_peer_on_new_session() {
 #[tokio::test]
 async fn should_keep_new_connection_for_error_outdated_peer_session_on_new_session() {
     let (mut mgr, mut conn_rx) = make_manager(0, 20);
-    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+    let remote_peers = make_sessions(&mut mgr, 1, 5000, SessionType::Outbound).await;
 
     let inner = mgr.core_inner();
     let test_peer = remote_peers.first().expect("get first peer");
@@ -599,7 +616,7 @@ async fn should_keep_new_connection_for_error_outdated_peer_session_on_new_sessi
 #[tokio::test]
 async fn should_reject_new_connections_when_we_reach_max_connections_on_new_session() {
     let (mut mgr, mut conn_rx) = make_manager(0, 10); // set max to 10
-    let _remote_peers = make_sessions(&mut mgr, 10, 7000).await;
+    let _remote_peers = make_sessions(&mut mgr, 10, 7000, SessionType::Outbound).await;
 
     let remote_pubkey = make_pubkey();
     let remote_addr = make_multiaddr(2077, Some(remote_pubkey.peer_id()));
@@ -631,7 +648,7 @@ async fn should_reject_new_connections_when_we_reach_max_connections_on_new_sess
 async fn should_remove_connecting_even_if_session_is_reject_due_to_reach_max_connections_on_new_session(
 ) {
     let (mut mgr, mut conn_rx) = make_manager(0, 5); // set max to 5
-    let _remote_peers = make_sessions(&mut mgr, 5, 7000).await;
+    let _remote_peers = make_sessions(&mut mgr, 5, 7000, SessionType::Outbound).await;
 
     let test_peer = make_peer(2020);
     let inner = mgr.core_inner();
@@ -730,7 +747,7 @@ async fn should_start_trust_metric_on_connected_peer_on_new_session() {
 #[tokio::test]
 async fn should_replace_low_quality_peer_with_better_one_due_to_max_connections_on_new_session() {
     let (mut mgr, mut conn_rx) = make_manager(0, 10);
-    let remote_peers = make_sessions(&mut mgr, 10, 5000).await;
+    let remote_peers = make_sessions(&mut mgr, 10, 5000, SessionType::Outbound).await;
     let target_peer = remote_peers.first().expect("get first peer");
     let peer_trust_config = Arc::new(TrustMetricConfig::default());
 
@@ -787,7 +804,7 @@ async fn should_replace_low_quality_peer_with_better_one_due_to_max_connections_
 async fn should_not_replace_any_peer_if_incoming_hasnt_trust_score_due_to_max_connections_on_new_session(
 ) {
     let (mut mgr, mut conn_rx) = make_manager(0, 10);
-    let remote_peers = make_sessions(&mut mgr, 10, 5000).await;
+    let remote_peers = make_sessions(&mut mgr, 10, 5000, SessionType::Outbound).await;
     let target_peer = remote_peers.first().expect("get first peer");
     let peer_trust_config = Arc::new(TrustMetricConfig::default());
 
@@ -835,7 +852,7 @@ async fn should_not_replace_any_peer_if_incoming_hasnt_trust_score_due_to_max_co
 #[tokio::test]
 async fn should_not_replace_any_higher_score_peer_due_to_max_connections_on_new_session() {
     let (mut mgr, mut conn_rx) = make_manager(0, 10);
-    let remote_peers = make_sessions(&mut mgr, 10, 5000).await;
+    let remote_peers = make_sessions(&mut mgr, 10, 5000, SessionType::Outbound).await;
     let target_peer = remote_peers.first().expect("get first peer");
     let peer_trust_config = Arc::new(TrustMetricConfig::default());
 
@@ -891,7 +908,7 @@ async fn should_not_replace_any_higher_score_peer_due_to_max_connections_on_new_
 async fn should_not_replace_peer_in_allowlist_with_better_score_peer_due_to_max_connections_on_new_session(
 ) {
     let (mut mgr, mut conn_rx) = make_manager(0, 1);
-    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+    let remote_peers = make_sessions(&mut mgr, 1, 5000, SessionType::Outbound).await;
     let target_peer = remote_peers.first().expect("get first peer");
     let peer_trust_config = Arc::new(TrustMetricConfig::default());
 
@@ -948,7 +965,7 @@ async fn should_not_replace_peer_in_allowlist_with_better_score_peer_due_to_max_
 #[tokio::test]
 async fn should_not_replace_peer_not_old_enough_due_to_max_connections_on_new_session() {
     let (mut mgr, mut conn_rx) = make_manager(0, 10);
-    let remote_peers = make_sessions(&mut mgr, 10, 5000).await;
+    let remote_peers = make_sessions(&mut mgr, 10, 5000, SessionType::Outbound).await;
     let target_peer = remote_peers.first().expect("get first peer");
     let peer_trust_config = Arc::new(TrustMetricConfig::default());
 
@@ -1000,7 +1017,7 @@ async fn should_not_replace_peer_not_old_enough_due_to_max_connections_on_new_se
 #[tokio::test]
 async fn should_remove_session_on_session_closed() {
     let (mut mgr, _conn_rx) = make_manager(2, 20);
-    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+    let remote_peers = make_sessions(&mut mgr, 1, 5000, SessionType::Outbound).await;
 
     let test_peer = remote_peers.first().expect("get first peer");
     assert_eq!(
@@ -1036,7 +1053,7 @@ async fn should_remove_session_on_session_closed() {
 #[tokio::test]
 async fn should_pause_trust_metric_on_session_closed() {
     let (mut mgr, _conn_rx) = make_manager(2, 20);
-    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+    let remote_peers = make_sessions(&mut mgr, 1, 5000, SessionType::Outbound).await;
     let test_peer = remote_peers.first().expect("get first");
 
     let session_closed = PeerManagerEvent::SessionClosed {
@@ -1052,7 +1069,7 @@ async fn should_pause_trust_metric_on_session_closed() {
 #[tokio::test]
 async fn should_increase_retry_for_short_alive_session_on_session_closed() {
     let (mut mgr, _conn_rx) = make_manager(2, 20);
-    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+    let remote_peers = make_sessions(&mut mgr, 1, 5000, SessionType::Outbound).await;
     let test_peer = remote_peers.first().expect("get first peer");
     assert_eq!(
         test_peer.retry.count(),
@@ -1326,7 +1343,7 @@ async fn should_wait_for_other_connecting_multiaddrs_if_we_dont_give_up_peer_on_
 #[tokio::test]
 async fn should_ensure_disconnect_session_on_session_failed() {
     let (mut mgr, mut conn_rx) = make_manager(0, 20);
-    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+    let remote_peers = make_sessions(&mut mgr, 1, 5000, SessionType::Outbound).await;
 
     let test_peer = remote_peers.first().expect("get first peer");
     let expect_sid = test_peer.session_id();
@@ -1357,7 +1374,7 @@ async fn should_ensure_disconnect_session_on_session_failed() {
 #[tokio::test]
 async fn should_increase_retry_for_io_error_on_session_failed() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+    let remote_peers = make_sessions(&mut mgr, 1, 5000, SessionType::Outbound).await;
 
     let test_peer = remote_peers.first().expect("get first peer");
     let expect_sid = test_peer.session_id();
@@ -1375,7 +1392,7 @@ async fn should_increase_retry_for_io_error_on_session_failed() {
 #[tokio::test]
 async fn should_give_up_peer_for_protocol_error_on_session_failed() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+    let remote_peers = make_sessions(&mut mgr, 1, 5000, SessionType::Outbound).await;
 
     let test_peer = remote_peers.first().expect("get first peer");
     let expect_sid = test_peer.session_id();
@@ -1400,7 +1417,7 @@ async fn should_give_up_peer_for_protocol_error_on_session_failed() {
 #[tokio::test]
 async fn should_give_up_peer_for_unexpected_error_on_session_failed() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+    let remote_peers = make_sessions(&mut mgr, 1, 5000, SessionType::Outbound).await;
 
     let test_peer = remote_peers.first().expect("get first peer");
     let expect_sid = test_peer.session_id();
@@ -1425,7 +1442,7 @@ async fn should_give_up_peer_for_unexpected_error_on_session_failed() {
 #[tokio::test]
 async fn should_reduce_trust_score_on_session_failed() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+    let remote_peers = make_sessions(&mut mgr, 1, 5000, SessionType::Outbound).await;
     let test_peer = remote_peers.first().expect("get first peer");
 
     let trust_metric = test_peer.trust_metric().expect("get trust metric");
@@ -1452,7 +1469,7 @@ async fn should_reduce_trust_score_on_session_failed() {
 #[tokio::test]
 async fn should_update_peer_alive_on_peer_alive() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+    let remote_peers = make_sessions(&mut mgr, 1, 5000, SessionType::Outbound).await;
 
     let test_peer = remote_peers.first().expect("get first peer");
     let old_alive = test_peer.alive();
@@ -1475,7 +1492,7 @@ async fn should_update_peer_alive_on_peer_alive() {
 #[tokio::test]
 async fn should_reset_peer_retry_on_peer_alive() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+    let remote_peers = make_sessions(&mut mgr, 1, 5000, SessionType::Outbound).await;
 
     let test_peer = remote_peers.first().expect("get first peer");
     assert_eq!(test_peer.retry.count(), 0, "should have 0 retry");
@@ -1494,7 +1511,7 @@ async fn should_reset_peer_retry_on_peer_alive() {
 #[tokio::test]
 async fn should_disconnect_peer_on_misbehave() {
     let (mut mgr, mut conn_rx) = make_manager(0, 20);
-    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+    let remote_peers = make_sessions(&mut mgr, 1, 5000, SessionType::Outbound).await;
 
     let test_peer = remote_peers.first().expect("get first peer");
     let expect_sid = test_peer.session_id();
@@ -1520,7 +1537,7 @@ async fn should_disconnect_peer_on_misbehave() {
 #[tokio::test]
 async fn should_reduce_trust_score_on_misbehave() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+    let remote_peers = make_sessions(&mut mgr, 1, 5000, SessionType::Outbound).await;
     let test_peer = remote_peers.first().expect("get first peer");
 
     let trust_metric = test_peer.trust_metric().expect("get trust metric");
@@ -1546,7 +1563,7 @@ async fn should_reduce_trust_score_on_misbehave() {
 #[tokio::test]
 async fn should_increase_retry_for_ping_timeout_on_misbehave() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+    let remote_peers = make_sessions(&mut mgr, 1, 5000, SessionType::Outbound).await;
 
     let test_peer = remote_peers.first().expect("get first peer");
     let peer_misbehave = PeerManagerEvent::Misbehave {
@@ -1563,7 +1580,7 @@ async fn should_increase_retry_for_ping_timeout_on_misbehave() {
 #[tokio::test]
 async fn should_give_up_peer_for_ping_unexpect_on_misbehave() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+    let remote_peers = make_sessions(&mut mgr, 1, 5000, SessionType::Outbound).await;
 
     let test_peer = remote_peers.first().expect("get first peer");
     let peer_misbehave = PeerManagerEvent::Misbehave {
@@ -1584,7 +1601,7 @@ async fn should_give_up_peer_for_ping_unexpect_on_misbehave() {
 #[tokio::test]
 async fn should_give_up_peer_for_discovery_on_misbehave() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+    let remote_peers = make_sessions(&mut mgr, 1, 5000, SessionType::Outbound).await;
 
     let test_peer = remote_peers.first().expect("get first peer");
     let peer_misbehave = PeerManagerEvent::Misbehave {
@@ -1605,7 +1622,7 @@ async fn should_give_up_peer_for_discovery_on_misbehave() {
 #[tokio::test]
 async fn should_mark_session_blocked_on_session_blocked() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+    let remote_peers = make_sessions(&mut mgr, 1, 5000, SessionType::Outbound).await;
 
     let test_peer = remote_peers.first().expect("get first peer");
     let sess_ctx = SessionContext::make(
@@ -1629,7 +1646,7 @@ async fn should_mark_session_blocked_on_session_blocked() {
 #[tokio::test]
 async fn should_add_one_bad_event_on_session_blocked() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+    let remote_peers = make_sessions(&mut mgr, 1, 5000, SessionType::Outbound).await;
 
     let test_peer = remote_peers.first().expect("get first peer");
     let trust_metric = test_peer.trust_metric().expect("get trust metric");
@@ -1853,7 +1870,7 @@ async fn should_skip_our_listen_multiaddrs_on_discover_multi_addrs() {
 #[tokio::test]
 async fn should_add_multiaddrs_to_peer_on_identified_addrs() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+    let remote_peers = make_sessions(&mut mgr, 1, 5000, SessionType::Outbound).await;
     let test_peer = remote_peers.first().expect("get first");
     let old_multiaddrs_len = test_peer.multiaddrs.len();
 
@@ -1883,7 +1900,7 @@ async fn should_add_multiaddrs_to_peer_on_identified_addrs() {
 #[tokio::test]
 async fn should_push_id_to_multiaddrs_if_not_included_on_identified_addrs() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+    let remote_peers = make_sessions(&mut mgr, 1, 5000, SessionType::Outbound).await;
     let test_peer = remote_peers.first().expect("get first");
     let test_multiaddr = make_multiaddr(2077, None);
 
@@ -1908,7 +1925,7 @@ async fn should_push_id_to_multiaddrs_if_not_included_on_identified_addrs() {
 #[tokio::test]
 async fn should_not_reset_exist_multiaddr_failure_count_on_identified_addrs() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+    let remote_peers = make_sessions(&mut mgr, 1, 5000, SessionType::Outbound).await;
     let test_peer = remote_peers.first().expect("get first");
     let test_multiaddr = test_peer.multiaddrs.all().pop().expect("multiaddr");
 
@@ -1935,7 +1952,7 @@ async fn should_not_reset_exist_multiaddr_failure_count_on_identified_addrs() {
 #[tokio::test]
 async fn should_reset_peer_failure_for_outbound_multiaddr_on_repeated_connection() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+    let remote_peers = make_sessions(&mut mgr, 1, 5000, SessionType::Outbound).await;
     let test_peer = remote_peers.first().expect("get first");
     let test_multiaddr = test_peer.multiaddrs.all().pop().expect("multiaddr");
 
@@ -1963,7 +1980,7 @@ async fn should_reset_peer_failure_for_outbound_multiaddr_on_repeated_connection
 #[tokio::test]
 async fn should_remove_inbound_multiaddr_on_repeated_connection() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+    let remote_peers = make_sessions(&mut mgr, 1, 5000, SessionType::Outbound).await;
     let test_peer = remote_peers.first().expect("get first");
 
     let test_multiaddr = make_peer_multiaddr(2077, test_peer.owned_id());
@@ -1985,7 +2002,7 @@ async fn should_remove_inbound_multiaddr_on_repeated_connection() {
 #[tokio::test]
 async fn should_enforce_id_if_not_included_on_repeated_connection() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+    let remote_peers = make_sessions(&mut mgr, 1, 5000, SessionType::Outbound).await;
     let test_peer = remote_peers.first().expect("get first");
     let test_multiaddr = test_peer.multiaddrs.all().pop().expect("multiaddr");
 
@@ -2127,7 +2144,7 @@ async fn should_always_include_our_listen_addrs_in_return_from_manager_handle_ra
 #[tokio::test]
 async fn should_accept_always_allow_peer_even_if_we_reach_max_connections_on_new_session() {
     let (mut mgr, _conn_rx) = make_manager(0, 10);
-    let _remote_peers = make_sessions(&mut mgr, 10, 5000).await;
+    let _remote_peers = make_sessions(&mut mgr, 10, 5000, SessionType::Outbound).await;
 
     let peer = make_peer(2019);
     let always_allow_peer = make_peer(2077);
@@ -2207,6 +2224,8 @@ async fn should_only_connect_peers_in_allowlist_if_enable_allowlist_only() {
         peer_soft_ban,
         max_connections: 10,
         same_ip_conn_limit: 99,
+        inbound_conn_limit: 5,
+        outbound_conn_limit: 5,
         routine_interval: Duration::from_secs(10),
         peer_dat_file,
     };
@@ -2271,6 +2290,8 @@ async fn should_only_accept_incoming_from_peer_in_allowlist_if_enable_allowlist_
         peer_soft_ban,
         max_connections: 10,
         same_ip_conn_limit: 9,
+        inbound_conn_limit: 5,
+        outbound_conn_limit: 5,
         routine_interval: Duration::from_secs(10),
         peer_dat_file,
     };
@@ -2338,7 +2359,7 @@ async fn should_only_accept_incoming_from_peer_in_allowlist_if_enable_allowlist_
 #[tokio::test]
 async fn should_disconnect_and_ban_peer_for_fatal_feedback_on_trust_metric() {
     let (mut mgr, mut conn_rx) = make_manager(0, 20);
-    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+    let remote_peers = make_sessions(&mut mgr, 1, 5000, SessionType::Outbound).await;
     let test_peer = remote_peers.first().expect("get first peer");
     let target_sid = test_peer.session_id();
 
@@ -2370,7 +2391,7 @@ async fn should_disconnect_and_ban_peer_for_fatal_feedback_on_trust_metric() {
 #[tokio::test]
 async fn should_exclude_always_allow_peer_from_fatal_feedback_ban_on_trust_metric() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+    let remote_peers = make_sessions(&mut mgr, 1, 5000, SessionType::Outbound).await;
     let test_peer = remote_peers.first().expect("get first peer");
 
     let inner = mgr.core_inner();
@@ -2392,7 +2413,7 @@ async fn should_exclude_always_allow_peer_from_fatal_feedback_ban_on_trust_metri
 #[tokio::test]
 async fn should_add_one_bad_event_for_bad_feedback_on_trust_metric() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+    let remote_peers = make_sessions(&mut mgr, 1, 5000, SessionType::Outbound).await;
     let test_peer = remote_peers.first().expect("get first peer");
     let trust_metric = test_peer.trust_metric().expect("trust metric");
 
@@ -2412,7 +2433,7 @@ async fn should_add_one_bad_event_for_bad_feedback_on_trust_metric() {
 #[tokio::test]
 async fn should_add_ten_bad_events_for_worse_feedback_on_trust_metric() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+    let remote_peers = make_sessions(&mut mgr, 1, 5000, SessionType::Outbound).await;
     let test_peer = remote_peers.first().expect("get first peer");
     let trust_metric = test_peer.trust_metric().expect("trust metric");
 
@@ -2433,7 +2454,7 @@ async fn should_add_ten_bad_events_for_worse_feedback_on_trust_metric() {
 async fn should_disconnect_and_soft_ban_peer_if_below_fourty_score_on_worse_feedback_on_trust_metric(
 ) {
     let (mut mgr, mut conn_rx) = make_manager(0, 20);
-    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+    let remote_peers = make_sessions(&mut mgr, 1, 5000, SessionType::Outbound).await;
     let test_peer = remote_peers.first().expect("get first peer");
     let trust_metric = test_peer.trust_metric().expect("trust metric");
     let test_sid = test_peer.session_id();
@@ -2475,7 +2496,7 @@ async fn should_disconnect_and_soft_ban_peer_if_below_fourty_score_on_worse_feed
 #[tokio::test]
 async fn should_not_knock_out_peer_just_set_up_trust_metric_on_worse_feedback_on_trust_metric() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+    let remote_peers = make_sessions(&mut mgr, 1, 5000, SessionType::Outbound).await;
     let test_peer = remote_peers.first().expect("get first peer");
     let trust_metric = test_peer.trust_metric().expect("trust metric");
 
@@ -2508,7 +2529,7 @@ async fn should_not_knock_out_peer_just_set_up_trust_metric_on_worse_feedback_on
 async fn should_not_punish_always_allow_peer_when_its_score_below_fourty_on_worse_feedback_on_trust_metric(
 ) {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+    let remote_peers = make_sessions(&mut mgr, 1, 5000, SessionType::Outbound).await;
     let test_peer = remote_peers.first().expect("get first peer");
     let trust_metric = test_peer.trust_metric().expect("trust metric");
 
@@ -2540,7 +2561,7 @@ async fn should_not_punish_always_allow_peer_when_its_score_below_fourty_on_wors
 #[tokio::test]
 async fn should_do_nothing_for_neutral_feedback_on_trust_metric() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+    let remote_peers = make_sessions(&mut mgr, 1, 5000, SessionType::Outbound).await;
     let test_peer = remote_peers.first().expect("get first peer");
     let trust_metric = test_peer.trust_metric().expect("trust metric");
 
@@ -2565,7 +2586,7 @@ async fn should_do_nothing_for_neutral_feedback_on_trust_metric() {
 #[tokio::test]
 async fn should_add_one_bad_event_for_good_feedback_on_trust_metric() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+    let remote_peers = make_sessions(&mut mgr, 1, 5000, SessionType::Outbound).await;
     let test_peer = remote_peers.first().expect("get first peer");
     let trust_metric = test_peer.trust_metric().expect("trust metric");
 
@@ -2585,10 +2606,22 @@ async fn should_add_one_bad_event_for_good_feedback_on_trust_metric() {
 #[tokio::test]
 async fn should_pick_good_peer_first_on_finding_connectable_peers() {
     let (mut mgr, mut conn_rx) = make_manager(0, 4);
-    let _remote_peers = make_sessions(&mut mgr, 3, 5000).await;
+    let outbound_conn_limit = mgr.config().outbound_conn_limit;
+    let pre_connected_count = outbound_conn_limit - 1;
+    let _remote_peers = make_sessions(
+        &mut mgr,
+        pre_connected_count as u16,
+        5000,
+        SessionType::Outbound,
+    )
+    .await;
 
     let inner = mgr.core_inner();
-    assert_eq!(inner.connected(), 3, "should have 3 connections");
+    assert_eq!(
+        inner.connected(),
+        pre_connected_count,
+        "should have pre connected connections just one below outbound conn limit"
+    );
 
     // Fill connecting attempts, left one for our test
     let fill_peers = (3..4 + MAX_CONNECTING_MARGIN - 1)
@@ -2636,7 +2669,7 @@ async fn should_pick_good_peer_first_on_finding_connectable_peers() {
 #[tokio::test]
 async fn should_setup_trust_metric_if_none_on_session_closed() {
     let (mut mgr, _conn_rx) = make_manager(2, 20);
-    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+    let remote_peers = make_sessions(&mut mgr, 1, 5000, SessionType::Outbound).await;
 
     let test_peer = remote_peers.first().expect("get first peer");
     test_peer.remove_trust_metric();
@@ -2656,7 +2689,7 @@ async fn should_setup_trust_metric_if_none_on_session_closed() {
 #[tokio::test]
 async fn should_setup_trust_metric_if_none_on_session_failed() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+    let remote_peers = make_sessions(&mut mgr, 1, 5000, SessionType::Outbound).await;
 
     let test_peer = remote_peers.first().expect("get first peer");
     test_peer.remove_trust_metric();
@@ -2685,7 +2718,7 @@ async fn should_setup_trust_metric_if_none_on_session_failed() {
 #[tokio::test]
 async fn should_setup_trust_metric_if_none_on_peer_misbehave() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+    let remote_peers = make_sessions(&mut mgr, 1, 5000, SessionType::Outbound).await;
 
     let test_peer = remote_peers.first().expect("get first peer");
     test_peer.remove_trust_metric();
@@ -2713,7 +2746,7 @@ async fn should_setup_trust_metric_if_none_on_peer_misbehave() {
 #[tokio::test]
 async fn should_setup_trust_metric_if_none_on_session_blocked() {
     let (mut mgr, _conn_rx) = make_manager(0, 20);
-    let remote_peers = make_sessions(&mut mgr, 1, 5000).await;
+    let remote_peers = make_sessions(&mut mgr, 1, 5000, SessionType::Outbound).await;
 
     let test_peer = remote_peers.first().expect("get first peer");
     test_peer.remove_trust_metric();
@@ -2810,6 +2843,8 @@ async fn should_reject_same_ip_connection_when_reach_limit_on_new_session() {
         peer_soft_ban,
         max_connections: 10,
         same_ip_conn_limit: 1,
+        inbound_conn_limit: 5,
+        outbound_conn_limit: 5,
         routine_interval: Duration::from_secs(10),
         peer_dat_file,
     };
@@ -2819,7 +2854,7 @@ async fn should_reject_same_ip_connection_when_reach_limit_on_new_session() {
     let manager = PeerManager::new(config, mgr_rx, conn_tx);
 
     let mut mgr = MockManager::new(manager, mgr_tx);
-    make_sessions(&mut mgr, 1, 5000).await;
+    make_sessions(&mut mgr, 1, 5000, SessionType::Outbound).await;
 
     let same_ip_peer = make_peer(9527);
     let expect_sid = same_ip_peer.session_id();
@@ -2859,4 +2894,158 @@ async fn should_reject_same_ip_connection_when_reach_limit_on_new_session() {
         ConnectionEvent::Disconnect(sid) => assert_eq!(sid, 99.into(), "should be new session id"),
         _ => panic!("should be disconnect event"),
     }
+}
+
+#[tokio::test]
+async fn should_not_dail_new_peer_after_reach_outbound_conn_limit() {
+    let (mut mgr, mut conn_rx) = make_manager(0, 4);
+    let outbound_conn_limit = mgr.config().outbound_conn_limit;
+    let _remote_peers = make_sessions(
+        &mut mgr,
+        outbound_conn_limit as u16,
+        5000,
+        SessionType::Outbound,
+    )
+    .await;
+
+    let inner = mgr.core_inner();
+    assert_eq!(
+        inner.connected(),
+        outbound_conn_limit,
+        "should have pre connected connections just one below outbound conn limit"
+    );
+
+    mgr.poll().await;
+    match conn_rx.try_next() {
+        Err(_) => (),
+        _ => panic!("should not have any event"),
+    }
+}
+
+#[tokio::test]
+async fn should_reject_inbound_conn_when_reach_inbound_conn_limit() {
+    let (mut mgr, mut conn_rx) = make_manager(0, 20);
+    let inbound_conn_limit = mgr.config().inbound_conn_limit;
+    let _remote_peers = make_sessions(
+        &mut mgr,
+        inbound_conn_limit as u16,
+        5000,
+        SessionType::Inbound,
+    )
+    .await;
+
+    let inner = mgr.core_inner();
+    assert_eq!(
+        inner.connected(),
+        inbound_conn_limit,
+        "should have reach inbound conn limit"
+    );
+
+    let remote_pubkey = make_pubkey();
+    let remote_peer_id = remote_pubkey.peer_id();
+    let remote_addr = make_multiaddr(6000, Some(remote_pubkey.peer_id()));
+
+    let sess_ctx = SessionContext::make(
+        SessionId::new(99),
+        remote_addr.clone(),
+        SessionType::Inbound,
+        remote_pubkey.clone(),
+    );
+    let new_session = PeerManagerEvent::NewSession {
+        pid:    remote_peer_id.clone(),
+        pubkey: remote_pubkey.clone(),
+        ctx:    sess_ctx.arced(),
+    };
+    mgr.poll_event(new_session).await;
+
+    assert_eq!(
+        inner.connected(),
+        inbound_conn_limit,
+        "should not accept inbound connection"
+    );
+
+    let conn_event = conn_rx.next().await.expect("should have disconnect event");
+    match conn_event {
+        ConnectionEvent::Disconnect(sid) => assert_eq!(sid, 99.into(), "should be new session id"),
+        _ => panic!("should be disconnect event"),
+    }
+}
+
+#[tokio::test]
+async fn should_accept_peer_in_allowlist_even_reach_inbound_conn_limit() {
+    let manager_pubkey = make_pubkey();
+    let manager_id = manager_pubkey.peer_id();
+    let mut peer_dat_file = std::env::temp_dir();
+    peer_dat_file.push("peer.dat");
+    let peer_trust_config = Arc::new(TrustMetricConfig::default());
+    let peer_fatal_ban = Duration::from_secs(50);
+    let peer_soft_ban = Duration::from_secs(10);
+
+    let test_peer = make_peer(2077);
+
+    let config = PeerManagerConfig {
+        our_id: manager_id,
+        pubkey: manager_pubkey,
+        bootstraps: Default::default(),
+        allowlist: vec![test_peer.id.to_owned()],
+        allowlist_only: false,
+        peer_trust_config,
+        peer_fatal_ban,
+        peer_soft_ban,
+        max_connections: 10,
+        same_ip_conn_limit: 9,
+        inbound_conn_limit: 5,
+        outbound_conn_limit: 5,
+        routine_interval: Duration::from_secs(10),
+        peer_dat_file,
+    };
+
+    let (conn_tx, _conn_rx) = unbounded();
+    let (mgr_tx, mgr_rx) = unbounded();
+    let manager = PeerManager::new(config, mgr_rx, conn_tx);
+
+    let inner = manager.inner();
+    let allowed_peer = inner
+        .peer(&test_peer.id)
+        .expect("should be inserted through config");
+    assert!(allowed_peer.tags.contains(&PeerTag::AlwaysAllow));
+
+    let mut manager = MockManager::new(manager, mgr_tx);
+    assert_eq!(inner.connected(), 0, "should have zero connections");
+
+    let inbound_conn_limit = manager.config().inbound_conn_limit;
+    let _remote_peers = make_sessions(
+        &mut manager,
+        inbound_conn_limit as u16,
+        5000,
+        SessionType::Inbound,
+    )
+    .await;
+
+    let sess_ctx = SessionContext::make(
+        SessionId::new(666),
+        test_peer
+            .multiaddrs
+            .all_raw()
+            .pop()
+            .expect("peer multiaddr"),
+        SessionType::Inbound,
+        test_peer
+            .owned_pubkey()
+            .expect("always allow peer's pubkey"),
+    );
+    let new_session = PeerManagerEvent::NewSession {
+        pid:    test_peer.owned_id(),
+        pubkey: test_peer
+            .owned_pubkey()
+            .expect("always allow peer's pubkey"),
+        ctx:    sess_ctx.arced(),
+    };
+    manager.poll_event(new_session).await;
+
+    assert_eq!(
+        inner.connected(),
+        inbound_conn_limit + 1,
+        "should accept peer in allowlist"
+    );
 }
