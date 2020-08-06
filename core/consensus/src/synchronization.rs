@@ -153,7 +153,7 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
         } else {
             remote_height + ONCE_SYNC_BLOCK_LIMIT
         };
-    
+
         let mut current_consented_height = current_height;
 
         while current_consented_height < remote_height {
