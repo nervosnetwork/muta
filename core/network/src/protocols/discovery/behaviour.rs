@@ -56,6 +56,12 @@ pub struct DiscoveryBehaviourHandle {
     pub peer_mgr:         PeerManagerHandle,
 }
 
+impl DiscoveryBehaviourHandle {
+    pub fn contains_session(&self, session_id: SessionId) -> bool {
+        self.peer_mgr.contains_session(session_id)
+    }
+}
+
 impl DiscoveryBehaviour {
     /// Query cycle means checking and synchronizing the cycle time of the
     /// currently connected node, default is 24 hours

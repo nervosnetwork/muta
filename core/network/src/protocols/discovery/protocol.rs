@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use futures::channel::mpsc::{channel, Sender};
-use futures::FutureExt;
 use futures::stream::StreamExt;
+use futures::FutureExt;
 use log::{debug, warn};
 use tentacle::context::{ProtocolContext, ProtocolContextMutRef};
 use tentacle::traits::ServiceProtocol;
@@ -60,7 +60,10 @@ impl ServiceProtocol for DiscoveryProtocol {
             session.id, session.address, session.ty
         );
 
-        if self.
+        if !self.behaviour_handle.contains_session(session.id) {
+            let _ = context.close_protocol(session.id, context.proto_id());
+            return;
+        }
 
         let (sender, receiver) = channel(8);
         self.discovery_senders.insert(session.id, sender);
