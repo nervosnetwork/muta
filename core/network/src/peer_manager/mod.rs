@@ -824,6 +824,10 @@ impl PeerManager {
     fn session_closed(&mut self, sid: SessionId) {
         debug!("session {} closed", sid);
 
+        if let Some(session) = self.unidentified_backlog.take(sid) {
+            return;
+        }
+
         let session = match self.inner.remove_session(sid) {
             Some(s) => s,
             None => return, /* Session may be removed by other event or rejected
