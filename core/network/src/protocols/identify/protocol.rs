@@ -9,6 +9,7 @@ use prost::Message;
 use tentacle::context::{ProtocolContext, ProtocolContextMutRef, SessionContext};
 use tentacle::multiaddr::{Multiaddr, Protocol};
 use tentacle::secio::PeerId;
+use tentacle::service::TargetProtocol;
 use tentacle::traits::ServiceProtocol;
 use tentacle::SessionId;
 
@@ -177,9 +178,20 @@ impl ServiceProtocol for IdentifyProtocol {
                 if behaviour
                     .received_identify(&mut remote_info, message.identify.as_bytes())
                     .is_disconnect()
-                    || behaviour
-                        .process_listens(&mut remote_info, message.listen_addrs())
-                        .is_disconnect()
+                {
+                    let _ = context.disconnect(session.id);
+                    return;
+                }
+
+                if let Err(err) = context.open_protocols(context.session.id, TargetProtocol::All) {
+                    warn!("open protocols {}", err);
+                    let _ = context.disconnect(session.id);
+                    return;
+                }
+
+                if behaviour
+                    .process_listens(&mut remote_info, message.listen_addrs())
+                    .is_disconnect()
                     || behaviour
                         .process_observed(&mut remote_info, message.observed_addr())
                         .is_disconnect()
