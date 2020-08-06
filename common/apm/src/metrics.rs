@@ -40,7 +40,7 @@ impl From<Error> for ProtocolError {
 impl std::error::Error for Error {}
 
 pub fn duration_to_sec(d: Duration) -> f64 {
-    d.as_secs_f64() + (f64::from(d.subsec_nanos()) / 1e9)
+    d.as_secs_f64()
 }
 
 pub fn all_metrics() -> ProtocolResult<Vec<u8>> {
@@ -53,4 +53,18 @@ pub fn all_metrics() -> ProtocolResult<Vec<u8>> {
         .map_err(Error::Prometheus)?;
 
     Ok(encoded_metrics)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::duration_to_sec;
+    use std::time::Duration;
+
+    #[test]
+    fn test_duration_to_sec() {
+        let d = Duration::from_millis(1110);
+        let sec = duration_to_sec(d);
+
+        assert_eq!(sec, 1.11 as f64);
+    }
 }
