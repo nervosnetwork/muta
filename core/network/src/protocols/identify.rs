@@ -4,23 +4,26 @@ mod identification;
 mod message;
 mod protocol;
 
-use self::protocol::IdentifyProtocol;
-use behaviour::IdentifyBehaviour;
-
 use futures::channel::mpsc::UnboundedSender;
 use tentacle::builder::MetaBuilder;
 use tentacle::service::{ProtocolHandle, ProtocolMeta};
-use tentacle::ProtocolId;
+use tentacle::{ProtocolId, SessionId};
 
 use crate::event::PeerManagerEvent;
 use crate::peer_manager::PeerManagerHandle;
+
+use self::protocol::IdentifyProtocol;
+use behaviour::IdentifyBehaviour;
+
+pub use self::identification::WaitIdentification;
+pub use self::protocol::Error;
 
 pub const NAME: &str = "chain_identify";
 pub const SUPPORT_VERSIONS: [&str; 1] = ["0.1"];
 
 #[derive(Clone)]
 pub struct Identify {
-    pub proto: IdentifyProtocol,
+    proto: IdentifyProtocol,
 }
 
 impl Identify {
@@ -43,5 +46,12 @@ impl Identify {
             .support_versions(support_versions!(SUPPORT_VERSIONS))
             .service_handle(move || ProtocolHandle::Callback(Box::new(self.proto)))
             .build()
+    }
+
+    pub fn wait_identified(
+        &self,
+        session_id: SessionId,
+    ) -> Result<WaitIdentification, self::protocol::Error> {
+        self.proto.wait(session_id)
     }
 }
