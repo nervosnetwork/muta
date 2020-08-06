@@ -26,9 +26,6 @@ const CHECK_TIMEOUT_TOKEN: u64 = 100;
 pub enum Error {
     #[display(fmt = "session does not enable encryption")]
     EncryptionNotEnabled,
-
-    #[display(fmt = "session info not found, wait should be called during protocol handshake")]
-    SessionInfoNotFound,
 }
 
 pub struct RemoteInfo {
@@ -42,7 +39,12 @@ pub struct RemoteInfo {
 }
 
 impl RemoteInfo {
-    pub fn new(peer_id: PeerId, session: SessionContext, timeout: Duration) -> RemoteInfo {
+    pub fn new(
+        peer_id: PeerId,
+        session: SessionContext,
+        timeout: Duration,
+        identification: Option<Identification>,
+    ) -> RemoteInfo {
         RemoteInfo {
             peer_id,
             session,
@@ -50,13 +52,14 @@ impl RemoteInfo {
             timeout,
             listen_addrs: None,
             observed_addr: None,
-            identification: Identification::new(),
+            identification: identification.unwrap_or_else(|| Identification::new()),
         }
     }
 }
 
 #[derive(Clone)]
 pub struct IdentifyProtocol {
+    wait_backlog: Arc<RwLock<HashMap<SessionId, Identification>>>,
     remote_infos: Arc<RwLock<HashMap<SessionId, RemoteInfo>>>,
     behaviour:    Arc<IdentifyBehaviour>,
 }
@@ -64,15 +67,22 @@ pub struct IdentifyProtocol {
 impl IdentifyProtocol {
     pub fn new(behaviour: IdentifyBehaviour) -> Self {
         IdentifyProtocol {
+            wait_backlog: Default::default(),
             remote_infos: Default::default(),
             behaviour:    Arc::new(behaviour),
         }
     }
 
-    pub fn wait(&self, session_id: SessionId) -> Result<WaitIdentification, self::Error> {
+    pub fn wait(&self, session_id: SessionId) -> WaitIdentification {
         match self.remote_infos.read().get(&session_id) {
-            Some(remote_info) => Ok(remote_info.identification.wait()),
-            None => Err(self::Error::SessionInfoNotFound),
+            Some(remote_info) => remote_info.identification.wait(),
+            None => {
+                let identification = Identification::new();
+                let wait_fut = identification.wait();
+
+                self.wait_backlog.write().insert(session_id, identification);
+                wait_fut
+            }
         }
     }
 
@@ -92,10 +102,17 @@ impl IdentifyProtocol {
                 return Err(self::Error::EncryptionNotEnabled);
             }
         };
-
         trace!("IdentifyProtocol connected from {:?}", remote_peer_id);
-        let remote_info = RemoteInfo::new(remote_peer_id, session.clone(), DEFAULT_TIMEOUT);
+
+        let identification = { self.wait_backlog.write().remove(&session.id) };
         {
+            let remote_info = RemoteInfo::new(
+                remote_peer_id,
+                session.clone(),
+                DEFAULT_TIMEOUT,
+                identification,
+            );
+
             self.remote_infos.write().insert(session.id, remote_info);
         }
 
@@ -153,6 +170,8 @@ impl ServiceProtocol for IdentifyProtocol {
 
     fn disconnected(&mut self, context: ProtocolContextMutRef) {
         let info = {
+            self.wait_backlog.write().remove(&context.session.id);
+
             let mut infos = self.remote_infos.write();
             infos.remove(&context.session.id)
         };

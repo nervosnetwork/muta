@@ -315,9 +315,9 @@ struct UnidentifiedSession {
     ident_fut: WaitIdentification,
 }
 
-impl Borrow<UnidentifiedSessionEvent> for UnidentifiedSession {
-    fn borrow(&self) -> &UnidentifiedSessionEvent {
-        &self.event
+impl Borrow<SessionId> for UnidentifiedSession {
+    fn borrow(&self) -> &SessionId {
+        &self.event.ctx.id
     }
 }
 
@@ -659,16 +659,9 @@ impl PeerManager {
             .as_ref()
             .expect("identify protocol must be set");
 
-        let ident_fut = match identify.wait_identified(session_id) {
-            Ok(fut) => fut,
-            Err(err) => {
-                log::warn!("wait session identify: {}", err);
-                self.disconnect_session(session_id);
-                return;
-            }
-        };
-
+        let ident_fut = identify.wait_identified(session_id);
         let unidentified_session = UnidentifiedSession { event, ident_fut };
+
         self.unidentified_backlog.insert(unidentified_session);
     }
 
@@ -824,7 +817,7 @@ impl PeerManager {
     fn session_closed(&mut self, sid: SessionId) {
         debug!("session {} closed", sid);
 
-        if let Some(session) = self.unidentified_backlog.take(sid) {
+        if let Some(_) = self.unidentified_backlog.take(&sid) {
             return;
         }
 

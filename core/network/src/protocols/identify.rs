@@ -48,10 +48,7 @@ impl Identify {
             .build()
     }
 
-    pub fn wait_identified(
-        &self,
-        session_id: SessionId,
-    ) -> Result<WaitIdentification, self::protocol::Error> {
+    pub fn wait_identified(&self, session_id: SessionId) -> WaitIdentification {
         self.proto.wait(session_id)
     }
 }
