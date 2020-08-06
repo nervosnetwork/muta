@@ -64,6 +64,7 @@ mod tests {
     fn test_duration_to_sec() {
         let d = Duration::from_millis(1110);
         let sec = duration_to_sec(d);
+
         assert_eq!(sec, 1.11 as f64);
     }
 }
