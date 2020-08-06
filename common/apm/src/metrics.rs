@@ -57,8 +57,8 @@ pub fn all_metrics() -> ProtocolResult<Vec<u8>> {
 
 #[cfg(test)]
 mod tests {
-    use std::time::{Duration, Instant};
     use super::duration_to_sec;
+    use std::time::{Duration, Instant};
 
     #[test]
     fn test_duration_to_sec() {
