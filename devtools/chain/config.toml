@@ -5,12 +5,16 @@ privkey = "0x5ec982173d54d830b6789cbbbe43eaa2853a5ff752d1ebc1b266cf9790314f8a"
 data_path = "./devtools/chain/data"
 
 [graphql]
-listening_address = "0.0.0.0:8000"
+listening_address = "127.0.0.1:8000"
 graphql_uri = "/graphql"
 graphiql_uri = "/graphiql"
 workers = 0 # if 0, uses number of available logical cpu as threads count.
 maxconn = 25000
 max_payload_size = 1048576
+# [graphql.tls]
+# private_key_file_path = "key.pem"
+# certificate_chain_file_path = "cert.pem"
+
 
 [network]
 listening_address = "0.0.0.0:1337"

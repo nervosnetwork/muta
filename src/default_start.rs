@@ -18,7 +18,7 @@ use common_crypto::{
     ToPublicKey, UncompressedPublicKey,
 };
 use core_api::adapter::DefaultAPIAdapter;
-use core_api::config::GraphQLConfig;
+use core_api::config::{GraphQLConfig, GraphQLTLS};
 use core_consensus::fixed_types::{FixedBlock, FixedProof, FixedSignedTxs};
 use core_consensus::message::{
     ChokeMessageHandler, ProposalMessageHandler, PullBlockRpcHandler, PullProofRpcHandler,
@@ -557,6 +557,12 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     }
     if config.graphql.max_payload_size != 0 {
         graphql_config.max_payload_size = config.graphql.max_payload_size;
+    }
+    if let Some(tls) = config.graphql.tls {
+        graphql_config.tls = Some(GraphQLTLS {
+            private_key_file_path: tls.private_key_file_path,
+            certificate_chain_file_path: tls.certificate_chain_file_path,
+        })
     }
 
     tokio::task::spawn_local(async move {
