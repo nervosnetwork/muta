@@ -43,12 +43,7 @@ impl CoreProtocol {
 
 impl NetworkProtocol for CoreProtocol {
     fn target() -> TargetProtocol {
-        TargetProtocol::Multi(vec![
-            ProtocolId::new(PING_PROTOCOL_ID),
-            ProtocolId::new(IDENTIFY_PROTOCOL_ID),
-            ProtocolId::new(DISCOVERY_PROTOCOL_ID),
-            ProtocolId::new(TRANSMITTER_PROTOCOL_ID),
-        ])
+        TargetProtocol::Single(ProtocolId::new(IDENTIFY_PROTOCOL_ID))
     }
 
     fn metas(self) -> Vec<ProtocolMeta> {
