@@ -84,6 +84,17 @@ pub struct ConfigExecutor {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct ConfigTrieDB {
+    pub cache_size: usize,
+}
+
+impl Default for ConfigTrieDB {
+    fn default() -> Self {
+        ConfigTrieDB { cache_size: 2000 }
+    }
+}
+
+#[derive(Debug, Deserialize)]
 pub struct ConfigRocksDB {
     pub max_open_files: i32,
 }
@@ -144,6 +155,8 @@ pub struct Config {
     pub logger:    ConfigLogger,
     #[serde(default)]
     pub rocksdb:   ConfigRocksDB,
+    #[serde(default)]
+    pub triedb:    ConfigTrieDB,
     pub apm:       Option<ConfigAPM>,
 }
 

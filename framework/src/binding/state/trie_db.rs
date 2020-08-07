@@ -13,17 +13,21 @@ use common_apm::metrics::storage::{on_storage_get_state, on_storage_put_state};
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
 const RAND_SEED: u64 = 49999;
-const MAP_SIZE: usize = 2000;
 
 pub struct RocksTrieDB {
-    light: bool,
-    db:    Arc<DB>,
-
-    cache: RwLock<HashMap<Vec<u8>, Vec<u8>>>,
+    light:      bool,
+    db:         Arc<DB>,
+    cache_size: usize,
+    cache:      RwLock<HashMap<Vec<u8>, Vec<u8>>>,
 }
 
 impl RocksTrieDB {
-    pub fn new<P: AsRef<Path>>(path: P, light: bool, max_open_files: i32) -> ProtocolResult<Self> {
+    pub fn new<P: AsRef<Path>>(
+        path: P,
+        light: bool,
+        max_open_files: i32,
+        cache_size: usize,
+    ) -> ProtocolResult<Self> {
         let mut opts = Options::default();
         opts.create_if_missing(true);
         opts.create_missing_column_families(true);
@@ -34,7 +38,8 @@ impl RocksTrieDB {
         Ok(RocksTrieDB {
             light,
             db: Arc::new(db),
-            cache: RwLock::new(HashMap::new()),
+            cache: RwLock::new(HashMap::with_capacity(cache_size + 500)),
+            cache_size,
         })
     }
 
@@ -45,8 +50,18 @@ impl RocksTrieDB {
         };
 
         if res.is_none() {
-            return Ok(self.db.get(key).map_err(to_store_err)?);
+            let inst = Instant::now();
+            let ret = self.db.get(key).map_err(to_store_err)?;
+            on_storage_get_state(inst.elapsed(), 1i64);
+
+            if let Some(val) = ret.clone() {
+                let mut cache = self.cache.write();
+                cache.insert(key.to_owned(), val);
+            }
+
+            return Ok(ret);
         }
+
         Ok(res)
     }
 }
@@ -55,12 +70,7 @@ impl cita_trie::DB for RocksTrieDB {
     type Error = RocksTrieDBError;
 
     fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, Self::Error> {
-        let inst = Instant::now();
-
-        let res = self.inner_get(key)?;
-
-        on_storage_get_state(inst.elapsed(), 1i64);
-        Ok(res)
+        self.inner_get(key)
     }
 
     fn contains(&self, key: &[u8]) -> Result<bool, Self::Error> {
@@ -150,12 +160,12 @@ impl cita_trie::DB for RocksTrieDB {
         let mut cache = self.cache.write();
         let len = cache.len();
 
-        if len <= MAP_SIZE {
+        if len <= self.cache_size {
             return Ok(());
         }
 
         let keys = cache.keys().collect::<Vec<_>>();
-        let remove_list = rand_remove_list(keys, len - MAP_SIZE);
+        let remove_list = rand_remove_list(keys, len - self.cache_size);
 
         for item in remove_list.iter() {
             cache.remove(item);

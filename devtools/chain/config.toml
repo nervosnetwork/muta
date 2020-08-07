@@ -44,6 +44,9 @@ metrics = true
 [rocksdb]
 max_open_files = 64
 
+# [triedb]
+# cache_size = 2000
+
 # [apm]
 # service_name = "muta"
 # tracing_address = "127.0.0.1:6831"

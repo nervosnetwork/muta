@@ -31,7 +31,7 @@ lazy_static::lazy_static! {
 
 macro_rules! benchmark {
     ($payload: expr, $num: expr, $bencher: expr) => {{
-        let memdb = Arc::new(RocksTrieDB::new("./free-space/state", false, 1024).unwrap());
+        let memdb = Arc::new(RocksTrieDB::new("./free-space/state", false, 1024, 2000).unwrap());
 
         let rocks_adapter = Arc::new(RocksAdapter::new("./free-space/block", 1024).unwrap());
 
@@ -76,7 +76,7 @@ macro_rules! benchmark {
 
 macro_rules! perf_exec {
     ($assets_num: expr, $payload: expr, $num: expr, $bencher: expr) => {{
-        let memdb = Arc::new(RocksTrieDB::new("./free-space/state", false, 1024).unwrap());
+        let memdb = Arc::new(RocksTrieDB::new("./free-space/state", false, 1024, 2000).unwrap());
 
         let rocks_adapter = Arc::new(RocksAdapter::new("./free-space/block", 1024).unwrap());
 
