@@ -111,4 +111,4 @@ Block proposer is address instead public key
 
 Block proposer is address instead public key
 
-* fix: compilation failedss
+* fix: compilation failed
