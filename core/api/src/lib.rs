@@ -321,7 +321,6 @@ pub async fn start_graphql<Adapter: APIAdapter + 'static>(cfg: GraphQLConfig, ad
     .workers(workers)
     .maxconn(cmp::max(maxconn / workers, 1));
 
-    println!("tls config {:?}", cfg.tls);
     if let Some(tls) = cfg.tls {
         // load ssl keys
         let mut builder = SslAcceptor::mozilla_intermediate(SslMethod::tls()).unwrap();
