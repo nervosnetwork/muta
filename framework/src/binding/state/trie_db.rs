@@ -208,19 +208,31 @@ fn to_store_err(e: rocksdb::Error) -> RocksTrieDBError {
 }
 
 #[cfg(test)]
-mod benchmark {
+mod tests {
     extern crate test;
     use test::Bencher;
 
     use super::*;
 
     #[bench]
-    fn bench_insert(b: &mut Bencher) {
+    fn bench_rand(b: &mut Bencher) {
         b.iter(|| {
             let mut rng = SmallRng::seed_from_u64(49999);
             for _ in 0..10000 {
                 rng.gen_range(10, 1000000);
             }
         })
+    }
+
+    #[test]
+    fn test_rand_remove() {
+        let list = (0..10).collect::<Vec<_>>();
+        let keys = list.iter().collect::<Vec<_>>();
+        let to_removed_num = (1..10).collect::<Vec<_>>();
+
+        for num in to_removed_num.into_iter() {
+            let res = rand_remove_list(keys.clone(), num);
+            assert_eq!(res.len(), num);
+        }
     }
 }
