@@ -1,4 +1,20 @@
-# [](https://github.com/nervosnetwork/muta/compare/v0.2.0-beta.1...v) (2020-08-04)
+# [](https://github.com/nervosnetwork/muta/compare/v0.2.0-beta.2...v) (2020-08-07)
+
+
+### Bug Fixes
+
+* **apm:** Return the correct time ([#400](https://github.com/nervosnetwork/muta/issues/400)) ([fd6549a](https://github.com/nervosnetwork/muta/commit/fd6549a6352633cee7b5b747448129df7a0532ca))
+
+
+### Features
+
+* **network:** limit connections from same ip ([#388](https://github.com/nervosnetwork/muta/issues/388)) ([dc78c13](https://github.com/nervosnetwork/muta/commit/dc78c13b8aa25f3e4535e588149042f6345e4d25))
+* **network:** limit inbound and outbound connections ([#393](https://github.com/nervosnetwork/muta/issues/393)) ([3a3111e](https://github.com/nervosnetwork/muta/commit/3a3111e1e332529bc8636c54526920c292c04f8a))
+* **sync:** Limit the maximum height of once sync ([#390](https://github.com/nervosnetwork/muta/issues/390)) ([f951a95](https://github.com/nervosnetwork/muta/commit/f951a953daf307ffc98b4df0fe1a77a6a810ac71))
+
+
+
+# [0.2.0-beta.2](https://github.com/nervosnetwork/muta/compare/v0.2.0-beta.1...v0.2.0-beta.2) (2020-08-04)
 
 
 ### Bug Fixes
@@ -16,9 +32,7 @@
 
 * **metrics:** Add metrics of state ([#397](https://github.com/nervosnetwork/muta/issues/397)) ([5822764](https://github.com/nervosnetwork/muta/commit/5822764240f8b4e8cfeca4bccf7d399a0bf71897))
 
-### BREAKING CHANGE
 
-* **MultiSig:** change interface and substitute adaptive_address for autonomy ([#384](https://github.com/nervosnetwork/muta/pull/384)) ([a58831e](https://github.com/nervosnetwork/muta/commit/a58831ee029bf27ba79ed08bf0ece7f511abd899))
 
 # [0.2.0-beta.1](https://github.com/nervosnetwork/muta/compare/v0.2.0-alpha.1...v0.2.0-beta.1) (2020-08-03)
 
