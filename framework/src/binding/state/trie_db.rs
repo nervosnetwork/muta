@@ -136,8 +136,8 @@ impl cita_trie::DB for RocksTrieDB {
             {
                 let mut cache = self.cache.write();
                 for key in keys {
-                    cache.remove(key);
                     batch.delete(key);
+                    cache.remove(key);
                 }
             }
 
@@ -166,7 +166,7 @@ impl cita_trie::DB for RocksTrieDB {
 
 fn rand_remove_list<T: Clone>(keys: Vec<&T>, num: usize) -> Vec<T> {
     let mut len = keys.len() - 1;
-    let mut idx_list = (0..len).map(|i| i).collect::<Vec<_>>();
+    let mut idx_list = (0..len).collect::<Vec<_>>();
     let mut rng = SmallRng::seed_from_u64(RAND_SEED);
     let mut ret = Vec::new();
 
