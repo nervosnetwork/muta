@@ -1,26 +1,31 @@
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use derive_more::Display;
-use log::{debug, error, trace, warn};
+use futures::future::{self, AbortHandle};
+use futures_timer::Delay;
+use lazy_static::lazy_static;
 use parking_lot::RwLock;
 use prost::Message;
-use tentacle::context::{ProtocolContext, ProtocolContextMutRef, SessionContext};
+use tentacle::context::{ProtocolContextMutRef, SessionContext};
 use tentacle::multiaddr::{Multiaddr, Protocol};
 use tentacle::secio::PeerId;
-use tentacle::service::{SessionType, TargetProtocol};
-use tentacle::traits::ServiceProtocol;
-use tentacle::SessionId;
+use tentacle::service::{ServiceControl, SessionType, TargetProtocol};
+use tentacle::traits::SessionProtocol;
+use tentacle::{ProtocolId, SessionId};
 
 use super::behaviour::{IdentifyBehaviour, Misbehavior, MAX_ADDRS};
 use super::common::reachable;
 use super::identification::{Identification, WaitIdentification};
-use super::message::IdentifyMessage;
+use super::message::{self, Acknowledge, Identity};
 
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(8);
-const CHECK_TIMEOUT_INTERVAL: Duration = Duration::from_secs(1);
-const CHECK_TIMEOUT_TOKEN: u64 = 100;
+
+lazy_static! {
+    static ref SESSION_WAIT_BACKLOG: RwLock<HashMap<SessionId, Identification>> =
+        RwLock::new(HashMap::new());
+}
 
 #[derive(Debug, Display)]
 pub enum Error {
@@ -28,236 +33,352 @@ pub enum Error {
     EncryptionNotEnabled,
 }
 
-pub struct RemoteInfo {
-    pub peer_id:        PeerId,
-    pub session:        SessionContext,
-    pub connected_at:   Instant,
-    pub timeout:        Duration,
-    pub listen_addrs:   Option<Vec<Multiaddr>>,
-    pub observed_addr:  Option<Multiaddr>,
-    pub identification: Identification,
+pub struct ProcedureContext {
+    pub peer_id:              PeerId,
+    pub protocol_id:          ProtocolId,
+    pub service_control:      ServiceControl,
+    pub session_context:      SessionContext,
+    pub timeout_abort_handle: Option<AbortHandle>,
 }
 
-impl RemoteInfo {
-    pub fn new(
-        peer_id: PeerId,
-        session: SessionContext,
-        timeout: Duration,
-        identification: Option<Identification>,
-    ) -> RemoteInfo {
-        RemoteInfo {
-            peer_id,
-            session,
-            connected_at: Instant::now(),
-            timeout,
-            listen_addrs: None,
-            observed_addr: None,
-            identification: identification.unwrap_or_else(|| Identification::new()),
+impl ProcedureContext {
+    pub fn cancel_timeout(&self) {
+        if let Some(timeout) = self.timeout_abort_handle.as_ref() {
+            timeout.abort()
         }
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ClientProcedure {
+    WaitAck,
+    OpenOtherProtocols,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ServerProcedure {
+    WaitIdentity,
+    AckedIdentity, // After accept session
+}
+
+pub enum Procedure {
+    New,
+    Client {
+        current: ClientProcedure,
+        context: ProcedureContext,
+    },
+    Server {
+        current: ServerProcedure,
+        context: ProcedureContext,
+    },
+}
+
 pub struct IdentifyProtocol {
-    wait_backlog: Arc<RwLock<HashMap<SessionId, Identification>>>,
-    remote_infos: Arc<RwLock<HashMap<SessionId, RemoteInfo>>>,
-    behaviour:    Arc<IdentifyBehaviour>,
+    procedure: Procedure,
+    behaviour: Arc<IdentifyBehaviour>,
 }
 
 impl IdentifyProtocol {
-    pub fn new(behaviour: IdentifyBehaviour) -> Self {
+    pub fn new(behaviour: Arc<IdentifyBehaviour>) -> Self {
         IdentifyProtocol {
-            wait_backlog: Default::default(),
-            remote_infos: Default::default(),
-            behaviour:    Arc::new(behaviour),
+            procedure: Procedure::New,
+            behaviour,
         }
     }
 
-    pub fn wait(&self, session_id: SessionId) -> WaitIdentification {
-        match self.remote_infos.read().get(&session_id) {
-            Some(remote_info) => remote_info.identification.wait(),
-            None => {
-                let identification = Identification::new();
-                let wait_fut = identification.wait();
+    pub fn wait(session_id: SessionId) -> WaitIdentification {
+        let identification = Identification::new();
+        let wait_fut = identification.wait();
 
-                self.wait_backlog.write().insert(session_id, identification);
-                wait_fut
-            }
-        }
-    }
-
-    fn insert_info_if_new(&self, context: &ProtocolContextMutRef) -> Result<(), self::Error> {
-        let session = context.session;
         {
-            if self.remote_infos.read().get(&session.id).is_some() {
-                return Ok(());
-            }
+            SESSION_WAIT_BACKLOG
+                .write()
+                .insert(session_id, identification);
         }
 
+        wait_fut
+    }
+
+    fn new_procedure_context(
+        &mut self,
+        context: &ProtocolContextMutRef,
+    ) -> Result<ProcedureContext, self::Error> {
+        let session = context.session;
         let remote_peer_id = match &session.remote_pubkey {
             Some(pubkey) => pubkey.peer_id(),
             None => {
-                error!("IdentifyProtocol require secio enabled!");
-                let _ = context.disconnect(session.id);
                 return Err(self::Error::EncryptionNotEnabled);
             }
         };
-        trace!("IdentifyProtocol connected from {:?}", remote_peer_id);
 
-        let identification = { self.wait_backlog.write().remove(&session.id) };
-        {
-            let remote_info = RemoteInfo::new(
-                remote_peer_id,
-                session.clone(),
-                DEFAULT_TIMEOUT,
-                identification,
-            );
+        let procedure_context = ProcedureContext {
+            peer_id:              remote_peer_id,
+            protocol_id:          context.proto_id(),
+            service_control:      context.control().clone(),
+            session_context:      context.session.clone(),
+            timeout_abort_handle: None,
+        };
 
-            self.remote_infos.write().insert(session.id, remote_info);
-        }
-
-        Ok(())
-    }
-}
-
-impl ServiceProtocol for IdentifyProtocol {
-    fn init(&mut self, context: &mut ProtocolContext) {
-        let proto_id = context.proto_id;
-
-        if let Err(e) =
-            context.set_service_notify(proto_id, CHECK_TIMEOUT_INTERVAL, CHECK_TIMEOUT_TOKEN)
-        {
-            warn!("identify start fail {}", e);
-        }
+        Ok(procedure_context)
     }
 
-    fn connected(&mut self, context: ProtocolContextMutRef, _version: &str) {
-        if self.insert_info_if_new(&context).is_err() {
-            return;
-        }
-
-        let listen_addrs: Vec<Multiaddr> = self
-            .behaviour
+    pub fn listen_addrs(behaviour: &IdentifyBehaviour) -> Vec<Multiaddr> {
+        behaviour
             .local_listen_addrs()
             .into_iter()
             .filter(reachable)
             .take(MAX_ADDRS)
-            .collect();
+            .collect()
+    }
 
-        let observed_addr = context
-            .session
+    pub fn observed_addr(session_context: &SessionContext) -> Multiaddr {
+        session_context
             .address
             .iter()
             .filter(|proto| match proto {
                 Protocol::P2P(_) => false,
                 _ => true,
             })
-            .collect::<Multiaddr>();
+            .collect::<Multiaddr>()
+    }
+}
 
-        let identify = self.behaviour.identify();
-        let msg = match IdentifyMessage::new(listen_addrs, observed_addr, identify).into_bytes() {
-            Ok(msg) => msg,
+impl SessionProtocol for IdentifyProtocol {
+    fn connected(&mut self, context: ProtocolContextMutRef, _version: &str) {
+        let mut procedure_context = match self.new_procedure_context(&context) {
+            Ok(c) => c,
             Err(err) => {
-                warn!("encode {}", err);
+                log::warn!("create procedure context failed: {}", err);
+                let _ = context.disconnect(context.session.id);
                 return;
             }
         };
+        log::trace!("connected from {:?}", procedure_context.peer_id);
 
-        if let Err(err) = context.quick_send_message(msg) {
-            warn!("quick send message {}", err);
+        let service_control = procedure_context.service_control.clone();
+        let session_context = procedure_context.session_context.clone();
+        match context.session.ty {
+            SessionType::Inbound => {
+                let (timeout, timeout_abort_handle) = future::abortable(async move {
+                    Delay::new(DEFAULT_TIMEOUT).await;
+                    log::warn!(
+                        "wait identity from session {} timeout, disconnect it",
+                        session_context.id
+                    );
+                    let _ = service_control.disconnect(session_context.id);
+                });
+                procedure_context.timeout_abort_handle = Some(timeout_abort_handle);
+                tokio::spawn(timeout);
+
+                self.procedure = Procedure::Server {
+                    current: ServerProcedure::WaitIdentity,
+                    context: procedure_context,
+                };
+            }
+            SessionType::Outbound => {
+                let identity = self.behaviour.identity();
+                let address_info = {
+                    let listen_addrs = Self::listen_addrs(&self.behaviour);
+                    let observed_addr = Self::observed_addr(&context.session);
+                    message::AddressInfo::new(listen_addrs, observed_addr)
+                };
+
+                let init_msg = match Identity::new(identity, address_info).into_bytes() {
+                    Ok(msg) => msg,
+                    Err(err) => {
+                        log::warn!("encode {}", err);
+                        let _ = service_control.disconnect(session_context.id);
+                        return;
+                    }
+                };
+
+                if let Err(err) = context.quick_send_message(init_msg) {
+                    log::warn!("quick send message {}", err);
+                }
+
+                let (timeout, timeout_abort_handle) = future::abortable(async move {
+                    Delay::new(DEFAULT_TIMEOUT).await;
+                    log::warn!(
+                        "wait acknowledge from session {} timeout, disconnect it",
+                        session_context.id
+                    );
+                    let _ = service_control.disconnect(session_context.id);
+                });
+                procedure_context.timeout_abort_handle = Some(timeout_abort_handle);
+                tokio::spawn(timeout);
+
+                self.procedure = Procedure::Client {
+                    current: ClientProcedure::WaitAck,
+                    context: procedure_context,
+                };
+            }
         }
     }
 
     fn disconnected(&mut self, context: ProtocolContextMutRef) {
-        let info = {
-            self.wait_backlog.write().remove(&context.session.id);
+        let session_id = context.session.id;
+        if let Some(identification) = SESSION_WAIT_BACKLOG.write().remove(&session_id) {
+            identification.failed()
+        }
 
-            let mut infos = self.remote_infos.write();
-            infos.remove(&context.session.id)
-        };
-
-        trace!(
-            "IdentifyProtocol disconnected from {:?}",
-            info.map(|i| i.peer_id)
-        );
+        log::trace!("disconnected from session {}", context.session.id);
     }
 
-    fn received(&mut self, context: ProtocolContextMutRef, data: bytes::Bytes) {
-        let session = context.session;
+    fn received(&mut self, protocol_context: ProtocolContextMutRef, data: bytes::Bytes) {
+        let session = protocol_context.session;
 
-        match IdentifyMessage::decode(data) {
-            Ok(message) => {
-                let mut infos = self.remote_infos.write();
+        match &mut self.procedure {
+            Procedure::Server {
+                ref mut current,
+                context,
+            } => {
+                match current {
+                    ServerProcedure::WaitIdentity => {
+                        match Identity::decode(data) {
+                            Ok(msg) => {
+                                context.cancel_timeout();
 
-                let mut remote_info = infos.get_mut(&session.id).expect("RemoteInfo must exists");
+                                let behaviour = &mut self.behaviour;
+                                let wait_identified =
+                                    match { SESSION_WAIT_BACKLOG.write().remove(&session.id) } {
+                                        Some(ident) => ident,
+                                        None => {
+                                            let _ = protocol_context.disconnect(session.id);
+                                            return;
+                                        }
+                                    };
 
-                let behaviour = &mut self.behaviour;
+                                // Need to interrupt processing, avoid pollution
+                                if behaviour
+                                    .received_identity(
+                                        &context.peer_id,
+                                        &wait_identified,
+                                        &msg.identity,
+                                    )
+                                    .is_disconnect()
+                                {
+                                    let _ = protocol_context.disconnect(session.id);
+                                    return;
+                                }
 
-                // Need to interrupt processing, avoid pollution
-                if behaviour
-                    .received_identify(&mut remote_info, message.identify.as_bytes())
-                    .is_disconnect()
-                {
-                    let _ = context.disconnect(session.id);
-                    return;
-                }
+                                if behaviour
+                                    .process_listens(&context, msg.listen_addrs())
+                                    .is_disconnect()
+                                    || behaviour
+                                        .process_observed(&context, msg.observed_addr())
+                                        .is_disconnect()
+                                {
+                                    let _ = protocol_context.disconnect(session.id);
+                                    return;
+                                }
 
-                if let SessionType::Outbound = session.ty {
-                    if let Err(err) =
-                        context.open_protocols(context.session.id, TargetProtocol::All)
-                    {
-                        warn!("open protocols {}", err);
-                        let _ = context.disconnect(session.id);
-                        return;
+                                let address_info = {
+                                    let listen_addrs = Self::listen_addrs(&self.behaviour);
+                                    let observed_addr = Self::observed_addr(&session);
+                                    message::AddressInfo::new(listen_addrs, observed_addr)
+                                };
+                                let init_msg = match Acknowledge::new(address_info).into_bytes() {
+                                    Ok(msg) => msg,
+                                    Err(err) => {
+                                        log::warn!("encode {}", err);
+                                        let _ = protocol_context
+                                            .disconnect(protocol_context.session.id);
+                                        return;
+                                    }
+                                };
+
+                                if let Err(err) = protocol_context.quick_send_message(init_msg) {
+                                    log::warn!("quick send message {}", err);
+                                }
+
+                                *current = ServerProcedure::AckedIdentity;
+                            }
+                            Err(_) => {
+                                log::warn!("received invalid data from {:?}", context.peer_id);
+
+                                if self
+                                    .behaviour
+                                    .misbehave(&context.peer_id, Misbehavior::InvalidData)
+                                    .is_disconnect()
+                                {
+                                    let _ = protocol_context.disconnect(session.id);
+                                }
+                            }
+                        }
+                    }
+                    ServerProcedure::AckedIdentity => {
+                        // TODO: misbehave duplicate data
+                        log::warn!("receive duplicate data from peer {:?}", context.peer_id);
                     }
                 }
-
-                if behaviour
-                    .process_listens(&mut remote_info, message.listen_addrs())
-                    .is_disconnect()
-                    || behaviour
-                        .process_observed(&mut remote_info, message.observed_addr())
-                        .is_disconnect()
-                {
-                    let _ = context.disconnect(session.id);
-                }
             }
-            Err(_) => {
-                let infos = self.remote_infos.read();
-                let remote_info = infos.get(&session.id).expect("RemoteInfo must exists");
+            Procedure::Client {
+                ref mut current,
+                context,
+            } => {
+                match current {
+                    ClientProcedure::WaitAck => match Acknowledge::decode(data) {
+                        Ok(msg) => {
+                            if let Some(timeout_handle) = context.timeout_abort_handle.as_ref() {
+                                timeout_handle.abort();
+                            }
 
-                warn!(
-                    "IdentifyProtocol received invalid data from {:?}",
-                    remote_info.peer_id
-                );
+                            let behaviour = &mut self.behaviour;
+                            let identification =
+                                match { SESSION_WAIT_BACKLOG.write().remove(&session.id) } {
+                                    Some(ident) => ident,
+                                    None => {
+                                        let _ = protocol_context.disconnect(session.id);
+                                        return;
+                                    }
+                                };
+                            identification.pass();
 
-                if self
-                    .behaviour
-                    .misbehave(&remote_info.peer_id, Misbehavior::InvalidData)
-                    .is_disconnect()
-                {
-                    let _ = context.disconnect(session.id);
-                }
+                            if behaviour
+                                .process_listens(&context, msg.listen_addrs())
+                                .is_disconnect()
+                                || behaviour
+                                    .process_observed(&context, msg.observed_addr())
+                                    .is_disconnect()
+                            {
+                                let _ = protocol_context.disconnect(session.id);
+                                return;
+                            }
+
+                            if let Err(err) = protocol_context
+                                .open_protocols(protocol_context.session.id, TargetProtocol::All)
+                            {
+                                log::warn!("open protocols {}", err);
+                                let _ = protocol_context.disconnect(protocol_context.session.id);
+                                return;
+                            }
+
+                            *current = ClientProcedure::OpenOtherProtocols;
+                        }
+                        Err(_) => {
+                            log::warn!("received invalid data from {:?}", context.peer_id);
+
+                            if self
+                                .behaviour
+                                .misbehave(&context.peer_id, Misbehavior::InvalidData)
+                                .is_disconnect()
+                            {
+                                let _ = protocol_context.disconnect(session.id);
+                            }
+                            return;
+                        }
+                    },
+                    ClientProcedure::OpenOtherProtocols => {
+                        // TODO: misbehave init identify
+                        log::warn!(
+                            "client receive data during init identify from peer {:?}",
+                            context.peer_id
+                        );
+                        return;
+                    }
+                };
             }
-        }
-    }
-
-    fn notify(&mut self, context: &mut ProtocolContext, _token: u64) {
-        let now = Instant::now();
-
-        for (session_id, info) in self.remote_infos.read().iter() {
-            if (info.listen_addrs.is_none() || info.observed_addr.is_none())
-                && (info.connected_at + info.timeout) <= now
-            {
-                debug!("{:?} receive identify message timeout", info.peer_id);
-                if self
-                    .behaviour
-                    .misbehave(&info.peer_id, Misbehavior::Timeout)
-                    .is_disconnect()
-                {
-                    let _ = context.disconnect(*session_id);
-                }
-            }
+            Procedure::New => unreachable!(),
         }
     }
 }

@@ -4,6 +4,8 @@ mod identification;
 mod message;
 mod protocol;
 
+use std::sync::Arc;
+
 use futures::channel::mpsc::UnboundedSender;
 use tentacle::builder::MetaBuilder;
 use tentacle::service::{ProtocolHandle, ProtocolMeta};
@@ -21,9 +23,8 @@ pub use self::protocol::Error;
 pub const NAME: &str = "chain_identify";
 pub const SUPPORT_VERSIONS: [&str; 1] = ["0.1"];
 
-#[derive(Clone)]
 pub struct Identify {
-    proto: IdentifyProtocol,
+    behaviour: Arc<IdentifyBehaviour>,
 }
 
 impl Identify {
@@ -33,22 +34,24 @@ impl Identify {
         #[cfg(not(feature = "global_ip_only"))]
         log::info!("turn off global ip only");
 
-        let behaviour = IdentifyBehaviour::new(peer_mgr, event_tx);
-        Identify {
-            proto: IdentifyProtocol::new(behaviour),
-        }
+        let behaviour = Arc::new(IdentifyBehaviour::new(peer_mgr, event_tx));
+        Identify { behaviour }
     }
 
     pub fn build_meta(self, protocol_id: ProtocolId) -> ProtocolMeta {
+        let behaviour = self.behaviour;
+
         MetaBuilder::new()
             .id(protocol_id)
             .name(name!(NAME))
             .support_versions(support_versions!(SUPPORT_VERSIONS))
-            .service_handle(move || ProtocolHandle::Callback(Box::new(self.proto)))
+            .session_handle(move || {
+                ProtocolHandle::Callback(Box::new(IdentifyProtocol::new(Arc::clone(&behaviour))))
+            })
             .build()
     }
 
-    pub fn wait_identified(&self, session_id: SessionId) -> WaitIdentification {
-        self.proto.wait(session_id)
+    pub fn wait_identified(session_id: SessionId) -> WaitIdentification {
+        IdentifyProtocol::wait(session_id)
     }
 }

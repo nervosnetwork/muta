@@ -509,8 +509,6 @@ pub struct PeerManager {
 
     // unidentified session backlog
     unidentified_backlog: HashSet<UnidentifiedSession>,
-    // TODO: Split store and manager logic
-    identify_protocol:    Option<Identify>,
 
     event_rx: UnboundedReceiver<PeerManagerEvent>,
     conn_tx:  UnboundedSender<ConnectionEvent>,
@@ -560,7 +558,6 @@ impl PeerManager {
 
             connecting: Default::default(),
             unidentified_backlog: Default::default(),
-            identify_protocol: None,
 
             event_rx,
             conn_tx,
@@ -579,10 +576,6 @@ impl PeerManager {
         PeerManagerHandle {
             inner: Arc::clone(&self.inner),
         }
-    }
-
-    pub fn set_identify_protocol(&mut self, identify_protocol: Identify) {
-        self.identify_protocol = Some(identify_protocol);
     }
 
     pub fn share_session_book(&self, config: shared::Config) -> SharedSessions {
@@ -654,12 +647,8 @@ impl PeerManager {
     fn new_unidentified_session(&mut self, pubkey: PublicKey, ctx: Arc<SessionContext>) {
         let session_id = ctx.id;
         let event = UnidentifiedSessionEvent { pubkey, ctx };
-        let identify = self
-            .identify_protocol
-            .as_ref()
-            .expect("identify protocol must be set");
 
-        let ident_fut = identify.wait_identified(session_id);
+        let ident_fut = Identify::wait_identified(session_id);
         let unidentified_session = UnidentifiedSession { event, ident_fut };
 
         self.unidentified_backlog.insert(unidentified_session);

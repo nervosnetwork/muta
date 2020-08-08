@@ -229,8 +229,6 @@ impl NetworkService {
             .transmitter(raw_msg_tx.clone())
             .build();
 
-        peer_mgr.set_identify_protocol(proto.identify());
-
         // Build connection service
         let keeper = ConnectionServiceKeeper::new(mgr_tx.clone(), sys_tx.clone());
         let conn_srv = ConnectionService::<CoreProtocol>::new(proto, conn_config, keeper, conn_rx);

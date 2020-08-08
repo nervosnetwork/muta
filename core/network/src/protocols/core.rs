@@ -27,17 +27,12 @@ pub struct CoreProtocolBuilder {
 }
 
 pub struct CoreProtocol {
-    metas:    Vec<ProtocolMeta>,
-    identify: Identify,
+    metas: Vec<ProtocolMeta>,
 }
 
 impl CoreProtocol {
     pub fn build() -> CoreProtocolBuilder {
         CoreProtocolBuilder::new()
-    }
-
-    pub fn identify(&self) -> Identify {
-        self.identify.clone()
     }
 }
 
@@ -123,10 +118,10 @@ impl CoreProtocolBuilder {
         let transmitter = transmitter.expect("init: missing protocol transmitter");
 
         metas.push(ping.build_meta(PING_PROTOCOL_ID.into()));
-        metas.push(identify.clone().build_meta(IDENTIFY_PROTOCOL_ID.into()));
+        metas.push(identify.build_meta(IDENTIFY_PROTOCOL_ID.into()));
         metas.push(discovery.build_meta(DISCOVERY_PROTOCOL_ID.into()));
         metas.push(transmitter.build_meta(TRANSMITTER_PROTOCOL_ID.into()));
 
-        CoreProtocol { metas, identify }
+        CoreProtocol { metas }
     }
 }

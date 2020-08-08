@@ -3,18 +3,17 @@ use std::sync::Arc;
 
 use futures::channel::mpsc::UnboundedSender;
 use log::{debug, trace, warn};
-#[cfg(not(feature = "disable_chain_id_check"))]
 use protocol::types::Hash;
-#[cfg(not(feature = "disable_chain_id_check"))]
-use protocol::Bytes;
 use tentacle::multiaddr::Multiaddr;
 use tentacle::secio::PeerId;
 use tentacle::service::SessionType;
 
-use super::common::reachable;
-use super::protocol::RemoteInfo;
 use crate::event::PeerManagerEvent;
 use crate::peer_manager::PeerManagerHandle;
+
+use super::common::reachable;
+use super::identification::Identification;
+use super::protocol::ProcedureContext;
 
 pub const MAX_ADDRS: usize = 10;
 
@@ -93,26 +92,23 @@ impl IdentifyBehaviour {
         }
     }
 
-    pub fn identify(&self) -> String {
+    pub fn identity(&self) -> String {
         self.peer_mgr.chain_id().as_ref().as_hex()
     }
 
     pub fn process_listens(
         &self,
-        info: &mut RemoteInfo,
+        procedure_context: &ProcedureContext,
         listens: Vec<Multiaddr>,
     ) -> MisbehaveResult {
-        if info.listen_addrs.is_some() {
-            debug!("remote({:?}) repeat send observed address", info.peer_id);
-            self.misbehave(&info.peer_id, Misbehavior::DuplicateListenAddrs)
-        } else if listens.len() > MAX_ADDRS {
-            self.misbehave(&info.peer_id, Misbehavior::TooManyAddresses(listens.len()))
+        let peer_id = &procedure_context.peer_id;
+        if listens.len() > MAX_ADDRS {
+            self.misbehave(peer_id, Misbehavior::TooManyAddresses(listens.len()))
         } else {
             trace!("received listen addresses: {:?}", listens);
-            let reachable_addrs = listens.into_iter().filter(reachable).collect::<Vec<_>>();
 
-            info.listen_addrs = Some(reachable_addrs.clone());
-            self.add_remote_listen_addrs(&info.peer_id, reachable_addrs);
+            let reachable_addrs = listens.into_iter().filter(reachable).collect::<Vec<_>>();
+            self.add_remote_listen_addrs(peer_id, reachable_addrs);
 
             MisbehaveResult::Continue
         }
@@ -120,62 +116,56 @@ impl IdentifyBehaviour {
 
     pub fn process_observed(
         &self,
-        info: &mut RemoteInfo,
+        procedure_context: &ProcedureContext,
         observed: Option<Multiaddr>,
     ) -> MisbehaveResult {
-        if info.observed_addr.is_some() {
-            debug!("remote({:?}) repeat send listen addresses", info.peer_id);
-            self.misbehave(&info.peer_id, Misbehavior::DuplicateObservedAddr)
-        } else {
-            let observed = match observed {
-                Some(addr) => addr,
-                None => {
-                    warn!("observed is none from peer {:?}", info.peer_id);
-                    return MisbehaveResult::Disconnect;
-                }
-            };
-
-            trace!("received observed address: {}", observed);
-            let unobservable = |info: &mut RemoteInfo, observed| -> bool {
-                self.add_observed_addr(&info.peer_id, observed, info.session.ty)
-                    .is_disconnect()
-            };
-
-            if reachable(&observed) && unobservable(info, observed.clone()) {
+        let peer_id = &procedure_context.peer_id;
+        let session_type = procedure_context.session_context.ty;
+        let observed = match observed {
+            Some(addr) => addr,
+            None => {
+                warn!("observed is none from peer {:?}", peer_id);
                 return MisbehaveResult::Disconnect;
             }
+        };
 
-            info.observed_addr = Some(observed);
+        trace!("received observed address: {}", observed);
+        let unobservable = |observed| -> bool {
+            self.add_observed_addr(peer_id, observed, session_type)
+                .is_disconnect()
+        };
+
+        if reachable(&observed) && unobservable(observed.clone()) {
+            MisbehaveResult::Disconnect
+        } else {
             MisbehaveResult::Continue
         }
     }
 
-    #[cfg(feature = "disable_chain_id_check")]
-    pub fn received_identify(&self, info: &mut RemoteInfo, _identify: &[u8]) -> MisbehaveResult {
-        info.identification.pass();
-        MisbehaveResult::Continue
-    }
-
-    #[cfg(not(feature = "disable_chain_id_check"))]
-    pub fn received_identify(&self, info: &mut RemoteInfo, identify: &[u8]) -> MisbehaveResult {
-        let hash = match Hash::from_bytes(Bytes::from(identify.to_vec())) {
+    pub fn received_identity(
+        &self,
+        peer_id: &PeerId,
+        identification: &Identification,
+        identity: &str,
+    ) -> MisbehaveResult {
+        let hash = match Hash::from_hex(identity) {
             Ok(h) => h,
             Err(err) => {
-                warn!("decode chain id from {:?} failed: {}", info.peer_id, err);
+                warn!("decode chain id from {:?} failed: {}", peer_id, err);
 
-                info.identification.failed();
+                identification.failed();
                 return MisbehaveResult::Disconnect;
             }
         };
 
         if &hash != self.peer_mgr.chain_id().as_ref() {
-            warn!("peer {:?} from different chain", info.peer_id);
+            warn!("peer {:?} from different chain", peer_id);
 
-            info.identification.failed();
+            identification.failed();
             return MisbehaveResult::Disconnect;
         }
 
-        info.identification.pass();
+        identification.pass();
         MisbehaveResult::Continue
     }
 
