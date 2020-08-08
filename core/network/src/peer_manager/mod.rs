@@ -1312,11 +1312,26 @@ impl Future for PeerManager {
                 Poll::Ready(ret) => match ret {
                     Ok(()) => {
                         let UnidentifiedSession { event, .. } = session;
-                        self.process_event(PeerManagerEvent::NewSession {
+                        let new_session_event = PeerManagerEvent::NewSession {
                             pid:    event.pubkey.peer_id(),
                             pubkey: event.pubkey,
                             ctx:    event.ctx,
-                        });
+                        };
+
+                        // TODO: Remove duplicate diag code
+                        #[cfg(feature = "diagnostic")]
+                        let diag_event: Option<
+                            diagnostic::DiagnosticEvent,
+                        > = From::from(&new_session_event);
+
+                        self.process_event(new_session_event);
+
+                        #[cfg(feature = "diagnostic")]
+                        if let (Some(hook), Some(event)) =
+                            (self.diagnostic_hook.as_ref(), diag_event)
+                        {
+                            hook(event)
+                        }
                     }
                     Err(()) => self.disconnect_session(session.event.ctx.id),
                 },

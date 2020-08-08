@@ -247,6 +247,9 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     let metadata: Metadata =
         serde_json::from_str(&exec_resp.succeed_data).expect("Decode metadata failed!");
 
+    // set chain id in network
+    network_service.set_chain_id(Hash::from_hex(consts::CHAIN_ID).expect("chain id"));
+
     // set args in mempool
     mempool.set_args(
         metadata.timeout_gap,
