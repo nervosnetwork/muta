@@ -319,9 +319,7 @@ impl SessionProtocol for IdentifyProtocol {
                 match current {
                     ClientProcedure::WaitAck => match Acknowledge::decode(data) {
                         Ok(msg) => {
-                            if let Some(timeout_handle) = context.timeout_abort_handle.as_ref() {
-                                timeout_handle.abort();
-                            }
+                            context.cancel_timeout();
 
                             let behaviour = &mut self.behaviour;
                             let identification =
