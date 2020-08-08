@@ -365,7 +365,6 @@ impl SessionProtocol for IdentifyProtocol {
                             {
                                 let _ = protocol_context.disconnect(session.id);
                             }
-                            return;
                         }
                     },
                     ClientProcedure::OpenOtherProtocols => {
@@ -374,7 +373,6 @@ impl SessionProtocol for IdentifyProtocol {
                             "client receive data during init identify from peer {:?}",
                             context.peer_id
                         );
-                        return;
                     }
                 };
             }
