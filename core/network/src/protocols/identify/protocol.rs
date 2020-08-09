@@ -433,7 +433,7 @@ impl SessionProtocol for IdentifyProtocol {
             },
             _ => {
                 log::warn!(
-                    "should not received message from {}",
+                    "should not received message from {} out of negotiate state",
                     protocol_context.session.address
                 );
                 let _ = protocol_context.disconnect(protocol_context.session.id);
