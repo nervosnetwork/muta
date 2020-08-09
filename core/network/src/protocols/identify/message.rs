@@ -34,15 +34,15 @@ impl AddressInfo {
 #[derive(Message)]
 pub struct Identity {
     #[prost(string, tag = "1")]
-    pub identity:  String,
+    pub chain_id:  String,
     #[prost(message, tag = "2")]
     pub addr_info: Option<AddressInfo>,
 }
 
 impl Identity {
-    pub fn new(identity: String, addr_info: AddressInfo) -> Self {
+    pub fn new(chain_id: String, addr_info: AddressInfo) -> Self {
         Identity {
-            identity,
+            chain_id,
             addr_info: Some(addr_info),
         }
     }

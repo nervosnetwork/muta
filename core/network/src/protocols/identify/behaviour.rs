@@ -2,8 +2,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use futures::channel::mpsc::UnboundedSender;
-use log::{debug, trace, warn};
-use protocol::types::Hash;
 use tentacle::multiaddr::Multiaddr;
 use tentacle::secio::PeerId;
 use tentacle::service::SessionType;
@@ -12,21 +10,13 @@ use crate::event::PeerManagerEvent;
 use crate::peer_manager::PeerManagerHandle;
 
 use super::common::reachable;
-use super::identification::Identification;
-use super::protocol::ProcedureContext;
+use super::message;
+use super::protocol::StateContext;
 
 pub const MAX_ADDRS: usize = 10;
 
 /// The misbehavior to report to underlying peer storage
 pub enum Misbehavior {
-    /// Repeat send listen addresses
-    DuplicateListenAddrs,
-    /// Repeat send observed address
-    DuplicateObservedAddr,
-    /// Timeout reached
-    Timeout,
-    /// Remote peer send invalid data
-    InvalidData,
     /// Send too many addresses in listen addresses
     TooManyAddresses(usize),
 }
@@ -69,7 +59,7 @@ impl AddrReporter {
         }
 
         if self.inner.unbounded_send(event).is_err() {
-            debug!("network: discovery: peer manager offline");
+            log::debug!("network: discovery: peer manager offline");
 
             self.shutdown.store(true, Ordering::SeqCst);
         }
@@ -92,20 +82,83 @@ impl IdentifyBehaviour {
         }
     }
 
-    pub fn identity(&self) -> String {
+    pub fn chain_id(&self) -> String {
         self.peer_mgr.chain_id().as_ref().as_hex()
+    }
+
+    pub fn local_listen_addrs(&self) -> Vec<Multiaddr> {
+        let addrs = self.peer_mgr.listen_addrs();
+        let reachable_addrs = addrs.into_iter().filter(reachable);
+
+        reachable_addrs.take(MAX_ADDRS).collect()
+    }
+
+    pub fn send_identity(&self, context: &StateContext) {
+        let address_info = {
+            let listen_addrs = self.local_listen_addrs();
+            let observed_addr = context.observed_addr();
+            message::AddressInfo::new(listen_addrs, observed_addr)
+        };
+
+        let identity = {
+            let msg = message::Identity::new(self.chain_id(), address_info);
+            match msg.into_bytes() {
+                Ok(msg) => msg,
+                Err(err) => {
+                    log::warn!("encode identity msg failed {}", err);
+                    context.disconnect();
+                    return;
+                }
+            }
+        };
+
+        context.send_message(identity);
+    }
+
+    pub fn send_ack(&self, context: &StateContext) {
+        let address_info = {
+            let listen_addrs = self.local_listen_addrs();
+            let observed_addr = context.observed_addr();
+            message::AddressInfo::new(listen_addrs, observed_addr)
+        };
+
+        let acknowledge = {
+            let msg = message::Acknowledge::new(address_info);
+            match msg.into_bytes() {
+                Ok(msg) => msg,
+                Err(err) => {
+                    log::warn!("encode acknowledge msg failed {}", err);
+                    context.disconnect();
+                    return;
+                }
+            }
+        };
+
+        context.send_message(acknowledge);
+    }
+
+    pub fn verify_remote_identity(
+        &self,
+        identity: &message::Identity,
+    ) -> Result<(), super::protocol::Error> {
+        if identity.chain_id != self.chain_id() {
+            Err(super::protocol::Error::WrongChainId)
+        } else {
+            Ok(())
+        }
     }
 
     pub fn process_listens(
         &self,
-        procedure_context: &ProcedureContext,
+        context: &StateContext,
         listens: Vec<Multiaddr>,
     ) -> MisbehaveResult {
-        let peer_id = &procedure_context.peer_id;
+        let peer_id = &context.remote_peer.id;
+
         if listens.len() > MAX_ADDRS {
             self.misbehave(peer_id, Misbehavior::TooManyAddresses(listens.len()))
         } else {
-            trace!("received listen addresses: {:?}", listens);
+            log::debug!("received listen addresses: {:?}", listens);
 
             let reachable_addrs = listens.into_iter().filter(reachable).collect::<Vec<_>>();
             self.add_remote_listen_addrs(peer_id, reachable_addrs);
@@ -116,20 +169,26 @@ impl IdentifyBehaviour {
 
     pub fn process_observed(
         &self,
-        procedure_context: &ProcedureContext,
+        context: &StateContext,
         observed: Option<Multiaddr>,
     ) -> MisbehaveResult {
-        let peer_id = &procedure_context.peer_id;
-        let session_type = procedure_context.session_context.ty;
+        let peer_id = &context.remote_peer.id;
+        let session_type = context.session_context.ty;
+
         let observed = match observed {
             Some(addr) => addr,
             None => {
-                warn!("observed is none from peer {:?}", peer_id);
+                log::warn!("observed is none from peer {:?}", context.remote_peer);
                 return MisbehaveResult::Disconnect;
             }
         };
 
-        trace!("received observed address: {}", observed);
+        log::debug!(
+            "received observed address {} from {}",
+            observed,
+            context.remote_peer
+        );
+
         let unobservable = |observed| -> bool {
             self.add_observed_addr(peer_id, observed, session_type)
                 .is_disconnect()
@@ -142,41 +201,8 @@ impl IdentifyBehaviour {
         }
     }
 
-    pub fn received_identity(
-        &self,
-        peer_id: &PeerId,
-        identification: &Identification,
-        identity: &str,
-    ) -> MisbehaveResult {
-        use super::protocol::Error::WrongIdentity;
-
-        let hash = match Hash::from_hex(identity) {
-            Ok(h) => h,
-            Err(err) => {
-                warn!("decode chain id from {:?} failed: {}", peer_id, err);
-
-                identification.failed(WrongIdentity(err.to_string()));
-                return MisbehaveResult::Disconnect;
-            }
-        };
-
-        if &hash != self.peer_mgr.chain_id().as_ref() {
-            warn!("peer {:?} from different chain", peer_id);
-
-            identification.failed(WrongIdentity("different chain id".to_owned()));
-            return MisbehaveResult::Disconnect;
-        }
-
-        identification.pass();
-        MisbehaveResult::Continue
-    }
-
-    pub fn local_listen_addrs(&self) -> Vec<Multiaddr> {
-        self.peer_mgr.listen_addrs()
-    }
-
     pub fn add_remote_listen_addrs(&self, peer_id: &PeerId, addrs: Vec<Multiaddr>) {
-        debug!("add remote listen {:?} addrs {:?}", peer_id, addrs);
+        log::debug!("add remote listen {:?} addrs {:?}", peer_id, addrs);
 
         let identified_addrs = PeerManagerEvent::IdentifiedAddrs {
             pid: peer_id.to_owned(),
@@ -191,7 +217,7 @@ impl IdentifyBehaviour {
         addr: Multiaddr,
         ty: SessionType,
     ) -> MisbehaveResult {
-        debug!("add observed: {:?}, addr {:?}, ty: {:?}", peer, addr, ty);
+        log::debug!("add observed: {:?}, addr {:?}, ty: {:?}", peer, addr, ty);
 
         // Noop right now
         MisbehaveResult::Continue
@@ -200,17 +226,9 @@ impl IdentifyBehaviour {
     /// Report misbehavior
     pub fn misbehave(&self, peer: &PeerId, kind: Misbehavior) -> MisbehaveResult {
         match kind {
-            Misbehavior::DuplicateListenAddrs => {
-                debug!("peer {:?} misbehave: duplicatelisten addrs", peer)
-            }
-            Misbehavior::DuplicateObservedAddr => {
-                debug!("peer {:?} misbehave: duplicate observed addr", peer)
-            }
             Misbehavior::TooManyAddresses(size) => {
-                debug!("peer {:?} misbehave: too many address {}", peer, size)
+                log::warn!("peer {:?} misbehave: too many address {}", peer, size)
             }
-            Misbehavior::InvalidData => debug!("peer {:?} misbehave: invalid data", peer),
-            Misbehavior::Timeout => debug!("peer {:?} misbehave: timeout", peer),
         }
 
         MisbehaveResult::Disconnect
