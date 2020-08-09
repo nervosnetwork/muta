@@ -148,12 +148,14 @@ impl IdentifyBehaviour {
         identification: &Identification,
         identity: &str,
     ) -> MisbehaveResult {
+        use super::protocol::Error::WrongIdentity;
+
         let hash = match Hash::from_hex(identity) {
             Ok(h) => h,
             Err(err) => {
                 warn!("decode chain id from {:?} failed: {}", peer_id, err);
 
-                identification.failed();
+                identification.failed(WrongIdentity(err.to_string()));
                 return MisbehaveResult::Disconnect;
             }
         };
@@ -161,7 +163,7 @@ impl IdentifyBehaviour {
         if &hash != self.peer_mgr.chain_id().as_ref() {
             warn!("peer {:?} from different chain", peer_id);
 
-            identification.failed();
+            identification.failed(WrongIdentity("different chain id".to_owned()));
             return MisbehaveResult::Disconnect;
         }
 

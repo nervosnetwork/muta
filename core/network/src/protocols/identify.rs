@@ -8,8 +8,9 @@ use std::sync::Arc;
 
 use futures::channel::mpsc::UnboundedSender;
 use tentacle::builder::MetaBuilder;
+use tentacle::secio::PeerId;
 use tentacle::service::{ProtocolHandle, ProtocolMeta};
-use tentacle::{ProtocolId, SessionId};
+use tentacle::ProtocolId;
 
 use crate::event::PeerManagerEvent;
 use crate::peer_manager::PeerManagerHandle;
@@ -51,7 +52,7 @@ impl Identify {
             .build()
     }
 
-    pub fn wait_identified(session_id: SessionId) -> WaitIdentification {
-        IdentifyProtocol::wait(session_id)
+    pub fn wait_identified(peer_id: PeerId) -> WaitIdentification {
+        IdentifyProtocol::wait(peer_id)
     }
 }

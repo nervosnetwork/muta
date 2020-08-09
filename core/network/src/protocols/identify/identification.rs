@@ -11,68 +11,67 @@ use parking_lot::Mutex;
 type Index = usize;
 
 pub struct WaitIdentification {
-    idx:   Index,
-    ident: Identification,
+    idx:          Index,
+    ident_status: Arc<Mutex<IdentificationStatus>>,
 }
 
 impl WaitIdentification {
-    pub fn new(ident: Identification) -> Self {
+    fn new(ident_status: Arc<Mutex<IdentificationStatus>>) -> Self {
         WaitIdentification {
             idx: usize::MAX,
-            ident,
+            ident_status,
         }
     }
 }
 
 impl Future for WaitIdentification {
-    type Output = Result<(), ()>;
+    type Output = Result<(), super::protocol::Error>;
 
     fn poll(mut self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
-        let updated_idx = {
-            let cur_idx = self.idx;
-
-            match &mut *self.ident.status.lock() {
+        let insert_idx = {
+            let idx = self.idx;
+            match &mut *self.ident_status.lock() {
                 IdentificationStatus::Done(ret) => return Poll::Ready(ret.to_owned()),
-                IdentificationStatus::Pending(_) if cur_idx != usize::MAX => return Poll::Pending,
+                IdentificationStatus::Pending(_) if idx != usize::MAX => return Poll::Pending,
                 IdentificationStatus::Pending(wakerset) => wakerset.insert(ctx.waker().to_owned()),
             }
         };
 
-        self.idx = updated_idx;
+        self.idx = insert_idx;
         Poll::Pending
     }
 }
 
 impl Drop for WaitIdentification {
     fn drop(&mut self) {
-        if let IdentificationStatus::Pending(wakerset) = &mut *self.ident.status.lock() {
+        if let IdentificationStatus::Pending(wakerset) = &mut *self.ident_status.lock() {
             wakerset.remove(self.idx);
         }
     }
 }
 
-#[derive(Clone)]
 pub struct Identification {
     status: Arc<Mutex<IdentificationStatus>>,
 }
 
 impl Identification {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Identification {
             status: Default::default(),
         }
     }
 
     pub fn wait(&self) -> WaitIdentification {
-        WaitIdentification::new(self.clone())
+        WaitIdentification::new(Arc::clone(&self.status))
     }
 
     pub fn pass(&self) {
+        log::error!("passed");
         self.done(Ok(()))
     }
 
-    pub fn failed(&self) {
-        self.done(Err(()))
+    pub fn failed(&self, error: super::protocol::Error) {
+        self.done(Err(error))
     }
 
     fn fail_if_not_done(&self) {
@@ -83,10 +82,10 @@ impl Identification {
             }
         }
 
-        self.failed()
+        self.failed(super::protocol::Error::WaitFutDropped)
     }
 
-    fn done(&self, ret: Result<(), ()>) {
+    fn done(&self, ret: Result<(), super::protocol::Error>) {
         let mut status = self.status.lock();
 
         match std::mem::replace(&mut *status, IdentificationStatus::Done(ret)) {
@@ -172,7 +171,7 @@ impl WakerSet {
 
 enum IdentificationStatus {
     Pending(WakerSet),
-    Done(Result<(), ()>),
+    Done(Result<(), super::protocol::Error>),
 }
 
 impl Default for IdentificationStatus {

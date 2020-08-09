@@ -13,7 +13,6 @@ use tentacle::multiaddr::{Multiaddr, Protocol};
 use tentacle::secio::PeerId;
 use tentacle::service::{ServiceControl, SessionType, TargetProtocol};
 use tentacle::traits::SessionProtocol;
-use tentacle::{ProtocolId, SessionId};
 
 use super::behaviour::{IdentifyBehaviour, Misbehavior, MAX_ADDRS};
 use super::common::reachable;
@@ -23,19 +22,31 @@ use super::message::{self, Acknowledge, Identity};
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(8);
 
 lazy_static! {
-    static ref SESSION_WAIT_BACKLOG: RwLock<HashMap<SessionId, Identification>> =
+    // NOTE: Use peer id here because trust metric integrated test run in one process
+    static ref PEER_IDENTIFICATION_BACKLOG: RwLock<HashMap<PeerId, Identification>> =
         RwLock::new(HashMap::new());
 }
 
-#[derive(Debug, Display)]
+#[derive(Debug, Display, Clone)]
 pub enum Error {
-    #[display(fmt = "session does not enable encryption")]
+    #[display(fmt = "remote peer does not enable encryption")]
     EncryptionNotEnabled,
+
+    #[display(fmt = "wrong identity {}", _0)]
+    WrongIdentity(String),
+
+    #[display(fmt = "timeout")]
+    Timeout,
+
+    #[display(fmt = "wait future dropped")]
+    WaitFutDropped,
+
+    #[display(fmt = "disconnected")]
+    Disconnected,
 }
 
 pub struct ProcedureContext {
     pub peer_id:              PeerId,
-    pub protocol_id:          ProtocolId,
     pub service_control:      ServiceControl,
     pub session_context:      SessionContext,
     pub timeout_abort_handle: Option<AbortHandle>,
@@ -86,14 +97,14 @@ impl IdentifyProtocol {
         }
     }
 
-    pub fn wait(session_id: SessionId) -> WaitIdentification {
+    pub fn wait(peer_id: PeerId) -> WaitIdentification {
         let identification = Identification::new();
         let wait_fut = identification.wait();
 
         {
-            SESSION_WAIT_BACKLOG
+            PEER_IDENTIFICATION_BACKLOG
                 .write()
-                .insert(session_id, identification);
+                .insert(peer_id, identification);
         }
 
         wait_fut
@@ -113,7 +124,6 @@ impl IdentifyProtocol {
 
         let procedure_context = ProcedureContext {
             peer_id:              remote_peer_id,
-            protocol_id:          context.proto_id(),
             service_control:      context.control().clone(),
             session_context:      context.session.clone(),
             timeout_abort_handle: None,
@@ -153,7 +163,7 @@ impl SessionProtocol for IdentifyProtocol {
                 return;
             }
         };
-        log::trace!("connected from {:?}", procedure_context.peer_id);
+        log::debug!("connected from {:?}", procedure_context.peer_id);
 
         let service_control = procedure_context.service_control.clone();
         let session_context = procedure_context.session_context.clone();
@@ -216,12 +226,14 @@ impl SessionProtocol for IdentifyProtocol {
     }
 
     fn disconnected(&mut self, context: ProtocolContextMutRef) {
-        let session_id = context.session.id;
-        if let Some(identification) = SESSION_WAIT_BACKLOG.write().remove(&session_id) {
-            identification.failed()
-        }
+        let peer_id = match context.session.remote_pubkey.as_ref() {
+            Some(pubkey) => pubkey.peer_id(),
+            None => return,
+        };
 
-        log::trace!("disconnected from session {}", context.session.id);
+        if let Some(identification) = PEER_IDENTIFICATION_BACKLOG.write().remove(&peer_id) {
+            identification.failed(self::Error::Disconnected);
+        }
     }
 
     fn received(&mut self, protocol_context: ProtocolContextMutRef, data: bytes::Bytes) {
@@ -239,14 +251,15 @@ impl SessionProtocol for IdentifyProtocol {
                                 context.cancel_timeout();
 
                                 let behaviour = &mut self.behaviour;
-                                let wait_identified =
-                                    match { SESSION_WAIT_BACKLOG.write().remove(&session.id) } {
-                                        Some(ident) => ident,
-                                        None => {
-                                            let _ = protocol_context.disconnect(session.id);
-                                            return;
-                                        }
-                                    };
+                                let wait_identified = match {
+                                    PEER_IDENTIFICATION_BACKLOG.write().remove(&context.peer_id)
+                                } {
+                                    Some(ident) => ident,
+                                    None => {
+                                        let _ = protocol_context.disconnect(session.id);
+                                        return;
+                                    }
+                                };
 
                                 // Need to interrupt processing, avoid pollution
                                 if behaviour
@@ -320,16 +333,18 @@ impl SessionProtocol for IdentifyProtocol {
                     ClientProcedure::WaitAck => match Acknowledge::decode(data) {
                         Ok(msg) => {
                             context.cancel_timeout();
+                            log::warn!("received server ack");
 
                             let behaviour = &mut self.behaviour;
-                            let identification =
-                                match { SESSION_WAIT_BACKLOG.write().remove(&session.id) } {
-                                    Some(ident) => ident,
-                                    None => {
-                                        let _ = protocol_context.disconnect(session.id);
-                                        return;
-                                    }
-                                };
+                            let identification = match {
+                                PEER_IDENTIFICATION_BACKLOG.write().remove(&context.peer_id)
+                            } {
+                                Some(ident) => ident,
+                                None => {
+                                    let _ = protocol_context.disconnect(session.id);
+                                    return;
+                                }
+                            };
                             identification.pass();
 
                             if behaviour
