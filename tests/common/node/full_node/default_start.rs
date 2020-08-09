@@ -4,7 +4,6 @@ use super::diagnostic::{
 };
 /// Almost same as src/default_start.rs, only remove graphql service.
 use super::{config::Config, consts, error::MainError, memory_db::MemoryDB, Sync};
-use crate::trust_metric_all::common;
 
 use std::collections::HashMap;
 use std::convert::TryFrom;
@@ -224,7 +223,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     );
 
     // Create full transactions wal
-    let wal_path = common::tmp_dir()
+    let wal_path = crate::common::tmp_dir()
         .to_str()
         .expect("wal path string")
         .to_string();

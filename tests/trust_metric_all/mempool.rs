@@ -1,7 +1,9 @@
-use super::{common, node::client_node::ClientNodeError, trust_test};
-
 use core_mempool::{MsgNewTxs, END_GOSSIP_NEW_TXS};
 use protocol::{traits::TrustFeedback, types::Hash, Bytes};
+
+use super::client_node::ClientNodeError;
+use super::common;
+use super::trust_test;
 
 #[test]
 fn should_report_good_on_valid_transaction() {

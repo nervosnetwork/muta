@@ -1,10 +1,11 @@
-use super::{node::client_node::ClientNodeError, trust_test};
-
 use core_consensus::message::{
     Choke, Proposal, Vote, BROADCAST_HEIGHT, END_GOSSIP_AGGREGATED_VOTE, END_GOSSIP_SIGNED_CHOKE,
     END_GOSSIP_SIGNED_PROPOSAL, END_GOSSIP_SIGNED_VOTE, QC,
 };
 use protocol::traits::TrustFeedback;
+
+use super::client_node::ClientNodeError;
+use super::trust_test;
 
 #[test]
 fn should_be_disconnected_for_repeated_undecodeable_proposal_within_four_intervals() {

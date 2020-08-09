@@ -1,11 +1,9 @@
-use super::diagnostic::{
-    TrustNewIntervalReq, TrustTwinEventReq, TwinEvent, GOSSIP_TRUST_NEW_INTERVAL,
-    GOSSIP_TRUST_TWIN_EVENT,
-};
-use super::{
-    consts,
-    sync::{Sync, SyncError, SyncEvent},
-};
+use std::collections::HashSet;
+use std::convert::TryFrom;
+use std::iter::FromIterator;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::ops::Deref;
+use std::str::FromStr;
 
 use common_crypto::{PrivateKey, PublicKey, Secp256k1PrivateKey, ToPublicKey};
 use core_consensus::message::{
@@ -16,21 +14,18 @@ use core_network::{
     TrustReport,
 };
 use derive_more::Display;
-use protocol::{
-    async_trait,
-    traits::{Context, Gossip, MessageCodec, MessageHandler, Priority, Rpc, TrustFeedback},
-    types::{Address, Block, BlockHeader, Hash, Proof},
-    Bytes,
+use protocol::traits::{
+    Context, Gossip, MessageCodec, MessageHandler, Priority, Rpc, TrustFeedback,
 };
+use protocol::types::{Address, Block, BlockHeader, Hash, Proof};
+use protocol::{async_trait, Bytes};
 
-use std::{
-    collections::HashSet,
-    convert::TryFrom,
-    iter::FromIterator,
-    net::{IpAddr, Ipv4Addr, SocketAddr},
-    ops::Deref,
-    str::FromStr,
+use crate::common::node::consts;
+use crate::common::node::diagnostic::{
+    TrustNewIntervalReq, TrustTwinEventReq, TwinEvent, GOSSIP_TRUST_NEW_INTERVAL,
+    GOSSIP_TRUST_TWIN_EVENT,
 };
+use crate::common::node::sync::{Sync, SyncError, SyncEvent};
 
 #[derive(Debug, Display)]
 pub enum ClientNodeError {

@@ -94,6 +94,11 @@ name = "trust_metric"
 path = "tests/trust_metric.rs"
 required-features = [ "core-network/diagnostic" ]
 
+[[test]]
+name = "verify_chain_id"
+path = "tests/verify_chain_id.rs"
+required-features = [ "core-network/diagnostic" ]
+
 [[bench]]
 name = "bench_execute"
 path = "benchmark/mod.rs"

@@ -1,21 +1,22 @@
 #![allow(clippy::mutable_key_type)]
 
+mod client_node;
 mod common;
 mod consensus;
 mod logger;
 mod mempool;
-mod node;
 
 use std::panic;
 
 use common_crypto::{PrivateKey, Secp256k1PrivateKey};
 use futures::future::BoxFuture;
 
-use node::client_node::{ClientNode, ClientNodeError};
-use node::sync::Sync;
+use crate::common::node::sync::Sync;
+use crate::common::{available_port_pair, node};
+use client_node::{ClientNode, ClientNodeError};
 
 fn trust_test(test: impl FnOnce(ClientNode) -> BoxFuture<'static, ()> + Send + 'static) {
-    let (full_port, client_port) = common::available_port_pair();
+    let (full_port, client_port) = available_port_pair();
     let mut rt = tokio::runtime::Runtime::new().expect("create runtime");
     let local = tokio::task::LocalSet::new();
 
@@ -35,8 +36,7 @@ fn trust_test(test: impl FnOnce(ClientNode) -> BoxFuture<'static, ()> + Send + '
         sync.wait().await;
 
         let handle = tokio::spawn(async move {
-            let client_node =
-                node::client_node::connect(full_port, full_seckey, client_port, sync).await;
+            let client_node = client_node::connect(full_port, full_seckey, client_port, sync).await;
 
             test(client_node).await;
         });
