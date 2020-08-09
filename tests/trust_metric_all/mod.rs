@@ -6,11 +6,13 @@ mod logger;
 mod mempool;
 mod node;
 
+use std::panic;
+
+use common_crypto::{PrivateKey, Secp256k1PrivateKey};
 use futures::future::BoxFuture;
+
 use node::client_node::{ClientNode, ClientNodeError};
 use node::sync::Sync;
-
-use std::panic;
 
 fn trust_test(test: impl FnOnce(ClientNode) -> BoxFuture<'static, ()> + Send + 'static) {
     let (full_port, client_port) = common::available_port_pair();
@@ -19,13 +21,22 @@ fn trust_test(test: impl FnOnce(ClientNode) -> BoxFuture<'static, ()> + Send + '
 
     local.block_on(&mut rt, async move {
         let sync = Sync::new();
-        tokio::task::spawn_local(node::full_node::run(full_port, sync.clone()));
+        let full_seckey = {
+            let key = Secp256k1PrivateKey::generate(&mut rand::rngs::OsRng);
+            hex::encode(key.to_bytes()).to_string()
+        };
+        tokio::task::spawn_local(node::full_node::run(
+            full_port,
+            full_seckey.clone(),
+            sync.clone(),
+        ));
 
         // Wait full node network initialization
         sync.wait().await;
 
         let handle = tokio::spawn(async move {
-            let client_node = node::client_node::connect(full_port, client_port, sync).await;
+            let client_node =
+                node::client_node::connect(full_port, full_seckey, client_port, sync).await;
 
             test(client_node).await;
         });

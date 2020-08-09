@@ -3,17 +3,17 @@ use super::diagnostic::{
     GOSSIP_TRUST_TWIN_EVENT,
 };
 use super::{
-    config::Config,
     consts,
     sync::{Sync, SyncError, SyncEvent},
 };
 
-use common_crypto::{PrivateKey, Secp256k1PrivateKey};
+use common_crypto::{PrivateKey, PublicKey, Secp256k1PrivateKey, ToPublicKey};
 use core_consensus::message::{
     FixedBlock, FixedHeight, BROADCAST_HEIGHT, RPC_RESP_SYNC_PULL_BLOCK, RPC_SYNC_PULL_BLOCK,
 };
 use core_network::{
-    DiagnosticEvent, NetworkConfig, NetworkService, NetworkServiceHandle, PeerId, TrustReport,
+    DiagnosticEvent, NetworkConfig, NetworkService, NetworkServiceHandle, PeerId, PeerIdExt,
+    TrustReport,
 };
 use derive_more::Display;
 use protocol::{
@@ -25,6 +25,7 @@ use protocol::{
 
 use std::{
     collections::HashSet,
+    convert::TryFrom,
     iter::FromIterator,
     net::{IpAddr, Ipv4Addr, SocketAddr},
     ops::Deref,
@@ -89,8 +90,13 @@ pub struct ClientNode {
     pub sync:           Sync,
 }
 
-pub async fn connect(full_node_port: u16, listen_port: u16, sync: Sync) -> ClientNode {
-    let full_node_peer_id = full_node_peer_id();
+pub async fn connect(
+    full_node_port: u16,
+    full_seckey: String,
+    listen_port: u16,
+    sync: Sync,
+) -> ClientNode {
+    let full_node_peer_id = full_node_peer_id(&full_seckey);
     let full_node_addr = format!("127.0.0.1:{}", full_node_port);
 
     let config = NetworkConfig::new()
@@ -292,14 +298,13 @@ impl Deref for ClientNode {
     }
 }
 
-fn full_node_peer_id() -> PeerId {
-    let config: Config =
-        common_config_parser::parse(&consts::CHAIN_CONFIG_PATH).expect("parse chain config.toml");
-
-    let mut bootstraps = config.network.bootstraps.expect("config.toml full node");
-    let full_node = bootstraps.pop().expect("there should be one bootstrap");
-
-    full_node.peer_id.parse().expect("parse peer id")
+fn full_node_peer_id(full_seckey: &str) -> PeerId {
+    let seckey = {
+        let key = hex::decode(full_seckey).expect("hex private key string");
+        Secp256k1PrivateKey::try_from(key.as_ref()).expect("valid private key")
+    };
+    let pubkey = seckey.pub_key();
+    PeerId::from_pubkey_bytes(pubkey.to_bytes()).expect("valid public key")
 }
 
 fn mock_block(height: u64) -> Block {

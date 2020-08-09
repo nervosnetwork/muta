@@ -135,6 +135,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     config: Config,
     service_mapping: Arc<Mapping>,
     db: MemoryDB,
+    seckey: String,
     sync: Sync,
 ) -> ProtocolResult<()> {
     log::info!("node starts");
@@ -160,8 +161,6 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         .write_timeout(config.network.write_timeout)
         .recv_buffer_size(config.network.recv_buffer_size);
 
-    let network_privkey = config.privkey.as_string_trim0x();
-
     let mut bootstrap_pairs = vec![];
     if let Some(bootstrap) = &config.network.bootstraps {
         for bootstrap in bootstrap.iter() {
@@ -174,7 +173,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     let network_config = network_config
         .bootstraps(bootstrap_pairs)?
         .allowlist(allowlist)?
-        .secio_keypair(network_privkey)?;
+        .secio_keypair(seckey.clone())?;
     let mut network_service = NetworkService::new(network_config);
     network_service
         .listen(config.network.listening_address)

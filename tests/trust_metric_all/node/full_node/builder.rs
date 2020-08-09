@@ -84,7 +84,7 @@ impl<Mapping: 'static + ServiceMapping> Muta<Mapping> {
         }
     }
 
-    pub async fn run(self, sync: Sync) -> ProtocolResult<()> {
+    pub async fn run(self, seckey: String, sync: Sync) -> ProtocolResult<()> {
         // run muta
         let memory_db = MemoryDB::default();
 
@@ -93,6 +93,7 @@ impl<Mapping: 'static + ServiceMapping> Muta<Mapping> {
             self.config,
             Arc::clone(&self.service_mapping),
             memory_db,
+            seckey,
             sync,
         )
         .await?;
