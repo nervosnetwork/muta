@@ -7,4 +7,4 @@ mod ping;
 mod transmitter;
 
 pub mod identify;
-pub use self::core::{CoreProtocol, CoreProtocolBuilder};
+pub use self::core::{CoreProtocol, CoreProtocolBuilder, OpenedProtocols};

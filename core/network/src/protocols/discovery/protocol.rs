@@ -65,6 +65,16 @@ impl ServiceProtocol for DiscoveryProtocol {
             return;
         }
 
+        let peer_id = match context.session.remote_pubkey.as_ref() {
+            Some(pubkey) => pubkey.peer_id(),
+            None => {
+                log::warn!("peer connection must be encrypted");
+                let _ = context.disconnect(context.session.id);
+                return;
+            }
+        };
+        crate::protocols::OpenedProtocols::register(peer_id, context.proto_id());
+
         let (sender, receiver) = channel(8);
         self.discovery_senders.insert(session.id, sender);
         let substream = Substream::new(context, receiver);

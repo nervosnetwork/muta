@@ -140,6 +140,22 @@ impl StateContext {
         }
     }
 
+    pub fn set_open_protocols_timeout(&mut self, timeout: Duration) {
+        let service_control = self.service_control.clone();
+        let remote_peer = Arc::clone(&self.remote_peer);
+
+        tokio::spawn(async move {
+            Delay::new(timeout).await;
+
+            if crate::protocols::OpenedProtocols::is_all_opened(&remote_peer.id) {
+                return;
+            }
+
+            log::warn!("peer {} open protocols timeout, disconnect it", remote_peer);
+            let _ = service_control.disconnect(remote_peer.sid);
+        });
+    }
+
     pub fn set_timeout(&mut self, description: &'static str, timeout: Duration) {
         let service_control = self.service_control.clone();
         let remote_peer = Arc::clone(&self.remote_peer);
@@ -251,6 +267,11 @@ impl SessionProtocol for IdentifyProtocol {
         };
         log::debug!("connected from {:?}", state_context.remote_peer);
 
+        crate::protocols::OpenedProtocols::register(
+            state_context.remote_peer.id.to_owned(),
+            state_context.proto_id,
+        );
+
         match protocol_context.session.ty {
             SessionType::Inbound => {
                 state_context.set_timeout("wait client identity", DEFAULT_TIMEOUT);
@@ -279,6 +300,9 @@ impl SessionProtocol for IdentifyProtocol {
             Some(pubkey) => pubkey.peer_id(),
             None => return,
         };
+
+        // TODO: Remove from upper level
+        crate::protocols::OpenedProtocols::remove(&peer_id);
 
         if let Some(identification) = PEER_IDENTIFICATION_BACKLOG.write().remove(&peer_id) {
             identification.failed(self::Error::Disconnected);
@@ -341,6 +365,7 @@ impl SessionProtocol for IdentifyProtocol {
                     }
 
                     self.behaviour.send_ack(&context);
+                    context.set_open_protocols_timeout(DEFAULT_TIMEOUT);
                     *procedure = ServerProcedure::WaitOpenProtocols;
                 }
                 ServerProcedure::Failed | ServerProcedure::WaitOpenProtocols => {

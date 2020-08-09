@@ -1,6 +1,11 @@
+use std::collections::{HashMap, HashSet};
+use std::iter::FromIterator;
 use std::time::Duration;
 
 use futures::channel::mpsc::UnboundedSender;
+use lazy_static::lazy_static;
+use parking_lot::RwLock;
+use tentacle::secio::PeerId;
 use tentacle::service::{ProtocolMeta, TargetProtocol};
 use tentacle::ProtocolId;
 
@@ -17,6 +22,44 @@ pub const PING_PROTOCOL_ID: usize = 1;
 pub const IDENTIFY_PROTOCOL_ID: usize = 2;
 pub const DISCOVERY_PROTOCOL_ID: usize = 3;
 pub const TRANSMITTER_PROTOCOL_ID: usize = 4;
+
+lazy_static! {
+    // NOTE: Use peer id here because trust metric integrated test run in one process
+    static ref PEER_OPENED_PROTOCOLS: RwLock<HashMap<PeerId, HashSet<ProtocolId>>> = RwLock::new(HashMap::new());
+}
+
+pub struct OpenedProtocols {}
+
+impl OpenedProtocols {
+    pub fn register(peer_id: PeerId, proto_id: ProtocolId) {
+        PEER_OPENED_PROTOCOLS
+            .write()
+            .entry(peer_id)
+            .and_modify(|protos| {
+                protos.insert(proto_id);
+            })
+            .or_insert(HashSet::from_iter(vec![proto_id]));
+    }
+
+    #[allow(dead_code)]
+    pub fn unregister(peer_id: &PeerId, proto_id: ProtocolId) {
+        if let Some(ref mut proto_ids) = PEER_OPENED_PROTOCOLS.write().get_mut(peer_id) {
+            proto_ids.remove(&proto_id);
+        }
+    }
+
+    pub fn remove(peer_id: &PeerId) {
+        PEER_OPENED_PROTOCOLS.write().remove(peer_id);
+    }
+
+    pub fn is_all_opened(peer_id: &PeerId) -> bool {
+        PEER_OPENED_PROTOCOLS
+            .read()
+            .get(peer_id)
+            .map(|ids| ids.len() == 4)
+            .unwrap_or_else(|| false)
+    }
+}
 
 #[derive(Default)]
 pub struct CoreProtocolBuilder {
