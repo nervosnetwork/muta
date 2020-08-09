@@ -10,7 +10,6 @@ use bytes::Bytes;
 use futures::stream::StreamExt;
 use futures::{future, lock::Mutex};
 use futures_timer::Delay;
-use serde_json::Value;
 #[cfg(unix)]
 use tokio::signal::unix::{self as os_impl};
 
@@ -57,12 +56,8 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
 ) -> ProtocolResult<Block> {
     let metadata_payload = genesis.get_payload("metadata");
 
-    let nodes: Value =
-        serde_json::from_str(metadata_payload).expect("metadata's genesis payload is invalid JSON");
+    let hrp = Metadata::get_hrp_from_json(metadata_payload.to_string());
 
-    let hrp = nodes["bech32_address_hrp"]
-        .as_str()
-        .expect("bech32_address_hrp in genesis payload is not string?");
     // Set bech32 address hrp
     if !protocol::address_hrp_inited() {
         protocol::init_address_hrp(hrp.to_owned());
