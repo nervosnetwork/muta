@@ -66,7 +66,6 @@ impl Identification {
     }
 
     pub fn pass(&self) {
-        log::error!("passed");
         self.done(Ok(()))
     }
 
