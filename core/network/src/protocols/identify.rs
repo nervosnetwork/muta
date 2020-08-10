@@ -25,7 +25,7 @@ pub use self::identification::WaitIdentification;
 pub use self::protocol::Error;
 
 pub const NAME: &str = "chain_identify";
-pub const SUPPORT_VERSIONS: [&str; 1] = ["0.1"];
+pub const SUPPORT_VERSIONS: [&str; 1] = ["0.2"];
 
 pub struct Identify {
     behaviour: Arc<IdentifyBehaviour>,
