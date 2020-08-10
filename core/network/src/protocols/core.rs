@@ -52,6 +52,15 @@ impl OpenedProtocols {
         PEER_OPENED_PROTOCOLS.write().remove(peer_id);
     }
 
+    #[cfg(test)]
+    pub fn is_open(peer_id: &PeerId, proto_id: &ProtocolId) -> bool {
+        PEER_OPENED_PROTOCOLS
+            .read()
+            .get(peer_id)
+            .map(|ids| ids.contains(proto_id))
+            .unwrap_or_else(|| false)
+    }
+
     pub fn is_all_opened(peer_id: &PeerId) -> bool {
         PEER_OPENED_PROTOCOLS
             .read()
