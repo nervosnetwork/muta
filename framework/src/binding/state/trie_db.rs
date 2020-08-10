@@ -66,6 +66,29 @@ impl RocksTrieDB {
 
         Ok(res)
     }
+
+    pub fn insert_batch_without_cache(&self, keys: Vec<Vec<u8>>, values: Vec<Vec<u8>>) {
+        let mut _total_size = 0;
+        let mut batch = WriteBatch::default();
+
+        for (key, val) in keys.iter().zip(values.iter()) {
+            _total_size += key.len();
+            _total_size += val.len();
+            batch.put(key, val);
+        }
+
+        self.db.write(batch).unwrap();
+    }
+
+    #[cfg(test)]
+    pub fn insert_without_cache(&self, key: Vec<u8>, value: Vec<u8>) {
+        self.db.put(key, value).unwrap();
+    }
+
+    #[cfg(test)]
+    pub fn get_without_cache(&self, key: &[u8]) -> Option<Vec<u8>> {
+        self.db.get(key).unwrap()
+    }
 }
 
 impl cita_trie::DB for RocksTrieDB {
@@ -111,8 +134,6 @@ impl cita_trie::DB for RocksTrieDB {
     }
 
     fn insert_batch(&self, keys: Vec<Vec<u8>>, values: Vec<Vec<u8>>) -> Result<(), Self::Error> {
-        let inst = Instant::now();
-
         if keys.len() != values.len() {
             return Err(RocksTrieDBError::BatchLengthMismatch);
         }
@@ -130,8 +151,8 @@ impl cita_trie::DB for RocksTrieDB {
             }
         }
 
+        let inst = Instant::now();
         self.db.write(batch).map_err(to_store_err)?;
-
         on_storage_put_state(inst.elapsed(), total_size as i64);
         Ok(())
     }
