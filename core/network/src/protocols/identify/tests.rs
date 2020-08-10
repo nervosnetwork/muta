@@ -648,7 +648,8 @@ async fn should_pass_error_to_wait_identification_result_if_failed_identify() {
 }
 
 #[tokio::test]
-async fn should_pass_disconnected_to_wait_identification_result_if_still_wait_identify_but_disconnected() {
+async fn should_pass_disconnected_to_wait_identification_result_if_still_wait_identify_but_disconnected(
+) {
     let mut identify = IdentifyProtocol::new();
     let proto_context =
         ProtocolContext::make(PROTOCOL_ID.into(), SESSION_ID.into(), SessionType::Outbound);
@@ -689,8 +690,8 @@ async fn should_remove_from_opened_protocols_after_disconnect() {
     identify.on_connected(&IdentifyProtocolContext(&proto_context));
     identify.on_disconnected(&IdentifyProtocolContext(&proto_context));
 
-    assert_eq!(crate::protocols::OpenedProtocols::is_open(
-        &peer_id,
-        &PROTOCOL_ID.into()
-    ), false);
+    assert_eq!(
+        crate::protocols::OpenedProtocols::is_open(&peer_id, &PROTOCOL_ID.into()),
+        false
+    );
 }

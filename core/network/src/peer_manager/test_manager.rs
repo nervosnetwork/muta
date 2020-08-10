@@ -3143,7 +3143,8 @@ async fn should_reject_same_ip_connection_when_reach_limit_on_unidentified_sessi
 }
 
 #[tokio::test]
-async fn should_accept_always_allow_peer_even_if_we_reach_max_connections_on_unidentified_session() {
+async fn should_accept_always_allow_peer_even_if_we_reach_max_connections_on_unidentified_session()
+{
     let (mut mgr, mut conn_rx) = make_manager(0, 10);
     let _remote_peers = make_sessions(&mut mgr, 10, 5000, SessionType::Outbound).await;
 
