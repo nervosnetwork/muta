@@ -81,6 +81,25 @@ impl AddressInfo {
 
         Ok(())
     }
+
+    #[cfg(test)]
+    pub fn mock_valid() -> Self {
+        let listen_addr: Multiaddr = "/ip4/47.111.169.36/tcp/2000".parse().unwrap();
+        let observed_addr: Multiaddr = "/ip4/47.111.169.36/tcp/2001".parse().unwrap();
+
+        AddressInfo {
+            listen_addrs:  vec![listen_addr.to_vec()],
+            observed_addr: observed_addr.to_vec(),
+        }
+    }
+
+    #[cfg(test)]
+    pub fn mock_invalid() -> Self {
+        AddressInfo {
+            listen_addrs:  vec![],
+            observed_addr: b"xxx".to_vec(),
+        }
+    }
 }
 
 #[derive(Message)]
@@ -109,6 +128,29 @@ impl Identity {
 
         Ok(buf.freeze())
     }
+
+    #[cfg(test)]
+    pub fn mock_valid() -> Self {
+        use protocol::types::Hash;
+
+        Identity {
+            chain_id:  Hash::digest(Bytes::from_static(b"hello")).as_hex(),
+            addr_info: Some(AddressInfo::mock_valid()),
+        }
+    }
+
+    #[cfg(test)]
+    pub fn mock_invalid() -> Self {
+        use protocol::types::Hash;
+
+        let identity = Identity {
+            chain_id:  Hash::digest(Bytes::from_static(b"hello")).as_hex(),
+            addr_info: Some(AddressInfo::mock_invalid()),
+        };
+        assert!(identity.validate().is_err());
+
+        identity
+    }
 }
 
 #[derive(Message)]
@@ -133,5 +175,19 @@ impl Acknowledge {
         self.encode(&mut buf)?;
 
         Ok(buf.freeze())
+    }
+
+    #[cfg(test)]
+    pub fn mock_valid() -> Self {
+        Acknowledge {
+            addr_info: Some(AddressInfo::mock_valid()),
+        }
+    }
+
+    #[cfg(test)]
+    pub fn mock_invalid() -> Self {
+        Acknowledge {
+            addr_info: Some(AddressInfo::mock_invalid()),
+        }
     }
 }
