@@ -58,6 +58,8 @@ impl Identify {
 
     #[cfg(test)]
     pub fn build_meta(self, protocol_id: ProtocolId) -> ProtocolMeta {
+        let _ = self.behaviour;
+
         MetaBuilder::new()
             .id(protocol_id)
             .name(name!(NAME))
