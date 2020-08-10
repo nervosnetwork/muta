@@ -5,6 +5,7 @@
 
 * load hrp before deserializing genesis payload to take hrp effect ([#405](https://github.com/nervosnetwork/muta/issues/405)) ([828e6d5](https://github.com/nervosnetwork/muta/commit/828e6d539cf4da9cf042c450418e75a944315014))
 
+* service field of event is not binded to ctx.service ([#405](https://github.com/nervosnetwork/muta/issues/408)) ([120f1ee](https://github.com/nervosnetwork/muta/commit/120f1ee125593d7def075460f34fc3dcd5a8fe83))
 
 ### Features
 
@@ -131,3 +132,4 @@ Block proposer is address instead public key
 Block proposer is address instead public key
 
 * fix: compilation failed
+
