@@ -67,6 +67,7 @@ impl RocksTrieDB {
         Ok(res)
     }
 
+    #[cfg(test)]
     pub fn insert_batch_without_cache(&self, keys: Vec<Vec<u8>>, values: Vec<Vec<u8>>) {
         let mut _total_size = 0;
         let mut batch = WriteBatch::default();

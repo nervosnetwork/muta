@@ -13,11 +13,10 @@ use protocol::types::{Address, Hash, MerkleRoot};
 use crate::binding::state::{GeneralServiceState, MPTTrie, RocksTrieDB};
 
 #[rustfmt::skip]
-/// Bench in AMD Ryzen 7 3800X 8-Core Processor(16 x 4250)
-/// test binding::state::trie_db::tests::bench_rand              ... bench:      10,702 ns/iter (+/- 341)
+/// Bench in AMD Ryzen 7 3800X 8-Core Processor (16 x 4250)
 /// test binding::tests::state::bench_get_cache_hit              ... bench:          47 ns/iter (+/- 3)
 /// test binding::tests::state::bench_get_cache_miss             ... bench:       1,063 ns/iter (+/- 35)
-/// test binding::tests::state::bench_get_without_cache          ... bench:          47 ns/iter (+/- 0)
+/// test binding::tests::state::bench_get_without_cache          ... bench:         526 ns/iter (+/- 19)
 /// test binding::tests::state::bench_insert_batch_with_cache    ... bench:   1,113,015 ns/iter (+/- 489,068)
 /// test binding::tests::state::bench_insert_batch_without_cache ... bench:     979,408 ns/iter (+/- 510,953)
 /// test binding::tests::state::bench_insert_with_cache          ... bench:       2,716 ns/iter (+/- 602)
@@ -115,13 +114,11 @@ fn bench_get_without_cache(b: &mut Bencher) {
     let keys = (0..1000).map(|_| rand_bytes()).collect::<Vec<_>>();
     let values = (0..1000).map(|_| rand_bytes()).collect::<Vec<_>>();
 
-    for (k, v) in keys.iter().zip(values.iter()) {
-        triedb.insert_without_cache(k.clone(), v.clone());
-    }
+    triedb.insert_batch_without_cache(keys.clone(), values.clone());
 
     let key = keys[0].clone();
     b.iter(|| {
-        let _ = triedb.get(&key).unwrap();
+        let _ = triedb.get_without_cache(&key).unwrap();
     })
 }
 
