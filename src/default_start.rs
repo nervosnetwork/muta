@@ -54,6 +54,15 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
     genesis: &Genesis,
     servive_mapping: Arc<Mapping>,
 ) -> ProtocolResult<Block> {
+    let metadata_payload = genesis.get_payload("metadata");
+
+    let hrp = Metadata::get_hrp_from_json(metadata_payload.to_string());
+
+    // Set bech32 address hrp
+    if !protocol::address_hrp_inited() {
+        protocol::init_address_hrp(hrp.to_owned());
+    }
+
     let metadata: Metadata =
         serde_json::from_str(genesis.get_payload("metadata")).expect("Decode metadata failed!");
 
@@ -105,11 +114,6 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
         Arc::clone(&storage),
         servive_mapping,
     )?;
-
-    // Set bech32 address hrp
-    if !protocol::address_hrp_inited() {
-        protocol::init_address_hrp(metadata.bech32_address_hrp);
-    }
 
     // Build genesis block.
     let proposer = Address::from_hash(Hash::digest(Bytes::from(
