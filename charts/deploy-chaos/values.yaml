@@ -2,6 +2,19 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
+benchmark:
+  schedule: "*/6 * * * *"
+  image: mutadev/muta-benchmark:v0.1.12
+  args:
+    - -d
+    - 300s
+    - -c
+    - 16
+    - -g
+    - 9999
+    - cpu
+    - 3
+
 namespace: mutadev
 
 repo_name: muta
@@ -30,7 +43,7 @@ chain_genesis:
   prevhash: 0x44915be5b6c20b0678cf05fcddbbaa832e25d7e6ac538784cd5c24de00d47472
   metadata:
     chain_id: 0xb6a4d7da21443f5e816e8700eea87610e6d769657d6b8ec73028457bf2ca4036
-    timeout_gap: 20
+    timeout_gap: 9999
     cycles_limit: 99999999
     cycles_price: 1
     interval: 3000
