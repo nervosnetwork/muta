@@ -4,6 +4,9 @@ mod identification;
 mod message;
 mod protocol;
 
+#[cfg(test)]
+mod tests;
+
 use std::sync::Arc;
 
 use futures::channel::mpsc::UnboundedSender;
@@ -39,6 +42,7 @@ impl Identify {
         Identify { behaviour }
     }
 
+    #[cfg(not(test))]
     pub fn build_meta(self, protocol_id: ProtocolId) -> ProtocolMeta {
         let behaviour = self.behaviour;
 
@@ -49,6 +53,18 @@ impl Identify {
             .session_handle(move || {
                 ProtocolHandle::Callback(Box::new(IdentifyProtocol::new(Arc::clone(&behaviour))))
             })
+            .build()
+    }
+
+    #[cfg(test)]
+    pub fn build_meta(self, protocol_id: ProtocolId) -> ProtocolMeta {
+        let behaviour = self.behaviour;
+
+        MetaBuilder::new()
+            .id(protocol_id)
+            .name(name!(NAME))
+            .support_versions(support_versions!(SUPPORT_VERSIONS))
+            .session_handle(move || ProtocolHandle::Callback(Box::new(IdentifyProtocol::new())))
             .build()
     }
 

@@ -9,14 +9,24 @@ use lazy_static::lazy_static;
 use parking_lot::RwLock;
 use prost::Message;
 use protocol::Bytes;
-use tentacle::context::{ProtocolContextMutRef, SessionContext};
 use tentacle::multiaddr::{Multiaddr, Protocol};
 use tentacle::secio::PeerId;
-use tentacle::service::{ServiceControl, SessionType, TargetProtocol};
+use tentacle::service::{SessionType, TargetProtocol};
 use tentacle::traits::SessionProtocol;
 use tentacle::{ProtocolId, SessionId};
 
+#[cfg(test)]
+use crate::test::mock::{ServiceControl, SessionContext};
+#[cfg(not(test))]
+use tentacle::context::{ProtocolContextMutRef, SessionContext};
+#[cfg(not(test))]
+use tentacle::service::ServiceControl;
+
+#[cfg(not(test))]
 use super::behaviour::IdentifyBehaviour;
+#[cfg(test)]
+use super::tests::MockIdentifyBehaviour;
+
 use super::identification::{Identification, WaitIdentification};
 use super::message::{Acknowledge, AddressInfoMessage, Identity};
 
@@ -59,6 +69,12 @@ pub enum Error {
     Other(String),
 }
 
+// Wrap ProtocolContextMutRef for easy mock and test
+#[cfg(not(test))]
+pub struct IdentifyProtocolContext<'a>(ProtocolContextMutRef<'a>);
+#[cfg(test)]
+pub struct IdentifyProtocolContext<'a>(pub &'a crate::test::mock::ProtocolContext);
+
 #[derive(Debug, Display)]
 #[display(fmt = "peer {:?} addr {:?}", id, addr)]
 pub struct RemotePeer {
@@ -71,15 +87,15 @@ pub struct NoEncryption;
 
 impl RemotePeer {
     pub fn from_proto_context(
-        proto_context: &ProtocolContextMutRef,
+        proto_context: &IdentifyProtocolContext,
     ) -> Result<RemotePeer, NoEncryption> {
-        match proto_context.session.remote_pubkey.as_ref() {
+        match proto_context.0.session.remote_pubkey.as_ref() {
             None => Err(NoEncryption),
             Some(pubkey) => {
                 let remote_peer = RemotePeer {
                     id:   pubkey.peer_id(),
-                    sid:  proto_context.session.id,
-                    addr: proto_context.session.address.to_owned(),
+                    sid:  proto_context.0.session.id,
+                    addr: proto_context.0.session.address.to_owned(),
                 };
 
                 Ok(remote_peer)
@@ -98,14 +114,14 @@ pub struct StateContext {
 
 impl StateContext {
     pub fn from_proto_context(
-        proto_context: &ProtocolContextMutRef,
+        proto_context: &IdentifyProtocolContext,
     ) -> Result<StateContext, NoEncryption> {
         let remote_peer = RemotePeer::from_proto_context(proto_context)?;
         let state_context = StateContext {
             remote_peer:          Arc::new(remote_peer),
-            proto_id:             proto_context.proto_id(),
-            service_control:      proto_context.control().clone(),
-            session_context:      proto_context.session.clone(),
+            proto_id:             proto_context.0.proto_id(),
+            service_control:      proto_context.0.control().clone(),
+            session_context:      proto_context.0.session.clone(),
             timeout_abort_handle: None,
         };
 
@@ -233,15 +249,27 @@ pub enum State {
 }
 
 pub struct IdentifyProtocol {
-    state:     State,
-    behaviour: Arc<IdentifyBehaviour>,
+    pub(crate) state:     State,
+    #[cfg(not(test))]
+    behaviour:            Arc<IdentifyBehaviour>,
+    #[cfg(test)]
+    pub(crate) behaviour: Arc<MockIdentifyBehaviour>,
 }
 
 impl IdentifyProtocol {
+    #[cfg(not(test))]
     pub fn new(behaviour: Arc<IdentifyBehaviour>) -> Self {
         IdentifyProtocol {
             state: State::SessionProtocolInited,
             behaviour,
+        }
+    }
+
+    #[cfg(test)]
+    pub fn new() -> Self {
+        IdentifyProtocol {
+            state:     State::SessionProtocolInited,
+            behaviour: Arc::new(MockIdentifyBehaviour::new()),
         }
     }
 
@@ -257,22 +285,20 @@ impl IdentifyProtocol {
             identification.failed(self::Error::Other(error))
         }
     }
-}
 
-impl SessionProtocol for IdentifyProtocol {
-    fn connected(&mut self, protocol_context: ProtocolContextMutRef, _version: &str) {
-        let mut state_context = match StateContext::from_proto_context(&protocol_context) {
+    pub fn on_connected(&mut self, protocol_context: &IdentifyProtocolContext) {
+        let mut state_context = match StateContext::from_proto_context(protocol_context) {
             Ok(ctx) => ctx,
             Err(_no) => {
                 // Without peer id, there's no way to register a wait identification.No
                 // need to clean it.
                 log::warn!(
                     "session from {:?} without encryption, disconnect it",
-                    protocol_context.session.address
+                    protocol_context.0.session.address
                 );
 
                 self.state = State::FailedWithoutEncryption;
-                let _ = protocol_context.disconnect(protocol_context.session.id);
+                let _ = protocol_context.0.disconnect(protocol_context.0.session.id);
                 return;
             }
         };
@@ -283,7 +309,7 @@ impl SessionProtocol for IdentifyProtocol {
             state_context.proto_id,
         );
 
-        match protocol_context.session.ty {
+        match protocol_context.0.session.ty {
             SessionType::Inbound => {
                 state_context.set_timeout("wait client identity", DEFAULT_TIMEOUT);
 
@@ -304,26 +330,10 @@ impl SessionProtocol for IdentifyProtocol {
         }
     }
 
-    fn disconnected(&mut self, context: ProtocolContextMutRef) {
-        // Without peer id, there's no way to register a wait identification. No
-        // need to clean it.
-        let peer_id = match context.session.remote_pubkey.as_ref() {
-            Some(pubkey) => pubkey.peer_id(),
-            None => return,
-        };
-
-        // TODO: Remove from upper level
-        crate::protocols::OpenedProtocols::remove(&peer_id);
-
-        if let Some(identification) = PEER_IDENTIFICATION_BACKLOG.write().remove(&peer_id) {
-            identification.failed(self::Error::Disconnected);
-        }
-    }
-
-    fn received(&mut self, protocol_context: ProtocolContextMutRef, data: bytes::Bytes) {
+    pub fn on_received(&mut self, protocol_context: &IdentifyProtocolContext, data: Bytes) {
         {
             if data.len() > MAX_MESSAGE_SIZE {
-                let peer_id = match protocol_context.session.remote_pubkey.as_ref() {
+                let peer_id = match protocol_context.0.session.remote_pubkey.as_ref() {
                     Some(pubkey) => pubkey.peer_id(),
                     None => return,
                 };
@@ -331,7 +341,7 @@ impl SessionProtocol for IdentifyProtocol {
                 if let Some(identification) = PEER_IDENTIFICATION_BACKLOG.write().remove(&peer_id) {
                     identification.failed(self::Error::ExceedMaxMessageSize);
                     self.state = State::FailedWithExceedMsgSize;
-                    let _ = protocol_context.disconnect(protocol_context.session.id);
+                    let _ = protocol_context.0.disconnect(protocol_context.0.session.id);
                     return;
                 }
             }
@@ -451,11 +461,41 @@ impl SessionProtocol for IdentifyProtocol {
             _ => {
                 log::warn!(
                     "should not received message from {} out of negotiate state",
-                    protocol_context.session.address
+                    protocol_context.0.session.address
                 );
-                let _ = protocol_context.disconnect(protocol_context.session.id);
+                let _ = protocol_context.0.disconnect(protocol_context.0.session.id);
             }
         }
+    }
+}
+
+#[cfg(test)]
+impl SessionProtocol for IdentifyProtocol {}
+
+#[cfg(not(test))]
+impl SessionProtocol for IdentifyProtocol {
+    fn connected(&mut self, protocol_context: ProtocolContextMutRef, _version: &str) {
+        self.on_connected(&IdentifyProtocolContext(protocol_context));
+    }
+
+    fn disconnected(&mut self, context: ProtocolContextMutRef) {
+        // Without peer id, there's no way to register a wait identification. No
+        // need to clean it.
+        let peer_id = match context.session.remote_pubkey.as_ref() {
+            Some(pubkey) => pubkey.peer_id(),
+            None => return,
+        };
+
+        // TODO: Remove from upper level
+        crate::protocols::OpenedProtocols::remove(&peer_id);
+
+        if let Some(identification) = PEER_IDENTIFICATION_BACKLOG.write().remove(&peer_id) {
+            identification.failed(self::Error::Disconnected);
+        }
+    }
+
+    fn received(&mut self, protocol_context: ProtocolContextMutRef, data: bytes::Bytes) {
+        self.on_received(&IdentifyProtocolContext(protocol_context), data)
     }
 }
 
