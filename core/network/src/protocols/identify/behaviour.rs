@@ -13,31 +13,6 @@ use super::common::reachable;
 use super::message;
 use super::protocol::StateContext;
 
-pub const MAX_ADDRS: usize = 10;
-
-/// The misbehavior to report to underlying peer storage
-pub enum Misbehavior {
-    /// Send too many addresses in listen addresses
-    TooManyAddresses(usize),
-}
-
-/// Misbehavior report result
-pub enum MisbehaveResult {
-    /// Continue to run
-    Continue,
-    /// Disconnect this peer
-    Disconnect,
-}
-
-impl MisbehaveResult {
-    pub fn is_disconnect(&self) -> bool {
-        match self {
-            MisbehaveResult::Disconnect => true,
-            _ => false,
-        }
-    }
-}
-
 #[derive(Clone)]
 struct AddrReporter {
     inner:    UnboundedSender<PeerManagerEvent>,
@@ -90,7 +65,7 @@ impl IdentifyBehaviour {
         let addrs = self.peer_mgr.listen_addrs();
         let reachable_addrs = addrs.into_iter().filter(reachable);
 
-        reachable_addrs.take(MAX_ADDRS).collect()
+        reachable_addrs.take(message::MAX_LISTEN_ADDRS).collect()
     }
 
     pub fn send_identity(&self, context: &StateContext) {
@@ -148,67 +123,32 @@ impl IdentifyBehaviour {
         }
     }
 
-    pub fn process_listens(
-        &self,
-        context: &StateContext,
-        listens: Vec<Multiaddr>,
-    ) -> MisbehaveResult {
+    pub fn process_listens(&self, context: &StateContext, listens: Vec<Multiaddr>) {
         let peer_id = &context.remote_peer.id;
+        log::debug!("listen addresses: {:?}", listens);
 
-        if listens.len() > MAX_ADDRS {
-            self.misbehave(peer_id, Misbehavior::TooManyAddresses(listens.len()))
-        } else {
-            log::debug!("received listen addresses: {:?}", listens);
-
-            let reachable_addrs = listens.into_iter().filter(reachable).collect::<Vec<_>>();
-            self.add_remote_listen_addrs(peer_id, reachable_addrs);
-
-            MisbehaveResult::Continue
-        }
+        let reachable_addrs = listens.into_iter().filter(reachable).collect::<Vec<_>>();
+        let identified_addrs = PeerManagerEvent::IdentifiedAddrs {
+            pid:   peer_id.to_owned(),
+            addrs: reachable_addrs,
+        };
+        self.addr_reporter.report(identified_addrs);
     }
 
-    pub fn process_observed(
-        &self,
-        context: &StateContext,
-        observed: Option<Multiaddr>,
-    ) -> MisbehaveResult {
+    pub fn process_observed(&self, context: &StateContext, observed: Multiaddr) {
         let peer_id = &context.remote_peer.id;
         let session_type = context.session_context.ty;
-
-        let observed = match observed {
-            Some(addr) => addr,
-            None => {
-                log::warn!("observed is none from peer {:?}", context.remote_peer);
-                return MisbehaveResult::Disconnect;
-            }
-        };
-
-        log::debug!(
-            "received observed address {} from {}",
-            observed,
-            context.remote_peer
-        );
+        log::debug!("observed addr {:?} from {}", observed, context.remote_peer);
 
         let unobservable = |observed| -> bool {
             self.add_observed_addr(peer_id, observed, session_type)
-                .is_disconnect()
+                .is_err()
         };
 
         if reachable(&observed) && unobservable(observed.clone()) {
-            MisbehaveResult::Disconnect
-        } else {
-            MisbehaveResult::Continue
+            log::warn!("unobservable {} from {}", observed, context.remote_peer);
+            context.disconnect();
         }
-    }
-
-    pub fn add_remote_listen_addrs(&self, peer_id: &PeerId, addrs: Vec<Multiaddr>) {
-        log::debug!("add remote listen {:?} addrs {:?}", peer_id, addrs);
-
-        let identified_addrs = PeerManagerEvent::IdentifiedAddrs {
-            pid: peer_id.to_owned(),
-            addrs,
-        };
-        self.addr_reporter.report(identified_addrs);
     }
 
     pub fn add_observed_addr(
@@ -216,21 +156,10 @@ impl IdentifyBehaviour {
         peer: &PeerId,
         addr: Multiaddr,
         ty: SessionType,
-    ) -> MisbehaveResult {
+    ) -> Result<(), ()> {
         log::debug!("add observed: {:?}, addr {:?}, ty: {:?}", peer, addr, ty);
 
         // Noop right now
-        MisbehaveResult::Continue
-    }
-
-    /// Report misbehavior
-    pub fn misbehave(&self, peer: &PeerId, kind: Misbehavior) -> MisbehaveResult {
-        match kind {
-            Misbehavior::TooManyAddresses(size) => {
-                log::warn!("peer {:?} misbehave: too many address {}", peer, size)
-            }
-        }
-
-        MisbehaveResult::Disconnect
+        Ok(())
     }
 }

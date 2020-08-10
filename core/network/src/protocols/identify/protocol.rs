@@ -18,7 +18,7 @@ use tentacle::{ProtocolId, SessionId};
 
 use super::behaviour::IdentifyBehaviour;
 use super::identification::{Identification, WaitIdentification};
-use super::message::{Acknowledge, Identity};
+use super::message::{Acknowledge, AddressInfoMessage, Identity};
 
 pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(8);
 pub const MAX_MESSAGE_SIZE: usize = 5 * 1000; // 5KB
@@ -40,11 +40,14 @@ pub enum Error {
     #[display(fmt = "exceed max message size")]
     ExceedMaxMessageSize,
 
-    #[display(fmt = "received invalid identity")]
-    InvalidIdentity,
+    #[display(fmt = "decode indentity failed")]
+    DecodeIdentityFailed,
 
-    #[display(fmt = "received invalid ack")]
-    InvalidAck,
+    #[display(fmt = "decode ack failed")]
+    DecodeAckFailed,
+
+    #[display(fmt = "{}", _0)]
+    InvalidMessage(String),
 
     #[display(fmt = "wait future dropped")]
     WaitFutDropped,
@@ -347,45 +350,39 @@ impl SessionProtocol for IdentifyProtocol {
 
                             finish_identify(
                                 &context.remote_peer,
-                                Err(self::Error::InvalidIdentity),
+                                Err(self::Error::DecodeIdentityFailed),
                             );
                             *procedure = ServerProcedure::Failed;
                             context.disconnect();
                             return;
                         }
                     };
-
                     context.cancel_timeout();
-                    let verify_result = self.behaviour.verify_remote_identity(&identity);
-                    finish_identify(&context.remote_peer, verify_result.clone());
-                    if verify_result.is_err() {
+
+                    if let Err(err) = identity.validate() {
+                        finish_identify(
+                            &context.remote_peer,
+                            Err(self::Error::InvalidMessage(err.to_string())),
+                        );
                         *procedure = ServerProcedure::Failed;
                         context.disconnect();
                         return;
                     }
 
-                    let listen_addrs = identity.listen_addrs();
-                    if self
-                        .behaviour
-                        .process_listens(&context, listen_addrs)
-                        .is_disconnect()
-                    {
-                        log::warn!("invalid listen addrs from {}", context.remote_peer);
+                    if let Err(err) = self.behaviour.verify_remote_identity(&identity) {
+                        finish_identify(&context.remote_peer, Err(err));
                         *procedure = ServerProcedure::Failed;
                         context.disconnect();
                         return;
                     }
 
-                    let observed_addr = identity.observed_addr();
-                    if self
-                        .behaviour
-                        .process_observed(&context, observed_addr)
-                        .is_disconnect()
-                    {
-                        log::warn!("invalid observed addr from {}", context.remote_peer);
-                        *procedure = ServerProcedure::Failed;
-                        context.disconnect();
-                        return;
+                    finish_identify(&context.remote_peer, Ok(()));
+
+                    let listen_addrs = identity.addr_info.listen_addrs();
+                    self.behaviour.process_listens(&context, listen_addrs);
+
+                    if let Some(observed_addr) = identity.addr_info.observed_addr() {
+                        self.behaviour.process_observed(&context, observed_addr);
                     }
 
                     self.behaviour.send_ack(&context);
@@ -410,38 +407,34 @@ impl SessionProtocol for IdentifyProtocol {
                         Err(_) => {
                             log::warn!("received invalid ack from {:?}", context.remote_peer);
 
-                            finish_identify(&context.remote_peer, Err(self::Error::InvalidAck));
+                            finish_identify(
+                                &context.remote_peer,
+                                Err(self::Error::DecodeAckFailed),
+                            );
                             *procedure = ClientProcedure::Failed;
                             context.disconnect();
                             return;
                         }
                     };
-
                     context.cancel_timeout();
-                    finish_identify(&context.remote_peer, Ok(()));
 
-                    let listen_addrs = acknowledge.listen_addrs();
-                    if self
-                        .behaviour
-                        .process_listens(&context, listen_addrs)
-                        .is_disconnect()
-                    {
-                        log::warn!("invalid listen addrs from {}", context.remote_peer);
+                    if let Err(err) = acknowledge.validate() {
+                        finish_identify(
+                            &context.remote_peer,
+                            Err(self::Error::InvalidMessage(err.to_string())),
+                        );
                         *procedure = ClientProcedure::Failed;
                         context.disconnect();
                         return;
                     }
 
-                    let observed_addr = acknowledge.observed_addr();
-                    if self
-                        .behaviour
-                        .process_observed(&context, observed_addr)
-                        .is_disconnect()
-                    {
-                        log::warn!("invalid observed addr from {}", context.remote_peer);
-                        *procedure = ClientProcedure::Failed;
-                        context.disconnect();
-                        return;
+                    finish_identify(&context.remote_peer, Ok(()));
+
+                    let listen_addrs = acknowledge.addr_info.listen_addrs();
+                    self.behaviour.process_listens(&context, listen_addrs);
+
+                    if let Some(observed_addr) = acknowledge.addr_info.observed_addr() {
+                        self.behaviour.process_observed(&context, observed_addr);
                     }
 
                     context.open_protocols();

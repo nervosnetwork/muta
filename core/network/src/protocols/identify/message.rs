@@ -1,8 +1,48 @@
 use std::convert::TryFrom;
 
+use derive_more::Display;
 use prost::{EncodeError, Message};
 use protocol::{Bytes, BytesMut};
 use tentacle::multiaddr::Multiaddr;
+
+pub const MAX_LISTEN_ADDRS: usize = 10;
+
+#[derive(Debug, Display)]
+pub enum Error {
+    #[display(fmt = "too many listen addrs")]
+    TooManyListenAddrs,
+
+    #[display(fmt = "no observed addrs")]
+    NoObservedAddr,
+
+    #[display(fmt = "no addr info")]
+    NoAddrInfo,
+}
+
+pub trait AddressInfoMessage {
+    fn validate(&self) -> Result<(), self::Error>;
+    fn listen_addrs(&self) -> Vec<Multiaddr>;
+    fn observed_addr(&self) -> Option<Multiaddr>;
+}
+
+impl AddressInfoMessage for Option<AddressInfo> {
+    fn listen_addrs(&self) -> Vec<Multiaddr> {
+        self.as_ref()
+            .map(|ai| ai.listen_addrs())
+            .unwrap_or_else(Vec::new)
+    }
+
+    fn observed_addr(&self) -> Option<Multiaddr> {
+        self.as_ref().map(|ai| ai.observed_addr()).flatten()
+    }
+
+    fn validate(&self) -> Result<(), self::Error> {
+        match self.as_ref() {
+            Some(addr_info) => addr_info.validate(),
+            None => Err(self::Error::NoAddrInfo),
+        }
+    }
+}
 
 #[derive(Message)]
 pub struct AddressInfo {
@@ -29,6 +69,18 @@ impl AddressInfo {
     pub fn observed_addr(&self) -> Option<Multiaddr> {
         Multiaddr::try_from(self.observed_addr.clone()).ok()
     }
+
+    pub fn validate(&self) -> Result<(), self::Error> {
+        if self.listen_addrs.len() > MAX_LISTEN_ADDRS {
+            return Err(self::Error::TooManyListenAddrs);
+        }
+
+        if self.observed_addr().is_none() {
+            return Err(self::Error::NoObservedAddr);
+        }
+
+        Ok(())
+    }
 }
 
 #[derive(Message)]
@@ -47,18 +99,8 @@ impl Identity {
         }
     }
 
-    pub fn listen_addrs(&self) -> Vec<Multiaddr> {
-        self.addr_info
-            .as_ref()
-            .map(|ai| ai.listen_addrs())
-            .unwrap_or_else(Vec::new)
-    }
-
-    pub fn observed_addr(&self) -> Option<Multiaddr> {
-        self.addr_info
-            .as_ref()
-            .map(|ai| ai.observed_addr())
-            .flatten()
+    pub fn validate(&self) -> Result<(), self::Error> {
+        self.addr_info.validate()
     }
 
     pub fn into_bytes(self) -> Result<Bytes, EncodeError> {
@@ -82,18 +124,8 @@ impl Acknowledge {
         }
     }
 
-    pub fn listen_addrs(&self) -> Vec<Multiaddr> {
-        self.addr_info
-            .as_ref()
-            .map(|ai| ai.listen_addrs())
-            .unwrap_or_else(Vec::new)
-    }
-
-    pub fn observed_addr(&self) -> Option<Multiaddr> {
-        self.addr_info
-            .as_ref()
-            .map(|ai| ai.observed_addr())
-            .flatten()
+    pub fn validate(&self) -> Result<(), self::Error> {
+        self.addr_info.validate()
     }
 
     pub fn into_bytes(self) -> Result<Bytes, EncodeError> {
