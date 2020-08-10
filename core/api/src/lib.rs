@@ -300,7 +300,7 @@ pub async fn start_graphql<Adapter: APIAdapter + 'static>(cfg: GraphQLConfig, ad
     let workers = cfg.workers;
     let maxconn = cfg.maxconn;
     let add_listening_address = cfg.listening_address;
-    let max_payload_size = cfg.max_payload_size;s
+    let max_payload_size = cfg.max_payload_size;
 
     // Start http server
     let server = HttpServer::new(move || {
