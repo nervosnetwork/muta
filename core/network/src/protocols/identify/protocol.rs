@@ -20,7 +20,8 @@ use super::behaviour::IdentifyBehaviour;
 use super::identification::{Identification, WaitIdentification};
 use super::message::{Acknowledge, Identity};
 
-const DEFAULT_TIMEOUT: Duration = Duration::from_secs(8);
+pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(8);
+pub const MAX_MESSAGE_SIZE: usize = 5 * 1000; // 5KB
 
 lazy_static! {
     // NOTE: Use peer id here because trust metric integrated test run in one process
@@ -35,6 +36,9 @@ pub enum Error {
 
     #[display(fmt = "timeout")]
     Timeout,
+
+    #[display(fmt = "exceed max message size")]
+    ExceedMaxMessageSize,
 
     #[display(fmt = "received invalid identity")]
     InvalidIdentity,
@@ -313,6 +317,21 @@ impl SessionProtocol for IdentifyProtocol {
     }
 
     fn received(&mut self, protocol_context: ProtocolContextMutRef, data: bytes::Bytes) {
+        {
+            if data.len() > MAX_MESSAGE_SIZE {
+                let peer_id = match protocol_context.session.remote_pubkey.as_ref() {
+                    Some(pubkey) => pubkey.peer_id(),
+                    None => return,
+                };
+
+                if let Some(identification) = PEER_IDENTIFICATION_BACKLOG.write().remove(&peer_id) {
+                    identification.failed(self::Error::ExceedMaxMessageSize);
+                    let _ = protocol_context.disconnect(protocol_context.session.id);
+                    return;
+                }
+            }
+        }
+
         match &mut self.state {
             State::ServerNegotiate {
                 ref mut procedure,
