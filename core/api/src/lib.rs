@@ -12,6 +12,7 @@ use futures::executor::block_on;
 use juniper::http::GraphQLRequest;
 use juniper::FieldResult;
 use lazy_static::lazy_static;
+use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
 
 use common_crypto::{
     HashValue, PrivateKey, PublicKey, Secp256k1PrivateKey, Signature, ToPublicKey,
@@ -302,7 +303,7 @@ pub async fn start_graphql<Adapter: APIAdapter + 'static>(cfg: GraphQLConfig, ad
     let max_payload_size = cfg.max_payload_size;
 
     // Start http server
-    HttpServer::new(move || {
+    let server = HttpServer::new(move || {
         App::new()
             .data(state.clone())
             .service(
@@ -316,10 +317,30 @@ pub async fn start_graphql<Adapter: APIAdapter + 'static>(cfg: GraphQLConfig, ad
             .service(web::resource("/metrics").route(web::get().to(metrics)))
     })
     .workers(workers)
-    .maxconn(cmp::max(maxconn / workers, 1))
-    .bind(add_listening_address)
-    .unwrap()
-    .run()
-    .await
-    .unwrap()
+    .maxconn(cmp::max(maxconn / workers, 1));
+
+    if let Some(tls) = cfg.tls {
+        // load ssl keys
+        let mut builder = SslAcceptor::mozilla_intermediate(SslMethod::tls()).unwrap();
+        builder
+            .set_private_key_file(tls.private_key_file_path, SslFiletype::PEM)
+            .unwrap();
+        builder
+            .set_certificate_chain_file(tls.certificate_chain_file_path)
+            .unwrap();
+
+        server
+            .bind_openssl(add_listening_address, builder)
+            .unwrap()
+            .run()
+            .await
+            .unwrap()
+    } else {
+        server
+            .bind(add_listening_address)
+            .unwrap()
+            .run()
+            .await
+            .unwrap()
+    }
 }
