@@ -30,6 +30,7 @@ broadcast_txs_interval = 200
 
 [executor]
 light = false
+triedb_cache_size = 2000
 
 [logger]
 filter = "info"
@@ -43,9 +44,6 @@ metrics = true
 
 [rocksdb]
 max_open_files = 64
-
-# [triedb]
-# cache_size = 2000
 
 # [apm]
 # service_name = "muta"

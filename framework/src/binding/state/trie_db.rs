@@ -82,7 +82,12 @@ impl cita_trie::DB for RocksTrieDB {
         if res {
             Ok(true)
         } else {
-            Ok(self.db.get(key).map_err(to_store_err)?.is_some())
+            if let Some(val) = self.db.get(key).map_err(to_store_err)? {
+                let mut cache = self.cache.write();
+                cache.insert(key.to_owned(), val.to_owned());
+                return Ok(true);
+            }
+            Ok(false)
         }
     }
 

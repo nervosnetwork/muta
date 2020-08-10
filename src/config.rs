@@ -80,18 +80,8 @@ pub struct ConfigMempool {
 
 #[derive(Debug, Deserialize)]
 pub struct ConfigExecutor {
-    pub light: bool,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct ConfigTrieDB {
-    pub cache_size: usize,
-}
-
-impl Default for ConfigTrieDB {
-    fn default() -> Self {
-        ConfigTrieDB { cache_size: 2000 }
-    }
+    pub light:             bool,
+    pub triedb_cache_size: usize,
 }
 
 #[derive(Debug, Deserialize)]
@@ -155,8 +145,6 @@ pub struct Config {
     pub logger:    ConfigLogger,
     #[serde(default)]
     pub rocksdb:   ConfigRocksDB,
-    #[serde(default)]
-    pub triedb:    ConfigTrieDB,
     pub apm:       Option<ConfigAPM>,
 }
 

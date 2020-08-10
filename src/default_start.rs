@@ -96,7 +96,7 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
         path_state,
         config.executor.light,
         config.rocksdb.max_open_files,
-        config.triedb.cache_size,
+        config.executor.triedb_cache_size,
     )?);
 
     // Init genesis
@@ -215,7 +215,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         path_state,
         config.executor.light,
         config.rocksdb.max_open_files,
-        config.triedb.cache_size,
+        config.executor.triedb_cache_size,
     )?);
 
     // Init mempool
