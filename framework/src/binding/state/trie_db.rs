@@ -86,7 +86,7 @@ impl cita_trie::DB for RocksTrieDB {
         } else {
             if let Some(val) = self.db.get(key).map_err(to_store_err)? {
                 let mut cache = self.cache.write();
-                cache.insert(key.to_owned(), val.to_owned());
+                cache.insert(key.to_owned(), val);
                 return Ok(true);
             }
             Ok(false)
