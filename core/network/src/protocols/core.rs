@@ -38,7 +38,7 @@ impl OpenedProtocols {
             .and_modify(|protos| {
                 protos.insert(proto_id);
             })
-            .or_insert(HashSet::from_iter(vec![proto_id]));
+            .or_insert_with(|| HashSet::from_iter(vec![proto_id]));
     }
 
     #[allow(dead_code)]

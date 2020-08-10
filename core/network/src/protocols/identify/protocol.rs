@@ -239,7 +239,7 @@ impl IdentifyProtocol {
 
     pub fn wait(peer_id: PeerId) -> WaitIdentification {
         let mut backlog = PEER_IDENTIFICATION_BACKLOG.write();
-        let identification = backlog.entry(peer_id).or_insert(Identification::new());
+        let identification = backlog.entry(peer_id).or_insert_with(Identification::new);
 
         identification.wait()
     }

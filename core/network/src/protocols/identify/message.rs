@@ -51,7 +51,7 @@ impl Identity {
         self.addr_info
             .as_ref()
             .map(|ai| ai.listen_addrs())
-            .unwrap_or_else(|| Vec::new())
+            .unwrap_or_else(Vec::new)
     }
 
     pub fn observed_addr(&self) -> Option<Multiaddr> {
@@ -86,7 +86,7 @@ impl Acknowledge {
         self.addr_info
             .as_ref()
             .map(|ai| ai.listen_addrs())
-            .unwrap_or_else(|| Vec::new())
+            .unwrap_or_else(Vec::new)
     }
 
     pub fn observed_addr(&self) -> Option<Multiaddr> {

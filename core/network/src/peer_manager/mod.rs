@@ -852,7 +852,8 @@ impl PeerManager {
     fn session_closed(&mut self, sid: SessionId) {
         debug!("session {} closed", sid);
 
-        if let Some(_) = self.unidentified_backlog.take(&sid) {
+        // Unidentified session
+        if self.unidentified_backlog.take(&sid).is_some() {
             return;
         }
 

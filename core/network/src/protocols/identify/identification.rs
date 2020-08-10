@@ -87,9 +87,10 @@ impl Identification {
     fn done(&self, ret: Result<(), super::protocol::Error>) {
         let mut status = self.status.lock();
 
-        match std::mem::replace(&mut *status, IdentificationStatus::Done(ret)) {
-            IdentificationStatus::Pending(workerset) => workerset.wake(),
-            _ => (),
+        if let IdentificationStatus::Pending(wakerset) =
+            std::mem::replace(&mut *status, IdentificationStatus::Done(ret))
+        {
+            wakerset.wake()
         }
     }
 }
