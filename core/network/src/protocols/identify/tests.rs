@@ -600,7 +600,7 @@ async fn should_wake_wait_identification_after_call_finish_identify() {
 
     match wait_fut.await {
         Ok(()) => (),
-        Err(err) => panic!("should be ok if pass identify"),
+        Err(_) => panic!("should be ok if pass identify"),
     }
 }
 

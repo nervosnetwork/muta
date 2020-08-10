@@ -111,10 +111,6 @@ impl MockManager {
     pub fn core_inner(&self) -> Arc<Inner> {
         self.inner.inner()
     }
-
-    pub fn inner_manager_mut(&mut self) -> &PeerManager {
-        &mut self.inner
-    }
 }
 
 impl Future for MockManager {
@@ -3060,8 +3056,6 @@ async fn should_reject_new_connection_for_same_peer_on_unidentified_session() {
     let remote_peers = make_sessions(&mut mgr, 1, 5000, SessionType::Outbound).await;
 
     let test_peer = remote_peers.first().expect("get first peer");
-    let expect_sid = test_peer.session_id();
-
     let sess_ctx = SessionContext::make(
         SessionId::new(99),
         test_peer.multiaddrs.all_raw().pop().expect("get multiaddr"),
@@ -3117,7 +3111,6 @@ async fn should_reject_same_ip_connection_when_reach_limit_on_unidentified_sessi
     make_sessions(&mut mgr, 1, 5000, SessionType::Outbound).await;
 
     let same_ip_peer = make_peer(9527);
-    let expect_sid = same_ip_peer.session_id();
 
     // Save same ip peer
     let inner = mgr.core_inner();

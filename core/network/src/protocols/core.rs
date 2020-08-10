@@ -48,6 +48,7 @@ impl OpenedProtocols {
         }
     }
 
+    #[cfg(not(test))]
     pub fn remove(peer_id: &PeerId) {
         PEER_OPENED_PROTOCOLS.write().remove(peer_id);
     }

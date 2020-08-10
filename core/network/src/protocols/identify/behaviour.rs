@@ -47,6 +47,8 @@ pub struct IdentifyBehaviour {
     addr_reporter: AddrReporter,
 }
 
+// Allow dead code for cfg(test)
+#[allow(dead_code)]
 impl IdentifyBehaviour {
     pub fn new(peer_mgr: PeerManagerHandle, event_tx: UnboundedSender<PeerManagerEvent>) -> Self {
         let addr_reporter = AddrReporter::new(event_tx);
