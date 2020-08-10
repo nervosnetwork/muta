@@ -82,7 +82,8 @@ pub struct ConfigMempool {
 
 #[derive(Debug, Deserialize)]
 pub struct ConfigExecutor {
-    pub light: bool,
+    pub light:             bool,
+    pub triedb_cache_size: usize,
 }
 
 #[derive(Debug, Deserialize)]

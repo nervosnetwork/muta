@@ -30,6 +30,7 @@ broadcast_txs_interval = 200
 
 [executor]
 light = false
+triedb_cache_size = 2000
 
 [logger]
 filter = "info"
