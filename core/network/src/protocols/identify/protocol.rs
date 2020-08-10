@@ -218,6 +218,7 @@ pub enum ServerProcedure {
 pub enum State {
     SessionProtocolInited,
     FailedWithoutEncryption,
+    FailedWithExceedMsgSize,
     ClientNegotiate {
         procedure: ClientProcedure,
         context:   StateContext,
@@ -326,6 +327,7 @@ impl SessionProtocol for IdentifyProtocol {
 
                 if let Some(identification) = PEER_IDENTIFICATION_BACKLOG.write().remove(&peer_id) {
                     identification.failed(self::Error::ExceedMaxMessageSize);
+                    self.state = State::FailedWithExceedMsgSize;
                     let _ = protocol_context.disconnect(protocol_context.session.id);
                     return;
                 }
