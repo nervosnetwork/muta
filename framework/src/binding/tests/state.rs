@@ -114,7 +114,7 @@ fn bench_get_without_cache(b: &mut Bencher) {
     let keys = (0..1000).map(|_| rand_bytes()).collect::<Vec<_>>();
     let values = (0..1000).map(|_| rand_bytes()).collect::<Vec<_>>();
 
-    triedb.insert_batch_without_cache(keys.clone(), values.clone());
+    triedb.insert_batch_without_cache(keys.clone(), values);
 
     let key = keys[0].clone();
     b.iter(|| {
