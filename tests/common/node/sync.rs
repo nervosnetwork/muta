@@ -120,6 +120,12 @@ impl Sync {
     }
 }
 
+impl Default for Sync {
+    fn default() -> Self {
+        Sync::new()
+    }
+}
+
 impl Drop for Sync {
     fn drop(&mut self) {
         self.connected.store(false, Ordering::SeqCst);

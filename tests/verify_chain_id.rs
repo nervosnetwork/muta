@@ -82,7 +82,7 @@ fn should_be_disconnected_due_to_different_chain_id() {
         tokio::spawn(network);
 
         match sync.recv().await {
-            Err(SyncError::Disconected) => assert!(true, "should not be connected"),
+            Err(SyncError::Disconected) => (),
             Err(err) => panic!("unexpected err {}", err),
             Ok(event) => panic!("unexpected event {}", event),
         }
