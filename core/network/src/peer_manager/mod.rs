@@ -77,6 +77,24 @@ const MAX_CONNECTING_MARGIN: usize = 10;
 const GOOD_TRUST_SCORE: u8 = 80u8;
 const WORSE_TRUST_SCALAR_RATIO: usize = 10;
 
+#[derive(Debug, Display)]
+pub enum NewSessionPreCheckError {
+    #[display(fmt = "peer banned")]
+    PeerBanned,
+
+    #[display(fmt = "allow list peer only")]
+    AllowListOnly,
+
+    #[display(fmt = "reach max connection")]
+    ReachMaxConnection,
+
+    #[display(fmt = "peer already connected, only allow one connection per peer")]
+    PeerAlreadyConnected,
+
+    #[display(fmt = "{}", _0)]
+    ReachSessionLimit(session_book::Error),
+}
+
 #[derive(Debug, Clone, Display, Serialize, Deserialize)]
 #[display(fmt = "{}", _0)]
 pub struct PeerMultiaddr(Multiaddr);
@@ -644,17 +662,11 @@ impl PeerManager {
         }
     }
 
-    fn new_unidentified_session(&mut self, pubkey: PublicKey, ctx: Arc<SessionContext>) {
-        let peer_id = pubkey.peer_id();
-        let event = UnidentifiedSessionEvent { pubkey, ctx };
-
-        let ident_fut = Identify::wait_identified(peer_id);
-        let unidentified_session = UnidentifiedSession { event, ident_fut };
-
-        self.unidentified_backlog.insert(unidentified_session);
-    }
-
-    fn new_session(&mut self, pubkey: PublicKey, ctx: Arc<SessionContext>) {
+    fn new_session_pre_check(
+        &mut self,
+        pubkey: &PublicKey,
+        ctx: &Arc<SessionContext>,
+    ) -> Result<ArcSession, NewSessionPreCheckError> {
         let remote_peer_id = pubkey.peer_id();
         let remote_multiaddr = PeerMultiaddr::new(ctx.address.to_owned(), &remote_peer_id);
 
@@ -662,13 +674,6 @@ impl PeerManager {
         self.connecting.remove(&remote_peer_id);
         let opt_peer = self.inner.peer(&remote_peer_id);
         let remote_peer = opt_peer.unwrap_or_else(|| ArcPeer::new(remote_peer_id.clone()));
-
-        if !remote_peer.has_pubkey() {
-            if let Err(e) = remote_peer.set_pubkey(pubkey) {
-                error!("impossible, set public key failed {}", e);
-                error!("new session without peer pubkey, chain book will not be updated");
-            }
-        }
 
         // Inbound address is client address, it's useless
         match ctx.ty {
@@ -686,7 +691,7 @@ impl PeerManager {
             info!("banned peer {:?} incomming", remote_peer_id);
             remote_peer.mark_disconnected();
             self.disconnect_session(ctx.id);
-            return;
+            return Err(NewSessionPreCheckError::PeerBanned);
         }
 
         if self.config.allowlist_only
@@ -696,7 +701,7 @@ impl PeerManager {
             debug!("allowlist_only enabled, reject peer {:?}", remote_peer.id);
             remote_peer.mark_disconnected();
             self.disconnect_session(ctx.id);
-            return;
+            return Err(NewSessionPreCheckError::AllowListOnly);
         }
 
         if self.inner.connected() >= self.config.max_connections {
@@ -744,7 +749,7 @@ impl PeerManager {
 
                 remote_peer.mark_disconnected();
                 self.disconnect_session(ctx.id);
-                return;
+                return Err(NewSessionPreCheckError::ReachMaxConnection);
             }
         }
 
@@ -757,7 +762,7 @@ impl PeerManager {
             if exist_sid != ctx.id && self.inner.session(exist_sid).is_some() {
                 // We don't support multiple connections, disconnect new one
                 self.disconnect_session(ctx.id);
-                return;
+                return Err(NewSessionPreCheckError::PeerAlreadyConnected);
             }
 
             if self.inner.session(exist_sid).is_none() {
@@ -785,16 +790,51 @@ impl PeerManager {
 
                 remote_peer.mark_disconnected();
                 self.disconnect_session(ctx.id);
+                return Err(NewSessionPreCheckError::ReachSessionLimit(err));
+            }
+        }
+
+        Ok(session)
+    }
+
+    fn new_unidentified_session(&mut self, pubkey: PublicKey, ctx: Arc<SessionContext>) {
+        let peer_id = pubkey.peer_id();
+        if let Err(err) = self.new_session_pre_check(&pubkey, &ctx) {
+            log::info!("reject unidentified session due to {}", err);
+
+            Identify::wait_failed(&peer_id, err.to_string());
+            return;
+        }
+
+        let event = UnidentifiedSessionEvent { pubkey, ctx };
+        let ident_fut = Identify::wait_identified(peer_id);
+        let unidentified_session = UnidentifiedSession { event, ident_fut };
+
+        self.unidentified_backlog.insert(unidentified_session);
+    }
+
+    fn new_session(&mut self, pubkey: PublicKey, ctx: Arc<SessionContext>) {
+        let session = match self.new_session_pre_check(&pubkey, &ctx) {
+            Ok(session) => session,
+            Err(err) => {
+                log::info!("reject new session due to {}", err);
                 return;
+            }
+        };
+
+        if !session.peer.has_pubkey() {
+            if let Err(e) = session.peer.set_pubkey(pubkey) {
+                error!("impossible, set public key failed {}", e);
             }
         }
 
         // Currently we only save accepted peer.
         // TODO: save to database
-        if !self.inner.contains(&remote_peer_id) {
-            self.inner.add_peer(remote_peer.clone());
+        if !self.inner.contains(&session.peer.id) {
+            self.inner.add_peer(session.peer.clone());
         }
 
+        let remote_peer = session.peer.clone();
         self.inner.sessions.insert(AcceptableSession(session));
         remote_peer.mark_connected(ctx.id);
 

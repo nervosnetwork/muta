@@ -47,6 +47,9 @@ pub enum Error {
 
     #[display(fmt = "disconnected")]
     Disconnected,
+
+    #[display(fmt = "{}", _0)]
+    Other(String),
 }
 
 #[derive(Debug, Display)]
@@ -245,6 +248,12 @@ impl IdentifyProtocol {
         }
 
         wait_fut
+    }
+
+    pub fn wait_failed(peer_id: &PeerId, error: String) {
+        if let Some(identification) = { PEER_IDENTIFICATION_BACKLOG.write().remove(peer_id) } {
+            identification.failed(self::Error::Other(error))
+        }
     }
 }
 

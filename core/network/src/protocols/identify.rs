@@ -55,4 +55,8 @@ impl Identify {
     pub fn wait_identified(peer_id: PeerId) -> WaitIdentification {
         IdentifyProtocol::wait(peer_id)
     }
+
+    pub fn wait_failed(peer_id: &PeerId, error: String) {
+        IdentifyProtocol::wait_failed(peer_id, error)
+    }
 }
