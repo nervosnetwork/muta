@@ -1,6 +1,7 @@
 extern crate test;
 
 use std::collections::HashSet;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use bytes::Bytes;
@@ -23,7 +24,7 @@ use crate::binding::state::{GeneralServiceState, MPTTrie, RocksTrieDB};
 /// test binding::tests::state::bench_insert_without_cache       ... bench:       2,491 ns/iter (+/- 486)
 #[bench]
 fn bench_insert_batch_with_cache(b: &mut Bencher) {
-    let triedb = new_triedb();
+    let triedb = new_triedb("bench_insert_batch_with_cache");
 
     let keys = (0..1000).map(|_| rand_bytes()).collect::<Vec<_>>();
     let values = (0..1000).map(|_| rand_bytes()).collect::<Vec<_>>();
@@ -35,7 +36,7 @@ fn bench_insert_batch_with_cache(b: &mut Bencher) {
 
 #[bench]
 fn bench_insert_batch_without_cache(b: &mut Bencher) {
-    let triedb = new_triedb();
+    let triedb = new_triedb("bench_insert_batch_without_cache");
 
     let keys = (0..1000).map(|_| rand_bytes()).collect::<Vec<_>>();
     let values = (0..1000).map(|_| rand_bytes()).collect::<Vec<_>>();
@@ -47,7 +48,7 @@ fn bench_insert_batch_without_cache(b: &mut Bencher) {
 
 #[bench]
 fn bench_insert_with_cache(b: &mut Bencher) {
-    let triedb = new_triedb();
+    let triedb = new_triedb("bench_insert_with_cache");
 
     let key = rand_bytes();
     let value = rand_bytes();
@@ -59,7 +60,7 @@ fn bench_insert_with_cache(b: &mut Bencher) {
 
 #[bench]
 fn bench_insert_without_cache(b: &mut Bencher) {
-    let triedb = new_triedb();
+    let triedb = new_triedb("bench_insert_without_cache");
 
     let key = rand_bytes();
     let value = rand_bytes();
@@ -71,7 +72,7 @@ fn bench_insert_without_cache(b: &mut Bencher) {
 
 #[bench]
 fn bench_get_cache_hit(b: &mut Bencher) {
-    let triedb = new_triedb();
+    let triedb = new_triedb("bench_get_cache_hit");
 
     let keys = (0..1000).map(|_| rand_bytes()).collect::<Vec<_>>();
     let values = (0..1000).map(|_| rand_bytes()).collect::<Vec<_>>();
@@ -86,7 +87,7 @@ fn bench_get_cache_hit(b: &mut Bencher) {
 
 #[bench]
 fn bench_get_cache_miss(b: &mut Bencher) {
-    let triedb = new_triedb();
+    let triedb = new_triedb("bench_get_cache_miss");
 
     let keys = (0..1000).map(|_| rand_bytes()).collect::<Vec<_>>();
     let values = (0..1000).map(|_| rand_bytes()).collect::<Vec<_>>();
@@ -109,7 +110,7 @@ fn bench_get_cache_miss(b: &mut Bencher) {
 
 #[bench]
 fn bench_get_without_cache(b: &mut Bencher) {
-    let triedb = new_triedb();
+    let triedb = new_triedb("bench_get_without_cache");
 
     let keys = (0..1000).map(|_| rand_bytes()).collect::<Vec<_>>();
     let values = (0..1000).map(|_| rand_bytes()).collect::<Vec<_>>();
@@ -124,7 +125,7 @@ fn bench_get_without_cache(b: &mut Bencher) {
 
 #[test]
 fn test_trie_db() {
-    let triedb = new_triedb();
+    let triedb = new_triedb("test_trie_db");
     let key = rand_bytes();
     let value = rand_bytes();
 
@@ -204,8 +205,10 @@ pub fn new_state(memdb: Arc<MemoryDB>, root: Option<MerkleRoot>) -> GeneralServi
     GeneralServiceState::new(trie)
 }
 
-fn new_triedb() -> RocksTrieDB {
-    RocksTrieDB::new("./free-space", false, 1024, 2000).unwrap()
+fn new_triedb(name: &str) -> RocksTrieDB {
+    let mut path = PathBuf::from("./free-space/");
+    path.push(name);
+    RocksTrieDB::new(path, false, 1024, 2000).unwrap()
 }
 
 fn rand_bytes() -> Vec<u8> {
