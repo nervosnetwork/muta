@@ -330,6 +330,22 @@ impl IdentifyProtocol {
         }
     }
 
+    pub fn on_disconnected(&mut self, protocol_context: &IdentifyProtocolContext) {
+        // Without peer id, there's no way to register a wait identification. No
+        // need to clean it.
+        let peer_id = match protocol_context.0.session.remote_pubkey.as_ref() {
+            Some(pubkey) => pubkey.peer_id(),
+            None => return,
+        };
+
+        // TODO: Remove from upper level
+        crate::protocols::OpenedProtocols::remove(&peer_id);
+
+        if let Some(identification) = PEER_IDENTIFICATION_BACKLOG.write().remove(&peer_id) {
+            identification.failed(self::Error::Disconnected);
+        }
+    }
+
     pub fn on_received(&mut self, protocol_context: &IdentifyProtocolContext, data: Bytes) {
         {
             if data.len() > MAX_MESSAGE_SIZE {
@@ -478,20 +494,8 @@ impl SessionProtocol for IdentifyProtocol {
         self.on_connected(&IdentifyProtocolContext(protocol_context));
     }
 
-    fn disconnected(&mut self, context: ProtocolContextMutRef) {
-        // Without peer id, there's no way to register a wait identification. No
-        // need to clean it.
-        let peer_id = match context.session.remote_pubkey.as_ref() {
-            Some(pubkey) => pubkey.peer_id(),
-            None => return,
-        };
-
-        // TODO: Remove from upper level
-        crate::protocols::OpenedProtocols::remove(&peer_id);
-
-        if let Some(identification) = PEER_IDENTIFICATION_BACKLOG.write().remove(&peer_id) {
-            identification.failed(self::Error::Disconnected);
-        }
+    fn disconnected(&mut self, protocol_context: ProtocolContextMutRef) {
+        self.on_disconnected(&IdentifyProtocolContext(protocol_context));
     }
 
     fn received(&mut self, protocol_context: ProtocolContextMutRef, data: bytes::Bytes) {
