@@ -1,6 +1,6 @@
 [package]
 name = "binding-macro"
-version = "0.2.0-beta3"
+version = "0.2.0-beta.4"
 authors = ["Muta Dev <muta@nervos.org>"]
 edition = "2018"
 repository = "https://github.com/nervosnetwork/muta"
