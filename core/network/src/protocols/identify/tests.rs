@@ -558,3 +558,91 @@ async fn should_disconnect_if_either_send_data_no_in_negotiate_procedure() {
         _ => panic!("should disconnect"),
     }
 }
+
+#[tokio::test]
+async fn should_wake_wait_identification_after_call_finish_identify() {
+    let mut identify = IdentifyProtocol::new();
+    let proto_context =
+        ProtocolContext::make(PROTOCOL_ID.into(), SESSION_ID.into(), SessionType::Inbound);
+
+    let peer_id = proto_context
+        .session
+        .remote_pubkey
+        .as_ref()
+        .unwrap()
+        .peer_id();
+
+    let wait_fut = IdentifyProtocol::wait(peer_id);
+
+    tokio::spawn(async move {
+        identify.on_connected(&IdentifyProtocolContext(&proto_context));
+
+        let identity = message::Identity::mock_valid().into_bytes().unwrap();
+        identify.behaviour.skip_chain_id_verify(true);
+        identify.on_received(&IdentifyProtocolContext(&proto_context), identity);
+
+        match identify.state {
+            State::ServerNegotiate {
+                procedure: ServerProcedure::WaitOpenProtocols,
+                context,
+            } => assert!(
+                context.timeout_abort_handle.is_some(),
+                "should set up wait open protocols timeout"
+            ),
+            _ => panic!("should enter wait open protocols state"),
+        }
+
+        match identify.behaviour.event() {
+            Some(BehaviourEvent::SendAck) => (),
+            _ => panic!("should send ack"),
+        }
+    });
+
+    match wait_fut.await {
+        Ok(()) => (),
+        Err(err) => panic!("should be ok if pass identify"),
+    }
+}
+
+#[tokio::test]
+async fn should_pass_error_to_wait_identification_result_if_failed_identify() {
+    let mut identify = IdentifyProtocol::new();
+    let proto_context =
+        ProtocolContext::make(PROTOCOL_ID.into(), SESSION_ID.into(), SessionType::Outbound);
+
+    let peer_id = proto_context
+        .session
+        .remote_pubkey
+        .as_ref()
+        .unwrap()
+        .peer_id();
+
+    let wait_fut = IdentifyProtocol::wait(peer_id);
+
+    tokio::spawn(async move {
+        identify.on_connected(&IdentifyProtocolContext(&proto_context));
+
+        identify.on_received(
+            &IdentifyProtocolContext(&proto_context),
+            Bytes::from_static(b"xxx"),
+        );
+
+        match identify.state {
+            State::ClientNegotiate {
+                procedure: ClientProcedure::Failed,
+                ..
+            } => (),
+            _ => panic!("should enter failed state"),
+        }
+
+        match proto_context.control().event() {
+            Some(ControlEvent::Disconnect { session_id }) if session_id == SESSION_ID.into() => (),
+            _ => panic!("should disconnect"),
+        }
+    });
+
+    match wait_fut.await {
+        Err(Error::DecodeAckFailed) => (),
+        _ => panic!("should pass decode failed error"),
+    }
+}
