@@ -177,6 +177,7 @@ fn test_emit_event() {
     assert_eq!(receipt.response.response.code, 0);
     assert_eq!(receipt.events.len(), 1);
     assert_eq!(&receipt.events[0].data, "test");
+    assert_eq!(&receipt.events[0].name, "wow");
 }
 
 #[test]

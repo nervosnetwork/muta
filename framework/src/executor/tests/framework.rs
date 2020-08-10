@@ -217,14 +217,22 @@ impl<SDK: ServiceSDK> TestService<SDK> {
     #[cycles(300_00)]
     #[write]
     fn test_write(&mut self, ctx: ServiceContext) -> ServiceResponse<String> {
-        ctx.emit_event("write".to_owned(), "write".to_owned());
+        ctx.emit_event(
+            "test_service".to_owned(),
+            "write".to_owned(),
+            "write".to_owned(),
+        );
         ServiceResponse::from_succeed("".to_owned())
     }
 
     #[tx_hook_before]
     fn test_tx_hook_before(&mut self, ctx: ServiceContext) -> ServiceResponse<()> {
         // we emit an event
-        ctx.emit_event("before".to_owned(), "before".to_owned());
+        ctx.emit_event(
+            "test_service".to_owned(),
+            "before".to_owned(),
+            "before".to_owned(),
+        );
         if ctx.get_payload().contains("before") {
             return ServiceResponse::from_error(2, "before_error".to_owned());
         }
@@ -236,7 +244,11 @@ impl<SDK: ServiceSDK> TestService<SDK> {
         if ctx.get_payload().contains("after") {
             return ServiceResponse::from_error(2, "after_error".to_owned());
         }
-        ctx.emit_event("after".to_owned(), "after".to_owned());
+        ctx.emit_event(
+            "test_service".to_owned(),
+            "after".to_owned(),
+            "after".to_owned(),
+        );
         ServiceResponse::from_succeed(())
     }
 }

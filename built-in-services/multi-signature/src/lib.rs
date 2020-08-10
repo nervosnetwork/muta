@@ -42,6 +42,7 @@ macro_rules! impl_multisig {
         }
     }};
 }
+pub const MULTI_SIG_SERVICE_NAME: &str = "multi_signature";
 
 pub trait MultiSignature {
     fn verify_signature_(
