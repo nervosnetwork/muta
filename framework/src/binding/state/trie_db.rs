@@ -12,6 +12,7 @@ use rocksdb::{Options, WriteBatch, DB};
 use common_apm::metrics::storage::{on_storage_get_state, on_storage_put_state};
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
+// 49999 is the largest prime number within 50000.
 const RAND_SEED: u64 = 49999;
 
 pub struct RocksTrieDB {
@@ -35,10 +36,11 @@ impl RocksTrieDB {
 
         let db = DB::open(&opts, path).map_err(RocksTrieDBError::from)?;
 
+        // Init HashMap with capacity 2 * cache_size to avoid reallocate memory.
         Ok(RocksTrieDB {
             light,
             db: Arc::new(db),
-            cache: RwLock::new(HashMap::with_capacity(cache_size + 500)),
+            cache: RwLock::new(HashMap::with_capacity(cache_size + cache_size)),
             cache_size,
         })
     }
@@ -232,7 +234,7 @@ mod tests {
     #[bench]
     fn bench_rand(b: &mut Bencher) {
         b.iter(|| {
-            let mut rng = SmallRng::seed_from_u64(49999);
+            let mut rng = SmallRng::seed_from_u64(RAND_SEED);
             for _ in 0..10000 {
                 rng.gen_range(10, 1000000);
             }
