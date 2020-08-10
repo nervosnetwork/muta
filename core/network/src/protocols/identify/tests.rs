@@ -598,10 +598,7 @@ async fn should_wake_wait_identification_after_call_finish_identify() {
         }
     });
 
-    match wait_fut.await {
-        Ok(()) => (),
-        Err(_) => panic!("should be ok if pass identify"),
-    }
+    assert!(wait_fut.await.is_ok(), "should be ok if pass identify");
 }
 
 #[tokio::test]
