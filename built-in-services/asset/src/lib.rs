@@ -34,6 +34,8 @@ macro_rules! impl_assets {
     }};
 }
 
+pub const ASSET_SERVICE_NAME: &str = "asset";
+
 pub trait Assets {
     fn create_(
         &mut self,
@@ -265,7 +267,11 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
             return ServiceResponse::<Asset>::from_error(103, format!("{:?}", e));
         }
         let event_str = event_res.unwrap();
-        ctx.emit_event("CreateAsset".to_owned(), event_str);
+        ctx.emit_event(
+            ASSET_SERVICE_NAME.to_owned(),
+            "CreateAsset".to_owned(),
+            event_str,
+        );
 
         ServiceResponse::<Asset>::from_succeed(asset)
     }
@@ -302,7 +308,11 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
             return ServiceResponse::<()>::from_error(103, format!("{:?}", e));
         };
         let event_str = event_res.unwrap();
-        ctx.emit_event("TransferAsset".to_owned(), event_str);
+        ctx.emit_event(
+            ASSET_SERVICE_NAME.to_owned(),
+            "TransferAsset".to_owned(),
+            event_str,
+        );
 
         ServiceResponse::<()>::from_succeed(())
     }
@@ -351,7 +361,11 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
             return ServiceResponse::<()>::from_error(103, format!("{:?}", e));
         };
         let event_str = event_res.unwrap();
-        ctx.emit_event("ApproveAsset".to_owned(), event_str);
+        ctx.emit_event(
+            ASSET_SERVICE_NAME.to_owned(),
+            "ApproveAsset".to_owned(),
+            event_str,
+        );
 
         ServiceResponse::<()>::from_succeed(())
     }
@@ -413,7 +427,11 @@ impl<SDK: ServiceSDK> AssetService<SDK> {
             return ServiceResponse::<()>::from_error(103, format!("{:?}", e));
         };
         let event_str = event_res.unwrap();
-        ctx.emit_event("TransferFrom".to_owned(), event_str);
+        ctx.emit_event(
+            ASSET_SERVICE_NAME.to_owned(),
+            "TransferFrom".to_owned(),
+            event_str,
+        );
 
         ServiceResponse::<()>::from_succeed(())
     }

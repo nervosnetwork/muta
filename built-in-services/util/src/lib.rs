@@ -12,6 +12,8 @@ use crate::types::{KeccakPayload, KeccakResponse, SigVerifyPayload, SigVerifyRes
 mod tests;
 pub mod types;
 
+pub const UTIL_SERVICE_NAME: &str = "util";
+
 pub struct UtilService<SDK> {
     _sdk: SDK,
 }

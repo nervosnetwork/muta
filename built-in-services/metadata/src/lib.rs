@@ -24,6 +24,8 @@ macro_rules! impl_meatdata {
     }};
 }
 
+pub const METADATA_SERVICE_NAME: &str = "metadata";
+
 pub trait MetaData {
     fn get_(&self, ctx: &ServiceContext) -> Result<Metadata, ServiceResponse<()>>;
 }
