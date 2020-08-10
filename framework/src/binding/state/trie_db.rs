@@ -70,6 +70,7 @@ impl RocksTrieDB {
     pub fn insert_batch_without_cache(&self, keys: Vec<Vec<u8>>, values: Vec<Vec<u8>>) {
         let mut _total_size = 0;
         let mut batch = WriteBatch::default();
+        assert_eq!(keys.len(), values.len());
 
         for (key, val) in keys.iter().zip(values.iter()) {
             _total_size += key.len();
@@ -88,6 +89,12 @@ impl RocksTrieDB {
     #[cfg(test)]
     pub fn get_without_cache(&self, key: &[u8]) -> Option<Vec<u8>> {
         self.db.get(key).unwrap()
+    }
+
+    #[cfg(test)]
+    pub fn cache(&self) -> HashMap<Vec<u8>, Vec<u8>> {
+        let cache = self.cache.read();
+        cache.clone()
     }
 }
 

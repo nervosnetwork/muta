@@ -126,6 +126,31 @@ fn bench_get_without_cache(b: &mut Bencher) {
 }
 
 #[test]
+fn test_trie_db() {
+    let triedb = new_triedb();
+    let key = rand_bytes();
+    let value = rand_bytes();
+
+    triedb.insert(key.clone(), value.clone()).unwrap();
+    assert_eq!(triedb.get(&key).unwrap().unwrap(), value);
+
+    let keys = (0..3000).map(|_| rand_bytes()).collect::<Vec<_>>();
+    let values = (0..3000).map(|_| rand_bytes()).collect::<Vec<_>>();
+    triedb.insert_batch(keys.clone(), values.clone()).unwrap();
+
+    let _ = keys
+        .iter()
+        .zip(values.iter())
+        .map(|(k, v)| assert_eq!(&triedb.get(k).unwrap().unwrap(), v));
+    assert_eq!(triedb.cache().len(), 3001);
+
+    triedb.flush().unwrap();
+    assert_eq!(triedb.cache().len(), 2000);
+
+    let _ = keys.iter().map(|k| assert!(triedb.contains(k).unwrap()));
+}
+
+#[test]
 fn test_state_insert() {
     let memdb = Arc::new(MemoryDB::new(false));
     let mut state = new_state(Arc::clone(&memdb), None);
