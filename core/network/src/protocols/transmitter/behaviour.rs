@@ -23,7 +23,7 @@ use crate::error::{ErrorKind, NetworkError};
 use crate::event::PeerManagerEvent;
 use crate::peer_manager::SharedSessions;
 use crate::protocols::core::TRANSMITTER_PROTOCOL_ID;
-use crate::traits::SessionBook;
+use crate::traits::SharedSessionBook;
 
 // TODO: Refactor connection service, decouple protocol and service
 // initialization.
