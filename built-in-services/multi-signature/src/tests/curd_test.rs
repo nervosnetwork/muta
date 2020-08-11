@@ -106,7 +106,7 @@ fn test_set_threshold() {
     });
     assert_eq!(
         res.error_message,
-        "new threshold larger the sum of the weights".to_owned()
+        "accounts weight or threshold not valid".to_owned()
     );
 
     // test set new threshold success
@@ -294,7 +294,7 @@ fn test_set_weight() {
     });
     assert_eq!(
         res.error_message,
-        "the sum of weight will below threshold".to_owned()
+        "accounts weight or threshold not valid".to_owned()
     );
 
     // test get permission after add a new account
@@ -348,7 +348,7 @@ fn test_remove_account() {
 
     assert_eq!(
         res.error_message,
-        "the sum of weight will below threshold".to_owned()
+        "accounts weight or threshold not valid".to_owned()
     );
 
     let permission =
