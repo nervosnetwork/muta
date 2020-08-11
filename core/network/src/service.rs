@@ -226,7 +226,7 @@ impl NetworkService {
             .ping(config.ping_interval, config.ping_timeout, mgr_tx.clone())
             .identify(peer_mgr_handle.clone(), mgr_tx.clone())
             .discovery(peer_mgr_handle.clone(), mgr_tx.clone(), disc_sync_interval)
-            .transmitter(raw_msg_tx.clone())
+            .transmitter(raw_msg_tx.clone(), peer_mgr_handle.clone())
             .build();
 
         // Build connection service

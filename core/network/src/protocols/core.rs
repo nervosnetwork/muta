@@ -147,8 +147,12 @@ impl CoreProtocolBuilder {
         self
     }
 
-    pub fn transmitter(mut self, bytes_tx: UnboundedSender<RawSessionMessage>) -> Self {
-        let transmitter = Transmitter::new(bytes_tx);
+    pub fn transmitter(
+        mut self,
+        bytes_tx: UnboundedSender<RawSessionMessage>,
+        peer_mgr: PeerManagerHandle,
+    ) -> Self {
+        let transmitter = Transmitter::new(bytes_tx, peer_mgr);
 
         self.transmitter = Some(transmitter);
         self

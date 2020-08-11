@@ -1,25 +1,31 @@
 use futures::channel::mpsc::UnboundedSender;
 use log::error;
-use tentacle::{
-    builder::MetaBuilder,
-    context::{ProtocolContext, ProtocolContextMutRef},
-    service::{ProtocolHandle, ProtocolMeta},
-    traits::ServiceProtocol,
-    ProtocolId,
-};
+use tentacle::builder::MetaBuilder;
+use tentacle::context::{ProtocolContext, ProtocolContextMutRef};
+use tentacle::service::{ProtocolHandle, ProtocolMeta};
+use tentacle::traits::ServiceProtocol;
+use tentacle::ProtocolId;
 
 use crate::message::RawSessionMessage;
+use crate::peer_manager::PeerManagerHandle;
 
 pub const NAME: &str = "chain_transmitter";
 pub const SUPPORT_VERSIONS: [&str; 1] = ["0.2"];
 
 pub struct Transmitter {
     msg_deliver: UnboundedSender<RawSessionMessage>,
+    peer_mgr:    PeerManagerHandle,
 }
 
 impl Transmitter {
-    pub fn new(msg_deliver: UnboundedSender<RawSessionMessage>) -> Self {
-        Transmitter { msg_deliver }
+    pub fn new(
+        msg_deliver: UnboundedSender<RawSessionMessage>,
+        peer_mgr: PeerManagerHandle,
+    ) -> Self {
+        Transmitter {
+            msg_deliver,
+            peer_mgr,
+        }
     }
 
     pub fn build_meta(self, protocol_id: ProtocolId) -> ProtocolMeta {
@@ -38,6 +44,11 @@ impl ServiceProtocol for Transmitter {
     }
 
     fn connected(&mut self, context: ProtocolContextMutRef, _version: &str) {
+        if !self.peer_mgr.contains_session(context.session.id) {
+            let _ = context.close_protocol(context.session.id, context.proto_id());
+            return;
+        }
+
         let peer_id = match context.session.remote_pubkey.as_ref() {
             Some(pubkey) => pubkey.peer_id(),
             None => {
