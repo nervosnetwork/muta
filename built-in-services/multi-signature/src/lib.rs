@@ -675,7 +675,7 @@ impl<T: Default> From<ServiceError> for ServiceResponse<T> {
     }
 }
 
-pub fn decode_list<T: Decodable>(bytes: &[u8], ty: &str) -> Result<Vec<T>, ServiceError> {
+fn decode_list<T: Decodable>(bytes: &[u8], ty: &str) -> Result<Vec<T>, ServiceError> {
     Rlp::new(bytes)
         .as_list()
         .map_err(|_| ServiceError::DecodeErr(ty.to_string()))
