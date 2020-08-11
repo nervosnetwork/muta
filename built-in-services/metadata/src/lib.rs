@@ -5,6 +5,8 @@ use binding_macro::{cycles, genesis, service};
 use protocol::traits::{ExecutorParams, ServiceResponse, ServiceSDK};
 use protocol::types::{Metadata, ServiceContext, METADATA_KEY};
 
+pub const METADATA_SERVICE_NAME: &str = "metadata";
+
 pub trait MetaData {
     fn get_(&self, ctx: &ServiceContext) -> ServiceResponse<Metadata>;
 }

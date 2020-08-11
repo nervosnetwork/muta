@@ -20,6 +20,7 @@ use crate::types::{
     UpdateAccountPayload, VerifySignaturePayload, Witness,
 };
 
+pub const MULTI_SIG_SERVICE_NAME: &str = "multi_signature";
 const MAX_MULTI_SIGNATURE_RECURSION_DEPTH: u8 = 8;
 const MAX_PERMISSION_ACCOUNTS: u8 = 16;
 
