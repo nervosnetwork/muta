@@ -15,7 +15,7 @@ use crate::error::{ErrorKind, NetworkError};
 use crate::event::PeerManagerEvent;
 use crate::message::{NetworkMessage, SessionMessage};
 use crate::protocols::ReceivedMessage;
-use crate::traits::{Compression, SessionBook};
+use crate::traits::{Compression, SharedSessionBook};
 
 pub struct MessageRouter<C, S> {
     // Endpoint to reactor channel map
@@ -40,7 +40,7 @@ pub struct MessageRouter<C, S> {
 impl<C, S> MessageRouter<C, S>
 where
     C: Compression + Send + Unpin + Clone + 'static,
-    S: SessionBook + Send + Unpin + Clone + 'static,
+    S: SharedSessionBook + Send + Unpin + Clone + 'static,
 {
     pub fn new(
         recv_data_rx: UnboundedReceiver<ReceivedMessage>,
@@ -115,7 +115,7 @@ where
 impl<C, S> Future for MessageRouter<C, S>
 where
     C: Compression + Send + Unpin + Clone + 'static,
-    S: SessionBook + Send + Unpin + Clone + 'static,
+    S: SharedSessionBook + Send + Unpin + Clone + 'static,
 {
     type Output = ();
 

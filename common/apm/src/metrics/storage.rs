@@ -15,6 +15,7 @@ make_auto_flush_static_metric! {
     signed_tx,
     wal,
     hash_height,
+    state,
   }
 
   pub struct StoragePutCfTimeUsageVec: LocalCounter {
@@ -70,6 +71,20 @@ lazy_static! {
         auto_flush_from!(STORAGE_GET_CF_TIME_USAGE_VEC, StorageGetCfTimeUsageVec);
     pub static ref STORAGE_GET_CF_COUNTER: StorageGetCfTotalVec =
         auto_flush_from!(STORAGE_GET_CF_COUNTER_VEC, StorageGetCfTotalVec);
+}
+
+pub fn on_storage_get_state(duration: Duration, keys: i64) {
+    let seconds = duration_to_sec(duration);
+
+    STORAGE_GET_CF_TIME_USAGE.state.inc_by(seconds);
+    STORAGE_GET_CF_COUNTER.state.inc_by(keys);
+}
+
+pub fn on_storage_put_state(duration: Duration, size: i64) {
+    let seconds = duration_to_sec(duration);
+
+    STORAGE_PUT_CF_TIME_USAGE.state.inc_by(seconds);
+    STORAGE_PUT_CF_BYTES_COUNTER.state.inc_by(size);
 }
 
 pub fn on_storage_get_cf(sc: StorageCategory, duration: Duration, keys: i64) {

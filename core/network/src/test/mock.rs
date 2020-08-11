@@ -1,9 +1,10 @@
-use tentacle::{multiaddr::Multiaddr, secio::PublicKey, service::SessionType, SessionId};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 
-use std::sync::{
-    atomic::{AtomicUsize, Ordering},
-    Arc,
-};
+use tentacle::multiaddr::Multiaddr;
+use tentacle::secio::PublicKey;
+use tentacle::service::SessionType;
+use tentacle::SessionId;
 
 #[derive(Clone, Debug)]
 pub struct SessionContext {

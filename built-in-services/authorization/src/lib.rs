@@ -4,6 +4,8 @@ use protocol::types::{ServiceContext, SignedTransaction};
 
 use multi_signature::MultiSignatureService;
 
+pub const AUTHORIZATION_SERVICE_NAME: &str = "authorization";
+
 pub struct AuthorizationService<SDK> {
     _sdk:      SDK,
     multi_sig: MultiSignatureService<SDK>,

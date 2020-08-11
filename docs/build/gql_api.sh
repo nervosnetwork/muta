@@ -18,9 +18,11 @@ if [ ! -z "$1" ]; then
   endpoint=$1
 fi
 
-res_code=$(curl --write-out %{http_code} --silent --output /dev/null \
-            -X POST -d '{"query":"{\n  getBlock(height: \"3\") {\n    header {\n      height\n      preHash\n    }\n    orderedTxHashes\n  }\n}\n"}' \
-            $endpoint)
+#res_code=$(curl --write-out %{http_code} --silent --output /dev/null \
+#            -X POST -d 'query q{\n  getBlock(height:"0x00"){\n    hash \n  }\n}' \
+#            $endpoint)
+
+res_code=$(curl $endpoint --write-out %{http_code} --silent --output /dev/null -H 'content-type: application/json' --data-binary '{"operationName":"q","variables":{},"query":"query q {\n  getBlock(height: \"0x00\") {\n    hash\n  }\n}\n"}')
 
 if [ $res_code -ne 200 ]; then
   echo "$endpoint GraphQL endpoint request failed"

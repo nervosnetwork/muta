@@ -18,7 +18,7 @@ use crate::{
     common::socket_to_multi_addr,
     connection::ConnectionConfig,
     error::NetworkError,
-    peer_manager::{ArcPeer, PeerManagerConfig, SharedSessionsConfig, TrustMetricConfig},
+    peer_manager::{ArcPeer, PeerManagerConfig, TrustMetricConfig},
     selfcheck::SelfCheckConfig,
     traits::MultiaddrExt,
     PeerIdExt,
@@ -38,6 +38,9 @@ pub const DEFAULT_BUFFER_SIZE: usize = 24 * 1024 * 1024; // same as tentacle
 pub const DEFAULT_MAX_WAIT_STREAMS: usize = 256;
 // Default write timeout
 pub const DEFAULT_WRITE_TIMEOUT: u64 = 10; // seconds
+
+pub const DEFAULT_SAME_IP_CONN_LIMIT: usize = 1;
+pub const DEFAULT_INBOUND_CONN_LIMIT: usize = 20;
 
 // Default peer trust metric
 pub const DEFAULT_PEER_TRUST_INTERVAL_DURATION: Duration = Duration::from_secs(60);
@@ -124,6 +127,8 @@ pub struct NetworkConfig {
     pub peer_trust_max_history: Duration,
     pub peer_fatal_ban:         Duration,
     pub peer_soft_ban:          Duration,
+    pub same_ip_conn_limit:     usize,
+    pub inbound_conn_limit:     usize,
 
     // identity and encryption
     pub secio_keypair: SecioKeyPair,
@@ -170,6 +175,8 @@ impl NetworkConfig {
             peer_trust_max_history: DEFAULT_PEER_TRUST_MAX_HISTORY_DURATION,
             peer_fatal_ban:         DEFAULT_PEER_FATAL_BAN_DURATION,
             peer_soft_ban:          DEFAULT_PEER_SOFT_BAN_DURATION,
+            same_ip_conn_limit:     DEFAULT_SAME_IP_CONN_LIMIT,
+            inbound_conn_limit:     DEFAULT_INBOUND_CONN_LIMIT,
 
             secio_keypair: SecioKeyPair::secp256k1_generated(),
 
@@ -186,12 +193,36 @@ impl NetworkConfig {
         }
     }
 
-    pub fn max_connections(mut self, max: Option<usize>) -> Self {
+    pub fn max_connections(mut self, max: Option<usize>) -> ProtocolResult<Self> {
         if let Some(max) = max {
+            if max <= self.inbound_conn_limit {
+                return Err(NetworkError::InboundLimitEqualOrSmallerThanMaxConn.into());
+            }
+
             self.max_connections = max;
         }
 
+        Ok(self)
+    }
+
+    pub fn same_ip_conn_limit(mut self, limit: Option<usize>) -> Self {
+        if let Some(limit) = limit {
+            self.same_ip_conn_limit = limit;
+        }
+
         self
+    }
+
+    pub fn inbound_conn_limit(mut self, limit: Option<usize>) -> ProtocolResult<Self> {
+        if let Some(limit) = limit {
+            if self.max_connections <= limit {
+                return Err(NetworkError::InboundLimitEqualOrSmallerThanMaxConn.into());
+            }
+
+            self.inbound_conn_limit = limit;
+        }
+
+        Ok(self)
     }
 
     pub fn max_frame_length(mut self, max: Option<usize>) -> Self {
@@ -427,17 +458,20 @@ impl From<&NetworkConfig> for PeerManagerConfig {
             TrustMetricConfig::new(config.peer_trust_interval, config.peer_trust_max_history);
 
         PeerManagerConfig {
-            our_id:            config.secio_keypair.peer_id(),
-            pubkey:            config.secio_keypair.public_key(),
-            bootstraps:        config.bootstraps.clone(),
-            allowlist:         config.allowlist.clone(),
-            allowlist_only:    config.allowlist_only,
-            peer_trust_config: Arc::new(peer_trust_config),
-            peer_fatal_ban:    config.peer_fatal_ban,
-            peer_soft_ban:     config.peer_soft_ban,
-            max_connections:   config.max_connections,
-            routine_interval:  config.peer_manager_heart_beat_interval,
-            peer_dat_file:     config.peer_dat_file.clone(),
+            our_id:              config.secio_keypair.peer_id(),
+            pubkey:              config.secio_keypair.public_key(),
+            bootstraps:          config.bootstraps.clone(),
+            allowlist:           config.allowlist.clone(),
+            allowlist_only:      config.allowlist_only,
+            peer_trust_config:   Arc::new(peer_trust_config),
+            peer_fatal_ban:      config.peer_fatal_ban,
+            peer_soft_ban:       config.peer_soft_ban,
+            max_connections:     config.max_connections,
+            same_ip_conn_limit:  config.same_ip_conn_limit,
+            inbound_conn_limit:  config.inbound_conn_limit,
+            outbound_conn_limit: config.max_connections - config.inbound_conn_limit,
+            routine_interval:    config.peer_manager_heart_beat_interval,
+            peer_dat_file:       config.peer_dat_file.clone(),
         }
     }
 }
@@ -459,16 +493,6 @@ impl From<&NetworkConfig> for SelfCheckConfig {
     fn from(config: &NetworkConfig) -> SelfCheckConfig {
         SelfCheckConfig {
             interval: config.selfcheck_interval,
-        }
-    }
-}
-
-// TODO: checkout max_frame_length
-impl From<&NetworkConfig> for SharedSessionsConfig {
-    fn from(config: &NetworkConfig) -> Self {
-        SharedSessionsConfig {
-            write_timeout:          config.write_timeout,
-            max_stream_window_size: config.max_frame_length,
         }
     }
 }

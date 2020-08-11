@@ -84,6 +84,7 @@ describe("API test via @mutadev/muta-sdk-js", () => {
 
     var GenerateMultiSigAccountPayload = {
       owner: wangYe.address,
+      autonomy: false,
       addr_with_weight: [{ address: wangYe.address, weight: 1 }, { address: qing.address, weight: 1 }],
       threshold: 2,
       memo: 'welcome to BiYouCun'
@@ -127,16 +128,12 @@ describe("API test via @mutadev/muta-sdk-js", () => {
     expect(Number(balance.code)).toBe(0);
     expect(Number(balance.succeedData.balance)).toBe(2077);
 
-    const newMultiSigAccountPayload = {
+    const updateAccountPayload = {
+      account_address: multiSigAddress,
       owner: wangYe.address,
       addr_with_weight: [{ address: wangYe.address, weight: 3 }, { address: qing.address, weight: 1 }],
       threshold: 4,
       memo: 'welcome to BiYouCun'
-    };
-
-    const updateAccountPayload = {
-      account_address: multiSigAddress,
-      new_account_info: newMultiSigAccountPayload,
     };
 
     const update = await multiSigService.write.update_account(updateAccountPayload);
@@ -148,6 +145,7 @@ describe("API test via @mutadev/muta-sdk-js", () => {
 
     var GenerateMultiSigAccountPayload = {
       owner: wangYe.address,
+      autonomy: false,
       addr_with_weight: [{ address: multiSigAddress, weight: 2 }, { address: fei.address, weight: 1 }],
       threshold: 2,
       memo: 'welcome to CiYouCun'

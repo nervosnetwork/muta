@@ -285,19 +285,20 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
         _proposer: Address,
     ) -> ProtocolResult<Metadata> {
         Ok(Metadata {
-            chain_id:        Hash::from_empty(),
-            common_ref:      Hex::from_string("0x6c747758636859487038".to_string()).unwrap(),
-            timeout_gap:     20,
-            cycles_limit:    9999,
-            cycles_price:    1,
-            interval:        3000,
-            verifier_list:   mock_verifier_list(),
-            propose_ratio:   10,
-            prevote_ratio:   10,
-            precommit_ratio: 10,
-            brake_ratio:     10,
-            tx_num_limit:    20000,
-            max_tx_size:     1_073_741_824,
+            chain_id:           Hash::from_empty(),
+            bech32_address_hrp: "muta".to_owned(),
+            common_ref:         Hex::from_string("0x6c747758636859487038".to_string()).unwrap(),
+            timeout_gap:        20,
+            cycles_limit:       9999,
+            cycles_price:       1,
+            interval:           3000,
+            verifier_list:      mock_verifier_list(),
+            propose_ratio:      10,
+            prevote_ratio:      10,
+            precommit_ratio:    10,
+            brake_ratio:        10,
+            tx_num_limit:       20000,
+            max_tx_size:        1_073_741_824,
         })
     }
 

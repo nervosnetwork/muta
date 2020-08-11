@@ -1,7 +1,10 @@
 use std::convert::TryFrom;
 use std::fmt;
 use std::str::FromStr;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
+use arc_swap::ArcSwap;
 use bech32::{self, FromBase32, ToBase32};
 use bytes::Bytes;
 use hasher::{Hasher, HasherKeccak};
@@ -11,6 +14,7 @@ use ophelia::UncompressedPublicKey;
 use ophelia_secp256k1::Secp256k1PublicKey;
 use serde::de;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 use crate::fixed_codec::{FixedCodec, FixedCodecError};
 use crate::types::TypesError;
@@ -20,10 +24,36 @@ pub const METADATA_KEY: &str = "metadata";
 
 lazy_static! {
     static ref HASHER_INST: HasherKeccak = HasherKeccak::new();
+    static ref ADDRESS_HRP: ArcSwap<String> = ArcSwap::from(Arc::new("muta".to_owned()));
+    static ref ADDRESS_HRP_INITED: AtomicBool = AtomicBool::new(false);
 }
 
-/// The address bech32 hrp
-pub static ADDRESS_HRP: &str = include!(concat!(env!("OUT_DIR"), "/address_hrp.rs"));
+pub fn address_hrp() -> Arc<String> {
+    ADDRESS_HRP.load_full()
+}
+
+pub fn init_address_hrp(address_hrp: String) {
+    if ADDRESS_HRP_INITED.load(Ordering::SeqCst) {
+        panic!("address hrp can only be inited once");
+    }
+
+    // Verify address hrp
+    let hash = HASHER_INST.digest(b"hello muta");
+    assert_eq!(hash.len(), 32);
+
+    let bytes = &hash[12..];
+    assert_eq!(bytes.len(), 20);
+
+    bech32::encode(&address_hrp, bytes.to_base32()).expect("invalid address hrp");
+
+    // Set address hrp
+    ADDRESS_HRP.store(Arc::new(address_hrp));
+    ADDRESS_HRP_INITED.store(true, Ordering::SeqCst);
+}
+
+pub fn address_hrp_inited() -> bool {
+    ADDRESS_HRP_INITED.load(Ordering::SeqCst)
+}
 
 /// The height of the genesis block.
 pub const GENESIS_HEIGHT: u64 = 0;
@@ -285,6 +315,14 @@ impl Address {
     pub fn as_bytes(&self) -> Bytes {
         self.0.clone()
     }
+
+    pub fn from_hex(s: &str) -> ProtocolResult<Self> {
+        let s = clean_0x(s)?;
+        let bytes = hex::decode(s).map_err(TypesError::from)?;
+
+        let bytes = Bytes::from(bytes);
+        Self::from_bytes(bytes)
+    }
 }
 
 impl FromStr for Address {
@@ -292,7 +330,7 @@ impl FromStr for Address {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let (hrp, data) = bech32::decode(s).map_err(TypesError::from)?;
-        if hrp != ADDRESS_HRP {
+        if &hrp != address_hrp().as_ref() {
             return Err(TypesError::InvalidAddress {
                 address: s.to_owned(),
             });
@@ -305,33 +343,45 @@ impl FromStr for Address {
 
 impl fmt::Debug for Address {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        // NOTE: ADDRESS_HRP was verified in protocol/build.rs
-        bech32::encode_to_fmt(f, ADDRESS_HRP, &self.0.to_base32()).unwrap()
+        // NOTE: ADDRESS_HRP was verified in init_address_hrp fn
+        bech32::encode_to_fmt(f, address_hrp().as_ref(), &self.0.to_base32()).unwrap()
     }
 }
 
 impl fmt::Display for Address {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        // NOTE: ADDRESS_HRP was verified in protocol/build.rs
-        bech32::encode_to_fmt(f, ADDRESS_HRP, &self.0.to_base32()).unwrap()
+        // NOTE: ADDRESS_HRP was verified in init_address_hrp fn
+        bech32::encode_to_fmt(f, address_hrp().as_ref(), &self.0.to_base32()).unwrap()
     }
 }
 
 #[derive(RlpFixedCodec, Deserialize, Default, Serialize, Clone, Debug, PartialEq, Eq)]
 pub struct Metadata {
-    pub chain_id:        Hash,
-    pub common_ref:      Hex,
-    pub timeout_gap:     u64,
-    pub cycles_limit:    u64,
-    pub cycles_price:    u64,
-    pub interval:        u64,
-    pub verifier_list:   Vec<ValidatorExtend>,
-    pub propose_ratio:   u64,
-    pub prevote_ratio:   u64,
-    pub precommit_ratio: u64,
-    pub brake_ratio:     u64,
-    pub tx_num_limit:    u64,
-    pub max_tx_size:     u64,
+    pub chain_id:           Hash,
+    pub bech32_address_hrp: String,
+    pub common_ref:         Hex,
+    pub timeout_gap:        u64,
+    pub cycles_limit:       u64,
+    pub cycles_price:       u64,
+    pub interval:           u64,
+    pub verifier_list:      Vec<ValidatorExtend>,
+    pub propose_ratio:      u64,
+    pub prevote_ratio:      u64,
+    pub precommit_ratio:    u64,
+    pub brake_ratio:        u64,
+    pub tx_num_limit:       u64,
+    pub max_tx_size:        u64,
+}
+
+impl Metadata {
+    pub fn get_hrp_from_json(payload: String) -> String {
+        let nodes: Value = serde_json::from_str(payload.as_str())
+            .expect("metadata's genesis payload is invalid JSON");
+        nodes["bech32_address_hrp"]
+            .as_str()
+            .expect("bech32_address_hrp in genesis payload is not string?")
+            .to_string()
+    }
 }
 
 #[derive(RlpFixedCodec, Serialize, Deserialize, Clone, PartialEq, Eq, Default)]
@@ -381,7 +431,8 @@ mod tests {
     use bech32::{self, FromBase32};
     use bytes::Bytes;
 
-    use super::{Address, Hash, ValidatorExtend};
+    use super::{address_hrp, init_address_hrp, Address, Hash, ValidatorExtend};
+    use crate::types::Metadata;
     use crate::{fixed_codec::FixedCodec, types::Hex};
 
     #[test]
@@ -390,6 +441,14 @@ mod tests {
 
         let bytes = hash.as_bytes();
         Hash::from_bytes(bytes).unwrap();
+    }
+
+    #[test]
+    fn test_from_hex() {
+        let address_hex = "0x755cdba6ae4f479f7164792b318b2a06c759833b";
+        let address_bech32 = "muta1w4wdhf4wfare7uty0y4nrze2qmr4nqem9j7teu";
+        let address = Address::from_hex(address_hex).unwrap();
+        assert_eq!(address.to_string(), address_bech32);
     }
 
     #[test]
@@ -433,5 +492,55 @@ mod tests {
 
         let decoded = ValidatorExtend::decode_fixed(extend.encode_fixed().unwrap()).unwrap();
         assert_eq!(decoded, extend);
+    }
+
+    // Note: All tests run in same process, change ADDRESS_HRP affects other tests
+    #[test]
+    #[should_panic(expected = "must set hrp before deserialization")]
+    fn test_init_address_hrp() {
+        assert_eq!(address_hrp().as_ref(), "muta", "default value");
+
+        let metadata_payload = r#"
+        {
+            "chain_id": "0xb6a4d7da21443f5e816e8700eea87610e6d769657d6b8ec73028457bf2ca4036",
+            "bech32_address_hrp": "ham",
+            "common_ref": "0x6c747758636859487038",
+            "timeout_gap": 20,
+            "cycles_limit": 4294967295,
+            "cycles_price": 1,
+            "interval": 3000,
+            "verifier_list": [
+               {
+                   "bls_pub_key": "0x04102947214862a503c73904deb5818298a186d68c7907bb609583192a7de6331493835e5b8281f4d9ee705537c0e765580e06f86ddce5867812fceb42eecefd209f0eddd0389d6b7b0100f00fb119ef9ab23826c6ea09aadcc76fa6cea6a32724",
+                   "pub_key": "0x02ef0cb0d7bc6c18b4bea1f5908d9106522b35ab3c399369605d4242525bda7e60",
+                   "address": "ham14e0lmgck835vm2dfm0w3ckv6svmez8fdmq5fts",
+                   "propose_weight": 1,
+                   "vote_weight": 1
+               }
+            ],
+            "propose_ratio": 15,
+            "prevote_ratio": 10,
+            "precommit_ratio": 10,
+            "brake_ratio": 7,
+            "tx_num_limit": 20000,
+            "max_tx_size": 1024
+        }
+        "#;
+
+        let hrp = Metadata::get_hrp_from_json(metadata_payload.to_string());
+
+        assert_eq!("ham".to_string(), hrp, "should be same");
+
+        // this should fail because we did not set hrp to ham like
+        // init_address_hrp(hrp);
+        serde_json::from_str::<Metadata>(metadata_payload)
+            .expect("must set hrp before deserialization");
+    }
+
+    #[test]
+    #[should_panic(expected = "address hrp can only be inited once")]
+    fn test_init_address_hrp_twice() {
+        init_address_hrp("muta".to_owned());
+        init_address_hrp("muta".to_owned());
     }
 }

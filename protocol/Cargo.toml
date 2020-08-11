@@ -1,6 +1,6 @@
 [package]
 name = "muta-protocol"
-version = "0.1.0-alpha.1"
+version = "0.2.0-beta.4"
 authors = ["Muta Dev <muta@nervos.org>"]
 edition = "2018"
 repository = "https://github.com/nervosnetwork/muta"
@@ -30,11 +30,8 @@ muta-codec-derive = "0.2"
 ophelia = "0.3"
 ophelia-secp256k1 = "0.3"
 bech32 = "0.7"
+arc-swap = "0.4"
 
 [dev-dependencies]
 rayon = "1.3"
 rand = "0.6"
-
-[build-dependencies]
-hasher = { version = "0.1", features = ['hash-keccak'] }
-bech32 = "0.7"

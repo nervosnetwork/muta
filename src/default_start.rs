@@ -18,7 +18,7 @@ use common_crypto::{
     ToPublicKey, UncompressedPublicKey,
 };
 use core_api::adapter::DefaultAPIAdapter;
-use core_api::config::GraphQLConfig;
+use core_api::config::{GraphQLConfig, GraphQLTLS};
 use core_consensus::fixed_types::{FixedBlock, FixedProof, FixedSignedTxs};
 use core_consensus::message::{
     ChokeMessageHandler, ProposalMessageHandler, PullBlockRpcHandler, PullProofRpcHandler,
@@ -43,9 +43,7 @@ use core_storage::{adapter::rocks::RocksAdapter, ImplStorage, StorageError};
 use framework::binding::state::RocksTrieDB;
 use framework::executor::{ServiceExecutor, ServiceExecutorFactory};
 use protocol::traits::{APIAdapter, Context, MemPool, Network, NodeInfo, ServiceMapping, Storage};
-use protocol::types::{
-    Address, Block, BlockHeader, Genesis, Hash, Metadata, Proof, Validator, ADDRESS_HRP,
-};
+use protocol::types::{Address, Block, BlockHeader, Genesis, Hash, Metadata, Proof, Validator};
 use protocol::{fixed_codec::FixedCodec, ProtocolResult};
 
 use crate::config::Config;
@@ -56,6 +54,15 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
     genesis: &Genesis,
     servive_mapping: Arc<Mapping>,
 ) -> ProtocolResult<Block> {
+    let metadata_payload = genesis.get_payload("metadata");
+
+    let hrp = Metadata::get_hrp_from_json(metadata_payload.to_string());
+
+    // Set bech32 address hrp
+    if !protocol::address_hrp_inited() {
+        protocol::init_address_hrp(hrp.to_owned());
+    }
+
     let metadata: Metadata =
         serde_json::from_str(genesis.get_payload("metadata")).expect("Decode metadata failed!");
 
@@ -98,6 +105,7 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
         path_state,
         config.executor.light,
         config.rocksdb.max_open_files,
+        config.executor.triedb_cache_size,
     )?);
 
     // Init genesis
@@ -109,7 +117,9 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
     )?;
 
     // Build genesis block.
-    let proposer = Address::from_hash(Hash::digest(Bytes::from_static(ADDRESS_HRP.as_bytes())))?;
+    let proposer = Address::from_hash(Hash::digest(Bytes::from(
+        protocol::address_hrp().as_ref().to_owned(),
+    )))?;
     let genesis_block_header = BlockHeader {
         chain_id: metadata.chain_id.clone(),
         height: 0,
@@ -166,7 +176,9 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
 
     // Init network
     let network_config = NetworkConfig::new()
-        .max_connections(config.network.max_connected_peers)
+        .max_connections(config.network.max_connected_peers)?
+        .same_ip_conn_limit(config.network.same_ip_conn_limit)
+        .inbound_conn_limit(config.network.inbound_conn_limit)?
         .allowlist_only(config.network.allowlist_only)
         .peer_trust_metric(
             config.network.trust_interval_duration,
@@ -209,6 +221,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         path_state,
         config.executor.light,
         config.rocksdb.max_open_files,
+        config.executor.triedb_cache_size,
     )?);
 
     // Init mempool
@@ -271,6 +284,11 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
 
     let metadata: Metadata =
         serde_json::from_str(&exec_resp.succeed_data).expect("Decode metadata failed!");
+
+    // Set bech32 address hrp
+    if !protocol::address_hrp_inited() {
+        protocol::init_address_hrp(metadata.bech32_address_hrp);
+    }
 
     // set args in mempool
     mempool.set_args(
@@ -545,6 +563,12 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     }
     if config.graphql.max_payload_size != 0 {
         graphql_config.max_payload_size = config.graphql.max_payload_size;
+    }
+    if let Some(tls) = config.graphql.tls {
+        graphql_config.tls = Some(GraphQLTLS {
+            private_key_file_path:       tls.private_key_file_path,
+            certificate_chain_file_path: tls.certificate_chain_file_path,
+        })
     }
 
     tokio::task::spawn_local(async move {

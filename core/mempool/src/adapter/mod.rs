@@ -30,7 +30,7 @@ use protocol::{
         Context, ExecutorFactory, ExecutorParams, Gossip, MemPoolAdapter, PeerTrust, Priority, Rpc,
         ServiceMapping, ServiceResponse, Storage, TrustFeedback,
     },
-    types::{Address, Hash, SignedTransaction, TransactionRequest, ADDRESS_HRP},
+    types::{Address, Hash, SignedTransaction, TransactionRequest},
     Bytes, ProtocolError, ProtocolErrorKind, ProtocolResult,
 };
 
@@ -300,8 +300,9 @@ where
                     MemPoolError::EncodeJson
                 })?;
 
-                let caller =
-                    Address::from_hash(Hash::digest(Bytes::from_static(ADDRESS_HRP.as_bytes())))?;
+                let caller = Address::from_hash(Hash::digest(Bytes::from(
+                    protocol::address_hrp().as_ref().to_owned(),
+                )))?;
                 let executor = EF::from_root(
                     block.header.state_root.clone(),
                     Arc::clone(&trie_db_clone),
@@ -414,12 +415,6 @@ where
         let timeout_gap = self.timeout_gap.load(Ordering::SeqCst);
 
         if stx.raw.timeout > latest_height + timeout_gap {
-            if ctx.is_network_origin_txs() {
-                self.network.report(
-                    ctx.clone(),
-                    TrustFeedback::Bad(format!("Mempool invalid timeout of tx {:?}", stx.tx_hash)),
-                );
-            }
             let invalid_timeout = MemPoolError::InvalidTimeout {
                 tx_hash: stx.tx_hash,
             };
@@ -428,12 +423,6 @@ where
         }
 
         if stx.raw.timeout < latest_height {
-            if ctx.is_network_origin_txs() {
-                self.network.report(
-                    ctx,
-                    TrustFeedback::Bad(format!("Mempool timeout of tx {:?}", stx.tx_hash)),
-                );
-            }
             let timeout = MemPoolError::Timeout {
                 tx_hash: stx.tx_hash,
                 timeout: stx.raw.timeout,

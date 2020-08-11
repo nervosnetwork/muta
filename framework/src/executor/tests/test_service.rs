@@ -59,7 +59,7 @@ impl<SDK: ServiceSDK> TestService<SDK> {
         ctx: ServiceContext,
         _: TestWritePayload,
     ) -> ServiceResponse<TestWriteResponse> {
-        ctx.emit_event("test-name".to_owned(), "test".to_owned());
+        ctx.emit_event("wow".to_owned(), "test-name".to_owned(), "test".to_owned());
         ServiceResponse::from_succeed(TestWriteResponse::default())
     }
 
@@ -114,6 +114,7 @@ impl<SDK: ServiceSDK> TestService<SDK> {
             && ctx.get_payload().to_owned().contains("test_hook_before")
         {
             ctx.emit_event(
+                "test_service".to_owned(),
                 "test-name".to_owned(),
                 "test_tx_hook_before invoked".to_owned(),
             );
@@ -133,6 +134,7 @@ impl<SDK: ServiceSDK> TestService<SDK> {
             && ctx.get_payload().to_owned().contains("test_hook_after")
         {
             ctx.emit_event(
+                "test_service".to_owned(),
                 "test-name".to_owned(),
                 "test_tx_hook_after invoked".to_owned(),
             );

@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::error::Error;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use bytes::buf::BufMut;
 use bytes::BytesMut;
@@ -16,6 +17,13 @@ use protocol::fixed_codec::FixedCodec;
 use protocol::traits::Context;
 use protocol::types::{Address, Hash, Hex, MerkleRoot, SignedTransaction};
 use protocol::{Bytes, ProtocolError, ProtocolResult};
+
+pub fn time_now() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as u64
+}
 
 pub struct OverlordCrypto {
     private_key: BlsPrivateKey,

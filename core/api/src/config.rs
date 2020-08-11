@@ -1,4 +1,5 @@
 use std::net::SocketAddr;
+use std::path::PathBuf;
 
 #[derive(Debug, Clone)]
 pub struct GraphQLConfig {
@@ -18,6 +19,14 @@ pub struct GraphQLConfig {
     // It is used to prevent DOS attacking through memory exhaustion.
     // The default value is 1024 * 1024, which is 1MB.
     pub max_payload_size: usize,
+
+    pub tls: Option<GraphQLTLS>,
+}
+
+#[derive(Debug, Clone)]
+pub struct GraphQLTLS {
+    pub private_key_file_path:       PathBuf,
+    pub certificate_chain_file_path: PathBuf,
 }
 
 impl Default for GraphQLConfig {
@@ -32,6 +41,7 @@ impl Default for GraphQLConfig {
             workers:          num_cpus::get(),
             maxconn:          25000,
             max_payload_size: 1024 * 1024, // 1MB
+            tls:              None,
         }
     }
 }

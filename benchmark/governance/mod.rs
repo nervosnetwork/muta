@@ -12,7 +12,7 @@ use protocol::traits::{ExecutorParams, ServiceResponse, ServiceSDK, StoreMap};
 use protocol::types::{Address, Hash, ServiceContext, ServiceContextParams};
 
 use asset::types::TransferPayload;
-use asset::AssetService;
+use asset::Assets;
 use types::{GovernanceInfo, InitGenesisPayload};
 
 const INFO_KEY: &str = "admin";
@@ -24,17 +24,16 @@ lazy_static::lazy_static! {
     pub static ref NATIVE_ASSET_ID: Hash = Hash::from_hex("0xf56924db538e77bb5951eb5ff0d02b88983c49c45eea30e8ae3e7234b311436c").unwrap();
 }
 
-pub struct GovernanceService<SDK> {
+pub struct GovernanceService<A, SDK> {
     sdk:     SDK,
     profits: Box<dyn StoreMap<Address, u64>>,
     miners:  Box<dyn StoreMap<Address, Address>>,
-
-    asset: AssetService<SDK>,
+    asset:   A,
 }
 
 #[service]
-impl<SDK: ServiceSDK> GovernanceService<SDK> {
-    pub fn new(mut sdk: SDK, asset: AssetService<SDK>) -> Self {
+impl<A: Assets, SDK: ServiceSDK> GovernanceService<A, SDK> {
+    pub fn new(mut sdk: SDK, asset: A) -> Self {
         let profits: Box<dyn StoreMap<Address, u64>> = sdk.alloc_or_recover_map("profit");
         let miners: Box<dyn StoreMap<Address, Address>> = sdk.alloc_or_recover_map("miner_address");
         Self {
@@ -80,19 +79,17 @@ impl<SDK: ServiceSDK> GovernanceService<SDK> {
 
         let info = info.unwrap();
         let tx_fee_inlet_address = tx_fee_inlet_address.unwrap();
-
-        // Pledge the tx failure fee before executed the transaction.
-        let ret = self.asset.transfer(ctx, TransferPayload {
+        let payload = TransferPayload {
             asset_id: NATIVE_ASSET_ID.clone(),
             to:       tx_fee_inlet_address,
             value:    info.tx_failure_fee,
-        });
+        };
 
-        if ret.is_error() {
-            return ServiceResponse::from_error(ret.code, ret.error_message);
+        // Pledge the tx failure fee before executed the transaction.
+        match self.asset.transfer_(&ctx, payload) {
+            Ok(_) => ServiceResponse::from_succeed("".to_owned()),
+            Err(e) => ServiceResponse::from_error(e.code, e.error_message),
         }
-
-        ServiceResponse::from_succeed("".to_owned())
     }
 
     #[tx_hook_after]
@@ -105,18 +102,16 @@ impl<SDK: ServiceSDK> GovernanceService<SDK> {
         }
 
         let tx_fee_inlet_address = tx_fee_inlet_address.unwrap();
-
-        let ret = self.asset.transfer(ctx, TransferPayload {
+        let payload = TransferPayload {
             asset_id: NATIVE_ASSET_ID.clone(),
             to:       tx_fee_inlet_address,
             value:    1,
-        });
+        };
 
-        if ret.is_error() {
-            return ServiceResponse::from_error(ret.code, ret.error_message);
+        match self.asset.transfer_(&ctx, payload) {
+            Ok(_) => ServiceResponse::from_succeed("".to_owned()),
+            Err(e) => ServiceResponse::from_error(e.code, e.error_message),
         }
-
-        ServiceResponse::from_succeed("".to_owned())
     }
 
     #[hook_after]
@@ -166,7 +161,7 @@ impl<SDK: ServiceSDK> GovernanceService<SDK> {
 
         let _ = self
             .asset
-            .transfer(ServiceContext::new(ctx_params), payload);
+            .transfer_(&ServiceContext::new(ctx_params), payload);
     }
 }
 

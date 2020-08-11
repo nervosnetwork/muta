@@ -11,6 +11,7 @@ interface AddressWithWeight {
 
 interface GenerateMultiSigAccountPayload {
     owner: Address,
+    autonomy:         boolean,
     addr_with_weight: Vec<AddressWithWeight>,
     threshold: u32,
     memo: string,
@@ -30,7 +31,10 @@ interface GetMultiSigAccountResponse {
 
 interface UpdateAccountPayload {
     account_address: Address,
-    new_account_info: GenerateMultiSigAccountPayload
+    owner: Address,
+    addr_with_weight: Vec<AddressWithWeight>,
+    threshold: u32,
+    memo: string,
 }
 
 interface MultiSigPermission {

@@ -4,6 +4,7 @@ mod addr_set;
 mod peer;
 mod retry;
 mod save_restore;
+mod session_book;
 mod shared;
 mod tags;
 mod time;
@@ -15,66 +16,55 @@ pub mod diagnostic;
 use addr_set::PeerAddrSet;
 use retry::Retry;
 use save_restore::{NoPeerDatFile, PeerDatFile, SaveRestore};
+use session_book::{AcceptableSession, ArcSession, SessionContext};
 use tags::Tags;
 
 pub use peer::{ArcPeer, Connectedness};
-pub use shared::{SharedSessions, SharedSessionsConfig};
+pub use session_book::SessionBook;
+pub use shared::SharedSessions;
 pub use trust_metric::{TrustMetric, TrustMetricConfig};
 
 #[cfg(test)]
 mod test_manager;
 
-use std::{
-    borrow::Borrow,
-    cmp::PartialEq,
-    collections::HashSet,
-    convert::{TryFrom, TryInto},
-    future::Future,
-    hash::{Hash, Hasher},
-    iter::FromIterator,
-    ops::Deref,
-    path::PathBuf,
-    pin::Pin,
-    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
-    sync::Arc,
-    task::{Context, Poll},
-    time::Duration,
-};
+use std::borrow::Borrow;
+use std::cmp::PartialEq;
+use std::collections::HashSet;
+use std::convert::{TryFrom, TryInto};
+use std::future::Future;
+use std::hash::{Hash, Hasher};
+use std::iter::FromIterator;
+use std::ops::Deref;
+use std::path::PathBuf;
+use std::pin::Pin;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
+use std::task::{Context, Poll};
+use std::time::Duration;
 
 use derive_more::Display;
-use futures::{
-    channel::mpsc::{UnboundedReceiver, UnboundedSender},
-    pin_mut,
-    stream::Stream,
-    task::AtomicWaker,
-};
+use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
+use futures::stream::Stream;
+use futures::task::AtomicWaker;
 use log::{debug, error, info, warn};
 use parking_lot::RwLock;
 use protocol::traits::{PeerTag, TrustFeedback};
 use rand::seq::IteratorRandom;
 use serde_derive::{Deserialize, Serialize};
-#[cfg(not(test))]
-use tentacle::context::SessionContext;
-use tentacle::{
-    multiaddr::Multiaddr,
-    secio::{PeerId, PublicKey},
-    service::{SessionType, TargetProtocol},
-    SessionId,
+use tentacle::multiaddr::Multiaddr;
+use tentacle::secio::{PeerId, PublicKey};
+use tentacle::service::{SessionType, TargetProtocol};
+use tentacle::SessionId;
+
+use crate::common::{resolve_if_unspecified, HeartBeat};
+use crate::error::{NetworkError, PeerIdNotFound};
+use crate::event::{
+    ConnectionErrorKind, ConnectionEvent, ConnectionType, MisbehaviorKind, PeerManagerEvent,
+    SessionErrorKind,
 };
+use crate::traits::MultiaddrExt;
 
-use crate::{
-    common::{resolve_if_unspecified, ConnectedAddr, HeartBeat},
-    error::{NetworkError, PeerIdNotFound},
-    event::{
-        ConnectionErrorKind, ConnectionEvent, ConnectionType, MisbehaviorKind, PeerManagerEvent,
-        SessionErrorKind,
-    },
-    traits::MultiaddrExt,
-};
-
-#[cfg(test)]
-use crate::test::mock::SessionContext;
-
+const SAME_IP_LIMIT_BAN: Duration = Duration::from_secs(5 * 60);
 const REPEATED_CONNECTION_TIMEOUT: u64 = 30; // seconds
 const BACKOFF_BASE: u64 = 2;
 const MAX_RETRY_INTERVAL: u64 = 512; // seconds
@@ -202,91 +192,24 @@ impl Hash for ConnectingAttempt {
     }
 }
 
-#[derive(Debug)]
-struct Session {
-    id:             SessionId,
-    ctx:            Arc<SessionContext>,
-    peer:           ArcPeer,
-    blocked:        AtomicBool,
-    connected_addr: ConnectedAddr,
-}
-
-#[derive(Debug, Clone)]
-struct ArcSession(Arc<Session>);
-
-impl ArcSession {
-    pub fn new(peer: ArcPeer, ctx: Arc<SessionContext>) -> Self {
-        let connected_addr = ConnectedAddr::from(&ctx.address);
-        let session = Session {
-            id: ctx.id,
-            ctx,
-            peer,
-            blocked: AtomicBool::new(false),
-            connected_addr,
-        };
-
-        ArcSession(Arc::new(session))
-    }
-
-    pub fn block(&self) {
-        self.blocked.store(true, Ordering::SeqCst);
-    }
-
-    pub fn is_blocked(&self) -> bool {
-        self.blocked.load(Ordering::SeqCst)
-    }
-
-    pub fn unblock(&self) {
-        self.blocked.store(false, Ordering::SeqCst);
-    }
-}
-
-impl Borrow<SessionId> for ArcSession {
-    fn borrow(&self) -> &SessionId {
-        &self.id
-    }
-}
-
-impl PartialEq for ArcSession {
-    fn eq(&self, other: &ArcSession) -> bool {
-        self.id == other.id
-    }
-}
-
-impl Eq for ArcSession {}
-
-impl Hash for ArcSession {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.id.hash(state)
-    }
-}
-
-impl Deref for ArcSession {
-    type Target = Session;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
 struct Inner {
     our_id: Arc<PeerId>,
 
+    sessions:  SessionBook,
     consensus: RwLock<HashSet<PeerId>>,
-    sessions:  RwLock<HashSet<ArcSession>>,
     peers:     RwLock<HashSet<ArcPeer>>,
 
     listen: RwLock<HashSet<PeerMultiaddr>>,
 }
 
 impl Inner {
-    pub fn new(our_id: PeerId) -> Self {
+    pub fn new(our_id: PeerId, sessions: SessionBook) -> Self {
         Inner {
             our_id: Arc::new(our_id),
 
+            sessions,
             consensus: Default::default(),
-            sessions:  Default::default(),
-            peers:     Default::default(),
+            peers: Default::default(),
 
             listen: Default::default(),
         }
@@ -305,7 +228,7 @@ impl Inner {
     }
 
     pub fn connected(&self) -> usize {
-        self.sessions.read().len()
+        self.sessions.len()
     }
 
     /// If peer exists, return false
@@ -346,15 +269,15 @@ impl Inner {
     }
 
     pub fn session(&self, sid: SessionId) -> Option<ArcSession> {
-        self.sessions.read().get(&sid).cloned()
+        self.sessions.get(&sid)
     }
 
     pub fn share_sessions(&self) -> Vec<ArcSession> {
-        self.sessions.read().iter().cloned().collect()
+        self.sessions.all()
     }
 
     pub fn remove_session(&self, sid: SessionId) -> Option<ArcSession> {
-        self.sessions.write().take(&sid)
+        self.sessions.remove(&sid)
     }
 
     pub fn package_peers(&self) -> Vec<ArcPeer> {
@@ -363,6 +286,10 @@ impl Inner {
 
     fn restore(&self, peers: Vec<ArcPeer>) {
         self.peers.write().extend(peers);
+    }
+
+    fn outbound_count(&self) -> usize {
+        self.sessions.outbound_count()
     }
 }
 
@@ -381,6 +308,15 @@ pub struct PeerManagerConfig {
     pub allowlist:      Vec<PeerId>,
     /// Only accept/conect peers in allowlist
     pub allowlist_only: bool,
+
+    /// Limit connections from same ip
+    pub same_ip_conn_limit: usize,
+
+    /// Limit inbound connections
+    pub inbound_conn_limit: usize,
+
+    /// Limit outbound connections
+    pub outbound_conn_limit: usize,
 
     /// Trust metric config
     pub peer_trust_config: Arc<TrustMetricConfig>,
@@ -539,8 +475,10 @@ impl PeerManager {
         conn_tx: UnboundedSender<ConnectionEvent>,
     ) -> Self {
         let peer_id = config.our_id.clone();
+        let session_config = session_book::Config::from(&config);
+        let session_book = SessionBook::new(session_config);
 
-        let inner = Arc::new(Inner::new(config.our_id.clone()));
+        let inner = Arc::new(Inner::new(config.our_id.clone(), session_book));
         let bootstraps = HashSet::from_iter(config.bootstraps.clone());
         let waker = Arc::new(AtomicWaker::new());
         let heart_beat = HeartBeat::new(Arc::clone(&waker), config.routine_interval);
@@ -582,7 +520,7 @@ impl PeerManager {
         }
     }
 
-    pub fn share_session_book(&self, config: SharedSessionsConfig) -> SharedSessions {
+    pub fn share_session_book(&self, config: shared::Config) -> SharedSessions {
         SharedSessions::new(Arc::clone(&self.inner), config)
     }
 
@@ -736,12 +674,6 @@ impl PeerManager {
             }
         }
 
-        // Currently we only save accepted peer.
-        // TODO: save to database
-        if !self.inner.contains(&remote_peer_id) {
-            self.inner.add_peer(remote_peer.clone());
-        }
-
         let connectedness = remote_peer.connectedness();
         if connectedness == Connectedness::Connected {
             // This should not happen, because of repeated connection event
@@ -764,7 +696,32 @@ impl PeerManager {
         let session = ArcSession::new(remote_peer.clone(), Arc::clone(&ctx));
         info!("new session from {}", session.connected_addr);
 
-        self.inner.sessions.write().insert(session);
+        // Always allow peer in allowlist and consensus peer
+        if !remote_peer.tags.contains(&PeerTag::AlwaysAllow)
+            && !remote_peer.tags.contains(&PeerTag::Consensus)
+        {
+            if let Err(err) = self.inner.sessions.acceptable(&session) {
+                warn!("session {} unacceptable {}", ctx.id, err);
+
+                // Ban this peer for a while so we won't choose it again
+                // NOTE: Always allowed and consensus peer cannot be banned.
+                if let Err(err) = remote_peer.tags.insert_ban(SAME_IP_LIMIT_BAN) {
+                    warn!("ban same ip peer {:?} failed: {}", remote_peer.id, err);
+                }
+
+                remote_peer.mark_disconnected();
+                self.disconnect_session(ctx.id);
+                return;
+            }
+        }
+
+        // Currently we only save accepted peer.
+        // TODO: save to database
+        if !self.inner.contains(&remote_peer_id) {
+            self.inner.add_peer(remote_peer.clone());
+        }
+
+        self.inner.sessions.insert(AcceptableSession(session));
         remote_peer.mark_connected(ctx.id);
 
         match remote_peer.trust_metric() {
@@ -1270,7 +1227,7 @@ impl Future for PeerManager {
         // Process manager events
         loop {
             let event_rx = &mut self.as_mut().event_rx;
-            pin_mut!(event_rx);
+            futures::pin_mut!(event_rx);
 
             // service ready in common
             let event = crate::service_ready!("peer manager", event_rx.poll_next(ctx));
@@ -1289,10 +1246,12 @@ impl Future for PeerManager {
 
         // Check connecting count
         let connected_count = self.inner.connected();
-        let connection_attempts = connected_count + self.connecting.len();
-        let max_connection_attempts = self.config.max_connections + MAX_CONNECTING_MARGIN;
+        let outbound_count = self.inner.outbound_count();
+        let connection_attempts = outbound_count + self.connecting.len();
+        let max_connection_attempts = self.config.outbound_conn_limit + MAX_CONNECTING_MARGIN;
 
         if connected_count < self.config.max_connections
+            && outbound_count < self.config.outbound_conn_limit
             && connection_attempts < max_connection_attempts
         {
             let filter_good_peer = |peer: &ArcPeer| -> bool {

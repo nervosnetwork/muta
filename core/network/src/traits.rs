@@ -39,7 +39,7 @@ pub trait ListenExchangeManager {
     fn misbehave(&mut self, sid: SessionId);
 }
 
-pub trait SessionBook {
+pub trait SharedSessionBook {
     fn all_sendable(&self) -> Vec<SessionId>;
     fn all_blocked(&self) -> Vec<SessionId>;
     fn refresh_blocked(&self);
