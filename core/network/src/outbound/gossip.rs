@@ -45,9 +45,7 @@ where
             headers.set_span_id(state.span_id());
             log::info!("no trace id found for gossip {}", endpoint.full_url());
         }
-        let net_msg = NetworkMessage::new(endpoint, data, headers)
-            .encode()
-            .await?;
+        let net_msg = NetworkMessage::new(endpoint, data, headers).encode()?;
         let msg = self.compression.compress(net_msg)?;
 
         Ok(msg)

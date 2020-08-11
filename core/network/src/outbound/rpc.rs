@@ -116,9 +116,7 @@ where
             log::info!("no trace id found for rpc {}", endpoint.full_url());
         }
         common_apm::metrics::network::on_network_message_sent(endpoint.full_url());
-        let net_msg = NetworkMessage::new(endpoint, data, headers)
-            .encode()
-            .await?;
+        let net_msg = NetworkMessage::new(endpoint, data, headers).encode()?;
 
         self.send(cx, sid, net_msg, priority).await?;
 
@@ -182,9 +180,7 @@ where
             log::info!("no trace id found for rpc {}", endpoint.full_url());
         }
         common_apm::metrics::network::on_network_message_sent(endpoint.full_url());
-        let net_msg = NetworkMessage::new(endpoint, encoded_resp, headers)
-            .encode()
-            .await?;
+        let net_msg = NetworkMessage::new(endpoint, encoded_resp, headers).encode()?;
 
         self.send(cx, sid, net_msg, priority).await?;
 

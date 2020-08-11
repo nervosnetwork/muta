@@ -131,7 +131,7 @@ pub async fn main() {
             dealer: handle.clone(),
         };
         bootstrap
-            .register_endpoint_handler(SHOP_CASH_CHANNEL, Box::new(check_out))
+            .register_endpoint_handler(SHOP_CASH_CHANNEL, check_out)
             .unwrap();
 
         tokio::spawn(bootstrap);
@@ -165,7 +165,7 @@ pub async fn main() {
         let take_my_money = TakeMyMoney {
             shop: handle.clone(),
         };
-        peer.register_endpoint_handler(RELEASE_CHANNEL, Box::new(take_my_money))
+        peer.register_endpoint_handler(RELEASE_CHANNEL, take_my_money)
             .unwrap();
         peer.register_rpc_response::<ACopy>(SHOP_CHANNEL).unwrap();
 

@@ -1,85 +1,65 @@
 mod router;
-pub(crate) use router::MessageRouter;
 
-use std::{
-    convert::TryFrom,
-    future::Future,
-    marker::PhantomData,
-    pin::Pin,
-    sync::Arc,
-    task::{Context as TaskContext, Poll},
-};
+use std::convert::TryFrom;
+use std::marker::PhantomData;
+use std::sync::Arc;
 
 use async_trait::async_trait;
-use futures::{channel::mpsc::UnboundedReceiver, future::TryFutureExt, pin_mut, stream::Stream};
 use log::{error, warn};
-use protocol::{
-    traits::{Context, MessageCodec, MessageHandler, TrustFeedback},
-    Bytes, ProtocolError,
-};
+use protocol::traits::{Context, MessageCodec, MessageHandler, TrustFeedback};
+use protocol::{Bytes, ProtocolResult};
 
-use crate::common::ConnectedAddr;
-use crate::{
-    endpoint::{Endpoint, EndpointScheme, RpcEndpoint},
-    event::PeerManagerEvent,
-    message::SessionMessage,
-    rpc::RpcResponse,
-    rpc_map::RpcMap,
-    traits::NetworkContext,
-};
+use crate::endpoint::{Endpoint, EndpointScheme, RpcEndpoint};
+use crate::event::PeerManagerEvent;
+use crate::message::SessionMessage;
+use crate::rpc::RpcResponse;
+use crate::rpc_map::RpcMap;
+use crate::traits::NetworkContext;
 
-pub struct Reactor<M> {
-    smsg_rx: UnboundedReceiver<SessionMessage>,
-    handler: Arc<Box<dyn MessageHandler<Message = M>>>,
-    rpc_map: Arc<RpcMap>,
+pub(crate) use router::MessageRouter;
+
+#[async_trait]
+pub trait Reactor: Send + Sync {
+    async fn react(&self, session_message: &SessionMessage) -> ProtocolResult<()>;
 }
 
-impl<M> Reactor<M>
-where
-    M: MessageCodec,
-{
-    pub fn new(
-        smsg_rx: UnboundedReceiver<SessionMessage>,
-        boxed_handler: Box<dyn MessageHandler<Message = M>>,
-        rpc_map: Arc<RpcMap>,
-    ) -> Self {
-        Reactor {
-            smsg_rx,
-            handler: Arc::new(boxed_handler),
-            rpc_map,
-        }
+pub struct MessageReactor<M: MessageCodec, H: MessageHandler<Message = M>> {
+    msg_handler: H,
+    rpc_map:     Arc<RpcMap>,
+}
+
+pub fn generate<M: MessageCodec, H: MessageHandler<Message = M>>(
+    h: H,
+    rpc_map: Arc<RpcMap>,
+) -> MessageReactor<M, H> {
+    MessageReactor {
+        msg_handler: h,
+        rpc_map,
     }
+}
 
-    pub fn rpc_resp(smsg_rx: UnboundedReceiver<SessionMessage>, rpc_map: Arc<RpcMap>) -> Self {
-        Reactor {
-            smsg_rx,
-            handler: Arc::new(Box::new(DummyHandler::new())),
-            rpc_map,
-        }
+pub fn rpc_resp<M: MessageCodec>(rpc_map: Arc<RpcMap>) -> MessageReactor<M, DummyHandler<M>> {
+    MessageReactor {
+        msg_handler: DummyHandler::new(),
+        rpc_map,
     }
+}
 
-    pub fn react(&self, smsg: SessionMessage) -> impl Future<Output = ()> {
-        let handler = Arc::clone(&self.handler);
-        let rpc_map = Arc::clone(&self.rpc_map);
-
-        let SessionMessage {
-            sid,
-            msg: net_msg,
-            pid,
-            connected_addr,
-            trust_tx,
-            ..
-        } = smsg;
-
-        let endpoint = net_msg.url.to_owned();
+#[async_trait]
+impl<M: MessageCodec, H: MessageHandler<Message = M>> Reactor for MessageReactor<M, H> {
+    async fn react(&self, session_message: &SessionMessage) -> ProtocolResult<()> {
         let mut ctx = Context::new()
-            .set_session_id(sid)
-            .set_remote_peer_id(pid.clone());
-        if let Some(ref connected_addr) = connected_addr {
+            .set_session_id(session_message.sid)
+            .set_remote_peer_id(session_message.pid.clone());
+
+        if let Some(ref connected_addr) = session_message.connected_addr {
             ctx = ctx.set_remote_connected_addr(connected_addr.clone());
         }
 
-        let mut ctx = match (net_msg.trace_id(), net_msg.span_id()) {
+        let mut ctx = match (
+            session_message.msg.trace_id(),
+            session_message.msg.span_id(),
+        ) {
             (Some(trace_id), Some(span_id)) => {
                 let span_state = common_apm::muta_apm::MutaTracer::new_state(trace_id, span_id);
                 common_apm::muta_apm::MutaTracer::inject_span_state(ctx, span_state)
@@ -87,97 +67,58 @@ where
             _ => ctx,
         };
 
-        let react = async move {
-            let connected_addr = ctx.remote_connected_addr();
-            struct ProcessingGuage {
-                connected_addr: Option<ConnectedAddr>,
+        let endpoint = session_message.msg.url.parse::<Endpoint>()?;
+        let session_id = session_message.sid;
+
+        let feedback = match endpoint.scheme() {
+            EndpointScheme::Gossip => {
+                let content = M::decode(Bytes::from(session_message.msg.content.to_vec())).await?;
+                self.msg_handler.process(ctx, content).await
             }
-            impl Drop for ProcessingGuage {
-                fn drop(&mut self) {
-                    common_apm::metrics::network::NETWORK_RECEIVED_MESSAGE_IN_PROCESSING_GUAGE
-                        .dec();
-                    if let Some(host) = self.connected_addr.as_ref().map(|a| &a.host) {
-                        common_apm::metrics::network::NETWORK_RECEIVED_IP_MESSAGE_IN_PROCESSING_GUAGE_VEC
-                            .with_label_values(&[host])
-                            .dec();
-                    }
-                }
+            EndpointScheme::RpcCall => {
+                let content = M::decode(Bytes::from(session_message.msg.content.to_vec())).await?;
+                let rpc_endpoint = RpcEndpoint::try_from(endpoint)?;
+
+                let ctx = ctx.set_rpc_id(rpc_endpoint.rpc_id().value());
+                self.msg_handler.process(ctx, content).await
             }
-            let _processing = ProcessingGuage {
-                connected_addr: ctx.remote_connected_addr(),
-            };
+            EndpointScheme::RpcResponse => {
+                let content =
+                    RpcResponse::decode(Bytes::from(session_message.msg.content.to_vec())).await?;
+                let rpc_endpoint = RpcEndpoint::try_from(endpoint)?;
+                let rpc_id = rpc_endpoint.rpc_id().value();
 
-            let endpoint = net_msg.url.parse::<Endpoint>()?;
+                if !self.rpc_map.contains(session_id, rpc_id) {
+                    let full_url = rpc_endpoint.endpoint().full_url();
 
-            let feedback = match endpoint.scheme() {
-                EndpointScheme::Gossip => {
-                    let content = M::decode(Bytes::from(net_msg.content)).await?;
-                    handler.process(ctx, content).await
+                    warn!(
+                        "rpc entry for {} from {:?} not found, maybe timeout",
+                        full_url, session_message.connected_addr
+                    );
+                    return Ok(());
                 }
-                EndpointScheme::RpcCall => {
-                    let content = M::decode(Bytes::from(net_msg.content)).await?;
-                    let rpc_endpoint = RpcEndpoint::try_from(endpoint)?;
 
-                    let ctx = ctx.set_rpc_id(rpc_endpoint.rpc_id().value());
-                    handler.process(ctx, content).await
+                let resp_tx = self
+                    .rpc_map
+                    .take::<RpcResponse>(session_id, rpc_endpoint.rpc_id().value())?;
+                if resp_tx.send(content).is_err() {
+                    let end = rpc_endpoint.endpoint().full_url();
+
+                    warn!("network: reactor: {} rpc dropped on {}", session_id, end);
                 }
-                EndpointScheme::RpcResponse => {
-                    let content = RpcResponse::decode(Bytes::from(net_msg.content)).await?;
-                    let rpc_endpoint = RpcEndpoint::try_from(endpoint)?;
-                    let rpc_id = rpc_endpoint.rpc_id().value();
-
-                    if !rpc_map.contains(sid, rpc_id) {
-                        let full_url = rpc_endpoint.endpoint().full_url();
-
-                        warn!(
-                            "rpc entry for {} from {:?} not found, maybe timeout",
-                            full_url, connected_addr
-                        );
-                        return Ok(());
-                    }
-
-                    let resp_tx =
-                        rpc_map.take::<RpcResponse>(sid, rpc_endpoint.rpc_id().value())?;
-                    if resp_tx.send(content).is_err() {
-                        let end = rpc_endpoint.endpoint().full_url();
-
-                        warn!("network: reactor: {} rpc dropped on {}", sid, end);
-                    }
-
-                    return Ok::<(), ProtocolError>(());
-                }
-            };
-
-            let trust_feedback = PeerManagerEvent::TrustMetric { pid, feedback };
-            if let Err(e) = trust_tx.unbounded_send(trust_feedback) {
-                error!("send peer trust report {}", e);
+                return Ok(());
             }
-
-            Ok::<(), ProtocolError>(())
         };
 
-        react.unwrap_or_else(move |err| warn!("network: {} reactor: {}", endpoint, err))
-    }
-}
-
-impl<M> Future for Reactor<M>
-where
-    M: MessageCodec,
-{
-    type Output = ();
-
-    fn poll(mut self: Pin<&mut Self>, ctx: &mut TaskContext<'_>) -> Poll<Self::Output> {
-        loop {
-            let smsg_rx = &mut self.as_mut().smsg_rx;
-            pin_mut!(smsg_rx);
-
-            let reactor_name = concat!("reactor service", stringify!(M));
-            let smsg = crate::service_ready!(reactor_name, smsg_rx.poll_next(ctx));
-
-            tokio::spawn(self.react(smsg));
+        let trust_feedback = PeerManagerEvent::TrustMetric {
+            pid: session_message.pid.clone(),
+            feedback,
+        };
+        if let Err(e) = session_message.trust_tx.unbounded_send(trust_feedback) {
+            error!("send peer trust report {}", e);
         }
 
-        Poll::Pending
+        Ok(())
     }
 }
 

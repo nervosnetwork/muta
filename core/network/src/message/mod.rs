@@ -79,7 +79,7 @@ impl NetworkMessage {
         })
     }
 
-    pub async fn encode(self) -> Result<Bytes, NetworkError> {
+    pub fn encode(self) -> Result<Bytes, NetworkError> {
         let mut buf = Vec::with_capacity(self.encoded_len());
 
         <Self as Message>::encode(&self, &mut buf)
@@ -88,7 +88,7 @@ impl NetworkMessage {
         Ok(Bytes::from(buf))
     }
 
-    pub async fn decode(bytes: Bytes) -> Result<Self, NetworkError> {
+    pub fn decode(bytes: Bytes) -> Result<Self, NetworkError> {
         <Self as Message>::decode(bytes).map_err(|e| ErrorKind::BadMessage(Box::new(e)).into())
     }
 }
