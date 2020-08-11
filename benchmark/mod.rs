@@ -43,10 +43,7 @@ lazy_static::lazy_static! {
 
 macro_rules! exec {
     ($adapter: expr, $payloads: expr) => {{
-        let stxs = $payloads
-            .into_iter()
-            .map(|pld| construct_stx(pld))
-            .collect::<Vec<_>>();
+        let stxs = $payloads.into_iter().map(construct_stx).collect::<Vec<_>>();
 
         let mut executor = $adapter.create_executor();
         let params = $adapter.create_params();
@@ -58,10 +55,7 @@ macro_rules! exec {
 
 macro_rules! perf_exec {
     ($adapter: expr, $payloads: expr, $bencher: expr) => {{
-        let stxs = $payloads
-            .into_iter()
-            .map(|pld| construct_stx(pld))
-            .collect::<Vec<_>>();
+        let stxs = $payloads.into_iter().map(construct_stx).collect::<Vec<_>>();
 
         let mut executor = $adapter.create_executor();
         let params = $adapter.create_params();
@@ -86,6 +80,12 @@ pub struct BenchmarkAdapter {
     state_root: MerkleRoot,
 }
 
+impl Default for BenchmarkAdapter {
+    fn default() -> Self {
+        BenchmarkAdapter::new()
+    }
+}
+
 impl BenchmarkAdapter {
     pub fn new() -> Self {
         let mut rt = tokio::runtime::Builder::new()
@@ -97,7 +97,7 @@ impl BenchmarkAdapter {
         let genesis: Genesis = toml::from_str(toml_str).unwrap();
 
         let mut ret = BenchmarkAdapter {
-            trie_db:    Arc::new(RocksTrieDB::new(TRIE_PATH, false, 1024).unwrap()),
+            trie_db:    Arc::new(RocksTrieDB::new(TRIE_PATH, false, 1024, 2000).unwrap()),
             storage:    Arc::new(ImplStorage::new(Arc::clone(&rocks_adapter))),
             height:     1,
             timestamp:  1,
@@ -223,14 +223,10 @@ pub fn construct_stx(req: TransactionRequest) -> SignedTransaction {
     let sig = Secp256k1::sign_message(&hash.as_bytes(), &PRIV_KEY).unwrap();
 
     SignedTransaction {
-        raw:       raw_tx.clone(),
+        raw:       raw_tx,
         tx_hash:   hash,
-        pubkey:    Bytes::from(rlp::encode_list::<Vec<u8>, _>(&vec![PUB_KEY
-            .clone()
-            .to_vec()])),
-        signature: Bytes::from(rlp::encode_list::<Vec<u8>, _>(&vec![sig
-            .to_bytes()
-            .to_vec()])),
+        pubkey:    Bytes::from(rlp::encode_list::<Vec<u8>, _>(&[PUB_KEY.clone().to_vec()])),
+        signature: Bytes::from(rlp::encode_list::<Vec<u8>, _>(&[sig.to_bytes().to_vec()])),
     }
 }
 
