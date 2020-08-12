@@ -19,20 +19,15 @@ use crate::rpc_map::RpcMap;
 use crate::traits::{Compression, NetworkContext};
 
 #[derive(Clone)]
-pub struct NetworkRpc<C> {
+pub struct NetworkRpc {
     transmitter: Transmitter,
-    compression: C,
     timeout:     TimeoutConfig,
 }
 
-impl<C> NetworkRpc<C>
-where
-    C: Compression + Sync + Clone,
-{
-    pub fn new(transmitter: Transmitter, compression: C, timeout: TimeoutConfig) -> Self {
+impl NetworkRpc {
+    pub fn new(transmitter: Transmitter, timeout: TimeoutConfig) -> Self {
         NetworkRpc {
             transmitter,
-            compression,
             timeout,
         }
     }
@@ -44,7 +39,7 @@ where
         data: Bytes,
         priority: Priority,
     ) -> Result<(), NetworkError> {
-        let compressed_data = self.compression.compress(data)?;
+        let compressed_data = self.transmitter.compressor().compress(data)?;
 
         let msg = TransmitterMessage {
             recipient: Recipient::Session(TargetSession::Single(session_id)),
@@ -57,10 +52,7 @@ where
 }
 
 #[async_trait]
-impl<C> Rpc for NetworkRpc<C>
-where
-    C: Compression + Send + Sync + Clone,
-{
+impl Rpc for NetworkRpc {
     async fn call<M, R>(
         &self,
         cx: Context,

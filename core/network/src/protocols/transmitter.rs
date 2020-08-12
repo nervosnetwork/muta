@@ -11,6 +11,7 @@ use tentacle::ProtocolId;
 use crate::compression::Snappy;
 use crate::peer_manager::PeerManagerHandle;
 use crate::reactor::MessageRouter;
+use crate::traits::Compression;
 
 use self::behaviour::TransmitterBehaviour;
 use self::protocol::TransmitterProtocol;
@@ -48,5 +49,9 @@ impl Transmitter {
                 ProtocolHandle::Callback(Box::new(proto))
             })
             .build()
+    }
+
+    pub fn compressor(&self) -> impl Compression {
+        Snappy
     }
 }

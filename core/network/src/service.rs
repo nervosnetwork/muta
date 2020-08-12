@@ -37,8 +37,8 @@ use crate::{NetworkConfig, PeerIdExt};
 
 #[derive(Clone)]
 pub struct NetworkServiceHandle {
-    gossip:     NetworkGossip<Snappy>,
-    rpc:        NetworkRpc<Snappy>,
+    gossip:     NetworkGossip,
+    rpc:        NetworkRpc,
     peer_trust: UnboundedSender<PeerManagerEvent>,
     peer_state: PeerManagerHandle,
 
@@ -163,8 +163,8 @@ pub struct NetworkService {
     config: NetworkConfig,
 
     // Public service components
-    gossip:  NetworkGossip<Snappy>,
-    rpc:     NetworkRpc<Snappy>,
+    gossip:      NetworkGossip,
+    rpc:         NetworkRpc,
     transmitter: Transmitter,
 
     // Core service
@@ -236,8 +236,8 @@ impl NetworkService {
             .init(conn_ctrl, mgr_tx.clone(), session_book.clone());
 
         // Build public service components
-        let gossip = NetworkGossip::new(transmitter.clone(), Snappy);
-        let rpc = NetworkRpc::new(transmitter.clone(), Snappy, (&config).into());
+        let gossip = NetworkGossip::new(transmitter.clone());
+        let rpc = NetworkRpc::new(transmitter.clone(), (&config).into());
 
         // Build metrics service
         let metrics = Metrics::new(session_book.clone());
