@@ -32,9 +32,9 @@ pub fn generate<M: MessageCodec, H: MessageHandler<Message = M>>(h: H) -> Messag
     MessageReactor { msg_handler: h }
 }
 
-pub fn rpc_resp<M: MessageCodec>() -> MessageReactor<M, DummyHandler<M>> {
+pub fn rpc_resp<M: MessageCodec>() -> MessageReactor<M, NoopHandler<M>> {
     MessageReactor {
-        msg_handler: DummyHandler::new(),
+        msg_handler: NoopHandler::new(),
     }
 }
 
@@ -106,21 +106,21 @@ impl<M: MessageCodec, H: MessageHandler<Message = M>> Reactor for MessageReactor
 }
 
 #[derive(Debug)]
-pub struct DummyHandler<M> {
+pub struct NoopHandler<M> {
     pin_m: PhantomData<fn() -> M>,
 }
 
-impl<M> DummyHandler<M>
+impl<M> NoopHandler<M>
 where
     M: MessageCodec,
 {
     pub fn new() -> Self {
-        DummyHandler { pin_m: PhantomData }
+        NoopHandler { pin_m: PhantomData }
     }
 }
 
 #[async_trait]
-impl<M> MessageHandler for DummyHandler<M>
+impl<M> MessageHandler for NoopHandler<M>
 where
     M: MessageCodec,
 {
