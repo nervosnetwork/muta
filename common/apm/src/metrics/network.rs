@@ -83,6 +83,18 @@ lazy_static! {
         &["ip"]
     )
     .expect("network ip pending data size");
+    pub static ref NETWORK_RECEIVED_MESSAGE_IN_PROCESSING_GUAGE: IntGauge = register_int_gauge!(
+        "muta_network_received_message_in_processing_guage",
+        "Total number of network received message current in processing"
+    )
+    .expect("network received message in processing");
+    pub static ref NETWORK_RECEIVED_IP_MESSAGE_IN_PROCESSING_GUAGE_VEC: IntGaugeVec =
+        register_int_gauge_vec!(
+            "muta_network_received_ip_message_in_processing_guage",
+            "Totale number of network received messasge from ip current in processing",
+            &["ip"]
+        )
+        .expect("network received ip message in processing");
 }
 
 fn on_network_message(direction: &str, target: &str, url: &str, inc: i64) {

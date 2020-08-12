@@ -5,6 +5,7 @@ use protocol::Bytes;
 use tentacle::context::ProtocolContextMutRef;
 use tentacle::traits::SessionProtocol;
 
+use crate::common::ConnectedAddr;
 use crate::peer_manager::PeerManagerHandle;
 
 use super::message::{ReceivedMessage, SeqChunkMessage};
@@ -114,8 +115,14 @@ impl SessionProtocol for TransmitterProtocol {
             data: Bytes::from(data),
         };
 
+        let host = ConnectedAddr::from(&ctx.session.address).host;
         if self.data_tx.unbounded_send(recv_msg).is_err() {
             log::error!("network: transmitter: msg receiver dropped");
+        } else {
+            common_apm::metrics::network::NETWORK_RECEIVED_MESSAGE_IN_PROCESSING_GUAGE.inc();
+            common_apm::metrics::network::NETWORK_RECEIVED_IP_MESSAGE_IN_PROCESSING_GUAGE_VEC
+                .with_label_values(&[&host])
+                .inc();
         }
     }
 }
