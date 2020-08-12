@@ -4,12 +4,13 @@ mod protocol;
 
 use std::time::Duration;
 
-use futures::channel::mpsc::UnboundedSender;
 use tentacle::builder::MetaBuilder;
 use tentacle::service::{ProtocolHandle, ProtocolMeta};
 use tentacle::ProtocolId;
 
+use crate::compression::Snappy;
 use crate::peer_manager::PeerManagerHandle;
+use crate::reactor::MessageRouter;
 
 use self::behaviour::TransmitterBehaviour;
 use self::protocol::TransmitterProtocol;
@@ -22,16 +23,16 @@ pub const MAX_CHUNK_SIZE: usize = 4 * 1000 * 1000; // 4MB
 
 #[derive(Clone)]
 pub struct Transmitter {
-    data_tx:              UnboundedSender<ReceivedMessage>,
+    router:               MessageRouter<Snappy>,
     pub(crate) behaviour: TransmitterBehaviour,
     peer_mgr:             PeerManagerHandle,
 }
 
 impl Transmitter {
-    pub fn new(data_tx: UnboundedSender<ReceivedMessage>, peer_mgr: PeerManagerHandle) -> Self {
+    pub fn new(router: MessageRouter<Snappy>, peer_mgr: PeerManagerHandle) -> Self {
         let behaviour = TransmitterBehaviour::new();
         Transmitter {
-            data_tx,
+            router,
             behaviour,
             peer_mgr,
         }
@@ -43,7 +44,7 @@ impl Transmitter {
             .name(name!(NAME))
             .support_versions(support_versions!(SUPPORT_VERSIONS))
             .session_handle(move || {
-                let proto = TransmitterProtocol::new(self.data_tx.clone(), self.peer_mgr.clone());
+                let proto = TransmitterProtocol::new(self.router.clone(), self.peer_mgr.clone());
                 ProtocolHandle::Callback(Box::new(proto))
             })
             .build()

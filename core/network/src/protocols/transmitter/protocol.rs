@@ -1,18 +1,18 @@
 use std::time::Instant;
 
-use futures::channel::mpsc::UnboundedSender;
 use protocol::Bytes;
 use tentacle::context::ProtocolContextMutRef;
 use tentacle::traits::SessionProtocol;
 
-use crate::common::ConnectedAddr;
+use crate::compression::Snappy;
 use crate::peer_manager::PeerManagerHandle;
+use crate::reactor::{MessageRouter, RemotePeer};
 
 use super::message::{ReceivedMessage, SeqChunkMessage};
 use super::{DATA_SEQ_TIMEOUT, MAX_CHUNK_SIZE};
 
 pub struct TransmitterProtocol {
-    data_tx:            UnboundedSender<ReceivedMessage>,
+    router:             MessageRouter<Snappy>,
     peer_mgr:           PeerManagerHandle,
     data_buf:           Vec<u8>,
     current_data_seq:   u64,
@@ -20,9 +20,9 @@ pub struct TransmitterProtocol {
 }
 
 impl TransmitterProtocol {
-    pub fn new(data_tx: UnboundedSender<ReceivedMessage>, peer_mgr: PeerManagerHandle) -> Self {
+    pub fn new(router: MessageRouter<Snappy>, peer_mgr: PeerManagerHandle) -> Self {
         TransmitterProtocol {
-            data_tx,
+            router,
             peer_mgr,
             data_buf: Vec::new(),
             current_data_seq: 0,
@@ -109,20 +109,36 @@ impl SessionProtocol for TransmitterProtocol {
         let data = std::mem::replace(&mut self.data_buf, Vec::new());
         log::debug!("final seq {} data size {}", seq, data.len());
 
+        let remote_peer = match RemotePeer::from_proto_context(&ctx) {
+            Ok(peer) => peer,
+            Err(_err) => {
+                log::warn!("received data from unencrypted peer, impossible, drop it");
+                return;
+            }
+        };
+
         let recv_msg = ReceivedMessage {
             session_id,
             peer_id,
             data: Bytes::from(data),
         };
 
-        let host = ConnectedAddr::from(&ctx.session.address).host;
-        if self.data_tx.unbounded_send(recv_msg).is_err() {
-            log::error!("network: transmitter: msg receiver dropped");
-        } else {
+        let host = remote_peer.connected_addr.host.to_owned();
+        let route_fut = self.router.route_message(remote_peer.clone(), recv_msg);
+        tokio::spawn(async move {
             common_apm::metrics::network::NETWORK_RECEIVED_MESSAGE_IN_PROCESSING_GUAGE.inc();
             common_apm::metrics::network::NETWORK_RECEIVED_IP_MESSAGE_IN_PROCESSING_GUAGE_VEC
                 .with_label_values(&[&host])
                 .inc();
-        }
+
+            if let Err(err) = route_fut.await {
+                log::warn!("route {} message failed: {}", remote_peer, err);
+            }
+
+            common_apm::metrics::network::NETWORK_RECEIVED_MESSAGE_IN_PROCESSING_GUAGE.dec();
+            common_apm::metrics::network::NETWORK_RECEIVED_IP_MESSAGE_IN_PROCESSING_GUAGE_VEC
+                .with_label_values(&[&host])
+                .dec();
+        });
     }
 }
