@@ -95,11 +95,9 @@ lazy_static! {
             &["ip"]
         )
         .expect("network received ip message in processing");
-    pub static ref NETWORK_CONNECTED_PEER_COUNT: IntGauge = register_int_gauge!(
-        "muta_network_connected_peer_count",
-        "Total connected peer count"
-    )
-    .expect("network total connected peer");
+    pub static ref NETWORK_CONNECTED_PEERS: IntGauge =
+        register_int_gauge!("muta_network_connected_peers", "Total connected peer count")
+            .expect("network total connecteds");
     pub static ref NETWORK_PING_IP_IN_MS_VEC: IntGaugeVec =
         register_int_gauge_vec!("muta_network_ip_ping_in_ms", "Ping to ip in ms", &["ip"])
             .expect("network ping ip value");
@@ -108,8 +106,8 @@ lazy_static! {
         "Total number of disconnect"
     )
     .expect("network disconnect count");
-    pub static ref NETWORK_OUTBOUND_CONNECTING_PEER_COUNT: IntGauge = register_int_gauge!(
-        "muta_network_outbound_connecting_peer_count",
+    pub static ref NETWORK_OUTBOUND_CONNECTING_PEERS: IntGauge = register_int_gauge!(
+        "muta_network_outbound_connecting_peers",
         "Total number of network outbound connecting peers"
     )
     .expect("network outbound connecting peer count");

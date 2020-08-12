@@ -671,7 +671,7 @@ impl PeerManager {
         let remote_multiaddr = PeerMultiaddr::new(ctx.address.to_owned(), &remote_peer_id);
 
         // Remove from connecting if we dial this peer or create new one
-        common_apm::metrics::network::NETWORK_OUTBOUND_CONNECTING_PEER_COUNT.dec();
+        common_apm::metrics::network::NETWORK_OUTBOUND_CONNECTING_PEERS.dec();
         self.connecting.remove(&remote_peer_id);
         let opt_peer = self.inner.peer(&remote_peer_id);
         let remote_peer = opt_peer.unwrap_or_else(|| ArcPeer::new(remote_peer_id.clone()));
@@ -841,7 +841,7 @@ impl PeerManager {
         self.inner.sessions.insert(AcceptableSession(session));
         remote_peer.mark_connected(ctx.id);
 
-        common_apm::metrics::network::NETWORK_CONNECTED_PEER_COUNT.inc();
+        common_apm::metrics::network::NETWORK_CONNECTED_PEERS.inc();
 
         match remote_peer.trust_metric() {
             Some(trust_metric) => trust_metric.start(),
@@ -862,7 +862,7 @@ impl PeerManager {
             return;
         }
 
-        common_apm::metrics::network::NETWORK_CONNECTED_PEER_COUNT.dec();
+        common_apm::metrics::network::NETWORK_CONNECTED_PEERS.dec();
         common_apm::metrics::network::NETWORK_DISCONNECT_COUNT.inc();
 
         let session = match self.inner.remove_session(sid) {
@@ -956,7 +956,7 @@ impl PeerManager {
                     attempt.peer.set_connectedness(Connectedness::Unconnectable);
                 }
 
-                common_apm::metrics::network::NETWORK_OUTBOUND_CONNECTING_PEER_COUNT.dec();
+                common_apm::metrics::network::NETWORK_OUTBOUND_CONNECTING_PEERS.dec();
             // FIXME
             // if let Some(trust_metric) = attempt.peer.trust_metric() {
             //     trust_metric.bad_events(1);
@@ -1459,7 +1459,7 @@ impl Future for PeerManager {
             );
 
             if !connectable_peers.is_empty() {
-                common_apm::metrics::network::NETWORK_OUTBOUND_CONNECTING_PEER_COUNT
+                common_apm::metrics::network::NETWORK_OUTBOUND_CONNECTING_PEERS
                     .add(connectable_peers.len() as i64);
 
                 self.connect_peers(connectable_peers);
