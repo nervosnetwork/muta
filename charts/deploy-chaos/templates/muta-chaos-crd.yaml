@@ -51,6 +51,7 @@ spec:
     prevhash: {{ .Values.chain_genesis.prevhash }}
     metadata:
       chain_id: {{ .Values.chain_genesis.metadata.chain_id }}
+      bech32_address_hrp: {{ .Values.chain_genesis.metadata.bech32_address_hrp }}
       timeout_gap: {{ .Values.chain_genesis.metadata.timeout_gap }}
       cycles_limit: {{ .Values.chain_genesis.metadata.cycles_limit }}
       cycles_price: {{ .Values.chain_genesis.metadata.cycles_price }}

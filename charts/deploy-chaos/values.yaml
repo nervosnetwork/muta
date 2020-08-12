@@ -12,7 +12,7 @@ benchmark:
     - 16
     - -g
     - 9999
-    - cpu
+    - --cpu
     - 3
 
 namespace: mutadev
@@ -21,9 +21,9 @@ repo_name: muta
 version: latest
 
 resources:
-  cpu: 1100m
-  memory: 4Gi
-  storage: 6Gi
+  cpu: 2200m
+  memory: 8Gi
+  storage: 50Gi
   persistent: true
 
 chaos:
@@ -43,6 +43,7 @@ chain_genesis:
   prevhash: 0x44915be5b6c20b0678cf05fcddbbaa832e25d7e6ac538784cd5c24de00d47472
   metadata:
     chain_id: 0xb6a4d7da21443f5e816e8700eea87610e6d769657d6b8ec73028457bf2ca4036
+    bech32_address_hrp: muta
     timeout_gap: 9999
     cycles_limit: 99999999
     cycles_price: 1
