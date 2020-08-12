@@ -28,7 +28,7 @@ use crate::outbound::{NetworkGossip, NetworkRpc};
 #[cfg(feature = "diagnostic")]
 use crate::peer_manager::diagnostic::{Diagnostic, DiagnosticHookFn};
 use crate::peer_manager::{PeerManager, PeerManagerConfig, PeerManagerHandle, SharedSessions};
-use crate::protocols::CoreProtocol;
+use crate::protocols::{CoreProtocol, Transmitter};
 use crate::reactor::MessageRouter;
 use crate::rpc_map::RpcMap;
 use crate::selfcheck::SelfCheck;
@@ -165,14 +165,12 @@ pub struct NetworkService {
     // Public service components
     gossip:  NetworkGossip<Snappy>,
     rpc:     NetworkRpc<Snappy>,
-    #[allow(dead_code)]
-    rpc_map: Arc<RpcMap>,
+    transmitter: Transmitter,
 
     // Core service
     net_conn_srv:    Option<NetworkConnectionService>,
     peer_mgr:        Option<PeerManager>,
     peer_mgr_handle: PeerManagerHandle,
-    router:          Option<MessageRouter<Snappy>>,
 
     // Metrics
     metrics: Option<Metrics<SharedSessions>>,
@@ -219,7 +217,7 @@ impl NetworkService {
         // Build service protocol
         let disc_sync_interval = config.discovery_sync_interval;
         let rpc_map = Arc::new(RpcMap::new());
-        let message_router = MessageRouter::new(Arc::clone(&rpc_map), mgr_tx.clone(), Snappy);
+        let message_router = MessageRouter::new(rpc_map, mgr_tx.clone(), Snappy);
         let proto = CoreProtocol::build()
             .ping(config.ping_interval, config.ping_timeout, mgr_tx.clone())
             .identify(peer_mgr_handle.clone(), mgr_tx.clone())
@@ -239,9 +237,7 @@ impl NetworkService {
 
         // Build public service components
         let gossip = NetworkGossip::new(transmitter.clone(), Snappy);
-        let rpc_map_clone = Arc::clone(&rpc_map);
-        let rpc = NetworkRpc::new(transmitter, Snappy, rpc_map_clone, (&config).into());
-        let router = MessageRouter::new(Arc::clone(&rpc_map), mgr_tx.clone(), Snappy);
+        let rpc = NetworkRpc::new(transmitter.clone(), Snappy, (&config).into());
 
         // Build metrics service
         let metrics = Metrics::new(session_book.clone());
@@ -261,12 +257,11 @@ impl NetworkService {
 
             gossip,
             rpc,
-            rpc_map,
+            transmitter,
 
             net_conn_srv: Some(NetworkConnectionService::NoListen(conn_srv)),
             peer_mgr: Some(peer_mgr),
             peer_mgr_handle,
-            router: Some(router),
 
             metrics: Some(metrics),
 
@@ -292,10 +287,7 @@ impl NetworkService {
             return Err(NetworkError::UnexpectedScheme(err).into());
         }
 
-        if let Some(router) = &mut self.router {
-            router.register_reactor(endpoint, handler);
-        }
-
+        self.transmitter.router.register_reactor(endpoint, handler);
         Ok(())
     }
 
@@ -310,10 +302,7 @@ impl NetworkService {
             return Err(NetworkError::UnexpectedScheme(end.to_owned()).into());
         }
 
-        if let Some(router) = &mut self.router {
-            router.register_rpc_response(endpoint);
-        }
-
+        self.transmitter.router.register_rpc_response(endpoint);
         Ok(())
     }
 

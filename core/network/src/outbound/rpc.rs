@@ -22,26 +22,17 @@ use crate::traits::{Compression, NetworkContext};
 pub struct NetworkRpc<C> {
     transmitter: Transmitter,
     compression: C,
-    map:         Arc<RpcMap>,
-
-    timeout: TimeoutConfig,
+    timeout:     TimeoutConfig,
 }
 
 impl<C> NetworkRpc<C>
 where
     C: Compression + Sync + Clone,
 {
-    pub fn new(
-        transmitter: Transmitter,
-        compression: C,
-        map: Arc<RpcMap>,
-        timeout: TimeoutConfig,
-    ) -> Self {
+    pub fn new(transmitter: Transmitter, compression: C, timeout: TimeoutConfig) -> Self {
         NetworkRpc {
             transmitter,
             compression,
-            map,
-
             timeout,
         }
     }
@@ -83,9 +74,10 @@ where
     {
         let endpoint = endpoint.parse::<Endpoint>()?;
         let sid = cx.session_id()?;
-        let rid = self.map.next_rpc_id();
+        let rpc_map = &self.transmitter.router.rpc_map;
+        let rid = rpc_map.next_rpc_id();
         let connected_addr = cx.remote_connected_addr();
-        let done_rx = self.map.insert::<RpcResponse>(sid, rid);
+        let done_rx = rpc_map.insert::<RpcResponse>(sid, rid);
         let inst = Instant::now();
 
         struct _Guard {
@@ -102,7 +94,7 @@ where
         }
 
         let _guard = _Guard {
-            map: Arc::clone(&self.map),
+            map: Arc::clone(&rpc_map),
             sid,
             rid,
         };

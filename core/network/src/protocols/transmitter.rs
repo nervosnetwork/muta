@@ -23,7 +23,7 @@ pub const MAX_CHUNK_SIZE: usize = 4 * 1000 * 1000; // 4MB
 
 #[derive(Clone)]
 pub struct Transmitter {
-    router:               MessageRouter<Snappy>,
+    pub(crate) router:    MessageRouter<Snappy>,
     pub(crate) behaviour: TransmitterBehaviour,
     peer_mgr:             PeerManagerHandle,
 }
