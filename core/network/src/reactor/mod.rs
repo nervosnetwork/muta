@@ -18,6 +18,7 @@ use protocol::{
     Bytes, ProtocolError,
 };
 
+use crate::common::ConnectedAddr;
 use crate::{
     endpoint::{Endpoint, EndpointScheme, RpcEndpoint},
     event::PeerManagerEvent,
@@ -26,7 +27,6 @@ use crate::{
     rpc_map::RpcMap,
     traits::NetworkContext,
 };
-use crate::common::ConnectedAddr;
 
 pub struct Reactor<M> {
     smsg_rx: UnboundedReceiver<SessionMessage>,
@@ -103,7 +103,9 @@ where
                     }
                 }
             }
-            let _processing = ProcessingGuage {connected_addr: ctx.remote_connected_addr()};
+            let _processing = ProcessingGuage {
+                connected_addr: ctx.remote_connected_addr(),
+            };
 
             let endpoint = net_msg.url.parse::<Endpoint>()?;
 

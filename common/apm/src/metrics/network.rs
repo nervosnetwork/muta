@@ -108,6 +108,11 @@ lazy_static! {
         "Total number of disconnect"
     )
     .expect("network disconnect count");
+    pub static ref NETWORK_OUTBOUND_CONNECTING_PEER_COUNT: IntGauge = register_int_gauge!(
+        "muta_network_outbound_connecting_peer_count",
+        "Total number of network outbound connecting peers"
+    )
+    .expect("network outbound connecting peer count");
 }
 
 fn on_network_message(direction: &str, target: &str, url: &str, inc: i64) {

@@ -671,6 +671,7 @@ impl PeerManager {
         let remote_multiaddr = PeerMultiaddr::new(ctx.address.to_owned(), &remote_peer_id);
 
         // Remove from connecting if we dial this peer or create new one
+        common_apm::metrics::network::NETWORK_OUTBOUND_CONNECTING_PEER_COUNT.dec();
         self.connecting.remove(&remote_peer_id);
         let opt_peer = self.inner.peer(&remote_peer_id);
         let remote_peer = opt_peer.unwrap_or_else(|| ArcPeer::new(remote_peer_id.clone()));
@@ -953,6 +954,7 @@ impl PeerManager {
                     attempt.peer.set_connectedness(Connectedness::Unconnectable);
                 }
 
+                common_apm::metrics::network::NETWORK_OUTBOUND_CONNECTING_PEER_COUNT.dec();
             // FIXME
             // if let Some(trust_metric) = attempt.peer.trust_metric() {
             //     trust_metric.bad_events(1);
@@ -1451,6 +1453,9 @@ impl Future for PeerManager {
             );
 
             if !connectable_peers.is_empty() {
+                common_apm::metrics::network::NETWORK_OUTBOUND_CONNECTING_PEER_COUNT
+                    .add(connectable_peers.len() as i64);
+
                 self.connect_peers(connectable_peers);
             }
         }
