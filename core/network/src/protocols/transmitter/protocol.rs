@@ -60,6 +60,8 @@ impl SessionProtocol for TransmitterProtocol {
         };
         let session_id = ctx.session.id;
 
+        // Seq u64 takes 8 bytes, and eof bool take 1 byte, so a valid data length
+        // must be bigger or equal than 10.
         if data.len() < 10 {
             log::warn!("session {} data size < 10, drop it", session_id);
             return;
