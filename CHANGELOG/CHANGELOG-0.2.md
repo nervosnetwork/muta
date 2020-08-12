@@ -1,11 +1,20 @@
-# [](https://github.com/nervosnetwork/muta/compare/v0.2.0-beta.3...v) (2020-08-10)
+# [](https://github.com/nervosnetwork/muta/compare/v0.2.0-beta.4...v) (2020-08-12)
+
+
+### Features
+
+* **network:** split transmitter data ([#380](https://github.com/nervosnetwork/muta/issues/380)) ([0322cd6](https://github.com/nervosnetwork/muta/commit/0322cd690cb118f56153e424e9a6bf4b2a11d8b4))
+* **network:** verify chain id during protocol handshake ([#406](https://github.com/nervosnetwork/muta/issues/406)) ([e678e92](https://github.com/nervosnetwork/muta/commit/e678e92bf01bc4bc914e74b6fed22c8b55b3cdc7))
+
+
+
+# [0.2.0-beta.4](https://github.com/nervosnetwork/muta/compare/v0.2.0-beta.3...v0.2.0-beta.4) (2020-08-10)
 
 
 ### Bug Fixes
 
 * load hrp before deserializing genesis payload to take hrp effect ([#405](https://github.com/nervosnetwork/muta/issues/405)) ([828e6d5](https://github.com/nervosnetwork/muta/commit/828e6d539cf4da9cf042c450418e75a944315014))
 
-* service field of event is not binded to ctx.service ([#405](https://github.com/nervosnetwork/muta/issues/408)) ([120f1ee](https://github.com/nervosnetwork/muta/commit/120f1ee125593d7def075460f34fc3dcd5a8fe83))
 
 ### Features
 
