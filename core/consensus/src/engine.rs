@@ -356,7 +356,18 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             .await
         {
             Ok(txs) => txs,
-            Err(_) => self.txs_wal.load(current_height, block_hash)?,
+            Err(_) => {
+                let tmp_txs = self.txs_wal.load(current_height, block_hash)?;
+                if pill.block.header.order_signed_transactions_hash
+                    != digest_signed_transactions(&tmp_txs)?
+                {
+                    return Err(ProtocolError::from(ConsensusError::WalTxsMismatch(
+                        current_height,
+                    ))
+                    .into());
+                }
+                tmp_txs
+            }
         };
 
         // Execute transactions

@@ -87,7 +87,6 @@ tentacle_metrics = ["core-network/tentacle_metrics"]
 
 [[example]]
 name = "muta-chain"
-features = [ "random_leader" ]
 crate-type = ["bin"]
 
 [[test]]

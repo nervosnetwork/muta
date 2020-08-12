@@ -69,13 +69,27 @@ impl SignedTxsWAL {
         file_path.push(block_hash.as_hex());
         file_path.set_extension("txt");
 
-        let mut read_buf = Vec::new();
-        let mut file = fs::File::open(&file_path).map_err(ConsensusError::WALErr)?;
-        let _ = file
-            .read_to_end(&mut read_buf)
-            .map_err(ConsensusError::WALErr)?;
-        let txs = FixedSignedTxs::decode_sync(Bytes::from(read_buf))?;
-        Ok(txs.inner)
+        self.recover_stxs(file_path)
+    }
+
+    pub fn load_by_height(&self, height: u64) -> Vec<SignedTransaction> {
+        let mut dir = self.path.clone();
+        dir.push(height.to_string());
+        let dir = if let Ok(res) = fs::read_dir(dir) {
+            res
+        } else {
+            return Vec::new();
+        };
+
+        let mut ret = Vec::new();
+        for entry in dir {
+            if let Ok(file_dir) = entry {
+                if let Ok(mut stxs) = self.recover_stxs(file_dir.path()) {
+                    ret.append(&mut stxs);
+                }
+            }
+        }
+        ret
     }
 
     pub fn remove(&self, committed_height: u64) -> ProtocolResult<()> {
@@ -98,6 +112,16 @@ impl SignedTxsWAL {
             }
         }
         Ok(())
+    }
+
+    fn recover_stxs(&self, file_path: PathBuf) -> ProtocolResult<Vec<SignedTransaction>> {
+        let mut read_buf = Vec::new();
+        let mut file = fs::File::open(&file_path).map_err(ConsensusError::WALErr)?;
+        let _ = file
+            .read_to_end(&mut read_buf)
+            .map_err(ConsensusError::WALErr)?;
+        let txs = FixedSignedTxs::decode_sync(Bytes::from(read_buf))?;
+        Ok(txs.inner)
     }
 }
 
@@ -182,6 +206,17 @@ mod tests {
         let txs_02 = mock_wal_txs(100);
         let hash_02 = Hash::digest(Bytes::from(rlp::encode_list(&txs_02)));
         wal.save(3u64, hash_02.clone(), txs_02.clone()).unwrap();
+
+        let txs_03 = mock_wal_txs(100);
+        let hash_03 = Hash::digest(Bytes::from(rlp::encode_list(&txs_03)));
+        wal.save(3u64, hash_03, txs_03.clone()).unwrap();
+
+        let res = wal.load_by_height(3);
+        assert_eq!(res.len(), 200);
+
+        for tx in res.iter() {
+            assert!(txs_02.contains(tx) || txs_03.contains(tx));
+        }
 
         assert_eq!(wal.load(1u64, hash_01.clone()).unwrap(), txs_01);
         assert_eq!(wal.load(3u64, hash_02.clone()).unwrap(), txs_02);

@@ -224,6 +224,10 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         config.executor.triedb_cache_size,
     )?);
 
+    // Init full transactions wal
+    let wal_path = config.data_path_for_txs_wal().to_str().unwrap().to_string();
+    let txs_wal = Arc::new(SignedTxsWAL::new(wal_path));
+
     // Init mempool
     let current_block = storage.get_latest_block(Context::new()).await?;
     let mempool_adapter =
@@ -239,6 +243,19 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         config.mempool.pool_size as usize,
         mempool_adapter,
     ));
+
+    // Recover signed transactions of current height, and insert them into the
+    // mempool.
+    let current_stxs = txs_wal.load_by_height(current_block.header.height + 1);
+    log::info!(
+        "Recover {} tx of height {} from wal",
+        current_stxs.len(),
+        current_block.header.height + 1
+    );
+
+    for tx in current_stxs.into_iter() {
+        let _ = mempool.insert(Context::new(), tx).await;
+    }
 
     let monitor_mempool = Arc::clone(&mempool);
     tokio::spawn(async move {
@@ -264,10 +281,6 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         Arc::clone(&trie_db),
         Arc::clone(&service_mapping),
     );
-
-    // Create full transactions wal
-    let wal_path = config.data_path_for_txs_wal().to_str().unwrap().to_string();
-    let txs_wal = Arc::new(SignedTxsWAL::new(wal_path));
 
     let exec_resp = api_adapter
         .query_service(
