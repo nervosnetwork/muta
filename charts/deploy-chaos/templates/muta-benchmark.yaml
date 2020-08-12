@@ -19,5 +19,7 @@ spec:
             {{- end }}
             - --chain-id
             - {{ .Values.chain_genesis.metadata.chain_id }}
-            - {{- range $i, $e := until (.Values.size | int) }} {{ printf "http://%s-%d:8000/graphql" $chainName $i }} {{- end }}
+            {{- range $i, $e := until (.Values.size | int) }}
+            - {{ printf "http://%s-%d:8000/graphql" $chainName $i }}
+            {{- end }}
           restartPolicy: OnFailure
