@@ -1,0 +1,25 @@
+{{- $chainName  := (printf "chaos-%s-%s" .Values.repo_name .Values.version) -}}
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: benchmark-{{ .Values.repo_name }}-{{ .Values.version }}
+  namespace: {{ .Values.namespace }} # Only supports deployment to the mutadev namespace
+spec:
+  schedule: {{ .Values.benchmark.schedule | quote }}
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: benchmark
+            image: {{ .Values.benchmark.image }}
+            args:
+            {{- range .Values.benchmark.args }}
+            - {{ . | quote }}
+            {{- end }}
+            - --chain-id
+            - {{ .Values.chain_genesis.metadata.chain_id }}
+            {{- range $i, $e := until (.Values.size | int) }}
+            - {{ printf "http://%s-%d:8000/graphql" $chainName $i }}
+            {{- end }}
+          restartPolicy: OnFailure
