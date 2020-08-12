@@ -11,6 +11,8 @@ use tentacle::{
     SessionId,
 };
 
+use crate::common::ConnectedAddr;
+
 use std::{
     collections::HashMap,
     str,
@@ -26,7 +28,7 @@ pub enum PingEvent {
     /// Peer send ping to us.
     Ping(PeerId),
     /// Peer send pong to us.
-    Pong(PeerId, Duration),
+    Pong(PeerId, ConnectedAddr, Duration),
     /// Peer is timeout.
     Timeout(PeerId),
     /// Peer cause a unexpected error.
@@ -192,7 +194,8 @@ impl ServiceProtocol for PingProtocol {
                                 }
                                 None => return,
                             };
-                            self.send_event(PingEvent::Pong(peer_id, ping_time));
+                            let connected_addr = ConnectedAddr::from(&context.session.address);
+                            self.send_event(PingEvent::Pong(peer_id, connected_addr, ping_time));
                         } else {
                             // ignore if nonce is incorrect
 

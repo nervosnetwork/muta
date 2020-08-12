@@ -91,7 +91,7 @@ lazy_static! {
     pub static ref NETWORK_RECEIVED_IP_MESSAGE_IN_PROCESSING_GUAGE_VEC: IntGaugeVec =
         register_int_gauge_vec!(
             "muta_network_received_ip_message_in_processing_guage",
-            "Totale number of network received messasge from ip current in processing",
+            "Number of network received messasge from ip current in processing",
             &["ip"]
         )
         .expect("network received ip message in processing");
@@ -100,6 +100,9 @@ lazy_static! {
         "Total connected peer count"
     )
     .expect("network total connected peer");
+    pub static ref NETWORK_PING_IP_IN_MS_VEC: IntGaugeVec =
+        register_int_gauge_vec!("muta_network_ip_ping_in_ms", "Ping to ip in ms", &["ip"])
+            .expect("network ping ip value");
 }
 
 fn on_network_message(direction: &str, target: &str, url: &str, inc: i64) {

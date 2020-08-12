@@ -60,7 +60,14 @@ impl Future for EventTranslator {
 
             let mgr_event = match event {
                 PingEvent::Ping(ref _pid) => continue,
-                PingEvent::Pong(ref pid, _) => PeerManagerEvent::PeerAlive { pid: pid.clone() },
+                PingEvent::Pong(ref pid, ref connected_addr, ping_time) => {
+                    let host = &connected_addr.host;
+                    common_apm::metrics::network::NETWORK_PING_IP_IN_MS_VEC
+                        .with_label_values(&[host])
+                        .set(ping_time.as_millis() as i64);
+
+                    PeerManagerEvent::PeerAlive { pid: pid.clone() }
+                }
                 PingEvent::Timeout(ref pid) => {
                     let kind = MisbehaviorKind::PingTimeout;
 
