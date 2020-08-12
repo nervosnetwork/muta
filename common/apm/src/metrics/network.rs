@@ -121,6 +121,11 @@ lazy_static! {
         "Total number of saved peer count"
     )
     .expect("network saved peer count");
+    pub static ref NETWORK_TAGGED_CONSENSUS_PEERS: IntGauge = register_int_gauge!(
+        "muta_network_tagged_consensus_peers",
+        "Total number of consensus peers"
+    )
+    .expect("network tagged consensus peers");
 }
 
 fn on_network_message(direction: &str, target: &str, url: &str, inc: i64) {

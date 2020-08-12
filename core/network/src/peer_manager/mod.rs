@@ -497,6 +497,8 @@ impl PeerManagerHandle {
     }
 
     pub fn tag_consensus(&self, peer_ids: Vec<PeerId>) {
+        common_apm::metrics::network::NETWORK_TAGGED_CONSENSUS_PEERS.set(peer_ids.len() as i64);
+
         {
             for peer_id in self.inner.consensus.read().iter() {
                 if let Some(peer) = self.inner.peer(peer_id) {
