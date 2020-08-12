@@ -78,7 +78,7 @@ pipelineConfig:
                 image: mutadev/muta-watchdog:v0.2.0-rc
                 env:
                   - name: WATCH_DURATION
-                    value: 14400H
+                    value: 10d
                   - name: APP_NAMESPACE
                     value: mutadev
                   - name: APP_PORT
