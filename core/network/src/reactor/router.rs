@@ -157,16 +157,13 @@ where
                     .ok_or_else(|| NetworkError::from(ErrorKind::NoReactor(endpoint.root())))?
             };
 
-            if let Err(err) = reactor
+            let ret = reactor
                 .react(router_context, endpoint.clone(), network_message)
-                .await
-            {
+                .await;
+            if let Err(err) = ret.as_ref() {
                 log::error!("process {} message failed: {}", endpoint, err);
-
-                Err(err)
-            } else {
-                Ok(())
             }
+            ret
         }
     }
 }

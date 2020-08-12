@@ -134,7 +134,7 @@ impl SessionProtocol for TransmitterProtocol {
                 .inc();
 
             if let Err(err) = route_fut.await {
-                log::warn!("route {} message failed: {}", remote_peer, err);
+                log::warn!("route message from {} failed: {}", remote_peer, err);
             }
 
             common_apm::metrics::network::NETWORK_RECEIVED_MESSAGE_IN_PROCESSING_GUAGE.dec();
