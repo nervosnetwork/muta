@@ -18,7 +18,7 @@ use common_crypto::{
     ToPublicKey, UncompressedPublicKey,
 };
 use core_api::adapter::DefaultAPIAdapter;
-use core_api::config::GraphQLConfig;
+use core_api::config::{GraphQLConfig, GraphQLTLS};
 use core_consensus::fixed_types::{FixedBlock, FixedProof, FixedSignedTxs};
 use core_consensus::message::{
     ChokeMessageHandler, ProposalMessageHandler, PullBlockRpcHandler, PullProofRpcHandler,
@@ -54,6 +54,15 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
     genesis: &Genesis,
     servive_mapping: Arc<Mapping>,
 ) -> ProtocolResult<Block> {
+    let metadata_payload = genesis.get_payload("metadata");
+
+    let hrp = Metadata::get_hrp_from_json(metadata_payload.to_string());
+
+    // Set bech32 address hrp
+    if !protocol::address_hrp_inited() {
+        protocol::init_address_hrp(hrp.to_owned());
+    }
+
     let metadata: Metadata =
         serde_json::from_str(genesis.get_payload("metadata")).expect("Decode metadata failed!");
 
@@ -96,6 +105,7 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
         path_state,
         config.executor.light,
         config.rocksdb.max_open_files,
+        config.executor.triedb_cache_size,
     )?);
 
     // Init genesis
@@ -105,11 +115,6 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
         Arc::clone(&storage),
         servive_mapping,
     )?;
-
-    // Set bech32 address hrp
-    if !protocol::address_hrp_inited() {
-        protocol::init_address_hrp(metadata.bech32_address_hrp);
-    }
 
     // Build genesis block.
     let proposer = Address::from_hash(Hash::digest(Bytes::from(
@@ -216,6 +221,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         path_state,
         config.executor.light,
         config.rocksdb.max_open_files,
+        config.executor.triedb_cache_size,
     )?);
 
     // Init mempool
@@ -560,6 +566,12 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     }
     if config.graphql.max_payload_size != 0 {
         graphql_config.max_payload_size = config.graphql.max_payload_size;
+    }
+    if let Some(tls) = config.graphql.tls {
+        graphql_config.tls = Some(GraphQLTLS {
+            private_key_file_path:       tls.private_key_file_path,
+            certificate_chain_file_path: tls.certificate_chain_file_path,
+        })
     }
 
     tokio::task::spawn_local(async move {

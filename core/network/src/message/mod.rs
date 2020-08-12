@@ -18,14 +18,6 @@ use crate::{
 
 use std::{collections::HashMap, str::FromStr};
 
-#[derive(Constructor)]
-#[non_exhaustive]
-pub struct RawSessionMessage {
-    pub(crate) sid: SessionId,
-    pub(crate) pid: PeerId,
-    pub(crate) msg: Bytes,
-}
-
 pub struct Headers(HashMap<String, Vec<u8>>);
 
 impl Default for Headers {

@@ -1,34 +1,28 @@
-use std::{
-    collections::HashMap,
-    future::Future,
-    pin::Pin,
-    sync::Arc,
-    task::{Context, Poll},
-};
+use std::collections::HashMap;
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::Arc;
+use std::task::{Context, Poll};
 
-use futures::{
-    channel::mpsc::{UnboundedReceiver, UnboundedSender},
-    future::TryFutureExt,
-    pin_mut,
-    stream::Stream,
-};
+use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
+use futures::future::TryFutureExt;
+use futures::stream::Stream;
 use log::{error, warn};
 use parking_lot::RwLock;
 
-use crate::{
-    endpoint::Endpoint,
-    error::{ErrorKind, NetworkError},
-    event::PeerManagerEvent,
-    message::{NetworkMessage, RawSessionMessage, SessionMessage},
-    traits::{Compression, SharedSessionBook},
-};
+use crate::endpoint::Endpoint;
+use crate::error::{ErrorKind, NetworkError};
+use crate::event::PeerManagerEvent;
+use crate::message::{NetworkMessage, SessionMessage};
+use crate::protocols::ReceivedMessage;
+use crate::traits::{Compression, SharedSessionBook};
 
 pub struct MessageRouter<C, S> {
     // Endpoint to reactor channel map
     reactor_map: Arc<RwLock<HashMap<Endpoint, UnboundedSender<SessionMessage>>>>,
 
     // Receiver for compressed session message
-    raw_msg_rx: UnboundedReceiver<RawSessionMessage>,
+    recv_data_rx: UnboundedReceiver<ReceivedMessage>,
 
     // Sender for peer trust metric feedback
     trust_tx: UnboundedSender<PeerManagerEvent>,
@@ -49,7 +43,7 @@ where
     S: SharedSessionBook + Send + Unpin + Clone + 'static,
 {
     pub fn new(
-        raw_msg_rx: UnboundedReceiver<RawSessionMessage>,
+        recv_data_rx: UnboundedReceiver<ReceivedMessage>,
         trust_tx: UnboundedSender<PeerManagerEvent>,
         compression: C,
         sessions: S,
@@ -58,7 +52,7 @@ where
         MessageRouter {
             reactor_map: Default::default(),
 
-            raw_msg_rx,
+            recv_data_rx,
             trust_tx,
             compression,
             sessions,
@@ -75,7 +69,7 @@ where
         self.reactor_map.write().insert(endpoint, smsg_tx);
     }
 
-    pub fn route_raw_message(&self, raw_msg: RawSessionMessage) -> impl Future<Output = ()> {
+    pub fn route_recived_message(&self, recv_msg: ReceivedMessage) -> impl Future<Output = ()> {
         let reactor_map = Arc::clone(&self.reactor_map);
         let compression = self.compression.clone();
         let sessions = self.sessions.clone();
@@ -83,7 +77,7 @@ where
         let trust_tx = self.trust_tx.clone();
 
         let route = async move {
-            let des_msg = compression.decompress(raw_msg.msg)?;
+            let des_msg = compression.decompress(recv_msg.data)?;
             let net_msg = NetworkMessage::decode(des_msg).await?;
             common_apm::metrics::network::on_network_message_received(&net_msg.url);
 
@@ -95,10 +89,10 @@ where
 
             // Peer may disconnect when we try to fetch its connected address.
             // This connected addr is mainly for debug purpose, so no error.
-            let connected_addr = sessions.connected_addr(raw_msg.sid);
+            let connected_addr = sessions.connected_addr(recv_msg.session_id);
             let smsg = SessionMessage {
-                sid: raw_msg.sid,
-                pid: raw_msg.pid,
+                sid: recv_msg.session_id,
+                pid: recv_msg.peer_id,
                 msg: net_msg,
                 connected_addr,
                 trust_tx,
@@ -127,13 +121,13 @@ where
 
     fn poll(mut self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
         loop {
-            let raw_msg_rx = &mut self.as_mut().raw_msg_rx;
-            pin_mut!(raw_msg_rx);
+            let recv_data_rx = &mut self.as_mut().recv_data_rx;
+            futures::pin_mut!(recv_data_rx);
 
             // service ready in common
-            let raw_msg = crate::service_ready!("router service", raw_msg_rx.poll_next(ctx));
+            let recv_msg = crate::service_ready!("router service", recv_data_rx.poll_next(ctx));
 
-            tokio::spawn(self.route_raw_message(raw_msg));
+            tokio::spawn(self.route_recived_message(recv_msg));
         }
 
         Poll::Pending

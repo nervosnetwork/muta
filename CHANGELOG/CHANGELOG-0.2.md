@@ -1,4 +1,24 @@
-# [](https://github.com/nervosnetwork/muta/compare/v0.2.0-beta.2...v) (2020-08-07)
+# [](https://github.com/nervosnetwork/muta/compare/v0.2.0-beta.3...v) (2020-08-10)
+
+
+### Bug Fixes
+
+* load hrp before deserializing genesis payload to take hrp effect ([#405](https://github.com/nervosnetwork/muta/issues/405)) ([828e6d5](https://github.com/nervosnetwork/muta/commit/828e6d539cf4da9cf042c450418e75a944315014))
+
+* service field of event is not binded to ctx.service ([#405](https://github.com/nervosnetwork/muta/issues/408)) ([120f1ee](https://github.com/nervosnetwork/muta/commit/120f1ee125593d7def075460f34fc3dcd5a8fe83))
+
+### Features
+
+* **api:** Support enabled TLS ([#402](https://github.com/nervosnetwork/muta/issues/402)) ([c2908a3](https://github.com/nervosnetwork/muta/commit/c2908a3ba6a5ab1219ddc9b14ff6d7320cf70228))
+
+
+### Performance Improvements
+
+* **state:** add state cache for trieDB ([#404](https://github.com/nervosnetwork/muta/issues/404)) ([2a08c14](https://github.com/nervosnetwork/muta/commit/2a08c147571707507b72882788fd51f7a799f3ec))
+
+
+
+# [0.2.0-beta.3](https://github.com/nervosnetwork/muta/compare/v0.2.0-beta.2...v0.2.0-beta.3) (2020-08-07)
 
 
 ### Bug Fixes
@@ -112,3 +132,4 @@ Block proposer is address instead public key
 Block proposer is address instead public key
 
 * fix: compilation failed
+

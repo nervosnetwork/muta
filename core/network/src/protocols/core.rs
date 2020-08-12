@@ -10,12 +10,11 @@ use tentacle::service::{ProtocolMeta, TargetProtocol};
 use tentacle::ProtocolId;
 
 use crate::event::PeerManagerEvent;
-use crate::message::RawSessionMessage;
 use crate::peer_manager::PeerManagerHandle;
 use crate::protocols::discovery::Discovery;
 use crate::protocols::identify::Identify;
 use crate::protocols::ping::Ping;
-use crate::protocols::transmitter::Transmitter;
+use crate::protocols::transmitter::{ReceivedMessage, Transmitter};
 use crate::traits::NetworkProtocol;
 
 pub const PING_PROTOCOL_ID: usize = 1;
@@ -79,12 +78,17 @@ pub struct CoreProtocolBuilder {
 }
 
 pub struct CoreProtocol {
-    metas: Vec<ProtocolMeta>,
+    metas:       Vec<ProtocolMeta>,
+    transmitter: Transmitter,
 }
 
 impl CoreProtocol {
     pub fn build() -> CoreProtocolBuilder {
         CoreProtocolBuilder::new()
+    }
+
+    pub fn transmitter(&self) -> Transmitter {
+        self.transmitter.clone()
     }
 }
 
@@ -95,10 +99,6 @@ impl NetworkProtocol for CoreProtocol {
 
     fn metas(self) -> Vec<ProtocolMeta> {
         self.metas
-    }
-
-    fn message_proto_id() -> ProtocolId {
-        ProtocolId::new(TRANSMITTER_PROTOCOL_ID)
     }
 }
 
@@ -149,7 +149,7 @@ impl CoreProtocolBuilder {
 
     pub fn transmitter(
         mut self,
-        bytes_tx: UnboundedSender<RawSessionMessage>,
+        bytes_tx: UnboundedSender<ReceivedMessage>,
         peer_mgr: PeerManagerHandle,
     ) -> Self {
         let transmitter = Transmitter::new(bytes_tx, peer_mgr);
@@ -176,8 +176,12 @@ impl CoreProtocolBuilder {
         metas.push(ping.build_meta(PING_PROTOCOL_ID.into()));
         metas.push(identify.build_meta(IDENTIFY_PROTOCOL_ID.into()));
         metas.push(discovery.build_meta(DISCOVERY_PROTOCOL_ID.into()));
-        metas.push(transmitter.build_meta(TRANSMITTER_PROTOCOL_ID.into()));
+        metas.push(
+            transmitter
+                .clone()
+                .build_meta(TRANSMITTER_PROTOCOL_ID.into()),
+        );
 
-        CoreProtocol { metas }
+        CoreProtocol { metas, transmitter }
     }
 }

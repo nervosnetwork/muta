@@ -18,6 +18,13 @@ pub struct ConfigGraphQL {
     pub maxconn:           usize,
     #[serde(default)]
     pub max_payload_size:  usize,
+    pub tls:               Option<ConfigGraphQLTLS>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ConfigGraphQLTLS {
+    pub private_key_file_path:       PathBuf,
+    pub certificate_chain_file_path: PathBuf,
 }
 
 #[derive(Debug, Deserialize)]
@@ -82,7 +89,8 @@ pub struct ConfigMempool {
 
 #[derive(Debug, Deserialize)]
 pub struct ConfigExecutor {
-    pub light: bool,
+    pub light:             bool,
+    pub triedb_cache_size: usize,
 }
 
 #[derive(Debug, Deserialize)]

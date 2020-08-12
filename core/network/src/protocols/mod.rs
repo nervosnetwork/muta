@@ -8,3 +8,4 @@ mod transmitter;
 
 pub mod identify;
 pub use self::core::{CoreProtocol, CoreProtocolBuilder, OpenedProtocols};
+pub use transmitter::{ReceivedMessage, Recipient, Transmitter, TransmitterMessage};
