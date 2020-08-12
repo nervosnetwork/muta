@@ -807,6 +807,8 @@ impl PeerManager {
             return;
         }
 
+        common_apm::metrics::network::NETWORK_UNIDENTIFIED_CONNECTIONS.inc();
+
         let event = UnidentifiedSessionEvent { pubkey, ctx };
         let ident_fut = Identify::wait_identified(peer_id);
         let unidentified_session = UnidentifiedSession { event, ident_fut };
@@ -1365,6 +1367,8 @@ impl Future for PeerManager {
                 }
                 Poll::Ready(ret) => match ret {
                     Ok(()) => {
+                        common_apm::metrics::network::NETWORK_UNIDENTIFIED_CONNECTIONS.dec();
+
                         let UnidentifiedSession { event, .. } = session;
                         let new_session_event = PeerManagerEvent::NewSession {
                             pid:    event.pubkey.peer_id(),
@@ -1388,6 +1392,8 @@ impl Future for PeerManager {
                         }
                     }
                     Err(err) => {
+                        common_apm::metrics::network::NETWORK_UNIDENTIFIED_CONNECTIONS.dec();
+
                         warn!(
                             "reject peer {:?} due to identification failed: {}",
                             session.event.pubkey.peer_id(),

@@ -113,6 +113,11 @@ lazy_static! {
         "Total number of network outbound connecting peers"
     )
     .expect("network outbound connecting peer count");
+    pub static ref NETWORK_UNIDENTIFIED_CONNECTIONS: IntGauge = register_int_gauge!(
+        "muta_network_unidentified_connections",
+        "Total number of network unidentified connections"
+    )
+    .expect("network unidentified connections");
 }
 
 fn on_network_message(direction: &str, target: &str, url: &str, inc: i64) {
