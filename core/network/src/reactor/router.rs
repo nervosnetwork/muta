@@ -17,9 +17,9 @@ use crate::error::{ErrorKind, NetworkError};
 use crate::event::PeerManagerEvent;
 use crate::message::NetworkMessage;
 use crate::protocols::ReceivedMessage;
-use crate::rpc_map::RpcMap;
 use crate::traits::Compression;
 
+use super::rpc_map::RpcMap;
 use super::Reactor;
 
 #[derive(Debug, Display)]
@@ -82,10 +82,12 @@ impl RouterContext {
     }
 }
 
+type ReactorMap = HashMap<Endpoint, Arc<Box<dyn Reactor>>>;
+
 #[derive(Clone)]
 pub struct MessageRouter<C> {
     // Endpoint to reactor channel map
-    reactor_map: Arc<RwLock<HashMap<Endpoint, Arc<Box<dyn Reactor>>>>>,
+    reactor_map: Arc<RwLock<ReactorMap>>,
 
     // Rpc map
     pub(crate) rpc_map: Arc<RpcMap>,
@@ -101,15 +103,10 @@ impl<C> MessageRouter<C>
 where
     C: Compression + Send + Clone + 'static,
 {
-    pub fn new(
-        rpc_map: Arc<RpcMap>,
-        trust_tx: UnboundedSender<PeerManagerEvent>,
-        compression: C,
-    ) -> Self {
+    pub fn new(trust_tx: UnboundedSender<PeerManagerEvent>, compression: C) -> Self {
         MessageRouter {
             reactor_map: Default::default(),
-
-            rpc_map,
+            rpc_map: Arc::new(RpcMap::new()),
             trust_tx,
             compression,
         }

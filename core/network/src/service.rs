@@ -30,7 +30,6 @@ use crate::peer_manager::diagnostic::{Diagnostic, DiagnosticHookFn};
 use crate::peer_manager::{PeerManager, PeerManagerConfig, PeerManagerHandle, SharedSessions};
 use crate::protocols::{CoreProtocol, Transmitter};
 use crate::reactor::MessageRouter;
-use crate::rpc_map::RpcMap;
 use crate::selfcheck::SelfCheck;
 use crate::traits::NetworkContext;
 use crate::{NetworkConfig, PeerIdExt};
@@ -216,8 +215,7 @@ impl NetworkService {
 
         // Build service protocol
         let disc_sync_interval = config.discovery_sync_interval;
-        let rpc_map = Arc::new(RpcMap::new());
-        let message_router = MessageRouter::new(rpc_map, mgr_tx.clone(), Snappy);
+        let message_router = MessageRouter::new(mgr_tx.clone(), Snappy);
         let proto = CoreProtocol::build()
             .ping(config.ping_interval, config.ping_timeout, mgr_tx.clone())
             .identify(peer_mgr_handle.clone(), mgr_tx.clone())
@@ -227,7 +225,7 @@ impl NetworkService {
         let transmitter = proto.transmitter();
 
         // Build connection service
-        let keeper = ConnectionServiceKeeper::new(mgr_tx.clone(), sys_tx.clone());
+        let keeper = ConnectionServiceKeeper::new(mgr_tx.clone(), sys_tx);
         let conn_srv = ConnectionService::<CoreProtocol>::new(proto, conn_config, keeper, conn_rx);
         let conn_ctrl = conn_srv.control();
 

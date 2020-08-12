@@ -1,4 +1,3 @@
-use std::sync::Arc;
 use std::time::Instant;
 
 use async_trait::async_trait;
@@ -15,7 +14,6 @@ use crate::error::{ErrorKind, NetworkError};
 use crate::message::{Headers, NetworkMessage};
 use crate::protocols::{Recipient, Transmitter, TransmitterMessage};
 use crate::rpc::{RpcErrorMessage, RpcResponse, RpcResponseCode};
-use crate::rpc_map::RpcMap;
 use crate::traits::{Compression, NetworkContext};
 
 #[derive(Clone)]
@@ -73,20 +71,21 @@ impl Rpc for NetworkRpc {
         let inst = Instant::now();
 
         struct _Guard {
-            map: Arc<RpcMap>,
-            sid: SessionId,
-            rid: u64,
+            transmitter: Transmitter,
+            sid:         SessionId,
+            rid:         u64,
         }
 
         impl Drop for _Guard {
             fn drop(&mut self) {
                 // Simple take then drop if there is one
-                let _ = self.map.take::<RpcResponse>(self.sid, self.rid);
+                let rpc_map = &self.transmitter.router.rpc_map;
+                let _ = rpc_map.take::<RpcResponse>(self.sid, self.rid);
             }
         }
 
         let _guard = _Guard {
-            map: Arc::clone(&rpc_map),
+            transmitter: self.transmitter.clone(),
             sid,
             rid,
         };
