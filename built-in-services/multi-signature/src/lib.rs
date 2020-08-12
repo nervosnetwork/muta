@@ -5,9 +5,11 @@ mod tests;
 pub mod types;
 
 use std::collections::HashMap;
-use std::panic::catch_unwind;
 
 use binding_macro::{cycles, genesis, service};
+use derive_more::Display;
+use rlp::{Decodable, Rlp};
+
 use common_crypto::{Crypto, Secp256k1};
 use protocol::traits::{ExecutorParams, ServiceResponse, ServiceSDK};
 use protocol::types::{Address, Bytes, Hash, ServiceContext, SignedTransaction};
@@ -115,10 +117,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
         if payload.addr_with_weight.is_empty()
             || payload.addr_with_weight.len() > MAX_PERMISSION_ACCOUNTS as usize
         {
-            return ServiceResponse::<GenerateMultiSigAccountResponse>::from_error(
-                110,
-                "accounts length must be [1,16]".to_owned(),
-            );
+            return ServiceError::InvalidAccountLength.into();
         }
 
         let weight_sum = payload
@@ -128,10 +127,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
             .sum::<u32>();
 
         if payload.threshold == 0 || weight_sum < payload.threshold {
-            return ServiceResponse::<GenerateMultiSigAccountResponse>::from_error(
-                111,
-                "accounts weight or threshold not valid".to_owned(),
-            );
+            return ServiceError::InvalidAccountWeights.into();
         }
 
         // check the recursion depth
@@ -141,15 +137,15 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
             .map(|s| self._is_recursion_depth_overflow(&s.address, 0))
             .any(|res| res)
         {
-            return ServiceResponse::<GenerateMultiSigAccountResponse>::from_error(
-                116,
-                "above max recursion depth".to_owned(),
-            );
+            return ServiceError::AboveMaxRecursionDepth.into();
         }
 
-        if let Ok(address) = Address::from_hash(Hash::digest(
-            ctx.get_tx_hash().expect("Can not get tx hash").as_bytes(),
-        )) {
+        let tx_hash = match ctx.get_tx_hash() {
+            Some(hash) => hash,
+            None => return ServiceError::CtxMissingTxHash.into(),
+        };
+
+        if let Ok(address) = Address::from_hash(Hash::digest(tx_hash.as_bytes())) {
             let accounts = payload
                 .addr_with_weight
                 .iter()
@@ -182,10 +178,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
                 GenerateMultiSigAccountResponse { address },
             )
         } else {
-            ServiceResponse::<GenerateMultiSigAccountResponse>::from_error(
-                112,
-                "generate address from tx_hash failed".to_owned(),
-            )
+            ServiceError::GenerateAddressFailed.into()
         }
     }
 
@@ -201,10 +194,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
                 GetMultiSigAccountResponse { permission },
             )
         } else {
-            ServiceResponse::<GetMultiSigAccountResponse>::from_error(
-                113,
-                "account not existed".to_owned(),
-            )
+            ServiceError::AccountNotExsit.into()
         }
     }
 
@@ -215,20 +205,14 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
         ctx: ServiceContext,
         payload: SignedTransaction,
     ) -> ServiceResponse<()> {
-        let pubkeys = if let Ok(pubkeys_bytes) =
-            catch_unwind(|| rlp::decode_list::<Vec<u8>>(&payload.pubkey.to_vec()))
-        {
-            pubkeys_bytes
-        } else {
-            return ServiceResponse::<()>::from_error(122, "decode pubkey failed".to_owned());
+        let pubkeys = match decode_list::<Vec<u8>>(&payload.pubkey.to_vec(), "public key") {
+            Ok(pks) => pks,
+            Err(err) => return err.into(),
         };
 
-        let sigs = if let Ok(sigs_bytes) =
-            catch_unwind(|| rlp::decode_list::<Vec<u8>>(&payload.signature.to_vec()))
-        {
-            sigs_bytes
-        } else {
-            return ServiceResponse::<()>::from_error(122, "decode signatures failed".to_owned());
+        let sigs = match decode_list::<Vec<u8>>(&payload.signature.to_vec(), "signature") {
+            Ok(sig) => sig,
+            Err(err) => return err.into(),
         };
 
         self._inner_verify_signature(VerifySignaturePayload {
@@ -252,7 +236,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
         {
             // check owner address
             if ctx.get_caller() != permission.owner {
-                return ServiceResponse::<()>::from_error(118, "invalid owner".to_owned());
+                return ServiceError::InvalidOwner.into();
             }
 
             // check if account contains itself
@@ -262,20 +246,14 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
                 .map(|a| a.address.clone())
                 .any(|addr| addr == payload.account_address)
             {
-                return ServiceResponse::<()>::from_error(
-                    115,
-                    "account can not contain itself".to_owned(),
-                );
+                return ServiceError::AccountSelfContained.into();
             }
 
             // check sum of weight
             if payload.addr_with_weight.is_empty()
                 || payload.addr_with_weight.len() > MAX_PERMISSION_ACCOUNTS as usize
             {
-                return ServiceResponse::<()>::from_error(
-                    110,
-                    "accounts length must be [1,16]".to_owned(),
-                );
+                return ServiceError::InvalidAccountLength.into();
             }
 
             let weight_sum = payload
@@ -286,10 +264,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
 
             // check if sum of the weights is above threshold
             if payload.threshold == 0 || weight_sum < payload.threshold {
-                return ServiceResponse::<()>::from_error(
-                    111,
-                    "accounts weight or threshold not valid".to_owned(),
-                );
+                return ServiceError::InvalidAccountWeights.into();
             }
 
             // check the recursion depth
@@ -299,10 +274,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
                 .map(|s| self._is_recursion_depth_overflow(&s.address, 0))
                 .any(|res| res)
             {
-                return ServiceResponse::<()>::from_error(
-                    116,
-                    "above max recursion depth".to_owned(),
-                );
+                return ServiceError::AboveMaxRecursionDepth.into();
             }
 
             let accounts = payload
@@ -329,7 +301,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
             return ServiceResponse::<()>::from_succeed(());
         }
 
-        ServiceResponse::<()>::from_error(113, "account not existed".to_owned())
+        ServiceError::AccountNotExsit.into()
     }
 
     #[cycles(21_000)]
@@ -345,15 +317,12 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
         {
             // check owner address
             if ctx.get_caller() != permission.owner {
-                return ServiceResponse::<()>::from_error(118, "invalid owner".to_owned());
+                return ServiceError::InvalidOwner.into();
             }
 
             // check new owner's recursion depth
             if self._is_recursion_depth_overflow(&payload.new_owner, 0) {
-                return ServiceResponse::<()>::from_error(
-                    116,
-                    "new owner above max recursion depth".to_owned(),
-                );
+                return ServiceError::AboveMaxRecursionDepth.into();
             }
 
             permission.set_owner(payload.new_owner);
@@ -361,7 +330,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
                 .set_account_value(&payload.multi_sig_address, 0u8, permission);
             ServiceResponse::<()>::from_succeed(())
         } else {
-            ServiceResponse::<()>::from_error(113, "account not existed".to_owned())
+            ServiceError::AccountNotExsit.into()
         }
     }
 
@@ -378,7 +347,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
         {
             // check owner address
             if ctx.get_caller() != permission.owner {
-                return ServiceResponse::<()>::from_error(118, "invalid owner".to_owned());
+                return ServiceError::InvalidOwner.into();
             }
 
             permission.set_memo(payload.new_memo);
@@ -386,7 +355,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
                 .set_account_value(&payload.multi_sig_address, 0u8, permission);
             ServiceResponse::<()>::from_succeed(())
         } else {
-            ServiceResponse::<()>::from_error(113, "account not existed".to_owned())
+            ServiceError::AccountNotExsit.into()
         }
     }
 
@@ -403,23 +372,17 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
         {
             // check owner address
             if ctx.get_caller() != permission.owner {
-                return ServiceResponse::<()>::from_error(118, "invalid owner".to_owned());
+                return ServiceError::InvalidOwner.into();
             }
 
             // check whether reach the max count
             if permission.accounts.len() == MAX_PERMISSION_ACCOUNTS as usize {
-                return ServiceResponse::<()>::from_error(
-                    119,
-                    "the account count reach max value".to_owned(),
-                );
+                return ServiceError::AccountCountReachMaxValue.into();
             }
 
             // check whether the new account above max recursion depth
             if self._is_recursion_depth_overflow(&payload.new_account.address, 1) {
-                return ServiceResponse::<()>::from_error(
-                    116,
-                    "new account above max recursion depth".to_owned(),
-                );
+                return ServiceError::AboveMaxRecursionDepth.into();
             }
 
             permission.add_account(payload.new_account.clone());
@@ -428,7 +391,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
 
             ServiceResponse::<()>::from_succeed(())
         } else {
-            ServiceResponse::<()>::from_error(113, "account not existed".to_owned())
+            ServiceError::AccountNotExsit.into()
         }
     }
 
@@ -445,7 +408,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
         {
             // check owner address
             if ctx.get_caller() != permission.owner {
-                return ServiceResponse::<Account>::from_error(118, "invalid owner".to_owned());
+                return ServiceError::InvalidOwner.into();
             }
 
             match permission.remove_account(&payload.account_address) {
@@ -455,15 +418,12 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
                     return ServiceResponse::<Account>::from_succeed(ret);
                 }
                 RemoveAccountResult::BelowThreshold => {
-                    return ServiceResponse::<Account>::from_error(
-                        121,
-                        "the sum of weight will below threshold".to_owned(),
-                    );
+                    return ServiceError::InvalidAccountWeights.into();
                 }
                 _ => (),
             }
         }
-        ServiceResponse::<Account>::from_error(113, "account not existed".to_owned())
+        ServiceError::AccountNotExsit.into()
     }
 
     #[cycles(21_000)]
@@ -479,7 +439,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
         {
             // check owner address
             if ctx.get_caller() != permission.owner {
-                return ServiceResponse::<()>::from_error(118, "invalid owner".to_owned());
+                return ServiceError::InvalidOwner.into();
             }
 
             match permission.set_account_weight(&payload.account_address, payload.new_weight) {
@@ -489,15 +449,12 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
                     return ServiceResponse::<()>::from_succeed(());
                 }
                 SetWeightResult::InvalidNewWeight => {
-                    return ServiceResponse::<()>::from_error(
-                        121,
-                        "the sum of weight will below threshold".to_owned(),
-                    );
+                    return ServiceError::InvalidAccountWeights.into();
                 }
                 _ => (),
             }
         }
-        ServiceResponse::<()>::from_error(113, "account not existed".to_owned())
+        ServiceError::AccountNotExsit.into()
     }
 
     #[cycles(21_000)]
@@ -513,7 +470,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
         {
             // check owner address
             if ctx.get_caller() != permission.owner {
-                return ServiceResponse::<()>::from_error(118, "invalid owner".to_owned());
+                return ServiceError::InvalidOwner.into();
             }
 
             // check new threshold
@@ -524,10 +481,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
                 .sum::<u32>()
                 < payload.new_threshold
             {
-                return ServiceResponse::<()>::from_error(
-                    121,
-                    "new threshold larger the sum of the weights".to_owned(),
-                );
+                return ServiceError::InvalidAccountWeights.into();
             }
 
             permission.set_threshold(payload.new_threshold);
@@ -535,7 +489,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
                 .set_account_value(&payload.multi_sig_address, 0u8, permission);
             ServiceResponse::<()>::from_succeed(())
         } else {
-            ServiceResponse::<()>::from_error(113, "account not existed".to_owned())
+            ServiceError::AccountNotExsit.into()
         }
     }
 
@@ -544,10 +498,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
         let signatures = payload.signatures.clone();
 
         if pubkeys.len() != signatures.len() {
-            return ServiceResponse::<()>::from_error(
-                114,
-                "pubkkeys len is not equal to signatures len".to_owned(),
-            );
+            return ServiceError::PubkeyAndSignatureMismatch.into();
         }
 
         if pubkeys.len() == 1 {
@@ -560,7 +511,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
                     );
                 }
             } else {
-                return ServiceResponse::<()>::from_error(123, "invalid public key".to_owned());
+                return ServiceError::InvalidPublicKey.into();
             }
         }
 
@@ -584,7 +535,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
 
         // check recursion depth
         if depth_clone >= MAX_MULTI_SIGNATURE_RECURSION_DEPTH {
-            return ServiceResponse::<()>::from_error(116, "above max recursion depth".to_owned());
+            return ServiceError::AboveMaxRecursionDepth.into();
         }
 
         let mut weight_acc = 0u32;
@@ -593,7 +544,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
             .sdk
             .get_account_value::<_, MultiSigPermission>(sender, &0u8);
         if permission.is_none() {
-            return ServiceResponse::<()>::from_error(113, "account not existed".to_owned());
+            return ServiceError::AccountNotExsit.into();
         }
         let permission = permission.unwrap();
 
@@ -616,7 +567,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
             }
         }
 
-        ServiceResponse::<()>::from_error(117, "multi signature not verified".to_owned())
+        ServiceError::VerifyMultiSignatureFailed.into()
     }
 
     fn _verify_single_signature(
@@ -630,7 +581,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
         {
             ServiceResponse::<()>::from_succeed(())
         } else {
-            ServiceResponse::<()>::from_error(117, "signature verified failed".to_owned())
+            ServiceError::VerifyMultiSignatureFailed.into()
         }
     }
 
@@ -654,4 +605,78 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
             false
         }
     }
+}
+
+#[derive(Debug, Display)]
+pub enum ServiceError {
+    #[display(fmt = "Decode {:?} error", _0)]
+    DecodeErr(String),
+
+    #[display(fmt = "accounts length must be [1,16]")]
+    InvalidAccountLength,
+
+    #[display(fmt = "accounts weight or threshold not valid")]
+    InvalidAccountWeights,
+
+    #[display(fmt = "above max recursion depth")]
+    AboveMaxRecursionDepth,
+
+    #[display(fmt = "Can not get tx hash from service context")]
+    CtxMissingTxHash,
+
+    #[display(fmt = "generate address from tx_hash failed")]
+    GenerateAddressFailed,
+
+    #[display(fmt = "account is not existed")]
+    AccountNotExsit,
+
+    #[display(fmt = "invalid owner")]
+    InvalidOwner,
+
+    #[display(fmt = "account can not contain itself")]
+    AccountSelfContained,
+
+    #[display(fmt = "the account count reach max value")]
+    AccountCountReachMaxValue,
+
+    #[display(fmt = "pubkkeys len is not equal to signatures len")]
+    PubkeyAndSignatureMismatch,
+
+    #[display(fmt = "invalid public key")]
+    InvalidPublicKey,
+
+    #[display(fmt = "multi signature verified failed")]
+    VerifyMultiSignatureFailed,
+}
+
+impl ServiceError {
+    fn code(&self) -> u64 {
+        match self {
+            ServiceError::DecodeErr(_) => 101,
+            ServiceError::InvalidAccountLength => 102,
+            ServiceError::InvalidAccountWeights => 103,
+            ServiceError::AboveMaxRecursionDepth => 104,
+            ServiceError::CtxMissingTxHash => 105,
+            ServiceError::GenerateAddressFailed => 106,
+            ServiceError::AccountNotExsit => 107,
+            ServiceError::InvalidOwner => 108,
+            ServiceError::AccountSelfContained => 109,
+            ServiceError::AccountCountReachMaxValue => 110,
+            ServiceError::PubkeyAndSignatureMismatch => 111,
+            ServiceError::InvalidPublicKey => 112,
+            ServiceError::VerifyMultiSignatureFailed => 113,
+        }
+    }
+}
+
+impl<T: Default> From<ServiceError> for ServiceResponse<T> {
+    fn from(err: ServiceError) -> ServiceResponse<T> {
+        ServiceResponse::from_error(err.code(), err.to_string())
+    }
+}
+
+fn decode_list<T: Decodable>(bytes: &[u8], ty: &str) -> Result<Vec<T>, ServiceError> {
+    Rlp::new(bytes)
+        .as_list()
+        .map_err(|_| ServiceError::DecodeErr(ty.to_string()))
 }
