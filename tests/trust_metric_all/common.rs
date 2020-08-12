@@ -1,34 +1,14 @@
-use super::node::consts;
-
 use common_crypto::{
     Crypto, PrivateKey, PublicKey, Secp256k1, Secp256k1PrivateKey, Signature, ToPublicKey,
 };
-use protocol::{
-    fixed_codec::FixedCodec,
-    types::{Address, Hash, JsonString, RawTransaction, SignedTransaction, TransactionRequest},
-    Bytes, BytesMut,
+use protocol::fixed_codec::FixedCodec;
+use protocol::types::{
+    Address, Hash, JsonString, RawTransaction, SignedTransaction, TransactionRequest,
 };
+use protocol::{Bytes, BytesMut};
 use rand::{rngs::OsRng, RngCore};
 
-use std::{
-    net::TcpListener,
-    path::PathBuf,
-    sync::atomic::{AtomicU16, Ordering},
-};
-
-static AVAILABLE_PORT: AtomicU16 = AtomicU16::new(2000);
-
-pub fn tmp_dir() -> PathBuf {
-    let mut tmp_dir = std::env::temp_dir();
-    let sub_dir = {
-        let mut random_bytes = [0u8; 32];
-        OsRng.fill_bytes(&mut random_bytes);
-        Hash::digest(BytesMut::from(random_bytes.as_ref()).freeze()).as_hex()
-    };
-
-    tmp_dir.push(sub_dir + "/");
-    tmp_dir
-}
+use crate::common::node::consts;
 
 pub struct SignedTransactionBuilder {
     chain_id:     Hash,
@@ -111,19 +91,4 @@ impl SignedTransactionBuilder {
 
 pub fn stx_builder() -> SignedTransactionBuilder {
     SignedTransactionBuilder::default()
-}
-
-pub fn available_port_pair() -> (u16, u16) {
-    (available_port(), available_port())
-}
-
-fn available_port() -> u16 {
-    let is_available = |port| -> bool { TcpListener::bind(("127.0.0.1", port)).is_ok() };
-
-    loop {
-        let port = AVAILABLE_PORT.fetch_add(1, Ordering::SeqCst);
-        if is_available(port) {
-            return port;
-        }
-    }
 }

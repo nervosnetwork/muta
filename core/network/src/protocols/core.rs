@@ -1,6 +1,11 @@
+use std::collections::{HashMap, HashSet};
+use std::iter::FromIterator;
 use std::time::Duration;
 
 use futures::channel::mpsc::UnboundedSender;
+use lazy_static::lazy_static;
+use parking_lot::RwLock;
+use tentacle::secio::PeerId;
 use tentacle::service::{ProtocolMeta, TargetProtocol};
 use tentacle::ProtocolId;
 
@@ -16,6 +21,53 @@ pub const PING_PROTOCOL_ID: usize = 1;
 pub const IDENTIFY_PROTOCOL_ID: usize = 2;
 pub const DISCOVERY_PROTOCOL_ID: usize = 3;
 pub const TRANSMITTER_PROTOCOL_ID: usize = 4;
+
+lazy_static! {
+    // NOTE: Use peer id here because trust metric integrated test run in one process
+    static ref PEER_OPENED_PROTOCOLS: RwLock<HashMap<PeerId, HashSet<ProtocolId>>> = RwLock::new(HashMap::new());
+}
+
+pub struct OpenedProtocols {}
+
+impl OpenedProtocols {
+    pub fn register(peer_id: PeerId, proto_id: ProtocolId) {
+        PEER_OPENED_PROTOCOLS
+            .write()
+            .entry(peer_id)
+            .and_modify(|protos| {
+                protos.insert(proto_id);
+            })
+            .or_insert_with(|| HashSet::from_iter(vec![proto_id]));
+    }
+
+    #[allow(dead_code)]
+    pub fn unregister(peer_id: &PeerId, proto_id: ProtocolId) {
+        if let Some(ref mut proto_ids) = PEER_OPENED_PROTOCOLS.write().get_mut(peer_id) {
+            proto_ids.remove(&proto_id);
+        }
+    }
+
+    pub fn remove(peer_id: &PeerId) {
+        PEER_OPENED_PROTOCOLS.write().remove(peer_id);
+    }
+
+    #[cfg(test)]
+    pub fn is_open(peer_id: &PeerId, proto_id: &ProtocolId) -> bool {
+        PEER_OPENED_PROTOCOLS
+            .read()
+            .get(peer_id)
+            .map(|ids| ids.contains(proto_id))
+            .unwrap_or_else(|| false)
+    }
+
+    pub fn is_all_opened(peer_id: &PeerId) -> bool {
+        PEER_OPENED_PROTOCOLS
+            .read()
+            .get(peer_id)
+            .map(|ids| ids.len() == 4)
+            .unwrap_or_else(|| false)
+    }
+}
 
 #[derive(Default)]
 pub struct CoreProtocolBuilder {
@@ -42,12 +94,7 @@ impl CoreProtocol {
 
 impl NetworkProtocol for CoreProtocol {
     fn target() -> TargetProtocol {
-        TargetProtocol::Multi(vec![
-            ProtocolId::new(PING_PROTOCOL_ID),
-            ProtocolId::new(IDENTIFY_PROTOCOL_ID),
-            ProtocolId::new(DISCOVERY_PROTOCOL_ID),
-            ProtocolId::new(TRANSMITTER_PROTOCOL_ID),
-        ])
+        TargetProtocol::Single(ProtocolId::new(IDENTIFY_PROTOCOL_ID))
     }
 
     fn metas(self) -> Vec<ProtocolMeta> {
@@ -100,8 +147,12 @@ impl CoreProtocolBuilder {
         self
     }
 
-    pub fn transmitter(mut self, data_tx: UnboundedSender<ReceivedMessage>) -> Self {
-        let transmitter = Transmitter::new(data_tx);
+    pub fn transmitter(
+        mut self,
+        bytes_tx: UnboundedSender<ReceivedMessage>,
+        peer_mgr: PeerManagerHandle,
+    ) -> Self {
+        let transmitter = Transmitter::new(bytes_tx, peer_mgr);
 
         self.transmitter = Some(transmitter);
         self
@@ -117,32 +168,20 @@ impl CoreProtocolBuilder {
             transmitter,
         } = self;
 
-        // Panic for missing protocol
-        assert!(ping.is_some(), "init: missing protocol ping");
-        assert!(identify.is_some(), "init: missing protocol identify");
-        assert!(discovery.is_some(), "init: missing protocol discovery");
-        assert!(transmitter.is_some(), "init: missing protocol transmitter");
+        let ping = ping.expect("init: missing protocol ping");
+        let identify = identify.expect("init: missing protocol identify");
+        let discovery = discovery.expect("init: missing protocol discovery");
+        let transmitter = transmitter.expect("init: missing protocol transmitter");
 
-        if let Some(ping) = ping {
-            metas.push(ping.build_meta(PING_PROTOCOL_ID.into()));
-        }
+        metas.push(ping.build_meta(PING_PROTOCOL_ID.into()));
+        metas.push(identify.build_meta(IDENTIFY_PROTOCOL_ID.into()));
+        metas.push(discovery.build_meta(DISCOVERY_PROTOCOL_ID.into()));
+        metas.push(
+            transmitter
+                .clone()
+                .build_meta(TRANSMITTER_PROTOCOL_ID.into()),
+        );
 
-        if let Some(identify) = identify {
-            metas.push(identify.build_meta(IDENTIFY_PROTOCOL_ID.into()));
-        }
-
-        if let Some(discovery) = discovery {
-            metas.push(discovery.build_meta(DISCOVERY_PROTOCOL_ID.into()));
-        }
-
-        if let Some(transmitter) = transmitter.as_ref() {
-            let transmitter = transmitter.clone();
-            metas.push(transmitter.build_meta(TRANSMITTER_PROTOCOL_ID.into()));
-        }
-
-        CoreProtocol {
-            metas,
-            transmitter: transmitter.unwrap(),
-        }
+        CoreProtocol { metas, transmitter }
     }
 }

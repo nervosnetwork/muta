@@ -13,17 +13,6 @@ mod trust_metric;
 #[cfg(feature = "diagnostic")]
 pub mod diagnostic;
 
-use addr_set::PeerAddrSet;
-use retry::Retry;
-use save_restore::{NoPeerDatFile, PeerDatFile, SaveRestore};
-use session_book::{AcceptableSession, ArcSession, SessionContext};
-use tags::Tags;
-
-pub use peer::{ArcPeer, Connectedness};
-pub use session_book::SessionBook;
-pub use shared::SharedSessions;
-pub use trust_metric::{TrustMetric, TrustMetricConfig};
-
 #[cfg(test)]
 mod test_manager;
 
@@ -42,6 +31,7 @@ use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::Duration;
 
+use arc_swap::ArcSwap;
 use derive_more::Display;
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use futures::stream::Stream;
@@ -62,7 +52,19 @@ use crate::event::{
     ConnectionErrorKind, ConnectionEvent, ConnectionType, MisbehaviorKind, PeerManagerEvent,
     SessionErrorKind,
 };
+use crate::protocols::identify::{Identify, WaitIdentification};
 use crate::traits::MultiaddrExt;
+
+use addr_set::PeerAddrSet;
+use retry::Retry;
+use save_restore::{NoPeerDatFile, PeerDatFile, SaveRestore};
+use session_book::{AcceptableSession, ArcSession, SessionContext};
+use tags::Tags;
+
+pub use peer::{ArcPeer, Connectedness};
+pub use session_book::SessionBook;
+pub use shared::SharedSessions;
+pub use trust_metric::{TrustMetric, TrustMetricConfig};
 
 const SAME_IP_LIMIT_BAN: Duration = Duration::from_secs(5 * 60);
 const REPEATED_CONNECTION_TIMEOUT: u64 = 30; // seconds
@@ -74,6 +76,24 @@ const MAX_CONNECTING_MARGIN: usize = 10;
 
 const GOOD_TRUST_SCORE: u8 = 80u8;
 const WORSE_TRUST_SCALAR_RATIO: usize = 10;
+
+#[derive(Debug, Display)]
+pub enum NewSessionPreCheckError {
+    #[display(fmt = "peer banned")]
+    PeerBanned,
+
+    #[display(fmt = "allow list peer only")]
+    AllowListOnly,
+
+    #[display(fmt = "reach max connection")]
+    ReachMaxConnection,
+
+    #[display(fmt = "peer already connected, only allow one connection per peer")]
+    PeerAlreadyConnected,
+
+    #[display(fmt = "{}", _0)]
+    ReachSessionLimit(session_book::Error),
+}
 
 #[derive(Debug, Clone, Display, Serialize, Deserialize)]
 #[display(fmt = "{}", _0)]
@@ -193,7 +213,8 @@ impl Hash for ConnectingAttempt {
 }
 
 struct Inner {
-    our_id: Arc<PeerId>,
+    our_id:   Arc<PeerId>,
+    chain_id: ArcSwap<protocol::types::Hash>,
 
     sessions:  SessionBook,
     consensus: RwLock<HashSet<PeerId>>,
@@ -206,6 +227,7 @@ impl Inner {
     pub fn new(our_id: PeerId, sessions: SessionBook) -> Self {
         Inner {
             our_id: Arc::new(our_id),
+            chain_id: ArcSwap::new(Arc::new(protocol::types::Hash::from_empty())),
 
             sessions,
             consensus: Default::default(),
@@ -225,6 +247,14 @@ impl Inner {
 
     pub fn remove_listen(&self, multiaddr: &PeerMultiaddr) {
         self.listen.write().remove(multiaddr);
+    }
+
+    pub fn set_chain_id(&self, chain_id: protocol::types::Hash) {
+        self.chain_id.store(Arc::new(chain_id));
+    }
+
+    pub fn chain_id(&self) -> Arc<protocol::types::Hash> {
+        self.chain_id.load_full()
     }
 
     pub fn connected(&self) -> usize {
@@ -293,6 +323,36 @@ impl Inner {
     }
 }
 
+struct UnidentifiedSessionEvent {
+    pubkey: PublicKey,
+    ctx:    Arc<SessionContext>,
+}
+
+struct UnidentifiedSession {
+    event:     UnidentifiedSessionEvent,
+    ident_fut: WaitIdentification,
+}
+
+impl Borrow<SessionId> for UnidentifiedSession {
+    fn borrow(&self) -> &SessionId {
+        &self.event.ctx.id
+    }
+}
+
+impl PartialEq for UnidentifiedSession {
+    fn eq(&self, other: &UnidentifiedSession) -> bool {
+        self.event.ctx.id == other.event.ctx.id
+    }
+}
+
+impl Eq for UnidentifiedSession {}
+
+impl Hash for UnidentifiedSession {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.event.ctx.id.hash(state)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct PeerManagerConfig {
     /// Our Peer ID
@@ -341,6 +401,18 @@ pub struct PeerManagerHandle {
 impl PeerManagerHandle {
     pub fn peer_id(&self, sid: SessionId) -> Option<PeerId> {
         self.inner.session(sid).map(|s| s.peer.owned_id())
+    }
+
+    pub fn set_chain_id(&self, chain_id: protocol::types::Hash) {
+        self.inner.set_chain_id(chain_id);
+    }
+
+    pub fn chain_id(&self) -> Arc<protocol::types::Hash> {
+        self.inner.chain_id()
+    }
+
+    pub fn contains_session(&self, session_id: SessionId) -> bool {
+        self.inner.session(session_id).is_some()
     }
 
     pub fn random_addrs(&self, max: usize, sid: SessionId) -> Vec<Multiaddr> {
@@ -453,6 +525,9 @@ pub struct PeerManager {
     // peers currently connecting
     connecting: HashSet<ConnectingAttempt>,
 
+    // unidentified session backlog
+    unidentified_backlog: HashSet<UnidentifiedSession>,
+
     event_rx: UnboundedReceiver<PeerManagerEvent>,
     conn_tx:  UnboundedSender<ConnectionEvent>,
 
@@ -500,6 +575,7 @@ impl PeerManager {
             bootstraps,
 
             connecting: Default::default(),
+            unidentified_backlog: Default::default(),
 
             event_rx,
             conn_tx,
@@ -586,7 +662,11 @@ impl PeerManager {
         }
     }
 
-    fn new_session(&mut self, pubkey: PublicKey, ctx: Arc<SessionContext>) {
+    fn new_session_pre_check(
+        &mut self,
+        pubkey: &PublicKey,
+        ctx: &Arc<SessionContext>,
+    ) -> Result<ArcSession, NewSessionPreCheckError> {
         let remote_peer_id = pubkey.peer_id();
         let remote_multiaddr = PeerMultiaddr::new(ctx.address.to_owned(), &remote_peer_id);
 
@@ -594,13 +674,6 @@ impl PeerManager {
         self.connecting.remove(&remote_peer_id);
         let opt_peer = self.inner.peer(&remote_peer_id);
         let remote_peer = opt_peer.unwrap_or_else(|| ArcPeer::new(remote_peer_id.clone()));
-
-        if !remote_peer.has_pubkey() {
-            if let Err(e) = remote_peer.set_pubkey(pubkey) {
-                error!("impossible, set public key failed {}", e);
-                error!("new session without peer pubkey, chain book will not be updated");
-            }
-        }
 
         // Inbound address is client address, it's useless
         match ctx.ty {
@@ -618,7 +691,7 @@ impl PeerManager {
             info!("banned peer {:?} incomming", remote_peer_id);
             remote_peer.mark_disconnected();
             self.disconnect_session(ctx.id);
-            return;
+            return Err(NewSessionPreCheckError::PeerBanned);
         }
 
         if self.config.allowlist_only
@@ -628,7 +701,7 @@ impl PeerManager {
             debug!("allowlist_only enabled, reject peer {:?}", remote_peer.id);
             remote_peer.mark_disconnected();
             self.disconnect_session(ctx.id);
-            return;
+            return Err(NewSessionPreCheckError::AllowListOnly);
         }
 
         if self.inner.connected() >= self.config.max_connections {
@@ -656,6 +729,10 @@ impl PeerManager {
                         && session.peer.alive()
                             > self.config.peer_trust_config.interval().as_secs() * 20
                     {
+                        info!(
+                            "session peer {:?} is been replaced by peer {:?}",
+                            session.peer.id, remote_peer.id
+                        );
                         self.disconnect_session(session.id);
                         return true;
                     }
@@ -668,9 +745,11 @@ impl PeerManager {
                 && !remote_peer.tags.contains(&PeerTag::Consensus)
                 && !found_replacement()
             {
+                info!("reject peer {:?} due to max conn limit", remote_peer.id);
+
                 remote_peer.mark_disconnected();
                 self.disconnect_session(ctx.id);
-                return;
+                return Err(NewSessionPreCheckError::ReachMaxConnection);
             }
         }
 
@@ -683,7 +762,7 @@ impl PeerManager {
             if exist_sid != ctx.id && self.inner.session(exist_sid).is_some() {
                 // We don't support multiple connections, disconnect new one
                 self.disconnect_session(ctx.id);
-                return;
+                return Err(NewSessionPreCheckError::PeerAlreadyConnected);
             }
 
             if self.inner.session(exist_sid).is_none() {
@@ -711,16 +790,51 @@ impl PeerManager {
 
                 remote_peer.mark_disconnected();
                 self.disconnect_session(ctx.id);
+                return Err(NewSessionPreCheckError::ReachSessionLimit(err));
+            }
+        }
+
+        Ok(session)
+    }
+
+    fn new_unidentified_session(&mut self, pubkey: PublicKey, ctx: Arc<SessionContext>) {
+        let peer_id = pubkey.peer_id();
+        if let Err(err) = self.new_session_pre_check(&pubkey, &ctx) {
+            log::info!("reject unidentified session due to {}", err);
+
+            Identify::wait_failed(&peer_id, err.to_string());
+            return;
+        }
+
+        let event = UnidentifiedSessionEvent { pubkey, ctx };
+        let ident_fut = Identify::wait_identified(peer_id);
+        let unidentified_session = UnidentifiedSession { event, ident_fut };
+
+        self.unidentified_backlog.insert(unidentified_session);
+    }
+
+    fn new_session(&mut self, pubkey: PublicKey, ctx: Arc<SessionContext>) {
+        let session = match self.new_session_pre_check(&pubkey, &ctx) {
+            Ok(session) => session,
+            Err(err) => {
+                log::info!("reject new session due to {}", err);
                 return;
+            }
+        };
+
+        if !session.peer.has_pubkey() {
+            if let Err(e) = session.peer.set_pubkey(pubkey) {
+                error!("impossible, set public key failed {}", e);
             }
         }
 
         // Currently we only save accepted peer.
         // TODO: save to database
-        if !self.inner.contains(&remote_peer_id) {
-            self.inner.add_peer(remote_peer.clone());
+        if !self.inner.contains(&session.peer.id) {
+            self.inner.add_peer(session.peer.clone());
         }
 
+        let remote_peer = session.peer.clone();
         self.inner.sessions.insert(AcceptableSession(session));
         remote_peer.mark_connected(ctx.id);
 
@@ -737,6 +851,11 @@ impl PeerManager {
 
     fn session_closed(&mut self, sid: SessionId) {
         debug!("session {} closed", sid);
+
+        // Unidentified session
+        if self.unidentified_backlog.take(&sid).is_some() {
+            return;
+        }
 
         let session = match self.inner.remove_session(sid) {
             Some(s) => s,
@@ -841,9 +960,8 @@ impl PeerManager {
     }
 
     fn session_failed(&self, sid: SessionId, error_kind: SessionErrorKind) {
+        warn!("session {} failed {}", sid, error_kind);
         use SessionErrorKind::{Io, Protocol, Unexpected};
-
-        debug!("session {} failed", sid);
 
         let session = match self.inner.remove_session(sid) {
             Some(s) => s,
@@ -893,6 +1011,7 @@ impl PeerManager {
     }
 
     fn peer_misbehave(&self, pid: PeerId, kind: MisbehaviorKind) {
+        warn!("peer {:?} misbehave {}", pid, kind);
         use MisbehaviorKind::{Discovery, PingTimeout, PingUnexpect};
 
         let peer = match self.inner.peer(&pid) {
@@ -1172,6 +1291,9 @@ impl PeerManager {
         match event {
             PeerManagerEvent::ConnectPeersNow { pids } => self.connect_peers_by_id(pids),
             PeerManagerEvent::ConnectFailed { addr, kind } => self.connect_failed(addr, kind),
+            PeerManagerEvent::UnidentifiedSession { pubkey, ctx, .. } => {
+                self.new_unidentified_session(pubkey, ctx)
+            }
             PeerManagerEvent::NewSession { pubkey, ctx, .. } => self.new_session(pubkey, ctx),
             // NOTE: Alice may disconnect to Bob, but bob didn't know
             // that, so the next time, Alice try to connect to Bob will
@@ -1222,6 +1344,53 @@ impl Future for PeerManager {
         // Spawn heart beat
         if let Some(heart_beat) = self.heart_beat.take() {
             tokio::spawn(heart_beat);
+        }
+
+        // Process unidentified sessions
+        let unidentified_sessions = self.unidentified_backlog.drain().collect::<Vec<_>>();
+        for mut session in unidentified_sessions {
+            let ident_fut = &mut session.ident_fut;
+            futures::pin_mut!(ident_fut);
+
+            match ident_fut.poll(ctx) {
+                Poll::Pending => {
+                    self.unidentified_backlog.insert(session);
+                }
+                Poll::Ready(ret) => match ret {
+                    Ok(()) => {
+                        let UnidentifiedSession { event, .. } = session;
+                        let new_session_event = PeerManagerEvent::NewSession {
+                            pid:    event.pubkey.peer_id(),
+                            pubkey: event.pubkey,
+                            ctx:    event.ctx,
+                        };
+
+                        // TODO: Remove duplicate diag code
+                        #[cfg(feature = "diagnostic")]
+                        let diag_event: Option<
+                            diagnostic::DiagnosticEvent,
+                        > = From::from(&new_session_event);
+
+                        self.process_event(new_session_event);
+
+                        #[cfg(feature = "diagnostic")]
+                        if let (Some(hook), Some(event)) =
+                            (self.diagnostic_hook.as_ref(), diag_event)
+                        {
+                            hook(event)
+                        }
+                    }
+                    Err(err) => {
+                        warn!(
+                            "reject peer {:?} due to identification failed: {}",
+                            session.event.pubkey.peer_id(),
+                            err
+                        );
+
+                        self.disconnect_session(session.event.ctx.id);
+                    }
+                },
+            }
         }
 
         // Process manager events

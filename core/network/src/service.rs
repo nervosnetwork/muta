@@ -13,6 +13,7 @@ use protocol::traits::{
     Context, Gossip, MessageCodec, MessageHandler, Network, PeerTag, PeerTrust, Priority, Rpc,
     TrustFeedback,
 };
+use protocol::types::Hash;
 use protocol::{Bytes, ProtocolResult};
 use tentacle::secio::PeerId;
 
@@ -222,7 +223,7 @@ impl NetworkService {
             .ping(config.ping_interval, config.ping_timeout, mgr_tx.clone())
             .identify(peer_mgr_handle.clone(), mgr_tx.clone())
             .discovery(peer_mgr_handle.clone(), mgr_tx.clone(), disc_sync_interval)
-            .transmitter(recv_data_tx.clone())
+            .transmitter(recv_data_tx.clone(), peer_mgr_handle.clone())
             .build();
         let transmitter = proto.transmitter();
 
@@ -354,6 +355,10 @@ impl NetworkService {
 
     pub fn peer_id(&self) -> PeerId {
         self.config.secio_keypair.peer_id()
+    }
+
+    pub fn set_chain_id(&self, chain_id: Hash) {
+        self.peer_mgr_handle.set_chain_id(chain_id);
     }
 
     pub async fn listen(&mut self, socket_addr: SocketAddr) -> ProtocolResult<()> {

@@ -4,7 +4,6 @@ use super::diagnostic::{
 };
 /// Almost same as src/default_start.rs, only remove graphql service.
 use super::{config::Config, consts, error::MainError, memory_db::MemoryDB, Sync};
-use crate::trust_metric_all::common;
 
 use std::collections::HashMap;
 use std::convert::TryFrom;
@@ -135,6 +134,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     config: Config,
     service_mapping: Arc<Mapping>,
     db: MemoryDB,
+    seckey: String,
     sync: Sync,
 ) -> ProtocolResult<()> {
     log::info!("node starts");
@@ -160,8 +160,6 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         .write_timeout(config.network.write_timeout)
         .recv_buffer_size(config.network.recv_buffer_size);
 
-    let network_privkey = config.privkey.as_string_trim0x();
-
     let mut bootstrap_pairs = vec![];
     if let Some(bootstrap) = &config.network.bootstraps {
         for bootstrap in bootstrap.iter() {
@@ -174,7 +172,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     let network_config = network_config
         .bootstraps(bootstrap_pairs)?
         .allowlist(allowlist)?
-        .secio_keypair(network_privkey)?;
+        .secio_keypair(seckey.clone())?;
     let mut network_service = NetworkService::new(network_config);
     network_service
         .listen(config.network.listening_address)
@@ -225,7 +223,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     );
 
     // Create full transactions wal
-    let wal_path = common::tmp_dir()
+    let wal_path = crate::common::tmp_dir()
         .to_str()
         .expect("wal path string")
         .to_string();
@@ -246,6 +244,9 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
 
     let metadata: Metadata =
         serde_json::from_str(&exec_resp.succeed_data).expect("Decode metadata failed!");
+
+    // set chain id in network
+    network_service.set_chain_id(Hash::from_hex(consts::CHAIN_ID).expect("chain id"));
 
     // set args in mempool
     mempool.set_args(

@@ -3049,3 +3049,157 @@ async fn should_accept_peer_in_allowlist_even_reach_inbound_conn_limit() {
         "should accept peer in allowlist"
     );
 }
+
+#[tokio::test]
+async fn should_reject_new_connection_for_same_peer_on_unidentified_session() {
+    let (mut mgr, mut conn_rx) = make_manager(0, 20);
+    let remote_peers = make_sessions(&mut mgr, 1, 5000, SessionType::Outbound).await;
+
+    let test_peer = remote_peers.first().expect("get first peer");
+    let sess_ctx = SessionContext::make(
+        SessionId::new(99),
+        test_peer.multiaddrs.all_raw().pop().expect("get multiaddr"),
+        SessionType::Outbound,
+        test_peer.owned_pubkey().expect("pubkey"),
+    );
+    let new_session = PeerManagerEvent::UnidentifiedSession {
+        pid:    test_peer.owned_id(),
+        pubkey: test_peer.owned_pubkey().expect("pubkey"),
+        ctx:    sess_ctx.arced(),
+    };
+    mgr.poll_event(new_session).await;
+
+    let conn_event = conn_rx.next().await.expect("should have disconnect event");
+    match conn_event {
+        ConnectionEvent::Disconnect(sid) => assert_eq!(sid, 99.into(), "should be new session id"),
+        _ => panic!("should be disconnect event"),
+    }
+}
+
+#[tokio::test]
+async fn should_reject_same_ip_connection_when_reach_limit_on_unidentified_session() {
+    let manager_pubkey = make_pubkey();
+    let manager_id = manager_pubkey.peer_id();
+    let mut peer_dat_file = std::env::temp_dir();
+    peer_dat_file.push("peer.dat");
+    let peer_trust_config = Arc::new(TrustMetricConfig::default());
+    let peer_fatal_ban = Duration::from_secs(50);
+    let peer_soft_ban = Duration::from_secs(10);
+
+    let config = PeerManagerConfig {
+        our_id: manager_id,
+        pubkey: manager_pubkey,
+        bootstraps: Default::default(),
+        allowlist: vec![],
+        allowlist_only: false,
+        peer_trust_config,
+        peer_fatal_ban,
+        peer_soft_ban,
+        max_connections: 10,
+        same_ip_conn_limit: 1,
+        inbound_conn_limit: 5,
+        outbound_conn_limit: 5,
+        routine_interval: Duration::from_secs(10),
+        peer_dat_file,
+    };
+
+    let (conn_tx, mut conn_rx) = unbounded();
+    let (mgr_tx, mgr_rx) = unbounded();
+    let manager = PeerManager::new(config, mgr_rx, conn_tx);
+
+    let mut mgr = MockManager::new(manager, mgr_tx);
+    make_sessions(&mut mgr, 1, 5000, SessionType::Outbound).await;
+
+    let same_ip_peer = make_peer(9527);
+
+    // Save same ip peer
+    let inner = mgr.core_inner();
+    inner.add_peer(same_ip_peer.clone());
+
+    let sess_ctx = SessionContext::make(
+        SessionId::new(99),
+        same_ip_peer.multiaddrs.all_raw().pop().unwrap(),
+        SessionType::Outbound,
+        same_ip_peer.owned_pubkey().expect("pubkey"),
+    );
+    let new_session = PeerManagerEvent::UnidentifiedSession {
+        pid:    same_ip_peer.owned_id(),
+        pubkey: same_ip_peer.owned_pubkey().expect("pubkey"),
+        ctx:    sess_ctx.arced(),
+    };
+    mgr.poll_event(new_session).await;
+
+    let inserted_same_ip_peer = inner.peer(&same_ip_peer.id).unwrap();
+    assert_eq!(
+        inserted_same_ip_peer.tags.get_banned_until(),
+        Some(time::now() + SAME_IP_LIMIT_BAN.as_secs())
+    );
+
+    let conn_event = conn_rx.next().await.expect("should have disconnect event");
+    match conn_event {
+        ConnectionEvent::Disconnect(sid) => assert_eq!(sid, 99.into(), "should be new session id"),
+        _ => panic!("should be disconnect event"),
+    }
+}
+
+#[tokio::test]
+async fn should_accept_always_allow_peer_even_if_we_reach_max_connections_on_unidentified_session()
+{
+    let (mut mgr, mut conn_rx) = make_manager(0, 10);
+    let _remote_peers = make_sessions(&mut mgr, 10, 5000, SessionType::Outbound).await;
+
+    let peer = make_peer(2019);
+    let always_allow_peer = make_peer(2077);
+    always_allow_peer.tags.insert(PeerTag::AlwaysAllow).unwrap();
+
+    let inner = mgr.core_inner();
+    inner.add_peer(always_allow_peer.clone());
+
+    assert_eq!(inner.connected(), 10, "should have 10 connections");
+
+    // First one without AlwaysAllow tag
+    let sess_ctx = SessionContext::make(
+        SessionId::new(233),
+        peer.multiaddrs.all_raw().pop().expect("peer multiaddr"),
+        SessionType::Inbound,
+        peer.owned_pubkey().expect("pubkey"),
+    );
+    let new_session = PeerManagerEvent::UnidentifiedSession {
+        pid:    peer.owned_id(),
+        pubkey: peer.owned_pubkey().expect("pubkey"),
+        ctx:    sess_ctx.arced(),
+    };
+    mgr.poll_event(new_session).await;
+    let conn_event = conn_rx.next().await.expect("should have disconnect event");
+    match conn_event {
+        ConnectionEvent::Disconnect(sid) => assert_eq!(sid, 233.into(), "should be new session id"),
+        _ => panic!("should be disconnect event"),
+    }
+
+    // Now peer has AlwaysAllow tag
+    let sess_ctx = SessionContext::make(
+        SessionId::new(666),
+        always_allow_peer
+            .multiaddrs
+            .all_raw()
+            .pop()
+            .expect("peer multiaddr"),
+        SessionType::Inbound,
+        always_allow_peer
+            .owned_pubkey()
+            .expect("always allow peer's pubkey"),
+    );
+    let new_session = PeerManagerEvent::UnidentifiedSession {
+        pid:    always_allow_peer.owned_id(),
+        pubkey: always_allow_peer
+            .owned_pubkey()
+            .expect("always allow peer's pubkey"),
+        ctx:    sess_ctx.arced(),
+    };
+    mgr.poll_event(new_session).await;
+
+    match conn_rx.try_next() {
+        Err(_) => (), // Err means channel is empty, it's expected
+        _ => panic!("should not have any disconnect event"),
+    }
+}

@@ -35,8 +35,8 @@ impl Discovery {
         #[cfg(not(feature = "global_ip_only"))]
         log::info!("turn off global ip only");
 
-        let address_manager = AddressManager::new(peer_mgr, event_tx);
-        let behaviour = DiscoveryBehaviour::new(address_manager, Some(sync_interval));
+        let address_manager = AddressManager::new(peer_mgr.clone(), event_tx);
+        let behaviour = DiscoveryBehaviour::new(address_manager, peer_mgr, Some(sync_interval));
 
         Discovery(DiscoveryProtocol::new(behaviour))
     }

@@ -9,6 +9,8 @@ use tentacle::builder::MetaBuilder;
 use tentacle::service::{ProtocolHandle, ProtocolMeta};
 use tentacle::ProtocolId;
 
+use crate::peer_manager::PeerManagerHandle;
+
 use self::behaviour::TransmitterBehaviour;
 use self::protocol::TransmitterProtocol;
 pub use message::{ReceivedMessage, Recipient, TransmitterMessage};
@@ -22,12 +24,17 @@ pub const MAX_CHUNK_SIZE: usize = 4 * 1000 * 1000; // 4MB
 pub struct Transmitter {
     data_tx:              UnboundedSender<ReceivedMessage>,
     pub(crate) behaviour: TransmitterBehaviour,
+    peer_mgr:             PeerManagerHandle,
 }
 
 impl Transmitter {
-    pub fn new(data_tx: UnboundedSender<ReceivedMessage>) -> Self {
+    pub fn new(data_tx: UnboundedSender<ReceivedMessage>, peer_mgr: PeerManagerHandle) -> Self {
         let behaviour = TransmitterBehaviour::new();
-        Transmitter { data_tx, behaviour }
+        Transmitter {
+            data_tx,
+            behaviour,
+            peer_mgr,
+        }
     }
 
     pub fn build_meta(self, protocol_id: ProtocolId) -> ProtocolMeta {
@@ -36,7 +43,7 @@ impl Transmitter {
             .name(name!(NAME))
             .support_versions(support_versions!(SUPPORT_VERSIONS))
             .session_handle(move || {
-                let proto = TransmitterProtocol::new(self.data_tx.clone());
+                let proto = TransmitterProtocol::new(self.data_tx.clone(), self.peer_mgr.clone());
                 ProtocolHandle::Callback(Box::new(proto))
             })
             .build()

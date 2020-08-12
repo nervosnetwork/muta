@@ -222,9 +222,9 @@ impl ServiceHandle for ConnectionServiceKeeper {
                 let pid = pubkey.peer_id();
                 #[cfg(test)]
                 let session_context = SessionContext::from(session_context).arced();
-                let new_peer_session = PeerManagerEvent::NewSession { pid, pubkey, ctx: session_context };
+                let new_unidentified_session = PeerManagerEvent::UnidentifiedSession { pid, pubkey, ctx: session_context };
 
-                self.report_peer(new_peer_session);
+                self.report_peer(new_unidentified_session);
             }
             ServiceEvent::SessionClose { session_context } => {
                 let pid = peer_pubkey!(&session_context).peer_id();

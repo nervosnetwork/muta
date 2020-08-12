@@ -1,21 +1,15 @@
-use super::{
-    behaviour::{DiscoveryBehaviour, DiscoveryBehaviourHandle},
-    substream::Substream,
-};
-
-use futures::{
-    channel::mpsc::{channel, Sender},
-    future::FutureExt,
-    stream::StreamExt,
-};
-use log::{debug, warn};
-use tentacle::{
-    context::{ProtocolContext, ProtocolContextMutRef},
-    traits::ServiceProtocol,
-    SessionId,
-};
-
 use std::collections::HashMap;
+
+use futures::channel::mpsc::{channel, Sender};
+use futures::stream::StreamExt;
+use futures::FutureExt;
+use log::{debug, warn};
+use tentacle::context::{ProtocolContext, ProtocolContextMutRef};
+use tentacle::traits::ServiceProtocol;
+use tentacle::SessionId;
+
+use super::behaviour::{DiscoveryBehaviour, DiscoveryBehaviourHandle};
+use super::substream::Substream;
 
 pub struct DiscoveryProtocol {
     behaviour:         Option<DiscoveryBehaviour>,
@@ -65,6 +59,21 @@ impl ServiceProtocol for DiscoveryProtocol {
             "protocol [discovery] open on session [{}], address: [{}], type: [{:?}]",
             session.id, session.address, session.ty
         );
+
+        if !self.behaviour_handle.contains_session(session.id) {
+            let _ = context.close_protocol(session.id, context.proto_id());
+            return;
+        }
+
+        let peer_id = match context.session.remote_pubkey.as_ref() {
+            Some(pubkey) => pubkey.peer_id(),
+            None => {
+                log::warn!("peer connection must be encrypted");
+                let _ = context.disconnect(context.session.id);
+                return;
+            }
+        };
+        crate::protocols::OpenedProtocols::register(peer_id, context.proto_id());
 
         let (sender, receiver) = channel(8);
         self.discovery_senders.insert(session.id, sender);

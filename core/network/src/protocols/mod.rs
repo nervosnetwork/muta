@@ -3,9 +3,9 @@ mod r#macro;
 
 mod core;
 mod discovery;
-mod identify;
 mod ping;
 mod transmitter;
 
-pub use self::core::{CoreProtocol, CoreProtocolBuilder};
+pub mod identify;
+pub use self::core::{CoreProtocol, CoreProtocolBuilder, OpenedProtocols};
 pub use transmitter::{ReceivedMessage, Recipient, Transmitter, TransmitterMessage};

@@ -118,15 +118,17 @@ impl ServiceProtocol for PingProtocol {
                 self.connected_session_ids
                     .entry(session.id)
                     .or_insert_with(|| PingStatus {
-                        last_ping: SystemTime::now(),
+                        last_ping:  SystemTime::now(),
                         processing: false,
-                        peer_id,
+                        peer_id:    peer_id.clone(),
                     });
                 debug!(
                     "proto id [{}] open on session [{}], address: [{}], type: [{:?}], version: {}",
                     context.proto_id, session.id, session.address, session.ty, version
                 );
                 debug!("connected sessions are: {:?}", self.connected_session_ids);
+
+                crate::protocols::OpenedProtocols::register(peer_id, context.proto_id);
             }
             None => {
                 if context.disconnect(session.id).is_err() {

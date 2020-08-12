@@ -1,35 +1,31 @@
-use super::diagnostic::{
-    TrustNewIntervalReq, TrustTwinEventReq, TwinEvent, GOSSIP_TRUST_NEW_INTERVAL,
-    GOSSIP_TRUST_TWIN_EVENT,
-};
-use super::{
-    config::Config,
-    consts,
-    sync::{Sync, SyncError, SyncEvent},
-};
+use std::collections::HashSet;
+use std::convert::TryFrom;
+use std::iter::FromIterator;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::ops::Deref;
+use std::str::FromStr;
 
-use common_crypto::{PrivateKey, Secp256k1PrivateKey};
+use common_crypto::{PrivateKey, PublicKey, Secp256k1PrivateKey, ToPublicKey};
 use core_consensus::message::{
     FixedBlock, FixedHeight, BROADCAST_HEIGHT, RPC_RESP_SYNC_PULL_BLOCK, RPC_SYNC_PULL_BLOCK,
 };
 use core_network::{
-    DiagnosticEvent, NetworkConfig, NetworkService, NetworkServiceHandle, PeerId, TrustReport,
+    DiagnosticEvent, NetworkConfig, NetworkService, NetworkServiceHandle, PeerId, PeerIdExt,
+    TrustReport,
 };
 use derive_more::Display;
-use protocol::{
-    async_trait,
-    traits::{Context, Gossip, MessageCodec, MessageHandler, Priority, Rpc, TrustFeedback},
-    types::{Address, Block, BlockHeader, Hash, Proof},
-    Bytes,
+use protocol::traits::{
+    Context, Gossip, MessageCodec, MessageHandler, Priority, Rpc, TrustFeedback,
 };
+use protocol::types::{Address, Block, BlockHeader, Hash, Proof};
+use protocol::{async_trait, Bytes};
 
-use std::{
-    collections::HashSet,
-    iter::FromIterator,
-    net::{IpAddr, Ipv4Addr, SocketAddr},
-    ops::Deref,
-    str::FromStr,
+use crate::common::node::consts;
+use crate::common::node::diagnostic::{
+    TrustNewIntervalReq, TrustTwinEventReq, TwinEvent, GOSSIP_TRUST_NEW_INTERVAL,
+    GOSSIP_TRUST_TWIN_EVENT,
 };
+use crate::common::node::sync::{Sync, SyncError, SyncEvent};
 
 #[derive(Debug, Display)]
 pub enum ClientNodeError {
@@ -89,8 +85,13 @@ pub struct ClientNode {
     pub sync:           Sync,
 }
 
-pub async fn connect(full_node_port: u16, listen_port: u16, sync: Sync) -> ClientNode {
-    let full_node_peer_id = full_node_peer_id();
+pub async fn connect(
+    full_node_port: u16,
+    full_seckey: String,
+    listen_port: u16,
+    sync: Sync,
+) -> ClientNode {
+    let full_node_peer_id = full_node_peer_id(&full_seckey);
     let full_node_addr = format!("127.0.0.1:{}", full_node_port);
 
     let config = NetworkConfig::new()
@@ -103,6 +104,8 @@ pub async fn connect(full_node_port: u16, listen_port: u16, sync: Sync) -> Clien
 
     let mut network = NetworkService::new(config);
     let handle = network.handle();
+
+    network.set_chain_id(Hash::from_hex(consts::CHAIN_ID).expect("chain id"));
 
     network
         .register_endpoint_handler(
@@ -290,14 +293,13 @@ impl Deref for ClientNode {
     }
 }
 
-fn full_node_peer_id() -> PeerId {
-    let config: Config =
-        common_config_parser::parse(&consts::CHAIN_CONFIG_PATH).expect("parse chain config.toml");
-
-    let mut bootstraps = config.network.bootstraps.expect("config.toml full node");
-    let full_node = bootstraps.pop().expect("there should be one bootstrap");
-
-    full_node.peer_id.parse().expect("parse peer id")
+fn full_node_peer_id(full_seckey: &str) -> PeerId {
+    let seckey = {
+        let key = hex::decode(full_seckey).expect("hex private key string");
+        Secp256k1PrivateKey::try_from(key.as_ref()).expect("valid private key")
+    };
+    let pubkey = seckey.pub_key();
+    PeerId::from_pubkey_bytes(pubkey.to_bytes()).expect("valid public key")
 }
 
 fn mock_block(height: u64) -> Block {

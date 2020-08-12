@@ -5,20 +5,24 @@ use protocol::Bytes;
 use tentacle::context::ProtocolContextMutRef;
 use tentacle::traits::SessionProtocol;
 
+use crate::peer_manager::PeerManagerHandle;
+
 use super::message::{ReceivedMessage, SeqChunkMessage};
 use super::{DATA_SEQ_TIMEOUT, MAX_CHUNK_SIZE};
 
 pub struct TransmitterProtocol {
     data_tx:            UnboundedSender<ReceivedMessage>,
+    peer_mgr:           PeerManagerHandle,
     data_buf:           Vec<u8>,
     current_data_seq:   u64,
     first_seq_bytes_at: Instant,
 }
 
 impl TransmitterProtocol {
-    pub fn new(data_tx: UnboundedSender<ReceivedMessage>) -> Self {
+    pub fn new(data_tx: UnboundedSender<ReceivedMessage>, peer_mgr: PeerManagerHandle) -> Self {
         TransmitterProtocol {
             data_tx,
+            peer_mgr,
             data_buf: Vec::new(),
             current_data_seq: 0,
             first_seq_bytes_at: Instant::now(),
@@ -27,6 +31,23 @@ impl TransmitterProtocol {
 }
 
 impl SessionProtocol for TransmitterProtocol {
+    fn connected(&mut self, context: ProtocolContextMutRef, _version: &str) {
+        if !self.peer_mgr.contains_session(context.session.id) {
+            let _ = context.close_protocol(context.session.id, context.proto_id());
+            return;
+        }
+
+        let peer_id = match context.session.remote_pubkey.as_ref() {
+            Some(pubkey) => pubkey.peer_id(),
+            None => {
+                log::warn!("peer connection must be encrypted");
+                let _ = context.disconnect(context.session.id);
+                return;
+            }
+        };
+        crate::protocols::OpenedProtocols::register(peer_id, context.proto_id());
+    }
+
     fn received(&mut self, ctx: ProtocolContextMutRef, data: Bytes) {
         let peer_id = match ctx.session.remote_pubkey.as_ref() {
             Some(pk) => pk.peer_id(),
