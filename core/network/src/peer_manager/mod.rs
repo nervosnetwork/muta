@@ -263,6 +263,7 @@ impl Inner {
 
     /// If peer exists, return false
     pub fn add_peer(&self, peer: ArcPeer) -> bool {
+        common_apm::metrics::network::NETWORK_SAVED_PEER_COUNT.inc();
         self.peers.write().insert(peer)
     }
 

@@ -116,6 +116,11 @@ lazy_static! {
         "Total number of network unidentified connections"
     )
     .expect("network unidentified connections");
+    pub static ref NETWORK_SAVED_PEER_COUNT: IntCounter = register_int_counter!(
+        "muta_network_saved_peer_count",
+        "Total number of saved peer count"
+    )
+    .expect("network saved peer count");
 }
 
 fn on_network_message(direction: &str, target: &str, url: &str, inc: i64) {
