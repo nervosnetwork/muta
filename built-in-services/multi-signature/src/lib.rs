@@ -24,11 +24,6 @@ pub const MULTI_SIG_SERVICE_NAME: &str = "multi_signature";
 const MAX_MULTI_SIGNATURE_RECURSION_DEPTH: u8 = 8;
 const MAX_PERMISSION_ACCOUNTS: u8 = 16;
 
-lazy_static::lazy_static! {
-   // FIXME:
-   pub static ref ADEPTIVE_ADDRESS: Address = "muta14e0lmgck835vm2dfm0w3ckv6svmez8fdgdl705".parse().unwrap();
-}
-
 pub trait MultiSignature {
     fn verify_signature_(
         &self,
