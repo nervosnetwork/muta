@@ -838,6 +838,8 @@ impl PeerManager {
         self.inner.sessions.insert(AcceptableSession(session));
         remote_peer.mark_connected(ctx.id);
 
+        common_apm::metrics::network::NETWORK_CONNECTED_PEER_COUNT.inc();
+
         match remote_peer.trust_metric() {
             Some(trust_metric) => trust_metric.start(),
             None => {
@@ -856,6 +858,8 @@ impl PeerManager {
         if self.unidentified_backlog.take(&sid).is_some() {
             return;
         }
+
+        common_apm::metrics::network::NETWORK_CONNECTED_PEER_COUNT.dec();
 
         let session = match self.inner.remove_session(sid) {
             Some(s) => s,

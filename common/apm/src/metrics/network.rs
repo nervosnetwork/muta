@@ -95,6 +95,11 @@ lazy_static! {
             &["ip"]
         )
         .expect("network received ip message in processing");
+    pub static ref NETWORK_CONNECTED_PEER_COUNT: IntGauge = register_int_gauge!(
+        "muta_network_connected_peer_count",
+        "Total connected peer count"
+    )
+    .expect("network total connected peer");
 }
 
 fn on_network_message(direction: &str, target: &str, url: &str, inc: i64) {
