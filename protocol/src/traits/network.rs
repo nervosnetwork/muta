@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{traits::Context, ProtocolError, ProtocolErrorKind, ProtocolResult};
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum Priority {
     High,
     Normal,

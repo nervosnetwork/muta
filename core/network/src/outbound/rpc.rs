@@ -1,41 +1,44 @@
-use std::{sync::Arc, time::Instant};
+use std::sync::Arc;
+use std::time::Instant;
 
 use async_trait::async_trait;
 use futures::future::{self, Either};
 use futures_timer::Delay;
-use protocol::{
-    traits::{Context, MessageCodec, Priority, Rpc},
-    Bytes, ProtocolResult,
-};
-use tentacle::{service::TargetSession, SessionId};
+use protocol::traits::{Context, MessageCodec, Priority, Rpc};
+use protocol::{Bytes, ProtocolResult};
+use tentacle::service::TargetSession;
+use tentacle::SessionId;
 
-use crate::{
-    config::TimeoutConfig,
-    endpoint::Endpoint,
-    error::{ErrorKind, NetworkError},
-    message::{Headers, NetworkMessage},
-    rpc::{RpcErrorMessage, RpcResponse, RpcResponseCode},
-    rpc_map::RpcMap,
-    traits::{Compression, MessageSender, NetworkContext},
-};
+use crate::config::TimeoutConfig;
+use crate::endpoint::Endpoint;
+use crate::error::{ErrorKind, NetworkError};
+use crate::message::{Headers, NetworkMessage};
+use crate::protocols::{Recipient, Transmitter, TransmitterMessage};
+use crate::rpc::{RpcErrorMessage, RpcResponse, RpcResponseCode};
+use crate::rpc_map::RpcMap;
+use crate::traits::{Compression, NetworkContext};
 
 #[derive(Clone)]
-pub struct NetworkRpc<S, C> {
-    sender:      S,
+pub struct NetworkRpc<C> {
+    transmitter: Transmitter,
     compression: C,
     map:         Arc<RpcMap>,
 
     timeout: TimeoutConfig,
 }
 
-impl<S, C> NetworkRpc<S, C>
+impl<C> NetworkRpc<C>
 where
-    S: MessageSender + Sync + Clone,
     C: Compression + Sync + Clone,
 {
-    pub fn new(sender: S, compression: C, map: Arc<RpcMap>, timeout: TimeoutConfig) -> Self {
+    pub fn new(
+        transmitter: Transmitter,
+        compression: C,
+        map: Arc<RpcMap>,
+        timeout: TimeoutConfig,
+    ) -> Self {
         NetworkRpc {
-            sender,
+            transmitter,
             compression,
             map,
 
@@ -43,26 +46,42 @@ where
         }
     }
 
-    fn send(&self, _: Context, s: SessionId, msg: Bytes, p: Priority) -> Result<(), NetworkError> {
-        let compressed_msg = self.compression.compress(msg)?;
-        let target = TargetSession::Single(s);
+    async fn send(
+        &self,
+        _: Context,
+        session_id: SessionId,
+        data: Bytes,
+        priority: Priority,
+    ) -> Result<(), NetworkError> {
+        let compressed_data = self.compression.compress(data)?;
 
-        self.sender.send(target, compressed_msg, p)
+        let msg = TransmitterMessage {
+            recipient: Recipient::Session(TargetSession::Single(session_id)),
+            priority,
+            data: compressed_data,
+        };
+
+        self.transmitter.behaviour.send(msg).await
     }
 }
 
 #[async_trait]
-impl<S, C> Rpc for NetworkRpc<S, C>
+impl<C> Rpc for NetworkRpc<C>
 where
-    S: MessageSender + Send + Sync + Clone,
     C: Compression + Send + Sync + Clone,
 {
-    async fn call<M, R>(&self, cx: Context, end: &str, mut msg: M, p: Priority) -> ProtocolResult<R>
+    async fn call<M, R>(
+        &self,
+        cx: Context,
+        endpoint: &str,
+        mut msg: M,
+        priority: Priority,
+    ) -> ProtocolResult<R>
     where
         M: MessageCodec,
         R: MessageCodec,
     {
-        let endpoint = end.parse::<Endpoint>()?;
+        let endpoint = endpoint.parse::<Endpoint>()?;
         let sid = cx.session_id()?;
         let rid = self.map.next_rpc_id();
         let connected_addr = cx.remote_connected_addr();
@@ -101,7 +120,7 @@ where
             .encode()
             .await?;
 
-        self.send(cx, sid, net_msg, p)?;
+        self.send(cx, sid, net_msg, priority).await?;
 
         let timeout = Delay::new(self.timeout.rpc);
         let ret = match future::select(done_rx, timeout).await {
@@ -135,14 +154,14 @@ where
     async fn response<M>(
         &self,
         cx: Context,
-        end: &str,
+        endpoint: &str,
         ret: ProtocolResult<M>,
-        p: Priority,
+        priority: Priority,
     ) -> ProtocolResult<()>
     where
         M: MessageCodec,
     {
-        let endpoint = end.parse::<Endpoint>()?;
+        let endpoint = endpoint.parse::<Endpoint>()?;
         let sid = cx.session_id()?;
         let rid = cx.rpc_id()?;
 
@@ -167,7 +186,7 @@ where
             .encode()
             .await?;
 
-        self.send(cx, sid, net_msg, p)?;
+        self.send(cx, sid, net_msg, priority).await?;
 
         Ok(())
     }

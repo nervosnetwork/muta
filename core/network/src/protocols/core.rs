@@ -1,18 +1,16 @@
-use crate::{
-    event::PeerManagerEvent,
-    message::RawSessionMessage,
-    peer_manager::PeerManagerHandle,
-    protocols::{discovery::Discovery, identify::Identify, ping::Ping, transmitter::Transmitter},
-    traits::NetworkProtocol,
-};
+use std::time::Duration;
 
 use futures::channel::mpsc::UnboundedSender;
-use tentacle::{
-    service::{ProtocolMeta, TargetProtocol},
-    ProtocolId,
-};
+use tentacle::service::{ProtocolMeta, TargetProtocol};
+use tentacle::ProtocolId;
 
-use std::time::Duration;
+use crate::event::PeerManagerEvent;
+use crate::peer_manager::PeerManagerHandle;
+use crate::protocols::discovery::Discovery;
+use crate::protocols::identify::Identify;
+use crate::protocols::ping::Ping;
+use crate::protocols::transmitter::{ReceivedMessage, Transmitter};
+use crate::traits::NetworkProtocol;
 
 pub const PING_PROTOCOL_ID: usize = 1;
 pub const IDENTIFY_PROTOCOL_ID: usize = 2;
@@ -28,12 +26,17 @@ pub struct CoreProtocolBuilder {
 }
 
 pub struct CoreProtocol {
-    metas: Vec<ProtocolMeta>,
+    metas:       Vec<ProtocolMeta>,
+    transmitter: Transmitter,
 }
 
 impl CoreProtocol {
     pub fn build() -> CoreProtocolBuilder {
         CoreProtocolBuilder::new()
+    }
+
+    pub fn transmitter(&self) -> Transmitter {
+        self.transmitter.clone()
     }
 }
 
@@ -49,10 +52,6 @@ impl NetworkProtocol for CoreProtocol {
 
     fn metas(self) -> Vec<ProtocolMeta> {
         self.metas
-    }
-
-    fn message_proto_id() -> ProtocolId {
-        ProtocolId::new(TRANSMITTER_PROTOCOL_ID)
     }
 }
 
@@ -101,8 +100,8 @@ impl CoreProtocolBuilder {
         self
     }
 
-    pub fn transmitter(mut self, bytes_tx: UnboundedSender<RawSessionMessage>) -> Self {
-        let transmitter = Transmitter::new(bytes_tx);
+    pub fn transmitter(mut self, data_tx: UnboundedSender<ReceivedMessage>) -> Self {
+        let transmitter = Transmitter::new(data_tx);
 
         self.transmitter = Some(transmitter);
         self
@@ -118,7 +117,7 @@ impl CoreProtocolBuilder {
             transmitter,
         } = self;
 
-        // Panic early during protocol setup not runtime
+        // Panic for missing protocol
         assert!(ping.is_some(), "init: missing protocol ping");
         assert!(identify.is_some(), "init: missing protocol identify");
         assert!(discovery.is_some(), "init: missing protocol discovery");
@@ -136,10 +135,14 @@ impl CoreProtocolBuilder {
             metas.push(discovery.build_meta(DISCOVERY_PROTOCOL_ID.into()));
         }
 
-        if let Some(transmitter) = transmitter {
+        if let Some(transmitter) = transmitter.as_ref() {
+            let transmitter = transmitter.clone();
             metas.push(transmitter.build_meta(TRANSMITTER_PROTOCOL_ID.into()));
         }
 
-        CoreProtocol { metas }
+        CoreProtocol {
+            metas,
+            transmitter: transmitter.unwrap(),
+        }
     }
 }

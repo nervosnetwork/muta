@@ -8,3 +8,4 @@ mod ping;
 mod transmitter;
 
 pub use self::core::{CoreProtocol, CoreProtocolBuilder};
+pub use transmitter::{ReceivedMessage, Recipient, Transmitter, TransmitterMessage};
