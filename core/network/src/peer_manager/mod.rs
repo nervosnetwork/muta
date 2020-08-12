@@ -845,6 +845,9 @@ impl PeerManager {
         remote_peer.mark_connected(ctx.id);
 
         common_apm::metrics::network::NETWORK_CONNECTED_PEERS.inc();
+        if remote_peer.tags.contains(&PeerTag::Consensus) {
+            common_apm::metrics::network::NETWORK_CONNECTED_CONSENSUS_PEERS.inc();
+        }
 
         match remote_peer.trust_metric() {
             Some(trust_metric) => trust_metric.start(),
@@ -876,6 +879,10 @@ impl PeerManager {
 
         info!("session closed {}", session.connected_addr);
         session.peer.mark_disconnected();
+
+        if session.peer.tags.contains(&PeerTag::Consensus) {
+            common_apm::metrics::network::NETWORK_CONNECTED_CONSENSUS_PEERS.dec();
+        }
 
         match session.peer.trust_metric() {
             Some(trust_metric) => trust_metric.pause(),
