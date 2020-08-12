@@ -869,13 +869,16 @@ impl PeerManager {
         }
 
         common_apm::metrics::network::NETWORK_CONNECTED_PEERS.dec();
-        common_apm::metrics::network::NETWORK_DISCONNECT_COUNT.inc();
 
         let session = match self.inner.remove_session(sid) {
             Some(s) => s,
             None => return, /* Session may be removed by other event or rejected
                              * due to max connections before insert */
         };
+
+        common_apm::metrics::network::NETWORK_IP_DISCONNECTED_COUNT_VEC
+            .with_label_values(&[&session.connected_addr.host])
+            .inc();
 
         info!("session closed {}", session.connected_addr);
         session.peer.mark_disconnected();

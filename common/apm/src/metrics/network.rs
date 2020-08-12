@@ -101,11 +101,12 @@ lazy_static! {
     pub static ref NETWORK_PING_IP_IN_MS_VEC: IntGaugeVec =
         register_int_gauge_vec!("muta_network_ip_ping_in_ms", "Ping to ip in ms", &["ip"])
             .expect("network ping ip value");
-    pub static ref NETWORK_DISCONNECT_COUNT: IntCounter = register_int_counter!(
-        "muta_network_disconnect_count",
-        "Total number of disconnect"
+    pub static ref NETWORK_IP_DISCONNECTED_COUNT_VEC: IntCounterVec = register_int_counter_vec!(
+        "muta_network_ip_disconnected_count",
+        "Total number of ip disconnected count",
+        &["ip"]
     )
-    .expect("network disconnect count");
+    .expect("network disconnect ip count");
     pub static ref NETWORK_OUTBOUND_CONNECTING_PEERS: IntGauge = register_int_gauge!(
         "muta_network_outbound_connecting_peers",
         "Total number of network outbound connecting peers"
