@@ -5,29 +5,10 @@ use binding_macro::{cycles, genesis, service};
 use protocol::traits::{ExecutorParams, ServiceResponse, ServiceSDK};
 use protocol::types::{Metadata, ServiceContext, METADATA_KEY};
 
-macro_rules! impl_meatdata {
-    ($self: expr, $method: ident, $ctx: expr) => {{
-        let res = $self.$method($ctx.clone());
-        if res.is_error() {
-            Err(ServiceResponse::from_error(res.code, res.error_message))
-        } else {
-            Ok(res.succeed_data)
-        }
-    }};
-    ($self: expr, $method: ident, $ctx: expr, $payload: expr) => {{
-        let res = $self.$method($ctx.clone(), $payload);
-        if res.is_error() {
-            Err(ServiceResponse::from_error(res.code, res.error_message))
-        } else {
-            Ok(res.succeed_data)
-        }
-    }};
-}
-
 pub const METADATA_SERVICE_NAME: &str = "metadata";
 
 pub trait MetaData {
-    fn get_(&self, ctx: &ServiceContext) -> Result<Metadata, ServiceResponse<()>>;
+    fn get_(&self, ctx: &ServiceContext) -> ServiceResponse<Metadata>;
 }
 
 pub struct MetadataService<SDK> {
@@ -35,8 +16,8 @@ pub struct MetadataService<SDK> {
 }
 
 impl<SDK: ServiceSDK> MetaData for MetadataService<SDK> {
-    fn get_(&self, ctx: &ServiceContext) -> Result<Metadata, ServiceResponse<()>> {
-        impl_meatdata!(self, get_metadata, ctx)
+    fn get_(&self, ctx: &ServiceContext) -> ServiceResponse<Metadata> {
+        self.get_metadata(ctx.clone())
     }
 }
 

@@ -9,6 +9,7 @@ use derive_more::{Display, From};
 
 use binding_macro::{genesis, hook_after, service, tx_hook_after, tx_hook_before};
 use protocol::traits::{ExecutorParams, ServiceResponse, ServiceSDK, StoreMap};
+use protocol::try_service_response;
 use protocol::types::{Address, Hash, ServiceContext, ServiceContextParams};
 
 use asset::types::TransferPayload;
@@ -86,10 +87,9 @@ impl<A: Assets, SDK: ServiceSDK> GovernanceService<A, SDK> {
         };
 
         // Pledge the tx failure fee before executed the transaction.
-        match self.asset.transfer_(&ctx, payload) {
-            Ok(_) => ServiceResponse::from_succeed("".to_owned()),
-            Err(e) => ServiceResponse::from_error(e.code, e.error_message),
-        }
+        let res = self.asset.transfer_(&ctx, payload);
+        try_service_response!(res);
+        ServiceResponse::from_succeed(String::new())
     }
 
     #[tx_hook_after]
@@ -108,10 +108,9 @@ impl<A: Assets, SDK: ServiceSDK> GovernanceService<A, SDK> {
             value:    1,
         };
 
-        match self.asset.transfer_(&ctx, payload) {
-            Ok(_) => ServiceResponse::from_succeed("".to_owned()),
-            Err(e) => ServiceResponse::from_error(e.code, e.error_message),
-        }
+        let res = self.asset.transfer_(&ctx, payload);
+        try_service_response!(res);
+        ServiceResponse::from_succeed(String::new())
     }
 
     #[hook_after]

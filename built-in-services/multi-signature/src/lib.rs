@@ -8,7 +8,6 @@ use std::collections::HashMap;
 use std::panic::catch_unwind;
 
 use binding_macro::{cycles, genesis, service};
-
 use common_crypto::{Crypto, Secp256k1};
 use protocol::traits::{ExecutorParams, ServiceResponse, ServiceSDK};
 use protocol::types::{Address, Bytes, Hash, ServiceContext, SignedTransaction};
@@ -21,41 +20,22 @@ use crate::types::{
     UpdateAccountPayload, VerifySignaturePayload, Witness,
 };
 
+pub const MULTI_SIG_SERVICE_NAME: &str = "multi_signature";
 const MAX_MULTI_SIGNATURE_RECURSION_DEPTH: u8 = 8;
 const MAX_PERMISSION_ACCOUNTS: u8 = 16;
-
-macro_rules! impl_multisig {
-    ($self: expr, $method: ident, $ctx: expr) => {{
-        let res = $self.$method($ctx.clone());
-        if res.is_error() {
-            Err(ServiceResponse::from_error(res.code, res.error_message))
-        } else {
-            Ok(res.succeed_data)
-        }
-    }};
-    ($self: expr, $method: ident, $ctx: expr, $payload: expr) => {{
-        let res = $self.$method($ctx.clone(), $payload);
-        if res.is_error() {
-            Err(ServiceResponse::from_error(res.code, res.error_message))
-        } else {
-            Ok(res.succeed_data)
-        }
-    }};
-}
-pub const MULTI_SIG_SERVICE_NAME: &str = "multi_signature";
 
 pub trait MultiSignature {
     fn verify_signature_(
         &self,
         ctx: &ServiceContext,
         payload: SignedTransaction,
-    ) -> Result<(), ServiceResponse<()>>;
+    ) -> ServiceResponse<()>;
 
     fn generate_account_(
         &mut self,
         ctx: &ServiceContext,
         payload: GenerateMultiSigAccountPayload,
-    ) -> Result<GenerateMultiSigAccountResponse, ServiceResponse<()>>;
+    ) -> ServiceResponse<GenerateMultiSigAccountResponse>;
 }
 
 pub struct MultiSignatureService<SDK> {
@@ -67,16 +47,16 @@ impl<SDK: ServiceSDK> MultiSignature for MultiSignatureService<SDK> {
         &self,
         ctx: &ServiceContext,
         payload: SignedTransaction,
-    ) -> Result<(), ServiceResponse<()>> {
-        impl_multisig!(self, verify_signature, ctx, payload)
+    ) -> ServiceResponse<()> {
+        self.verify_signature(ctx.clone(), payload)
     }
 
     fn generate_account_(
         &mut self,
         ctx: &ServiceContext,
         payload: GenerateMultiSigAccountPayload,
-    ) -> Result<GenerateMultiSigAccountResponse, ServiceResponse<()>> {
-        impl_multisig!(self, generate_account, ctx, payload)
+    ) -> ServiceResponse<GenerateMultiSigAccountResponse> {
+        self.generate_account(ctx.clone(), payload)
     }
 }
 
