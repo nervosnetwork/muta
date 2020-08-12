@@ -2,8 +2,8 @@ use lazy_static::lazy_static;
 
 use crate::metrics::{
     auto_flush_from, exponential_buckets, make_auto_flush_static_metric, register_histogram_vec,
-    register_int_counter_vec, register_int_gauge, register_int_gauge_vec, HistogramVec,
-    IntCounterVec, IntGauge, IntGaugeVec,
+    register_int_counter, register_int_counter_vec, register_int_gauge, register_int_gauge_vec,
+    HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec,
 };
 
 make_auto_flush_static_metric! {
@@ -103,6 +103,11 @@ lazy_static! {
     pub static ref NETWORK_PING_IP_IN_MS_VEC: IntGaugeVec =
         register_int_gauge_vec!("muta_network_ip_ping_in_ms", "Ping to ip in ms", &["ip"])
             .expect("network ping ip value");
+    pub static ref NETWORK_DISCONNECT_COUNT: IntCounter = register_int_counter!(
+        "muta_network_disconnect_count",
+        "Total number of disconnect"
+    )
+    .expect("network disconnect count");
 }
 
 fn on_network_message(direction: &str, target: &str, url: &str, inc: i64) {

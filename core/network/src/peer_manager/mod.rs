@@ -860,6 +860,7 @@ impl PeerManager {
         }
 
         common_apm::metrics::network::NETWORK_CONNECTED_PEER_COUNT.dec();
+        common_apm::metrics::network::NETWORK_DISCONNECT_COUNT.inc();
 
         let session = match self.inner.remove_session(sid) {
             Some(s) => s,
