@@ -5,16 +5,11 @@ prevhash = "0x44915be5b6c20b0678cf05fcddbbaa832e25d7e6ac538784cd5c24de00d47472"
 name = "asset"
 payload = '''
 {
-    "id": "0xf56924db538e77bb5951eb5ff0d02b88983c49c45eea30e8ae3e7234b311436c",
-    "name": "HuobiToken",
-   "symbol": "HT",
+   "id": "0xf56924db538e77bb5951eb5ff0d02b88983c49c45eea30e8ae3e7234b311436c",
+   "name": "MutaToken",
+   "symbol": "MT",
    "supply": 320000011,
-   "precision": 100000,
-   "issuer": "muta14e0lmgck835vm2dfm0w3ckv6svmez8fdgdl705",
-   "fee_account": "muta15a8a9ksxe3hhjpw3l7wz7ry778qg8h9wz8y35p",
-   "fee": 10,
-   "admin": "muta14e0lmgck835vm2dfm0w3ckv6svmez8fdgdl705",
-   "relayable": true
+   "issuer": "muta14e0lmgck835vm2dfm0w3ckv6svmez8fdgdl705"
 }
 '''
 
