@@ -27,7 +27,8 @@ resources:
   persistent: true
 
 chaos:
-  - all
+  - stable-node-failure
+  - stable-node-kill
 
 size: 4
 
