@@ -49,6 +49,9 @@ pub enum ConnectionErrorKind {
     #[display(fmt = "handshake {}", _0)]
     SecioHandshake(Box<dyn Error + Send>),
 
+    #[display(fmt = "timeout {}", _0)]
+    TimeOut(String),
+
     #[display(fmt = "remote peer doesn't match one in multiaddr")]
     PeerIdNotMatch,
 
