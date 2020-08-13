@@ -123,9 +123,9 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
 
         if header.height != header.proof.height + 1 {
             error!(
-                "[consensus] get_block for {}, proof error, proof height mismatch, block : {:?}",
+                "[consensus] get_block for {}, proof error, proof height {} mismatch",
                 header.height,
-                header.clone(),
+                header.proof.height,
             );
         }
 
