@@ -5,6 +5,7 @@ metadata:
   name: benchmark-{{ .Values.repo_name }}-{{ .Values.version }}
   namespace: {{ .Values.namespace }} # Only supports deployment to the mutadev namespace
 spec:
+  concurrencyPolicy: Replace
   schedule: {{ .Values.benchmark.schedule | quote }}
   jobTemplate:
     spec:
