@@ -83,6 +83,7 @@ members = [
 [features]
 default = []
 random_leader = ["core-consensus/random_leader"]
+tentacle_metrics = ["core-network/tentacle_metrics"]
 
 [[example]]
 name = "muta-chain"
