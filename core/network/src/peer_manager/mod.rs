@@ -263,6 +263,7 @@ impl Inner {
 
     /// If peer exists, return false
     pub fn add_peer(&self, peer: ArcPeer) -> bool {
+        common_apm::metrics::network::NETWORK_SAVED_PEER_COUNT.inc();
         self.peers.write().insert(peer)
     }
 
@@ -496,6 +497,8 @@ impl PeerManagerHandle {
     }
 
     pub fn tag_consensus(&self, peer_ids: Vec<PeerId>) {
+        common_apm::metrics::network::NETWORK_TAGGED_CONSENSUS_PEERS.set(peer_ids.len() as i64);
+
         {
             for peer_id in self.inner.consensus.read().iter() {
                 if let Some(peer) = self.inner.peer(peer_id) {
@@ -671,6 +674,7 @@ impl PeerManager {
         let remote_multiaddr = PeerMultiaddr::new(ctx.address.to_owned(), &remote_peer_id);
 
         // Remove from connecting if we dial this peer or create new one
+        common_apm::metrics::network::NETWORK_OUTBOUND_CONNECTING_PEERS.dec();
         self.connecting.remove(&remote_peer_id);
         let opt_peer = self.inner.peer(&remote_peer_id);
         let remote_peer = opt_peer.unwrap_or_else(|| ArcPeer::new(remote_peer_id.clone()));
@@ -806,6 +810,8 @@ impl PeerManager {
             return;
         }
 
+        common_apm::metrics::network::NETWORK_UNIDENTIFIED_CONNECTIONS.inc();
+
         let event = UnidentifiedSessionEvent { pubkey, ctx };
         let ident_fut = Identify::wait_identified(peer_id);
         let unidentified_session = UnidentifiedSession { event, ident_fut };
@@ -838,6 +844,11 @@ impl PeerManager {
         self.inner.sessions.insert(AcceptableSession(session));
         remote_peer.mark_connected(ctx.id);
 
+        common_apm::metrics::network::NETWORK_CONNECTED_PEERS.inc();
+        if remote_peer.tags.contains(&PeerTag::Consensus) {
+            common_apm::metrics::network::NETWORK_CONNECTED_CONSENSUS_PEERS.inc();
+        }
+
         match remote_peer.trust_metric() {
             Some(trust_metric) => trust_metric.start(),
             None => {
@@ -857,14 +868,24 @@ impl PeerManager {
             return;
         }
 
+        common_apm::metrics::network::NETWORK_CONNECTED_PEERS.dec();
+
         let session = match self.inner.remove_session(sid) {
             Some(s) => s,
             None => return, /* Session may be removed by other event or rejected
                              * due to max connections before insert */
         };
 
+        common_apm::metrics::network::NETWORK_IP_DISCONNECTED_COUNT_VEC
+            .with_label_values(&[&session.connected_addr.host])
+            .inc();
+
         info!("session closed {}", session.connected_addr);
         session.peer.mark_disconnected();
+
+        if session.peer.tags.contains(&PeerTag::Consensus) {
+            common_apm::metrics::network::NETWORK_CONNECTED_CONSENSUS_PEERS.dec();
+        }
 
         match session.peer.trust_metric() {
             Some(trust_metric) => trust_metric.pause(),
@@ -948,6 +969,7 @@ impl PeerManager {
                     attempt.peer.set_connectedness(Connectedness::Unconnectable);
                 }
 
+                common_apm::metrics::network::NETWORK_OUTBOUND_CONNECTING_PEERS.dec();
             // FIXME
             // if let Some(trust_metric) = attempt.peer.trust_metric() {
             //     trust_metric.bad_events(1);
@@ -1358,6 +1380,8 @@ impl Future for PeerManager {
                 }
                 Poll::Ready(ret) => match ret {
                     Ok(()) => {
+                        common_apm::metrics::network::NETWORK_UNIDENTIFIED_CONNECTIONS.dec();
+
                         let UnidentifiedSession { event, .. } = session;
                         let new_session_event = PeerManagerEvent::NewSession {
                             pid:    event.pubkey.peer_id(),
@@ -1381,6 +1405,8 @@ impl Future for PeerManager {
                         }
                     }
                     Err(err) => {
+                        common_apm::metrics::network::NETWORK_UNIDENTIFIED_CONNECTIONS.dec();
+
                         warn!(
                             "reject peer {:?} due to identification failed: {}",
                             session.event.pubkey.peer_id(),
@@ -1446,6 +1472,9 @@ impl Future for PeerManager {
             );
 
             if !connectable_peers.is_empty() {
+                common_apm::metrics::network::NETWORK_OUTBOUND_CONNECTING_PEERS
+                    .add(connectable_peers.len() as i64);
+
                 self.connect_peers(connectable_peers);
             }
         }

@@ -2,8 +2,8 @@ use lazy_static::lazy_static;
 
 use crate::metrics::{
     auto_flush_from, exponential_buckets, make_auto_flush_static_metric, register_histogram_vec,
-    register_int_counter_vec, register_int_gauge, register_int_gauge_vec, HistogramVec,
-    IntCounterVec, IntGauge, IntGaugeVec,
+    register_int_counter, register_int_counter_vec, register_int_gauge, register_int_gauge_vec,
+    HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec,
 };
 
 make_auto_flush_static_metric! {
@@ -83,6 +83,55 @@ lazy_static! {
         &["ip"]
     )
     .expect("network ip pending data size");
+    pub static ref NETWORK_RECEIVED_MESSAGE_IN_PROCESSING_GUAGE: IntGauge = register_int_gauge!(
+        "muta_network_received_message_in_processing_guage",
+        "Total number of network received message current in processing"
+    )
+    .expect("network received message in processing");
+    pub static ref NETWORK_RECEIVED_IP_MESSAGE_IN_PROCESSING_GUAGE_VEC: IntGaugeVec =
+        register_int_gauge_vec!(
+            "muta_network_received_ip_message_in_processing_guage",
+            "Number of network received messasge from ip current in processing",
+            &["ip"]
+        )
+        .expect("network received ip message in processing");
+    pub static ref NETWORK_CONNECTED_PEERS: IntGauge =
+        register_int_gauge!("muta_network_connected_peers", "Total connected peer count")
+            .expect("network total connecteds");
+    pub static ref NETWORK_PING_IP_IN_MS_VEC: IntGaugeVec =
+        register_int_gauge_vec!("muta_network_ip_ping_in_ms", "Ping to ip in ms", &["ip"])
+            .expect("network ping ip value");
+    pub static ref NETWORK_IP_DISCONNECTED_COUNT_VEC: IntCounterVec = register_int_counter_vec!(
+        "muta_network_ip_disconnected_count",
+        "Total number of ip disconnected count",
+        &["ip"]
+    )
+    .expect("network disconnect ip count");
+    pub static ref NETWORK_OUTBOUND_CONNECTING_PEERS: IntGauge = register_int_gauge!(
+        "muta_network_outbound_connecting_peers",
+        "Total number of network outbound connecting peers"
+    )
+    .expect("network outbound connecting peer count");
+    pub static ref NETWORK_UNIDENTIFIED_CONNECTIONS: IntGauge = register_int_gauge!(
+        "muta_network_unidentified_connections",
+        "Total number of network unidentified connections"
+    )
+    .expect("network unidentified connections");
+    pub static ref NETWORK_SAVED_PEER_COUNT: IntCounter = register_int_counter!(
+        "muta_network_saved_peer_count",
+        "Total number of saved peer count"
+    )
+    .expect("network saved peer count");
+    pub static ref NETWORK_TAGGED_CONSENSUS_PEERS: IntGauge = register_int_gauge!(
+        "muta_network_tagged_consensus_peers",
+        "Total number of consensus peers"
+    )
+    .expect("network tagged consensus peers");
+    pub static ref NETWORK_CONNECTED_CONSENSUS_PEERS: IntGauge = register_int_gauge!(
+        "muta_network_connected_consensus_peers",
+        "Total number of connected consensus peers"
+    )
+    .expect("network connected consenss peers");
 }
 
 fn on_network_message(direction: &str, target: &str, url: &str, inc: i64) {

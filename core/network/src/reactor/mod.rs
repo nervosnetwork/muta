@@ -18,6 +18,7 @@ use protocol::{
     Bytes, ProtocolError,
 };
 
+use crate::common::ConnectedAddr;
 use crate::{
     endpoint::{Endpoint, EndpointScheme, RpcEndpoint},
     event::PeerManagerEvent,
@@ -87,6 +88,25 @@ where
         };
 
         let react = async move {
+            let connected_addr = ctx.remote_connected_addr();
+            struct ProcessingGuage {
+                connected_addr: Option<ConnectedAddr>,
+            }
+            impl Drop for ProcessingGuage {
+                fn drop(&mut self) {
+                    common_apm::metrics::network::NETWORK_RECEIVED_MESSAGE_IN_PROCESSING_GUAGE
+                        .dec();
+                    if let Some(host) = self.connected_addr.as_ref().map(|a| &a.host) {
+                        common_apm::metrics::network::NETWORK_RECEIVED_IP_MESSAGE_IN_PROCESSING_GUAGE_VEC
+                            .with_label_values(&[host])
+                            .dec();
+                    }
+                }
+            }
+            let _processing = ProcessingGuage {
+                connected_addr: ctx.remote_connected_addr(),
+            };
+
             let endpoint = net_msg.url.parse::<Endpoint>()?;
 
             let feedback = match endpoint.scheme() {
