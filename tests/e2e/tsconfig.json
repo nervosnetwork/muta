@@ -15,9 +15,13 @@
       "listFiles": false,
       "pretty": true,
       "composite": true,
-      "lib": ["es2017"]
+      "lib": ["es2017"],
+      "sourceMap": true,
+      "inlineSources": true,
+      "outDir": "lib",
+      "rootDir": "src"
     },
-    "files": ["./multisig.ts", "./sdk.test.ts", "./utils.ts"],
+    "files": ["./sdk.test.ts", "./utils.ts"],
     "references": [
     ]
 }

@@ -1,7 +1,6 @@
-import { AssetService } from '@mutadev/service'
+import { AssetService, MultiSignatureService } from '@mutadev/service'
 import * as sdk from '@mutadev/muta-sdk';
 import { mutaClient } from './utils';
-import { MultiSigService } from './multisig';
 
 const { Account, retry } = sdk;
 const { toHex } = sdk.utils;
@@ -80,7 +79,7 @@ describe("API test via @mutadev/muta-sdk-js", () => {
       '0x2000000000000000000000000000000000000000000000000000000000000000',
     );
 
-    const multiSigService = new MultiSigService(mutaClient, wangYe);
+    const multiSigService = new MultiSignatureService(mutaClient, wangYe);
 
     var GenerateMultiSigAccountPayload = {
       owner: wangYe.address,
