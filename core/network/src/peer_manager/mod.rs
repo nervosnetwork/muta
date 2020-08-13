@@ -894,6 +894,7 @@ impl PeerManager {
     fn connect_failed(&mut self, addr: Multiaddr, error_kind: ConnectionErrorKind) {
         use ConnectionErrorKind::{
             DNSResolver, Io, MultiaddrNotSuppored, PeerIdNotMatch, ProtocolHandle, SecioHandshake,
+            TimeOut,
         };
 
         let peer_addr: PeerMultiaddr = match addr.clone().try_into() {
@@ -924,6 +925,10 @@ impl PeerManager {
             PeerIdNotMatch => {
                 warn!("give up multiaddr {} because peer id not match", peer_addr);
                 peer.multiaddrs.give_up(&peer_addr);
+            }
+            TimeOut(reason) => {
+                info!("connect timeout {}", reason);
+                peer.multiaddrs.inc_failure(&peer_addr);
             }
             SecioHandshake(_) | ProtocolHandle => {
                 warn!("give up peer {:?} becasue {}", peer.id, error_kind);

@@ -4,7 +4,7 @@ use futures::channel::mpsc::UnboundedSender;
 use log::{debug, error};
 use tentacle::{
     context::ServiceContext,
-    error::{DialerErrorKind, ListenErrorKind},
+    error::{DialerErrorKind, HandshakeErrorKind, ListenErrorKind},
     multiaddr::Multiaddr,
     service::{ServiceError, ServiceEvent},
     traits::ServiceHandle,
@@ -96,6 +96,9 @@ impl ConnectionServiceKeeper {
                 let ty = ConnectionType::Outbound;
                 let repeated_connection = PeerManagerEvent::RepeatedConnection { ty, sid, addr };
                 return self.report_peer(repeated_connection);
+            }
+            HandshakeError(HandshakeErrorKind::Timeout(reason)) => {
+                ConnectionErrorKind::TimeOut(reason)
             }
             HandshakeError(err) => ConnectionErrorKind::SecioHandshake(Box::new(err)),
             TransportError(err) => ConnectionErrorKind::from(err),
