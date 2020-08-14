@@ -971,6 +971,7 @@ impl PeerManager {
                 attempt.peer.set_connectedness(Connectedness::CanConnect);
 
                 if attempt.peer.retry.run_out() {
+                    warn!("give up peer {:?} due to retry run out", attempt.peer.id);
                     attempt.peer.set_connectedness(Connectedness::Unconnectable);
                 }
 
@@ -1076,7 +1077,10 @@ impl PeerManager {
 
         match kind {
             PingTimeout => peer.retry.inc(),
-            PingUnexpect | Discovery => peer.set_connectedness(Connectedness::Unconnectable), /* Give up this peer */
+            PingUnexpect | Discovery => {
+                warn!("give up peer {:?} because of {}", peer.id, kind);
+                peer.set_connectedness(Connectedness::Unconnectable)
+            }
         }
     }
 
