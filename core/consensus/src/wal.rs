@@ -28,7 +28,7 @@ impl SignedTxsWAL {
     pub fn save(
         &self,
         height: u64,
-        block_hash: Hash,
+        ordered_signed_transactions_hash: Hash,
         txs: Vec<SignedTransaction>,
     ) -> ProtocolResult<()> {
         let mut wal_path = self.path.clone();
@@ -37,7 +37,7 @@ impl SignedTxsWAL {
             fs::create_dir(&wal_path).map_err(ConsensusError::WALErr)?;
         }
 
-        wal_path.push(block_hash.as_hex());
+        wal_path.push(ordered_signed_transactions_hash.as_hex());
         wal_path.set_extension("txt");
 
         let mut wal_file = match fs::OpenOptions::new()
@@ -63,10 +63,14 @@ impl SignedTxsWAL {
         Ok(())
     }
 
-    pub fn load(&self, height: u64, block_hash: Hash) -> ProtocolResult<Vec<SignedTransaction>> {
+    pub fn load(
+        &self,
+        height: u64,
+        ordered_signed_transactions_hash: Hash,
+    ) -> ProtocolResult<Vec<SignedTransaction>> {
         let mut file_path = self.path.clone();
         file_path.push(height.to_string());
-        file_path.push(block_hash.as_hex());
+        file_path.push(ordered_signed_transactions_hash.as_hex());
         file_path.set_extension("txt");
 
         self.recover_stxs(file_path)

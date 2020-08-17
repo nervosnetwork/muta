@@ -254,7 +254,9 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     );
 
     for tx in current_stxs.into_iter() {
-        let _ = mempool.insert(Context::new(), tx).await;
+        if let Err(e) = mempool.insert_without_check(Context::new(), tx).await {
+            log::warn!("Re-insert tx to mempool when reboot error {:?}", e);
+        }
     }
 
     let monitor_mempool = Arc::clone(&mempool);

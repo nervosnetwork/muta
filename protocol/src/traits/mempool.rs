@@ -20,6 +20,9 @@ impl MixedTxHashes {
 pub trait MemPool: Send + Sync {
     async fn insert(&self, ctx: Context, tx: SignedTransaction) -> ProtocolResult<()>;
 
+    async fn insert_without_check(&self, ctx: Context, tx: SignedTransaction)
+        -> ProtocolResult<()>;
+
     async fn package(
         &self,
         ctx: Context,

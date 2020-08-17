@@ -177,6 +177,20 @@ where
         self.insert_tx(ctx, tx, TxType::NewTx).await
     }
 
+    async fn insert_without_check(
+        &self,
+        ctx: Context,
+        tx: SignedTransaction,
+    ) -> ProtocolResult<()> {
+        let _lock = self.flush_lock.read().await;
+
+        self.tx_cache.check_exist(&tx.tx_hash).await?;
+        self.adapter
+            .check_storage_exist(ctx.clone(), tx.tx_hash.clone())
+            .await?;
+        self.tx_cache.insert_propose_tx(tx).await
+    }
+
     #[muta_apm::derive::tracing_span(
         kind = "mempool",
         logs = "{'cycles_limit': 'cycles_limit', 'tx_num_limit': 'tx_num_limit'}"
