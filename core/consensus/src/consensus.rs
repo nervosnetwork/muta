@@ -90,7 +90,6 @@ impl<Adapter: ConsensusAdapter + 'static> Consensus for OverlordConsensus<Adapte
     async fn set_choke(&self, ctx: Context, choke: Vec<u8>) -> ProtocolResult<()> {
         let signed_choke: SignedChoke = rlp::decode(&choke)
             .map_err(|_| ConsensusError::DecodeErr(ConsensusType::SignedChoke))?;
-
         let msg = OverlordMsg::SignedChoke(signed_choke);
         tracing_overlord_message(ctx.clone(), &msg);
 
