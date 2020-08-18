@@ -2,6 +2,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use futures::channel::mpsc::UnboundedSender;
 use log::{debug, error};
+use tentacle::secio::error::SecioError;
 use tentacle::{
     context::ServiceContext,
     error::{DialerErrorKind, HandshakeErrorKind, ListenErrorKind},
@@ -99,6 +100,9 @@ impl ConnectionServiceKeeper {
             }
             HandshakeError(HandshakeErrorKind::Timeout(reason)) => {
                 ConnectionErrorKind::TimeOut(reason)
+            }
+            HandshakeError(HandshakeErrorKind::SecioError(SecioError::IoError(err))) => {
+                ConnectionErrorKind::Io(err)
             }
             HandshakeError(err) => ConnectionErrorKind::SecioHandshake(Box::new(err)),
             TransportError(err) => ConnectionErrorKind::from(err),
