@@ -1230,8 +1230,15 @@ impl PeerManager {
             if connectedness != Connectedness::CanConnect
                 && connectedness != Connectedness::NotConnected
             {
-                debug!("peer {:?} connectedness {}", p.id, connectedness);
-                None
+                if connectedness == Connectedness::Unconnectable
+                    && p.tags.contains(&PeerTag::Consensus)
+                {
+                    // For consensus peer, just try again.
+                    Some(p)
+                } else {
+                    debug!("peer {:?} connectedness {}", p.id, connectedness);
+                    None
+                }
             } else {
                 Some(p)
             }
