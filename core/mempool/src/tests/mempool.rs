@@ -17,12 +17,8 @@ macro_rules! insert {
         insert!(inner($valid * 10, 1, $valid, $invalid, $output));
     };
     (inner($pool_size: expr, $repeat: expr, $valid: expr, $invalid: expr, $output: expr)) => {
-        let mempool = Arc::new(new_mempool(
-            $pool_size,
-            TIMEOUT_GAP,
-            CYCLE_LIMIT,
-            MAX_TX_SIZE,
-        ));
+        let mempool =
+            Arc::new(new_mempool($pool_size, TIMEOUT_GAP, CYCLE_LIMIT, MAX_TX_SIZE).await);
         let txs = mock_txs($valid, $invalid, TIMEOUT);
         for _ in 0..$repeat {
             concurrent_insert(txs.clone(), Arc::clone(&mempool)).await;
@@ -75,12 +71,8 @@ macro_rules! package {
         package!(inner($insert, $timeout_gap, $timeout, $insert, $expect, 0));
     };
     (inner($tx_num_limit: expr, $timeout_gap: expr, $timeout: expr, $insert: expr, $expect_order: expr, $expect_propose: expr)) => {
-        let mempool = &Arc::new(new_mempool(
-            $insert * 10,
-            $timeout_gap,
-            CYCLE_LIMIT,
-            MAX_TX_SIZE,
-        ));
+        let mempool =
+            &Arc::new(new_mempool($insert * 10, $timeout_gap, CYCLE_LIMIT, MAX_TX_SIZE).await);
         let txs = mock_txs($insert, 0, $timeout);
         concurrent_insert(txs.clone(), Arc::clone(mempool)).await;
         let mixed_tx_hashes = exec_package(Arc::clone(mempool), CYCLE_LIMIT, $tx_num_limit).await;
@@ -117,7 +109,7 @@ async fn test_package() {
 
 #[tokio::test]
 async fn test_package_order_consistent_with_insert_order() {
-    let mempool = &Arc::new(default_mempool());
+    let mempool = &Arc::new(default_mempool().await);
 
     let txs = default_mock_txs(100);
     for tx in txs.iter() {
@@ -136,7 +128,7 @@ async fn test_package_order_consistent_with_insert_order() {
 
 #[tokio::test]
 async fn test_flush() {
-    let mempool = Arc::new(default_mempool());
+    let mempool = Arc::new(default_mempool().await);
 
     // insert txs
     let txs = default_mock_txs(555);
@@ -169,7 +161,7 @@ async fn test_flush() {
 
 macro_rules! ensure_order_txs {
     ($in_pool: expr, $out_pool: expr) => {
-        let mempool = &Arc::new(default_mempool());
+        let mempool = &Arc::new(default_mempool().await);
 
         let txs = &default_mock_txs($in_pool + $out_pool);
         let (in_pool_txs, out_pool_txs) = txs.split_at($in_pool);
@@ -198,7 +190,7 @@ async fn test_ensure_order_txs() {
 
 #[tokio::test]
 async fn test_sync_propose_txs() {
-    let mempool = &Arc::new(default_mempool());
+    let mempool = &Arc::new(default_mempool().await);
 
     let txs = &default_mock_txs(50);
     let (exist_txs, need_sync_txs) = txs.split_at(20);
@@ -240,7 +232,7 @@ async fn test_sync_propose_txs() {
 #[bench]
 fn bench_insert(b: &mut Bencher) {
     let mut runtime = tokio::runtime::Runtime::new().unwrap();
-    let mempool = &Arc::new(default_mempool());
+    let mempool = &Arc::new(default_mempool_sync());
 
     b.iter(|| {
         let txs = default_mock_txs(100);
@@ -250,7 +242,7 @@ fn bench_insert(b: &mut Bencher) {
 
 #[bench]
 fn bench_insert_serial_1(b: &mut Bencher) {
-    let mempool = &Arc::new(default_mempool());
+    let mempool = &Arc::new(default_mempool_sync());
     let txs = default_mock_txs(1);
 
     b.iter(move || {
@@ -264,7 +256,7 @@ fn bench_insert_serial_1(b: &mut Bencher) {
 
 #[bench]
 fn bench_insert_serial_10(b: &mut Bencher) {
-    let mempool = &Arc::new(default_mempool());
+    let mempool = &Arc::new(default_mempool_sync());
     let txs = default_mock_txs(10);
 
     b.iter(move || {
@@ -278,7 +270,7 @@ fn bench_insert_serial_10(b: &mut Bencher) {
 
 #[bench]
 fn bench_insert_serial_100(b: &mut Bencher) {
-    let mempool = &Arc::new(default_mempool());
+    let mempool = &Arc::new(default_mempool_sync());
     let txs = default_mock_txs(100);
 
     b.iter(move || {
@@ -292,7 +284,7 @@ fn bench_insert_serial_100(b: &mut Bencher) {
 
 #[bench]
 fn bench_insert_serial_1000(b: &mut Bencher) {
-    let mempool = &Arc::new(default_mempool());
+    let mempool = &Arc::new(default_mempool_sync());
     let txs = default_mock_txs(1000);
 
     b.iter(move || {
@@ -308,7 +300,7 @@ fn bench_insert_serial_1000(b: &mut Bencher) {
 fn bench_package(b: &mut Bencher) {
     let mut runtime = tokio::runtime::Runtime::new().unwrap();
 
-    let mempool = Arc::new(default_mempool());
+    let mempool = Arc::new(default_mempool_sync());
     let txs = default_mock_txs(50_000);
     runtime.block_on(concurrent_insert(txs, Arc::clone(&mempool)));
     b.iter(|| {
@@ -324,7 +316,7 @@ fn bench_package(b: &mut Bencher) {
 fn bench_get_10000_full_txs(b: &mut Bencher) {
     let mut runtime = tokio::runtime::Runtime::new().unwrap();
 
-    let mempool = Arc::new(default_mempool());
+    let mempool = Arc::new(default_mempool_sync());
     let txs = default_mock_txs(10_000);
     let tx_hashes = txs.iter().map(|tx| tx.tx_hash.clone()).collect::<Vec<_>>();
     runtime.block_on(concurrent_insert(txs, Arc::clone(&mempool)));
@@ -337,7 +329,7 @@ fn bench_get_10000_full_txs(b: &mut Bencher) {
 fn bench_get_20000_full_txs(b: &mut Bencher) {
     let mut runtime = tokio::runtime::Runtime::new().unwrap();
 
-    let mempool = Arc::new(default_mempool());
+    let mempool = Arc::new(default_mempool_sync());
     let txs = default_mock_txs(20_000);
     let tx_hashes = txs.iter().map(|tx| tx.tx_hash.clone()).collect::<Vec<_>>();
     runtime.block_on(concurrent_insert(txs, Arc::clone(&mempool)));
@@ -350,7 +342,7 @@ fn bench_get_20000_full_txs(b: &mut Bencher) {
 fn bench_get_40000_full_txs(b: &mut Bencher) {
     let mut runtime = tokio::runtime::Runtime::new().unwrap();
 
-    let mempool = Arc::new(default_mempool());
+    let mempool = Arc::new(default_mempool_sync());
     let txs = default_mock_txs(40_000);
     let tx_hashes = txs.iter().map(|tx| tx.tx_hash.clone()).collect::<Vec<_>>();
     runtime.block_on(concurrent_insert(txs, Arc::clone(&mempool)));
@@ -363,7 +355,7 @@ fn bench_get_40000_full_txs(b: &mut Bencher) {
 fn bench_get_80000_full_txs(b: &mut Bencher) {
     let mut runtime = tokio::runtime::Runtime::new().unwrap();
 
-    let mempool = Arc::new(default_mempool());
+    let mempool = Arc::new(default_mempool_sync());
     let txs = default_mock_txs(80_000);
     let tx_hashes = txs.iter().map(|tx| tx.tx_hash.clone()).collect::<Vec<_>>();
     runtime.block_on(concurrent_insert(txs, Arc::clone(&mempool)));
@@ -376,7 +368,7 @@ fn bench_get_80000_full_txs(b: &mut Bencher) {
 fn bench_flush(b: &mut Bencher) {
     let mut runtime = tokio::runtime::Runtime::new().unwrap();
 
-    let mempool = &Arc::new(default_mempool());
+    let mempool = &Arc::new(default_mempool_sync());
     let txs = &default_mock_txs(100);
     let remove_hashes: &Vec<Hash> = &txs.iter().map(|tx| tx.tx_hash.clone()).collect();
     b.iter(|| {

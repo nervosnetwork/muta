@@ -55,15 +55,27 @@ impl<Adapter: 'static> HashMemPool<Adapter>
 where
     Adapter: MemPoolAdapter,
 {
-    pub fn new(pool_size: usize, adapter: Adapter) -> Self {
-        HashMemPool {
+    pub async fn new(
+        pool_size: usize,
+        adapter: Adapter,
+        initial_txs: Vec<SignedTransaction>,
+    ) -> Self {
+        let mempool = HashMemPool {
             pool_size,
             timeout_gap: AtomicU64::new(0),
             tx_cache: TxCache::new(pool_size * 2),
             callback_cache: Arc::new(Map::new(pool_size)),
             adapter: Arc::new(adapter),
             flush_lock: RwLock::new(()),
+        };
+
+        for tx in initial_txs.into_iter() {
+            if let Err(e) = mempool.initial_insert(Context::new(), tx).await {
+                log::warn!("[mempool]: initial insert tx failed {:?}", e);
+            }
         }
+
+        mempool
     }
 
     pub fn get_tx_cache(&self) -> &TxCache {
@@ -89,6 +101,16 @@ where
         }
 
         unknown_hashes
+    }
+
+    async fn initial_insert(&self, ctx: Context, tx: SignedTransaction) -> ProtocolResult<()> {
+        let _lock = self.flush_lock.read().await;
+
+        self.tx_cache.check_exist(&tx.tx_hash).await?;
+        self.adapter
+            .check_storage_exist(ctx.clone(), tx.tx_hash.clone())
+            .await?;
+        self.tx_cache.insert_propose_tx(tx).await
     }
 
     async fn insert_tx(

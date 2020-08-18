@@ -170,6 +170,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         let order_hashes_len = order_hashes.len();
         let exemption = { self.exemption_hash.read().contains(&hash) };
         let sync_tx_hashes = block.get_propose_hashes();
+        let pill = block.inner;
 
         // If the block is proposed by self, it does not need to check. Get full signed
         // transactions directly.
@@ -177,12 +178,12 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             let current_timestamp = time_now();
 
             self.adapter
-                .verify_block_header(ctx.clone(), block.inner.block.clone())
+                .verify_block_header(ctx.clone(), pill.block.clone())
                 .await
                 .map_err(|e| {
                     error!(
                         "[consensus] check_block, verify_block_header error, block header: {:?}",
-                        block.inner.block.header
+                        pill.block.header
                     );
                     e
                 })?;
@@ -192,13 +193,13 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             // sync and waste a delay of read
             let previous_block = self
                 .adapter
-                .get_block_by_height(ctx.clone(), block.inner.block.header.height - 1)
+                .get_block_by_height(ctx.clone(), pill.block.header.height - 1)
                 .await?;
 
             // verify block timestamp.
             if !validate_timestamp(
                 current_timestamp,
-                block.inner.block.header.timestamp,
+                pill.block.header.timestamp,
                 previous_block.header.timestamp,
             ) {
                 return Err(ProtocolError::from(ConsensusError::InvalidTimestamp).into());
@@ -208,14 +209,14 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
                 .verify_proof(
                     ctx.clone(),
                     previous_block.clone(),
-                    block.inner.block.header.proof.clone(),
+                    pill.block.header.proof.clone(),
                 )
                 .await
                 .map_err(|e| {
                     error!(
                         "[consensus] check_block, verify_proof error, previous block header: {:?}, proof: {:?}",
                         previous_block.header,
-                        block.inner.block.header.proof
+                        pill.block.header.proof
                     );
                     e
                 })?;
@@ -223,8 +224,8 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             self.adapter
                 .verify_txs(
                     ctx.clone(),
-                    block.inner.block.header.height,
-                    block.inner.block.ordered_tx_hashes.clone(),
+                    pill.block.header.height,
+                    pill.block.ordered_tx_hashes.clone(),
                 )
                 .await
                 .map_err(|e| {
@@ -236,7 +237,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             // period of time.
             let mut check_retry = 0;
             loop {
-                match self.check_block_roots(ctx.clone(), &block.inner.block.header) {
+                match self.check_block_roots(ctx.clone(), &pill.block.header) {
                     Ok(()) => break,
                     Err(e) => {
                         if check_retry >= RETRY_CHECK_ROOT_LIMIT {
@@ -251,9 +252,9 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
 
             let signed_txs = self
                 .adapter
-                .get_full_txs(ctx.clone(), block.inner.block.ordered_tx_hashes.clone())
+                .get_full_txs(ctx.clone(), pill.block.ordered_tx_hashes.clone())
                 .await?;
-            self.check_order_transactions(ctx.clone(), &block.inner.block, &signed_txs)?;
+            self.check_order_transactions(ctx.clone(), &pill.block, &signed_txs)?;
 
             let adapter = Arc::clone(&self.adapter);
             let ctx_clone = ctx.clone();
@@ -276,8 +277,11 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             Instant::now() - time
         );
         let time = Instant::now();
-        self.txs_wal
-            .save(next_height, Hash::from_bytes(hash)?, txs)?;
+        self.txs_wal.save(
+            next_height,
+            pill.block.header.order_signed_transactions_hash,
+            txs,
+        )?;
 
         info!(
             "[consensus-engine]: write wal cost {:?} order_hashes_len {:?}",
@@ -356,7 +360,10 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             .await
         {
             Ok(txs) => txs,
-            Err(_) => self.txs_wal.load(current_height, block_hash)?,
+            Err(_) => self.txs_wal.load(
+                current_height,
+                pill.block.header.order_signed_transactions_hash.clone(),
+            )?,
         };
 
         // Execute transactions

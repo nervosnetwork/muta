@@ -137,6 +137,9 @@ pub enum ConsensusError {
     #[display(fmt = "Lock in sync")]
     LockInSync,
 
+    #[display(fmt = "Wal transactions mismatch, height {}", _0)]
+    WalTxsMismatch(u64),
+
     #[display(
         fmt = "Commit an outdated block, block_height {}, last_committed_height {}",
         _0,

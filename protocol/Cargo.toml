@@ -19,7 +19,7 @@ prost = "0.6"
 bytes = { version = "0.5", features = ["serde"] }
 hasher = { version = "0.1", features = ['hash-keccak'] }
 creep = "0.2"
-bincode = "1.2"
+bincode = "1.3"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 rlp = "0.4"
@@ -34,4 +34,4 @@ arc-swap = "0.4"
 
 [dev-dependencies]
 rayon = "1.3"
-rand = "0.6"
+rand = "0.7"
