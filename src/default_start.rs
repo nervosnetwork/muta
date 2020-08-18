@@ -228,8 +228,16 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     let wal_path = config.data_path_for_txs_wal().to_str().unwrap().to_string();
     let txs_wal = Arc::new(SignedTxsWAL::new(wal_path));
 
-    // Init mempool
+    // Recover signed transactions of current height
     let current_block = storage.get_latest_block(Context::new()).await?;
+    let current_stxs = txs_wal.load_by_height(current_block.header.height + 1);
+    log::info!(
+        "Recover {} tx of height {} from wal",
+        current_stxs.len(),
+        current_block.header.height + 1
+    );
+
+    // Init mempool
     let mempool_adapter =
         DefaultMemPoolAdapter::<ServiceExecutorFactory, Secp256k1, _, _, _, _>::new(
             network_service.handle(),
@@ -239,25 +247,14 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
             config.mempool.broadcast_txs_size,
             config.mempool.broadcast_txs_interval,
         );
-    let mempool = Arc::new(HashMemPool::new(
-        config.mempool.pool_size as usize,
-        mempool_adapter,
-    ));
-
-    // Recover signed transactions of current height, and insert them into the
-    // mempool.
-    let current_stxs = txs_wal.load_by_height(current_block.header.height + 1);
-    log::info!(
-        "Recover {} tx of height {} from wal",
-        current_stxs.len(),
-        current_block.header.height + 1
+    let mempool = Arc::new(
+        HashMemPool::new(
+            config.mempool.pool_size as usize,
+            mempool_adapter,
+            current_stxs,
+        )
+        .await,
     );
-
-    for tx in current_stxs.into_iter() {
-        if let Err(e) = mempool.insert_without_check(Context::new(), tx).await {
-            log::warn!("Re-insert tx to mempool when reboot error {:?}", e);
-        }
-    }
 
     let monitor_mempool = Arc::clone(&mempool);
     tokio::spawn(async move {

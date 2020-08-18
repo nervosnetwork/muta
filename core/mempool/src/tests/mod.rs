@@ -114,18 +114,23 @@ fn mock_txs(valid_size: usize, invalid_size: usize, timeout: u64) -> Vec<SignedT
     vec
 }
 
-fn default_mempool() -> HashMemPool<HashMemPoolAdapter> {
-    new_mempool(POOL_SIZE, TIMEOUT_GAP, CYCLE_LIMIT, MAX_TX_SIZE)
+fn default_mempool_sync() -> HashMemPool<HashMemPoolAdapter> {
+    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(default_mempool())
 }
 
-fn new_mempool(
+async fn default_mempool() -> HashMemPool<HashMemPoolAdapter> {
+    new_mempool(POOL_SIZE, TIMEOUT_GAP, CYCLE_LIMIT, MAX_TX_SIZE).await
+}
+
+async fn new_mempool(
     pool_size: usize,
     timeout_gap: u64,
     cycles_limit: u64,
     max_tx_size: u64,
 ) -> HashMemPool<HashMemPoolAdapter> {
     let adapter = HashMemPoolAdapter::new();
-    let mempool = HashMemPool::new(pool_size, adapter);
+    let mempool = HashMemPool::new(pool_size, adapter, vec![]).await;
     mempool.set_args(timeout_gap, cycles_limit, max_tx_size);
     mempool
 }
