@@ -8,7 +8,7 @@ pipelineConfig:
         options:
           timeout:
             time: 180 # 3H
-            unit: minutes
+            unit: hours
         stages:
           - name: chaos
             environment:
@@ -78,7 +78,7 @@ pipelineConfig:
                 image: mutadev/muta-watchdog:v0.2.0-rc
                 env:
                   - name: WATCH_DURATION
-                    value: 1H
+                    value: 100H
                   - name: APP_NAMESPACE
                     value: mutadev
                   - name: APP_PORT
