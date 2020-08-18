@@ -674,7 +674,6 @@ impl PeerManager {
         let remote_multiaddr = PeerMultiaddr::new(ctx.address.to_owned(), &remote_peer_id);
 
         // Remove from connecting if we dial this peer or create new one
-        common_apm::metrics::network::NETWORK_OUTBOUND_CONNECTING_PEERS.dec();
         self.connecting.remove(&remote_peer_id);
         let opt_peer = self.inner.peer(&remote_peer_id);
         let remote_peer = opt_peer.unwrap_or_else(|| ArcPeer::new(remote_peer_id.clone()));
@@ -802,6 +801,8 @@ impl PeerManager {
     }
 
     fn new_unidentified_session(&mut self, pubkey: PublicKey, ctx: Arc<SessionContext>) {
+        common_apm::metrics::network::NETWORK_OUTBOUND_CONNECTING_PEERS.dec();
+
         let peer_id = pubkey.peer_id();
         if let Err(err) = self.new_session_pre_check(&pubkey, &ctx) {
             log::info!("reject unidentified session due to {}", err);
