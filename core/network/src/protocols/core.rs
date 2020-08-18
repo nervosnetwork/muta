@@ -9,12 +9,14 @@ use tentacle::secio::PeerId;
 use tentacle::service::{ProtocolMeta, TargetProtocol};
 use tentacle::ProtocolId;
 
+use crate::compression::Snappy;
 use crate::event::PeerManagerEvent;
 use crate::peer_manager::PeerManagerHandle;
 use crate::protocols::discovery::Discovery;
 use crate::protocols::identify::Identify;
 use crate::protocols::ping::Ping;
-use crate::protocols::transmitter::{ReceivedMessage, Transmitter};
+use crate::protocols::transmitter::Transmitter;
+use crate::reactor::MessageRouter;
 use crate::traits::NetworkProtocol;
 
 pub const PING_PROTOCOL_ID: usize = 1;
@@ -149,10 +151,10 @@ impl CoreProtocolBuilder {
 
     pub fn transmitter(
         mut self,
-        bytes_tx: UnboundedSender<ReceivedMessage>,
+        message_router: MessageRouter<Snappy>,
         peer_mgr: PeerManagerHandle,
     ) -> Self {
-        let transmitter = Transmitter::new(bytes_tx, peer_mgr);
+        let transmitter = Transmitter::new(message_router, peer_mgr);
 
         self.transmitter = Some(transmitter);
         self

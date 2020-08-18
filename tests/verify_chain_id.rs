@@ -56,10 +56,7 @@ fn should_be_disconnected_due_to_different_chain_id() {
         network.set_chain_id(chain_id);
 
         network
-            .register_endpoint_handler(
-                BROADCAST_HEIGHT,
-                Box::new(ReceiveRemoteHeight(sync.clone())),
-            )
+            .register_endpoint_handler(BROADCAST_HEIGHT, ReceiveRemoteHeight(sync.clone()))
             .expect("register remote height");
 
         let hook_fn = |sync: Sync| -> _ {
@@ -182,10 +179,7 @@ async fn connect(
         .expect("register consensus rpc response pull block");
 
     network
-        .register_endpoint_handler(
-            BROADCAST_HEIGHT,
-            Box::new(ReceiveRemoteHeight(sync.clone())),
-        )
+        .register_endpoint_handler(BROADCAST_HEIGHT, ReceiveRemoteHeight(sync.clone()))
         .expect("register remote height");
 
     let hook_fn = |sync: Sync| -> _ {

@@ -72,7 +72,7 @@ async fn broadcast() {
     let (done_tx, mut bootstrap_done) = unbounded();
 
     bootstrap
-        .register_endpoint_handler(END_TEST_BROADCAST, Box::new(NewsReader::new(done_tx)))
+        .register_endpoint_handler(END_TEST_BROADCAST, NewsReader::new(done_tx))
         .expect("bootstrap register news reader");
 
     tokio::spawn(bootstrap);
@@ -82,7 +82,7 @@ async fn broadcast() {
     let (done_tx, mut alpha_done) = unbounded();
 
     alpha
-        .register_endpoint_handler(END_TEST_BROADCAST, Box::new(NewsReader::new(done_tx)))
+        .register_endpoint_handler(END_TEST_BROADCAST, NewsReader::new(done_tx))
         .expect("alpha register news reader");
 
     tokio::spawn(alpha);
@@ -92,7 +92,7 @@ async fn broadcast() {
     let (done_tx, mut brova_done) = unbounded();
 
     brova
-        .register_endpoint_handler(END_TEST_BROADCAST, Box::new(NewsReader::new(done_tx)))
+        .register_endpoint_handler(END_TEST_BROADCAST, NewsReader::new(done_tx))
         .expect("brova register news reader");
 
     tokio::spawn(brova);

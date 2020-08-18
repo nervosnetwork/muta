@@ -1,4 +1,3 @@
-use std::sync::Arc;
 use std::time::Instant;
 
 use async_trait::async_trait;
@@ -15,33 +14,18 @@ use crate::error::{ErrorKind, NetworkError};
 use crate::message::{Headers, NetworkMessage};
 use crate::protocols::{Recipient, Transmitter, TransmitterMessage};
 use crate::rpc::{RpcErrorMessage, RpcResponse, RpcResponseCode};
-use crate::rpc_map::RpcMap;
 use crate::traits::{Compression, NetworkContext};
 
 #[derive(Clone)]
-pub struct NetworkRpc<C> {
+pub struct NetworkRpc {
     transmitter: Transmitter,
-    compression: C,
-    map:         Arc<RpcMap>,
-
-    timeout: TimeoutConfig,
+    timeout:     TimeoutConfig,
 }
 
-impl<C> NetworkRpc<C>
-where
-    C: Compression + Sync + Clone,
-{
-    pub fn new(
-        transmitter: Transmitter,
-        compression: C,
-        map: Arc<RpcMap>,
-        timeout: TimeoutConfig,
-    ) -> Self {
+impl NetworkRpc {
+    pub fn new(transmitter: Transmitter, timeout: TimeoutConfig) -> Self {
         NetworkRpc {
             transmitter,
-            compression,
-            map,
-
             timeout,
         }
     }
@@ -53,7 +37,7 @@ where
         data: Bytes,
         priority: Priority,
     ) -> Result<(), NetworkError> {
-        let compressed_data = self.compression.compress(data)?;
+        let compressed_data = self.transmitter.compressor().compress(data)?;
 
         let msg = TransmitterMessage {
             recipient: Recipient::Session(TargetSession::Single(session_id)),
@@ -66,10 +50,7 @@ where
 }
 
 #[async_trait]
-impl<C> Rpc for NetworkRpc<C>
-where
-    C: Compression + Send + Sync + Clone,
-{
+impl Rpc for NetworkRpc {
     async fn call<M, R>(
         &self,
         cx: Context,
@@ -83,26 +64,28 @@ where
     {
         let endpoint = endpoint.parse::<Endpoint>()?;
         let sid = cx.session_id()?;
-        let rid = self.map.next_rpc_id();
+        let rpc_map = &self.transmitter.router.rpc_map;
+        let rid = rpc_map.next_rpc_id();
         let connected_addr = cx.remote_connected_addr();
-        let done_rx = self.map.insert::<RpcResponse>(sid, rid);
+        let done_rx = rpc_map.insert::<RpcResponse>(sid, rid);
         let inst = Instant::now();
 
         struct _Guard {
-            map: Arc<RpcMap>,
-            sid: SessionId,
-            rid: u64,
+            transmitter: Transmitter,
+            sid:         SessionId,
+            rid:         u64,
         }
 
         impl Drop for _Guard {
             fn drop(&mut self) {
                 // Simple take then drop if there is one
-                let _ = self.map.take::<RpcResponse>(self.sid, self.rid);
+                let rpc_map = &self.transmitter.router.rpc_map;
+                let _ = rpc_map.take::<RpcResponse>(self.sid, self.rid);
             }
         }
 
         let _guard = _Guard {
-            map: Arc::clone(&self.map),
+            transmitter: self.transmitter.clone(),
             sid,
             rid,
         };
@@ -116,9 +99,7 @@ where
             log::info!("no trace id found for rpc {}", endpoint.full_url());
         }
         common_apm::metrics::network::on_network_message_sent(endpoint.full_url());
-        let net_msg = NetworkMessage::new(endpoint, data, headers)
-            .encode()
-            .await?;
+        let net_msg = NetworkMessage::new(endpoint, data, headers).encode()?;
 
         self.send(cx, sid, net_msg, priority).await?;
 
@@ -182,9 +163,7 @@ where
             log::info!("no trace id found for rpc {}", endpoint.full_url());
         }
         common_apm::metrics::network::on_network_message_sent(endpoint.full_url());
-        let net_msg = NetworkMessage::new(endpoint, encoded_resp, headers)
-            .encode()
-            .await?;
+        let net_msg = NetworkMessage::new(endpoint, encoded_resp, headers).encode()?;
 
         self.send(cx, sid, net_msg, priority).await?;
 

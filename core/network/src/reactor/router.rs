@@ -1,135 +1,169 @@
 use std::collections::HashMap;
 use std::future::Future;
-use std::pin::Pin;
 use std::sync::Arc;
-use std::task::{Context, Poll};
 
-use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
-use futures::future::TryFutureExt;
-use futures::stream::Stream;
-use log::{error, warn};
+use derive_more::Display;
+use futures::channel::mpsc::UnboundedSender;
 use parking_lot::RwLock;
+use protocol::traits::{MessageCodec, MessageHandler, TrustFeedback};
+use protocol::ProtocolResult;
+use tentacle::context::ProtocolContextMutRef;
+use tentacle::secio::PeerId;
+use tentacle::SessionId;
 
+use crate::common::ConnectedAddr;
 use crate::endpoint::Endpoint;
 use crate::error::{ErrorKind, NetworkError};
 use crate::event::PeerManagerEvent;
-use crate::message::{NetworkMessage, SessionMessage};
+use crate::message::NetworkMessage;
 use crate::protocols::ReceivedMessage;
-use crate::traits::{Compression, SharedSessionBook};
+use crate::traits::Compression;
 
-pub struct MessageRouter<C, S> {
+use super::rpc_map::RpcMap;
+use super::Reactor;
+
+#[derive(Debug, Display)]
+#[display(fmt = "connection isnt encrypted, no peer id")]
+pub struct NoEncryption {}
+
+#[derive(Debug, Display, Clone)]
+#[display(fmt = "remote peer {:?} addr {}", peer_id, connected_addr)]
+pub struct RemotePeer {
+    pub session_id:     SessionId,
+    pub peer_id:        PeerId,
+    pub connected_addr: ConnectedAddr,
+}
+
+impl RemotePeer {
+    pub fn from_proto_context(
+        protocol_context: &ProtocolContextMutRef,
+    ) -> Result<Self, NoEncryption> {
+        let session = protocol_context.session;
+        let pubkey = session
+            .remote_pubkey
+            .as_ref()
+            .ok_or_else(|| NoEncryption {})?;
+
+        Ok(RemotePeer {
+            session_id:     session.id,
+            peer_id:        pubkey.peer_id(),
+            connected_addr: ConnectedAddr::from(&session.address),
+        })
+    }
+}
+
+pub struct RouterContext {
+    pub(crate) remote_peer: RemotePeer,
+    pub(crate) rpc_map:     Arc<RpcMap>,
+    trust_tx:               UnboundedSender<PeerManagerEvent>,
+}
+
+impl RouterContext {
+    fn new(
+        remote_peer: RemotePeer,
+        rpc_map: Arc<RpcMap>,
+        trust_tx: UnboundedSender<PeerManagerEvent>,
+    ) -> Self {
+        RouterContext {
+            remote_peer,
+            rpc_map,
+            trust_tx,
+        }
+    }
+
+    pub fn report_feedback(&self, feedback: TrustFeedback) {
+        let feedback_event = PeerManagerEvent::TrustMetric {
+            pid: self.remote_peer.peer_id.clone(),
+            feedback,
+        };
+        if let Err(e) = self.trust_tx.unbounded_send(feedback_event) {
+            log::error!("send peer {} feedback failed {}", self.remote_peer, e);
+        }
+    }
+}
+
+type ReactorMap = HashMap<Endpoint, Arc<Box<dyn Reactor>>>;
+
+#[derive(Clone)]
+pub struct MessageRouter<C> {
     // Endpoint to reactor channel map
-    reactor_map: Arc<RwLock<HashMap<Endpoint, UnboundedSender<SessionMessage>>>>,
+    reactor_map: Arc<RwLock<ReactorMap>>,
 
-    // Receiver for compressed session message
-    recv_data_rx: UnboundedReceiver<ReceivedMessage>,
+    // Rpc map
+    pub(crate) rpc_map: Arc<RpcMap>,
 
     // Sender for peer trust metric feedback
     trust_tx: UnboundedSender<PeerManagerEvent>,
 
     // Compression to decompress message
     compression: C,
-
-    // Session book
-    sessions: S,
-
-    // Fatal system error reporter
-    sys_tx: UnboundedSender<NetworkError>,
 }
 
-impl<C, S> MessageRouter<C, S>
+impl<C> MessageRouter<C>
 where
-    C: Compression + Send + Unpin + Clone + 'static,
-    S: SharedSessionBook + Send + Unpin + Clone + 'static,
+    C: Compression + Send + Clone + 'static,
 {
-    pub fn new(
-        recv_data_rx: UnboundedReceiver<ReceivedMessage>,
-        trust_tx: UnboundedSender<PeerManagerEvent>,
-        compression: C,
-        sessions: S,
-        sys_tx: UnboundedSender<NetworkError>,
-    ) -> Self {
+    pub fn new(trust_tx: UnboundedSender<PeerManagerEvent>, compression: C) -> Self {
         MessageRouter {
             reactor_map: Default::default(),
-
-            recv_data_rx,
+            rpc_map: Arc::new(RpcMap::new()),
             trust_tx,
             compression,
-            sessions,
-
-            sys_tx,
         }
     }
 
-    pub fn register_reactor(
-        &mut self,
+    pub fn register_reactor<M: MessageCodec>(
+        &self,
         endpoint: Endpoint,
-        smsg_tx: UnboundedSender<SessionMessage>,
+        message_handler: impl MessageHandler<Message = M>,
     ) {
-        self.reactor_map.write().insert(endpoint, smsg_tx);
+        let reactor = super::generate(message_handler);
+        self.reactor_map
+            .write()
+            .insert(endpoint, Arc::new(Box::new(reactor)));
     }
 
-    pub fn route_recived_message(&self, recv_msg: ReceivedMessage) -> impl Future<Output = ()> {
+    pub fn register_rpc_response(&self, endpoint: Endpoint) {
+        let reactor = super::rpc_resp::<()>();
+        self.reactor_map
+            .write()
+            .insert(endpoint, Arc::new(Box::new(reactor)));
+    }
+
+    pub fn route_message(
+        &self,
+        remote_peer: RemotePeer,
+        recv_msg: ReceivedMessage,
+    ) -> impl Future<Output = ProtocolResult<()>> {
         let reactor_map = Arc::clone(&self.reactor_map);
         let compression = self.compression.clone();
-        let sessions = self.sessions.clone();
-        let sys_tx = self.sys_tx.clone();
-        let trust_tx = self.trust_tx.clone();
+        let router_context = RouterContext::new(
+            remote_peer,
+            Arc::clone(&self.rpc_map),
+            self.trust_tx.clone(),
+        );
 
-        let route = async move {
-            let des_msg = compression.decompress(recv_msg.data)?;
-            let net_msg = NetworkMessage::decode(des_msg).await?;
-            common_apm::metrics::network::on_network_message_received(&net_msg.url);
+        async move {
+            let network_message = {
+                let decompressed = compression.decompress(recv_msg.data)?;
+                NetworkMessage::decode(decompressed)?
+            };
+            common_apm::metrics::network::on_network_message_received(&network_message.url);
 
-            let reactor_map = reactor_map.read();
-            let endpoint = net_msg.url.parse::<Endpoint>()?;
-
-            let opt_smsg_tx = reactor_map.get(&endpoint).cloned();
-            let smsg_tx = opt_smsg_tx.ok_or_else(|| ErrorKind::NoReactor(endpoint.root()))?;
-
-            // Peer may disconnect when we try to fetch its connected address.
-            // This connected addr is mainly for debug purpose, so no error.
-            let connected_addr = sessions.connected_addr(recv_msg.session_id);
-            let smsg = SessionMessage {
-                sid: recv_msg.session_id,
-                pid: recv_msg.peer_id,
-                msg: net_msg,
-                connected_addr,
-                trust_tx,
+            let endpoint = network_message.url.parse::<Endpoint>()?;
+            let reactor = {
+                let opt_reactor = reactor_map.read().get(&endpoint).cloned();
+                opt_reactor
+                    .ok_or_else(|| NetworkError::from(ErrorKind::NoReactor(endpoint.root())))?
             };
 
-            if smsg_tx.unbounded_send(smsg).is_err() {
-                error!("network: we lost {} reactor", endpoint.root());
-
-                // If network service is offline, there's nothing we can do
-                let _ = sys_tx.unbounded_send(ErrorKind::Offline("reactor").into());
+            let ret = reactor
+                .react(router_context, endpoint.clone(), network_message)
+                .await;
+            if let Err(err) = ret.as_ref() {
+                log::error!("process {} message failed: {}", endpoint, err);
             }
-
-            Ok::<(), NetworkError>(())
-        };
-
-        route.unwrap_or_else(|err| warn!("network: router {}", err))
-    }
-}
-
-impl<C, S> Future for MessageRouter<C, S>
-where
-    C: Compression + Send + Unpin + Clone + 'static,
-    S: SharedSessionBook + Send + Unpin + Clone + 'static,
-{
-    type Output = ();
-
-    fn poll(mut self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {
-        loop {
-            let recv_data_rx = &mut self.as_mut().recv_data_rx;
-            futures::pin_mut!(recv_data_rx);
-
-            // service ready in common
-            let recv_msg = crate::service_ready!("router service", recv_data_rx.poll_next(ctx));
-
-            tokio::spawn(self.route_recived_message(recv_msg));
+            ret
         }
-
-        Poll::Pending
     }
 }

@@ -28,17 +28,16 @@ use crate::outbound::{NetworkGossip, NetworkRpc};
 #[cfg(feature = "diagnostic")]
 use crate::peer_manager::diagnostic::{Diagnostic, DiagnosticHookFn};
 use crate::peer_manager::{PeerManager, PeerManagerConfig, PeerManagerHandle, SharedSessions};
-use crate::protocols::{CoreProtocol, ReceivedMessage};
-use crate::reactor::{MessageRouter, Reactor};
-use crate::rpc_map::RpcMap;
+use crate::protocols::{CoreProtocol, Transmitter};
+use crate::reactor::MessageRouter;
 use crate::selfcheck::SelfCheck;
 use crate::traits::NetworkContext;
 use crate::{NetworkConfig, PeerIdExt};
 
 #[derive(Clone)]
 pub struct NetworkServiceHandle {
-    gossip:     NetworkGossip<Snappy>,
-    rpc:        NetworkRpc<Snappy>,
+    gossip:     NetworkGossip,
+    rpc:        NetworkRpc,
     peer_trust: UnboundedSender<PeerManagerEvent>,
     peer_state: PeerManagerHandle,
 
@@ -154,25 +153,23 @@ pub struct NetworkService {
     sys_rx: UnboundedReceiver<NetworkError>,
 
     // Heart beats
-    conn_tx:      UnboundedSender<ConnectionEvent>,
-    mgr_tx:       UnboundedSender<PeerManagerEvent>,
-    recv_data_tx: UnboundedSender<ReceivedMessage>,
-    heart_beat:   Option<HeartBeat>,
-    hb_waker:     Arc<AtomicWaker>,
+    conn_tx:    UnboundedSender<ConnectionEvent>,
+    mgr_tx:     UnboundedSender<PeerManagerEvent>,
+    heart_beat: Option<HeartBeat>,
+    hb_waker:   Arc<AtomicWaker>,
 
     // Config backup
     config: NetworkConfig,
 
     // Public service components
-    gossip:  NetworkGossip<Snappy>,
-    rpc:     NetworkRpc<Snappy>,
-    rpc_map: Arc<RpcMap>,
+    gossip:      NetworkGossip,
+    rpc:         NetworkRpc,
+    transmitter: Transmitter,
 
     // Core service
     net_conn_srv:    Option<NetworkConnectionService>,
     peer_mgr:        Option<PeerManager>,
     peer_mgr_handle: PeerManagerHandle,
-    router:          Option<MessageRouter<Snappy, SharedSessions>>,
 
     // Metrics
     metrics: Option<Metrics<SharedSessions>>,
@@ -189,7 +186,6 @@ impl NetworkService {
     pub fn new(config: NetworkConfig) -> Self {
         let (mgr_tx, mgr_rx) = unbounded();
         let (conn_tx, conn_rx) = unbounded();
-        let (recv_data_tx, recv_data_rx) = unbounded();
         let (sys_tx, sys_rx) = unbounded();
 
         let hb_waker = Arc::new(AtomicWaker::new());
@@ -219,16 +215,17 @@ impl NetworkService {
 
         // Build service protocol
         let disc_sync_interval = config.discovery_sync_interval;
+        let message_router = MessageRouter::new(mgr_tx.clone(), Snappy);
         let proto = CoreProtocol::build()
             .ping(config.ping_interval, config.ping_timeout, mgr_tx.clone())
             .identify(peer_mgr_handle.clone(), mgr_tx.clone())
             .discovery(peer_mgr_handle.clone(), mgr_tx.clone(), disc_sync_interval)
-            .transmitter(recv_data_tx.clone(), peer_mgr_handle.clone())
+            .transmitter(message_router, peer_mgr_handle.clone())
             .build();
         let transmitter = proto.transmitter();
 
         // Build connection service
-        let keeper = ConnectionServiceKeeper::new(mgr_tx.clone(), sys_tx.clone());
+        let keeper = ConnectionServiceKeeper::new(mgr_tx.clone(), sys_tx);
         let conn_srv = ConnectionService::<CoreProtocol>::new(proto, conn_config, keeper, conn_rx);
         let conn_ctrl = conn_srv.control();
 
@@ -237,17 +234,8 @@ impl NetworkService {
             .init(conn_ctrl, mgr_tx.clone(), session_book.clone());
 
         // Build public service components
-        let rpc_map = Arc::new(RpcMap::new());
-        let gossip = NetworkGossip::new(transmitter.clone(), Snappy);
-        let rpc_map_clone = Arc::clone(&rpc_map);
-        let rpc = NetworkRpc::new(transmitter, Snappy, rpc_map_clone, (&config).into());
-        let router = MessageRouter::new(
-            recv_data_rx,
-            mgr_tx.clone(),
-            Snappy,
-            session_book.clone(),
-            sys_tx,
-        );
+        let gossip = NetworkGossip::new(transmitter.clone());
+        let rpc = NetworkRpc::new(transmitter.clone(), (&config).into());
 
         // Build metrics service
         let metrics = Metrics::new(session_book.clone());
@@ -259,7 +247,6 @@ impl NetworkService {
             sys_rx,
             conn_tx,
             mgr_tx,
-            recv_data_tx,
             hb_waker,
 
             heart_beat: Some(heart_beat),
@@ -268,12 +255,11 @@ impl NetworkService {
 
             gossip,
             rpc,
-            rpc_map,
+            transmitter,
 
             net_conn_srv: Some(NetworkConnectionService::NoListen(conn_srv)),
             peer_mgr: Some(peer_mgr),
             peer_mgr_handle,
-            router: Some(router),
 
             metrics: Some(metrics),
 
@@ -287,27 +273,19 @@ impl NetworkService {
     pub fn register_endpoint_handler<M>(
         &mut self,
         end: &str,
-        handler: Box<dyn MessageHandler<Message = M>>,
+        handler: impl MessageHandler<Message = M>,
     ) -> ProtocolResult<()>
     where
         M: MessageCodec,
     {
         let endpoint = end.parse::<Endpoint>()?;
-        let (msg_tx, msg_rx) = unbounded();
-
         if endpoint.scheme() == EndpointScheme::RpcResponse {
             let err = "use register_rpc_response() instead".to_owned();
 
             return Err(NetworkError::UnexpectedScheme(err).into());
         }
 
-        if let Some(router) = &mut self.router {
-            router.register_reactor(endpoint, msg_tx);
-
-            let reactor = Reactor::new(msg_rx, handler, Arc::clone(&self.rpc_map));
-            tokio::spawn(reactor);
-        }
-
+        self.transmitter.router.register_reactor(endpoint, handler);
         Ok(())
     }
 
@@ -318,19 +296,11 @@ impl NetworkService {
         M: MessageCodec,
     {
         let endpoint = end.parse::<Endpoint>()?;
-        let (msg_tx, msg_rx) = unbounded();
-
         if endpoint.scheme() != EndpointScheme::RpcResponse {
             return Err(NetworkError::UnexpectedScheme(end.to_owned()).into());
         }
 
-        if let Some(router) = &mut self.router {
-            router.register_reactor(endpoint, msg_tx);
-
-            let reactor = Reactor::<M>::rpc_resp(msg_rx, Arc::clone(&self.rpc_map));
-            tokio::spawn(reactor);
-        }
-
+        self.transmitter.router.register_rpc_response(endpoint);
         Ok(())
     }
 
@@ -426,10 +396,6 @@ impl Future for NetworkService {
             tokio::spawn(peer_mgr);
         }
 
-        if let Some(router) = self.router.take() {
-            tokio::spawn(router);
-        }
-
         if let Some(metrics) = self.metrics.take() {
             tokio::spawn(metrics);
         }
@@ -457,10 +423,6 @@ impl Future for NetworkService {
 
         if self.mgr_tx.is_closed() {
             info!("network: peer manager closed");
-        }
-
-        if self.recv_data_tx.is_closed() {
-            info!("network: message router closed");
         }
 
         // Process system error report

@@ -181,14 +181,11 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     // Register diagnostic
     network_service.register_endpoint_handler(
         GOSSIP_TRUST_NEW_INTERVAL,
-        Box::new(TrustNewIntervalHandler::new(
-            sync.clone(),
-            network_service.handle(),
-        )),
+        TrustNewIntervalHandler::new(sync.clone(), network_service.handle()),
     )?;
     network_service.register_endpoint_handler(
         GOSSIP_TRUST_TWIN_EVENT,
-        Box::new(TrustTwinEventHandler(network_service.handle())),
+        TrustTwinEventHandler(network_service.handle()),
     )?;
 
     let hook_fn = |sync: Sync| -> _ { Box::new(move |event: DiagnosticEvent| sync.emit(event)) };
@@ -257,18 +254,13 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     );
 
     // register broadcast new transaction
-    network_service.register_endpoint_handler(
-        END_GOSSIP_NEW_TXS,
-        Box::new(NewTxsHandler::new(Arc::clone(&mempool))),
-    )?;
+    network_service
+        .register_endpoint_handler(END_GOSSIP_NEW_TXS, NewTxsHandler::new(Arc::clone(&mempool)))?;
 
     // register pull txs from other node
     network_service.register_endpoint_handler(
         RPC_PULL_TXS,
-        Box::new(PullTxsHandler::new(
-            Arc::new(network_service.handle()),
-            Arc::clone(&mempool),
-        )),
+        PullTxsHandler::new(Arc::new(network_service.handle()), Arc::clone(&mempool)),
     )?;
     network_service.register_rpc_response::<MsgPushTxs>(RPC_RESP_PULL_TXS)?;
 
@@ -416,48 +408,37 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
     // register consensus
     network_service.register_endpoint_handler(
         END_GOSSIP_SIGNED_PROPOSAL,
-        Box::new(ProposalMessageHandler::new(Arc::clone(&overlord_consensus))),
+        ProposalMessageHandler::new(Arc::clone(&overlord_consensus)),
     )?;
     network_service.register_endpoint_handler(
         END_GOSSIP_AGGREGATED_VOTE,
-        Box::new(QCMessageHandler::new(Arc::clone(&overlord_consensus))),
+        QCMessageHandler::new(Arc::clone(&overlord_consensus)),
     )?;
     network_service.register_endpoint_handler(
         END_GOSSIP_SIGNED_VOTE,
-        Box::new(VoteMessageHandler::new(Arc::clone(&overlord_consensus))),
+        VoteMessageHandler::new(Arc::clone(&overlord_consensus)),
     )?;
     network_service.register_endpoint_handler(
         END_GOSSIP_SIGNED_CHOKE,
-        Box::new(ChokeMessageHandler::new(Arc::clone(&overlord_consensus))),
+        ChokeMessageHandler::new(Arc::clone(&overlord_consensus)),
     )?;
     network_service.register_endpoint_handler(
         BROADCAST_HEIGHT,
-        Box::new(RemoteHeightMessageHandler::new(Arc::clone(
-            &synchronization,
-        ))),
+        RemoteHeightMessageHandler::new(Arc::clone(&synchronization)),
     )?;
     network_service.register_endpoint_handler(
         RPC_SYNC_PULL_BLOCK,
-        Box::new(PullBlockRpcHandler::new(
-            Arc::new(network_service.handle()),
-            Arc::clone(&storage),
-        )),
+        PullBlockRpcHandler::new(Arc::new(network_service.handle()), Arc::clone(&storage)),
     )?;
 
     network_service.register_endpoint_handler(
         RPC_SYNC_PULL_PROOF,
-        Box::new(PullProofRpcHandler::new(
-            Arc::new(network_service.handle()),
-            Arc::clone(&storage),
-        )),
+        PullProofRpcHandler::new(Arc::new(network_service.handle()), Arc::clone(&storage)),
     )?;
 
     network_service.register_endpoint_handler(
         RPC_SYNC_PULL_TXS,
-        Box::new(PullTxsRpcHandler::new(
-            Arc::new(network_service.handle()),
-            Arc::clone(&storage),
-        )),
+        PullTxsRpcHandler::new(Arc::new(network_service.handle()), Arc::clone(&storage)),
     )?;
     network_service.register_rpc_response::<FixedBlock>(RPC_RESP_SYNC_PULL_BLOCK)?;
     network_service.register_rpc_response::<FixedProof>(RPC_RESP_SYNC_PULL_PROOF)?;

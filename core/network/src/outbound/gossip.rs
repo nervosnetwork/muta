@@ -12,20 +12,13 @@ use crate::traits::Compression;
 use crate::PeerIdExt;
 
 #[derive(Clone)]
-pub struct NetworkGossip<C> {
+pub struct NetworkGossip {
     transmitter: Transmitter,
-    compression: C,
 }
 
-impl<C> NetworkGossip<C>
-where
-    C: Compression + Sync + Send + Clone,
-{
-    pub fn new(transmitter: Transmitter, compression: C) -> Self {
-        NetworkGossip {
-            transmitter,
-            compression,
-        }
+impl NetworkGossip {
+    pub fn new(transmitter: Transmitter) -> Self {
+        NetworkGossip { transmitter }
     }
 
     async fn package_message<M>(
@@ -45,10 +38,8 @@ where
             headers.set_span_id(state.span_id());
             log::info!("no trace id found for gossip {}", endpoint.full_url());
         }
-        let net_msg = NetworkMessage::new(endpoint, data, headers)
-            .encode()
-            .await?;
-        let msg = self.compression.compress(net_msg)?;
+        let net_msg = NetworkMessage::new(endpoint, data, headers).encode()?;
+        let msg = self.transmitter.compressor().compress(net_msg)?;
 
         Ok(msg)
     }
@@ -94,10 +85,7 @@ where
 }
 
 #[async_trait]
-impl<C> Gossip for NetworkGossip<C>
-where
-    C: Compression + Sync + Send + Clone,
-{
+impl Gossip for NetworkGossip {
     async fn broadcast<M>(
         &self,
         cx: Context,

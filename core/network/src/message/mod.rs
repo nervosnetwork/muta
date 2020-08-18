@@ -1,22 +1,14 @@
 pub mod serde;
 pub mod serde_multi;
 
-use common_apm::muta_apm::rustracing_jaeger::span::TraceId;
+use std::{collections::HashMap, str::FromStr};
 
-use derive_more::Constructor;
-use futures::channel::mpsc::UnboundedSender;
+use common_apm::muta_apm::rustracing_jaeger::span::TraceId;
 use prost::Message;
 use protocol::Bytes;
-use tentacle::{secio::PeerId, SessionId};
 
-use crate::{
-    common::ConnectedAddr,
-    endpoint::Endpoint,
-    error::{ErrorKind, NetworkError},
-    event::PeerManagerEvent,
-};
-
-use std::{collections::HashMap, str::FromStr};
+use crate::endpoint::Endpoint;
+use crate::error::{ErrorKind, NetworkError};
 
 pub struct Headers(HashMap<String, Vec<u8>>);
 
@@ -79,7 +71,7 @@ impl NetworkMessage {
         })
     }
 
-    pub async fn encode(self) -> Result<Bytes, NetworkError> {
+    pub fn encode(self) -> Result<Bytes, NetworkError> {
         let mut buf = Vec::with_capacity(self.encoded_len());
 
         <Self as Message>::encode(&self, &mut buf)
@@ -88,19 +80,9 @@ impl NetworkMessage {
         Ok(Bytes::from(buf))
     }
 
-    pub async fn decode(bytes: Bytes) -> Result<Self, NetworkError> {
+    pub fn decode(bytes: Bytes) -> Result<Self, NetworkError> {
         <Self as Message>::decode(bytes).map_err(|e| ErrorKind::BadMessage(Box::new(e)).into())
     }
-}
-
-#[derive(Constructor)]
-#[non_exhaustive]
-pub struct SessionMessage {
-    pub(crate) sid:            SessionId,
-    pub(crate) pid:            PeerId,
-    pub(crate) msg:            NetworkMessage,
-    pub(crate) connected_addr: Option<ConnectedAddr>,
-    pub(crate) trust_tx:       UnboundedSender<PeerManagerEvent>,
 }
 
 #[cfg(test)]
