@@ -2,7 +2,7 @@
 All current metrics and usage
 ## API
 
-| Metric name | Metric types | Related promethues panel |
+| Metric name | Metric types | Related Grafana panel |
 |---|---|---|
 | muta_api_request_total             | counter      |                          |
 | muta_api_request_result_total      | counter      | processed_tx_request     |
@@ -20,7 +20,7 @@ All current metrics and usage
   <tr>
     <td>Metric name</td>
     <td>Metric types</td>
-    <td>Related promethues panel</td>
+    <td>Related Grafana panel</td>
   </tr>
   <tr>
     <td>muta_concensus_result</td>
@@ -72,7 +72,7 @@ All current metrics and usage
   <tr>
     <th>Metric name</th>
     <th>Metric types</th>
-    <th>Related promethues panel</th>
+    <th>Related Grafana panel</th>
   </tr>
 </thead>
 <tbody>
@@ -115,7 +115,7 @@ All current metrics and usage
   <tr>
     <th>Metric name</th>
     <th>Metric types</th>
-    <th>Related promethues panel</th>
+    <th>Related Grafana panel</th>
   </tr>
 </thead>
 <tbody>
@@ -206,7 +206,7 @@ All current metrics and usage
   <tr>
     <th>Metric name</th>
     <th>Metric types</th>
-    <th>Related promethues panel</th>
+    <th>Related Grafana panel</th>
   </tr>
 </thead>
 <tbody>
