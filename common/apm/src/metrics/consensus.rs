@@ -65,6 +65,8 @@ lazy_static! {
         register_int_gauge!("muta_consensus_round", "Round count of consensus").unwrap();
     pub static ref ENGINE_HEIGHT_GAUGE: IntGauge =
         register_int_gauge!("muta_consensus_height", "Height of muta").unwrap();
+    pub static ref ENGINE_EXECUTING_BLOCK_GAUGE: IntGauge =
+        register_int_gauge!("muta_executing_block_count", "The executing blocks").unwrap();
     pub static ref ENGINE_COMMITED_TX_COUNTER: IntCounter = register_int_counter!(
         "muta_consensus_committed_tx_total",
         "The committed transactions"
