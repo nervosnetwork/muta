@@ -9,7 +9,7 @@ All current metrics and usage
 | muta_api_request_time_cost_seconds | histogram    |                          |
 
 
-## Consensus		
+## Consensus
 <table>
 <thead>
   <tr>
@@ -36,6 +36,11 @@ All current metrics and usage
     <td>muta_consensus_round</td>
     <td>gauge</td>
     <td>consensus_round_cost</td>
+  </tr>
+  <tr>
+    <td>muta_executing_queue</td>
+    <td>gauge</td>
+    <td>executing_block_size</td>
   </tr>
   <tr>
     <td rowspan="3">muta_consensus_height</td>

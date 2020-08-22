@@ -68,11 +68,6 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
     ) -> Result<(FixedPill, Bytes), Box<dyn Error + Send>> {
         let current_consensus_status = self.status_agent.to_inner();
 
-        common_apm::metrics::consensus::ENGINE_EXECUTING_BLOCK_GAUGE.set(
-            (current_consensus_status.latest_committed_height
-                - current_consensus_status.exec_height) as i64,
-        );
-
         if current_consensus_status.latest_committed_height
             != current_consensus_status.current_proof.height
         {
@@ -434,10 +429,6 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             authority_list: covert_to_overlord_authority(&current_consensus_status.validators),
         };
 
-        common_apm::metrics::consensus::ENGINE_EXECUTING_BLOCK_GAUGE.set(
-            (current_consensus_status.latest_committed_height
-                - current_consensus_status.exec_height) as i64,
-        );
         common_apm::metrics::consensus::ENGINE_HEIGHT_GAUGE.set((current_height + 1) as i64);
         common_apm::metrics::consensus::ENGINE_COMMITED_TX_COUNTER.inc_by(txs_len as i64);
 
@@ -639,9 +630,6 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
     #[muta_apm::derive::tracing_span(kind = "consensus.engine")]
     fn check_block_roots(&self, ctx: Context, block: &BlockHeader) -> ProtocolResult<()> {
         let status = self.status_agent.to_inner();
-
-        common_apm::metrics::consensus::ENGINE_EXECUTING_BLOCK_GAUGE
-            .set((status.latest_committed_height - status.exec_height) as i64);
 
         // check previous hash
         if status.current_hash != block.prev_hash {
