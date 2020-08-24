@@ -801,7 +801,8 @@ impl PeerManager {
     }
 
     fn new_unidentified_session(&mut self, pubkey: PublicKey, ctx: Arc<SessionContext>) {
-        common_apm::metrics::network::NETWORK_OUTBOUND_CONNECTING_PEERS.dec();
+        common_apm::metrics::network::NETWORK_OUTBOUND_CONNECTING_PEERS
+            .set(self.connecting.len() as i64);
 
         let peer_id = pubkey.peer_id();
         if let Err(err) = self.new_session_pre_check(&pubkey, &ctx) {
@@ -976,7 +977,8 @@ impl PeerManager {
                     attempt.peer.set_connectedness(Connectedness::Unconnectable);
                 }
 
-                common_apm::metrics::network::NETWORK_OUTBOUND_CONNECTING_PEERS.dec();
+                common_apm::metrics::network::NETWORK_OUTBOUND_CONNECTING_PEERS
+                    .set(self.connecting.len() as i64);
             // FIXME
             // if let Some(trust_metric) = attempt.peer.trust_metric() {
             //     trust_metric.bad_events(1);
@@ -1489,10 +1491,10 @@ impl Future for PeerManager {
             );
 
             if !connectable_peers.is_empty() {
-                common_apm::metrics::network::NETWORK_OUTBOUND_CONNECTING_PEERS
-                    .add(connectable_peers.len() as i64);
-
                 self.connect_peers(connectable_peers);
+
+                common_apm::metrics::network::NETWORK_OUTBOUND_CONNECTING_PEERS
+                    .set(self.connecting.len() as i64);
             }
         }
 
