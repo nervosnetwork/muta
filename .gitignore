@@ -33,7 +33,6 @@ logs/
 Cargo.lock
 
 # free space, you can store anything you want here
-free-space/
+free-space
 
 byzantine/tests/node_modules
-

@@ -6,6 +6,7 @@ edition = "2018"
 repository = "https://github.com/nervosnetwork/muta"
 
 [dependencies]
+cli = { path = "./core/cli"}
 byzantine = { path = "./byzantine" }
 common-apm = { path = "./common/apm" }
 common-config-parser = { path = "./common/config-parser" }
@@ -38,6 +39,8 @@ toml = "0.5"
 tokio = { version = "0.2", features = ["macros", "sync", "rt-core", "rt-util", "signal", "time"] }
 muta-apm = "0.1.0-alpha.7"
 futures-timer="3.0"
+cita_trie = "2.0"
+fs_extra = "1.2.0"
 
 [dev-dependencies]
 cita_trie = "2.0"
@@ -70,6 +73,8 @@ members = [
   "core/mempool",
   "core/network",
   "core/storage",
+  "core/cli",
+  "core/run",
 
   "binding-macro",
   "framework",

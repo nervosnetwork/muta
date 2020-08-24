@@ -1,0 +1,41 @@
+[package]
+name = "run"
+version = "0.1.0"
+authors = ["LycrusHamster <liang2929@hotmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+backtrace = "0.3"
+actix-rt = "1.0"
+derive_more = "0.99"
+futures = "0.3"
+parking_lot = "0.11"
+serde = "1.0"
+serde_derive = "1.0"
+serde_json = "1.0"
+log = "0.4"
+clap = "2.33"
+bytes = "0.5"
+hex = "0.4"
+rlp = "0.4"
+toml = "0.5"
+futures-timer="3.0"
+cita_trie = "2.0"
+tokio = { version = "0.2", features = ["macros", "sync", "rt-core", "rt-util", "signal", "time"] }
+
+byzantine = { path = "../../byzantine" }
+common-apm = { path = "../../common/apm" }
+common-config-parser = { path = "../../common/config-parser" }
+common-crypto = { path = "../../common/crypto" }
+common-logger = { path = "../../common/logger" }
+protocol = { path = "../../protocol", package = "muta-protocol" }
+core-api = { path = "../../core/api" }
+core-storage = { path = "../../core/storage" }
+core-mempool = { path = "../../core/mempool" }
+core-network = { path = "../../core/network" }
+core-consensus = { path = "../../core/consensus" }
+
+binding-macro = { path = "../../binding-macro" }
+framework = { path = "../../framework" }

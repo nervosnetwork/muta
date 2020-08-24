@@ -30,7 +30,7 @@ use protocol::{ProtocolError, ProtocolErrorKind};
 pub use crate::adapter::OverlordConsensusAdapter;
 pub use crate::consensus::OverlordConsensus;
 pub use crate::synchronization::{OverlordSynchronization, RichBlock};
-pub use crate::wal::SignedTxsWAL;
+pub use crate::wal::{ConsensusWal, SignedTxsWAL};
 pub use overlord::{types::Node, DurationConfig};
 
 pub const DEFAULT_OVERLORD_GAP: usize = 5;
@@ -153,6 +153,18 @@ pub enum ConsensusError {
     /// Other error used for very few errors.
     #[display(fmt = "{:?}", _0)]
     Other(String),
+
+    #[display(fmt = "{:?}", _0)]
+    SystemTime(std::time::SystemTimeError),
+
+    #[display(fmt = "parse file name into timestamp error")]
+    FileNameTimestamp,
+
+    #[display(fmt = "consensus wal dir doesn't exist")]
+    ConsensusWalDirNotExist,
+
+    #[display(fmt = "no consensus wal file available")]
+    ConsensusWalNoWalFile,
 }
 
 #[derive(Debug, Display)]

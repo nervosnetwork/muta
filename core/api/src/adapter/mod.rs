@@ -4,9 +4,9 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use derive_more::Display;
 
-use protocol::traits::ExecutorFactory;
 use protocol::traits::{
-    APIAdapter, Context, ExecutorParams, MemPool, ServiceMapping, ServiceResponse, Storage,
+    APIAdapter, Context, ExecutorFactory, ExecutorParams, MemPool, ServiceMapping, ServiceResponse,
+    Storage,
 };
 use protocol::types::{Address, Block, Hash, Receipt, SignedTransaction, TransactionRequest};
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};

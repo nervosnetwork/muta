@@ -170,14 +170,11 @@ where
         Ok(block.header.validators)
     }
 
+    /// Get the current height from storage.
     #[muta_apm::derive::tracing_span(kind = "consensus.adapter")]
-    async fn save_overlord_wal(&self, ctx: Context, info: Bytes) -> ProtocolResult<()> {
-        self.storage.update_overlord_wal(ctx, info).await
-    }
-
-    #[muta_apm::derive::tracing_span(kind = "consensus.adapter")]
-    async fn load_overlord_wal(&self, ctx: Context) -> ProtocolResult<Bytes> {
-        self.storage.load_overlord_wal(ctx).await
+    async fn get_current_height(&self, ctx: Context) -> ProtocolResult<u64> {
+        let res = self.storage.get_latest_block(ctx).await?;
+        Ok(res.header.height)
     }
 
     #[muta_apm::derive::tracing_span(kind = "consensus.adapter")]
@@ -188,13 +185,6 @@ where
             .call::<FixedHeight, FixedBlock>(ctx, end, FixedHeight::new(height), Priority::High)
             .await?;
         Ok(res.inner)
-    }
-
-    /// Get the current height from storage.
-    #[muta_apm::derive::tracing_span(kind = "consensus.adapter")]
-    async fn get_current_height(&self, ctx: Context) -> ProtocolResult<u64> {
-        let res = self.storage.get_latest_block(ctx).await?;
-        Ok(res.header.height)
     }
 
     #[muta_apm::derive::tracing_span(kind = "consensus.adapter", logs = "{'txs_len': 'txs.len()'}")]

@@ -22,7 +22,8 @@ use common_apm::metrics::storage::on_storage_get_cf;
 use common_apm::muta_apm;
 use protocol::codec::ProtocolCodecSync;
 use protocol::traits::{
-    Context, Storage, StorageAdapter, StorageBatchModify, StorageCategory, StorageSchema,
+    CommonStorage, Context, MaintenanceStorage, Storage, StorageAdapter, StorageBatchModify,
+    StorageCategory, StorageSchema,
 };
 use protocol::types::{Block, Hash, Proof, Receipt, SignedTransaction};
 use protocol::Bytes;
@@ -33,7 +34,6 @@ const BATCH_VALUE_DECODE_NUMBER: usize = 1000;
 lazy_static! {
     pub static ref LATEST_BLOCK_KEY: Hash = Hash::digest(Bytes::from("latest_hash"));
     pub static ref LATEST_PROOF_KEY: Hash = Hash::digest(Bytes::from("latest_proof"));
-    pub static ref OVERLORD_WAL_KEY: Hash = Hash::digest(Bytes::from("overlord_wal"));
 }
 
 // FIXME: https://github.com/facebook/rocksdb/wiki/Transactions
@@ -255,7 +255,9 @@ impl_storage_schema_for!(ReceiptBytesSchema, CommonHashKey, Bytes, Receipt);
 impl_storage_schema_for!(HashHeightSchema, Hash, u64, HashHeight);
 impl_storage_schema_for!(LatestBlockSchema, Hash, Block, Block);
 impl_storage_schema_for!(LatestProofSchema, Hash, Proof, Block);
-impl_storage_schema_for!(OverlordWalSchema, Hash, Bytes, Wal);
+
+#[async_trait]
+impl<Adapter: StorageAdapter> MaintenanceStorage for ImplStorage<Adapter> {}
 
 #[async_trait]
 impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
@@ -369,24 +371,6 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
         } else {
             Ok(None)
         }
-    }
-
-    #[muta_apm::derive::tracing_span(kind = "storage")]
-    async fn insert_block(&self, ctx: Context, block: Block) -> ProtocolResult<()> {
-        self.adapter
-            .insert::<BlockSchema>(BlockKey::new(block.header.height), block.clone())
-            .await?;
-        self.adapter
-            .insert::<LatestBlockSchema>(LATEST_BLOCK_KEY.clone(), block.clone())
-            .await?;
-
-        self.latest_block.write().await.replace(block);
-
-        Ok(())
-    }
-
-    async fn get_block(&self, _ctx: Context, height: u64) -> ProtocolResult<Option<Block>> {
-        self.adapter.get::<BlockSchema>(BlockKey::new(height)).await
     }
 
     #[muta_apm::derive::tracing_span(kind = "storage")]
@@ -504,6 +488,36 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
         let proof = ensure_get!(self, LATEST_PROOF_KEY.clone(), LatestProofSchema);
         Ok(proof)
     }
+}
+
+#[async_trait]
+impl<Adapter: StorageAdapter> CommonStorage for ImplStorage<Adapter> {
+    async fn insert_block(&self, ctx: Context, block: Block) -> ProtocolResult<()> {
+        self.set_block(ctx.clone(), block.clone()).await?;
+
+        self.set_latest_block(ctx, block).await?;
+
+        Ok(())
+    }
+
+    async fn get_block(&self, _ctx: Context, height: u64) -> ProtocolResult<Option<Block>> {
+        self.adapter.get::<BlockSchema>(BlockKey::new(height)).await
+    }
+
+    // !!!be careful, the prev_hash may mismatch and latest block may diverse!!!
+    async fn set_block(&self, _ctx: Context, block: Block) -> ProtocolResult<()> {
+        self.adapter
+            .insert::<BlockSchema>(BlockKey::new(block.header.height), block.clone())
+            .await?;
+        Ok(())
+    }
+
+    // !be careful, only call this function in maintenance mode!
+    async fn remove_block(&self, _ctx: Context, height: u64) -> ProtocolResult<()> {
+        self.adapter
+            .remove::<BlockSchema>(BlockKey::new(height))
+            .await
+    }
 
     async fn get_latest_block(&self, _ctx: Context) -> ProtocolResult<Block> {
         let opt_block = { self.latest_block.read().await.clone() };
@@ -516,18 +530,14 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
         }
     }
 
-    #[muta_apm::derive::tracing_span(kind = "storage")]
-    async fn update_overlord_wal(&self, ctx: Context, info: Bytes) -> ProtocolResult<()> {
+    async fn set_latest_block(&self, _ctx: Context, block: Block) -> ProtocolResult<()> {
         self.adapter
-            .insert::<OverlordWalSchema>(OVERLORD_WAL_KEY.clone(), info)
+            .insert::<LatestBlockSchema>(LATEST_BLOCK_KEY.clone(), block.clone())
             .await?;
-        Ok(())
-    }
 
-    #[muta_apm::derive::tracing_span(kind = "storage")]
-    async fn load_overlord_wal(&self, ctx: Context) -> ProtocolResult<Bytes> {
-        let wal_info = ensure_get!(self, OVERLORD_WAL_KEY.clone(), OverlordWalSchema);
-        Ok(wal_info)
+        self.latest_block.write().await.replace(block);
+
+        Ok(())
     }
 }
 

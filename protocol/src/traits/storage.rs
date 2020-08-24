@@ -6,7 +6,7 @@ use crate::traits::Context;
 use crate::types::block::{Block, Proof};
 use crate::types::receipt::Receipt;
 use crate::types::{Hash, SignedTransaction};
-use crate::{Bytes, ProtocolResult};
+use crate::ProtocolResult;
 
 #[derive(Debug, Copy, Clone, Display)]
 pub enum StorageCategory {
@@ -34,7 +34,22 @@ pub trait IntoIteratorByRef<S: StorageSchema> {
 }
 
 #[async_trait]
-pub trait Storage: Send + Sync {
+pub trait CommonStorage: Send + Sync {
+    async fn insert_block(&self, ctx: Context, block: Block) -> ProtocolResult<()>;
+
+    async fn get_block(&self, ctx: Context, height: u64) -> ProtocolResult<Option<Block>>;
+
+    async fn set_block(&self, _ctx: Context, block: Block) -> ProtocolResult<()>;
+
+    async fn remove_block(&self, ctx: Context, height: u64) -> ProtocolResult<()>;
+
+    async fn get_latest_block(&self, ctx: Context) -> ProtocolResult<Block>;
+
+    async fn set_latest_block(&self, ctx: Context, block: Block) -> ProtocolResult<()>;
+}
+
+#[async_trait]
+pub trait Storage: CommonStorage {
     async fn insert_transactions(
         &self,
         ctx: Context,
@@ -54,10 +69,6 @@ pub trait Storage: Send + Sync {
         ctx: Context,
         hash: Hash,
     ) -> ProtocolResult<Option<SignedTransaction>>;
-
-    async fn insert_block(&self, ctx: Context, block: Block) -> ProtocolResult<()>;
-
-    async fn get_block(&self, ctx: Context, height: u64) -> ProtocolResult<Option<Block>>;
 
     async fn insert_receipts(
         &self,
@@ -82,13 +93,10 @@ pub trait Storage: Send + Sync {
     async fn update_latest_proof(&self, ctx: Context, proof: Proof) -> ProtocolResult<()>;
 
     async fn get_latest_proof(&self, ctx: Context) -> ProtocolResult<Proof>;
-
-    async fn get_latest_block(&self, ctx: Context) -> ProtocolResult<Block>;
-
-    async fn update_overlord_wal(&self, ctx: Context, info: Bytes) -> ProtocolResult<()>;
-
-    async fn load_overlord_wal(&self, ctx: Context) -> ProtocolResult<Bytes>;
 }
+
+#[async_trait]
+pub trait MaintenanceStorage: CommonStorage {}
 
 pub enum StorageBatchModify<S: StorageSchema> {
     Remove,

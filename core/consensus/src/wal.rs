@@ -2,12 +2,17 @@ use std::fs;
 use std::io::{ErrorKind, Read, Write};
 use std::path::{Path, PathBuf};
 
+use common_apm::muta_apm;
 use protocol::codec::ProtocolCodecSync;
 use protocol::types::{Bytes, Hash, SignedTransaction};
 use protocol::ProtocolResult;
 
 use crate::fixed_types::FixedSignedTxs;
 use crate::ConsensusError;
+use bytes::{BufMut, BytesMut};
+use creep::Context;
+use std::str::FromStr;
+use std::time::SystemTime;
 
 #[derive(Debug)]
 pub struct SignedTxsWAL {
@@ -60,6 +65,26 @@ impl SignedTxsWAL {
         wal_file
             .write_all(data.as_ref())
             .map_err(ConsensusError::WALErr)?;
+        Ok(())
+    }
+
+    pub fn available_height(&self) -> ProtocolResult<Vec<u64>> {
+        let dir_path = self.path.clone();
+        let mut availables = vec![];
+        for item in fs::read_dir(dir_path).map_err(ConsensusError::WALErr)? {
+            let item = item.map_err(ConsensusError::WALErr)?;
+
+            if item.path().is_dir() {
+                availables.push(item.file_name().to_str().unwrap().parse().unwrap())
+            }
+        }
+        Ok(availables)
+    }
+
+    pub fn remove_all(&self) -> ProtocolResult<()> {
+        for height in self.available_height()? {
+            self.remove(height)?
+        }
         Ok(())
     }
 
@@ -129,6 +154,173 @@ impl SignedTxsWAL {
     }
 }
 
+#[derive(Debug)]
+pub struct ConsensusWal {
+    path: PathBuf,
+}
+
+impl ConsensusWal {
+    pub fn new<P: AsRef<Path>>(path: P) -> Self {
+        if !path.as_ref().exists() {
+            fs::create_dir_all(&path).expect("Failed to create wal directory");
+        }
+
+        ConsensusWal {
+            path: path.as_ref().to_path_buf(),
+        }
+    }
+
+    #[muta_apm::derive::tracing_span(kind = "consensus_wal")]
+    pub fn update_overlord_wal(&self, ctx: Context, info: Bytes) -> ProtocolResult<()> {
+        // 1st, make sure the dir exists
+        let dir_path = self.path.clone();
+        if !dir_path.exists() {
+            fs::create_dir(&dir_path).map_err(ConsensusError::WALErr)?;
+        }
+
+        // 2nd, write info into file
+        let check_sum = Hash::digest(info.clone());
+
+        let mut content = BytesMut::new();
+        content.put(check_sum.as_bytes());
+        content.put(info);
+
+        let (data_path, timestamp) = {
+            loop {
+                let timestamp = SystemTime::now()
+                    .duration_since(SystemTime::UNIX_EPOCH)
+                    .map_err(ConsensusError::SystemTime)?;
+
+                let timestamp = timestamp.as_millis();
+
+                let mut data_path = dir_path.clone();
+
+                data_path.push(timestamp.to_string());
+
+                if !data_path.exists() {
+                    break (data_path, timestamp);
+                }
+            }
+        };
+
+        let mut data_file = match fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(data_path)
+        {
+            Ok(file) => file,
+            Err(err) => {
+                if err.kind() == ErrorKind::AlreadyExists {
+                    return Ok(());
+                } else {
+                    return Err(ConsensusError::WALErr(err).into());
+                }
+            }
+        };
+
+        data_file
+            .write_all(content.as_ref())
+            .map_err(ConsensusError::WALErr)?;
+
+        // 3rd, we can safely clean other old wal files
+        for item in fs::read_dir(dir_path).map_err(ConsensusError::WALErr)? {
+            let item = item.map_err(ConsensusError::WALErr)?;
+
+            let file_name = item
+                .file_name()
+                .to_str()
+                .ok_or(ConsensusError::FileNameTimestamp)?
+                .to_owned();
+
+            let file_name_timestamp = u128::from_str(file_name.as_str())
+                .map_err(|e| ConsensusError::FileNameTimestamp)?;
+
+            if file_name_timestamp < timestamp {
+                fs::remove_file(item.path()).map_err(ConsensusError::WALErr)?;
+            }
+        }
+
+        Ok(())
+    }
+
+    #[muta_apm::derive::tracing_span(kind = "consensus_wal")]
+    pub fn load_overlord_wal(&self, ctx: Context) -> ProtocolResult<Bytes> {
+        // 1st,
+        let dir_path = self.path.clone();
+        if !dir_path.exists() {
+            return Err(ConsensusError::ConsensusWalDirNotExist.into());
+        }
+
+        // 2 read all log files and sort by timestamp in their names
+        let files = fs::read_dir(dir_path.clone()).map_err(ConsensusError::WALErr)?;
+
+        let mut file_names_timestamps = files
+            .filter_map(|item| {
+                let item = item.ok()?;
+                let file_name = item.file_name();
+                let file_name = file_name.to_str()?;
+
+                let file_name_timestamp = u128::from_str(file_name).ok()?;
+
+                Some(file_name_timestamp)
+            })
+            .collect::<Vec<_>>();
+
+        file_names_timestamps.sort_by(|a, b| b.cmp(a));
+
+        // 3rd, get a latest and valid wal if possible
+        let mut index = 0;
+        let content = loop {
+            if index >= file_names_timestamps.len() {
+                break None;
+            }
+
+            let file_name_timestamp = file_names_timestamps[index];
+
+            let mut log_path = dir_path.clone();
+            log_path.push(file_name_timestamp.to_string());
+
+            let mut read_buf = Vec::new();
+            let mut file = fs::File::open(&log_path).map_err(ConsensusError::WALErr)?;
+            let res = file.read_to_end(&mut read_buf);
+            if res.is_err() {
+                continue;
+            }
+
+            let mut info = Bytes::from(read_buf);
+
+            if info.len() < Hash::default().as_bytes().len() {
+                continue;
+            }
+
+            let content = info.split_off(Hash::default().as_bytes().len());
+
+            if info == Hash::digest(content.clone()).as_bytes() {
+                break Some(content);
+            } else {
+                index += 1;
+            }
+        };
+
+        content.ok_or_else(|| ConsensusError::ConsensusWalNoWalFile.into())
+    }
+
+    pub fn clear(&self) -> ProtocolResult<()> {
+        let dir_path = self.path.clone();
+        if !dir_path.exists() {
+            return Ok(());
+        }
+
+        for item in fs::read_dir(dir_path).map_err(ConsensusError::WALErr)? {
+            let item = item.map_err(ConsensusError::WALErr)?;
+
+            fs::remove_file(item.path()).map_err(ConsensusError::WALErr)?;
+        }
+        Ok(())
+    }
+}
+
 #[rustfmt::skip]
 /// Bench in Intel(R) Core(TM) i7-4770HQ CPU @ 2.20GHz (8 x 2200):
 /// test wal::test::bench_save_wal_1000_txs  ... bench:   2,346,611 ns/iter (+/- 754,074)
@@ -152,8 +344,10 @@ mod tests {
 
     use super::*;
 
-    static FULL_TXS_PATH: &str = "./free-space/wal";
+    static FULL_TXS_PATH: &str = "./free-space/wal/txs";
 
+    static FULL_CONSENSUS_PATH: &str = "./free-space/wal/consensus";
+    
     fn mock_hash() -> Hash {
         Hash::digest(get_random_bytes(10))
     }
@@ -203,6 +397,8 @@ mod tests {
 
     #[test]
     fn test_txs_wal() {
+        fs::remove_dir_all(PathBuf::from_str(FULL_TXS_PATH).unwrap()).unwrap();
+        
         let wal = SignedTxsWAL::new(FULL_TXS_PATH.to_string());
         let txs_01 = mock_wal_txs(100);
         let hash_01 = Hash::digest(Bytes::from(rlp::encode_list(&txs_01)));
@@ -233,6 +429,66 @@ mod tests {
         wal.remove(3u64).unwrap();
     }
 
+    #[test]
+    fn test_consensus_wal() {
+        // write one, read one
+        let wal = ConsensusWal::new(FULL_CONSENSUS_PATH.to_string());
+        let info = get_random_bytes(1000);
+        wal.update_overlord_wal(Context::new(),info.clone()).unwrap();
+        
+        let load = wal.load_overlord_wal(Context::new()).unwrap();
+        assert_eq!(load,info);
+        
+        // write three, read latest
+        fs::remove_dir_all(PathBuf::from_str(FULL_CONSENSUS_PATH).unwrap()).unwrap();
+
+        let info = get_random_bytes(1000);
+        wal.update_overlord_wal(Context::new(),get_random_bytes(1000)).unwrap();
+        wal.update_overlord_wal(Context::new(),get_random_bytes(1000)).unwrap();
+        wal.update_overlord_wal(Context::new(),info.clone()).unwrap();
+
+        let load = wal.load_overlord_wal(Context::new()).unwrap();
+        assert_eq!(load,info);
+
+        // remove all, read nothing
+        fs::remove_dir_all(PathBuf::from_str(FULL_CONSENSUS_PATH).unwrap()).unwrap();
+
+        let load = wal.load_overlord_wal(Context::new());
+        assert!(load.is_err());
+        
+        // write a old correct one and a new wrong one, read old
+        
+        // old one
+        //fs::remove_dir_all(PathBuf::from_str(FULL_CONSENSUS_PATH).unwrap()).unwrap();
+
+        let info = get_random_bytes(1000);
+        wal.update_overlord_wal(Context::new(),info.clone()).unwrap();
+        
+        // -> copy and modify to a new fake one
+
+        let mut files = fs::read_dir(FULL_CONSENSUS_PATH).unwrap();
+        
+        let file = files.next().unwrap().unwrap();
+        
+        let from = u128::from_str( file.file_name().to_str().unwrap()).unwrap();
+
+        let to = file.path().parent().unwrap().join((from+1).to_string());
+        
+        let mut new_file = fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(to).unwrap();
+
+        new_file
+            .write_all(get_random_bytes(1000).as_ref()).unwrap();
+
+        let load = wal.load_overlord_wal(Context::new()).unwrap();
+        assert_eq!(load,info);
+
+        fs::remove_dir_all(PathBuf::from_str(FULL_CONSENSUS_PATH).unwrap()).unwrap();
+    }
+    
     #[test]
     fn test_wal_txs_codec() {
         for _ in 0..10 {

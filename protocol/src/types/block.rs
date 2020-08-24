@@ -7,13 +7,13 @@ use crate::fixed_codec::{FixedCodec, FixedCodecError};
 use crate::types::{Address, Hash, MerkleRoot};
 use crate::ProtocolResult;
 
-#[derive(RlpFixedCodec, Clone, Debug, PartialEq, Eq)]
+#[derive(RlpFixedCodec, Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct Block {
     pub header:            BlockHeader,
     pub ordered_tx_hashes: Vec<Hash>,
 }
 
-#[derive(RlpFixedCodec, Clone, Debug, Display, PartialEq, Eq)]
+#[derive(RlpFixedCodec, Clone, Debug, Display, PartialEq, Eq, Deserialize, Serialize)]
 #[display(
     fmt = "chain id {:?}, height {}, exec height {}, previous hash {:?},
     ordered root {:?}, order_signed_transactions_hash {:?}, confirm root {:?}, state root {:?},

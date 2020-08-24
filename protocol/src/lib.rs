@@ -40,6 +40,7 @@ pub enum ProtocolErrorKind {
 
     // metric
     Metric,
+    Cli,
 }
 
 // refer to https://github.com/rust-lang/rust/blob/a17951c4f80eb5208030f91fdb4ae93919fa6b12/src/libstd/io/error.rs#L73

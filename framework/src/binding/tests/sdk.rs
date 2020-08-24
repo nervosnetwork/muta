@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use cita_trie::MemoryDB;
 
-use protocol::traits::{Context, ServiceResponse, ServiceSDK, Storage};
+use protocol::traits::{CommonStorage, Context, ServiceResponse, ServiceSDK, Storage};
 use protocol::types::{
     Address, Block, BlockHeader, Event, Hash, MerkleRoot, Proof, RawTransaction, Receipt,
     ReceiptResponse, SignedTransaction, TransactionRequest, Validator,
@@ -106,37 +106,55 @@ fn test_service_sdk() {
 struct MockStorage;
 
 #[async_trait]
-impl Storage for MockStorage {
-    async fn insert_transactions(
-        &self,
-        _ctx: Context,
-        _height: u64,
-        _signed_txs: Vec<SignedTransaction>,
-    ) -> ProtocolResult<()> {
-        Ok(())
-    }
-
+impl CommonStorage for MockStorage {
     async fn insert_block(&self, _ctx: Context, _block: Block) -> ProtocolResult<()> {
         Ok(())
     }
 
-    async fn insert_receipts(
+    async fn get_block(&self, _ctx: Context, _height: u64) -> ProtocolResult<Option<Block>> {
+        Ok(Some(mock_block(1)))
+    }
+
+    async fn set_block(&self, _ctx: Context, _block: Block) -> ProtocolResult<()> {
+        Ok(())
+    }
+
+    async fn remove_block(&self, _ctx: Context, _height: u64) -> ProtocolResult<()> {
+        Ok(())
+    }
+
+    async fn get_latest_block(&self, _ctx: Context) -> ProtocolResult<Block> {
+        Ok(mock_block(1))
+    }
+
+    async fn set_latest_block(&self, _ctx: Context, _block: Block) -> ProtocolResult<()> {
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl Storage for MockStorage {
+    async fn insert_transactions(
         &self,
         _ctx: Context,
-        _height: u64,
-        _receipts: Vec<Receipt>,
+        _: u64,
+        _: Vec<SignedTransaction>,
     ) -> ProtocolResult<()> {
         Ok(())
     }
 
-    async fn update_latest_proof(&self, _ctx: Context, _proof: Proof) -> ProtocolResult<()> {
+    async fn insert_receipts(&self, _ctx: Context, _: u64, _: Vec<Receipt>) -> ProtocolResult<()> {
+        Ok(())
+    }
+
+    async fn update_latest_proof(&self, _ctx: Context, _: Proof) -> ProtocolResult<()> {
         Ok(())
     }
 
     async fn get_transaction_by_hash(
         &self,
         _ctx: Context,
-        _tx_hash: Hash,
+        _: Hash,
     ) -> ProtocolResult<Option<SignedTransaction>> {
         Ok(Some(mock_signed_tx()))
     }
@@ -144,46 +162,26 @@ impl Storage for MockStorage {
     async fn get_transactions(
         &self,
         _ctx: Context,
-        _height: u64,
-        _hashes: Vec<Hash>,
+        _: u64,
+        _: Vec<Hash>,
     ) -> ProtocolResult<Vec<Option<SignedTransaction>>> {
         Err(StoreError::GetNone.into())
     }
 
-    async fn get_latest_block(&self, _ctx: Context) -> ProtocolResult<Block> {
-        Ok(mock_block(1))
-    }
-
-    async fn get_block(&self, _ctx: Context, _height: u64) -> ProtocolResult<Option<Block>> {
-        Ok(Some(mock_block(1)))
-    }
-
-    async fn get_receipt_by_hash(
-        &self,
-        _ctx: Context,
-        _hash: Hash,
-    ) -> ProtocolResult<Option<Receipt>> {
+    async fn get_receipt_by_hash(&self, _ctx: Context, _: Hash) -> ProtocolResult<Option<Receipt>> {
         Ok(Some(mock_receipt()))
     }
 
     async fn get_receipts(
         &self,
         _ctx: Context,
-        _height: u64,
-        _hash: Vec<Hash>,
+        _: u64,
+        _: Vec<Hash>,
     ) -> ProtocolResult<Vec<Option<Receipt>>> {
         Err(StoreError::GetNone.into())
     }
 
     async fn get_latest_proof(&self, _ctx: Context) -> ProtocolResult<Proof> {
-        Err(StoreError::GetNone.into())
-    }
-
-    async fn update_overlord_wal(&self, _ctx: Context, _info: Bytes) -> ProtocolResult<()> {
-        Ok(())
-    }
-
-    async fn load_overlord_wal(&self, _ctx: Context) -> ProtocolResult<Bytes> {
         Err(StoreError::GetNone.into())
     }
 }

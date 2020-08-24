@@ -1,3 +1,5 @@
+// This file is copied directly from example/muta-chain
+
 use derive_more::{Display, From};
 use protocol::traits::{SDKFactory, Service, ServiceMapping, ServiceSDK};
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
@@ -8,7 +10,7 @@ use metadata::{MetadataService, METADATA_SERVICE_NAME};
 use multi_signature::{MultiSignatureService, MULTI_SIG_SERVICE_NAME};
 use util::{UtilService, UTIL_SERVICE_NAME};
 
-struct DefaultServiceMapping;
+pub struct DefaultServiceMapping;
 
 impl ServiceMapping for DefaultServiceMapping {
     fn get_service<SDK: 'static + ServiceSDK, Factory: SDKFactory<SDK>>(
@@ -49,10 +51,6 @@ impl ServiceMapping for DefaultServiceMapping {
             UTIL_SERVICE_NAME.to_owned(),
         ]
     }
-}
-
-pub fn main() {
-    muta::run(DefaultServiceMapping, None)
 }
 
 #[derive(Debug, Display, From)]

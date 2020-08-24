@@ -35,7 +35,7 @@ use crate::message::{
 };
 use crate::status::StatusAgent;
 use crate::util::{check_list_roots, digest_signed_transactions, time_now, OverlordCrypto};
-use crate::wal::SignedTxsWAL;
+use crate::wal::{ConsensusWal, SignedTxsWAL};
 use crate::ConsensusError;
 
 const RETRY_COMMIT_INTERVAL: u64 = 1000; // 1s
@@ -55,6 +55,7 @@ pub struct ConsensusEngine<Adapter> {
     lock:    Arc<Mutex<()>>,
 
     last_commit_time:             RwLock<u64>,
+    consensus_wal:                Arc<ConsensusWal>,
     last_check_block_fail_reason: RwLock<String>,
 }
 
@@ -510,15 +511,14 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
 #[async_trait]
 impl<Adapter: ConsensusAdapter + 'static> Wal for ConsensusEngine<Adapter> {
     async fn save(&self, info: Bytes) -> Result<(), Box<dyn Error + Send>> {
-        self.adapter
-            .save_overlord_wal(Context::new(), info)
-            .await
+        self.consensus_wal
+            .update_overlord_wal(Context::new(), info)
             .map_err(|e| ProtocolError::from(ConsensusError::Other(e.to_string())))?;
         Ok(())
     }
 
     async fn load(&self) -> Result<Option<Bytes>, Box<dyn Error + Send>> {
-        let res = self.adapter.load_overlord_wal(Context::new()).await.ok();
+        let res = self.consensus_wal.load_overlord_wal(Context::new()).ok();
         Ok(res)
     }
 }
@@ -531,6 +531,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
         adapter: Arc<Adapter>,
         crypto: Arc<OverlordCrypto>,
         lock: Arc<Mutex<()>>,
+        consensus_wal: Arc<ConsensusWal>,
     ) -> Self {
         Self {
             status_agent,
@@ -541,6 +542,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
             crypto,
             lock,
             last_commit_time: RwLock::new(time_now()),
+            consensus_wal,
             last_check_block_fail_reason: RwLock::new(String::new()),
         }
     }

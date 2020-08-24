@@ -217,11 +217,5 @@ pub trait ConsensusAdapter: CommonConsensusAdapter + Send + Sync {
     /// Pull some blocks from other nodes from `begin` to `end`.
     async fn pull_block(&self, ctx: Context, height: u64, end: &str) -> ProtocolResult<Block>;
 
-    /// Save overlord wal info.
-    async fn save_overlord_wal(&self, ctx: Context, info: Bytes) -> ProtocolResult<()>;
-
-    /// Load latest overlord wal info.
-    async fn load_overlord_wal(&self, ctx: Context) -> ProtocolResult<Bytes>;
-
     async fn verify_txs(&self, ctx: Context, height: u64, txs: Vec<Hash>) -> ProtocolResult<()>;
 }

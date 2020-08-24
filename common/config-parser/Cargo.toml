@@ -13,3 +13,7 @@ serde = "1.0"
 serde_derive = "1.0"
 stringreader = "0.1"
 toml = "0.4"
+
+core-consensus = { path = "../../core/consensus" }
+core-mempool = { path = "../../core/mempool" }
+protocol = { path = "../../protocol", package = "muta-protocol" }

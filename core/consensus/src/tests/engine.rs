@@ -23,11 +23,12 @@ use crate::engine::ConsensusEngine;
 use crate::fixed_types::FixedPill;
 use crate::status::StatusAgent;
 use crate::util::OverlordCrypto;
-use crate::wal::SignedTxsWAL;
+use crate::wal::{ConsensusWal, SignedTxsWAL};
 
 use super::*;
 
-static FULL_TXS_PATH: &str = "./free-space/engine";
+static FULL_TXS_PATH: &str = "./free-space/engine/txs";
+static FULL_CONSENSUS_PATH: &str = "./free-space/engine/consensus";
 
 #[tokio::test]
 async fn test_repetitive_commit() {
@@ -79,6 +80,7 @@ fn init_engine(init_status: CurrentConsensusStatus) -> ConsensusEngine<MockConse
         Arc::new(MockConsensusAdapter {}),
         Arc::new(init_crypto()),
         Arc::new(Mutex::new(())),
+        Arc::new(ConsensusWal::new(FULL_CONSENSUS_PATH)),
     )
 }
 
@@ -299,14 +301,6 @@ impl ConsensusAdapter for MockConsensusAdapter {
         _ctx: Context,
         _height: u64,
     ) -> ProtocolResult<Vec<Validator>> {
-        unimplemented!()
-    }
-
-    async fn save_overlord_wal(&self, _ctx: Context, _info: Bytes) -> ProtocolResult<()> {
-        Ok(())
-    }
-
-    async fn load_overlord_wal(&self, _ctx: Context) -> ProtocolResult<Bytes> {
         unimplemented!()
     }
 
