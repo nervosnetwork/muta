@@ -117,6 +117,9 @@ impl CurrentConsensusStatus {
         self.list_confirm_root.push(info.confirm_root.clone());
         self.list_receipt_root.push(info.receipt_root.clone());
         self.list_state_root.push(info.state_root);
+
+        common_apm::metrics::consensus::ENGINE_EXECUTING_BLOCK_GAUGE
+            .set(self.latest_committed_height as i64 - self.exec_height as i64);
     }
 
     pub(crate) fn update_by_committed(
@@ -136,6 +139,9 @@ impl CurrentConsensusStatus {
         self.latest_committed_state_root = block.header.state_root.clone();
 
         self.split_off(&block);
+
+        common_apm::metrics::consensus::ENGINE_EXECUTING_BLOCK_GAUGE
+            .set((self.latest_committed_height - self.exec_height) as i64);
     }
 
     pub(crate) fn set_metadata(&mut self, metadata: Metadata) {
