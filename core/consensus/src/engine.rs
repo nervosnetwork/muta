@@ -484,12 +484,28 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
 
     fn report_view_change(&self, _cx: Context, height: u64, round: u64, reason: ViewChangeReason) {
         // TODO@TangGX: Fix this log after finish the log standard.
-        log::warn!(
-            "[consensus]: overlord view change in height {}, round {}, because {:?}",
-            height,
-            round,
-            reason
-        );
+        match reason {
+            ViewChangeReason::CheckBlockNotPass => {
+                let err = {
+                    let e = self.last_check_block_fail_reason.read();
+                    reason.to_string() + " " + e.as_str()
+                };
+                log::warn!(
+                    "[consensus]: overlord view change in height {} round {}, because {:?}",
+                    height,
+                    round,
+                    err
+                );
+            }
+            _ => {
+                log::warn!(
+                    "[consensus]: overlord view change in height {}, round {}, because {:?}",
+                    height,
+                    round,
+                    reason
+                );
+            }
+        }
     }
 }
 
