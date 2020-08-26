@@ -9,7 +9,7 @@ use futures::lock::Mutex;
 use futures_timer::Delay;
 use log::{error, info, warn};
 use overlord::error::ConsensusError as OverlordError;
-use overlord::types::{Commit, Node, OverlordMsg, Status};
+use overlord::types::{Commit, Node, OverlordMsg, Status, ViewChangeReason};
 use overlord::{Consensus as Engine, DurationConfig, Wal};
 use parking_lot::RwLock;
 use rlp::Encodable;
@@ -52,7 +52,8 @@ pub struct ConsensusEngine<Adapter> {
     crypto:  Arc<OverlordCrypto>,
     lock:    Arc<Mutex<()>>,
 
-    last_commit_time: RwLock<u64>,
+    last_commit_time:             RwLock<u64>,
+    last_check_block_fail_reason: RwLock<String>,
 }
 
 #[async_trait]
@@ -175,86 +176,14 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         // If the block is proposed by self, it does not need to check. Get full signed
         // transactions directly.
         if !exemption {
-            let current_timestamp = time_now();
-
-            self.adapter
-                .verify_block_header(ctx.clone(), pill.block.clone())
+            if let Err(e) = self
+                .inner_check_block(ctx.clone(), pill.block.clone())
                 .await
-                .map_err(|e| {
-                    error!(
-                        "[consensus] check_block, verify_block_header error, block header: {:?}",
-                        pill.block.header
-                    );
-                    e
-                })?;
-
-            // verify the proof in the block for previous block
-            // skip to get previous proof to compare because the node may just comes from
-            // sync and waste a delay of read
-            let previous_block = self
-                .adapter
-                .get_block_by_height(ctx.clone(), pill.block.header.height - 1)
-                .await?;
-
-            // verify block timestamp.
-            if !validate_timestamp(
-                current_timestamp,
-                pill.block.header.timestamp,
-                previous_block.header.timestamp,
-            ) {
-                return Err(ProtocolError::from(ConsensusError::InvalidTimestamp).into());
+            {
+                let mut reason = self.last_check_block_fail_reason.write();
+                *reason = e.to_string();
+                return Err(e.into());
             }
-
-            self.adapter
-                .verify_proof(
-                    ctx.clone(),
-                    previous_block.clone(),
-                    pill.block.header.proof.clone(),
-                )
-                .await
-                .map_err(|e| {
-                    error!(
-                        "[consensus] check_block, verify_proof error, previous block header: {:?}, proof: {:?}",
-                        previous_block.header,
-                        pill.block.header.proof
-                    );
-                    e
-                })?;
-
-            self.adapter
-                .verify_txs(
-                    ctx.clone(),
-                    pill.block.header.height,
-                    pill.block.ordered_tx_hashes.clone(),
-                )
-                .await
-                .map_err(|e| {
-                    error!("[consensus] check_block, verify_txs error",);
-                    e
-                })?;
-
-            // If it is inconsistent with the state of the proposal, we will wait for a
-            // period of time.
-            let mut check_retry = 0;
-            loop {
-                match self.check_block_roots(ctx.clone(), &pill.block.header) {
-                    Ok(()) => break,
-                    Err(e) => {
-                        if check_retry >= RETRY_CHECK_ROOT_LIMIT {
-                            return Err(e.into());
-                        }
-
-                        check_retry += 1;
-                    }
-                }
-                Delay::new(Duration::from_millis(RETRY_CHECK_ROOT_INTERVAL)).await;
-            }
-
-            let signed_txs = self
-                .adapter
-                .get_full_txs(ctx.clone(), pill.block.ordered_tx_hashes.clone())
-                .await?;
-            self.check_order_transactions(ctx.clone(), &pill.block, &signed_txs)?;
 
             let adapter = Arc::clone(&self.adapter);
             let ctx_clone = ctx.clone();
@@ -429,15 +358,8 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             authority_list: covert_to_overlord_authority(&current_consensus_status.validators),
         };
 
-        common_apm::metrics::consensus::ENGINE_HEIGHT_GAUGE.set((current_height + 1) as i64);
-        common_apm::metrics::consensus::ENGINE_COMMITED_TX_COUNTER.inc_by(txs_len as i64);
+        self.metric_commit(current_height, txs_len);
 
-        let now = time_now();
-        let last_commit_time = *(self.last_commit_time.read());
-        let elapsed = (now - last_commit_time) as f64;
-        common_apm::metrics::consensus::ENGINE_CONSENSUS_COST_TIME.observe(elapsed / 1e3);
-        let mut last_commit_time = self.last_commit_time.write();
-        *last_commit_time = now;
         Ok(status)
     }
 
@@ -559,6 +481,16 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             _ => (),
         }
     }
+
+    fn report_view_change(&self, _cx: Context, height: u64, round: u64, reason: ViewChangeReason) {
+        // TODO@TangGX: Fix this log after finish the log standard.
+        log::warn!(
+            "[consensus]: overlord view change in height {}, round {}, because {:?}",
+            height,
+            round,
+            reason
+        );
+    }
 }
 
 #[async_trait]
@@ -595,6 +527,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
             crypto,
             lock,
             last_commit_time: RwLock::new(time_now()),
+            last_check_block_fail_reason: RwLock::new(String::new()),
         }
     }
 
@@ -625,6 +558,89 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
                 timestamp,
             )
             .await
+    }
+
+    async fn inner_check_block(&self, ctx: Context, block: Block) -> ProtocolResult<()> {
+        let current_timestamp = time_now();
+
+        self.adapter
+            .verify_block_header(ctx.clone(), block.clone())
+            .await
+            .map_err(|e| {
+                error!(
+                    "[consensus] check_block, verify_block_header error, block header: {:?}",
+                    block.header
+                );
+                e
+            })?;
+
+        // verify the proof in the block for previous block
+        // skip to get previous proof to compare because the node may just comes from
+        // sync and waste a delay of read
+        let previous_block = self
+            .adapter
+            .get_block_by_height(ctx.clone(), block.header.height - 1)
+            .await?;
+
+        // verify block timestamp.
+        if !validate_timestamp(
+            current_timestamp,
+            block.header.timestamp,
+            previous_block.header.timestamp,
+        ) {
+            return Err(ProtocolError::from(ConsensusError::InvalidTimestamp).into());
+        }
+
+        self.adapter
+                .verify_proof(
+                    ctx.clone(),
+                    previous_block.clone(),
+                    block.header.proof.clone(),
+                )
+                .await
+                .map_err(|e| {
+                    error!(
+                        "[consensus] check_block, verify_proof error, previous block header: {:?}, proof: {:?}",
+                        previous_block.header,
+                        block.header.proof
+                    );
+                    e
+                })?;
+
+        self.adapter
+            .verify_txs(
+                ctx.clone(),
+                block.header.height,
+                block.ordered_tx_hashes.clone(),
+            )
+            .await
+            .map_err(|e| {
+                error!("[consensus] check_block, verify_txs error",);
+                e
+            })?;
+
+        // If it is inconsistent with the state of the proposal, we will wait for a
+        // period of time.
+        let mut check_retry = 0;
+        loop {
+            match self.check_block_roots(ctx.clone(), &block.header) {
+                Ok(()) => break,
+                Err(e) => {
+                    if check_retry >= RETRY_CHECK_ROOT_LIMIT {
+                        return Err(e.into());
+                    }
+
+                    check_retry += 1;
+                }
+            }
+            Delay::new(Duration::from_millis(RETRY_CHECK_ROOT_INTERVAL)).await;
+        }
+
+        let signed_txs = self
+            .adapter
+            .get_full_txs(ctx.clone(), block.ordered_tx_hashes.clone())
+            .await?;
+        self.check_order_transactions(ctx.clone(), &block, &signed_txs)
     }
 
     #[muta_apm::derive::tracing_span(kind = "consensus.engine")]
@@ -782,6 +798,18 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
     fn update_overlord_crypto(&self, metadata: Metadata) -> ProtocolResult<()> {
         self.crypto.update(generate_new_crypto_map(metadata)?);
         Ok(())
+    }
+
+    fn metric_commit(&self, current_height: u64, txs_len: usize) {
+        common_apm::metrics::consensus::ENGINE_HEIGHT_GAUGE.set((current_height + 1) as i64);
+        common_apm::metrics::consensus::ENGINE_COMMITED_TX_COUNTER.inc_by(txs_len as i64);
+
+        let now = time_now();
+        let last_commit_time = *(self.last_commit_time.read());
+        let elapsed = (now - last_commit_time) as f64;
+        common_apm::metrics::consensus::ENGINE_CONSENSUS_COST_TIME.observe(elapsed / 1e3);
+        let mut last_commit_time = self.last_commit_time.write();
+        *last_commit_time = now;
     }
 
     #[cfg(test)]
