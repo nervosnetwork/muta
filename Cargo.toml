@@ -6,6 +6,7 @@ edition = "2018"
 repository = "https://github.com/nervosnetwork/muta"
 
 [dependencies]
+byzantine = { path = "./byzantine" }
 common-apm = { path = "./common/apm" }
 common-config-parser = { path = "./common/config-parser" }
 common-crypto = { path = "./common/crypto" }
@@ -78,6 +79,8 @@ members = [
   "built-in-services/authorization",
 
   "protocol",
+
+  "byzantine",
 ]
 
 [features]

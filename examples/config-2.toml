@@ -7,7 +7,7 @@ rpc_timeout = 10
 
 [[network.bootstraps]]
 peer_id = "QmTEJkB5QKWsEq37huryZZfVvqBKb54sHnKn9TQcA6j3n9"
-address = "localhost:1337" # Replace it with your IP
+address = "127.0.0.1:1337" # Replace it with your IP
 
 [graphql]
 graphiql_uri = "/graphiql"
