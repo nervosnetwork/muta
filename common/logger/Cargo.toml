@@ -9,5 +9,8 @@ repository = "https://github.com/nervosnetwork/muta"
 
 [dependencies]
 log = "0.4"
-log4rs = "0.13"
+# Turn off default features should turn off gzip feature. For more information,
+# reference log4rs document. gzip feature will be removed from default features as
+# of 1.0.
+log4rs = { version = "0.13", default-features = false }
 json = "0.12"
