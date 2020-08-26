@@ -588,7 +588,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
             block.header.timestamp,
             previous_block.header.timestamp,
         ) {
-            return Err(ProtocolError::from(ConsensusError::InvalidTimestamp).into());
+            return Err(ProtocolError::from(ConsensusError::InvalidTimestamp));
         }
 
         self.adapter
@@ -627,7 +627,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
                 Ok(()) => break,
                 Err(e) => {
                     if check_retry >= RETRY_CHECK_ROOT_LIMIT {
-                        return Err(e.into());
+                        return Err(e);
                     }
 
                     check_retry += 1;
