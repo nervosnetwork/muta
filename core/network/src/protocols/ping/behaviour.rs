@@ -62,9 +62,10 @@ impl Future for EventTranslator {
                 PingEvent::Ping(ref _pid) => continue,
                 PingEvent::Pong(ref pid, ref connected_addr, ping_time) => {
                     let host = &connected_addr.host;
-                    common_apm::metrics::network::NETWORK_PING_IP_IN_MS_VEC
+
+                    common_apm::metrics::network::NETWORK_PING_HISTOGRAM_VEC
                         .with_label_values(&[host])
-                        .set(ping_time.as_millis() as i64);
+                        .observe(ping_time.as_millis() as f64);
 
                     PeerManagerEvent::PeerAlive { pid: pid.clone() }
                 }
