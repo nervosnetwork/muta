@@ -87,4 +87,3 @@ byzantine
 │   ├── utils.rs               # 工具方法
 └── └── worker.rs              # 根据 Behavior 生成和发送消息
 ```
-

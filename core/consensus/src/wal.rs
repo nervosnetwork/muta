@@ -203,7 +203,7 @@ mod tests {
 
     #[test]
     fn test_txs_wal() {
-        let wal = SignedTxsWAL::new(FULL_TXS_PATH.to_string());
+        let wal = SignedTxsWAL::new(FULL_TXS_PATH.to_string() + "/test_txs_wal");
         let txs_01 = mock_wal_txs(100);
         let hash_01 = Hash::digest(Bytes::from(rlp::encode_list(&txs_01)));
         wal.save(1u64, hash_01.clone(), txs_01.clone()).unwrap();
@@ -228,6 +228,9 @@ mod tests {
         wal.remove(2u64).unwrap();
         assert!(wal.load(1u64, hash_01).is_err());
         assert!(wal.load(2u64, hash_02).is_err());
+
+        wal.remove(1u64).unwrap();
+        wal.remove(3u64).unwrap();
     }
 
     #[test]
