@@ -19,7 +19,7 @@ core-storage = { path = "../core/storage" }
 core-mempool = { path = "../core/mempool" }
 core-network = { path = "../core/network" }
 core-consensus = { path = "../core/consensus" }
-overlord = { git = "https://github.com/nervosnetwork/overlord", rev = "b965dc4b" }
+overlord = { git = "https://github.com/nervosnetwork/overlord", rev = "42a5f53" }
 
 binding-macro = { path = "../binding-macro" }
 framework = { path = "../framework" }
