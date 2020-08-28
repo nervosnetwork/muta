@@ -140,7 +140,7 @@ mod tests {
 
         let mut log_data = vec![];
         let archived_log = {
-            let mut temp_file = temp_dir.clone();
+            let mut temp_file = temp_dir;
             temp_file.push(&format!("{}.muta.{}.log", &date, &timestamp));
             temp_file
         };
