@@ -152,7 +152,7 @@ mod tests {
 
     use super::*;
 
-    static FULL_TXS_PATH: &str = "./free-space";
+    static FULL_TXS_PATH: &str = "./free-space/wal";
 
     fn mock_hash() -> Hash {
         Hash::digest(get_random_bytes(10))
@@ -203,7 +203,7 @@ mod tests {
 
     #[test]
     fn test_txs_wal() {
-        let wal = SignedTxsWAL::new(FULL_TXS_PATH.to_string() + "/test_txs_wal");
+        let wal = SignedTxsWAL::new(FULL_TXS_PATH.to_string());
         let txs_01 = mock_wal_txs(100);
         let hash_01 = Hash::digest(Bytes::from(rlp::encode_list(&txs_01)));
         wal.save(1u64, hash_01.clone(), txs_01.clone()).unwrap();
