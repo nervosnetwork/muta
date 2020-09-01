@@ -27,7 +27,7 @@ use crate::wal::SignedTxsWAL;
 
 use super::*;
 
-static FULL_TXS_PATH: &str = "./free-space";
+static FULL_TXS_PATH: &str = "./free-space/engine";
 
 #[tokio::test]
 async fn test_repetitive_commit() {

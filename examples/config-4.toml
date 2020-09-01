@@ -24,7 +24,7 @@ triedb_cache_size = 2000
 [mempool]
 broadcast_txs_size = 200
 broadcast_txs_interval = 200
-pool_size = 200000
+pool_size = 1000
 
 [logger]
 metrics = false

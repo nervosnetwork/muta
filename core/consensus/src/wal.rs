@@ -152,7 +152,7 @@ mod tests {
 
     use super::*;
 
-    static FULL_TXS_PATH: &str = "./free-space";
+    static FULL_TXS_PATH: &str = "./free-space/wal";
 
     fn mock_hash() -> Hash {
         Hash::digest(get_random_bytes(10))
@@ -228,6 +228,9 @@ mod tests {
         wal.remove(2u64).unwrap();
         assert!(wal.load(1u64, hash_01).is_err());
         assert!(wal.load(2u64, hash_02).is_err());
+
+        wal.remove(1u64).unwrap();
+        wal.remove(3u64).unwrap();
     }
 
     #[test]
