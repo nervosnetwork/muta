@@ -36,12 +36,14 @@ pub struct ConfigNetworkBootstrap {
 
 #[derive(Debug, Deserialize)]
 pub struct ConfigConsensus {
+    pub overlord_gap: usize,
     pub sync_txs_chunk_size: usize,
 }
 
 impl Default for ConfigConsensus {
     fn default() -> Self {
         Self {
+            overlord_gap: 5,
             sync_txs_chunk_size: 5000,
         }
     }

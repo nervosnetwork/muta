@@ -4,6 +4,7 @@ use std::path::PathBuf;
 
 use serde_derive::Deserialize;
 
+use core_consensus::{DEFAULT_OVERLORD_GAP, DEFAULT_SYNC_TXS_CHUNK_SIZE};
 use core_mempool::{DEFAULT_BROADCAST_TXS_INTERVAL, DEFAULT_BROADCAST_TXS_SIZE};
 use protocol::types::Hex;
 
@@ -56,17 +57,20 @@ pub struct ConfigNetworkBootstrap {
     pub address: String,
 }
 
-#[derive(Debug, Deserialize)]
-pub struct ConfigConsensus {
-    pub sync_txs_chunk_size: usize,
+fn default_overlord_gap() -> usize {
+    DEFAULT_OVERLORD_GAP
 }
 
-impl Default for ConfigConsensus {
-    fn default() -> Self {
-        Self {
-            sync_txs_chunk_size: 5000,
-        }
-    }
+fn default_sync_txs_chunk_size() -> usize {
+    DEFAULT_SYNC_TXS_CHUNK_SIZE
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ConfigConsensus {
+    #[serde(default = "default_overlord_gap")]
+    pub overlord_gap:        usize,
+    #[serde(default = "default_sync_txs_chunk_size")]
+    pub sync_txs_chunk_size: usize,
 }
 
 fn default_broadcast_txs_size() -> usize {
@@ -150,7 +154,6 @@ pub struct Config {
     pub network:   ConfigNetwork,
     pub mempool:   ConfigMempool,
     pub executor:  ConfigExecutor,
-    #[serde(default)]
     pub consensus: ConfigConsensus,
     #[serde(default)]
     pub logger:    ConfigLogger,
