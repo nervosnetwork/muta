@@ -112,6 +112,7 @@ pub struct ConfigLogger {
     pub log_to_file:                bool,
     pub metrics:                    bool,
     pub log_path:                   PathBuf,
+    pub file_size_limit:            u64,
     #[serde(default)]
     pub modules_level:              HashMap<String, String>,
 }
@@ -125,6 +126,7 @@ impl Default for ConfigLogger {
             log_to_file:                true,
             metrics:                    true,
             log_path:                   "logs/".into(),
+            file_size_limit:            1024 * 1024 * 1024, // GiB
             modules_level:              HashMap::new(),
         }
     }

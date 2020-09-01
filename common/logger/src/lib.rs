@@ -1,13 +1,19 @@
+mod date_fixed_roller;
+
 use std::collections::HashMap;
 use std::path::PathBuf;
 
 use json::JsonValue;
 use log::LevelFilter;
 use log4rs::append::console::ConsoleAppender;
-use log4rs::append::file::FileAppender;
+use log4rs::append::rolling_file::policy::compound::trigger::size::SizeTrigger;
+use log4rs::append::rolling_file::policy::compound::CompoundPolicy;
+use log4rs::append::rolling_file::RollingFileAppender;
 use log4rs::config::{Appender, Config, Logger, Root};
 use log4rs::encode::json::JsonEncoder;
 use log4rs::encode::pattern::PatternEncoder;
+
+use date_fixed_roller::DateFixedWindowRoller;
 
 pub use json::array;
 pub use json::object;
@@ -19,6 +25,7 @@ pub fn init<S: ::std::hash::BuildHasher>(
     log_to_file: bool,
     metrics: bool,
     log_path: PathBuf,
+    file_size_limit: u64, // bytes
     modules_level: HashMap<String, String, S>,
 ) {
     let console = ConsoleAppender::builder()
@@ -31,15 +38,34 @@ pub fn init<S: ::std::hash::BuildHasher>(
         )))
         .build();
 
-    let file = FileAppender::builder()
-        .encoder(Box::new(JsonEncoder::new()))
-        .build(log_path.join("muta.log"))
-        .unwrap();
+    let muta_roller_pat = log_path.join("{date}.muta.{timestamp}.log");
+    let metrics_roller_pat = log_path.join("{date}.metrics.{timestamp}.log");
 
-    let metrics_appender = FileAppender::builder()
-        .encoder(Box::new(JsonEncoder::new()))
-        .build(log_path.join("metrics.log"))
-        .unwrap();
+    let file = {
+        let size_trigger = SizeTrigger::new(file_size_limit);
+        let roller = DateFixedWindowRoller::builder()
+            .build(&muta_roller_pat.to_string_lossy())
+            .unwrap();
+        let policy = CompoundPolicy::new(Box::new(size_trigger), Box::new(roller));
+
+        RollingFileAppender::builder()
+            .encoder(Box::new(JsonEncoder::new()))
+            .build(log_path.join("muta.log"), Box::new(policy))
+            .unwrap()
+    };
+
+    let metrics_appender = {
+        let size_trigger = SizeTrigger::new(file_size_limit);
+        let roller = DateFixedWindowRoller::builder()
+            .build(&metrics_roller_pat.to_string_lossy())
+            .unwrap();
+        let policy = CompoundPolicy::new(Box::new(size_trigger), Box::new(roller));
+
+        RollingFileAppender::builder()
+            .encoder(Box::new(JsonEncoder::new()))
+            .build(log_path.join("metrics.log"), Box::new(policy))
+            .unwrap()
+    };
 
     let mut root_builder = Root::builder();
     if log_to_console {
