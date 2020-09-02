@@ -152,12 +152,13 @@ impl<Adapter: ConsensusAdapter + 'static> OverlordConsensus<Adapter> {
 
     pub async fn run(
         &self,
+        init_height: u64,
         interval: u64,
         authority_list: Vec<Node>,
         timer_config: Option<DurationConfig>,
     ) -> ProtocolResult<()> {
         self.inner
-            .run(interval, authority_list, timer_config)
+            .run(init_height, interval, authority_list, timer_config)
             .await
             .map_err(|e| ConsensusError::OverlordErr(Box::new(e)))?;
 
