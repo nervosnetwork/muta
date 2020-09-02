@@ -342,6 +342,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
             Arc::clone(&service_mapping),
             status_agent.clone(),
             Arc::clone(&crypto),
+            config.consensus.overlord_gap,
         )?;
 
     let exec_demon = consensus_adapter.take_exec_demon();

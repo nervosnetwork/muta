@@ -21,6 +21,7 @@ listening_address = "0.0.0.0:1337"
 rpc_timeout = 10
 
 [consensus]
+overlord_gap = 5
 sync_txs_chunk_size = 5000
 
 [[network.bootstraps]]
