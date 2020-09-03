@@ -1,6 +1,5 @@
 use std::error::Error;
 
-use async_trait::async_trait;
 use overlord::Codec;
 
 use protocol::codec::{Deserialize, ProtocolCodecSync, Serialize};
@@ -22,9 +21,8 @@ pub enum ConsensusRpcResponse {
     PullTxs(Box<FixedSignedTxs>),
 }
 
-#[async_trait]
 impl MessageCodec for ConsensusRpcResponse {
-    async fn encode(&mut self) -> ProtocolResult<Bytes> {
+    fn encode(&mut self) -> ProtocolResult<Bytes> {
         let bytes = match self {
             ConsensusRpcResponse::PullBlocks(ep) => {
                 let mut tmp = BytesMut::from(ep.encode_fixed()?.as_ref());
@@ -45,7 +43,7 @@ impl MessageCodec for ConsensusRpcResponse {
         Ok(bytes.freeze())
     }
 
-    async fn decode(mut bytes: Bytes) -> ProtocolResult<Self> {
+    fn decode(mut bytes: Bytes) -> ProtocolResult<Self> {
         let len = bytes.len();
         let flag = bytes.split_off(len - 1);
 
@@ -97,13 +95,12 @@ pub struct FixedBlock {
     pub inner: Block,
 }
 
-#[async_trait]
 impl MessageCodec for FixedBlock {
-    async fn encode(&mut self) -> ProtocolResult<Bytes> {
+    fn encode(&mut self) -> ProtocolResult<Bytes> {
         self.inner.encode_sync()
     }
 
-    async fn decode(bytes: Bytes) -> ProtocolResult<Self> {
+    fn decode(bytes: Bytes) -> ProtocolResult<Self> {
         let inner: Block = ProtocolCodecSync::decode_sync(bytes)?;
         Ok(FixedBlock::new(inner))
     }
@@ -120,13 +117,12 @@ pub struct FixedProof {
     pub inner: Proof,
 }
 
-#[async_trait]
 impl MessageCodec for FixedProof {
-    async fn encode(&mut self) -> ProtocolResult<Bytes> {
+    fn encode(&mut self) -> ProtocolResult<Bytes> {
         self.inner.encode_sync()
     }
 
-    async fn decode(bytes: Bytes) -> ProtocolResult<Self> {
+    fn decode(bytes: Bytes) -> ProtocolResult<Self> {
         let inner: Proof = ProtocolCodecSync::decode_sync(bytes)?;
         Ok(FixedProof::new(inner))
     }
@@ -285,8 +281,8 @@ mod test {
 
         let block = gen_block(random::<u64>(), Hash::from_empty());
         let mut origin = FixedBlock::new(block.clone());
-        let bytes = origin.encode().await.unwrap();
-        let res: FixedBlock = MessageCodec::decode(bytes).await.unwrap();
+        let bytes = origin.encode().unwrap();
+        let res: FixedBlock = MessageCodec::decode(bytes).unwrap();
         assert_eq!(res.inner, block);
     }
 }

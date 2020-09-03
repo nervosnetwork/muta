@@ -1,7 +1,6 @@
 use std::error::Error;
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use bytes::Bytes;
 use derive_more::Constructor;
 use overlord::types::SignedProposal;
@@ -39,13 +38,12 @@ impl InvalidStruct {
     }
 }
 
-#[async_trait]
 impl MessageCodec for InvalidStruct {
-    async fn encode(&mut self) -> ProtocolResult<Bytes> {
+    fn encode(&mut self) -> ProtocolResult<Bytes> {
         Ok(self.inner.clone())
     }
 
-    async fn decode(bytes: Bytes) -> ProtocolResult<Self> {
+    fn decode(bytes: Bytes) -> ProtocolResult<Self> {
         Ok(InvalidStruct::new(bytes))
     }
 }

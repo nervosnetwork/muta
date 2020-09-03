@@ -555,7 +555,7 @@ mod tests {
         where
             M: MessageCodec,
         {
-            let bytes = msg.encode().await.expect("encode message fail");
+            let bytes = msg.encode().expect("encode message fail");
             self.msgs.lock().push(bytes);
 
             self.signal_tx
@@ -584,7 +584,7 @@ mod tests {
     macro_rules! pop_msg {
         ($msgs:expr) => {{
             let msg = $msgs.pop().expect("should have one message");
-            MsgNewTxs::decode(msg).await.expect("decode MsgNewTxs fail")
+            MsgNewTxs::decode(msg).expect("decode MsgNewTxs fail")
         }};
     }
 

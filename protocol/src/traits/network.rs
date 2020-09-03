@@ -84,11 +84,10 @@ impl Hash for PeerTag {
     }
 }
 
-#[async_trait]
 pub trait MessageCodec: Sized + Send + Debug + 'static {
-    async fn encode(&mut self) -> ProtocolResult<Bytes>;
+    fn encode(&mut self) -> ProtocolResult<Bytes>;
 
-    async fn decode(bytes: Bytes) -> ProtocolResult<Self>;
+    fn decode(bytes: Bytes) -> ProtocolResult<Self>;
 }
 
 #[derive(Debug, Display)]
@@ -103,18 +102,17 @@ impl From<SerdeError> for ProtocolError {
     }
 }
 
-#[async_trait]
 impl<T> MessageCodec for T
 where
     T: Serialize + for<'a> Deserialize<'a> + Send + Debug + 'static,
 {
-    async fn encode(&mut self) -> ProtocolResult<Bytes> {
+    fn encode(&mut self) -> ProtocolResult<Bytes> {
         let bytes = bincode::serialize(self).map_err(|e| SerdeError(Box::new(e)))?;
 
         Ok(bytes.into())
     }
 
-    async fn decode(bytes: Bytes) -> ProtocolResult<Self> {
+    fn decode(bytes: Bytes) -> ProtocolResult<Self> {
         bincode::deserialize::<T>(&bytes.as_ref()).map_err(|e| SerdeError(Box::new(e)).into())
     }
 }
