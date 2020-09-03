@@ -90,7 +90,7 @@ impl Rpc for NetworkRpc {
             rid,
         };
 
-        let data = msg.encode().await?;
+        let data = msg.encode()?;
         let endpoint = endpoint.extend(&rid.to_string())?;
         let mut headers = Headers::default();
         if let Some(state) = common_apm::muta_apm::MutaTracer::span_state(&cx) {
@@ -126,7 +126,7 @@ impl Rpc for NetworkRpc {
                     .rpc
                     .observe(common_apm::metrics::duration_to_sec(inst.elapsed()));
 
-                Ok(R::decode(v).await?)
+                Ok(R::decode(v)?)
             }
             RpcResponse::Error(e) => Err(NetworkError::RemoteResponse(Box::new(e)).into()),
         }
@@ -147,14 +147,14 @@ impl Rpc for NetworkRpc {
         let rid = cx.rpc_id()?;
 
         let mut resp = match ret.map_err(|e| e.to_string()) {
-            Ok(mut m) => RpcResponse::Success(m.encode().await?),
+            Ok(mut m) => RpcResponse::Success(m.encode()?),
             Err(err_msg) => RpcResponse::Error(RpcErrorMessage {
                 code: RpcResponseCode::ServerError,
                 msg:  err_msg,
             }),
         };
 
-        let encoded_resp = resp.encode().await?;
+        let encoded_resp = resp.encode()?;
         let endpoint = endpoint.extend(&rid.to_string())?;
         let mut headers = Headers::default();
         if let Some(state) = common_apm::muta_apm::MutaTracer::span_state(&cx) {

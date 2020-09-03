@@ -31,7 +31,7 @@ impl NetworkGossip {
         M: MessageCodec,
     {
         let endpoint = endpoint.parse::<Endpoint>()?;
-        let data = msg.encode().await?;
+        let data = msg.encode()?;
         let mut headers = Headers::default();
         if let Some(state) = common_apm::muta_apm::MutaTracer::span_state(&ctx) {
             headers.set_trace_id(state.trace_id());

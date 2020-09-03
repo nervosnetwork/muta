@@ -64,18 +64,18 @@ impl<M: MessageCodec, H: MessageHandler<Message = M>> Reactor for MessageReactor
         let raw_context = Bytes::from(network_message.content);
         let feedback = match endpoint.scheme() {
             EndpointScheme::Gossip => {
-                let content = M::decode(raw_context).await?;
+                let content = M::decode(raw_context)?;
                 self.msg_handler.process(ctx, content).await
             }
             EndpointScheme::RpcCall => {
-                let content = M::decode(raw_context).await?;
+                let content = M::decode(raw_context)?;
                 let rpc_endpoint = RpcEndpoint::try_from(endpoint)?;
 
                 let ctx = ctx.set_rpc_id(rpc_endpoint.rpc_id().value());
                 self.msg_handler.process(ctx, content).await
             }
             EndpointScheme::RpcResponse => {
-                let content = RpcResponse::decode(raw_context).await?;
+                let content = RpcResponse::decode(raw_context)?;
                 let rpc_endpoint = RpcEndpoint::try_from(endpoint)?;
                 let rpc_id = rpc_endpoint.rpc_id().value();
 
