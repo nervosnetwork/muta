@@ -9,8 +9,12 @@ repository = "https://github.com/nervosnetwork/muta"
 
 [dependencies]
 log = "0.4"
+# Turn off gzip feature, it hurts performance. For more information, reference
+# log4rs document.
 log4rs = { version = "0.13", features = ["all_components", "file", "yaml_format"] }
 json = "0.12"
+creep = "0.2"
+rustracing_jaeger = "0.5"
 serde = "1.0"
 serde_derive = "1.0"
 chrono = "0.4"

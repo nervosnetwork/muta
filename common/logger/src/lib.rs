@@ -3,8 +3,9 @@ mod date_fixed_roller;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
+use creep::Context;
 use json::JsonValue;
-use log::LevelFilter;
+use log::{Level, LevelFilter};
 use log4rs::append::console::ConsoleAppender;
 use log4rs::append::rolling_file::policy::compound::trigger::size::SizeTrigger;
 use log4rs::append::rolling_file::policy::compound::CompoundPolicy;
@@ -12,6 +13,7 @@ use log4rs::append::rolling_file::RollingFileAppender;
 use log4rs::config::{Appender, Config, Logger, Root};
 use log4rs::encode::json::JsonEncoder;
 use log4rs::encode::pattern::PatternEncoder;
+use rustracing_jaeger::span::{SpanContext, TraceId};
 
 use date_fixed_roller::DateFixedWindowRoller;
 
@@ -123,4 +125,42 @@ pub fn metrics(name: &str, mut content: JsonValue) {
         content["name"] = name.into();
         content
     });
+}
+
+// Usage:
+// log(Level::Info, "network", "netw0001", &ctx, json!{"music": "beautiful
+// world"})
+pub fn log(level: Level, module: &str, event: &str, ctx: &Context, mut msg: JsonValue) {
+    if let Some(trace_ctx) = trace_context(ctx) {
+        msg["trace_id"] = trace_ctx.trace_id.to_string().into();
+        msg["span_id"] = trace_ctx.span_id.into();
+    }
+
+    log::log!(target: module, level, "{}", {
+        msg["event"] = event.into();
+        msg
+    });
+}
+
+#[derive(Debug, Clone, Copy)]
+struct TraceContext {
+    trace_id: TraceId,
+    span_id:  u64,
+}
+
+// NOTE: Reference muta_apm::MutaTracer::span_state.
+// Copy code to avoid depends on muta_apm crate.
+fn trace_context(ctx: &Context) -> Option<TraceContext> {
+    match ctx.get::<Option<SpanContext>>("parent_span_ctx") {
+        Some(Some(parent_ctx)) => {
+            let state = parent_ctx.state();
+            let trace_ctx = TraceContext {
+                trace_id: state.trace_id(),
+                span_id:  state.span_id(),
+            };
+
+            Some(trace_ctx)
+        }
+        _ => None,
+    }
 }

@@ -1,7 +1,7 @@
 # This file is yaml style config, can make testing the logger more easily.
 # When you need to do some test, Add the code below to the `init` function.
 # log4rs::init_file("common/logger/log.yml", Default::default()).unwrap();
-# reference: <https://docs.rs/log4rs/0.8.3/log4rs/>
+# reference: <https://docs.rs/log4rs/0.13.0/log4rs/>
 appenders:
   console:
     kind: console
