@@ -419,6 +419,8 @@ impl<S: 'static + Storage, DB: 'static + TrieDB, Mapping: 'static + ServiceMappi
         };
 
         if ret.is_error() {
+            event.borrow_mut().truncate(event_index);
+            self.states.revert_cache()?;
             service_context.cancel("tx_exec_return_code_not_zero".to_owned());
         }
 
