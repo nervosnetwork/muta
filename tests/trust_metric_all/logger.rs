@@ -5,6 +5,7 @@ const LOGGER_LOG_TO_CONSOLE: bool = true;
 const LOGGER_CONSOLE_SHOW_FILE_AND_LINE: bool = false;
 const LOGGER_LOG_TO_FILE: bool = false;
 const LOGGER_METRICS: bool = false;
+const LOGGER_FILE_SIZE_LIMIT: u64 = 1024 * 1024 * 1024;
 
 #[allow(dead_code)]
 pub fn init() {
@@ -20,6 +21,7 @@ pub fn init() {
         LOGGER_LOG_TO_FILE,
         LOGGER_METRICS,
         log_path,
+        LOGGER_FILE_SIZE_LIMIT,
         modules_level,
     )
 }

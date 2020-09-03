@@ -33,6 +33,9 @@ pub use crate::synchronization::{OverlordSynchronization, RichBlock};
 pub use crate::wal::SignedTxsWAL;
 pub use overlord::{types::Node, DurationConfig};
 
+pub const DEFAULT_OVERLORD_GAP: usize = 5;
+pub const DEFAULT_SYNC_TXS_CHUNK_SIZE: usize = 5000;
+
 #[derive(Clone, Debug, Display, PartialEq, Eq)]
 pub enum ConsensusType {
     #[display(fmt = "Signed Proposal")]

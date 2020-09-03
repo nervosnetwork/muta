@@ -16,10 +16,10 @@ pipelineConfig:
                 resources:
                   limits:
                     cpu: 4
-                    memory: 8Gi
+                    memory: 10Gi
                   requests:
                     cpu: 2
-                    memory: 8Gi
+                    memory: 10Gi
 
             steps:
               - name: unit

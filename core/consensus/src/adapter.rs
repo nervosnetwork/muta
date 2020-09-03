@@ -40,8 +40,6 @@ use crate::BlockHeaderField::{PreviousBlockHash, ProofHash, Proposer};
 use crate::BlockProofField::{BitMap, HashMismatch, HeightMismatch, Signature, WeightNotFound};
 use crate::{BlockHeaderField, BlockProofField, ConsensusError};
 
-const OVERLORD_GAP: usize = 10;
-
 pub struct OverlordConsensusAdapter<
     EF: ExecutorFactory<DB, S, Mapping>,
     M: MemPool,
@@ -832,8 +830,9 @@ where
         service_mapping: Arc<Mapping>,
         status_agent: StatusAgent,
         crypto: Arc<OverlordCrypto>,
+        gap: usize,
     ) -> ProtocolResult<Self> {
-        let (exec_queue, rx) = channel(OVERLORD_GAP);
+        let (exec_queue, rx) = channel(gap);
         let exec_demons = Some(ExecDemons::new(
             Arc::clone(&storage),
             Arc::clone(&trie_db),
