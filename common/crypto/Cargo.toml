@@ -1,6 +1,6 @@
 [package]
 name = "common-crypto"
-version = "0.2.0-rc.2"
+version = "0.2.0-rc.2.1"
 authors = ["Muta Dev <muta@nervos.org>"]
 edition = "2018"
 repository = "https://github.com/nervosnetwork/muta"
