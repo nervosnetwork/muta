@@ -1,9 +1,4 @@
 interval = 500
-[[list]]
-msg_type = { SendProposal = "Valid" }     
-probability = 0.01
-num_range = [1, 2]
-priority = "High"
 
 #################
 ##### NewTx #####
@@ -14,225 +9,225 @@ probability = 1.0
 num_range = [10, 100]
 priority = "Normal"
 
-#[[list]]
-#msg_type = { NewTxs = "InvalidStruct" }
-#probability = 0.01
-#num_range = [1, 10]
-#priority = "Normal"
+[[list]]
+msg_type = { NewTxs = "InvalidStruct" }
+probability = 0.01
+num_range = [1, 10]
+priority = "Normal"
 
-#[[list]]
-#msg_type = { NewTxs = "InvalidHash" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "Normal"
-#
-#[[list]]
-#msg_type = { NewTxs = "InvalidSig" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "Normal"
+[[list]]
+msg_type = { NewTxs = "InvalidHash" }
+probability = 1.0
+num_range = [1, 10]
+priority = "Normal"
 
-#[[list]]
-#msg_type = { NewTxs = "InvalidChainID" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "Normal"
-#
-#[[list]]
-#msg_type = { NewTxs = "InvalidCyclesPrice" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "Normal"
+[[list]]
+msg_type = { NewTxs = "InvalidSig" }
+probability = 1.0
+num_range = [1, 10]
+priority = "Normal"
 
-#[[list]]
-#msg_type = { NewTxs = "InvalidCyclesLimit" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "Normal"
+[[list]]
+msg_type = { NewTxs = "InvalidChainID" }
+probability = 1.0
+num_range = [1, 10]
+priority = "Normal"
 
-#[[list]]
-#msg_type = { NewTxs = "InvalidNonceOfRandLen" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "Normal"
-#
-#[[list]]
-#msg_type = { NewTxs = "InvalidNonceDup" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "Normal"
-#
-#[[list]]
-#msg_type = { NewTxs = "InvalidRequest" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "Normal"
+[[list]]
+msg_type = { NewTxs = "InvalidCyclesPrice" }
+probability = 1.0
+num_range = [1, 10]
+priority = "Normal"
 
-#[[list]]
-#msg_type = { NewTxs = "InvalidTimeout" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "Normal"
-#
-#[[list]]
-#msg_type = { NewTxs = "InvalidSender" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "Normal"
+[[list]]
+msg_type = { NewTxs = "InvalidCyclesLimit" }
+probability = 1.0
+num_range = [1, 10]
+priority = "Normal"
+
+[[list]]
+msg_type = { NewTxs = "InvalidNonceOfRandLen" }
+probability = 1.0
+num_range = [1, 10]
+priority = "Normal"
+
+[[list]]
+msg_type = { NewTxs = "InvalidNonceDup" }
+probability = 1.0
+num_range = [1, 10]
+priority = "Normal"
+
+[[list]]
+msg_type = { NewTxs = "InvalidRequest" }
+probability = 1.0
+num_range = [1, 10]
+priority = "Normal"
+
+[[list]]
+msg_type = { NewTxs = "InvalidTimeout" }
+probability = 1.0
+num_range = [1, 10]
+priority = "Normal"
+
+[[list]]
+msg_type = { NewTxs = "InvalidSender" }
+probability = 1.0
+num_range = [1, 10]
+priority = "Normal"
 
 #########################
 ###### RecvProposal #####
 #########################
-#[[list]]
-#req_end = "/gossip/consensus/signed_proposal"
-#msg_type = { RecvProposal = "InvalidHeight" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "High"
-#
-#[[list]]
-#req_end = "/gossip/consensus/signed_proposal"
-#msg_type = { RecvProposal = "InvalidHash" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "High"
-#
-#[[list]]
-#req_end = "/gossip/consensus/signed_proposal"
-#msg_type = { RecvProposal = "NotExistTxs" }
-#probability = 1.0
-#num_range = [1, 1000]
-#priority = "High"
-#
-#[[list]]
-#req_end = "/gossip/consensus/signed_proposal"
-#msg_type = { RecvProposal = "InvalidStruct" }
-#probability = 1.0
-#num_range = [1, 2]
-#priority = "High"
-#
+[[list]]
+req_end = "/gossip/consensus/signed_proposal"
+msg_type = { RecvProposal = "InvalidHeight" }
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+req_end = "/gossip/consensus/signed_proposal"
+msg_type = { RecvProposal = "InvalidHash" }
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+req_end = "/gossip/consensus/signed_proposal"
+msg_type = { RecvProposal = "NotExistTxs" }
+probability = 1.0
+num_range = [1, 1000]
+priority = "High"
+
+[[list]]
+req_end = "/gossip/consensus/signed_proposal"
+msg_type = { RecvProposal = "InvalidStruct" }
+probability = 1.0
+num_range = [1, 2]
+priority = "High"
+
 ##########################
 ####### SendProposal #####
 ##########################
-#[[list]]
-#msg_type = { SendProposal = "InvalidStruct" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "High"
+[[list]]
+msg_type = { SendProposal = "InvalidStruct" }
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendProposal = "InvalidChainId" }
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendProposal = "InvalidPrevHash" }
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendProposal = "InvalidHeight" }
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendProposal = "InvalidExecHeight" }
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendProposal = "InvalidTimestamp" }
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendProposal = "InvalidOrderRoot" }
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendProposal = "InvalidSignedTxsHash" }
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendProposal = "InvalidConfirmRoot" }
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendProposal = "InvalidStateRoot" }
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendProposal = "InvalidReceiptRoot" }
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendProposal = "InvalidCyclesUsed" }
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
 #
-#[[list]]
-#msg_type = { SendProposal = "InvalidChainId" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "High"
-#
-#[[list]]
-#msg_type = { SendProposal = "InvalidPrevHash" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "High"
-#
-#[[list]]
-#msg_type = { SendProposal = "InvalidHeight" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "High"
-#
-#[[list]]
-#msg_type = { SendProposal = "InvalidExecHeight" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "High"
-#
-#[[list]]
-#msg_type = { SendProposal = "InvalidTimestamp" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "High"
-#
-#[[list]]
-#msg_type = { SendProposal = "InvalidOrderRoot" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "High"
-#
-#[[list]]
-#msg_type = { SendProposal = "InvalidSignedTxsHash" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "High"
-#
-#[[list]]
-#msg_type = { SendProposal = "InvalidConfirmRoot" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "High"
-#
-#[[list]]
-#msg_type = { SendProposal = "InvalidStateRoot" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "High"
-#
-#[[list]]
-#msg_type = { SendProposal = "InvalidReceiptRoot" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "High"
-#
-#[[list]]
-#msg_type = { SendProposal = "InvalidCyclesUsed" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "High"
-##
-#[[list]]
-#msg_type = { SendProposal = "InvalidBlockProposer" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "High"
-#
-#[[list]]
-#msg_type = { SendProposal = "InvalidProof" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "High"
-#
-#[[list]]
-#msg_type = { SendProposal = "InvalidVersion" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "High"
-#
-#[[list]]
-#msg_type = { SendProposal = "InvalidValidators" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "High"
-#
-#[[list]]
-#msg_type = { SendProposal = "InvalidTxHash" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "High"
-#
-#[[list]]
-#msg_type = { SendProposal = "InvalidSig" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "High"
-#
-#[[list]]
-#msg_type = { SendProposal = "InvalidProposalHeight" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "High"
-#
-#[[list]]
-#msg_type = { SendProposal = "InvalidRound" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "High"
+[[list]]
+msg_type = { SendProposal = "InvalidBlockProposer" }
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendProposal = "InvalidProof" }
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendProposal = "InvalidVersion" }
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendProposal = "InvalidValidators" }
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendProposal = "InvalidTxHash" }
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendProposal = "InvalidSig" }
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendProposal = "InvalidProposalHeight" }
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendProposal = "InvalidRound" }
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
 #
 ##[[list]]
 ##msg_type = { SendProposal = "InvalidContentStruct" }     ## Cause panic
@@ -246,215 +241,215 @@ priority = "Normal"
 ##num_range = [1, 10]
 ##priority = "High"
 #
-#[[list]]
-#msg_type = { SendProposal = "InvalidLock" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "High"
-#
-#[[list]]
-#msg_type = { SendProposal = "InvalidProposalProposer" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "High"
-#
+[[list]]
+msg_type = { SendProposal = "InvalidLock" }
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendProposal = "InvalidProposalProposer" }
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
 ####################
 ##### SendVote #####
 ####################
-#[[list]]
-#msg_type = { SendVote = "InvalidStruct" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "High"
-#
-#[[list]]
-#msg_type = { SendVote = "InvalidHeight" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "High"
-#
-#[[list]]
-#msg_type = { SendVote = "InvalidRound" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "High"
-#
-#[[list]]
-#msg_type = { SendVote = "InvalidBlockHash" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "High"
-#
-#[[list]]
-#msg_type = { SendVote = "InvalidSig" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "High"
-#
-#[[list]]
-#msg_type = { SendVote = "InvalidVoter" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "High"
-#
+[[list]]
+msg_type = { SendVote = "InvalidStruct" }
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendVote = "InvalidHeight" }
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendVote = "InvalidRound" }
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendVote = "InvalidBlockHash" }
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendVote = "InvalidSig" }
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendVote = "InvalidVoter" }
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
 ##################
 ##### SendQC #####
 ##################
-#[[list]]
-#msg_type = { SendQC = "InvalidStruct" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "High"
-#
-#[[list]]
-#msg_type = { SendQC = "InvalidHeight" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "High"
-#
-#[[list]]
-#msg_type = { SendQC = "InvalidRound" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "High"
-#
-#[[list]]
-#msg_type = { SendQC = "InvalidBlockHash" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "High"
-#
-#[[list]]
-#msg_type = { SendQC = "InvalidSig" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "High"
-#
-#[[list]]
-#msg_type = { SendQC = "InvalidLeader" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "High"
-#
+[[list]]
+msg_type = { SendQC = "InvalidStruct" }
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendQC = "InvalidHeight" }
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendQC = "InvalidRound" }
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendQC = "InvalidBlockHash" }
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendQC = "InvalidSig" }
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendQC = "InvalidLeader" }
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
 #####################
 ##### SendChoke #####
 #####################
-#
-#[[list]]
-#msg_type = { SendChoke = "InvalidStruct" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "High"
-#
-#[[list]]
-#msg_type = { SendChoke = "InvalidHeight" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "High"
-#
-#[[list]]
-#msg_type = { SendChoke = "InvalidRound" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "High"
-#
+
+[[list]]
+msg_type = { SendChoke = "InvalidStruct" }
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendChoke = "InvalidHeight" }
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendChoke = "InvalidRound" }
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
 ##[[list]]
 ##msg_type = { SendChoke = "InvalidFrom" }     ## Break liveness
 ##probability = 1.0
 ##num_range = [1, 10]
 ##priority = "High"
 #
-#[[list]]
-#msg_type = { SendChoke = "InvalidSig" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "High"
-#
-#[[list]]
-#msg_type = { SendChoke = "InvalidAddress" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "High"
-#
-######################
-##### SendHeight #####
-######################
-#[[list]]
-#msg_type = "SendHeight"
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "High"
-#
-######################
-##### PullTxs #####
-######################
-#
-#[[list]]
-#req_end = "/rpc_call/mempool/pull_txs"
-#msg_type = { PullTxs = "InvalidStruct" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "High"
-#
-#[[list]]
-#req_end = "/rpc_call/mempool/pull_txs"
-#msg_type = { PullTxs = "InvalidHash" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "High"
-#
-#[[list]]
-#req_end = "/rpc_call/mempool/pull_txs"
-#msg_type = { PullTxs = "InvalidSig" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "High"
-#
-#[[list]]
-#req_end = "/rpc_call/mempool/pull_txs"
-#msg_type = { PullTxs = "InvalidChainID" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "High"
-#
-#[[list]]
-#req_end = "/rpc_call/mempool/pull_txs"
-#msg_type = { PullTxs = "InvalidCyclesPrice" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "High"
-#
-#[[list]]
-#req_end = "/rpc_call/mempool/pull_txs"
-#msg_type = { PullTxs = "InvalidCyclesLimit" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "High"
-#
-#[[list]]
-#req_end = "/rpc_call/mempool/pull_txs"
-#msg_type = { PullTxs = "InvalidNonceOfRandLen" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "High"
-#
-#[[list]]
-#req_end = "/rpc_call/mempool/pull_txs"
-#msg_type = { PullTxs = "InvalidRequest" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "High"
-#
-#[[list]]
-#req_end = "/rpc_call/mempool/pull_txs"
-#msg_type = { PullTxs = "InvalidTimeout" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "High"
-#
-#[[list]]
-#req_end = "/rpc_call/mempool/pull_txs"
-#msg_type = { PullTxs = "InvalidSender" }
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "High"
+[[list]]
+msg_type = { SendChoke = "InvalidSig" }
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+msg_type = { SendChoke = "InvalidAddress" }
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
+#####################
+#### SendHeight #####
+#####################
+[[list]]
+msg_type = "SendHeight"
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
+#####################
+#### PullTxs #####
+#####################
+
+[[list]]
+req_end = "/rpc_call/mempool/pull_txs"
+msg_type = { PullTxs = "InvalidStruct" }
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+req_end = "/rpc_call/mempool/pull_txs"
+msg_type = { PullTxs = "InvalidHash" }
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+req_end = "/rpc_call/mempool/pull_txs"
+msg_type = { PullTxs = "InvalidSig" }
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+req_end = "/rpc_call/mempool/pull_txs"
+msg_type = { PullTxs = "InvalidChainID" }
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+req_end = "/rpc_call/mempool/pull_txs"
+msg_type = { PullTxs = "InvalidCyclesPrice" }
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+req_end = "/rpc_call/mempool/pull_txs"
+msg_type = { PullTxs = "InvalidCyclesLimit" }
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+req_end = "/rpc_call/mempool/pull_txs"
+msg_type = { PullTxs = "InvalidNonceOfRandLen" }
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+req_end = "/rpc_call/mempool/pull_txs"
+msg_type = { PullTxs = "InvalidRequest" }
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+req_end = "/rpc_call/mempool/pull_txs"
+msg_type = { PullTxs = "InvalidTimeout" }
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
+
+[[list]]
+req_end = "/rpc_call/mempool/pull_txs"
+msg_type = { PullTxs = "InvalidSender" }
+probability = 1.0
+num_range = [1, 10]
+priority = "High"
