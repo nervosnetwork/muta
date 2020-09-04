@@ -33,6 +33,7 @@ log_to_console = true
 filter = "info"
 log_to_file = true
 console_show_file_and_line = false
+file_size_limit = 1073741824 # 1 GiB
 
 [rocksdb]
 max_open_files = 64

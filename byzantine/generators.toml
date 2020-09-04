@@ -1,13 +1,14 @@
 interval = 500
-[[list]]
-msg_type = { SendProposal = "Valid" }     
-probability = 0.01
-num_range = [1, 2]
-priority = "High"
 
 #################
 ##### NewTx #####
 #################
+[[list]]
+msg_type = { NewTxs = "Valid" }
+probability = 1.0
+num_range = [10, 100]
+priority = "Normal"
+
 [[list]]
 msg_type = { NewTxs = "InvalidStruct" }
 probability = 0.01
@@ -105,9 +106,9 @@ probability = 1.0
 num_range = [1, 2]
 priority = "High"
 
-#########################
-###### SendProposal #####
-#########################
+##########################
+####### SendProposal #####
+##########################
 [[list]]
 msg_type = { SendProposal = "InvalidStruct" }
 probability = 1.0
@@ -227,19 +228,19 @@ msg_type = { SendProposal = "InvalidRound" }
 probability = 1.0
 num_range = [1, 10]
 priority = "High"
-
-#[[list]]
-#msg_type = { SendProposal = "InvalidContentStruct" }     ## Cause panic
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "High"
-
-#[[list]]
-#msg_type = { SendProposal = "InvalidBlockHash" }     ## Cause panic
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "High"
-
+#
+##[[list]]
+##msg_type = { SendProposal = "InvalidContentStruct" }     ## Cause panic
+##probability = 1.0
+##num_range = [1, 10]
+##priority = "High"
+#
+##[[list]]
+##msg_type = { SendProposal = "InvalidBlockHash" }     ## Cause panic
+##probability = 1.0
+##num_range = [1, 10]
+##priority = "High"
+#
 [[list]]
 msg_type = { SendProposal = "InvalidLock" }
 probability = 1.0
@@ -252,9 +253,9 @@ probability = 1.0
 num_range = [1, 10]
 priority = "High"
 
-###################
-#### SendVote #####
-###################
+####################
+##### SendVote #####
+####################
 [[list]]
 msg_type = { SendVote = "InvalidStruct" }
 probability = 1.0
@@ -291,9 +292,9 @@ probability = 1.0
 num_range = [1, 10]
 priority = "High"
 
-#################
-#### SendQC #####
-#################
+##################
+##### SendQC #####
+##################
 [[list]]
 msg_type = { SendQC = "InvalidStruct" }
 probability = 1.0
@@ -330,9 +331,9 @@ probability = 1.0
 num_range = [1, 10]
 priority = "High"
 
-####################
-#### SendChoke #####
-####################
+#####################
+##### SendChoke #####
+#####################
 
 [[list]]
 msg_type = { SendChoke = "InvalidStruct" }
@@ -352,12 +353,12 @@ probability = 1.0
 num_range = [1, 10]
 priority = "High"
 
-#[[list]]
-#msg_type = { SendChoke = "InvalidFrom" }     ## Break liveness
-#probability = 1.0
-#num_range = [1, 10]
-#priority = "High"
-
+##[[list]]
+##msg_type = { SendChoke = "InvalidFrom" }     ## Break liveness
+##probability = 1.0
+##num_range = [1, 10]
+##priority = "High"
+#
 [[list]]
 msg_type = { SendChoke = "InvalidSig" }
 probability = 1.0

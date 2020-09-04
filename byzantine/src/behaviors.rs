@@ -74,6 +74,7 @@ pub enum NewTx {
     InvalidRequest,
     InvalidTimeout,
     InvalidSender,
+    Valid,
 }
 
 #[derive(Clone, Debug, Deserialize)]
