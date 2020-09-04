@@ -11,7 +11,7 @@ use overlord::Crypto;
 use rand::distributions::uniform::{SampleBorrow, SampleUniform};
 use rand::distributions::Alphanumeric;
 use rand::{random, Rng};
-use rlp::{Encodable, RlpStream};
+use rlp::{self, Encodable, RlpStream};
 
 use common_crypto::{
     HashValue, PrivateKey, PublicKey, Secp256k1PrivateKey, Signature, ToPublicKey,
@@ -79,8 +79,8 @@ pub fn gen_valid_raw_tx(
 ) -> RawTransaction {
     RawTransaction {
         chain_id:     metadata.chain_id.clone(),
-        cycles_price: gen_range(0, metadata.cycles_price),
-        cycles_limit: gen_range(0, metadata.cycles_limit),
+        cycles_price: 100,
+        cycles_limit: 1_000_000,
         nonce:        gen_valid_hash(),
         request:      gen_transfer_tx_request(),
         timeout:      gen_range(height, height + metadata.timeout_gap),
@@ -142,6 +142,8 @@ pub fn gen_signed_tx(
     let hash_value = HashValue::try_from(tx_hash.as_bytes().as_ref()).unwrap();
     let signature = sig.unwrap_or_else(|| pri_key.sign_message(&hash_value).to_bytes());
     let pubkey = pri_key.pub_key().to_bytes();
+    let signature = Bytes::from(rlp::encode_list::<Vec<u8>, _>(&[signature.to_vec()]));
+    let pubkey = Bytes::from(rlp::encode_list::<Vec<u8>, _>(&[pubkey.to_vec()]));
     SignedTransaction {
         raw,
         tx_hash,

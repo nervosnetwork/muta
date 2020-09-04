@@ -740,3 +740,12 @@ pub fn gen_invalid_sender_signed_tx(
     raw.sender = gen_invalid_address();
     gen_valid_signed_tx(raw, pri_key)
 }
+
+pub fn gen_valid_tx(
+    pri_key: &Secp256k1PrivateKey,
+    height: u64,
+    metadata: &Metadata,
+) -> SignedTransaction {
+    let raw = gen_valid_raw_tx(pri_key, height, metadata);
+    gen_valid_signed_tx(raw, pri_key)
+}

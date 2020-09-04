@@ -110,13 +110,4 @@ fn add_primitive_generator(list: &mut Vec<BehaviorGenerator>) {
         priority:    Priority::High,
     };
     list.push(valid_recv_height_generator);
-
-    // let valid_new_proposal_generator = BehaviorGenerator {
-    //     req_end:     None,
-    //     msg_type:    MessageType::SendProposal(NewProposal::Valid),
-    //     probability: 1.0,
-    //     num_range:   (1, 2),
-    //     priority:    Priority::High,
-    // };
-    // list.push(valid_new_proposal_generator);
 }

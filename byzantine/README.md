@@ -34,7 +34,7 @@ muta$ CONFIG=examples/config-1.toml GENESIS=examples/genesis.toml cargo run --re
 muta$ CONFIG=examples/config-2.toml GENESIS=examples/genesis.toml cargo run --release --example muta-chain
 muta$ CONFIG=examples/config-3.toml GENESIS=examples/genesis.toml cargo run --release --example muta-chain
 // 启动一个拜占庭节点
-muta$ CONFIG=examples/config-4.toml GENESIS=examples/genesis.toml cargo run --release --example byzantine-node
+muta$ CONFIG=examples/config-4.toml GENESIS=examples/genesis.toml cargo run --release --example byzantine_node
 ```
 
 # 3. 架构设计

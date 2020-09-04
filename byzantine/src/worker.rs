@@ -52,7 +52,7 @@ use crate::invalid_types::{
     gen_invalid_timeout_signed_tx, gen_invalid_timestamp_new_proposal,
     gen_invalid_tx_hash_new_proposal, gen_invalid_validators_new_proposal,
     gen_invalid_version_new_proposal, gen_invalid_voter_new_vote, gen_not_exists_txs_pull_txs,
-    gen_valid_new_proposal, InvalidStruct,
+    gen_valid_new_proposal, gen_valid_tx, InvalidStruct,
 };
 use crate::utils::{
     gen_positive_range, gen_random_bytes, gen_valid_signed_choke, gen_valid_signed_vote, time_now,
@@ -329,6 +329,7 @@ where
                 NewTx::InvalidSender => {
                     send_new_tx!(self, ctx, behavior, gen_invalid_sender_signed_tx)
                 }
+                NewTx::Valid => send_new_tx!(self, ctx, behavior, gen_valid_tx),
             },
             MessageType::RecvProposal(pull_txs) => match pull_txs {
                 PullTxs::Valid => self.set_state(behavior.request.as_ref()).await,
