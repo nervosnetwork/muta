@@ -1,6 +1,6 @@
 [package]
 name = "muta-keypair"
-version = "0.2.0-rc"
+version = "0.2.0-rc.2"
 authors = ["Muta Dev <muta@nervos.org>"]
 edition = "2018"
 include = ["Cargo.toml", "src/*"]
