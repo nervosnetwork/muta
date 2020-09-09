@@ -153,6 +153,7 @@ mod tests {
 
     use crate::binding::state::MPTTrie;
     use super::*;
+
     #[test]
     fn test_get_trie() {
         let state = Rc::new(RefCell::new(GeneralServiceState::new(MPTTrie::new(
@@ -162,7 +163,7 @@ mod tests {
         let key = Bytes::from("test");
         let value = Bytes::from("test");
     
-        state.insert(key.clone(), value.clone()).unwrap());
+        state.insert(key.clone(), value.clone()).unwrap();
 
         assert_eq!(state.get(key.clone()).unwrap().unwrap(), value);
         state.insert(key.clone(), Bytes::new()).unwrap();
