@@ -34,7 +34,7 @@ impl<DB: TrieDB> GeneralServiceState<DB> {
     }
 
     fn get_bytes_value(&self, key: Bytes) -> ProtocolResult<Option<Bytes>> {
-         if let Some(value_bytes) = self.cache_map.get(&key) {
+        if let Some(value_bytes) = self.cache_map.get(&key) {
             if value_bytes.is_empty() {
                 return Ok(None);
             }
@@ -144,25 +144,23 @@ fn get_address_key<Key: FixedCodec>(address: &Address, key: &Key) -> ProtocolRes
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
     use bytes::Bytes;
+    use std::sync::Arc;
 
     use cita_trie::MemoryDB;
 
     use protocol::traits::ServiceState;
 
-    use crate::binding::state::MPTTrie;
     use super::*;
+    use crate::binding::state::MPTTrie;
 
     #[test]
     fn test_get_trie() {
-        let mut state = GeneralServiceState::new(MPTTrie::new(
-            Arc::new(MemoryDB::new(false)),
-        ));
+        let mut state = GeneralServiceState::new(MPTTrie::new(Arc::new(MemoryDB::new(false))));
 
         let key = Bytes::from("test");
         let value = Bytes::from("test");
-    
+
         state.insert(key.clone(), value.clone()).unwrap();
 
         assert_eq!(state.get::<Bytes, Bytes>(&key).unwrap(), Some(value));
