@@ -8,7 +8,7 @@ use crate::endpoint::Endpoint;
 use crate::error::NetworkError;
 use crate::message::{Headers, NetworkMessage};
 use crate::protocols::{Recipient, Transmitter, TransmitterMessage};
-use crate::traits::Compression;
+use crate::traits::{Compression, NetworkContext};
 use crate::PeerIdExt;
 
 #[derive(Clone)]
@@ -99,7 +99,7 @@ impl Gossip for NetworkGossip {
         M: MessageCodec,
     {
         let msg = self.package_message(cx.clone(), endpoint, msg).await?;
-        let ctx = cx.set_url(endpoint.full_url().to_owned());
+        let ctx = cx.set_url(endpoint.to_owned());
         self.send_to_sessions(ctx, TargetSession::All, msg, priority)
             .await?;
         common_apm::metrics::network::on_network_message_sent_all_target(endpoint);
@@ -121,7 +121,7 @@ impl Gossip for NetworkGossip {
         let msg = self.package_message(cx.clone(), endpoint, msg).await?;
         let multicast_count = peer_ids.as_ref().len();
 
-        let ctx = cx.set_url(endpoint.full_url().to_owned());
+        let ctx = cx.set_url(endpoint.to_owned());
         self.send_to_peers(ctx, peer_ids, msg, priority).await?;
         common_apm::metrics::network::on_network_message_sent_multi_target(
             endpoint,
