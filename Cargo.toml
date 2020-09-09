@@ -64,6 +64,7 @@ members = [
   "common/logger",
   "common/merkle",
   "common/pubsub",
+  "common/pprof",
 
   "core/api",
   "core/consensus",
