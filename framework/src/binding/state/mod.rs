@@ -34,25 +34,25 @@ impl<DB: TrieDB> GeneralServiceState<DB> {
     }
 
     fn get_bytes_value(&self, key: Bytes) -> ProtocolResult<Option<Bytes>> {
-         if let Some(value_bytes) = self.cache_map.get(&encoded_key) {
+         if let Some(value_bytes) = self.cache_map.get(&key) {
             if value_bytes.is_empty() {
                 return Ok(None);
             }
-            return Ok(Some(inst));
+            return Ok(Some(value_bytes.clone()));
         }
 
-        if let Some(value_bytes) = self.stash_map.get(&encoded_key) {
+        if let Some(value_bytes) = self.stash_map.get(&key) {
             if value_bytes.is_empty() {
                 return Ok(None);
             }
-            return Ok(Some(inst));
+            return Ok(Some(value_bytes.clone()));
         }
 
-        if let Some(value_bytes) = self.trie.get(&encoded_key)? {
+        if let Some(value_bytes) = self.trie.get(&key)? {
             if value_bytes.is_empty() {
                 return Ok(None);
             }
-            return Ok(Some(value_bytes));
+            return Ok(Some(value_bytes.clone()));
         }
 
         Ok(None)
@@ -64,8 +64,8 @@ impl<DB: TrieDB> ServiceState for GeneralServiceState<DB> {
         let encoded_key = key.encode_fixed()?;
 
         if let Some(value_bytes) = self.get_bytes_value(encoded_key)? {
-            let inst = <_>::decode_fixed(value_bytes.clone())?;
-            Ok(inst)
+            let inst = <_>::decode_fixed(value_bytes)?;
+            Ok(Some(inst))
         } else {
             Ok(None)
         }
@@ -74,7 +74,7 @@ impl<DB: TrieDB> ServiceState for GeneralServiceState<DB> {
     fn contains<Key: FixedCodec>(&self, key: &Key) -> ProtocolResult<bool> {
         let encoded_key = key.encode_fixed()?;
 
-        self.get_bytes_value(encoded_key)?.is_some()
+        Ok(self.get_bytes_value(encoded_key)?.is_some())
     }
 
     // Insert a pair of key / value
@@ -145,30 +145,30 @@ fn get_address_key<Key: FixedCodec>(address: &Address, key: &Key) -> ProtocolRes
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
-    use std::cell::RefCell;
-    use std::rc::Rc;
     use bytes::Bytes;
 
     use cita_trie::MemoryDB;
+
+    use protocol::traits::ServiceState;
 
     use crate::binding::state::MPTTrie;
     use super::*;
 
     #[test]
     fn test_get_trie() {
-        let state = Rc::new(RefCell::new(GeneralServiceState::new(MPTTrie::new(
+        let mut state = GeneralServiceState::new(MPTTrie::new(
             Arc::new(MemoryDB::new(false)),
-        ))));
+        ));
 
         let key = Bytes::from("test");
         let value = Bytes::from("test");
     
         state.insert(key.clone(), value.clone()).unwrap();
 
-        assert_eq!(state.get(key.clone()).unwrap().unwrap(), value);
+        assert_eq!(state.get::<Bytes, Bytes>(&key).unwrap(), Some(value));
         state.insert(key.clone(), Bytes::new()).unwrap();
 
-        assert_eq!(state.get(key.clone()).unwrap().is_some(), false);
-        assert_eq!(state.contains(key.clone()).unwrap(), false);
+        assert_eq!(state.get::<Bytes, Bytes>(&key).unwrap().is_some(), false);
+        assert_eq!(state.contains(&key).unwrap(), false);
     }
 }
