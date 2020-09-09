@@ -52,7 +52,7 @@ impl<DB: TrieDB> GeneralServiceState<DB> {
             if value_bytes.is_empty() {
                 return Ok(None);
             }
-            return Ok(Some(value_bytes.clone()));
+            return Ok(Some(value_bytes));
         }
 
         Ok(None)
