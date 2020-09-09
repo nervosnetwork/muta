@@ -7,6 +7,7 @@ use std::time::{Duration, Instant};
 use async_trait::async_trait;
 use futures::lock::Mutex;
 use futures_timer::Delay;
+use json::JsonValue;
 use log::{error, info, warn};
 use overlord::error::ConsensusError as OverlordError;
 use overlord::types::{Commit, Node, OverlordMsg, Status, ViewChangeReason};
@@ -16,6 +17,7 @@ use rlp::Encodable;
 
 use common_apm::muta_apm;
 use common_crypto::BlsPublicKey;
+use common_logger::log;
 use common_merkle::Merkle;
 
 use protocol::fixed_codec::FixedCodec;
@@ -482,28 +484,24 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         }
     }
 
-    fn report_view_change(&self, _cx: Context, height: u64, round: u64, reason: ViewChangeReason) {
-        // TODO@TangGX: Fix this log after finish the log standard.
+    fn report_view_change(&self, cx: Context, height: u64, round: u64, reason: ViewChangeReason) {
+        let mut evt = JsonValue::new_object();
+        evt["height"] = height.into();
+        evt["round"] = round.into();
+
         match reason {
             ViewChangeReason::CheckBlockNotPass => {
                 let err = {
                     let e = self.last_check_block_fail_reason.read();
                     reason.to_string() + " " + e.as_str()
                 };
-                log::warn!(
-                    "[consensus]: overlord view change in height {} round {}, because {:?}",
-                    height,
-                    round,
-                    err
-                );
+
+                evt["reason"] = err.into();
+                log(log::Level::Warn, "consensus", "cons000", &cx, evt);
             }
             _ => {
-                log::warn!(
-                    "[consensus]: overlord view change in height {}, round {}, because {:?}",
-                    height,
-                    round,
-                    reason
-                );
+                evt["reason"] = reason.to_string().into();
+                log(log::Level::Warn, "consensus", "cons000", &cx, evt);
             }
         }
     }
