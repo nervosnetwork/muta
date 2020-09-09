@@ -27,9 +27,9 @@ num_cpus = "1.12"
 log = "0.4"
 openssl = "0.10"
 pprof = { version = "0.3", optional = true, features = ["flamegraph", "protobuf"] }
-url = "2.1"
-tokio = { version = "0.2", features = [ "time" ] }
+url = { version = "2.1", optional = true }
+tokio = { version = "0.2", optional = true, features = [ "time" ] }
 
 [features]
 default = []
-dump_profile = [ "pprof" ]
+dump_profile = [ "pprof", "url", "tokio" ]
