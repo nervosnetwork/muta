@@ -23,7 +23,7 @@ use crate::error::{ErrorKind, NetworkError};
 use crate::event::PeerManagerEvent;
 use crate::peer_manager::SharedSessions;
 use crate::protocols::core::TRANSMITTER_PROTOCOL_ID;
-use crate::traits::SharedSessionBook;
+use crate::traits::{NetworkContext, SharedSessionBook};
 
 // TODO: Refactor connection service, decouple protocol and service
 // initialization.
@@ -150,6 +150,8 @@ impl Future for BackgroundSending {
     }
 }
 
+type MessageContext = protocol::traits::Context;
+
 struct SendingContext<'a> {
     conn_ctrl:  &'a ConnectionServiceControl,
     peers_serv: &'a UnboundedSender<PeerManagerEvent>,
@@ -162,8 +164,8 @@ impl<'a> SendingContext<'a> {
         let TransmitterMessage { priority, data, .. } = msg;
 
         match msg.recipient {
-            Recipient::Session(target) => self.send_to_sessions(target, data, priority),
-            Recipient::PeerId(peer_ids) => self.send_to_peers(peer_ids, data, priority),
+            Recipient::Session(target) => self.send_to_sessions(target, data, priority, msg.ctx),
+            Recipient::PeerId(peer_ids) => self.send_to_peers(peer_ids, data, priority, msg.ctx),
         }
     }
 
@@ -172,6 +174,7 @@ impl<'a> SendingContext<'a> {
         target: TargetSession,
         mut data: Bytes,
         priority: Priority,
+        msg_ctx: MessageContext,
     ) -> Result<(), NetworkError> {
         let (target, opt_blocked) = match self.filter_blocked(target) {
             (None, None) => unreachable!(),
@@ -183,6 +186,11 @@ impl<'a> SendingContext<'a> {
             }
             (Some(tar), opt_blocked) => (tar, opt_blocked),
         };
+
+        let url = msg_ctx.url().unwrap_or_else(|_| "");
+        common_apm::metrics::network::NETWORK_MESSAGE_SIZE_COUNT_VEC
+            .with_label_values(&["send", url])
+            .inc_by(data.len() as i64);
 
         let seq = self.data_seq.fetch_add(1, Ordering::SeqCst);
         log::debug!("seq {} data size {}", seq, data.len());
@@ -285,9 +293,11 @@ impl<'a> SendingContext<'a> {
         peer_ids: Vec<PeerId>,
         data: Bytes,
         priority: Priority,
+        msg_ctx: MessageContext,
     ) -> Result<(), NetworkError> {
         let (connected, unconnected) = self.sessions.peers(peer_ids);
-        let send_ret = self.send_to_sessions(TargetSession::Multi(connected), data, priority);
+        let send_ret =
+            self.send_to_sessions(TargetSession::Multi(connected), data, priority, msg_ctx);
         if unconnected.is_empty() {
             return send_ret;
         }
