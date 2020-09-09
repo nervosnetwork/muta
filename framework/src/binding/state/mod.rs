@@ -151,8 +151,8 @@ mod tests {
 
     use cita_trie::MemoryDB;
 
-    use crate::binding::state::{GeneralServiceState, MPTTrie};
-
+    use crate::binding::state::MPTTrie;
+    use super::*;
     #[test]
     fn test_get_trie() {
         let state = Rc::new(RefCell::new(GeneralServiceState::new(MPTTrie::new(
