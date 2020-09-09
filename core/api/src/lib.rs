@@ -287,7 +287,6 @@ async fn metrics() -> HttpResponse {
         .body(metrics_data)
 }
 
-#[cfg(feature = "dump_profile")]
 mod profile {
     use std::collections::HashMap;
     use std::str::FromStr;
@@ -422,6 +421,7 @@ pub async fn start_graphql<Adapter: APIAdapter + 'static>(cfg: GraphQLConfig, ad
     let maxconn = cfg.maxconn;
     let add_listening_address = cfg.listening_address;
     let max_payload_size = cfg.max_payload_size;
+    let enable_dump_profile = cfg.enable_dump_profile;
 
     // Start http server
     let server = HttpServer::new(move || {
@@ -437,11 +437,11 @@ pub async fn start_graphql<Adapter: APIAdapter + 'static>(cfg: GraphQLConfig, ad
             .service(web::resource(&path_graphiql_uri).route(web::get().to(graphiql)))
             .service(web::resource("/metrics").route(web::get().to(metrics)));
 
-        #[cfg(feature = "dump_profile")]
-        let app =
-            app.service(web::resource("/dump_profile").route(web::get().to(profile::dump_profile)));
-
-        app
+        if enable_dump_profile {
+            app.service(web::resource("/dump_profile").route(web::get().to(profile::dump_profile)))
+        } else {
+            app
+        }
     })
     .workers(workers)
     .maxconn(cmp::max(maxconn / workers, 1));

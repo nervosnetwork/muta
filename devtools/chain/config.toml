@@ -11,6 +11,7 @@ graphiql_uri = "/graphiql"
 workers = 0 # if 0, uses number of available logical cpu as threads count.
 maxconn = 25000
 max_payload_size = 1048576
+# enable_dump_profile = false
 # [graphql.tls]
 # private_key_file_path = "key.pem"
 # certificate_chain_file_path = "cert.pem"
