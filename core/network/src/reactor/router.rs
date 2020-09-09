@@ -142,6 +142,7 @@ where
             Arc::clone(&self.rpc_map),
             self.trust_tx.clone(),
         );
+        let raw_data_size = recv_msg.data.len();
 
         async move {
             let network_message = {
@@ -151,6 +152,10 @@ where
             common_apm::metrics::network::on_network_message_received(&network_message.url);
 
             let endpoint = network_message.url.parse::<Endpoint>()?;
+            common_apm::metrics::network::NETWORK_MESSAGE_SIZE_COUNT_VEC
+                .with_label_values(&["received", endpoint.full_url().as_str()])
+                .inc_by(raw_data_size as i64);
+
             let reactor = {
                 let opt_reactor = reactor_map.read().get(&endpoint).cloned();
                 opt_reactor
