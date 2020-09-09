@@ -188,6 +188,14 @@ impl<'a> SendingContext<'a> {
         };
 
         let url = msg_ctx.url().unwrap_or_else(|_| "");
+        let data_size = match target {
+            TargetSession::Single(_) => data.len(),
+            TargetSession::Multi(sessions) => data.len().saturating_mul(sesisons.len()),
+            _ => {
+                log::warn!("filter blocked return target other than single and multi");
+                data.len()
+            }
+        };
         common_apm::metrics::network::NETWORK_MESSAGE_SIZE_COUNT_VEC
             .with_label_values(&["send", url])
             .inc_by(data.len() as i64);
