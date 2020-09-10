@@ -50,7 +50,7 @@ lazy_static! {
     pub static ref NETWORK_MESSAGE_SIZE_COUNT_VEC: IntCounterVec = register_int_counter_vec!(
         "muta_network_message_size",
         "Accumulated compressed network message size",
-        &["direction", "url", "size"]
+        &["direction", "url"]
     )
     .expect("network message size");
     pub static ref NETWORK_RPC_RESULT_COUNT_VEC: IntCounterVec = register_int_counter_vec!(
