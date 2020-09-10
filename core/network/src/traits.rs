@@ -50,6 +50,7 @@ pub trait SharedSessionBook {
     fn connected_addr(&self, sid: SessionId) -> Option<ConnectedAddr>;
     fn pending_data_size(&self, sid: SessionId) -> usize;
     fn allowlist(&self) -> Vec<PeerId>;
+    fn len(&self) -> usize;
 }
 
 pub trait MultiaddrExt {

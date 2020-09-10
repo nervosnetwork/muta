@@ -191,10 +191,7 @@ impl<'a> SendingContext<'a> {
         let data_size = match &target {
             TargetSession::Single(_) => data.len(),
             TargetSession::Multi(sessions) => data.len().saturating_mul(sessions.len()),
-            _ => {
-                log::warn!("filter blocked return target other than single and multi");
-                data.len()
-            }
+            TargetSession::All => data.len().saturating_mul(self.sessions.len()),
         };
         common_apm::metrics::network::NETWORK_MESSAGE_SIZE_COUNT_VEC
             .with_label_values(&["send", url])
