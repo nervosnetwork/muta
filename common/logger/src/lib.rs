@@ -128,8 +128,8 @@ pub fn metrics(name: &str, mut content: JsonValue) {
 }
 
 // Usage:
-// log(Level::Info, "network", "netw0001", &ctx, json!{"music": "beautiful
-// world"})
+// log(Level::Info, "network", "netw0001", &ctx, common_logger::object!{"music"
+// : "beautiful world"})
 pub fn log(level: Level, module: &str, event: &str, ctx: &Context, mut msg: JsonValue) {
     if let Some(trace_ctx) = trace_context(ctx) {
         msg["trace_id"] = trace_ctx.trace_id.to_string().into();
