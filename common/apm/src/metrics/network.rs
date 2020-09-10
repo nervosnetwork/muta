@@ -47,6 +47,12 @@ lazy_static! {
         &["direction", "target", "type", "module", "action"]
     )
     .expect("network message total");
+    pub static ref NETWORK_MESSAGE_SIZE_COUNT_VEC: IntCounterVec = register_int_counter_vec!(
+        "muta_network_message_size",
+        "Accumulated compressed network message size",
+        &["direction", "url"]
+    )
+    .expect("network message size");
     pub static ref NETWORK_RPC_RESULT_COUNT_VEC: IntCounterVec = register_int_counter_vec!(
         "muta_network_rpc_result_total",
         "Total number of network rpc result",

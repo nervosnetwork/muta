@@ -1,5 +1,5 @@
 use bytes::{Buf, BufMut};
-use protocol::traits::Priority;
+use protocol::traits::{Context, Priority};
 use protocol::{Bytes, BytesMut};
 use tentacle::secio::PeerId;
 use tentacle::service::TargetSession;
@@ -14,6 +14,7 @@ pub struct TransmitterMessage {
     pub recipient: Recipient,
     pub priority:  Priority,
     pub data:      Bytes,
+    pub ctx:       Context, // For metric
 }
 
 pub struct ReceivedMessage {

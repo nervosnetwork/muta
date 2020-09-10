@@ -32,7 +32,7 @@ impl NetworkRpc {
 
     async fn send(
         &self,
-        _: Context,
+        ctx: Context,
         session_id: SessionId,
         data: Bytes,
         priority: Priority,
@@ -43,6 +43,7 @@ impl NetworkRpc {
             recipient: Recipient::Session(TargetSession::Single(session_id)),
             priority,
             data: compressed_data,
+            ctx,
         };
 
         self.transmitter.behaviour.send(msg).await
@@ -53,7 +54,7 @@ impl NetworkRpc {
 impl Rpc for NetworkRpc {
     async fn call<M, R>(
         &self,
-        cx: Context,
+        mut cx: Context,
         endpoint: &str,
         mut msg: M,
         priority: Priority,
@@ -99,9 +100,10 @@ impl Rpc for NetworkRpc {
             log::info!("no trace id found for rpc {}", endpoint.full_url());
         }
         common_apm::metrics::network::on_network_message_sent(endpoint.full_url());
-        let net_msg = NetworkMessage::new(endpoint, data, headers).encode()?;
 
-        self.send(cx, sid, net_msg, priority).await?;
+        let ctx = cx.set_url(endpoint.full_url().to_owned());
+        let net_msg = NetworkMessage::new(endpoint, data, headers).encode()?;
+        self.send(ctx, sid, net_msg, priority).await?;
 
         let timeout = Delay::new(self.timeout.rpc);
         let ret = match future::select(done_rx, timeout).await {
@@ -134,7 +136,7 @@ impl Rpc for NetworkRpc {
 
     async fn response<M>(
         &self,
-        cx: Context,
+        mut cx: Context,
         endpoint: &str,
         ret: ProtocolResult<M>,
         priority: Priority,
@@ -163,9 +165,10 @@ impl Rpc for NetworkRpc {
             log::info!("no trace id found for rpc {}", endpoint.full_url());
         }
         common_apm::metrics::network::on_network_message_sent(endpoint.full_url());
-        let net_msg = NetworkMessage::new(endpoint, encoded_resp, headers).encode()?;
 
-        self.send(cx, sid, net_msg, priority).await?;
+        let ctx = cx.set_url(endpoint.full_url().to_owned());
+        let net_msg = NetworkMessage::new(endpoint, encoded_resp, headers).encode()?;
+        self.send(ctx, sid, net_msg, priority).await?;
 
         Ok(())
     }

@@ -8,7 +8,7 @@ use crate::endpoint::Endpoint;
 use crate::error::NetworkError;
 use crate::message::{Headers, NetworkMessage};
 use crate::protocols::{Recipient, Transmitter, TransmitterMessage};
-use crate::traits::Compression;
+use crate::traits::{Compression, NetworkContext};
 use crate::PeerIdExt;
 
 #[derive(Clone)]
@@ -46,7 +46,7 @@ impl NetworkGossip {
 
     async fn send_to_sessions(
         &self,
-        _ctx: Context,
+        ctx: Context,
         target_session: TargetSession,
         data: Bytes,
         priority: Priority,
@@ -55,6 +55,7 @@ impl NetworkGossip {
             recipient: Recipient::Session(target_session),
             priority,
             data,
+            ctx,
         };
 
         self.transmitter.behaviour.send(msg).await
@@ -62,7 +63,7 @@ impl NetworkGossip {
 
     async fn send_to_peers<'a, P: AsRef<[Bytes]> + 'a>(
         &self,
-        _ctx: Context,
+        ctx: Context,
         peer_ids: P,
         data: Bytes,
         priority: Priority,
@@ -78,6 +79,7 @@ impl NetworkGossip {
             recipient: Recipient::PeerId(peer_ids),
             priority,
             data,
+            ctx,
         };
 
         self.transmitter.behaviour.send(msg).await
@@ -88,7 +90,7 @@ impl NetworkGossip {
 impl Gossip for NetworkGossip {
     async fn broadcast<M>(
         &self,
-        cx: Context,
+        mut cx: Context,
         endpoint: &str,
         msg: M,
         priority: Priority,
@@ -97,7 +99,8 @@ impl Gossip for NetworkGossip {
         M: MessageCodec,
     {
         let msg = self.package_message(cx.clone(), endpoint, msg).await?;
-        self.send_to_sessions(cx, TargetSession::All, msg, priority)
+        let ctx = cx.set_url(endpoint.to_owned());
+        self.send_to_sessions(ctx, TargetSession::All, msg, priority)
             .await?;
         common_apm::metrics::network::on_network_message_sent_all_target(endpoint);
         Ok(())
@@ -105,7 +108,7 @@ impl Gossip for NetworkGossip {
 
     async fn multicast<'a, M, P>(
         &self,
-        cx: Context,
+        mut cx: Context,
         endpoint: &str,
         peer_ids: P,
         msg: M,
@@ -118,7 +121,8 @@ impl Gossip for NetworkGossip {
         let msg = self.package_message(cx.clone(), endpoint, msg).await?;
         let multicast_count = peer_ids.as_ref().len();
 
-        self.send_to_peers(cx, peer_ids, msg, priority).await?;
+        let ctx = cx.set_url(endpoint.to_owned());
+        self.send_to_peers(ctx, peer_ids, msg, priority).await?;
         common_apm::metrics::network::on_network_message_sent_multi_target(
             endpoint,
             multicast_count as i64,
