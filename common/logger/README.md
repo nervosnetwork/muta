@@ -60,6 +60,23 @@ This signature of the function is showed below. The `JsonValue` is a `enum` from
 pub fn metrics(name: &str, mut content: JsonValue)
 ```
 
+## Structured Event Log With TraceId Included
+
+Structured event log api provide a convenient way to log structured json data. It's signature is provided as below:
+
+```rust
+pub fn log(level: Level, module: &str, event: &str, ctx: &Context, mut msg: JsonValue)
+```
+
+`module` should be your component name, `event` is just event name, better begin with 4 chars with 4 digits
+to identify this event. `Context` is used to extract trace id. `msg` is `JsonValue` which is same as `metrics`.
+
+Useage example:
+
+```rust
+common_logger::log(Level::Info, "network", "netw0001", &ctx, common_logger::object!{"music": "beautiful world"});
+```
+
 ## Yaml File
 
 The `log.yml` in this crate is the yaml style config of log4rs with default logger config.
