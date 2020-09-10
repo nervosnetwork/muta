@@ -188,9 +188,9 @@ impl<'a> SendingContext<'a> {
         };
 
         let url = msg_ctx.url().unwrap_or_else(|_| "");
-        let data_size = match target {
+        let data_size = match &target {
             TargetSession::Single(_) => data.len(),
-            TargetSession::Multi(sessions) => data.len().saturating_mul(sesisons.len()),
+            TargetSession::Multi(sessions) => data.len().saturating_mul(sessions.len()),
             _ => {
                 log::warn!("filter blocked return target other than single and multi");
                 data.len()
@@ -198,7 +198,7 @@ impl<'a> SendingContext<'a> {
         };
         common_apm::metrics::network::NETWORK_MESSAGE_SIZE_COUNT_VEC
             .with_label_values(&["send", url])
-            .inc_by(data.len() as i64);
+            .inc_by(data_size as i64);
 
         let seq = self.data_seq.fetch_add(1, Ordering::SeqCst);
         log::debug!("seq {} data size {}", seq, data.len());
