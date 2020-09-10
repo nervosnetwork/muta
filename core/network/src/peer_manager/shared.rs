@@ -122,6 +122,10 @@ impl SharedSessionBook for SharedSessions {
             .collect()
         })
     }
+
+    fn len(&self) -> usize {
+        self.sessions().len()
+    }
 }
 
 #[cfg(test)]
