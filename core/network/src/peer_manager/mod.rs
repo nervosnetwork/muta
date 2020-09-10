@@ -776,7 +776,7 @@ impl PeerManager {
         }
 
         let session = ArcSession::new(remote_peer.clone(), Arc::clone(&ctx));
-        info!("new session from {}", session.connected_addr);
+        info!("check new session from {}", session.connected_addr);
 
         // Always allow peer in allowlist and consensus peer
         if !remote_peer.tags.contains(&PeerTag::AlwaysAllow)
@@ -829,6 +829,7 @@ impl PeerManager {
                 return;
             }
         };
+        info!("new session from {}", session.connected_addr);
 
         if !session.peer.has_pubkey() {
             if let Err(e) = session.peer.set_pubkey(pubkey) {
@@ -862,54 +863,61 @@ impl PeerManager {
         }
     }
 
-    fn session_closed(&mut self, sid: SessionId) {
-        debug!("session {} closed", sid);
+    fn session_closed(&mut self, pid: PeerId, sid: SessionId) {
+        debug!("peer {:?} session {} closed", pid, sid);
 
         // Unidentified session
         if self.unidentified_backlog.take(&sid).is_some() {
             return;
         }
-
         common_apm::metrics::network::NETWORK_CONNECTED_PEERS.dec();
 
-        let session = match self.inner.remove_session(sid) {
-            Some(s) => s,
-            None => return, /* Session may be removed by other event or rejected
-                             * due to max connections before insert */
+        // Session may be removed by other event or rejected
+        let opt_session = self.inner.remove_session(sid);
+        if let Some(ref session) = opt_session {
+            common_apm::metrics::network::NETWORK_IP_DISCONNECTED_COUNT_VEC
+                .with_label_values(&[&session.connected_addr.host])
+                .inc();
+
+            log::info!("{} session closed", session.connected_addr);
+        }
+
+        let remote_peer = {
+            match opt_session.map_or_else(|| self.inner.peer(&pid), |s| Some(s.peer.to_owned())) {
+                Some(peer) => peer,
+                None => {
+                    log::info!("close unsaved peer session, peer {:?}", pid);
+                    return;
+                }
+            }
         };
 
-        common_apm::metrics::network::NETWORK_IP_DISCONNECTED_COUNT_VEC
-            .with_label_values(&[&session.connected_addr.host])
-            .inc();
-
-        info!("session closed {}", session.connected_addr);
-        session.peer.mark_disconnected();
-
-        if session.peer.tags.contains(&PeerTag::Consensus) {
+        remote_peer.mark_disconnected();
+        if remote_peer.tags.contains(&PeerTag::Consensus) {
             common_apm::metrics::network::NETWORK_CONNECTED_CONSENSUS_PEERS.dec();
         }
 
-        match session.peer.trust_metric() {
+        match remote_peer.trust_metric() {
             Some(trust_metric) => trust_metric.pause(),
             None => {
-                warn!("session peer {:?} trust metric not found", session.peer.id);
+                warn!("session peer {:?} trust metric not found", remote_peer.id);
 
                 let trust_metric = TrustMetric::new(Arc::clone(&self.config.peer_trust_config));
-                session.peer.set_trust_metric(trust_metric);
+                remote_peer.set_trust_metric(trust_metric);
             }
         }
 
-        if session.peer.alive() < SHORT_ALIVE_SESSION {
+        if remote_peer.alive() < SHORT_ALIVE_SESSION {
             // NOTE: peer maybe abnormally disconnect from others. When we try
             // to reconnect, other peers may treat this as repeated connection,
             // then disconnect. We have to wait for timeout.
             warn!(
                 "increase peer {:?} retry due to repeated short live session",
-                session.peer.id
+                remote_peer.id
             );
 
-            while session.peer.retry.eta() < REPEATED_CONNECTION_TIMEOUT {
-                session.peer.retry.inc();
+            while remote_peer.retry.eta() < REPEATED_CONNECTION_TIMEOUT {
+                remote_peer.retry.inc();
             }
         }
     }
@@ -1344,7 +1352,7 @@ impl PeerManager {
                 self.repeated_connection(ty, sid, addr)
             }
             PeerManagerEvent::SessionBlocked { ctx, .. } => self.session_blocked(ctx),
-            PeerManagerEvent::SessionClosed { sid, .. } => self.session_closed(sid),
+            PeerManagerEvent::SessionClosed { sid, pid } => self.session_closed(pid, sid),
             PeerManagerEvent::SessionFailed { sid, kind } => self.session_failed(sid, kind),
             PeerManagerEvent::PeerAlive { pid } => self.update_peer_alive(&pid),
             PeerManagerEvent::Misbehave { pid, kind } => self.peer_misbehave(pid, kind),

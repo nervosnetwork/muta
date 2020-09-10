@@ -1098,6 +1098,27 @@ async fn should_increase_retry_for_short_alive_session_on_session_closed() {
 }
 
 #[tokio::test]
+async fn should_properly_update_peer_state_even_if_session_not_found_on_session_closed() {
+    let (mut mgr, _conn_rx) = make_manager(2, 20);
+    let remote_peers = make_sessions(&mut mgr, 1, 5000, SessionType::Outbound).await;
+    let test_peer = remote_peers.first().expect("get first peer");
+
+    let inner = mgr.core_inner();
+    assert_eq!(inner.connected(), 1, "should have one session");
+
+    inner.remove_session(test_peer.session_id());
+    assert_eq!(inner.connected(), 0, "should have no session");
+
+    let session_closed = PeerManagerEvent::SessionClosed {
+        pid: test_peer.owned_id(),
+        sid: test_peer.session_id(),
+    };
+    mgr.poll_event(session_closed).await;
+
+    assert_eq!(test_peer.connectedness(), Connectedness::CanConnect);
+}
+
+#[tokio::test]
 async fn should_inc_peer_multiaddr_failure_count_for_io_error_on_connect_failed() {
     let (mut mgr, _conn_rx) = make_manager(1, 20);
 
