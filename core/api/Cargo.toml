@@ -26,3 +26,6 @@ lazy_static = "1.4"
 num_cpus = "1.12"
 log = "0.4"
 openssl = "0.10"
+pprof = { version = "0.3", features = ["flamegraph", "protobuf"] }
+url = { version = "2.1" }
+tokio = { version = "0.2", features = [ "time" ] }

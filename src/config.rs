@@ -10,16 +10,17 @@ use protocol::types::Hex;
 
 #[derive(Debug, Deserialize)]
 pub struct ConfigGraphQL {
-    pub listening_address: SocketAddr,
-    pub graphql_uri:       String,
-    pub graphiql_uri:      String,
+    pub listening_address:   SocketAddr,
+    pub graphql_uri:         String,
+    pub graphiql_uri:        String,
     #[serde(default)]
-    pub workers:           usize,
+    pub workers:             usize,
     #[serde(default)]
-    pub maxconn:           usize,
+    pub maxconn:             usize,
     #[serde(default)]
-    pub max_payload_size:  usize,
-    pub tls:               Option<ConfigGraphQLTLS>,
+    pub max_payload_size:    usize,
+    pub tls:                 Option<ConfigGraphQLTLS>,
+    pub enable_dump_profile: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]

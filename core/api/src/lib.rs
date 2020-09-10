@@ -287,6 +287,126 @@ async fn metrics() -> HttpResponse {
         .body(metrics_data)
 }
 
+mod profile {
+    use std::collections::HashMap;
+    use std::str::FromStr;
+    use std::time::Duration;
+
+    use actix_web::error::{ErrorBadRequest, ErrorInternalServerError};
+    use actix_web::{dev, FromRequest, HttpRequest, HttpResponse};
+    use futures::future;
+    use pprof::protos::Message;
+
+    pub enum ProfileReport {
+        /// Perf flamegraph
+        FlameGraph,
+        /// Go pprof
+        PProf,
+    }
+
+    impl FromStr for ProfileReport {
+        type Err = &'static str;
+
+        fn from_str(report: &str) -> Result<Self, Self::Err> {
+            match report {
+                "flamegraph" => Ok(ProfileReport::FlameGraph),
+                "pprof" => Ok(ProfileReport::PProf),
+                _ => Err("invalid report type, only support flamegraph and pprof"),
+            }
+        }
+    }
+
+    pub struct ProfileConfig {
+        duration:  Duration,
+        frequency: i32,
+        report:    ProfileReport,
+    }
+
+    impl Default for ProfileConfig {
+        fn default() -> Self {
+            ProfileConfig {
+                duration:  Duration::from_secs(10),
+                frequency: 99,
+                report:    ProfileReport::FlameGraph,
+            }
+        }
+    }
+
+    impl FromRequest for ProfileConfig {
+        type Config = ();
+        type Error = actix_web::Error;
+        type Future = future::Ready<Result<Self, Self::Error>>;
+
+        fn from_request(req: &HttpRequest, _: &mut dev::Payload) -> Self::Future {
+            let query = req.query_string();
+            let query_pairs: HashMap<_, _> =
+                url::form_urlencoded::parse(query.as_bytes()).collect();
+
+            let duration: Duration = match query_pairs.get("duration").map(|val| val.parse()) {
+                Some(Ok(val)) => Duration::from_secs(val),
+                Some(Err(e)) => return future::err(ErrorBadRequest(e)),
+                None => ProfileConfig::default().duration,
+            };
+
+            let frequency: i32 = match query_pairs.get("frequency").map(|val| val.parse()) {
+                Some(Ok(val)) => val,
+                Some(Err(e)) => return future::err(ErrorBadRequest(e)),
+                None => ProfileConfig::default().frequency,
+            };
+
+            let report: ProfileReport = match query_pairs.get("report").map(|val| val.parse()) {
+                Some(Ok(val)) => val,
+                Some(Err(e)) => return future::err(ErrorBadRequest(e)),
+                None => ProfileConfig::default().report,
+            };
+
+            future::ok(ProfileConfig {
+                duration,
+                frequency,
+                report,
+            })
+        }
+    }
+
+    pub async fn dump_profile(maybe_config: actix_web::Result<ProfileConfig>) -> HttpResponse {
+        let config = match maybe_config {
+            Ok(config) => config,
+            Err(e) => return e.into(),
+        };
+
+        let guard = match pprof::ProfilerGuard::new(config.frequency) {
+            Ok(guard) => guard,
+            Err(e) => return ErrorInternalServerError(e).into(),
+        };
+
+        tokio::time::delay_for(config.duration).await;
+        let report = match guard.report().build() {
+            Ok(report) => report,
+            Err(e) => return ErrorInternalServerError(e).into(),
+        };
+        drop(guard);
+
+        let mut body = Vec::new();
+        match config.report {
+            ProfileReport::FlameGraph => match report.flamegraph(&mut body) {
+                Ok(_) => {
+                    log::info!("dump flamegraph successfully");
+                    HttpResponse::Ok().body(body)
+                }
+                Err(err) => HttpResponse::InternalServerError().body(err.to_string()),
+            },
+            ProfileReport::PProf => match report.pprof().map(|p| p.encode(&mut body)) {
+                Ok(Ok(())) => {
+                    log::info!("dump pprof successfully");
+                    HttpResponse::Ok().body(body)
+                }
+                Err(err) => HttpResponse::InternalServerError().body(err.to_string()),
+                Ok(Err(err)) => HttpResponse::InternalServerError().body(err.to_string()),
+            },
+        }
+    }
+}
+
 pub async fn start_graphql<Adapter: APIAdapter + 'static>(cfg: GraphQLConfig, adapter: Adapter) {
     let schema = Schema::new(Query, Mutation);
 
@@ -301,10 +421,11 @@ pub async fn start_graphql<Adapter: APIAdapter + 'static>(cfg: GraphQLConfig, ad
     let maxconn = cfg.maxconn;
     let add_listening_address = cfg.listening_address;
     let max_payload_size = cfg.max_payload_size;
+    let enable_dump_profile = cfg.enable_dump_profile;
 
     // Start http server
     let server = HttpServer::new(move || {
-        App::new()
+        let app = App::new()
             .data(state.clone())
             .service(
                 web::resource(&path_graphql_uri)
@@ -314,7 +435,13 @@ pub async fn start_graphql<Adapter: APIAdapter + 'static>(cfg: GraphQLConfig, ad
                     .route(web::post().to(graphql)),
             )
             .service(web::resource(&path_graphiql_uri).route(web::get().to(graphiql)))
-            .service(web::resource("/metrics").route(web::get().to(metrics)))
+            .service(web::resource("/metrics").route(web::get().to(metrics)));
+
+        if enable_dump_profile {
+            app.service(web::resource("/dump_profile").route(web::get().to(profile::dump_profile)))
+        } else {
+            app
+        }
     })
     .workers(workers)
     .maxconn(cmp::max(maxconn / workers, 1));

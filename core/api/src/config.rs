@@ -21,6 +21,8 @@ pub struct GraphQLConfig {
     pub max_payload_size: usize,
 
     pub tls: Option<GraphQLTLS>,
+
+    pub enable_dump_profile: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -36,12 +38,13 @@ impl Default for GraphQLConfig {
                 .parse()
                 .expect("Unable to parse socket address"),
 
-            graphql_uri:      "/graphql".to_owned(),
-            graphiql_uri:     "/graphiql".to_owned(),
-            workers:          num_cpus::get(),
-            maxconn:          25000,
-            max_payload_size: 1024 * 1024, // 1MB
-            tls:              None,
+            graphql_uri:         "/graphql".to_owned(),
+            graphiql_uri:        "/graphiql".to_owned(),
+            workers:             num_cpus::get(),
+            maxconn:             25000,
+            max_payload_size:    1024 * 1024, // 1MB
+            tls:                 None,
+            enable_dump_profile: false,
         }
     }
 }
