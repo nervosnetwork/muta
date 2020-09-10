@@ -475,7 +475,12 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
 
     let consensus_handle = tokio::spawn(async move {
         if let Err(e) = overlord_consensus
-            .run(consensus_interval, authority_list, Some(timer_config))
+            .run(
+                current_height,
+                consensus_interval,
+                authority_list,
+                Some(timer_config),
+            )
             .await
         {
             log::error!("muta-consensus: {:?} error", e);
