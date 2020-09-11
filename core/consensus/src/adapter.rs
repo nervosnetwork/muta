@@ -462,9 +462,7 @@ where
             Arc::clone(&self.service_mapping),
         )?;
 
-        let caller = Address::from_hash(Hash::digest(Bytes::from(
-            protocol::address_hrp().as_ref().to_owned(),
-        )))?;
+        let caller = Address::from_hash(Hash::digest(protocol::address_hrp().as_str()))?;
 
         let params = ExecutorParams {
             state_root,

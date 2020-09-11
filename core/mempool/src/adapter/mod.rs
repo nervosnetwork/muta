@@ -300,9 +300,7 @@ where
                     MemPoolError::EncodeJson
                 })?;
 
-                let caller = Address::from_hash(Hash::digest(Bytes::from(
-                    protocol::address_hrp().as_ref().to_owned(),
-                )))?;
+                let caller = Address::from_hash(Hash::digest(protocol::address_hrp().as_str()))?;
                 let executor = EF::from_root(
                     block.header.state_root.clone(),
                     Arc::clone(&trie_db_clone),

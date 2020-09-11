@@ -31,6 +31,7 @@ ophelia = "0.3"
 ophelia-secp256k1 = "0.3"
 bech32 = "0.7"
 arc-swap = "0.4"
+smol_str = "0.1"
 
 [dev-dependencies]
 rayon = "1.3"
