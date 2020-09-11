@@ -221,11 +221,11 @@ impl Witness {
         }
     }
 
-    pub fn to_addr_map(&self) -> HashMap<Address, (Bytes, Bytes)> {
+    pub fn into_addr_map(self) -> HashMap<Address, (Bytes, Bytes)> {
         let mut ret = HashMap::new();
-        for (pk, sig) in self.pubkeys.iter().zip(self.signatures.iter()) {
-            if let Ok(addr) = Address::from_pubkey_bytes(pk.clone()) {
-                ret.insert(addr, (pk.clone(), sig.clone()));
+        for (pk, sig) in self.pubkeys.into_iter().zip(self.signatures.into_iter()) {
+            if let Ok(addr) = Address::from_pubkey_bytes(&pk) {
+                ret.insert(addr, (pk, sig));
             }
         }
         ret

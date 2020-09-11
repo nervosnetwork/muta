@@ -10,7 +10,7 @@ use bytes::Bytes;
 use hasher::{Hasher, HasherKeccak};
 use lazy_static::lazy_static;
 use muta_codec_derive::RlpFixedCodec;
-use ophelia::UncompressedPublicKey;
+use ophelia::{PublicKey, UncompressedPublicKey};
 use ophelia_secp256k1::Secp256k1PublicKey;
 use serde::de;
 use serde::{Deserialize, Serialize};
@@ -189,8 +189,8 @@ impl Hash {
     /// Enter an array of bytes to get a 32-bit hash.
     /// Note: sha3 is used for the time being and may be replaced with other
     /// hashing algorithms later.
-    pub fn digest(bytes: Bytes) -> Self {
-        let out = HASHER_INST.digest(&bytes);
+    pub fn digest<B: AsRef<[u8]>>(bytes: B) -> Self {
+        let out = HASHER_INST.digest(bytes.as_ref());
         Self(Bytes::from(out))
     }
 
@@ -218,6 +218,10 @@ impl Hash {
 
     pub fn as_bytes(&self) -> Bytes {
         self.0.clone()
+    }
+
+    pub fn as_slice(&self) -> &[u8] {
+        &self.0
     }
 
     pub fn as_hex(&self) -> String {
@@ -298,21 +302,31 @@ impl<'de> Deserialize<'de> for Address {
 }
 
 impl Address {
-    pub fn from_pubkey_bytes(mut bytes: Bytes) -> ProtocolResult<Self> {
+    pub fn from_pubkey_bytes<B: AsRef<[u8]>>(bytes: B) -> ProtocolResult<Self> {
+        let compressed_pubkey_len = <Secp256k1PublicKey as PublicKey>::LENGTH;
         let uncompressed_pubkey_len = <Secp256k1PublicKey as UncompressedPublicKey>::LENGTH;
-        if bytes.len() != uncompressed_pubkey_len {
-            let pubkey = Secp256k1PublicKey::try_from(bytes.as_ref())
-                .map_err(|_| TypesError::InvalidPublicKey)?;
-            bytes = pubkey.to_uncompressed_bytes();
-        }
-        let bytes = bytes.split_off(1); // Drop first byte
 
-        let hash = Hash::digest(bytes);
+        let slice = bytes.as_ref();
+        if slice.len() != compressed_pubkey_len && slice.len() != uncompressed_pubkey_len {
+            return Err(TypesError::InvalidPublicKey.into());
+        }
+
+        // Drop first byte
+        let hash = {
+            if slice.len() == compressed_pubkey_len {
+                let pubkey = Secp256k1PublicKey::try_from(slice)
+                    .map_err(|_| TypesError::InvalidPublicKey)?;
+                Hash::digest(&(pubkey.to_uncompressed_bytes())[1..])
+            } else {
+                Hash::digest(&slice[1..])
+            }
+        };
+
         Self::from_hash(hash)
     }
 
     pub fn from_hash(hash: Hash) -> ProtocolResult<Self> {
-        let hash_val = hash.as_bytes();
+        let hash_val = hash.as_slice();
         ensure_len(hash_val.len(), HASH_LEN)?;
 
         Self::from_bytes(Bytes::copy_from_slice(&hash_val[12..]))
@@ -326,6 +340,10 @@ impl Address {
 
     pub fn as_bytes(&self) -> Bytes {
         self.0.clone()
+    }
+
+    pub fn as_slice(&self) -> &[u8] {
+        &self.0
     }
 
     pub fn from_hex(s: &str) -> ProtocolResult<Self> {

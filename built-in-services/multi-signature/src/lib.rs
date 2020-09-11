@@ -205,12 +205,12 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
         ctx: ServiceContext,
         payload: SignedTransaction,
     ) -> ServiceResponse<()> {
-        let pubkeys = match decode_list::<Vec<u8>>(&payload.pubkey.to_vec(), "public key") {
+        let pubkeys = match decode_list::<Vec<u8>>(&payload.pubkey, "public key") {
             Ok(pks) => pks,
             Err(err) => return err.into(),
         };
 
-        let sigs = match decode_list::<Vec<u8>>(&payload.signature.to_vec(), "signature") {
+        let sigs = match decode_list::<Vec<u8>>(&payload.signature, "signature") {
             Ok(sig) => sig,
             Err(err) => return err.into(),
         };
@@ -494,20 +494,17 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
     }
 
     fn _inner_verify_signature(&self, payload: VerifySignaturePayload) -> ServiceResponse<()> {
-        let pubkeys = payload.pubkeys.clone();
-        let signatures = payload.signatures.clone();
-
-        if pubkeys.len() != signatures.len() {
+        if payload.pubkeys.len() != payload.signatures.len() {
             return ServiceError::PubkeyAndSignatureMismatch.into();
         }
 
-        if pubkeys.len() == 1 {
-            if let Ok(addr) = Address::from_pubkey_bytes(pubkeys[0].clone()) {
+        if payload.pubkeys.len() == 1 {
+            if let Ok(addr) = Address::from_pubkey_bytes(&payload.pubkeys[0]) {
                 if addr == payload.sender {
                     return self._verify_single_signature(
                         &payload.tx_hash,
-                        &signatures[0],
-                        &pubkeys[0],
+                        &payload.signatures[0],
+                        &payload.pubkeys[0],
                     );
                 }
             } else {
@@ -517,7 +514,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
 
         self._verify_multi_signature(
             &payload.tx_hash,
-            &Witness::new(pubkeys, signatures).to_addr_map(),
+            &Witness::new(payload.pubkeys, payload.signatures).into_addr_map(),
             &payload.sender,
             0u8,
         )
@@ -576,9 +573,7 @@ impl<SDK: ServiceSDK> MultiSignatureService<SDK> {
         sig: &Bytes,
         pubkey: &Bytes,
     ) -> ServiceResponse<()> {
-        if Secp256k1::verify_signature(tx_hash.as_bytes().as_ref(), sig.as_ref(), pubkey.as_ref())
-            .is_ok()
-        {
+        if Secp256k1::verify_signature(tx_hash.as_slice(), sig.as_ref(), pubkey.as_ref()).is_ok() {
             ServiceResponse::<()>::from_succeed(())
         } else {
             ServiceError::VerifyMultiSignatureFailed.into()
