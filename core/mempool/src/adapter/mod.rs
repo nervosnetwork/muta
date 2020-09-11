@@ -258,44 +258,41 @@ where
         let network = self.network.clone();
         let network_clone = network.clone();
         let ctx_clone = ctx.clone();
-        let tx_clone = tx.clone();
         let block = self.storage.get_latest_block(ctx.clone()).await?;
         let trie_db_clone = Arc::clone(&self.trie_db);
         let storage_clone = Arc::clone(&self.storage);
         let service_mapping_clone = Arc::clone(&self.service_mapping);
+        let tx_hash = tx.tx_hash.clone();
 
         let blocking_res: ProtocolResult<ServiceResponse<String>> =
             tokio::task::spawn_blocking(move || {
                 // Verify transaction hash
-                let fixed_bytes = tx_clone.raw.encode_fixed()?;
+                let fixed_bytes = tx.raw.encode_fixed()?;
                 let tx_hash = Hash::digest(fixed_bytes);
 
-                if tx_hash != tx_clone.tx_hash {
+                if tx_hash != tx.tx_hash {
                     if ctx_clone.is_network_origin_txs() {
                         network.report(
                             ctx_clone,
                             TrustFeedback::Worse(format!(
                                 "Mempool wrong tx_hash of tx {:?}",
-                                tx_clone.tx_hash
+                                tx.tx_hash
                             )),
                         );
                     }
 
                     return Err(MemPoolError::CheckHash {
-                        expect: tx_clone.tx_hash,
+                        expect: tx.tx_hash,
                         actual: tx_hash,
                     }
                     .into());
                 }
 
                 // Verify transaction signatures
-                let stx_json = serde_json::to_string(&tx_clone).map_err(|_| {
+                let stx_json = serde_json::to_string(&tx).map_err(|_| {
                     network_clone.report(
                         ctx_clone.clone(),
-                        TrustFeedback::Worse(format!(
-                            "Mempool encode json error {:?}",
-                            tx_clone.tx_hash
-                        )),
+                        TrustFeedback::Worse(format!("Mempool encode json error {:?}", tx.tx_hash)),
                     );
                     MemPoolError::EncodeJson
                 })?;
@@ -332,13 +329,13 @@ where
                     ctx,
                     TrustFeedback::Worse(format!(
                         "Mempool check authorization failed tx hash {:?}",
-                        tx.tx_hash.clone()
+                        tx_hash
                     )),
                 )
             }
 
             return Err(MemPoolError::CheckAuthorization {
-                tx_hash:  tx.tx_hash,
+                tx_hash,
                 err_info: check_resp.error_message,
             }
             .into());
