@@ -31,7 +31,7 @@ use protocol::{
         ServiceMapping, ServiceResponse, Storage, TrustFeedback,
     },
     types::{Address, Hash, SignedTransaction, TransactionRequest},
-    Bytes, ProtocolError, ProtocolErrorKind, ProtocolResult,
+    ProtocolError, ProtocolErrorKind, ProtocolResult,
 };
 
 use crate::adapter::message::{
@@ -256,7 +256,6 @@ where
 
     async fn check_authorization(&self, ctx: Context, tx: SignedTransaction) -> ProtocolResult<()> {
         let network = self.network.clone();
-        let network_clone = network.clone();
         let ctx_clone = ctx.clone();
         let block = self.storage.get_latest_block(ctx.clone()).await?;
         let trie_db_clone = Arc::clone(&self.trie_db);
@@ -289,14 +288,6 @@ where
                 }
 
                 // Verify transaction signatures
-                let stx_json = serde_json::to_string(&tx).map_err(|_| {
-                    network_clone.report(
-                        ctx_clone.clone(),
-                        TrustFeedback::Worse(format!("Mempool encode json error {:?}", tx.tx_hash)),
-                    );
-                    MemPoolError::EncodeJson
-                })?;
-
                 let caller = Address::from_hash(Hash::digest(protocol::address_hrp().as_str()))?;
                 let executor = EF::from_root(
                     block.header.state_root.clone(),
@@ -311,10 +302,13 @@ where
                     cycles_limit: 99999,
                     proposer:     block.header.proposer,
                 };
+
+                let stx_ptr_json =
+                    format!("{{ \"ptr\": {} }}", Box::into_raw(Box::new(tx)) as usize);
                 let check_resp = executor.read(&params, &caller, 1, &TransactionRequest {
                     service_name: "authorization".to_string(),
-                    method:       "check_authorization".to_string(),
-                    payload:      stx_json,
+                    method:       "check_authorization_by_ptr".to_string(),
+                    payload:      stx_ptr_json,
                 })?;
 
                 Ok(check_resp)
