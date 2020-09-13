@@ -3,7 +3,7 @@ use derive_more::Display;
 
 use crate::codec::ProtocolCodec;
 use crate::traits::Context;
-use crate::types::block::{Block, Proof};
+use crate::types::block::{Block, BlockHeader, Proof};
 use crate::types::receipt::Receipt;
 use crate::types::{Hash, SignedTransaction};
 use crate::ProtocolResult;
@@ -46,6 +46,9 @@ pub trait CommonStorage: Send + Sync {
     async fn get_latest_block(&self, ctx: Context) -> ProtocolResult<Block>;
 
     async fn set_latest_block(&self, ctx: Context, block: Block) -> ProtocolResult<()>;
+
+    async fn get_latest_block_header(&self, ctx: Context) -> ProtocolResult<BlockHeader>;
+
 }
 
 #[async_trait]

@@ -257,7 +257,7 @@ where
     async fn check_authorization(&self, ctx: Context, tx: SignedTransaction) -> ProtocolResult<()> {
         let network = self.network.clone();
         let ctx_clone = ctx.clone();
-        let block = self.storage.get_latest_block(ctx.clone()).await?;
+        let header = self.storage.get_latest_block_header(ctx.clone()).await?;
         let trie_db_clone = Arc::clone(&self.trie_db);
         let storage_clone = Arc::clone(&self.storage);
         let service_mapping_clone = Arc::clone(&self.service_mapping);
@@ -290,17 +290,17 @@ where
                 // Verify transaction signatures
                 let caller = Address::from_hash(Hash::digest(protocol::address_hrp().as_str()))?;
                 let executor = EF::from_root(
-                    block.header.state_root.clone(),
+                    header.state_root.clone(),
                     Arc::clone(&trie_db_clone),
                     Arc::clone(&storage_clone),
                     Arc::clone(&service_mapping_clone),
                 )?;
                 let params = ExecutorParams {
-                    state_root:   block.header.state_root,
-                    height:       block.header.height,
-                    timestamp:    block.header.timestamp,
+                    state_root:   header.state_root,
+                    height:       header.height,
+                    timestamp:    header.timestamp,
                     cycles_limit: 99999,
-                    proposer:     block.header.proposer,
+                    proposer:     header.proposer,
                 };
 
                 let stx_ptr_json =
@@ -384,8 +384,8 @@ where
         }
 
         // Verify chain id
-        let latest_block = self.storage.get_latest_block(ctx.clone()).await?;
-        if latest_block.header.chain_id != stx.raw.chain_id {
+        let latest_header = self.storage.get_latest_block_header(ctx.clone()).await?;
+        if latest_header.chain_id != stx.raw.chain_id {
             if ctx.is_network_origin_txs() {
                 self.network.report(
                     ctx.clone(),
@@ -400,7 +400,7 @@ where
         }
 
         // Verify timeout
-        let latest_height = latest_block.header.height;
+        let latest_height = latest_header.height;
         let timeout_gap = self.timeout_gap.load(Ordering::SeqCst);
 
         if stx.raw.timeout > latest_height + timeout_gap {
@@ -436,7 +436,7 @@ where
     }
 
     async fn get_latest_height(&self, ctx: Context) -> ProtocolResult<u64> {
-        let height = self.storage.get_latest_block(ctx).await?.header.height;
+        let height = self.storage.get_latest_block_header(ctx).await?.height;
         Ok(height)
     }
 
