@@ -13,10 +13,10 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Instant;
 
+use arc_swap::ArcSwap;
 use async_trait::async_trait;
 use derive_more::{Display, From};
 use lazy_static::lazy_static;
-use tokio::sync::RwLock;
 
 use common_apm::metrics::storage::on_storage_get_cf;
 use common_apm::muta_apm;
@@ -103,14 +103,14 @@ macro_rules! impl_storage_schema_for {
 pub struct ImplStorage<Adapter> {
     adapter: Arc<Adapter>,
 
-    latest_block: RwLock<Option<Block>>,
+    latest_block: ArcSwap<Option<Block>>,
 }
 
 impl<Adapter: StorageAdapter> ImplStorage<Adapter> {
     pub fn new(adapter: Arc<Adapter>) -> Self {
         Self {
             adapter,
-            latest_block: RwLock::new(None),
+            latest_block: ArcSwap::from(Arc::new(None)),
         }
     }
 }
@@ -520,9 +520,7 @@ impl<Adapter: StorageAdapter> CommonStorage for ImplStorage<Adapter> {
     }
 
     async fn get_latest_block(&self, _ctx: Context) -> ProtocolResult<Block> {
-        let opt_block = { self.latest_block.read().await.clone() };
-
-        if let Some(block) = opt_block {
+        if let Some(block) = self.latest_block.load().as_ref().clone() {
             Ok(block)
         } else {
             let block = ensure_get!(self, LATEST_BLOCK_KEY.clone(), LatestBlockSchema);
@@ -532,7 +530,8 @@ impl<Adapter: StorageAdapter> CommonStorage for ImplStorage<Adapter> {
 
     async fn get_latest_block_header(&self, _ctx: Context) -> ProtocolResult<BlockHeader> {
         let opt_header = {
-            let opt_block = self.latest_block.read().await;
+            let guard = self.latest_block.load();
+            let opt_block = guard.as_ref();
             opt_block.as_ref().map(|b| b.header.clone())
         };
 
@@ -549,7 +548,7 @@ impl<Adapter: StorageAdapter> CommonStorage for ImplStorage<Adapter> {
             .insert::<LatestBlockSchema>(LATEST_BLOCK_KEY.clone(), block.clone())
             .await?;
 
-        self.latest_block.write().await.replace(block);
+        self.latest_block.store(Arc::new(Some(block)));
 
         Ok(())
     }
