@@ -511,10 +511,7 @@ where
     }
 
     /// this function verify all info in header except proof and roots
-    #[muta_apm::derive::tracing_span(
-        kind = "consensus.adapter",
-        logs = "{'txs_len': 'block.ordered_tx_hashes.len()'}"
-    )]
+    #[muta_apm::derive::tracing_span(kind = "consensus.adapter")]
     async fn verify_block_header(&self, ctx: Context, block: &Block) -> ProtocolResult<()> {
         let previous_block_header = self
             .get_block_header_by_height(ctx.clone(), block.header.height - 1)
@@ -627,27 +624,32 @@ where
     }
 
     #[muta_apm::derive::tracing_span(kind = "consensus.adapter")]
-    async fn verify_proof(&self, ctx: Context, block: &Block, proof: &Proof) -> ProtocolResult<()> {
+    async fn verify_proof(
+        &self,
+        ctx: Context,
+        block_header: &BlockHeader,
+        proof: &Proof,
+    ) -> ProtocolResult<()> {
         // the block 0 has no proof, which is consensus-ed by community, not by chain
 
-        if block.header.height == 0 {
+        if block_header.height == 0 {
             return Ok(());
         };
 
-        if block.header.height != proof.height {
+        if block_header.height != proof.height {
             log::error!(
-                "[consensus] verify_proof, block.header.height: {}, proof.height: {}",
-                block.header.height,
+                "[consensus] verify_proof, block_header.height: {}, proof.height: {}",
+                block_header.height,
                 proof.height
             );
             return Err(ConsensusError::VerifyProof(
-                block.header.height,
-                HeightMismatch(block.header.height, proof.height),
+                block_header.height,
+                HeightMismatch(block_header.height, proof.height),
             )
             .into());
         }
 
-        let blockhash = Hash::digest(block.header.encode_fixed()?);
+        let blockhash = Hash::digest(block_header.encode_fixed()?);
 
         if blockhash != proof.block_hash {
             log::error!(
@@ -655,16 +657,16 @@ where
                 blockhash,
                 proof.block_hash
             );
-            return Err(ConsensusError::VerifyProof(block.header.height, HashMismatch).into());
+            return Err(ConsensusError::VerifyProof(block_header.height, HashMismatch).into());
         }
 
         let previous_block_header = self
-            .get_block_header_by_height(ctx.clone(), block.header.height - 1)
+            .get_block_header_by_height(ctx.clone(), block_header.height - 1)
             .await
             .map_err(|e| {
                 log::error!(
                     "[consensus] verify_proof, previous_block {} fails",
-                    block.header.height - 1,
+                    block_header.height - 1,
                 );
                 e
             })?;
@@ -689,7 +691,7 @@ where
 
         let signed_voters = extract_voters(&mut authority_list, &proof.bitmap).map_err(|_| {
             log::error!("[consensus] extract_voters fails, bitmap error");
-            ConsensusError::VerifyProof(block.header.height, BitMap)
+            ConsensusError::VerifyProof(block_header.height, BitMap)
         })?;
 
         let vote = Vote {
@@ -705,7 +707,7 @@ where
             .collect::<HashMap<overlord::types::Address, u32>>();
         self.verify_proof_weight(
             ctx.clone(),
-            block.header.height,
+            block_header.height,
             weight_map,
             signed_voters.clone(),
         )?;
@@ -725,13 +727,13 @@ where
 
         self.verify_proof_signature(
             ctx.clone(),
-            block.header.height,
+            block_header.height,
             vote_hash.clone(),
             proof.signature.clone(),
             hex_pubkeys,
         ).map_err(|e| {
             log::error!("[consensus] verify_proof_signature error, height {}, vote: {:?}, vote_hash:{:?}, sig:{:?}, signed_voter:{:?}",
-            block.header.height,
+            block_header.height,
             vote,
             vote_hash,
             proof.signature,

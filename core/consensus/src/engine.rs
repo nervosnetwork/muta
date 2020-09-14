@@ -589,16 +589,16 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
         // verify the proof in the block for previous block
         // skip to get previous proof to compare because the node may just comes from
         // sync and waste a delay of read
-        let previous_block = self
+        let previous_block_header = self
             .adapter
-            .get_block_by_height(ctx.clone(), block.header.height - 1)
+            .get_block_header_by_height(ctx.clone(), block.header.height - 1)
             .await?;
 
         // verify block timestamp.
         if !validate_timestamp(
             current_timestamp,
             block.header.timestamp,
-            previous_block.header.timestamp,
+            previous_block_header.timestamp,
         ) {
             return Err(ProtocolError::from(ConsensusError::InvalidTimestamp));
         }
@@ -606,14 +606,14 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
         self.adapter
                 .verify_proof(
                     ctx.clone(),
-                    &previous_block,
+                    &previous_block_header,
                     &block.header.proof,
                 )
                 .await
                 .map_err(|e| {
                     error!(
                         "[consensus] check_block, verify_proof error, previous block header: {:?}, proof: {:?}",
-                        previous_block.header,
+                        previous_block_header,
                         block.header.proof
                     );
                     e

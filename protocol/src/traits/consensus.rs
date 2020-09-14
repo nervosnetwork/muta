@@ -140,7 +140,12 @@ pub trait CommonConsensusAdapter: Send + Sync {
 
     fn set_args(&self, context: Context, timeout_gap: u64, cycles_limit: u64, max_tx_size: u64);
 
-    async fn verify_proof(&self, ctx: Context, block: &Block, proof: &Proof) -> ProtocolResult<()>;
+    async fn verify_proof(
+        &self,
+        ctx: Context,
+        block_header: &BlockHeader,
+        proof: &Proof,
+    ) -> ProtocolResult<()>;
 
     async fn verify_block_header(&self, ctx: Context, block: &Block) -> ProtocolResult<()>;
 
