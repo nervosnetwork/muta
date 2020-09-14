@@ -250,6 +250,7 @@ impl_storage_schema_for!(
     SignedTransaction
 );
 impl_storage_schema_for!(BlockSchema, BlockKey, Block, Block);
+impl_storage_schema_for!(BlockHeaderSchema, BlockKey, BlockHeader, BlockHeader);
 impl_storage_schema_for!(ReceiptSchema, CommonHashKey, Receipt, Receipt);
 impl_storage_schema_for!(ReceiptBytesSchema, CommonHashKey, Bytes, Receipt);
 impl_storage_schema_for!(HashHeightSchema, Hash, u64, HashHeight);
@@ -504,10 +505,23 @@ impl<Adapter: StorageAdapter> CommonStorage for ImplStorage<Adapter> {
         self.adapter.get::<BlockSchema>(BlockKey::new(height)).await
     }
 
+    async fn get_block_header(
+        &self,
+        ctx: Context,
+        height: u64,
+    ) -> ProtocolResult<Option<BlockHeader>> {
+        self.adapter
+            .get::<BlockHeaderSchema>(BlockKey::new(height))
+            .await
+    }
+
     // !!!be careful, the prev_hash may mismatch and latest block may diverse!!!
     async fn set_block(&self, _ctx: Context, block: Block) -> ProtocolResult<()> {
         self.adapter
             .insert::<BlockSchema>(BlockKey::new(block.header.height), block.clone())
+            .await?;
+        self.adapter
+            .insert::<BlockHeaderSchema>(BlockKey::new(block.header.height), block.header.clone())
             .await?;
         Ok(())
     }

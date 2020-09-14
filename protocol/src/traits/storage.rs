@@ -11,6 +11,7 @@ use crate::ProtocolResult;
 #[derive(Debug, Copy, Clone, Display)]
 pub enum StorageCategory {
     Block,
+    BlockHeader,
     Receipt,
     SignedTransaction,
     Wal,
@@ -39,6 +40,12 @@ pub trait CommonStorage: Send + Sync {
 
     async fn get_block(&self, ctx: Context, height: u64) -> ProtocolResult<Option<Block>>;
 
+    async fn get_block_header(
+        &self,
+        ctx: Context,
+        height: u64,
+    ) -> ProtocolResult<Option<BlockHeader>>;
+
     async fn set_block(&self, _ctx: Context, block: Block) -> ProtocolResult<()>;
 
     async fn remove_block(&self, ctx: Context, height: u64) -> ProtocolResult<()>;
@@ -48,7 +55,6 @@ pub trait CommonStorage: Send + Sync {
     async fn set_latest_block(&self, ctx: Context, block: Block) -> ProtocolResult<()>;
 
     async fn get_latest_block_header(&self, ctx: Context) -> ProtocolResult<BlockHeader>;
-
 }
 
 #[async_trait]
