@@ -630,6 +630,8 @@ impl<Mapping: 'static + ServiceMapping> Muta<Mapping> {
                 certificate_chain_file_path: tls.certificate_chain_file_path,
             })
         }
+        graphql_config.enable_dump_profile =
+            config.graphql.enable_dump_profile.unwrap_or_else(|| false);
 
         tokio::task::spawn_local(async move {
             let local = tokio::task::LocalSet::new();
