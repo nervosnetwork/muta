@@ -17,7 +17,7 @@ use rlp::Encodable;
 
 use common_apm::muta_apm;
 use common_crypto::BlsPublicKey;
-use common_logger::log;
+use common_logger::{json, log};
 use common_merkle::Merkle;
 
 use protocol::fixed_codec::FixedCodec;
@@ -485,25 +485,21 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
     }
 
     fn report_view_change(&self, cx: Context, height: u64, round: u64, reason: ViewChangeReason) {
-        let mut evt = JsonValue::new_object();
-        evt["height"] = height.into();
-        evt["round"] = round.into();
-
-        match reason {
+        let view_change_reason = match reason {
             ViewChangeReason::CheckBlockNotPass => {
-                let err = {
-                    let e = self.last_check_block_fail_reason.read();
-                    reason.to_string() + " " + e.as_str()
-                };
+                let e = self.last_check_block_fail_reason.read();
+                reason.to_string() + " " + e.as_str()
+            }
+            _ => reason.to_string(),
+        };
 
-                evt["reason"] = err.into();
-                log(log::Level::Warn, "consensus", "cons000", &cx, evt);
-            }
-            _ => {
-                evt["reason"] = reason.to_string().into();
-                log(log::Level::Warn, "consensus", "cons000", &cx, evt);
-            }
-        }
+        log(
+            log::Level::Warn,
+            "consensus",
+            "cons000",
+            &cx,
+            json!({"height", height; "round", round; "reason", view_change_reason}),
+        );
     }
 }
 

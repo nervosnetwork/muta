@@ -20,6 +20,15 @@ use date_fixed_roller::DateFixedWindowRoller;
 pub use json::array;
 pub use json::object;
 
+#[macro_export]
+macro_rules! json {
+    ({$($key: expr, $value: expr); *}) => {{
+        let mut evt = JsonValue::new_object();
+        $(evt[$key] = $value.into();)*
+        evt
+    }};
+}
+
 pub fn init<S: ::std::hash::BuildHasher>(
     filter: String,
     log_to_console: bool,
@@ -162,5 +171,26 @@ fn trace_context(ctx: &Context) -> Option<TraceContext> {
             Some(trace_ctx)
         }
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_json() {
+        env_logger::init();
+        let json = json!({"height", 1; "msg", "asset_01"; "is_connected", true});
+        log(
+            Level::Warn,
+            "logger",
+            "logg_001",
+            &Context::new(),
+            json.clone(),
+        );
+        assert_eq!(json["height"], 1);
+        assert_eq!(json["msg"], "asset_01");
+        assert_eq!(json["is_connected"], true);
     }
 }
