@@ -22,8 +22,8 @@ use protocol::traits::{
     ServiceMapping, Storage, SynchronizationAdapter, TrustFeedback,
 };
 use protocol::types::{
-    Address, Block, Bytes, Hash, Hex, MerkleRoot, Metadata, Proof, Receipt, SignedTransaction,
-    TransactionRequest, Validator,
+    Address, Block, BlockHeader, Bytes, Hash, Hex, MerkleRoot, Metadata, Proof, Receipt,
+    SignedTransaction, TransactionRequest, Validator,
 };
 use protocol::{fixed_codec::FixedCodec, ProtocolResult};
 
@@ -162,12 +162,12 @@ where
         ctx: Context,
         height: u64,
     ) -> ProtocolResult<Vec<Validator>> {
-        let block = self
+        let header = self
             .storage
-            .get_block(ctx, height)
+            .get_block_header(ctx, height)
             .await?
             .ok_or_else(|| ConsensusError::StorageItemNotFound)?;
-        Ok(block.header.validators)
+        Ok(header.validators)
     }
 
     /// Get the current height from storage.
@@ -404,6 +404,17 @@ where
     async fn get_block_by_height(&self, ctx: Context, height: u64) -> ProtocolResult<Block> {
         self.storage
             .get_block(ctx, height)
+            .await?
+            .ok_or_else(|| ConsensusError::StorageItemNotFound.into())
+    }
+
+    async fn get_block_header_by_height(
+        &self,
+        ctx: Context,
+        height: u64,
+    ) -> ProtocolResult<BlockHeader> {
+        self.storage
+            .get_block_header(ctx, height)
             .await?
             .ok_or_else(|| ConsensusError::StorageItemNotFound.into())
     }

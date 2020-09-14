@@ -5,8 +5,8 @@ use creep::Context;
 
 use crate::traits::{ExecutorParams, ExecutorResp, TrustFeedback};
 use crate::types::{
-    Address, Block, Bytes, Hash, Hex, MerkleRoot, Metadata, Proof, Receipt, SignedTransaction,
-    Validator,
+    Address, Block, BlockHeader, Bytes, Hash, Hex, MerkleRoot, Metadata, Proof, Receipt,
+    SignedTransaction, Validator,
 };
 use crate::{traits::mempool::MixedTxHashes, ProtocolResult};
 
@@ -106,6 +106,12 @@ pub trait CommonConsensusAdapter: Send + Sync {
 
     /// Get a block corresponding to the given height.
     async fn get_block_by_height(&self, ctx: Context, height: u64) -> ProtocolResult<Block>;
+
+    async fn get_block_header_by_height(
+        &self,
+        ctx: Context,
+        height: u64,
+    ) -> ProtocolResult<BlockHeader>;
 
     /// Get the current height from storage.
     async fn get_current_height(&self, ctx: Context) -> ProtocolResult<u64>;

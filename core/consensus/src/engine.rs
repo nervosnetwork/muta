@@ -452,16 +452,16 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             return Ok(vec![]);
         }
 
-        let old_block = self
+        let old_block_header = self
             .adapter
-            .get_block_by_height(ctx.clone(), next_height - 1)
+            .get_block_header_by_height(ctx.clone(), next_height - 1)
             .await?;
         let old_metadata = self.adapter.get_metadata(
             ctx.clone(),
-            old_block.header.state_root.clone(),
-            old_block.header.timestamp,
-            old_block.header.height,
-            old_block.header.proposer,
+            old_block_header.state_root.clone(),
+            old_block_header.timestamp,
+            old_block_header.height,
+            old_block_header.proposer,
         )?;
         let mut old_validators = old_metadata
             .verifier_list

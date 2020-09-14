@@ -276,8 +276,8 @@ impl<R: Rpc + 'static, S: Storage + 'static> MessageHandler for PullProofRpcHand
         let ret = match latest_proof {
             Ok(latest_proof) => match height {
                 height if height < latest_proof.height => {
-                    match self.storage.get_block(ctx.clone(), height + 1).await {
-                        Ok(Some(next_block)) => Ok(next_block.header.proof),
+                    match self.storage.get_block_header(ctx.clone(), height + 1).await {
+                        Ok(Some(next_header)) => Ok(next_header.proof),
                         Ok(None) => Err(StorageError::GetNone.into()),
                         Err(_) => Err(StorageError::GetNone.into()),
                     }
