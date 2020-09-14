@@ -93,7 +93,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             .clap();
         let signed_txs = self
             .adapter
-            .get_full_txs(ctx.clone(), ordered_tx_hashes.clone())
+            .get_full_txs(ctx.clone(), &ordered_tx_hashes)
             .await?;
         let order_signed_transactions_hash = digest_signed_transactions(&signed_txs)?;
 
@@ -199,7 +199,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             Instant::now() - time
         );
         let time = Instant::now();
-        let txs = self.adapter.get_full_txs(ctx, order_hashes).await?;
+        let txs = self.adapter.get_full_txs(ctx, &order_hashes).await?;
 
         info!(
             "[consensus-engine]: get txs cost {:?}",
@@ -285,7 +285,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         let ordered_tx_hashes = pill.block.ordered_tx_hashes.clone();
         let signed_txs = match self
             .adapter
-            .get_full_txs(ctx.clone(), ordered_tx_hashes.clone())
+            .get_full_txs(ctx.clone(), &ordered_tx_hashes)
             .await
         {
             Ok(txs) => txs,
@@ -617,11 +617,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
                 })?;
 
         self.adapter
-            .verify_txs(
-                ctx.clone(),
-                block.header.height,
-                block.ordered_tx_hashes.clone(),
-            )
+            .verify_txs(ctx.clone(), block.header.height, &block.ordered_tx_hashes)
             .await
             .map_err(|e| {
                 error!("[consensus] check_block, verify_txs error",);
@@ -647,7 +643,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
 
         let signed_txs = self
             .adapter
-            .get_full_txs(ctx.clone(), block.ordered_tx_hashes.clone())
+            .get_full_txs(ctx.clone(), &block.ordered_tx_hashes)
             .await?;
         self.check_order_transactions(ctx.clone(), &block, &signed_txs)
     }

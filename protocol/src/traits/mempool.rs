@@ -33,14 +33,14 @@ pub trait MemPool: Send + Sync {
         &self,
         ctx: Context,
         height: Option<u64>,
-        tx_hashes: Vec<Hash>,
+        tx_hashes: &Vec<Hash>,
     ) -> ProtocolResult<Vec<SignedTransaction>>;
 
     async fn ensure_order_txs(
         &self,
         ctx: Context,
         height: Option<u64>,
-        order_tx_hashes: Vec<Hash>,
+        order_tx_hashes: &Vec<Hash>,
     ) -> ProtocolResult<()>;
 
     async fn sync_propose_txs(

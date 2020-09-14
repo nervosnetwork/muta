@@ -229,7 +229,7 @@ async fn exec_ensure_order_txs(
     mempool: Arc<HashMemPool<HashMemPoolAdapter>>,
 ) {
     mempool
-        .ensure_order_txs(Context::new(), None, require_hashes)
+        .ensure_order_txs(Context::new(), None, &require_hashes)
         .await
         .unwrap();
 }

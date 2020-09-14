@@ -91,9 +91,9 @@ where
     async fn get_full_txs(
         &self,
         ctx: Context,
-        txs: Vec<Hash>,
+        txs: &Vec<Hash>,
     ) -> ProtocolResult<Vec<SignedTransaction>> {
-        self.mempool.get_full_txs(ctx, None, txs).await
+        self.mempool.get_full_txs(ctx, None, &txs).await
     }
 
     #[muta_apm::derive::tracing_span(kind = "consensus.adapter")]
@@ -188,10 +188,10 @@ where
     }
 
     #[muta_apm::derive::tracing_span(kind = "consensus.adapter", logs = "{'txs_len': 'txs.len()'}")]
-    async fn verify_txs(&self, ctx: Context, height: u64, txs: Vec<Hash>) -> ProtocolResult<()> {
+    async fn verify_txs(&self, ctx: Context, height: u64, txs: &Vec<Hash>) -> ProtocolResult<()> {
         if let Err(e) = self
             .mempool
-            .ensure_order_txs(ctx.clone(), Some(height), txs)
+            .ensure_order_txs(ctx.clone(), Some(height), &txs)
             .await
         {
             log::error!("verify_txs error {:?}", e);
@@ -928,8 +928,8 @@ where
     )]
     async fn exec(&self, ctx: Context, info: ExecuteInfo) -> ProtocolResult<()> {
         let height = info.height;
-        let txs = info.signed_txs.clone();
-        let order_root = info.order_root.clone();
+        let txs = info.signed_txs;
+        let order_root = info.order_root;
         let state_root = self.status.to_inner().get_latest_state_root();
 
         let now = Instant::now();
@@ -966,7 +966,7 @@ where
         );
         self.status.update_by_executed(gen_executed_info(
             info.ctx.clone(),
-            resp.clone(),
+            resp,
             height,
             order_root,
         ));
