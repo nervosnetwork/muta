@@ -515,19 +515,19 @@ where
         kind = "consensus.adapter",
         logs = "{'txs_len': 'block.ordered_tx_hashes.len()'}"
     )]
-    async fn verify_block_header(&self, ctx: Context, block: Block) -> ProtocolResult<()> {
-        let previous_block = self
-            .get_block_by_height(ctx.clone(), block.header.height - 1)
+    async fn verify_block_header(&self, ctx: Context, block: &Block) -> ProtocolResult<()> {
+        let previous_block_header = self
+            .get_block_header_by_height(ctx.clone(), block.header.height - 1)
             .await
             .map_err(|e| {
                 log::error!(
-                    "[consensus] verify_block_header, previous_block {} fails",
+                    "[consensus] verify_block_header, previous_block_header {} fails",
                     block.header.height - 1,
                 );
                 e
             })?;
 
-        let previous_block_hash = Hash::digest(previous_block.header.encode_fixed()?);
+        let previous_block_hash = Hash::digest(previous_block_header.encode_fixed()?);
 
         if previous_block_hash != block.header.prev_hash {
             log::error!(
@@ -552,10 +552,10 @@ where
         // verify proposer and validators
         let previous_metadata = self.get_metadata(
             ctx,
-            previous_block.header.state_root.clone(),
-            previous_block.header.height,
-            previous_block.header.timestamp,
-            previous_block.header.proposer,
+            previous_block_header.state_root.clone(),
+            previous_block_header.height,
+            previous_block_header.timestamp,
+            previous_block_header.proposer,
         )?;
 
         let authority_map = previous_metadata
@@ -627,7 +627,7 @@ where
     }
 
     #[muta_apm::derive::tracing_span(kind = "consensus.adapter")]
-    async fn verify_proof(&self, ctx: Context, block: Block, proof: Proof) -> ProtocolResult<()> {
+    async fn verify_proof(&self, ctx: Context, block: &Block, proof: &Proof) -> ProtocolResult<()> {
         // the block 0 has no proof, which is consensus-ed by community, not by chain
 
         if block.header.height == 0 {
@@ -647,7 +647,7 @@ where
             .into());
         }
 
-        let blockhash = Hash::digest(block.header.clone().encode_fixed()?);
+        let blockhash = Hash::digest(block.header.encode_fixed()?);
 
         if blockhash != proof.block_hash {
             log::error!(
@@ -658,8 +658,8 @@ where
             return Err(ConsensusError::VerifyProof(block.header.height, HashMismatch).into());
         }
 
-        let previous_block = self
-            .get_block_by_height(ctx.clone(), block.header.height - 1)
+        let previous_block_header = self
+            .get_block_header_by_height(ctx.clone(), block.header.height - 1)
             .await
             .map_err(|e| {
                 log::error!(
@@ -671,10 +671,10 @@ where
         // the auth_list for the target should comes from previous height
         let metadata = self.get_metadata(
             ctx.clone(),
-            previous_block.header.state_root.clone(),
-            previous_block.header.height,
-            previous_block.header.timestamp,
-            previous_block.header.proposer,
+            previous_block_header.state_root.clone(),
+            previous_block_header.height,
+            previous_block_header.timestamp,
+            previous_block_header.proposer,
         )?;
 
         let mut authority_list = metadata

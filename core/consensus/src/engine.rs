@@ -576,7 +576,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
         let current_timestamp = time_now();
 
         self.adapter
-            .verify_block_header(ctx.clone(), block.clone())
+            .verify_block_header(ctx.clone(), &block)
             .await
             .map_err(|e| {
                 error!(
@@ -606,8 +606,8 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
         self.adapter
                 .verify_proof(
                     ctx.clone(),
-                    previous_block.clone(),
-                    block.header.proof.clone(),
+                    &previous_block,
+                    &block.header.proof,
                 )
                 .await
                 .map_err(|e| {
