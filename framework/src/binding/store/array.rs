@@ -7,9 +7,9 @@ use bytes::Bytes;
 use protocol::fixed_codec::FixedCodec;
 use protocol::traits::{ServiceState, StoreArray};
 use protocol::types::Hash;
-use protocol::{ProtocolError, ProtocolResult};
+use protocol::ProtocolResult;
 
-use crate::binding::store::{FixedKeys, StoreError};
+use crate::binding::store::FixedKeys;
 
 pub struct DefaultStoreArray<S: ServiceState, E: FixedCodec> {
     state:    Rc<RefCell<S>>,
@@ -43,14 +43,10 @@ impl<S: ServiceState, E: FixedCodec> DefaultStoreArray<S, E> {
 
     fn inner_get(&self, index: u64) -> ProtocolResult<Option<E>> {
         if let Some(k) = self.keys.inner.get(index as usize) {
-            self.state.borrow().get(k)?.map_or_else(
-                || {
-                    let e: E = <_>::decode_fixed(Bytes::new())
-                        .map_err(|_| ProtocolError::from(StoreError::DecodeError))?;
-                    Ok(Some(e))
-                },
-                |e| Ok(Some(e)),
-            )
+            self.state
+                .borrow()
+                .get(k)?
+                .map_or_else(|| Ok(None), |v| Ok(Some(v)))
         } else {
             Ok(None)
         }

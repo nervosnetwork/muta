@@ -9,9 +9,9 @@ use rayon::prelude::*;
 use protocol::fixed_codec::FixedCodec;
 use protocol::traits::{ServiceState, StoreMap};
 use protocol::types::Hash;
-use protocol::{ProtocolError, ProtocolResult};
+use protocol::ProtocolResult;
 
-use crate::binding::store::{get_bucket_index, Bucket, FixedBuckets, StoreError};
+use crate::binding::store::{get_bucket_index, Bucket, FixedBuckets};
 
 pub struct DefaultStoreMap<S: ServiceState, K: FixedCodec + PartialEq, V: FixedCodec> {
     state:    Rc<RefCell<S>>,
@@ -71,14 +71,7 @@ where
             self.state
                 .borrow()
                 .get(&self.get_map_key(&key_bytes))?
-                .map_or_else(
-                    || {
-                        Ok(Some(<_>::decode_fixed(Bytes::new()).map_err(|_| {
-                            ProtocolError::from(StoreError::DecodeError)
-                        })?))
-                    },
-                    |v| Ok(Some(v)),
-                )
+                .map_or_else(|| Ok(None), |v| Ok(Some(v)))
         } else {
             Ok(None)
         }
