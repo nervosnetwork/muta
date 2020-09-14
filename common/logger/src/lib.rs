@@ -20,6 +20,13 @@ use date_fixed_roller::DateFixedWindowRoller;
 pub use json::array;
 pub use json::object;
 
+/// Example
+/// ```rust
+///     let json_obj = json!({
+///         "key_01", value_01;
+///         "key_02", value_02;
+///    });
+/// ```
 #[macro_export]
 macro_rules! json {
     ({$($key: expr, $value: expr); *}) => {{
