@@ -179,10 +179,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         // If the block is proposed by self, it does not need to check. Get full signed
         // transactions directly.
         if !exemption {
-            if let Err(e) = self
-                .inner_check_block(ctx.clone(), pill.block.clone())
-                .await
-            {
+            if let Err(e) = self.inner_check_block(ctx.clone(), &pill.block).await {
                 let mut reason = self.last_check_block_fail_reason.write();
                 *reason = e.to_string();
                 return Err(e.into());
@@ -572,7 +569,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
             .await
     }
 
-    async fn inner_check_block(&self, ctx: Context, block: Block) -> ProtocolResult<()> {
+    async fn inner_check_block(&self, ctx: Context, block: &Block) -> ProtocolResult<()> {
         let current_timestamp = time_now();
 
         self.adapter
