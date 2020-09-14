@@ -173,8 +173,8 @@ where
     /// Get the current height from storage.
     #[muta_apm::derive::tracing_span(kind = "consensus.adapter")]
     async fn get_current_height(&self, ctx: Context) -> ProtocolResult<u64> {
-        let res = self.storage.get_latest_block(ctx).await?;
-        Ok(res.header.height)
+        let header = self.storage.get_latest_block_header(ctx).await?;
+        Ok(header.height)
     }
 
     #[muta_apm::derive::tracing_span(kind = "consensus.adapter")]
@@ -411,8 +411,8 @@ where
     /// Get the current height from storage.
     #[muta_apm::derive::tracing_span(kind = "consensus.adapter")]
     async fn get_current_height(&self, ctx: Context) -> ProtocolResult<u64> {
-        let res = self.storage.get_latest_block(ctx).await?;
-        Ok(res.header.height)
+        let header = self.storage.get_latest_block_header(ctx).await?;
+        Ok(header.height)
     }
 
     #[muta_apm::derive::tracing_span(
