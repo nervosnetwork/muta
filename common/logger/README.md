@@ -74,7 +74,7 @@ to identify this event. `Context` is used to extract trace id. `msg` is `JsonVal
 Useage example:
 
 ```rust
-common_logger::log(Level::Info, "network", "netw0001", &ctx, common_logger::object!{"music": "beautiful world"});
+common_logger::log(Level::Info, "network", "netw0001", &ctx, common_logger::json!({"music", "beautiful world"; "movie", "fury"}));
 ```
 
 ## Yaml File
