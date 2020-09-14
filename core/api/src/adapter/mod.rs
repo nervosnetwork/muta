@@ -103,7 +103,7 @@ impl<
             .get_receipt_by_hash(ctx.clone(), tx_hash)
             .await?;
 
-        let exec_height = self.storage.get_latest_block(ctx).await?.header.exec_height;
+        let exec_height = self.storage.get_latest_block_header(ctx).await?.exec_height;
 
         match opt_receipt {
             Some(receipt) => {
