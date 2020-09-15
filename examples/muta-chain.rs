@@ -55,7 +55,7 @@ pub fn main() {
     muta::run(
         DefaultServiceMapping,
         "muta-chain",
-        "v0.2.0-rc.2.1",
+        "v0.2.0",
         "Muta Dev <muta@nervos.org>",
         None,
     )
