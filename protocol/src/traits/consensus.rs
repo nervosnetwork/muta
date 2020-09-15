@@ -187,7 +187,7 @@ pub trait ConsensusAdapter: CommonConsensusAdapter + Send + Sync {
     async fn get_full_txs(
         &self,
         ctx: Context,
-        order_txs: &Vec<Hash>,
+        order_txs: &[Hash],
     ) -> ProtocolResult<Vec<SignedTransaction>>;
 
     /// Consensus transmit a message to the given target.
@@ -228,5 +228,5 @@ pub trait ConsensusAdapter: CommonConsensusAdapter + Send + Sync {
     /// Pull some blocks from other nodes from `begin` to `end`.
     async fn pull_block(&self, ctx: Context, height: u64, end: &str) -> ProtocolResult<Block>;
 
-    async fn verify_txs(&self, ctx: Context, height: u64, txs: &Vec<Hash>) -> ProtocolResult<()>;
+    async fn verify_txs(&self, ctx: Context, height: u64, txs: &[Hash]) -> ProtocolResult<()>;
 }

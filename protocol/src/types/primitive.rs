@@ -376,7 +376,7 @@ impl FromStr for Address {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let (hrp, data) = bech32::decode(s).map_err(TypesError::from)?;
-        if &hrp != address_hrp() {
+        if hrp != address_hrp() {
             return Err(TypesError::InvalidAddress {
                 address: s.to_owned(),
             });
