@@ -95,7 +95,14 @@ fn block_get() -> Block {
         "11",
     ];
 
-    let maintenance_cli = Cli::new(DefaultServiceMapping {}, Some(cmd)).generate_maintenance_cli();
+    let maintenance_cli = Cli::new(
+        DefaultServiceMapping {},
+        "Rodents",
+        "Big Cheek",
+        "Hamsters",
+        Some(cmd),
+    )
+    .generate_maintenance_cli();
 
     let block = if let ("block", Some(sub_cmd)) = maintenance_cli.matches.subcommand() {
         let mut rt = tokio::runtime::Runtime::new().expect("new tokio runtime");
@@ -134,7 +141,14 @@ fn block_set() {
         "#,
     ];
 
-    let maintenance_cli = Cli::new(DefaultServiceMapping {}, Some(cmd)).generate_maintenance_cli();
+    let maintenance_cli = Cli::new(
+        DefaultServiceMapping {},
+        "Rodents",
+        "Big Cheek",
+        "Hamsters",
+        Some(cmd),
+    )
+    .generate_maintenance_cli();
     let mut rt = tokio::runtime::Runtime::new().expect("new tokio runtime");
 
     rt.block_on(async move {
@@ -171,7 +185,14 @@ fn latest_get(expect: u64) -> Block {
         "get",
     ];
 
-    let maintenance_cli = Cli::new(DefaultServiceMapping {}, Some(cmd)).generate_maintenance_cli();
+    let maintenance_cli = Cli::new(
+        DefaultServiceMapping {},
+        "Rodents",
+        "Big Cheek",
+        "Hamsters",
+        Some(cmd),
+    )
+    .generate_maintenance_cli();
 
     let block = if let ("latest_block", Some(sub_cmd)) = maintenance_cli.matches.subcommand() {
         if let ("get", Some(_cmd)) = sub_cmd.subcommand() {
@@ -206,7 +227,14 @@ fn latest_set() {
         "10",
     ];
 
-    let maintenance_cli = Cli::new(DefaultServiceMapping {}, Some(cmd)).generate_maintenance_cli();
+    let maintenance_cli = Cli::new(
+        DefaultServiceMapping {},
+        "Rodents",
+        "Big Cheek",
+        "Hamsters",
+        Some(cmd),
+    )
+    .generate_maintenance_cli();
 
     if let ("latest_block", Some(sub_cmd)) = maintenance_cli.matches.subcommand() {
         if let ("set", Some(_cmd)) = sub_cmd.subcommand() {
@@ -245,7 +273,14 @@ fn prepare() {
         "get",
     ];
 
-    let maintenance_cli = Cli::new(DefaultServiceMapping {}, Some(cmd)).generate_maintenance_cli();
+    let maintenance_cli = Cli::new(
+        DefaultServiceMapping {},
+        "Rodents",
+        "Big Cheek",
+        "Hamsters",
+        Some(cmd),
+    )
+    .generate_maintenance_cli();
 
     let storage = maintenance_cli.storage;
 
@@ -321,5 +356,12 @@ fn clean() {
 }
 
 fn run(cmd: Vec<&str>) -> ProtocolResult<()> {
-    Cli::new(service_mapping::DefaultServiceMapping {}, Some(cmd)).start()
+    Cli::new(
+        service_mapping::DefaultServiceMapping {},
+        "Rodents",
+        "Big Cheek",
+        "Hamsters",
+        Some(cmd),
+    )
+    .start()
 }

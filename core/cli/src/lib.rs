@@ -38,15 +38,27 @@ impl<'a, Mapping> Cli<'a, Mapping>
 where
     Mapping: 'static + ServiceMapping,
 {
-    pub fn run(service_mapping: Mapping, target_commands: Option<Vec<&str>>) {
-        let cli = Self::new(service_mapping, target_commands);
+    pub fn run(
+        service_mapping: Mapping,
+        app_name: &str,
+        version: &str,
+        author: &str,
+        target_commands: Option<Vec<&str>>,
+    ) {
+        let cli = Self::new(service_mapping, app_name, version, author, target_commands);
         if let Err(e) = cli.start() {
             log::error!("{:?}", e)
         }
     }
 
-    pub fn new(service_mapping: Mapping, target_commands: Option<Vec<&str>>) -> Self {
-        let matches = Self::generate_matches(target_commands);
+    pub fn new(
+        service_mapping: Mapping,
+        app_name: &str,
+        version: &str,
+        author: &str,
+        target_commands: Option<Vec<&str>>,
+    ) -> Self {
+        let matches = Self::generate_matches(app_name, version, author, target_commands);
 
         let config_path = matches.value_of("config").expect("missing config path");
 
@@ -136,10 +148,15 @@ where
         }
     }
 
-    pub fn generate_matches(cmds: Option<Vec<&str>>) -> ArgMatches<'a> {
-        let app = clap::App::new("muta-chain")
-            .version("v0.2.0-rc.2.1")
-            .author("Muta Dev <muta@nervos.org>")
+    pub fn generate_matches(
+        app_name: &str,
+        version: &str,
+        author: &str,
+        cmds: Option<Vec<&str>>,
+    ) -> ArgMatches<'a> {
+        let app = clap::App::new(app_name)
+            .version(version)
+            .author(author)
             .arg(
                 clap::Arg::with_name("config")
                     .short("c")
