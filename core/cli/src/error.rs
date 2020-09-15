@@ -29,6 +29,9 @@ pub enum CliError {
 
     #[display(fmt = "unsupported command")]
     UnsupportedCommand,
+
+    #[display(fmt = "genesis.toml is missing")]
+    MissingGenesis,
 }
 
 impl Error for CliError {}

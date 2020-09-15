@@ -15,7 +15,6 @@ use core_consensus::wal::ConsensusWal;
 use core_consensus::SignedTxsWAL;
 use core_storage::adapter::rocks::RocksAdapter;
 use core_storage::ImplStorage;
-use framework::binding::state::RocksTrieDB;
 use protocol::traits::{Context, MaintenanceStorage, ServiceMapping};
 use protocol::types::{Block, Genesis, SignedTransaction};
 use protocol::ProtocolResult;
@@ -91,8 +90,13 @@ where
         match self.matches.subcommand() {
             ("run", Some(_sub_cmd)) => {
                 log::info!("run subcommand run");
-                let muta = run::Muta::new(self.config, self.genesis.unwrap(), self.service_mapping);
-                muta.run()
+                if let Some(genesis) = self.genesis {
+                    let muta = run::Muta::new(self.config, genesis, self.service_mapping);
+                    muta.run()
+                } else {
+                    log::error!("genesis.toml is missing");
+                    Err(CliError::MissingGenesis.into())
+                }
             }
             ("latest_block", Some(_sub_cmd)) => {
                 log::info!("run subcommand latest_block");
@@ -118,8 +122,13 @@ where
             }
             _ => {
                 log::info!("run without any subcommand, default to run");
-                let muta = run::Muta::new(self.config, self.genesis.unwrap(), self.service_mapping);
-                muta.run()
+                if let Some(genesis) = self.genesis {
+                    let muta = run::Muta::new(self.config, genesis, self.service_mapping);
+                    muta.run()
+                } else {
+                    log::error!("genesis.toml is missing");
+                    Err(CliError::MissingGenesis.into())
+                }
             }
         }
     }
@@ -135,7 +144,7 @@ where
                     .value_name("FILE")
                     .help("a required file for the configuration")
                     .env("CONFIG")
-                    .default_value("./devtools/chain/config.toml"),
+                    .default_value("./config.toml"),
             )
             .arg(
                 clap::Arg::with_name("genesis")
@@ -144,7 +153,7 @@ where
                     .value_name("FILE")
                     .help("a required file for the genesis")
                     .env("GENESIS")
-                    .default_value("./devtools/chain/genesis.toml"),
+                    .default_value("./genesis.toml"),
             )
             .subcommand(clap::SubCommand::with_name("run").about("run the muta-chain"))
             .subcommand(
@@ -224,9 +233,7 @@ where
         }
     }
 
-    fn generate_maintenance_cli(
-        self,
-    ) -> MaintenanceCli<'a, Mapping, RocksTrieDB, ImplStorage<RocksAdapter>> {
+    fn generate_maintenance_cli(self) -> MaintenanceCli<'a, Mapping, ImplStorage<RocksAdapter>> {
         let path_block = self.config.data_path_for_block();
         let rocks_adapter = match RocksAdapter::new(path_block, self.config.rocksdb.max_open_files)
         {
@@ -237,19 +244,6 @@ where
             }
         };
         let storage = ImplStorage::new(rocks_adapter);
-
-        let trie_db = match RocksTrieDB::new(
-            self.config.data_path_for_state(),
-            self.config.executor.light,
-            self.config.rocksdb.max_open_files,
-            self.config.executor.triedb_cache_size,
-        ) {
-            Ok(trie_db) => trie_db,
-            Err(e) => {
-                log::error!("{:?}", e);
-                panic!("TrieDb init fails")
-            }
-        };
 
         // Init full transactions wal
         let txs_wal_path = self
@@ -273,7 +267,6 @@ where
             self.matches,
             self.config,
             self.service_mapping,
-            trie_db,
             storage,
             txs_wal,
             consensus_wal,
@@ -281,32 +274,28 @@ where
     }
 }
 
-pub struct MaintenanceCli<'a, Mapping, DB, S>
+pub struct MaintenanceCli<'a, Mapping, S>
 where
     Mapping: 'static + ServiceMapping,
-    DB: 'static + cita_trie::DB,
     S: 'static + MaintenanceStorage,
 {
     pub matches:         ArgMatches<'a>,
     pub config:          Config,
     pub service_mapping: Arc<Mapping>,
-    pub db:              Arc<DB>,
     pub storage:         Arc<S>,
     pub txs_wal:         Arc<SignedTxsWAL>,
     pub consensus_wal:   Arc<ConsensusWal>,
 }
 
-impl<'a, Mapping, DB, S> MaintenanceCli<'a, Mapping, DB, S>
+impl<'a, Mapping, S> MaintenanceCli<'a, Mapping, S>
 where
     Mapping: 'static + ServiceMapping,
-    DB: 'static + cita_trie::DB,
     S: 'static + MaintenanceStorage,
 {
     pub fn new(
         matches: ArgMatches<'a>,
         config: Config,
         service_mapping: Arc<Mapping>,
-        trie_db: DB,
         storage: S,
         txs_wal: SignedTxsWAL,
         consensus_wal: ConsensusWal,
@@ -315,7 +304,6 @@ where
             matches,
             config,
             service_mapping,
-            db: Arc::new(trie_db),
             storage: Arc::new(storage),
             txs_wal: Arc::new(txs_wal),
             consensus_wal: Arc::new(consensus_wal),

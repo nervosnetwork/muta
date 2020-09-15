@@ -56,7 +56,7 @@ info:
 e2e-test:
 	cargo build --example muta-chain
 	rm -rf ./devtools/chain/data
-	./target/debug/examples/muta-chain > /tmp/log 2>&1 &
+	./target/debug/examples/muta-chain -c ./devtools/chain/config.toml -g ./devtools/chain/genesis.toml > /tmp/log 2>&1 &
 	cd tests/e2e && yarn && ./wait-for-it.sh -t 300 localhost:8000 -- yarn run test
 	pkill -2 muta-chain
 
