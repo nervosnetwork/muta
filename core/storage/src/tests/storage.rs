@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use test::Bencher;
 
-use protocol::traits::{Context, Storage};
+use protocol::traits::{CommonStorage, Context, Storage};
 use protocol::types::Hash;
 use tokio::runtime::Runtime;
 
@@ -174,19 +174,6 @@ async fn test_storage_latest_proof_insert() {
     let proof_2 = storage.get_latest_proof(Context::new()).await.unwrap();
 
     assert_eq!(proof.block_hash, proof_2.block_hash);
-}
-
-#[tokio::test]
-async fn test_storage_wal_insert() {
-    let storage = ImplStorage::new(Arc::new(MemoryAdapter::new()));
-
-    let info = get_random_bytes(64);
-    storage
-        .update_overlord_wal(Context::new(), info.clone())
-        .await
-        .unwrap();
-    let info_2 = storage.load_overlord_wal(Context::new()).await.unwrap();
-    assert_eq!(info, info_2);
 }
 
 #[rustfmt::skip]

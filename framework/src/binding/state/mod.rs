@@ -1,5 +1,5 @@
 mod trie;
-mod trie_db;
+pub mod trie_db;
 
 pub use trie::{MPTTrie, MPTTrieError};
 pub use trie_db::{RocksTrieDB, RocksTrieDBError};

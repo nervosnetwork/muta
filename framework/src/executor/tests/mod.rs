@@ -16,7 +16,8 @@ use asset::types::{Asset, GetBalanceResponse};
 use asset::AssetService;
 use metadata::MetadataService;
 use protocol::traits::{
-    Context, Executor, ExecutorParams, SDKFactory, Service, ServiceMapping, ServiceSDK, Storage,
+    CommonStorage, Context, Executor, ExecutorParams, SDKFactory, Service, ServiceMapping,
+    ServiceSDK, Storage,
 };
 use protocol::types::{
     Address, Block, Genesis, Hash, Proof, RawTransaction, Receipt, SignedTransaction,
@@ -596,6 +597,33 @@ impl ServiceMapping for MockServiceMapping {
 struct MockStorage;
 
 #[async_trait]
+impl CommonStorage for MockStorage {
+    async fn insert_block(&self, _ctx: Context, _block: Block) -> ProtocolResult<()> {
+        unimplemented!()
+    }
+
+    async fn get_block(&self, _ctx: Context, _height: u64) -> ProtocolResult<Option<Block>> {
+        unimplemented!()
+    }
+
+    async fn set_block(&self, _ctx: Context, _block: Block) -> ProtocolResult<()> {
+        unimplemented!()
+    }
+
+    async fn remove_block(&self, _ctx: Context, _height: u64) -> ProtocolResult<()> {
+        unimplemented!()
+    }
+
+    async fn get_latest_block(&self, _ctx: Context) -> ProtocolResult<Block> {
+        unimplemented!()
+    }
+
+    async fn set_latest_block(&self, _ctx: Context, _block: Block) -> ProtocolResult<()> {
+        unimplemented!()
+    }
+}
+
+#[async_trait]
 impl Storage for MockStorage {
     async fn insert_transactions(
         &self,
@@ -603,10 +631,6 @@ impl Storage for MockStorage {
         _: u64,
         _: Vec<SignedTransaction>,
     ) -> ProtocolResult<()> {
-        unimplemented!()
-    }
-
-    async fn insert_block(&self, _ctx: Context, _: Block) -> ProtocolResult<()> {
         unimplemented!()
     }
 
@@ -635,14 +659,6 @@ impl Storage for MockStorage {
         unimplemented!()
     }
 
-    async fn get_latest_block(&self, _ctx: Context) -> ProtocolResult<Block> {
-        unimplemented!()
-    }
-
-    async fn get_block(&self, _ctx: Context, _: u64) -> ProtocolResult<Option<Block>> {
-        unimplemented!()
-    }
-
     async fn get_receipt_by_hash(&self, _ctx: Context, _: Hash) -> ProtocolResult<Option<Receipt>> {
         unimplemented!()
     }
@@ -657,14 +673,6 @@ impl Storage for MockStorage {
     }
 
     async fn get_latest_proof(&self, _ctx: Context) -> ProtocolResult<Proof> {
-        unimplemented!()
-    }
-
-    async fn update_overlord_wal(&self, _ctx: Context, _info: Bytes) -> ProtocolResult<()> {
-        unimplemented!()
-    }
-
-    async fn load_overlord_wal(&self, _ctx: Context) -> ProtocolResult<Bytes> {
         unimplemented!()
     }
 }

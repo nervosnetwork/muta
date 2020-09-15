@@ -1,0 +1,57 @@
+# crypto
+privkey = "0x5ec982173d54d830b6789cbbbe43eaa2853a5ff752d1ebc1b266cf9790314f8a"
+
+# db config
+data_path = "./free-space/data"
+
+[graphql]
+listening_address = "127.0.0.1:8000"
+graphql_uri = "/graphql"
+graphiql_uri = "/graphiql"
+workers = 0 # if 0, uses number of available logical cpu as threads count.
+maxconn = 25000
+max_payload_size = 1048576
+# [graphql.tls]
+# private_key_file_path = "key.pem"
+# certificate_chain_file_path = "cert.pem"
+
+
+[network]
+listening_address = "0.0.0.0:1337"
+rpc_timeout = 10
+
+[consensus]
+overlord_gap = 5
+sync_txs_chunk_size = 5000
+
+[[network.bootstraps]]
+peer_id = "QmTEJkB5QKWsEq37huryZZfVvqBKb54sHnKn9TQcA6j3n9"
+address = "0.0.0.0:1888"
+
+[mempool]
+pool_size = 20000
+broadcast_txs_size = 200
+broadcast_txs_interval = 200
+
+[executor]
+light = false
+triedb_cache_size = 2000
+
+[logger]
+filter = "info"
+log_to_console = true
+console_show_file_and_line = false
+log_path = "./free-space/logs"
+log_to_file = true
+file_size_limit = 1073741824 # 1 GiB
+metrics = true
+# you can specify log level for modules with config below
+# modules_level = { "overlord::state::process" = "debug", core_consensus = "error" }
+
+[rocksdb]
+max_open_files = 64
+
+# [apm]
+# service_name = "muta"
+# tracing_address = "127.0.0.1:6831"
+# tracing_batch_size = 50

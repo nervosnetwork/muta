@@ -12,7 +12,8 @@ use framework::binding::state::RocksTrieDB;
 use framework::executor::{ServiceExecutor, ServiceExecutorFactory};
 use protocol::fixed_codec::FixedCodec;
 use protocol::traits::{
-    Context, Executor, ExecutorParams, SDKFactory, Service, ServiceMapping, ServiceSDK, Storage,
+    CommonStorage, Context, Executor, ExecutorParams, SDKFactory, Service, ServiceMapping,
+    ServiceSDK, Storage,
 };
 use protocol::types::{
     Address, Block, BlockHeader, Bytes, Genesis, Hash, Hex, MerkleRoot, Proof, RawTransaction,

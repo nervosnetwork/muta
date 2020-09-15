@@ -29,8 +29,8 @@ use core_consensus::message::{
 use core_consensus::status::{CurrentConsensusStatus, StatusAgent};
 use core_consensus::util::OverlordCrypto;
 use core_consensus::{
-    DurationConfig, Node, OverlordConsensus, OverlordConsensusAdapter, OverlordSynchronization,
-    RichBlock, SignedTxsWAL,
+    ConsensusWal, DurationConfig, Node, OverlordConsensus, OverlordConsensusAdapter,
+    OverlordSynchronization, RichBlock, SignedTxsWAL,
 };
 use core_mempool::{
     DefaultMemPoolAdapter, HashMemPool, MsgPushTxs, NewTxsHandler, PullTxsHandler,
@@ -39,7 +39,9 @@ use core_mempool::{
 use core_network::{DiagnosticEvent, NetworkConfig, NetworkService, PeerId, PeerIdExt};
 use core_storage::{ImplStorage, StorageError};
 use framework::executor::{ServiceExecutor, ServiceExecutorFactory};
-use protocol::traits::{APIAdapter, Context, MemPool, Network, NodeInfo, ServiceMapping, Storage};
+use protocol::traits::{
+    APIAdapter, CommonStorage, Context, MemPool, Network, NodeInfo, ServiceMapping, Storage,
+};
 use protocol::types::{Address, Block, BlockHeader, Genesis, Hash, Metadata, Proof, Validator};
 use protocol::{fixed_codec::FixedCodec, ProtocolResult};
 
@@ -227,6 +229,13 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         .to_string();
     let txs_wal = Arc::new(SignedTxsWAL::new(wal_path));
 
+    // Init consensus wal
+    let wal_path = crate::common::tmp_dir()
+        .to_str()
+        .expect("wal path string")
+        .to_string();
+    let consensus_wal = Arc::new(ConsensusWal::new(wal_path));
+
     let exec_resp = api_adapter
         .query_service(
             Context::new(),
@@ -357,6 +366,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         Arc::clone(&txs_wal),
         Arc::clone(&consensus_adapter),
         Arc::clone(&lock),
+        Arc::clone(&consensus_wal),
     ));
 
     consensus_adapter.set_overlord_handler(overlord_consensus.get_overlord_handler());

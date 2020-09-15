@@ -21,8 +21,8 @@ pub use network::{
     Gossip, MessageCodec, MessageHandler, Network, PeerTag, PeerTrust, Priority, Rpc, TrustFeedback,
 };
 pub use storage::{
-    IntoIteratorByRef, Storage, StorageAdapter, StorageBatchModify, StorageCategory,
-    StorageIterator, StorageSchema,
+    CommonStorage, IntoIteratorByRef, MaintenanceStorage, Storage, StorageAdapter,
+    StorageBatchModify, StorageCategory, StorageIterator, StorageSchema,
 };
 
 pub use creep::{Cloneable, Context};

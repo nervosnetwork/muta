@@ -245,8 +245,15 @@ impl fmt::Debug for Hash {
 /// Address length.
 const ADDRESS_LEN: usize = 20;
 
-#[derive(RlpFixedCodec, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
+#[derive(RlpFixedCodec, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Address(Bytes);
+
+impl Default for Address {
+    fn default() -> Self {
+        Address::from_hex("0x0000000000000000000000000000000000000000")
+            .expect("Address must consist of 20 bytes")
+    }
+}
 
 impl Serialize for Address {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>

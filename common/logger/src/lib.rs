@@ -19,6 +19,7 @@ use date_fixed_roller::DateFixedWindowRoller;
 
 pub use json::array;
 pub use json::object;
+use log4rs::append::file::FileAppender;
 
 pub fn init<S: ::std::hash::BuildHasher>(
     filter: String,
@@ -30,7 +31,7 @@ pub fn init<S: ::std::hash::BuildHasher>(
     file_size_limit: u64, // bytes
     modules_level: HashMap<String, String, S>,
 ) {
-    let console = ConsoleAppender::builder()
+    let console_appender = ConsoleAppender::builder()
         .encoder(Box::new(PatternEncoder::new(
             if console_show_file_and_line {
                 "[{d} {h({l})} {t} {f}:{L}] {m}{n}"
@@ -43,7 +44,7 @@ pub fn init<S: ::std::hash::BuildHasher>(
     let muta_roller_pat = log_path.join("{date}.muta.{timestamp}.log");
     let metrics_roller_pat = log_path.join("{date}.metrics.{timestamp}.log");
 
-    let file = {
+    let file_appender = {
         let size_trigger = SizeTrigger::new(file_size_limit);
         let roller = DateFixedWindowRoller::builder()
             .build(&muta_roller_pat.to_string_lossy())
@@ -55,6 +56,11 @@ pub fn init<S: ::std::hash::BuildHasher>(
             .build(log_path.join("muta.log"), Box::new(policy))
             .unwrap()
     };
+
+    let cli_file_appender = FileAppender::builder()
+        .encoder(Box::new(JsonEncoder::new()))
+        .build(log_path.join("cli.log"))
+        .unwrap();
 
     let metrics_appender = {
         let size_trigger = SizeTrigger::new(file_size_limit);
@@ -76,6 +82,7 @@ pub fn init<S: ::std::hash::BuildHasher>(
     if log_to_file {
         root_builder = root_builder.appender("file");
     }
+
     let level_filter = convert_level(filter.as_ref());
     let root = root_builder.build(level_filter);
 
@@ -87,11 +94,21 @@ pub fn init<S: ::std::hash::BuildHasher>(
             LevelFilter::Off
         },
     );
+
+    let cli_logger = Logger::builder()
+        .additive(false)
+        .appender("cli")
+        .appender("console")
+        .build("cli", LevelFilter::Trace);
+
     let mut config_builder = Config::builder()
-        .appender(Appender::builder().build("console", Box::new(console)))
-        .appender(Appender::builder().build("file", Box::new(file)))
+        .appender(Appender::builder().build("console", Box::new(console_appender)))
+        .appender(Appender::builder().build("file", Box::new(file_appender)))
         .appender(Appender::builder().build("metrics", Box::new(metrics_appender)))
-        .logger(metrics_logger);
+        .appender(Appender::builder().build("cli", Box::new(cli_file_appender)))
+        .logger(metrics_logger)
+        .logger(cli_logger);
+
     for (module, level) in &modules_level {
         let module_logger = Logger::builder()
             .additive(false)
@@ -102,7 +119,7 @@ pub fn init<S: ::std::hash::BuildHasher>(
     }
     let config = config_builder.build(root).unwrap();
 
-    log4rs::init_config(config).unwrap();
+    log4rs::init_config(config).expect("");
 }
 
 fn convert_level(level: &str) -> LevelFilter {
