@@ -90,7 +90,7 @@ where
         &self.adapter
     }
 
-    async fn show_unknown_txs(&self, tx_hashes: &Vec<Hash>) -> Vec<Hash> {
+    async fn show_unknown_txs(&self, tx_hashes: &[Hash]) -> Vec<Hash> {
         let tx_hashes = self.tx_cache.show_unknown(tx_hashes).await;
         let mut unknown_hashes = vec![];
 
@@ -279,7 +279,7 @@ where
         &self,
         ctx: Context,
         height: Option<u64>,
-        tx_hashes: &Vec<Hash>,
+        tx_hashes: &[Hash],
     ) -> ProtocolResult<Vec<SignedTransaction>> {
         let len = tx_hashes.len();
         let mut missing_hashes = vec![];
@@ -329,11 +329,11 @@ where
         &self,
         ctx: Context,
         height: Option<u64>,
-        order_tx_hashes: &Vec<Hash>,
+        order_tx_hashes: &[Hash],
     ) -> ProtocolResult<()> {
-        check_dup_order_hashes(&order_tx_hashes)?;
+        check_dup_order_hashes(order_tx_hashes)?;
 
-        let unknown_hashes = self.show_unknown_txs(&order_tx_hashes).await;
+        let unknown_hashes = self.show_unknown_txs(order_tx_hashes).await;
         if !unknown_hashes.is_empty() {
             let unknown_len = unknown_hashes.len();
             let txs = self

@@ -249,7 +249,7 @@ async fn exec_get_full_txs(
     mempool: Arc<HashMemPool<HashMemPoolAdapter>>,
 ) -> Vec<SignedTransaction> {
     mempool
-        .get_full_txs(Context::new(), None, require_hashes)
+        .get_full_txs(Context::new(), None, &require_hashes)
         .await
         .unwrap()
 }

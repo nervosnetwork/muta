@@ -89,9 +89,9 @@ impl<N: Rpc + Send + Sync + 'static> MessageHandler for Checkout<N> {
         let acopy = ACopy {
             hash: Hash::digest(Bytes::new()),
             gifs: vec![
-                Hash::digest("jacket".into()),
-                Hash::digest("map".into()),
-                Hash::digest("book".into()),
+                Hash::digest("jacket"),
+                Hash::digest("map"),
+                Hash::digest("book"),
             ],
         };
 

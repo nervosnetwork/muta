@@ -115,6 +115,14 @@ impl CommonStorage for MockStorage {
         Ok(Some(mock_block(1)))
     }
 
+    async fn get_block_header(
+        &self,
+        _ctx: Context,
+        _height: u64,
+    ) -> ProtocolResult<Option<BlockHeader>> {
+        Ok(Some(mock_block(1).header))
+    }
+
     async fn set_block(&self, _ctx: Context, _block: Block) -> ProtocolResult<()> {
         Ok(())
     }
@@ -129,6 +137,10 @@ impl CommonStorage for MockStorage {
 
     async fn set_latest_block(&self, _ctx: Context, _block: Block) -> ProtocolResult<()> {
         Ok(())
+    }
+
+    async fn get_latest_block_header(&self, _ctx: Context) -> ProtocolResult<BlockHeader> {
+        Ok(mock_block(1).header)
     }
 }
 

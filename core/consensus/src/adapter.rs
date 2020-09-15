@@ -91,9 +91,9 @@ where
     async fn get_full_txs(
         &self,
         ctx: Context,
-        txs: &Vec<Hash>,
+        txs: &[Hash],
     ) -> ProtocolResult<Vec<SignedTransaction>> {
-        self.mempool.get_full_txs(ctx, None, &txs).await
+        self.mempool.get_full_txs(ctx, None, txs).await
     }
 
     #[muta_apm::derive::tracing_span(kind = "consensus.adapter")]
@@ -188,10 +188,10 @@ where
     }
 
     #[muta_apm::derive::tracing_span(kind = "consensus.adapter", logs = "{'txs_len': 'txs.len()'}")]
-    async fn verify_txs(&self, ctx: Context, height: u64, txs: &Vec<Hash>) -> ProtocolResult<()> {
+    async fn verify_txs(&self, ctx: Context, height: u64, txs: &[Hash]) -> ProtocolResult<()> {
         if let Err(e) = self
             .mempool
-            .ensure_order_txs(ctx.clone(), Some(height), &txs)
+            .ensure_order_txs(ctx.clone(), Some(height), txs)
             .await
         {
             log::error!("verify_txs error {:?}", e);

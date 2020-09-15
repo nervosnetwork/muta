@@ -251,6 +251,20 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
         Ok(self.local_blocks.read().get(&height).unwrap().clone())
     }
 
+    async fn get_block_header_by_height(
+        &self,
+        _ctx: Context,
+        height: u64,
+    ) -> ProtocolResult<BlockHeader> {
+        Ok(self
+            .local_blocks
+            .read()
+            .get(&height)
+            .unwrap()
+            .header
+            .clone())
+    }
+
     /// Get the current height from storage.
     async fn get_current_height(&self, _: Context) -> ProtocolResult<u64> {
         Ok(*self.latest_height.read())
@@ -318,7 +332,7 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
     }
 
     /// this function verify all info in header except proof and roots
-    async fn verify_block_header(&self, ctx: Context, block: Block) -> ProtocolResult<()> {
+    async fn verify_block_header(&self, ctx: Context, block: &Block) -> ProtocolResult<()> {
         let previous_block = self
             .get_block_by_height(ctx.clone(), block.header.height - 1)
             .await?;
@@ -421,27 +435,32 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
         Ok(())
     }
 
-    async fn verify_proof(&self, ctx: Context, block: Block, proof: Proof) -> ProtocolResult<()> {
+    async fn verify_proof(
+        &self,
+        ctx: Context,
+        block_header: &BlockHeader,
+        proof: &Proof,
+    ) -> ProtocolResult<()> {
         // the block 0 has no proof, which is consensus-ed by community, not by chain
 
-        if block.header.height == 0 {
+        if block_header.height == 0 {
             return Ok(());
         };
 
-        if block.header.height != proof.height {
+        if block_header.height != proof.height {
             log::error!(
-                "[consensus] verify_proof, block.header.height: {}, proof.height: {}",
-                block.header.height,
+                "[consensus] verify_proof, block_header.height: {}, proof.height: {}",
+                block_header.height,
                 proof.height
             );
             return Err(ConsensusError::VerifyProof(
-                block.header.height,
-                HeightMismatch(block.header.height, proof.height),
+                block_header.height,
+                HeightMismatch(block_header.height, proof.height),
             )
             .into());
         }
 
-        let blockhash = Hash::digest(block.header.clone().encode_fixed()?);
+        let blockhash = Hash::digest(block_header.clone().encode_fixed()?);
 
         if blockhash != proof.block_hash {
             log::error!(
@@ -449,11 +468,11 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
                 blockhash,
                 proof.block_hash
             );
-            return Err(ConsensusError::VerifyProof(block.header.height, HashMismatch).into());
+            return Err(ConsensusError::VerifyProof(block_header.height, HashMismatch).into());
         }
 
         let previous_block = self
-            .get_block_by_height(ctx.clone(), block.header.height - 1)
+            .get_block_by_height(ctx.clone(), block_header.height - 1)
             .await?;
         // the auth_list for the target should comes from previous height
         let metadata = self.get_metadata(
@@ -476,7 +495,7 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
 
         let signed_voters = extract_voters(&mut authority_list, &proof.bitmap).map_err(|_| {
             log::error!("[consensus] extract_voters fails, bitmap error");
-            ConsensusError::VerifyProof(block.header.height, BitMap)
+            ConsensusError::VerifyProof(block_header.height, BitMap)
         })?;
 
         let vote = Vote {
@@ -501,13 +520,13 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
 
         self.verify_proof_signature(
             ctx.clone(),
-            block.header.height,
+            block_header.height,
             vote_hash.clone(),
             proof.signature.clone(),
             hex_pubkeys,
         ).map_err(|e| {
             log::error!("[consensus] verify_proof_signature error, height {}, vote: {:?}, vote_hash:{:?}, sig:{:?}, signed_voter:{:?}",
-            block.header.height,
+            block_header.height,
             vote,
             vote_hash,
             proof.signature,
@@ -521,7 +540,7 @@ impl CommonConsensusAdapter for MockCommonConsensusAdapter {
             .map(|node| (node.address.clone(), node.vote_weight))
             .collect::<HashMap<_, _>>();
 
-        self.verify_proof_weight(ctx.clone(), block.header.height, weight_map, signed_voters)?;
+        self.verify_proof_weight(ctx.clone(), block_header.height, weight_map, signed_voters)?;
 
         Ok(())
     }

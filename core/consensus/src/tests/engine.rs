@@ -14,8 +14,8 @@ use protocol::traits::{
     TrustFeedback,
 };
 use protocol::types::{
-    Address, Block, Hash, Hex, MerkleRoot, Metadata, Pill, Proof, Receipt, SignedTransaction,
-    Validator,
+    Address, Block, BlockHeader, Hash, Hex, MerkleRoot, Metadata, Pill, Proof, Receipt,
+    SignedTransaction, Validator,
 };
 use protocol::{Bytes, ProtocolResult};
 
@@ -169,6 +169,14 @@ impl CommonConsensusAdapter for MockConsensusAdapter {
         unimplemented!()
     }
 
+    async fn get_block_header_by_height(
+        &self,
+        _ctx: Context,
+        _height: u64,
+    ) -> ProtocolResult<BlockHeader> {
+        unimplemented!()
+    }
+
     async fn get_current_height(&self, _ctx: Context) -> ProtocolResult<u64> {
         Ok(10)
     }
@@ -181,15 +189,15 @@ impl CommonConsensusAdapter for MockConsensusAdapter {
         unimplemented!()
     }
 
-    async fn verify_block_header(&self, _ctx: Context, _block: Block) -> ProtocolResult<()> {
-        Ok(())
+    async fn verify_block_header(&self, _ctx: Context, _block: &Block) -> ProtocolResult<()> {
+        unimplemented!()
     }
 
     async fn verify_proof(
         &self,
         _ctx: Context,
-        _block: Block,
-        _proof: Proof,
+        _block_header: &BlockHeader,
+        _proof: &Proof,
     ) -> ProtocolResult<()> {
         Ok(())
     }
@@ -265,7 +273,7 @@ impl ConsensusAdapter for MockConsensusAdapter {
     async fn get_full_txs(
         &self,
         _ctx: Context,
-        _txs: Vec<Hash>,
+        _txs: &[Hash],
     ) -> ProtocolResult<Vec<SignedTransaction>> {
         Ok(vec![])
     }
@@ -312,7 +320,7 @@ impl ConsensusAdapter for MockConsensusAdapter {
         Ok(10)
     }
 
-    async fn verify_txs(&self, _ctx: Context, _height: u64, _txs: Vec<Hash>) -> ProtocolResult<()> {
+    async fn verify_txs(&self, _ctx: Context, _height: u64, _txs: &[Hash]) -> ProtocolResult<()> {
         Ok(())
     }
 }
