@@ -8,6 +8,7 @@ repository = "https://github.com/nervosnetwork/muta"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+env_logger = "0.7"
 log = "0.4"
 # Turn off gzip feature, it hurts performance. For more information, reference
 # log4rs document.
