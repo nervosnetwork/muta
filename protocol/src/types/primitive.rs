@@ -255,7 +255,7 @@ impl fmt::Debug for Hash {
 const ADDRESS_LEN: usize = 20;
 
 #[derive(RlpFixedCodec, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct Address(Bytes);
+pub struct Address([u8; 20]);
 
 impl Default for Address {
     fn default() -> Self {
@@ -327,24 +327,24 @@ impl Address {
             }
         };
 
-        Self::from_hash(hash)
+        Ok(Self::from_slice_unchecked(hash.as_slice()))
     }
 
     pub fn from_hash(hash: Hash) -> ProtocolResult<Self> {
         let hash_val = hash.as_slice();
         ensure_len(hash_val.len(), HASH_LEN)?;
 
-        Self::from_bytes(Bytes::copy_from_slice(&hash_val[12..]))
+        Ok(Self::from_slice_unchecked(hash_val))
     }
 
-    pub fn from_bytes(bytes: Bytes) -> ProtocolResult<Self> {
-        ensure_len(bytes.len(), ADDRESS_LEN)?;
+    pub fn from_bytes<B: AsRef<[u8]>>(bytes: B) -> ProtocolResult<Self> {
+        ensure_len(bytes.as_ref().len(), ADDRESS_LEN)?;
 
-        Ok(Self(bytes))
+        Ok(Self::from_slice_unchecked(&bytes))
     }
 
     pub fn as_bytes(&self) -> Bytes {
-        self.0.clone()
+        Bytes::copy_from_slice(&self.0)
     }
 
     pub fn as_slice(&self) -> &[u8] {
@@ -353,15 +353,21 @@ impl Address {
 
     pub fn from_hex(s: &str) -> ProtocolResult<Self> {
         let s = clean_0x(s)?;
-        let bytes = hex::decode(s).map_err(TypesError::from)?;
+        let mut buf = [0u8; 20];
+        hex::decode_to_slice(&s[..40], &mut buf).map_err(TypesError::from)?;
 
-        let bytes = Bytes::from(bytes);
-        Self::from_bytes(bytes)
+        Ok(Address(buf))
     }
 
     /// Used for byzantine test
     pub fn from_invalid_bytes(bytes: Bytes) -> Self {
-        Self(bytes)
+        Self::from_slice_unchecked(&bytes)
+    }
+
+    fn from_slice_unchecked<B: AsRef<[u8]>>(b: B) -> Self {
+        let mut buf = [0u8; 20];
+        buf.copy_from_slice(&b.as_ref()[12..]);
+        Address(buf)
     }
 }
 
@@ -377,21 +383,90 @@ impl FromStr for Address {
         }
 
         let bytes = Vec::<u8>::from_base32(&data).map_err(TypesError::from)?;
-        Ok(Address(Bytes::from(bytes)))
+        if bytes.len() != ADDRESS_LEN {
+            return Err(TypesError::LengthMismatch {
+                expect: ADDRESS_LEN,
+                real:   bytes.len(),
+            });
+        }
+
+        Ok(Address::from_slice_unchecked(bytes))
+    }
+}
+
+struct Bech32Buf {
+    inner:        [bech32::u5; ADDRESS_LEN],
+    unfilled_len: usize,
+}
+
+impl Default for Bech32Buf {
+    fn default() -> Self {
+        let def_u5 = bech32::u5::try_from_u8(0).expect("impossible");
+
+        Bech32Buf {
+            inner:        [def_u5; ADDRESS_LEN],
+            unfilled_len: ADDRESS_LEN,
+        }
+    }
+}
+
+impl bech32::WriteBase32 for Bech32Buf {
+    type Err = &'static str;
+
+    fn write(&mut self, data: &[bech32::u5]) -> Result<(), Self::Err> {
+        if data.len() > self.unfilled_len {
+            return Err("not enough space for data");
+        }
+
+        debug_assert!(
+            ADDRESS_LEN > self.unfilled_len,
+            "ADDRESS_LEN should always equal or big than unfilled len"
+        );
+
+        let insert_idx = ADDRESS_LEN - self.unfilled_len;
+        self.unfilled_len -= data.len();
+        self.inner[insert_idx..].copy_from_slice(&data[..data.len()]);
+        Ok(())
+    }
+
+    fn write_u5(&mut self, data: bech32::u5) -> Result<(), Self::Err> {
+        if self.unfilled_len < 1 {
+            return Err("not enough space for data");
+        }
+
+        debug_assert!(
+            ADDRESS_LEN > self.unfilled_len,
+            "ADDRESS_LEN should always equal or big than unfilled len"
+        );
+
+        let insert_idx = ADDRESS_LEN - self.unfilled_len;
+        self.unfilled_len -= 1;
+        self.inner[insert_idx] = data;
+        Ok(())
+    }
+}
+
+impl AsRef<[bech32::u5]> for Bech32Buf {
+    fn as_ref(&self) -> &[bech32::u5] {
+        &self.inner[..]
     }
 }
 
 impl fmt::Debug for Address {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         // NOTE: ADDRESS_HRP was verified in init_address_hrp fn
-        bech32::encode_to_fmt(f, address_hrp().as_ref(), &self.0.to_base32()).unwrap()
+        let mut buf = Bech32Buf::default();
+        self.0.write_base32(&mut buf).unwrap();
+        bech32::encode_to_fmt(f, address_hrp().as_ref(), buf).unwrap()
     }
 }
 
 impl fmt::Display for Address {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         // NOTE: ADDRESS_HRP was verified in init_address_hrp fn
-        bech32::encode_to_fmt(f, address_hrp().as_ref(), &self.0.to_base32()).unwrap()
+        let mut buf = Bech32Buf::default();
+        self.0.write_base32(&mut buf).unwrap();
+        bech32::encode_to_fmt(f, address_hrp().as_ref(), buf).unwrap()
     }
 }
 
@@ -538,7 +613,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "must set hrp before deserialization")]
     fn test_init_address_hrp() {
-        assert_eq!(address_hrp().as_ref(), "muta", "default value");
+        assert_eq!(address_hrp(), "muta", "default value");
 
         let metadata_payload = r#"
         {
