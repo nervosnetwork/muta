@@ -187,15 +187,15 @@ impl<'a> SendingContext<'a> {
             (Some(tar), opt_blocked) => (tar, opt_blocked),
         };
 
-        let url = msg_ctx.url().unwrap_or_else(|_| "");
-        let data_size = match &target {
-            TargetSession::Single(_) => data.len(),
-            TargetSession::Multi(sessions) => data.len().saturating_mul(sessions.len()),
-            TargetSession::All => data.len().saturating_mul(self.sessions.len()),
-        };
-        common_apm::metrics::network::NETWORK_MESSAGE_SIZE_COUNT_VEC
-            .with_label_values(&["send", url])
-            .inc_by(data_size as i64);
+        // let url = msg_ctx.url().unwrap_or_else(|_| "");
+        // let data_size = match &target {
+        //     TargetSession::Single(_) => data.len(),
+        //     TargetSession::Multi(sessions) =>
+        // data.len().saturating_mul(sessions.len()),     TargetSession::All =>
+        // data.len().saturating_mul(self.sessions.len()), };
+        // common_apm::metrics::network::NETWORK_MESSAGE_SIZE_COUNT_VEC
+        //     .with_label_values(&["send", url])
+        //     .inc_by(data_size as i64);
 
         let seq = self.data_seq.fetch_add(1, Ordering::SeqCst);
         log::debug!("seq {} data size {}", seq, data.len());
