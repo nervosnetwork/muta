@@ -7,7 +7,10 @@ use cli::Cli;
 
 pub fn run<Mapping: 'static + ServiceMapping>(
     service_mapping: Mapping,
+    app_name: &str,
+    version: &str,
+    author: &str,
     target_commands: Option<Vec<&str>>,
 ) {
-    Cli::run(service_mapping, target_commands)
+    Cli::run(service_mapping, app_name, version, author, target_commands)
 }

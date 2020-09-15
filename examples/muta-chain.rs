@@ -52,7 +52,13 @@ impl ServiceMapping for DefaultServiceMapping {
 }
 
 pub fn main() {
-    muta::run(DefaultServiceMapping, None)
+    muta::run(
+        DefaultServiceMapping,
+        "muta-chain",
+        "v0.2.0-rc.2.1",
+        "Muta Dev <muta@nervos.org>",
+        None,
+    )
 }
 
 #[derive(Debug, Display, From)]
