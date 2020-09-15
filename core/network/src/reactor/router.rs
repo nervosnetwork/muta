@@ -153,7 +153,7 @@ where
 
             let endpoint = network_message.url.parse::<Endpoint>()?;
             common_apm::metrics::network::NETWORK_MESSAGE_SIZE_COUNT_VEC
-                .with_label_values(&["received", endpoint.full_url()])
+                .with_label_values(&["received", &endpoint.root()])
                 .inc_by(raw_data_size as i64);
 
             let reactor = {
