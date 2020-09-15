@@ -21,6 +21,9 @@ use protocol::ProtocolResult;
 
 use crate::error::CliError;
 
+const PLEASE_CONFIRM: &str =
+    "Please use -y to confirm modification and DO BACK UP YOUR DB DATA AND WAL";
+
 pub struct Cli<'a, Mapping>
 where
     Mapping: 'static + ServiceMapping,
@@ -163,6 +166,7 @@ where
                     .subcommand(
                         clap::SubCommand::with_name("set")
                             .arg(clap::Arg::with_name("BLOCK_HEIGHT").required(true))
+                            .arg(clap::Arg::with_name("confirm").short("y").help("confirm to take effect"))
                             .about("set the latest block")
                     )
                     .subcommand(
@@ -180,6 +184,7 @@ where
                     .subcommand(
                         clap::SubCommand::with_name("set")
                             .arg(clap::Arg::with_name("BLOCK").required(true))
+                            .arg(clap::Arg::with_name("confirm").short("y").help("confirm to take effect"))
                             .about("upsert target block by [BLOCK], [BLOCK] is in JSON format"),
                     ),
             )
@@ -188,13 +193,17 @@ where
                     .about("APIs for Write Ahead Log operation")
                     .subcommand(
                         clap::SubCommand::with_name("clear")
+                            .arg(clap::Arg::with_name("confirm")
+                                .short("y").help("confirm to take effect"))
                             .about("clear all wals, include mempool wal and consensus txs"),
                     )
                     .subcommand(
                         clap::SubCommand::with_name("mempool")
                             .about("handle mempool wal")
                             .subcommand(
-                                clap::SubCommand::with_name("clear").about("clear mempool wal"),
+                                clap::SubCommand::with_name("clear")
+                                    .arg(clap::Arg::with_name("confirm").short("y").help("confirm to take effect"))
+                                    .about("clear mempool wal"),
                             )
                             .subcommand(
                                 clap::SubCommand::with_name("list").about("list mempool wal"),
@@ -209,7 +218,9 @@ where
                         clap::SubCommand::with_name("consensus")
                             .about("handle consensus wal")
                             .subcommand(
-                                clap::SubCommand::with_name("clear").about("clear consensus wal"),
+                                clap::SubCommand::with_name("clear")
+                                    .arg(clap::Arg::with_name("confirm").short("y").help("confirm to take effect"))
+                                    .about("clear consensus wal"),
                             ),
                     ),
             )
@@ -329,6 +340,12 @@ where
                     .value_of("BLOCK_HEIGHT")
                     .expect("missing [BLOCK_HEIGHT]");
 
+                let confirm = cmd.is_present("confirm");
+                if !confirm {
+                    log::info!("{}", PLEASE_CONFIRM);
+                    return Ok(());
+                }
+
                 match u64::from_str_radix(height, 10) {
                     Ok(height) => rt.block_on(async move { self.latest_block_set(height).await }),
                     Err(_e) => Err(CliError::Parse.into()),
@@ -386,6 +403,12 @@ where
 
         match sub_cmd.subcommand() {
             ("set", Some(cmd)) => {
+                let confirm = cmd.is_present("confirm");
+                if !confirm {
+                    log::info!("{}", PLEASE_CONFIRM);
+                    return Ok(());
+                }
+
                 let block_json = cmd.value_of("BLOCK").expect("missing [BLOCK]");
                 rt.block_on(async move { self.block_set(block_json).await })?;
 
@@ -424,6 +447,7 @@ where
             log::info!("use 'block get 0' to get a example block JSON output");
             CliError::JSONFormat(e)
         })?;
+
         self.storage
             .remove_block(Context::new(), block.header.height)
             .await?;
@@ -440,7 +464,14 @@ where
     pub fn wal(&self, sub_cmd: &ArgMatches) -> ProtocolResult<()> {
         match sub_cmd.subcommand() {
             ("mempool", Some(cmd)) => match cmd.subcommand() {
-                ("clear", Some(_cmd)) => self.wal_txs_clear(),
+                ("clear", Some(cmd)) => {
+                    let confirm = cmd.is_present("confirm");
+                    if !confirm {
+                        log::info!("{}", PLEASE_CONFIRM);
+                        return Ok(());
+                    };
+                    self.wal_txs_clear()
+                }
                 ("list", Some(_cmd)) => {
                     self.wal_txs_list()?;
                     Ok(())
@@ -458,11 +489,25 @@ where
             },
 
             ("consensus", Some(cmd)) => match cmd.subcommand() {
-                ("clear", Some(_cmd)) => self.wal_consensus_clear(),
+                ("clear", Some(cmd)) => {
+                    let confirm = cmd.is_present("confirm");
+                    if !confirm {
+                        log::info!("{}", PLEASE_CONFIRM);
+                        return Ok(());
+                    };
+                    self.wal_consensus_clear()
+                }
                 _ => Err(CliError::Grammar.into()),
             },
 
-            ("clear", Some(_cmd)) => {
+            ("clear", Some(cmd)) => {
+                let confirm = cmd.is_present("confirm");
+
+                if !confirm {
+                    log::info!("{}", PLEASE_CONFIRM);
+                    return Ok(());
+                };
+
                 self.wal_consensus_clear()?;
                 self.wal_txs_clear()?;
                 log::info!("wal clear, successfully");

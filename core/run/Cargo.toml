@@ -1,6 +1,6 @@
 [package]
 name = "run"
-version = "0.1.0"
+version = "0.2.0-rc.2.1"
 authors = ["LycrusHamster <liang2929@hotmail.com>"]
 edition = "2018"
 
