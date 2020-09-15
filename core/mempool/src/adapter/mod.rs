@@ -254,7 +254,11 @@ where
         Ok(())
     }
 
-    async fn check_authorization(&self, ctx: Context, tx: SignedTransaction) -> ProtocolResult<()> {
+    async fn check_authorization(
+        &self,
+        ctx: Context,
+        tx: &SignedTransaction,
+    ) -> ProtocolResult<()> {
         let network = self.network.clone();
         let ctx_clone = ctx.clone();
         let header = self.storage.get_latest_block_header(ctx.clone()).await?;
@@ -263,6 +267,7 @@ where
         let service_mapping_clone = Arc::clone(&self.service_mapping);
         let tx_hash = tx.tx_hash.clone();
 
+        let tx = tx.to_owned();
         let blocking_res: ProtocolResult<ServiceResponse<String>> =
             tokio::task::spawn_blocking(move || {
                 // Verify transaction hash
@@ -337,7 +342,7 @@ where
         Ok(())
     }
 
-    async fn check_transaction(&self, ctx: Context, stx: SignedTransaction) -> ProtocolResult<()> {
+    async fn check_transaction(&self, ctx: Context, stx: &SignedTransaction) -> ProtocolResult<()> {
         let fixed_bytes = stx.raw.encode_fixed()?;
         let size = fixed_bytes.len() as u64;
         let tx_hash = stx.tx_hash.clone();
@@ -393,7 +398,7 @@ where
                 );
             }
             let wrong_chain_id = MemPoolError::WrongChain {
-                tx_hash: stx.tx_hash,
+                tx_hash: stx.tx_hash.clone(),
             };
 
             return Err(wrong_chain_id.into());
@@ -405,7 +410,7 @@ where
 
         if stx.raw.timeout > latest_height + timeout_gap {
             let invalid_timeout = MemPoolError::InvalidTimeout {
-                tx_hash: stx.tx_hash,
+                tx_hash: stx.tx_hash.clone(),
             };
 
             return Err(invalid_timeout.into());
@@ -413,7 +418,7 @@ where
 
         if stx.raw.timeout < latest_height {
             let timeout = MemPoolError::Timeout {
-                tx_hash: stx.tx_hash,
+                tx_hash: stx.tx_hash.clone(),
                 timeout: stx.raw.timeout,
             };
 
@@ -423,13 +428,12 @@ where
         Ok(())
     }
 
-    async fn check_storage_exist(&self, ctx: Context, tx_hash: Hash) -> ProtocolResult<()> {
-        match self
-            .storage
-            .get_transaction_by_hash(ctx, tx_hash.clone())
-            .await
-        {
-            Ok(Some(_)) => Err(MemPoolError::CommittedTx { tx_hash }.into()),
+    async fn check_storage_exist(&self, ctx: Context, tx_hash: &Hash) -> ProtocolResult<()> {
+        match self.storage.get_transaction_by_hash(ctx, tx_hash).await {
+            Ok(Some(_)) => Err(MemPoolError::CommittedTx {
+                tx_hash: tx_hash.clone(),
+            }
+            .into()),
             Ok(None) => Ok(()),
             Err(err) => Err(err),
         }
@@ -444,13 +448,13 @@ where
         &self,
         ctx: Context,
         block_height: Option<u64>,
-        tx_hashes: Vec<Hash>,
+        tx_hashes: &[Hash],
     ) -> ProtocolResult<Vec<Option<SignedTransaction>>> {
         if let Some(height) = block_height {
             self.storage.get_transactions(ctx, height, tx_hashes).await
         } else {
             let futs = tx_hashes
-                .into_iter()
+                .iter()
                 .map(|tx_hash| self.storage.get_transaction_by_hash(ctx.clone(), tx_hash))
                 .collect::<Vec<_>>();
             futures::future::try_join_all(futs).await

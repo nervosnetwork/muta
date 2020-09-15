@@ -391,7 +391,7 @@ async fn bench_sign_with_spawn_list() {
             let adapter = Arc::clone(&adapter);
             tokio::spawn(async move {
                 adapter
-                    .check_authorization(Context::new(), tx.clone())
+                    .check_authorization(Context::new(), &tx)
                     .await
                     .unwrap();
             })
@@ -414,7 +414,7 @@ async fn bench_sign() {
 
     for tx in txs.iter() {
         adapter
-            .check_authorization(Context::new(), tx.clone())
+            .check_authorization(Context::new(), &tx)
             .await
             .unwrap();
     }

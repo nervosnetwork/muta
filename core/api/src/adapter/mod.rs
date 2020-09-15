@@ -136,7 +136,7 @@ impl<
         ctx: Context,
         tx_hash: Hash,
     ) -> ProtocolResult<Option<SignedTransaction>> {
-        self.storage.get_transaction_by_hash(ctx, tx_hash).await
+        self.storage.get_transaction_by_hash(ctx, &tx_hash).await
     }
 
     async fn query_service(

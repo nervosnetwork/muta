@@ -68,17 +68,21 @@ impl MemPoolAdapter for HashMemPoolAdapter {
     async fn check_authorization(
         &self,
         _ctx: Context,
-        tx: SignedTransaction,
+        tx: &SignedTransaction,
     ) -> ProtocolResult<()> {
-        check_hash(tx.clone()).await?;
+        check_hash(&tx.clone()).await?;
         check_sig(&tx)
     }
 
-    async fn check_transaction(&self, _ctx: Context, _tx: SignedTransaction) -> ProtocolResult<()> {
+    async fn check_transaction(
+        &self,
+        _ctx: Context,
+        _tx: &SignedTransaction,
+    ) -> ProtocolResult<()> {
         Ok(())
     }
 
-    async fn check_storage_exist(&self, _ctx: Context, _tx_hash: Hash) -> ProtocolResult<()> {
+    async fn check_storage_exist(&self, _ctx: Context, _tx_hash: &Hash) -> ProtocolResult<()> {
         Ok(())
     }
 
@@ -90,7 +94,7 @@ impl MemPoolAdapter for HashMemPoolAdapter {
         &self,
         _ctx: Context,
         _height: Option<u64>,
-        _tx_hashes: Vec<Hash>,
+        _tx_hashes: &[Hash],
     ) -> ProtocolResult<Vec<Option<SignedTransaction>>> {
         Ok(vec![])
     }
@@ -135,8 +139,8 @@ async fn new_mempool(
     mempool
 }
 
-async fn check_hash(tx: SignedTransaction) -> ProtocolResult<()> {
-    let mut raw = tx.raw;
+async fn check_hash(tx: &SignedTransaction) -> ProtocolResult<()> {
+    let mut raw = tx.raw.clone();
     let raw_bytes = raw.encode().await?;
     let tx_hash = Hash::digest(raw_bytes);
     if tx_hash != tx.tx_hash {
@@ -210,7 +214,7 @@ async fn exec_insert(signed_tx: SignedTransaction, mempool: Arc<HashMemPool<Hash
 }
 
 async fn exec_flush(remove_hashes: Vec<Hash>, mempool: Arc<HashMemPool<HashMemPoolAdapter>>) {
-    mempool.flush(Context::new(), remove_hashes).await.unwrap()
+    mempool.flush(Context::new(), &remove_hashes).await.unwrap()
 }
 
 async fn exec_package(

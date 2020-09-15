@@ -123,7 +123,7 @@ pub async fn main() {
 
         let now = Instant::now();
         let stxs = storage
-            .get_transactions(Context::new(), height, hashes)
+            .get_transactions(Context::new(), height, &hashes)
             .await
             .expect("fetch");
 

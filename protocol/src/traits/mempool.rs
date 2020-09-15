@@ -27,7 +27,7 @@ pub trait MemPool: Send + Sync {
         tx_num_limit: u64,
     ) -> ProtocolResult<MixedTxHashes>;
 
-    async fn flush(&self, ctx: Context, tx_hashes: Vec<Hash>) -> ProtocolResult<()>;
+    async fn flush(&self, ctx: Context, tx_hashes: &[Hash]) -> ProtocolResult<()>;
 
     async fn get_full_txs(
         &self,
@@ -63,11 +63,12 @@ pub trait MemPoolAdapter: Send + Sync {
 
     async fn broadcast_tx(&self, ctx: Context, tx: SignedTransaction) -> ProtocolResult<()>;
 
-    async fn check_authorization(&self, ctx: Context, tx: SignedTransaction) -> ProtocolResult<()>;
+    async fn check_authorization(&self, ctx: Context, tx: &SignedTransaction)
+        -> ProtocolResult<()>;
 
-    async fn check_transaction(&self, ctx: Context, tx: SignedTransaction) -> ProtocolResult<()>;
+    async fn check_transaction(&self, ctx: Context, tx: &SignedTransaction) -> ProtocolResult<()>;
 
-    async fn check_storage_exist(&self, ctx: Context, tx_hash: Hash) -> ProtocolResult<()>;
+    async fn check_storage_exist(&self, ctx: Context, tx_hash: &Hash) -> ProtocolResult<()>;
 
     async fn get_latest_height(&self, ctx: Context) -> ProtocolResult<u64>;
 
@@ -75,7 +76,7 @@ pub trait MemPoolAdapter: Send + Sync {
         &self,
         ctx: Context,
         block_height: Option<u64>,
-        tx_hashes: Vec<Hash>,
+        tx_hashes: &[Hash],
     ) -> ProtocolResult<Vec<Option<SignedTransaction>>>;
 
     fn report_good(&self, ctx: Context);

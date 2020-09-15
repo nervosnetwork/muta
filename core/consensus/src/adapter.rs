@@ -396,7 +396,7 @@ where
         logs = "{'flush_txs_len': 'ordered_tx_hashes.len()'}"
     )]
     async fn flush_mempool(&self, ctx: Context, ordered_tx_hashes: &[Hash]) -> ProtocolResult<()> {
-        self.mempool.flush(ctx, ordered_tx_hashes.to_vec()).await
+        self.mempool.flush(ctx, ordered_tx_hashes).await
     }
 
     /// Get a block corresponding to the given height.
@@ -437,10 +437,7 @@ where
     ) -> ProtocolResult<Vec<SignedTransaction>> {
         let futs = tx_hashes
             .iter()
-            .map(|tx_hash| {
-                self.storage
-                    .get_transaction_by_hash(ctx.clone(), tx_hash.to_owned())
-            })
+            .map(|tx_hash| self.storage.get_transaction_by_hash(ctx.clone(), tx_hash))
             .collect::<Vec<_>>();
         futures::future::try_join_all(futs).await.map(|txs| {
             txs.into_iter()

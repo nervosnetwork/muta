@@ -21,7 +21,7 @@ impl<S: Storage> ChainQuerier for DefaultChainQuerier<S> {
     fn get_transaction_by_hash(&self, tx_hash: &Hash) -> ProtocolResult<Option<SignedTransaction>> {
         let ret = block_on(
             self.storage
-                .get_transaction_by_hash(Context::new(), tx_hash.clone()),
+                .get_transaction_by_hash(Context::new(), &tx_hash),
         )
         .map_err(|_| ChainQueryError::AsyncStorage)?;
 

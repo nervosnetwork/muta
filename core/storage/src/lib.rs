@@ -279,7 +279,7 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
         &self,
         ctx: Context,
         block_height: u64,
-        hashes: Vec<Hash>,
+        hashes: &[Hash],
     ) -> ProtocolResult<Vec<Option<SignedTransaction>>> {
         let key_prefix = CommonPrefix::new(block_height);
         let mut found = Vec::with_capacity(hashes.len());
@@ -352,21 +352,18 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
             }
         };
 
-        Ok(hashes
-            .into_iter()
-            .map(|h| found.remove(&h))
-            .collect::<Vec<_>>())
+        Ok(hashes.iter().map(|h| found.remove(&h)).collect::<Vec<_>>())
     }
 
     async fn get_transaction_by_hash(
         &self,
         _ctx: Context,
-        hash: Hash,
+        hash: &Hash,
     ) -> ProtocolResult<Option<SignedTransaction>> {
         if let Some(block_height) = get!(self, hash.clone(), HashHeightSchema)? {
             get!(
                 self,
-                CommonHashKey::new(block_height, hash),
+                CommonHashKey::new(block_height, hash.clone()),
                 TransactionSchema
             )
         } else {

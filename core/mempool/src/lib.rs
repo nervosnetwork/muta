@@ -108,7 +108,7 @@ where
 
         self.tx_cache.check_exist(&tx.tx_hash).await?;
         self.adapter
-            .check_storage_exist(ctx.clone(), tx.tx_hash.clone())
+            .check_storage_exist(ctx.clone(), &tx.tx_hash)
             .await?;
         self.tx_cache.insert_propose_tx(tx).await
     }
@@ -124,14 +124,10 @@ where
         let tx_hash = &tx.tx_hash;
         self.tx_cache.check_reach_limit(self.pool_size).await?;
         self.tx_cache.check_exist(tx_hash).await?;
+        self.adapter.check_authorization(ctx.clone(), &tx).await?;
+        self.adapter.check_transaction(ctx.clone(), &tx).await?;
         self.adapter
-            .check_authorization(ctx.clone(), tx.clone())
-            .await?;
-        self.adapter
-            .check_transaction(ctx.clone(), tx.clone())
-            .await?;
-        self.adapter
-            .check_storage_exist(ctx.clone(), tx_hash.clone())
+            .check_storage_exist(ctx.clone(), tx_hash)
             .await?;
 
         match tx_type {
@@ -148,34 +144,32 @@ where
         Ok(())
     }
 
-    #[muta_apm::derive::tracing_span(kind = "mempool", logs = "{'txs': 'txs.len()'}")]
-    async fn verify_tx_in_parallel(
-        &self,
-        ctx: Context,
-        txs: Vec<SignedTransaction>,
-    ) -> ProtocolResult<()> {
+    #[muta_apm::derive::tracing_span(kind = "mempool", logs = "{'txs': 'tx_ptrs.len()'}")]
+    async fn verify_tx_in_parallel(&self, ctx: Context, tx_ptrs: Vec<usize>) -> ProtocolResult<()> {
         let now = Instant::now();
-        let len = txs.len();
+        let len = tx_ptrs.len();
 
-        let futs = txs
+        let futs = tx_ptrs
             .into_iter()
-            .map(|signed_tx| {
+            .map(|ptr| {
                 let adapter = Arc::clone(&self.adapter);
                 let ctx = ctx.clone();
 
                 tokio::spawn(async move {
+                    let signed_tx = {
+                        let boxed = unsafe { Box::from_raw(ptr as *mut SignedTransaction) };
+                        *boxed
+                    };
+
+                    adapter.check_authorization(ctx.clone(), &signed_tx).await?;
+                    adapter.check_transaction(ctx.clone(), &signed_tx).await?;
                     adapter
-                        .check_authorization(ctx.clone(), signed_tx.clone())
-                        .await?;
-                    adapter
-                        .check_transaction(ctx.clone(), signed_tx.clone())
-                        .await?;
-                    adapter
-                        .check_storage_exist(ctx.clone(), signed_tx.tx_hash.clone())
+                        .check_storage_exist(ctx.clone(), &signed_tx.tx_hash)
                         .await
                 })
             })
             .collect::<Vec<_>>();
+
         try_join_all(futs).await.map_err(|e| {
             log::error!("[mempool] verify batch txs error {:?}", e);
             MemPoolError::VerifyBatchTransactions
@@ -250,7 +244,7 @@ where
         logs = "{'tx_len':
      'tx_hashes.len()'}"
     )]
-    async fn flush(&self, ctx: Context, tx_hashes: Vec<Hash>) -> ProtocolResult<()> {
+    async fn flush(&self, ctx: Context, tx_hashes: &[Hash]) -> ProtocolResult<()> {
         let _lock = self.flush_lock.write().await;
 
         let current_height = self.adapter.get_latest_height(ctx.clone()).await?;
@@ -300,7 +294,7 @@ where
         if !missing_hashes.is_empty() {
             let txs = self
                 .adapter
-                .get_transactions_from_storage(ctx, height, missing_hashes)
+                .get_transactions_from_storage(ctx, height, &missing_hashes)
                 .await?;
             let txs = txs
                 .into_iter()
@@ -349,10 +343,17 @@ where
                 .into());
             }
 
-            self.verify_tx_in_parallel(ctx.clone(), txs.clone()).await?;
+            let txs = txs.into_iter().map(|tx| Box::new(tx)).collect::<Vec<_>>();
+
+            let tx_ptrs = txs
+                .iter()
+                .map(|tx| Box::into_raw(tx.clone()) as usize)
+                .collect::<Vec<_>>();
+            self.verify_tx_in_parallel(ctx.clone(), tx_ptrs).await?;
+
             for signed_tx in txs.into_iter() {
                 self.callback_cache
-                    .insert(signed_tx.tx_hash.clone(), signed_tx)
+                    .insert(signed_tx.tx_hash.clone(), *signed_tx)
                     .await;
             }
 

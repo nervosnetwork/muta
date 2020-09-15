@@ -328,7 +328,7 @@ impl<R: Rpc + 'static, S: Storage + 'static> MessageHandler for PullTxsRpcHandle
 
         let ret = self
             .storage
-            .get_transactions(ctx.clone(), height, inner)
+            .get_transactions(ctx.clone(), height, &inner)
             .await
             .map(|txs| {
                 txs.into_iter()

@@ -70,13 +70,13 @@ pub trait Storage: CommonStorage {
         &self,
         ctx: Context,
         block_height: u64,
-        hashes: Vec<Hash>,
+        hashes: &[Hash],
     ) -> ProtocolResult<Vec<Option<SignedTransaction>>>;
 
     async fn get_transaction_by_hash(
         &self,
         ctx: Context,
-        hash: Hash,
+        hash: &Hash,
     ) -> ProtocolResult<Option<SignedTransaction>>;
 
     async fn insert_receipts(

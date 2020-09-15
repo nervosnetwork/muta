@@ -115,7 +115,7 @@ async fn test_storage_transactions_insert() {
         .await
         .unwrap();
     let transactions_2 = storage
-        .get_transactions(Context::new(), height, hashes)
+        .get_transactions(Context::new(), height, &hashes)
         .await
         .unwrap();
 
@@ -148,7 +148,7 @@ async fn test_storage_transactions_get_batch_decode() {
         .await
         .unwrap();
     let transactions_2 = storage
-        .get_transactions(Context::new(), height, hashes)
+        .get_transactions(Context::new(), height, &hashes)
         .await
         .unwrap();
 
