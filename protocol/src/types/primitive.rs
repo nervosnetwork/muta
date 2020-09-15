@@ -538,7 +538,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "must set hrp before deserialization")]
     fn test_init_address_hrp() {
-        assert_eq!(address_hrp().as_ref(), "muta", "default value");
+        assert_eq!(address_hrp(), "muta", "default value");
 
         let metadata_payload = r#"
         {
