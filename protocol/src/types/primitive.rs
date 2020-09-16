@@ -33,13 +33,12 @@ pub fn address_hrp() -> SmolStr {
     ADDRESS_HRP.load().as_ref().clone()
 }
 
-pub fn init_address_hrp(address_hrp: String) {
+pub fn init_address_hrp(address_hrp: SmolStr) {
     if ADDRESS_HRP_INITED.load(Ordering::SeqCst) {
         panic!("address hrp can only be inited once");
     }
-
-    if address_hrp.as_bytes().len() > 21 {
-        panic!("address hrp's length of bytes should be less than 22")
+    if address_hrp.is_heap_allocated() {
+        log::warn!("address hrp too long");
     }
 
     // Verify address hrp
@@ -52,7 +51,7 @@ pub fn init_address_hrp(address_hrp: String) {
     bech32::encode(&address_hrp, bytes.to_base32()).expect("invalid address hrp");
 
     // Set address hrp
-    ADDRESS_HRP.store(Arc::new(address_hrp.into()));
+    ADDRESS_HRP.store(Arc::new(address_hrp));
     ADDRESS_HRP_INITED.store(true, Ordering::SeqCst);
 }
 
@@ -580,7 +579,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "address hrp can only be inited once")]
     fn test_init_address_hrp_twice() {
-        init_address_hrp("muta".to_owned());
-        init_address_hrp("muta".to_owned());
+        init_address_hrp("muta".into());
+        init_address_hrp("muta".into());
     }
 }

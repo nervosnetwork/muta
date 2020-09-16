@@ -107,7 +107,7 @@ impl<Mapping: 'static + ServiceMapping> Muta<Mapping> {
 
         // Set bech32 address hrp
         if !protocol::address_hrp_inited() {
-            protocol::init_address_hrp(hrp.to_owned());
+            protocol::init_address_hrp(hrp.into());
         }
 
         // Init Block db
@@ -349,7 +349,7 @@ impl<Mapping: 'static + ServiceMapping> Muta<Mapping> {
 
         // Set bech32 address hrp
         if !protocol::address_hrp_inited() {
-            protocol::init_address_hrp(metadata.bech32_address_hrp);
+            protocol::init_address_hrp(metadata.bech32_address_hrp.into());
         }
 
         // set chain id in network
