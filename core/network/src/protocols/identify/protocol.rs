@@ -175,6 +175,7 @@ impl StateContext {
             }
 
             log::warn!("peer {} open protocols timeout, disconnect it", remote_peer);
+            finish_identify(&remote_peer, Err(self::Error::Timeout));
             let _ = service_control.disconnect(remote_peer.sid);
         });
     }
