@@ -121,22 +121,25 @@ where
     ) -> ProtocolResult<()> {
         let _lock = self.flush_lock.read().await;
 
+        let tx = Box::new(tx);
         let tx_hash = &tx.tx_hash;
         self.tx_cache.check_reach_limit(self.pool_size).await?;
         self.tx_cache.check_exist(tx_hash).await?;
-        self.adapter.check_authorization(ctx.clone(), &tx).await?;
+        self.adapter
+            .check_authorization(ctx.clone(), tx.clone())
+            .await?;
         self.adapter.check_transaction(ctx.clone(), &tx).await?;
         self.adapter
             .check_storage_exist(ctx.clone(), tx_hash)
             .await?;
 
         match tx_type {
-            TxType::NewTx => self.tx_cache.insert_new_tx(tx.clone()).await?,
-            TxType::ProposeTx => self.tx_cache.insert_propose_tx(tx.clone()).await?,
+            TxType::NewTx => self.tx_cache.insert_new_tx(*tx.clone()).await?,
+            TxType::ProposeTx => self.tx_cache.insert_propose_tx(*tx.clone()).await?,
         }
 
         if !ctx.is_network_origin_txs() {
-            self.adapter.broadcast_tx(ctx, tx).await?;
+            self.adapter.broadcast_tx(ctx, *tx).await?;
         } else {
             self.adapter.report_good(ctx);
         }
@@ -155,12 +158,10 @@ where
                 let ctx = ctx.clone();
 
                 tokio::spawn(async move {
-                    let signed_tx = {
-                        let boxed = unsafe { Box::from_raw(ptr as *mut SignedTransaction) };
-                        *boxed
-                    };
+                    let boxed_stx = unsafe { Box::from_raw(ptr as *mut SignedTransaction) };
+                    let signed_tx = *(boxed_stx.clone());
 
-                    adapter.check_authorization(ctx.clone(), &signed_tx).await?;
+                    adapter.check_authorization(ctx.clone(), boxed_stx).await?;
                     adapter.check_transaction(ctx.clone(), &signed_tx).await?;
                     adapter
                         .check_storage_exist(ctx.clone(), &signed_tx.tx_hash)

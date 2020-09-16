@@ -257,7 +257,7 @@ where
     async fn check_authorization(
         &self,
         ctx: Context,
-        tx: &SignedTransaction,
+        tx: Box<SignedTransaction>,
     ) -> ProtocolResult<()> {
         let network = self.network.clone();
         let ctx_clone = ctx.clone();
@@ -267,8 +267,6 @@ where
         let service_mapping_clone = Arc::clone(&self.service_mapping);
         let tx_hash = tx.tx_hash.clone();
 
-        // TODO: Remove clone
-        let tx = tx.to_owned();
         let blocking_res: ProtocolResult<ServiceResponse<String>> =
             tokio::task::spawn_blocking(move || {
                 // Verify transaction hash
@@ -309,8 +307,7 @@ where
                     proposer:     header.proposer,
                 };
 
-                let stx_ptr_json =
-                    format!("{{ \"ptr\": {} }}", Box::into_raw(Box::new(tx)) as usize);
+                let stx_ptr_json = format!("{{ \"ptr\": {} }}", Box::into_raw(tx) as usize);
                 let check_resp = executor.read(&params, &caller, 1, &TransactionRequest {
                     service_name: "authorization".to_string(),
                     method:       "check_authorization_by_ptr".to_string(),
