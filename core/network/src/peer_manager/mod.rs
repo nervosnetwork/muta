@@ -678,6 +678,9 @@ impl PeerManager {
         let opt_peer = self.inner.peer(&remote_peer_id);
         let remote_peer = opt_peer.unwrap_or_else(|| ArcPeer::new(remote_peer_id.clone()));
 
+        common_apm::metrics::network::NETWORK_OUTBOUND_CONNECTING_PEERS
+            .set(self.connecting.len() as i64);
+
         // Inbound address is client address, it's useless
         match ctx.ty {
             SessionType::Inbound => remote_peer.multiaddrs.remove(&remote_multiaddr),
@@ -801,9 +804,6 @@ impl PeerManager {
     }
 
     fn new_unidentified_session(&mut self, pubkey: PublicKey, ctx: Arc<SessionContext>) {
-        common_apm::metrics::network::NETWORK_OUTBOUND_CONNECTING_PEERS
-            .set(self.connecting.len() as i64);
-
         let peer_id = pubkey.peer_id();
         if let Err(err) = self.new_session_pre_check(&pubkey, &ctx) {
             log::info!("reject unidentified session due to {}", err);
@@ -811,7 +811,6 @@ impl PeerManager {
             Identify::wait_failed(&peer_id, err.to_string());
             return;
         }
-
         common_apm::metrics::network::NETWORK_UNIDENTIFIED_CONNECTIONS.inc();
 
         let event = UnidentifiedSessionEvent { pubkey, ctx };
@@ -1407,8 +1406,6 @@ impl Future for PeerManager {
                 }
                 Poll::Ready(ret) => match ret {
                     Ok(()) => {
-                        common_apm::metrics::network::NETWORK_UNIDENTIFIED_CONNECTIONS.dec();
-
                         let UnidentifiedSession { event, .. } = session;
                         let new_session_event = PeerManagerEvent::NewSession {
                             pid:    event.pubkey.peer_id(),
@@ -1432,8 +1429,6 @@ impl Future for PeerManager {
                         }
                     }
                     Err(err) => {
-                        common_apm::metrics::network::NETWORK_UNIDENTIFIED_CONNECTIONS.dec();
-
                         warn!(
                             "reject peer {:?} due to identification failed: {}",
                             session.event.pubkey.peer_id(),
@@ -1445,6 +1440,8 @@ impl Future for PeerManager {
                 },
             }
         }
+        common_apm::metrics::network::NETWORK_UNIDENTIFIED_CONNECTIONS
+            .set(self.unidentified_backlog.len() as i64);
 
         // Process manager events
         loop {
