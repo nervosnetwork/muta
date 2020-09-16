@@ -144,7 +144,6 @@ where
         Ok(())
     }
 
-    #[muta_apm::derive::tracing_span(kind = "mempool", logs = "{'txs': 'tx_ptrs.len()'}")]
     async fn verify_tx_in_parallel(&self, ctx: Context, tx_ptrs: Vec<usize>) -> ProtocolResult<()> {
         let now = Instant::now();
         let len = tx_ptrs.len();
@@ -193,10 +192,6 @@ where
         self.insert_tx(ctx, tx, TxType::NewTx).await
     }
 
-    #[muta_apm::derive::tracing_span(
-        kind = "mempool",
-        logs = "{'cycles_limit': 'cycles_limit', 'tx_num_limit': 'tx_num_limit'}"
-    )]
     async fn package(
         &self,
         ctx: Context,
@@ -239,11 +234,6 @@ where
         }
     }
 
-    #[muta_apm::derive::tracing_span(
-        kind = "mempool",
-        logs = "{'tx_len':
-     'tx_hashes.len()'}"
-    )]
     async fn flush(&self, ctx: Context, tx_hashes: &[Hash]) -> ProtocolResult<()> {
         let _lock = self.flush_lock.write().await;
 
@@ -264,11 +254,6 @@ where
         Ok(())
     }
 
-    #[muta_apm::derive::tracing_span(
-        kind = "mempool",
-        logs = "{'tx_len':
-     'tx_hashes.len()'}"
-    )]
     async fn get_full_txs(
         &self,
         ctx: Context,
@@ -315,10 +300,6 @@ where
         }
     }
 
-    #[muta_apm::derive::tracing_span(
-        kind = "mempool",
-        logs = "{'tx_len': 'order_tx_hashes.len()'}"
-    )]
     async fn ensure_order_txs(
         &self,
         ctx: Context,
@@ -334,6 +315,7 @@ where
                 .adapter
                 .pull_txs(ctx.clone(), height, unknown_hashes)
                 .await?;
+
             // Make sure response signed_txs is the same size of request hashes.
             if txs.len() != unknown_len {
                 return Err(MemPoolError::EnsureBreak {
@@ -343,12 +325,14 @@ where
                 .into());
             }
 
-            let txs = txs.into_iter().map(|tx| Box::new(tx)).collect::<Vec<_>>();
+            let (tx_ptrs, txs): (Vec<_>, Vec<_>) = txs
+                .into_iter()
+                .map(|tx| {
+                    let boxed = Box::new(tx);
+                    (Box::into_raw(boxed.clone()) as usize, boxed)
+                })
+                .unzip();
 
-            let tx_ptrs = txs
-                .iter()
-                .map(|tx| Box::into_raw(tx.clone()) as usize)
-                .collect::<Vec<_>>();
             self.verify_tx_in_parallel(ctx.clone(), tx_ptrs).await?;
 
             for signed_tx in txs.into_iter() {
@@ -363,10 +347,6 @@ where
         Ok(())
     }
 
-    #[muta_apm::derive::tracing_span(
-        kind = "mempool",
-        logs = "{'tx_len': 'propose_tx_hashes.len()'}"
-    )]
     async fn sync_propose_txs(
         &self,
         ctx: Context,

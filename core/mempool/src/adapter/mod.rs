@@ -267,6 +267,7 @@ where
         let service_mapping_clone = Arc::clone(&self.service_mapping);
         let tx_hash = tx.tx_hash.clone();
 
+        // TODO: Remove clone
         let tx = tx.to_owned();
         let blocking_res: ProtocolResult<ServiceResponse<String>> =
             tokio::task::spawn_blocking(move || {
