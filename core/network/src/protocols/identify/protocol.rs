@@ -207,6 +207,17 @@ impl StateContext {
     }
 }
 
+impl Drop for StateContext {
+    fn drop(&mut self) {
+        // Something wrong happend, disconnect
+        self.disconnect();
+        finish_identify(
+            &self.remote_peer,
+            Err(Error::Other("StateContext dropped".to_owned())),
+        );
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Display)]
 pub enum ClientProcedure {
     #[display(fmt = "client wait for server identity acknowledge")]
