@@ -17,7 +17,6 @@ CARGO := env ${SYS_ROCKSDB} cargo
 
 test:
 	${CARGO} test ${VERBOSE} --all -- --skip trust_metric --nocapture
-	${CARGO} test -- --test-threads=1
 
 doc:
 	cargo doc --all --no-deps
