@@ -880,6 +880,11 @@ impl PeerManager {
         if self.unidentified_backlog.take(&sid).is_some() {
             return;
         }
+        if let Some(_) = self.connecting.take(&pid) {
+            log::info!("connecting peer {:?} session closed", pid);
+            common_apm::metrics::network::NETWORK_OUTBOUND_CONNECTING_PEERS
+                .set(self.connecting.len() as i64);
+        }
         common_apm::metrics::network::NETWORK_CONNECTED_PEERS.dec();
 
         // Session may be removed by other event or rejected
