@@ -93,7 +93,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             .clap();
         let signed_txs = self
             .adapter
-            .get_full_txs(ctx.clone(), ordered_tx_hashes.clone())
+            .get_full_txs(ctx.clone(), &ordered_tx_hashes)
             .await?;
         let order_signed_transactions_hash = digest_signed_transactions(&signed_txs)?;
 
@@ -179,10 +179,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         // If the block is proposed by self, it does not need to check. Get full signed
         // transactions directly.
         if !exemption {
-            if let Err(e) = self
-                .inner_check_block(ctx.clone(), pill.block.clone())
-                .await
-            {
+            if let Err(e) = self.inner_check_block(ctx.clone(), &pill.block).await {
                 let mut reason = self.last_check_block_fail_reason.write();
                 *reason = e.to_string();
                 return Err(e.into());
@@ -202,7 +199,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             Instant::now() - time
         );
         let time = Instant::now();
-        let txs = self.adapter.get_full_txs(ctx, order_hashes).await?;
+        let txs = self.adapter.get_full_txs(ctx, &order_hashes).await?;
 
         info!(
             "[consensus-engine]: get txs cost {:?}",
@@ -288,7 +285,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         let ordered_tx_hashes = pill.block.ordered_tx_hashes.clone();
         let signed_txs = match self
             .adapter
-            .get_full_txs(ctx.clone(), ordered_tx_hashes.clone())
+            .get_full_txs(ctx.clone(), &ordered_tx_hashes)
             .await
         {
             Ok(txs) => txs,
@@ -452,16 +449,16 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
             return Ok(vec![]);
         }
 
-        let old_block = self
+        let old_block_header = self
             .adapter
-            .get_block_by_height(ctx.clone(), next_height - 1)
+            .get_block_header_by_height(ctx.clone(), next_height - 1)
             .await?;
         let old_metadata = self.adapter.get_metadata(
             ctx.clone(),
-            old_block.header.state_root.clone(),
-            old_block.header.timestamp,
-            old_block.header.height,
-            old_block.header.proposer,
+            old_block_header.state_root.clone(),
+            old_block_header.timestamp,
+            old_block_header.height,
+            old_block_header.proposer,
         )?;
         let mut old_validators = old_metadata
             .verifier_list
@@ -572,11 +569,11 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
             .await
     }
 
-    async fn inner_check_block(&self, ctx: Context, block: Block) -> ProtocolResult<()> {
+    async fn inner_check_block(&self, ctx: Context, block: &Block) -> ProtocolResult<()> {
         let current_timestamp = time_now();
 
         self.adapter
-            .verify_block_header(ctx.clone(), block.clone())
+            .verify_block_header(ctx.clone(), &block)
             .await
             .map_err(|e| {
                 error!(
@@ -589,16 +586,16 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
         // verify the proof in the block for previous block
         // skip to get previous proof to compare because the node may just comes from
         // sync and waste a delay of read
-        let previous_block = self
+        let previous_block_header = self
             .adapter
-            .get_block_by_height(ctx.clone(), block.header.height - 1)
+            .get_block_header_by_height(ctx.clone(), block.header.height - 1)
             .await?;
 
         // verify block timestamp.
         if !validate_timestamp(
             current_timestamp,
             block.header.timestamp,
-            previous_block.header.timestamp,
+            previous_block_header.timestamp,
         ) {
             return Err(ProtocolError::from(ConsensusError::InvalidTimestamp));
         }
@@ -606,25 +603,21 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
         self.adapter
                 .verify_proof(
                     ctx.clone(),
-                    previous_block.clone(),
-                    block.header.proof.clone(),
+                    &previous_block_header,
+                    &block.header.proof,
                 )
                 .await
                 .map_err(|e| {
                     error!(
                         "[consensus] check_block, verify_proof error, previous block header: {:?}, proof: {:?}",
-                        previous_block.header,
+                        previous_block_header,
                         block.header.proof
                     );
                     e
                 })?;
 
         self.adapter
-            .verify_txs(
-                ctx.clone(),
-                block.header.height,
-                block.ordered_tx_hashes.clone(),
-            )
+            .verify_txs(ctx.clone(), block.header.height, &block.ordered_tx_hashes)
             .await
             .map_err(|e| {
                 error!("[consensus] check_block, verify_txs error",);
@@ -650,7 +643,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
 
         let signed_txs = self
             .adapter
-            .get_full_txs(ctx.clone(), block.ordered_tx_hashes.clone())
+            .get_full_txs(ctx.clone(), &block.ordered_tx_hashes)
             .await?;
         self.check_order_transactions(ctx.clone(), &block, &signed_txs)
     }

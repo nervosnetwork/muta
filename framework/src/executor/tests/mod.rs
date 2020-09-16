@@ -20,7 +20,7 @@ use protocol::traits::{
     ServiceSDK, Storage,
 };
 use protocol::types::{
-    Address, Block, Genesis, Hash, Proof, RawTransaction, Receipt, SignedTransaction,
+    Address, Block, BlockHeader, Genesis, Hash, Proof, RawTransaction, Receipt, SignedTransaction,
     TransactionRequest,
 };
 use protocol::ProtocolResult;
@@ -606,6 +606,14 @@ impl CommonStorage for MockStorage {
         unimplemented!()
     }
 
+    async fn get_block_header(
+        &self,
+        _ctx: Context,
+        _height: u64,
+    ) -> ProtocolResult<Option<BlockHeader>> {
+        unimplemented!()
+    }
+
     async fn set_block(&self, _ctx: Context, _block: Block) -> ProtocolResult<()> {
         unimplemented!()
     }
@@ -619,6 +627,10 @@ impl CommonStorage for MockStorage {
     }
 
     async fn set_latest_block(&self, _ctx: Context, _block: Block) -> ProtocolResult<()> {
+        unimplemented!()
+    }
+
+    async fn get_latest_block_header(&self, _ctx: Context) -> ProtocolResult<BlockHeader> {
         unimplemented!()
     }
 }
@@ -645,7 +657,7 @@ impl Storage for MockStorage {
     async fn get_transaction_by_hash(
         &self,
         _ctx: Context,
-        _: Hash,
+        _: &Hash,
     ) -> ProtocolResult<Option<SignedTransaction>> {
         unimplemented!()
     }
@@ -654,7 +666,7 @@ impl Storage for MockStorage {
         &self,
         _ctx: Context,
         _: u64,
-        _: Vec<Hash>,
+        _: &[Hash],
     ) -> ProtocolResult<Vec<Option<SignedTransaction>>> {
         unimplemented!()
     }

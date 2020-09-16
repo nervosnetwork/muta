@@ -71,7 +71,7 @@ pub fn main() {
         };
         let keypair = SecioKeyPair::secp256k1_raw_key(seckey.as_ref()).expect("secp256k1 keypair");
         let pubkey = keypair.to_public_key().inner();
-        let address = Address::from_pubkey_bytes(pubkey.clone().into()).expect("address");
+        let address = Address::from_pubkey_bytes(pubkey.clone()).expect("address");
 
         k.private_key = add_0x(hex::encode(seckey.as_ref()));
         k.public_key = add_0x(hex::encode(pubkey));

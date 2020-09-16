@@ -22,8 +22,8 @@ use protocol::traits::{
     ServiceMapping, Storage, SynchronizationAdapter, TrustFeedback,
 };
 use protocol::types::{
-    Address, Block, Bytes, Hash, Hex, MerkleRoot, Metadata, Proof, Receipt, SignedTransaction,
-    TransactionRequest, Validator,
+    Address, Block, BlockHeader, Bytes, Hash, Hex, MerkleRoot, Metadata, Proof, Receipt,
+    SignedTransaction, TransactionRequest, Validator,
 };
 use protocol::{fixed_codec::FixedCodec, ProtocolResult};
 
@@ -91,7 +91,7 @@ where
     async fn get_full_txs(
         &self,
         ctx: Context,
-        txs: Vec<Hash>,
+        txs: &[Hash],
     ) -> ProtocolResult<Vec<SignedTransaction>> {
         self.mempool.get_full_txs(ctx, None, txs).await
     }
@@ -162,19 +162,19 @@ where
         ctx: Context,
         height: u64,
     ) -> ProtocolResult<Vec<Validator>> {
-        let block = self
+        let header = self
             .storage
-            .get_block(ctx, height)
+            .get_block_header(ctx, height)
             .await?
             .ok_or_else(|| ConsensusError::StorageItemNotFound)?;
-        Ok(block.header.validators)
+        Ok(header.validators)
     }
 
     /// Get the current height from storage.
     #[muta_apm::derive::tracing_span(kind = "consensus.adapter")]
     async fn get_current_height(&self, ctx: Context) -> ProtocolResult<u64> {
-        let res = self.storage.get_latest_block(ctx).await?;
-        Ok(res.header.height)
+        let header = self.storage.get_latest_block_header(ctx).await?;
+        Ok(header.height)
     }
 
     #[muta_apm::derive::tracing_span(kind = "consensus.adapter")]
@@ -188,7 +188,7 @@ where
     }
 
     #[muta_apm::derive::tracing_span(kind = "consensus.adapter", logs = "{'txs_len': 'txs.len()'}")]
-    async fn verify_txs(&self, ctx: Context, height: u64, txs: Vec<Hash>) -> ProtocolResult<()> {
+    async fn verify_txs(&self, ctx: Context, height: u64, txs: &[Hash]) -> ProtocolResult<()> {
         if let Err(e) = self
             .mempool
             .ensure_order_txs(ctx.clone(), Some(height), txs)
@@ -396,7 +396,7 @@ where
         logs = "{'flush_txs_len': 'ordered_tx_hashes.len()'}"
     )]
     async fn flush_mempool(&self, ctx: Context, ordered_tx_hashes: &[Hash]) -> ProtocolResult<()> {
-        self.mempool.flush(ctx, ordered_tx_hashes.to_vec()).await
+        self.mempool.flush(ctx, ordered_tx_hashes).await
     }
 
     /// Get a block corresponding to the given height.
@@ -408,11 +408,22 @@ where
             .ok_or_else(|| ConsensusError::StorageItemNotFound.into())
     }
 
+    async fn get_block_header_by_height(
+        &self,
+        ctx: Context,
+        height: u64,
+    ) -> ProtocolResult<BlockHeader> {
+        self.storage
+            .get_block_header(ctx, height)
+            .await?
+            .ok_or_else(|| ConsensusError::StorageItemNotFound.into())
+    }
+
     /// Get the current height from storage.
     #[muta_apm::derive::tracing_span(kind = "consensus.adapter")]
     async fn get_current_height(&self, ctx: Context) -> ProtocolResult<u64> {
-        let res = self.storage.get_latest_block(ctx).await?;
-        Ok(res.header.height)
+        let header = self.storage.get_latest_block_header(ctx).await?;
+        Ok(header.height)
     }
 
     #[muta_apm::derive::tracing_span(
@@ -426,10 +437,7 @@ where
     ) -> ProtocolResult<Vec<SignedTransaction>> {
         let futs = tx_hashes
             .iter()
-            .map(|tx_hash| {
-                self.storage
-                    .get_transaction_by_hash(ctx.clone(), tx_hash.to_owned())
-            })
+            .map(|tx_hash| self.storage.get_transaction_by_hash(ctx.clone(), tx_hash))
             .collect::<Vec<_>>();
         futures::future::try_join_all(futs).await.map(|txs| {
             txs.into_iter()
@@ -462,9 +470,7 @@ where
             Arc::clone(&self.service_mapping),
         )?;
 
-        let caller = Address::from_hash(Hash::digest(Bytes::from(
-            protocol::address_hrp().as_ref().to_owned(),
-        )))?;
+        let caller = Address::from_hash(Hash::digest(protocol::address_hrp().as_str()))?;
 
         let params = ExecutorParams {
             state_root,
@@ -502,23 +508,20 @@ where
     }
 
     /// this function verify all info in header except proof and roots
-    #[muta_apm::derive::tracing_span(
-        kind = "consensus.adapter",
-        logs = "{'txs_len': 'block.ordered_tx_hashes.len()'}"
-    )]
-    async fn verify_block_header(&self, ctx: Context, block: Block) -> ProtocolResult<()> {
-        let previous_block = self
-            .get_block_by_height(ctx.clone(), block.header.height - 1)
+    #[muta_apm::derive::tracing_span(kind = "consensus.adapter")]
+    async fn verify_block_header(&self, ctx: Context, block: &Block) -> ProtocolResult<()> {
+        let previous_block_header = self
+            .get_block_header_by_height(ctx.clone(), block.header.height - 1)
             .await
             .map_err(|e| {
                 log::error!(
-                    "[consensus] verify_block_header, previous_block {} fails",
+                    "[consensus] verify_block_header, previous_block_header {} fails",
                     block.header.height - 1,
                 );
                 e
             })?;
 
-        let previous_block_hash = Hash::digest(previous_block.header.encode_fixed()?);
+        let previous_block_hash = Hash::digest(previous_block_header.encode_fixed()?);
 
         if previous_block_hash != block.header.prev_hash {
             log::error!(
@@ -543,10 +546,10 @@ where
         // verify proposer and validators
         let previous_metadata = self.get_metadata(
             ctx,
-            previous_block.header.state_root.clone(),
-            previous_block.header.height,
-            previous_block.header.timestamp,
-            previous_block.header.proposer,
+            previous_block_header.state_root.clone(),
+            previous_block_header.height,
+            previous_block_header.timestamp,
+            previous_block_header.proposer,
         )?;
 
         let authority_map = previous_metadata
@@ -618,27 +621,32 @@ where
     }
 
     #[muta_apm::derive::tracing_span(kind = "consensus.adapter")]
-    async fn verify_proof(&self, ctx: Context, block: Block, proof: Proof) -> ProtocolResult<()> {
+    async fn verify_proof(
+        &self,
+        ctx: Context,
+        block_header: &BlockHeader,
+        proof: &Proof,
+    ) -> ProtocolResult<()> {
         // the block 0 has no proof, which is consensus-ed by community, not by chain
 
-        if block.header.height == 0 {
+        if block_header.height == 0 {
             return Ok(());
         };
 
-        if block.header.height != proof.height {
+        if block_header.height != proof.height {
             log::error!(
-                "[consensus] verify_proof, block.header.height: {}, proof.height: {}",
-                block.header.height,
+                "[consensus] verify_proof, block_header.height: {}, proof.height: {}",
+                block_header.height,
                 proof.height
             );
             return Err(ConsensusError::VerifyProof(
-                block.header.height,
-                HeightMismatch(block.header.height, proof.height),
+                block_header.height,
+                HeightMismatch(block_header.height, proof.height),
             )
             .into());
         }
 
-        let blockhash = Hash::digest(block.header.clone().encode_fixed()?);
+        let blockhash = Hash::digest(block_header.encode_fixed()?);
 
         if blockhash != proof.block_hash {
             log::error!(
@@ -646,26 +654,26 @@ where
                 blockhash,
                 proof.block_hash
             );
-            return Err(ConsensusError::VerifyProof(block.header.height, HashMismatch).into());
+            return Err(ConsensusError::VerifyProof(block_header.height, HashMismatch).into());
         }
 
-        let previous_block = self
-            .get_block_by_height(ctx.clone(), block.header.height - 1)
+        let previous_block_header = self
+            .get_block_header_by_height(ctx.clone(), block_header.height - 1)
             .await
             .map_err(|e| {
                 log::error!(
                     "[consensus] verify_proof, previous_block {} fails",
-                    block.header.height - 1,
+                    block_header.height - 1,
                 );
                 e
             })?;
         // the auth_list for the target should comes from previous height
         let metadata = self.get_metadata(
             ctx.clone(),
-            previous_block.header.state_root.clone(),
-            previous_block.header.height,
-            previous_block.header.timestamp,
-            previous_block.header.proposer,
+            previous_block_header.state_root.clone(),
+            previous_block_header.height,
+            previous_block_header.timestamp,
+            previous_block_header.proposer,
         )?;
 
         let mut authority_list = metadata
@@ -680,7 +688,7 @@ where
 
         let signed_voters = extract_voters(&mut authority_list, &proof.bitmap).map_err(|_| {
             log::error!("[consensus] extract_voters fails, bitmap error");
-            ConsensusError::VerifyProof(block.header.height, BitMap)
+            ConsensusError::VerifyProof(block_header.height, BitMap)
         })?;
 
         let vote = Vote {
@@ -696,7 +704,7 @@ where
             .collect::<HashMap<overlord::types::Address, u32>>();
         self.verify_proof_weight(
             ctx.clone(),
-            block.header.height,
+            block_header.height,
             weight_map,
             signed_voters.clone(),
         )?;
@@ -716,13 +724,13 @@ where
 
         self.verify_proof_signature(
             ctx.clone(),
-            block.header.height,
+            block_header.height,
             vote_hash.clone(),
             proof.signature.clone(),
             hex_pubkeys,
         ).map_err(|e| {
             log::error!("[consensus] verify_proof_signature error, height {}, vote: {:?}, vote_hash:{:?}, sig:{:?}, signed_voter:{:?}",
-            block.header.height,
+            block_header.height,
             vote,
             vote_hash,
             proof.signature,
@@ -917,8 +925,8 @@ where
     )]
     async fn exec(&self, ctx: Context, info: ExecuteInfo) -> ProtocolResult<()> {
         let height = info.height;
-        let txs = info.signed_txs.clone();
-        let order_root = info.order_root.clone();
+        let txs = info.signed_txs;
+        let order_root = info.order_root;
         let state_root = self.status.to_inner().get_latest_state_root();
 
         let now = Instant::now();
@@ -955,7 +963,7 @@ where
         );
         self.status.update_by_executed(gen_executed_info(
             info.ctx.clone(),
-            resp.clone(),
+            resp,
             height,
             order_root,
         ));

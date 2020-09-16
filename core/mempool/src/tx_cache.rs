@@ -158,12 +158,12 @@ impl TxCache {
         self.insert(tx_hash, shared_tx).await
     }
 
-    pub async fn show_unknown(&self, tx_hashes: Vec<Hash>) -> Vec<Hash> {
+    pub async fn show_unknown(&self, tx_hashes: &[Hash]) -> Vec<Hash> {
         let mut unknow_hashes = vec![];
 
-        for tx_hash in tx_hashes.into_iter() {
+        for tx_hash in tx_hashes.iter() {
             if !self.contain(&tx_hash).await {
-                unknow_hashes.push(tx_hash);
+                unknow_hashes.push(tx_hash.clone());
             }
         }
 

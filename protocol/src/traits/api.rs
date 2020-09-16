@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 
 use crate::traits::{Context, ServiceResponse};
-use crate::types::{Address, Block, Hash, Receipt, SignedTransaction};
+use crate::types::{Address, Block, BlockHeader, Hash, Receipt, SignedTransaction};
 use crate::ProtocolResult;
 
 #[async_trait]
@@ -17,6 +17,12 @@ pub trait APIAdapter: Send + Sync {
         ctx: Context,
         height: Option<u64>,
     ) -> ProtocolResult<Option<Block>>;
+
+    async fn get_block_header_by_height(
+        &self,
+        ctx: Context,
+        height: Option<u64>,
+    ) -> ProtocolResult<Option<BlockHeader>>;
 
     async fn get_receipt_by_tx_hash(
         &self,

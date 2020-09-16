@@ -5,8 +5,8 @@ use creep::Context;
 
 use crate::traits::{ExecutorParams, ExecutorResp, TrustFeedback};
 use crate::types::{
-    Address, Block, Bytes, Hash, Hex, MerkleRoot, Metadata, Proof, Receipt, SignedTransaction,
-    Validator,
+    Address, Block, BlockHeader, Bytes, Hash, Hex, MerkleRoot, Metadata, Proof, Receipt,
+    SignedTransaction, Validator,
 };
 use crate::{traits::mempool::MixedTxHashes, ProtocolResult};
 
@@ -107,6 +107,12 @@ pub trait CommonConsensusAdapter: Send + Sync {
     /// Get a block corresponding to the given height.
     async fn get_block_by_height(&self, ctx: Context, height: u64) -> ProtocolResult<Block>;
 
+    async fn get_block_header_by_height(
+        &self,
+        ctx: Context,
+        height: u64,
+    ) -> ProtocolResult<BlockHeader>;
+
     /// Get the current height from storage.
     async fn get_current_height(&self, ctx: Context) -> ProtocolResult<u64>;
 
@@ -134,9 +140,14 @@ pub trait CommonConsensusAdapter: Send + Sync {
 
     fn set_args(&self, context: Context, timeout_gap: u64, cycles_limit: u64, max_tx_size: u64);
 
-    async fn verify_proof(&self, ctx: Context, block: Block, proof: Proof) -> ProtocolResult<()>;
+    async fn verify_proof(
+        &self,
+        ctx: Context,
+        block_header: &BlockHeader,
+        proof: &Proof,
+    ) -> ProtocolResult<()>;
 
-    async fn verify_block_header(&self, ctx: Context, block: Block) -> ProtocolResult<()>;
+    async fn verify_block_header(&self, ctx: Context, block: &Block) -> ProtocolResult<()>;
 
     fn verify_proof_signature(
         &self,
@@ -176,7 +187,7 @@ pub trait ConsensusAdapter: CommonConsensusAdapter + Send + Sync {
     async fn get_full_txs(
         &self,
         ctx: Context,
-        order_txs: Vec<Hash>,
+        order_txs: &[Hash],
     ) -> ProtocolResult<Vec<SignedTransaction>>;
 
     /// Consensus transmit a message to the given target.
@@ -217,5 +228,5 @@ pub trait ConsensusAdapter: CommonConsensusAdapter + Send + Sync {
     /// Pull some blocks from other nodes from `begin` to `end`.
     async fn pull_block(&self, ctx: Context, height: u64, end: &str) -> ProtocolResult<Block>;
 
-    async fn verify_txs(&self, ctx: Context, height: u64, txs: Vec<Hash>) -> ProtocolResult<()>;
+    async fn verify_txs(&self, ctx: Context, height: u64, txs: &[Hash]) -> ProtocolResult<()>;
 }

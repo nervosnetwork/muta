@@ -107,7 +107,7 @@ impl<Mapping: 'static + ServiceMapping> Muta<Mapping> {
 
         // Set bech32 address hrp
         if !protocol::address_hrp_inited() {
-            protocol::init_address_hrp(hrp.to_owned());
+            protocol::init_address_hrp(hrp.into());
         }
 
         // Init Block db
@@ -161,9 +161,7 @@ impl<Mapping: 'static + ServiceMapping> Muta<Mapping> {
         )?;
 
         // Build genesis block.
-        let proposer = Address::from_hash(Hash::digest(Bytes::from(
-            protocol::address_hrp().as_ref().to_owned(),
-        )))?;
+        let proposer = Address::from_hash(Hash::digest(protocol::address_hrp().as_str()))?;
         let genesis_block_header = BlockHeader {
             chain_id: metadata.chain_id.clone(),
             height: 0,
@@ -351,7 +349,7 @@ impl<Mapping: 'static + ServiceMapping> Muta<Mapping> {
 
         // Set bech32 address hrp
         if !protocol::address_hrp_inited() {
-            protocol::init_address_hrp(metadata.bech32_address_hrp);
+            protocol::init_address_hrp(metadata.bech32_address_hrp.into());
         }
 
         // set chain id in network
@@ -512,7 +510,7 @@ impl<Mapping: 'static + ServiceMapping> Muta<Mapping> {
                 .get_transactions(
                     Context::new(),
                     block.header.height,
-                    block.ordered_tx_hashes.clone(),
+                    &block.ordered_tx_hashes,
                 )
                 .await?
                 .into_iter()

@@ -8,7 +8,9 @@ use protocol::traits::{
     APIAdapter, Context, ExecutorFactory, ExecutorParams, MemPool, ServiceMapping, ServiceResponse,
     Storage,
 };
-use protocol::types::{Address, Block, Hash, Receipt, SignedTransaction, TransactionRequest};
+use protocol::types::{
+    Address, Block, BlockHeader, Hash, Receipt, SignedTransaction, TransactionRequest,
+};
 use protocol::{ProtocolError, ProtocolErrorKind, ProtocolResult};
 
 #[derive(Debug, Display)]
@@ -93,6 +95,17 @@ impl<
         }
     }
 
+    async fn get_block_header_by_height(
+        &self,
+        ctx: Context,
+        height: Option<u64>,
+    ) -> ProtocolResult<Option<BlockHeader>> {
+        match height {
+            Some(id) => self.storage.get_block_header(ctx.clone(), id).await,
+            None => Ok(Some(self.storage.get_latest_block_header(ctx).await?)),
+        }
+    }
+
     async fn get_receipt_by_tx_hash(
         &self,
         ctx: Context,
@@ -103,7 +116,7 @@ impl<
             .get_receipt_by_hash(ctx.clone(), tx_hash)
             .await?;
 
-        let exec_height = self.storage.get_latest_block(ctx).await?.header.exec_height;
+        let exec_height = self.storage.get_latest_block_header(ctx).await?.exec_height;
 
         match opt_receipt {
             Some(receipt) => {
@@ -123,7 +136,7 @@ impl<
         ctx: Context,
         tx_hash: Hash,
     ) -> ProtocolResult<Option<SignedTransaction>> {
-        self.storage.get_transaction_by_hash(ctx, tx_hash).await
+        self.storage.get_transaction_by_hash(ctx, &tx_hash).await
     }
 
     async fn query_service(
@@ -137,24 +150,24 @@ impl<
         method: String,
         payload: String,
     ) -> ProtocolResult<ServiceResponse<String>> {
-        let block = self
-            .get_block_by_height(ctx.clone(), Some(height))
+        let header = self
+            .get_block_header_by_height(ctx.clone(), Some(height))
             .await?
             .ok_or_else(|| APIError::NotFound)?;
 
         let executor = EF::from_root(
-            block.header.state_root.clone(),
+            header.state_root.clone(),
             Arc::clone(&self.trie_db),
             Arc::clone(&self.storage),
             Arc::clone(&self.service_mapping),
         )?;
 
         let params = ExecutorParams {
-            state_root: block.header.state_root,
+            state_root: header.state_root,
             height,
-            timestamp: block.header.timestamp,
+            timestamp: header.timestamp,
             cycles_limit,
-            proposer: block.header.proposer,
+            proposer: header.proposer,
         };
         executor.read(&params, &caller, cycles_price, &TransactionRequest {
             service_name,

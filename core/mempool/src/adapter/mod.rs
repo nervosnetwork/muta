@@ -31,7 +31,7 @@ use protocol::{
         ServiceMapping, ServiceResponse, Storage, TrustFeedback,
     },
     types::{Address, Hash, SignedTransaction, TransactionRequest},
-    Bytes, ProtocolError, ProtocolErrorKind, ProtocolResult,
+    ProtocolError, ProtocolErrorKind, ProtocolResult,
 };
 
 use crate::adapter::message::{
@@ -254,72 +254,64 @@ where
         Ok(())
     }
 
-    async fn check_authorization(&self, ctx: Context, tx: SignedTransaction) -> ProtocolResult<()> {
+    async fn check_authorization(
+        &self,
+        ctx: Context,
+        tx: Box<SignedTransaction>,
+    ) -> ProtocolResult<()> {
         let network = self.network.clone();
-        let network_clone = network.clone();
         let ctx_clone = ctx.clone();
-        let tx_clone = tx.clone();
-        let block = self.storage.get_latest_block(ctx.clone()).await?;
+        let header = self.storage.get_latest_block_header(ctx.clone()).await?;
         let trie_db_clone = Arc::clone(&self.trie_db);
         let storage_clone = Arc::clone(&self.storage);
         let service_mapping_clone = Arc::clone(&self.service_mapping);
+        let tx_hash = tx.tx_hash.clone();
 
         let blocking_res: ProtocolResult<ServiceResponse<String>> =
             tokio::task::spawn_blocking(move || {
                 // Verify transaction hash
-                let fixed_bytes = tx_clone.raw.encode_fixed()?;
+                let fixed_bytes = tx.raw.encode_fixed()?;
                 let tx_hash = Hash::digest(fixed_bytes);
 
-                if tx_hash != tx_clone.tx_hash {
+                if tx_hash != tx.tx_hash {
                     if ctx_clone.is_network_origin_txs() {
                         network.report(
                             ctx_clone,
                             TrustFeedback::Worse(format!(
                                 "Mempool wrong tx_hash of tx {:?}",
-                                tx_clone.tx_hash
+                                tx.tx_hash
                             )),
                         );
                     }
 
                     return Err(MemPoolError::CheckHash {
-                        expect: tx_clone.tx_hash,
+                        expect: tx.tx_hash,
                         actual: tx_hash,
                     }
                     .into());
                 }
 
                 // Verify transaction signatures
-                let stx_json = serde_json::to_string(&tx_clone).map_err(|_| {
-                    network_clone.report(
-                        ctx_clone.clone(),
-                        TrustFeedback::Worse(format!(
-                            "Mempool encode json error {:?}",
-                            tx_clone.tx_hash
-                        )),
-                    );
-                    MemPoolError::EncodeJson
-                })?;
-
-                let caller = Address::from_hash(Hash::digest(Bytes::from(
-                    protocol::address_hrp().as_ref().to_owned(),
-                )))?;
+                let caller = Address::from_hash(Hash::digest(protocol::address_hrp().as_str()))?;
                 let executor = EF::from_root(
-                    block.header.state_root.clone(),
+                    header.state_root.clone(),
                     Arc::clone(&trie_db_clone),
                     Arc::clone(&storage_clone),
                     Arc::clone(&service_mapping_clone),
                 )?;
                 let params = ExecutorParams {
-                    state_root:   block.header.state_root,
-                    height:       block.header.height,
-                    timestamp:    block.header.timestamp,
+                    state_root:   header.state_root,
+                    height:       header.height,
+                    timestamp:    header.timestamp,
                     cycles_limit: 99999,
-                    proposer:     block.header.proposer,
+                    proposer:     header.proposer,
                 };
+
+                let stx_ptr_json = format!("{{ \"ptr\": {} }}", Box::into_raw(tx) as usize);
                 let check_resp = executor.read(&params, &caller, 1, &TransactionRequest {
                     service_name: "authorization".to_string(),
-                    method:       "check_authorization".to_string(),
-                    payload:      stx_json,
+                    method:       "check_authorization_by_ptr".to_string(),
+                    payload:      stx_ptr_json,
                 })?;
 
                 Ok(check_resp)
@@ -334,13 +326,13 @@ where
                     ctx,
                     TrustFeedback::Worse(format!(
                         "Mempool check authorization failed tx hash {:?}",
-                        tx.tx_hash.clone()
+                        tx_hash
                     )),
                 )
             }
 
             return Err(MemPoolError::CheckAuthorization {
-                tx_hash:  tx.tx_hash,
+                tx_hash,
                 err_info: check_resp.error_message,
             }
             .into());
@@ -348,7 +340,7 @@ where
         Ok(())
     }
 
-    async fn check_transaction(&self, ctx: Context, stx: SignedTransaction) -> ProtocolResult<()> {
+    async fn check_transaction(&self, ctx: Context, stx: &SignedTransaction) -> ProtocolResult<()> {
         let fixed_bytes = stx.raw.encode_fixed()?;
         let size = fixed_bytes.len() as u64;
         let tx_hash = stx.tx_hash.clone();
@@ -395,8 +387,8 @@ where
         }
 
         // Verify chain id
-        let latest_block = self.storage.get_latest_block(ctx.clone()).await?;
-        if latest_block.header.chain_id != stx.raw.chain_id {
+        let latest_header = self.storage.get_latest_block_header(ctx.clone()).await?;
+        if latest_header.chain_id != stx.raw.chain_id {
             if ctx.is_network_origin_txs() {
                 self.network.report(
                     ctx.clone(),
@@ -404,19 +396,19 @@ where
                 );
             }
             let wrong_chain_id = MemPoolError::WrongChain {
-                tx_hash: stx.tx_hash,
+                tx_hash: stx.tx_hash.clone(),
             };
 
             return Err(wrong_chain_id.into());
         }
 
         // Verify timeout
-        let latest_height = latest_block.header.height;
+        let latest_height = latest_header.height;
         let timeout_gap = self.timeout_gap.load(Ordering::SeqCst);
 
         if stx.raw.timeout > latest_height + timeout_gap {
             let invalid_timeout = MemPoolError::InvalidTimeout {
-                tx_hash: stx.tx_hash,
+                tx_hash: stx.tx_hash.clone(),
             };
 
             return Err(invalid_timeout.into());
@@ -424,7 +416,7 @@ where
 
         if stx.raw.timeout < latest_height {
             let timeout = MemPoolError::Timeout {
-                tx_hash: stx.tx_hash,
+                tx_hash: stx.tx_hash.clone(),
                 timeout: stx.raw.timeout,
             };
 
@@ -434,20 +426,19 @@ where
         Ok(())
     }
 
-    async fn check_storage_exist(&self, ctx: Context, tx_hash: Hash) -> ProtocolResult<()> {
-        match self
-            .storage
-            .get_transaction_by_hash(ctx, tx_hash.clone())
-            .await
-        {
-            Ok(Some(_)) => Err(MemPoolError::CommittedTx { tx_hash }.into()),
+    async fn check_storage_exist(&self, ctx: Context, tx_hash: &Hash) -> ProtocolResult<()> {
+        match self.storage.get_transaction_by_hash(ctx, tx_hash).await {
+            Ok(Some(_)) => Err(MemPoolError::CommittedTx {
+                tx_hash: tx_hash.clone(),
+            }
+            .into()),
             Ok(None) => Ok(()),
             Err(err) => Err(err),
         }
     }
 
     async fn get_latest_height(&self, ctx: Context) -> ProtocolResult<u64> {
-        let height = self.storage.get_latest_block(ctx).await?.header.height;
+        let height = self.storage.get_latest_block_header(ctx).await?.height;
         Ok(height)
     }
 
@@ -455,13 +446,13 @@ where
         &self,
         ctx: Context,
         block_height: Option<u64>,
-        tx_hashes: Vec<Hash>,
+        tx_hashes: &[Hash],
     ) -> ProtocolResult<Vec<Option<SignedTransaction>>> {
         if let Some(height) = block_height {
             self.storage.get_transactions(ctx, height, tx_hashes).await
         } else {
             let futs = tx_hashes
-                .into_iter()
+                .iter()
                 .map(|tx_hash| self.storage.get_transaction_by_hash(ctx.clone(), tx_hash))
                 .collect::<Vec<_>>();
             futures::future::try_join_all(futs).await

@@ -90,7 +90,7 @@ where
         &self.adapter
     }
 
-    async fn show_unknown_txs(&self, tx_hashes: Vec<Hash>) -> Vec<Hash> {
+    async fn show_unknown_txs(&self, tx_hashes: &[Hash]) -> Vec<Hash> {
         let tx_hashes = self.tx_cache.show_unknown(tx_hashes).await;
         let mut unknown_hashes = vec![];
 
@@ -108,7 +108,7 @@ where
 
         self.tx_cache.check_exist(&tx.tx_hash).await?;
         self.adapter
-            .check_storage_exist(ctx.clone(), tx.tx_hash.clone())
+            .check_storage_exist(ctx.clone(), &tx.tx_hash)
             .await?;
         self.tx_cache.insert_propose_tx(tx).await
     }
@@ -121,26 +121,25 @@ where
     ) -> ProtocolResult<()> {
         let _lock = self.flush_lock.read().await;
 
+        let tx = Box::new(tx);
         let tx_hash = &tx.tx_hash;
         self.tx_cache.check_reach_limit(self.pool_size).await?;
         self.tx_cache.check_exist(tx_hash).await?;
         self.adapter
             .check_authorization(ctx.clone(), tx.clone())
             .await?;
+        self.adapter.check_transaction(ctx.clone(), &tx).await?;
         self.adapter
-            .check_transaction(ctx.clone(), tx.clone())
-            .await?;
-        self.adapter
-            .check_storage_exist(ctx.clone(), tx_hash.clone())
+            .check_storage_exist(ctx.clone(), tx_hash)
             .await?;
 
         match tx_type {
-            TxType::NewTx => self.tx_cache.insert_new_tx(tx.clone()).await?,
-            TxType::ProposeTx => self.tx_cache.insert_propose_tx(tx.clone()).await?,
+            TxType::NewTx => self.tx_cache.insert_new_tx(*tx.clone()).await?,
+            TxType::ProposeTx => self.tx_cache.insert_propose_tx(*tx.clone()).await?,
         }
 
         if !ctx.is_network_origin_txs() {
-            self.adapter.broadcast_tx(ctx, tx).await?;
+            self.adapter.broadcast_tx(ctx, *tx).await?;
         } else {
             self.adapter.report_good(ctx);
         }
@@ -148,34 +147,29 @@ where
         Ok(())
     }
 
-    #[muta_apm::derive::tracing_span(kind = "mempool", logs = "{'txs': 'txs.len()'}")]
-    async fn verify_tx_in_parallel(
-        &self,
-        ctx: Context,
-        txs: Vec<SignedTransaction>,
-    ) -> ProtocolResult<()> {
+    async fn verify_tx_in_parallel(&self, ctx: Context, tx_ptrs: Vec<usize>) -> ProtocolResult<()> {
         let now = Instant::now();
-        let len = txs.len();
+        let len = tx_ptrs.len();
 
-        let futs = txs
+        let futs = tx_ptrs
             .into_iter()
-            .map(|signed_tx| {
+            .map(|ptr| {
                 let adapter = Arc::clone(&self.adapter);
                 let ctx = ctx.clone();
 
                 tokio::spawn(async move {
+                    let boxed_stx = unsafe { Box::from_raw(ptr as *mut SignedTransaction) };
+                    let signed_tx = *(boxed_stx.clone());
+
+                    adapter.check_authorization(ctx.clone(), boxed_stx).await?;
+                    adapter.check_transaction(ctx.clone(), &signed_tx).await?;
                     adapter
-                        .check_authorization(ctx.clone(), signed_tx.clone())
-                        .await?;
-                    adapter
-                        .check_transaction(ctx.clone(), signed_tx.clone())
-                        .await?;
-                    adapter
-                        .check_storage_exist(ctx.clone(), signed_tx.tx_hash.clone())
+                        .check_storage_exist(ctx.clone(), &signed_tx.tx_hash)
                         .await
                 })
             })
             .collect::<Vec<_>>();
+
         try_join_all(futs).await.map_err(|e| {
             log::error!("[mempool] verify batch txs error {:?}", e);
             MemPoolError::VerifyBatchTransactions
@@ -199,10 +193,6 @@ where
         self.insert_tx(ctx, tx, TxType::NewTx).await
     }
 
-    #[muta_apm::derive::tracing_span(
-        kind = "mempool",
-        logs = "{'cycles_limit': 'cycles_limit', 'tx_num_limit': 'tx_num_limit'}"
-    )]
     async fn package(
         &self,
         ctx: Context,
@@ -245,12 +235,7 @@ where
         }
     }
 
-    #[muta_apm::derive::tracing_span(
-        kind = "mempool",
-        logs = "{'tx_len':
-     'tx_hashes.len()'}"
-    )]
-    async fn flush(&self, ctx: Context, tx_hashes: Vec<Hash>) -> ProtocolResult<()> {
+    async fn flush(&self, ctx: Context, tx_hashes: &[Hash]) -> ProtocolResult<()> {
         let _lock = self.flush_lock.write().await;
 
         let current_height = self.adapter.get_latest_height(ctx.clone()).await?;
@@ -270,16 +255,11 @@ where
         Ok(())
     }
 
-    #[muta_apm::derive::tracing_span(
-        kind = "mempool",
-        logs = "{'tx_len':
-     'tx_hashes.len()'}"
-    )]
     async fn get_full_txs(
         &self,
         ctx: Context,
         height: Option<u64>,
-        tx_hashes: Vec<Hash>,
+        tx_hashes: &[Hash],
     ) -> ProtocolResult<Vec<SignedTransaction>> {
         let len = tx_hashes.len();
         let mut missing_hashes = vec![];
@@ -300,7 +280,7 @@ where
         if !missing_hashes.is_empty() {
             let txs = self
                 .adapter
-                .get_transactions_from_storage(ctx, height, missing_hashes)
+                .get_transactions_from_storage(ctx, height, &missing_hashes)
                 .await?;
             let txs = txs
                 .into_iter()
@@ -321,17 +301,13 @@ where
         }
     }
 
-    #[muta_apm::derive::tracing_span(
-        kind = "mempool",
-        logs = "{'tx_len': 'order_tx_hashes.len()'}"
-    )]
     async fn ensure_order_txs(
         &self,
         ctx: Context,
         height: Option<u64>,
-        order_tx_hashes: Vec<Hash>,
+        order_tx_hashes: &[Hash],
     ) -> ProtocolResult<()> {
-        check_dup_order_hashes(&order_tx_hashes)?;
+        check_dup_order_hashes(order_tx_hashes)?;
 
         let unknown_hashes = self.show_unknown_txs(order_tx_hashes).await;
         if !unknown_hashes.is_empty() {
@@ -340,6 +316,7 @@ where
                 .adapter
                 .pull_txs(ctx.clone(), height, unknown_hashes)
                 .await?;
+
             // Make sure response signed_txs is the same size of request hashes.
             if txs.len() != unknown_len {
                 return Err(MemPoolError::EnsureBreak {
@@ -349,10 +326,19 @@ where
                 .into());
             }
 
-            self.verify_tx_in_parallel(ctx.clone(), txs.clone()).await?;
+            let (tx_ptrs, txs): (Vec<_>, Vec<_>) = txs
+                .into_iter()
+                .map(|tx| {
+                    let boxed = Box::new(tx);
+                    (Box::into_raw(boxed.clone()) as usize, boxed)
+                })
+                .unzip();
+
+            self.verify_tx_in_parallel(ctx.clone(), tx_ptrs).await?;
+
             for signed_tx in txs.into_iter() {
                 self.callback_cache
-                    .insert(signed_tx.tx_hash.clone(), signed_tx)
+                    .insert(signed_tx.tx_hash.clone(), *signed_tx)
                     .await;
             }
 
@@ -362,16 +348,12 @@ where
         Ok(())
     }
 
-    #[muta_apm::derive::tracing_span(
-        kind = "mempool",
-        logs = "{'tx_len': 'propose_tx_hashes.len()'}"
-    )]
     async fn sync_propose_txs(
         &self,
         ctx: Context,
         propose_tx_hashes: Vec<Hash>,
     ) -> ProtocolResult<()> {
-        let unknown_hashes = self.show_unknown_txs(propose_tx_hashes).await;
+        let unknown_hashes = self.show_unknown_txs(&propose_tx_hashes).await;
         if !unknown_hashes.is_empty() {
             let txs = self
                 .adapter

@@ -128,7 +128,7 @@ where
         let push_txs = async move {
             let ret = self
                 .mem_pool
-                .get_full_txs(ctx.clone(), msg.height, msg.hashes)
+                .get_full_txs(ctx.clone(), msg.height, &msg.hashes)
                 .await
                 .map(|sig_txs| MsgPushTxs { sig_txs });
 

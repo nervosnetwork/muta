@@ -10,11 +10,12 @@ use bytes::Bytes;
 use hasher::{Hasher, HasherKeccak};
 use lazy_static::lazy_static;
 use muta_codec_derive::RlpFixedCodec;
-use ophelia::UncompressedPublicKey;
+use ophelia::{PublicKey, UncompressedPublicKey};
 use ophelia_secp256k1::Secp256k1PublicKey;
 use serde::de;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use smol_str::SmolStr;
 
 use crate::fixed_codec::{FixedCodec, FixedCodecError};
 use crate::types::TypesError;
@@ -24,17 +25,20 @@ pub const METADATA_KEY: &str = "metadata";
 
 lazy_static! {
     static ref HASHER_INST: HasherKeccak = HasherKeccak::new();
-    static ref ADDRESS_HRP: ArcSwap<String> = ArcSwap::from(Arc::new("muta".to_owned()));
+    static ref ADDRESS_HRP: ArcSwap<SmolStr> = ArcSwap::from(Arc::new("muta".into()));
     static ref ADDRESS_HRP_INITED: AtomicBool = AtomicBool::new(false);
 }
 
-pub fn address_hrp() -> Arc<String> {
-    ADDRESS_HRP.load_full()
+pub fn address_hrp() -> SmolStr {
+    ADDRESS_HRP.load().as_ref().clone()
 }
 
-pub fn init_address_hrp(address_hrp: String) {
+pub fn init_address_hrp(address_hrp: SmolStr) {
     if ADDRESS_HRP_INITED.load(Ordering::SeqCst) {
         panic!("address hrp can only be inited once");
+    }
+    if address_hrp.is_heap_allocated() {
+        log::warn!("address hrp too long");
     }
 
     // Verify address hrp
@@ -189,8 +193,8 @@ impl Hash {
     /// Enter an array of bytes to get a 32-bit hash.
     /// Note: sha3 is used for the time being and may be replaced with other
     /// hashing algorithms later.
-    pub fn digest(bytes: Bytes) -> Self {
-        let out = HASHER_INST.digest(&bytes);
+    pub fn digest<B: AsRef<[u8]>>(bytes: B) -> Self {
+        let out = HASHER_INST.digest(bytes.as_ref());
         Self(Bytes::from(out))
     }
 
@@ -218,6 +222,10 @@ impl Hash {
 
     pub fn as_bytes(&self) -> Bytes {
         self.0.clone()
+    }
+
+    pub fn as_slice(&self) -> &[u8] {
+        &self.0
     }
 
     pub fn as_hex(&self) -> String {
@@ -298,21 +306,31 @@ impl<'de> Deserialize<'de> for Address {
 }
 
 impl Address {
-    pub fn from_pubkey_bytes(mut bytes: Bytes) -> ProtocolResult<Self> {
+    pub fn from_pubkey_bytes<B: AsRef<[u8]>>(bytes: B) -> ProtocolResult<Self> {
+        let compressed_pubkey_len = <Secp256k1PublicKey as PublicKey>::LENGTH;
         let uncompressed_pubkey_len = <Secp256k1PublicKey as UncompressedPublicKey>::LENGTH;
-        if bytes.len() != uncompressed_pubkey_len {
-            let pubkey = Secp256k1PublicKey::try_from(bytes.as_ref())
-                .map_err(|_| TypesError::InvalidPublicKey)?;
-            bytes = pubkey.to_uncompressed_bytes();
-        }
-        let bytes = bytes.split_off(1); // Drop first byte
 
-        let hash = Hash::digest(bytes);
+        let slice = bytes.as_ref();
+        if slice.len() != compressed_pubkey_len && slice.len() != uncompressed_pubkey_len {
+            return Err(TypesError::InvalidPublicKey.into());
+        }
+
+        // Drop first byte
+        let hash = {
+            if slice.len() == compressed_pubkey_len {
+                let pubkey = Secp256k1PublicKey::try_from(slice)
+                    .map_err(|_| TypesError::InvalidPublicKey)?;
+                Hash::digest(&(pubkey.to_uncompressed_bytes())[1..])
+            } else {
+                Hash::digest(&slice[1..])
+            }
+        };
+
         Self::from_hash(hash)
     }
 
     pub fn from_hash(hash: Hash) -> ProtocolResult<Self> {
-        let hash_val = hash.as_bytes();
+        let hash_val = hash.as_slice();
         ensure_len(hash_val.len(), HASH_LEN)?;
 
         Self::from_bytes(Bytes::copy_from_slice(&hash_val[12..]))
@@ -326,6 +344,10 @@ impl Address {
 
     pub fn as_bytes(&self) -> Bytes {
         self.0.clone()
+    }
+
+    pub fn as_slice(&self) -> &[u8] {
+        &self.0
     }
 
     pub fn from_hex(s: &str) -> ProtocolResult<Self> {
@@ -347,7 +369,7 @@ impl FromStr for Address {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let (hrp, data) = bech32::decode(s).map_err(TypesError::from)?;
-        if &hrp != address_hrp().as_ref() {
+        if hrp != address_hrp() {
             return Err(TypesError::InvalidAddress {
                 address: s.to_owned(),
             });
@@ -515,7 +537,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "must set hrp before deserialization")]
     fn test_init_address_hrp() {
-        assert_eq!(address_hrp().as_ref(), "muta", "default value");
+        assert_eq!(address_hrp(), "muta", "default value");
 
         let metadata_payload = r#"
         {
@@ -557,7 +579,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "address hrp can only be inited once")]
     fn test_init_address_hrp_twice() {
-        init_address_hrp("muta".to_owned());
-        init_address_hrp("muta".to_owned());
+        init_address_hrp("muta".into());
+        init_address_hrp("muta".into());
     }
 }

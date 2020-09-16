@@ -90,9 +90,7 @@ pub async fn create_genesis<Mapping: 'static + ServiceMapping>(
     )?;
 
     // Build genesis block.
-    let proposer = Address::from_hash(Hash::digest(Bytes::from(
-        protocol::address_hrp().as_ref().to_owned(),
-    )))?;
+    let proposer = Address::from_hash(Hash::digest(protocol::address_hrp().as_str()))?;
     let genesis_block_header = BlockHeader {
         chain_id: metadata.chain_id.clone(),
         height: 0,
@@ -401,7 +399,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
             .get_transactions(
                 Context::new(),
                 block.header.height,
-                block.ordered_tx_hashes.clone(),
+                &block.ordered_tx_hashes,
             )
             .await?
             .into_iter()

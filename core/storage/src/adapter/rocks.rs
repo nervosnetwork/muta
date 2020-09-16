@@ -32,6 +32,7 @@ impl RocksAdapter {
 
         let categories = [
             map_category(StorageCategory::Block),
+            map_category(StorageCategory::BlockHeader),
             map_category(StorageCategory::Receipt),
             map_category(StorageCategory::SignedTransaction),
             map_category(StorageCategory::Wal),
@@ -247,10 +248,12 @@ const C_SIGNED_TRANSACTIONS: &str = "c2";
 const C_RECEIPTS: &str = "c3";
 const C_WALS: &str = "c4";
 const C_HASH_HEIGHT_MAP: &str = "c5";
+const C_BLOCK_HEADERS: &str = "c6";
 
 fn map_category(c: StorageCategory) -> &'static str {
     match c {
         StorageCategory::Block => C_BLOCKS,
+        StorageCategory::BlockHeader => C_BLOCK_HEADERS,
         StorageCategory::Receipt => C_RECEIPTS,
         StorageCategory::SignedTransaction => C_SIGNED_TRANSACTIONS,
         StorageCategory::Wal => C_WALS,

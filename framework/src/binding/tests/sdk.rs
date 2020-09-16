@@ -115,6 +115,14 @@ impl CommonStorage for MockStorage {
         Ok(Some(mock_block(1)))
     }
 
+    async fn get_block_header(
+        &self,
+        _ctx: Context,
+        _height: u64,
+    ) -> ProtocolResult<Option<BlockHeader>> {
+        Ok(Some(mock_block(1).header))
+    }
+
     async fn set_block(&self, _ctx: Context, _block: Block) -> ProtocolResult<()> {
         Ok(())
     }
@@ -129,6 +137,10 @@ impl CommonStorage for MockStorage {
 
     async fn set_latest_block(&self, _ctx: Context, _block: Block) -> ProtocolResult<()> {
         Ok(())
+    }
+
+    async fn get_latest_block_header(&self, _ctx: Context) -> ProtocolResult<BlockHeader> {
+        Ok(mock_block(1).header)
     }
 }
 
@@ -154,7 +166,7 @@ impl Storage for MockStorage {
     async fn get_transaction_by_hash(
         &self,
         _ctx: Context,
-        _: Hash,
+        _tx_hash: &Hash,
     ) -> ProtocolResult<Option<SignedTransaction>> {
         Ok(Some(mock_signed_tx()))
     }
@@ -162,8 +174,8 @@ impl Storage for MockStorage {
     async fn get_transactions(
         &self,
         _ctx: Context,
-        _: u64,
-        _: Vec<Hash>,
+        _height: u64,
+        _hashes: &[Hash],
     ) -> ProtocolResult<Vec<Option<SignedTransaction>>> {
         Err(StoreError::GetNone.into())
     }

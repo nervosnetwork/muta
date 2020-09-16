@@ -101,7 +101,7 @@ impl Rpc for NetworkRpc {
         }
         common_apm::metrics::network::on_network_message_sent(endpoint.full_url());
 
-        let ctx = cx.set_url(endpoint.full_url().to_owned());
+        let ctx = cx.set_url(endpoint.root());
         let net_msg = NetworkMessage::new(endpoint, data, headers).encode()?;
         self.send(ctx, sid, net_msg, priority).await?;
 
@@ -166,7 +166,7 @@ impl Rpc for NetworkRpc {
         }
         common_apm::metrics::network::on_network_message_sent(endpoint.full_url());
 
-        let ctx = cx.set_url(endpoint.full_url().to_owned());
+        let ctx = cx.set_url(endpoint.root());
         let net_msg = NetworkMessage::new(endpoint, encoded_resp, headers).encode()?;
         self.send(ctx, sid, net_msg, priority).await?;
 

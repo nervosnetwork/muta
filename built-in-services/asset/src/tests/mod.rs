@@ -10,7 +10,8 @@ use framework::binding::sdk::{DefaultChainQuerier, DefaultServiceSDK};
 use framework::binding::state::{GeneralServiceState, MPTTrie};
 use protocol::traits::{CommonStorage, Context, Storage};
 use protocol::types::{
-    Address, Block, Hash, Proof, Receipt, ServiceContext, ServiceContextParams, SignedTransaction,
+    Address, Block, BlockHeader, Hash, Proof, Receipt, ServiceContext, ServiceContextParams,
+    SignedTransaction,
 };
 use protocol::ProtocolResult;
 
@@ -254,6 +255,18 @@ impl CommonStorage for MockStorage {
     async fn set_latest_block(&self, _ctx: Context, _block: Block) -> ProtocolResult<()> {
         unimplemented!()
     }
+
+    async fn get_latest_block_header(&self, _ctx: Context) -> ProtocolResult<BlockHeader> {
+        unimplemented!()
+    }
+
+    async fn get_block_header(
+        &self,
+        _ctx: Context,
+        _height: u64,
+    ) -> ProtocolResult<Option<BlockHeader>> {
+        unimplemented!()
+    }
 }
 
 #[async_trait]
@@ -278,7 +291,7 @@ impl Storage for MockStorage {
     async fn get_transaction_by_hash(
         &self,
         _ctx: Context,
-        _: Hash,
+        _: &Hash,
     ) -> ProtocolResult<Option<SignedTransaction>> {
         unimplemented!()
     }
@@ -287,7 +300,7 @@ impl Storage for MockStorage {
         &self,
         _ctx: Context,
         _: u64,
-        _: Vec<Hash>,
+        _: &[Hash],
     ) -> ProtocolResult<Vec<Option<SignedTransaction>>> {
         unimplemented!()
     }

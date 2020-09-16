@@ -11,6 +11,7 @@ use crate::metrics::{
 make_auto_flush_static_metric! {
   pub label_enum COLUMN_FAMILY_TYPES {
     block,
+    block_header,
     receipt,
     signed_tx,
     wal,
@@ -95,6 +96,10 @@ pub fn on_storage_get_cf(sc: StorageCategory, duration: Duration, keys: i64) {
             STORAGE_GET_CF_TIME_USAGE.block.inc_by(seconds);
             STORAGE_GET_CF_COUNTER.block.inc_by(keys);
         }
+        StorageCategory::BlockHeader => {
+            STORAGE_GET_CF_TIME_USAGE.block_header.inc_by(seconds);
+            STORAGE_GET_CF_COUNTER.block_header.inc_by(keys);
+        }
         StorageCategory::Receipt => {
             STORAGE_GET_CF_TIME_USAGE.receipt.inc_by(seconds);
             STORAGE_GET_CF_COUNTER.receipt.inc_by(keys);
@@ -121,6 +126,10 @@ pub fn on_storage_put_cf(sc: StorageCategory, duration: Duration, size: i64) {
         StorageCategory::Block => {
             STORAGE_PUT_CF_TIME_USAGE.block.inc_by(seconds);
             STORAGE_PUT_CF_BYTES_COUNTER.block.inc_by(size);
+        }
+        StorageCategory::BlockHeader => {
+            STORAGE_PUT_CF_TIME_USAGE.block_header.inc_by(seconds);
+            STORAGE_PUT_CF_BYTES_COUNTER.block_header.inc_by(size);
         }
         StorageCategory::Receipt => {
             STORAGE_PUT_CF_TIME_USAGE.receipt.inc_by(seconds);
