@@ -22,7 +22,7 @@ use self::protocol::IdentifyProtocol;
 use behaviour::IdentifyBehaviour;
 
 pub use self::identification::WaitIdentification;
-pub use self::protocol::Error;
+pub use self::protocol::{Error, DEFAULT_TIMEOUT};
 
 pub const NAME: &str = "chain_identify";
 pub const SUPPORT_VERSIONS: [&str; 1] = ["0.2"];

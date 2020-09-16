@@ -29,7 +29,7 @@ use std::pin::Pin;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::task::{Context, Poll};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use arc_swap::ArcSwap;
 use derive_more::Display;
@@ -52,7 +52,7 @@ use crate::event::{
     ConnectionErrorKind, ConnectionEvent, ConnectionType, MisbehaviorKind, PeerManagerEvent,
     SessionErrorKind,
 };
-use crate::protocols::identify::{Identify, WaitIdentification};
+use crate::protocols::identify::{self, Identify, WaitIdentification};
 use crate::traits::MultiaddrExt;
 
 use addr_set::PeerAddrSet;
@@ -330,8 +330,19 @@ struct UnidentifiedSessionEvent {
 }
 
 struct UnidentifiedSession {
-    event:     UnidentifiedSessionEvent,
-    ident_fut: WaitIdentification,
+    event:        UnidentifiedSessionEvent,
+    ident_fut:    WaitIdentification,
+    connected_at: Instant,
+}
+
+impl UnidentifiedSession {
+    fn new(event: UnidentifiedSessionEvent, ident_fut: WaitIdentification) -> Self {
+        UnidentifiedSession {
+            event,
+            ident_fut,
+            connected_at: Instant::now(),
+        }
+    }
 }
 
 impl Borrow<SessionId> for UnidentifiedSession {
@@ -815,7 +826,7 @@ impl PeerManager {
 
         let event = UnidentifiedSessionEvent { pubkey, ctx };
         let ident_fut = Identify::wait_identified(peer_id);
-        let unidentified_session = UnidentifiedSession { event, ident_fut };
+        let unidentified_session = UnidentifiedSession::new(event, ident_fut);
 
         self.unidentified_backlog.insert(unidentified_session);
     }
@@ -1402,7 +1413,16 @@ impl Future for PeerManager {
 
             match ident_fut.poll(ctx) {
                 Poll::Pending => {
-                    self.unidentified_backlog.insert(session);
+                    if session.connected_at.elapsed() >= identify::DEFAULT_TIMEOUT {
+                        warn!(
+                            "reject peer {:?} due to identification timeout",
+                            session.event.pubkey.peer_id()
+                        );
+
+                        self.disconnect_session(session.event.ctx.id);
+                    } else {
+                        self.unidentified_backlog.insert(session);
+                    }
                 }
                 Poll::Ready(ret) => match ret {
                     Ok(()) => {
