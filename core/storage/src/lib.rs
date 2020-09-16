@@ -504,12 +504,18 @@ impl<Adapter: StorageAdapter> CommonStorage for ImplStorage<Adapter> {
 
     async fn get_block_header(
         &self,
-        _ctx: Context,
+        ctx: Context,
         height: u64,
     ) -> ProtocolResult<Option<BlockHeader>> {
-        self.adapter
+        let opt_header = self
+            .adapter
             .get::<BlockHeaderSchema>(BlockKey::new(height))
-            .await
+            .await?;
+        if opt_header.is_some() {
+            return Ok(opt_header);
+        }
+
+        Ok(self.get_block(ctx, height).await?.map(|b| b.header))
     }
 
     // !!!be careful, the prev_hash may mismatch and latest block may diverse!!!
