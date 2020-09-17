@@ -750,6 +750,7 @@ impl PeerManager {
                             "session peer {:?} is been replaced by peer {:?}",
                             session.peer.id, remote_peer.id
                         );
+                        session.peer.mark_disconnected();
                         self.disconnect_session(session.id);
                         return true;
                     }
@@ -1413,18 +1414,19 @@ impl Future for PeerManager {
         // Process unidentified sessions
         let unidentified_sessions = self.unidentified_backlog.drain().collect::<Vec<_>>();
         for mut session in unidentified_sessions {
+            let peer_id = session.event.pubkey.peer_id();
             let ident_fut = &mut session.ident_fut;
             futures::pin_mut!(ident_fut);
 
             match ident_fut.poll(ctx) {
                 Poll::Pending => {
                     if session.connected_at.elapsed() >= identify::DEFAULT_TIMEOUT {
-                        warn!(
-                            "reject peer {:?} due to identification timeout",
-                            session.event.pubkey.peer_id()
-                        );
+                        warn!("reject peer {:?} due to identification timeout", peer_id);
 
                         self.disconnect_session(session.event.ctx.id);
+                        if let Some(peer) = self.inner.peer(&peer_id) {
+                            peer.mark_disconnected();
+                        }
                     } else {
                         self.unidentified_backlog.insert(session);
                     }
@@ -1456,11 +1458,13 @@ impl Future for PeerManager {
                     Err(err) => {
                         warn!(
                             "reject peer {:?} due to identification failed: {}",
-                            session.event.pubkey.peer_id(),
-                            err
+                            peer_id, err
                         );
 
                         self.disconnect_session(session.event.ctx.id);
+                        if let Some(peer) = self.inner.peer(&peer_id) {
+                            peer.mark_disconnected();
+                        }
                     }
                 },
             }
