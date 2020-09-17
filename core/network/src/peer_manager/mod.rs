@@ -26,7 +26,6 @@ use std::iter::FromIterator;
 use std::ops::Deref;
 use std::path::PathBuf;
 use std::pin::Pin;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::{Duration, Instant};
@@ -74,6 +73,7 @@ const MAX_RETRY_COUNT: u8 = 30;
 const SHORT_ALIVE_SESSION: u64 = 3; // seconds
 const MAX_CONNECTING_MARGIN: usize = 10;
 const MAX_RANDOM_NEXT_RETRY: u64 = 20;
+const MAX_CONNECTING_TIMEOUT: Duration = Duration::from_secs(30);
 
 const GOOD_TRUST_SCORE: u8 = 80u8;
 const WORSE_TRUST_SCALAR_RATIO: usize = 10;
@@ -174,22 +174,32 @@ impl Into<Multiaddr> for PeerMultiaddr {
 #[derive(Debug)]
 struct ConnectingAttempt {
     peer:       ArcPeer,
-    multiaddrs: AtomicUsize,
+    multiaddrs: HashSet<PeerMultiaddr>,
+    at:         Instant,
 }
 
 impl ConnectingAttempt {
     fn new(peer: ArcPeer) -> Self {
-        let multiaddrs = AtomicUsize::new(peer.multiaddrs.connectable_len());
+        let multiaddrs = HashSet::from_iter(peer.multiaddrs.connectable());
+        let at = Instant::now();
 
-        ConnectingAttempt { peer, multiaddrs }
+        ConnectingAttempt {
+            peer,
+            multiaddrs,
+            at,
+        }
     }
 
     fn multiaddrs(&self) -> usize {
-        self.multiaddrs.load(Ordering::SeqCst)
+        self.multiaddrs.len()
     }
 
-    fn complete_one_multiaddr(&self) {
-        self.multiaddrs.fetch_sub(1, Ordering::SeqCst);
+    fn complete_one_multiaddr(&mut self, multiaddr: &PeerMultiaddr) {
+        self.multiaddrs.remove(multiaddr);
+    }
+
+    fn is_timeout(&self) -> bool {
+        self.at.elapsed() >= MAX_CONNECTING_TIMEOUT
     }
 }
 
@@ -995,13 +1005,13 @@ impl PeerManager {
             }
         }
 
-        if let Some(attempt) = self.connecting.take(&peer_id) {
+        if let Some(mut attempt) = self.connecting.take(&peer_id) {
             if attempt.peer.connectedness() == Connectedness::Unconnectable {
                 // We already give up peer
                 return;
             }
 
-            attempt.complete_one_multiaddr();
+            attempt.complete_one_multiaddr(&peer_addr);
             // No more connecting multiaddrs from this peer
             // This means all multiaddrs failure
             if attempt.multiaddrs() == 0 {
@@ -1483,6 +1493,26 @@ impl Future for PeerManager {
         }
         common_apm::metrics::network::NETWORK_UNIDENTIFIED_CONNECTIONS
             .set(self.unidentified_backlog.len() as i64);
+
+        // Check connecting timeout
+        let timeout_reason = format!("exceed {} seconds", MAX_CONNECTING_TIMEOUT.as_secs());
+        let timeout_multiaddrs = {
+            let connecting_attempts = self.connecting.iter();
+            let timeouted_attempts = connecting_attempts.filter_map(|attempt| {
+                if !attempt.is_timeout() {
+                    return None;
+                }
+
+                Some(attempt.multiaddrs.iter().cloned().collect::<Vec<_>>())
+            });
+            timeouted_attempts.flatten().collect::<Vec<_>>()
+        };
+        for peer_multiaddr in timeout_multiaddrs {
+            self.connect_failed(
+                peer_multiaddr.into(),
+                ConnectionErrorKind::TimeOut(timeout_reason.clone()),
+            )
+        }
 
         // Process manager events
         loop {
