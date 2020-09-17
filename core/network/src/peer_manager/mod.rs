@@ -1494,26 +1494,6 @@ impl Future for PeerManager {
         common_apm::metrics::network::NETWORK_UNIDENTIFIED_CONNECTIONS
             .set(self.unidentified_backlog.len() as i64);
 
-        // Check connecting timeout
-        let timeout_reason = format!("exceed {} seconds", MAX_CONNECTING_TIMEOUT.as_secs());
-        let timeout_multiaddrs = {
-            let connecting_attempts = self.connecting.iter();
-            let timeouted_attempts = connecting_attempts.filter_map(|attempt| {
-                if !attempt.is_timeout() {
-                    return None;
-                }
-
-                Some(attempt.multiaddrs.iter().cloned().collect::<Vec<_>>())
-            });
-            timeouted_attempts.flatten().collect::<Vec<_>>()
-        };
-        for peer_multiaddr in timeout_multiaddrs {
-            self.connect_failed(
-                peer_multiaddr.into(),
-                ConnectionErrorKind::TimeOut(timeout_reason.clone()),
-            )
-        }
-
         // Process manager events
         loop {
             let event_rx = &mut self.as_mut().event_rx;
@@ -1532,6 +1512,26 @@ impl Future for PeerManager {
             if let (Some(hook), Some(event)) = (self.diagnostic_hook.as_ref(), diag_event) {
                 hook(event)
             }
+        }
+
+        // Check connecting timeout
+        let timeout_reason = format!("exceed {} seconds", MAX_CONNECTING_TIMEOUT.as_secs());
+        let timeout_multiaddrs = {
+            let connecting_attempts = self.connecting.iter();
+            let timeouted_attempts = connecting_attempts.filter_map(|attempt| {
+                if !attempt.is_timeout() {
+                    return None;
+                }
+
+                Some(attempt.multiaddrs.iter().cloned().collect::<Vec<_>>())
+            });
+            timeouted_attempts.flatten().collect::<Vec<_>>()
+        };
+        for peer_multiaddr in timeout_multiaddrs {
+            self.connect_failed(
+                peer_multiaddr.into(),
+                ConnectionErrorKind::TimeOut(timeout_reason.clone()),
+            )
         }
 
         // Check connecting count
