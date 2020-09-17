@@ -894,7 +894,7 @@ impl PeerManager {
             common_apm::metrics::network::NETWORK_CONNECTED_PEERS.dec();
         }
 
-        if let Some(_) = self.connecting.take(&pid) {
+        if self.connecting.take(&pid).is_some() {
             log::info!("connecting peer {:?} session closed", pid);
             common_apm::metrics::network::NETWORK_OUTBOUND_CONNECTING_PEERS
                 .set(self.connecting.len() as i64);
