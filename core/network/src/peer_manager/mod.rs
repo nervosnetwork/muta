@@ -73,6 +73,7 @@ const MAX_RETRY_INTERVAL: u64 = 512; // seconds
 const MAX_RETRY_COUNT: u8 = 30;
 const SHORT_ALIVE_SESSION: u64 = 3; // seconds
 const MAX_CONNECTING_MARGIN: usize = 10;
+const MAX_RANDOM_NEXT_RETRY: u64 = 20;
 
 const GOOD_TRUST_SCORE: u8 = 80u8;
 const WORSE_TRUST_SCALAR_RATIO: usize = 10;
@@ -877,16 +878,17 @@ impl PeerManager {
     fn session_closed(&mut self, pid: PeerId, sid: SessionId) {
         debug!("peer {:?} session {} closed", pid, sid);
 
-        // Unidentified session
-        if self.unidentified_backlog.take(&sid).is_some() {
-            return;
+        // Check unidentified session
+        let opt_unidentified_session = self.unidentified_backlog.take(&sid);
+        if opt_unidentified_session.is_none() {
+            common_apm::metrics::network::NETWORK_CONNECTED_PEERS.dec();
         }
+
         if let Some(_) = self.connecting.take(&pid) {
             log::info!("connecting peer {:?} session closed", pid);
             common_apm::metrics::network::NETWORK_OUTBOUND_CONNECTING_PEERS
                 .set(self.connecting.len() as i64);
         }
-        common_apm::metrics::network::NETWORK_CONNECTED_PEERS.dec();
 
         // Session may be removed by other event or rejected
         let opt_session = self.inner.remove_session(sid);
@@ -909,7 +911,7 @@ impl PeerManager {
         };
 
         remote_peer.mark_disconnected();
-        if remote_peer.tags.contains(&PeerTag::Consensus) {
+        if remote_peer.tags.contains(&PeerTag::Consensus) && opt_unidentified_session.is_none() {
             common_apm::metrics::network::NETWORK_CONNECTED_CONSENSUS_PEERS.dec();
         }
 
@@ -934,6 +936,16 @@ impl PeerManager {
 
             while remote_peer.retry.eta() < REPEATED_CONNECTION_TIMEOUT {
                 remote_peer.retry.inc();
+            }
+        } else {
+            // Set up a short ban, so we won't retry this peer immediately
+            let rand_next_retry = {
+                let duration = rand::random::<u64>() % MAX_RANDOM_NEXT_RETRY;
+                Duration::from_secs(duration)
+            };
+
+            if let Err(err) = remote_peer.tags.insert_ban(rand_next_retry) {
+                log::info!("random retry for peer {:?} failed: {}", remote_peer.id, err);
             }
         }
     }
