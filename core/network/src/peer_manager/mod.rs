@@ -968,6 +968,7 @@ impl PeerManager {
             DNSResolver, Io, MultiaddrNotSuppored, PeerIdNotMatch, ProtocolHandle, SecioHandshake,
             TimeOut,
         };
+        log::info!("connect to {:?} failed: {}", addr, error_kind);
 
         let peer_addr: PeerMultiaddr = match addr.clone().try_into() {
             Ok(pma) => pma,
@@ -1018,6 +1019,8 @@ impl PeerManager {
             // No more connecting multiaddrs from this peer
             // This means all multiaddrs failure
             if attempt.multiaddrs() == 0 {
+                log::info!("peer {:?} increase retry", attempt.peer.id);
+
                 attempt.peer.retry.inc();
                 attempt.peer.set_connectedness(Connectedness::CanConnect);
 
@@ -1063,7 +1066,10 @@ impl PeerManager {
         }
 
         match error_kind {
-            Io(_) => session.peer.retry.inc(),
+            Io(_) => {
+                info!("peer {:?} session failed, increase retry", session.peer.id);
+                session.peer.retry.inc();
+            }
             Protocol { .. } | Unexpected(_) => {
                 let pid = &session.peer.id;
                 let remote_addr = &session.connected_addr;
@@ -1268,6 +1274,8 @@ impl PeerManager {
     fn connect_peers(&mut self, peers: Vec<ArcPeer>) {
         let connectable = |p: ArcPeer| -> Option<ArcPeer> {
             if p.multiaddrs.len() == 0 {
+                log::info!("peer {:?} has no multiaddress", p.id);
+
                 return None;
             }
 
@@ -1289,7 +1297,7 @@ impl PeerManager {
                     // For consensus peer, just try again.
                     Some(p)
                 } else {
-                    debug!("peer {:?} connectedness {}", p.id, connectedness);
+                    log::info!("peer {:?} connectedness {}", p.id, connectedness);
                     None
                 }
             } else {
@@ -1312,6 +1320,7 @@ impl PeerManager {
                 .collect()
         };
 
+        log::info!("connect to peers {:?} found {:?}", pids, peers_to_connect);
         self.connect_peers(peers_to_connect);
     }
 
@@ -1533,7 +1542,7 @@ impl Future for PeerManager {
 
         // Check connecting timeout
         let timeout_reason = format!("exceed {} seconds", MAX_CONNECTING_TIMEOUT.as_secs());
-        let timeout_multiaddrs = {
+        let timeouted_mutiaddrs = {
             let connecting_attempts = self.connecting.iter();
             let timeouted_attempts = connecting_attempts.filter_map(|attempt| {
                 if !attempt.is_timeout() {
@@ -1544,9 +1553,10 @@ impl Future for PeerManager {
             });
             timeouted_attempts.flatten().collect::<Vec<_>>()
         };
-        for peer_multiaddr in timeout_multiaddrs {
+        log::info!("timeouted connecting found: {:?}", timeouted_mutiaddrs);
+        for peer_multiaddr in timeouted_mutiaddrs {
             self.connect_failed(
-                peer_multiaddr.into(),
+                Into::<Multiaddr>::into(peer_multiaddr),
                 ConnectionErrorKind::TimeOut(timeout_reason.clone()),
             )
         }
