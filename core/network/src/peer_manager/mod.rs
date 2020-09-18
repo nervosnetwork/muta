@@ -1263,6 +1263,10 @@ impl PeerManager {
 
     fn connect_peers(&mut self, peers: Vec<ArcPeer>) {
         let connectable = |p: ArcPeer| -> Option<ArcPeer> {
+            if p.multiaddrs.len() == 0 {
+                return None;
+            }
+
             if self.config.allowlist_only
                 && !p.tags.contains(&PeerTag::AlwaysAllow)
                 && !p.tags.contains(&PeerTag::Consensus)
