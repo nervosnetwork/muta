@@ -3,8 +3,8 @@
 use super::{
     time, ArcPeer, Connectedness, ConnectingAttempt, Inner, MisbehaviorKind, PeerManager,
     PeerManagerConfig, PeerMultiaddr, TrustMetric, TrustMetricConfig, GOOD_TRUST_SCORE,
-    MAX_CONNECTING_MARGIN, MAX_RETRY_COUNT, REPEATED_CONNECTION_TIMEOUT, SAME_IP_LIMIT_BAN,
-    SHORT_ALIVE_SESSION,
+    MAX_CONNECTING_MARGIN, MAX_RANDOM_NEXT_RETRY, MAX_RETRY_COUNT, REPEATED_CONNECTION_TIMEOUT,
+    SAME_IP_LIMIT_BAN, SHORT_ALIVE_SESSION,
 };
 use crate::{
     common::ConnectedAddr,
@@ -1040,13 +1040,52 @@ async fn should_remove_session_on_session_closed() {
     assert_eq!(inner.connected(), 0, "shoulld have zero connected");
     assert_eq!(inner.share_sessions().len(), 0, "should have no session");
     assert_eq!(
+        test_peer.connectedness(),
+        Connectedness::CanConnect,
+        "should set peer connectednes to Connecting since we have't reach max connection"
+    );
+    assert_eq!(test_peer.retry.count(), 0, "should keep retry to 0");
+}
+
+#[tokio::test]
+async fn should_not_reconnect_to_closed_session_immediately_after_session_closed() {
+    let (mut mgr, _conn_rx) = make_manager(2, 20);
+    let remote_peers = make_sessions(&mut mgr, 1, 5000, SessionType::Outbound).await;
+
+    let test_peer = remote_peers.first().expect("get first peer");
+    assert_eq!(
+        test_peer.retry.count(),
+        0,
+        "should reset retry after connect"
+    );
+    // Set connected at to older timestamp to increase peer alive
+    test_peer.set_connected_at(time::now() - SHORT_ALIVE_SESSION - 1);
+
+    let session_closed = PeerManagerEvent::SessionClosed {
+        pid: test_peer.owned_id(),
+        sid: test_peer.session_id(),
+    };
+    mgr.poll_event(session_closed).await;
+
+    let inner = mgr.core_inner();
+    let random_short_ban = {
+        let opt_banned = test_peer.tags.get_banned_until();
+        opt_banned.expect("should have a random short ban")
+    };
+    assert_eq!(inner.connected(), 0, "shoulld have zero connected");
+    assert_eq!(inner.share_sessions().len(), 0, "should have no session");
+    assert!(
+        random_short_ban <= (time::now() + MAX_RANDOM_NEXT_RETRY),
+        "should have a random short ban, so we dont reconnect to this peer immediately"
+    );
+    assert_eq!(
         mgr.connecting().len(),
-        1,
-        "should have one connecting attempt"
+        0,
+        "should not reconnect immediately"
     );
     assert_eq!(
         test_peer.connectedness(),
-        Connectedness::Connecting,
+        Connectedness::CanConnect,
         "should set peer connectednes to Connecting since we have't reach max connection"
     );
     assert_eq!(test_peer.retry.count(), 0, "should keep retry to 0");

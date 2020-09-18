@@ -761,7 +761,6 @@ impl PeerManager {
                             "session peer {:?} is been replaced by peer {:?}",
                             session.peer.id, remote_peer.id
                         );
-                        session.peer.mark_disconnected();
                         self.disconnect_session(session.id);
                         return true;
                     }
