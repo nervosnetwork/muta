@@ -42,7 +42,7 @@ use rand::seq::IteratorRandom;
 use serde_derive::{Deserialize, Serialize};
 use tentacle::multiaddr::Multiaddr;
 use tentacle::secio::{PeerId, PublicKey};
-use tentacle::service::{SessionType, TargetProtocol};
+use tentacle::service::SessionType;
 use tentacle::SessionId;
 
 use crate::common::{resolve_if_unspecified, HeartBeat};
@@ -52,7 +52,8 @@ use crate::event::{
     SessionErrorKind,
 };
 use crate::protocols::identify::{self, Identify, WaitIdentification};
-use crate::traits::MultiaddrExt;
+use crate::protocols::CoreProtocol;
+use crate::traits::{MultiaddrExt, NetworkProtocol};
 
 use addr_set::PeerAddrSet;
 use retry::Retry;
@@ -1263,7 +1264,7 @@ impl PeerManager {
 
         let connect_attempt = ConnectionEvent::Connect {
             addrs,
-            proto: TargetProtocol::All,
+            proto: CoreProtocol::target(),
         };
 
         if self.conn_tx.unbounded_send(connect_attempt).is_err() {
