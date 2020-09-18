@@ -359,6 +359,10 @@ impl UnidentifiedSession {
             connected_at: Instant::now(),
         }
     }
+
+    fn peer_id(&self) -> PeerId {
+        self.event.pubkey.peer_id()
+    }
 }
 
 impl Borrow<SessionId> for UnidentifiedSession {
@@ -1359,19 +1363,31 @@ impl PeerManager {
             sid, ty, addr
         );
 
-        let session = match self.inner.session(sid) {
-            Some(s) => s,
-            None => {
-                // Impossibl
-                error!("repeated connection but session {} not found", sid);
-                return;
+        let peer_id = {
+            let opt_unidentified_session = self.unidentified_backlog.get(&sid);
+            let opt_pid = opt_unidentified_session.map_or_else(
+                || self.inner.session(sid).map(|s| s.peer.owned_id()),
+                |unidentified_session| Some(unidentified_session.peer_id()),
+            );
+
+            match opt_pid {
+                Some(pid) => pid,
+                None => {
+                    // Impossibl
+                    error!("repeated connection but session {} not found", sid);
+
+                    return;
+                }
             }
         };
 
-        let peer_addr = PeerMultiaddr::new(addr, &session.peer.id);
-        match ty {
-            ConnectionType::Inbound => session.peer.multiaddrs.remove(&peer_addr),
-            ConnectionType::Outbound => session.peer.multiaddrs.reset_failure(&peer_addr),
+        if let Some(peer) = self.inner.peer(&peer_id) {
+            let peer_addr = PeerMultiaddr::new(addr, &peer_id);
+
+            match ty {
+                ConnectionType::Inbound => peer.multiaddrs.remove(&peer_addr),
+                ConnectionType::Outbound => peer.multiaddrs.reset_failure(&peer_addr),
+            }
         }
     }
 
