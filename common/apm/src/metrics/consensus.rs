@@ -72,6 +72,10 @@ lazy_static! {
         "The committed transactions"
     )
     .unwrap();
+    pub static ref ENGINE_ORDER_TX_GAUGE: IntGauge =
+        register_int_gauge!("muta_proposal_order_tx_len", "The ordered transactions len").unwrap();
+    pub static ref ENGINE_SYNC_TX_GAUGE: IntGauge =
+        register_int_gauge!("muta_proposal_sync_tx_len", "The sync transactions len").unwrap();
     pub static ref ENGINE_SYNC_BLOCK_COUNTER: IntCounter = register_int_counter!(
         "muta_consensus_sync_block_total",
         "The counter for sync blocks from remote"
