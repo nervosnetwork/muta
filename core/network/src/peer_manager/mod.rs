@@ -72,7 +72,7 @@ const MAX_RETRY_INTERVAL: u64 = 512; // seconds
 const MAX_RETRY_COUNT: u8 = 30;
 const SHORT_ALIVE_SESSION: u64 = 3; // seconds
 const MAX_CONNECTING_MARGIN: usize = 10;
-const MAX_RANDOM_NEXT_RETRY: u64 = 20;
+const MAX_RANDOM_NEXT_RETRY: u64 = 10;
 const MAX_CONNECTING_TIMEOUT: Duration = Duration::from_secs(30);
 
 const GOOD_TRUST_SCORE: u8 = 80u8;
