@@ -201,6 +201,11 @@ impl ConnectingAttempt {
     fn is_timeout(&self) -> bool {
         self.at.elapsed() >= MAX_CONNECTING_TIMEOUT
     }
+
+    #[cfg(test)]
+    fn set_at(&mut self, duration: Duration) {
+        self.at = self.at.checked_sub(duration).unwrap();
+    }
 }
 
 impl Borrow<PeerId> for ConnectingAttempt {

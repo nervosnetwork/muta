@@ -3,8 +3,8 @@
 use super::{
     time, ArcPeer, Connectedness, ConnectingAttempt, Inner, MisbehaviorKind, PeerManager,
     PeerManagerConfig, PeerMultiaddr, TrustMetric, TrustMetricConfig, GOOD_TRUST_SCORE,
-    MAX_CONNECTING_MARGIN, MAX_RANDOM_NEXT_RETRY, MAX_RETRY_COUNT, REPEATED_CONNECTION_TIMEOUT,
-    SAME_IP_LIMIT_BAN, SHORT_ALIVE_SESSION,
+    MAX_CONNECTING_MARGIN, MAX_CONNECTING_TIMEOUT, MAX_RANDOM_NEXT_RETRY, MAX_RETRY_COUNT,
+    REPEATED_CONNECTION_TIMEOUT, SAME_IP_LIMIT_BAN, SHORT_ALIVE_SESSION,
 };
 use crate::{
     common::ConnectedAddr,
@@ -3265,4 +3265,33 @@ async fn should_accept_always_allow_peer_even_if_we_reach_max_connections_on_uni
         Err(_) => (), // Err means channel is empty, it's expected
         _ => panic!("should not have any disconnect event"),
     }
+}
+
+#[tokio::test]
+async fn should_remove_connecting_attempt_when_reach_timeout() {
+    let (mut mgr, _conn_rx) = make_manager(0, 20);
+
+    let test_peer = make_peer(9527);
+    let mut target_attempt = ConnectingAttempt::new(test_peer.clone());
+    target_attempt.set_at(MAX_CONNECTING_TIMEOUT + Duration::from_secs(1));
+
+    let inner = mgr.core_inner();
+    inner.add_peer(test_peer);
+    assert_eq!(inner.connected(), 0, "should have zero connected");
+
+    mgr.connecting_mut().insert(target_attempt);
+    assert_eq!(
+        mgr.connecting().len(),
+        1,
+        "should have one connecting attempt"
+    );
+
+    mgr.poll().await;
+
+    assert_eq!(
+        mgr.connecting().len(),
+        0,
+        "should have 0 connecting attempt"
+    );
+    assert_eq!(inner.connected(), 0, "should have 0 connected");
 }
