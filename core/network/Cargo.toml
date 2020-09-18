@@ -25,7 +25,7 @@ rand = "0.7"
 serde = "1.0"
 serde_derive = "1.0"
 snap = "0.2"
-tentacle = { git = "http://github.com/zeroqn/p2p", rev = "492ed8f", features = ["molc"]}
+tentacle = { git = "http://github.com/zeroqn/p2p", rev = "b2682d2", features = ["molc"]}
 tokio = { version = "0.2", features = ["macros", "rt-core"]}
 tokio-util = { version = "0.2", features = ["codec"] }
 hostname = "0.3"
