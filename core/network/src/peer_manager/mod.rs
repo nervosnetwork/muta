@@ -705,9 +705,6 @@ impl PeerManager {
         let opt_peer = self.inner.peer(&remote_peer_id);
         let remote_peer = opt_peer.unwrap_or_else(|| ArcPeer::new(remote_peer_id.clone()));
 
-        common_apm::metrics::network::NETWORK_OUTBOUND_CONNECTING_PEERS
-            .set(self.connecting.len() as i64);
-
         // Inbound address is client address, it's useless
         match ctx.ty {
             SessionType::Inbound => remote_peer.multiaddrs.remove(&remote_multiaddr),
@@ -900,8 +897,6 @@ impl PeerManager {
 
         if self.connecting.take(&pid).is_some() {
             log::info!("connecting peer {:?} session closed", pid);
-            common_apm::metrics::network::NETWORK_OUTBOUND_CONNECTING_PEERS
-                .set(self.connecting.len() as i64);
         }
 
         // Session may be removed by other event or rejected
@@ -1027,8 +1022,6 @@ impl PeerManager {
                     attempt.peer.set_connectedness(Connectedness::Unconnectable);
                 }
 
-                common_apm::metrics::network::NETWORK_OUTBOUND_CONNECTING_PEERS
-                    .set(self.connecting.len() as i64);
             // FIXME
             // if let Some(trust_metric) = attempt.peer.trust_metric() {
             //     trust_metric.bad_events(1);
@@ -1537,6 +1530,8 @@ impl Future for PeerManager {
                 ConnectionErrorKind::TimeOut(timeout_reason.clone()),
             )
         }
+        common_apm::metrics::network::NETWORK_OUTBOUND_CONNECTING_PEERS
+            .set(self.connecting.len() as i64);
 
         // Check connecting count
         let connected_count = self.inner.connected();
