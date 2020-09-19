@@ -176,6 +176,8 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<FixedPill> for ConsensusEngine<
         let sync_tx_hashes = block.get_propose_hashes();
         let pill = block.inner;
 
+        gauge_txs_len(&pill);
+
         // If the block is proposed by self, it does not need to check. Get full signed
         // transactions directly.
         if !exemption {
@@ -872,6 +874,12 @@ fn validate_timestamp(
     }
 
     true
+}
+
+fn gauge_txs_len(pill: &Pill) {
+    common_apm::metrics::consensus::ENGINE_ORDER_TX_GAUGE
+        .set(pill.block.ordered_tx_hashes.len() as i64);
+    common_apm::metrics::consensus::ENGINE_SYNC_TX_GAUGE.set(pill.propose_hashes.len() as i64);
 }
 
 #[cfg(test)]
