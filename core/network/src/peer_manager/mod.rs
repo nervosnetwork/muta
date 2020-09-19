@@ -1554,7 +1554,9 @@ impl Future for PeerManager {
             });
             timeouted_attempts.flatten().collect::<Vec<_>>()
         };
-        log::info!("timeouted connecting found: {:?}", timeouted_mutiaddrs);
+        if !timeouted_mutiaddrs.is_empty() {
+            log::info!("timeouted connecting found: {:?}", timeouted_mutiaddrs);
+        }
         for peer_multiaddr in timeouted_mutiaddrs {
             self.connect_failed(
                 Into::<Multiaddr>::into(peer_multiaddr),
