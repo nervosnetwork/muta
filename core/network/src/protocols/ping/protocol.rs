@@ -57,7 +57,9 @@ impl PingStatus {
 
     /// Time duration since we last send ping.
     fn elapsed(&self) -> Duration {
-        self.last_ping.elapsed().unwrap_or(Duration::from_secs(0))
+        self.last_ping
+            .elapsed()
+            .unwrap_or_else(|_| Duration::from_secs(0))
     }
 }
 

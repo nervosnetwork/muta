@@ -197,7 +197,7 @@ impl SessionBook {
         let session_host = &session.connected_addr.host;
         let host_count = {
             let hosts = self.hosts.read();
-            hosts.get(session_host).cloned().unwrap_or_else(|| 0)
+            hosts.get(session_host).cloned().unwrap_or(0)
         };
 
         if host_count == usize::MAX || host_count + 1 > self.config.same_ip_conn_limit {

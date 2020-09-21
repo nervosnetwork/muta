@@ -153,7 +153,7 @@ impl RpcEndpoint {
         let end = end.full_url();
 
         // Rpc id should be the last comp
-        let r_sep_idx = end.rfind('/').ok_or_else(|| NetworkError::NotEndpoint)?;
+        let r_sep_idx = end.rfind('/').ok_or(NetworkError::NotEndpoint)?;
         if end.len() == (r_sep_idx + 1) {
             // Last separator '/' should not be the last char
             return Err(NetworkError::NotEndpoint);

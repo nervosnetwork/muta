@@ -187,7 +187,7 @@ impl<'a> SendingContext<'a> {
             (Some(tar), opt_blocked) => (tar, opt_blocked),
         };
 
-        let url = msg_ctx.url().unwrap_or_else(|_| "");
+        let url = msg_ctx.url().unwrap_or("");
         let data_size = match &target {
             TargetSession::Single(_) => data.len(),
             TargetSession::Multi(sessions) => data.len().saturating_mul(sessions.len()),
