@@ -274,9 +274,8 @@ mod tests {
     fn test_rand_remove() {
         let list = (0..10).collect::<Vec<_>>();
         let keys = list.iter().collect::<Vec<_>>();
-        let to_removed_num = (1..10).collect::<Vec<_>>();
 
-        for num in to_removed_num.into_iter() {
+        for num in 1..10 {
             let res = rand_remove_list(keys.clone(), num);
             assert_eq!(res.len(), num);
         }

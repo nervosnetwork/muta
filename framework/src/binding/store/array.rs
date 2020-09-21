@@ -98,11 +98,7 @@ impl<S: ServiceState, E: FixedCodec> StoreArray<E> for DefaultStoreArray<S, E> {
     }
 
     fn is_empty(&self) -> bool {
-        if let 0 = self.len() {
-            true
-        } else {
-            false
-        }
+        self.len() == 0
     }
 
     fn iter<'a>(&'a self) -> Box<dyn Iterator<Item = (u64, E)> + 'a> {
