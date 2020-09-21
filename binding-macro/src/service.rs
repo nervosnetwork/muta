@@ -382,13 +382,7 @@ fn extract_hooks(items: &[ImplItem]) -> Hooks {
 fn find_list_for_item_method(items: &[ImplItem]) -> Vec<ImplItemMethod> {
     items
         .iter()
-        .filter(|item| {
-            if let ImplItem::Method(_) = item {
-                true
-            } else {
-                false
-            }
-        })
+        .filter(|item| matches!(item, ImplItem::Method(_)))
         .map(|item| {
             if let ImplItem::Method(method) = item {
                 method.clone()
