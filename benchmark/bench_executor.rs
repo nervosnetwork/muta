@@ -1,3 +1,5 @@
+#![allow(clippy::needles_collect)]
+
 use asset::types::TransferPayload;
 
 use super::*;
