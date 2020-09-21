@@ -953,8 +953,17 @@ impl PeerManager {
             }
         } else {
             // Set up a short ban, so we won't retry this peer immediately
+            if remote_peer.tags.contains(&PeerTag::Consensus)
+                || remote_peer.tags.contains(&PeerTag::AlwaysAllow)
+            {
+                return;
+            }
+
             let rand_next_retry = {
-                let duration = rand::random::<u64>() % MAX_RANDOM_NEXT_RETRY;
+                let mut duration = rand::random::<u64>() % MAX_RANDOM_NEXT_RETRY;
+                if duration < 2 {
+                    duration = 2; // At least 2 seconds
+                }
                 Duration::from_secs(duration)
             };
 
