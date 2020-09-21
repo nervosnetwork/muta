@@ -394,7 +394,7 @@ pub async fn start<Mapping: 'static + ServiceMapping>(
         let block = storage
             .get_block(Context::new(), height)
             .await?
-            .ok_or_else(|| StorageError::GetNone)?;
+            .ok_or(StorageError::GetNone)?;
         let txs = storage
             .get_transactions(
                 Context::new(),

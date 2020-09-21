@@ -20,7 +20,7 @@ fn should_report_good_on_valid_transaction() {
                 .expect("broadcast stx");
 
             match client_node.until_trust_processed().await {
-                Ok(TrustFeedback::Good) => return,
+                Ok(TrustFeedback::Good) => {}
                 Ok(_) => panic!("should be good report"),
                 _ => panic!("fetch trust report"),
             }
