@@ -267,7 +267,7 @@ impl ConsensusWal {
             })
             .collect::<Vec<_>>();
 
-        file_names_timestamps.sort_by(|a, b| b.cmp(a));
+        file_names_timestamps.sort_by_key(|&b| std::cmp::Reverse(b));
 
         // 3rd, get a latest and valid wal if possible
         let mut index = 0;

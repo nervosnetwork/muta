@@ -166,7 +166,7 @@ where
             .storage
             .get_block_header(ctx, height)
             .await?
-            .ok_or_else(|| ConsensusError::StorageItemNotFound)?;
+            .ok_or(ConsensusError::StorageItemNotFound)?;
         Ok(header.validators)
     }
 
