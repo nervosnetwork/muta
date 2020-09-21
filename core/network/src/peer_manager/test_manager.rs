@@ -1,4 +1,4 @@
-#[allow(clippy::needless_collect)]
+#![allow(clippy::needless_collect)]
 
 use super::{
     time, ArcPeer, Connectedness, ConnectingAttempt, Inner, MisbehaviorKind, PeerManager,
