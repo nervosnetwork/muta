@@ -1,4 +1,4 @@
-#![allow(clippy::needles_collect)]
+#![allow(clippy::needless_collect)]
 
 use asset::types::TransferPayload;
 
