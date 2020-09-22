@@ -1,3 +1,5 @@
+#![allow(clippy::needles_collect)]
+
 #![feature(test)]
 extern crate test;
 
