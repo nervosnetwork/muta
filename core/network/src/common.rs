@@ -120,10 +120,7 @@ impl MultiaddrExt for Multiaddr {
     }
 
     fn has_id(&self) -> bool {
-        self.iter().any(|proto| match proto {
-            Protocol::P2P(_) => true,
-            _ => false,
-        })
+        self.iter().any(|proto| matches!(proto, Protocol::P2P(_)))
     }
 
     fn push_id(&mut self, peer_id: PeerId) {

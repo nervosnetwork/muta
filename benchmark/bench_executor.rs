@@ -1,3 +1,5 @@
+#![allow(clippy::needless_collect)]
+
 use asset::types::TransferPayload;
 
 use super::*;

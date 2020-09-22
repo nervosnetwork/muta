@@ -42,10 +42,7 @@ pub enum MisbehaveResult {
 
 impl MisbehaveResult {
     pub fn is_disconnect(&self) -> bool {
-        match self {
-            MisbehaveResult::Disconnect => true,
-            _ => false,
-        }
+        matches!(self, MisbehaveResult::Disconnect)
     }
 }
 

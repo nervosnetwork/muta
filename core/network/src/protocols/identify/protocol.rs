@@ -132,10 +132,7 @@ impl StateContext {
         let remote_addr = self.session_context.address.iter();
 
         remote_addr
-            .filter(|proto| match proto {
-                Protocol::P2P(_) => false,
-                _ => true,
-            })
+            .filter(|proto| !matches!(proto, Protocol::P2P(_)))
             .collect()
     }
 

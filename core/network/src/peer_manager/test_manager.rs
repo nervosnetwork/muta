@@ -1,3 +1,5 @@
+#![allow(clippy::needless_collect)]
+
 use super::{
     time, ArcPeer, Connectedness, ConnectingAttempt, Inner, MisbehaviorKind, PeerManager,
     PeerManagerConfig, PeerMultiaddr, TrustMetric, TrustMetricConfig, GOOD_TRUST_SCORE,
@@ -1742,6 +1744,7 @@ async fn should_try_all_peer_multiaddrs_on_connect_peers_now() {
         expect_multiaddrs.len(),
         "should have same number of multiaddrs"
     );
+
     assert!(
         !multiaddrs_in_event
             .iter()

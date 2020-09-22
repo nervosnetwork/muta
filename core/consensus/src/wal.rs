@@ -267,7 +267,7 @@ impl ConsensusWal {
             })
             .collect::<Vec<_>>();
 
-        file_names_timestamps.sort_by(|a, b| b.cmp(a));
+        file_names_timestamps.sort_by_key(|&b| std::cmp::Reverse(b));
 
         // 3rd, get a latest and valid wal if possible
         let mut index = 0;
@@ -347,7 +347,7 @@ mod tests {
     static FULL_TXS_PATH: &str = "./free-space/wal/txs";
 
     static FULL_CONSENSUS_PATH: &str = "./free-space/wal/consensus";
-    
+
     fn mock_hash() -> Hash {
         Hash::digest(get_random_bytes(10))
     }
@@ -398,7 +398,7 @@ mod tests {
     #[test]
     fn test_txs_wal() {
         fs::remove_dir_all(PathBuf::from_str(FULL_TXS_PATH).unwrap()).unwrap();
-        
+
         let wal = SignedTxsWAL::new(FULL_TXS_PATH.to_string());
         let txs_01 = mock_wal_txs(100);
         let hash_01 = Hash::digest(Bytes::from(rlp::encode_list(&txs_01)));
@@ -435,10 +435,10 @@ mod tests {
         let wal = ConsensusWal::new(FULL_CONSENSUS_PATH.to_string());
         let info = get_random_bytes(1000);
         wal.update_overlord_wal(Context::new(),info.clone()).unwrap();
-        
+
         let load = wal.load_overlord_wal(Context::new()).unwrap();
         assert_eq!(load,info);
-        
+
         // write three, read latest
         fs::remove_dir_all(PathBuf::from_str(FULL_CONSENSUS_PATH).unwrap()).unwrap();
 
@@ -455,25 +455,25 @@ mod tests {
 
         let load = wal.load_overlord_wal(Context::new());
         assert!(load.is_err());
-        
+
         // write a old correct one and a new wrong one, read old
-        
+
         // old one
         //fs::remove_dir_all(PathBuf::from_str(FULL_CONSENSUS_PATH).unwrap()).unwrap();
 
         let info = get_random_bytes(1000);
         wal.update_overlord_wal(Context::new(),info.clone()).unwrap();
-        
+
         // -> copy and modify to a new fake one
 
         let mut files = fs::read_dir(FULL_CONSENSUS_PATH).unwrap();
-        
+
         let file = files.next().unwrap().unwrap();
-        
+
         let from = u128::from_str( file.file_name().to_str().unwrap()).unwrap();
 
         let to = file.path().parent().unwrap().join((from+1).to_string());
-        
+
         let mut new_file = fs::OpenOptions::new()
             .read(true)
             .write(true)
@@ -488,7 +488,7 @@ mod tests {
 
         fs::remove_dir_all(PathBuf::from_str(FULL_CONSENSUS_PATH).unwrap()).unwrap();
     }
-    
+
     #[test]
     fn test_wal_txs_codec() {
         for _ in 0..10 {

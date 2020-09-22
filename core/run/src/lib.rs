@@ -505,7 +505,7 @@ impl<Mapping: 'static + ServiceMapping> Muta<Mapping> {
             let block = storage
                 .get_block(Context::new(), height)
                 .await?
-                .ok_or_else(|| StorageError::GetNone)?;
+                .ok_or(StorageError::GetNone)?;
             let txs = storage
                 .get_transactions(
                     Context::new(),
@@ -628,8 +628,7 @@ impl<Mapping: 'static + ServiceMapping> Muta<Mapping> {
                 certificate_chain_file_path: tls.certificate_chain_file_path,
             })
         }
-        graphql_config.enable_dump_profile =
-            config.graphql.enable_dump_profile.unwrap_or_else(|| false);
+        graphql_config.enable_dump_profile = config.graphql.enable_dump_profile.unwrap_or(false);
 
         tokio::task::spawn_local(async move {
             let local = tokio::task::LocalSet::new();

@@ -153,7 +153,7 @@ impl<
         let header = self
             .get_block_header_by_height(ctx.clone(), Some(height))
             .await?
-            .ok_or_else(|| APIError::NotFound)?;
+            .ok_or(APIError::NotFound)?;
 
         let executor = EF::from_root(
             header.state_root.clone(),
