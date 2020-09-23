@@ -57,6 +57,8 @@ pub fn main() {
         "muta-chain",
         "v0.2.0",
         "Muta Dev <muta@nervos.org>",
+        "./devtools/chain/config.toml",
+        "./devtools/chain/genesis.toml",
         None,
     )
 }
