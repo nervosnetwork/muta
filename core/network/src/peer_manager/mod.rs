@@ -26,10 +26,9 @@ use std::iter::FromIterator;
 use std::ops::Deref;
 use std::path::PathBuf;
 use std::pin::Pin;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::task::{Context, Poll};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use arc_swap::ArcSwap;
 use derive_more::Display;
@@ -43,7 +42,7 @@ use rand::seq::IteratorRandom;
 use serde_derive::{Deserialize, Serialize};
 use tentacle::multiaddr::Multiaddr;
 use tentacle::secio::{PeerId, PublicKey};
-use tentacle::service::{SessionType, TargetProtocol};
+use tentacle::service::SessionType;
 use tentacle::SessionId;
 
 use crate::common::{resolve_if_unspecified, HeartBeat};
@@ -52,8 +51,9 @@ use crate::event::{
     ConnectionErrorKind, ConnectionEvent, ConnectionType, MisbehaviorKind, PeerManagerEvent,
     SessionErrorKind,
 };
-use crate::protocols::identify::{Identify, WaitIdentification};
-use crate::traits::MultiaddrExt;
+use crate::protocols::identify::{self, Identify, WaitIdentification};
+use crate::protocols::CoreProtocol;
+use crate::traits::{MultiaddrExt, NetworkProtocol};
 
 use addr_set::PeerAddrSet;
 use retry::Retry;
@@ -73,6 +73,8 @@ const MAX_RETRY_INTERVAL: u64 = 512; // seconds
 const MAX_RETRY_COUNT: u8 = 30;
 const SHORT_ALIVE_SESSION: u64 = 3; // seconds
 const MAX_CONNECTING_MARGIN: usize = 10;
+const MAX_RANDOM_NEXT_RETRY: u64 = 10;
+const MAX_CONNECTING_TIMEOUT: Duration = Duration::from_secs(30);
 
 const GOOD_TRUST_SCORE: u8 = 80u8;
 const WORSE_TRUST_SCALAR_RATIO: usize = 10;
@@ -173,22 +175,37 @@ impl Into<Multiaddr> for PeerMultiaddr {
 #[derive(Debug)]
 struct ConnectingAttempt {
     peer:       ArcPeer,
-    multiaddrs: AtomicUsize,
+    multiaddrs: HashSet<PeerMultiaddr>,
+    at:         Instant,
 }
 
 impl ConnectingAttempt {
     fn new(peer: ArcPeer) -> Self {
-        let multiaddrs = AtomicUsize::new(peer.multiaddrs.connectable_len());
+        let multiaddrs = HashSet::from_iter(peer.multiaddrs.connectable());
+        let at = Instant::now();
 
-        ConnectingAttempt { peer, multiaddrs }
+        ConnectingAttempt {
+            peer,
+            multiaddrs,
+            at,
+        }
     }
 
     fn multiaddrs(&self) -> usize {
-        self.multiaddrs.load(Ordering::SeqCst)
+        self.multiaddrs.len()
     }
 
-    fn complete_one_multiaddr(&self) {
-        self.multiaddrs.fetch_sub(1, Ordering::SeqCst);
+    fn complete_one_multiaddr(&mut self, multiaddr: &PeerMultiaddr) {
+        self.multiaddrs.remove(multiaddr);
+    }
+
+    fn is_timeout(&self) -> bool {
+        self.at.elapsed() >= MAX_CONNECTING_TIMEOUT
+    }
+
+    #[cfg(test)]
+    fn set_at(&mut self, duration: Duration) {
+        self.at = self.at.checked_sub(duration).unwrap();
     }
 }
 
@@ -330,8 +347,23 @@ struct UnidentifiedSessionEvent {
 }
 
 struct UnidentifiedSession {
-    event:     UnidentifiedSessionEvent,
-    ident_fut: WaitIdentification,
+    event:        UnidentifiedSessionEvent,
+    ident_fut:    WaitIdentification,
+    connected_at: Instant,
+}
+
+impl UnidentifiedSession {
+    fn new(event: UnidentifiedSessionEvent, ident_fut: WaitIdentification) -> Self {
+        UnidentifiedSession {
+            event,
+            ident_fut,
+            connected_at: Instant::now(),
+        }
+    }
+
+    fn peer_id(&self) -> PeerId {
+        self.event.pubkey.peer_id()
+    }
 }
 
 impl Borrow<SessionId> for UnidentifiedSession {
@@ -801,9 +833,6 @@ impl PeerManager {
     }
 
     fn new_unidentified_session(&mut self, pubkey: PublicKey, ctx: Arc<SessionContext>) {
-        common_apm::metrics::network::NETWORK_OUTBOUND_CONNECTING_PEERS
-            .set(self.connecting.len() as i64);
-
         let peer_id = pubkey.peer_id();
         if let Err(err) = self.new_session_pre_check(&pubkey, &ctx) {
             log::info!("reject unidentified session due to {}", err);
@@ -811,12 +840,11 @@ impl PeerManager {
             Identify::wait_failed(&peer_id, err.to_string());
             return;
         }
-
         common_apm::metrics::network::NETWORK_UNIDENTIFIED_CONNECTIONS.inc();
 
         let event = UnidentifiedSessionEvent { pubkey, ctx };
         let ident_fut = Identify::wait_identified(peer_id);
-        let unidentified_session = UnidentifiedSession { event, ident_fut };
+        let unidentified_session = UnidentifiedSession::new(event, ident_fut);
 
         self.unidentified_backlog.insert(unidentified_session);
     }
@@ -866,11 +894,15 @@ impl PeerManager {
     fn session_closed(&mut self, pid: PeerId, sid: SessionId) {
         debug!("peer {:?} session {} closed", pid, sid);
 
-        // Unidentified session
-        if self.unidentified_backlog.take(&sid).is_some() {
-            return;
+        // Check unidentified session
+        let opt_unidentified_session = self.unidentified_backlog.take(&sid);
+        if opt_unidentified_session.is_none() {
+            common_apm::metrics::network::NETWORK_CONNECTED_PEERS.dec();
         }
-        common_apm::metrics::network::NETWORK_CONNECTED_PEERS.dec();
+
+        if self.connecting.take(&pid).is_some() {
+            log::info!("connecting peer {:?} session closed", pid);
+        }
 
         // Session may be removed by other event or rejected
         let opt_session = self.inner.remove_session(sid);
@@ -893,7 +925,7 @@ impl PeerManager {
         };
 
         remote_peer.mark_disconnected();
-        if remote_peer.tags.contains(&PeerTag::Consensus) {
+        if remote_peer.tags.contains(&PeerTag::Consensus) && opt_unidentified_session.is_none() {
             common_apm::metrics::network::NETWORK_CONNECTED_CONSENSUS_PEERS.dec();
         }
 
@@ -919,6 +951,25 @@ impl PeerManager {
             while remote_peer.retry.eta() < REPEATED_CONNECTION_TIMEOUT {
                 remote_peer.retry.inc();
             }
+        } else {
+            // Set up a short ban, so we won't retry this peer immediately
+            if remote_peer.tags.contains(&PeerTag::Consensus)
+                || remote_peer.tags.contains(&PeerTag::AlwaysAllow)
+            {
+                return;
+            }
+
+            let rand_next_retry = {
+                let mut duration = rand::random::<u64>() % MAX_RANDOM_NEXT_RETRY;
+                if duration < 2 {
+                    duration = 2; // At least 2 seconds
+                }
+                Duration::from_secs(duration)
+            };
+
+            if let Err(err) = remote_peer.tags.insert_ban(rand_next_retry) {
+                log::info!("random retry for peer {:?} failed: {}", remote_peer.id, err);
+            }
         }
     }
 
@@ -927,6 +978,7 @@ impl PeerManager {
             DNSResolver, Io, MultiaddrNotSuppored, PeerIdNotMatch, ProtocolHandle, SecioHandshake,
             TimeOut,
         };
+        log::info!("connect to {:?} failed: {}", addr, error_kind);
 
         let peer_addr: PeerMultiaddr = match addr.clone().try_into() {
             Ok(pma) => pma,
@@ -967,16 +1019,18 @@ impl PeerManager {
             }
         }
 
-        if let Some(attempt) = self.connecting.take(&peer_id) {
+        if let Some(mut attempt) = self.connecting.take(&peer_id) {
             if attempt.peer.connectedness() == Connectedness::Unconnectable {
                 // We already give up peer
                 return;
             }
 
-            attempt.complete_one_multiaddr();
+            attempt.complete_one_multiaddr(&peer_addr);
             // No more connecting multiaddrs from this peer
             // This means all multiaddrs failure
             if attempt.multiaddrs() == 0 {
+                log::info!("peer {:?} increase retry", attempt.peer.id);
+
                 attempt.peer.retry.inc();
                 attempt.peer.set_connectedness(Connectedness::CanConnect);
 
@@ -985,8 +1039,6 @@ impl PeerManager {
                     attempt.peer.set_connectedness(Connectedness::Unconnectable);
                 }
 
-                common_apm::metrics::network::NETWORK_OUTBOUND_CONNECTING_PEERS
-                    .set(self.connecting.len() as i64);
             // FIXME
             // if let Some(trust_metric) = attempt.peer.trust_metric() {
             //     trust_metric.bad_events(1);
@@ -1024,7 +1076,10 @@ impl PeerManager {
         }
 
         match error_kind {
-            Io(_) => session.peer.retry.inc(),
+            Io(_) => {
+                info!("peer {:?} session failed, increase retry", session.peer.id);
+                session.peer.retry.inc();
+            }
             Protocol { .. } | Unexpected(_) => {
                 let pid = &session.peer.id;
                 let remote_addr = &session.connected_addr;
@@ -1218,7 +1273,7 @@ impl PeerManager {
 
         let connect_attempt = ConnectionEvent::Connect {
             addrs,
-            proto: TargetProtocol::All,
+            proto: CoreProtocol::target(),
         };
 
         if self.conn_tx.unbounded_send(connect_attempt).is_err() {
@@ -1228,6 +1283,12 @@ impl PeerManager {
 
     fn connect_peers(&mut self, peers: Vec<ArcPeer>) {
         let connectable = |p: ArcPeer| -> Option<ArcPeer> {
+            if p.multiaddrs.len() == 0 {
+                log::info!("peer {:?} has no multiaddress", p.id);
+
+                return None;
+            }
+
             if self.config.allowlist_only
                 && !p.tags.contains(&PeerTag::AlwaysAllow)
                 && !p.tags.contains(&PeerTag::Consensus)
@@ -1246,7 +1307,7 @@ impl PeerManager {
                     // For consensus peer, just try again.
                     Some(p)
                 } else {
-                    debug!("peer {:?} connectedness {}", p.id, connectedness);
+                    log::info!("peer {:?} connectedness {}", p.id, connectedness);
                     None
                 }
             } else {
@@ -1269,6 +1330,7 @@ impl PeerManager {
                 .collect()
         };
 
+        log::info!("connect to peers {:?} found {:?}", pids, peers_to_connect);
         self.connect_peers(peers_to_connect);
     }
 
@@ -1320,19 +1382,31 @@ impl PeerManager {
             sid, ty, addr
         );
 
-        let session = match self.inner.session(sid) {
-            Some(s) => s,
-            None => {
-                // Impossibl
-                error!("repeated connection but session {} not found", sid);
-                return;
+        let peer_id = {
+            let opt_unidentified_session = self.unidentified_backlog.get(&sid);
+            let opt_pid = opt_unidentified_session.map_or_else(
+                || self.inner.session(sid).map(|s| s.peer.owned_id()),
+                |unidentified_session| Some(unidentified_session.peer_id()),
+            );
+
+            match opt_pid {
+                Some(pid) => pid,
+                None => {
+                    // Impossibl
+                    error!("repeated connection but session {} not found", sid);
+
+                    return;
+                }
             }
         };
 
-        let peer_addr = PeerMultiaddr::new(addr, &session.peer.id);
-        match ty {
-            ConnectionType::Inbound => session.peer.multiaddrs.remove(&peer_addr),
-            ConnectionType::Outbound => session.peer.multiaddrs.reset_failure(&peer_addr),
+        if let Some(peer) = self.inner.peer(&peer_id) {
+            let peer_addr = PeerMultiaddr::new(addr, &peer_id);
+
+            match ty {
+                ConnectionType::Inbound => peer.multiaddrs.remove(&peer_addr),
+                ConnectionType::Outbound => peer.multiaddrs.reset_failure(&peer_addr),
+            }
         }
     }
 
@@ -1398,17 +1472,25 @@ impl Future for PeerManager {
         // Process unidentified sessions
         let unidentified_sessions = self.unidentified_backlog.drain().collect::<Vec<_>>();
         for mut session in unidentified_sessions {
+            let peer_id = session.event.pubkey.peer_id();
             let ident_fut = &mut session.ident_fut;
             futures::pin_mut!(ident_fut);
 
             match ident_fut.poll(ctx) {
                 Poll::Pending => {
-                    self.unidentified_backlog.insert(session);
+                    if session.connected_at.elapsed() >= identify::DEFAULT_TIMEOUT {
+                        warn!("reject peer {:?} due to identification timeout", peer_id);
+
+                        self.disconnect_session(session.event.ctx.id);
+                        if let Some(peer) = self.inner.peer(&peer_id) {
+                            peer.mark_disconnected();
+                        }
+                    } else {
+                        self.unidentified_backlog.insert(session);
+                    }
                 }
                 Poll::Ready(ret) => match ret {
                     Ok(()) => {
-                        common_apm::metrics::network::NETWORK_UNIDENTIFIED_CONNECTIONS.dec();
-
                         let UnidentifiedSession { event, .. } = session;
                         let new_session_event = PeerManagerEvent::NewSession {
                             pid:    event.pubkey.peer_id(),
@@ -1432,19 +1514,21 @@ impl Future for PeerManager {
                         }
                     }
                     Err(err) => {
-                        common_apm::metrics::network::NETWORK_UNIDENTIFIED_CONNECTIONS.dec();
-
                         warn!(
                             "reject peer {:?} due to identification failed: {}",
-                            session.event.pubkey.peer_id(),
-                            err
+                            peer_id, err
                         );
 
                         self.disconnect_session(session.event.ctx.id);
+                        if let Some(peer) = self.inner.peer(&peer_id) {
+                            peer.mark_disconnected();
+                        }
                     }
                 },
             }
         }
+        common_apm::metrics::network::NETWORK_UNIDENTIFIED_CONNECTIONS
+            .set(self.unidentified_backlog.len() as i64);
 
         // Process manager events
         loop {
@@ -1465,6 +1549,31 @@ impl Future for PeerManager {
                 hook(event)
             }
         }
+
+        // Check connecting timeout
+        let timeout_reason = format!("exceed {} seconds", MAX_CONNECTING_TIMEOUT.as_secs());
+        let timeouted_mutiaddrs = {
+            let connecting_attempts = self.connecting.iter();
+            let timeouted_attempts = connecting_attempts.filter_map(|attempt| {
+                if !attempt.is_timeout() {
+                    return None;
+                }
+
+                Some(attempt.multiaddrs.iter().cloned().collect::<Vec<_>>())
+            });
+            timeouted_attempts.flatten().collect::<Vec<_>>()
+        };
+        if !timeouted_mutiaddrs.is_empty() {
+            log::info!("timeouted connecting found: {:?}", timeouted_mutiaddrs);
+        }
+        for peer_multiaddr in timeouted_mutiaddrs {
+            self.connect_failed(
+                Into::<Multiaddr>::into(peer_multiaddr),
+                ConnectionErrorKind::TimeOut(timeout_reason.clone()),
+            )
+        }
+        common_apm::metrics::network::NETWORK_OUTBOUND_CONNECTING_PEERS
+            .set(self.connecting.len() as i64);
 
         // Check connecting count
         let connected_count = self.inner.connected();

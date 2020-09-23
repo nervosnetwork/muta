@@ -175,6 +175,7 @@ impl StateContext {
             }
 
             log::warn!("peer {} open protocols timeout, disconnect it", remote_peer);
+            finish_identify(&remote_peer, Err(self::Error::Timeout));
             let _ = service_control.disconnect(remote_peer.sid);
         });
     }
@@ -204,6 +205,17 @@ impl StateContext {
         if let Some(timeout) = self.timeout_abort_handle.as_ref() {
             timeout.abort()
         }
+    }
+}
+
+impl Drop for StateContext {
+    fn drop(&mut self) {
+        // Something wrong happend, disconnect
+        self.disconnect();
+        finish_identify(
+            &self.remote_peer,
+            Err(Error::Other("StateContext dropped".to_owned())),
+        );
     }
 }
 
@@ -308,6 +320,11 @@ impl IdentifyProtocol {
 
         match protocol_context.0.session.ty {
             SessionType::Inbound => {
+                log::info!(
+                    "enter identify inbound procedure for {}",
+                    protocol_context.0.session.address
+                );
+
                 state_context.set_timeout("wait client identity", DEFAULT_TIMEOUT);
 
                 self.state = State::ServerNegotiate {
@@ -316,6 +333,11 @@ impl IdentifyProtocol {
                 };
             }
             SessionType::Outbound => {
+                log::info!(
+                    "enter identify outbound procedure for {}",
+                    protocol_context.0.session.address
+                );
+
                 self.behaviour.send_identity(&state_context);
                 state_context.set_timeout("wait server ack", DEFAULT_TIMEOUT);
 
