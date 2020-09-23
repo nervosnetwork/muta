@@ -24,6 +24,14 @@ use crate::error::CliError;
 const PLEASE_CONFIRM: &str =
     "Please use -y to confirm modification and DO BACK UP YOUR DB DATA AND WAL";
 
+pub struct CliConfig {
+    pub app_name:      &'static str,
+    pub version:       &'static str,
+    pub author:        &'static str,
+    pub config_path:   &'static str,
+    pub genesis_patch: &'static str,
+}
+
 pub struct Cli<'a, Mapping>
 where
     Mapping: 'static + ServiceMapping,
@@ -40,12 +48,10 @@ where
 {
     pub fn run(
         service_mapping: Mapping,
-        app_name: &str,
-        version: &str,
-        author: &str,
+        cli_config: CliConfig,
         target_commands: Option<Vec<&str>>,
     ) {
-        let cli = Self::new(service_mapping, app_name, version, author, target_commands);
+        let cli = Self::new(service_mapping, cli_config, target_commands);
         if let Err(e) = cli.start() {
             log::error!("{:?}", e)
         }
@@ -53,12 +59,10 @@ where
 
     pub fn new(
         service_mapping: Mapping,
-        app_name: &str,
-        version: &str,
-        author: &str,
+        cli_config: CliConfig,
         target_commands: Option<Vec<&str>>,
     ) -> Self {
-        let matches = Self::generate_matches(app_name, version, author, target_commands);
+        let matches = Self::generate_matches(cli_config, target_commands);
 
         let config_path = matches.value_of("config").expect("missing config path");
 
@@ -148,15 +152,10 @@ where
         }
     }
 
-    pub fn generate_matches(
-        app_name: &str,
-        version: &str,
-        author: &str,
-        cmds: Option<Vec<&str>>,
-    ) -> ArgMatches<'a> {
-        let app = clap::App::new(app_name)
-            .version(version)
-            .author(author)
+    pub fn generate_matches(cli_config: CliConfig, cmds: Option<Vec<&str>>) -> ArgMatches<'a> {
+        let app = clap::App::new(cli_config.app_name)
+            .version(cli_config.version)
+            .author(cli_config.author)
             .arg(
                 clap::Arg::with_name("config")
                     .short("c")
@@ -164,7 +163,7 @@ where
                     .value_name("FILE")
                     .help("a required file for the configuration")
                     .env("CONFIG")
-                    .default_value("./config.toml"),
+                    .default_value(cli_config.config_path),
             )
             .arg(
                 clap::Arg::with_name("genesis")
@@ -173,7 +172,7 @@ where
                     .value_name("FILE")
                     .help("a required file for the genesis")
                     .env("GENESIS")
-                    .default_value("./genesis.toml"),
+                    .default_value(cli_config.genesis_patch),
             )
             .subcommand(clap::SubCommand::with_name("run").about("run the muta-chain"))
             .subcommand(
