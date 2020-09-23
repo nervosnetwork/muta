@@ -7,7 +7,7 @@ use protocol::traits::{CommonStorage, Context};
 use protocol::types::{Block, BlockHeader, Bytes, Hash, Proof};
 use protocol::ProtocolResult;
 
-use crate::Cli;
+use crate::{Cli, CliConfig};
 
 use service_mapping::DefaultServiceMapping;
 
@@ -97,9 +97,13 @@ fn block_get() -> Block {
 
     let maintenance_cli = Cli::new(
         DefaultServiceMapping {},
-        "Rodents",
-        "Big Cheek",
-        "Hamsters",
+        CliConfig {
+            app_name:      "Rodents",
+            version:       "Big Cheek",
+            author:        "Hamsters",
+            config_path:   "./cofnig.toml",
+            genesis_patch: "./genesis.toml",
+        },
         Some(cmd),
     )
     .generate_maintenance_cli();
@@ -143,9 +147,13 @@ fn block_set() {
 
     let maintenance_cli = Cli::new(
         DefaultServiceMapping {},
-        "Rodents",
-        "Big Cheek",
-        "Hamsters",
+        CliConfig {
+            app_name:      "Rodents",
+            version:       "Big Cheek",
+            author:        "Hamsters",
+            config_path:   "./cofnig.toml",
+            genesis_patch: "./genesis.toml",
+        },
         Some(cmd),
     )
     .generate_maintenance_cli();
@@ -187,9 +195,13 @@ fn latest_get(expect: u64) -> Block {
 
     let maintenance_cli = Cli::new(
         DefaultServiceMapping {},
-        "Rodents",
-        "Big Cheek",
-        "Hamsters",
+        CliConfig {
+            app_name:      "Rodents",
+            version:       "Big Cheek",
+            author:        "Hamsters",
+            config_path:   "./cofnig.toml",
+            genesis_patch: "./genesis.toml",
+        },
         Some(cmd),
     )
     .generate_maintenance_cli();
@@ -229,9 +241,13 @@ fn latest_set() {
 
     let maintenance_cli = Cli::new(
         DefaultServiceMapping {},
-        "Rodents",
-        "Big Cheek",
-        "Hamsters",
+        CliConfig {
+            app_name:      "Rodents",
+            version:       "Big Cheek",
+            author:        "Hamsters",
+            config_path:   "./cofnig.toml",
+            genesis_patch: "./genesis.toml",
+        },
         Some(cmd),
     )
     .generate_maintenance_cli();
@@ -275,9 +291,13 @@ fn prepare() {
 
     let maintenance_cli = Cli::new(
         DefaultServiceMapping {},
-        "Rodents",
-        "Big Cheek",
-        "Hamsters",
+        CliConfig {
+            app_name:      "Rodents",
+            version:       "Big Cheek",
+            author:        "Hamsters",
+            config_path:   "./cofnig.toml",
+            genesis_patch: "./genesis.toml",
+        },
         Some(cmd),
     )
     .generate_maintenance_cli();
@@ -358,9 +378,13 @@ fn clean() {
 fn run(cmd: Vec<&str>) -> ProtocolResult<()> {
     Cli::new(
         service_mapping::DefaultServiceMapping {},
-        "Rodents",
-        "Big Cheek",
-        "Hamsters",
+        CliConfig {
+            app_name:      "Rodents",
+            version:       "Big Cheek",
+            author:        "Hamsters",
+            config_path:   "./cofnig.toml",
+            genesis_patch: "./genesis.toml",
+        },
         Some(cmd),
     )
     .start()
