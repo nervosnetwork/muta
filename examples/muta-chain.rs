@@ -55,7 +55,7 @@ pub fn main() {
     muta::run(
         DefaultServiceMapping,
         "muta-chain",
-        "v0.2.0",
+        "v0.2.1",
         "Muta Dev <muta@nervos.org>",
         "./devtools/chain/config.toml",
         "./devtools/chain/genesis.toml",
