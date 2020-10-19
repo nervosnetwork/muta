@@ -1,6 +1,6 @@
 <p align="center">
   <a href="https://github.com/nervosnetwork/muta">
-    <img src="https://github.com/nervosnetwork/muta-docs/blob/master/static/muta-logo1.png" width="270">
+    <img src="https://github.com/nervosnetwork/muta-docs/blob/master/static/docs-img/muta-logo1.png" width="270">
   </a>
   <h3 align="center">让世界上任何一个人都可以搭建属于他们自己的区块链</h3>
   <p align="center">
@@ -61,7 +61,7 @@ Service 是 Muta 框架中用于扩展的抽象层，用户可以基于 Service 
 
 <p align="left">
   <a href="https://www.huobichain.com/">
-    <img src="https://github.com/nervosnetwork/muta-docs/blob/master/static/user/s_huobichain.jpg" width="150">
+    <img src="https://github.com/nervosnetwork/muta-docs/blob/master/static/docs-img/user/s_huobichain.jpg" width="150">
   </a>
 </p>
 

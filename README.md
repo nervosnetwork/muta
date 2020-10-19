@@ -1,6 +1,6 @@
 <p align="center">
   <a href="https://github.com/nervosnetwork/muta">
-    <img src="https://github.com/nervosnetwork/muta-docs/blob/master/static/muta-logo1.png" width="270">
+    <img src="https://github.com/nervosnetwork/muta-docs/blob/master/static/docs-img/muta-logo1.png" width="270">
   </a>
   <h3 align="center">Build your own blockchain,today</h3>
   <p align="center">
@@ -64,7 +64,7 @@ Muta powers some open source projects.
 
 <p align="left">
   <a href="https://www.huobichain.com/">
-    <img src="https://github.com/nervosnetwork/muta-docs/blob/master/static/user/s_huobichain.jpg" width="150">
+    <img src="https://github.com/nervosnetwork/muta-docs/blob/master/static/docs-img/user/s_huobichain.jpg" width="150">
   </a>
 </p>
 
