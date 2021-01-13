@@ -11,7 +11,7 @@ repository = "https://github.com/nervosnetwork/muta"
 protocol = { path = "../../protocol", package = "muta-protocol" }
 
 muta-apm = "0.1.0-alpha.15"
-prometheus = { git = "https://github.com/tikv/rust-prometheus.git", rev = "fd122caa03" }
-prometheus-static-metric = { git = "https://github.com/tikv/rust-prometheus.git", rev = "fd122caa03" }
+prometheus = "0.10"
+prometheus-static-metric = "0.5"
 derive_more = "0.99"
 lazy_static = "1.4"
