@@ -15,7 +15,7 @@
     "graphql": "^15.2.0",
     "graphql-tag": "^2.10.1",
     "toml": "^3.0.0",
-    "lodash": "^4.17.15",
+    "lodash": "^4.17.21",
     "ts-node": "^8.3.0",
     "typescript": "^3.5.3"
   },
